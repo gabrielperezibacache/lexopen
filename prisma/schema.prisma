@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      String   @default("abogado") // admin | abogado | asistente | cliente
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  causasAsignadas Causa[]     @relation("AbogadoResponsable")
+  documentos      Documento[]
+  actividades     Activity[]
+  plazos          Plazo[]
+}
+
+model Cliente {
+  id        String   @id @default(cuid())
+  razonSocial String
+  rut       String?
+  email     String?
+  telefono  String?
+  tipo      String   @default("persona") // persona | empresa
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  causas Causa[]
+}
+
+model Causa {
+  id          String   @id @default(cuid())
+  titulo      String
+  rit         String? // Rol Interno del Tribunal e.g. C-1234-2024
+  ruc         String? // Rol Único de Causa
+  tribunal    String
+  materia     String // civil | laboral | penal | familia | administrativo | constitucional
+  procedimiento String?
+  estado      String   @default("activa") // activa | archivada | terminada | suspensa
+  etapa       String   @default("ingreso") // ingreso | notificacion | contestacion | prueba | sentencia | recurso | ejecucion
+  caratula    String?
+  resumen     String?
+  fechaIngreso DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
+
+  abogadoId String?
+  abogado   User? @relation("AbogadoResponsable", fields: [abogadoId], references: [id])
+
+  partes      Parte[]
+  documentos  Documento[]
+  plazos      Plazo[]
+  actividades Activity[]
+  notas       Nota[]
+}
+
+model Parte {
+  id       String  @id @default(cuid())
+  nombre   String
+  rut      String?
+  rol      String // demandante | demandado | tercero | querellante | imputado | victima
+  domicilio String?
+  causaId  String
+  causa    Causa   @relation(fields: [causaId], references: [id], onDelete: Cascade)
+}
+
+model Documento {
+  id          String   @id @default(cuid())
+  nombre      String
+  tipo        String   @default("otro") // escrito | sentencia | prueba | contrato | memo | otro
+  mimeType    String?
+  contenido   String? // texto / markdown para demo
+  ruta        String?
+  version     Int      @default(1)
+  obsidianPath String?
+  googleDriveId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  causaId String?
+  causa   Causa? @relation(fields: [causaId], references: [id], onDelete: SetNull)
+
+  autorId String?
+  autor   User? @relation(fields: [autorId], references: [id])
+}
+
+model Plazo {
+  id          String   @id @default(cuid())
+  titulo      String
+  descripcion String?
+  fechaLimite DateTime
+  tipo        String   @default("procesal") // procesal | interno | cliente | audiencia
+  estado      String   @default("pendiente") // pendiente | cumplido | vencido | prorrogado
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  causaId String?
+  causa   Causa? @relation(fields: [causaId], references: [id], onDelete: Cascade)
+
+  responsableId String?
+  responsable   User? @relation(fields: [responsableId], references: [id])
+}
+
+model Nota {
+  id        String   @id @default(cuid())
+  titulo    String
+  contenido String // markdown — sync con Obsidian
+  tags      String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  causaId String?
+  causa   Causa? @relation(fields: [causaId], references: [id], onDelete: Cascade)
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  tipo      String // comentario | documento | plazo | estado | sistema | hermes
+  mensaje   String
+  createdAt DateTime @default(now())
+
+  causaId String?
+  causa   Causa? @relation(fields: [causaId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User? @relation(fields: [userId], references: [id])
+}
+
+model Jurisprudencia {
+  id           String   @id @default(cuid())
+  rol          String
+  tribunal     String
+  sala         String?
+  fecha        DateTime?
+  materia      String?
+  caratula     String?
+  descripcion  String?
+  doctrina     String?
+  texto        String?
+  url          String?
+  fuente       String   @default("LexOpen") // LexOpen | Corte Suprema | Corte Apelaciones | TC
+  tags         String   @default("")
+  createdAt    DateTime @default(now())
+}
+
+model IntegrationConfig {
+  id        String   @id @default(cuid())
+  provider  String   @unique // obsidian | hermes | google
+  enabled   Boolean  @default(false)
+  configJson String  @default("{}")
+  updatedAt DateTime @updatedAt
+}

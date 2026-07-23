@@ -1,0 +1,227 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #0c1c24;
+  --ink-soft: #1a3340;
+  --copper: #c47a3a;
+  --copper-deep: #9a5a28;
+  --sea: #1f6f78;
+  --sea-bright: #2a8f99;
+  --mist: #e7eef1;
+  --paper: #f3f6f4;
+  --sand: #d6c4a8;
+  --danger: #b42318;
+  --ok: #1f7a4c;
+  --warn: #b86e1a;
+  --line: rgba(12, 28, 36, 0.12);
+  --shadow: 0 18px 50px rgba(12, 28, 36, 0.12);
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ink: var(--ink);
+  --color-copper: var(--copper);
+  --color-sea: var(--sea);
+  --color-mist: var(--mist);
+  --color-sand: var(--sand);
+  --font-sans: var(--font-sora);
+  --font-display: var(--font-fraunces);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(196, 122, 58, 0.18), transparent 55%),
+    radial-gradient(900px 500px at -10% 20%, rgba(31, 111, 120, 0.16), transparent 50%),
+    linear-gradient(180deg, #f7faf8 0%, var(--paper) 45%, #eef3f1 100%);
+  font-family: var(--font-sora), "Segoe UI", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(196, 122, 58, 0.28);
+}
+
+.display {
+  font-family: var(--font-fraunces), Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.7rem 1.15rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--copper), var(--copper-deep));
+  color: white;
+  box-shadow: 0 10px 24px rgba(154, 90, 40, 0.28);
+}
+
+.btn-secondary {
+  background: var(--ink);
+  color: #f4f8f7;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.badge-activa {
+  background: rgba(31, 122, 76, 0.12);
+  color: var(--ok);
+}
+
+.badge-vencido {
+  background: rgba(180, 35, 24, 0.12);
+  color: var(--danger);
+}
+
+.badge-pendiente {
+  background: rgba(184, 110, 26, 0.14);
+  color: var(--warn);
+}
+
+.badge-sea {
+  background: rgba(31, 111, 120, 0.12);
+  color: var(--sea);
+}
+
+.badge-ink {
+  background: rgba(12, 28, 36, 0.08);
+  color: var(--ink-soft);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: rgba(31, 111, 120, 0.55);
+  box-shadow: 0 0 0 3px rgba(31, 111, 120, 0.12);
+}
+
+.textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.fade-up {
+  animation: fadeUp 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fade-up-delay {
+  animation: fadeUp 900ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+
+.fade-up-delay-2 {
+  animation: fadeUp 1000ms cubic-bezier(0.22, 1, 0.36, 1) 220ms both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-glow {
+  animation: drift 12s ease-in-out infinite alternate;
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-18px, 12px, 0) scale(1.04);
+  }
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.9rem;
+  color: rgba(243, 246, 244, 0.72);
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.table-row {
+  border-bottom: 1px solid var(--line);
+  transition: background 140ms ease;
+}
+
+.table-row:hover {
+  background: rgba(31, 111, 120, 0.04);
+}

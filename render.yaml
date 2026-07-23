@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: lexopen
+    runtime: node
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma db push && npx tsx prisma/seed.ts && npm run start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        value: file:./prod.db
+      - key: NEXT_PUBLIC_APP_NAME
+        value: LexOpen
+      - key: HERMES_API_URL
+        sync: false
+      - key: HERMES_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: OBSIDIAN_VAULT_PATH
+        value: ./obsidian-vault
