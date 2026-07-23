@@ -12,43 +12,133 @@ model User {
   email     String   @unique
   name      String
   role      String   @default("abogado") // admin | abogado | asistente | cliente
+  password  String   @default("lexopen")
+  avatarColor String @default("#1f6f78")
+  title     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  causasAsignadas Causa[]     @relation("AbogadoResponsable")
+  causasAsignadas Causa[]          @relation("AbogadoResponsable")
   documentos      Documento[]
   actividades     Activity[]
   plazos          Plazo[]
+  siteMemberships SiteMember[]
+  tasksAssigned   Task[]           @relation("TaskAssignee")
+  tasksCreated    Task[]           @relation("TaskCreator")
+  comments        Comment[]
+  messagesSent    Message[]        @relation("MessageSender")
+  messagesRecv    Message[]        @relation("MessageReceiver")
+  notifications   Notification[]
+  qaPosts         QaPost[]
+  wikiPages       WikiPage[]
+  workflowActions WorkflowInstance[] @relation("WorkflowActor")
+  groupMembers    GroupMember[]
+  fileVersions    FileVersion[]
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  members     GroupMember[]
+  siteAccess  SiteGroup[]
+}
+
+model GroupMember {
+  id      String @id @default(cuid())
+  groupId String
+  userId  String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+}
+
+/// HighQ Site / Workspace / Data Room
+model Site {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  tipo        String   @default("matter") // matter | vdr | client_portal | project | knowledge
+  status      String   @default("active") // active | archived
+  color       String   @default("#1f6f78")
+  isClientVisible Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
+
+  causaId String? @unique
+  causa   Causa?  @relation(fields: [causaId], references: [id])
+
+  members     SiteMember[]
+  groups      SiteGroup[]
+  folders     Folder[]
+  files       SiteFile[]
+  wikiPages   WikiPage[]
+  tasks       Task[]
+  isheets     ISheet[]
+  qaThreads   QaThread[]
+  workflows   Workflow[]
+  activities  Activity[]
+  blogPosts   BlogPost[]
+}
+
+model SiteMember {
+  id        String   @id @default(cuid())
+  siteId    String
+  userId    String
+  role      String   @default("contributor") // admin | contributor | viewer | client
+  createdAt DateTime @default(now())
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, userId])
+}
+
+model SiteGroup {
+  id      String @id @default(cuid())
+  siteId  String
+  groupId String
+  role    String @default("viewer")
+  site    Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, groupId])
 }
 
 model Cliente {
-  id        String   @id @default(cuid())
+  id          String   @id @default(cuid())
   razonSocial String
-  rut       String?
-  email     String?
-  telefono  String?
-  tipo      String   @default("persona") // persona | empresa
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  rut         String?
+  email       String?
+  telefono    String?
+  tipo        String   @default("persona")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   causas Causa[]
+  sites  Site[]
 }
 
 model Causa {
-  id          String   @id @default(cuid())
-  titulo      String
-  rit         String? // Rol Interno del Tribunal e.g. C-1234-2024
-  ruc         String? // Rol Único de Causa
-  tribunal    String
-  materia     String // civil | laboral | penal | familia | administrativo | constitucional
+  id            String    @id @default(cuid())
+  titulo        String
+  rit           String?
+  ruc           String?
+  tribunal      String
+  materia       String
   procedimiento String?
-  estado      String   @default("activa") // activa | archivada | terminada | suspensa
-  etapa       String   @default("ingreso") // ingreso | notificacion | contestacion | prueba | sentencia | recurso | ejecucion
-  caratula    String?
-  resumen     String?
-  fechaIngreso DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  estado        String    @default("activa")
+  etapa         String    @default("ingreso")
+  caratula      String?
+  resumen       String?
+  fechaIngreso  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   clienteId String?
   cliente   Cliente? @relation(fields: [clienteId], references: [id])
@@ -61,101 +151,319 @@ model Causa {
   plazos      Plazo[]
   actividades Activity[]
   notas       Nota[]
+  site        Site?
 }
 
 model Parte {
-  id       String  @id @default(cuid())
-  nombre   String
-  rut      String?
-  rol      String // demandante | demandado | tercero | querellante | imputado | victima
+  id        String  @id @default(cuid())
+  nombre    String
+  rut       String?
+  rol       String
   domicilio String?
-  causaId  String
-  causa    Causa   @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  causaId   String
+  causa     Causa   @relation(fields: [causaId], references: [id], onDelete: Cascade)
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  siteId    String
+  parentId  String?
+  createdAt DateTime @default(now())
+
+  site     Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  parent   Folder?   @relation("FolderTree", fields: [parentId], references: [id])
+  children Folder[]  @relation("FolderTree")
+  files    SiteFile[]
+}
+
+model SiteFile {
+  id          String   @id @default(cuid())
+  name        String
+  mimeType    String   @default("text/plain")
+  sizeBytes   Int      @default(0)
+  contenido   String?
+  storagePath String?
+  version     Int      @default(1)
+  checkedOut  Boolean  @default(false)
+  tags        String   @default("")
+  metadataJson String  @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  siteId   String
+  folderId String?
+  site     Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  folder   Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  versions FileVersion[]
+  comments Comment[]
+}
+
+model FileVersion {
+  id        String   @id @default(cuid())
+  fileId    String
+  version   Int
+  contenido String?
+  note      String?
+  createdAt DateTime @default(now())
+  authorId  String?
+  file      SiteFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  author    User?    @relation(fields: [authorId], references: [id])
 }
 
 model Documento {
-  id          String   @id @default(cuid())
-  nombre      String
-  tipo        String   @default("otro") // escrito | sentencia | prueba | contrato | memo | otro
-  mimeType    String?
-  contenido   String? // texto / markdown para demo
-  ruta        String?
-  version     Int      @default(1)
-  obsidianPath String?
+  id            String   @id @default(cuid())
+  nombre        String
+  tipo          String   @default("otro")
+  mimeType      String?
+  contenido     String?
+  ruta          String?
+  version       Int      @default(1)
+  obsidianPath  String?
   googleDriveId String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   causaId String?
   causa   Causa? @relation(fields: [causaId], references: [id], onDelete: SetNull)
-
   autorId String?
-  autor   User? @relation(fields: [autorId], references: [id])
+  autor   User?  @relation(fields: [autorId], references: [id])
 }
 
 model Plazo {
-  id          String   @id @default(cuid())
-  titulo      String
-  descripcion String?
-  fechaLimite DateTime
-  tipo        String   @default("procesal") // procesal | interno | cliente | audiencia
-  estado      String   @default("pendiente") // pendiente | cumplido | vencido | prorrogado
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  titulo        String
+  descripcion   String?
+  fechaLimite   DateTime
+  tipo          String   @default("procesal")
+  estado        String   @default("pendiente")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  causaId String?
-  causa   Causa? @relation(fields: [causaId], references: [id], onDelete: Cascade)
-
+  causaId       String?
+  causa         Causa? @relation(fields: [causaId], references: [id], onDelete: Cascade)
   responsableId String?
-  responsable   User? @relation(fields: [responsableId], references: [id])
+  responsable   User?  @relation(fields: [responsableId], references: [id])
 }
 
 model Nota {
   id        String   @id @default(cuid())
   titulo    String
-  contenido String // markdown — sync con Obsidian
+  contenido String
   tags      String   @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  causaId String?
-  causa   Causa? @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  causaId   String?
+  causa     Causa?   @relation(fields: [causaId], references: [id], onDelete: Cascade)
 }
 
 model Activity {
   id        String   @id @default(cuid())
-  tipo      String // comentario | documento | plazo | estado | sistema | hermes
+  tipo      String
   mensaje   String
   createdAt DateTime @default(now())
 
   causaId String?
   causa   Causa? @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  siteId  String?
+  site    Site?  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  userId  String?
+  user    User?  @relation(fields: [userId], references: [id])
+}
 
-  userId String?
-  user   User? @relation(fields: [userId], references: [id])
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("todo") // todo | in_progress | blocked | done
+  priority    String    @default("medium") // low | medium | high | urgent
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  siteId     String?
+  site       Site? @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  assigneeId String?
+  assignee   User? @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creatorId  String?
+  creator    User? @relation("TaskCreator", fields: [creatorId], references: [id])
+
+  comments Comment[]
+}
+
+model WikiPage {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String
+  content   String
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  siteId   String
+  site     Site  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  authorId String?
+  author   User? @relation(fields: [authorId], references: [id])
+
+  @@unique([siteId, slug])
+}
+
+model BlogPost {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+}
+
+/// HighQ iSheets — structured collaborative tables
+model ISheet {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  siteId  String
+  site    Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  columns ISheetColumn[]
+  rows    ISheetRow[]
+}
+
+model ISheetColumn {
+  id       String @id @default(cuid())
+  sheetId  String
+  name     String
+  key      String
+  type     String @default("text") // text | number | date | choice | user | checkbox
+  options  String @default("") // comma-separated for choice
+  position Int    @default(0)
+  sheet    ISheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@unique([sheetId, key])
+}
+
+model ISheetRow {
+  id        String   @id @default(cuid())
+  sheetId   String
+  dataJson  String   @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sheet     ISheet   @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+}
+
+model QaThread {
+  id        String   @id @default(cuid())
+  subject   String
+  status    String   @default("open") // open | answered | closed
+  category  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  siteId String
+  site   Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  posts  QaPost[]
+}
+
+model QaPost {
+  id        String   @id @default(cuid())
+  body      String
+  isAnswer  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  threadId String
+  thread   QaThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  authorId String?
+  author   User?    @relation(fields: [authorId], references: [id])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  authorId String?
+  author   User?     @relation(fields: [authorId], references: [id])
+  fileId   String?
+  file     SiteFile? @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  taskId   String?
+  task     Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  subject    String?
+  body       String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  senderId   String
+  receiverId String
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
+  receiver   User     @relation("MessageReceiver", fields: [receiverId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  href      String?
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  triggerType String   @default("manual") // manual | file_upload | task_done | isheet_row
+  stepsJson   String   @default("[]") // [{name, role}]
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  siteId    String
+  site      Site               @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  instances WorkflowInstance[]
+}
+
+model WorkflowInstance {
+  id          String   @id @default(cuid())
+  workflowId  String
+  status      String   @default("pending") // pending | approved | rejected | running
+  currentStep Int      @default(0)
+  payloadJson String   @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  actorId  String?
+  actor    User?     @relation("WorkflowActor", fields: [actorId], references: [id])
+  workflow Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 }
 
 model Jurisprudencia {
-  id           String   @id @default(cuid())
-  rol          String
-  tribunal     String
-  sala         String?
-  fecha        DateTime?
-  materia      String?
-  caratula     String?
-  descripcion  String?
-  doctrina     String?
-  texto        String?
-  url          String?
-  fuente       String   @default("LexOpen") // LexOpen | Corte Suprema | Corte Apelaciones | TC
-  tags         String   @default("")
-  createdAt    DateTime @default(now())
+  id          String    @id @default(cuid())
+  rol         String
+  tribunal    String
+  sala        String?
+  fecha       DateTime?
+  materia     String?
+  caratula    String?
+  descripcion String?
+  doctrina    String?
+  texto       String?
+  url         String?
+  fuente      String    @default("LexOpen")
+  tags        String    @default("")
+  createdAt   DateTime  @default(now())
 }
 
 model IntegrationConfig {
-  id        String   @id @default(cuid())
-  provider  String   @unique // obsidian | hermes | google
-  enabled   Boolean  @default(false)
-  configJson String  @default("{}")
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  provider   String   @unique
+  enabled    Boolean  @default(false)
+  configJson String   @default("{}")
+  updatedAt  DateTime @updatedAt
 }

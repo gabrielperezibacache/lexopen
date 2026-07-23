@@ -2,14 +2,19 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDate, StatusBadge } from "@/components/ui";
 import { labelMateria } from "@/lib/chile";
-import { ArrowRight, Briefcase, CalendarClock, Files, BookOpen } from "lucide-react";
+import { ArrowRight, Building2, Briefcase, ListTodo, MessageSquare } from "lucide-react";
+import { getCurrentUser } from "@/lib/auth/session";
 
 async function ensureSeeded() {
-  const count = await prisma.causa.count();
+  const count = await prisma.site.count().catch(() => 0);
   if (count === 0) {
     const { execFile } = await import("child_process");
     const { promisify } = await import("util");
     const execFileAsync = promisify(execFile);
+    await execFileAsync("npx", ["prisma", "db", "push", "--skip-generate"], {
+      cwd: process.cwd(),
+      env: process.env,
+    }).catch(() => undefined);
     await execFileAsync("npx", ["tsx", "prisma/seed.ts"], {
       cwd: process.cwd(),
       env: process.env,
@@ -19,36 +24,39 @@ async function ensureSeeded() {
 
 export default async function DashboardPage() {
   await ensureSeeded();
+  const user = await getCurrentUser();
 
-  const [causas, plazosPendientes, documentos, jurisprudencia, proximosPlazos, causasRecientes, actividades] =
+  const [sites, causas, tasksOpen, unread, sitesList, tasks, actividades] =
     await Promise.all([
+      prisma.site.count({ where: { status: "active" } }),
       prisma.causa.count({ where: { estado: "activa" } }),
-      prisma.plazo.count({ where: { estado: "pendiente" } }),
-      prisma.documento.count(),
-      prisma.jurisprudencia.count(),
-      prisma.plazo.findMany({
-        where: { estado: { in: ["pendiente", "vencido"] } },
-        include: { causa: true, responsable: true },
-        orderBy: { fechaLimite: "asc" },
+      prisma.task.count({ where: { status: { in: ["todo", "in_progress", "blocked"] } } }),
+      user
+        ? prisma.notification.count({ where: { userId: user.id, read: false } })
+        : Promise.resolve(0),
+      prisma.site.findMany({
+        include: { _count: { select: { files: true, tasks: true } }, causa: true },
+        orderBy: { updatedAt: "desc" },
         take: 6,
       }),
-      prisma.causa.findMany({
-        include: { cliente: true, abogado: true },
-        orderBy: { updatedAt: "desc" },
-        take: 5,
+      prisma.task.findMany({
+        where: { status: { not: "done" } },
+        include: { site: true, assignee: true },
+        orderBy: { dueDate: "asc" },
+        take: 6,
       }),
       prisma.activity.findMany({
-        include: { user: true, causa: true },
+        include: { user: true, site: true, causa: true },
         orderBy: { createdAt: "desc" },
         take: 8,
       }),
     ]);
 
   const stats = [
+    { label: "Sites activos", value: sites, icon: Building2 },
     { label: "Causas activas", value: causas, icon: Briefcase },
-    { label: "Plazos pendientes", value: plazosPendientes, icon: CalendarClock },
-    { label: "Documentos", value: documentos, icon: Files },
-    { label: "Jurisprudencia", value: jurisprudencia, icon: BookOpen },
+    { label: "Tasks abiertas", value: tasksOpen, icon: ListTodo },
+    { label: "Notificaciones", value: unread, icon: MessageSquare },
   ];
 
   return (
@@ -56,16 +64,23 @@ export default async function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            Operaciones del estudio
+            HighQ-style home
           </p>
-          <h1 className="display mt-2 text-4xl">Dashboard</h1>
+          <h1 className="display mt-2 text-4xl">
+            {user ? `Hola, ${user.name.split(" ")[0]}` : "Dashboard"}
+          </h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Visibilidad de causas, plazos fatales y actividad colaborativa — al estilo HighQ, open source.
+            Sites, tasks, activity stream y causas Chile en un solo control center.
           </p>
         </div>
-        <Link href="/causas/nueva" className="btn btn-primary">
-          Nueva causa <ArrowRight size={16} />
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/sites" className="btn btn-secondary">
+            Ver sites
+          </Link>
+          <Link href="/causas/nueva" className="btn btn-primary">
+            Nueva causa <ArrowRight size={16} />
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -83,58 +98,61 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Próximos plazos</h2>
-            <Link href="/plazos" className="text-sm text-[var(--sea)]">
-              Ver todos
+            <h2 className="text-lg font-semibold">Sites recientes</h2>
+            <Link href="/sites" className="text-sm text-[var(--sea)]">
+              Todos
             </Link>
           </div>
           <div className="space-y-3">
-            {proximosPlazos.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3"
+            {sitesList.map((s) => (
+              <Link
+                key={s.id}
+                href={`/sites/${s.id}`}
+                className="block rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
-                <div>
-                  <div className="font-medium">{p.titulo}</div>
-                  <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
-                    {p.causa?.rit || p.causa?.titulo || "Sin causa"} · {formatDate(p.fechaLimite)}
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
+                  <div className="font-medium">{s.name}</div>
                 </div>
-                <StatusBadge estado={p.estado} />
-              </div>
+                <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                  {s.tipo} · {s._count.files} files · {s._count.tasks} tasks
+                  {s.causa?.rit ? ` · ${s.causa.rit}` : ""}
+                </div>
+              </Link>
             ))}
           </div>
         </section>
 
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Causas recientes</h2>
-            <Link href="/causas" className="text-sm text-[var(--sea)]">
+            <h2 className="text-lg font-semibold">My tasks</h2>
+            <Link href="/tareas" className="text-sm text-[var(--sea)]">
               Ver todas
             </Link>
           </div>
           <div className="space-y-3">
-            {causasRecientes.map((c) => (
-              <Link
-                key={c.id}
-                href={`/causas/${c.id}`}
-                className="block rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+            {tasks.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium">{c.titulo}</div>
-                  <StatusBadge estado={c.estado} />
+                <div>
+                  <div className="font-medium">{t.title}</div>
+                  <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                    {t.site?.name || "—"} · {formatDate(t.dueDate)}
+                  </div>
                 </div>
-                <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
-                  {c.rit || "Sin RIT"} · {labelMateria(c.materia)} · {c.tribunal}
-                </div>
-              </Link>
+                <StatusBadge
+                  estado={t.priority === "urgent" ? "vencido" : "pendiente"}
+                />
+              </div>
             ))}
           </div>
         </section>
       </div>
 
       <section className="panel rounded-3xl p-5">
-        <h2 className="mb-4 text-lg font-semibold">Actividad del equipo</h2>
+        <h2 className="mb-4 text-lg font-semibold">Activity stream</h2>
         <div className="space-y-3">
           {actividades.map((a) => (
             <div key={a.id} className="flex gap-3 border-b border-[var(--line)] pb-3 last:border-0">
@@ -142,7 +160,7 @@ export default async function DashboardPage() {
               <div>
                 <div className="text-sm">{a.mensaje}</div>
                 <div className="mt-1 text-xs text-[var(--ink-soft)]/60">
-                  {a.user?.name || "Sistema"} · {a.causa?.rit || a.causa?.titulo || "General"} ·{" "}
+                  {a.user?.name || "Sistema"} · {a.site?.name || a.causa?.rit || labelMateria(a.causa?.materia || "") || "General"} ·{" "}
                   {formatDate(a.createdAt)}
                 </div>
               </div>

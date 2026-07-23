@@ -1,101 +1,91 @@
 # LexOpen
 
-**LexOpen** es un clon open-source de [Thomson Reuters HighQ](https://legal.thomsonreuters.com/en/products/highq) orientado a **estudios jurídicos en Chile**: gestión de causas judiciales, plazos, documentos, portal de cliente, consulta de jurisprudencia e integraciones con **Obsidian**, **Hermes Agent** y **Google Workspace**.
+**LexOpen** es un **clon open-source de [Thomson Reuters HighQ](https://legal.thomsonreuters.com/en/products/highq)** para estudios jurídicos, con capa nativa para **Chile** (causas RIT/RUC, plazos procesales, jurisprudencia).
 
-> No está afiliado a Thomson Reuters. HighQ es marca de terceros; LexOpen es una implementación independiente y libre.
+> No afiliado a Thomson Reuters. HighQ es marca de terceros.
 
-## Características
+## Módulos HighQ cubiertos
 
-| Módulo | Qué hace |
+| Módulo HighQ | En LexOpen |
 | --- | --- |
-| **Causas** | RIT/RUC, tribunal, materia, etapa procesal, partes, carátula |
-| **Plazos** | Procesales, audiencias, internos — sync a Google Calendar |
-| **Documentos** | Data room colaborativo, versionado simple, rutas Obsidian/Drive |
-| **Jurisprudencia** | Búsqueda por rol, tribunal, materia y doctrina (corpus demo Chile) |
-| **Portal cliente** | Vista HighQ-like del estado de causas y documentos compartidos |
-| **Obsidian** | Export Markdown por causa (`Index.md`, Notas, Documentos) |
-| **Hermes Agent** | Cliente OpenAI-compatible + modo demo con aprobación humana |
-| **Google Workspace** | OAuth Drive / Calendar / Gmail |
+| **Sites / Workspaces** | Matters, VDR, knowledge, client portal, projects |
+| **Files / Virtual Data Room** | Carpetas, archivos, versionado, comentarios, tags |
+| **iSheets** | Tablas estructuradas con columnas tipadas y filas editables |
+| **Tasks & Calendar** | Tasks por site + calendario unificado con plazos Chile |
+| **Wiki / Blog** | Páginas Markdown por site + blog posts |
+| **Q&A** | Hilos cliente/equipo con respuesta oficial |
+| **Workflows** | Aprobaciones multi-paso (escritos, portal) |
+| **People / Groups** | Usuarios, roles de site, grupos |
+| **Messages & Notifications** | Mensajería interna + alertas |
+| **Client portal** | Sites `isClientVisible` + docs etiquetados |
+| **Search** | Índice unificado sites/causas/files/tasks/wiki/jurisprudencia |
+| **Activity stream** | Feed por site y global |
+| **APIs** | REST bajo `/api/*` |
+
+### Capa Chile + integraciones
+- Causas judiciales (RIT/RUC, tribunal, etapa, partes)
+- Jurisprudencia (CS, Apelaciones, TC — corpus demo)
+- **Obsidian** (export vault Markdown)
+- **Hermes Agent** (API OpenAI-compatible + demo)
+- **Google Workspace** (OAuth Drive / Calendar / Gmail)
 
 ## Stack
 
-- Next.js 15 (App Router) + TypeScript + Tailwind CSS 4
-- Prisma 5 + SQLite (local / demo) — listo para Postgres en producción
-- Render Blueprint (`render.yaml`)
+Next.js 15 · TypeScript · Tailwind 4 · Prisma 5 · SQLite (Postgres-ready) · AGPL-3.0
 
 ## Inicio rápido
 
 ```bash
 cp .env.example .env
 npm install
-npm run setup    # prisma db push + seed Chile
+npm run setup    # db push + seed HighQ/Chile
 npm run dev
 ```
 
-Abra [http://localhost:3000](http://localhost:3000) → **Entrar al estudio**.
+Abra http://localhost:3000 → **Entrar al estudio**.
 
-### Usuarios demo (seed)
+### Usuarios demo (password `lexopen`)
+| Email | Rol |
+| --- | --- |
+| `socio@estudio.cl` | admin / socia |
+| `abogado@estudio.cl` | abogado |
+| `asistente@estudio.cl` | paralegal |
+| `cliente@andes.cl` | cliente (portal) |
 
-- `socio@estudio.cl` — María Paz Contreras (admin)
-- `abogado@estudio.cl` — Andrés Valenzuela
-- `asistente@estudio.cl` — Camila Rojas
+Cambie de usuario desde el switcher inferior del sidebar.
 
-## Integraciones
+### Sites demo
+- Matter Andes · Cobro C-4521-2025 (Files, Wiki, iSheet hitos, Q&A, workflow)
+- Matter Muñoz · Tutela O-1189-2025
+- VDR Due Diligence Pacífico + iSheet issues log
+- Knowledge · Jurisprudencia & Playbooks
+- Portal Cliente · Constructora Andes
 
-### Obsidian
+## API (muestra)
 
 ```bash
-# Desde la UI: Integraciones → Sincronizar vault
-# O por API:
-curl -X POST http://localhost:3000/api/integrations/obsidian \
+# Sites
+curl localhost:3000/api/sites
+
+# Data room
+curl -X POST localhost:3000/api/sites/<id>/files \
   -H 'content-type: application/json' \
-  -d '{"action":"sync-all"}'
+  -d '{"action":"create-file","name":"Memo.md","contenido":"# Hola"}'
+
+# iSheets
+curl localhost:3000/api/sites/<id>/isheets
+
+# Search
+curl 'localhost:3000/api/search?q=tutela'
+
+# Obsidian sync
+curl -X POST localhost:3000/api/integrations/obsidian \
+  -H 'content-type: application/json' -d '{"action":"sync-all"}'
 ```
 
-Genera `./obsidian-vault/LexOpen/Causas/<RIT>/…`. Ábralo como vault en Obsidian. Opcionalmente use [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) con `OBSIDIAN_REST_URL` / `OBSIDIAN_REST_API_KEY`.
+## Render
 
-### Hermes Agent
-
-Configure el [API server](https://hermes-agent.nousresearch.com/docs/developer-guide/programmatic-integration) de Hermes:
-
-```env
-HERMES_API_URL=http://localhost:8642/v1
-HERMES_API_KEY=
-```
-
-Si Hermes no está disponible, LexOpen responde en **modo demo** y registra la actividad con flag de aprobación humana.
-
-### Google Workspace
-
-1. Cree credenciales OAuth en Google Cloud (tipo Web).
-2. Redirect URI: `http://localhost:3000/api/integrations/google/callback`
-3. Configure:
-
-```env
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback
-```
-
-4. En **Integraciones → Conectar Google**.
-
-## Despliegue en Render
-
-```bash
-# Con Blueprint
-# Dashboard → New → Blueprint → seleccione este repo (render.yaml)
-```
-
-Bind a `0.0.0.0:$PORT` (ya configurado en `npm start`). Para producción real use Postgres managed y un disco persistente (SQLite en filesystem efímero se pierde al redeploy).
-
-## Estructura
-
-```
-src/app/(app)/          # UI autenticada del estudio
-src/app/api/            # REST API
-src/lib/integrations/   # Obsidian, Hermes, Google
-prisma/                 # Schema + seed Chile
-```
+Use `render.yaml` (Blueprint). En producción prefiera Postgres managed; el filesystem es efímero.
 
 ## Licencia
 
