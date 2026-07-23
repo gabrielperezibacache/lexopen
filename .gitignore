@@ -44,5 +44,6 @@ yarn-error.log*
 # local data
 /prisma/*.db
 /prisma/*.db-journal
-/obsidian-vault
+/obsidian-vault/**
+!/obsidian-vault/.gitkeep
 /*.db

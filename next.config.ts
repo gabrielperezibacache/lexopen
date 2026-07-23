@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  /* LexOpen: Node web service on Render uses `next start` */
 };
 
 export default nextConfig;

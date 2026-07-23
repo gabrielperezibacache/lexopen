@@ -1,0 +1,3 @@
+# LexOpen Obsidian vault
+# Ejecute «Sincronizar vault» desde Integraciones o:
+# curl -X POST http://localhost:3000/api/integrations/obsidian -H 'content-type: application/json' -d '{"action":"sync-all"}'
