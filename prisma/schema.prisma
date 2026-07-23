@@ -34,6 +34,10 @@ model User {
   workflowActions WorkflowInstance[] @relation("WorkflowActor")
   groupMembers    GroupMember[]
   fileVersions    FileVersion[]
+  timeEntries     TimeEntry[]
+  expenses        Expense[]        @relation("ExpenseAuthor")
+  invoicesCreated Invoice[]        @relation("InvoiceAuthor")
+  feeArrangements FeeArrangement[] @relation("FeeOwner")
 }
 
 model Group {
@@ -120,8 +124,14 @@ model Cliente {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  causas Causa[]
-  sites  Site[]
+  causas          Causa[]
+  sites           Site[]
+  feeArrangements FeeArrangement[]
+  timeEntries     TimeEntry[]
+  expenses        Expense[]
+  invoices        Invoice[]
+  payments        Payment[]
+  ledgerEntries   LedgerEntry[]
 }
 
 model Causa {
@@ -146,12 +156,17 @@ model Causa {
   abogadoId String?
   abogado   User? @relation("AbogadoResponsable", fields: [abogadoId], references: [id])
 
-  partes      Parte[]
-  documentos  Documento[]
-  plazos      Plazo[]
-  actividades Activity[]
-  notas       Nota[]
-  site        Site?
+  partes          Parte[]
+  documentos      Documento[]
+  plazos          Plazo[]
+  actividades     Activity[]
+  notas           Nota[]
+  site            Site?
+  feeArrangements FeeArrangement[]
+  timeEntries     TimeEntry[]
+  expenses        Expense[]
+  invoices        Invoice[]
+  ledgerEntries   LedgerEntry[]
 }
 
 model Parte {
@@ -466,4 +481,157 @@ model IntegrationConfig {
   enabled    Boolean  @default(false)
   configJson String   @default("{}")
   updatedAt  DateTime @updatedAt
+}
+
+/// Condición de honorarios del estudio (por causa o cliente)
+model FeeArrangement {
+  id              String    @id @default(cuid())
+  name            String
+  tipo            String    @default("hourly") // hourly | flat | retainer | cuota_litis | mixed
+  currency        String    @default("CLP") // CLP | UF
+  rateHourlyClp   Int? // tarifa horaria en CLP
+  rateHourlyUf    Float?
+  flatFeeClp      Int?
+  retainerClp     Int?
+  cuotaLitisPct   Float? // % del resultado
+  billingCapClp   Int?
+  notes           String?
+  active          Boolean   @default(true)
+  startDate       DateTime  @default(now())
+  endDate         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
+  causaId   String?
+  causa     Causa?   @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  ownerId   String?
+  owner     User?    @relation("FeeOwner", fields: [ownerId], references: [id])
+}
+
+model TimeEntry {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  hours       Float
+  description String
+  billable    Boolean  @default(true)
+  billed      Boolean  @default(false)
+  rateClp     Int? // override; si null usa fee arrangement / default
+  amountClp   Int // hours * rate (calculado al guardar)
+  activityCode String  @default("general") // research | hearing | drafting | meeting | travel | general
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
+  causaId   String?
+  causa     Causa?   @relation(fields: [causaId], references: [id], onDelete: SetNull)
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  description String
+  category    String   @default("otro") // notario | receptor | perito | costas | traslado | certificado | otro
+  amountClp   Int
+  billable    Boolean  @default(true)
+  billed      Boolean  @default(false)
+  reimbursable Boolean @default(true) // gasto por cuenta del cliente
+  vendor      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  authorId  String?
+  author    User?    @relation("ExpenseAuthor", fields: [authorId], references: [id])
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
+  causaId   String?
+  causa     Causa?   @relation(fields: [causaId], references: [id], onDelete: SetNull)
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+}
+
+model Invoice {
+  id            String    @id @default(cuid())
+  number        String    @unique
+  tipoDocumento String    @default("boleta_honorarios") // factura_afecta | boleta_honorarios | nota_credito | factura_exenta
+  status        String    @default("borrador") // borrador | emitida | parcialmente_pagada | pagada | vencida | anulada
+  currency      String    @default("CLP")
+  issueDate     DateTime  @default(now())
+  dueDate       DateTime?
+  subtotalClp   Int       @default(0)
+  ivaClp        Int       @default(0) // 19% si factura afecta
+  retencionClp  Int       @default(0) // retención boleta honorarios
+  totalClp      Int       @default(0)
+  paidClp       Int       @default(0)
+  notes         String?
+  glosa         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+  causaId   String?
+  causa     Causa?  @relation(fields: [causaId], references: [id], onDelete: SetNull)
+  authorId  String?
+  author    User?   @relation("InvoiceAuthor", fields: [authorId], references: [id])
+
+  lines       InvoiceLine[]
+  payments    Payment[]
+  timeEntries TimeEntry[]
+  expenses    Expense[]
+  ledger      LedgerEntry[]
+}
+
+model InvoiceLine {
+  id          String @id @default(cuid())
+  description String
+  quantity    Float  @default(1)
+  unitAmountClp Int
+  amountClp   Int
+  tipo        String @default("honorario") // honorario | gasto | anticipo | otro
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  amountClp   Int
+  method      String   @default("transferencia") // transferencia | cheque | efectivo | tarjeta | retencion
+  reference   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  ledger    LedgerEntry[]
+}
+
+/// Cuenta corriente / provisión de fondos del cliente
+model LedgerEntry {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  tipo        String // provision | cargo_honorario | cargo_gasto | pago | ajuste | reembolso
+  description String
+  debitClp    Int      @default(0) // cargo al cliente
+  creditClp   Int      @default(0) // abono / provisión / pago
+  balanceClp  Int      @default(0) // saldo tras el movimiento (crédito neto)
+  createdAt   DateTime @default(now())
+
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  causaId   String?
+  causa     Causa?   @relation(fields: [causaId], references: [id], onDelete: SetNull)
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  paymentId String?
+  payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 }

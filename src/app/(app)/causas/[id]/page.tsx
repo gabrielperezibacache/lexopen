@@ -47,6 +47,29 @@ export default async function CausaDetailPage({ params }: Params) {
         <CausaActions causaId={causa.id} />
       </div>
 
+      <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-3xl px-5 py-4">
+        <div>
+          <div className="text-sm font-semibold">Facturación de la causa</div>
+          <p className="text-sm text-[var(--ink-soft)]/75">
+            Horas, gastos, tarifas y documentos tributarios vinculados al cliente.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/facturacion/horas" className="btn btn-ghost">
+            Horas
+          </Link>
+          <Link href="/facturacion/facturas" className="btn btn-secondary">
+            Facturas
+          </Link>
+          <Link
+            href={`/facturacion/cuenta-corriente${causa.clienteId ? `?clienteId=${causa.clienteId}` : ""}`}
+            className="btn btn-primary"
+          >
+            Cuenta corriente
+          </Link>
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-3">
         <div className="panel rounded-3xl p-5 md:col-span-2">
           <h2 className="text-lg font-semibold">Ficha procesal</h2>

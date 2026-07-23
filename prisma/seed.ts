@@ -4,6 +4,13 @@ const prisma = new PrismaClient();
 
 async function wipe() {
   const models = [
+    "ledgerEntry",
+    "payment",
+    "invoiceLine",
+    "invoice",
+    "expense",
+    "timeEntry",
+    "feeArrangement",
     "workflowInstance",
     "workflow",
     "notification",
@@ -960,10 +967,311 @@ async function main() {
     ],
   });
 
+  // —— Contabilidad / facturación ——
+  await prisma.feeArrangement.createMany({
+    data: [
+      {
+        name: "Andes · tarifa horaria litigio civil",
+        tipo: "hourly",
+        rateHourlyClp: 150000,
+        clienteId: cliente1.id,
+        causaId: causa1.id,
+        ownerId: abogado.id,
+        notes: "Incluye audiencias; gastos por separado.",
+      },
+      {
+        name: "Muñoz · cuota litis tutela",
+        tipo: "cuota_litis",
+        cuotaLitisPct: 25,
+        retainerClp: 800000,
+        clienteId: cliente2.id,
+        causaId: causa2.id,
+        ownerId: admin.id,
+        notes: "25% del resultado + anticipo $800.000.",
+      },
+      {
+        name: "Andes · retainer mensual corporate",
+        tipo: "retainer",
+        retainerClp: 2500000,
+        clienteId: cliente1.id,
+        ownerId: admin.id,
+        notes: "Hasta 15 horas/mes; exceso a $150.000/h.",
+      },
+    ],
+  });
+
+  const t1 = await prisma.timeEntry.create({
+    data: {
+      date: new Date("2026-07-10"),
+      hours: 3.5,
+      description: "Redacción demanda y revisión de contrato de obra",
+      activityCode: "drafting",
+      billable: true,
+      billed: true,
+      rateClp: 150000,
+      amountClp: 525000,
+      userId: abogado.id,
+      clienteId: cliente1.id,
+      causaId: causa1.id,
+    },
+  });
+  const t2 = await prisma.timeEntry.create({
+    data: {
+      date: new Date("2026-07-18"),
+      hours: 2,
+      description: "Preparación audiencia de prueba — índice documental",
+      activityCode: "hearing",
+      billable: true,
+      billed: false,
+      rateClp: 150000,
+      amountClp: 300000,
+      userId: abogado.id,
+      clienteId: cliente1.id,
+      causaId: causa1.id,
+    },
+  });
+  const t3 = await prisma.timeEntry.create({
+    data: {
+      date: new Date("2026-07-20"),
+      hours: 1.5,
+      description: "Reunión estrategia con cliente Andes",
+      activityCode: "meeting",
+      billable: true,
+      billed: false,
+      rateClp: 150000,
+      amountClp: 225000,
+      userId: admin.id,
+      clienteId: cliente1.id,
+      causaId: causa1.id,
+    },
+  });
+  await prisma.timeEntry.create({
+    data: {
+      date: new Date("2026-07-15"),
+      hours: 4,
+      description: "Borrador demanda tutela y revisión jurisprudencia CS",
+      activityCode: "research",
+      billable: true,
+      billed: false,
+      rateClp: 130000,
+      amountClp: 520000,
+      userId: admin.id,
+      clienteId: cliente2.id,
+      causaId: causa2.id,
+    },
+  });
+  await prisma.timeEntry.create({
+    data: {
+      date: new Date("2026-07-12"),
+      hours: 1,
+      description: "Capacitación interna playbook tutela (no facturable)",
+      activityCode: "general",
+      billable: false,
+      billed: false,
+      rateClp: 0,
+      amountClp: 0,
+      userId: asistente.id,
+      causaId: causa2.id,
+    },
+  });
+
+  const e1 = await prisma.expense.create({
+    data: {
+      date: new Date("2026-07-08"),
+      description: "Notificación demanda — receptor judicial",
+      category: "receptor",
+      amountClp: 85000,
+      billable: true,
+      billed: true,
+      vendor: "Receptor Civil Santiago",
+      authorId: asistente.id,
+      clienteId: cliente1.id,
+      causaId: causa1.id,
+    },
+  });
+  await prisma.expense.create({
+    data: {
+      date: new Date("2026-07-19"),
+      description: "Certificado de dominio vigente CBR",
+      category: "certificado",
+      amountClp: 42000,
+      billable: true,
+      billed: false,
+      vendor: "Conservador Bienes Raíces",
+      authorId: asistente.id,
+      clienteId: cliente1.id,
+      causaId: causa1.id,
+    },
+  });
+  await prisma.expense.create({
+    data: {
+      date: new Date("2026-07-16"),
+      description: "Peritaje médico laboral (anticipo)",
+      category: "perito",
+      amountClp: 350000,
+      billable: true,
+      billed: false,
+      vendor: "Dr. Perito Laboral",
+      authorId: admin.id,
+      clienteId: cliente2.id,
+      causaId: causa2.id,
+    },
+  });
+
+  const due = new Date();
+  due.setDate(due.getDate() + 15);
+
+  const inv1 = await prisma.invoice.create({
+    data: {
+      number: "BH-2026-00001",
+      tipoDocumento: "boleta_honorarios",
+      status: "pagada",
+      issueDate: new Date("2026-07-11"),
+      dueDate: new Date("2026-07-25"),
+      subtotalClp: 610000,
+      ivaClp: 0,
+      retencionClp: 83875,
+      totalClp: 526125,
+      paidClp: 526125,
+      glosa: "Honorarios redacción demanda + gasto receptor",
+      clienteId: cliente1.id,
+      causaId: causa1.id,
+      authorId: abogado.id,
+      lines: {
+        create: [
+          {
+            description: "3.5h — Redacción demanda y revisión de contrato",
+            quantity: 3.5,
+            unitAmountClp: 150000,
+            amountClp: 525000,
+            tipo: "honorario",
+          },
+          {
+            description: "[receptor] Notificación demanda",
+            quantity: 1,
+            unitAmountClp: 85000,
+            amountClp: 85000,
+            tipo: "gasto",
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.timeEntry.update({ where: { id: t1.id }, data: { invoiceId: inv1.id } });
+  await prisma.expense.update({ where: { id: e1.id }, data: { invoiceId: inv1.id } });
+
+  const inv2 = await prisma.invoice.create({
+    data: {
+      number: "FA-2026-00002",
+      tipoDocumento: "factura_afecta",
+      status: "emitida",
+      issueDate: new Date("2026-07-01"),
+      dueDate: due,
+      subtotalClp: 2500000,
+      ivaClp: 475000,
+      retencionClp: 0,
+      totalClp: 2975000,
+      paidClp: 0,
+      glosa: "Retainer mensual julio — servicios legales corporate",
+      clienteId: cliente1.id,
+      authorId: admin.id,
+      lines: {
+        create: [
+          {
+            description: "Retainer mensual julio 2026",
+            quantity: 1,
+            unitAmountClp: 2500000,
+            amountClp: 2500000,
+            tipo: "anticipo",
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.payment.create({
+    data: {
+      date: new Date("2026-07-12"),
+      amountClp: 526125,
+      method: "transferencia",
+      reference: "TRX-77821",
+      clienteId: cliente1.id,
+      invoiceId: inv1.id,
+    },
+  });
+
+  // Ledger: provisión → cargos → pago
+  await prisma.ledgerEntry.create({
+    data: {
+      date: new Date("2026-06-28"),
+      tipo: "provision",
+      description: "Provisión de fondos inicial — Andes",
+      debitClp: 0,
+      creditClp: 3000000,
+      balanceClp: 3000000,
+      clienteId: cliente1.id,
+    },
+  });
+  await prisma.ledgerEntry.create({
+    data: {
+      date: new Date("2026-07-01"),
+      tipo: "cargo_honorario",
+      description: `Emisión ${inv2.number}`,
+      debitClp: 2975000,
+      creditClp: 0,
+      balanceClp: 25000,
+      clienteId: cliente1.id,
+      invoiceId: inv2.id,
+    },
+  });
+  await prisma.ledgerEntry.create({
+    data: {
+      date: new Date("2026-07-11"),
+      tipo: "cargo_honorario",
+      description: `Emisión ${inv1.number}`,
+      debitClp: 526125,
+      creditClp: 0,
+      balanceClp: -501125,
+      clienteId: cliente1.id,
+      causaId: causa1.id,
+      invoiceId: inv1.id,
+    },
+  });
+  await prisma.ledgerEntry.create({
+    data: {
+      date: new Date("2026-07-12"),
+      tipo: "pago",
+      description: "Pago transferencia TRX-77821",
+      debitClp: 0,
+      creditClp: 526125,
+      balanceClp: 25000,
+      clienteId: cliente1.id,
+      causaId: causa1.id,
+      invoiceId: inv1.id,
+    },
+  });
+  await prisma.ledgerEntry.create({
+    data: {
+      date: new Date("2026-07-05"),
+      tipo: "provision",
+      description: "Anticipo cuota litis — Muñoz",
+      debitClp: 0,
+      creditClp: 800000,
+      balanceClp: 800000,
+      clienteId: cliente2.id,
+      causaId: causa2.id,
+    },
+  });
+
+  void t2;
+  void t3;
+
   console.log("Seed LexOpen HighQ OK", {
     users: 4,
     sites: 5,
     causas: 3,
+    invoices: 2,
     siteCivil: siteCivil.slug,
     siteVdr: siteVdr.slug,
     sitePortal: sitePortal.slug,

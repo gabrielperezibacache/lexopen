@@ -24,6 +24,7 @@
 
 ### Capa Chile + integraciones
 - Causas judiciales (RIT/RUC, tribunal, etapa, partes)
+- **Facturación y contabilidad**: horas, gastos, tarifas, boletas/facturas (IVA/retención), pagos, cuenta corriente / provisión de fondos
 - Jurisprudencia (CS, Apelaciones, TC — corpus demo)
 - **Obsidian** (export vault Markdown)
 - **Hermes Agent** (API OpenAI-compatible + demo)

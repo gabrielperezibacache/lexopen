@@ -20,6 +20,7 @@ import {
   MessageSquare,
   GitBranch,
   Bell,
+  CircleDollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
@@ -28,6 +29,7 @@ const primary = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/sites", label: "Sites", icon: Building2 },
   { href: "/causas", label: "Causas Chile", icon: Briefcase },
+  { href: "/facturacion", label: "Facturación", icon: CircleDollarSign },
   { href: "/tareas", label: "Tasks", icon: ListTodo },
   { href: "/calendario", label: "Calendar", icon: CalendarDays },
   { href: "/buscar", label: "Search", icon: Search },
