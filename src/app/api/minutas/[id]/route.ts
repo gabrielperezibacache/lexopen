@@ -5,10 +5,15 @@ import {
   isValidEstadoAccion,
   renderMinutaMarkdown,
 } from "@/lib/minutas";
+import { handleRouteError, requireStaff } from "@/lib/api";
+import { canSeeConfidential } from "@/lib/auth/rbac";
+import { writeAudit } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
+  try {
+  const user = await requireStaff();
   const { id } = await params;
   const minuta = await prisma.minuta.findUnique({
     where: { id },
@@ -28,6 +33,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (!minuta) {
     return NextResponse.json({ error: "Minuta no encontrada" }, { status: 404 });
   }
+  if (minuta.confidencial && !canSeeConfidential(user.role)) {
+    return NextResponse.json({ error: "Minuta confidencial" }, { status: 403 });
+  }
 
   // Orden: abiertas primero, luego por fecha
   const rank: Record<string, number> = {
@@ -46,9 +54,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
   });
 
   return NextResponse.json(minuta);
+  } catch (e) {
+    return handleRouteError(e);
+  }
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+  const user = await requireStaff();
   const { id } = await params;
   const body = await req.json();
 
@@ -146,7 +159,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const data: Record<string, unknown> = {};
-  for (const key of [
+  const editableKeys = [
     "titulo",
     "resumenEjecutivo",
     "hechosRelevantes",
@@ -158,7 +171,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     "lugar",
     "modalidad",
     "confidencial",
-  ] as const) {
+  ] as const;
+  for (const key of editableKeys) {
     if (body[key] !== undefined) data[key] = body[key];
   }
 
@@ -198,5 +212,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
   }
 
+  if (Object.keys(data).length > 0) {
+    await writeAudit({
+      actorId: user.id,
+      action: "minuta.update",
+      entityType: "Minuta",
+      entityId: id,
+      before: Object.fromEntries(editableKeys.map((key) => [key, current[key]])),
+      after: Object.fromEntries(editableKeys.map((key) => [key, minuta[key]])),
+    });
+  }
+
   return NextResponse.json(minuta);
+  } catch (e) {
+    return handleRouteError(e);
+  }
 }

@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/session";
+import {
+  confidentialWhere,
+  handleRouteError,
+  requireStaff,
+} from "@/lib/api";
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { pushMinutaToDrive } from "@/lib/integrations/google";
+import { writeAudit } from "@/lib/audit";
 import {
   formatLocalDate,
   isValidModalidad,
@@ -16,6 +21,8 @@ import {
 } from "@/lib/minutas";
 
 export async function GET(req: NextRequest) {
+  try {
+  const user = await requireStaff();
   const causaId = req.nextUrl.searchParams.get("causaId");
   const rawLimit = Number(req.nextUrl.searchParams.get("limit") || 50);
   const limit = Number.isFinite(rawLimit)
@@ -23,7 +30,10 @@ export async function GET(req: NextRequest) {
     : 50;
 
   const minutas = await prisma.minuta.findMany({
-    where: causaId ? { causaId } : undefined,
+    where: {
+      ...(causaId ? { causaId } : {}),
+      ...confidentialWhere(user.role),
+    },
     include: {
       causa: { select: { id: true, titulo: true, rit: true, tribunal: true } },
       autor: { select: { id: true, name: true, email: true } },
@@ -35,11 +45,15 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json(minutas);
+  } catch (e) {
+    return handleRouteError(e);
+  }
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const body = await req.json();
-  const user = await getCurrentUser();
+  const user = await requireStaff();
 
   if (!body.causaId || !body.titulo?.trim() || !body.resumenEjecutivo?.trim()) {
     return NextResponse.json(
@@ -305,6 +319,14 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  await writeAudit({
+    actorId: user.id,
+    action: "minuta.create",
+    entityType: "Minuta",
+    entityId: minuta.id,
+    after: { titulo: body.titulo, tipo, confidencial: Boolean(body.confidencial) },
+  });
+
   return NextResponse.json(
     {
       minuta: full,
@@ -319,4 +341,7 @@ export async function POST(req: NextRequest) {
     },
     { status: 201 }
   );
+  } catch (e) {
+    return handleRouteError(e);
+  }
 }

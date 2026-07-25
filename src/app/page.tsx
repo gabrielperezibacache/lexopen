@@ -32,7 +32,7 @@ export default function LandingPage() {
           <Link href="/sites" className="btn btn-ghost hidden sm:inline-flex">
             Sites
           </Link>
-          <Link href="/dashboard" className="btn btn-primary">
+          <Link href="/login" className="btn btn-primary">
             Entrar al estudio <ArrowRight size={16} />
           </Link>
         </div>
@@ -51,7 +51,7 @@ export default function LandingPage() {
             más causas judiciales chilenas, jurisprudencia, Obsidian, Hermes y Google Workspace.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/dashboard" className="btn btn-primary">
+            <Link href="/login" className="btn btn-primary">
               Abrir plataforma
             </Link>
             <Link href="/sites" className="btn btn-secondary">

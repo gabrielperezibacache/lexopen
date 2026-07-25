@@ -55,3 +55,34 @@ export function labelEtapa(value: string) {
 export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
+
+/** Valida RUT chileno (con o sin puntos; con guión). */
+export function validarRut(rut: string): boolean {
+  const clean = rut.replace(/\./g, "").replace(/\s/g, "").toUpperCase();
+  const m = clean.match(/^(\d{7,8})-([\dK])$/);
+  if (!m) return false;
+  const body = m[1];
+  const dv = m[2];
+  let sum = 0;
+  let mul = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += Number(body[i]) * mul;
+    mul = mul === 7 ? 2 : mul + 1;
+  }
+  const mod = 11 - (sum % 11);
+  const expected = mod === 11 ? "0" : mod === 10 ? "K" : String(mod);
+  return dv === expected;
+}
+
+/** RIT típico Chile: C-1234-2025 / O-1189-2025 / 71345-2025 */
+export function validarRit(rit: string): boolean {
+  const v = rit.trim().toUpperCase();
+  return /^[A-Z]{0,3}-?\d{1,6}-\d{4}$/.test(v) || /^\d{4,6}-\d{4}$/.test(v);
+}
+
+export function normalizarRut(rut: string): string {
+  const clean = rut.replace(/\./g, "").replace(/\s/g, "").toUpperCase();
+  const m = clean.match(/^(\d{7,8})-?([\dK])$/);
+  if (!m) return rut.trim();
+  return `${m[1]}-${m[2]}`;
+}

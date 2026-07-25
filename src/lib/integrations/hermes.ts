@@ -77,7 +77,20 @@ export async function askHermes(params: {
       content,
       requireApproval: config.requireApproval,
     };
-  } catch {
+  } catch (err) {
+    const allowDemo =
+      process.env.HERMES_ALLOW_DEMO === "1" ||
+      process.env.NODE_ENV === "development";
+    if (!allowDemo) {
+      return {
+        source: "error" as const,
+        content: "",
+        requireApproval: true,
+        note:
+          "Hermes Agent no está alcanzable. Modo demo deshabilitado (HERMES_ALLOW_DEMO≠1).",
+        error: err instanceof Error ? err.message : "unreachable",
+      };
+    }
     const lastUser = [...params.messages].reverse().find((m) => m.role === "user");
     const demo = buildDemoReply(lastUser?.content || "");
     if (params.causaId) {
@@ -94,7 +107,7 @@ export async function askHermes(params: {
       source: "demo" as const,
       content: demo,
       requireApproval: true,
-      note: "Hermes Agent no está alcanzable. Se usó respuesta local de demostración. Configure HERMES_API_URL.",
+      note: "⚠ Modo demo: Hermes no alcanzable. Esta respuesta NO es del agente real.",
     };
   }
 }

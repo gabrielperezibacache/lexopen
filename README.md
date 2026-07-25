@@ -34,18 +34,28 @@
 
 ## Stack
 
-Next.js 15 · TypeScript · Tailwind 4 · Prisma 5 · SQLite (Postgres-ready) · AGPL-3.0
+Next.js 15 · TypeScript · Tailwind 4 · Prisma 5 · Postgres · AGPL-3.0
 
 ## Inicio rápido
 
 ```bash
 cp .env.example .env
 npm install
-npm run setup    # db push + seed HighQ/Chile
+npm run db:migrate
+npm run db:seed  # datos demo HighQ/Chile
 npm run dev
 ```
 
-Abra http://localhost:3000 → **Entrar al estudio**.
+LexOpen requiere Postgres en `DATABASE_URL`. En producción ejecute `npm run db:migrate`
+al iniciar o desplegar; no ejecute seed automáticamente. Use `npm run db:seed` solo para
+cargar datos demo.
+
+Abra http://localhost:3000/login e ingrese con un usuario demo.
+
+Variables relevantes:
+- `SESSION_SECRET`: obligatorio en producción para firmar sesiones y proteger tokens OAuth.
+- `HERMES_ALLOW_DEMO=1`: habilita respuestas demo cuando Hermes Agent no está disponible.
+- `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`: opcionales para almacenar documentos fuera del filesystem local.
 
 ### Usuarios demo (password `lexopen`)
 | Email | Rol |
@@ -98,7 +108,9 @@ curl -X POST localhost:3000/api/integrations/google \
 
 ## Render
 
-Use `render.yaml` (Blueprint). En producción prefiera Postgres managed; el filesystem es efímero.
+Use `render.yaml` (Blueprint). En producción use Postgres managed, `npm run db:migrate`
+en deploy y S3/objeto compatible para documentos si necesita persistencia; el filesystem
+local es efímero.
 
 ## Licencia
 

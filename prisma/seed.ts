@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import { TRIBUNALES_CHILE } from "../src/lib/chile";
 
 const prisma = new PrismaClient();
 
@@ -35,14 +37,23 @@ async function wipe() {
     "activity",
     "minutaAccion",
     "minuta",
+    "minutaPlantilla",
     "nota",
     "plazo",
     "documento",
     "parte",
+    "etapaHistorial",
+    "causaMovimiento",
+    "agentChat",
     "causa",
     "cliente",
     "jurisprudencia",
     "integrationConfig",
+    "auditEvent",
+    "ufRate",
+    "tribunal",
+    "firmSettings",
+    "organization",
     "user",
   ] as const;
 
@@ -55,6 +66,63 @@ async function wipe() {
 async function main() {
   await wipe();
 
+  const password = await bcrypt.hash("lexopen", 10);
+
+  const org = await prisma.organization.create({
+    data: {
+      name: "Estudio LexOpen SpA",
+      rut: "76.123.456-0",
+      email: "contacto@estudio.cl",
+      settings: {
+        create: {
+          emisorRazonSocial: "Estudio LexOpen SpA",
+          emisorRut: "76.123.456-0",
+          emisorGiro: "Servicios jurídicos",
+          emisorDireccion: "Av. Apoquindo 3000, Las Condes",
+        },
+      },
+    },
+  });
+
+  await prisma.tribunal.createMany({
+    data: TRIBUNALES_CHILE.map((nombre) => ({
+      nombre,
+      region: "Metropolitana",
+      competencia: "general",
+    })),
+  });
+
+  await prisma.ufRate.create({
+    data: {
+      date: new Date(2026, 6, 25, 12),
+      valueClp: 39250,
+      source: "seed",
+    },
+  });
+
+  await prisma.minutaPlantilla.createMany({
+    data: [
+      {
+        tipo: "audiencia",
+        nombre: "Audiencia civil — checklist",
+        materia: "civil",
+        bodyJson: JSON.stringify({
+          titulo: "Audiencia",
+          resumenEjecutivo: "",
+          proximosPasos: ["Actualizar plazo", "Informar cliente"],
+        }),
+      },
+      {
+        tipo: "llamada",
+        nombre: "Llamada con cliente",
+        bodyJson: JSON.stringify({
+          titulo: "Llamada con cliente",
+          resumenEjecutivo: "",
+        }),
+      },
+    ],
+  });
+
   const admin = await prisma.user.create({
     data: {
       email: "socio@estudio.cl",
@@ -62,7 +130,7 @@ async function main() {
       role: "admin",
       title: "Socia · Litigio Civil",
       avatarColor: "#c47a3a",
-      password: "lexopen",
+      password,
     },
   });
   const abogado = await prisma.user.create({
@@ -72,7 +140,7 @@ async function main() {
       role: "abogado",
       title: "Asociado senior",
       avatarColor: "#1f6f78",
-      password: "lexopen",
+      password,
     },
   });
   const asistente = await prisma.user.create({
@@ -82,7 +150,7 @@ async function main() {
       role: "asistente",
       title: "Paralegal",
       avatarColor: "#2a4d3a",
-      password: "lexopen",
+      password,
     },
   });
   const clienteUser = await prisma.user.create({
@@ -92,9 +160,10 @@ async function main() {
       role: "cliente",
       title: "Gerenta Legal · Constructora Andes",
       avatarColor: "#4a5d73",
-      password: "lexopen",
+      password,
     },
   });
+  void org;
 
   const litigioGroup = await prisma.group.create({
     data: {

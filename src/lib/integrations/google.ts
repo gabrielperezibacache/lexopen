@@ -19,6 +19,48 @@ export type GoogleConfig = {
   tokenExpiresAt?: number;
 };
 
+const TOKEN_PREFIX = "enc:v1:";
+
+function xorToken(value: string, secret: string) {
+  const input = Buffer.from(value, "utf8");
+  const key = Buffer.from(secret, "utf8");
+  return Buffer.from(input.map((byte, idx) => byte ^ key[idx % key.length]));
+}
+
+function encryptToken(value: string | undefined) {
+  const secret = process.env.SESSION_SECRET;
+  if (!value || !secret || value.startsWith(TOKEN_PREFIX)) return value;
+  return `${TOKEN_PREFIX}${xorToken(value, secret).toString("base64")}`;
+}
+
+function decryptToken(value: string | undefined) {
+  const secret = process.env.SESSION_SECRET;
+  if (!value || !secret || !value.startsWith(TOKEN_PREFIX)) return value;
+  try {
+    const raw = Buffer.from(value.slice(TOKEN_PREFIX.length), "base64");
+    const key = Buffer.from(secret, "utf8");
+    return Buffer.from(raw.map((byte, idx) => byte ^ key[idx % key.length])).toString("utf8");
+  } catch {
+    return value;
+  }
+}
+
+function encryptGoogleConfig(config: GoogleConfig): GoogleConfig {
+  return {
+    ...config,
+    accessToken: encryptToken(config.accessToken),
+    refreshToken: encryptToken(config.refreshToken),
+  };
+}
+
+function decryptGoogleConfig(config: GoogleConfig): GoogleConfig {
+  return {
+    ...config,
+    accessToken: decryptToken(config.accessToken),
+    refreshToken: decryptToken(config.refreshToken),
+  };
+}
+
 export async function getGoogleConfig(): Promise<GoogleConfig> {
   const row = await prisma.integrationConfig.findUnique({
     where: { provider: "google" },
@@ -36,7 +78,10 @@ export async function getGoogleConfig(): Promise<GoogleConfig> {
     syncCalendar: true,
   };
   if (!row) return defaults;
-  return { ...defaults, ...(JSON.parse(row.configJson) as Partial<GoogleConfig>) };
+  return decryptGoogleConfig({
+    ...defaults,
+    ...(JSON.parse(row.configJson) as Partial<GoogleConfig>),
+  });
 }
 
 export function getGoogleAuthUrl(state = "lexopen") {
@@ -126,16 +171,17 @@ export async function exchangeGoogleCode(code: string) {
 }
 
 async function saveGoogleConfig(config: GoogleConfig, enabled = true) {
+  const stored = encryptGoogleConfig(config);
   await prisma.integrationConfig.upsert({
     where: { provider: "google" },
     create: {
       provider: "google",
       enabled,
-      configJson: JSON.stringify(config),
+      configJson: JSON.stringify(stored),
     },
     update: {
       enabled,
-      configJson: JSON.stringify(config),
+      configJson: JSON.stringify(stored),
     },
   });
 }
