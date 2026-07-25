@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
-import { canSeeConfidential, isCliente, isStaff } from "@/lib/auth/rbac";
-import { newStorageKey, putObject } from "@/lib/storage";
+import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
+import { siteFileWhereForRole } from "@/lib/auth/access";
+import { assertUploadSize, newStorageKey, putObject } from "@/lib/storage";
 
 type Params = { params: Promise<{ id: string }> };
 const LARGE_CONTENT_BYTES = 64 * 1024;
@@ -14,6 +14,7 @@ async function prepareFileBody(siteId: string, name: string, body: Record<string
   const mimeType = typeof body.mimeType === "string" ? body.mimeType : "text/markdown";
   const binary = contenidoBase64 ? Buffer.from(contenidoBase64, "base64") : null;
   const sizeBytes = binary?.length ?? Buffer.byteLength(contenido, "utf8");
+  assertUploadSize(sizeBytes);
   const shouldStore = Boolean(binary) || sizeBytes > LARGE_CONTENT_BYTES;
 
   if (!shouldStore) {
@@ -29,13 +30,44 @@ async function prepareFileBody(siteId: string, name: string, body: Record<string
   return { contenido: null, storageKey: key, sizeBytes, mimeType };
 }
 
+async function parseFileRequest(req: NextRequest) {
+  const contentType = req.headers.get("content-type") || "";
+  if (!contentType.includes("multipart/form-data")) {
+    return (await req.json()) as Record<string, unknown>;
+  }
+
+  const form = await req.formData();
+  const file = form.get("file");
+  const body: Record<string, unknown> = {
+    action: String(form.get("action") || (file instanceof File ? "create-file" : "create-folder")),
+    name: String(form.get("name") || (file instanceof File ? file.name : "")),
+    folderId: String(form.get("folderId") || "") || null,
+    tags: String(form.get("tags") || ""),
+    contenido: String(form.get("contenido") || ""),
+    confidencial: form.get("confidencial") === "on",
+    privilegio: form.get("privilegio") === "on",
+  };
+
+  if (file instanceof File && file.size > 0) {
+    assertUploadSize(file.size);
+    body.name = body.name || file.name;
+    body.mimeType = file.type || "application/octet-stream";
+    body.contenidoBase64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+  }
+
+  return body;
+}
+
+function stringField(value: unknown, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
-    const fileWhere =
-      isStaff(user.role) || canSeeConfidential(user.role) ? {} : { confidencial: false };
+    const fileWhere = siteFileWhereForRole(user.role);
     const folders = await prisma.folder.findMany({
       where: { siteId: id },
       include: {
@@ -58,44 +90,47 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function POST(req: NextRequest, { params }: Params) {
   try {
     assertCsrf(req);
-    const user = await requireUser();
+    const user = await requireStaff();
     const { id } = await params;
     await requireSiteAccess(id, user);
-    const body = await req.json();
-    if (isCliente(user.role) && (body.confidencial !== undefined || body.privilegio !== undefined)) {
-      return NextResponse.json({ error: "Clientes no pueden marcar confidencialidad" }, { status: 403 });
-    }
+    const body = await parseFileRequest(req);
+    const action = stringField(body.action);
+    const name = stringField(body.name).trim();
+    const folderId = stringField(body.folderId) || null;
 
-    if (body.action === "create-folder") {
-      if (body.parentId) {
+    if (action === "create-folder") {
+      if (!name) return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
+      const parentId = stringField(body.parentId) || null;
+      if (parentId) {
         const parent = await prisma.folder.findFirst({
-          where: { id: body.parentId, siteId: id },
+          where: { id: parentId, siteId: id },
           select: { id: true },
         });
         if (!parent) return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
       }
       const folder = await prisma.folder.create({
         data: {
-          name: body.name,
+          name,
           siteId: id,
-          parentId: body.parentId || null,
+          parentId,
         },
       });
       return NextResponse.json(folder, { status: 201 });
     }
 
-    if (body.action === "upload-file" || body.action === "create-file") {
-      if (body.folderId) {
+    if (action === "upload-file" || action === "create-file") {
+      if (!name) return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
+      if (folderId) {
         const folder = await prisma.folder.findFirst({
-          where: { id: body.folderId, siteId: id },
+          where: { id: folderId, siteId: id },
           select: { id: true },
         });
         if (!folder) return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
       }
-      const prepared = await prepareFileBody(id, body.name, body);
+      const prepared = await prepareFileBody(id, name, body);
       const file = await prisma.siteFile.create({
         data: {
-          name: body.name,
+          name,
           mimeType: prepared.mimeType,
           contenido: prepared.contenido,
           storageKey: prepared.storageKey,
@@ -103,8 +138,8 @@ export async function POST(req: NextRequest, { params }: Params) {
           confidencial: Boolean(body.confidencial),
           privilegio: Boolean(body.privilegio),
           siteId: id,
-          folderId: body.folderId || null,
-          tags: body.tags || "",
+          folderId,
+          tags: stringField(body.tags),
           metadataJson: JSON.stringify(body.metadata || {}),
           versions: {
             create: {
@@ -127,14 +162,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json(file, { status: 201 });
     }
 
-    if (body.action === "new-version" && body.fileId) {
-      const existing = await prisma.siteFile.findFirst({ where: { id: body.fileId, siteId: id } });
+    if (action === "new-version" && body.fileId) {
+      const fileId = stringField(body.fileId);
+      const existing = await prisma.siteFile.findFirst({ where: { id: fileId, siteId: id } });
       if (!existing) return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
       const version = existing.version + 1;
-      const prepared = await prepareFileBody(id, body.name || existing.name, {
+      const prepared = await prepareFileBody(id, name || existing.name, {
         ...body,
-        mimeType: body.mimeType || existing.mimeType,
-        contenido: body.contenido ?? existing.contenido ?? "",
+        mimeType: stringField(body.mimeType, existing.mimeType),
+        contenido: stringField(body.contenido, existing.contenido ?? ""),
       });
       const file = await prisma.siteFile.update({
         where: { id: existing.id },
@@ -151,7 +187,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             create: {
               version,
               contenido: prepared.contenido,
-              note: body.note || `Versión ${version}`,
+              note: stringField(body.note, `Versión ${version}`),
               authorId: user.id,
             },
           },

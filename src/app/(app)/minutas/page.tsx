@@ -3,8 +3,10 @@ import { prisma } from "@/lib/db";
 import { formatDateTime, StatusBadge } from "@/components/ui";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
 import { ClipboardPen } from "lucide-react";
+import { requireStaffPage } from "@/lib/auth/access";
 
 export default async function MinutasPage() {
+  await requireStaffPage();
   const [minutas, causas, accionesAbiertasTotal] = await Promise.all([
     prisma.minuta.findMany({
       include: {

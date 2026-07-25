@@ -38,9 +38,9 @@ export default function SearchPage() {
   return (
     <div>
       <ModuleHeader
-        eyebrow="Enterprise search"
+        eyebrow="Búsqueda del estudio"
         title="Buscar"
-        subtitle="Sites, causas, minutas, files, tasks, wiki y jurisprudencia en un solo índice."
+        subtitle="Espacios, causas, minutas, archivos, tareas, wiki y jurisprudencia en un solo índice."
       />
       <form onSubmit={onSubmit} className="panel mb-6 flex gap-2 rounded-3xl p-4">
         <input className="input" name="q" placeholder="Ej. tutela, Andes, audiencia, C-4521…" required />
@@ -51,11 +51,11 @@ export default function SearchPage() {
 
       {results && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <ResultBlock title="Sites" items={results.sites.map((s) => ({ href: `/sites/${s.id}`, label: s.name, meta: s.tipo }))} />
+          <ResultBlock title="Espacios" items={results.sites.map((s) => ({ href: `/sites/${s.id}`, label: s.name, meta: s.tipo }))} />
           <ResultBlock title="Causas" items={results.causas.map((c) => ({ href: `/causas/${c.id}`, label: c.titulo, meta: c.rit || "" }))} />
           <ResultBlock title="Minutas" items={(results.minutas || []).map((m) => ({ href: `/causas/${m.causaId}/minutas/${m.id}`, label: m.titulo, meta: `${m.tipo} · ${m.causa.rit || m.causa.titulo}` }))} />
-          <ResultBlock title="Files" items={results.files.map((f) => ({ href: `/sites/${f.site.id}/archivos`, label: f.name, meta: f.site.name }))} />
-          <ResultBlock title="Tasks" items={results.tasks.map((t) => ({ href: t.site ? `/sites/${t.site.id}/tareas` : "/tareas", label: t.title, meta: t.site?.name || "" }))} />
+          <ResultBlock title="Archivos" items={results.files.map((f) => ({ href: `/sites/${f.site.id}/archivos`, label: f.name, meta: f.site.name }))} />
+          <ResultBlock title="Tareas" items={results.tasks.map((t) => ({ href: t.site ? `/sites/${t.site.id}/tareas` : "/tareas", label: t.title, meta: t.site?.name || "" }))} />
           <ResultBlock title="Wiki" items={results.wiki.map((w) => ({ href: `/sites/${w.site.id}/wiki`, label: w.title, meta: w.site.name }))} />
           <ResultBlock title="Jurisprudencia" items={results.jurisprudencia.map((j) => ({ href: `/jurisprudencia?q=${encodeURIComponent(j.rol)}`, label: j.caratula || j.rol, meta: j.rol }))} />
         </div>

@@ -12,6 +12,7 @@ import { validarRit, validarRuc, validarRut, normalizarRut } from "@/lib/chile";
 import { checkConflicts } from "@/lib/conflict";
 import { writeAudit } from "@/lib/audit";
 import { parseLocalDateInput } from "@/lib/minutas";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET(req: NextRequest) {
   try {
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
       },
       include: {
         cliente: true,
-        abogado: true,
+        abogado: { select: publicUserSelect },
         plazos: {
           where: { estado: "pendiente" },
           orderBy: { fechaLimite: "asc" },
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
           create: { etapa: body.etapa || "ingreso", nota: "Alta de causa" },
         },
       },
-      include: { partes: true, cliente: true, abogado: true },
+      include: { partes: true, cliente: true, abogado: { select: publicUserSelect } },
     });
 
     await prisma.activity.create({

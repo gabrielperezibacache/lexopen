@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET() {
   try {
@@ -8,7 +9,7 @@ export async function GET() {
     const workflows = await prisma.workflow.findMany({
       include: {
         site: true,
-        instances: { orderBy: { createdAt: "desc" }, take: 5, include: { actor: true } },
+        instances: { orderBy: { createdAt: "desc" }, take: 5, include: { actor: { select: publicUserSelect } } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -20,6 +21,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
     const body = await req.json();
 

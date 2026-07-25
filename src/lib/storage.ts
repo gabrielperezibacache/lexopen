@@ -13,6 +13,22 @@ function localRoot() {
   return process.env.STORAGE_PATH || path.join(process.cwd(), "storage");
 }
 
+export function maxUploadBytes() {
+  const configured = Number(process.env.MAX_UPLOAD_BYTES || "");
+  return Number.isFinite(configured) && configured > 0 ? configured : 10 * 1024 * 1024;
+}
+
+export function assertUploadSize(sizeBytes: number) {
+  const max = maxUploadBytes();
+  if (sizeBytes > max) {
+    const err = new Error(`Archivo supera el máximo permitido (${Math.round(max / 1024 / 1024)} MB)`) as Error & {
+      status: number;
+    };
+    err.status = 413;
+    throw err;
+  }
+}
+
 export function storageConfigured() {
   return Boolean(
     process.env.S3_BUCKET &&

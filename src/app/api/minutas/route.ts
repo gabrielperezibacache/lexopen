@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
+  assertCsrf,
   confidentialWhere,
   handleRouteError,
   requireStaff,
@@ -20,6 +21,7 @@ import {
   renderMinutaMarkdown,
   type MinutaAccionInput,
 } from "@/lib/minutas";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET(req: NextRequest) {
   try {
@@ -53,6 +55,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+  assertCsrf(req);
   const body = await req.json();
   const user = await requireStaff();
 
@@ -328,7 +331,7 @@ export async function POST(req: NextRequest) {
     where: { id: minuta.id },
     include: {
       causa: true,
-      autor: true,
+      autor: { select: publicUserSelect },
       acciones: true,
       documento: true,
     },

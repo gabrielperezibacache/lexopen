@@ -3,48 +3,28 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-function arrayBufferToBase64(buffer: ArrayBuffer) {
-  let binary = "";
-  const bytes = new Uint8Array(buffer);
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
 export function SiteFileActions({ siteId }: { siteId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState<"file" | "folder" | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
+    setError("");
     const fd = new FormData(e.currentTarget);
-    const file = fd.get("file");
-    const binary =
-      file instanceof File && file.size > 0
-        ? {
-            name: file.name,
-            mimeType: file.type || "application/octet-stream",
-            contenidoBase64: arrayBufferToBase64(await file.arrayBuffer()),
-          }
-        : null;
-    await fetch(`/api/sites/${siteId}/files`, {
+    fd.set("action", open === "folder" ? "create-folder" : "create-file");
+    const res = await fetch(`/api/sites/${siteId}/files`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        open === "folder"
-          ? { action: "create-folder", name: fd.get("name") }
-          : {
-              action: "create-file",
-              name: binary?.name || fd.get("name"),
-              mimeType: binary?.mimeType,
-              contenidoBase64: binary?.contenidoBase64,
-              contenido: fd.get("contenido"),
-              tags: fd.get("tags"),
-            }
-      ),
+      body: fd,
     });
     setBusy(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error || "No se pudo guardar");
+      return;
+    }
     setOpen(null);
     router.refresh();
   }
@@ -71,6 +51,7 @@ export function SiteFileActions({ siteId }: { siteId: string }) {
                 <textarea className="textarea" name="contenido" placeholder="Contenido markdown" />
               </>
             )}
+            {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
               <button className="btn btn-ghost" type="button" onClick={() => setOpen(null)}>
                 Cancelar

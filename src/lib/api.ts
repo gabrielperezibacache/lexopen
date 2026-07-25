@@ -67,7 +67,17 @@ export function staffOrForbid(userRole: string) {
   return null;
 }
 
-/** Origin/Referer CSRF check for mutating API requests. */
+export function originMatches(candidate: string, allowed: string) {
+  try {
+    const a = new URL(allowed);
+    const c = new URL(candidate);
+    return a.protocol === c.protocol && a.host === c.host;
+  } catch {
+    return candidate === allowed;
+  }
+}
+
+/** Origin/Referer CSRF check — exact host match (no startsWith spoofing). */
 export function assertCsrf(req: Request) {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
     return;
@@ -83,11 +93,11 @@ export function assertCsrf(req: Request) {
     process.env.NEXT_PUBLIC_APP_URL,
   ].filter(Boolean) as string[];
 
-  const okOrigin = origin && allowed.some((a) => origin === a || origin.startsWith(a));
-  const okReferer =
-    referer && allowed.some((a) => referer === a || referer.startsWith(a));
+  const okOrigin = Boolean(origin && allowed.some((a) => originMatches(origin, a)));
+  const okReferer = Boolean(
+    referer && allowed.some((a) => originMatches(referer, a))
+  );
 
-  // Same-origin fetch from browser usually sends Origin; server-to-server may not.
   if (!origin && !referer) {
     if (process.env.NODE_ENV === "production" && process.env.LEXOPEN_RELAX_CSRF !== "1") {
       throw httpError("CSRF: Origin/Referer requerido", 403);

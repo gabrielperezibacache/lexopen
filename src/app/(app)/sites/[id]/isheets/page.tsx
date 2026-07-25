@@ -4,12 +4,13 @@ import { prisma } from "@/lib/db";
 import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { NewISheetButton } from "@/components/sites/NewISheetButton";
+import { isCliente } from "@/lib/auth/rbac";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteISheetsPage({ params }: Params) {
   const { id } = await params;
-  await assertSitePageAccess(id);
+  const user = await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
   const sheets = await prisma.iSheet.findMany({
@@ -23,12 +24,12 @@ export default async function SiteISheetsPage({ params }: Params) {
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/isheets" />
+      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/isheets" role={user.role} />
       <div className="mb-4 flex items-center justify-between">
         <p className="mt-1 max-w-2xl text-sm text-[var(--ink-soft)]/75">
-          iSheets — tablas estructuradas colaborativas (seguimiento procesal, issues log, reporting).
+          Tablas estructuradas colaborativas para seguimiento procesal, incidencias y reportes.
         </p>
-        <NewISheetButton siteId={site.id} />
+        {!isCliente(user.role) && <NewISheetButton siteId={site.id} />}
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         {sheets.map((s) => (

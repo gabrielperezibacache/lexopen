@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const primary = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
@@ -61,6 +61,7 @@ const intel = [
 const clienteNav = [
   { href: "/portal", label: "Portal cliente", icon: DoorOpen },
   { href: "/sites", label: "Espacios", icon: Building2 },
+  { href: "/notificaciones", label: "Notificaciones", icon: Bell },
 ];
 
 function NavGroup({
@@ -103,6 +104,12 @@ export function AppSidebar({ role }: { role?: string | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isCliente = role === "cliente";
+
+  useEffect(() => {
+    const openMenu = () => setOpen(true);
+    window.addEventListener("lexopen:open-menu", openMenu);
+    return () => window.removeEventListener("lexopen:open-menu", openMenu);
+  }, []);
 
   const nav = (
     <>

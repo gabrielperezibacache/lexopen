@@ -55,7 +55,9 @@ Abra http://localhost:3000/login e ingrese con un usuario demo.
 Variables relevantes:
 - `SESSION_SECRET`: obligatorio en producción para firmar sesiones y proteger tokens OAuth.
 - `HERMES_ALLOW_DEMO=1`: habilita respuestas demo cuando Hermes Agent no está disponible.
-- `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`: opcionales para almacenar documentos fuera del filesystem local.
+- `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`: recomendados en producción para almacenar documentos fuera del filesystem local.
+- `MAX_UPLOAD_BYTES`: límite de subida (por defecto 10 MB).
+- `CRON_SECRET`: permite llamar `POST /api/plazos/alertas` desde un cron externo/Render.
 
 ### Usuarios demo (password `lexopen`)
 | Email | Rol |
@@ -110,7 +112,8 @@ curl -X POST localhost:3000/api/integrations/google \
 
 Use `render.yaml` (Blueprint). En producción use Postgres managed, `npm run db:migrate`
 en deploy y S3/objeto compatible para documentos si necesita persistencia; el filesystem
-local es efímero.
+local es efímero. `/api/health` es público con `{ ok: true }`; staff puede usar
+`/api/health?ready=1` para revisar DB y storage.
 
 ## Licencia
 

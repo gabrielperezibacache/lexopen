@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return new NextResponse(html, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Content-Disposition": `inline; filename="${invoice.number}.html"`,
+        "Content-Disposition": `attachment; filename="${invoice.number}.html"`,
       },
     });
   } catch (e) {

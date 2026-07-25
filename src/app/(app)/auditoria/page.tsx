@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/db";
-import { requireStaff } from "@/lib/auth/session";
+import { requireStaffPage } from "@/lib/auth/access";
 import { formatDateTime } from "@/components/ui";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 
 export default async function AuditoriaPage() {
-  await requireStaff();
+  await requireStaffPage();
   const events = await prisma.auditEvent.findMany({
     include: { actor: { select: { name: true, email: true } } },
     orderBy: { createdAt: "desc" },

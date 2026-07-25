@@ -5,15 +5,17 @@ import { ReactNode } from "react";
 import { cn } from "@/lib/chile";
 
 const tabs = [
-  { href: "", label: "Overview" },
-  { href: "/archivos", label: "Files" },
-  { href: "/tareas", label: "Tasks" },
+  { href: "", label: "Resumen" },
+  { href: "/archivos", label: "Archivos" },
+  { href: "/tareas", label: "Tareas" },
   { href: "/wiki", label: "Wiki" },
-  { href: "/isheets", label: "iSheets" },
+  { href: "/isheets", label: "Tablas" },
   { href: "/qa", label: "Q&A" },
-  { href: "/personas", label: "People" },
-  { href: "/flujos", label: "Workflows" },
+  { href: "/personas", label: "Personas" },
+  { href: "/flujos", label: "Flujos" },
 ];
+
+const clientTabs = tabs.filter((t) => t.href === "" || t.href === "/archivos" || t.href === "/qa");
 
 export function SiteNav({
   siteId,
@@ -21,31 +23,34 @@ export function SiteNav({
   tipo,
   color,
   active,
+  role,
 }: {
   siteId: string;
   siteName: string;
   tipo: string;
   color: string;
   active: string;
+  role?: string | null;
 }) {
+  const visibleTabs = role === "cliente" ? clientTabs : tabs;
   return (
     <div className="mb-6 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/sites" className="text-sm text-[var(--sea)]">
-            ← Sites
+            ← Espacios
           </Link>
           <div className="mt-2 flex items-center gap-3">
             <span className="h-4 w-4 rounded-full" style={{ background: color }} />
             <h1 className="display text-3xl md:text-4xl">{siteName}</h1>
           </div>
           <p className="mt-1 text-sm uppercase tracking-[0.14em] text-[var(--ink-soft)]/60">
-            {tipo.replace("_", " ")} · HighQ site
+            {tipo.replace("_", " ")} · Espacio LexOpen
           </p>
         </div>
       </div>
       <div className="flex flex-wrap gap-1 border-b border-[var(--line)] pb-1">
-        {tabs.map((t) => {
+        {visibleTabs.map((t) => {
           const href = `/sites/${siteId}${t.href}`;
           const isActive = active === t.href;
           return (

@@ -47,16 +47,16 @@ export default function LandingPage() {
             LexOpen
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-[var(--ink-soft)]/85">
-            Plataforma open-source para estudios jurídicos: espacios, data room,
-            iSheets, tareas, wiki, Q&A y flujos — con causas chilenas, plazos,
-            jurisprudencia, Obsidian, Hermes y Google Workspace.
+            Plataforma abierta para estudios jurídicos: espacios de trabajo,
+            archivos, tablas, tareas, wiki, Q&A y flujos — con causas chilenas,
+            plazos, jurisprudencia e integraciones.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/login" className="btn btn-primary">
               Abrir plataforma
             </Link>
             <Link href="/sites" className="btn btn-secondary">
-              Explorar espacios
+              Ver espacios
             </Link>
           </div>
         </div>
@@ -66,13 +66,13 @@ export default function LandingPage() {
           <div className="relative">
             <div className="text-xs uppercase tracking-[0.18em] text-white/50">Espacio de causa</div>
             <div className="display mt-3 text-3xl">Andes · C-4521-2025</div>
-            <p className="mt-2 text-sm text-white/70">Archivos · Tareas · iSheets · Q&A · Wiki</p>
+            <p className="mt-2 text-sm text-white/70">Archivos · Tareas · Tablas · Q&A · Wiki</p>
             <div className="mt-8 space-y-3">
               {[
-                "VDR con versionado y comentarios",
-                "iSheet de hitos procesales",
-                "Workflow de aprobación de escritos",
-                "Portal cliente + sync Obsidian",
+                "Archivos con versiones y comentarios",
+                "Tabla de hitos procesales",
+                "Flujo de aprobación de escritos",
+                "Portal cliente e integraciones",
               ].map((item) => (
                 <div
                   key={item}
@@ -90,8 +90,8 @@ export default function LandingPage() {
         <div className="fade-up-delay-2 grid gap-4 md:grid-cols-3 lg:grid-cols-6">
           {[
             { icon: Building2, title: "Espacios", text: "Causas, VDR, conocimiento y portal" },
-            { icon: Shield, title: "Archivos", text: "Data room, versiones, metadata" },
-            { icon: Sheet, title: "iSheets", text: "Tablas estructuradas colaborativas" },
+            { icon: Shield, title: "Archivos", text: "Versiones, metadatos y acceso cliente" },
+            { icon: Sheet, title: "Tablas", text: "Seguimiento estructurado colaborativo" },
             { icon: BookOpen, title: "Wiki + Q&A", text: "Conocimiento y preguntas cliente" },
             { icon: FolderSync, title: "Integraciones", text: "Obsidian · Google · Hermes" },
             { icon: Bot, title: "Chile", text: "Causas RIT/RUC + jurisprudencia" },

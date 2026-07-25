@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -11,7 +12,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     await requireSiteAccess(id, user);
     const members = await prisma.siteMember.findMany({
       where: { siteId: id },
-      include: { user: true },
+      include: { user: { select: publicUserSelect } },
     });
     return NextResponse.json(members);
   } catch (e) {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       where: { siteId_userId: { siteId: id, userId: body.userId } },
       create: { siteId: id, userId: body.userId, role: body.role || "contributor" },
       update: { role: body.role || "contributor" },
-      include: { user: true },
+      include: { user: { select: publicUserSelect } },
     });
     await prisma.activity.create({
       data: {

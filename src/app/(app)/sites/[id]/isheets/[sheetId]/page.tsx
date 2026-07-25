@@ -8,7 +8,7 @@ type Params = { params: Promise<{ id: string; sheetId: string }> };
 
 export default async function ISheetDetailPage({ params }: Params) {
   const { id, sheetId } = await params;
-  await assertSitePageAccess(id);
+  const user = await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
   const sheet = await prisma.iSheet.findUnique({
@@ -22,7 +22,7 @@ export default async function ISheetDetailPage({ params }: Params) {
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/isheets" />
+      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/isheets" role={user.role} />
       <div className="mb-4">
         <h2 className="display text-3xl">{sheet.name}</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/75">{sheet.description}</p>

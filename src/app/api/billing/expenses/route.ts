@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,7 +9,7 @@ export async function GET(req: NextRequest) {
     const unbilled = req.nextUrl.searchParams.get("unbilled");
     const expenses = await prisma.expense.findMany({
       where: unbilled === "1" ? { billable: true, billed: false } : undefined,
-      include: { author: true, causa: true, cliente: true },
+      include: { author: { select: publicUserSelect }, causa: true, cliente: true },
       orderBy: { date: "desc" },
     });
     return NextResponse.json(expenses);
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
         clienteId: body.clienteId || null,
         causaId: body.causaId || null,
       },
-      include: { author: true, causa: true, cliente: true },
+      include: { author: { select: publicUserSelect }, causa: true, cliente: true },
     });
     return NextResponse.json(expense, { status: 201 });
   } catch (e) {

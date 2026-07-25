@@ -28,5 +28,10 @@ export function canSeeConfidential(role: string) {
 }
 
 export function canImpersonate() {
-  return process.env.NODE_ENV === "development" || process.env.LEXOPEN_DEMO_SWITCHER === "1";
+  // Hard-deny in production even if LEXOPEN_DEMO_SWITCHER is mis-set
+  if (process.env.NODE_ENV === "production") return false;
+  return (
+    process.env.NODE_ENV === "development" ||
+    process.env.LEXOPEN_DEMO_SWITCHER === "1"
+  );
 }

@@ -3,8 +3,10 @@ import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { WorkflowActions } from "@/components/sites/WorkflowActions";
+import { requireStaffPage } from "@/lib/auth/access";
 
 export default async function WorkflowsGlobalPage() {
+  await requireStaffPage();
   const workflows = await prisma.workflow.findMany({
     include: {
       site: true,
@@ -20,9 +22,9 @@ export default async function WorkflowsGlobalPage() {
   return (
     <div>
       <ModuleHeader
-        eyebrow="Automation"
-        title="Workflows"
-        subtitle="Aprobaciones multi-paso para escritos, publicación a portal y triggers de site."
+        eyebrow="Automatización"
+        title="Flujos"
+        subtitle="Aprobaciones multi-paso para escritos, publicación a portal y disparadores de espacios."
       />
       <div className="space-y-4">
         {workflows.map((w) => {

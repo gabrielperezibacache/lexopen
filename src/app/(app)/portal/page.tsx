@@ -3,6 +3,7 @@ import { formatDate, StatusBadge } from "@/components/ui";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
+import { clientVisibleFileWhere } from "@/lib/auth/access";
 
 export default async function PortalPage() {
   const user = await requireUser();
@@ -19,10 +20,7 @@ export default async function PortalPage() {
       cliente: true,
       causa: true,
       files: {
-        where: {
-          tags: { contains: "cliente" },
-          confidencial: false,
-        },
+        where: clientVisibleFileWhere(),
         take: 5,
         orderBy: { updatedAt: "desc" },
       },

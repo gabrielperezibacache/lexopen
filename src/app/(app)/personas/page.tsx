@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
+import { requireStaffPage } from "@/lib/auth/access";
 
 export default async function PeoplePage() {
+  await requireStaffPage();
   const [users, groups] = await Promise.all([
     prisma.user.findMany({
       include: {
@@ -18,8 +20,8 @@ export default async function PeoplePage() {
   return (
     <div>
       <ModuleHeader
-        eyebrow="Users & groups"
-        title="People"
+        eyebrow="Usuarios y grupos"
+        title="Personas"
         subtitle="Directorio del estudio, roles y grupos con acceso a sites."
       />
       <div className="grid gap-6 lg:grid-cols-2">

@@ -2,10 +2,14 @@ import { prisma } from "@/lib/db";
 import { formatDate } from "@/components/ui";
 import Link from "next/link";
 import { DocumentoUploadForm } from "@/components/DocumentoUploadForm";
+import { requireStaffPage } from "@/lib/auth/access";
+import { confidentialWhere } from "@/lib/api";
 
 export default async function DocumentosPage() {
+  const user = await requireStaffPage();
   const [documentos, causas] = await Promise.all([
     prisma.documento.findMany({
+      where: confidentialWhere(user.role),
       include: { causa: true, autor: true },
       orderBy: { updatedAt: "desc" },
     }),
@@ -20,7 +24,7 @@ export default async function DocumentosPage() {
     <div className="space-y-6">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          Data room
+          Repositorio documental
         </p>
         <h1 className="display mt-2 text-4xl">Documentos</h1>
         <p className="mt-2 text-[var(--ink-soft)]/80">

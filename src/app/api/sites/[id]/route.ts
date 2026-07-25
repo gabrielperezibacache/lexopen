@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
-import { confidentialFileWhere } from "@/lib/auth/access";
+import { siteFileWhereForRole } from "@/lib/auth/access";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -10,18 +11,18 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
-    const fileWhere = confidentialFileWhere(user.role);
+    const fileWhere = siteFileWhereForRole(user.role);
     const site = await prisma.site.findUnique({
       where: { id },
       include: {
         cliente: true,
         causa: { include: { partes: true, plazos: true } },
-        members: { include: { user: true } },
+        members: { include: { user: { select: publicUserSelect } } },
         folders: { include: { children: true, files: { where: fileWhere } } },
         files: { where: { folderId: null, ...fileWhere }, orderBy: { updatedAt: "desc" }, take: 20 },
         wikiPages: { orderBy: { updatedAt: "desc" }, take: 10 },
         tasks: {
-          include: { assignee: true },
+          include: { assignee: { select: publicUserSelect } },
           orderBy: { dueDate: "asc" },
           take: 12,
         },
@@ -33,7 +34,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         },
         workflows: { include: { instances: { take: 5, orderBy: { createdAt: "desc" } } } },
         activities: {
-          include: { user: true },
+          include: { user: { select: publicUserSelect } },
           orderBy: { createdAt: "desc" },
           take: 20,
         },

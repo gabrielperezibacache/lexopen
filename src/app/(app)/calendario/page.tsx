@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { clasificarUrgencia } from "@/lib/plazos";
 import { formatDate } from "@/components/ui";
-import { requireStaff } from "@/lib/auth/session";
+import { requireStaffPage } from "@/lib/auth/access";
 
 function monthMatrix(base: Date) {
   const year = base.getFullYear();
@@ -20,7 +20,7 @@ function monthMatrix(base: Date) {
 }
 
 export default async function CalendarioPage() {
-  await requireStaff();
+  await requireStaffPage();
   const now = new Date();
   const [plazos, tasks] = await Promise.all([
     prisma.plazo.findMany({

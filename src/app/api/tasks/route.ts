@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
           mine === "1" ? { assigneeId: user.id } : {},
         ],
       },
-      include: { site: true, assignee: true, creator: true },
+      include: { site: true, assignee: { select: publicUserSelect }, creator: { select: publicUserSelect } },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
     });
     return NextResponse.json(tasks);
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    assertCsrf(req);
     await requireStaff();
     const body = await req.json();
     const task = await prisma.task.update({

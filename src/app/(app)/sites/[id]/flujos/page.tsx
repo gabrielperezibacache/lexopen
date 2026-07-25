@@ -9,7 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteWorkflowsPage({ params }: Params) {
   const { id } = await params;
-  await assertSitePageAccess(id);
+  const user = await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
   const workflows = await prisma.workflow.findMany({
@@ -25,9 +25,9 @@ export default async function SiteWorkflowsPage({ params }: Params) {
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/flujos" />
+      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/flujos" role={user.role} />
       <p className="mb-4 text-sm text-[var(--ink-soft)]/75">
-        Workflows de aprobación — escritos, publicación a portal y triggers.
+        Flujos de aprobación para escritos, publicación a portal y disparadores.
       </p>
       <div className="space-y-4">
         {workflows.map((w) => {

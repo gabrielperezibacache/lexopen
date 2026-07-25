@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireUser } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET() {
   try {
     const user = await requireUser();
     const messages = await prisma.message.findMany({
       where: { OR: [{ receiverId: user.id }, { senderId: user.id }] },
-      include: { sender: true, receiver: true },
+      include: { sender: { select: publicUserSelect }, receiver: { select: publicUserSelect } },
       orderBy: { createdAt: "desc" },
       take: 50,
     });
@@ -19,6 +20,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireUser();
     const body = await req.json();
     const msg = await prisma.message.create({

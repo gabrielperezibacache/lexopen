@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
+  assertCsrf,
   handleRouteError,
   jsonError,
   parseBody,
@@ -11,12 +12,13 @@ import { calcularVencimiento } from "@/lib/plazos";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { writeAudit } from "@/lib/audit";
 import { z } from "zod";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET() {
   try {
     await requireStaff();
     const plazos = await prisma.plazo.findMany({
-      include: { causa: true, responsable: true },
+      include: { causa: true, responsable: { select: publicUserSelect } },
       orderBy: { fechaLimite: "asc" },
     });
     return NextResponse.json(plazos);
@@ -27,6 +29,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, plazoCreateSchema);
 
@@ -95,6 +98,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
     const body = z
       .object({ id: z.string(), estado: z.string() })

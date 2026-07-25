@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   MATERIAS,
@@ -23,9 +23,24 @@ export default function NuevaCausaPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tribunales, setTribunales] = useState<string[]>([...TRIBUNALES_CHILE]);
   const [conflicts, setConflicts] = useState<ConflictHit[]>([]);
   const [conflictStatus, setConflictStatus] = useState<"idle" | "clear" | "warning" | "blocked">("idle");
   const [overrideRequired, setOverrideRequired] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/tribunales")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        const names = body?.tribunales?.map((t: { nombre: string }) => t.nombre).filter(Boolean);
+        if (!cancelled && names?.length) setTribunales(names);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -145,8 +160,8 @@ export default function NuevaCausaPage() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Tribunal</label>
-          <select className="select" name="tribunal" required defaultValue={TRIBUNALES_CHILE[0]}>
-            {TRIBUNALES_CHILE.map((t) => (
+          <select className="select" name="tribunal" required defaultValue={tribunales[0]}>
+            {tribunales.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>

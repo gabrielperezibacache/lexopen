@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, parseBody, requireBillingManager, requireStaff } from "@/lib/api";
-import { computeInvoiceTotals, nextInvoiceNumber } from "@/lib/billing";
+import { computeInvoiceTotals, getFirmTaxRates, nextInvoiceNumber } from "@/lib/billing";
 import { invoiceCreateSchema } from "@/lib/schemas";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
       include: {
         cliente: true,
         causa: true,
-        author: true,
+        author: { select: publicUserSelect },
         lines: true,
         payments: true,
         _count: { select: { timeEntries: true, expenses: true } },
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "La factura necesita al menos una línea" }, { status: 400 });
     }
 
-    const totals = computeInvoiceTotals({ tipoDocumento, lines });
+    const totals = computeInvoiceTotals({ tipoDocumento, lines, rates: await getFirmTaxRates() });
     const count = await prisma.invoice.count();
     const number = body.number || nextInvoiceNumber(count + 1, tipoDocumento);
 

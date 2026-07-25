@@ -14,6 +14,7 @@ assert.deepEqual(confidentialFileWhere("admin"), {});
 
 assert.equal(isClientAllowedPath("/portal"), true);
 assert.equal(isClientAllowedPath("/sites/site_1"), true);
+assert.equal(isClientAllowedPath("/notificaciones"), true);
 assert.equal(isClientAllowedPath("/facturacion"), false);
 
 assert.equal(validarRut("12.345.678-5"), true);

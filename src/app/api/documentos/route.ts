@@ -8,8 +8,9 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { documentoCreateSchema } from "@/lib/schemas";
-import { newStorageKey, putObject } from "@/lib/storage";
+import { assertUploadSize, newStorageKey, putObject } from "@/lib/storage";
 import { writeAudit } from "@/lib/audit";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
         ...(causaId ? { causaId } : {}),
         ...confidentialWhere(user.role),
       },
-      include: { causa: true, autor: true },
+      include: { causa: true, autor: { select: publicUserSelect } },
       orderBy: { updatedAt: "desc" },
     });
     return NextResponse.json(documentos);
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
       autorId = user.id;
       if (file && typeof (file as File).arrayBuffer === "function" && (file as File).size > 0) {
         const uploaded = file as File;
+        assertUploadSize(uploaded.size);
         nombre = nombre || uploaded.name;
         mimeType = uploaded.type || "application/octet-stream";
         const key = newStorageKey("documentos", nombre);
@@ -80,6 +82,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (contenido && !storageKey) {
+      assertUploadSize(Buffer.byteLength(contenido, "utf8"));
       const key = newStorageKey("documentos", nombre);
       await putObject({
         key,

@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { assertSitePageAccess, confidentialFileWhere } from "@/lib/auth/access";
+import { assertSitePageAccess, siteFileWhereForRole } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
+import { isCliente } from "@/lib/auth/rbac";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteOverviewPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
-  const fileWhere = confidentialFileWhere(user.role);
+  const isClient = isCliente(user.role);
+  const fileWhere = siteFileWhereForRole(user.role);
   const site = await prisma.site.findUnique({
     where: { id },
     include: {
@@ -39,14 +41,15 @@ export default async function SiteOverviewPage({ params }: Params) {
         tipo={site.tipo}
         color={site.color}
         active=""
+        role={user.role}
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Files", value: visibleFilesCount },
-          { label: "Tasks", value: site._count.tasks },
-          { label: "Wiki pages", value: site._count.wikiPages },
-          { label: "People", value: site._count.members },
+          { label: "Archivos", value: visibleFilesCount },
+          { label: "Tareas", value: site._count.tasks },
+          { label: "Wiki", value: site._count.wikiPages },
+          { label: "Personas", value: site._count.members },
         ].map((s) => (
           <div key={s.label} className="panel rounded-3xl p-4">
             <div className="text-sm text-[var(--ink-soft)]/70">{s.label}</div>
@@ -64,10 +67,15 @@ export default async function SiteOverviewPage({ params }: Params) {
               ? ` · ${site.causa.rit || site.causa.titulo} · ${site.causa.tribunal}`
               : ""}
           </p>
-          {site.causa && (
+          {site.causa && !isClient && (
             <Link href={`/causas/${site.causa.id}`} className="mt-3 inline-flex text-sm text-[var(--sea)]">
               Abrir ficha de causa →
             </Link>
+          )}
+          {site.causa && isClient && (
+            <div className="mt-3 rounded-2xl border border-[var(--line)] bg-white/60 p-3 text-sm text-[var(--ink-soft)]/80">
+              {site.causa.resumen || "Resumen ejecutivo compartido por el estudio."}
+            </div>
           )}
         </div>
       )}
@@ -75,7 +83,7 @@ export default async function SiteOverviewPage({ params }: Params) {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">Tasks</h2>
+            <h2 className="font-semibold">Tareas</h2>
             <Link href={`/sites/${site.id}/tareas`} className="text-sm text-[var(--sea)]">
               Ver
             </Link>
@@ -97,9 +105,9 @@ export default async function SiteOverviewPage({ params }: Params) {
 
         <section className="panel rounded-3xl p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">Files recientes</h2>
+            <h2 className="font-semibold">Archivos recientes</h2>
             <Link href={`/sites/${site.id}/archivos`} className="text-sm text-[var(--sea)]">
-              Data room
+              Ver
             </Link>
           </div>
           <div className="space-y-2">
@@ -114,7 +122,7 @@ export default async function SiteOverviewPage({ params }: Params) {
 
         <section className="panel rounded-3xl p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">iSheets</h2>
+            <h2 className="font-semibold">Tablas</h2>
             <Link href={`/sites/${site.id}/isheets`} className="text-sm text-[var(--sea)]">
               Abrir
             </Link>
@@ -131,13 +139,13 @@ export default async function SiteOverviewPage({ params }: Params) {
               </Link>
             ))}
             {site.isheets.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">Sin iSheets aún.</p>
+              <p className="text-sm text-[var(--ink-soft)]/65">Sin tablas aún.</p>
             )}
           </div>
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <h2 className="mb-3 font-semibold">Activity stream</h2>
+          <h2 className="mb-3 font-semibold">Actividad</h2>
           <div className="space-y-3">
             {site.activities.map((a) => (
               <div key={a.id} className="border-b border-[var(--line)] pb-2 text-sm last:border-0">

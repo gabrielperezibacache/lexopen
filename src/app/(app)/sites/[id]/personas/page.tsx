@@ -24,10 +24,10 @@ export default async function SitePeoplePage({ params }: Params) {
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/personas" />
+      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/personas" role={user.role} />
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
-          Usuarios, roles del site y grupos (ethical walls / permisos HighQ-style).
+          Usuarios, roles del espacio y grupos con permisos segmentados.
         </p>
         {isStaff(user.role) && (
           <AddMemberButton

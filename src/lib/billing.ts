@@ -4,6 +4,22 @@ export const IVA_RATE = 0.19;
 /** Retención típica boleta de honorarios (aprox. 2ª categoría) — configurable */
 export const BOLETA_RETENCION_RATE = 0.1375;
 
+export type FirmTaxRates = {
+  ivaPct: number;
+  retencionPct: number;
+};
+
+export async function getFirmTaxRates(): Promise<FirmTaxRates> {
+  const { prisma } = await import("@/lib/db");
+  const settings = await prisma.firmSettings.findFirst({
+    select: { ivaPct: true, defaultRetencionPct: true },
+  });
+  return {
+    ivaPct: settings?.ivaPct ?? IVA_RATE,
+    retencionPct: settings?.defaultRetencionPct ?? BOLETA_RETENCION_RATE,
+  };
+}
+
 export const FEE_TIPOS = [
   { value: "hourly", label: "Por hora" },
   { value: "flat", label: "Suma alzada" },
@@ -49,17 +65,20 @@ export function clp(n: number) {
 export function computeInvoiceTotals(params: {
   tipoDocumento: string;
   lines: Array<{ amountClp: number }>;
+  rates?: FirmTaxRates;
 }) {
   const subtotalClp = params.lines.reduce((s, l) => s + l.amountClp, 0);
+  const ivaRate = params.rates?.ivaPct ?? IVA_RATE;
+  const retencionRate = params.rates?.retencionPct ?? BOLETA_RETENCION_RATE;
   let ivaClp = 0;
   let retencionClp = 0;
   let totalClp = subtotalClp;
 
   if (params.tipoDocumento === "factura_afecta") {
-    ivaClp = Math.round(subtotalClp * IVA_RATE);
+    ivaClp = Math.round(subtotalClp * ivaRate);
     totalClp = subtotalClp + ivaClp;
   } else if (params.tipoDocumento === "boleta_honorarios") {
-    retencionClp = Math.round(subtotalClp * BOLETA_RETENCION_RATE);
+    retencionClp = Math.round(subtotalClp * retencionRate);
     totalClp = subtotalClp - retencionClp;
   }
 

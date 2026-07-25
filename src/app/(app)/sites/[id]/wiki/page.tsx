@@ -3,12 +3,13 @@ import { prisma } from "@/lib/db";
 import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { NewWikiButton } from "@/components/sites/NewWikiButton";
+import { isCliente } from "@/lib/auth/rbac";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteWikiPage({ params }: Params) {
   const { id } = await params;
-  await assertSitePageAccess(id);
+  const user = await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
   const pages = await prisma.wikiPage.findMany({
@@ -19,12 +20,12 @@ export default async function SiteWikiPage({ params }: Params) {
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/wiki" />
+      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/wiki" role={user.role} />
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
           Wiki colaborativa del site — playbooks, checklists y home del matter.
         </p>
-        <NewWikiButton siteId={site.id} />
+        {!isCliente(user.role) && <NewWikiButton siteId={site.id} />}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         {pages.map((p) => (

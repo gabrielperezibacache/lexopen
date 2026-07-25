@@ -4,6 +4,13 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
 import { canSeeConfidential, isCliente, isStaff } from "@/lib/auth/rbac";
 
+/** Server pages that must be staff-only (defense in depth beyond layout). */
+export async function requireStaffPage() {
+  const user = await requireUser();
+  if (!isStaff(user.role)) redirect("/portal");
+  return user;
+}
+
 export function httpError(message: string, status: number) {
   const err = new Error(message) as Error & { status: number };
   err.status = status;
@@ -54,7 +61,19 @@ export function confidentialFileWhere(role: string) {
   return { confidencial: false };
 }
 
-const CLIENT_ALLOWED_PREFIXES = ["/portal", "/sites"];
+export function clientVisibleFileWhere() {
+  return {
+    confidencial: false,
+    tags: { contains: "cliente", mode: "insensitive" as const },
+  };
+}
+
+export function siteFileWhereForRole(role: string) {
+  if (isCliente(role)) return clientVisibleFileWhere();
+  return confidentialFileWhere(role);
+}
+
+const CLIENT_ALLOWED_PREFIXES = ["/portal", "/sites", "/notificaciones"];
 
 export function isClientAllowedPath(pathname: string) {
   if (!pathname) return true;

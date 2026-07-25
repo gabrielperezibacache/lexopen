@@ -7,11 +7,11 @@ import { ModuleHeader } from "@/components/sites/SiteNav";
 import { NewSiteButton } from "@/components/sites/NewSiteButton";
 
 const tipoLabel: Record<string, string> = {
-  matter: "Matter",
-  vdr: "Virtual Data Room",
-  client_portal: "Client portal",
-  project: "Project",
-  knowledge: "Knowledge",
+  matter: "Causa",
+  vdr: "Sala documental",
+  client_portal: "Portal cliente",
+  project: "Proyecto",
+  knowledge: "Conocimiento",
 };
 
 export default async function SitesPage() {
@@ -29,10 +29,10 @@ export default async function SitesPage() {
   return (
     <div>
       <ModuleHeader
-        eyebrow="HighQ workspaces"
-        title="Sites"
-        subtitle="Matters, VDRs, knowledge bases y portales cliente — el contenedor central de LexOpen."
-        actions={<NewSiteButton />}
+        eyebrow="Espacios de trabajo"
+        title="Espacios"
+        subtitle="Causas, salas documentales, conocimiento y portales cliente en LexOpen."
+        actions={!isCliente(user.role) ? <NewSiteButton /> : undefined}
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -51,10 +51,10 @@ export default async function SitesPage() {
               {s.description || "Sin descripción"}
             </p>
             <div className="mt-4 flex flex-wrap gap-3 text-xs text-[var(--ink-soft)]/65">
-              <span>{s._count.files} files</span>
-              <span>{s._count.tasks} tasks</span>
-              <span>{s._count.isheets} iSheets</span>
-              <span>{s._count.members} people</span>
+              <span>{s._count.files} archivos</span>
+              <span>{s._count.tasks} tareas</span>
+              <span>{s._count.isheets} tablas</span>
+              <span>{s._count.members} personas</span>
             </div>
             {(s.causa || s.cliente) && (
               <div className="mt-3 text-xs text-[var(--copper)]">
@@ -63,6 +63,9 @@ export default async function SitesPage() {
             )}
           </Link>
         ))}
+        {sites.length === 0 && (
+          <p className="text-sm text-[var(--ink-soft)]/65">No hay espacios visibles para esta sesión.</p>
+        )}
       </div>
     </div>
   );

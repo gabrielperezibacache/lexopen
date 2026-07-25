@@ -44,3 +44,20 @@ services:
         sync: false
       - key: S3_SECRET_ACCESS_KEY
         sync: false
+      - key: MAX_UPLOAD_BYTES
+        value: "10485760"
+      - key: CRON_SECRET
+        sync: false
+
+# Optional cron job for plazo alerts (configure ALERTS_URL to your web service URL):
+# - type: cron
+#   name: lexopen-plazo-alertas
+#   runtime: node
+#   schedule: "0 12 * * *"
+#   buildCommand: npm install
+#   startCommand: curl -fsS -X POST "$ALERTS_URL/api/plazos/alertas?days=3" -H "x-cron-secret: $CRON_SECRET"
+#   envVars:
+#     - key: ALERTS_URL
+#       sync: false
+#     - key: CRON_SECRET
+#       sync: false

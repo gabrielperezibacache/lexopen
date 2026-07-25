@@ -9,7 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteTasksPage({ params }: Params) {
   const { id } = await params;
-  await assertSitePageAccess(id);
+  const user = await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({
     where: { id },
     include: { members: { include: { user: true } } },
@@ -23,7 +23,7 @@ export default async function SiteTasksPage({ params }: Params) {
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/tareas" />
+      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/tareas" role={user.role} />
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
           Legal project management — asignación, prioridad y due dates.

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
 import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { getObject } from "@/lib/storage";
@@ -19,6 +19,9 @@ export async function GET(_req: Request, { params }: Params) {
     }
     if (file.confidencial && !canSeeConfidential(user.role)) {
       return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
+    }
+    if (isCliente(user.role) && !file.tags.toLowerCase().split(",").map((t) => t.trim()).includes("cliente")) {
+      return NextResponse.json({ error: "Archivo no compartido con cliente" }, { status: 403 });
     }
     const body = file.storageKey
       ? await getObject(file.storageKey)

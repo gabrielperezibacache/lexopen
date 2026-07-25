@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { handleRouteError, requireStaff } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET() {
   try {
@@ -37,7 +38,7 @@ export async function GET() {
         take: 8,
       }),
       prisma.timeEntry.findMany({
-        include: { user: true, causa: true, cliente: true },
+        include: { user: { select: publicUserSelect }, causa: true, cliente: true },
         orderBy: { date: "desc" },
         take: 8,
       }),

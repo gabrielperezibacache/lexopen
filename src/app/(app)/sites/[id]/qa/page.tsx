@@ -9,7 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteQaPage({ params }: Params) {
   const { id } = await params;
-  await assertSitePageAccess(id);
+  const user = await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
   const threads = await prisma.qaThread.findMany({
@@ -22,7 +22,7 @@ export default async function SiteQaPage({ params }: Params) {
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/qa" />
+      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/qa" role={user.role} />
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
           Q&A del site — hilos con cliente y equipo, con respuestas marcadas.

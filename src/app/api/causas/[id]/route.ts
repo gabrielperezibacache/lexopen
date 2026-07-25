@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     where: { id },
     include: {
       cliente: true,
-      abogado: true,
+      abogado: { select: publicUserSelect },
       partes: true,
       documentos: { orderBy: { updatedAt: "desc" } },
       plazos: { orderBy: { fechaLimite: "asc" } },
@@ -27,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         take: 20,
       },
       actividades: {
-        include: { user: true },
+        include: { user: { select: publicUserSelect } },
         orderBy: { createdAt: "desc" },
         take: 30,
       },

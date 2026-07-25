@@ -4,12 +4,14 @@ import { labelEtapa, labelMateria } from "@/lib/chile";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { Plus } from "lucide-react";
 import { CausasFilters } from "@/components/CausasFilters";
+import { requireStaffPage } from "@/lib/auth/access";
 
 export default async function CausasPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; materia?: string; estado?: string }>;
 }) {
+  await requireStaffPage();
   const sp = await searchParams;
   const q = sp.q?.trim();
   const materia = sp.materia;

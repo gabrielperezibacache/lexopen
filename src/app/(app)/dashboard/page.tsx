@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { formatDate, StatusBadge } from "@/components/ui";
 import { labelMateria } from "@/lib/chile";
 import { ArrowRight, Building2, Briefcase, ListTodo, MessageSquare } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireStaffPage } from "@/lib/auth/access";
 
 async function ensureSeeded() {
   const count = await prisma.site.count().catch(() => 0);
@@ -26,7 +26,7 @@ export default async function DashboardPage() {
   if (process.env.NODE_ENV === "development") {
     await ensureSeeded();
   }
-  const user = await getCurrentUser();
+  const user = await requireStaffPage();
 
   const [sites, causas, tasksOpen, unread, sitesList, tasks, actividades, minutasRecientes] =
     await Promise.all([
@@ -65,9 +65,9 @@ export default async function DashboardPage() {
     ]);
 
   const stats = [
-    { label: "Sites activos", value: sites, icon: Building2 },
+    { label: "Espacios activos", value: sites, icon: Building2 },
     { label: "Causas activas", value: causas, icon: Briefcase },
-    { label: "Tasks abiertas", value: tasksOpen, icon: ListTodo },
+    { label: "Tareas abiertas", value: tasksOpen, icon: ListTodo },
     { label: "Notificaciones", value: unread, icon: MessageSquare },
   ];
 
@@ -76,14 +76,13 @@ export default async function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            HighQ-style home
+            Panel del estudio
           </p>
           <h1 className="display mt-2 text-4xl">
-            {user ? `Hola, ${user.name.split(" ")[0]}` : "Dashboard"}
+            {`Hola, ${user.name.split(" ")[0]}`}
           </h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Sites, causas Chile, minutas de handoff y activity stream en un solo
-            control center.
+            Espacios, causas chilenas, minutas de continuidad y actividad reciente en un solo lugar.
           </p>
         </div>
         <div className="flex gap-2">
@@ -111,7 +110,7 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Sites recientes</h2>
+            <h2 className="text-lg font-semibold">Espacios recientes</h2>
             <Link href="/sites" className="text-sm text-[var(--sea)]">
               Todos
             </Link>
@@ -128,17 +127,20 @@ export default async function DashboardPage() {
                   <div className="font-medium">{s.name}</div>
                 </div>
                 <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
-                  {s.tipo} · {s._count.files} files · {s._count.tasks} tasks
+                  {s.tipo} · {s._count.files} archivos · {s._count.tasks} tareas
                   {s.causa?.rit ? ` · ${s.causa.rit}` : ""}
                 </div>
               </Link>
             ))}
+            {sitesList.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">Sin espacios activos todavía.</p>
+            )}
           </div>
         </section>
 
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">My tasks</h2>
+            <h2 className="text-lg font-semibold">Mis tareas</h2>
             <Link href="/tareas" className="text-sm text-[var(--sea)]">
               Ver todas
             </Link>
@@ -160,6 +162,9 @@ export default async function DashboardPage() {
                 />
               </div>
             ))}
+            {tasks.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">No hay tareas abiertas.</p>
+            )}
           </div>
         </section>
       </div>
@@ -194,7 +199,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="panel rounded-3xl p-5">
-        <h2 className="mb-4 text-lg font-semibold">Activity stream</h2>
+        <h2 className="mb-4 text-lg font-semibold">Actividad reciente</h2>
         <div className="space-y-3">
           {actividades.map((a) => (
             <div key={a.id} className="flex gap-3 border-b border-[var(--line)] pb-3 last:border-0">
@@ -208,6 +213,9 @@ export default async function DashboardPage() {
               </div>
             </div>
           ))}
+          {actividades.length === 0 && (
+            <p className="text-sm text-[var(--ink-soft)]/65">Sin actividad registrada.</p>
+          )}
         </div>
       </section>
     </div>

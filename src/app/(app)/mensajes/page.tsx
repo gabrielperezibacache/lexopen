@@ -62,9 +62,9 @@ export default function MessagesPage() {
   return (
     <div>
       <ModuleHeader
-        eyebrow="Secure messaging"
-        title="Messages"
-        subtitle="Mensajería interna + centro de notificaciones (HighQ activity / alerts)."
+        eyebrow="Mensajería segura"
+        title="Mensajes"
+        subtitle="Mensajería interna y centro de notificaciones del estudio."
         actions={
           <button className="btn btn-ghost" type="button" onClick={markRead}>
             Marcar notificaciones leídas
@@ -84,6 +84,9 @@ export default function MessagesPage() {
                 <p className="mt-1 text-[var(--ink-soft)]/85">{m.body}</p>
               </div>
             ))}
+            {messages.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">Sin mensajes todavía.</p>
+            )}
           </div>
           <form onSubmit={send} className="mt-4 space-y-2 border-t border-[var(--line)] pt-4">
             <select className="select" name="receiverId" required defaultValue="">

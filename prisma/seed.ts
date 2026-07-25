@@ -4,6 +4,27 @@ import { TRIBUNALES_CHILE } from "../src/lib/chile";
 
 const prisma = new PrismaClient();
 
+function tribunalRegion(nombre: string) {
+  if (nombre.includes("Valparaíso")) return "Valparaíso";
+  if (nombre.includes("Concepción")) return "Biobío";
+  if (nombre.includes("Antofagasta")) return "Antofagasta";
+  if (nombre.includes("La Serena")) return "Coquimbo";
+  if (nombre.includes("Rancagua")) return "O'Higgins";
+  if (nombre.includes("Talca")) return "Maule";
+  if (nombre.includes("Temuco")) return "La Araucanía";
+  if (nombre.includes("Puerto Montt")) return "Los Lagos";
+  return "Metropolitana";
+}
+
+function tribunalCompetencia(nombre: string) {
+  if (nombre.includes("Trabajo") || nombre.includes("Laboral")) return "laboral";
+  if (nombre.includes("Familia")) return "familia";
+  if (nombre.includes("Garantía") || nombre.includes("Penal")) return "penal";
+  if (nombre.includes("Corte")) return "corte";
+  if (nombre.includes("Constitucional")) return "constitucional";
+  return "civil";
+}
+
 async function wipe() {
   const models = [
     "ledgerEntry",
@@ -87,8 +108,8 @@ async function main() {
   await prisma.tribunal.createMany({
     data: TRIBUNALES_CHILE.map((nombre) => ({
       nombre,
-      region: "Metropolitana",
-      competencia: "general",
+      region: tribunalRegion(nombre),
+      competencia: tribunalCompetencia(nombre),
     })),
   });
 

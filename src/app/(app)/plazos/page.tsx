@@ -3,6 +3,7 @@ import { StatusBadge, formatDate } from "@/components/ui";
 import Link from "next/link";
 import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
 import { PlazoForm } from "@/components/PlazoForm";
+import { requireStaffPage } from "@/lib/auth/access";
 
 type Props = { searchParams: Promise<{ mes?: string }> };
 
@@ -21,6 +22,7 @@ function monthParam(date: Date) {
 }
 
 export default async function PlazosPage({ searchParams }: Props) {
+  await requireStaffPage();
   const sp = await searchParams;
   const { start, end } = monthBounds(sp.mes);
   const [plazos, causas, responsables] = await Promise.all([

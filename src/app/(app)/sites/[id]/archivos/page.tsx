@@ -1,16 +1,18 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { assertSitePageAccess, confidentialFileWhere } from "@/lib/auth/access";
+import { assertSitePageAccess, siteFileWhereForRole } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { formatDate } from "@/components/ui";
 import { SiteFileActions } from "@/components/sites/SiteFileActions";
+import { isCliente } from "@/lib/auth/rbac";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteFilesPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
-  const fileWhere = confidentialFileWhere(user.role);
+  const fileWhere = siteFileWhereForRole(user.role);
+  const canUpload = !isCliente(user.role);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
 
@@ -38,12 +40,12 @@ export default async function SiteFilesPage({ params }: Params) {
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/archivos" />
+      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/archivos" role={user.role} />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--ink-soft)]/75">
-          Virtual Data Room / Files — carpetas, versiones, comentarios y metadata.
+          Archivos del espacio: carpetas, versiones, comentarios y metadatos.
         </p>
-        <SiteFileActions siteId={site.id} />
+        {canUpload && <SiteFileActions siteId={site.id} />}
       </div>
 
       <div className="space-y-4">

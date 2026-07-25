@@ -2,10 +2,10 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireStaffPage } from "@/lib/auth/access";
 
 export default async function GlobalTasksPage() {
-  const user = await getCurrentUser();
+  const user = await requireStaffPage();
   const tasks = await prisma.task.findMany({
     include: { site: true, assignee: true },
     orderBy: [{ status: "asc" }, { dueDate: "asc" }],
@@ -14,8 +14,8 @@ export default async function GlobalTasksPage() {
   return (
     <div>
       <ModuleHeader
-        eyebrow="Legal project management"
-        title="Tasks"
+        eyebrow="Gestión legal"
+        title="Tareas"
         subtitle={
           user
             ? `Vista global de tareas del estudio. Sesión: ${user.name}.`

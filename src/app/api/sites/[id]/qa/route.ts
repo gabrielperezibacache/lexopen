@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const threads = await prisma.qaThread.findMany({
       where: { siteId: id },
       include: {
-        posts: { include: { author: true }, orderBy: { createdAt: "asc" } },
+        posts: { include: { author: { select: publicUserSelect } }, orderBy: { createdAt: "asc" } },
       },
       orderBy: { updatedAt: "desc" },
     });

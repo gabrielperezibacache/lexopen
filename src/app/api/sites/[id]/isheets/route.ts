@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
-import { isCliente } from "@/lib/auth/rbac";
+import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,12 +26,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function POST(req: NextRequest, { params }: Params) {
   try {
     assertCsrf(req);
-    const user = await requireUser();
+    const user = await requireStaff();
     const { id } = await params;
     await requireSiteAccess(id, user);
-    if (isCliente(user.role)) {
-      return NextResponse.json({ error: "Clientes no pueden editar iSheets" }, { status: 403 });
-    }
     const body = await req.json();
 
     if (body.action === "create-sheet") {
