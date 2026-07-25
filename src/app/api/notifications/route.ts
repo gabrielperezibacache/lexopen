@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireUser } from "@/lib/api";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const user = await requireUser();
+    if (req.nextUrl.searchParams.get("count") === "1") {
+      const unread = await prisma.notification.count({
+        where: { userId: user.id, read: false },
+      });
+      return NextResponse.json({ unread });
+    }
     const items = await prisma.notification.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },

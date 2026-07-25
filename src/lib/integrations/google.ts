@@ -428,6 +428,12 @@ export async function linkCausaDriveFolder(causaId: string, folderRef: string) {
     if (meta.webViewLink) folderUrl = meta.webViewLink;
   }
 
+  if (!config.accessToken && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Google OAuth requerido para vincular carpetas Drive en producción"
+    );
+  }
+
   const updated = await prisma.causa.update({
     where: { id: causaId },
     data: {

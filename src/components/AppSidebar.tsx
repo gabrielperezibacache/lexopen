@@ -103,6 +103,7 @@ function NavGroup({
 export function AppSidebar({ role }: { role?: string | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
   const isCliente = role === "cliente";
 
   useEffect(() => {
@@ -110,6 +111,13 @@ export function AppSidebar({ role }: { role?: string | null }) {
     window.addEventListener("lexopen:open-menu", openMenu);
     return () => window.removeEventListener("lexopen:open-menu", openMenu);
   }, []);
+
+  useEffect(() => {
+    fetch("/api/notifications?count=1")
+      .then((r) => (r.ok ? r.json() : { unread: 0 }))
+      .then((d) => setUnread(Number(d.unread) || 0))
+      .catch(() => setUnread(0));
+  }, [pathname]);
 
   const nav = (
     <>
@@ -143,7 +151,7 @@ export function AppSidebar({ role }: { role?: string | null }) {
         {!isCliente && (
           <Link href="/notificaciones" className="nav-link" onClick={() => setOpen(false)}>
             <Bell size={16} />
-            <span>Notificaciones</span>
+            <span>Notificaciones{unread > 0 ? ` (${unread})` : ""}</span>
           </Link>
         )}
         <UserSwitcher />
