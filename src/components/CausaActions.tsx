@@ -15,9 +15,24 @@ export function CausaActions({ causaId }: { causaId: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "sync-causa", causaId }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     setBusy(false);
-    setMsg(res.ok ? `Obsidian sync: ${data.result?.files ?? 0} archivos` : data.error || "Error");
+    if (!res.ok) {
+      setMsg(data.error || "Error Obsidian");
+      return;
+    }
+    const skipped = data.result?.skippedConfidential;
+    const skipNote =
+      skipped && (skipped.minutas || skipped.documentos)
+        ? ` · omitidos confidenciales: ${skipped.minutas} minutas / ${skipped.documentos} docs`
+        : "";
+    const warn =
+      Array.isArray(data.result?.warnings) && data.result.warnings.length
+        ? ` · avisos: ${data.result.warnings.slice(0, 2).join("; ")}`
+        : "";
+    setMsg(
+      `Obsidian (${data.result?.mode || "storage"}): ${data.result?.files ?? 0} archivos${skipNote}${warn}`
+    );
   }
 
   async function askHermes() {
@@ -32,9 +47,19 @@ export function CausaActions({ causaId }: { causaId: string }) {
           "Resume el estado procesal de esta causa chilena y sugiere los próximos tres pasos del litigio, considerando las minutas recientes si existen.",
       }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     setBusy(false);
-    setMsg(data.content?.slice(0, 280) || data.error || "Sin respuesta");
+    if (!res.ok) {
+      setMsg(data.error || "Error Hermes");
+      return;
+    }
+    if (data.source === "error") {
+      setMsg(data.note || data.error || "Hermes no alcanzable");
+      return;
+    }
+    const prefix =
+      data.source === "demo" ? "[DEMO] " : data.source === "hermes" ? "[Hermes] " : "";
+    setMsg(`${prefix}${data.content?.slice(0, 280) || "Sin respuesta"}`);
   }
 
   return (
@@ -70,7 +95,10 @@ export function CausaActions({ causaId }: { causaId: string }) {
         </Link>
       </div>
       {msg && (
-        <p className="max-w-md rounded-2xl border border-[var(--line)] bg-white/80 p-3 text-xs text-[var(--ink-soft)]/80">
+        <p
+          className="max-w-md rounded-2xl border border-[var(--line)] bg-white/80 p-3 text-xs text-[var(--ink-soft)]/80"
+          role="status"
+        >
           {msg}
         </p>
       )}

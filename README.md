@@ -28,8 +28,8 @@
 - **Google Drive por causa**: vincular o crear una carpeta determinada; distingue carpetas reales vs stub/demo; documentos y minutas solo se suben a carpetas reales con OAuth.
 - **Facturación y contabilidad**: horas, gastos, tarifas, boletas/facturas (IVA/retención), pagos, cuenta corriente / provisión de fondos
 - Jurisprudencia (CS, Apelaciones, TC — corpus demo)
-- **Obsidian** (export vault Markdown, incluye Minutas/)
-- **Hermes Agent** (API OpenAI-compatible + demo)
+- **Obsidian**: export Markdown por causa (omite confidenciales). Prefiere `OBSIDIAN_REST_URL`; en producción sin REST escribe a object storage (el FS de Render es efímero).
+- **Hermes Agent**: API OpenAI-compatible con historial `AgentChat`, contexto ACL y fail-closed en prod (`HERMES_ALLOW_DEMO=0`). Demo solo si se habilita explícitamente y siempre etiquetada.
 - **Google Workspace** (OAuth Drive / Calendar / Gmail)
 
 ## Stack
