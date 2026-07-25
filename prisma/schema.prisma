@@ -3,8 +3,33 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String   @default("Estudio LexOpen")
+  rut         String?
+  email       String?
+  telefono   String?
+  direccion   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  settings    FirmSettings?
+}
+
+model FirmSettings {
+  id              String  @id @default(cuid())
+  organizationId  String  @unique
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  emisorRazonSocial String?
+  emisorRut       String?
+  emisorGiro      String?
+  emisorDireccion String?
+  defaultRetencionPct Float @default(0.1375)
+  ivaPct          Float   @default(0.19)
+  hermesAllowDemo Boolean @default(true)
 }
 
 model User {
@@ -38,6 +63,40 @@ model User {
   expenses        Expense[]        @relation("ExpenseAuthor")
   invoicesCreated Invoice[]        @relation("InvoiceAuthor")
   feeArrangements FeeArrangement[] @relation("FeeOwner")
+  minutas         Minuta[]         @relation("MinutaAutor")
+  minutaAcciones  MinutaAccion[]   @relation("MinutaAccionUser")
+  auditEvents     AuditEvent[]
+  timeApprovals   TimeEntry[]      @relation("TimeApprover")
+  agentChats      AgentChat[]
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String?
+  beforeJson String?
+  afterJson  String?
+  ip         String?
+  createdAt  DateTime @default(now())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+}
+
+model Tribunal {
+  id        String  @id @default(cuid())
+  nombre    String  @unique
+  region    String?
+  competencia String?
+  activo    Boolean @default(true)
+}
+
+model UfRate {
+  id        String   @id @default(cuid())
+  date      DateTime @unique
+  valueClp  Int
+  source    String   @default("manual")
+  createdAt DateTime @default(now())
 }
 
 model Group {
@@ -140,6 +199,8 @@ model Causa {
   rit           String?
   ruc           String?
   tribunal      String
+  sala          String?
+  cuaderno      String?
   materia       String
   procedimiento String?
   estado        String    @default("activa")
@@ -147,6 +208,15 @@ model Causa {
   caratula      String?
   resumen       String?
   fechaIngreso  DateTime?
+  fechaNotificacion DateTime?
+  abogadoContraparte String?
+  conflictCheckedAt DateTime?
+  conflictStatus String @default("clear") // clear | warning | blocked
+  conflictNotes String?
+  /// Carpeta de Google Drive vinculada a la causa (expediente digital)
+  googleDriveFolderId   String?
+  googleDriveFolderName String?
+  googleDriveFolderUrl  String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -161,12 +231,113 @@ model Causa {
   plazos          Plazo[]
   actividades     Activity[]
   notas           Nota[]
+  minutas         Minuta[]
   site            Site?
   feeArrangements FeeArrangement[]
   timeEntries     TimeEntry[]
   expenses        Expense[]
   invoices        Invoice[]
   ledgerEntries   LedgerEntry[]
+  etapaHistorial  EtapaHistorial[]
+  agentChats      AgentChat[]
+  movimientos     CausaMovimiento[]
+
+  @@index([rit])
+  @@index([ruc])
+  @@index([estado])
+}
+
+model EtapaHistorial {
+  id        String   @id @default(cuid())
+  etapa     String
+  nota      String?
+  createdAt DateTime @default(now())
+  causaId   String
+  causa     Causa    @relation(fields: [causaId], references: [id], onDelete: Cascade)
+}
+
+model CausaMovimiento {
+  id          String   @id @default(cuid())
+  titulo      String
+  detalle     String?
+  fuente      String   @default("manual") // manual | pjud | import
+  fecha       DateTime @default(now())
+  createdAt   DateTime @default(now())
+  causaId     String
+  causa       Causa    @relation(fields: [causaId], references: [id], onDelete: Cascade)
+}
+
+model AgentChat {
+  id        String   @id @default(cuid())
+  title     String   @default("Consulta Hermes")
+  messagesJson String @default("[]")
+  demoMode  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  causaId   String?
+  causa     Causa?   @relation(fields: [causaId], references: [id], onDelete: SetNull)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+/// Minuta post-audiencia, reunión o llamada — handoff entre abogados del estudio
+model Minuta {
+  id                String   @id @default(cuid())
+  tipo              String   @default("reunion") // audiencia | reunion | llamada
+  titulo            String
+  fecha             DateTime @default(now())
+  modalidad         String   @default("presencial") // presencial | videollamada | telefonica | hibrida
+  lugar             String?
+  participantes     String   @default("") // nombres separados por coma o JSON simple
+  resumenEjecutivo  String
+  hechosRelevantes  String?
+  acuerdos          String?
+  proximosPasos     String? // texto estructurado; también se materializan en MinutaAccion
+  riesgosAlertas    String?
+  estadoCausaNota   String? // cómo queda la causa tras el acto
+  etapaSugerida     String? // opcional: actualizar etapa de la causa
+  confidencial      Boolean  @default(false)
+  googleDriveFileId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  causaId     String
+  causa       Causa      @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  autorId     String?
+  autor       User?      @relation("MinutaAutor", fields: [autorId], references: [id])
+  documentoId String?
+  documento   Documento? @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+  acciones    MinutaAccion[]
+}
+
+/// Acción de seguimiento derivada de una minuta (continuidad de tramitación)
+model MinutaAccion {
+  id          String    @id @default(cuid())
+  descripcion String
+  responsable String? // nombre libre si aún no hay user
+  fechaLimite DateTime?
+  prioridad   String    @default("media") // baja | media | alta | urgente
+  estado      String    @default("pendiente") // pendiente | en_curso | hecha | cancelada
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  minutaId String
+  minuta   Minuta @relation(fields: [minutaId], references: [id], onDelete: Cascade)
+  plazoId  String?
+  plazo    Plazo? @relation(fields: [plazoId], references: [id], onDelete: SetNull)
+  taskId   String?
+  task     Task?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  responsableId String?
+  responsableUser User? @relation("MinutaAccionUser", fields: [responsableId], references: [id], onDelete: SetNull)
+}
+
+model MinutaPlantilla {
+  id        String   @id @default(cuid())
+  tipo      String
+  nombre    String
+  materia   String?
+  bodyJson  String   @default("{}")
+  createdAt DateTime @default(now())
 }
 
 model Parte {
@@ -199,6 +370,9 @@ model SiteFile {
   sizeBytes   Int      @default(0)
   contenido   String?
   storagePath String?
+  storageKey  String?
+  confidencial Boolean @default(false)
+  privilegio  Boolean  @default(false)
   version     Int      @default(1)
   checkedOut  Boolean  @default(false)
   tags        String   @default("")
@@ -234,6 +408,9 @@ model Documento {
   mimeType      String?
   contenido     String?
   ruta          String?
+  storageKey    String?
+  confidencial  Boolean  @default(false)
+  privilegio    Boolean  @default(false)
   version       Int      @default(1)
   obsidianPath  String?
   googleDriveId String?
@@ -244,6 +421,9 @@ model Documento {
   causa   Causa? @relation(fields: [causaId], references: [id], onDelete: SetNull)
   autorId String?
   autor   User?  @relation(fields: [autorId], references: [id])
+  minutas Minuta[]
+
+  @@index([causaId])
 }
 
 model Plazo {
@@ -251,8 +431,13 @@ model Plazo {
   titulo        String
   descripcion   String?
   fechaLimite   DateTime
+  fechaNotificacion DateTime?
+  diasPlazo     Int?
+  tipoComputo   String   @default("habiles") // habiles | corridos
+  esFatal       Boolean  @default(false)
   tipo          String   @default("procesal")
   estado        String   @default("pendiente")
+  alertaEnviada Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -260,6 +445,10 @@ model Plazo {
   causa         Causa? @relation(fields: [causaId], references: [id], onDelete: Cascade)
   responsableId String?
   responsable   User?  @relation(fields: [responsableId], references: [id])
+  minutaAcciones MinutaAccion[]
+
+  @@index([fechaLimite])
+  @@index([estado])
 }
 
 model Nota {
@@ -305,6 +494,7 @@ model Task {
   creator    User? @relation("TaskCreator", fields: [creatorId], references: [id])
 
   comments Comment[]
+  minutaAcciones MinutaAccion[]
 }
 
 model WikiPage {
@@ -517,14 +707,19 @@ model TimeEntry {
   description String
   billable    Boolean  @default(true)
   billed      Boolean  @default(false)
+  approved    Boolean  @default(false)
   rateClp     Int? // override; si null usa fee arrangement / default
   amountClp   Int // hours * rate (calculado al guardar)
   activityCode String  @default("general") // research | hearing | drafting | meeting | travel | general
+  minutaId    String?
+  startedAt   DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   userId    String
   user      User     @relation(fields: [userId], references: [id])
+  approverId String?
+  approver  User?    @relation("TimeApprover", fields: [approverId], references: [id])
   clienteId String?
   cliente   Cliente? @relation(fields: [clienteId], references: [id])
   causaId   String?

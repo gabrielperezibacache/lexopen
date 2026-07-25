@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { prisma } from "@/lib/db";
+import { newStorageKey, putObject } from "@/lib/storage";
 
 export type ObsidianConfig = {
   vaultPath: string;
@@ -27,6 +28,43 @@ function sanitize(name: string) {
   return name.replace(/[<>:"/\\|?*]/g, "-").trim();
 }
 
+async function writeExportFile(opts: {
+  localPath: string;
+  relativePath: string;
+  content: string;
+  vaultPath?: string | null;
+  storageKeys: string[];
+}) {
+  const restUrl = process.env.OBSIDIAN_REST_URL?.replace(/\/$/, "");
+  if (restUrl) {
+    const res = await fetch(`${restUrl}/vault/${encodeURIComponent(opts.relativePath)}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        ...(process.env.OBSIDIAN_REST_TOKEN
+          ? { Authorization: `Bearer ${process.env.OBSIDIAN_REST_TOKEN}` }
+          : {}),
+      },
+      body: opts.content,
+    });
+    if (!res.ok) {
+      throw new Error(`Obsidian REST PUT failed: ${res.status}`);
+    }
+    return;
+  }
+
+  if (opts.vaultPath && process.env.NODE_ENV !== "production") {
+    await fs.mkdir(path.dirname(opts.localPath), { recursive: true });
+    await fs.writeFile(opts.localPath, opts.content, "utf8");
+  }
+  const stored = await putObject({
+    key: newStorageKey("obsidian", opts.relativePath),
+    body: opts.content,
+    contentType: "text/markdown",
+  });
+  opts.storageKeys.push(stored.key);
+}
+
 export async function exportCausaToObsidian(causaId: string) {
   const config = await getObsidianConfig();
   const causa = await prisma.causa.findUnique({
@@ -34,17 +72,23 @@ export async function exportCausaToObsidian(causaId: string) {
     include: {
       partes: true,
       notas: true,
-      documentos: true,
+      documentos: { where: { confidencial: false } },
       plazos: true,
       cliente: true,
       abogado: true,
+      minutas: {
+        where: { confidencial: false },
+        include: { acciones: true },
+        orderBy: { fecha: "desc" },
+      },
     },
   });
   if (!causa) throw new Error("Causa no encontrada");
 
   const folderName = sanitize(causa.rit || causa.titulo);
   const dir = path.join(config.vaultPath, config.folderPrefix, "Causas", folderName);
-  await fs.mkdir(dir, { recursive: true });
+  const storageKeys: string[] = [];
+  let files = 0;
 
   const indexMd = `---
 rit: ${causa.rit ?? ""}
@@ -53,6 +97,7 @@ tribunal: ${causa.tribunal}
 materia: ${causa.materia}
 estado: ${causa.estado}
 etapa: ${causa.etapa}
+google_drive_folder: ${causa.googleDriveFolderId ?? ""}
 lexopen_id: ${causa.id}
 ---
 
@@ -61,6 +106,7 @@ lexopen_id: ${causa.id}
 **Carátula:** ${causa.caratula ?? "—"}
 **Cliente:** ${causa.cliente?.razonSocial ?? "—"}
 **Abogado:** ${causa.abogado?.name ?? "—"}
+**Drive:** ${causa.googleDriveFolderUrl ?? "—"}
 
 ## Resumen
 ${causa.resumen ?? "_Sin resumen_"}
@@ -70,30 +116,67 @@ ${causa.partes.map((p) => `- **${p.rol}:** ${p.nombre}${p.rut ? ` (${p.rut})` : 
 
 ## Plazos
 ${causa.plazos.map((p) => `- [ ] ${p.titulo} — ${p.fechaLimite.toISOString().slice(0, 10)} (${p.estado})`).join("\n") || "_Sin plazos_"}
+
+## Minutas
+${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.titulo}]] — ${m.fecha.toISOString().slice(0, 10)}`).join("\n") || "_Sin minutas_"}
 `;
 
-  await fs.writeFile(path.join(dir, "Index.md"), indexMd, "utf8");
+  await writeExportFile({
+    localPath: path.join(dir, "Index.md"),
+    relativePath: path.join(config.folderPrefix, "Causas", folderName, "Index.md"),
+    content: indexMd,
+    vaultPath: config.vaultPath,
+    storageKeys,
+  });
+  files += 1;
 
   if (config.syncNotes) {
     const notesDir = path.join(dir, "Notas");
-    await fs.mkdir(notesDir, { recursive: true });
     for (const nota of causa.notas) {
       const file = `${sanitize(nota.titulo)}.md`;
-      await fs.writeFile(
-        path.join(notesDir, file),
-        `---\ntags: [${nota.tags}]\n---\n\n# ${nota.titulo}\n\n${nota.contenido}\n`,
-        "utf8"
-      );
+      await writeExportFile({
+        localPath: path.join(notesDir, file),
+        relativePath: path.join(config.folderPrefix, "Causas", folderName, "Notas", file),
+        content: `---\ntags: [${nota.tags}]\n---\n\n# ${nota.titulo}\n\n${nota.contenido}\n`,
+        vaultPath: config.vaultPath,
+        storageKeys,
+      });
+      files += 1;
     }
+  }
+
+  const minutasDir = path.join(dir, "Minutas");
+  for (const minuta of causa.minutas) {
+    const file = `${sanitize(minuta.titulo)}.md`;
+    const acciones = minuta.acciones
+      .map(
+        (a) =>
+          `- [${a.estado === "hecha" ? "x" : " "}] ${a.descripcion}${a.responsable ? ` (@${a.responsable})` : ""}`
+      )
+      .join("\n");
+    await writeExportFile({
+      localPath: path.join(minutasDir, file),
+      relativePath: path.join(config.folderPrefix, "Causas", folderName, "Minutas", file),
+      content: `---\ntipo: ${minuta.tipo}\nfecha: ${minuta.fecha.toISOString()}\n---\n\n# ${minuta.titulo}\n\n## Resumen\n${minuta.resumenEjecutivo}\n\n## Próximos pasos\n${acciones || minuta.proximosPasos || "_Sin acciones_"}\n`,
+      vaultPath: config.vaultPath,
+      storageKeys,
+    });
+    files += 1;
   }
 
   if (config.syncDocumentos) {
     const docsDir = path.join(dir, "Documentos");
-    await fs.mkdir(docsDir, { recursive: true });
     for (const doc of causa.documentos) {
       if (!doc.contenido) continue;
       const file = sanitize(doc.nombre.endsWith(".md") ? doc.nombre : `${doc.nombre}.md`);
-      await fs.writeFile(path.join(docsDir, file), doc.contenido, "utf8");
+      await writeExportFile({
+        localPath: path.join(docsDir, file),
+        relativePath: path.join(config.folderPrefix, "Causas", folderName, "Documentos", file),
+        content: doc.contenido,
+        vaultPath: config.vaultPath,
+        storageKeys,
+      });
+      files += 1;
       await prisma.documento.update({
         where: { id: doc.id },
         data: { obsidianPath: path.join(config.folderPrefix, "Causas", folderName, "Documentos", file) },
@@ -101,7 +184,12 @@ ${causa.plazos.map((p) => `- [ ] ${p.titulo} — ${p.fechaLimite.toISOString().s
     }
   }
 
-  return { vaultPath: dir, files: causa.notas.length + causa.documentos.length + 1 };
+  return {
+    vaultPath: dir,
+    storageKeys,
+    files,
+    mode: process.env.OBSIDIAN_REST_URL ? "rest" : "storage",
+  };
 }
 
 export async function syncAllCausasToObsidian() {

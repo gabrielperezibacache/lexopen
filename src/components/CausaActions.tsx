@@ -29,7 +29,7 @@ export function CausaActions({ causaId }: { causaId: string }) {
       body: JSON.stringify({
         causaId,
         prompt:
-          "Resume el estado procesal de esta causa chilena y sugiere los próximos tres pasos del litigio.",
+          "Resume el estado procesal de esta causa chilena y sugiere los próximos tres pasos del litigio, considerando las minutas recientes si existen.",
       }),
     });
     const data = await res.json();
@@ -38,15 +38,34 @@ export function CausaActions({ causaId }: { causaId: string }) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex flex-wrap justify-end gap-2">
-        <button className="btn btn-ghost" disabled={busy} onClick={syncObsidian} type="button">
+    <div className="flex w-full flex-col items-stretch gap-2 sm:items-end">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+        <Link
+          href={`/causas/${causaId}/minuta/nueva`}
+          className="btn btn-primary w-full sm:w-auto"
+        >
+          Nueva minuta
+        </Link>
+        <button
+          className="btn btn-ghost w-full sm:w-auto"
+          disabled={busy}
+          onClick={syncObsidian}
+          type="button"
+        >
           Sync Obsidian
         </button>
-        <button className="btn btn-secondary" disabled={busy} onClick={askHermes} type="button">
+        <button
+          className="btn btn-secondary w-full sm:w-auto"
+          disabled={busy}
+          onClick={askHermes}
+          type="button"
+        >
           Consultar Hermes
         </button>
-        <Link href={`/agente?causaId=${causaId}`} className="btn btn-primary">
+        <Link
+          href={`/agente?causaId=${causaId}`}
+          className="btn btn-ghost w-full sm:w-auto"
+        >
           Abrir agente
         </Link>
       </div>

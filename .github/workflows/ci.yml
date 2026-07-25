@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "cursor/**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lexopen
+          POSTGRES_PASSWORD: lexopen
+          POSTGRES_DB: lexopen
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lexopen"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://lexopen:lexopen@localhost:5432/lexopen
+      SESSION_SECRET: ci-session-secret-16plus
+      HERMES_ALLOW_DEMO: "1"
+      LEXOPEN_RELAX_CSRF: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build

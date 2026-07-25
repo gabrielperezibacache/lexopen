@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, listUsers } from "@/lib/auth/session";
+import { canImpersonate } from "@/lib/auth/rbac";
 
 export async function GET() {
-  const [user, users] = await Promise.all([getCurrentUser(), listUsers()]);
+  const user = await getCurrentUser();
+  const users = canImpersonate() ? await listUsers() : user ? [user] : [];
   return NextResponse.json({
     user: user
       ? {
@@ -22,5 +24,6 @@ export async function GET() {
       title: u.title,
       avatarColor: u.avatarColor,
     })),
+    demoSwitcher: canImpersonate(),
   });
 }

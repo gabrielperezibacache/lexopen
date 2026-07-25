@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE } from "@/lib/auth/session";
+import { ROLE_COOKIE, SESSION_COOKIE } from "@/lib/auth/session";
 
 export async function POST() {
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+  const clear = {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  };
+  res.cookies.set(SESSION_COOKIE, "", clear);
+  res.cookies.set(ROLE_COOKIE, "", { ...clear, httpOnly: false });
   return res;
 }

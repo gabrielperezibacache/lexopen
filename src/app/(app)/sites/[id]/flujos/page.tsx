@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { WorkflowActions } from "@/components/sites/WorkflowActions";
@@ -8,6 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteWorkflowsPage({ params }: Params) {
   const { id } = await params;
+  await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
   const workflows = await prisma.workflow.findMany({

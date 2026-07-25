@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type User = {
   id: string;
@@ -16,35 +17,48 @@ export function UserSwitcher() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [demoSwitcher, setDemoSwitcher] = useState(false);
   const [open, setOpen] = useState(false);
 
   async function load() {
     const res = await fetch("/api/auth/me");
+    if (res.status === 401) {
+      setUser(null);
+      return;
+    }
     const data = await res.json();
     setUser(data.user);
     setUsers(data.users || []);
+    setDemoSwitcher(Boolean(data.demoSwitcher));
   }
 
   useEffect(() => {
     load();
   }, []);
 
-  async function loginAs(email: string) {
-    await fetch("/api/auth/login", {
+  async function loginAs(userId: string) {
+    if (!demoSwitcher) return;
+    await fetch("/api/auth/impersonate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password: "lexopen" }),
+      body: JSON.stringify({ userId }),
     });
     setOpen(false);
     await load();
     router.refresh();
   }
 
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
+
   if (!user) {
     return (
-      <button className="nav-link w-full" type="button" onClick={() => loginAs("socio@estudio.cl")}>
-        Iniciar sesión demo
-      </button>
+      <Link href="/login" className="nav-link w-full">
+        Iniciar sesión
+      </Link>
     );
   }
 
@@ -71,27 +85,38 @@ export function UserSwitcher() {
         </span>
       </button>
       {open && (
-        <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 z-20 max-h-64 overflow-auto rounded-xl border border-white/10 bg-[#0c1c24] p-2 shadow-xl">
-          <div className="px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-white/40">
-            Cambiar usuario (demo)
-          </div>
-          {users.map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-white/80 hover:bg-white/10"
-              onClick={() => loginAs(u.email)}
-            >
-              <span
-                className="h-6 w-6 rounded-full"
-                style={{ background: u.avatarColor || "#1f6f78" }}
-              />
-              <span className="min-w-0">
-                <span className="block truncate">{u.name}</span>
-                <span className="block truncate text-[11px] text-white/45">{u.email}</span>
-              </span>
-            </button>
-          ))}
+        <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 z-20 max-h-72 overflow-auto rounded-xl border border-white/10 bg-[#0c1c24] p-2 shadow-xl">
+          {demoSwitcher && (
+            <>
+              <div className="px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-white/40">
+                Cambiar usuario (solo desarrollo)
+              </div>
+              {users.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-white/80 hover:bg-white/10"
+                  onClick={() => loginAs(u.id)}
+                >
+                  <span
+                    className="h-6 w-6 rounded-full"
+                    style={{ background: u.avatarColor || "#1f6f78" }}
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate">{u.name}</span>
+                    <span className="block truncate text-[11px] text-white/45">{u.email}</span>
+                  </span>
+                </button>
+              ))}
+            </>
+          )}
+          <button
+            type="button"
+            className="mt-1 flex w-full items-center rounded-lg px-2 py-2 text-left text-sm text-white/80 hover:bg-white/10"
+            onClick={logout}
+          >
+            Cerrar sesión
+          </button>
         </div>
       )}
     </div>

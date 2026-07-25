@@ -1,14 +1,17 @@
 import { prisma } from "@/lib/db";
 import { formatDate, StatusBadge } from "@/components/ui";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth/session";
+import { requireUser } from "@/lib/auth/session";
+import { isCliente, isStaff } from "@/lib/auth/rbac";
 
 export default async function PortalPage() {
-  const user = await getCurrentUser();
+  const user = await requireUser();
+
+  // Staff can preview; clients only see their memberships
   const sites = await prisma.site.findMany({
     where: {
       isClientVisible: true,
-      ...(user?.role === "cliente"
+      ...(isCliente(user.role)
         ? { members: { some: { userId: user.id } } }
         : {}),
     },
@@ -16,7 +19,10 @@ export default async function PortalPage() {
       cliente: true,
       causa: true,
       files: {
-        where: { tags: { contains: "cliente" } },
+        where: {
+          tags: { contains: "cliente" },
+          confidencial: false,
+        },
         take: 5,
         orderBy: { updatedAt: "desc" },
       },
@@ -38,14 +44,22 @@ export default async function PortalPage() {
     <div className="space-y-6">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          HighQ client experience
+          Experiencia cliente
         </p>
         <h1 className="display mt-2 text-4xl">Portal del cliente</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Sites visibles al cliente: documentos compartidos, hitos y Q&A — con control de
-          publicación vía workflows.
+          Documentos compartidos, hitos y Q&A.{" "}
+          {isCliente(user.role)
+            ? "Solo ve sites donde es miembro."
+            : "Vista previa staff (sites client-visible)."}
         </p>
       </div>
+
+      {isCliente(user.role) && (
+        <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
+          Acceso restringido: sin facturación interna, Hermes ni carpetas Drive del estudio.
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {sites.map((s) => (
@@ -68,44 +82,56 @@ export default async function PortalPage() {
               <ul className="mt-2 space-y-1">
                 {s.files.map((d) => (
                   <li key={d.id} className="text-sm text-[var(--ink-soft)]/80">
-                    {d.name}
+                    <a
+                      href={`/api/sites/${s.id}/files/${d.id}/content`}
+                      className="text-[var(--sea)]"
+                    >
+                      {d.name}
+                    </a>
                   </li>
                 ))}
                 {s.files.length === 0 && (
-                  <li className="text-sm text-[var(--ink-soft)]/60">Sin archivos etiquetados cliente.</li>
+                  <li className="text-sm text-[var(--ink-soft)]/60">
+                    Sin archivos etiquetados cliente.
+                  </li>
                 )}
               </ul>
             </div>
 
             <div className="mt-5">
-              <h3 className="text-sm font-semibold">Próximos hitos</h3>
-              <ul className="mt-2 space-y-2">
-                {s.tasks.map((p) => (
-                  <li key={p.id} className="text-sm text-[var(--ink-soft)]/80">
-                    {formatDate(p.dueDate)} — {p.title}
+              <h3 className="text-sm font-semibold">Q&A abiertas</h3>
+              <ul className="mt-2 space-y-1">
+                {s.qaThreads.map((q) => (
+                  <li key={q.id} className="text-sm text-[var(--ink-soft)]/80">
+                    {q.subject}
                   </li>
                 ))}
               </ul>
             </div>
 
-            {s.qaThreads.length > 0 && (
-              <div className="mt-5">
-                <h3 className="text-sm font-semibold">Q&A abiertos</h3>
-                <ul className="mt-2 space-y-1">
-                  {s.qaThreads.map((q) => (
-                    <li key={q.id} className="text-sm text-[var(--ink-soft)]/80">
-                      {q.subject}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <Link href={`/sites/${s.id}`} className="mt-5 inline-flex text-sm text-[var(--sea)]">
-              Abrir site →
-            </Link>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {isStaff(user.role) ? (
+                <Link href={`/sites/${s.id}`} className="btn btn-secondary">
+                  Abrir site (staff)
+                </Link>
+              ) : (
+                <Link href={`/sites/${s.id}/qa`} className="btn btn-primary">
+                  Ir a Q&A
+                </Link>
+              )}
+              {s.causa && isStaff(user.role) && (
+                <Link href={`/causas/${s.causa.id}`} className="btn btn-ghost">
+                  Causa {formatDate(s.causa.updatedAt)}
+                </Link>
+              )}
+            </div>
           </article>
         ))}
+        {sites.length === 0 && (
+          <p className="text-sm text-[var(--ink-soft)]/65">
+            No hay sites visibles para este usuario.
+          </p>
+        )}
       </div>
     </div>
   );

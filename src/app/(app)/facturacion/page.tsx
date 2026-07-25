@@ -65,6 +65,7 @@ export default async function FacturacionPage() {
     { label: "Cobrado este mes", value: clp(cobradoMes), sub: "Pagos recibidos", icon: Receipt, href: "/facturacion/facturas" },
     { label: "Provisión / CC", value: clp(provisionTotal), sub: "Saldo a favor clientes", icon: PiggyBank, href: "/facturacion/cuenta-corriente" },
     { label: "Tarifas", value: "Honorarios", sub: "Condiciones por causa", icon: FileSpreadsheet, href: "/facturacion/tarifas" },
+    { label: "UF", value: "Valores", sub: "Conversión honorarios", icon: CircleDollarSign, href: "/facturacion/uf" },
   ];
 
   return (

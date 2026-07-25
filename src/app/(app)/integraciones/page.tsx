@@ -14,6 +14,7 @@ type GoogleStatus = {
 function IntegracionesInner() {
   const sp = useSearchParams();
   const [obsidianMsg, setObsidianMsg] = useState("");
+  const [obsidianMode, setObsidianMode] = useState("");
   const [google, setGoogle] = useState<GoogleStatus | null>(null);
   const [hermesInfo, setHermesInfo] = useState("");
 
@@ -22,6 +23,18 @@ function IntegracionesInner() {
       .then((r) => r.json())
       .then(setGoogle)
       .catch(() => setGoogle(null));
+    fetch("/api/integrations/obsidian")
+      .then((r) => r.json())
+      .then((d) =>
+        setObsidianMode(
+          process.env.NODE_ENV === "production"
+            ? d.config?.vaultPath
+              ? "storage/REST"
+              : "storage"
+            : d.config?.vaultPath || "storage"
+        )
+      )
+      .catch(() => setObsidianMode("storage"));
     fetch("/api/integrations/hermes")
       .then((r) => r.json())
       .then((d) =>
@@ -44,7 +57,7 @@ function IntegracionesInner() {
     const data = await res.json();
     setObsidianMsg(
       res.ok
-        ? `Vault actualizado: ${data.synced} causas exportadas a ./obsidian-vault/LexOpen`
+        ? `Exportación completa: ${data.synced} causas (${data.results?.[0]?.mode || "storage"}).`
         : data.error || "Error"
     );
   }
@@ -74,8 +87,12 @@ function IntegracionesInner() {
         <section className="panel rounded-3xl p-5">
           <h2 className="text-xl font-semibold">Obsidian</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
-            Exporta cada causa a carpetas Markdown (`Index.md`, Notas, Documentos) listas para abrir
-            como vault o sincronizar con Local REST API.
+            Exporta cada causa como Markdown. Si `OBSIDIAN_REST_URL` está configurado,
+            escribe vía Local REST; si no, guarda los `.md` en storage. En desarrollo
+            también puede escribir en un vault local.
+          </p>
+          <p className="mt-3 text-xs text-[var(--ink-soft)]/65">
+            Destino actual: {obsidianMode || "cargando..."}
           </p>
           <button className="btn btn-primary mt-5" type="button" onClick={syncObsidian}>
             Sincronizar vault
@@ -98,8 +115,9 @@ function IntegracionesInner() {
         <section className="panel rounded-3xl p-5">
           <h2 className="text-xl font-semibold">Google Workspace</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
-            OAuth 2.0 para Drive (documentos), Calendar (plazos) y Gmail. Configure
-            `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`.
+            OAuth 2.0 para Drive (carpeta por causa + documentos/minutas), Calendar
+            (plazos) y Gmail. En cada causa puede vincular o crear la carpeta del
+            expediente. Configure `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`.
           </p>
           <div className="mt-4 text-sm text-[var(--ink-soft)]/75">
             {google?.connected
@@ -108,15 +126,34 @@ function IntegracionesInner() {
                 ? "Credenciales OK — pendiente autorizar"
                 : "Credenciales no configuradas (modo stub activo)"}
           </div>
-          {google?.authUrl ? (
-            <a href={google.authUrl} className="btn btn-primary mt-5 inline-flex">
-              Conectar Google
-            </a>
-          ) : (
-            <button className="btn btn-ghost mt-5" type="button" disabled>
-              Configure OAuth en .env
-            </button>
-          )}
+          <div className="mt-5 flex flex-wrap gap-2">
+            {google?.authUrl ? (
+              <a href={google.authUrl} className="btn btn-primary inline-flex">
+                {google.connected ? "Reconectar Google" : "Conectar Google"}
+              </a>
+            ) : (
+              <button className="btn btn-ghost" type="button" disabled>
+                Configure OAuth en .env
+              </button>
+            )}
+            {google?.connected && (
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={async () => {
+                  await fetch("/api/integrations/google", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "disconnect" }),
+                  });
+                  const r = await fetch("/api/integrations/google");
+                  setGoogle(await r.json());
+                }}
+              >
+                Desconectar
+              </button>
+            )}
+          </div>
         </section>
       </div>
 

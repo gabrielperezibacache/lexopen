@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { NewWikiButton } from "@/components/sites/NewWikiButton";
 
@@ -7,6 +8,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteWikiPage({ params }: Params) {
   const { id } = await params;
+  await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
   const pages = await prisma.wikiPage.findMany({

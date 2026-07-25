@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDateTime } from "@/components/ui";
 import { QaActions } from "@/components/sites/QaActions";
@@ -8,6 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteQaPage({ params }: Params) {
   const { id } = await params;
+  await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
   const threads = await prisma.qaThread.findMany({

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { writeAudit } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
+  try {
+  await requireStaff();
   const { id } = await params;
   const causa = await prisma.causa.findUnique({
     where: { id },
@@ -14,6 +18,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
       documentos: { orderBy: { updatedAt: "desc" } },
       plazos: { orderBy: { fechaLimite: "asc" } },
       notas: { orderBy: { updatedAt: "desc" } },
+      minutas: {
+        include: {
+          autor: { select: { id: true, name: true } },
+          acciones: true,
+        },
+        orderBy: { fecha: "desc" },
+        take: 20,
+      },
       actividades: {
         include: { user: true },
         orderBy: { createdAt: "desc" },
@@ -23,27 +35,51 @@ export async function GET(_req: NextRequest, { params }: Params) {
   });
   if (!causa) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
   return NextResponse.json(causa);
+  } catch (e) {
+    return handleRouteError(e);
+  }
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+  assertCsrf(req);
+  const user = await requireStaff();
   const { id } = await params;
   const body = await req.json();
+
+  // Drive solo vía /api/integrations/google (link/create/unlink)
+  const data: Record<string, unknown> = {};
+  for (const key of [
+    "titulo",
+    "rit",
+    "ruc",
+    "tribunal",
+    "materia",
+    "procedimiento",
+    "estado",
+    "etapa",
+    "caratula",
+    "resumen",
+    "clienteId",
+    "abogadoId",
+    "sala",
+    "cuaderno",
+    "abogadoContraparte",
+  ] as const) {
+    if (body[key] !== undefined) data[key] = body[key];
+  }
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json(
+      { error: "Sin campos para actualizar" },
+      { status: 400 }
+    );
+  }
+
+  const prev = await prisma.causa.findUnique({ where: { id } });
   const causa = await prisma.causa.update({
     where: { id },
-    data: {
-      titulo: body.titulo,
-      rit: body.rit,
-      ruc: body.ruc,
-      tribunal: body.tribunal,
-      materia: body.materia,
-      procedimiento: body.procedimiento,
-      estado: body.estado,
-      etapa: body.etapa,
-      caratula: body.caratula,
-      resumen: body.resumen,
-      clienteId: body.clienteId,
-      abogadoId: body.abogadoId,
-    },
+    data,
   });
 
   if (body.estado || body.etapa) {
@@ -52,15 +88,44 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         tipo: "estado",
         mensaje: `Actualización: estado=${causa.estado}, etapa=${causa.etapa}`,
         causaId: causa.id,
+        userId: user.id,
       },
     });
   }
+  if (body.etapa && body.etapa !== prev?.etapa) {
+    await prisma.etapaHistorial.create({
+      data: { causaId: id, etapa: body.etapa, nota: "Cambio de etapa" },
+    });
+  }
+  await writeAudit({
+    actorId: user.id,
+    action: "causa.update",
+    entityType: "Causa",
+    entityId: id,
+    before: prev,
+    after: data,
+  });
 
   return NextResponse.json(causa);
+  } catch (e) {
+    return handleRouteError(e);
+  }
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  try {
+  assertCsrf(_req);
+  const user = await requireStaff();
   const { id } = await params;
   await prisma.causa.delete({ where: { id } });
+  await writeAudit({
+    actorId: user.id,
+    action: "causa.delete",
+    entityType: "Causa",
+    entityId: id,
+  });
   return NextResponse.json({ ok: true });
+  } catch (e) {
+    return handleRouteError(e);
+  }
 }

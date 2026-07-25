@@ -50,12 +50,25 @@ export default async function InvoiceDetailPage({ params }: Params) {
               <span className="ml-2 text-sm text-[var(--ink-soft)]/65">{invoice.status}</span>
             </div>
           </div>
-          <InvoiceActions
-            invoiceId={invoice.id}
-            status={invoice.status}
-            clienteId={invoice.clienteId}
-            balanceClp={invoice.totalClp - invoice.paidClp}
-          />
+          <div className="flex flex-col items-end gap-2">
+            <InvoiceActions
+              invoiceId={invoice.id}
+              status={invoice.status}
+              clienteId={invoice.clienteId}
+              balanceClp={invoice.totalClp - invoice.paidClp}
+            />
+            <a
+              href={`/api/billing/invoices/${invoice.id}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-secondary"
+            >
+              Ver PDF / imprimir
+            </a>
+            <p className="max-w-xs text-right text-xs text-[var(--ink-soft)]/60">
+              Cuenta interna LexOpen — no es DTE SII
+            </p>
+          </div>
         </div>
       </div>
 

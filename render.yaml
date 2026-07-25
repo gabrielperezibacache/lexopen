@@ -1,18 +1,31 @@
+databases:
+  - name: lexopen-db
+    plan: free
+    postgresMajorVersion: "16"
+
 services:
   - type: web
     name: lexopen
     runtime: node
     plan: free
-    buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npx prisma db push && npx tsx prisma/seed.ts && npm run start
-    healthCheckPath: /
+    buildCommand: npm install && npx prisma generate && npx prisma migrate deploy && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: "22"
       - key: DATABASE_URL
-        value: file:./prod.db
+        fromDatabase:
+          name: lexopen-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
       - key: NEXT_PUBLIC_APP_NAME
         value: LexOpen
+      - key: HERMES_ALLOW_DEMO
+        value: "0"
+      - key: LEXOPEN_DEMO_SWITCHER
+        value: "0"
       - key: HERMES_API_URL
         sync: false
       - key: HERMES_API_KEY
@@ -23,5 +36,11 @@ services:
         sync: false
       - key: GOOGLE_REDIRECT_URI
         sync: false
-      - key: OBSIDIAN_VAULT_PATH
-        value: ./obsidian-vault
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
