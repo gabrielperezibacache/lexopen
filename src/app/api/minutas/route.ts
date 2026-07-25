@@ -8,6 +8,7 @@ import {
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { pushMinutaToDrive } from "@/lib/integrations/google";
 import { writeAudit } from "@/lib/audit";
+import { calcularVencimiento } from "@/lib/plazos";
 import {
   formatLocalDate,
   isValidModalidad,
@@ -103,6 +104,9 @@ export async function POST(req: NextRequest) {
           descripcion: a.descripcion.trim(),
           responsable: a.responsable?.trim() || undefined,
           fechaLimite: a.fechaLimite || null,
+          diasPlazo: a.diasPlazo ? Number(a.diasPlazo) : null,
+          tipoComputo: a.tipoComputo === "corridos" ? "corridos" : "habiles",
+          esFatal: Boolean(a.esFatal),
           prioridad: a.prioridad || "media",
           crearPlazo: Boolean(a.crearPlazo),
           crearTask: a.crearTask !== false,
@@ -116,10 +120,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (a.crearPlazo && !a.fechaLimite) {
+    if (a.crearPlazo && !a.fechaLimite && !a.diasPlazo) {
       return NextResponse.json(
         {
-          error: `La acción «${a.descripcion}» pide crear plazo pero no tiene fecha límite.`,
+          error: `La acción «${a.descripcion}» pide crear plazo pero no tiene fecha ni días plazo.`,
         },
         { status: 400 }
       );
@@ -184,7 +188,15 @@ export async function POST(req: NextRequest) {
     for (const accion of accionesInput) {
       let plazoId: string | undefined;
       let taskId: string | undefined;
-      const due = parseLocalDateInput(accion.fechaLimite);
+      const due =
+        parseLocalDateInput(accion.fechaLimite) ||
+        (accion.diasPlazo
+          ? calcularVencimiento({
+              desde: fecha,
+              dias: accion.diasPlazo,
+              tipoComputo: accion.tipoComputo || "habiles",
+            })
+          : null);
 
       if (accion.crearPlazo && due) {
         const plazo = await tx.plazo.create({
@@ -192,6 +204,9 @@ export async function POST(req: NextRequest) {
             titulo: accion.descripcion.slice(0, 120),
             descripcion: `Derivado de minuta: ${body.titulo.trim()}`,
             fechaLimite: due,
+            diasPlazo: accion.diasPlazo || null,
+            tipoComputo: accion.tipoComputo || "habiles",
+            esFatal: Boolean(accion.esFatal),
             tipo: tipo === "audiencia" ? "procesal" : "interno",
             estado: "pendiente",
             causaId: causa.id,

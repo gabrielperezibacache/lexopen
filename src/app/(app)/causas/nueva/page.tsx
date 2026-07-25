@@ -2,38 +2,99 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MATERIAS, ETAPAS, TRIBUNALES_CHILE } from "@/lib/chile";
+import {
+  MATERIAS,
+  ETAPAS,
+  TRIBUNALES_CHILE,
+  validarRit,
+  validarRuc,
+  validarRut,
+} from "@/lib/chile";
+
+type ConflictHit = {
+  causaId: string;
+  titulo: string;
+  rit: string | null;
+  match: string;
+  severity: "warning" | "blocked";
+};
 
 export default function NuevaCausaPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [conflicts, setConflicts] = useState<ConflictHit[]>([]);
+  const [conflictStatus, setConflictStatus] = useState<"idle" | "clear" | "warning" | "blocked">("idle");
+  const [overrideRequired, setOverrideRequired] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError("");
     const fd = new FormData(e.currentTarget);
+    const rit = String(fd.get("rit") || "");
+    const ruc = String(fd.get("ruc") || "");
+    const partes = [
+      {
+        nombre: String(fd.get("demandante") || ""),
+        rut: String(fd.get("demandanteRut") || ""),
+        rol: "demandante",
+      },
+      {
+        nombre: String(fd.get("demandado") || ""),
+        rut: String(fd.get("demandadoRut") || ""),
+        rol: "demandado",
+      },
+    ].filter((p) => p.nombre);
+    if (rit && !validarRit(rit)) {
+      setError("RIT inválido. Use formatos como C-1234-2026.");
+      setLoading(false);
+      return;
+    }
+    if (ruc && !validarRuc(ruc)) {
+      setError("RUC inválido. Use cuerpo numérico con dígito verificador.");
+      setLoading(false);
+      return;
+    }
+    for (const parte of partes) {
+      if (parte.rut && !validarRut(parte.rut)) {
+        setError(`RUT inválido para ${parte.nombre}.`);
+        setLoading(false);
+        return;
+      }
+    }
+
+    const preflight = await fetch("/api/conflict-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ partes }),
+    });
+    if (preflight.ok) {
+      const result = (await preflight.json()) as { conflicts: ConflictHit[] };
+      setConflicts(result.conflicts);
+      const hasBlocked = result.conflicts.some((c) => c.severity === "blocked");
+      setConflictStatus(hasBlocked ? "blocked" : result.conflicts.length ? "warning" : "clear");
+      if (hasBlocked && !fd.get("conflictOverride")) {
+        setOverrideRequired(true);
+        setError("Se detectó un conflicto bloqueante. Revise y confirme override con notas.");
+        setLoading(false);
+        return;
+      }
+    }
+
     const payload = {
       titulo: String(fd.get("titulo")),
-      rit: String(fd.get("rit") || ""),
-      ruc: String(fd.get("ruc") || ""),
+      rit,
+      ruc,
       tribunal: String(fd.get("tribunal")),
       materia: String(fd.get("materia")),
       procedimiento: String(fd.get("procedimiento") || ""),
       etapa: String(fd.get("etapa")),
       caratula: String(fd.get("caratula") || ""),
       resumen: String(fd.get("resumen") || ""),
-      partes: [
-        {
-          nombre: String(fd.get("demandante") || ""),
-          rol: "demandante",
-        },
-        {
-          nombre: String(fd.get("demandado") || ""),
-          rol: "demandado",
-        },
-      ].filter((p) => p.nombre),
+      conflictOverride: fd.get("conflictOverride") === "on",
+      conflictNotes: String(fd.get("conflictNotes") || ""),
+      partes,
     };
 
     const res = await fetch("/api/causas", {
@@ -43,6 +104,14 @@ export default function NuevaCausaPage() {
     });
     setLoading(false);
     if (!res.ok) {
+      if (res.status === 409) {
+        const body = (await res.json()) as { conflicts?: ConflictHit[]; error?: string };
+        setConflicts(body.conflicts || []);
+        setConflictStatus("blocked");
+        setOverrideRequired(true);
+        setError(body.error || "Conflicto de interés detectado");
+        return;
+      }
       setError("No se pudo crear la causa");
       return;
     }
@@ -71,7 +140,7 @@ export default function NuevaCausaPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">RUC</label>
-            <input className="input" name="ruc" placeholder="Opcional" />
+            <input className="input" name="ruc" placeholder="2500123456-7" />
           </div>
         </div>
         <div>
@@ -118,12 +187,48 @@ export default function NuevaCausaPage() {
           <div>
             <label className="mb-1 block text-sm font-medium">Demandante / recurrente</label>
             <input className="input" name="demandante" />
+            <input className="input mt-2" name="demandanteRut" placeholder="RUT parte" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Demandado / recorrido</label>
             <input className="input" name="demandado" />
+            <input className="input mt-2" name="demandadoRut" placeholder="RUT parte" />
           </div>
         </div>
+        {conflictStatus !== "idle" && (
+          <div className="rounded-2xl border border-[var(--line)] bg-white/70 p-4 text-sm">
+            <div className="font-semibold">
+              Conflictos:{" "}
+              {conflictStatus === "clear"
+                ? "sin hallazgos"
+                : conflictStatus === "blocked"
+                  ? "bloqueante"
+                  : "advertencias"}
+            </div>
+            {conflicts.length > 0 && (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--ink-soft)]/80">
+                {conflicts.map((c) => (
+                  <li key={`${c.causaId}-${c.match}`}>
+                    {c.match} ({c.severity})
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {overrideRequired && (
+          <div className="rounded-2xl border border-[var(--danger)]/30 bg-red-50 p-4">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" name="conflictOverride" /> Autorizar override de conflicto
+            </label>
+            <textarea
+              className="textarea mt-3"
+              name="conflictNotes"
+              required={overrideRequired}
+              placeholder="Fundamento del override y aprobación interna"
+            />
+          </div>
+        )}
         <div>
           <label className="mb-1 block text-sm font-medium">Resumen</label>
           <textarea className="textarea" name="resumen" />

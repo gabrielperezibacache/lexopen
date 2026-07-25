@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, parseBody, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, parseBody, requireBillingManager, requireStaff } from "@/lib/api";
 import { ledgerCreateSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
@@ -38,7 +38,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireStaff();
+    assertCsrf(req);
+    await requireBillingManager();
     const body = await parseBody(req, ledgerCreateSchema);
     const debitClp = body.debitClp || 0;
     const creditClp = body.creditClp || 0;

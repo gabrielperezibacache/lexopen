@@ -42,6 +42,12 @@ export default async function TarifasPage() {
                   <dd className="font-medium">{clp(f.rateHourlyClp)}</dd>
                 </>
               )}
+              {f.rateHourlyUf != null && (
+                <>
+                  <dt className="text-[var(--ink-soft)]/60">Tarifa hora UF</dt>
+                  <dd className="font-medium">{f.rateHourlyUf} UF</dd>
+                </>
+              )}
               {f.flatFeeClp != null && (
                 <>
                   <dt className="text-[var(--ink-soft)]/60">Suma alzada</dt>

@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomBytes } from "crypto";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 /**
  * Almacenamiento de archivos:
@@ -25,6 +26,19 @@ export function newStorageKey(prefix: string, filename: string) {
   return `${prefix}/${Date.now()}-${randomBytes(4).toString("hex")}-${safe}`;
 }
 
+function s3Client() {
+  const endpoint = process.env.S3_ENDPOINT;
+  return new S3Client({
+    region: process.env.S3_REGION || "auto",
+    endpoint,
+    forcePathStyle: Boolean(endpoint),
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+    },
+  });
+}
+
 export async function putObject(opts: {
   key: string;
   body: Buffer | string;
@@ -34,23 +48,16 @@ export async function putObject(opts: {
     typeof opts.body === "string" ? Buffer.from(opts.body, "utf8") : opts.body;
 
   if (storageConfigured()) {
-    const endpoint = process.env.S3_ENDPOINT;
     const bucket = process.env.S3_BUCKET!;
-    const url = endpoint
-      ? `${endpoint.replace(/\/$/, "")}/${bucket}/${opts.key}`
-      : `https://${bucket}.s3.${process.env.S3_REGION || "auto"}.amazonaws.com/${opts.key}`;
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Content-Type": opts.contentType || "application/octet-stream",
-        Authorization: `Bearer ${process.env.S3_ACCESS_KEY_ID}`,
-      },
-      body: body as BodyInit,
-    });
-    if (!res.ok) {
-      throw new Error(`S3 PUT failed: ${res.status}`);
-    }
-    return { key: opts.key, backend: "s3" as const, url };
+    await s3Client().send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: opts.key,
+        Body: body,
+        ContentType: opts.contentType || "application/octet-stream",
+      })
+    );
+    return { key: opts.key, backend: "s3" as const };
   }
 
   const full = path.join(localRoot(), opts.key);
@@ -61,14 +68,19 @@ export async function putObject(opts: {
 
 export async function getObject(key: string): Promise<Buffer | null> {
   if (storageConfigured()) {
-    const endpoint = process.env.S3_ENDPOINT;
-    const bucket = process.env.S3_BUCKET!;
-    const url = endpoint
-      ? `${endpoint.replace(/\/$/, "")}/${bucket}/${key}`
-      : `https://${bucket}.s3.${process.env.S3_REGION || "auto"}.amazonaws.com/${key}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    return Buffer.from(await res.arrayBuffer());
+    try {
+      const res = await s3Client().send(
+        new GetObjectCommand({
+          Bucket: process.env.S3_BUCKET!,
+          Key: key,
+        })
+      );
+      if (!res.Body) return null;
+      const bytes = await res.Body.transformToByteArray();
+      return Buffer.from(bytes);
+    } catch {
+      return null;
+    }
   }
   try {
     return await fs.readFile(path.join(localRoot(), key));

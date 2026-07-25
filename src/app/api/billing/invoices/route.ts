@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, parseBody, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, parseBody, requireBillingManager, requireStaff } from "@/lib/api";
 import { computeInvoiceTotals, nextInvoiceNumber } from "@/lib/billing";
 import { invoiceCreateSchema } from "@/lib/schemas";
 
@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireStaff();
+    assertCsrf(req);
+    const user = await requireBillingManager();
     const body = await parseBody(req, invoiceCreateSchema);
     const tipoDocumento = body.tipoDocumento || "boleta_honorarios";
 

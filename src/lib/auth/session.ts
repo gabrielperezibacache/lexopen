@@ -4,14 +4,16 @@ import { prisma } from "@/lib/db";
 import { canImpersonate, isStaff } from "@/lib/auth/rbac";
 
 export const SESSION_COOKIE = "lexopen_session";
+export const ROLE_COOKIE = "lexopen_role";
 const SESSION_DAYS = 14;
 
-function sessionSecret() {
-  return (
-    process.env.SESSION_SECRET ||
-    process.env.GOOGLE_CLIENT_SECRET ||
-    "lexopen-dev-session-secret-change-me"
-  );
+export function sessionSecret() {
+  const secret = process.env.SESSION_SECRET;
+  if (secret && secret.length >= 16) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET es obligatorio en producción (mín. 16 chars)");
+  }
+  return secret || "lexopen-dev-session-secret-change-me";
 }
 
 export function signSessionToken(userId: string, expiresAt: number) {
@@ -44,7 +46,7 @@ export async function getCurrentUser() {
   const raw = jar.get(SESSION_COOKIE)?.value;
   if (!raw) return null;
 
-  // Compat: cookie antigua = solo userId (solo en desarrollo)
+  // Legacy unsigned cookie removed outside development
   if (!raw.includes(".")) {
     if (process.env.NODE_ENV === "development") {
       return prisma.user.findUnique({ where: { id: raw } });

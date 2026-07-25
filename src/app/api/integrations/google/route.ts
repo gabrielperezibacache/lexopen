@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import {
   createCausaDriveFolder,
   getGoogleAuthUrl,
@@ -17,8 +18,9 @@ export async function GET() {
     await requireStaff();
     const row = await prisma.integrationConfig.findUnique({ where: { provider: "google" } });
     const config = await getGoogleConfig();
-    const authUrl = getGoogleAuthUrl();
-    return NextResponse.json({
+    const state = randomBytes(24).toString("base64url");
+    const authUrl = getGoogleAuthUrl(state);
+    const res = NextResponse.json({
       enabled: row?.enabled ?? false,
       connected: Boolean(config.accessToken),
       connectedEmail: config.connectedEmail || null,
@@ -32,6 +34,16 @@ export async function GET() {
         process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
       ),
     });
+    if (authUrl) {
+      res.cookies.set("google_oauth_state", state, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/api/integrations/google/callback",
+        maxAge: 10 * 60,
+      });
+    }
+    return res;
   } catch (e) {
     return handleRouteError(e);
   }
@@ -39,6 +51,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    assertCsrf(req);
     await requireStaff();
     const body = await req.json();
 

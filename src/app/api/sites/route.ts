@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, parseBody, requireStaff, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, parseBody, requireStaff, requireUser } from "@/lib/api";
+import { clientSiteWhere } from "@/lib/auth/access";
 import { isCliente } from "@/lib/auth/rbac";
 import { siteCreateSchema } from "@/lib/schemas";
 
@@ -16,19 +17,14 @@ export async function GET(req: NextRequest) {
           q
             ? {
                 OR: [
-                  { name: { contains: q } },
-                  { description: { contains: q } },
-                  { slug: { contains: q } },
+                  { name: { contains: q, mode: "insensitive" } },
+                  { description: { contains: q, mode: "insensitive" } },
+                  { slug: { contains: q, mode: "insensitive" } },
                 ],
               }
             : {},
           isCliente(user.role)
-            ? {
-                OR: [
-                  { isClientVisible: true },
-                  { members: { some: { userId: user.id } } },
-                ],
-              }
+            ? clientSiteWhere(user.id)
             : {},
         ],
       },
@@ -55,6 +51,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, siteCreateSchema);
     const slug =

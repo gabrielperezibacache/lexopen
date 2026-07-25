@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { handleRouteError, parseBody, requireRole, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, parseBody, requireRole, requireStaff } from "@/lib/api";
 import { parseLocalDateInput } from "@/lib/minutas";
 
 export async function GET() {
@@ -20,6 +20,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    assertCsrf(req);
     await requireRole("admin", "abogado");
     const body = await parseBody(
       req,

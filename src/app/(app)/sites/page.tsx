@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/auth/session";
+import { isCliente } from "@/lib/auth/rbac";
+import { clientSiteWhere } from "@/lib/auth/access";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { NewSiteButton } from "@/components/sites/NewSiteButton";
 
@@ -12,7 +15,9 @@ const tipoLabel: Record<string, string> = {
 };
 
 export default async function SitesPage() {
+  const user = await requireUser();
   const sites = await prisma.site.findMany({
+    where: isCliente(user.role) ? clientSiteWhere(user.id) : undefined,
     include: {
       cliente: true,
       causa: true,

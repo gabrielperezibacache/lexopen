@@ -31,6 +31,9 @@ export type MinutaAccionInput = {
   descripcion: string;
   responsable?: string;
   fechaLimite?: string | null;
+  diasPlazo?: number | null;
+  tipoComputo?: "habiles" | "corridos";
+  esFatal?: boolean;
   prioridad?: string;
   crearPlazo?: boolean;
   crearTask?: boolean;

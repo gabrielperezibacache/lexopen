@@ -1,12 +1,20 @@
 import { prisma } from "@/lib/db";
 import { formatDate } from "@/components/ui";
 import Link from "next/link";
+import { DocumentoUploadForm } from "@/components/DocumentoUploadForm";
 
 export default async function DocumentosPage() {
-  const documentos = await prisma.documento.findMany({
-    include: { causa: true, autor: true },
-    orderBy: { updatedAt: "desc" },
-  });
+  const [documentos, causas] = await Promise.all([
+    prisma.documento.findMany({
+      include: { causa: true, autor: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.causa.findMany({
+      select: { id: true, rit: true, titulo: true },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+    }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -19,6 +27,8 @@ export default async function DocumentosPage() {
           Repositorio colaborativo de escritos, contratos y memos — sincronizable con Obsidian y Google Drive.
         </p>
       </div>
+
+      <DocumentoUploadForm causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))} />
 
       <div className="panel overflow-hidden rounded-3xl">
         <table className="min-w-full text-left text-sm">
@@ -36,6 +46,12 @@ export default async function DocumentosPage() {
               <tr key={d.id} className="table-row">
                 <td className="px-4 py-3">
                   <div className="font-medium">{d.nombre}</div>
+                  <a
+                    href={`/api/documentos/${d.id}/content`}
+                    className="text-xs text-[var(--sea)]"
+                  >
+                    Descargar
+                  </a>
                   {d.obsidianPath && (
                     <div className="text-xs text-[var(--ink-soft)]/60">Obsidian: {d.obsidianPath}</div>
                   )}

@@ -9,7 +9,7 @@
     "build": "prisma generate && next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint .",
-    "test": "tsx src/lib/integrations/drive-folder.test.ts && tsx src/lib/minutas.render.test.ts && tsx src/lib/minutas.api-contract.test.ts && tsx src/lib/chile.test.ts && tsx src/lib/plazos.test.ts",
+    "test": "tsx src/lib/integrations/drive-folder.test.ts && tsx src/lib/minutas.render.test.ts && tsx src/lib/minutas.api-contract.test.ts && tsx src/lib/chile.test.ts && tsx src/lib/plazos.test.ts && tsx src/lib/maturity.integration.test.ts",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:migrate": "prisma migrate deploy",
@@ -21,6 +21,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1095.0",
     "@prisma/client": "5.22.0",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",

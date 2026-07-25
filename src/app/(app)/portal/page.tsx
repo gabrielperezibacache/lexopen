@@ -82,7 +82,12 @@ export default async function PortalPage() {
               <ul className="mt-2 space-y-1">
                 {s.files.map((d) => (
                   <li key={d.id} className="text-sm text-[var(--ink-soft)]/80">
-                    {d.name}
+                    <a
+                      href={`/api/sites/${s.id}/files/${d.id}/content`}
+                      className="text-[var(--sea)]"
+                    >
+                      {d.name}
+                    </a>
                   </li>
                 ))}
                 {s.files.length === 0 && (

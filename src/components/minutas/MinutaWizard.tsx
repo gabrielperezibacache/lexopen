@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ETAPAS } from "@/lib/chile";
 import {
@@ -14,9 +14,19 @@ type AccionDraft = {
   descripcion: string;
   responsable: string;
   fechaLimite: string;
+  diasPlazo: string;
+  tipoComputo: "habiles" | "corridos";
+  esFatal: boolean;
   prioridad: string;
   crearPlazo: boolean;
   crearTask: boolean;
+};
+
+type Plantilla = {
+  id: string;
+  tipo: string;
+  nombre: string;
+  bodyJson: string;
 };
 
 type Props = {
@@ -35,6 +45,9 @@ function emptyAccion(): AccionDraft {
     descripcion: "",
     responsable: "",
     fechaLimite: "",
+    diasPlazo: "",
+    tipoComputo: "habiles",
+    esFatal: false,
     prioridad: "media",
     crearPlazo: false,
     crearTask: true,
@@ -75,18 +88,59 @@ export function MinutaWizard({
   const [subirADrive, setSubirADrive] = useState(hasRealDriveFolder);
   const [confidencial, setConfidencial] = useState(false);
   const [acciones, setAcciones] = useState<AccionDraft[]>([emptyAccion()]);
+  const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
 
   const steps = useMemo(
     () => ["Contexto", "Qué ocurrió", "Próximos pasos", "Publicar"],
     []
   );
+  const plantillasTipo = plantillas.filter((p) => p.tipo === tipo);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/minutas/plantillas")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((rows: Plantilla[]) => {
+        if (!cancelled) setPlantillas(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function applyPlantilla(id: string) {
+    const plantilla = plantillas.find((p) => p.id === id);
+    if (!plantilla) return;
+    const body = JSON.parse(plantilla.bodyJson || "{}") as {
+      titulo?: string;
+      resumenEjecutivo?: string;
+      hechosRelevantes?: string;
+      acuerdos?: string;
+      riesgosAlertas?: string;
+      proximosPasos?: string[];
+    };
+    if (body.titulo) setTitulo(body.titulo);
+    if (body.resumenEjecutivo !== undefined) setResumenEjecutivo(body.resumenEjecutivo);
+    if (body.hechosRelevantes !== undefined) setHechosRelevantes(body.hechosRelevantes);
+    if (body.acuerdos !== undefined) setAcuerdos(body.acuerdos);
+    if (body.riesgosAlertas !== undefined) setRiesgosAlertas(body.riesgosAlertas);
+    if (Array.isArray(body.proximosPasos) && body.proximosPasos.length > 0) {
+      setAcciones(
+        body.proximosPasos.map((descripcion) => ({
+          ...emptyAccion(),
+          descripcion,
+        }))
+      );
+    }
+  }
 
   function updateAccion(key: string, patch: Partial<AccionDraft>) {
     setAcciones((prev) =>
       prev.map((a) => {
         if (a.key !== key) return a;
         const next = { ...a, ...patch };
-        if (!next.fechaLimite) next.crearPlazo = false;
+        if (!next.fechaLimite && !next.diasPlazo) next.crearPlazo = false;
         return next;
       })
     );
@@ -100,7 +154,7 @@ export function MinutaWizard({
     if (step === 0) return Boolean(tipo && titulo.trim() && fecha);
     if (step === 1) return Boolean(resumenEjecutivo.trim());
     if (step === 2) {
-      return !accionesValidas().some((a) => a.crearPlazo && !a.fechaLimite);
+      return !accionesValidas().some((a) => a.crearPlazo && !a.fechaLimite && !a.diasPlazo);
     }
     return true;
   }
@@ -108,11 +162,11 @@ export function MinutaWizard({
   function submit() {
     setError("");
     const invalidPlazo = accionesValidas().find(
-      (a) => a.crearPlazo && !a.fechaLimite
+      (a) => a.crearPlazo && !a.fechaLimite && !a.diasPlazo
     );
     if (invalidPlazo) {
       setError(
-        `La acción «${invalidPlazo.descripcion}» tiene «Crear plazo» sin fecha.`
+        `La acción «${invalidPlazo.descripcion}» tiene «Crear plazo» sin fecha ni días plazo.`
       );
       setStep(2);
       return;
@@ -144,8 +198,11 @@ export function MinutaWizard({
               descripcion: a.descripcion.trim(),
               responsable: a.responsable.trim() || undefined,
               fechaLimite: a.fechaLimite || null,
+              diasPlazo: a.diasPlazo ? Number(a.diasPlazo) : null,
+              tipoComputo: a.tipoComputo,
+              esFatal: a.esFatal,
               prioridad: a.prioridad,
-              crearPlazo: a.crearPlazo && Boolean(a.fechaLimite),
+              crearPlazo: a.crearPlazo && Boolean(a.fechaLimite || a.diasPlazo),
               crearTask: a.crearTask,
             })),
             proximosPasos: accionesValidas()
@@ -247,6 +304,28 @@ export function MinutaWizard({
               </button>
             ))}
           </div>
+          {plantillasTipo.length > 0 && (
+            <label className="block text-sm">
+              <span className="mb-1 block text-[var(--ink-soft)]/70">
+                Aplicar plantilla
+              </span>
+              <select
+                className="input"
+                defaultValue=""
+                onChange={(e) => {
+                  applyPlantilla(e.target.value);
+                  e.currentTarget.value = "";
+                }}
+              >
+                <option value="">Seleccione una plantilla</option>
+                {plantillasTipo.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="block text-sm">
             <span className="mb-1 block text-[var(--ink-soft)]/70">Título</span>
             <input
@@ -433,6 +512,19 @@ export function MinutaWizard({
                       })
                     }
                   />
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={a.diasPlazo}
+                    onChange={(e) =>
+                      updateAccion(a.key, {
+                        diasPlazo: e.target.value,
+                        crearPlazo: e.target.value ? true : a.crearPlazo,
+                      })
+                    }
+                    placeholder="Días plazo"
+                  />
                   <select
                     className="input"
                     value={a.prioridad}
@@ -449,6 +541,31 @@ export function MinutaWizard({
                 </div>
                 <div className="mt-3 flex flex-wrap gap-4 text-sm text-[var(--ink-soft)]/80">
                   <label className="inline-flex items-center gap-2">
+                    Cómputo
+                    <select
+                      className="rounded-lg border border-[var(--line)] bg-white px-2 py-1"
+                      value={a.tipoComputo}
+                      onChange={(e) =>
+                        updateAccion(a.key, {
+                          tipoComputo: e.target.value === "corridos" ? "corridos" : "habiles",
+                        })
+                      }
+                    >
+                      <option value="habiles">Hábiles</option>
+                      <option value="corridos">Corridos</option>
+                    </select>
+                  </label>
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={a.esFatal}
+                      onChange={(e) =>
+                        updateAccion(a.key, { esFatal: e.target.checked })
+                      }
+                    />
+                    Fatal
+                  </label>
+                  <label className="inline-flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={a.crearTask}
@@ -462,12 +579,12 @@ export function MinutaWizard({
                     <input
                       type="checkbox"
                       checked={a.crearPlazo}
-                      disabled={!a.fechaLimite}
+                      disabled={!a.fechaLimite && !a.diasPlazo}
                       onChange={(e) =>
                         updateAccion(a.key, { crearPlazo: e.target.checked })
                       }
                     />
-                    Crear plazo{!a.fechaLimite ? " (requiere fecha)" : ""}
+                    Crear plazo{!a.fechaLimite && !a.diasPlazo ? " (requiere fecha o días)" : ""}
                   </label>
                   {acciones.length > 1 && (
                     <button

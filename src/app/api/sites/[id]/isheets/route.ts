@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { isCliente } from "@/lib/auth/rbac";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -25,9 +26,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
+    assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
+    if (isCliente(user.role)) {
+      return NextResponse.json({ error: "Clientes no pueden editar iSheets" }, { status: 403 });
+    }
     const body = await req.json();
 
     if (body.action === "create-sheet") {
@@ -69,6 +74,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     if (body.action === "add-row" && body.sheetId) {
+      const sheet = await prisma.iSheet.findFirst({
+        where: { id: body.sheetId, siteId: id },
+        select: { id: true },
+      });
+      if (!sheet) return NextResponse.json({ error: "iSheet no encontrada" }, { status: 404 });
       const row = await prisma.iSheetRow.create({
         data: {
           sheetId: body.sheetId,
@@ -79,8 +89,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     if (body.action === "update-row" && body.rowId) {
+      const existing = await prisma.iSheetRow.findFirst({
+        where: { id: body.rowId, sheet: { siteId: id } },
+        select: { id: true },
+      });
+      if (!existing) return NextResponse.json({ error: "Fila no encontrada" }, { status: 404 });
       const row = await prisma.iSheetRow.update({
-        where: { id: body.rowId },
+        where: { id: existing.id },
         data: { dataJson: JSON.stringify(body.data || {}) },
       });
       return NextResponse.json(row);

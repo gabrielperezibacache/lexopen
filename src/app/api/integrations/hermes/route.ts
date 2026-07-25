@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { askHermes, getHermesConfig, legalSystemPrompt } from "@/lib/integrations/hermes";
 
@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: Request) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
     const body = await req.json();
 
@@ -116,10 +117,19 @@ export async function POST(req: Request) {
       { role: "user", content: prompt },
       { role: "assistant", content: result.content, source: result.source },
     ];
+    let chat;
     if (body.chatId) {
-      const existing = await prisma.agentChat.findUnique({ where: { id: body.chatId } });
+      const existing = await prisma.agentChat.findFirst({
+        where: {
+          id: body.chatId,
+          ...(user.role === "admin" ? {} : { userId: user.id }),
+        },
+      });
+      if (!existing) {
+        return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
+      }
       const previous = existing ? JSON.parse(existing.messagesJson || "[]") : [];
-      await prisma.agentChat.update({
+      chat = await prisma.agentChat.update({
         where: { id: body.chatId },
         data: {
           messagesJson: JSON.stringify([...previous, ...nextMessages]),
@@ -129,7 +139,7 @@ export async function POST(req: Request) {
         },
       });
     } else {
-      await prisma.agentChat.create({
+      chat = await prisma.agentChat.create({
         data: {
           title: prompt.slice(0, 80) || "Consulta Hermes",
           messagesJson: JSON.stringify(nextMessages),
@@ -140,7 +150,7 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, chat });
   } catch (e) {
     return handleRouteError(e);
   }

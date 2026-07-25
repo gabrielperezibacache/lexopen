@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
-import { canSeeConfidential, isStaff } from "@/lib/auth/rbac";
+import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { canSeeConfidential, isCliente, isStaff } from "@/lib/auth/rbac";
 import { newStorageKey, putObject } from "@/lib/storage";
 
 type Params = { params: Promise<{ id: string }> };
@@ -57,12 +57,23 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
+    assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
     const body = await req.json();
+    if (isCliente(user.role) && (body.confidencial !== undefined || body.privilegio !== undefined)) {
+      return NextResponse.json({ error: "Clientes no pueden marcar confidencialidad" }, { status: 403 });
+    }
 
     if (body.action === "create-folder") {
+      if (body.parentId) {
+        const parent = await prisma.folder.findFirst({
+          where: { id: body.parentId, siteId: id },
+          select: { id: true },
+        });
+        if (!parent) return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
+      }
       const folder = await prisma.folder.create({
         data: {
           name: body.name,
@@ -74,6 +85,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     if (body.action === "upload-file" || body.action === "create-file") {
+      if (body.folderId) {
+        const folder = await prisma.folder.findFirst({
+          where: { id: body.folderId, siteId: id },
+          select: { id: true },
+        });
+        if (!folder) return NextResponse.json({ error: "Carpeta no encontrada" }, { status: 404 });
+      }
       const prepared = await prepareFileBody(id, body.name, body);
       const file = await prisma.siteFile.create({
         data: {
@@ -110,7 +128,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     if (body.action === "new-version" && body.fileId) {
-      const existing = await prisma.siteFile.findUnique({ where: { id: body.fileId } });
+      const existing = await prisma.siteFile.findFirst({ where: { id: body.fileId, siteId: id } });
       if (!existing) return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
       const version = existing.version + 1;
       const prepared = await prepareFileBody(id, body.name || existing.name, {

@@ -23,7 +23,9 @@ async function ensureSeeded() {
 }
 
 export default async function DashboardPage() {
-  await ensureSeeded();
+  if (process.env.NODE_ENV === "development") {
+    await ensureSeeded();
+  }
   const user = await getCurrentUser();
 
   const [sites, causas, tasksOpen, unread, sitesList, tasks, actividades, minutasRecientes] =

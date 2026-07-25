@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { assertSitePageAccess, confidentialFileWhere } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
 
@@ -8,6 +9,8 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteOverviewPage({ params }: Params) {
   const { id } = await params;
+  const user = await assertSitePageAccess(id);
+  const fileWhere = confidentialFileWhere(user.role);
   const site = await prisma.site.findUnique({
     where: { id },
     include: {
@@ -15,15 +18,18 @@ export default async function SiteOverviewPage({ params }: Params) {
       causa: true,
       members: { include: { user: true } },
       tasks: { include: { assignee: true }, orderBy: { dueDate: "asc" }, take: 6 },
-      files: { orderBy: { updatedAt: "desc" }, take: 6 },
+      files: { where: fileWhere, orderBy: { updatedAt: "desc" }, take: 6 },
       wikiPages: { take: 5, orderBy: { updatedAt: "desc" } },
       isheets: { include: { _count: { select: { rows: true } } } },
       qaThreads: { take: 4, orderBy: { updatedAt: "desc" } },
       activities: { include: { user: true }, orderBy: { createdAt: "desc" }, take: 10 },
-      _count: { select: { files: true, tasks: true, members: true, wikiPages: true } },
+      _count: { select: { tasks: true, members: true, wikiPages: true } },
     },
   });
   if (!site) notFound();
+  const visibleFilesCount = await prisma.siteFile.count({
+    where: { siteId: id, ...fileWhere },
+  });
 
   return (
     <div>
@@ -37,7 +43,7 @@ export default async function SiteOverviewPage({ params }: Params) {
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Files", value: site._count.files },
+          { label: "Files", value: visibleFilesCount },
           { label: "Tasks", value: site._count.tasks },
           { label: "Wiki pages", value: site._count.wikiPages },
           { label: "People", value: site._count.members },

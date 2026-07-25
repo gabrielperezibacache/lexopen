@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireBillingManager, requireStaff } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -29,7 +29,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    await requireStaff();
+    assertCsrf(req);
+    await requireBillingManager();
     const { id } = await params;
     const body = await req.json();
     const current = await prisma.invoice.findUnique({ where: { id } });

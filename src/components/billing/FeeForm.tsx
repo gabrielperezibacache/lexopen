@@ -26,6 +26,7 @@ export function FeeForm({
         name: fd.get("name"),
         tipo,
         rateHourlyClp: fd.get("rateHourlyClp") || null,
+        rateHourlyUf: fd.get("rateHourlyUf") || null,
         flatFeeClp: fd.get("flatFeeClp") || null,
         retainerClp: fd.get("retainerClp") || null,
         cuotaLitisPct: fd.get("cuotaLitisPct") || null,
@@ -51,7 +52,10 @@ export function FeeForm({
         ))}
       </select>
       {(tipo === "hourly" || tipo === "mixed") && (
-        <input className="input" type="number" name="rateHourlyClp" placeholder="Tarifa hora CLP" />
+        <>
+          <input className="input" type="number" name="rateHourlyClp" placeholder="Tarifa hora CLP" />
+          <input className="input" type="number" step="0.01" name="rateHourlyUf" placeholder="Tarifa hora UF" />
+        </>
       )}
       {(tipo === "flat" || tipo === "mixed") && (
         <input className="input" type="number" name="flatFeeClp" placeholder="Suma alzada CLP" />

@@ -36,12 +36,12 @@ export function UserSwitcher() {
     load();
   }, []);
 
-  async function loginAs(email: string) {
+  async function loginAs(userId: string) {
     if (!demoSwitcher) return;
-    await fetch("/api/auth/login", {
+    await fetch("/api/auth/impersonate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password: "lexopen" }),
+      body: JSON.stringify({ userId }),
     });
     setOpen(false);
     await load();
@@ -96,7 +96,7 @@ export function UserSwitcher() {
                   key={u.id}
                   type="button"
                   className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-white/80 hover:bg-white/10"
-                  onClick={() => loginAs(u.email)}
+                  onClick={() => loginAs(u.id)}
                 >
                   <span
                     className="h-6 w-6 rounded-full"

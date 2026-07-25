@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { handleRouteError, requireUser } from "@/lib/api";
+import { clientSiteWhere } from "@/lib/auth/access";
 import { canSeeConfidential, isCliente, isStaff } from "@/lib/auth/rbac";
 
 const textMatch = (q: string) => ({ contains: q, mode: "insensitive" as const });
@@ -28,10 +29,14 @@ export async function GET(req: NextRequest) {
     if (isCliente(user.role)) {
       const sites = await prisma.site.findMany({
         where: {
-          isClientVisible: true,
-          OR: [
-            { name: textMatch(q) },
-            { description: textMatch(q) },
+          AND: [
+            clientSiteWhere(user.id),
+            {
+              OR: [
+                { name: textMatch(q) },
+                { description: textMatch(q) },
+              ],
+            },
           ],
         },
         take: 10,

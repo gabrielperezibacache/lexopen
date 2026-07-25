@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireUser } from "@/lib/api";
 
 export async function GET() {
   try {
@@ -18,6 +18,7 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireUser();
     const body = await req.json();
     if (body.action === "read-all") {
@@ -28,8 +29,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
     if (body.id) {
-      await prisma.notification.update({
-        where: { id: body.id },
+      await prisma.notification.updateMany({
+        where: { id: body.id, userId: user.id },
         data: { read: true },
       });
     }

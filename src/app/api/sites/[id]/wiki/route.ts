@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { isCliente } from "@/lib/auth/rbac";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,9 +23,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
+    assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
+    if (isCliente(user.role)) {
+      return NextResponse.json({ error: "Clientes no pueden editar la wiki" }, { status: 403 });
+    }
     const body = await req.json();
     const slug =
       body.slug ||

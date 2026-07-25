@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { assertSitePageAccess } from "@/lib/auth/access";
+import { isStaff } from "@/lib/auth/rbac";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { AddMemberButton } from "@/components/sites/AddMemberButton";
 
@@ -7,6 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SitePeoplePage({ params }: Params) {
   const { id } = await params;
+  const user = await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({
     where: { id },
     include: {
@@ -15,7 +18,9 @@ export default async function SitePeoplePage({ params }: Params) {
     },
   });
   if (!site) notFound();
-  const allUsers = await prisma.user.findMany({ orderBy: { name: "asc" } });
+  const allUsers = isStaff(user.role)
+    ? await prisma.user.findMany({ orderBy: { name: "asc" } })
+    : [];
 
   return (
     <div>
@@ -24,10 +29,12 @@ export default async function SitePeoplePage({ params }: Params) {
         <p className="text-sm text-[var(--ink-soft)]/75">
           Usuarios, roles del site y grupos (ethical walls / permisos HighQ-style).
         </p>
-        <AddMemberButton
-          siteId={site.id}
-          users={allUsers.map((u) => ({ id: u.id, name: u.name, email: u.email }))}
-        />
+        {isStaff(user.role) && (
+          <AddMemberButton
+            siteId={site.id}
+            users={allUsers.map((u) => ({ id: u.id, name: u.name, email: u.email }))}
+          />
+        )}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">

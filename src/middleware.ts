@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const SESSION_COOKIE = "lexopen_session";
+const ROLE_COOKIE = "lexopen_role";
 
 const PUBLIC_PATHS = [
   "/",
@@ -8,15 +9,15 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/logout",
   "/api/health",
-  "/api/integrations/google/callback",
 ];
 
 function sessionSecret() {
-  return (
-    process.env.SESSION_SECRET ||
-    process.env.GOOGLE_CLIENT_SECRET ||
-    "lexopen-dev-session-secret-change-me"
-  );
+  const secret = process.env.SESSION_SECRET;
+  if (secret && secret.length >= 16) return secret;
+  if (process.env.NODE_ENV === "production") {
+    return "";
+  }
+  return secret || "lexopen-dev-session-secret-change-me";
 }
 
 function toHex(buf: ArrayBuffer) {
@@ -32,10 +33,10 @@ function timingSafeEqualHex(a: string, b: string) {
   return out === 0;
 }
 
-async function hmacSha256Hex(payload: string) {
+async function hmacSha256Hex(payload: string, secret: string) {
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(sessionSecret()),
+    new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
@@ -49,8 +50,9 @@ async function hmacSha256Hex(payload: string) {
 }
 
 async function verifyToken(token: string): Promise<boolean> {
+  const secret = sessionSecret();
+  if (!secret) return false;
   if (!token.includes(".")) {
-    // Legacy cookie only allowed in development
     return process.env.NODE_ENV === "development";
   }
   const parts = token.split(".");
@@ -58,12 +60,39 @@ async function verifyToken(token: string): Promise<boolean> {
   const [userId, expStr, sig] = parts;
   const expiresAt = Number(expStr);
   if (!userId || !Number.isFinite(expiresAt) || expiresAt < Date.now()) return false;
-  const expected = await hmacSha256Hex(`${userId}.${expiresAt}`);
+  const expected = await hmacSha256Hex(`${userId}.${expiresAt}`, secret);
   return timingSafeEqualHex(sig, expected);
+}
+
+function isClientAllowedPath(pathname: string) {
+  return (
+    pathname === "/portal" ||
+    pathname.startsWith("/portal/") ||
+    pathname === "/sites" ||
+    pathname.startsWith("/sites/") ||
+    pathname.startsWith("/api/sites") ||
+    pathname.startsWith("/api/messages") ||
+    pathname.startsWith("/api/notifications") ||
+    pathname.startsWith("/api/auth/") ||
+    pathname === "/api/health" ||
+    pathname.startsWith("/api/search")
+  );
+}
+
+function withPathHeader(req: NextRequest, res: NextResponse) {
+  // Also set request header for RSC layouts
+  return res;
 }
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-lexopen-pathname", pathname);
+
+  const pass = () =>
+    NextResponse.next({
+      request: { headers: requestHeaders },
+    });
 
   if (
     PUBLIC_PATHS.includes(pathname) ||
@@ -71,12 +100,20 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/favicon") ||
     pathname.match(/\.(svg|png|jpg|css|js|ico|webp)$/)
   ) {
-    return NextResponse.next();
+    return pass();
   }
 
-  // Demo mode: allow unauthenticated access when explicitly enabled
-  if (process.env.LEXOPEN_OPEN_ACCESS === "1") {
-    return NextResponse.next();
+  // Google OAuth callback stays public but must still pass pathname header
+  if (pathname === "/api/integrations/google/callback") {
+    return pass();
+  }
+
+  // Open access NEVER in production
+  if (
+    process.env.LEXOPEN_OPEN_ACCESS === "1" &&
+    process.env.NODE_ENV !== "production"
+  ) {
+    return pass();
   }
 
   const token = req.cookies.get(SESSION_COOKIE)?.value;
@@ -89,7 +126,18 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  return NextResponse.next();
+  const role = req.cookies.get(ROLE_COOKIE)?.value;
+  if (role === "cliente" && !isClientAllowedPath(pathname)) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Acceso restringido al portal cliente" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.redirect(new URL("/portal", req.url));
+  }
+
+  return withPathHeader(req, pass());
 }
 
 export const config = {

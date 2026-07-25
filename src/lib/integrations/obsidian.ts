@@ -35,18 +35,34 @@ async function writeExportFile(opts: {
   vaultPath?: string | null;
   storageKeys: string[];
 }) {
-  if (opts.vaultPath) {
+  const restUrl = process.env.OBSIDIAN_REST_URL?.replace(/\/$/, "");
+  if (restUrl) {
+    const res = await fetch(`${restUrl}/vault/${encodeURIComponent(opts.relativePath)}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        ...(process.env.OBSIDIAN_REST_TOKEN
+          ? { Authorization: `Bearer ${process.env.OBSIDIAN_REST_TOKEN}` }
+          : {}),
+      },
+      body: opts.content,
+    });
+    if (!res.ok) {
+      throw new Error(`Obsidian REST PUT failed: ${res.status}`);
+    }
+    return;
+  }
+
+  if (opts.vaultPath && process.env.NODE_ENV !== "production") {
     await fs.mkdir(path.dirname(opts.localPath), { recursive: true });
     await fs.writeFile(opts.localPath, opts.content, "utf8");
   }
-  if (!process.env.OBSIDIAN_REST_URL) {
-    const stored = await putObject({
-      key: newStorageKey("obsidian", opts.relativePath),
-      body: opts.content,
-      contentType: "text/markdown",
-    });
-    opts.storageKeys.push(stored.key);
-  }
+  const stored = await putObject({
+    key: newStorageKey("obsidian", opts.relativePath),
+    body: opts.content,
+    contentType: "text/markdown",
+  });
+  opts.storageKeys.push(stored.key);
 }
 
 export async function exportCausaToObsidian(causaId: string) {
@@ -172,6 +188,7 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
     vaultPath: dir,
     storageKeys,
     files,
+    mode: process.env.OBSIDIAN_REST_URL ? "rest" : "storage",
   };
 }
 

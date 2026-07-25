@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import {
   driveFolderUrl,
   isPlaceholderDriveFolderId,
@@ -19,29 +20,55 @@ export type GoogleConfig = {
   tokenExpiresAt?: number;
 };
 
-const TOKEN_PREFIX = "enc:v1:";
-
-function xorToken(value: string, secret: string) {
-  const input = Buffer.from(value, "utf8");
-  const key = Buffer.from(secret, "utf8");
-  return Buffer.from(input.map((byte, idx) => byte ^ key[idx % key.length]));
-}
+const TOKEN_PREFIX = "enc:v2:";
+const LEGACY_TOKEN_PREFIX = "enc:v1:";
 
 function encryptToken(value: string | undefined) {
   const secret = process.env.SESSION_SECRET;
-  if (!value || !secret || value.startsWith(TOKEN_PREFIX)) return value;
-  return `${TOKEN_PREFIX}${xorToken(value, secret).toString("base64")}`;
+  if (!value || value.startsWith(TOKEN_PREFIX)) return value;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SESSION_SECRET requerido para guardar tokens Google");
+    }
+    return value;
+  }
+  const key = createHash("sha256").update(secret).digest();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${TOKEN_PREFIX}${iv.toString("base64url")}.${tag.toString("base64url")}.${encrypted.toString("base64url")}`;
 }
 
 function decryptToken(value: string | undefined) {
   const secret = process.env.SESSION_SECRET;
-  if (!value || !secret || !value.startsWith(TOKEN_PREFIX)) return value;
+  if (!value) return value;
+  if (!secret) return value.startsWith(TOKEN_PREFIX) ? undefined : value;
+  if (value.startsWith(LEGACY_TOKEN_PREFIX)) {
+    try {
+      const raw = Buffer.from(value.slice(LEGACY_TOKEN_PREFIX.length), "base64");
+      const key = Buffer.from(secret, "utf8");
+      return Buffer.from(raw.map((byte, idx) => byte ^ key[idx % key.length])).toString("utf8");
+    } catch {
+      return undefined;
+    }
+  }
+  if (!value.startsWith(TOKEN_PREFIX)) return value;
   try {
-    const raw = Buffer.from(value.slice(TOKEN_PREFIX.length), "base64");
-    const key = Buffer.from(secret, "utf8");
-    return Buffer.from(raw.map((byte, idx) => byte ^ key[idx % key.length])).toString("utf8");
+    const [ivRaw, tagRaw, encryptedRaw] = value.slice(TOKEN_PREFIX.length).split(".");
+    const key = createHash("sha256").update(secret).digest();
+    const decipher = createDecipheriv(
+      "aes-256-gcm",
+      key,
+      Buffer.from(ivRaw, "base64url")
+    );
+    decipher.setAuthTag(Buffer.from(tagRaw, "base64url"));
+    return Buffer.concat([
+      decipher.update(Buffer.from(encryptedRaw, "base64url")),
+      decipher.final(),
+    ]).toString("utf8");
   } catch {
-    return value;
+    return undefined;
   }
 }
 
@@ -451,6 +478,9 @@ export async function createCausaDriveFolder(
   const config = await ensureGoogleAccessToken();
 
   if (!config.accessToken) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Google OAuth requerido para crear carpetas Drive en producción");
+    }
     const stubId = makeStubFolderId(causa.id);
     const url = stubFolderUrl(stubId);
     const updated = await prisma.causa.update({

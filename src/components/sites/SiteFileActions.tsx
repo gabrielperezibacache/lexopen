@@ -3,6 +3,13 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 export function SiteFileActions({ siteId }: { siteId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState<"file" | "folder" | null>(null);
@@ -12,6 +19,15 @@ export function SiteFileActions({ siteId }: { siteId: string }) {
     e.preventDefault();
     setBusy(true);
     const fd = new FormData(e.currentTarget);
+    const file = fd.get("file");
+    const binary =
+      file instanceof File && file.size > 0
+        ? {
+            name: file.name,
+            mimeType: file.type || "application/octet-stream",
+            contenidoBase64: arrayBufferToBase64(await file.arrayBuffer()),
+          }
+        : null;
     await fetch(`/api/sites/${siteId}/files`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -20,7 +36,9 @@ export function SiteFileActions({ siteId }: { siteId: string }) {
           ? { action: "create-folder", name: fd.get("name") }
           : {
               action: "create-file",
-              name: fd.get("name"),
+              name: binary?.name || fd.get("name"),
+              mimeType: binary?.mimeType,
+              contenidoBase64: binary?.contenidoBase64,
               contenido: fd.get("contenido"),
               tags: fd.get("tags"),
             }
@@ -49,6 +67,7 @@ export function SiteFileActions({ siteId }: { siteId: string }) {
             {open === "file" && (
               <>
                 <input className="input" name="tags" placeholder="tags (csv)" />
+                <input className="input" type="file" name="file" />
                 <textarea className="textarea" name="contenido" placeholder="Contenido markdown" />
               </>
             )}

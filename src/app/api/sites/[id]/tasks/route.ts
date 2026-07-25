@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,6 +22,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
+    assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
@@ -64,12 +65,20 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
+    assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
     const body = await req.json();
+    const current = await prisma.task.findFirst({
+      where: { id: body.id, siteId: id },
+      select: { id: true },
+    });
+    if (!current) {
+      return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
+    }
     const task = await prisma.task.update({
-      where: { id: body.id },
+      where: { id: current.id },
       data: {
         status: body.status,
         title: body.title,

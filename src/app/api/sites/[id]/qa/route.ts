@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -24,6 +24,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
+    assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
@@ -56,6 +57,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     if (body.action === "reply" && body.threadId) {
+      const thread = await prisma.qaThread.findFirst({
+        where: { id: body.threadId, siteId: id },
+        select: { id: true },
+      });
+      if (!thread) return NextResponse.json({ error: "Hilo no encontrado" }, { status: 404 });
       const post = await prisma.qaPost.create({
         data: {
           threadId: body.threadId,
@@ -65,7 +71,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         },
       });
       await prisma.qaThread.update({
-        where: { id: body.threadId },
+        where: { id: thread.id },
         data: {
           status: body.isAnswer ? "answered" : undefined,
           updatedAt: new Date(),

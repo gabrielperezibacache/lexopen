@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
   confidentialWhere,
+  assertCsrf,
   handleRouteError,
   parseBody,
   requireStaff,
@@ -30,31 +31,75 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
-    const body = await parseBody(req, documentoCreateSchema);
+    const isMultipart = req.headers.get("content-type")?.includes("multipart/form-data");
+    const body = isMultipart
+      ? null
+      : await parseBody(req, documentoCreateSchema);
 
-    let storageKey = body.storageKey || null;
-    if (body.contenido && !storageKey) {
-      const key = newStorageKey("documentos", body.nombre);
+    let nombre = body?.nombre || "";
+    let tipo = body?.tipo || "otro";
+    let contenido = body?.contenido || null;
+    let mimeType = body?.mimeType || null;
+    let storageKey = body?.storageKey || null;
+    let confidencial = Boolean(body?.confidencial);
+    let privilegio = Boolean(body?.privilegio);
+    let causaId = body?.causaId || null;
+    let autorId = body?.autorId || user.id;
+
+    if (isMultipart) {
+      const form = await req.formData();
+      const file = form.get("file");
+      nombre = String(form.get("nombre") || "");
+      tipo = String(form.get("tipo") || "otro");
+      confidencial = form.get("confidencial") === "on";
+      privilegio = form.get("privilegio") === "on";
+      causaId = String(form.get("causaId") || "") || null;
+      autorId = user.id;
+      if (file && typeof (file as File).arrayBuffer === "function" && (file as File).size > 0) {
+        const uploaded = file as File;
+        nombre = nombre || uploaded.name;
+        mimeType = uploaded.type || "application/octet-stream";
+        const key = newStorageKey("documentos", nombre);
+        await putObject({
+          key,
+          body: Buffer.from(await uploaded.arrayBuffer()),
+          contentType: mimeType,
+        });
+        storageKey = key;
+      }
+      if (!storageKey) {
+        contenido = String(form.get("contenido") || "");
+        mimeType = mimeType || "text/plain";
+      }
+    }
+
+    if (!nombre) {
+      return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
+    }
+
+    if (contenido && !storageKey) {
+      const key = newStorageKey("documentos", nombre);
       await putObject({
         key,
-        body: body.contenido,
-        contentType: body.mimeType || "text/markdown",
+        body: contenido,
+        contentType: mimeType || "text/markdown",
       });
       storageKey = key;
     }
 
     const doc = await prisma.documento.create({
       data: {
-        nombre: body.nombre,
-        tipo: body.tipo || "otro",
-        contenido: body.contenido || null,
-        mimeType: body.mimeType || null,
+        nombre,
+        tipo,
+        contenido,
+        mimeType,
         storageKey,
-        confidencial: Boolean(body.confidencial),
-        privilegio: Boolean(body.privilegio),
-        causaId: body.causaId || null,
-        autorId: body.autorId || user.id,
+        confidencial,
+        privilegio,
+        causaId,
+        autorId,
       },
     });
 

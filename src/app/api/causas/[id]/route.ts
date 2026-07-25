@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
@@ -42,6 +42,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
+  assertCsrf(req);
   const user = await requireStaff();
   const { id } = await params;
   const body = await req.json();
@@ -113,6 +114,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
+  assertCsrf(_req);
   const user = await requireStaff();
   const { id } = await params;
   await prisma.causa.delete({ where: { id } });

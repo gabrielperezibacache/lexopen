@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
   handleRouteError,
+  assertCsrf,
   jsonError,
   parseBody,
   requireStaff,
 } from "@/lib/api";
 import { causaCreateSchema } from "@/lib/schemas";
-import { validarRit, validarRut, normalizarRut } from "@/lib/chile";
+import { validarRit, validarRuc, validarRut, normalizarRut } from "@/lib/chile";
 import { checkConflicts } from "@/lib/conflict";
 import { writeAudit } from "@/lib/audit";
 import { parseLocalDateInput } from "@/lib/minutas";
@@ -26,11 +27,11 @@ export async function GET(req: NextRequest) {
           q
             ? {
                 OR: [
-                  { titulo: { contains: q } },
-                  { rit: { contains: q } },
-                  { ruc: { contains: q } },
-                  { caratula: { contains: q } },
-                  { tribunal: { contains: q } },
+                  { titulo: { contains: q, mode: "insensitive" } },
+                  { rit: { contains: q, mode: "insensitive" } },
+                  { ruc: { contains: q, mode: "insensitive" } },
+                  { caratula: { contains: q, mode: "insensitive" } },
+                  { tribunal: { contains: q, mode: "insensitive" } },
                 ],
               }
             : {},
@@ -59,11 +60,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, causaCreateSchema);
 
     if (body.rit && !validarRit(body.rit)) {
       return jsonError("RIT inválido (ej. C-4521-2025)", 400);
+    }
+    if (body.ruc && !validarRuc(body.ruc)) {
+      return jsonError("RUC inválido", 400);
     }
     for (const p of body.partes || []) {
       if (p.rut && !validarRut(p.rut)) {

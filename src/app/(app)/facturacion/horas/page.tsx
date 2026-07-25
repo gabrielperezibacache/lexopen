@@ -3,6 +3,7 @@ import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp } from "@/lib/billing";
 import { formatDate } from "@/components/ui";
 import { TimeEntryForm } from "@/components/billing/TimeEntryForm";
+import { TimeEntryActions } from "@/components/billing/TimeEntryActions";
 import Link from "next/link";
 
 export default async function HorasPage() {
@@ -29,9 +30,14 @@ export default async function HorasPage() {
         title="Horas facturables"
         subtitle="Registro de tiempo por causa, actividad y tarifa. Listo para agrupar en boleta/factura."
         actions={
-          <Link href="/facturacion/facturas" className="btn btn-secondary">
-            Facturar selección →
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <a href="/api/billing/time-entries?format=csv" className="btn btn-ghost">
+              Exportar CSV
+            </a>
+            <Link href="/facturacion/facturas" className="btn btn-secondary">
+              Facturar selección →
+            </Link>
+          </div>
         }
       />
 
@@ -53,6 +59,7 @@ export default async function HorasPage() {
               <th className="px-4 py-3">Horas</th>
               <th className="px-4 py-3">Monto</th>
               <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3">Aprobación</th>
             </tr>
           </thead>
           <tbody>
@@ -69,6 +76,12 @@ export default async function HorasPage() {
                 <td className="px-4 py-3">{clp(e.amountClp)}</td>
                 <td className="px-4 py-3">
                   {e.billed ? "Facturado" : e.billable ? "Por facturar" : "No facturable"}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="mb-2 text-xs text-[var(--ink-soft)]/65">
+                    {e.approved ? "Aprobada" : "Pendiente"}
+                  </div>
+                  <TimeEntryActions id={e.id} approved={e.approved} />
                 </td>
               </tr>
             ))}

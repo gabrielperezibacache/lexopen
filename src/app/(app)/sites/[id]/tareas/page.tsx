@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { NewTaskButton, TaskStatusButton } from "@/components/sites/NewTaskButton";
@@ -8,6 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteTasksPage({ params }: Params) {
   const { id } = await params;
+  await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({
     where: { id },
     include: { members: { include: { user: true } } },

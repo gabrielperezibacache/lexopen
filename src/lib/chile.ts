@@ -80,6 +80,12 @@ export function validarRit(rit: string): boolean {
   return /^[A-Z]{0,3}-?\d{1,6}-\d{4}$/.test(v) || /^\d{4,6}-\d{4}$/.test(v);
 }
 
+/** RUC judicial chileno: cuerpo numérico y dígito verificador. */
+export function validarRuc(ruc: string): boolean {
+  const v = ruc.trim().toUpperCase().replace(/\./g, "");
+  return /^\d{10,12}-?[\dK]$/.test(v);
+}
+
 export function normalizarRut(rut: string): string {
   const clean = rut.replace(/\./g, "").replace(/\s/g, "").toUpperCase();
   const m = clean.match(/^(\d{7,8})-?([\dK])$/);

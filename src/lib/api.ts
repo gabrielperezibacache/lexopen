@@ -6,8 +6,13 @@ import {
   requireStaff,
   requireUser,
 } from "@/lib/auth/session";
-import { canSeeConfidential, isCliente, isStaff } from "@/lib/auth/rbac";
-import { prisma } from "@/lib/db";
+import {
+  canManageBilling,
+  canSeeConfidential,
+  isCliente,
+  isStaff,
+} from "@/lib/auth/rbac";
+import { requireSiteAccess, httpError } from "@/lib/auth/access";
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -31,10 +36,18 @@ export async function parseBody<T>(req: Request, schema: ZodSchema<T>) {
   return schema.parse(body);
 }
 
-export { getCurrentUser, requireUser, requireStaff, requireRole };
+export { getCurrentUser, requireUser, requireStaff, requireRole, requireSiteAccess };
 
 export async function assertStaffApi() {
   return requireStaff();
+}
+
+export async function requireBillingManager() {
+  const user = await requireUser();
+  if (!canManageBilling(user.role)) {
+    throw httpError("Prohibido: se requiere rol de facturación", 403);
+  }
+  return user;
 }
 
 export function confidentialWhere(userRole: string) {
@@ -54,35 +67,34 @@ export function staffOrForbid(userRole: string) {
   return null;
 }
 
-export async function requireSiteAccess(
-  siteId: string,
-  user: { id: string; role: string }
-) {
-  if (isStaff(user.role)) return;
-
-  const site = await prisma.site.findUnique({
-    where: { id: siteId },
-    select: {
-      id: true,
-      isClientVisible: true,
-      members: { where: { userId: user.id }, select: { id: true }, take: 1 },
-    },
-  });
-
-  if (!site) {
-    const err = new Error("Site no encontrado") as Error & { status: number };
-    err.status = 404;
-    throw err;
+/** Origin/Referer CSRF check for mutating API requests. */
+export function assertCsrf(req: Request) {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
+    return;
   }
+  const origin = req.headers.get("origin");
+  const referer = req.headers.get("referer");
+  const host = req.headers.get("host");
+  if (!host) return;
 
-  if (isCliente(user.role)) {
-    if (site.isClientVisible || site.members.length > 0) return;
-    const err = new Error("Acceso restringido") as Error & { status: number };
-    err.status = 403;
-    throw err;
+  const allowed = [
+    `http://${host}`,
+    `https://${host}`,
+    process.env.NEXT_PUBLIC_APP_URL,
+  ].filter(Boolean) as string[];
+
+  const okOrigin = origin && allowed.some((a) => origin === a || origin.startsWith(a));
+  const okReferer =
+    referer && allowed.some((a) => referer === a || referer.startsWith(a));
+
+  // Same-origin fetch from browser usually sends Origin; server-to-server may not.
+  if (!origin && !referer) {
+    if (process.env.NODE_ENV === "production" && process.env.LEXOPEN_RELAX_CSRF !== "1") {
+      throw httpError("CSRF: Origin/Referer requerido", 403);
+    }
+    return;
   }
-
-  const err = new Error("Prohibido") as Error & { status: number };
-  err.status = 403;
-  throw err;
+  if (!okOrigin && !okReferer) {
+    throw httpError("CSRF: origen no permitido", 403);
+  }
 }

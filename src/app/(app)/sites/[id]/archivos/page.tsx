@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { assertSitePageAccess, confidentialFileWhere } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { formatDate } from "@/components/ui";
 import { SiteFileActions } from "@/components/sites/SiteFileActions";
@@ -8,6 +9,8 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteFilesPage({ params }: Params) {
   const { id } = await params;
+  const user = await assertSitePageAccess(id);
+  const fileWhere = confidentialFileWhere(user.role);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
 
@@ -15,6 +18,7 @@ export default async function SiteFilesPage({ params }: Params) {
     where: { siteId: id },
     include: {
       files: {
+        where: fileWhere,
         include: {
           versions: { orderBy: { version: "desc" }, take: 3 },
           comments: { include: { author: true } },
@@ -25,7 +29,7 @@ export default async function SiteFilesPage({ params }: Params) {
     orderBy: { name: "asc" },
   });
   const rootFiles = await prisma.siteFile.findMany({
-    where: { siteId: id, folderId: null },
+    where: { siteId: id, folderId: null, ...fileWhere },
     include: {
       versions: { orderBy: { version: "desc" }, take: 3 },
       comments: { include: { author: true } },
@@ -62,7 +66,13 @@ export default async function SiteFilesPage({ params }: Params) {
                     )}
                   </div>
                   <div className="text-xs text-[var(--ink-soft)]/60">
-                    {f.versions.length} versiones
+                    <a
+                      href={`/api/sites/${site.id}/files/${f.id}/content`}
+                      className="text-[var(--sea)]"
+                    >
+                      Descargar
+                    </a>{" "}
+                    · {f.versions.length} versiones
                   </div>
                 </div>
               ))}
@@ -79,7 +89,13 @@ export default async function SiteFilesPage({ params }: Params) {
             <div className="mt-3 space-y-2">
               {rootFiles.map((f) => (
                 <div key={f.id} className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm">
-                  {f.name} · v{f.version}
+                  {f.name} · v{f.version} ·{" "}
+                  <a
+                    href={`/api/sites/${site.id}/files/${f.id}/content`}
+                    className="text-[var(--sea)]"
+                  >
+                    Descargar
+                  </a>
                 </div>
               ))}
             </div>

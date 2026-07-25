@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { ISheetTable } from "@/components/sites/ISheetTable";
 
@@ -7,6 +8,7 @@ type Params = { params: Promise<{ id: string; sheetId: string }> };
 
 export default async function ISheetDetailPage({ params }: Params) {
   const { id, sheetId } = await params;
+  await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
   const sheet = await prisma.iSheet.findUnique({

@@ -2,12 +2,47 @@ import { prisma } from "@/lib/db";
 import { StatusBadge, formatDate } from "@/components/ui";
 import Link from "next/link";
 import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
+import { PlazoForm } from "@/components/PlazoForm";
 
-export default async function PlazosPage() {
-  const plazos = await prisma.plazo.findMany({
-    include: { causa: true, responsable: true },
-    orderBy: { fechaLimite: "asc" },
-  });
+type Props = { searchParams: Promise<{ mes?: string }> };
+
+function monthBounds(value?: string) {
+  const now = new Date();
+  const match = value?.match(/^(\d{4})-(\d{2})$/);
+  const year = match ? Number(match[1]) : now.getFullYear();
+  const month = match ? Number(match[2]) - 1 : now.getMonth();
+  const start = new Date(year, month, 1, 0, 0, 0, 0);
+  const end = new Date(year, month + 1, 1, 0, 0, 0, 0);
+  return { start, end };
+}
+
+function monthParam(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export default async function PlazosPage({ searchParams }: Props) {
+  const sp = await searchParams;
+  const { start, end } = monthBounds(sp.mes);
+  const [plazos, causas, responsables] = await Promise.all([
+    prisma.plazo.findMany({
+      where: { fechaLimite: { gte: start, lt: end } },
+      include: { causa: true, responsable: true },
+      orderBy: { fechaLimite: "asc" },
+    }),
+    prisma.causa.findMany({
+      where: { estado: { in: ["activa", "suspensa"] } },
+      select: { id: true, rit: true, titulo: true },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+    }),
+    prisma.user.findMany({
+      where: { role: { in: ["admin", "abogado", "asistente"] } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+  const prev = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+  const next = new Date(start.getFullYear(), start.getMonth() + 1, 1);
 
   return (
     <div className="space-y-6">
@@ -19,6 +54,23 @@ export default async function PlazosPage() {
         <p className="mt-2 text-[var(--ink-soft)]/80">
           Plazos procesales, audiencias e internos. Envíelos a Google Calendar con un clic.
         </p>
+      </div>
+
+      <PlazoForm
+        causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))}
+        responsables={responsables.map((u) => ({ id: u.id, label: u.name }))}
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link className="btn btn-ghost" href={`/plazos?mes=${monthParam(prev)}`}>
+          Mes anterior
+        </Link>
+        <h2 className="text-lg font-semibold">
+          Calendario {start.toLocaleDateString("es-CL", { month: "long", year: "numeric" })}
+        </h2>
+        <Link className="btn btn-ghost" href={`/plazos?mes=${monthParam(next)}`}>
+          Mes siguiente
+        </Link>
       </div>
 
       <div className="space-y-3">

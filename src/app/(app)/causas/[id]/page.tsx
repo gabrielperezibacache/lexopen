@@ -5,6 +5,7 @@ import { labelEtapa, labelMateria } from "@/lib/chile";
 import { StatusBadge, formatDate, formatDateTime } from "@/components/ui";
 import { CausaActions } from "@/components/CausaActions";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
+import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
 import {
   isPlaceholderDriveFolderId,
@@ -24,6 +25,8 @@ export default async function CausaDetailPage({ params }: Params) {
       documentos: { orderBy: { updatedAt: "desc" } },
       plazos: { orderBy: { fechaLimite: "asc" } },
       notas: { orderBy: { updatedAt: "desc" } },
+      etapaHistorial: { orderBy: { createdAt: "desc" } },
+      movimientos: { orderBy: { fecha: "desc" } },
       minutas: {
         include: {
           autor: { select: { name: true } },
@@ -64,6 +67,17 @@ export default async function CausaDetailPage({ params }: Params) {
             <StatusBadge estado={causa.estado} />
             <span className="badge badge-sea">{labelMateria(causa.materia)}</span>
             <span className="badge badge-ink">{labelEtapa(causa.etapa)}</span>
+            <span
+              className={
+                causa.conflictStatus === "blocked"
+                  ? "badge badge-vencido"
+                  : causa.conflictStatus === "warning"
+                    ? "badge badge-pendiente"
+                    : "badge badge-activa"
+              }
+            >
+              Conflictos: {causa.conflictStatus}
+            </span>
             {isRealDriveFolderId(causa.googleDriveFolderId) && (
               <span className="badge badge-activa">Drive vinculado</span>
             )}
@@ -176,6 +190,17 @@ export default async function CausaDetailPage({ params }: Params) {
               <dt className="text-[var(--ink-soft)]/60">Abogado</dt>
               <dd className="font-medium">{causa.abogado?.name || "—"}</dd>
             </div>
+            <div>
+              <dt className="text-[var(--ink-soft)]/60">Conflicto</dt>
+              <dd className="font-medium">
+                {causa.conflictStatus}
+                {causa.conflictCheckedAt ? ` · ${formatDate(causa.conflictCheckedAt)}` : ""}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[var(--ink-soft)]/60">Notas conflicto</dt>
+              <dd className="font-medium">{causa.conflictNotes || "—"}</dd>
+            </div>
           </dl>
           <p className="mt-4 text-sm leading-relaxed text-[var(--ink-soft)]/85">
             {causa.resumen || "Sin resumen."}
@@ -243,6 +268,44 @@ export default async function CausaDetailPage({ params }: Params) {
           </ul>
         </div>
       </div>
+
+      <section className="panel rounded-3xl p-5">
+        <h2 className="text-lg font-semibold">Historial de etapa</h2>
+        <div className="mt-4 space-y-3">
+          {causa.etapaHistorial.map((h) => (
+            <div key={h.id} className="rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
+              <div className="font-medium">{labelEtapa(h.etapa)}</div>
+              <div className="text-xs text-[var(--ink-soft)]/65">
+                {formatDateTime(h.createdAt)}
+                {h.nota ? ` · ${h.nota}` : ""}
+              </div>
+            </div>
+          ))}
+          {causa.etapaHistorial.length === 0 && (
+            <p className="text-sm text-[var(--ink-soft)]/65">Sin cambios de etapa registrados.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="panel rounded-3xl p-5">
+        <h2 className="text-lg font-semibold">Movimientos</h2>
+        <CausaMovimientoForm causaId={causa.id} />
+        <div className="mt-5 space-y-3">
+          {causa.movimientos.map((m) => (
+            <div key={m.id} className="rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="font-medium">{m.titulo}</div>
+                <span className="badge badge-ink">{m.fuente}</span>
+              </div>
+              <div className="mt-1 text-xs text-[var(--ink-soft)]/65">{formatDate(m.fecha)}</div>
+              {m.detalle && <p className="mt-2 text-[var(--ink-soft)]/80">{m.detalle}</p>}
+            </div>
+          ))}
+          {causa.movimientos.length === 0 && (
+            <p className="text-sm text-[var(--ink-soft)]/65">Sin movimientos registrados.</p>
+          )}
+        </div>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">

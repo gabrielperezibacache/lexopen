@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Scale,
   LayoutDashboard,
@@ -26,11 +26,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const primary = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
-  { href: "/sites", label: "Sites", icon: Building2 },
+  { href: "/sites", label: "Espacios", icon: Building2 },
   { href: "/causas", label: "Causas", icon: Briefcase },
   { href: "/minutas", label: "Minutas", icon: ClipboardPen },
   { href: "/facturacion", label: "Facturación", icon: CircleDollarSign },
@@ -56,7 +56,7 @@ const intel = [
 
 const clienteNav = [
   { href: "/portal", label: "Portal cliente", icon: DoorOpen },
-  { href: "/sites", label: "Sites", icon: Building2 },
+  { href: "/sites", label: "Espacios", icon: Building2 },
 ];
 
 function NavGroup({
@@ -97,15 +97,8 @@ function NavGroup({
 
 export function AppSidebar({ role }: { role?: string | null }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const isCliente = role === "cliente";
-
-  useEffect(() => {
-    if (!isCliente) return;
-    if (pathname.startsWith("/portal") || pathname.startsWith("/sites")) return;
-    router.replace("/portal");
-  }, [isCliente, pathname, router]);
 
   const nav = (
     <>
@@ -137,7 +130,7 @@ export function AppSidebar({ role }: { role?: string | null }) {
 
       <div className="space-y-2 border-t border-white/10 p-3">
         {!isCliente && (
-          <Link href="/mensajes" className="nav-link" onClick={() => setOpen(false)}>
+          <Link href="/notificaciones" className="nav-link" onClick={() => setOpen(false)}>
             <Bell size={16} />
             <span>Notificaciones</span>
           </Link>
@@ -154,6 +147,7 @@ export function AppSidebar({ role }: { role?: string | null }) {
         className="fixed bottom-4 right-4 z-40 grid h-12 w-12 place-items-center rounded-full bg-[var(--ink)] text-white shadow-lg md:hidden"
         onClick={() => setOpen((v) => !v)}
         aria-label="Abrir menú"
+        aria-expanded={open}
       >
         <Menu size={20} />
       </button>

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, parseBody, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, parseBody, requireBillingManager, requireStaff } from "@/lib/api";
 import { DEFAULT_HOURLY_CLP } from "@/lib/billing";
+import { ufToClp } from "@/lib/uf";
 import { timeEntrySchema } from "@/lib/schemas";
 
 function minutesBetween(start: Date, end: Date) {
@@ -23,6 +24,34 @@ export async function GET(req: NextRequest) {
       include: { user: true, causa: true, cliente: true },
       orderBy: { date: "desc" },
     });
+    if (req.nextUrl.searchParams.get("format") === "csv") {
+      const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+      const csv = [
+        ["fecha", "descripcion", "causa", "cliente", "usuario", "horas", "monto_clp", "facturable", "facturado", "aprobado"].join(","),
+        ...entries.map((e) =>
+          [
+            e.date.toISOString().slice(0, 10),
+            e.description,
+            e.causa?.rit || e.causa?.titulo || "",
+            e.cliente?.razonSocial || "",
+            e.user.name,
+            e.hours,
+            e.amountClp,
+            e.billable,
+            e.billed,
+            e.approved,
+          ]
+            .map(escape)
+            .join(",")
+        ),
+      ].join("\n");
+      return new NextResponse(csv, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": 'attachment; filename="time-entries.csv"',
+        },
+      });
+    }
     return NextResponse.json(entries);
   } catch (e) {
     return handleRouteError(e);
@@ -31,6 +60,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, timeEntrySchema);
     const timerStartedAt = body.timerStartedAt ? new Date(body.timerStartedAt) : null;
@@ -48,7 +78,10 @@ export async function POST(req: NextRequest) {
         where: { causaId: body.causaId, active: true, tipo: { in: ["hourly", "mixed"] } },
         orderBy: { startDate: "desc" },
       });
-      rateClp = fee?.rateHourlyClp ?? DEFAULT_HOURLY_CLP;
+      rateClp =
+        fee?.rateHourlyClp ??
+        (fee?.rateHourlyUf ? await ufToClp(fee.rateHourlyUf, body.date ? new Date(body.date) : new Date()) : null) ??
+        DEFAULT_HOURLY_CLP;
     }
     if (rateClp == null) rateClp = DEFAULT_HOURLY_CLP;
 
@@ -77,9 +110,10 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const user = await requireStaff();
+    assertCsrf(req);
     const body = await req.json();
     if (body.action === "approve" || body.action === "reject") {
+      const user = await requireBillingManager();
       const entry = await prisma.timeEntry.update({
         where: { id: body.id },
         data: {
@@ -91,6 +125,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(entry);
     }
 
+    await requireStaff();
     if (body.action === "stop" && body.id) {
       const current = await prisma.timeEntry.findUnique({ where: { id: body.id } });
       if (!current?.startedAt) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
+import { confidentialFileWhere } from "@/lib/auth/access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -9,14 +10,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
+    const fileWhere = confidentialFileWhere(user.role);
     const site = await prisma.site.findUnique({
       where: { id },
       include: {
         cliente: true,
         causa: { include: { partes: true, plazos: true } },
         members: { include: { user: true } },
-        folders: { include: { children: true, files: true } },
-        files: { where: { folderId: null }, orderBy: { updatedAt: "desc" }, take: 20 },
+        folders: { include: { children: true, files: { where: fileWhere } } },
+        files: { where: { folderId: null, ...fileWhere }, orderBy: { updatedAt: "desc" }, take: 20 },
         wikiPages: { orderBy: { updatedAt: "desc" }, take: 10 },
         tasks: {
           include: { assignee: true },
@@ -50,6 +52,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
+    assertCsrf(req);
     await requireStaff();
     const { id } = await params;
     const body = await req.json();
