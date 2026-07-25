@@ -24,9 +24,9 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://lexopen:lexopen@localhost:5432/lexopen
-      SESSION_SECRET: ci-secret
-      LEXOPEN_OPEN_ACCESS: "1"
+      SESSION_SECRET: ci-session-secret-16plus
       HERMES_ALLOW_DEMO: "1"
+      LEXOPEN_RELAX_CSRF: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

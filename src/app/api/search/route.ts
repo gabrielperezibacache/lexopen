@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { handleRouteError, requireUser } from "@/lib/api";
 import { clientSiteWhere } from "@/lib/auth/access";
 import { canSeeConfidential, isCliente, isStaff } from "@/lib/auth/rbac";
+import { ftsCausaIds } from "@/lib/search";
 
 const textMatch = (q: string) => ({ contains: q, mode: "insensitive" as const });
 
@@ -58,6 +59,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Prohibido" }, { status: 403 });
     }
 
+    const ftsIds = await ftsCausaIds(prisma, q, 10);
+
     const [sites, causas, files, tasks, jurisprudencia, wiki, minutas] =
       await Promise.all([
         prisma.site.findMany({
@@ -71,14 +74,16 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.causa.findMany({
-          where: {
-            OR: [
-              { titulo: textMatch(q) },
-              { rit: textMatch(q) },
-              { caratula: textMatch(q) },
-              { tribunal: textMatch(q) },
-            ],
-          },
+          where: ftsIds
+            ? { id: { in: ftsIds } }
+            : {
+                OR: [
+                  { titulo: textMatch(q) },
+                  { rit: textMatch(q) },
+                  { caratula: textMatch(q) },
+                  { tribunal: textMatch(q) },
+                ],
+              },
           take: 10,
         }),
         prisma.siteFile.findMany({

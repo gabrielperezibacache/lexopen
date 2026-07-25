@@ -23,6 +23,8 @@ import {
   CircleDollarSign,
   ClipboardPen,
   Menu,
+  Shield,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
@@ -52,6 +54,8 @@ const intel = [
   { href: "/agente", label: "Agente Hermes", icon: Bot },
   { href: "/portal", label: "Portal cliente", icon: DoorOpen },
   { href: "/integraciones", label: "Integraciones", icon: Puzzle },
+  { href: "/auditoria", label: "Auditoría", icon: Shield },
+  { href: "/configuracion", label: "Configuración", icon: Settings },
 ];
 
 const clienteNav = [
