@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac, timingSafeEqual } from "crypto";
 
 const SESSION_COOKIE = "lexopen_session";
 
@@ -20,7 +19,36 @@ function sessionSecret() {
   );
 }
 
-function verifyToken(token: string): boolean {
+function toHex(buf: ArrayBuffer) {
+  return [...new Uint8Array(buf)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function timingSafeEqualHex(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let out = 0;
+  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return out === 0;
+}
+
+async function hmacSha256Hex(payload: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(sessionSecret()),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(payload)
+  );
+  return toHex(sig);
+}
+
+async function verifyToken(token: string): Promise<boolean> {
   if (!token.includes(".")) {
     // Legacy cookie only allowed in development
     return process.env.NODE_ENV === "development";
@@ -30,19 +58,11 @@ function verifyToken(token: string): boolean {
   const [userId, expStr, sig] = parts;
   const expiresAt = Number(expStr);
   if (!userId || !Number.isFinite(expiresAt) || expiresAt < Date.now()) return false;
-  const expected = createHmac("sha256", sessionSecret())
-    .update(`${userId}.${expiresAt}`)
-    .digest("hex");
-  try {
-    const a = Buffer.from(sig);
-    const b = Buffer.from(expected);
-    return a.length === b.length && timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
+  const expected = await hmacSha256Hex(`${userId}.${expiresAt}`);
+  return timingSafeEqualHex(sig, expected);
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (
@@ -60,7 +80,7 @@ export function middleware(req: NextRequest) {
   }
 
   const token = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!token || !verifyToken(token)) {
+  if (!token || !(await verifyToken(token))) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }

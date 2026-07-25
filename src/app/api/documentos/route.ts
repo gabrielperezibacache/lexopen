@@ -8,7 +8,6 @@ import {
 } from "@/lib/api";
 import { documentoCreateSchema } from "@/lib/schemas";
 import { newStorageKey, putObject } from "@/lib/storage";
-import { canSeeConfidential } from "@/lib/auth/rbac";
 import { writeAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
