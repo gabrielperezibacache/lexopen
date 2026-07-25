@@ -29,7 +29,7 @@ export function CausaActions({ causaId }: { causaId: string }) {
       body: JSON.stringify({
         causaId,
         prompt:
-          "Resume el estado procesal de esta causa chilena y sugiere los próximos tres pasos del litigio.",
+          "Resume el estado procesal de esta causa chilena y sugiere los próximos tres pasos del litigio, considerando las minutas recientes si existen.",
       }),
     });
     const data = await res.json();
@@ -40,13 +40,16 @@ export function CausaActions({ causaId }: { causaId: string }) {
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex flex-wrap justify-end gap-2">
+        <Link href={`/causas/${causaId}/minuta/nueva`} className="btn btn-primary">
+          Nueva minuta
+        </Link>
         <button className="btn btn-ghost" disabled={busy} onClick={syncObsidian} type="button">
           Sync Obsidian
         </button>
         <button className="btn btn-secondary" disabled={busy} onClick={askHermes} type="button">
           Consultar Hermes
         </button>
-        <Link href={`/agente?causaId=${causaId}`} className="btn btn-primary">
+        <Link href={`/agente?causaId=${causaId}`} className="btn btn-ghost">
           Abrir agente
         </Link>
       </div>

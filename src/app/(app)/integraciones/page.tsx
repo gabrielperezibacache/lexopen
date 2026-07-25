@@ -98,8 +98,9 @@ function IntegracionesInner() {
         <section className="panel rounded-3xl p-5">
           <h2 className="text-xl font-semibold">Google Workspace</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
-            OAuth 2.0 para Drive (documentos), Calendar (plazos) y Gmail. Configure
-            `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`.
+            OAuth 2.0 para Drive (carpeta por causa + documentos/minutas), Calendar
+            (plazos) y Gmail. En cada causa puede vincular o crear la carpeta del
+            expediente. Configure `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`.
           </p>
           <div className="mt-4 text-sm text-[var(--ink-soft)]/75">
             {google?.connected

@@ -34,7 +34,15 @@ export async function POST(req: Request) {
   if (body.causaId) {
     const causa = await prisma.causa.findUnique({
       where: { id: body.causaId },
-      include: { partes: true, plazos: true },
+      include: {
+        partes: true,
+        plazos: true,
+        minutas: {
+          include: { acciones: true },
+          orderBy: { fecha: "desc" },
+          take: 5,
+        },
+      },
     });
     if (causa) {
       context = JSON.stringify(
@@ -46,11 +54,23 @@ export async function POST(req: Request) {
           etapa: causa.etapa,
           caratula: causa.caratula,
           resumen: causa.resumen,
+          googleDriveFolder: causa.googleDriveFolderUrl,
           partes: causa.partes,
           plazos: causa.plazos.map((p) => ({
             titulo: p.titulo,
             fecha: p.fechaLimite,
             estado: p.estado,
+          })),
+          minutasRecientes: causa.minutas.map((m) => ({
+            tipo: m.tipo,
+            titulo: m.titulo,
+            fecha: m.fecha,
+            resumen: m.resumenEjecutivo,
+            proximosPasos: m.acciones.map((a) => ({
+              descripcion: a.descripcion,
+              estado: a.estado,
+              responsable: a.responsable,
+            })),
           })),
         },
         null,

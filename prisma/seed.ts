@@ -33,6 +33,8 @@ async function wipe() {
     "groupMember",
     "group",
     "activity",
+    "minutaAccion",
+    "minuta",
     "nota",
     "plazo",
     "documento",
@@ -143,6 +145,10 @@ async function main() {
       fechaIngreso: new Date("2025-03-12"),
       clienteId: cliente1.id,
       abogadoId: abogado.id,
+      googleDriveFolderId: "demo-folder-c4521-2025",
+      googleDriveFolderName: "C-4521-2025 — Cobro de pesos Andes",
+      googleDriveFolderUrl:
+        "https://drive.google.com/drive/folders/demo-folder-c4521-2025",
       partes: {
         create: [
           { nombre: "Constructora Andes SpA", rut: "76.543.210-K", rol: "demandante" },
@@ -168,6 +174,10 @@ async function main() {
       fechaIngreso: new Date("2025-11-02"),
       clienteId: cliente2.id,
       abogadoId: admin.id,
+      googleDriveFolderId: "demo-folder-o1189-2025",
+      googleDriveFolderName: "O-1189-2025 — Tutela Muñoz",
+      googleDriveFolderUrl:
+        "https://drive.google.com/drive/folders/demo-folder-o1189-2025",
       partes: {
         create: [
           { nombre: "Juan Carlos Muñoz Sepúlveda", rut: "12.345.678-9", rol: "demandante" },
@@ -282,6 +292,137 @@ async function main() {
         contenido: "- [ ] Cotizaciones\n- [ ] Carta de despido",
         tags: "laboral,tutela",
         causaId: causa2.id,
+      },
+    ],
+  });
+
+  const hace2dias = new Date();
+  hace2dias.setDate(hace2dias.getDate() - 2);
+  const hace5dias = new Date();
+  hace5dias.setDate(hace5dias.getDate() - 5);
+
+  const docMinuta1 = await prisma.documento.create({
+    data: {
+      nombre: "Minuta audiencia — Conciliación fallida.md",
+      tipo: "minuta",
+      mimeType: "text/markdown",
+      contenido:
+        "# Minuta — Audiencia\n\nConciliación fallida. Queda fijada audiencia de prueba.",
+      causaId: causa1.id,
+      autorId: abogado.id,
+    },
+  });
+
+  const minutaAudiencia = await prisma.minuta.create({
+    data: {
+      tipo: "audiencia",
+      titulo: "Audiencia de conciliación — sin acuerdo",
+      fecha: hace5dias,
+      modalidad: "presencial",
+      lugar: "1º Juzgado Civil de Santiago — Sala 3",
+      participantes:
+        "Camila Rojas (estudio), cliente Andes, abogado demandado, juez",
+      resumenEjecutivo:
+        "Se intentó conciliación sin resultado. El tribunal fijó audiencia de prueba y ordenó acompañar lista de testigos con 5 días de anticipación.",
+      hechosRelevantes:
+        "Demandado ofreció 40% del saldo; cliente rechazó. Quedó constancia de la negativa.",
+      acuerdos:
+        "Sin acuerdo. Se mantiene la demanda en sus términos. Audiencia de prueba citada.",
+      proximosPasos:
+        "- Preparar lista de testigos\n- Organizar carpeta de prueba documental",
+      riesgosAlertas:
+        "Plazo breve para lista de testigos; riesgo de preclusión si no se presenta a tiempo.",
+      estadoCausaNota: "Causa avanza a prueba. Sin suspensión.",
+      etapaSugerida: "prueba",
+      causaId: causa1.id,
+      autorId: abogado.id,
+      documentoId: docMinuta1.id,
+      acciones: {
+        create: [
+          {
+            descripcion: "Presentar lista de testigos y documentos",
+            responsable: "Camila Rojas",
+            fechaLimite: in7,
+            prioridad: "alta",
+            estado: "pendiente",
+          },
+          {
+            descripcion: "Informar a cliente Andes el resultado de la audiencia",
+            responsable: "Asistente",
+            fechaLimite: in3,
+            prioridad: "media",
+            estado: "hecha",
+          },
+        ],
+      },
+    },
+  });
+
+  const docMinuta2 = await prisma.documento.create({
+    data: {
+      nombre: "Minuta llamada — Prep. contestación.md",
+      tipo: "minuta",
+      mimeType: "text/markdown",
+      contenido:
+        "# Minuta — Llamada\n\nCoordinación con cliente Muñoz para contestación.",
+      causaId: causa2.id,
+      autorId: admin.id,
+    },
+  });
+
+  await prisma.minuta.create({
+    data: {
+      tipo: "llamada",
+      titulo: "Llamada con cliente — hechos del despido",
+      fecha: hace2dias,
+      modalidad: "telefonica",
+      lugar: "Teléfono estudio",
+      participantes: "Valentina Herrera, Juan Carlos Muñoz",
+      resumenEjecutivo:
+        "Cliente confirmó fecha de despido, ausencia de carta formal y presión por fuero sindical. Se acordó reunir cotizaciones y testigos de hostigamiento.",
+      hechosRelevantes:
+        "Despido verbal el 28/10. RR.HH. ofreció finiquito con renuncia a acciones.",
+      acuerdos:
+        "Cliente enviará capturas de WhatsApp y nómina de testigos internos esta semana.",
+      proximosPasos: "- Revisar cotizaciones\n- Borrador de contestación / réplica",
+      riesgosAlertas: "Plazo de contestación fatal en 3 días.",
+      estadoCausaNota: "Pendiente contestación; prueba documental en recolección.",
+      causaId: causa2.id,
+      autorId: admin.id,
+      documentoId: docMinuta2.id,
+      acciones: {
+        create: [
+          {
+            descripcion: "Incorporar capturas WhatsApp al expediente y a Drive",
+            responsable: "Asistente",
+            fechaLimite: in3,
+            prioridad: "alta",
+            estado: "pendiente",
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.activity.createMany({
+    data: [
+      {
+        tipo: "minuta",
+        mensaje: `Minuta de audiencia: ${minutaAudiencia.titulo}`,
+        causaId: causa1.id,
+        userId: abogado.id,
+      },
+      {
+        tipo: "drive",
+        mensaje: "Carpeta Google Drive vinculada: C-4521-2025 — Cobro de pesos Andes",
+        causaId: causa1.id,
+        userId: abogado.id,
+      },
+      {
+        tipo: "minuta",
+        mensaje: "Minuta de llamada: Llamada con cliente — hechos del despido",
+        causaId: causa2.id,
+        userId: admin.id,
       },
     ],
   });

@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { labelEtapa, labelMateria } from "@/lib/chile";
 import { StatusBadge, formatDate, formatDateTime } from "@/components/ui";
 import { CausaActions } from "@/components/CausaActions";
+import { DriveFolderPanel } from "@/components/DriveFolderPanel";
+import { labelTipoMinuta } from "@/lib/minutas";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -18,6 +20,14 @@ export default async function CausaDetailPage({ params }: Params) {
       documentos: { orderBy: { updatedAt: "desc" } },
       plazos: { orderBy: { fechaLimite: "asc" } },
       notas: { orderBy: { updatedAt: "desc" } },
+      minutas: {
+        include: {
+          autor: { select: { name: true } },
+          acciones: { where: { estado: { not: "hecha" } } },
+        },
+        orderBy: { fecha: "desc" },
+        take: 12,
+      },
       actividades: {
         include: { user: true },
         orderBy: { createdAt: "desc" },
@@ -26,6 +36,12 @@ export default async function CausaDetailPage({ params }: Params) {
     },
   });
   if (!causa) notFound();
+
+  const ultimaMinuta = causa.minutas[0];
+  const accionesAbiertas = causa.minutas.reduce(
+    (n, m) => n + m.acciones.length,
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -42,9 +58,61 @@ export default async function CausaDetailPage({ params }: Params) {
             <StatusBadge estado={causa.estado} />
             <span className="badge badge-sea">{labelMateria(causa.materia)}</span>
             <span className="badge badge-ink">{labelEtapa(causa.etapa)}</span>
+            {causa.googleDriveFolderId && (
+              <span className="badge badge-activa">Drive vinculado</span>
+            )}
           </div>
         </div>
         <CausaActions causaId={causa.id} />
+      </div>
+
+      <div className="panel rounded-3xl border border-[var(--sea)]/20 bg-[linear-gradient(135deg,rgba(31,111,120,0.08),rgba(255,255,255,0.85))] px-5 py-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-xl">
+            <div className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--sea)]">
+              Continuidad del expediente
+            </div>
+            <h2 className="mt-2 text-xl font-semibold">
+              ¿Acaba de salir de una audiencia, reunión o llamada?
+            </h2>
+            <p className="mt-2 text-sm text-[var(--ink-soft)]/80">
+              Genere la minuta con el resumen, acuerdos y próximos pasos para
+              que cualquier abogado del estudio pueda continuar la tramitación.
+            </p>
+            {ultimaMinuta && (
+              <p className="mt-3 text-sm text-[var(--ink-soft)]/70">
+                Última:{" "}
+                <Link
+                  href={`/causas/${causa.id}/minutas/${ultimaMinuta.id}`}
+                  className="text-[var(--sea)] underline-offset-2 hover:underline"
+                >
+                  {labelTipoMinuta(ultimaMinuta.tipo)} — {ultimaMinuta.titulo}
+                </Link>{" "}
+                · {accionesAbiertas} acción(es) abierta(s)
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/causas/${causa.id}/minuta/nueva?tipo=audiencia`}
+              className="btn btn-primary"
+            >
+              Minuta audiencia
+            </Link>
+            <Link
+              href={`/causas/${causa.id}/minuta/nueva?tipo=reunion`}
+              className="btn btn-secondary"
+            >
+              Minuta reunión
+            </Link>
+            <Link
+              href={`/causas/${causa.id}/minuta/nueva?tipo=llamada`}
+              className="btn btn-ghost"
+            >
+              Minuta llamada
+            </Link>
+          </div>
+        </div>
       </div>
 
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-3xl px-5 py-4">
@@ -70,8 +138,8 @@ export default async function CausaDetailPage({ params }: Params) {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="panel rounded-3xl p-5 md:col-span-2">
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="panel rounded-3xl p-5 lg:col-span-2">
           <h2 className="text-lg font-semibold">Ficha procesal</h2>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
@@ -102,6 +170,52 @@ export default async function CausaDetailPage({ params }: Params) {
           <p className="mt-4 text-sm leading-relaxed text-[var(--ink-soft)]/85">
             {causa.resumen || "Sin resumen."}
           </p>
+        </div>
+
+        <DriveFolderPanel
+          causaId={causa.id}
+          folderId={causa.googleDriveFolderId}
+          folderName={causa.googleDriveFolderName}
+          folderUrl={causa.googleDriveFolderUrl}
+        />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="panel rounded-3xl p-5 md:col-span-2">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Minutas del expediente</h2>
+            <Link href="/minutas" className="text-sm text-[var(--sea)]">
+              Ver todas
+            </Link>
+          </div>
+          <div className="mt-4 space-y-3">
+            {causa.minutas.map((m) => (
+              <Link
+                key={m.id}
+                href={`/causas/${causa.id}/minutas/${m.id}`}
+                className="block rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 transition hover:border-[var(--sea)]/40"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="badge badge-sea">
+                    {labelTipoMinuta(m.tipo)}
+                  </span>
+                  <span className="text-sm font-medium">{m.titulo}</span>
+                </div>
+                <div className="mt-1 text-xs text-[var(--ink-soft)]/65">
+                  {formatDateTime(m.fecha)} · {m.autor?.name || "Sin autor"} ·{" "}
+                  {m.acciones.length} pendientes
+                </div>
+                <p className="mt-2 line-clamp-2 text-sm text-[var(--ink-soft)]/80">
+                  {m.resumenEjecutivo}
+                </p>
+              </Link>
+            ))}
+            {causa.minutas.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Aún no hay minutas. Registre la primera tras el próximo acto.
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="panel rounded-3xl p-5">
@@ -147,6 +261,7 @@ export default async function CausaDetailPage({ params }: Params) {
                 <div className="font-medium">{d.nombre}</div>
                 <div className="text-xs text-[var(--ink-soft)]/65">
                   {d.tipo} · v{d.version}
+                  {d.googleDriveId ? ` · Drive: ${d.googleDriveId}` : ""}
                   {d.obsidianPath ? ` · Obsidian: ${d.obsidianPath}` : ""}
                 </div>
               </div>

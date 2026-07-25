@@ -14,6 +14,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
       documentos: { orderBy: { updatedAt: "desc" } },
       plazos: { orderBy: { fechaLimite: "asc" } },
       notas: { orderBy: { updatedAt: "desc" } },
+      minutas: {
+        include: {
+          autor: { select: { id: true, name: true } },
+          acciones: true,
+        },
+        orderBy: { fecha: "desc" },
+        take: 20,
+      },
       actividades: {
         include: { user: true },
         orderBy: { createdAt: "desc" },
@@ -43,6 +51,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       resumen: body.resumen,
       clienteId: body.clienteId,
       abogadoId: body.abogadoId,
+      googleDriveFolderId: body.googleDriveFolderId,
+      googleDriveFolderName: body.googleDriveFolderName,
+      googleDriveFolderUrl: body.googleDriveFolderUrl,
     },
   });
 

@@ -38,6 +38,10 @@ export async function exportCausaToObsidian(causaId: string) {
       plazos: true,
       cliente: true,
       abogado: true,
+      minutas: {
+        include: { acciones: true },
+        orderBy: { fecha: "desc" },
+      },
     },
   });
   if (!causa) throw new Error("Causa no encontrada");
@@ -53,6 +57,7 @@ tribunal: ${causa.tribunal}
 materia: ${causa.materia}
 estado: ${causa.estado}
 etapa: ${causa.etapa}
+google_drive_folder: ${causa.googleDriveFolderId ?? ""}
 lexopen_id: ${causa.id}
 ---
 
@@ -61,6 +66,7 @@ lexopen_id: ${causa.id}
 **Carátula:** ${causa.caratula ?? "—"}
 **Cliente:** ${causa.cliente?.razonSocial ?? "—"}
 **Abogado:** ${causa.abogado?.name ?? "—"}
+**Drive:** ${causa.googleDriveFolderUrl ?? "—"}
 
 ## Resumen
 ${causa.resumen ?? "_Sin resumen_"}
@@ -70,6 +76,9 @@ ${causa.partes.map((p) => `- **${p.rol}:** ${p.nombre}${p.rut ? ` (${p.rut})` : 
 
 ## Plazos
 ${causa.plazos.map((p) => `- [ ] ${p.titulo} — ${p.fechaLimite.toISOString().slice(0, 10)} (${p.estado})`).join("\n") || "_Sin plazos_"}
+
+## Minutas
+${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.titulo}]] — ${m.fecha.toISOString().slice(0, 10)}`).join("\n") || "_Sin minutas_"}
 `;
 
   await fs.writeFile(path.join(dir, "Index.md"), indexMd, "utf8");
@@ -87,6 +96,23 @@ ${causa.plazos.map((p) => `- [ ] ${p.titulo} — ${p.fechaLimite.toISOString().s
     }
   }
 
+  const minutasDir = path.join(dir, "Minutas");
+  await fs.mkdir(minutasDir, { recursive: true });
+  for (const minuta of causa.minutas) {
+    const file = `${sanitize(minuta.titulo)}.md`;
+    const acciones = minuta.acciones
+      .map(
+        (a) =>
+          `- [${a.estado === "hecha" ? "x" : " "}] ${a.descripcion}${a.responsable ? ` (@${a.responsable})` : ""}`
+      )
+      .join("\n");
+    await fs.writeFile(
+      path.join(minutasDir, file),
+      `---\ntipo: ${minuta.tipo}\nfecha: ${minuta.fecha.toISOString()}\n---\n\n# ${minuta.titulo}\n\n## Resumen\n${minuta.resumenEjecutivo}\n\n## Próximos pasos\n${acciones || minuta.proximosPasos || "_Sin acciones_"}\n`,
+      "utf8"
+    );
+  }
+
   if (config.syncDocumentos) {
     const docsDir = path.join(dir, "Documentos");
     await fs.mkdir(docsDir, { recursive: true });
@@ -101,7 +127,14 @@ ${causa.plazos.map((p) => `- [ ] ${p.titulo} — ${p.fechaLimite.toISOString().s
     }
   }
 
-  return { vaultPath: dir, files: causa.notas.length + causa.documentos.length + 1 };
+  return {
+    vaultPath: dir,
+    files:
+      causa.notas.length +
+      causa.documentos.length +
+      causa.minutas.length +
+      1,
+  };
 }
 
 export async function syncAllCausasToObsidian() {

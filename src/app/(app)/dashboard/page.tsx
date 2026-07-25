@@ -26,7 +26,7 @@ export default async function DashboardPage() {
   await ensureSeeded();
   const user = await getCurrentUser();
 
-  const [sites, causas, tasksOpen, unread, sitesList, tasks, actividades] =
+  const [sites, causas, tasksOpen, unread, sitesList, tasks, actividades, minutasRecientes] =
     await Promise.all([
       prisma.site.count({ where: { status: "active" } }),
       prisma.causa.count({ where: { estado: "activa" } }),
@@ -50,6 +50,14 @@ export default async function DashboardPage() {
         orderBy: { createdAt: "desc" },
         take: 8,
       }),
+      prisma.minuta.findMany({
+        include: {
+          causa: { select: { id: true, rit: true, titulo: true } },
+          acciones: { where: { estado: { not: "hecha" } } },
+        },
+        orderBy: { fecha: "desc" },
+        take: 5,
+      }),
     ]);
 
   const stats = [
@@ -70,12 +78,13 @@ export default async function DashboardPage() {
             {user ? `Hola, ${user.name.split(" ")[0]}` : "Dashboard"}
           </h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Sites, tasks, activity stream y causas Chile en un solo control center.
+            Sites, causas Chile, minutas de handoff y activity stream en un solo
+            control center.
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href="/sites" className="btn btn-secondary">
-            Ver sites
+          <Link href="/minutas" className="btn btn-secondary">
+            Minutas
           </Link>
           <Link href="/causas/nueva" className="btn btn-primary">
             Nueva causa <ArrowRight size={16} />
@@ -150,6 +159,35 @@ export default async function DashboardPage() {
           </div>
         </section>
       </div>
+
+      <section className="panel rounded-3xl p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Minutas recientes</h2>
+          <Link href="/minutas" className="text-sm text-[var(--sea)]">
+            Ver todas
+          </Link>
+        </div>
+        <div className="space-y-3">
+          {minutasRecientes.map((m) => (
+            <Link
+              key={m.id}
+              href={`/causas/${m.causaId}/minutas/${m.id}`}
+              className="block rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+            >
+              <div className="font-medium">{m.titulo}</div>
+              <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                {m.causa.rit || m.causa.titulo} · {m.tipo} ·{" "}
+                {m.acciones.length} pendientes
+              </div>
+            </Link>
+          ))}
+          {minutasRecientes.length === 0 && (
+            <p className="text-sm text-[var(--ink-soft)]/65">
+              Sin minutas aún. Tras cada audiencia o reunión, genere el handoff.
+            </p>
+          )}
+        </div>
+      </section>
 
       <section className="panel rounded-3xl p-5">
         <h2 className="mb-4 text-lg font-semibold">Activity stream</h2>

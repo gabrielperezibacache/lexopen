@@ -38,6 +38,7 @@ model User {
   expenses        Expense[]        @relation("ExpenseAuthor")
   invoicesCreated Invoice[]        @relation("InvoiceAuthor")
   feeArrangements FeeArrangement[] @relation("FeeOwner")
+  minutas         Minuta[]         @relation("MinutaAutor")
 }
 
 model Group {
@@ -147,6 +148,10 @@ model Causa {
   caratula      String?
   resumen       String?
   fechaIngreso  DateTime?
+  /// Carpeta de Google Drive vinculada a la causa (expediente digital)
+  googleDriveFolderId   String?
+  googleDriveFolderName String?
+  googleDriveFolderUrl  String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -161,12 +166,62 @@ model Causa {
   plazos          Plazo[]
   actividades     Activity[]
   notas           Nota[]
+  minutas         Minuta[]
   site            Site?
   feeArrangements FeeArrangement[]
   timeEntries     TimeEntry[]
   expenses        Expense[]
   invoices        Invoice[]
   ledgerEntries   LedgerEntry[]
+}
+
+/// Minuta post-audiencia, reunión o llamada — handoff entre abogados del estudio
+model Minuta {
+  id                String   @id @default(cuid())
+  tipo              String   @default("reunion") // audiencia | reunion | llamada
+  titulo            String
+  fecha             DateTime @default(now())
+  modalidad         String   @default("presencial") // presencial | videollamada | telefonica | hibrida
+  lugar             String?
+  participantes     String   @default("") // nombres separados por coma o JSON simple
+  resumenEjecutivo  String
+  hechosRelevantes  String?
+  acuerdos          String?
+  proximosPasos     String? // texto estructurado; también se materializan en MinutaAccion
+  riesgosAlertas    String?
+  estadoCausaNota   String? // cómo queda la causa tras el acto
+  etapaSugerida     String? // opcional: actualizar etapa de la causa
+  confidencial      Boolean  @default(false)
+  googleDriveFileId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  causaId     String
+  causa       Causa      @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  autorId     String?
+  autor       User?      @relation("MinutaAutor", fields: [autorId], references: [id])
+  documentoId String?
+  documento   Documento? @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+  acciones    MinutaAccion[]
+}
+
+/// Acción de seguimiento derivada de una minuta (continuidad de tramitación)
+model MinutaAccion {
+  id          String    @id @default(cuid())
+  descripcion String
+  responsable String? // nombre libre si aún no hay user
+  fechaLimite DateTime?
+  prioridad   String    @default("media") // baja | media | alta | urgente
+  estado      String    @default("pendiente") // pendiente | en_curso | hecha | cancelada
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  minutaId String
+  minuta   Minuta @relation(fields: [minutaId], references: [id], onDelete: Cascade)
+  plazoId  String?
+  plazo    Plazo? @relation(fields: [plazoId], references: [id], onDelete: SetNull)
+  taskId   String?
+  task     Task?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
 }
 
 model Parte {
@@ -244,6 +299,7 @@ model Documento {
   causa   Causa? @relation(fields: [causaId], references: [id], onDelete: SetNull)
   autorId String?
   autor   User?  @relation(fields: [autorId], references: [id])
+  minutas Minuta[]
 }
 
 model Plazo {
@@ -260,6 +316,7 @@ model Plazo {
   causa         Causa? @relation(fields: [causaId], references: [id], onDelete: Cascade)
   responsableId String?
   responsable   User?  @relation(fields: [responsableId], references: [id])
+  minutaAcciones MinutaAccion[]
 }
 
 model Nota {
@@ -305,6 +362,7 @@ model Task {
   creator    User? @relation("TaskCreator", fields: [creatorId], references: [id])
 
   comments Comment[]
+  minutaAcciones MinutaAccion[]
 }
 
 model WikiPage {

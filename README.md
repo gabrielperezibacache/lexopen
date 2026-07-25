@@ -24,9 +24,11 @@
 
 ### Capa Chile + integraciones
 - Causas judiciales (RIT/RUC, tribunal, etapa, partes)
+- **Minutas de handoff**: flujo guiado tras audiencia, reunión o llamada (resumen, acuerdos, próximos pasos → tasks/plazos, aviso al equipo)
+- **Google Drive por causa**: vincular o crear una carpeta determinada; documentos y minutas se suben al expediente digital
 - **Facturación y contabilidad**: horas, gastos, tarifas, boletas/facturas (IVA/retención), pagos, cuenta corriente / provisión de fondos
 - Jurisprudencia (CS, Apelaciones, TC — corpus demo)
-- **Obsidian** (export vault Markdown)
+- **Obsidian** (export vault Markdown, incluye Minutas/)
 - **Hermes Agent** (API OpenAI-compatible + demo)
 - **Google Workspace** (OAuth Drive / Calendar / Gmail)
 
@@ -82,6 +84,16 @@ curl 'localhost:3000/api/search?q=tutela'
 # Obsidian sync
 curl -X POST localhost:3000/api/integrations/obsidian \
   -H 'content-type: application/json' -d '{"action":"sync-all"}'
+
+# Minuta post-audiencia
+curl -X POST localhost:3000/api/minutas \
+  -H 'content-type: application/json' \
+  -d '{"causaId":"<id>","tipo":"audiencia","titulo":"Audiencia de prueba","resumenEjecutivo":"…","acciones":[{"descripcion":"Presentar lista de testigos","crearPlazo":true,"fechaLimite":"2026-08-01"}]}'
+
+# Vincular carpeta Drive a una causa
+curl -X POST localhost:3000/api/integrations/google \
+  -H 'content-type: application/json' \
+  -d '{"action":"link-causa-folder","causaId":"<id>","folderRef":"https://drive.google.com/drive/folders/…"}'
 ```
 
 ## Render
