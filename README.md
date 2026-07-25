@@ -24,8 +24,8 @@
 
 ### Capa Chile + integraciones
 - Causas judiciales (RIT/RUC, tribunal, etapa, partes)
-- **Minutas de handoff**: flujo guiado tras audiencia, reunión o llamada (resumen, acuerdos, próximos pasos → tasks/plazos, aviso al equipo)
-- **Google Drive por causa**: vincular o crear una carpeta determinada; documentos y minutas se suben al expediente digital
+- **Minutas de handoff**: flujo guiado tras audiencia, reunión o llamada (resumen, acuerdos, próximos pasos → tasks/plazos, aviso al equipo). Validación de tipo/plazos, fechas locales (Chile-safe) y creación atómica.
+- **Google Drive por causa**: vincular o crear una carpeta determinada; distingue carpetas reales vs stub/demo; documentos y minutas solo se suben a carpetas reales con OAuth.
 - **Facturación y contabilidad**: horas, gastos, tarifas, boletas/facturas (IVA/retención), pagos, cuenta corriente / provisión de fondos
 - Jurisprudencia (CS, Apelaciones, TC — corpus demo)
 - **Obsidian** (export vault Markdown, incluye Minutas/)

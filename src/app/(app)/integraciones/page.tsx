@@ -109,15 +109,34 @@ function IntegracionesInner() {
                 ? "Credenciales OK — pendiente autorizar"
                 : "Credenciales no configuradas (modo stub activo)"}
           </div>
-          {google?.authUrl ? (
-            <a href={google.authUrl} className="btn btn-primary mt-5 inline-flex">
-              Conectar Google
-            </a>
-          ) : (
-            <button className="btn btn-ghost mt-5" type="button" disabled>
-              Configure OAuth en .env
-            </button>
-          )}
+          <div className="mt-5 flex flex-wrap gap-2">
+            {google?.authUrl ? (
+              <a href={google.authUrl} className="btn btn-primary inline-flex">
+                {google.connected ? "Reconectar Google" : "Conectar Google"}
+              </a>
+            ) : (
+              <button className="btn btn-ghost" type="button" disabled>
+                Configure OAuth en .env
+              </button>
+            )}
+            {google?.connected && (
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={async () => {
+                  await fetch("/api/integrations/google", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "disconnect" }),
+                  });
+                  const r = await fetch("/api/integrations/google");
+                  setGoogle(await r.json());
+                }}
+              >
+                Desconectar
+              </button>
+            )}
+          </div>
         </section>
       </div>
 

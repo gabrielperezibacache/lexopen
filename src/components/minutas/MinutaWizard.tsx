@@ -25,7 +25,8 @@ type Props = {
   causaRit?: string | null;
   etapaActual?: string | null;
   defaultTipo?: string;
-  hasDriveFolder?: boolean;
+  /** Solo carpeta Drive real (no stub/demo). */
+  hasRealDriveFolder?: boolean;
 };
 
 function emptyAccion(): AccionDraft {
@@ -35,7 +36,7 @@ function emptyAccion(): AccionDraft {
     responsable: "",
     fechaLimite: "",
     prioridad: "media",
-    crearPlazo: true,
+    crearPlazo: false,
     crearTask: true,
   };
 }
@@ -46,13 +47,15 @@ export function MinutaWizard({
   causaRit,
   etapaActual,
   defaultTipo = "audiencia",
-  hasDriveFolder = false,
+  hasRealDriveFolder = false,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
-  const [tipo, setTipo] = useState(defaultTipo);
+  const [tipo, setTipo] = useState(
+    TIPOS_MINUTA.some((t) => t.value === defaultTipo) ? defaultTipo : "audiencia"
+  );
   const [titulo, setTitulo] = useState("");
   const [fecha, setFecha] = useState(() => {
     const d = new Date();
@@ -69,7 +72,7 @@ export function MinutaWizard({
   const [riesgosAlertas, setRiesgosAlertas] = useState("");
   const [etapaSugerida, setEtapaSugerida] = useState(etapaActual || "");
   const [actualizarEtapa, setActualizarEtapa] = useState(false);
-  const [subirADrive, setSubirADrive] = useState(hasDriveFolder);
+  const [subirADrive, setSubirADrive] = useState(hasRealDriveFolder);
   const [confidencial, setConfidencial] = useState(false);
   const [acciones, setAcciones] = useState<AccionDraft[]>([emptyAccion()]);
 
@@ -80,62 +83,92 @@ export function MinutaWizard({
 
   function updateAccion(key: string, patch: Partial<AccionDraft>) {
     setAcciones((prev) =>
-      prev.map((a) => (a.key === key ? { ...a, ...patch } : a))
+      prev.map((a) => {
+        if (a.key !== key) return a;
+        const next = { ...a, ...patch };
+        if (!next.fechaLimite) next.crearPlazo = false;
+        return next;
+      })
     );
+  }
+
+  function accionesValidas() {
+    return acciones.filter((a) => a.descripcion.trim());
   }
 
   function canNext() {
     if (step === 0) return Boolean(tipo && titulo.trim() && fecha);
     if (step === 1) return Boolean(resumenEjecutivo.trim());
+    if (step === 2) {
+      return !accionesValidas().some((a) => a.crearPlazo && !a.fechaLimite);
+    }
     return true;
   }
 
   function submit() {
     setError("");
+    const invalidPlazo = accionesValidas().find(
+      (a) => a.crearPlazo && !a.fechaLimite
+    );
+    if (invalidPlazo) {
+      setError(
+        `La acción «${invalidPlazo.descripcion}» tiene «Crear plazo» sin fecha.`
+      );
+      setStep(2);
+      return;
+    }
+
     startTransition(async () => {
-      const res = await fetch("/api/minutas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          causaId,
-          tipo,
-          titulo: titulo.trim(),
-          fecha,
-          modalidad,
-          lugar: lugar.trim() || null,
-          participantes: participantes.trim(),
-          resumenEjecutivo: resumenEjecutivo.trim(),
-          hechosRelevantes: hechosRelevantes.trim() || null,
-          acuerdos: acuerdos.trim() || null,
-          estadoCausaNota: estadoCausaNota.trim() || null,
-          riesgosAlertas: riesgosAlertas.trim() || null,
-          etapaSugerida: etapaSugerida || null,
-          actualizarEtapa,
-          confidencial,
-          subirADrive,
-          acciones: acciones
-            .filter((a) => a.descripcion.trim())
-            .map((a) => ({
+      try {
+        const res = await fetch("/api/minutas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            causaId,
+            tipo,
+            titulo: titulo.trim(),
+            fecha,
+            modalidad,
+            lugar: lugar.trim() || null,
+            participantes: participantes.trim(),
+            resumenEjecutivo: resumenEjecutivo.trim(),
+            hechosRelevantes: hechosRelevantes.trim() || null,
+            acuerdos: acuerdos.trim() || null,
+            estadoCausaNota: estadoCausaNota.trim() || null,
+            riesgosAlertas: riesgosAlertas.trim() || null,
+            etapaSugerida: etapaSugerida || null,
+            actualizarEtapa,
+            confidencial,
+            subirADrive: subirADrive && hasRealDriveFolder,
+            acciones: accionesValidas().map((a) => ({
               descripcion: a.descripcion.trim(),
               responsable: a.responsable.trim() || undefined,
               fechaLimite: a.fechaLimite || null,
               prioridad: a.prioridad,
-              crearPlazo: a.crearPlazo,
+              crearPlazo: a.crearPlazo && Boolean(a.fechaLimite),
               crearTask: a.crearTask,
             })),
-          proximosPasos: acciones
-            .filter((a) => a.descripcion.trim())
-            .map((a) => `- ${a.descripcion}`)
-            .join("\n"),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "No se pudo guardar la minuta");
-        return;
+            proximosPasos: accionesValidas()
+              .map((a) => `- ${a.descripcion}`)
+              .join("\n"),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || "No se pudo guardar la minuta");
+          return;
+        }
+        const driveWarn =
+          Array.isArray(data.warnings) && data.warnings.length > 0
+            ? `?aviso=${encodeURIComponent(data.warnings[0])}`
+            : "";
+        router.push(
+          `/causas/${causaId}/minutas/${data.minuta.id}${driveWarn}`
+        );
+        router.refresh();
+      } catch {
+        setError("Error de red al guardar la minuta. Intente de nuevo.");
       }
-      router.push(`/causas/${causaId}/minutas/${data.minuta.id}`);
-      router.refresh();
     });
   }
 
@@ -146,19 +179,24 @@ export function MinutaWizard({
           Causa · {causaRit || "Sin RIT"}
         </div>
         <div className="mt-1 font-semibold">{causaTitulo}</div>
-        <ol className="mt-4 flex flex-wrap gap-2">
+        <ol className="mt-4 flex flex-wrap gap-2" aria-label="Pasos del wizard">
           {steps.map((label, i) => (
-            <li
-              key={label}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                i === step
-                  ? "bg-[var(--sea)] text-white"
-                  : i < step
-                    ? "bg-[var(--sea)]/15 text-[var(--sea)]"
-                    : "bg-[var(--line)]/60 text-[var(--ink-soft)]/70"
-              }`}
-            >
-              {i + 1}. {label}
+            <li key={label}>
+              <button
+                type="button"
+                disabled={i > step}
+                onClick={() => i <= step && setStep(i)}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  i === step
+                    ? "bg-[var(--sea)] text-white"
+                    : i < step
+                      ? "bg-[var(--sea)]/15 text-[var(--sea)]"
+                      : "bg-[var(--line)]/60 text-[var(--ink-soft)]/70"
+                }`}
+                aria-current={i === step ? "step" : undefined}
+              >
+                {i + 1}. {label}
+              </button>
             </li>
           ))}
         </ol>
@@ -173,14 +211,20 @@ export function MinutaWizard({
               abogado del estudio.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div
+            className="grid gap-3 sm:grid-cols-3"
+            role="radiogroup"
+            aria-label="Tipo de minuta"
+          >
             {TIPOS_MINUTA.map((t) => (
               <button
                 key={t.value}
                 type="button"
+                role="radio"
+                aria-checked={tipo === t.value}
                 onClick={() => {
                   setTipo(t.value);
-                  if (!titulo) {
+                  if (!titulo.trim()) {
                     setTitulo(
                       t.value === "audiencia"
                         ? "Audiencia"
@@ -381,7 +425,12 @@ export function MinutaWizard({
                     type="date"
                     value={a.fechaLimite}
                     onChange={(e) =>
-                      updateAccion(a.key, { fechaLimite: e.target.value })
+                      updateAccion(a.key, {
+                        fechaLimite: e.target.value,
+                        crearPlazo: e.target.value
+                          ? a.crearPlazo || true
+                          : false,
+                      })
                     }
                   />
                   <select
@@ -413,11 +462,12 @@ export function MinutaWizard({
                     <input
                       type="checkbox"
                       checked={a.crearPlazo}
+                      disabled={!a.fechaLimite}
                       onChange={(e) =>
                         updateAccion(a.key, { crearPlazo: e.target.checked })
                       }
                     />
-                    Crear plazo
+                    Crear plazo{!a.fechaLimite ? " (requiere fecha)" : ""}
                   </label>
                   {acciones.length > 1 && (
                     <button
@@ -479,13 +529,14 @@ export function MinutaWizard({
               <label className="inline-flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={subirADrive}
+                  checked={subirADrive && hasRealDriveFolder}
+                  disabled={!hasRealDriveFolder}
                   onChange={(e) => setSubirADrive(e.target.checked)}
                 />
                 Subir a carpeta Google Drive
-                {!hasDriveFolder && (
+                {!hasRealDriveFolder && (
                   <span className="text-xs text-[var(--ink-soft)]/55">
-                    (vincule carpeta si aún no hay)
+                    (requiere carpeta real, no stub)
                   </span>
                 )}
               </label>
@@ -513,11 +564,25 @@ export function MinutaWizard({
             </ul>
           </div>
           {error && (
-            <p className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p
+              className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+              role="alert"
+              aria-live="assertive"
+            >
               {error}
             </p>
           )}
         </section>
+      )}
+
+      {error && step !== 3 && (
+        <p
+          className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          role="alert"
+          aria-live="assertive"
+        >
+          {error}
+        </p>
       )}
 
       <div className="flex flex-wrap justify-between gap-3">

@@ -146,9 +146,8 @@ async function main() {
       clienteId: cliente1.id,
       abogadoId: abogado.id,
       googleDriveFolderId: "demo-folder-c4521-2025",
-      googleDriveFolderName: "C-4521-2025 — Cobro de pesos Andes",
-      googleDriveFolderUrl:
-        "https://drive.google.com/drive/folders/demo-folder-c4521-2025",
+      googleDriveFolderName: "C-4521-2025 — Cobro de pesos Andes (demo)",
+      googleDriveFolderUrl: "lexopen://drive-stub/demo-folder-c4521-2025",
       partes: {
         create: [
           { nombre: "Constructora Andes SpA", rut: "76.543.210-K", rol: "demandante" },
@@ -175,9 +174,8 @@ async function main() {
       clienteId: cliente2.id,
       abogadoId: admin.id,
       googleDriveFolderId: "demo-folder-o1189-2025",
-      googleDriveFolderName: "O-1189-2025 — Tutela Muñoz",
-      googleDriveFolderUrl:
-        "https://drive.google.com/drive/folders/demo-folder-o1189-2025",
+      googleDriveFolderName: "O-1189-2025 — Tutela Muñoz (demo)",
+      googleDriveFolderUrl: "lexopen://drive-stub/demo-folder-o1189-2025",
       partes: {
         create: [
           { nombre: "Juan Carlos Muñoz Sepúlveda", rut: "12.345.678-9", rol: "demandante" },

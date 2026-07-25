@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { MinutaWizard } from "@/components/minutas/MinutaWizard";
+import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
+import { isValidTipoMinuta } from "@/lib/minutas";
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -13,6 +15,9 @@ export default async function NuevaMinutaPage({ params, searchParams }: Params) 
   const sp = await searchParams;
   const causa = await prisma.causa.findUnique({ where: { id } });
   if (!causa) notFound();
+
+  const tipo =
+    sp.tipo && isValidTipoMinuta(sp.tipo) ? sp.tipo : "audiencia";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -31,8 +36,8 @@ export default async function NuevaMinutaPage({ params, searchParams }: Params) 
         causaTitulo={causa.titulo}
         causaRit={causa.rit}
         etapaActual={causa.etapa}
-        defaultTipo={sp.tipo || "audiencia"}
-        hasDriveFolder={Boolean(causa.googleDriveFolderId)}
+        defaultTipo={tipo}
+        hasRealDriveFolder={isRealDriveFolderId(causa.googleDriveFolderId)}
       />
     </div>
   );

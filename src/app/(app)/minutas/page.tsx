@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDateTime, StatusBadge } from "@/components/ui";
-import { labelTipoMinuta } from "@/lib/minutas";
+import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
 import { ClipboardPen } from "lucide-react";
 
 export default async function MinutasPage() {
-  const [minutas, causas] = await Promise.all([
+  const [minutas, causas, accionesAbiertasTotal] = await Promise.all([
     prisma.minuta.findMany({
       include: {
         causa: { select: { id: true, titulo: true, rit: true } },
         autor: { select: { name: true } },
-        acciones: { where: { estado: { not: "hecha" } } },
+        acciones: {
+          where: { estado: { in: [...ACCIONES_ABIERTAS] } },
+        },
       },
       orderBy: { fecha: "desc" },
       take: 40,
@@ -21,12 +23,12 @@ export default async function MinutasPage() {
       orderBy: { updatedAt: "desc" },
       take: 8,
     }),
+    prisma.minutaAccion.count({
+      where: { estado: { in: [...ACCIONES_ABIERTAS] } },
+    }),
   ]);
 
-  const pendientes = minutas.reduce(
-    (acc, m) => acc + m.acciones.length,
-    0
-  );
+  const pendientes = accionesAbiertasTotal;
 
   return (
     <div className="space-y-6">

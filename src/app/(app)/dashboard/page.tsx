@@ -53,7 +53,9 @@ export default async function DashboardPage() {
       prisma.minuta.findMany({
         include: {
           causa: { select: { id: true, rit: true, titulo: true } },
-          acciones: { where: { estado: { not: "hecha" } } },
+          acciones: {
+            where: { estado: { in: ["pendiente", "en_curso"] } },
+          },
         },
         orderBy: { fecha: "desc" },
         take: 5,

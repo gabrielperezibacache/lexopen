@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FolderOpen, Link2, Unlink } from "lucide-react";
+import { isPlaceholderDriveFolderId, isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 
 type Props = {
   causaId: string;
@@ -23,6 +24,13 @@ export function DriveFolderPanel({
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
 
+  const isPlaceholder = isPlaceholderDriveFolderId(folderId);
+  const isReal = isRealDriveFolderId(folderId);
+  const canOpenExternal =
+    Boolean(folderUrl) &&
+    folderUrl!.startsWith("https://drive.google.com/") &&
+    isReal;
+
   async function run(action: string, extra: Record<string, unknown> = {}) {
     setMsg("");
     setError("");
@@ -40,11 +48,13 @@ export function DriveFolderPanel({
       data.message ||
         (data.status === "created"
           ? "Carpeta creada y vinculada"
-          : data.status === "linked" || data.status === "linked_stub"
+          : data.status === "linked" || data.status === "linked_offline"
             ? "Carpeta vinculada"
-            : data.status === "unlinked"
-              ? "Carpeta desvinculada"
-              : "Listo")
+            : data.status === "stub"
+              ? "Marcador local guardado (no es Drive real)"
+              : data.status === "unlinked"
+                ? "Carpeta desvinculada"
+                : "Listo")
     );
     setFolderRef("");
     router.refresh();
@@ -65,22 +75,47 @@ export function DriveFolderPanel({
 
       {folderId ? (
         <div className="mt-4 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3">
-          <div className="text-sm font-medium">
-            {folderName || "Carpeta vinculada"}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-sm font-medium">
+              {folderName || "Carpeta vinculada"}
+            </div>
+            {isPlaceholder ? (
+              <span className="badge badge-pendiente">stub / demo</span>
+            ) : (
+              <span className="badge badge-activa">Drive</span>
+            )}
           </div>
           <div className="mt-1 break-all text-xs text-[var(--ink-soft)]/65">
             ID: {folderId}
           </div>
+          {isPlaceholder && (
+            <p className="mt-2 text-xs text-[var(--ink-soft)]/70">
+              Marcador local: no abre Google Drive. Conecte OAuth y cree una
+              carpeta real para subir minutas.
+            </p>
+          )}
           <div className="mt-3 flex flex-wrap gap-2">
-            {folderUrl && (
+            {canOpenExternal && (
               <a
-                href={folderUrl}
+                href={folderUrl!}
                 target="_blank"
                 rel="noreferrer"
                 className="btn btn-secondary"
               >
                 Abrir en Drive
               </a>
+            )}
+            {isPlaceholder && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(() => run("create-causa-folder"))
+                }
+              >
+                Crear carpeta real
+              </button>
             )}
             <button
               type="button"
@@ -106,6 +141,7 @@ export function DriveFolderPanel({
               value={folderRef}
               onChange={(e) => setFolderRef(e.target.value)}
               placeholder="https://drive.google.com/drive/folders/…"
+              aria-label="URL o ID de carpeta Google Drive"
             />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -137,10 +173,14 @@ export function DriveFolderPanel({
       )}
 
       {msg && (
-        <p className="mt-3 text-sm text-[var(--sea)]">{msg}</p>
+        <p className="mt-3 text-sm text-[var(--sea)]" role="status">
+          {msg}
+        </p>
       )}
       {error && (
-        <p className="mt-3 text-sm text-red-700">{error}</p>
+        <p className="mt-3 text-sm text-red-700" role="alert">
+          {error}
+        </p>
       )}
     </section>
   );

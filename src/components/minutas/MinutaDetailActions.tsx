@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { formatLocalDate } from "@/lib/minutas";
+import { driveFileUrl, isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 
 type Accion = {
   id: string;
@@ -15,80 +17,120 @@ type Accion = {
 export function MinutaDetailActions({
   minutaId,
   acciones,
-  hasDriveFolder,
+  folderId,
   googleDriveFileId,
+  aviso,
 }: {
   minutaId: string;
   acciones: Accion[];
-  hasDriveFolder: boolean;
+  folderId?: string | null;
   googleDriveFileId?: string | null;
+  aviso?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState(aviso || "");
+  const [error, setError] = useState("");
+  const hasRealFolder = isRealDriveFolderId(folderId);
 
   function setEstado(accionId: string, estado: string) {
+    setError("");
     startTransition(async () => {
-      await fetch(`/api/minutas/${minutaId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "accion-estado",
-          accionId,
-          estado,
-        }),
-      });
-      router.refresh();
+      try {
+        const res = await fetch(`/api/minutas/${minutaId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "accion-estado",
+            accionId,
+            estado,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || "No se pudo actualizar la acción");
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError("Error de red al actualizar la acción");
+      }
     });
   }
 
   function pushDrive() {
+    setMsg("");
+    setError("");
     startTransition(async () => {
-      setMsg("");
-      const res = await fetch(`/api/minutas/${minutaId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "push-drive" }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setMsg(data.error || "Error");
-        return;
+      try {
+        const res = await fetch(`/api/minutas/${minutaId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "push-drive" }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || data.message || "Error al subir a Drive");
+          return;
+        }
+        setMsg(
+          data.message ||
+            (data.status === "uploaded"
+              ? "Minuta subida a la carpeta Drive de la causa"
+              : data.status === "stub"
+                ? "Modo stub: conecte Google OAuth para subir"
+                : String(data.status))
+        );
+        router.refresh();
+      } catch {
+        setError("Error de red al subir a Drive");
       }
-      setMsg(
-        data.message ||
-          (data.status === "uploaded"
-            ? "Minuta subida a la carpeta Drive de la causa"
-            : data.status === "stub"
-              ? "Modo stub: conecte Google OAuth para subir"
-              : JSON.stringify(data.status))
-      );
-      router.refresh();
     });
   }
 
   return (
     <div className="space-y-4">
       <section className="panel rounded-3xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Acciones de seguimiento</h2>
+        <h2 className="text-lg font-semibold">Google Drive</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+          {hasRealFolder
+            ? "Suba esta minuta a la carpeta del expediente."
+            : "Vincule una carpeta real en la causa para habilitar la subida."}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             className="btn btn-secondary"
-            disabled={pending || !hasDriveFolder}
+            disabled={pending || !hasRealFolder}
             onClick={pushDrive}
-            title={
-              hasDriveFolder
-                ? "Subir a Drive"
-                : "Vincule una carpeta Drive en la causa"
-            }
           >
             {googleDriveFileId ? "Re-subir a Drive" : "Subir a Drive"}
           </button>
+          {googleDriveFileId && !googleDriveFileId.startsWith("stub") && (
+            <a
+              href={driveFileUrl(googleDriveFileId)}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-ghost"
+            >
+              Abrir archivo
+            </a>
+          )}
         </div>
         {msg && (
-          <p className="mt-3 text-sm text-[var(--ink-soft)]/75">{msg}</p>
+          <p className="mt-3 text-sm text-[var(--sea)]" role="status">
+            {msg}
+          </p>
         )}
+        {error && (
+          <p className="mt-3 text-sm text-red-700" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+
+      <section className="panel rounded-3xl p-5">
+        <h2 className="text-lg font-semibold">Acciones de seguimiento</h2>
         <div className="mt-4 space-y-3">
           {acciones.map((a) => (
             <div
@@ -98,22 +140,56 @@ export function MinutaDetailActions({
               <div>
                 <div className="text-sm font-medium">{a.descripcion}</div>
                 <div className="text-xs text-[var(--ink-soft)]/65">
-                  {a.responsable || "Sin asignar"} · {a.prioridad} ·{" "}
-                  {a.estado}
+                  {a.responsable || "Sin asignar"} · {a.prioridad} · plazo{" "}
+                  {formatLocalDate(a.fechaLimite)} · {a.estado}
                 </div>
               </div>
-              {a.estado !== "hecha" ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={pending}
-                  onClick={() => setEstado(a.id, "hecha")}
-                >
-                  Marcar hecha
-                </button>
-              ) : (
-                <span className="badge badge-activa">hecha</span>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {a.estado !== "hecha" && a.estado !== "cancelada" ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={pending}
+                      onClick={() => setEstado(a.id, "hecha")}
+                    >
+                      Hecha
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={pending}
+                      onClick={() => setEstado(a.id, "cancelada")}
+                    >
+                      Cancelar
+                    </button>
+                  </>
+                ) : a.estado === "hecha" ? (
+                  <>
+                    <span className="badge badge-activa">hecha</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={pending}
+                      onClick={() => setEstado(a.id, "pendiente")}
+                    >
+                      Reabrir
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="badge badge-ink">cancelada</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={pending}
+                      onClick={() => setEstado(a.id, "pendiente")}
+                    >
+                      Reabrir
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           ))}
           {acciones.length === 0 && (

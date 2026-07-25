@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/db";
 import {
   driveFolderUrl,
+  isPlaceholderDriveFolderId,
+  isRealDriveFolderId,
+  makeStubFolderId,
   parseGoogleDriveFolderRef,
+  stubFolderUrl,
 } from "@/lib/integrations/drive-folder";
 
 export type GoogleConfig = {
@@ -11,6 +15,8 @@ export type GoogleConfig = {
   accessToken?: string;
   refreshToken?: string;
   connectedEmail?: string;
+  /** epoch ms when accessToken expires */
+  tokenExpiresAt?: number;
 };
 
 export async function getGoogleConfig(): Promise<GoogleConfig> {
@@ -112,21 +118,64 @@ export async function exchangeGoogleCode(code: string) {
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token || current.refreshToken,
     connectedEmail: email,
+    tokenExpiresAt: Date.now() + tokens.expires_in * 1000,
   };
 
+  await saveGoogleConfig(next, true);
+  return next;
+}
+
+async function saveGoogleConfig(config: GoogleConfig, enabled = true) {
   await prisma.integrationConfig.upsert({
     where: { provider: "google" },
     create: {
       provider: "google",
-      enabled: true,
-      configJson: JSON.stringify(next),
+      enabled,
+      configJson: JSON.stringify(config),
     },
     update: {
-      enabled: true,
-      configJson: JSON.stringify(next),
+      enabled,
+      configJson: JSON.stringify(config),
     },
   });
+}
 
+/** Refresca el access token si está por expirar (buffer 60s). */
+export async function ensureGoogleAccessToken(): Promise<GoogleConfig> {
+  const config = await getGoogleConfig();
+  if (!config.accessToken) return config;
+
+  const expiresAt = config.tokenExpiresAt || 0;
+  if (expiresAt > Date.now() + 60_000) return config;
+  if (!config.refreshToken) return config;
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return config;
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: config.refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  if (!res.ok) return config;
+
+  const tokens = (await res.json()) as {
+    access_token: string;
+    expires_in: number;
+  };
+  const next: GoogleConfig = {
+    ...config,
+    accessToken: tokens.access_token,
+    tokenExpiresAt: Date.now() + tokens.expires_in * 1000,
+  };
+  await saveGoogleConfig(next, true);
   return next;
 }
 
@@ -138,7 +187,7 @@ export async function pushPlazoToGoogleCalendar(plazoId: string) {
   });
   if (!plazo) throw new Error("Plazo no encontrado");
 
-  const config = await getGoogleConfig();
+  const config = await ensureGoogleAccessToken();
   if (!config.accessToken) {
     return {
       status: "stub" as const,
@@ -222,27 +271,36 @@ export async function pushDocumentoToDrive(documentoId: string) {
     include: { causa: true },
   });
   if (!doc) throw new Error("Documento no encontrado");
-  const config = await getGoogleConfig();
+  const config = await ensureGoogleAccessToken();
   const folderId = doc.causa?.googleDriveFolderId || null;
+  const realFolder = isRealDriveFolderId(folderId) ? folderId : null;
 
   if (!config.accessToken) {
     return {
       status: "stub" as const,
-      message: folderId
-        ? `Google Drive no conectado. El archivo iría a la carpeta ${folderId}.`
+      message: realFolder
+        ? `Google Drive no conectado. El archivo iría a la carpeta ${realFolder}.`
         : "Google Drive no conectado. OAuth requerido.",
       draft: {
         name: doc.nombre,
         mimeType: "text/markdown",
-        parents: folderId ? [folderId] : undefined,
+        parents: realFolder ? [realFolder] : undefined,
       },
+    };
+  }
+
+  if (folderId && isPlaceholderDriveFolderId(folderId)) {
+    return {
+      status: "needs_real_folder" as const,
+      message:
+        "La causa tiene una carpeta stub/demo. Cree o vincule una carpeta real de Google Drive antes de subir.",
     };
   }
 
   const file = await uploadMarkdownToDrive({
     name: doc.nombre,
     content: doc.contenido ?? "",
-    folderId,
+    folderId: realFolder,
     accessToken: config.accessToken,
   });
 
@@ -250,7 +308,7 @@ export async function pushDocumentoToDrive(documentoId: string) {
     where: { id: doc.id },
     data: { googleDriveId: file.id },
   });
-  return { status: "uploaded" as const, file, folderId };
+  return { status: "uploaded" as const, file, folderId: realFolder };
 }
 
 /** Vincula una causa a una carpeta de Drive existente (URL o ID). */
@@ -261,40 +319,47 @@ export async function linkCausaDriveFolder(causaId: string, folderRef: string) {
       "Referencia de carpeta inválida. Use la URL de Drive o el ID de la carpeta."
     );
   }
+  if (isPlaceholderDriveFolderId(parsed.folderId)) {
+    throw new Error(
+      "No se puede vincular un ID stub/demo. Use una carpeta real de Google Drive o créela desde LexOpen."
+    );
+  }
 
   const causa = await prisma.causa.findUnique({ where: { id: causaId } });
   if (!causa) throw new Error("Causa no encontrada");
 
-  const config = await getGoogleConfig();
+  const config = await ensureGoogleAccessToken();
   let folderName =
     causa.rit || causa.titulo.slice(0, 80) || "Carpeta LexOpen";
+  let folderUrl = parsed.folderUrl;
 
   if (config.accessToken) {
     const res = await fetch(
       `https://www.googleapis.com/drive/v3/files/${parsed.folderId}?fields=id,name,webViewLink,mimeType`,
       { headers: { Authorization: `Bearer ${config.accessToken}` } }
     );
-    if (res.ok) {
-      const meta = (await res.json()) as {
-        name?: string;
-        mimeType?: string;
-        webViewLink?: string;
-      };
-      if (
-        meta.mimeType &&
-        meta.mimeType !== "application/vnd.google-apps.folder"
-      ) {
-        throw new Error("El ID no corresponde a una carpeta de Google Drive.");
-      }
-      if (meta.name) folderName = meta.name;
+    if (!res.ok) {
+      throw new Error(
+        "No se pudo verificar la carpeta en Drive (¿scope drive.file o carpeta no accesible?). Prefiera «Crear carpeta en Drive»."
+      );
     }
+    const meta = (await res.json()) as {
+      name?: string;
+      mimeType?: string;
+      webViewLink?: string;
+    };
+    if (meta.mimeType !== "application/vnd.google-apps.folder") {
+      throw new Error("El ID no corresponde a una carpeta de Google Drive.");
+    }
+    if (meta.name) folderName = meta.name;
+    if (meta.webViewLink) folderUrl = meta.webViewLink;
   }
 
   const updated = await prisma.causa.update({
     where: { id: causaId },
     data: {
       googleDriveFolderId: parsed.folderId,
-      googleDriveFolderUrl: parsed.folderUrl,
+      googleDriveFolderUrl: folderUrl,
       googleDriveFolderName: folderName,
     },
   });
@@ -308,12 +373,15 @@ export async function linkCausaDriveFolder(causaId: string, folderRef: string) {
   });
 
   return {
-    status: config.accessToken ? ("linked" as const) : ("linked_stub" as const),
+    status: config.accessToken ? ("linked" as const) : ("linked_offline" as const),
+    message: config.accessToken
+      ? undefined
+      : "Carpeta guardada sin verificar (OAuth no conectado). Al conectar Google se podrá validar el acceso.",
     causa: updated,
     folder: {
       id: parsed.folderId,
       name: folderName,
-      url: parsed.folderUrl,
+      url: folderUrl,
     },
   };
 }
@@ -334,17 +402,17 @@ export async function createCausaDriveFolder(
     [causa.rit, causa.titulo].filter(Boolean).join(" — ").slice(0, 120) ||
     "Causa LexOpen";
 
-  const config = await getGoogleConfig();
+  const config = await ensureGoogleAccessToken();
 
   if (!config.accessToken) {
-    const stubId = `stub-folder-${causa.id.slice(0, 8)}`;
-    const url = driveFolderUrl(stubId);
+    const stubId = makeStubFolderId(causa.id);
+    const url = stubFolderUrl(stubId);
     const updated = await prisma.causa.update({
       where: { id: causaId },
       data: {
         googleDriveFolderId: stubId,
         googleDriveFolderUrl: url,
-        googleDriveFolderName: name,
+        googleDriveFolderName: `${name} (stub local)`,
       },
     });
     await prisma.activity.create({
@@ -357,9 +425,9 @@ export async function createCausaDriveFolder(
     return {
       status: "stub" as const,
       message:
-        "Google no conectado: se guardó un enlace stub local. Conecte OAuth para crear la carpeta real.",
+        "Google no conectado: se guardó un marcador local (no es una carpeta real de Drive). Conecte OAuth y use «Crear carpeta en Drive».",
       causa: updated,
-      folder: { id: stubId, name, url },
+      folder: { id: stubId, name: `${name} (stub local)`, url },
     };
   }
 
@@ -367,7 +435,7 @@ export async function createCausaDriveFolder(
     name,
     mimeType: "application/vnd.google-apps.folder",
   };
-  if (opts?.parentFolderId) {
+  if (opts?.parentFolderId && isRealDriveFolderId(opts.parentFolderId)) {
     metadata.parents = [opts.parentFolderId];
   }
 
@@ -443,28 +511,29 @@ export async function pushMinutaToDrive(minutaId: string) {
   });
   if (!minuta) throw new Error("Minuta no encontrada");
 
-  const config = await getGoogleConfig();
+  const config = await ensureGoogleAccessToken();
   const folderId = minuta.causa.googleDriveFolderId;
   const content =
     minuta.documento?.contenido ||
     `# ${minuta.titulo}\n\n${minuta.resumenEjecutivo}`;
   const name = minuta.documento?.nombre || `Minuta — ${minuta.titulo}.md`;
 
-  if (!config.accessToken) {
+  if (!folderId || isPlaceholderDriveFolderId(folderId)) {
     return {
-      status: "stub" as const,
-      message: folderId
-        ? `Drive no conectado. La minuta quedaría en la carpeta de la causa (${folderId}).`
-        : "Drive no conectado y la causa no tiene carpeta vinculada.",
-      draft: { name, parents: folderId ? [folderId] : undefined },
+      status: "needs_real_folder" as const,
+      message:
+        "Vincule o cree una carpeta real de Google Drive en la causa antes de subir la minuta.",
     };
   }
 
-  if (!folderId) {
+  if (!config.accessToken) {
     return {
-      status: "needs_folder" as const,
-      message:
-        "Vincule o cree una carpeta de Google Drive en la causa antes de subir la minuta.",
+      status: "stub" as const,
+      message: `Drive no conectado. La minuta quedaría en la carpeta de la causa (${folderId}). Conecte OAuth en Integraciones.`,
+      draft: {
+        name,
+        parents: [folderId],
+      },
     };
   }
 

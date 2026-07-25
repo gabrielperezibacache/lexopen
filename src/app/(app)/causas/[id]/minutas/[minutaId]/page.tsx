@@ -4,21 +4,41 @@ import { prisma } from "@/lib/db";
 import { formatDateTime } from "@/components/ui";
 import { labelModalidadMinuta, labelTipoMinuta } from "@/lib/minutas";
 import { MinutaDetailActions } from "@/components/minutas/MinutaDetailActions";
+import { driveFileUrl } from "@/lib/integrations/drive-folder";
 
-type Params = { params: Promise<{ id: string; minutaId: string }> };
+type Params = {
+  params: Promise<{ id: string; minutaId: string }>;
+  searchParams: Promise<{ aviso?: string }>;
+};
 
-export default async function MinutaDetailPage({ params }: Params) {
+export default async function MinutaDetailPage({ params, searchParams }: Params) {
   const { id, minutaId } = await params;
+  const sp = await searchParams;
   const minuta = await prisma.minuta.findUnique({
     where: { id: minutaId },
     include: {
       causa: true,
       autor: true,
-      acciones: { orderBy: [{ estado: "asc" }, { fechaLimite: "asc" }] },
+      acciones: true,
       documento: true,
     },
   });
   if (!minuta || minuta.causaId !== id) notFound();
+
+  const rank: Record<string, number> = {
+    pendiente: 0,
+    en_curso: 1,
+    hecha: 2,
+    cancelada: 3,
+  };
+  const acciones = [...minuta.acciones].sort((a, b) => {
+    const ra = rank[a.estado] ?? 9;
+    const rb = rank[b.estado] ?? 9;
+    if (ra !== rb) return ra - rb;
+    const da = a.fechaLimite?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const db = b.fechaLimite?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    return da - db;
+  });
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -52,7 +72,7 @@ export default async function MinutaDetailPage({ params }: Params) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="panel rounded-3xl p-5 lg:col-span-2 space-y-5">
+        <div className="panel space-y-5 rounded-3xl p-5 lg:col-span-2">
           <section>
             <h2 className="text-lg font-semibold">Resumen ejecutivo</h2>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[var(--ink-soft)]/90">
@@ -113,9 +133,16 @@ export default async function MinutaDetailPage({ params }: Params) {
               </div>
               {minuta.googleDriveFileId && (
                 <div>
-                  <dt className="text-[var(--ink-soft)]/55">Drive file</dt>
-                  <dd className="break-all font-medium">
-                    {minuta.googleDriveFileId}
+                  <dt className="text-[var(--ink-soft)]/55">Drive</dt>
+                  <dd className="font-medium">
+                    <a
+                      href={driveFileUrl(minuta.googleDriveFileId)}
+                      className="text-[var(--sea)]"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Ver archivo
+                    </a>
                   </dd>
                 </div>
               )}
@@ -123,9 +150,10 @@ export default async function MinutaDetailPage({ params }: Params) {
           </div>
           <MinutaDetailActions
             minutaId={minuta.id}
-            acciones={minuta.acciones}
-            hasDriveFolder={Boolean(minuta.causa.googleDriveFolderId)}
+            acciones={acciones}
+            folderId={minuta.causa.googleDriveFolderId}
             googleDriveFileId={minuta.googleDriveFileId}
+            aviso={sp.aviso || null}
           />
         </aside>
       </div>

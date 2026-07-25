@@ -36,25 +36,36 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
+
+  // Drive solo vía /api/integrations/google (link/create/unlink)
+  const data: Record<string, unknown> = {};
+  for (const key of [
+    "titulo",
+    "rit",
+    "ruc",
+    "tribunal",
+    "materia",
+    "procedimiento",
+    "estado",
+    "etapa",
+    "caratula",
+    "resumen",
+    "clienteId",
+    "abogadoId",
+  ] as const) {
+    if (body[key] !== undefined) data[key] = body[key];
+  }
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json(
+      { error: "Sin campos para actualizar" },
+      { status: 400 }
+    );
+  }
+
   const causa = await prisma.causa.update({
     where: { id },
-    data: {
-      titulo: body.titulo,
-      rit: body.rit,
-      ruc: body.ruc,
-      tribunal: body.tribunal,
-      materia: body.materia,
-      procedimiento: body.procedimiento,
-      estado: body.estado,
-      etapa: body.etapa,
-      caratula: body.caratula,
-      resumen: body.resumen,
-      clienteId: body.clienteId,
-      abogadoId: body.abogadoId,
-      googleDriveFolderId: body.googleDriveFolderId,
-      googleDriveFolderName: body.googleDriveFolderName,
-      googleDriveFolderUrl: body.googleDriveFolderUrl,
-    },
+    data,
   });
 
   if (body.estado || body.etapa) {

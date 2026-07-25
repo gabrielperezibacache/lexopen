@@ -5,7 +5,11 @@ import { labelEtapa, labelMateria } from "@/lib/chile";
 import { StatusBadge, formatDate, formatDateTime } from "@/components/ui";
 import { CausaActions } from "@/components/CausaActions";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
-import { labelTipoMinuta } from "@/lib/minutas";
+import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
+import {
+  isPlaceholderDriveFolderId,
+  isRealDriveFolderId,
+} from "@/lib/integrations/drive-folder";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,7 +27,9 @@ export default async function CausaDetailPage({ params }: Params) {
       minutas: {
         include: {
           autor: { select: { name: true } },
-          acciones: { where: { estado: { not: "hecha" } } },
+          acciones: {
+            where: { estado: { in: [...ACCIONES_ABIERTAS] } },
+          },
         },
         orderBy: { fecha: "desc" },
         take: 12,
@@ -58,16 +64,20 @@ export default async function CausaDetailPage({ params }: Params) {
             <StatusBadge estado={causa.estado} />
             <span className="badge badge-sea">{labelMateria(causa.materia)}</span>
             <span className="badge badge-ink">{labelEtapa(causa.etapa)}</span>
-            {causa.googleDriveFolderId && (
+            {isRealDriveFolderId(causa.googleDriveFolderId) && (
               <span className="badge badge-activa">Drive vinculado</span>
             )}
+            {isPlaceholderDriveFolderId(causa.googleDriveFolderId) &&
+              causa.googleDriveFolderId && (
+                <span className="badge badge-pendiente">Drive stub</span>
+              )}
           </div>
         </div>
         <CausaActions causaId={causa.id} />
       </div>
 
       <div className="panel rounded-3xl border border-[var(--sea)]/20 bg-[linear-gradient(135deg,rgba(31,111,120,0.08),rgba(255,255,255,0.85))] px-5 py-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-xl">
             <div className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--sea)]">
               Continuidad del expediente
@@ -92,22 +102,22 @@ export default async function CausaDetailPage({ params }: Params) {
               </p>
             )}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
             <Link
               href={`/causas/${causa.id}/minuta/nueva?tipo=audiencia`}
-              className="btn btn-primary"
+              className="btn btn-primary w-full sm:w-auto"
             >
               Minuta audiencia
             </Link>
             <Link
               href={`/causas/${causa.id}/minuta/nueva?tipo=reunion`}
-              className="btn btn-secondary"
+              className="btn btn-secondary w-full sm:w-auto"
             >
               Minuta reunión
             </Link>
             <Link
               href={`/causas/${causa.id}/minuta/nueva?tipo=llamada`}
-              className="btn btn-ghost"
+              className="btn btn-ghost w-full sm:w-auto"
             >
               Minuta llamada
             </Link>
@@ -203,7 +213,7 @@ export default async function CausaDetailPage({ params }: Params) {
                 </div>
                 <div className="mt-1 text-xs text-[var(--ink-soft)]/65">
                   {formatDateTime(m.fecha)} · {m.autor?.name || "Sin autor"} ·{" "}
-                  {m.acciones.length} pendientes
+                  {m.acciones.length} abiertas
                 </div>
                 <p className="mt-2 line-clamp-2 text-sm text-[var(--ink-soft)]/80">
                   {m.resumenEjecutivo}

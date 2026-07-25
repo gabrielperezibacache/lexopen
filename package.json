@@ -9,7 +9,7 @@
     "build": "prisma generate && next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint .",
-    "test": "tsx src/lib/integrations/drive-folder.test.ts && tsx src/lib/minutas.render.test.ts",
+    "test": "tsx src/lib/integrations/drive-folder.test.ts && tsx src/lib/minutas.render.test.ts && tsx src/lib/minutas.api-contract.test.ts",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
