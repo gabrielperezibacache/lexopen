@@ -30,6 +30,7 @@
 - Jurisprudencia (CS, Apelaciones, TC — corpus demo)
 - **Obsidian** (export vault Markdown, incluye Minutas/)
 - **Hermes Agent** (API OpenAI-compatible + demo)
+- **Monitoreo PJUD** (estilo CaseTracking): cartera con semáforos, sync, timeline clasificado y alertas. Partner API (`PJUD_API_URL`) o demo/CSV etiquetados — sin scrapers ocultos.
 - **Google Workspace** (OAuth Drive / Calendar / Gmail)
 
 ## Stack

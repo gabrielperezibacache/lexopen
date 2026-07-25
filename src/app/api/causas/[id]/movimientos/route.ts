@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
+import { classifyMovimiento } from "@/lib/pjud/classify";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -80,17 +81,20 @@ export async function POST(req: NextRequest, { params }: Params) {
           select: { abogadoId: true, rit: true, titulo: true },
         });
         const movimientos = await Promise.all(
-          rows.map((row) =>
-            tx.causaMovimiento.create({
+          rows.map((row) => {
+            const classified = classifyMovimiento(row.titulo, row.detalle);
+            return tx.causaMovimiento.create({
               data: {
                 causaId: id,
                 titulo: row.titulo,
                 detalle: row.detalle || null,
                 fuente: row.fuente || "import",
+                tipo: classified.tipo,
+                relevante: classified.relevante,
                 fecha: row.fecha ? new Date(row.fecha) : new Date(),
               },
-            })
-          )
+            });
+          })
         );
         await tx.activity.create({
           data: {
@@ -135,12 +139,15 @@ export async function POST(req: NextRequest, { params }: Params) {
         where: { id },
         select: { abogadoId: true, rit: true, titulo: true },
       });
+      const classified = classifyMovimiento(body.titulo, body.detalle);
       const created = await tx.causaMovimiento.create({
         data: {
           causaId: id,
           titulo: body.titulo,
           detalle: body.detalle || null,
           fuente: body.fuente || "manual",
+          tipo: classified.tipo,
+          relevante: classified.relevante,
           fecha: body.fecha ? new Date(body.fecha) : new Date(),
         },
       });

@@ -25,6 +25,7 @@ import {
   Menu,
   Shield,
   Settings,
+  Radar,
 } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
@@ -34,6 +35,7 @@ const primary = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/sites", label: "Espacios", icon: Building2 },
   { href: "/causas", label: "Causas", icon: Briefcase },
+  { href: "/causas/monitoreo", label: "Monitoreo PJUD", icon: Radar },
   { href: "/minutas", label: "Minutas", icon: ClipboardPen },
   { href: "/facturacion", label: "Facturación", icon: CircleDollarSign },
   { href: "/tareas", label: "Tareas", icon: ListTodo },
