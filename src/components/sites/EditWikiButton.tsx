@@ -49,7 +49,7 @@ export function EditWikiButton({
               className="textarea min-h-[220px]"
               name="content"
               defaultValue={page.content}
-              placeholder="Markdown"
+              placeholder="Contenido en Markdown"
             />
             <div className="flex justify-end gap-2">
               <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>

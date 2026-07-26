@@ -36,7 +36,7 @@ export function AddMemberButton({
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <form onSubmit={onSubmit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 className="text-lg font-semibold">Agregar al site</h3>
+            <h3 className="text-lg font-semibold">Agregar al espacio</h3>
             <select className="select" name="userId" required defaultValue="">
               <option value="" disabled>
                 Seleccione usuario
@@ -48,10 +48,10 @@ export function AddMemberButton({
               ))}
             </select>
             <select className="select" name="role" defaultValue="contributor">
-              <option value="admin">admin</option>
-              <option value="contributor">contributor</option>
-              <option value="viewer">viewer</option>
-              <option value="client">client</option>
+              <option value="admin">Administrador</option>
+              <option value="contributor">Colaborador</option>
+              <option value="viewer">Solo lectura</option>
+              <option value="client">Cliente</option>
             </select>
             <div className="flex justify-end gap-2">
               <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>

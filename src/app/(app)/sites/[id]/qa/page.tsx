@@ -4,6 +4,7 @@ import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDateTime } from "@/components/ui";
 import { QaActions } from "@/components/sites/QaActions";
+import { EmptyState } from "@/components/EmptyState";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -25,10 +26,17 @@ export default async function SiteQaPage({ params }: Params) {
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/qa" />
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
-          Q&A del site — hilos con cliente y equipo, con respuestas marcadas.
+          Q&A del espacio — hilos con cliente y equipo, con respuestas oficiales.
         </p>
         <QaActions siteId={site.id} />
       </div>
+      {threads.length === 0 && (
+        <EmptyState
+          title="Sin hilos de Q&A"
+          description="Abra una pregunta para el cliente o el equipo. Las respuestas oficiales quedan marcadas."
+          action={<QaActions siteId={site.id} />}
+        />
+      )}
       <div className="space-y-4">
         {threads.map((t) => (
           <article key={t.id} className="panel rounded-3xl p-5">

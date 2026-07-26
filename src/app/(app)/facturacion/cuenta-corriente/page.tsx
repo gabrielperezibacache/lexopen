@@ -39,7 +39,7 @@ export default async function CuentaCorrientePage({
   return (
     <div className="space-y-6">
       <ModuleHeader
-        eyebrow="Trust / client ledger"
+        eyebrow="Provisión de fondos"
         title="Cuenta corriente"
         subtitle="Provisiones de fondos, cargos por honorarios/gastos, pagos y saldo a favor del cliente."
       />
@@ -76,7 +76,7 @@ export default async function CuentaCorrientePage({
         </>
       )}
 
-      <div className="panel overflow-hidden rounded-3xl">
+      <div className="panel overflow-x-auto rounded-3xl">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--ink)] text-white/90">
             <tr>
@@ -89,6 +89,13 @@ export default async function CuentaCorrientePage({
             </tr>
           </thead>
           <tbody>
+            {entries.length === 0 && (
+              <tr>
+                <td className="px-4 py-8 text-[var(--ink-soft)]/65" colSpan={6}>
+                  Sin movimientos en esta cuenta. Registre una provisión o cargo.
+                </td>
+              </tr>
+            )}
             {entries.map((e) => (
               <tr key={e.id} className="table-row">
                 <td className="px-4 py-3">{formatDate(e.date)}</td>

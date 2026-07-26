@@ -39,7 +39,7 @@ export default async function MinutasPage() {
           </p>
           <h1 className="display mt-2 text-4xl">Minutas</h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Handoff tras audiencias, reuniones y llamadas. Cualquier abogado
+            Traspaso tras audiencias, reuniones y llamadas. Cualquier abogado
             puede retomar la tramitación con el resumen y los próximos pasos.
           </p>
         </div>
@@ -71,6 +71,15 @@ export default async function MinutasPage() {
             </Link>
           ))}
         </div>
+        {causas.length === 0 && (
+          <p className="mt-4 text-sm text-[var(--ink-soft)]/65">
+            No hay causas activas.{" "}
+            <Link href="/causas/nueva" className="text-[var(--sea)]">
+              Cree una causa
+            </Link>{" "}
+            para registrar el primer traspaso.
+          </p>
+        )}
       </section>
 
       <section className="panel overflow-hidden rounded-3xl">

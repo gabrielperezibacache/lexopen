@@ -16,7 +16,7 @@ const tabs = [
 ];
 
 const tipoLabel: Record<string, string> = {
-  matter: "Matter",
+  matter: "Matter / causa",
   vdr: "VDR",
   client_portal: "Portal cliente",
   project: "Proyecto",
@@ -52,25 +52,27 @@ export function SiteNav({
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap gap-1 border-b border-[var(--line)] pb-1">
-        {tabs.map((t) => {
-          const href = `/sites/${siteId}${t.href}`;
-          const isActive = active === t.href;
-          return (
-            <Link
-              key={t.href || "overview"}
-              href={href}
-              className={cn(
-                "rounded-t-lg px-3 py-2 text-sm font-medium transition",
-                isActive
-                  ? "bg-white text-[var(--ink)] shadow-sm"
-                  : "text-[var(--ink-soft)]/70 hover:text-[var(--ink)]"
-              )}
-            >
-              {t.label}
-            </Link>
-          );
-        })}
+      <div className="-mx-1 overflow-x-auto border-b border-[var(--line)] pb-1">
+        <div className="flex min-w-max gap-1 px-1">
+          {tabs.map((t) => {
+            const href = `/sites/${siteId}${t.href}`;
+            const isActive = active === t.href;
+            return (
+              <Link
+                key={t.href || "overview"}
+                href={href}
+                className={cn(
+                  "rounded-t-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition",
+                  isActive
+                    ? "bg-white text-[var(--ink)] shadow-sm"
+                    : "text-[var(--ink-soft)]/70 hover:text-[var(--ink)]"
+                )}
+              >
+                {t.label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

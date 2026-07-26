@@ -32,20 +32,20 @@ export function NewSiteButton() {
   return (
     <>
       <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>
-        Nuevo site
+        Nuevo espacio
       </button>
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <form onSubmit={onSubmit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h2 className="text-xl font-semibold">Crear site</h2>
-            <input className="input" name="name" required placeholder="Nombre del site" />
+            <h2 className="text-xl font-semibold">Crear espacio</h2>
+            <input className="input" name="name" required placeholder="Nombre del espacio" />
             <textarea className="textarea" name="description" placeholder="Descripción" />
             <select className="select" name="tipo" defaultValue="matter">
-              <option value="matter">Matter</option>
-              <option value="vdr">Virtual Data Room</option>
-              <option value="client_portal">Client portal</option>
-              <option value="project">Project</option>
-              <option value="knowledge">Knowledge</option>
+              <option value="matter">Matter / causa</option>
+              <option value="vdr">VDR / data room</option>
+              <option value="client_portal">Portal cliente</option>
+              <option value="project">Proyecto</option>
+              <option value="knowledge">Knowledge / playbooks</option>
             </select>
             <div className="flex justify-end gap-2">
               <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>

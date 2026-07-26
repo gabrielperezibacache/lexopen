@@ -30,9 +30,13 @@ export function NewWikiButton({ siteId }: { siteId: string }) {
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <form onSubmit={onSubmit} className="panel w-full max-w-lg space-y-3 rounded-3xl p-6">
-            <h3 className="text-lg font-semibold">Nueva wiki</h3>
+            <h3 className="text-lg font-semibold">Nueva página wiki</h3>
             <input className="input" name="title" required placeholder="Título" />
-            <textarea className="textarea min-h-[180px]" name="content" placeholder="Markdown" />
+            <textarea
+              className="textarea min-h-[180px]"
+              name="content"
+              placeholder="Escriba en Markdown: títulos (#), listas (-), negrita (**texto**)"
+            />
             <div className="flex justify-end gap-2">
               <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
                 Cancelar

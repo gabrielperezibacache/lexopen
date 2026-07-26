@@ -27,7 +27,7 @@ export default async function SitePeoplePage({ params }: Params) {
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/personas" />
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
-          Usuarios, roles del site y grupos (ethical walls / permisos HighQ-style).
+          Miembros, roles del espacio y grupos con acceso (muros éticos / permisos).
         </p>
         {isStaff(user.role) && (
           <AddMemberButton
@@ -58,9 +58,24 @@ export default async function SitePeoplePage({ params }: Params) {
                     {m.user.email} · {m.user.title || m.user.role}
                   </div>
                 </div>
-                <span className="badge badge-sea">{m.role}</span>
+                <span className="badge badge-sea">
+                  {m.role === "admin"
+                    ? "Admin"
+                    : m.role === "contributor"
+                      ? "Colaborador"
+                      : m.role === "viewer"
+                        ? "Lectura"
+                        : m.role === "client"
+                          ? "Cliente"
+                          : m.role}
+                </span>
               </div>
             ))}
+            {site.members.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Sin miembros. Agregue abogados o clientes del portal.
+              </p>
+            )}
           </div>
         </section>
         <section className="panel rounded-3xl p-5">
@@ -70,7 +85,7 @@ export default async function SitePeoplePage({ params }: Params) {
               <div key={g.id} className="rounded-2xl border border-[var(--line)] px-3 py-3">
                 <div className="font-medium">{g.group.name}</div>
                 <div className="text-xs text-[var(--ink-soft)]/65">
-                  rol site: {g.role} · {g.group.members.length} personas
+                  rol en espacio: {g.role} · {g.group.members.length} personas
                 </div>
               </div>
             ))}

@@ -75,29 +75,44 @@ export default async function SiteOverviewPage({ params }: Params) {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">Tasks</h2>
+            <h2 className="font-semibold">Tareas</h2>
             <Link href={`/sites/${site.id}/tareas`} className="text-sm text-[var(--sea)]">
               Ver
             </Link>
           </div>
           <div className="space-y-2">
             {site.tasks.map((t) => (
-              <div key={t.id} className="flex items-center justify-between gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm">
+              <div
+                key={t.id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
+              >
                 <div>
                   <div className="font-medium">{t.title}</div>
                   <div className="text-xs text-[var(--ink-soft)]/65">
                     {t.assignee?.name || "Sin asignar"} · {formatDate(t.dueDate)}
                   </div>
                 </div>
-                <StatusBadge estado={t.status === "done" ? "cumplido" : t.status === "todo" ? "pendiente" : "activa"} />
+                <StatusBadge
+                  estado={
+                    t.status === "done" ? "cumplido" : t.status === "todo" ? "pendiente" : "activa"
+                  }
+                />
               </div>
             ))}
+            {site.tasks.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Sin tareas.{" "}
+                <Link href={`/sites/${site.id}/tareas`} className="text-[var(--sea)]">
+                  Crear la primera
+                </Link>
+              </p>
+            )}
           </div>
         </section>
 
         <section className="panel rounded-3xl p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">Files recientes</h2>
+            <h2 className="font-semibold">Archivos recientes</h2>
             <Link href={`/sites/${site.id}/archivos`} className="text-sm text-[var(--sea)]">
               Data room
             </Link>
@@ -106,9 +121,19 @@ export default async function SiteOverviewPage({ params }: Params) {
             {site.files.map((f) => (
               <div key={f.id} className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm">
                 <div className="font-medium">{f.name}</div>
-                <div className="text-xs text-[var(--ink-soft)]/65">v{f.version} · {formatDate(f.updatedAt)}</div>
+                <div className="text-xs text-[var(--ink-soft)]/65">
+                  v{f.version} · {formatDate(f.updatedAt)}
+                </div>
               </div>
             ))}
+            {site.files.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Sin archivos.{" "}
+                <Link href={`/sites/${site.id}/archivos`} className="text-[var(--sea)]">
+                  Subir al VDR
+                </Link>
+              </p>
+            )}
           </div>
         </section>
 
@@ -137,7 +162,7 @@ export default async function SiteOverviewPage({ params }: Params) {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <h2 className="mb-3 font-semibold">Activity stream</h2>
+          <h2 className="mb-3 font-semibold">Actividad reciente</h2>
           <div className="space-y-3">
             {site.activities.map((a) => (
               <div key={a.id} className="border-b border-[var(--line)] pb-2 text-sm last:border-0">
@@ -147,6 +172,9 @@ export default async function SiteOverviewPage({ params }: Params) {
                 </div>
               </div>
             ))}
+            {site.activities.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">Sin actividad en este espacio.</p>
+            )}
           </div>
         </section>
       </div>

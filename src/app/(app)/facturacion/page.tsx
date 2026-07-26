@@ -136,12 +136,20 @@ export default async function FacturacionPage() {
                 </div>
               </Link>
             ))}
+            {recentInvoices.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Sin facturas aún.{" "}
+                <Link href="/facturacion/facturas" className="text-[var(--sea)]">
+                  Emitir documento
+                </Link>
+              </p>
+            )}
           </div>
         </section>
 
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Time entries recientes</h2>
+            <h2 className="text-lg font-semibold">Horas recientes</h2>
             <Link href="/facturacion/horas" className="text-sm text-[var(--sea)]">
               Registrar
             </Link>
@@ -159,6 +167,14 @@ export default async function FacturacionPage() {
                 </div>
               </div>
             ))}
+            {recentTime.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Sin horas registradas.{" "}
+                <Link href="/facturacion/horas" className="text-[var(--sea)]">
+                  Cargar tiempo
+                </Link>
+              </p>
+            )}
           </div>
         </section>
       </div>

@@ -77,9 +77,18 @@ function IntegracionesInner() {
       </div>
 
       {googleFlash && (
-        <div className="rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-sm">
-          Google OAuth: {googleFlash}
-          {sp.get("msg") ? ` — ${sp.get("msg")}` : ""}
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            googleFlash === "connected" || googleFlash === "ok"
+              ? "border-[var(--ok)]/30 bg-[rgba(31,122,76,0.08)] text-[var(--ink)]"
+              : "border-[var(--line)] bg-white/80 text-[var(--ink-soft)]/85"
+          }`}
+        >
+          {googleFlash === "connected" || googleFlash === "ok"
+            ? "Google Workspace conectado correctamente."
+            : googleFlash === "error"
+              ? `No se pudo completar OAuth${sp.get("msg") ? `: ${sp.get("msg")}` : "."}`
+              : `Estado Google: ${googleFlash}${sp.get("msg") ? ` — ${sp.get("msg")}` : ""}`}
         </div>
       )}
 
@@ -133,7 +142,7 @@ function IntegracionesInner() {
               </a>
             ) : (
               <button className="btn btn-ghost" type="button" disabled>
-                Configure OAuth en .env
+                Configure OAuth en el entorno
               </button>
             )}
             {google?.connected && (

@@ -29,8 +29,8 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/sites" className="btn btn-ghost hidden sm:inline-flex">
-            Espacios
+          <Link href="/login" className="btn btn-ghost">
+            Iniciar sesión
           </Link>
           <Link href="/login" className="btn btn-primary">
             Entrar al estudio <ArrowRight size={16} />
@@ -55,8 +55,8 @@ export default function LandingPage() {
             <Link href="/login" className="btn btn-primary">
               Abrir plataforma
             </Link>
-            <Link href="/sites" className="btn btn-secondary">
-              Explorar espacios
+            <Link href="/login?next=/dashboard" className="btn btn-secondary">
+              Ver demo del estudio
             </Link>
           </div>
         </div>

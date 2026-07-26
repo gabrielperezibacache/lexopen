@@ -26,7 +26,7 @@ export default async function HorasPage() {
   return (
     <div className="space-y-6">
       <ModuleHeader
-        eyebrow="Timekeeping"
+        eyebrow="Control de horas"
         title="Horas facturables"
         subtitle="Registro de tiempo por causa, actividad y tarifa. Listo para agrupar en boleta/factura."
         actions={
@@ -48,7 +48,7 @@ export default async function HorasPage() {
 
       <TimeEntryForm causas={causas} clientes={clientes} users={users} />
 
-      <div className="panel overflow-hidden rounded-3xl">
+      <div className="panel overflow-x-auto rounded-3xl">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--ink)] text-white/90">
             <tr>
@@ -63,6 +63,13 @@ export default async function HorasPage() {
             </tr>
           </thead>
           <tbody>
+            {entries.length === 0 && (
+              <tr>
+                <td className="px-4 py-8 text-[var(--ink-soft)]/65" colSpan={8}>
+                  Sin horas registradas. Use el formulario de arriba para cargar tiempo.
+                </td>
+              </tr>
+            )}
             {entries.map((e) => (
               <tr key={e.id} className="table-row">
                 <td className="px-4 py-3">{formatDate(e.date)}</td>

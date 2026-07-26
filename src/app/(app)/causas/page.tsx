@@ -97,7 +97,21 @@ export default async function CausasPage({
               {causas.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-[var(--ink-soft)]/70">
-                    No hay causas con esos filtros.
+                    {q || materia || estado ? (
+                      <>
+                        No hay causas con esos filtros.{" "}
+                        <Link href="/causas" className="text-[var(--sea)]">
+                          Limpiar filtros
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        Aún no hay causas.{" "}
+                        <Link href="/causas/nueva" className="text-[var(--sea)]">
+                          Crear la primera
+                        </Link>
+                      </>
+                    )}
                   </td>
                 </tr>
               )}

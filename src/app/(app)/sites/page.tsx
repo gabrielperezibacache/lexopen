@@ -8,8 +8,8 @@ import { NewSiteButton } from "@/components/sites/NewSiteButton";
 import { EmptyState } from "@/components/EmptyState";
 
 const tipoLabel: Record<string, string> = {
-  matter: "Matter",
-  vdr: "VDR / Data room",
+  matter: "Matter / causa",
+  vdr: "VDR / data room",
   client_portal: "Portal cliente",
   project: "Proyecto",
   knowledge: "Knowledge",
@@ -32,7 +32,7 @@ export default async function SitesPage() {
       <ModuleHeader
         eyebrow="Espacios de trabajo"
         title="Espacios"
-        subtitle="Matters, VDRs, bases de conocimiento y portales cliente — el contenedor central de LexOpen."
+        subtitle="Matters, VDRs, knowledge y portales cliente — el contenedor central de LexOpen."
         actions={!isCliente(user.role) ? <NewSiteButton /> : undefined}
       />
 

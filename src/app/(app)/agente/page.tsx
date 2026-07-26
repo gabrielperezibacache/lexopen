@@ -135,32 +135,38 @@ function AgenteInner() {
         </aside>
 
         <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
-        <div>
-          <label className="mb-1 block text-sm font-medium">Causa (contexto)</label>
-          <select
-            className="select"
-            value={causaId}
-            onChange={(e) => setCausaId(e.target.value)}
-          >
-            <option value="">Sin causa específica</option>
-            {causas.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.rit || c.titulo}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">Instrucción</label>
-          <textarea
-            className="textarea min-h-[140px]"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-        </div>
-        <button className="btn btn-primary" type="submit" disabled={busy}>
-          {busy ? "Consultando…" : "Enviar a Hermes"}
-        </button>
+          {messages.length === 0 && !reply && (
+            <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white/50 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
+              Elija una causa (opcional), ajuste la instrucción y envíe. Si Hermes no
+              está conectado, LexOpen responde en modo demo.
+            </div>
+          )}
+          <div>
+            <label className="mb-1 block text-sm font-medium">Causa (contexto)</label>
+            <select
+              className="select"
+              value={causaId}
+              onChange={(e) => setCausaId(e.target.value)}
+            >
+              <option value="">Sin causa específica</option>
+              {causas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.rit || c.titulo}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Instrucción</label>
+            <textarea
+              className="textarea min-h-[140px]"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+          </div>
+          <button className="btn btn-primary" type="submit" disabled={busy}>
+            {busy ? "Consultando…" : "Enviar a Hermes"}
+          </button>
         </form>
       </div>
 

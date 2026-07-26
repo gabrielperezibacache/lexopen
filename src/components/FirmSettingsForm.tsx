@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 type Settings = {
@@ -20,13 +20,35 @@ type Settings = {
   } | null;
 };
 
+function Field({
+  label,
+  hint,
+  children,
+  className = "",
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={`block text-sm ${className}`}>
+      <span className="mb-1 block font-medium text-[var(--ink)]">{label}</span>
+      {children}
+      {hint && <span className="mt-1 block text-xs text-[var(--ink-soft)]/60">{hint}</span>}
+    </label>
+  );
+}
+
 export function FirmSettingsForm({ organization }: { organization: Settings }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
+  const [ok, setOk] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
+    setOk(false);
     const fd = new FormData(e.currentTarget);
     const res = await fetch("/api/configuracion", {
       method: "PATCH",
@@ -46,31 +68,120 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
         hermesAllowDemo: fd.get("hermesAllowDemo") === "on",
       }),
     });
+    setOk(res.ok);
     setMessage(res.ok ? "Configuración guardada" : "No se pudo guardar");
     if (res.ok) router.refresh();
   }
 
   const s = organization.settings;
   return (
-    <form onSubmit={onSubmit} className="panel grid gap-4 rounded-3xl p-5 md:grid-cols-2">
-      <input className="input" name="name" defaultValue={organization.name} placeholder="Nombre estudio" />
-      <input className="input" name="rut" defaultValue={organization.rut || ""} placeholder="RUT estudio" />
-      <input className="input" name="email" defaultValue={organization.email || ""} placeholder="Email" />
-      <input className="input" name="telefono" defaultValue={organization.telefono || ""} placeholder="Teléfono" />
-      <input className="input md:col-span-2" name="direccion" defaultValue={organization.direccion || ""} placeholder="Dirección" />
-      <input className="input" name="emisorRazonSocial" defaultValue={s?.emisorRazonSocial || ""} placeholder="Emisor razón social" />
-      <input className="input" name="emisorRut" defaultValue={s?.emisorRut || ""} placeholder="Emisor RUT" />
-      <input className="input" name="emisorGiro" defaultValue={s?.emisorGiro || ""} placeholder="Giro" />
-      <input className="input" name="emisorDireccion" defaultValue={s?.emisorDireccion || ""} placeholder="Dirección tributaria" />
-      <input className="input" type="number" step="0.0001" name="defaultRetencionPct" defaultValue={s?.defaultRetencionPct ?? 0.1375} placeholder="Retención" />
-      <input className="input" type="number" step="0.0001" name="ivaPct" defaultValue={s?.ivaPct ?? 0.19} placeholder="IVA" />
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="hermesAllowDemo" defaultChecked={s?.hermesAllowDemo ?? true} />
-        Permitir demo Hermes
-      </label>
-      <div className="flex items-center justify-end gap-3">
-        {message && <span className="text-sm text-[var(--ink-soft)]/70">{message}</span>}
-        <button className="btn btn-primary" type="submit">Guardar</button>
+    <form onSubmit={onSubmit} className="panel space-y-8 rounded-3xl p-5 md:p-6">
+      <section>
+        <h2 className="text-lg font-semibold">Datos del estudio</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+          Identidad visible en el portal y documentos internos.
+        </p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Field label="Nombre del estudio">
+            <input className="input" name="name" required defaultValue={organization.name} />
+          </Field>
+          <Field label="RUT del estudio" hint="Formato 76.XXX.XXX-X">
+            <input className="input" name="rut" defaultValue={organization.rut || ""} />
+          </Field>
+          <Field label="Email de contacto">
+            <input
+              className="input"
+              name="email"
+              type="email"
+              defaultValue={organization.email || ""}
+            />
+          </Field>
+          <Field label="Teléfono">
+            <input className="input" name="telefono" defaultValue={organization.telefono || ""} />
+          </Field>
+          <Field label="Dirección" className="md:col-span-2">
+            <input className="input" name="direccion" defaultValue={organization.direccion || ""} />
+          </Field>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold">Emisor tributario</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+          Datos que aparecen en boletas y facturas.
+        </p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Field label="Razón social emisora">
+            <input
+              className="input"
+              name="emisorRazonSocial"
+              defaultValue={s?.emisorRazonSocial || ""}
+            />
+          </Field>
+          <Field label="RUT emisor">
+            <input className="input" name="emisorRut" defaultValue={s?.emisorRut || ""} />
+          </Field>
+          <Field label="Giro">
+            <input className="input" name="emisorGiro" defaultValue={s?.emisorGiro || ""} />
+          </Field>
+          <Field label="Dirección tributaria">
+            <input
+              className="input"
+              name="emisorDireccion"
+              defaultValue={s?.emisorDireccion || ""}
+            />
+          </Field>
+          <Field label="Retención por defecto" hint="Ej. 0.1375 = 13,75%">
+            <input
+              className="input"
+              type="number"
+              step="0.0001"
+              name="defaultRetencionPct"
+              defaultValue={s?.defaultRetencionPct ?? 0.1375}
+            />
+          </Field>
+          <Field label="IVA" hint="Ej. 0.19 = 19%">
+            <input
+              className="input"
+              type="number"
+              step="0.0001"
+              name="ivaPct"
+              defaultValue={s?.ivaPct ?? 0.19}
+            />
+          </Field>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold">Integraciones</h2>
+        <label className="mt-3 flex items-start gap-3 text-sm">
+          <input
+            className="mt-1"
+            type="checkbox"
+            name="hermesAllowDemo"
+            defaultChecked={s?.hermesAllowDemo ?? true}
+          />
+          <span>
+            <span className="font-medium">Permitir respuestas demo de Hermes</span>
+            <span className="mt-0.5 block text-[var(--ink-soft)]/65">
+              Si el agente no está disponible, LexOpen responde con contenido de demostración.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[var(--line)] pt-4">
+        {message && (
+          <span
+            className={`text-sm ${ok ? "text-[var(--ok)]" : "text-red-700"}`}
+            role="status"
+          >
+            {message}
+          </span>
+        )}
+        <button className="btn btn-primary" type="submit">
+          Guardar configuración
+        </button>
       </div>
     </form>
   );

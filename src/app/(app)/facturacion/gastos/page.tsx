@@ -20,7 +20,7 @@ export default async function GastosPage() {
   return (
     <div className="space-y-6">
       <ModuleHeader
-        eyebrow="Disbursements"
+        eyebrow="Desembolsos"
         title="Gastos"
         subtitle="Notaría, receptor, peritos, costas y otros desembolsos por cuenta del cliente."
       />
@@ -28,7 +28,7 @@ export default async function GastosPage() {
         Gastos por facturar: <strong>{clp(total)}</strong> ({unbilled.length} ítems)
       </div>
       <ExpenseForm causas={causas} clientes={clientes} />
-      <div className="panel overflow-hidden rounded-3xl">
+      <div className="panel overflow-x-auto rounded-3xl">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--ink)] text-white/90">
             <tr>
@@ -41,6 +41,13 @@ export default async function GastosPage() {
             </tr>
           </thead>
           <tbody>
+            {expenses.length === 0 && (
+              <tr>
+                <td className="px-4 py-8 text-[var(--ink-soft)]/65" colSpan={6}>
+                  Sin gastos. Registre notaría, receptor u otros desembolsos arriba.
+                </td>
+              </tr>
+            )}
             {expenses.map((e) => (
               <tr key={e.id} className="table-row">
                 <td className="px-4 py-3">{formatDate(e.date)}</td>

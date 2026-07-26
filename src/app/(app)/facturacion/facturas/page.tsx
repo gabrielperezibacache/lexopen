@@ -32,7 +32,7 @@ export default async function FacturasPage() {
   return (
     <div className="space-y-6">
       <ModuleHeader
-        eyebrow="Billing documents"
+        eyebrow="Documentos tributarios"
         title="Facturas y boletas"
         subtitle="Boleta de honorarios, factura afecta/exenta y nota de crédito — con IVA y retención Chile."
       />
@@ -56,7 +56,7 @@ export default async function FacturasPage() {
         }))}
       />
 
-      <div className="panel overflow-hidden rounded-3xl">
+      <div className="panel overflow-x-auto rounded-3xl">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--ink)] text-white/90">
             <tr>
@@ -70,6 +70,13 @@ export default async function FacturasPage() {
             </tr>
           </thead>
           <tbody>
+            {invoices.length === 0 && (
+              <tr>
+                <td className="px-4 py-8 text-[var(--ink-soft)]/65" colSpan={7}>
+                  Sin boletas ni facturas. Agrupe horas y gastos con el panel de emisión.
+                </td>
+              </tr>
+            )}
             {invoices.map((inv) => (
               <tr key={inv.id} className="table-row">
                 <td className="px-4 py-3">
