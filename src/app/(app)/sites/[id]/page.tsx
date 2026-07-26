@@ -43,10 +43,10 @@ export default async function SiteOverviewPage({ params }: Params) {
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Files", value: visibleFilesCount },
-          { label: "Tasks", value: site._count.tasks },
-          { label: "Wiki pages", value: site._count.wikiPages },
-          { label: "People", value: site._count.members },
+          { label: "Archivos", value: visibleFilesCount },
+          { label: "Tareas", value: site._count.tasks },
+          { label: "Páginas wiki", value: site._count.wikiPages },
+          { label: "Personas", value: site._count.members },
         ].map((s) => (
           <div key={s.label} className="panel rounded-3xl p-4">
             <div className="text-sm text-[var(--ink-soft)]/70">{s.label}</div>

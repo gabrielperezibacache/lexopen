@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
+import { requireStaff } from "@/lib/auth/session";
+import { isAdmin } from "@/lib/auth/rbac";
+import { PeopleManager } from "@/components/PeopleManager";
 
 export default async function PeoplePage() {
+  const me = await requireStaff();
   const [users, groups] = await Promise.all([
     prisma.user.findMany({
       include: {
@@ -12,62 +16,42 @@ export default async function PeoplePage() {
     }),
     prisma.group.findMany({
       include: { members: { include: { user: true } } },
+      orderBy: { name: "asc" },
     }),
   ]);
 
   return (
     <div>
       <ModuleHeader
-        eyebrow="Users & groups"
-        title="People"
-        subtitle="Directorio del estudio, roles y grupos con acceso a sites."
+        eyebrow="Directorio del estudio"
+        title="Personas"
+        subtitle="Usuarios, roles y grupos con acceso a espacios."
       />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="panel rounded-3xl p-5">
-          <h2 className="text-lg font-semibold">Usuarios</h2>
-          <div className="mt-4 space-y-3">
-            {users.map((u) => (
-              <div key={u.id} className="rounded-2xl border border-[var(--line)] px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <span
-                    className="grid h-10 w-10 place-items-center rounded-full text-xs font-bold text-white"
-                    style={{ background: u.avatarColor }}
-                  >
-                    {u.name
-                      .split(" ")
-                      .slice(0, 2)
-                      .map((p) => p[0])
-                      .join("")}
-                  </span>
-                  <div>
-                    <div className="font-medium">{u.name}</div>
-                    <div className="text-xs text-[var(--ink-soft)]/65">
-                      {u.email} · {u.role} · {u.title}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-[var(--ink-soft)]/70">
-                  Sites: {u.siteMemberships.map((m) => m.site.name).join(", ") || "—"}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className="panel rounded-3xl p-5">
-          <h2 className="text-lg font-semibold">Grupos</h2>
-          <div className="mt-4 space-y-3">
-            {groups.map((g) => (
-              <div key={g.id} className="rounded-2xl border border-[var(--line)] px-4 py-3">
-                <div className="font-medium">{g.name}</div>
-                <p className="mt-1 text-sm text-[var(--ink-soft)]/75">{g.description}</p>
-                <div className="mt-2 text-xs text-[var(--ink-soft)]/65">
-                  {g.members.map((m) => m.user.name).join(", ")}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+      <PeopleManager
+        canManage={isAdmin(me.role)}
+        initialUsers={users.map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          title: u.title,
+          avatarColor: u.avatarColor,
+          siteMemberships: u.siteMemberships.map((m) => ({
+            site: { id: m.site.id, name: m.site.name },
+          })),
+          groupMembers: u.groupMembers.map((m) => ({
+            group: { id: m.group.id, name: m.group.name },
+          })),
+        }))}
+        initialGroups={groups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          description: g.description,
+          members: g.members.map((m) => ({
+            user: { id: m.user.id, name: m.user.name },
+          })),
+        }))}
+      />
     </div>
   );
 }

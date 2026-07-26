@@ -74,6 +74,15 @@ export default async function PlazosPage({ searchParams }: Props) {
       </div>
 
       <div className="space-y-3">
+        {plazos.length === 0 && (
+          <div className="panel rounded-3xl px-6 py-10 text-center text-sm text-[var(--ink-soft)]/70">
+            No hay plazos en este mes. Cree uno arriba o revise el{" "}
+            <Link href="/calendario" className="text-[var(--sea)]">
+              calendario
+            </Link>
+            .
+          </div>
+        )}
         {plazos.map((p) => (
           <div
             key={p.id}
@@ -84,6 +93,7 @@ export default async function PlazosPage({ searchParams }: Props) {
                 <h2 className="font-semibold">{p.titulo}</h2>
                 <StatusBadge estado={p.estado} />
                 <span className="badge badge-ink">{p.tipo}</span>
+                {p.esFatal && <span className="badge badge-vencido">fatal</span>}
               </div>
               <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
                 {formatDate(p.fechaLimite)} ·{" "}

@@ -99,7 +99,13 @@ function NavGroup({
   );
 }
 
-export function AppSidebar({ role }: { role?: string | null }) {
+export function AppSidebar({
+  role,
+  unreadCount = 0,
+}: {
+  role?: string | null;
+  unreadCount?: number;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isCliente = role === "cliente";
@@ -136,7 +142,14 @@ export function AppSidebar({ role }: { role?: string | null }) {
         {!isCliente && (
           <Link href="/notificaciones" className="nav-link" onClick={() => setOpen(false)}>
             <Bell size={16} />
-            <span>Notificaciones</span>
+            <span className="flex flex-1 items-center justify-between gap-2">
+              Notificaciones
+              {unreadCount > 0 && (
+                <span className="rounded-full bg-[var(--copper)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </span>
           </Link>
         )}
         <UserSwitcher />

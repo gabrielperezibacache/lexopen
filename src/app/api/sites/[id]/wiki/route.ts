@@ -62,3 +62,44 @@ export async function POST(req: NextRequest, { params }: Params) {
     return handleRouteError(e);
   }
 }
+
+export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+    assertCsrf(req);
+    const user = await requireUser();
+    const { id } = await params;
+    await requireSiteAccess(id, user);
+    if (isCliente(user.role)) {
+      return NextResponse.json({ error: "Clientes no pueden editar la wiki" }, { status: 403 });
+    }
+    const body = await req.json();
+    if (!body.id) {
+      return NextResponse.json({ error: "id requerido" }, { status: 400 });
+    }
+    const current = await prisma.wikiPage.findFirst({
+      where: { id: body.id, siteId: id },
+    });
+    if (!current) {
+      return NextResponse.json({ error: "Página no encontrada" }, { status: 404 });
+    }
+    const page = await prisma.wikiPage.update({
+      where: { id: current.id },
+      data: {
+        ...(body.title !== undefined ? { title: body.title } : {}),
+        ...(body.content !== undefined ? { content: body.content } : {}),
+        ...(body.published !== undefined ? { published: Boolean(body.published) } : {}),
+      },
+    });
+    await prisma.activity.create({
+      data: {
+        tipo: "comentario",
+        mensaje: `Wiki editada: ${page.title}`,
+        siteId: id,
+        userId: user.id,
+      },
+    });
+    return NextResponse.json(page);
+  } catch (e) {
+    return handleRouteError(e);
+  }
+}

@@ -1,12 +1,18 @@
 import { AppSidebar } from "@/components/AppSidebar";
 import { enforceAppAccess } from "@/lib/auth/access";
+import { prisma } from "@/lib/db";
+import { isCliente } from "@/lib/auth/rbac";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await enforceAppAccess();
+  const unreadCount =
+    user && !isCliente(user.role)
+      ? await prisma.notification.count({ where: { userId: user.id, read: false } })
+      : 0;
   return (
     <div className="flex min-h-screen">
       <div className="sticky top-0 h-screen">
-        <AppSidebar role={user.role} />
+        <AppSidebar role={user.role} unreadCount={unreadCount} />
       </div>
       <div className="flex min-h-screen flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-[var(--line)] bg-white/50 px-4 py-3 backdrop-blur md:hidden">

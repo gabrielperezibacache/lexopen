@@ -3,6 +3,13 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const STATUS_LABEL: Record<string, string> = {
+  todo: "Por hacer",
+  in_progress: "En curso",
+  blocked: "Bloqueada",
+  done: "Hecha",
+};
+
 export function NewTaskButton({
   siteId,
   members,
@@ -34,19 +41,19 @@ export function NewTaskButton({
   return (
     <>
       <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>
-        Nueva task
+        Nueva tarea
       </button>
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <form onSubmit={onSubmit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 className="text-lg font-semibold">Nueva task</h3>
+            <h3 className="text-lg font-semibold">Nueva tarea</h3>
             <input className="input" name="title" required placeholder="Título" />
             <textarea className="textarea" name="description" placeholder="Descripción" />
             <select className="select" name="priority" defaultValue="medium">
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+              <option value="low">Baja</option>
+              <option value="medium">Media</option>
+              <option value="high">Alta</option>
+              <option value="urgent">Urgente</option>
             </select>
             <select className="select" name="assigneeId" defaultValue="">
               <option value="">Sin asignar</option>
@@ -91,11 +98,18 @@ export function TaskStatusButton({
     router.refresh();
   }
   if (status === "done") {
-    return <span className="text-sm text-[var(--ok)]">Done</span>;
+    return <span className="text-sm text-[var(--ok)]">{STATUS_LABEL.done}</span>;
   }
   return (
-    <button className="btn btn-ghost" type="button" onClick={() => setStatus("done")}>
-      Marcar done
-    </button>
+    <div className="flex flex-wrap gap-2">
+      {status !== "in_progress" && (
+        <button className="btn btn-ghost" type="button" onClick={() => setStatus("in_progress")}>
+          En curso
+        </button>
+      )}
+      <button className="btn btn-ghost" type="button" onClick={() => setStatus("done")}>
+        Marcar hecha
+      </button>
+    </div>
   );
 }

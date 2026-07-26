@@ -4,6 +4,7 @@ import { assertSitePageAccess, confidentialFileWhere } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { formatDate } from "@/components/ui";
 import { SiteFileActions } from "@/components/sites/SiteFileActions";
+import { EmptyState } from "@/components/EmptyState";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -41,12 +42,20 @@ export default async function SiteFilesPage({ params }: Params) {
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/archivos" />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--ink-soft)]/75">
-          Virtual Data Room / Files — carpetas, versiones, comentarios y metadata.
+          VDR / Archivos del espacio — carpetas, versiones, comentarios y metadatos.
+          Los documentos por causa están en Documentos.
         </p>
         <SiteFileActions siteId={site.id} />
       </div>
 
       <div className="space-y-4">
+        {folders.length === 0 && rootFiles.length === 0 && (
+          <EmptyState
+            title="Data room vacío"
+            description="Suba el primer archivo o cree una carpeta para organizar el VDR de este espacio."
+            action={<SiteFileActions siteId={site.id} />}
+          />
+        )}
         {folders.map((folder) => (
           <section key={folder.id} className="panel rounded-3xl p-5">
             <h2 className="text-lg font-semibold">{folder.name}</h2>
@@ -61,7 +70,7 @@ export default async function SiteFilesPage({ params }: Params) {
                     </div>
                     {f.comments[0] && (
                       <div className="mt-2 text-xs text-[var(--ink-soft)]/80">
-                        💬 {f.comments[0].author?.name}: {f.comments[0].body}
+                        {f.comments[0].author?.name}: {f.comments[0].body}
                       </div>
                     )}
                   </div>
@@ -85,7 +94,7 @@ export default async function SiteFilesPage({ params }: Params) {
 
         {rootFiles.length > 0 && (
           <section className="panel rounded-3xl p-5">
-            <h2 className="text-lg font-semibold">Raíz del site</h2>
+            <h2 className="text-lg font-semibold">Raíz del espacio</h2>
             <div className="mt-3 space-y-2">
               {rootFiles.map((f) => (
                 <div key={f.id} className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm">

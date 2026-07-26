@@ -5,15 +5,23 @@ import { ReactNode } from "react";
 import { cn } from "@/lib/chile";
 
 const tabs = [
-  { href: "", label: "Overview" },
-  { href: "/archivos", label: "Files" },
-  { href: "/tareas", label: "Tasks" },
+  { href: "", label: "Resumen" },
+  { href: "/archivos", label: "Archivos" },
+  { href: "/tareas", label: "Tareas" },
   { href: "/wiki", label: "Wiki" },
   { href: "/isheets", label: "iSheets" },
   { href: "/qa", label: "Q&A" },
-  { href: "/personas", label: "People" },
-  { href: "/flujos", label: "Workflows" },
+  { href: "/personas", label: "Personas" },
+  { href: "/flujos", label: "Flujos" },
 ];
+
+const tipoLabel: Record<string, string> = {
+  matter: "Matter",
+  vdr: "VDR",
+  client_portal: "Portal cliente",
+  project: "Proyecto",
+  knowledge: "Knowledge",
+};
 
 export function SiteNav({
   siteId,
@@ -33,14 +41,14 @@ export function SiteNav({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/sites" className="text-sm text-[var(--sea)]">
-            ← Sites
+            ← Espacios
           </Link>
           <div className="mt-2 flex items-center gap-3">
             <span className="h-4 w-4 rounded-full" style={{ background: color }} />
             <h1 className="display text-3xl md:text-4xl">{siteName}</h1>
           </div>
           <p className="mt-1 text-sm uppercase tracking-[0.14em] text-[var(--ink-soft)]/60">
-            {tipo.replace("_", " ")} · HighQ site
+            {tipoLabel[tipo] || tipo.replace("_", " ")} · Espacio LexOpen
           </p>
         </div>
       </div>

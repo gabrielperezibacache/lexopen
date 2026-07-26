@@ -42,7 +42,10 @@ export default async function DashboardPage() {
         take: 6,
       }),
       prisma.task.findMany({
-        where: { status: { not: "done" } },
+        where: {
+          status: { not: "done" },
+          ...(user ? { assigneeId: user.id } : {}),
+        },
         include: { site: true, assignee: true },
         orderBy: { dueDate: "asc" },
         take: 6,
@@ -65,9 +68,9 @@ export default async function DashboardPage() {
     ]);
 
   const stats = [
-    { label: "Sites activos", value: sites, icon: Building2 },
+    { label: "Espacios activos", value: sites, icon: Building2 },
     { label: "Causas activas", value: causas, icon: Briefcase },
-    { label: "Tasks abiertas", value: tasksOpen, icon: ListTodo },
+    { label: "Tareas abiertas", value: tasksOpen, icon: ListTodo },
     { label: "Notificaciones", value: unread, icon: MessageSquare },
   ];
 
@@ -76,14 +79,14 @@ export default async function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            HighQ-style home
+            Inicio del estudio
           </p>
           <h1 className="display mt-2 text-4xl">
-            {user ? `Hola, ${user.name.split(" ")[0]}` : "Dashboard"}
+            {user ? `Hola, ${user.name.split(" ")[0]}` : "Inicio"}
           </h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Sites, causas Chile, minutas de handoff y activity stream en un solo
-            control center.
+            Espacios, causas Chile, minutas de handoff y actividad reciente en un
+            solo panel de control.
           </p>
         </div>
         <div className="flex gap-2">
@@ -111,7 +114,7 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Sites recientes</h2>
+            <h2 className="text-lg font-semibold">Espacios recientes</h2>
             <Link href="/sites" className="text-sm text-[var(--sea)]">
               Todos
             </Link>
@@ -128,26 +131,35 @@ export default async function DashboardPage() {
                   <div className="font-medium">{s.name}</div>
                 </div>
                 <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
-                  {s.tipo} · {s._count.files} files · {s._count.tasks} tasks
+                  {s.tipo} · {s._count.files} archivos · {s._count.tasks} tareas
                   {s.causa?.rit ? ` · ${s.causa.rit}` : ""}
                 </div>
               </Link>
             ))}
+            {sitesList.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Aún no hay espacios.{" "}
+                <Link href="/sites" className="text-[var(--sea)]">
+                  Crear un espacio
+                </Link>
+              </p>
+            )}
           </div>
         </section>
 
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">My tasks</h2>
+            <h2 className="text-lg font-semibold">Mis tareas</h2>
             <Link href="/tareas" className="text-sm text-[var(--sea)]">
               Ver todas
             </Link>
           </div>
           <div className="space-y-3">
             {tasks.map((t) => (
-              <div
+              <Link
                 key={t.id}
-                className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3"
+                href={t.siteId ? `/sites/${t.siteId}/tareas` : "/tareas"}
+                className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
                 <div>
                   <div className="font-medium">{t.title}</div>
@@ -158,8 +170,16 @@ export default async function DashboardPage() {
                 <StatusBadge
                   estado={t.priority === "urgent" ? "vencido" : "pendiente"}
                 />
-              </div>
+              </Link>
             ))}
+            {tasks.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                No tiene tareas asignadas.{" "}
+                <Link href="/tareas" className="text-[var(--sea)]">
+                  Ver bandeja global
+                </Link>
+              </p>
+            )}
           </div>
         </section>
       </div>
@@ -194,7 +214,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="panel rounded-3xl p-5">
-        <h2 className="mb-4 text-lg font-semibold">Activity stream</h2>
+        <h2 className="mb-4 text-lg font-semibold">Actividad reciente</h2>
         <div className="space-y-3">
           {actividades.map((a) => (
             <div key={a.id} className="flex gap-3 border-b border-[var(--line)] pb-3 last:border-0">
@@ -208,6 +228,9 @@ export default async function DashboardPage() {
               </div>
             </div>
           ))}
+          {actividades.length === 0 && (
+            <p className="text-sm text-[var(--ink-soft)]/65">Sin actividad reciente.</p>
+          )}
         </div>
       </section>
     </div>

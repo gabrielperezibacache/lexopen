@@ -27,9 +27,14 @@ export default async function SiteWorkflowsPage({ params }: Params) {
     <div>
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/flujos" />
       <p className="mb-4 text-sm text-[var(--ink-soft)]/75">
-        Workflows de aprobación — escritos, publicación a portal y triggers.
+        Flujos de aprobación — escritos, publicación a portal y disparadores.
       </p>
       <div className="space-y-4">
+        {workflows.length === 0 && (
+          <div className="panel rounded-3xl px-6 py-10 text-center text-sm text-[var(--ink-soft)]/70">
+            Este espacio aún no tiene flujos. Use la API o el seed demo para crear uno.
+          </div>
+        )}
         {workflows.map((w) => {
           const steps = JSON.parse(w.stepsJson) as Array<{ name: string; role: string }>;
           return (

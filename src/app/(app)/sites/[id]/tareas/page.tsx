@@ -26,7 +26,7 @@ export default async function SiteTasksPage({ params }: Params) {
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/tareas" />
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
-          Legal project management — asignación, prioridad y due dates.
+          Gestión de proyecto — asignación, prioridad y fechas límite.
         </p>
         <NewTaskButton
           siteId={site.id}
@@ -60,6 +60,11 @@ export default async function SiteTasksPage({ params }: Params) {
             <TaskStatusButton taskId={t.id} siteId={site.id} status={t.status} />
           </div>
         ))}
+        {tasks.length === 0 && (
+          <div className="panel rounded-3xl px-6 py-10 text-center text-sm text-[var(--ink-soft)]/70">
+            No hay tareas en este espacio. Use «Nueva tarea» para asignar la primera.
+          </div>
+        )}
       </div>
     </div>
   );

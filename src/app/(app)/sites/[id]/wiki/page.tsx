@@ -3,12 +3,16 @@ import { prisma } from "@/lib/db";
 import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { NewWikiButton } from "@/components/sites/NewWikiButton";
+import { EditWikiButton } from "@/components/sites/EditWikiButton";
+import { MarkdownView } from "@/lib/markdown";
+import { EmptyState } from "@/components/EmptyState";
+import { isCliente } from "@/lib/auth/rbac";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteWikiPage({ params }: Params) {
   const { id } = await params;
-  await assertSitePageAccess(id);
+  const user = await assertSitePageAccess(id);
   const site = await prisma.site.findUnique({ where: { id } });
   if (!site) notFound();
   const pages = await prisma.wikiPage.findMany({
@@ -16,29 +20,48 @@ export default async function SiteWikiPage({ params }: Params) {
     include: { author: true },
     orderBy: { title: "asc" },
   });
+  const canEdit = !isCliente(user.role);
 
   return (
     <div>
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/wiki" />
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
-          Wiki colaborativa del site — playbooks, checklists y home del matter.
+          Wiki colaborativa del espacio — playbooks, checklists y home del matter.
         </p>
-        <NewWikiButton siteId={site.id} />
+        {canEdit && <NewWikiButton siteId={site.id} />}
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        {pages.map((p) => (
-          <article key={p.id} className="panel rounded-3xl p-5">
-            <h2 className="text-xl font-semibold">{p.title}</h2>
-            <p className="mt-1 text-xs text-[var(--ink-soft)]/60">
-              /{p.slug} · {p.author?.name || "—"}
-            </p>
-            <pre className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--ink-soft)]/85">
-              {p.content}
-            </pre>
-          </article>
-        ))}
-      </div>
+      {pages.length === 0 ? (
+        <EmptyState
+          title="Wiki vacía"
+          description="Documente playbooks, checklists o el home del matter en Markdown."
+          action={canEdit ? <NewWikiButton siteId={site.id} /> : undefined}
+        />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {pages.map((p) => (
+            <article key={p.id} className="panel rounded-3xl p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold">{p.title}</h2>
+                  <p className="mt-1 text-xs text-[var(--ink-soft)]/60">
+                    /{p.slug} · {p.author?.name || "—"}
+                  </p>
+                </div>
+                {canEdit && (
+                  <EditWikiButton
+                    siteId={site.id}
+                    page={{ id: p.id, title: p.title, content: p.content }}
+                  />
+                )}
+              </div>
+              <div className="mt-4 max-h-72 overflow-auto border-t border-[var(--line)] pt-3">
+                <MarkdownView content={p.content} />
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

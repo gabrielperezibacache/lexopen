@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { WorkflowActions } from "@/components/sites/WorkflowActions";
+import { EmptyState } from "@/components/EmptyState";
 
 export default async function WorkflowsGlobalPage() {
   const workflows = await prisma.workflow.findMany({
@@ -20,10 +21,18 @@ export default async function WorkflowsGlobalPage() {
   return (
     <div>
       <ModuleHeader
-        eyebrow="Automation"
-        title="Workflows"
-        subtitle="Aprobaciones multi-paso para escritos, publicación a portal y triggers de site."
+        eyebrow="Automatización"
+        title="Flujos"
+        subtitle="Aprobaciones multi-paso para escritos, publicación a portal y disparadores por espacio."
       />
+      {workflows.length === 0 ? (
+        <EmptyState
+          title="Sin flujos configurados"
+          description="Los flujos viven en cada espacio. Abra un matter o VDR para iniciar una aprobación."
+          actionLabel="Ver espacios"
+          actionHref="/sites"
+        />
+      ) : null}
       <div className="space-y-4">
         {workflows.map((w) => {
           const steps = JSON.parse(w.stepsJson) as Array<{ name: string }>;
