@@ -375,9 +375,9 @@ function LexOpenFeature() {
     "Facturación CLP / UF", "Obsidian · Google Workspace",
   ];
   const paras = [
-    "LexOpen es un clon open-source inspirado en Thomson Reuters HighQ, pensado para estudios jurídicos chilenos: espacios de trabajo, data room, wiki, tareas y portal de cliente, con una capa nativa de litigio (RIT/RUC, plazos hábiles, minutas de handoff y jurisprudencia).",
-    "Integra un CRM por carpeta de cliente —causas, trámites pendientes/hechos y documentos— y un catálogo de acciones de IA (resumen procesal, borradores de minuta, glosas, briefs) sobre endpoints OpenAI-compatibles: OpenAI, Azure, Groq, Ollama o Hermes.",
-    "Incluye facturación (horas, gastos, boletas/facturas, cuenta corriente), búsqueda unificada e integraciones con Obsidian y Google Drive/Calendar. Stack: Next.js 15, Postgres, Prisma; licencia AGPL-3.0. No afiliado a Thomson Reuters.",
+    "LexOpen es una plataforma open-source para la operación diaria del estudio jurídico en Chile: espacios de trabajo, data room, wiki, tareas y portal de cliente, junto con causas (RIT/RUC), plazos hábiles, minutas de handoff y jurisprudencia.",
+    "Integra un CRM por carpeta de cliente —causas, trámites pendientes/hechos y documentos— y un catálogo de acciones de IA (resumen procesal, borradores de minuta, glosas, briefs) sobre endpoints OpenAI-compatibles: OpenAI, Azure, Groq, Ollama o Hermes, siempre bajo revisión del abogado.",
+    "Incluye facturación (horas, gastos, boletas/facturas, cuenta corriente), búsqueda unificada e integraciones con Obsidian y Google Drive/Calendar. Stack: Next.js 15, Postgres, Prisma; licencia AGPL-3.0.",
   ];
   const ctaStyle = {
     display: "inline-flex",
