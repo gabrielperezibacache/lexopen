@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { formatDate } from "@/components/ui";
 import { labelMateria, MATERIAS } from "@/lib/chile";
 import { JurisprudenciaSearch } from "@/components/JurisprudenciaSearch";
+import { JurisprudenciaBrief } from "@/components/ai/JurisprudenciaBrief";
 
 export default async function JurisprudenciaPage({
   searchParams,
@@ -37,6 +38,7 @@ export default async function JurisprudenciaPage({
       </div>
 
       <JurisprudenciaSearch materias={[...MATERIAS]} />
+      <JurisprudenciaBrief />
 
       <div className="space-y-4">
         {items.map((j) => (

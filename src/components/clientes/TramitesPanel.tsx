@@ -8,6 +8,7 @@ import {
   templatesForMateria,
   type TramiteTemplate,
 } from "@/lib/tramite-templates";
+import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 
 type Tramite = {
   id: string;
@@ -92,8 +93,46 @@ export function TramitesPanel({
     router.refresh();
   }
 
+  async function applyAiTramites(result: AiActionResponse) {
+    const data = result.data as {
+      tramites?: Array<{ titulo?: string; detalle?: string; diasLimite?: number }>;
+    } | null;
+    const items = data?.tramites?.filter((t) => t.titulo?.trim()) || [];
+    if (!items.length) return;
+    setBusy(true);
+    for (const item of items) {
+      const fechaLimite =
+        typeof item.diasLimite === "number" && item.diasLimite > 0
+          ? new Date(Date.now() + item.diasLimite * 86400000)
+              .toISOString()
+              .slice(0, 10)
+          : null;
+      await fetch(`/api/causas/${causaId}/tramites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titulo: item.titulo,
+          detalle: item.detalle || null,
+          fechaLimite,
+          estado: "pendiente",
+        }),
+      });
+    }
+    setBusy(false);
+    router.refresh();
+  }
+
   return (
     <div className={compact ? "space-y-3" : "space-y-4"}>
+      {!compact && (
+        <AiAssist
+          action="causa.sugerir_tramites"
+          causaId={causaId}
+          label="Sugerir trámites con IA"
+          showPreview={false}
+          onResult={(r) => void applyAiTramites(r)}
+        />
+      )}
       <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-dashed border-[var(--line)] p-3">
         <label className="block min-w-[220px] flex-1 text-sm">
           <span className="mb-1 block text-xs font-medium text-[var(--ink-soft)]/70">

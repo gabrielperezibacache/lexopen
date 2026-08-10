@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { EmptyState } from "@/components/EmptyState";
+import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 
 type Msg = {
   id: string;
@@ -19,6 +20,8 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
 
   async function load() {
     const [m, me] = await Promise.all([
@@ -42,12 +45,20 @@ export default function MessagesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         receiverId: fd.get("receiverId"),
-        subject: fd.get("subject"),
-        body: fd.get("body"),
+        subject: subject || fd.get("subject"),
+        body: body || fd.get("body"),
       }),
     });
     e.currentTarget.reset();
+    setSubject("");
+    setBody("");
     load();
+  }
+
+  function applyAiDraft(result: AiActionResponse) {
+    const data = result.data as { asunto?: string; cuerpo?: string } | null;
+    if (data?.asunto) setSubject(data.asunto);
+    if (data?.cuerpo) setBody(data.cuerpo);
   }
 
   return (
@@ -86,6 +97,12 @@ export default function MessagesPage() {
         <section className="panel rounded-3xl p-5">
           <h2 className="font-semibold">Nuevo mensaje</h2>
           <form onSubmit={send} className="mt-4 space-y-2">
+            <AiAssist
+              action="mensaje.borrador"
+              label="Borrador IA"
+              showPreview={false}
+              onResult={applyAiDraft}
+            />
             <select className="select" name="receiverId" required defaultValue="">
               <option value="" disabled>
                 Destinatario
@@ -96,8 +113,21 @@ export default function MessagesPage() {
                 </option>
               ))}
             </select>
-            <input className="input" name="subject" placeholder="Asunto" />
-            <textarea className="textarea" name="body" required placeholder="Mensaje" />
+            <input
+              className="input"
+              name="subject"
+              placeholder="Asunto"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+            />
+            <textarea
+              className="textarea"
+              name="body"
+              required
+              placeholder="Mensaje"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+            />
             <button className="btn btn-primary" type="submit">
               Enviar
             </button>

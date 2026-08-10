@@ -10,6 +10,7 @@ import {
   validarRuc,
   validarRut,
 } from "@/lib/chile";
+import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 
 type ConflictHit = {
   causaId: string;
@@ -21,6 +22,8 @@ type ConflictHit = {
 
 type ClienteOption = { id: string; razonSocial: string; rut: string | null };
 
+const MATERIA_VALUES = new Set(MATERIAS.map((m) => m.value));
+
 function NuevaCausaForm() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -31,6 +34,20 @@ function NuevaCausaForm() {
   const [overrideRequired, setOverrideRequired] = useState(false);
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [clienteId, setClienteId] = useState(sp.get("clienteId") || "");
+  const [titulo, setTitulo] = useState("");
+  const [rit, setRit] = useState("");
+  const [ruc, setRuc] = useState("");
+  const [tribunal, setTribunal] = useState(TRIBUNALES_CHILE[0] || "");
+  const [materia, setMateria] = useState("civil");
+  const [etapa, setEtapa] = useState("ingreso");
+  const [procedimiento, setProcedimiento] = useState("");
+  const [caratula, setCaratula] = useState("");
+  const [resumen, setResumen] = useState("");
+  const [demandante, setDemandante] = useState("");
+  const [demandanteRut, setDemandanteRut] = useState("");
+  const [demandado, setDemandado] = useState("");
+  const [demandadoRut, setDemandadoRut] = useState("");
+  const [pasteText, setPasteText] = useState("");
 
   useEffect(() => {
     fetch("/api/clientes")
@@ -39,22 +56,60 @@ function NuevaCausaForm() {
       .catch(() => setClientes([]));
   }, []);
 
+  function applyExtract(result: AiActionResponse) {
+    const data = result.data as {
+      titulo?: string;
+      rit?: string | null;
+      ruc?: string | null;
+      tribunal?: string;
+      materia?: string;
+      caratula?: string;
+      resumen?: string;
+      partes?: Array<{ nombre?: string; rut?: string | null; rol?: string }>;
+    } | null;
+    if (!data) {
+      setError("La IA no pudo extraer campos estructurados.");
+      return;
+    }
+    if (data.titulo) setTitulo(data.titulo);
+    if (data.rit) setRit(data.rit);
+    if (data.ruc) setRuc(data.ruc);
+    if (data.tribunal) {
+      const match = TRIBUNALES_CHILE.find(
+        (t) => t.toLowerCase() === data.tribunal!.toLowerCase()
+      );
+      setTribunal(match || data.tribunal);
+    }
+    if (data.materia && MATERIA_VALUES.has(data.materia)) setMateria(data.materia);
+    if (data.caratula) setCaratula(data.caratula);
+    if (data.resumen) setResumen(data.resumen);
+    const dem =
+      data.partes?.find((p) => /demandante|recurrente/i.test(p.rol || "")) ||
+      data.partes?.[0];
+    const dado =
+      data.partes?.find((p) => /demandado|recorrido/i.test(p.rol || "")) ||
+      data.partes?.[1];
+    if (dem?.nombre) setDemandante(dem.nombre);
+    if (dem?.rut) setDemandanteRut(dem.rut);
+    if (dado?.nombre) setDemandado(dado.nombre);
+    if (dado?.rut) setDemandadoRut(dado.rut);
+    setError("");
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError("");
     const fd = new FormData(e.currentTarget);
-    const rit = String(fd.get("rit") || "");
-    const ruc = String(fd.get("ruc") || "");
     const partes = [
       {
-        nombre: String(fd.get("demandante") || ""),
-        rut: String(fd.get("demandanteRut") || ""),
+        nombre: demandante,
+        rut: demandanteRut,
         rol: "demandante",
       },
       {
-        nombre: String(fd.get("demandado") || ""),
-        rut: String(fd.get("demandadoRut") || ""),
+        nombre: demandado,
+        rut: demandadoRut,
         rol: "demandado",
       },
     ].filter((p) => p.nombre);
@@ -95,16 +150,16 @@ function NuevaCausaForm() {
     }
 
     const payload = {
-      titulo: String(fd.get("titulo")),
+      titulo,
       rit,
       ruc,
-      tribunal: String(fd.get("tribunal")),
-      materia: String(fd.get("materia")),
-      procedimiento: String(fd.get("procedimiento") || ""),
-      etapa: String(fd.get("etapa")),
-      caratula: String(fd.get("caratula") || ""),
-      resumen: String(fd.get("resumen") || ""),
-      clienteId: String(fd.get("clienteId") || "") || null,
+      tribunal,
+      materia,
+      procedimiento,
+      etapa,
+      caratula,
+      resumen,
+      clienteId: clienteId || null,
       conflictOverride: fd.get("conflictOverride") === "on",
       conflictNotes: String(fd.get("conflictNotes") || ""),
       partes,
@@ -142,6 +197,28 @@ function NuevaCausaForm() {
       </div>
 
       <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
+        <div className="rounded-2xl border border-dashed border-[var(--line)] p-3">
+          <label className="mb-1 block text-sm font-medium">
+            Pegar resolución / carátula (opcional)
+          </label>
+          <textarea
+            className="textarea min-h-[96px]"
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder="Pegue texto del proveído o carátula para autocompletar con IA…"
+          />
+          <div className="mt-2">
+            <AiAssist
+              action="causa.extraer"
+              label="Extraer campos con IA"
+              showPreview={false}
+              prompt={pasteText}
+              extra={{ texto: pasteText }}
+              onResult={applyExtract}
+            />
+          </div>
+        </div>
+
         <div>
           <label className="mb-1 block text-sm font-medium">Cliente</label>
           <select
@@ -161,21 +238,49 @@ function NuevaCausaForm() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Título</label>
-          <input className="input" name="titulo" required placeholder="Ej. Cobro de pesos — contrato" />
+          <input
+            className="input"
+            name="titulo"
+            required
+            placeholder="Ej. Cobro de pesos — contrato"
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+          />
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium">RIT</label>
-            <input className="input" name="rit" placeholder="C-1234-2026" />
+            <input
+              className="input"
+              name="rit"
+              placeholder="C-1234-2026"
+              value={rit}
+              onChange={(e) => setRit(e.target.value)}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">RUC</label>
-            <input className="input" name="ruc" placeholder="2500123456-7" />
+            <input
+              className="input"
+              name="ruc"
+              placeholder="2500123456-7"
+              value={ruc}
+              onChange={(e) => setRuc(e.target.value)}
+            />
           </div>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Tribunal</label>
-          <select className="select" name="tribunal" required defaultValue={TRIBUNALES_CHILE[0]}>
+          <select
+            className="select"
+            name="tribunal"
+            required
+            value={tribunal}
+            onChange={(e) => setTribunal(e.target.value)}
+          >
+            {!TRIBUNALES_CHILE.includes(tribunal) && tribunal && (
+              <option value={tribunal}>{tribunal}</option>
+            )}
             {TRIBUNALES_CHILE.map((t) => (
               <option key={t} value={t}>
                 {t}
@@ -186,7 +291,12 @@ function NuevaCausaForm() {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium">Materia</label>
-            <select className="select" name="materia" defaultValue="civil">
+            <select
+              className="select"
+              name="materia"
+              value={materia}
+              onChange={(e) => setMateria(e.target.value)}
+            >
               {MATERIAS.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
@@ -196,7 +306,12 @@ function NuevaCausaForm() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Etapa</label>
-            <select className="select" name="etapa" defaultValue="ingreso">
+            <select
+              className="select"
+              name="etapa"
+              value={etapa}
+              onChange={(e) => setEtapa(e.target.value)}
+            >
               {ETAPAS.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
@@ -207,22 +322,56 @@ function NuevaCausaForm() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Procedimiento</label>
-          <input className="input" name="procedimiento" placeholder="Ordinario, monitorio, protección…" />
+          <input
+            className="input"
+            name="procedimiento"
+            placeholder="Ordinario, monitorio, protección…"
+            value={procedimiento}
+            onChange={(e) => setProcedimiento(e.target.value)}
+          />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Carátula</label>
-          <input className="input" name="caratula" placeholder="A con B" />
+          <input
+            className="input"
+            name="caratula"
+            placeholder="A con B"
+            value={caratula}
+            onChange={(e) => setCaratula(e.target.value)}
+          />
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium">Demandante / recurrente</label>
-            <input className="input" name="demandante" />
-            <input className="input mt-2" name="demandanteRut" placeholder="RUT parte" />
+            <input
+              className="input"
+              name="demandante"
+              value={demandante}
+              onChange={(e) => setDemandante(e.target.value)}
+            />
+            <input
+              className="input mt-2"
+              name="demandanteRut"
+              placeholder="RUT parte"
+              value={demandanteRut}
+              onChange={(e) => setDemandanteRut(e.target.value)}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Demandado / recorrido</label>
-            <input className="input" name="demandado" />
-            <input className="input mt-2" name="demandadoRut" placeholder="RUT parte" />
+            <input
+              className="input"
+              name="demandado"
+              value={demandado}
+              onChange={(e) => setDemandado(e.target.value)}
+            />
+            <input
+              className="input mt-2"
+              name="demandadoRut"
+              placeholder="RUT parte"
+              value={demandadoRut}
+              onChange={(e) => setDemandadoRut(e.target.value)}
+            />
           </div>
         </div>
         {conflictStatus !== "idle" && (
@@ -261,7 +410,12 @@ function NuevaCausaForm() {
         )}
         <div>
           <label className="mb-1 block text-sm font-medium">Resumen</label>
-          <textarea className="textarea" name="resumen" />
+          <textarea
+            className="textarea"
+            name="resumen"
+            value={resumen}
+            onChange={(e) => setResumen(e.target.value)}
+          />
         </div>
         {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
         <button className="btn btn-primary" disabled={loading} type="submit">

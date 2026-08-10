@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { formatDate } from "@/components/ui";
 import Link from "next/link";
 import { DocumentoUploadForm } from "@/components/DocumentoUploadForm";
+import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 import { EmptyState } from "@/components/EmptyState";
 
 export default async function DocumentosPage({
@@ -99,6 +100,7 @@ export default async function DocumentosPage({
                 <th className="px-4 py-3 font-medium">Causa</th>
                 <th className="px-4 py-3 font-medium">Autor</th>
                 <th className="px-4 py-3 font-medium">Actualizado</th>
+                <th className="px-4 py-3 font-medium">IA</th>
               </tr>
             </thead>
             <tbody>
@@ -137,6 +139,12 @@ export default async function DocumentosPage({
                   </td>
                   <td className="px-4 py-3">{d.autor?.name || "—"}</td>
                   <td className="px-4 py-3">{formatDate(d.updatedAt)}</td>
+                  <td className="px-4 py-3 align-top">
+                    <DocumentoAiActions
+                      documentoId={d.id}
+                      causaId={d.causaId}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

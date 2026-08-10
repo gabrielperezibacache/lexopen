@@ -8,6 +8,7 @@ import {
   PRIORIDADES_ACCION,
   TIPOS_MINUTA,
 } from "@/lib/minutas";
+import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 
 type AccionDraft = {
   key: string;
@@ -133,6 +134,49 @@ export function MinutaWizard({
         }))
       );
     }
+  }
+
+  function applyAiDraft(result: AiActionResponse) {
+    const body = result.data as {
+      titulo?: string;
+      resumenEjecutivo?: string;
+      hechosRelevantes?: string;
+      acuerdos?: string;
+      estadoCausaNota?: string;
+      riesgosAlertas?: string;
+      acciones?: Array<{
+        descripcion?: string;
+        prioridad?: string;
+        diasPlazo?: number;
+        crearPlazo?: boolean;
+        crearTask?: boolean;
+      }>;
+    } | null;
+    if (!body) {
+      setError("La IA no devolvió un borrador estructurado.");
+      return;
+    }
+    if (body.titulo) setTitulo(body.titulo);
+    if (body.resumenEjecutivo) setResumenEjecutivo(body.resumenEjecutivo);
+    if (body.hechosRelevantes) setHechosRelevantes(body.hechosRelevantes);
+    if (body.acuerdos) setAcuerdos(body.acuerdos);
+    if (body.estadoCausaNota) setEstadoCausaNota(body.estadoCausaNota);
+    if (body.riesgosAlertas) setRiesgosAlertas(body.riesgosAlertas);
+    if (Array.isArray(body.acciones) && body.acciones.length) {
+      setAcciones(
+        body.acciones
+          .filter((a) => a.descripcion?.trim())
+          .map((a) => ({
+            ...emptyAccion(),
+            descripcion: String(a.descripcion),
+            prioridad: a.prioridad || "media",
+            diasPlazo: a.diasPlazo != null ? String(a.diasPlazo) : "",
+            crearPlazo: Boolean(a.crearPlazo && a.diasPlazo),
+            crearTask: a.crearTask !== false,
+          }))
+      );
+    }
+    setStep(1);
   }
 
   function updateAccion(key: string, patch: Partial<AccionDraft>) {
@@ -268,6 +312,14 @@ export function MinutaWizard({
               abogado del estudio.
             </p>
           </div>
+          <AiAssist
+            action="minuta.borrador"
+            causaId={causaId}
+            label="Borrador IA de minuta"
+            showPreview={false}
+            prompt={`Tipo de minuta: ${tipo}. Título tentativo: ${titulo || "(sin título)"}`}
+            onResult={applyAiDraft}
+          />
           <div
             className="grid gap-3 sm:grid-cols-3"
             role="radiogroup"

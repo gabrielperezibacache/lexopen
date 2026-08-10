@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DOC_TIPOS, clp } from "@/lib/billing";
+import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 
 type Item = {
   id: string;
@@ -30,6 +31,9 @@ export function CreateInvoicePanel({
   const [clienteId, setClienteId] = useState(clientes[0]?.id || "");
   const [causaId, setCausaId] = useState("");
   const [tipo, setTipo] = useState("boleta_honorarios");
+  const [glosa, setGlosa] = useState(
+    "Honorarios profesionales y gastos asociados"
+  );
   const [busy, setBusy] = useState(false);
 
   const preview = useMemo(() => {
@@ -54,7 +58,7 @@ export function CreateInvoicePanel({
         dueDate: due.toISOString(),
         timeEntryIds: selectedTime,
         expenseIds: selectedExp,
-        glosa: "Honorarios profesionales y gastos asociados",
+        glosa: glosa.trim() || "Honorarios profesionales y gastos asociados",
       }),
     });
     setBusy(false);
@@ -152,6 +156,35 @@ export function CreateInvoicePanel({
                   <p className="text-sm text-[var(--ink-soft)]/60">No hay gastos pendientes.</p>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Glosa</label>
+            <textarea
+              className="textarea min-h-[72px]"
+              value={glosa}
+              onChange={(e) => setGlosa(e.target.value)}
+              maxLength={400}
+            />
+            <div className="mt-2">
+              <AiAssist
+                action="factura.glosa"
+                label="Redactar glosa con IA"
+                causaId={causaId || undefined}
+                clienteId={clienteId || undefined}
+                showPreview={false}
+                extra={{
+                  tipoDocumento: tipo,
+                  subtotalClp: preview,
+                  clienteId,
+                  causaId: causaId || null,
+                }}
+                onResult={(result: AiActionResponse) => {
+                  const data = result.data as { glosa?: string } | null;
+                  if (data?.glosa) setGlosa(data.glosa.slice(0, 400));
+                }}
+              />
             </div>
           </div>
 
