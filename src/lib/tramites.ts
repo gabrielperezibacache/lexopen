@@ -26,3 +26,15 @@ export function isTramiteAbierto(estado: string) {
 export function isTramiteEstado(value: string): value is TramiteEstado {
   return (TRAMITE_ESTADOS as readonly string[]).includes(value);
 }
+
+/** Trámite abierto con fecha límite estrictamente anterior a `now`. */
+export function isTramiteVencido(
+  estado: string,
+  fechaLimite: Date | string | null | undefined,
+  now: Date = new Date()
+) {
+  if (!isTramiteAbierto(estado) || !fechaLimite) return false;
+  const d = typeof fechaLimite === "string" ? new Date(fechaLimite) : fechaLimite;
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getTime() < now.getTime();
+}

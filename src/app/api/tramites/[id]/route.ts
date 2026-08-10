@@ -16,7 +16,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const existing = await prisma.tramite.findUnique({ where: { id } });
+    const existing = await prisma.tramite.findUnique({
+      where: { id },
+      include: {
+        causa: {
+          select: { id: true, titulo: true, rit: true, clienteId: true },
+        },
+      },
+    });
     if (!existing) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
@@ -54,6 +61,29 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         responsable: { select: { id: true, name: true } },
       },
     });
+
+    const newResponsableId =
+      body.responsableId !== undefined
+        ? body.responsableId || null
+        : existing.responsableId;
+    if (
+      body.responsableId !== undefined &&
+      newResponsableId &&
+      newResponsableId !== existing.responsableId &&
+      newResponsableId !== user.id
+    ) {
+      const href = existing.causa.clienteId
+        ? `/clientes/${existing.causa.clienteId}`
+        : `/causas/${existing.causaId}#tramites`;
+      await prisma.notification.create({
+        data: {
+          userId: newResponsableId,
+          title: `Trámite asignado · ${existing.causa.rit || existing.causa.titulo}`,
+          body: tramite.titulo,
+          href,
+        },
+      });
+    }
 
     if (body.estado && body.estado !== existing.estado) {
       await prisma.activity.create({

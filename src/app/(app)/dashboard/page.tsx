@@ -10,7 +10,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
-import { TRAMITES_ABIERTOS } from "@/lib/tramites";
+import { TRAMITES_ABIERTOS, isTramiteVencido } from "@/lib/tramites";
 
 async function ensureSeeded() {
   const count = await prisma.site.count().catch(() => 0);
@@ -35,21 +35,30 @@ export default async function DashboardPage() {
   }
   const user = await getCurrentUser();
 
+  const now = new Date();
   const [
     causas,
     clientesActivos,
     tramitesPendientesCount,
+    tramitesVencidosCount,
     tasksOpen,
     sitesList,
     tasks,
     actividades,
     minutasRecientes,
     tramitesPendientes,
+    tramitesVencidos,
   ] = await Promise.all([
       prisma.causa.count({ where: { estado: "activa" } }),
       prisma.cliente.count({ where: { estado: "activo" } }),
       prisma.tramite.count({
         where: { estado: { in: [...TRAMITES_ABIERTOS] } },
+      }),
+      prisma.tramite.count({
+        where: {
+          estado: { in: [...TRAMITES_ABIERTOS] },
+          fechaLimite: { lt: now },
+        },
       }),
       prisma.task.count({ where: { status: { in: ["todo", "in_progress", "blocked"] } } }),
       prisma.site.findMany({
@@ -97,14 +106,45 @@ export default async function DashboardPage() {
         orderBy: [{ fechaLimite: "asc" }, { updatedAt: "desc" }],
         take: 8,
       }),
+      prisma.tramite.findMany({
+        where: {
+          estado: { in: [...TRAMITES_ABIERTOS] },
+          fechaLimite: { lt: now },
+        },
+        include: {
+          causa: {
+            select: {
+              id: true,
+              rit: true,
+              titulo: true,
+              cliente: { select: { id: true, razonSocial: true } },
+            },
+          },
+          responsable: { select: { name: true } },
+        },
+        orderBy: [{ fechaLimite: "asc" }],
+        take: 6,
+      }),
     ]);
 
   const stats = [
     { label: "Clientes activos", value: clientesActivos, icon: ContactRound, href: "/clientes" },
     { label: "Causas activas", value: causas, icon: Briefcase, href: "/causas" },
-    { label: "Trámites pendientes", value: tramitesPendientesCount, icon: ClipboardList, href: "/clientes" },
+    {
+      label: "Trámites vencidos",
+      value: tramitesVencidosCount,
+      icon: ClipboardList,
+      href: "/clientes",
+    },
     { label: "Tareas abiertas", value: tasksOpen, icon: ListTodo, href: "/tareas" },
   ];
+
+  function tramiteHref(t: (typeof tramitesPendientes)[number]) {
+    if (t.causa.cliente) {
+      return `/clientes/${t.causa.cliente.id}?causa=${t.causa.id}`;
+    }
+    return `/causas/${t.causa.id}#tramites`;
+  }
 
   return (
     <div className="space-y-8">
@@ -145,37 +185,59 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Trámites pendientes</h2>
+            <h2 className="text-lg font-semibold">
+              Trámites vencidos
+              {tramitesPendientesCount > 0 ? (
+                <span className="ml-2 text-sm font-normal text-[var(--ink-soft)]/60">
+                  · {tramitesPendientesCount} abiertos
+                </span>
+              ) : null}
+            </h2>
             <Link href="/clientes" className="text-sm text-[var(--sea)]">
               Ver CRM
             </Link>
           </div>
           <div className="space-y-3">
-            {tramitesPendientes.map((t) => (
-              <Link
-                key={t.id}
-                href={
-                  t.causa.cliente
-                    ? `/clientes/${t.causa.cliente.id}`
-                    : `/causas/${t.causa.id}`
-                }
-                className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
-              >
-                <div>
-                  <div className="font-medium">{t.titulo}</div>
-                  <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
-                    {t.causa.cliente?.razonSocial || "Sin cliente"} ·{" "}
-                    {t.causa.rit || t.causa.titulo}
-                  </div>
-                </div>
-                <StatusBadge
-                  estado={t.estado === "en_curso" ? "activa" : "pendiente"}
-                />
-              </Link>
-            ))}
+            {(tramitesVencidos.length ? tramitesVencidos : tramitesPendientes).map(
+              (t) => {
+                const vencido = isTramiteVencido(t.estado, t.fechaLimite, now);
+                return (
+                  <Link
+                    key={t.id}
+                    href={tramiteHref(t)}
+                    className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+                  >
+                    <div>
+                      <div className="font-medium">{t.titulo}</div>
+                      <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                        {t.causa.cliente?.razonSocial || "Sin cliente"} ·{" "}
+                        {t.causa.rit || t.causa.titulo}
+                        {t.fechaLimite
+                          ? ` · límite ${formatDate(t.fechaLimite)}`
+                          : ""}
+                      </div>
+                    </div>
+                    <StatusBadge
+                      estado={
+                        vencido
+                          ? "vencido"
+                          : t.estado === "en_curso"
+                            ? "activa"
+                            : "pendiente"
+                      }
+                    />
+                  </Link>
+                );
+              }
+            )}
             {tramitesPendientes.length === 0 && (
               <p className="text-sm text-[var(--ink-soft)]/65">
                 No hay trámites abiertos.
+              </p>
+            )}
+            {tramitesPendientes.length > 0 && tramitesVencidos.length === 0 && (
+              <p className="text-xs text-[var(--ink-soft)]/55">
+                Sin vencidos: se muestran los próximos pendientes.
               </p>
             )}
           </div>

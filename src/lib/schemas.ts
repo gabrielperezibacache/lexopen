@@ -62,6 +62,13 @@ export const documentoCreateSchema = z.object({
   storageKey: z.string().optional().nullable(),
 });
 
+export const documentoUpdateSchema = z.object({
+  nombre: z.string().min(1).optional(),
+  tipo: z.string().min(1).optional(),
+  confidencial: z.boolean().optional(),
+  privilegio: z.boolean().optional(),
+});
+
 export const clienteCreateSchema = z.object({
   razonSocial: z.string().min(2),
   rut: z.string().optional().nullable(),

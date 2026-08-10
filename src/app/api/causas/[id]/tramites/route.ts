@@ -50,11 +50,20 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const causa = await prisma.causa.findUnique({
       where: { id },
-      select: { id: true, titulo: true, materia: true },
+      select: {
+        id: true,
+        titulo: true,
+        materia: true,
+        rit: true,
+        clienteId: true,
+      },
     });
     if (!causa) {
       return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
     }
+    const tramiteHref = causa.clienteId
+      ? `/clientes/${causa.clienteId}`
+      : `/causas/${id}#tramites`;
 
     const raw = await req.json().catch(() => ({}));
     if (raw?.action === "apply-template") {
@@ -113,6 +122,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       _max: { orden: true },
     });
     const estado = body.estado || "pendiente";
+    const responsableId = body.responsableId || user.id;
     const tramite = await prisma.tramite.create({
       data: {
         causaId: id,
@@ -121,13 +131,24 @@ export async function POST(req: NextRequest, { params }: Params) {
         estado,
         fechaLimite: body.fechaLimite ? new Date(body.fechaLimite) : null,
         fechaHecho: estado === "hecho" ? new Date() : null,
-        responsableId: body.responsableId || user.id,
+        responsableId,
         orden: body.orden ?? (maxOrden._max.orden ?? 0) + 1,
       },
       include: {
         responsable: { select: { id: true, name: true } },
       },
     });
+
+    if (responsableId && responsableId !== user.id) {
+      await prisma.notification.create({
+        data: {
+          userId: responsableId,
+          title: `Trámite asignado · ${causa.rit || causa.titulo}`,
+          body: tramite.titulo,
+          href: tramiteHref,
+        },
+      });
+    }
 
     await prisma.activity.create({
       data: {

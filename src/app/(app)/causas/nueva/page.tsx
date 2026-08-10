@@ -390,7 +390,8 @@ function NuevaCausaForm() {
               <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--ink-soft)]/80">
                 {conflicts.map((c) => (
                   <li key={`${c.causaId}-${c.match}`}>
-                    {c.match} ({c.severity})
+                    {c.match} (
+                    {c.severity === "blocked" ? "bloqueante" : "advertencia"})
                   </li>
                 ))}
               </ul>
@@ -400,13 +401,14 @@ function NuevaCausaForm() {
         {overrideRequired && (
           <div className="rounded-2xl border border-[var(--danger)]/30 bg-red-50 p-4">
             <label className="flex items-center gap-2 text-sm font-medium">
-              <input type="checkbox" name="conflictOverride" /> Autorizar override de conflicto
+              <input type="checkbox" name="conflictOverride" /> Autorizar
+              excepción de conflicto
             </label>
             <textarea
               className="textarea mt-3"
               name="conflictNotes"
               required={overrideRequired}
-              placeholder="Fundamento del override y aprobación interna"
+              placeholder="Fundamento de la excepción y aprobación interna"
             />
           </div>
         )}

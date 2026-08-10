@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 
 export function DocumentoAiActions({
@@ -10,9 +11,11 @@ export function DocumentoAiActions({
   documentoId: string;
   causaId?: string | null;
 }) {
+  const router = useRouter();
   const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function onClassify(result: AiActionResponse) {
+  async function onClassify(result: AiActionResponse) {
     const data = result.data as {
       tipo?: string;
       confidencial?: boolean;
@@ -23,8 +26,29 @@ export function DocumentoAiActions({
       setNote("Sin clasificación estructurada.");
       return;
     }
+    setBusy(true);
+    const res = await fetch(`/api/documentos/${documentoId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...(data.tipo ? { tipo: data.tipo } : {}),
+        ...(typeof data.confidencial === "boolean"
+          ? { confidencial: data.confidencial }
+          : {}),
+        ...(typeof data.privilegio === "boolean"
+          ? { privilegio: data.privilegio }
+          : {}),
+      }),
+    });
+    setBusy(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setNote(err.error || "No se pudo guardar la clasificación.");
+      return;
+    }
     setNote(
       [
+        "Clasificación guardada",
         data.tipo ? `Tipo: ${data.tipo}` : null,
         data.confidencial ? "confidencial" : null,
         data.privilegio ? "privilegio" : null,
@@ -33,6 +57,7 @@ export function DocumentoAiActions({
         .filter(Boolean)
         .join(" · ")
     );
+    router.refresh();
   }
 
   return (
@@ -48,10 +73,10 @@ export function DocumentoAiActions({
         action="documento.clasificar"
         documentoId={documentoId}
         causaId={causaId || undefined}
-        label="Clasificar"
+        label={busy ? "Guardando…" : "Clasificar"}
         showPreview={false}
         showNotes={false}
-        onResult={onClassify}
+        onResult={(r) => void onClassify(r)}
       />
       {note && <p className="text-xs text-[var(--copper)]">{note}</p>}
     </div>

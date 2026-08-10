@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireStaffPage } from "@/lib/auth/access";
 import { labelEtapa, labelMateria } from "@/lib/chile";
 import { StatusBadge, formatDate } from "@/components/ui";
+import { EmptyState } from "@/components/EmptyState";
 import { ClienteEditForm } from "@/components/clientes/ClienteEditForm";
 import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { ClienteAiChat } from "@/components/clientes/ClienteAiChat";
@@ -11,10 +12,16 @@ import { DocumentoUploadForm } from "@/components/DocumentoUploadForm";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
 
 type Params = { params: Promise<{ id: string }> };
+type Search = { searchParams: Promise<{ causa?: string }> };
 
-export default async function ClienteDetailPage({ params }: Params) {
+export default async function ClienteDetailPage({
+  params,
+  searchParams,
+}: Params & Search) {
   await requireStaffPage();
   const { id } = await params;
+  const sp = await searchParams;
+  const focusCausaId = sp.causa || null;
 
   const [cliente, abogados] = await Promise.all([
     prisma.cliente.findUnique({
@@ -112,14 +119,17 @@ export default async function ClienteDetailPage({ params }: Params) {
         {cliente.causas.map((causa) => (
           <details
             key={causa.id}
-            className="panel group rounded-3xl p-5"
-            open={cliente.causas.length === 1}
+            id={`causa-${causa.id}`}
+            className="panel group scroll-mt-24 rounded-3xl p-5"
+            open={
+              cliente.causas.length === 1 || focusCausaId === causa.id
+            }
           >
             <summary className="cursor-pointer list-none">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <Link
-                    href={`/causas/${causa.id}`}
+                    href={`/causas/${causa.id}#tramites`}
                     className="text-base font-semibold text-[var(--sea)] hover:underline"
                   >
                     {causa.rit || causa.titulo}
@@ -157,6 +167,7 @@ export default async function ClienteDetailPage({ params }: Params) {
                 causaId={causa.id}
                 tramites={causa.tramites}
                 materia={causa.materia}
+                responsables={abogados}
                 compact
               />
             </div>
@@ -164,15 +175,12 @@ export default async function ClienteDetailPage({ params }: Params) {
         ))}
 
         {cliente.causas.length === 0 && (
-          <p className="text-sm text-[var(--ink-soft)]/65">
-            Este cliente aún no tiene causas.{" "}
-            <Link
-              href={`/causas/nueva?clienteId=${cliente.id}`}
-              className="text-[var(--sea)]"
-            >
-              Crear la primera
-            </Link>
-          </p>
+          <EmptyState
+            title="Sin causas todavía"
+            description="Abra la primera causa para llevar trámites, documentos y el expediente del cliente."
+            actionLabel="Nueva causa"
+            actionHref={`/causas/nueva?clienteId=${cliente.id}`}
+          />
         )}
       </section>
 

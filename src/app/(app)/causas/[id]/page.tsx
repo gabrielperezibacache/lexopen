@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { labelEtapa, labelMateria } from "@/lib/chile";
+import { labelConflictStatus } from "@/lib/conflict";
 import { StatusBadge, formatDate, formatDateTime } from "@/components/ui";
 import { CausaActions } from "@/components/CausaActions";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
@@ -17,38 +18,45 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function CausaDetailPage({ params }: Params) {
   const { id } = await params;
-  const causa = await prisma.causa.findUnique({
-    where: { id },
-    include: {
-      cliente: true,
-      abogado: true,
-      partes: true,
-      documentos: { orderBy: { updatedAt: "desc" } },
-      plazos: { orderBy: { fechaLimite: "asc" } },
-      notas: { orderBy: { updatedAt: "desc" } },
-      etapaHistorial: { orderBy: { createdAt: "desc" } },
-      movimientos: { orderBy: { fecha: "desc" } },
-      tramites: {
-        orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
-        include: { responsable: { select: { id: true, name: true } } },
-      },
-      minutas: {
-        include: {
-          autor: { select: { name: true } },
-          acciones: {
-            where: { estado: { in: [...ACCIONES_ABIERTAS] } },
-          },
+  const [causa, responsables] = await Promise.all([
+    prisma.causa.findUnique({
+      where: { id },
+      include: {
+        cliente: true,
+        abogado: true,
+        partes: true,
+        documentos: { orderBy: { updatedAt: "desc" } },
+        plazos: { orderBy: { fechaLimite: "asc" } },
+        notas: { orderBy: { updatedAt: "desc" } },
+        etapaHistorial: { orderBy: { createdAt: "desc" } },
+        movimientos: { orderBy: { fecha: "desc" } },
+        tramites: {
+          orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+          include: { responsable: { select: { id: true, name: true } } },
         },
-        orderBy: { fecha: "desc" },
-        take: 12,
+        minutas: {
+          include: {
+            autor: { select: { name: true } },
+            acciones: {
+              where: { estado: { in: [...ACCIONES_ABIERTAS] } },
+            },
+          },
+          orderBy: { fecha: "desc" },
+          take: 12,
+        },
+        actividades: {
+          include: { user: true },
+          orderBy: { createdAt: "desc" },
+          take: 30,
+        },
       },
-      actividades: {
-        include: { user: true },
-        orderBy: { createdAt: "desc" },
-        take: 30,
-      },
-    },
-  });
+    }),
+    prisma.user.findMany({
+      where: { role: { in: ["admin", "abogado", "asistente"] } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
   if (!causa) notFound();
 
   const ultimaMinuta = causa.minutas[0];
@@ -81,7 +89,7 @@ export default async function CausaDetailPage({ params }: Params) {
                     : "badge badge-activa"
               }
             >
-              Conflictos: {causa.conflictStatus}
+              Conflictos: {labelConflictStatus(causa.conflictStatus)}
             </span>
             {isRealDriveFolderId(causa.googleDriveFolderId) && (
               <span className="badge badge-activa">Drive vinculado</span>
@@ -209,7 +217,7 @@ export default async function CausaDetailPage({ params }: Params) {
             <div>
               <dt className="text-[var(--ink-soft)]/60">Conflicto</dt>
               <dd className="font-medium">
-                {causa.conflictStatus}
+                {labelConflictStatus(causa.conflictStatus)}
                 {causa.conflictCheckedAt ? ` · ${formatDate(causa.conflictCheckedAt)}` : ""}
               </dd>
             </div>
@@ -303,7 +311,7 @@ export default async function CausaDetailPage({ params }: Params) {
         </div>
       </section>
 
-      <section className="panel rounded-3xl p-5">
+      <section id="tramites" className="panel scroll-mt-24 rounded-3xl p-5">
         <h2 className="text-lg font-semibold">Trámites del estudio</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
           Checklist de gestiones pendientes y hechas (distinto del historial PJUD).
@@ -313,6 +321,7 @@ export default async function CausaDetailPage({ params }: Params) {
             causaId={causa.id}
             tramites={causa.tramites}
             materia={causa.materia}
+            responsables={responsables}
           />
         </div>
       </section>

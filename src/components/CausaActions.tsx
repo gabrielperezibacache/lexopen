@@ -20,7 +20,11 @@ export function CausaActions({ causaId }: { causaId: string }) {
     });
     const data = await res.json();
     setBusy(false);
-    setMsg(res.ok ? `Obsidian sync: ${data.result?.files ?? 0} archivos` : data.error || "Error");
+    setMsg(
+      res.ok
+        ? `Sincronización Obsidian: ${data.result?.files ?? 0} archivos`
+        : data.error || "Error"
+    );
   }
 
   async function applyTramites(result: AiActionResponse) {
@@ -71,7 +75,7 @@ export function CausaActions({ causaId }: { causaId: string }) {
           onClick={syncObsidian}
           type="button"
         >
-          Sync Obsidian
+          Sincronizar Obsidian
         </button>
         <Link
           href={`/agente?causaId=${causaId}`}
