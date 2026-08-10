@@ -217,6 +217,12 @@ model Causa {
   googleDriveFolderId   String?
   googleDriveFolderName String?
   googleDriveFolderUrl  String?
+  /// Monitoreo estilo CaseTracking (PJUD / proveedor)
+  pjudMonitoreoActivo   Boolean   @default(false)
+  pjudLastSyncAt        DateTime?
+  pjudLastSyncStatus    String?   // never | ok | partial | error | demo | disabled
+  pjudLastSyncNote      String?
+  pjudExternalKey       String?   // clave proveedor (RIT|tribunal)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -245,6 +251,8 @@ model Causa {
   @@index([rit])
   @@index([ruc])
   @@index([estado])
+  @@index([pjudMonitoreoActivo])
+  @@index([pjudLastSyncAt])
 }
 
 model EtapaHistorial {
@@ -260,11 +268,22 @@ model CausaMovimiento {
   id          String   @id @default(cuid())
   titulo      String
   detalle     String?
-  fuente      String   @default("manual") // manual | pjud | import
+  /// manual | pjud | import | demo
+  fuente      String   @default("manual")
+  /// proveido | resolucion | audiencia | escrito | notificacion | plazo | otro
+  tipo        String   @default("otro")
+  referencia  String?
+  /// ID externo del proveedor para deduplicar sync
+  externalId  String?
+  relevante   Boolean  @default(false)
   fecha       DateTime @default(now())
   createdAt   DateTime @default(now())
   causaId     String
   causa       Causa    @relation(fields: [causaId], references: [id], onDelete: Cascade)
+
+  @@index([causaId, fecha])
+  @@index([externalId])
+  @@index([tipo])
 }
 
 model AgentChat {

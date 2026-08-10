@@ -26,6 +26,7 @@ assert.ok(parsed!.expiresAt > Date.now());
 assert.equal(isClientAllowedPath("/portal"), true);
 assert.equal(isClientAllowedPath("/sites/abc"), true);
 assert.equal(isClientAllowedPath("/causas"), false);
+assert.equal(isClientAllowedPath("/causas/monitoreo"), false);
 assert.equal(isClientAllowedPath("/facturacion/horas"), false);
 assert.equal(isClientAllowedPath("/auditoria"), false);
 

@@ -30,6 +30,7 @@
 - Jurisprudencia (CS, Apelaciones, TC — corpus demo)
 - **Obsidian** (export vault Markdown, incluye Minutas/)
 - **Hermes Agent** (API OpenAI-compatible + demo)
+- **Monitoreo PJUD** (estilo CaseTracking): cartera con semáforos, sync, timeline clasificado y alertas. Partner API (`PJUD_API_URL`) o demo/CSV etiquetados — sin scrapers ocultos.
 - **Google Workspace** (OAuth Drive / Calendar / Gmail)
 
 ## Stack
@@ -55,6 +56,9 @@ Abra http://localhost:3000/login e ingrese con un usuario demo.
 Variables relevantes:
 - `SESSION_SECRET`: obligatorio en producción para firmar sesiones y proteger tokens OAuth.
 - `HERMES_ALLOW_DEMO=1`: habilita respuestas demo cuando Hermes Agent no está disponible.
+- `PJUD_API_URL` / `PJUD_API_KEY`: conector partner para sync de movimientos judiciales.
+- `PJUD_ALLOW_DEMO=1`: sync demo etiquetado (nunca scrapea ofpj.pjud.cl).
+- `CRON_SECRET`: permite `POST /api/causas/monitoreo` desde un cron externo/Render.
 - `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`: opcionales para almacenar documentos fuera del filesystem local.
 
 ### Usuarios demo (password `lexopen`)
@@ -104,6 +108,14 @@ curl -X POST localhost:3000/api/minutas \
 curl -X POST localhost:3000/api/integrations/google \
   -H 'content-type: application/json' \
   -d '{"action":"link-causa-folder","causaId":"<id>","folderRef":"https://drive.google.com/drive/folders/…"}'
+
+# Sync PJUD de una causa (requiere PJUD_API_URL o PJUD_ALLOW_DEMO=1)
+curl -X POST localhost:3000/api/causas/<id>/pjud \
+  -H 'content-type: application/json' \
+  -d '{"action":"sync"}'
+
+# Cartera de monitoreo
+curl localhost:3000/api/causas/monitoreo
 ```
 
 ## Render

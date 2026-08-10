@@ -25,6 +25,7 @@ import {
   Menu,
   Shield,
   Settings,
+  Radar,
 } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
@@ -34,6 +35,7 @@ const primary = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/sites", label: "Espacios", icon: Building2 },
   { href: "/causas", label: "Causas", icon: Briefcase },
+  { href: "/causas/monitoreo", label: "Monitoreo PJUD", icon: Radar },
   { href: "/minutas", label: "Minutas", icon: ClipboardPen },
   { href: "/facturacion", label: "Facturación", icon: CircleDollarSign },
   { href: "/tareas", label: "Tareas", icon: ListTodo },
@@ -80,20 +82,25 @@ function NavGroup({
         {title}
       </div>
       <div className="flex flex-col gap-0.5">
-        {links.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
-          return (
+        {(() => {
+          const matches = links.filter(
+            (l) => pathname === l.href || pathname.startsWith(`${l.href}/`)
+          );
+          const best =
+            [...matches].sort((a, b) => b.href.length - a.href.length)[0]
+              ?.href || null;
+          return links.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
-              className={cn("nav-link", active && "active")}
+              className={cn("nav-link", best === href && "active")}
               onClick={onNavigate}
             >
               <Icon size={16} />
               <span>{label}</span>
             </Link>
-          );
-        })}
+          ));
+        })()}
       </div>
     </div>
   );

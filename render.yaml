@@ -44,3 +44,24 @@ services:
         sync: false
       - key: S3_SECRET_ACCESS_KEY
         sync: false
+      - key: PJUD_API_URL
+        sync: false
+      - key: PJUD_API_KEY
+        sync: false
+      - key: PJUD_ALLOW_DEMO
+        value: "0"
+      - key: CRON_SECRET
+        sync: false
+
+# Optional cron (set ALERTS_URL to your web service URL):
+# - type: cron
+#   name: lexopen-pjud-sync
+#   runtime: node
+#   schedule: "0 */6 * * *"
+#   buildCommand: npm install
+#   startCommand: curl -fsS -X POST "$ALERTS_URL/api/causas/monitoreo" -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d "{}"
+#   envVars:
+#     - key: ALERTS_URL
+#       sync: false
+#     - key: CRON_SECRET
+#       sync: false
