@@ -122,6 +122,14 @@ export const es = {
     languageHelp:
       "Afecta navegación, login y textos de la plataforma. El contenido jurídico chileno (RIT, plazos, minutas) permanece en español cuando corresponde.",
   },
-} as const;
+};
 
-export type Dictionary = typeof es;
+type DeepStringify<T> = T extends string
+  ? string
+  : T extends readonly (infer U)[]
+    ? DeepStringify<U>[]
+    : T extends object
+      ? { [K in keyof T]: DeepStringify<T[K]> }
+      : T;
+
+export type Dictionary = DeepStringify<typeof es>;
