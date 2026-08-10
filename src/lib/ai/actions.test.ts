@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
 import {
   AI_ACTIONS,
   AI_ACTION_META,
@@ -7,33 +7,25 @@ import {
   parseActionResult,
 } from "./actions";
 
-describe("ai actions catalog", () => {
-  it("lists unique actions with metadata", () => {
-    expect(new Set(AI_ACTIONS).size).toBe(AI_ACTIONS.length);
-    for (const id of AI_ACTIONS) {
-      expect(AI_ACTION_META[id].id).toBe(id);
-      expect(AI_ACTION_META[id].label.length).toBeGreaterThan(2);
-    }
-  });
+assert.equal(new Set(AI_ACTIONS).size, AI_ACTIONS.length);
+for (const id of AI_ACTIONS) {
+  assert.equal(AI_ACTION_META[id].id, id);
+  assert.ok(AI_ACTION_META[id].label.length > 2);
+}
 
-  it("validates action ids", () => {
-    expect(isAiActionId("causa.resumen")).toBe(true);
-    expect(isAiActionId("no.existe")).toBe(false);
-  });
+assert.equal(isAiActionId("causa.resumen"), true);
+assert.equal(isAiActionId("no.existe"), false);
 
-  it("parses demo JSON actions", () => {
-    const raw = demoForAction("plazo.sugerir");
-    const parsed = parseActionResult("plazo.sugerir", raw);
-    expect(parsed.data).toBeTruthy();
-    const data = parsed.data as { plazos: unknown[] };
-    expect(Array.isArray(data.plazos)).toBe(true);
-    expect(data.plazos.length).toBeGreaterThan(0);
-  });
+const rawPlazos = demoForAction("plazo.sugerir");
+const parsedPlazos = parseActionResult("plazo.sugerir", rawPlazos);
+assert.ok(parsedPlazos.data);
+const plazosData = parsedPlazos.data as { plazos: unknown[] };
+assert.ok(Array.isArray(plazosData.plazos));
+assert.ok(plazosData.plazos.length > 0);
 
-  it("keeps markdown for non-json actions", () => {
-    const raw = demoForAction("causa.resumen", "prueba");
-    const parsed = parseActionResult("causa.resumen", raw);
-    expect(parsed.data).toBeNull();
-    expect(parsed.content).toContain("Estado actual");
-  });
-});
+const rawResumen = demoForAction("causa.resumen", "prueba");
+const parsedResumen = parseActionResult("causa.resumen", rawResumen);
+assert.equal(parsedResumen.data, null);
+assert.match(parsedResumen.content, /Estado actual/);
+
+console.log("ai/actions.test.ts OK");

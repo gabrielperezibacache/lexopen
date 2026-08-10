@@ -1,20 +1,9 @@
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
 import { extractJson } from "./parse";
 
-describe("extractJson", () => {
-  it("parses bare JSON", () => {
-    expect(extractJson('{"a":1}')).toEqual({ a: 1 });
-  });
+assert.deepEqual(extractJson('{"a":1}'), { a: 1 });
+assert.deepEqual(extractJson("```json\n{\"tramites\":[]}\n```"), { tramites: [] });
+assert.deepEqual(extractJson('Aquí va: {"ok":true} fin'), { ok: true });
+assert.equal(extractJson("sin json"), null);
 
-  it("parses fenced JSON", () => {
-    expect(extractJson('```json\n{"tramites":[]}\n```')).toEqual({ tramites: [] });
-  });
-
-  it("recovers object from prose", () => {
-    expect(extractJson('Aquí va: {"ok":true} fin')).toEqual({ ok: true });
-  });
-
-  it("returns null on garbage", () => {
-    expect(extractJson("sin json")).toBeNull();
-  });
-});
+console.log("ai/parse.test.ts OK");

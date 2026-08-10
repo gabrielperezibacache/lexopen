@@ -22,7 +22,8 @@ type ConflictHit = {
 
 type ClienteOption = { id: string; razonSocial: string; rut: string | null };
 
-const MATERIA_VALUES = new Set(MATERIAS.map((m) => m.value));
+type MateriaValue = (typeof MATERIAS)[number]["value"];
+const MATERIA_VALUES = new Set<string>(MATERIAS.map((m) => m.value));
 
 function NuevaCausaForm() {
   const router = useRouter();
@@ -37,9 +38,9 @@ function NuevaCausaForm() {
   const [titulo, setTitulo] = useState("");
   const [rit, setRit] = useState("");
   const [ruc, setRuc] = useState("");
-  const [tribunal, setTribunal] = useState(TRIBUNALES_CHILE[0] || "");
-  const [materia, setMateria] = useState("civil");
-  const [etapa, setEtapa] = useState("ingreso");
+  const [tribunal, setTribunal] = useState<string>(String(TRIBUNALES_CHILE[0] || ""));
+  const [materia, setMateria] = useState<MateriaValue>("civil");
+  const [etapa, setEtapa] = useState<string>("ingreso");
   const [procedimiento, setProcedimiento] = useState("");
   const [caratula, setCaratula] = useState("");
   const [resumen, setResumen] = useState("");
@@ -80,7 +81,9 @@ function NuevaCausaForm() {
       );
       setTribunal(match || data.tribunal);
     }
-    if (data.materia && MATERIA_VALUES.has(data.materia)) setMateria(data.materia);
+    if (data.materia && MATERIA_VALUES.has(data.materia)) {
+      setMateria(data.materia as MateriaValue);
+    }
     if (data.caratula) setCaratula(data.caratula);
     if (data.resumen) setResumen(data.resumen);
     const dem =
@@ -278,9 +281,8 @@ function NuevaCausaForm() {
             value={tribunal}
             onChange={(e) => setTribunal(e.target.value)}
           >
-            {!TRIBUNALES_CHILE.includes(tribunal) && tribunal && (
-              <option value={tribunal}>{tribunal}</option>
-            )}
+            {!(TRIBUNALES_CHILE as readonly string[]).includes(tribunal) &&
+              tribunal && <option value={tribunal}>{tribunal}</option>}
             {TRIBUNALES_CHILE.map((t) => (
               <option key={t} value={t}>
                 {t}
@@ -295,7 +297,7 @@ function NuevaCausaForm() {
               className="select"
               name="materia"
               value={materia}
-              onChange={(e) => setMateria(e.target.value)}
+              onChange={(e) => setMateria(e.target.value as MateriaValue)}
             >
               {MATERIAS.map((m) => (
                 <option key={m.value} value={m.value}>
