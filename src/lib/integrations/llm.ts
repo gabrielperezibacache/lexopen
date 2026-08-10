@@ -97,10 +97,14 @@ async function loadConfigRow() {
 
 export async function getLlmConfig(): Promise<LlmConfig> {
   const defaults = defaultsFromEnv();
-  const row = await loadConfigRow();
-  if (!row) return defaults;
-  const parsed = JSON.parse(row.configJson || "{}") as Partial<LlmConfig>;
-  return {
+  const [row, firm] = await Promise.all([
+    loadConfigRow(),
+    prisma.firmSettings.findFirst({ select: { hermesAllowDemo: true } }),
+  ]);
+  const parsed = row
+    ? (JSON.parse(row.configJson || "{}") as Partial<LlmConfig>)
+    : {};
+  const merged: LlmConfig = {
     ...defaults,
     ...parsed,
     apiKey:
@@ -108,6 +112,12 @@ export async function getLlmConfig(): Promise<LlmConfig> {
         ? defaults.apiKey
         : parsed.apiKey ?? defaults.apiKey,
   };
+  // FirmSettings.hermesAllowDemo acts as study-wide override when LLM config
+  // does not explicitly set allowDemo.
+  if (parsed.allowDemo === undefined && firm) {
+    merged.allowDemo = Boolean(firm.hermesAllowDemo);
+  }
+  return merged;
 }
 
 export function publicLlmConfig(config: LlmConfig) {

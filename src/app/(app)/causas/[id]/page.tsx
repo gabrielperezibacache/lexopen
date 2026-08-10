@@ -309,7 +309,11 @@ export default async function CausaDetailPage({ params }: Params) {
           Checklist de gestiones pendientes y hechas (distinto del historial PJUD).
         </p>
         <div className="mt-4">
-          <TramitesPanel causaId={causa.id} tramites={causa.tramites} />
+          <TramitesPanel
+            causaId={causa.id}
+            tramites={causa.tramites}
+            materia={causa.materia}
+          />
         </div>
       </section>
 

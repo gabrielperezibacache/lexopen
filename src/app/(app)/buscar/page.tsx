@@ -8,6 +8,30 @@ type Results = {
   q: string;
   sites: Array<{ id: string; name: string; tipo: string }>;
   causas: Array<{ id: string; titulo: string; rit: string | null }>;
+  clientes?: Array<{
+    id: string;
+    razonSocial: string;
+    rut: string | null;
+    estado: string;
+  }>;
+  tramites?: Array<{
+    id: string;
+    titulo: string;
+    estado: string;
+    causa: {
+      id: string;
+      rit: string | null;
+      titulo: string;
+      clienteId: string | null;
+    };
+  }>;
+  documentos?: Array<{
+    id: string;
+    nombre: string;
+    tipo: string;
+    cliente: { id: string; razonSocial: string } | null;
+    causa: { id: string; rit: string | null; titulo: string } | null;
+  }>;
   files: Array<{ id: string; name: string; site: { id: string; name: string } }>;
   tasks: Array<{ id: string; title: string; site: { id: string; name: string } | null }>;
   jurisprudencia: Array<{ id: string; rol: string; caratula: string | null }>;
@@ -49,7 +73,7 @@ export default function SearchPage() {
       <ModuleHeader
         eyebrow="Búsqueda unificada"
         title="Buscar"
-        subtitle="Espacios, causas, minutas, archivos, tareas, wiki y jurisprudencia en un solo índice."
+        subtitle="Clientes, causas, trámites, documentos, espacios, minutas y jurisprudencia."
       />
       <form onSubmit={onSubmit} className="panel mb-6 flex gap-2 rounded-3xl p-4">
         <input
@@ -88,11 +112,11 @@ export default function SearchPage() {
       {results && (
         <div className="grid gap-4 lg:grid-cols-2">
           <ResultBlock
-            title="Espacios"
-            items={results.sites.map((s) => ({
-              href: `/sites/${s.id}`,
-              label: s.name,
-              meta: s.tipo,
+            title="Clientes"
+            items={(results.clientes || []).map((c) => ({
+              href: `/clientes/${c.id}`,
+              label: c.razonSocial,
+              meta: `${c.rut || "Sin RUT"} · ${c.estado}`,
             }))}
           />
           <ResultBlock
@@ -101,6 +125,36 @@ export default function SearchPage() {
               href: `/causas/${c.id}`,
               label: c.titulo,
               meta: c.rit || "",
+            }))}
+          />
+          <ResultBlock
+            title="Trámites"
+            items={(results.tramites || []).map((t) => ({
+              href: t.causa.clienteId
+                ? `/clientes/${t.causa.clienteId}`
+                : `/causas/${t.causa.id}`,
+              label: t.titulo,
+              meta: `${t.estado} · ${t.causa.rit || t.causa.titulo}`,
+            }))}
+          />
+          <ResultBlock
+            title="Documentos"
+            items={(results.documentos || []).map((d) => ({
+              href: d.cliente
+                ? `/clientes/${d.cliente.id}`
+                : d.causa
+                  ? `/causas/${d.causa.id}`
+                  : "/documentos",
+              label: d.nombre,
+              meta: d.cliente?.razonSocial || d.causa?.rit || d.tipo,
+            }))}
+          />
+          <ResultBlock
+            title="Espacios"
+            items={results.sites.map((s) => ({
+              href: `/sites/${s.id}`,
+              label: s.name,
+              meta: s.tipo,
             }))}
           />
           <ResultBlock

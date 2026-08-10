@@ -2,8 +2,15 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDate, StatusBadge } from "@/components/ui";
 import { labelMateria } from "@/lib/chile";
-import { ArrowRight, Building2, Briefcase, ListTodo, MessageSquare } from "lucide-react";
+import {
+  ArrowRight,
+  Briefcase,
+  ListTodo,
+  ContactRound,
+  ClipboardList,
+} from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
+import { TRAMITES_ABIERTOS } from "@/lib/tramites";
 
 async function ensureSeeded() {
   const count = await prisma.site.count().catch(() => 0);
@@ -28,14 +35,23 @@ export default async function DashboardPage() {
   }
   const user = await getCurrentUser();
 
-  const [sites, causas, tasksOpen, unread, sitesList, tasks, actividades, minutasRecientes] =
-    await Promise.all([
-      prisma.site.count({ where: { status: "active" } }),
+  const [
+    causas,
+    clientesActivos,
+    tramitesPendientesCount,
+    tasksOpen,
+    sitesList,
+    tasks,
+    actividades,
+    minutasRecientes,
+    tramitesPendientes,
+  ] = await Promise.all([
       prisma.causa.count({ where: { estado: "activa" } }),
+      prisma.cliente.count({ where: { estado: "activo" } }),
+      prisma.tramite.count({
+        where: { estado: { in: [...TRAMITES_ABIERTOS] } },
+      }),
       prisma.task.count({ where: { status: { in: ["todo", "in_progress", "blocked"] } } }),
-      user
-        ? prisma.notification.count({ where: { userId: user.id, read: false } })
-        : Promise.resolve(0),
       prisma.site.findMany({
         include: { _count: { select: { files: true, tasks: true } }, causa: true },
         orderBy: { updatedAt: "desc" },
@@ -65,13 +81,29 @@ export default async function DashboardPage() {
         orderBy: { fecha: "desc" },
         take: 5,
       }),
+      prisma.tramite.findMany({
+        where: { estado: { in: [...TRAMITES_ABIERTOS] } },
+        include: {
+          causa: {
+            select: {
+              id: true,
+              rit: true,
+              titulo: true,
+              cliente: { select: { id: true, razonSocial: true } },
+            },
+          },
+          responsable: { select: { name: true } },
+        },
+        orderBy: [{ fechaLimite: "asc" }, { updatedAt: "desc" }],
+        take: 8,
+      }),
     ]);
 
   const stats = [
-    { label: "Espacios activos", value: sites, icon: Building2 },
-    { label: "Causas activas", value: causas, icon: Briefcase },
-    { label: "Tareas abiertas", value: tasksOpen, icon: ListTodo },
-    { label: "Notificaciones", value: unread, icon: MessageSquare },
+    { label: "Clientes activos", value: clientesActivos, icon: ContactRound, href: "/clientes" },
+    { label: "Causas activas", value: causas, icon: Briefcase, href: "/causas" },
+    { label: "Trámites pendientes", value: tramitesPendientesCount, icon: ClipboardList, href: "/clientes" },
+    { label: "Tareas abiertas", value: tasksOpen, icon: ListTodo, href: "/tareas" },
   ];
 
   return (
@@ -85,13 +117,12 @@ export default async function DashboardPage() {
             {user ? `Hola, ${user.name.split(" ")[0]}` : "Inicio"}
           </h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Espacios, causas Chile, minutas de handoff y actividad reciente en un
-            solo panel de control.
+            Clientes, causas, trámites pendientes, minutas y actividad del estudio.
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href="/minutas" className="btn btn-secondary">
-            Minutas
+          <Link href="/clientes" className="btn btn-secondary">
+            Clientes
           </Link>
           <Link href="/causas/nueva" className="btn btn-primary">
             Nueva causa <ArrowRight size={16} />
@@ -100,18 +131,56 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="panel rounded-3xl p-5">
+        {stats.map(({ label, value, icon: Icon, href }) => (
+          <Link key={label} href={href} className="panel rounded-3xl p-5 transition hover:border-[var(--sea)]/40">
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--ink-soft)]/70">{label}</span>
               <Icon size={18} className="text-[var(--copper)]" />
             </div>
             <div className="display mt-3 text-4xl">{value}</div>
-          </div>
+          </Link>
         ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <section className="panel rounded-3xl p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Trámites pendientes</h2>
+            <Link href="/clientes" className="text-sm text-[var(--sea)]">
+              Ver CRM
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {tramitesPendientes.map((t) => (
+              <Link
+                key={t.id}
+                href={
+                  t.causa.cliente
+                    ? `/clientes/${t.causa.cliente.id}`
+                    : `/causas/${t.causa.id}`
+                }
+                className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+              >
+                <div>
+                  <div className="font-medium">{t.titulo}</div>
+                  <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                    {t.causa.cliente?.razonSocial || "Sin cliente"} ·{" "}
+                    {t.causa.rit || t.causa.titulo}
+                  </div>
+                </div>
+                <StatusBadge
+                  estado={t.estado === "en_curso" ? "activa" : "pendiente"}
+                />
+              </Link>
+            ))}
+            {tramitesPendientes.length === 0 && (
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                No hay trámites abiertos.
+              </p>
+            )}
+          </div>
+        </section>
+
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Espacios recientes</h2>

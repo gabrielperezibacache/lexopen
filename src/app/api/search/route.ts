@@ -15,6 +15,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         sites: [],
         causas: [],
+        clientes: [],
+        tramites: [],
+        documentos: [],
         files: [],
         tasks: [],
         jurisprudencia: [],
@@ -45,6 +48,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         sites,
         causas: [],
+        clientes: [],
+        tramites: [],
+        documentos: [],
         files: [],
         tasks: [],
         jurisprudencia: [],
@@ -61,8 +67,18 @@ export async function GET(req: NextRequest) {
 
     const ftsIds = await ftsCausaIds(prisma, q, 10);
 
-    const [sites, causas, files, tasks, jurisprudencia, wiki, minutas] =
-      await Promise.all([
+    const [
+      sites,
+      causas,
+      clientes,
+      tramites,
+      documentos,
+      files,
+      tasks,
+      jurisprudencia,
+      wiki,
+      minutas,
+    ] = await Promise.all([
         prisma.site.findMany({
           where: {
             OR: [
@@ -84,6 +100,52 @@ export async function GET(req: NextRequest) {
                   { tribunal: textMatch(q) },
                 ],
               },
+          take: 10,
+        }),
+        prisma.cliente.findMany({
+          where: {
+            OR: [
+              { razonSocial: textMatch(q) },
+              { rut: textMatch(q) },
+              { email: textMatch(q) },
+              { notas: textMatch(q) },
+            ],
+          },
+          take: 10,
+        }),
+        prisma.tramite.findMany({
+          where: {
+            OR: [{ titulo: textMatch(q) }, { detalle: textMatch(q) }],
+          },
+          include: {
+            causa: {
+              select: {
+                id: true,
+                rit: true,
+                titulo: true,
+                clienteId: true,
+              },
+            },
+          },
+          take: 10,
+        }),
+        prisma.documento.findMany({
+          where: {
+            AND: [
+              confFilter,
+              {
+                OR: [
+                  { nombre: textMatch(q) },
+                  { contenido: textMatch(q) },
+                  { tipo: textMatch(q) },
+                ],
+              },
+            ],
+          },
+          include: {
+            cliente: { select: { id: true, razonSocial: true } },
+            causa: { select: { id: true, rit: true, titulo: true } },
+          },
           take: 10,
         }),
         prisma.siteFile.findMany({
@@ -152,6 +214,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       sites,
       causas,
+      clientes,
+      tramites,
+      documentos,
       files,
       tasks,
       jurisprudencia,

@@ -162,9 +162,10 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
             defaultChecked={s?.hermesAllowDemo ?? true}
           />
           <span>
-            <span className="font-medium">Permitir respuestas demo de Hermes</span>
+            <span className="font-medium">Permitir respuestas demo del asistente IA</span>
             <span className="mt-0.5 block text-[var(--ink-soft)]/65">
-              Si el agente no está disponible, LexOpen responde con contenido de demostración.
+              Fallback del estudio si el proveedor (OpenAI/Hermes/etc.) no responde.
+              También puede configurarse por proveedor en el panel de IA más abajo.
             </span>
           </span>
         </label>

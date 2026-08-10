@@ -1,8 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { labelTramiteEstado } from "@/lib/tramites";
+import {
+  TRAMITE_TEMPLATES,
+  templatesForMateria,
+  type TramiteTemplate,
+} from "@/lib/tramite-templates";
 
 type Tramite = {
   id: string;
@@ -23,14 +28,22 @@ function fmt(d: string | Date | null) {
 export function TramitesPanel({
   causaId,
   tramites,
+  materia,
   compact = false,
 }: {
   causaId: string;
   tramites: Tramite[];
+  materia?: string | null;
   compact?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [templateId, setTemplateId] = useState("");
+  const templates: TramiteTemplate[] = useMemo(() => {
+    const list = templatesForMateria(materia);
+    return list.length ? list : TRAMITE_TEMPLATES;
+  }, [materia]);
+
   const pendientes = tramites.filter(
     (t) => t.estado === "pendiente" || t.estado === "en_curso"
   );
@@ -66,8 +79,49 @@ export function TramitesPanel({
     router.refresh();
   }
 
+  async function applyTemplate() {
+    if (!templateId) return;
+    setBusy(true);
+    await fetch(`/api/causas/${causaId}/tramites`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "apply-template", templateId }),
+    });
+    setBusy(false);
+    setTemplateId("");
+    router.refresh();
+  }
+
   return (
     <div className={compact ? "space-y-3" : "space-y-4"}>
+      <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-dashed border-[var(--line)] p-3">
+        <label className="block min-w-[220px] flex-1 text-sm">
+          <span className="mb-1 block text-xs font-medium text-[var(--ink-soft)]/70">
+            Aplicar plantilla
+          </span>
+          <select
+            className="select"
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+          >
+            <option value="">Elegir checklist…</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label} ({t.items.length})
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          className="btn btn-secondary"
+          type="button"
+          disabled={busy || !templateId}
+          onClick={applyTemplate}
+        >
+          Cargar trámites
+        </button>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">

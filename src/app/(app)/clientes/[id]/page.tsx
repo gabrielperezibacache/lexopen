@@ -153,7 +153,12 @@ export default async function ClienteDetailPage({ params }: Params) {
               </div>
             </summary>
             <div className="mt-5 border-t border-[var(--line)] pt-4">
-              <TramitesPanel causaId={causa.id} tramites={causa.tramites} compact />
+              <TramitesPanel
+                causaId={causa.id}
+                tramites={causa.tramites}
+                materia={causa.materia}
+                compact
+              />
             </div>
           </details>
         ))}
