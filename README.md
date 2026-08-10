@@ -5,9 +5,9 @@
 <h1 align="center">LexOpen</h1>
 
 <p align="center">
-  <strong>Legal workspaces open-source para Chile</strong><br/>
-  Clon inspirado en <a href="https://legal.thomsonreuters.com/en/products/highq">Thomson Reuters HighQ</a>,
-  con capa nativa de litigio chileno, CRM, facturación e IA multi-proveedor.
+  <strong>Plataforma open-source para la operación diaria del estudio jurídico</strong><br/>
+  Organiza causas, clientes, plazos, documentos, facturación y colaboración —
+  con herramientas pensadas para la práctica en <strong>Chile</strong> y asistencia IA bajo control del abogado.
 </p>
 
 <p align="center">
@@ -19,10 +19,10 @@
 </p>
 
 <p align="center">
-  <a href="#inicio-rápido">Inicio rápido</a> ·
-  <a href="#mapa-del-producto">Mapa del producto</a> ·
+  <a href="#qué-aporta-al-estudio">Qué aporta</a> ·
+  <a href="#qué-hace-lexopen">Funciones</a> ·
   <a href="#asistente-ia">Asistente IA</a> ·
-  <a href="#api">API</a> ·
+  <a href="#inicio-rápido">Inicio rápido</a> ·
   <a href="#contribuir">Contribuir</a>
 </p>
 
@@ -36,32 +36,30 @@
   <img src="docs/assets/lexopen-banner.svg" alt="Banner LexOpen" width="100%"/>
 </p>
 
-> **Disclaimer:** LexOpen no está afiliado a Thomson Reuters. HighQ es marca de terceros.
-> El software se ofrece bajo **AGPL-3.0-or-later**.
-
 ---
 
-## ¿Por qué LexOpen?
+## Qué aporta al estudio
 
-Los estudios chilenos necesitan algo más que un drive compartido: **matters**, plazos fatales, handoffs entre abogados, carpeta del cliente y un asistente que entienda el expediente — sin vendor lock-in.
+LexOpen concentra en una sola plataforma lo que hoy suele repartirse entre planillas, WhatsApp, carpetas y herramientas caras o desconectadas. Está pensado para **abogados, paralegales y socios** que necesitan trazabilidad procesal, handoff limpio entre colegas y una relación ordenada con el cliente — sin vendor lock-in y con código auditable (AGPL-3.0).
 
-| Dolor del estudio | LexOpen |
+| Situación en el estudio | Cómo ayuda LexOpen |
 | --- | --- |
-| HighQ / iManage caros o inaccesibles | Espacios, VDR, wiki, iSheets y portal **open-source** |
-| Causas sin RIT/RUC ni plazos hábiles | Módulo Chile: causas, plazos, minutas, jurisprudencia |
-| El cliente “está en WhatsApp y carpetas” | **CRM**: cliente → causas → trámites → documentos |
-| IA genérica sin contexto del caso | Acciones IA + chat por carpeta / causa (OpenAI-compatible) |
-| Facturación aparte del matter | Horas, gastos, boletas/facturas, UF, cuenta corriente |
+| El expediente vive en drives y chats dispersos | **Espacios de trabajo** con archivos, wiki, tareas, Q&A y flujos de aprobación |
+| Plazos fatales se pierden entre agendas | **Plazos procesales** (hábiles/corridos), calendario y sync a Google Calendar |
+| Un abogado entra a una causa “a medias” | **Minutas de handoff** post-audiencia / reunión / llamada → tareas y plazos |
+| El cliente pide estado y nadie tiene el hilo | **CRM**: cliente → causas → trámites → documentos + portal cliente |
+| La facturación no habla con el matter | **Horas, gastos, boletas/facturas, UF y cuenta corriente** ligados a la causa |
+| La IA genérica inventa fuera del expediente | **Acciones IA** con contexto de causa/cliente y revisión humana |
 
 ```mermaid
 flowchart LR
   subgraph Estudio
-    A[Abogados] --> B[LexOpen Web]
-    C[Paralegals] --> B
+    A[Abogados] --> B[LexOpen]
+    C[Paralegales] --> B
   end
   B --> D[(Postgres)]
-  B --> E[Object storage]
-  B --> F[LLM OpenAI-compatible]
+  B --> E[Documentos / S3]
+  B --> F[IA OpenAI-compatible]
   B --> G[Google Workspace]
   B --> H[Obsidian]
   I[Cliente] --> J[Portal]
@@ -70,41 +68,40 @@ flowchart LR
 
 ---
 
-## Mapa del producto
+## Qué hace LexOpen
 
 <p align="center">
   <img src="docs/assets/modules.svg" alt="Mapa de módulos LexOpen" width="100%"/>
 </p>
 
-### HighQ → LexOpen
+### Operación y colaboración
 
-| Módulo HighQ | En LexOpen |
+| Capacidad | Para qué sirve en la práctica |
 | --- | --- |
-| **Sites / Workspaces** | Matters, VDR, knowledge, client portal, projects |
-| **Files / VDR** | Carpetas, archivos, versionado, comentarios, tags |
-| **iSheets** | Tablas tipadas con filas editables |
-| **Tasks & Calendar** | Tasks por site + calendario con plazos Chile |
-| **Wiki / Blog** | Markdown por site + borrador IA |
-| **Q&A** | Hilos cliente/equipo con respuesta oficial |
-| **Workflows** | Aprobaciones multi-paso |
-| **People / Groups** | Usuarios, roles de site, grupos |
-| **Messages & Notifications** | Mensajería interna + alertas |
-| **Client portal** | Sites `isClientVisible` + docs etiquetados |
-| **Search** | Índice unificado (sites, causas, files, tasks, wiki, clientes, trámites…) |
-| **Activity stream** | Feed por site y global |
-| **APIs** | REST bajo `/api/*` |
+| **Espacios (matters)** | Agrupa una causa o proyecto: equipo, archivos, wiki, tareas y actividad |
+| **Data room / archivos** | Comparte y versiona documentos con comentarios y etiquetas |
+| **iSheets** | Tablas tipadas (hitos, issues, checklists) editables en equipo |
+| **Tareas y calendario** | Asigna trabajo y ve plazos del estudio en un solo lugar |
+| **Wiki y playbooks** | Documenta criterios internos; borrador asistido por IA |
+| **Q&A** | Canal formal cliente ↔ equipo con respuesta oficial |
+| **Flujos de aprobación** | Revisa escritos u otras piezas antes de presentar o enviar |
+| **Personas y roles** | Controla quién ve qué (estudio vs portal cliente) |
+| **Mensajes y notificaciones** | Coordinación interna y alertas de plazos / actividad |
+| **Portal cliente** | Entrega visibilidad controlada sin abrir el back-office |
+| **Búsqueda unificada** | Encuentra causas, docs, tareas, wiki, clientes y trámites |
+| **API REST** | Integra LexOpen con otros sistemas del estudio |
 
-### Capa Chile + práctica del estudio
+### Litigio y práctica en Chile
 
-- **Causas** — RIT/RUC, tribunal, materia, etapa, partes, conflictos de interés  
-- **Minutas de handoff** — wizard post-audiencia / reunión / llamada → tasks y plazos  
-- **Plazos procesales** — cómputo hábil/corrido, fatales, sync Google Calendar  
-- **CRM de clientes** — ficha, causas, trámites pendientes/hechos, documentos de carpeta  
-- **Documentos** — por causa o cliente; Drive real vs stub/demo  
-- **Jurisprudencia** — corpus demo CS / Apelaciones / TC + brief IA  
-- **Facturación** — horas, gastos, tarifas, boletas/facturas (IVA/retención), UF, pagos, cuenta corriente  
-- **Asistente IA** — multi-proveedor + acciones puntuales en cada módulo  
-- **Integraciones** — Obsidian, Google Workspace, Hermes / cualquier endpoint Chat Completions  
+- **Causas** — RIT/RUC, tribunal, materia, etapa, partes y chequeo de conflictos de interés  
+- **Minutas de handoff** — wizard tras audiencia, reunión o llamada; genera tareas y plazos  
+- **Plazos procesales** — cómputo hábil/corrido, fatales, recordatorios  
+- **CRM de clientes** — ficha, causas, trámites pendientes/hechos, carpeta documental  
+- **Documentos** — vinculados a causa o cliente; Google Drive real cuando hay OAuth  
+- **Jurisprudencia** — consulta de corpus (CS / Apelaciones / TC) + brief asistido  
+- **Facturación** — horas, gastos, tarifas, boletas/facturas (IVA/retención), UF, pagos, cuenta corriente / provisión  
+- **Asistente IA** — acciones puntuales sobre el expediente (no un chat genérico suelto)  
+- **Integraciones** — Obsidian, Google Workspace, Hermes u otro endpoint Chat Completions  
 
 <p align="center">
   <img src="docs/assets/architecture.svg" alt="Arquitectura LexOpen" width="100%"/>
@@ -112,43 +109,41 @@ flowchart LR
 
 ---
 
-## Capturas del recorrido
+## Recorrido típico
 
-> Interfaz en español, tipografía editorial y paleta **ink / sea / copper** (sin el look genérico “AI purple”).
-
-| Módulo | Qué verás al arrancar el seed |
+| Módulo | Qué resuelve para el abogado |
 | --- | --- |
-| **Dashboard** | Causas activas, plazos, trámites pendientes, actividad |
-| **Clientes** | CRM con carpeta + chat IA contextual |
-| **Causas** | RIT, partes, minutas, trámites, Drive, acciones IA |
-| **Espacios** | Matter Andes, VDR Pacífico, Knowledge, Portal cliente |
-| **Facturación** | Emisión con glosa asistida por IA |
-| **Configuración** | LLM (OpenAI, Azure, Groq, Ollama, Hermes, custom) |
+| **Dashboard** | Ve causas activas, plazos y trámites pendientes al empezar el día |
+| **Clientes** | Abre la carpeta del cliente: causas, trámites y chat con contexto |
+| **Causas** | Trabaja RIT, partes, minutas, trámites, Drive y resúmenes IA |
+| **Espacios** | Coordina el matter (archivos, wiki, Q&A, flujos) con el equipo |
+| **Facturación** | Emite boleta/factura con glosa profesional asistida |
+| **Configuración** | Elige el proveedor LLM y políticas del estudio |
 
 ---
 
 ## Asistente IA
 
-LexOpen no es “un chat más”: es un **catálogo de acciones** con contexto del expediente.
+LexOpen ofrece un **catálogo de acciones** con contexto del expediente. El abogado mantiene el control: borradores y sugerencias requieren revisión humana.
 
-| Acción | Dónde | Efecto |
+| Acción | Dónde | Aporte |
 | --- | --- | --- |
-| `causa.resumen` | Ficha de causa | Resumen procesal + próximos pasos |
-| `causa.sugerir_tramites` | Causa / panel trámites | Crea checklist pendiente |
-| `causa.extraer` | Alta de causa | Rellena RIT, tribunal, partes… |
-| `minuta.borrador` | Wizard de minuta | Prefills hechos, acuerdos, acciones |
-| `documento.resumir` / `clasificar` | Documentos | Memo / tipo sugerido |
-| `plazo.sugerir` | Plazos | Prefills cómputo y fatales |
-| `jurisprudencia.brief` | Jurisprudencia | Brief sobre la consulta |
-| `factura.glosa` | Facturación | Glosa profesional CL |
-| `mensaje.borrador` | Mensajes | Asunto + cuerpo |
-| `wiki.borrador` | Wiki del site | Playbook Markdown |
+| `causa.resumen` | Ficha de causa | Resumen procesal y próximos pasos |
+| `causa.sugerir_tramites` | Causa / trámites | Checklist de pendientes |
+| `causa.extraer` | Alta de causa | Autocompleta RIT, tribunal, partes… |
+| `minuta.borrador` | Wizard de minuta | Prefills hechos, acuerdos y acciones |
+| `documento.resumir` / `clasificar` | Documentos | Memo ejecutivo / tipo sugerido |
+| `plazo.sugerir` | Plazos | Propone cómputo y fatales prudentes |
+| `jurisprudencia.brief` | Jurisprudencia | Brief aplicable a la consulta |
+| `factura.glosa` | Facturación | Glosa profesional chilena |
+| `mensaje.borrador` | Mensajes | Asunto y cuerpo listos para editar |
+| `wiki.borrador` | Wiki del espacio | Playbook Markdown accionable |
 
 ```bash
 # Listar acciones
 curl localhost:3000/api/ai/actions
 
-# Ejecutar (sesión staff + CSRF same-origin)
+# Ejecutar (sesión del estudio + same-origin)
 curl -X POST localhost:3000/api/ai/actions \
   -H 'content-type: application/json' \
   -d '{"action":"causa.resumen","causaId":"<id>"}'
@@ -163,7 +158,7 @@ LLM_MODEL=gpt-4o-mini
 LLM_ALLOW_DEMO=1   # respuestas demo si el proveedor no responde
 ```
 
-Presets: **OpenAI · Azure · Groq · Ollama · Hermes · custom** (cualquier API compatible con Chat Completions).
+Presets: **OpenAI · Azure · Groq · Ollama · Hermes · custom** (API compatible con Chat Completions).
 
 ---
 
@@ -197,7 +192,7 @@ cp .env.example .env
 
 npm install
 npm run db:migrate
-npm run db:seed    # datos demo HighQ + Chile
+npm run db:seed    # datos demo del estudio
 npm run dev
 ```
 
@@ -219,7 +214,7 @@ Password de todos: `lexopen`
 
 Cambie de usuario con el switcher inferior del sidebar (`LEXOPEN_DEMO_SWITCHER=1` en local).
 
-### Sites demo incluidos
+### Espacios demo incluidos
 
 - Matter Andes · Cobro `C-4521-2025`  
 - Matter Muñoz · Tutela `O-1189-2025`  
@@ -237,7 +232,7 @@ Cambie de usuario con el switcher inferior del sidebar (`LEXOPEN_DEMO_SWITCHER=1
 | `SESSION_SECRET` | Sesiones + protección OAuth (obligatorio en prod) |
 | `LLM_API_URL` / `LLM_API_KEY` / `LLM_MODEL` | Proveedor IA OpenAI-compatible |
 | `LLM_ALLOW_DEMO` | `1` = fallback demo si el LLM cae |
-| `HERMES_*` | Legacy Hermes (sigue soportado) |
+| `HERMES_*` | Adaptador Hermes (opcional) |
 | `GOOGLE_CLIENT_ID` / `SECRET` / `REDIRECT_URI` | Drive / Calendar / Gmail |
 | `OBSIDIAN_VAULT_PATH` | Export Markdown |
 | `S3_*` | Object storage (opcional) |
@@ -261,7 +256,7 @@ curl -X POST localhost:3000/api/clientes/<id>/ai \
   -H 'content-type: application/json' \
   -d '{"prompt":"Resume los trámites pendientes"}'
 
-# Sites / VDR / iSheets
+# Espacios / VDR / iSheets
 curl localhost:3000/api/sites
 curl -X POST localhost:3000/api/sites/<id>/files \
   -H 'content-type: application/json' \
@@ -319,7 +314,7 @@ npm run build && npm run start
 
 ## Roadmap (abierto)
 
-- [ ] Conectores PJUD / fuentes oficiales (sin scraping agresivo)  
+- [ ] Conectores a fuentes oficiales (sin scraping agresivo)  
 - [ ] Plantillas de escritos y exportación DOCX  
 - [ ] SSO / SAML para estudios grandes  
 - [ ] Multi-tenant por estudio  
@@ -357,7 +352,7 @@ Si modifica LexOpen y lo ofrece como servicio en red, debe publicar el código f
 <p align="center">
   <img src="docs/assets/lexopen-logo.svg" width="48" alt=""/>
   <br/>
-  <sub>Hecho para estudios en Chile · Open source · Sin vendor lock-in</sub>
+  <sub>Hecho para estudios y abogados en Chile · Open source · Sin vendor lock-in</sub>
   <br/><br/>
   <a href="https://github.com/gabrielperezibacache/lexopen/stargazers">⭐ Star</a>
   ·
