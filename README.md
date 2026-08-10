@@ -29,7 +29,9 @@
 - **Facturación y contabilidad**: horas, gastos, tarifas, boletas/facturas (IVA/retención), pagos, cuenta corriente / provisión de fondos
 - Jurisprudencia (CS, Apelaciones, TC — corpus demo)
 - **Obsidian** (export vault Markdown, incluye Minutas/)
-- **Hermes Agent** (API OpenAI-compatible + demo)
+- **CRM de clientes**: ficha por cliente → causas → trámites pendientes/hechos → carpeta documental
+- **Asistente IA multi-proveedor**: OpenAI, Azure, Groq, Ollama, Hermes u otro endpoint compatible (config en `/configuracion`); chat por carpeta de cliente
+- **Hermes Agent** (sigue soportado vía el adaptador LLM)
 - **Google Workspace** (OAuth Drive / Calendar / Gmail)
 
 ## Stack
@@ -55,6 +57,8 @@ Abra http://localhost:3000/login e ingrese con un usuario demo.
 Variables relevantes:
 - `SESSION_SECRET`: obligatorio en producción para firmar sesiones y proteger tokens OAuth.
 - `HERMES_ALLOW_DEMO=1`: habilita respuestas demo cuando Hermes Agent no está disponible.
+- `LLM_API_URL` / `LLM_API_KEY` / `LLM_MODEL`: endpoint OpenAI-compatible (prioridad sobre HERMES_*).
+- `LLM_ALLOW_DEMO=1`: respuestas demo si el proveedor IA no responde.
 - `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`: opcionales para almacenar documentos fuera del filesystem local.
 
 ### Usuarios demo (password `lexopen`)
@@ -77,6 +81,19 @@ Cambie de usuario desde el switcher inferior del sidebar.
 ## API (muestra)
 
 ```bash
+# Clientes (CRM)
+curl localhost:3000/api/clientes
+
+# Trámites de una causa
+curl -X POST localhost:3000/api/causas/<id>/tramites \
+  -H 'content-type: application/json' \
+  -d '{"titulo":"Preparar lista de testigos","estado":"pendiente"}'
+
+# Chat IA sobre carpeta de cliente
+curl -X POST localhost:3000/api/clientes/<id>/ai \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"Resume los trámites pendientes"}'
+
 # Sites
 curl localhost:3000/api/sites
 

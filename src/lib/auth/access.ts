@@ -77,3 +77,11 @@ export async function enforceAppAccess() {
 
   return user;
 }
+
+/** Page-level staff gate (redirects instead of throwing). */
+export async function requireStaffPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!isStaff(user.role)) redirect("/portal");
+  return user;
+}

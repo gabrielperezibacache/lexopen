@@ -54,11 +54,55 @@ export const documentoCreateSchema = z.object({
   tipo: z.string().optional(),
   contenido: z.string().optional().nullable(),
   causaId: z.string().optional().nullable(),
+  clienteId: z.string().optional().nullable(),
   autorId: z.string().optional().nullable(),
   confidencial: z.boolean().optional(),
   privilegio: z.boolean().optional(),
   mimeType: z.string().optional().nullable(),
   storageKey: z.string().optional().nullable(),
+});
+
+export const clienteCreateSchema = z.object({
+  razonSocial: z.string().min(2),
+  rut: z.string().optional().nullable(),
+  email: z.string().email().optional().nullable().or(z.literal("")),
+  telefono: z.string().optional().nullable(),
+  tipo: z.enum(["persona", "empresa"]).optional(),
+  estado: z.enum(["activo", "inactivo"]).optional(),
+  notas: z.string().optional().nullable(),
+  abogadoId: z.string().optional().nullable(),
+});
+
+export const clienteUpdateSchema = clienteCreateSchema.partial();
+
+export const tramiteCreateSchema = z.object({
+  titulo: z.string().min(2),
+  detalle: z.string().optional().nullable(),
+  estado: z.enum(["pendiente", "en_curso", "hecho", "cancelado"]).optional(),
+  fechaLimite: z.string().optional().nullable(),
+  responsableId: z.string().optional().nullable(),
+  orden: z.number().int().optional(),
+});
+
+export const tramiteUpdateSchema = z.object({
+  titulo: z.string().min(2).optional(),
+  detalle: z.string().optional().nullable(),
+  estado: z.enum(["pendiente", "en_curso", "hecho", "cancelado"]).optional(),
+  fechaLimite: z.string().optional().nullable(),
+  fechaHecho: z.string().optional().nullable(),
+  responsableId: z.string().optional().nullable(),
+  orden: z.number().int().optional(),
+});
+
+export const llmConfigSchema = z.object({
+  preset: z
+    .enum(["openai", "azure", "groq", "ollama", "hermes", "custom"])
+    .optional(),
+  apiUrl: z.string().min(1).optional(),
+  apiKey: z.string().optional().nullable(),
+  model: z.string().min(1).optional(),
+  requireApproval: z.boolean().optional(),
+  allowDemo: z.boolean().optional(),
 });
 
 export const invoiceCreateSchema = z.object({

@@ -4,9 +4,11 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export function DocumentoUploadForm({
-  causas,
+  causas = [],
+  clienteId,
 }: {
-  causas: Array<{ id: string; label: string }>;
+  causas?: Array<{ id: string; label: string }>;
+  clienteId?: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
@@ -32,6 +34,7 @@ export function DocumentoUploadForm({
 
   return (
     <form onSubmit={onSubmit} className="panel grid gap-4 rounded-3xl p-5 md:grid-cols-4">
+      {clienteId && <input type="hidden" name="clienteId" value={clienteId} />}
       <div>
         <label className="mb-1 block text-sm font-medium">Archivo</label>
         <input className="input" type="file" name="file" required />
@@ -51,9 +54,11 @@ export function DocumentoUploadForm({
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Causa</label>
+        <label className="mb-1 block text-sm font-medium">
+          {clienteId ? "Causa (opcional)" : "Causa"}
+        </label>
         <select className="select" name="causaId" defaultValue="">
-          <option value="">Sin causa</option>
+          <option value="">{clienteId ? "Solo carpeta cliente" : "Sin causa"}</option>
           {causas.map((c) => (
             <option key={c.id} value={c.id}>
               {c.label}

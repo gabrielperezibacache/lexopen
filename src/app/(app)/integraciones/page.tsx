@@ -16,7 +16,7 @@ function IntegracionesInner() {
   const [obsidianMsg, setObsidianMsg] = useState("");
   const [obsidianMode, setObsidianMode] = useState("");
   const [google, setGoogle] = useState<GoogleStatus | null>(null);
-  const [hermesInfo, setHermesInfo] = useState("");
+  const [llmInfo, setLlmInfo] = useState("");
 
   useEffect(() => {
     fetch("/api/integrations/google")
@@ -35,16 +35,16 @@ function IntegracionesInner() {
         )
       )
       .catch(() => setObsidianMode("storage"));
-    fetch("/api/integrations/hermes")
+    fetch("/api/integrations/llm")
       .then((r) => r.json())
       .then((d) =>
-        setHermesInfo(
-          `API: ${d.config?.apiUrl || "—"} · modelo ${d.config?.model || "—"} · ${
-            d.enabled ? "habilitado" : "deshabilitado"
-          }`
+        setLlmInfo(
+          `${d.config?.preset || "custom"} · ${d.config?.apiUrl || "—"} · modelo ${
+            d.config?.model || "—"
+          } · ${d.enabled ? "habilitado" : "deshabilitado"}`
         )
       )
-      .catch(() => setHermesInfo("No disponible"));
+      .catch(() => setLlmInfo("No disponible"));
   }, []);
 
   async function syncObsidian() {
@@ -72,7 +72,8 @@ function IntegracionesInner() {
         </p>
         <h1 className="display mt-2 text-4xl">Integraciones</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Obsidian (vault Markdown), Hermes Agent (API) y Google Workspace (OAuth Drive / Calendar / Gmail).
+          Obsidian (vault Markdown), asistente IA multi-proveedor y Google Workspace
+          (OAuth Drive / Calendar / Gmail).
         </p>
       </div>
 
@@ -110,15 +111,21 @@ function IntegracionesInner() {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <h2 className="text-xl font-semibold">Hermes Agent</h2>
+          <h2 className="text-xl font-semibold">Asistente IA</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
-            Cliente HTTP compatible con OpenAI hacia el API server de Hermes. Si no hay agente
-            local, LexOpen responde en modo demo con guardrails.
+            OpenAI Chat Completions compatible (OpenAI, Azure, Groq, Ollama, Hermes u
+            otro). Configure endpoint y API key en Configuración; use el chat por
+            carpeta de cliente en CRM.
           </p>
-          <p className="mt-4 text-xs text-[var(--ink-soft)]/65">{hermesInfo || "Cargando…"}</p>
-          <a href="/agente" className="btn btn-secondary mt-5 inline-flex">
-            Abrir consola Hermes
-          </a>
+          <p className="mt-4 text-xs text-[var(--ink-soft)]/65">{llmInfo || "Cargando…"}</p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <a href="/agente" className="btn btn-secondary inline-flex">
+              Abrir asistente
+            </a>
+            <a href="/configuracion" className="btn btn-ghost inline-flex">
+              Configurar proveedor
+            </a>
+          </div>
         </section>
 
         <section className="panel rounded-3xl p-5">

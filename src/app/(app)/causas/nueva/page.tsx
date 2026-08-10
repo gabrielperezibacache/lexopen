@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   MATERIAS,
   ETAPAS,
@@ -19,13 +19,25 @@ type ConflictHit = {
   severity: "warning" | "blocked";
 };
 
-export default function NuevaCausaPage() {
+type ClienteOption = { id: string; razonSocial: string; rut: string | null };
+
+function NuevaCausaForm() {
   const router = useRouter();
+  const sp = useSearchParams();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [conflicts, setConflicts] = useState<ConflictHit[]>([]);
   const [conflictStatus, setConflictStatus] = useState<"idle" | "clear" | "warning" | "blocked">("idle");
   const [overrideRequired, setOverrideRequired] = useState(false);
+  const [clientes, setClientes] = useState<ClienteOption[]>([]);
+  const [clienteId, setClienteId] = useState(sp.get("clienteId") || "");
+
+  useEffect(() => {
+    fetch("/api/clientes")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: ClienteOption[]) => setClientes(data))
+      .catch(() => setClientes([]));
+  }, []);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -92,6 +104,7 @@ export default function NuevaCausaPage() {
       etapa: String(fd.get("etapa")),
       caratula: String(fd.get("caratula") || ""),
       resumen: String(fd.get("resumen") || ""),
+      clienteId: String(fd.get("clienteId") || "") || null,
       conflictOverride: fd.get("conflictOverride") === "on",
       conflictNotes: String(fd.get("conflictNotes") || ""),
       partes,
@@ -129,6 +142,23 @@ export default function NuevaCausaPage() {
       </div>
 
       <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Cliente</label>
+          <select
+            className="select"
+            name="clienteId"
+            value={clienteId}
+            onChange={(e) => setClienteId(e.target.value)}
+          >
+            <option value="">Sin cliente asignado</option>
+            {clientes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.razonSocial}
+                {c.rut ? ` · ${c.rut}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Título</label>
           <input className="input" name="titulo" required placeholder="Ej. Cobro de pesos — contrato" />
@@ -239,5 +269,13 @@ export default function NuevaCausaPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function NuevaCausaPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm">Cargando…</div>}>
+      <NuevaCausaForm />
+    </Suspense>
   );
 }

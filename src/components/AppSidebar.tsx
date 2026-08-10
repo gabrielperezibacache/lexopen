@@ -25,6 +25,7 @@ import {
   Menu,
   Shield,
   Settings,
+  ContactRound,
 } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
@@ -33,6 +34,7 @@ import { useState } from "react";
 const primary = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/sites", label: "Espacios", icon: Building2 },
+  { href: "/clientes", label: "Clientes", icon: ContactRound },
   { href: "/causas", label: "Causas", icon: Briefcase },
   { href: "/minutas", label: "Minutas", icon: ClipboardPen },
   { href: "/facturacion", label: "Facturación", icon: CircleDollarSign },
@@ -51,7 +53,7 @@ const collab = [
 
 const intel = [
   { href: "/jurisprudencia", label: "Jurisprudencia", icon: BookOpen },
-  { href: "/agente", label: "Agente Hermes", icon: Bot },
+  { href: "/agente", label: "Asistente IA", icon: Bot },
   { href: "/portal", label: "Portal cliente", icon: DoorOpen },
   { href: "/integraciones", label: "Integraciones", icon: Puzzle },
   { href: "/auditoria", label: "Auditoría", icon: Shield },

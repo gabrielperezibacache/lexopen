@@ -2,8 +2,10 @@
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 type CausaOption = { id: string; titulo: string; rit: string | null };
+type ClienteOption = { id: string; razonSocial: string };
 type ChatMessage = { role: "user" | "assistant"; content: string; source?: string };
 type AgentChat = {
   id: string;
@@ -11,14 +13,21 @@ type AgentChat = {
   messagesJson: string;
   demoMode: boolean;
   updatedAt: string;
+  clienteId?: string | null;
+  causaId?: string | null;
 };
 
 function AgenteInner() {
   const sp = useSearchParams();
   const [causas, setCausas] = useState<CausaOption[]>([]);
+  const [clientes, setClientes] = useState<ClienteOption[]>([]);
+  const [scope, setScope] = useState<"global" | "causa" | "cliente">(
+    sp.get("clienteId") ? "cliente" : sp.get("causaId") ? "causa" : "global"
+  );
   const [causaId, setCausaId] = useState(sp.get("causaId") || "");
+  const [clienteId, setClienteId] = useState(sp.get("clienteId") || "");
   const [prompt, setPrompt] = useState(
-    "Redacta un memorial de alegatos preliminar y cita jurisprudencia útil para Chile."
+    "Resume el estado y sugiere próximos pasos jurídicos para Chile."
   );
   const [reply, setReply] = useState("");
   const [meta, setMeta] = useState("");
@@ -28,7 +37,10 @@ function AgenteInner() {
   const [busy, setBusy] = useState(false);
 
   async function loadChats() {
-    const res = await fetch("/api/integrations/hermes?chats=1");
+    const qs = new URLSearchParams({ chats: "1" });
+    if (scope === "causa" && causaId) qs.set("causaId", causaId);
+    if (scope === "cliente" && clienteId) qs.set("clienteId", clienteId);
+    const res = await fetch(`/api/integrations/llm?${qs}`);
     if (res.ok) setChats(await res.json());
   }
 
@@ -37,8 +49,16 @@ function AgenteInner() {
       .then((r) => r.json())
       .then((data: CausaOption[]) => setCausas(data))
       .catch(() => setCausas([]));
-    loadChats().catch(() => setChats([]));
+    fetch("/api/clientes")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: ClienteOption[]) => setClientes(data))
+      .catch(() => setClientes([]));
   }, []);
+
+  useEffect(() => {
+    loadChats().catch(() => setChats([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, causaId, clienteId]);
 
   function resumeChat(chat: AgentChat) {
     setChatId(chat.id);
@@ -46,7 +66,7 @@ function AgenteInner() {
     setMessages(parsed);
     const lastAssistant = [...parsed].reverse().find((m) => m.role === "assistant");
     setReply(lastAssistant?.content || "");
-    setMeta(chat.demoMode ? "Historial · modo demo" : "Historial · Hermes Agent");
+    setMeta(chat.demoMode ? "Historial · modo demo" : "Historial · Asistente IA");
   }
 
   async function onSubmit(e: FormEvent) {
@@ -54,10 +74,21 @@ function AgenteInner() {
     setBusy(true);
     setReply("");
     setMeta("");
-    const res = await fetch("/api/integrations/hermes", {
+
+    const endpoint =
+      scope === "cliente" && clienteId
+        ? `/api/clientes/${clienteId}/ai`
+        : "/api/integrations/llm";
+
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ causaId: causaId || undefined, prompt, chatId: chatId || undefined }),
+      body: JSON.stringify({
+        prompt,
+        chatId: chatId || undefined,
+        ...(scope === "causa" && causaId ? { causaId } : {}),
+        ...(scope === "cliente" && clienteId ? { clienteId } : {}),
+      }),
     });
     const data = await res.json();
     setBusy(false);
@@ -69,11 +100,12 @@ function AgenteInner() {
     }
     setMeta(
       [
-        data.source === "hermes"
-          ? "Fuente: Hermes Agent"
+        data.source === "llm" || data.source === "hermes"
+          ? `Fuente: ${data.provider || "LLM"}`
           : data.source === "error"
-            ? "Error de Hermes"
+            ? "Error de proveedor"
             : "Fuente: demo local",
+        data.model ? `Modelo ${data.model}` : null,
         data.requireApproval ? "Requiere aprobación humana" : null,
         data.note || null,
       ]
@@ -88,10 +120,13 @@ function AgenteInner() {
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
           IA jurídica
         </p>
-        <h1 className="display mt-2 text-4xl">Hermes Agent</h1>
+        <h1 className="display mt-2 text-4xl">Asistente IA</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Integra el API server OpenAI-compatible de Hermes. Las acciones sensibles quedan
-          sujetas a aprobación del abogado.
+          Conecte OpenAI u otro endpoint compatible en{" "}
+          <Link href="/configuracion" className="text-[var(--sea)] underline-offset-2 hover:underline">
+            Configuración
+          </Link>
+          . Puede trabajar en global, por causa o por carpeta de cliente.
         </p>
       </div>
 
@@ -118,44 +153,76 @@ function AgenteInner() {
                 key={chat.id}
                 type="button"
                 className={`w-full rounded-2xl border px-3 py-2 text-left text-sm ${
-                  chat.id === chatId ? "border-[var(--sea)] bg-[var(--sea)]/8" : "border-[var(--line)] bg-white/70"
+                  chat.id === chatId
+                    ? "border-[var(--sea)] bg-[var(--sea)]/8"
+                    : "border-[var(--line)] bg-white/70"
                 }`}
                 onClick={() => resumeChat(chat)}
               >
                 <div className="font-medium">{chat.title}</div>
                 <div className="text-xs text-[var(--ink-soft)]/60">
-                  {chat.demoMode ? "demo" : "Hermes"} · {new Date(chat.updatedAt).toLocaleDateString("es-CL")}
+                  {chat.demoMode ? "demo" : "IA"} ·{" "}
+                  {new Date(chat.updatedAt).toLocaleDateString("es-CL")}
                 </div>
               </button>
             ))}
             {chats.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">Sin chats guardados.</p>
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Sin chats guardados.
+              </p>
             )}
           </div>
         </aside>
 
         <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
-          {messages.length === 0 && !reply && (
-            <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white/50 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
-              Elija una causa (opcional), ajuste la instrucción y envíe. Si Hermes no
-              está conectado, LexOpen responde en modo demo.
-            </div>
-          )}
           <div>
-            <label className="mb-1 block text-sm font-medium">Causa (contexto)</label>
+            <label className="mb-1 block text-sm font-medium">Alcance</label>
             <select
               className="select"
-              value={causaId}
-              onChange={(e) => setCausaId(e.target.value)}
+              value={scope}
+              onChange={(e) =>
+                setScope(e.target.value as "global" | "causa" | "cliente")
+              }
             >
-              <option value="">Sin causa específica</option>
-              {causas.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.rit || c.titulo}
-                </option>
-              ))}
+              <option value="global">Global (sin carpeta)</option>
+              <option value="causa">Por causa</option>
+              <option value="cliente">Por carpeta de cliente</option>
             </select>
           </div>
+          {scope === "causa" && (
+            <div>
+              <label className="mb-1 block text-sm font-medium">Causa</label>
+              <select
+                className="select"
+                value={causaId}
+                onChange={(e) => setCausaId(e.target.value)}
+              >
+                <option value="">Seleccione causa…</option>
+                {causas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.rit || c.titulo}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {scope === "cliente" && (
+            <div>
+              <label className="mb-1 block text-sm font-medium">Cliente</label>
+              <select
+                className="select"
+                value={clienteId}
+                onChange={(e) => setClienteId(e.target.value)}
+              >
+                <option value="">Seleccione cliente…</option>
+                {clientes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.razonSocial}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium">Instrucción</label>
             <textarea
@@ -165,7 +232,7 @@ function AgenteInner() {
             />
           </div>
           <button className="btn btn-primary" type="submit" disabled={busy}>
-            {busy ? "Consultando…" : "Enviar a Hermes"}
+            {busy ? "Consultando…" : "Enviar al asistente"}
           </button>
         </form>
       </div>
@@ -173,13 +240,29 @@ function AgenteInner() {
       {messages.length > 0 && (
         <section className="panel rounded-3xl p-6">
           <h2 className="mb-4 text-lg font-semibold">Historial</h2>
+          {meta && (
+            <p className="mb-3 text-xs uppercase tracking-[0.12em] text-[var(--copper)]">
+              {meta}
+            </p>
+          )}
           <div className="space-y-4">
             {messages.map((m, i) => (
-              <div key={i} className="rounded-2xl border border-[var(--line)] bg-white/70 p-3">
+              <div
+                key={i}
+                className="rounded-2xl border border-[var(--line)] bg-white/70 p-3"
+              >
                 <div className="mb-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
-                  {m.role === "user" ? "Usuario" : m.source === "demo" ? "Hermes demo" : m.source === "error" ? "Hermes error" : "Hermes"}
+                  {m.role === "user"
+                    ? "Usuario"
+                    : m.source === "demo"
+                      ? "IA demo"
+                      : m.source === "error"
+                        ? "IA error"
+                        : "IA"}
                 </div>
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{m.content}</pre>
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                  {m.content}
+                </pre>
               </div>
             ))}
           </div>
@@ -188,8 +271,14 @@ function AgenteInner() {
 
       {(reply || meta) && messages.length === 0 && (
         <section className="panel rounded-3xl p-6">
-          {meta && <p className="mb-3 text-xs uppercase tracking-[0.12em] text-[var(--copper)]">{meta}</p>}
-          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{reply}</pre>
+          {meta && (
+            <p className="mb-3 text-xs uppercase tracking-[0.12em] text-[var(--copper)]">
+              {meta}
+            </p>
+          )}
+          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+            {reply}
+          </pre>
         </section>
       )}
     </div>

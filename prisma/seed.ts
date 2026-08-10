@@ -43,6 +43,7 @@ async function wipe() {
     "documento",
     "parte",
     "etapaHistorial",
+    "tramite",
     "causaMovimiento",
     "agentChat",
     "causa",
@@ -186,6 +187,9 @@ async function main() {
       email: "legal@andes.cl",
       telefono: "+56 2 2345 6789",
       tipo: "empresa",
+      estado: "activo",
+      notas: "Cliente corporativo — litigio civil y recursos.",
+      abogadoId: abogado.id,
     },
   });
   const cliente2 = await prisma.cliente.create({
@@ -195,6 +199,9 @@ async function main() {
       email: "jcmunoz@correo.cl",
       telefono: "+56 9 8765 4321",
       tipo: "persona",
+      estado: "activo",
+      notas: "Tutela laboral — seguimiento cercano de plazos.",
+      abogadoId: admin.id,
     },
   });
 
@@ -278,13 +285,85 @@ async function main() {
     },
   });
 
+  await prisma.tramite.createMany({
+    data: [
+      {
+        causaId: causa1.id,
+        titulo: "Preparar lista de testigos",
+        detalle: "Coordinar con cliente Andes antes de audiencia de prueba.",
+        estado: "pendiente",
+        fechaLimite: new Date("2026-08-20"),
+        orden: 1,
+        responsableId: abogado.id,
+      },
+      {
+        causaId: causa1.id,
+        titulo: "Notificar demanda a demandado",
+        detalle: "Gestión ya realizada ante receptor.",
+        estado: "hecho",
+        fechaHecho: new Date("2025-04-01"),
+        orden: 0,
+        responsableId: asistente.id,
+      },
+      {
+        causaId: causa1.id,
+        titulo: "Solicitar oficios a conservador",
+        estado: "en_curso",
+        fechaLimite: new Date("2026-08-15"),
+        orden: 2,
+        responsableId: asistente.id,
+      },
+      {
+        causaId: causa2.id,
+        titulo: "Presentar contestación / réplica tutela",
+        estado: "pendiente",
+        fechaLimite: new Date("2026-08-12"),
+        orden: 1,
+        responsableId: admin.id,
+      },
+      {
+        causaId: causa2.id,
+        titulo: "Recopilar liquidaciones de sueldo",
+        estado: "hecho",
+        fechaHecho: new Date("2025-12-10"),
+        orden: 0,
+        responsableId: asistente.id,
+      },
+      {
+        causaId: causa3.id,
+        titulo: "Preparar alegatos en Corte",
+        estado: "pendiente",
+        fechaLimite: new Date("2026-09-01"),
+        orden: 1,
+        responsableId: abogado.id,
+      },
+    ],
+  });
+
   await prisma.documento.createMany({
     data: [
+      {
+        nombre: "Ficha KYC Andes.md",
+        tipo: "otro",
+        contenido:
+          "# KYC Constructora Andes SpA\n\nCliente corporativo desde 2024.\nContacto legal: legal@andes.cl\nNotas: preferir minutas post-audiencia el mismo día.",
+        clienteId: cliente1.id,
+        autorId: abogado.id,
+      },
+      {
+        nombre: "Mandato judicial Muñoz.md",
+        tipo: "contrato",
+        contenido:
+          "# Mandato\n\nJuan Carlos Muñoz Sepúlveda otorga mandato a Estudio LexOpen para tutela laboral O-1189-2025.",
+        clienteId: cliente2.id,
+        autorId: admin.id,
+      },
       {
         nombre: "Demanda de cobro de pesos.md",
         tipo: "escrito",
         contenido: "# Demanda de cobro de pesos\n\nEn lo principal...",
         causaId: causa1.id,
+        clienteId: cliente1.id,
         autorId: abogado.id,
         obsidianPath: "Causas/C-4521-2025/Demanda.md",
       },
@@ -1154,9 +1233,27 @@ async function main() {
         provider: "hermes",
         enabled: true,
         configJson: JSON.stringify({
-          apiUrl: process.env.HERMES_API_URL || "http://localhost:8642/v1",
-          model: "hermes-legal",
+          apiUrl:
+            process.env.LLM_API_URL ||
+            process.env.HERMES_API_URL ||
+            "http://localhost:8642/v1",
+          model: process.env.LLM_MODEL || "hermes-legal",
           requireApproval: true,
+        }),
+      },
+      {
+        provider: "llm",
+        enabled: true,
+        configJson: JSON.stringify({
+          preset: "hermes",
+          apiUrl:
+            process.env.LLM_API_URL ||
+            process.env.HERMES_API_URL ||
+            "https://api.openai.com/v1",
+          apiKey: process.env.LLM_API_KEY || process.env.HERMES_API_KEY || "",
+          model: process.env.LLM_MODEL || "gpt-4o-mini",
+          requireApproval: true,
+          allowDemo: true,
         }),
       },
       {

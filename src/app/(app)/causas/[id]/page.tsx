@@ -6,6 +6,7 @@ import { StatusBadge, formatDate, formatDateTime } from "@/components/ui";
 import { CausaActions } from "@/components/CausaActions";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
+import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
 import {
   isPlaceholderDriveFolderId,
@@ -27,6 +28,10 @@ export default async function CausaDetailPage({ params }: Params) {
       notas: { orderBy: { updatedAt: "desc" } },
       etapaHistorial: { orderBy: { createdAt: "desc" } },
       movimientos: { orderBy: { fecha: "desc" } },
+      tramites: {
+        orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+        include: { responsable: { select: { id: true, name: true } } },
+      },
       minutas: {
         include: {
           autor: { select: { name: true } },
@@ -184,7 +189,18 @@ export default async function CausaDetailPage({ params }: Params) {
             </div>
             <div>
               <dt className="text-[var(--ink-soft)]/60">Cliente</dt>
-              <dd className="font-medium">{causa.cliente?.razonSocial || "—"}</dd>
+              <dd className="font-medium">
+                {causa.cliente ? (
+                  <Link
+                    href={`/clientes/${causa.cliente.id}`}
+                    className="text-[var(--sea)] hover:underline"
+                  >
+                    {causa.cliente.razonSocial}
+                  </Link>
+                ) : (
+                  "—"
+                )}
+              </dd>
             </div>
             <div>
               <dt className="text-[var(--ink-soft)]/60">Abogado</dt>
@@ -284,6 +300,16 @@ export default async function CausaDetailPage({ params }: Params) {
           {causa.etapaHistorial.length === 0 && (
             <p className="text-sm text-[var(--ink-soft)]/65">Sin cambios de etapa registrados.</p>
           )}
+        </div>
+      </section>
+
+      <section className="panel rounded-3xl p-5">
+        <h2 className="text-lg font-semibold">Trámites del estudio</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+          Checklist de gestiones pendientes y hechas (distinto del historial PJUD).
+        </p>
+        <div className="mt-4">
+          <TramitesPanel causaId={causa.id} tramites={causa.tramites} />
         </div>
       </section>
 
