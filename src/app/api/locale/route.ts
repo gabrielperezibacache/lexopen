@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { handleRouteError, parseBody } from "@/lib/api";
-import {
-  DEFAULT_LOCALE,
-  LOCALE_COOKIE,
-  isLocale,
-  negotiateLocale,
-} from "@/lib/i18n";
+import { LOCALE_COOKIE, isLocale, negotiateLocale } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +30,4 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     return handleRouteError(e);
   }
-}
-
-export function preferredLocale(req: NextRequest) {
-  const fromCookie = req.cookies.get(LOCALE_COOKIE)?.value;
-  if (isLocale(fromCookie)) return fromCookie;
-  return negotiateLocale(req.headers.get("accept-language")) || DEFAULT_LOCALE;
 }
