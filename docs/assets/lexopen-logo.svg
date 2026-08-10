@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="LexOpen">
+  <defs>
+    <linearGradient id="g" x1="20" y1="20" x2="140" y2="140" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1f6f78"/>
+      <stop offset="1" stop-color="#0c1c24"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="36" fill="url(#g)"/>
+  <path d="M42 118V46h22.5v52.5H96V118H42z" fill="#f3f6f4"/>
+  <path d="M104 46h14.5c14.8 0 24.5 8.8 24.5 22.2 0 9.4-5.1 16.5-13.2 19.4L144 118h-25.2l-12.4-27.4H118V46zm14.5 32.6c5.1 0 8.4-2.9 8.4-7.4s-3.3-7.3-8.4-7.3H118v14.7h.5z" fill="#c47a3a"/>
+  <circle cx="128" cy="118" r="5" fill="#2a8f99"/>
+</svg>

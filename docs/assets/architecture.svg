@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="480" viewBox="0 0 1100 480" role="img" aria-label="Arquitectura LexOpen">
+  <rect width="1100" height="480" fill="#f7faf8"/>
+  <text x="40" y="46" font-family="Georgia, serif" font-size="26" fill="#0c1c24">Arquitectura</text>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="13">
+    <!-- clients -->
+    <rect x="40" y="80" width="200" height="90" rx="16" fill="#0c1c24"/>
+    <text x="60" y="118" fill="#f3f6f4" font-size="16" font-weight="700">Estudio</text>
+    <text x="60" y="142" fill="#d6c4a8">Web app Next.js</text>
+    <rect x="40" y="190" width="200" height="90" rx="16" fill="#1a3340"/>
+    <text x="60" y="228" fill="#f3f6f4" font-size="16" font-weight="700">Cliente</text>
+    <text x="60" y="252" fill="#d6c4a8">Portal · Q&amp;A</text>
+    <!-- arrow -->
+    <path d="M250 170 H310" stroke="#c47a3a" stroke-width="3" marker-end="url(#m)"/>
+    <!-- core -->
+    <rect x="320" y="70" width="420" height="320" rx="24" fill="#ffffff" stroke="#1f6f78" stroke-width="2"/>
+    <text x="350" y="110" fill="#0c1c24" font-size="18" font-weight="700">LexOpen Core</text>
+    <rect x="350" y="130" width="170" height="70" rx="12" fill="#1f6f78"/>
+    <text x="368" y="172" fill="#f3f6f4">App Router / API</text>
+    <rect x="540" y="130" width="170" height="70" rx="12" fill="#c47a3a"/>
+    <text x="568" y="172" fill="#f3f6f4">Acciones IA</text>
+    <rect x="350" y="220" width="170" height="70" rx="12" fill="#0c1c24"/>
+    <text x="378" y="262" fill="#f3f6f4">RBAC · CSRF</text>
+    <rect x="540" y="220" width="170" height="70" rx="12" fill="#2a8f99"/>
+    <text x="562" y="262" fill="#f3f6f4">Prisma · Postgres</text>
+    <rect x="350" y="310" width="360" height="54" rx="12" fill="#f3f6f4" stroke="#d6c4a8"/>
+    <text x="370" y="343" fill="#1a3340">Storage local o S3 · Activity · Search</text>
+    <!-- integrations -->
+    <path d="M740 230 H800" stroke="#c47a3a" stroke-width="3"/>
+    <rect x="810" y="80" width="250" height="300" rx="20" fill="#0c1c24"/>
+    <text x="835" y="120" fill="#f3f6f4" font-size="16" font-weight="700">Integraciones</text>
+    <text x="835" y="160" fill="#d6c4a8">OpenAI / Groq / Ollama</text>
+    <text x="835" y="190" fill="#d6c4a8">Hermes Agent</text>
+    <text x="835" y="220" fill="#d6c4a8">Google Drive / Calendar</text>
+    <text x="835" y="250" fill="#d6c4a8">Obsidian vault</text>
+    <text x="835" y="280" fill="#d6c4a8">Render Blueprint</text>
+    <text x="835" y="330" fill="#2a8f99">OpenAI-compatible</text>
+  </g>
+</svg>
