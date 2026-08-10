@@ -28,40 +28,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
-import { useState } from "react";
-
-const primary = [
-  { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
-  { href: "/sites", label: "Espacios", icon: Building2 },
-  { href: "/causas", label: "Causas", icon: Briefcase },
-  { href: "/minutas", label: "Minutas", icon: ClipboardPen },
-  { href: "/facturacion", label: "Facturación", icon: CircleDollarSign },
-  { href: "/tareas", label: "Tareas", icon: ListTodo },
-  { href: "/calendario", label: "Calendario", icon: CalendarDays },
-  { href: "/buscar", label: "Buscar", icon: Search },
-];
-
-const collab = [
-  { href: "/mensajes", label: "Mensajes", icon: MessageSquare },
-  { href: "/flujos", label: "Flujos", icon: GitBranch },
-  { href: "/personas", label: "Personas", icon: Users },
-  { href: "/documentos", label: "Documentos", icon: Files },
-  { href: "/plazos", label: "Plazos", icon: CalendarClock },
-];
-
-const intel = [
-  { href: "/jurisprudencia", label: "Jurisprudencia", icon: BookOpen },
-  { href: "/agente", label: "Agente Hermes", icon: Bot },
-  { href: "/portal", label: "Portal cliente", icon: DoorOpen },
-  { href: "/integraciones", label: "Integraciones", icon: Puzzle },
-  { href: "/auditoria", label: "Auditoría", icon: Shield },
-  { href: "/configuracion", label: "Configuración", icon: Settings },
-];
-
-const clienteNav = [
-  { href: "/portal", label: "Portal cliente", icon: DoorOpen },
-  { href: "/sites", label: "Espacios", icon: Building2 },
-];
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { useMemo, useState } from "react";
 
 function NavGroup({
   title,
@@ -70,7 +39,7 @@ function NavGroup({
   onNavigate,
 }: {
   title: string;
-  links: typeof primary;
+  links: Array<{ href: string; label: string; icon: typeof LayoutDashboard }>;
   pathname: string;
   onNavigate?: () => void;
 }) {
@@ -109,6 +78,52 @@ export function AppSidebar({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isCliente = role === "cliente";
+  const { t } = useI18n();
+
+  const primary = useMemo(
+    () => [
+      { href: "/dashboard", label: t("nav.home"), icon: LayoutDashboard },
+      { href: "/sites", label: t("nav.sites"), icon: Building2 },
+      { href: "/causas", label: t("nav.cases"), icon: Briefcase },
+      { href: "/minutas", label: t("nav.minutes"), icon: ClipboardPen },
+      { href: "/facturacion", label: t("nav.billing"), icon: CircleDollarSign },
+      { href: "/tareas", label: t("nav.tasks"), icon: ListTodo },
+      { href: "/calendario", label: t("nav.calendar"), icon: CalendarDays },
+      { href: "/buscar", label: t("nav.search"), icon: Search },
+    ],
+    [t]
+  );
+
+  const collab = useMemo(
+    () => [
+      { href: "/mensajes", label: t("nav.messages"), icon: MessageSquare },
+      { href: "/flujos", label: t("nav.workflows"), icon: GitBranch },
+      { href: "/personas", label: t("nav.people"), icon: Users },
+      { href: "/documentos", label: t("nav.documents"), icon: Files },
+      { href: "/plazos", label: t("nav.deadlines"), icon: CalendarClock },
+    ],
+    [t]
+  );
+
+  const intel = useMemo(
+    () => [
+      { href: "/jurisprudencia", label: t("nav.jurisprudence"), icon: BookOpen },
+      { href: "/agente", label: t("nav.agent"), icon: Bot },
+      { href: "/portal", label: t("nav.portal"), icon: DoorOpen },
+      { href: "/integraciones", label: t("nav.integrations"), icon: Puzzle },
+      { href: "/auditoria", label: t("nav.audit"), icon: Shield },
+      { href: "/configuracion", label: t("nav.settings"), icon: Settings },
+    ],
+    [t]
+  );
+
+  const clienteNav = useMemo(
+    () => [
+      { href: "/portal", label: t("nav.portal"), icon: DoorOpen },
+      { href: "/sites", label: t("nav.sites"), icon: Building2 },
+    ],
+    [t]
+  );
 
   const nav = (
     <>
@@ -120,7 +135,7 @@ export function AppSidebar({
           <div>
             <div className="display text-xl leading-none">LexOpen</div>
             <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-white/55">
-              Estudio · Chile
+              {t("brand.tagline")}
             </div>
           </div>
         </Link>
@@ -128,12 +143,32 @@ export function AppSidebar({
 
       <nav className="flex-1 overflow-y-auto p-3">
         {isCliente ? (
-          <NavGroup title="Portal" links={clienteNav} pathname={pathname} onNavigate={() => setOpen(false)} />
+          <NavGroup
+            title={t("nav.groups.portal")}
+            links={clienteNav}
+            pathname={pathname}
+            onNavigate={() => setOpen(false)}
+          />
         ) : (
           <>
-            <NavGroup title="Espacio de trabajo" links={primary} pathname={pathname} onNavigate={() => setOpen(false)} />
-            <NavGroup title="Colaboración" links={collab} pathname={pathname} onNavigate={() => setOpen(false)} />
-            <NavGroup title="Inteligencia" links={intel} pathname={pathname} onNavigate={() => setOpen(false)} />
+            <NavGroup
+              title={t("nav.groups.workspace")}
+              links={primary}
+              pathname={pathname}
+              onNavigate={() => setOpen(false)}
+            />
+            <NavGroup
+              title={t("nav.groups.collab")}
+              links={collab}
+              pathname={pathname}
+              onNavigate={() => setOpen(false)}
+            />
+            <NavGroup
+              title={t("nav.groups.intel")}
+              links={intel}
+              pathname={pathname}
+              onNavigate={() => setOpen(false)}
+            />
           </>
         )}
       </nav>
@@ -143,7 +178,7 @@ export function AppSidebar({
           <Link href="/notificaciones" className="nav-link" onClick={() => setOpen(false)}>
             <Bell size={16} />
             <span className="flex flex-1 items-center justify-between gap-2">
-              Notificaciones
+              {t("nav.notifications")}
               {unreadCount > 0 && (
                 <span className="rounded-full bg-[var(--copper)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
                   {unreadCount > 99 ? "99+" : unreadCount}
@@ -152,6 +187,9 @@ export function AppSidebar({
             </span>
           </Link>
         )}
+        <div className="px-1 pt-1">
+          <LanguageSwitcher variant="dark" className="w-full [&_select]:w-full" />
+        </div>
         <UserSwitcher />
       </div>
     </>
@@ -163,7 +201,7 @@ export function AppSidebar({
         type="button"
         className="fixed bottom-4 right-4 z-40 grid h-12 w-12 place-items-center rounded-full bg-[var(--ink)] text-white shadow-lg md:hidden"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Abrir menú"
+        aria-label={t("common.openMenu")}
         aria-expanded={open}
       >
         <Menu size={20} />
@@ -174,7 +212,7 @@ export function AppSidebar({
           <button
             type="button"
             className="absolute inset-0 bg-black/40"
-            aria-label="Cerrar menú"
+            aria-label={t("common.closeMenu")}
             onClick={() => setOpen(false)}
           />
           <aside className="absolute left-0 top-0 flex h-full w-[270px] flex-col bg-[linear-gradient(180deg,#0c1c24_0%,#14313d_55%,#1a3d3f_100%)] text-white shadow-xl">

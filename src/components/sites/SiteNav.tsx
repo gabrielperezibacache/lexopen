@@ -3,25 +3,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import { cn } from "@/lib/chile";
-
-const tabs = [
-  { href: "", label: "Resumen" },
-  { href: "/archivos", label: "Archivos" },
-  { href: "/tareas", label: "Tareas" },
-  { href: "/wiki", label: "Wiki" },
-  { href: "/isheets", label: "iSheets" },
-  { href: "/qa", label: "Q&A" },
-  { href: "/personas", label: "Personas" },
-  { href: "/flujos", label: "Flujos" },
-];
-
-const tipoLabel: Record<string, string> = {
-  matter: "Matter / causa",
-  vdr: "VDR",
-  client_portal: "Portal cliente",
-  project: "Proyecto",
-  knowledge: "Knowledge",
-};
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 export function SiteNav({
   siteId,
@@ -36,30 +18,45 @@ export function SiteNav({
   color: string;
   active: string;
 }) {
+  const { t, dict } = useI18n();
+  const tabs = [
+    { href: "", label: t("siteTabs.overview") },
+    { href: "/archivos", label: t("siteTabs.files") },
+    { href: "/tareas", label: t("siteTabs.tasks") },
+    { href: "/wiki", label: t("siteTabs.wiki") },
+    { href: "/isheets", label: t("siteTabs.isheets") },
+    { href: "/qa", label: t("siteTabs.qa") },
+    { href: "/personas", label: t("siteTabs.people") },
+    { href: "/flujos", label: t("siteTabs.workflows") },
+  ];
+  const tipoLabel =
+    dict.siteTabs.types[tipo as keyof typeof dict.siteTabs.types] ||
+    tipo.replace("_", " ");
+
   return (
     <div className="mb-6 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/sites" className="text-sm text-[var(--sea)]">
-            ← Espacios
+            {t("siteTabs.backToSites")}
           </Link>
           <div className="mt-2 flex items-center gap-3">
             <span className="h-4 w-4 rounded-full" style={{ background: color }} />
             <h1 className="display text-3xl md:text-4xl">{siteName}</h1>
           </div>
           <p className="mt-1 text-sm uppercase tracking-[0.14em] text-[var(--ink-soft)]/60">
-            {tipoLabel[tipo] || tipo.replace("_", " ")} · Espacio LexOpen
+            {tipoLabel} · {t("siteTabs.spaceLabel")}
           </p>
         </div>
       </div>
       <div className="-mx-1 overflow-x-auto border-b border-[var(--line)] pb-1">
         <div className="flex min-w-max gap-1 px-1">
-          {tabs.map((t) => {
-            const href = `/sites/${siteId}${t.href}`;
-            const isActive = active === t.href;
+          {tabs.map((tab) => {
+            const href = `/sites/${siteId}${tab.href}`;
+            const isActive = active === tab.href;
             return (
               <Link
-                key={t.href || "overview"}
+                key={tab.href || "overview"}
                 href={href}
                 className={cn(
                   "rounded-t-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition",
@@ -68,7 +65,7 @@ export function SiteNav({
                     : "text-[var(--ink-soft)]/70 hover:text-[var(--ink)]"
                 )}
               >
-                {t.label}
+                {tab.label}
               </Link>
             );
           })}
