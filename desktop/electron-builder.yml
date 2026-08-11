@@ -88,6 +88,7 @@ nsis:
   deleteAppDataOnUninstall: false
   allowElevation: true
 linux:
+  desktopName: LexOpen
   target:
     - AppImage
   category: Office
