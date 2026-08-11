@@ -124,4 +124,4 @@ npm run desktop:dist                 # electron-builder → .dmg / .exe
 
 - Un solo Host activo (no multi-maestro).
 - Los instaladores firmados/notarizados (Apple/Windows SmartScreen) requieren certificados del estudio; el build genera artefactos sin firma.
-- Actualización automática (`electron-updater`) está preparada vía releases GitHub; hay que publicar tags `v*`.
+- El Host reconoce la versión nueva y los clientes Electron recargan la interfaz; la descarga e instalación automática (`electron-updater`) todavía no está implementada.
