@@ -9,7 +9,10 @@ assert.deepEqual(clientWhere, {
   members: { some: { userId: "user_1" } },
 });
 
-assert.deepEqual(confidentialFileWhere("cliente"), { confidencial: false });
+assert.deepEqual(confidentialFileWhere("cliente"), {
+  confidencial: false,
+  privilegio: false,
+});
 assert.deepEqual(confidentialFileWhere("admin"), {});
 
 assert.equal(isClientAllowedPath("/portal"), true);

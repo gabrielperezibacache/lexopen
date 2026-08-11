@@ -48,7 +48,14 @@ export async function parseBody<T>(req: Request, schema: ZodSchema<T>) {
   return schema.parse(body);
 }
 
-export { getCurrentUser, requireUser, requireStaff, requireRole, requireSiteAccess };
+export {
+  getCurrentUser,
+  requireUser,
+  requireStaff,
+  requireRole,
+  requireSiteAccess,
+  httpError,
+};
 
 export async function assertStaffApi() {
   return requireStaff();
@@ -64,7 +71,7 @@ export async function requireBillingManager() {
 
 export function confidentialWhere(userRole: string) {
   if (canSeeConfidential(userRole)) return {};
-  return { confidencial: false };
+  return { confidencial: false, privilegio: false };
 }
 
 export function portalBlockedResponse(userRole: string) {
