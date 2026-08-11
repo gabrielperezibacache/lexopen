@@ -58,19 +58,38 @@ Use esa URL en los clientes. El CSRF de LexOpen acepta el `Host` de la petición
 
 ## Actualizaciones (repo en constante cambio)
 
-1. Publicar un **release** GitHub con instaladores Mac/Windows (CI o build local con `npm run desktop:dist`).
-2. En el **Host**: instalar la nueva versión (el directorio de datos de Postgres **se conserva**).
-3. Al arrancar, el Host ejecuta `prisma migrate deploy` automáticamente.
-4. Los **clientes** solo necesitan actualizar si cambió la app de escritorio; si solo usan el navegador, no actualizan nada.
+**Garantía:** publicar o instalar una versión nueva **no reescribe** configuración ni datos del usuario. Solo se reemplaza el binario de la app.
 
-Datos del Host (no borrar al actualizar):
+| Se actualiza (instalador) | Se preserva (fuera del .app / Program Files) |
+| --- | --- |
+| Código Next/Electron | `desktop-config.json` (modo Host/Cliente, URL Tailscale) |
+| Migraciones Prisma (al arrancar) | `.env` (secretos, LLM, S3, Google…) — merge: solo claves *faltantes* |
+| | `pgdata/` (Postgres embebido) |
+| | `storage/` (documentos locales) |
+| | `obsidian-vault/`, `.seeded`, `app-state.json` |
+
+### Reconocimiento inmediato
+
+1. Al abrir el Host tras instalar, se escribe `app-state.json` con la nueva versión **antes** de migrar.
+2. `/api/health` expone `version` + `updateRecognized` con `Cache-Control: no-store`.
+3. Clientes Desktop consultan el health cada 15s; si el Host cambió de versión, **recargan al momento** (`?lexopen_v=`).
+4. Quien use solo el navegador ve la UI nueva en el siguiente refresh (sin reinstalar).
+
+Flujo operativo:
+
+1. Publicar release GitHub (`.dmg` / `.exe`) con `npm run desktop:dist`.
+2. En el **Host**: instalar encima (NSIS/macOS no tocan `%APPDATA%` / Application Support).
+3. Arrancar → log `Actualización reconocida: x → y` → `prisma migrate deploy` → listo.
+4. Clientes: si usan Desktop, recarga automática; si usan navegador, F5.
+
+Datos del Host:
 
 | SO | Ruta típica |
 | --- | --- |
 | macOS | `~/Library/Application Support/LexOpen/` |
 | Windows | `%APPDATA%\LexOpen\` |
 
-Ahí viven Postgres embebido, `.env` del host y la preferencia host/cliente.
+> El instalador **nunca** debe apuntar `STORAGE_PATH` ni Postgres al directorio de la aplicación: van bajo esa carpeta de datos.
 
 ## Desarrollo (desde el repo)
 

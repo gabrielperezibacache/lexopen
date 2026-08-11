@@ -1,6 +1,6 @@
 /**
  * Arranca Postgres embebido + migraciones + servidor Next en 0.0.0.0.
- * Usado por Electron (modo host) o `npm run desktop:host`.
+ * Datos/config del usuario viven en LEXOPEN_DATA_DIR (fuera del instalador).
  */
 import { createRequire } from "module";
 import { spawn } from "child_process";
@@ -15,8 +15,10 @@ const {
   defaultDataDir,
   ensureHostEnv,
   readConfig,
-  writeConfig,
+  recognizeAppVersion,
+  readPackageVersion,
   localAppUrl,
+  pgDataDir,
 } = require("./config.cjs");
 
 const repoRoot = process.env.LEXOPEN_APP_ROOT
@@ -25,6 +27,15 @@ const repoRoot = process.env.LEXOPEN_APP_ROOT
 const prismaRoot = process.env.LEXOPEN_PRISMA_ROOT
   ? path.resolve(process.env.LEXOPEN_PRISMA_ROOT)
   : path.join(repoRoot, "prisma");
+
+function appVersion() {
+  const fromEnv = process.env.LEXOPEN_APP_VERSION;
+  if (fromEnv) return fromEnv;
+  const desktopPkg = path.join(__dirname, "package.json");
+  const rootPkg = path.join(repoRoot, "package.json");
+  if (fs.existsSync(desktopPkg)) return readPackageVersion(desktopPkg);
+  return readPackageVersion(rootPkg);
+}
 
 function loadEnvFile(file) {
   if (!fs.existsSync(file)) return;
@@ -43,7 +54,8 @@ function loadEnvFile(file) {
 async function startEmbeddedPostgres(dataDir, pgPort) {
   const modPath = require.resolve("embedded-postgres");
   const EmbeddedPostgres = (await import(pathToFileURL(modPath).href)).default;
-  const databaseDir = path.join(dataDir, "pgdata");
+  const databaseDir = pgDataDir(dataDir);
+  const alreadyInitialized = fs.existsSync(path.join(databaseDir, "PG_VERSION"));
   const pg = new EmbeddedPostgres({
     databaseDir,
     user: "lexopen",
@@ -51,7 +63,9 @@ async function startEmbeddedPostgres(dataDir, pgPort) {
     port: pgPort,
     persistent: true,
   });
-  await pg.initialise();
+  if (!alreadyInitialized) {
+    await pg.initialise();
+  }
   await pg.start();
   try {
     await pg.createDatabase("lexopen");
@@ -87,11 +101,11 @@ async function migrate() {
   });
 }
 
-async function maybeSeed(seedDemo) {
+async function maybeSeed(seedDemo, dataDir) {
   if (!seedDemo) return;
-  const marker = path.join(process.env.LEXOPEN_DATA_DIR || defaultDataDir(), ".seeded");
+  const marker = path.join(dataDir, ".seeded");
   if (fs.existsSync(marker)) {
-    console.log("[lexopen-host] Seed demo ya aplicado (marker presente).");
+    console.log("[lexopen-host] Seed demo ya aplicado — no se vuelve a ejecutar.");
     return;
   }
   await run("npx", ["tsx", "prisma/seed.ts"]);
@@ -99,6 +113,8 @@ async function maybeSeed(seedDemo) {
 }
 
 function resolveServerEntry() {
+  const packaged = path.join(repoRoot, "server.js");
+  if (fs.existsSync(packaged)) return { type: "standalone", entry: packaged };
   const standalone = path.join(repoRoot, ".next", "standalone", "server.js");
   if (fs.existsSync(standalone)) return { type: "standalone", entry: standalone };
   return { type: "next", entry: null };
@@ -122,7 +138,9 @@ function startNextServer(port) {
     });
   }
 
-  console.log("[lexopen-host] Usando `next start` (ejecute LEXOPEN_STANDALONE=1 npm run build para empaquetado).");
+  console.log(
+    "[lexopen-host] Usando `next start` (empaquetado: LEXOPEN_STANDALONE=1 npm run build)."
+  );
   return spawn("npx", ["next", "start", "-H", "0.0.0.0", "-p", String(port)], {
     cwd: repoRoot,
     env,
@@ -151,32 +169,60 @@ export async function startHost(options = {}) {
   const cfg = readConfig(dataDir);
   const port = Number(options.port || cfg.port || 3000);
   const pgPort = Number(options.pgPort || cfg.pgPort || 54329);
-  const seedDemo = Boolean(options.seedDemo ?? cfg.seedDemo);
-  const publicUrl = options.publicUrl || cfg.publicUrl || "";
+  // seed solo si ya estaba guardado en config; no forzar en cada update
+  const seedDemo = Boolean(
+    options.seedDemo !== undefined ? options.seedDemo : cfg.seedDemo
+  );
+  const publicUrl =
+    options.publicUrl !== undefined ? options.publicUrl : cfg.publicUrl || "";
 
-  writeConfig({ mode: "host", port, pgPort, seedDemo, publicUrl }, dataDir);
+  const version = appVersion();
+  process.env.LEXOPEN_APP_VERSION = version;
+
+  // Reconocer actualización de inmediato (app-state.json), sin tocar desktop-config/.env
+  const recognition = recognizeAppVersion(version, dataDir);
+  process.env.LEXOPEN_APP_VERSION = version;
+  process.env.LEXOPEN_UPDATE_RECOGNIZED = recognition.changed ? "1" : "0";
+  if (recognition.previousVersion) {
+    process.env.LEXOPEN_PREVIOUS_APP_VERSION = recognition.previousVersion;
+  }
+  if (recognition.changed) {
+    console.log(
+      `[lexopen-host] Actualización reconocida: ${recognition.previousVersion} → ${recognition.currentVersion}`
+    );
+  } else if (recognition.firstRun) {
+    console.log(`[lexopen-host] Primera ejecución · v${version}`);
+  } else {
+    console.log(`[lexopen-host] Versión activa v${version} (datos preservados)`);
+  }
+
   const host = ensureHostEnv(dataDir, { port, pgPort, seedDemo, publicUrl });
   loadEnvFile(host.envFile);
+  // Reafirmar tras cargar .env (el archivo no debe pisar la versión del binario)
+  process.env.LEXOPEN_APP_VERSION = version;
+  process.env.LEXOPEN_UPDATE_RECOGNIZED = recognition.changed ? "1" : "0";
+  if (host.envPreserved) {
+    console.log(
+      "[lexopen-host] .env existente preservado (solo se completaron claves faltantes:",
+      host.addedKeys.length ? host.addedKeys.join(", ") : "ninguna",
+      ")"
+    );
+  }
 
   console.log("[lexopen-host] Datos en", dataDir);
-  console.log("[lexopen-host] Postgres :", host.pgPort);
-  console.log("[lexopen-host] App      :", localAppUrl(port), "(bind 0.0.0.0)");
-  if (publicUrl) {
-    console.log("[lexopen-host] URL pública (Tailscale):", publicUrl);
-  } else {
-    console.log(
-      "[lexopen-host] Tip Tailscale: instale Tailscale y use http://<hostname>:PORT o `tailscale serve --bg",
-      port,
-      "`"
-    );
+  console.log("[lexopen-host] Postgres :", host.pgPort, "·", pgDataDir(dataDir));
+  console.log("[lexopen-host] Storage  :", host.storagePath);
+  console.log("[lexopen-host] App      :", localAppUrl(host.port), "(bind 0.0.0.0)");
+  if (host.publicUrl) {
+    console.log("[lexopen-host] URL pública:", host.publicUrl);
   }
 
   const pg = await startEmbeddedPostgres(dataDir, pgPort);
   await migrate();
-  await maybeSeed(seedDemo);
+  await maybeSeed(seedDemo, dataDir);
 
-  const child = startNextServer(port);
-  const url = localAppUrl(port);
+  const child = startNextServer(host.port);
+  const url = localAppUrl(host.port);
   const ok = await waitForHealth(url);
   if (!ok) {
     console.warn("[lexopen-host] Health check lento; la ventana puede reintentar.");
@@ -194,7 +240,17 @@ export async function startHost(options = {}) {
   process.on("SIGINT", () => void stop().then(() => process.exit(0)));
   process.on("SIGTERM", () => void stop().then(() => process.exit(0)));
 
-  return { url, publicUrl: host.publicUrl, port, stop, child, dataDir };
+  return {
+    url,
+    publicUrl: host.publicUrl,
+    port: host.port,
+    stop,
+    child,
+    dataDir,
+    version,
+    updateRecognized: recognition.changed,
+    previousVersion: recognition.previousVersion,
+  };
 }
 
 const isMain =

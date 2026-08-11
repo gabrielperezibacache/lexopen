@@ -10,11 +10,21 @@ const {
   normalizeRemoteUrl,
   localAppUrl,
   defaultDataDir,
+  readPackageVersion,
+  readAppState,
 } = require("./config.cjs");
 
 let mainWindow = null;
 let hostHandle = null;
 let lastStatus = { phase: "idle", message: "Iniciando…" };
+let lastRemoteVersion = null;
+
+function bundledVersion() {
+  return (
+    process.env.LEXOPEN_APP_VERSION ||
+    readPackageVersion(path.join(__dirname, "package.json"))
+  );
+}
 
 function sendStatus(partial) {
   lastStatus = { ...lastStatus, ...partial, at: new Date().toISOString() };
@@ -54,9 +64,17 @@ async function probeRemote(url) {
   try {
     const res = await fetch(`${base}/api/health`, {
       signal: AbortSignal.timeout(8000),
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
     });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-    return { ok: true, url: base };
+    const body = await res.json().catch(() => ({}));
+    return {
+      ok: true,
+      url: base,
+      version: body.version || null,
+      updateRecognized: Boolean(body.updateRecognized),
+    };
   } catch (e) {
     return {
       ok: false,
@@ -65,21 +83,34 @@ async function probeRemote(url) {
   }
 }
 
+function loadAppUrl(url, version) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const v = version || bundledVersion();
+  const sep = url.includes("?") ? "&" : "?";
+  // Cache-bust inmediato tras publicar/actualizar el Host
+  mainWindow.loadURL(`${url}${sep}lexopen_v=${encodeURIComponent(v)}`);
+}
+
 async function startHostMode(cfg) {
   sendStatus({ phase: "starting-host", message: "Arrancando servidor local…" });
   const { startHost } = await import("./host-runtime.mjs");
   hostHandle = await startHost({
     dataDir: defaultDataDir(),
+    // No pasar seedDemo/publicUrl salvo que el usuario los cambie en el asistente:
+    // startHost lee desktop-config.json existente y preserve .env.
     port: cfg.port,
     pgPort: cfg.pgPort,
-    seedDemo: cfg.seedDemo,
-    publicUrl: cfg.publicUrl,
   });
+  const msg = hostHandle.updateRecognized
+    ? `Actualización v${hostHandle.previousVersion} → v${hostHandle.version} reconocida · datos intactos`
+    : `Servidor listo · v${hostHandle.version}`;
   sendStatus({
     phase: "ready",
-    message: "Servidor listo",
+    message: msg,
     url: hostHandle.url,
     publicUrl: hostHandle.publicUrl,
+    version: hostHandle.version,
+    updateRecognized: hostHandle.updateRecognized,
   });
   return hostHandle.url;
 }
@@ -103,6 +134,23 @@ async function boot() {
           {
             label: "Abrir carpeta de datos",
             click: () => shell.openPath(defaultDataDir()),
+          },
+          {
+            label: "Versión y estado",
+            click: () => {
+              const state = readAppState(defaultDataDir());
+              dialog.showMessageBox({
+                type: "info",
+                title: "LexOpen",
+                message: `Versión empaquetada: ${bundledVersion()}`,
+                detail: [
+                  `Última aplicada: ${state.lastAppVersion || "—"}`,
+                  `Reconocida: ${state.updateRecognizedAt || "—"}`,
+                  `Datos: ${defaultDataDir()}`,
+                  "Las actualizaciones no borran .env, pgdata ni storage.",
+                ].join("\n"),
+              });
+            },
           },
           { type: "separator" },
           { role: "quit", label: "Salir" },
@@ -131,8 +179,17 @@ async function boot() {
       mainWindow.loadFile(path.join(__dirname, "renderer", "setup.html"));
       return;
     }
-    sendStatus({ phase: "ready", message: "Conectado", url: probe.url });
-    mainWindow.loadURL(probe.url);
+    lastRemoteVersion = probe.version;
+    sendStatus({
+      phase: "ready",
+      message: probe.version
+        ? `Conectado · Host v${probe.version}`
+        : "Conectado",
+      url: probe.url,
+      version: probe.version,
+    });
+    loadAppUrl(probe.url, probe.version);
+    startClientVersionWatch(cfg.remoteUrl);
     return;
   }
 
@@ -140,7 +197,7 @@ async function boot() {
   createWindow(null);
   try {
     const url = await startHostMode(cfg);
-    mainWindow.loadURL(url);
+    loadAppUrl(url, hostHandle?.version);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     sendStatus({ phase: "error", message: msg });
@@ -149,9 +206,40 @@ async function boot() {
   }
 }
 
+let clientWatchTimer = null;
+
+function startClientVersionWatch(remoteUrl) {
+  if (clientWatchTimer) clearInterval(clientWatchTimer);
+  clientWatchTimer = setInterval(() => {
+    void (async () => {
+      const probe = await probeRemote(remoteUrl);
+      if (!probe.ok || !probe.version) return;
+      if (lastRemoteVersion && probe.version !== lastRemoteVersion) {
+        lastRemoteVersion = probe.version;
+        sendStatus({
+          phase: "ready",
+          message: `Host actualizado a v${probe.version} — recargando…`,
+          url: probe.url,
+          version: probe.version,
+          updateRecognized: true,
+        });
+        loadAppUrl(probe.url, probe.version);
+      } else if (!lastRemoteVersion) {
+        lastRemoteVersion = probe.version;
+      }
+    })();
+  }, 15000);
+}
+
 ipcMain.handle("desktop:get-state", async () => {
   const cfg = readConfig();
-  return { config: cfg, status: lastStatus, dataDir: defaultDataDir() };
+  return {
+    config: cfg,
+    status: lastStatus,
+    dataDir: defaultDataDir(),
+    appState: readAppState(defaultDataDir()),
+    version: bundledVersion(),
+  };
 });
 
 ipcMain.handle("desktop:save-setup", async (_e, payload) => {
@@ -166,6 +254,7 @@ ipcMain.handle("desktop:save-setup", async (_e, payload) => {
     return { ok: false, error: "Indique la URL del PC principal (Tailscale)." };
   }
 
+  // Solo el asistente escribe preferencias de modo; no se toca en updates.
   writeConfig({ mode, remoteUrl, port, pgPort, seedDemo, publicUrl });
 
   if (hostHandle?.stop) {
@@ -182,16 +271,31 @@ ipcMain.handle("desktop:save-setup", async (_e, payload) => {
         error: `No se alcanza ${remoteUrl}: ${probe.error}`,
       };
     }
-    sendStatus({ phase: "ready", message: "Conectado", url: probe.url });
-    if (mainWindow) mainWindow.loadURL(probe.url);
-    return { ok: true, url: probe.url };
+    lastRemoteVersion = probe.version;
+    sendStatus({
+      phase: "ready",
+      message: probe.version
+        ? `Conectado · Host v${probe.version}`
+        : "Conectado",
+      url: probe.url,
+      version: probe.version,
+    });
+    if (mainWindow) loadAppUrl(probe.url, probe.version);
+    startClientVersionWatch(remoteUrl);
+    return { ok: true, url: probe.url, version: probe.version };
   }
 
   try {
     const cfg = readConfig();
     const url = await startHostMode(cfg);
-    if (mainWindow) mainWindow.loadURL(url);
-    return { ok: true, url, publicUrl: cfg.publicUrl || localAppUrl(port) };
+    if (mainWindow) loadAppUrl(url, hostHandle?.version);
+    return {
+      ok: true,
+      url,
+      publicUrl: cfg.publicUrl || localAppUrl(port),
+      version: hostHandle?.version,
+      updateRecognized: hostHandle?.updateRecognized,
+    };
   } catch (e) {
     return {
       ok: false,
@@ -230,5 +334,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  if (clientWatchTimer) clearInterval(clientWatchTimer);
   if (hostHandle?.stop) void hostHandle.stop();
 });

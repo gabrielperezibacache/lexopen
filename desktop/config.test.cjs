@@ -8,6 +8,11 @@ const {
   readConfig,
   ensureHostEnv,
   localAppUrl,
+  mergeEnvPreserveUser,
+  recognizeAppVersion,
+  readAppState,
+  envPath,
+  storageDir,
 } = require("./config.cjs");
 
 assert.equal(normalizeRemoteUrl("pc.tailnet.ts.net:3000"), "http://pc.tailnet.ts.net:3000");
@@ -18,19 +23,60 @@ assert.equal(
 assert.equal(localAppUrl(3000), "http://127.0.0.1:3000");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-desktop-"));
+
+// merge: no pisa secretos ni LLM del usuario
+const merged = mergeEnvPreserveUser(
+  [
+    "SESSION_SECRET=keep-me",
+    "LLM_API_KEY=sk-user",
+    "CUSTOM_FLAG=1",
+    "",
+  ].join("\n"),
+  {
+    SESSION_SECRET: "new-secret",
+    LLM_API_KEY: "sk-default",
+    DATABASE_URL: "postgresql://lexopen:lexopen@127.0.0.1:54329/lexopen",
+    STORAGE_PATH: "/data/storage",
+  }
+);
+assert.match(merged.text, /SESSION_SECRET=keep-me/);
+assert.match(merged.text, /LLM_API_KEY=sk-user/);
+assert.match(merged.text, /CUSTOM_FLAG=1/);
+assert.match(merged.text, /DATABASE_URL=/);
+assert.match(merged.text, /STORAGE_PATH=\/data\/storage/);
+assert.ok(!merged.added.includes("SESSION_SECRET"));
+
 writeConfig({ mode: "client", remoteUrl: "http://host:3000", port: 3010 }, tmp);
 const cfg = readConfig(tmp);
 assert.equal(cfg.mode, "client");
 assert.equal(cfg.remoteUrl, "http://host:3000");
-assert.equal(cfg.port, 3010);
 
-const host = ensureHostEnv(tmp, { port: 3010, pgPort: 54330, publicUrl: "http://pc.ts.net:3010" });
+const host = ensureHostEnv(tmp, {
+  port: 3010,
+  pgPort: 54330,
+  publicUrl: "http://pc.ts.net:3010",
+});
 assert.match(host.databaseUrl, /54330/);
-assert.equal(host.port, 3010);
-const env = fs.readFileSync(host.envFile, "utf8");
-assert.match(env, /LEXOPEN_DESKTOP=1/);
-assert.match(env, /HOSTNAME=0\.0\.0\.0/);
-assert.match(env, /LEXOPEN_TRUSTED_ORIGINS=/);
+assert.equal(host.storagePath, storageDir(tmp));
+
+// segunda pasada: no reescribe SESSION_SECRET ni añade basura
+const secret1 = fs.readFileSync(envPath(tmp), "utf8").match(/^SESSION_SECRET=(.+)$/m)[1];
+fs.appendFileSync(envPath(tmp), "LLM_API_KEY=sk-estudio\n");
+ensureHostEnv(tmp, { port: 3010, pgPort: 54330, publicUrl: "http://pc.ts.net:3010" });
+const env2 = fs.readFileSync(envPath(tmp), "utf8");
+assert.match(env2, new RegExp(`SESSION_SECRET=${secret1}`));
+assert.match(env2, /LLM_API_KEY=sk-estudio/);
+
+const r1 = recognizeAppVersion("0.1.0", tmp);
+assert.equal(r1.firstRun, true);
+assert.equal(r1.changed, false);
+const r2 = recognizeAppVersion("0.2.0", tmp);
+assert.equal(r2.changed, true);
+assert.equal(r2.previousVersion, "0.1.0");
+assert.equal(readAppState(tmp).lastAppVersion, "0.2.0");
+// reconocimiento inmediato: misma versión no “changed”
+const r3 = recognizeAppVersion("0.2.0", tmp);
+assert.equal(r3.changed, false);
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log("desktop/config.test.cjs OK");

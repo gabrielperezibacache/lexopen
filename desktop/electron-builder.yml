@@ -43,6 +43,9 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   perMachine: false
+  # Nunca borrar Application Support / %APPDATA%\LexOpen al actualizar o desinstalar
+  deleteAppDataOnUninstall: false
+  allowElevation: true
 linux:
   target:
     - AppImage
