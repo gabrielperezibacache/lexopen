@@ -33,11 +33,26 @@ function AgenteInner() {
   }
 
   useEffect(() => {
+    let active = true;
     fetch("/api/causas")
       .then((r) => r.json())
-      .then((data: CausaOption[]) => setCausas(data))
-      .catch(() => setCausas([]));
-    loadChats().catch(() => setChats([]));
+      .then((data: CausaOption[]) => {
+        if (active) setCausas(data);
+      })
+      .catch(() => {
+        if (active) setCausas([]);
+      });
+    fetch("/api/integrations/hermes?chats=1")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: AgentChat[]) => {
+        if (active) setChats(data);
+      })
+      .catch(() => {
+        if (active) setChats([]);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   function resumeChat(chat: AgentChat) {

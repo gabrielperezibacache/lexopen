@@ -31,7 +31,26 @@ export default function MessagesPage() {
   }
 
   useEffect(() => {
-    load();
+    let active = true;
+    Promise.all([
+      fetch("/api/messages").then((r) => r.json()),
+      fetch("/api/auth/me").then((r) => r.json()),
+    ])
+      .then(([m, me]) => {
+        if (!active) return;
+        setMessages(Array.isArray(m) ? m : []);
+        setUsers(me.users || []);
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setMessages([]);
+        setUsers([]);
+        setLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function send(e: FormEvent<HTMLFormElement>) {

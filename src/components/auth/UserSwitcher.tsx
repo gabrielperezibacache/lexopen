@@ -33,7 +33,28 @@ export function UserSwitcher() {
   }
 
   useEffect(() => {
-    load();
+    let active = true;
+    fetch("/api/auth/me")
+      .then(async (res) => {
+        if (res.status === 401) return null;
+        return res.json();
+      })
+      .then((data) => {
+        if (!active) return;
+        if (!data) {
+          setUser(null);
+          return;
+        }
+        setUser(data.user);
+        setUsers(data.users || []);
+        setDemoSwitcher(Boolean(data.demoSwitcher));
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function loginAs(userId: string) {
