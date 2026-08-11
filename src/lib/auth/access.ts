@@ -57,6 +57,7 @@ export function confidentialFileWhere(role: string) {
 export function isClientAllowedPath(pathname: string) {
   if (!pathname) return true;
   if (pathname === "/portal" || pathname.startsWith("/portal/")) return true;
+  if (pathname === "/cuenta" || pathname.startsWith("/cuenta/")) return true;
   if (pathname === "/sites") return true;
   return /^\/sites\/[^/]+\/(archivos|qa)(?:\/.*)?$/.test(pathname);
 }

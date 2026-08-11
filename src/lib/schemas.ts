@@ -5,6 +5,11 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(256),
 });
 
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1).max(256),
+  newPassword: z.string().min(12).max(256),
+});
+
 export const causaCreateSchema = z.object({
   titulo: z.string().min(3),
   rit: z.string().optional().nullable(),

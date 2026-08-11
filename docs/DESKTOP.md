@@ -39,6 +39,7 @@ No se sincronizan copias locales: **siempre** se trabaja contra la instalación 
 1. En el **PC principal**, instalar LexOpen Desktop y elegir **«Este PC es el servidor del estudio»**.
 2. El Host abre la configuración inicial para crear el primer administrador con una contraseña propia. Cargar datos demo es opcional y solo debe usarse para una evaluación.
 3. Iniciar sesión y crear usuarios reales en LexOpen (People / configuración) — roles admin, abogado, asistente, cliente.
+   Cada usuario puede cambiar su contraseña desde **Mi cuenta**.
 4. Instalar **Tailscale** en el Host y en cada laptop. Anotar el hostname MagicDNS, p. ej. `pc-estudio.tailXXXX.ts.net`.
 5. En cada otro equipo: instalar LexOpen Desktop → **«Conectar a un servidor»** → URL  
    `http://pc-estudio.tailXXXX.ts.net:3000`  

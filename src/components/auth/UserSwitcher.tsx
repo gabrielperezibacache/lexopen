@@ -131,6 +131,13 @@ export function UserSwitcher() {
               ))}
             </>
           )}
+          <Link
+            href="/cuenta"
+            className="mt-1 flex w-full items-center rounded-lg px-2 py-2 text-left text-sm text-white/80 hover:bg-white/10"
+            onClick={() => setOpen(false)}
+          >
+            Mi cuenta
+          </Link>
           <button
             type="button"
             className="mt-1 flex w-full items-center rounded-lg px-2 py-2 text-left text-sm text-white/80 hover:bg-white/10"

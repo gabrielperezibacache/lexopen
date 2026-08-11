@@ -70,6 +70,8 @@ function isClientAllowedPath(pathname: string) {
   return (
     pathname === "/portal" ||
     pathname.startsWith("/portal/") ||
+    pathname === "/cuenta" ||
+    pathname.startsWith("/cuenta/") ||
     pathname === "/sites" ||
     /^\/sites\/[^/]+\/(archivos|qa)(?:\/.*)?$/.test(pathname) ||
     pathname === "/api/sites" ||
