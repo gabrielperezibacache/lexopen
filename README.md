@@ -12,7 +12,7 @@
       <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg" alt="Licencia AGPL-3.0-or-later">
     </a>
     <a href="package.json">
-      <img src="https://img.shields.io/badge/version-0.1.3-orange.svg" alt="Versión 0.1.3">
+      <img src="https://img.shields.io/badge/version-0.1.4-orange.svg" alt="Versión 0.1.4">
     </a>
     <a href="https://nodejs.org/">
       <img src="https://img.shields.io/badge/Node.js-22.x-339933.svg?logo=nodedotjs&logoColor=white" alt="Node.js 22">
@@ -30,7 +30,7 @@
 </div>
 
 > [!IMPORTANT]
-> **Estado del proyecto:** LexOpen está en la versión `0.1.3` y debe considerarse un
+> **Estado del proyecto:** LexOpen está en la versión `0.1.4` y debe considerarse un
 > prototipo funcional / base para pilotos e iteraciones. Antes de cargar información
 > real, revise seguridad, permisos, respaldos, cumplimiento y fuentes jurídicas según
 > las necesidades de su organización.
@@ -452,7 +452,7 @@ de producción:
   contraseñas en texto plano y el fallback demo de Hermes no deben activarse en
   producción.
 
-Estas limitaciones son parte del estado `0.1.3`, no un sustituto de un análisis de
+Estas limitaciones son parte del estado `0.1.4`, no un sustituto de un análisis de
 seguridad, privacidad o cumplimiento para una organización concreta.
 
 ## 🧪 Desarrollo y pruebas
