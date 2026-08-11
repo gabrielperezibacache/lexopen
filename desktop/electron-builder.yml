@@ -1,6 +1,5 @@
 appId: cl.perezibacache.lexopen
 productName: LexOpen
-desktopName: LexOpen
 copyright: Copyright © LexOpen contributors
 publish:
   provider: github
