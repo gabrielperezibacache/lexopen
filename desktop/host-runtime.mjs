@@ -5,6 +5,7 @@
 import { createRequire } from "module";
 import { spawn } from "child_process";
 import fs from "fs";
+import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 import { pathToFileURL } from "url";
@@ -27,6 +28,38 @@ const repoRoot = process.env.LEXOPEN_APP_ROOT
 const prismaRoot = process.env.LEXOPEN_PRISMA_ROOT
   ? path.resolve(process.env.LEXOPEN_PRISMA_ROOT)
   : path.join(repoRoot, "prisma");
+
+export function validateHostPorts(port, pgPort) {
+  for (const [label, value] of [
+    ["LexOpen", port],
+    ["PostgreSQL", pgPort],
+  ]) {
+    if (!Number.isInteger(value) || value < 1024 || value > 65535) {
+      throw new Error(`Puerto inválido para ${label}: ${value}`);
+    }
+  }
+  if (port === pgPort) {
+    throw new Error("El puerto de LexOpen y PostgreSQL debe ser distinto.");
+  }
+}
+
+async function assertPortAvailable(port, label, host = "127.0.0.1") {
+  await new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    const fail = (error) => {
+      probe.close();
+      if (error?.code === "EADDRINUSE") {
+        reject(new Error(`El puerto ${port} (${label}) ya está en uso.`));
+      } else {
+        reject(error);
+      }
+    };
+    probe.once("error", fail);
+    probe.listen({ port, host, exclusive: true }, () => {
+      probe.close((closeError) => (closeError ? reject(closeError) : resolve()));
+    });
+  });
+}
 
 function appVersion() {
   const fromEnv = process.env.LEXOPEN_APP_VERSION;
@@ -234,6 +267,7 @@ export async function startHost(options = {}) {
   const cfg = readConfig(dataDir);
   const port = Number(options.port || cfg.port || 3000);
   const pgPort = Number(options.pgPort || cfg.pgPort || 54329);
+  validateHostPorts(port, pgPort);
   // seed solo si ya estaba guardado en config; no forzar en cada update
   const seedDemo = Boolean(
     options.seedDemo !== undefined ? options.seedDemo : cfg.seedDemo
@@ -282,63 +316,69 @@ export async function startHost(options = {}) {
     console.log("[lexopen-host] URL pública:", host.publicUrl);
   }
 
-  const pg = await startEmbeddedPostgres(dataDir, pgPort);
-  await migrate();
-  await maybeSeed(seedDemo, dataDir);
+  let pg = null;
+  let child = null;
+  try {
+    await assertPortAvailable(pgPort, "PostgreSQL");
+    pg = await startEmbeddedPostgres(dataDir, pgPort);
+    await migrate();
+    await maybeSeed(seedDemo, dataDir);
+    await assertPortAvailable(host.port, "LexOpen", "0.0.0.0");
 
-  const child = startNextServer(host.port);
-  const url = localAppUrl(host.port);
-  const health = await waitForHealth(url);
-  if (!health.ok) {
+    child = startNextServer(host.port);
+    const url = localAppUrl(host.port);
+    const health = await waitForHealth(url);
+    if (!health.ok) {
+      throw new Error("[lexopen-host] Health check falló; el servidor no está listo.");
+    }
+    const needsSetup = health.needsSetup;
+    const bootstrapToken = needsSetup
+      ? process.env.LEXOPEN_BOOTSTRAP_TOKEN || ""
+      : null;
+    if (needsSetup && !bootstrapToken) {
+      throw new Error(
+        "[lexopen-host] No hay token de configuración inicial; revise el archivo .env del Host."
+      );
+    }
+    if (needsSetup) {
+      console.log(
+        "[lexopen-host] Configuración inicial:",
+        `${url}/setup?token=${bootstrapToken}`
+      );
+    }
+
+    let stopPromise = null;
+    const stop = async () => {
+      if (stopPromise) return stopPromise;
+      stopPromise = (async () => {
+        await stopChild(child);
+        try {
+          await pg.stop();
+        } catch (e) {
+          console.warn("[lexopen-host] pg.stop:", e);
+        }
+      })();
+      return stopPromise;
+    };
+
+    return {
+      url,
+      publicUrl: host.publicUrl,
+      port: host.port,
+      stop,
+      child,
+      dataDir,
+      version,
+      needsSetup,
+      bootstrapToken,
+      updateRecognized: recognition.changed,
+      previousVersion: recognition.previousVersion,
+    };
+  } catch (error) {
     await stopChild(child);
-    await pg.stop().catch(() => undefined);
-    throw new Error("[lexopen-host] Health check falló; el servidor no está listo.");
+    if (pg) await pg.stop().catch(() => undefined);
+    throw error;
   }
-  const needsSetup = health.needsSetup;
-  const bootstrapToken = needsSetup
-    ? process.env.LEXOPEN_BOOTSTRAP_TOKEN || ""
-    : null;
-  if (needsSetup && !bootstrapToken) {
-    await stopChild(child);
-    await pg.stop().catch(() => undefined);
-    throw new Error(
-      "[lexopen-host] No hay token de configuración inicial; revise el archivo .env del Host."
-    );
-  }
-  if (needsSetup) {
-    console.log(
-      "[lexopen-host] Configuración inicial:",
-      `${url}/setup?token=${bootstrapToken}`
-    );
-  }
-
-  let stopPromise = null;
-  const stop = async () => {
-    if (stopPromise) return stopPromise;
-    stopPromise = (async () => {
-      await stopChild(child);
-      try {
-        await pg.stop();
-      } catch (e) {
-        console.warn("[lexopen-host] pg.stop:", e);
-      }
-    })();
-    return stopPromise;
-  };
-
-  return {
-    url,
-    publicUrl: host.publicUrl,
-    port: host.port,
-    stop,
-    child,
-    dataDir,
-    version,
-    needsSetup,
-    bootstrapToken,
-    updateRecognized: recognition.changed,
-    previousVersion: recognition.previousVersion,
-  };
 }
 
 const isMain =

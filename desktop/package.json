@@ -13,7 +13,7 @@
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
-    "test": "node config.test.cjs && node backup.test.cjs"
+    "test": "node config.test.cjs && node backup.test.cjs && node host-runtime.test.mjs"
   },
   "dependencies": {
     "@prisma/debug": "^5.22.0",
