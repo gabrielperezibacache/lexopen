@@ -22,8 +22,8 @@
     </a>
   </p>
   <p>
-    <a href="#-inicio-rápido">Empezar</a> ·
-    <a href="#-qué-resuelve">Qué resuelve</a> ·
+    <a href="#-inicio-r%C3%A1pido">Empezar</a> ·
+    <a href="#-qu%C3%A9-resuelve">Qué resuelve</a> ·
     <a href="docs/DESKTOP.md">Desktop</a> ·
     <a href="CONTRIBUTING.md">Contribuir</a>
   </p>
@@ -194,7 +194,7 @@ npm run db:seed
 npm run dev
 ```
 
-Abra <http://localhost:3000/login>. Para una experiencia de demostración, el seed
+Abra `http://localhost:3000/login`. Para una experiencia de demostración, el seed
 crea usuarios y contenido ficticio; consulte [Usuarios y datos demo](#-usuarios-y-datos-demo).
 
 ### Comandos de base de datos
