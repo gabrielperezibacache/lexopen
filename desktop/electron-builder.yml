@@ -43,6 +43,10 @@ asarUnpack:
   - "node_modules/tsx/**"
   - "node_modules/esbuild/**"
   - "node_modules/get-tsconfig/**"
+  - "node_modules/embedded-postgres/**"
+  - "node_modules/@embedded-postgres/**"
+  - "node_modules/pg/**"
+  - "node_modules/async-exit-hook/**"
 mac:
   category: public.app-category.business
   target:
