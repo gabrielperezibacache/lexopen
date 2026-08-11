@@ -75,8 +75,8 @@ mac:
   target:
     - dmg
     - zip
-  hardenedRuntime: false
-  gatekeeperAssess: false
+  hardenedRuntime: true
+  gatekeeperAssess: true
 win:
   target:
     - nsis
