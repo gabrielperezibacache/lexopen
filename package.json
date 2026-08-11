@@ -21,7 +21,11 @@
     "desktop:host": "node desktop/host-runtime.mjs",
     "desktop:test": "node desktop/config.test.cjs",
     "desktop:build": "LEXOPEN_STANDALONE=1 npm run build",
-    "desktop:dist": "npm run desktop:build && npm --prefix desktop run dist"
+    "desktop:dist:mac": "npm run desktop:build && npm --prefix desktop run dist:mac",
+    "desktop:dist:win": "npm run desktop:build && npm --prefix desktop run dist:win",
+    "desktop:dist": "npm run desktop:build && npm --prefix desktop run dist",
+    "desktop:dist:linux": "npm run desktop:build && npm --prefix desktop run dist:linux",
+    "desktop:dist:all": "npm run desktop:build && npm --prefix desktop run dist -- --linux"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

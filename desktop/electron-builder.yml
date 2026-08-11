@@ -1,6 +1,11 @@
 appId: cl.perezibacache.lexopen
 productName: LexOpen
 copyright: Copyright © LexOpen contributors
+publish:
+  provider: github
+  owner: gabrielperezibacache
+  repo: lexopen
+  releaseType: release
 directories:
   output: dist
   buildResources: build

@@ -105,13 +105,30 @@ npm run desktop:host
 npm run desktop:dev
 ```
 
-Build de instaladores (en la máquina objetivo o CI con runners Mac/Windows):
+Build de instaladores (en la máquina objetivo o CI):
 
 ```bash
 npm run build
 LEXOPEN_STANDALONE=1 npm run build   # genera .next/standalone
 npm run desktop:dist                 # electron-builder → .dmg / .exe
+npm run desktop:dist:linux           # electron-builder → .AppImage
 ```
+
+Para releases reproducibles, cree un tag `vX.Y.Z` que coincida con las versiones
+de `package.json` y `desktop/package.json`. El workflow
+`.github/workflows/desktop-release.yml` ejecuta calidad, compila Linux/macOS/Windows
+y publica los artefactos en GitHub Releases.
+
+### Firma de instaladores
+
+Electron Builder firma automáticamente cuando el workflow recibe estos secrets:
+
+- `CSC_LINK`: certificado Windows (`.p12`) o certificado de firma macOS.
+- `CSC_KEY_PASSWORD`: contraseña del certificado.
+- `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`: notarización macOS.
+
+Sin esos secrets el workflow genera artefactos válidos pero sin firma. La firma y
+notarización son necesarias para evitar advertencias de SmartScreen y Gatekeeper.
 
 ## Seguridad
 
@@ -127,5 +144,7 @@ npm run desktop:dist                 # electron-builder → .dmg / .exe
 ## Limitaciones actuales (v0.1 desktop)
 
 - Un solo Host activo (no multi-maestro).
-- Los instaladores firmados/notarizados (Apple/Windows SmartScreen) requieren certificados del estudio; el build genera artefactos sin firma.
-- El Host reconoce la versión nueva y los clientes Electron recargan la interfaz; la descarga e instalación automática (`electron-updater`) todavía no está implementada.
+- La firma/notarización depende de los certificados del estudio y secrets del workflow.
+- El Host reconoce la versión nueva y los clientes Electron recargan la interfaz;
+  la descarga e instalación automática (`electron-updater`) todavía no está
+  implementada: las actualizaciones se instalan manualmente desde GitHub Releases.

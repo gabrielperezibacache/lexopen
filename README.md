@@ -339,12 +339,15 @@ Para generar instaladores de macOS y Windows:
 ```bash
 LEXOPEN_STANDALONE=1 npm run build
 npm run desktop:dist
+npm run desktop:dist:linux  # Linux AppImage
 ```
 
 La guía documenta macOS 12+ y Windows 10/11 como plataformas principales. El
-builder contiene un target AppImage para Linux, pero el script `desktop:dist` está
-configurado para generar `.dmg` y `.exe`. Los artefactos no están firmados ni
-notarizados automáticamente.
+builder contiene un target AppImage para Linux. Los tags `vX.Y.Z` activan
+`.github/workflows/desktop-release.yml`, que compila los tres sistemas y publica
+los artefactos. La firma/notarización requiere certificados configurados como
+secrets; sin ellos los instaladores son unsigned. Las actualizaciones siguen
+siendo manuales desde GitHub Releases.
 
 El Host conserva configuración y datos fuera del directorio de la aplicación; los
 clientes desktop detectan cambios de versión del Host y recargan la interfaz. La

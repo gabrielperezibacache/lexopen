@@ -11,6 +11,7 @@
     "dist": "electron-builder --mac --win",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
     "test": "node config.test.cjs && node backup.test.cjs"
   },
   "dependencies": {
