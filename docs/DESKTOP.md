@@ -118,7 +118,11 @@ npm run desktop:dist                 # electron-builder → .dmg / .exe
 - Tailscale evita exponer LexOpen a Internet abierto; no use port-forwarding al router.
 - Cambie `SESSION_SECRET` en el Host (asistente o `.env` en el directorio de datos).
 - Desactive `LEXOPEN_DEMO_SWITCHER` y seeds demo en uso real.
-- Backups: copie el directorio de datos del Host (o haga dump SQL) a un disco cifrado.
+- Backups: desde el menú **LexOpen → Crear respaldo…**, detenga brevemente el Host
+  y genere una copia consistente de `pgdata/`, documentos, vault y configuración.
+  El respaldo contiene secretos (`.env`): guárdelo en un disco cifrado.
+- Restauración: use **LexOpen → Restaurar respaldo…**. La aplicación conserva el
+  estado anterior temporalmente y lo revierte si el Host restaurado no puede arrancar.
 
 ## Limitaciones actuales (v0.1 desktop)
 

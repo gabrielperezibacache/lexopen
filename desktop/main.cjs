@@ -13,6 +13,12 @@ const {
   readPackageVersion,
   readAppState,
 } = require("./config.cjs");
+const {
+  createDataBackup,
+  finalizeRestore,
+  restoreDataDirectory,
+  rollbackRestore,
+} = require("./backup.cjs");
 
 let mainWindow = null;
 let hostHandle = null;
@@ -127,6 +133,123 @@ async function startHostMode(cfg) {
   return targetUrl;
 }
 
+async function stopHostForMaintenance() {
+  if (hostHandle?.stop) {
+    await hostHandle.stop();
+    hostHandle = null;
+  }
+}
+
+async function restartHostAfterMaintenance(cfg) {
+  const url = await startHostMode(cfg);
+  loadAppUrl(url, hostHandle?.version);
+  return url;
+}
+
+async function chooseDirectory(title, buttonLabel, defaultPath) {
+  const result = await dialog.showOpenDialog({
+    title,
+    buttonLabel,
+    defaultPath,
+    properties: ["openDirectory", "createDirectory"],
+  });
+  return result.canceled ? null : result.filePaths[0] || null;
+}
+
+async function createHostBackup() {
+  if (!hostHandle) {
+    dialog.showErrorBox("LexOpen", "El respaldo requiere un Host activo.");
+    return;
+  }
+  const destination = await chooseDirectory(
+    "Elegir destino del respaldo",
+    "Crear respaldo aquí",
+    path.join(
+      path.dirname(defaultDataDir()),
+      `LexOpen-backup-${new Date().toISOString().replace(/[:.]/g, "-")}`
+    )
+  );
+  if (!destination) return;
+
+  const cfg = readConfig();
+  try {
+    await stopHostForMaintenance();
+    const manifest = await createDataBackup(defaultDataDir(), destination, {
+      appVersion: bundledVersion(),
+    });
+    await restartHostAfterMaintenance(cfg);
+    await dialog.showMessageBox({
+      type: "info",
+      title: "Respaldo creado",
+      message: "El respaldo de LexOpen fue creado correctamente.",
+      detail: `${manifest.includes.length} componentes respaldados en:\n${destination}\n\nContiene secretos y debe guardarse en un disco cifrado.`,
+    });
+  } catch (error) {
+    try {
+      await restartHostAfterMaintenance(cfg);
+    } catch (restartError) {
+      console.error("[lexopen-desktop] No se pudo reanudar el Host", restartError);
+    }
+    dialog.showErrorBox(
+      "No se pudo crear el respaldo",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
+async function restoreHostBackup() {
+  if (!hostHandle) {
+    dialog.showErrorBox("LexOpen", "La restauración requiere un Host activo.");
+    return;
+  }
+  const backupDir = await chooseDirectory(
+    "Elegir respaldo LexOpen",
+    "Usar este respaldo",
+    path.dirname(defaultDataDir())
+  );
+  if (!backupDir) return;
+  const confirmation = await dialog.showMessageBox({
+    type: "warning",
+    title: "Restaurar respaldo",
+    message: "Esta operación reemplazará todos los datos actuales del Host.",
+    detail:
+      "El estado actual se conservará temporalmente para poder revertir si el arranque falla. Continúe solo si eligió un respaldo confiable.",
+    buttons: ["Cancelar", "Restaurar"],
+    defaultId: 0,
+    cancelId: 0,
+  });
+  if (confirmation.response !== 1) return;
+
+  const cfg = readConfig();
+  let replacement = null;
+  try {
+    await stopHostForMaintenance();
+    replacement = await restoreDataDirectory(defaultDataDir(), backupDir);
+    await restartHostAfterMaintenance(cfg);
+    await finalizeRestore(replacement.rollback);
+    await dialog.showMessageBox({
+      type: "info",
+      title: "Restauración completada",
+      message: "El Host fue restaurado y reiniciado correctamente.",
+      detail: `Respaldo utilizado: ${backupDir}`,
+    });
+  } catch (error) {
+    try {
+      if (hostHandle?.stop) await stopHostForMaintenance();
+      if (replacement) {
+        await rollbackRestore(defaultDataDir(), replacement.rollback);
+      }
+      await restartHostAfterMaintenance(cfg);
+    } catch (rollbackError) {
+      console.error("[lexopen-desktop] Falló la recuperación del estado anterior", rollbackError);
+    }
+    dialog.showErrorBox(
+      "No se pudo restaurar el respaldo",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
 async function boot() {
   const cfg = readConfig();
   Menu.setApplicationMenu(
@@ -146,6 +269,14 @@ async function boot() {
           {
             label: "Abrir carpeta de datos",
             click: () => shell.openPath(defaultDataDir()),
+          },
+          {
+            label: "Crear respaldo…",
+            click: () => void createHostBackup(),
+          },
+          {
+            label: "Restaurar respaldo…",
+            click: () => void restoreHostBackup(),
           },
           {
             label: "Versión y estado",

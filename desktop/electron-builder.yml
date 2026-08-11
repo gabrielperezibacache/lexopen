@@ -6,6 +6,7 @@ directories:
   buildResources: build
 files:
   - main.cjs
+  - backup.cjs
   - preload.cjs
   - config.cjs
   - host-runtime.mjs
