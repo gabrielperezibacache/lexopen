@@ -17,6 +17,7 @@ files:
   - host-runtime.mjs
   - renderer/**/*
   - package.json
+  - node_modules/**/*
 extraResources:
   - from: ../.next/standalone
     to: app-standalone

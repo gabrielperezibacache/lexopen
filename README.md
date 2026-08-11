@@ -330,6 +330,11 @@ En una instalación Host limpia, LexOpen abre `/setup` para crear el primer
 administrador con una contraseña propia; el seed demo es opcional y no es necesario
 para iniciar el estudio.
 
+Requiere Node 22 (ver [`.nvmrc`](.nvmrc)). Las actualizaciones del instalador no
+borran `Application Support` / `%APPDATA%\LexOpen` (config, Postgres, documentos).
+
+Variables relevantes y completas: [`.env.example`](.env.example).
+
 El menú desktop incluye **Crear respaldo…** y **Restaurar respaldo…**. El respaldo
 detiene brevemente el Host para copiar de forma consistente PostgreSQL embebido,
 documentos, vault y configuración; contiene secretos y debe guardarse cifrado.

@@ -37,7 +37,7 @@ No se sincronizan copias locales: **siempre** se trabaja contra la instalación 
 ## Flujo de instalación (estudio)
 
 1. En el **PC principal**, instalar LexOpen Desktop y elegir **«Este PC es el servidor del estudio»**.
-2. El Host abre la configuración inicial para crear el primer administrador con una contraseña propia. Cargar datos demo es opcional y solo debe usarse para una evaluación.
+2. El Host abre la configuración inicial para crear el primer administrador con una contraseña propia. Cargar datos demo es opcional y solo debe usarse para una evaluación. El `SESSION_SECRET` se genera solo en la carpeta de datos.
 3. Iniciar sesión y crear usuarios reales en LexOpen (People / configuración) — roles admin, abogado, asistente, cliente.
    Cada usuario puede cambiar su contraseña desde **Mi cuenta**.
 4. Instalar **Tailscale** en el Host y en cada laptop. Anotar el hostname MagicDNS, p. ej. `pc-estudio.tailXXXX.ts.net`.
@@ -155,3 +155,4 @@ notarización son necesarias para evitar advertencias de SmartScreen y Gatekeepe
 - Un solo Host activo (no multi-maestro).
 - La firma/notarización depende de los certificados del estudio y secrets del workflow.
 - Durante desarrollo (`electron .`) no se consulta el canal de actualizaciones.
+- El instalador empaquetado incluye el runtime; el desarrollo desde repo requiere Node 22.

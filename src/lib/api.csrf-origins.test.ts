@@ -1,32 +1,22 @@
 /**
- * Contrato: LEXOPEN_TRUSTED_ORIGINS amplía CSRF (Host local + Tailscale).
+ * Contrato: LEXOPEN_TRUSTED_ORIGINS + igualdad estricta de origen.
  */
 import assert from "node:assert/strict";
 import { assertCsrf, normalizeOrigin } from "@/lib/api";
+import { buildAllowedOrigins, isAllowedOrigin } from "./csrf";
 
-function buildAllowed(host: string, appUrl?: string, trustedCsv?: string) {
-  const trusted = (trustedCsv || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return [
-    `http://${host}`,
-    `https://${host}`,
-    appUrl,
-    ...trusted,
-  ].filter(Boolean) as string[];
-}
-
-const allowed = buildAllowed(
-  "pc-estudio.tailXXXX.ts.net:3000",
-  "http://pc-estudio.tailXXXX.ts.net:3000",
-  "http://127.0.0.1:3000,http://localhost:3000"
-);
+const allowed = buildAllowedOrigins({
+  host: "pc-estudio.tailXXXX.ts.net:3000",
+  appUrl: "http://pc-estudio.tailXXXX.ts.net:3000",
+  trustedCsv: "http://127.0.0.1:3000,http://localhost:3000",
+});
 
 assert.ok(allowed.includes("http://pc-estudio.tailXXXX.ts.net:3000"));
 assert.ok(allowed.includes("http://127.0.0.1:3000"));
-assert.ok(
-  allowed.some((a) => a === "http://pc-estudio.tailXXXX.ts.net:3000")
+assert.ok(isAllowedOrigin("http://pc-estudio.tailXXXX.ts.net:3000", allowed));
+assert.equal(
+  isAllowedOrigin("http://pc-estudio.tailXXXX.ts.net:3000.attacker", allowed),
+  false
 );
 
 assert.equal(normalizeOrigin("https://app.example/path"), "https://app.example");

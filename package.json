@@ -4,12 +4,15 @@
   "private": false,
   "license": "AGPL-3.0-or-later",
   "description": "LexOpen — clon open-source de HighQ para estudios jurídicos en Chile, con Obsidian, Hermes Agent y Google Workspace.",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "prisma generate && next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint .",
-    "test": "tsx src/lib/integrations/drive-folder.test.ts && tsx src/lib/minutas.render.test.ts && tsx src/lib/minutas.api-contract.test.ts && tsx src/lib/chile.test.ts && tsx src/lib/auth/bootstrap.test.ts && tsx src/lib/plazos.test.ts && tsx src/lib/maturity.integration.test.ts && tsx src/lib/storage.test.ts && tsx src/lib/e2e.smoke.test.ts && tsx src/lib/api.csrf-origins.test.ts && node desktop/config.test.cjs && node desktop/backup.test.cjs && node desktop/host-runtime.test.mjs",
+    "test": "tsx src/lib/integrations/drive-folder.test.ts && tsx src/lib/minutas.render.test.ts && tsx src/lib/minutas.api-contract.test.ts && tsx src/lib/chile.test.ts && tsx src/lib/auth/bootstrap.test.ts && tsx src/lib/plazos.test.ts && tsx src/lib/maturity.integration.test.ts && tsx src/lib/storage.test.ts && tsx src/lib/e2e.smoke.test.ts && tsx src/lib/api.csrf-origins.test.ts && tsx src/lib/csrf.test.ts && node desktop/config.test.cjs && node desktop/backup.test.cjs && node desktop/host-runtime.test.mjs",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:migrate": "prisma migrate deploy",

@@ -152,6 +152,19 @@ footer {
   margin-top: 28px;
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.version-line {
+  margin: 8px 0 0;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
 button {
   appearance: none;
   border: 0;
@@ -163,6 +176,12 @@ button {
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--sea);
+  border: 1px solid rgba(31, 111, 120, 0.45);
 }
 
 button:disabled {

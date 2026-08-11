@@ -2,9 +2,11 @@
   const statusEl = document.getElementById("status");
   const errorEl = document.getElementById("error");
   const dataDirEl = document.getElementById("dataDir");
+  const versionEl = document.getElementById("version");
   const hostFields = document.getElementById("host-fields");
   const clientFields = document.getElementById("client-fields");
   const continueBtn = document.getElementById("continue");
+  const retryBtn = document.getElementById("retry");
 
   function selectedMode() {
     return document.querySelector('input[name="mode"]:checked')?.value || "host";
@@ -14,6 +16,17 @@
     const mode = selectedMode();
     hostFields.classList.toggle("hidden", mode !== "host");
     clientFields.classList.toggle("hidden", mode !== "client");
+  }
+
+  function setBusy(busy) {
+    continueBtn.disabled = busy;
+    if (retryBtn) retryBtn.disabled = busy;
+  }
+
+  function showError(msg) {
+    errorEl.hidden = !msg;
+    errorEl.textContent = msg || "";
+    if (retryBtn) retryBtn.hidden = !msg;
   }
 
   document.querySelectorAll('input[name="mode"]').forEach((el) => {
@@ -27,7 +40,9 @@
     }
     const state = await window.lexopenDesktop.getState();
     dataDirEl.textContent = state.dataDir || "";
+    if (versionEl) versionEl.textContent = state.version ? `v${state.version}` : "";
     if (state.status?.message) statusEl.textContent = state.status.message;
+    if (state.status?.phase === "error") showError(state.status.message);
     const cfg = state.config || {};
     if (cfg.mode === "client") {
       document.querySelector('input[name="mode"][value="client"]').checked = true;
@@ -39,13 +54,22 @@
     syncModeUi();
     window.lexopenDesktop.onStatus((s) => {
       if (s?.message) statusEl.textContent = s.message;
+      if (s?.phase === "error") showError(s.message);
+      if (s?.phase === "starting-host" || s?.phase === "probing") {
+        showError("");
+        setBusy(true);
+      }
+      if (s?.phase === "ready" || s?.phase === "setup") setBusy(false);
     });
   }
 
   continueBtn.addEventListener("click", async () => {
-    errorEl.hidden = true;
-    continueBtn.disabled = true;
-    statusEl.textContent = "Guardando…";
+    showError("");
+    setBusy(true);
+    statusEl.textContent =
+      selectedMode() === "host"
+        ? "Arrancando servidor (puede tardar la primera vez)…"
+        : "Conectando al PC principal…";
     const payload = {
       mode: selectedMode(),
       port: Number(document.getElementById("port").value) || 3000,
@@ -54,15 +78,26 @@
       seedDemo: document.getElementById("seedDemo").checked,
     };
     const res = await window.lexopenDesktop.saveSetup(payload);
-    continueBtn.disabled = false;
+    setBusy(false);
     if (!res?.ok) {
-      errorEl.hidden = false;
-      errorEl.textContent = res?.error || "No se pudo iniciar.";
+      showError(res?.error || "No se pudo iniciar.");
       statusEl.textContent = "Revise la configuración.";
       return;
     }
-    statusEl.textContent = "Listo — cargando LexOpen…";
+    statusEl.textContent = res.updateRecognized
+      ? `Actualización reconocida · v${res.version}`
+      : "Listo — cargando LexOpen…";
   });
+
+  if (retryBtn) {
+    retryBtn.addEventListener("click", async () => {
+      showError("");
+      setBusy(true);
+      statusEl.textContent = "Reintentando…";
+      await window.lexopenDesktop.retry();
+      setBusy(false);
+    });
+  }
 
   void hydrate();
 })();

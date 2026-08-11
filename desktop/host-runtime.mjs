@@ -155,6 +155,26 @@ function runBundledTool(name, file, args, opts = {}) {
   });
 }
 
+function killChild(child) {
+  if (!child || child.killed) return;
+  try {
+    if (process.platform === "win32") {
+      spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+        stdio: "ignore",
+        shell: true,
+      });
+    } else {
+      child.kill("SIGTERM");
+    }
+  } catch {
+    try {
+      child.kill();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 function stopChild(child) {
   if (!child || child.exitCode !== null || child.killed) return Promise.resolve();
   return new Promise((resolve) => {
@@ -166,7 +186,7 @@ function stopChild(child) {
       clearTimeout(timer);
       resolve();
     });
-    child.kill("SIGTERM");
+    killChild(child);
   });
 }
 

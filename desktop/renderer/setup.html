@@ -21,6 +21,7 @@
       </header>
 
       <p id="status" class="status" role="status"></p>
+      <p class="version-line"><span id="version"></span></p>
 
       <section class="modes">
         <label class="card">
@@ -75,11 +76,20 @@
       </section>
 
       <footer>
-        <button id="continue" type="button">Continuar</button>
+        <div class="actions">
+          <button id="continue" type="button">Continuar</button>
+          <button id="retry" type="button" class="secondary" hidden>
+            Reintentar
+          </button>
+        </div>
         <p id="error" class="error" hidden></p>
         <p class="meta">
-          Datos del Host:
+          Datos del Host (se conservan al actualizar):
           <code id="dataDir"></code>
+        </p>
+        <p class="hint meta">
+          El secreto de sesión se genera una vez en <code>.env</code> y no se
+          regenera en actualizaciones. Puede editarlo en la carpeta de datos.
         </p>
       </footer>
     </main>

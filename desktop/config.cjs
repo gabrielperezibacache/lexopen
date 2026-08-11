@@ -97,6 +97,20 @@ function pgDataDir(dataDir = defaultDataDir()) {
   return path.join(dataDir, "pgdata");
 }
 
+/** true si la ruta de storage quedaría dentro del instalador (se borra al actualizar). */
+function isUnsafeStoragePath(storagePath, dataDir) {
+  if (!storagePath) return true;
+  const resolved = path.resolve(storagePath);
+  const data = path.resolve(dataDir);
+  if (resolved === data || resolved.startsWith(data + path.sep)) return false;
+  // cwd / .next / resources del empaquetado
+  const cwd = process.cwd();
+  if (resolved === cwd || resolved.startsWith(cwd + path.sep)) return true;
+  if (/[/\\]\.next([/\\]|$)/i.test(resolved)) return true;
+  if (/[/\\]app-standalone([/\\]|$)/i.test(resolved)) return true;
+  return false;
+}
+
 function readJsonSafe(file, fallback) {
   if (!fs.existsSync(file)) return fallback;
   try {
@@ -106,11 +120,35 @@ function readJsonSafe(file, fallback) {
   }
 }
 
-function writeJsonAtomic(file, data) {
+function replaceFileAtomic(file, contents) {
   ensureDir(path.dirname(file));
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n", "utf8");
-  fs.renameSync(tmp, file);
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, contents, "utf8");
+  try {
+    fs.renameSync(tmp, file);
+  } catch (e) {
+    // Windows: rename sobre destino existente puede fallar
+    const code = e && typeof e === "object" && "code" in e ? e.code : "";
+    if (code === "EEXIST" || code === "EPERM" || process.platform === "win32") {
+      try {
+        fs.unlinkSync(file);
+      } catch {
+        /* ignore */
+      }
+      fs.renameSync(tmp, file);
+    } else {
+      try {
+        fs.unlinkSync(tmp);
+      } catch {
+        /* ignore */
+      }
+      throw e;
+    }
+  }
+}
+
+function writeJsonAtomic(file, data) {
+  replaceFileAtomic(file, JSON.stringify(data, null, 2) + "\n");
 }
 
 function readConfig(dataDir = defaultDataDir()) {
@@ -297,21 +335,29 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
   };
 
   const merged = mergeEnvPreserveUser(existing, defaults);
-  // Solo escribir disco si el contenido cambia (evita touch innecesario)
-  if (merged.text !== existing) {
-    const tmp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, merged.text, "utf8");
-    fs.renameSync(tmp, file);
+  let finalMap = merged.map;
+  let finalText = merged.text;
+
+  // Si STORAGE_PATH apunta dentro del instalador (se perdería al actualizar), corregir
+  if (isUnsafeStoragePath(finalMap.STORAGE_PATH, dataDir)) {
+    const forced = parseEnvFile(finalText);
+    forced.map.STORAGE_PATH = storageDir(dataDir);
+    finalMap = forced.map;
+    finalText = serializeEnv(forced.map, forced.order);
+  }
+
+  if (finalText !== existing) {
+    replaceFileAtomic(file, finalText);
   }
 
   return {
     dataDir,
     envFile: file,
-    port: Number(merged.map.PORT || port),
+    port: Number(finalMap.PORT || port),
     pgPort,
-    databaseUrl: merged.map.DATABASE_URL,
-    publicUrl: merged.map.NEXT_PUBLIC_APP_URL || publicUrl,
-    storagePath: merged.map.STORAGE_PATH || storageDir(dataDir),
+    databaseUrl: finalMap.DATABASE_URL,
+    publicUrl: finalMap.NEXT_PUBLIC_APP_URL || publicUrl,
+    storagePath: finalMap.STORAGE_PATH || storageDir(dataDir),
     addedKeys: merged.added,
     envPreserved: Boolean(existing.trim()),
   };
@@ -352,4 +398,6 @@ module.exports = {
   ensureHostEnv,
   localAppUrl,
   readPackageVersion,
+  isUnsafeStoragePath,
+  replaceFileAtomic,
 };
