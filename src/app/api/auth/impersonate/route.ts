@@ -5,7 +5,7 @@ import {
   ROLE_COOKIE,
   SESSION_COOKIE,
   buildSessionCookieValue,
-  requireUser,
+  requireRole,
 } from "@/lib/auth/session";
 import { canImpersonate } from "@/lib/auth/rbac";
 import { assertCsrf, handleRouteError } from "@/lib/api";
@@ -19,7 +19,7 @@ const schema = z.object({
 export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
-    await requireUser();
+    await requireRole("admin");
     if (!canImpersonate()) {
       return NextResponse.json({ error: "Impersonación deshabilitada" }, { status: 403 });
     }

@@ -37,7 +37,7 @@ model User {
   email     String   @unique
   name      String
   role      String   @default("abogado") // admin | abogado | asistente | cliente
-  password  String   @default("lexopen")
+  password  String
   avatarColor String @default("#1f6f78")
   title     String?
   createdAt DateTime @default(now())

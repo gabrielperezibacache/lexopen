@@ -5,6 +5,7 @@ import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { isAdmin } from "@/lib/auth/rbac";
 import { hashPassword } from "@/lib/auth/password";
 import { writeAudit } from "@/lib/audit";
+import { publicUserSelect, toPublicUser } from "@/lib/auth/public-user";
 
 const createUserSchema = z.object({
   action: z.literal("create-user"),
@@ -12,7 +13,7 @@ const createUserSchema = z.object({
   email: z.string().email(),
   role: z.enum(["admin", "abogado", "asistente", "cliente"]),
   title: z.string().optional().nullable(),
-  password: z.string().min(6).optional(),
+  password: z.string().min(12).max(256).optional(),
 });
 
 const updateRoleSchema = z.object({
@@ -72,7 +73,13 @@ export async function POST(req: NextRequest) {
       if (exists) {
         return NextResponse.json({ error: "Ya existe un usuario con ese email" }, { status: 409 });
       }
-      const password = await hashPassword(data.password || "lexopen");
+      if (!data.password) {
+        return NextResponse.json(
+          { error: "Defina una contraseña de al menos 12 caracteres" },
+          { status: 400 }
+        );
+      }
+      const password = await hashPassword(data.password);
       const user = await prisma.user.create({
         data: {
           name: data.name.trim(),
@@ -90,7 +97,7 @@ export async function POST(req: NextRequest) {
         entityId: user.id,
         after: { email: user.email, role: user.role },
       });
-      return NextResponse.json(user, { status: 201 });
+      return NextResponse.json(toPublicUser(user), { status: 201 });
     }
 
     if (body.action === "create-group") {
@@ -103,7 +110,7 @@ export async function POST(req: NextRequest) {
             ? { create: data.memberIds.map((userId) => ({ userId })) }
             : undefined,
         },
-        include: { members: { include: { user: true } } },
+        include: { members: { include: { user: { select: publicUserSelect } } } },
       });
       await writeAudit({
         actorId: actor.id,
@@ -145,7 +152,7 @@ export async function PATCH(req: NextRequest) {
       before: { role: before.role },
       after: { role: user.role },
     });
-    return NextResponse.json(user);
+    return NextResponse.json(toPublicUser(user));
   } catch (e) {
     return handleRouteError(e);
   }

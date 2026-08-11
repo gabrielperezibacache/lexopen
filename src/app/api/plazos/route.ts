@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
+  assertCsrf,
   handleRouteError,
   jsonError,
   parseBody,
@@ -27,6 +28,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, plazoCreateSchema);
 
@@ -95,6 +97,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
     const body = z
       .object({ id: z.string(), estado: z.string() })

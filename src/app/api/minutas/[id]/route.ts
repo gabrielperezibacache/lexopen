@@ -5,9 +5,10 @@ import {
   isValidEstadoAccion,
   renderMinutaMarkdown,
 } from "@/lib/minutas";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { writeAudit } from "@/lib/audit";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -21,11 +22,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
       causa: {
         include: {
           cliente: true,
-          abogado: true,
+          abogado: { select: publicUserSelect },
           partes: true,
         },
       },
-      autor: true,
+      autor: { select: publicUserSelect },
       acciones: true,
       documento: true,
     },
@@ -61,6 +62,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
+  assertCsrf(req);
   const user = await requireStaff();
   const { id } = await params;
   const body = await req.json();
@@ -152,7 +154,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const current = await prisma.minuta.findUnique({
     where: { id },
-    include: { causa: true, autor: true, acciones: true, documento: true },
+    include: {
+      causa: true,
+      autor: { select: publicUserSelect },
+      acciones: true,
+      documento: true,
+    },
   });
   if (!current) {
     return NextResponse.json({ error: "Minuta no encontrada" }, { status: 404 });

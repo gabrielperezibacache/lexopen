@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET() {
   try {
     await requireStaff();
     const fees = await prisma.feeArrangement.findMany({
-      include: { cliente: true, causa: true, owner: true },
+      include: { cliente: true, causa: true, owner: { select: publicUserSelect } },
       orderBy: { updatedAt: "desc" },
     });
     return NextResponse.json(fees);

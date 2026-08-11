@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { storageConfigured } from "@/lib/storage";
-import { getCurrentUser } from "@/lib/auth/session";
-import { isStaff } from "@/lib/auth/rbac";
+import { persistentStorageReady, storageMode } from "@/lib/storage";
 
 function desktopPayload() {
   return {
@@ -17,27 +15,36 @@ function desktopPayload() {
 
 export async function GET() {
   const base = desktopPayload();
-
-  const user = await getCurrentUser();
-  if (!user || !isStaff(user.role)) {
-    return NextResponse.json(
-      { ok: true, ...base },
-      {
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate",
-        },
-      }
-    );
-  }
   const time = new Date().toISOString();
-  const storage = storageConfigured() ? "s3" : "local";
+  const storage = storageMode();
+  const storageReady = persistentStorageReady();
   try {
     await prisma.$queryRaw`SELECT 1`;
+    if (!storageReady) {
+      return NextResponse.json(
+        {
+          ok: false,
+          db: "up",
+          storage,
+          storageReady,
+          time,
+          error: "Almacenamiento persistente no configurado",
+          ...base,
+        },
+        {
+          status: 503,
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+          },
+        }
+      );
+    }
     return NextResponse.json(
       {
         ok: true,
         db: "up",
         storage,
+        storageReady,
         time,
         ...base,
       },
@@ -53,6 +60,7 @@ export async function GET() {
         ok: false,
         db: "down",
         storage,
+        storageReady,
         time,
         ...base,
       },

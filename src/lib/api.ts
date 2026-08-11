@@ -21,14 +21,26 @@ export function jsonError(message: string, status = 400) {
 export function handleRouteError(e: unknown) {
   if (e && typeof e === "object" && "status" in e) {
     const status = Number((e as { status: number }).status) || 500;
-    const message = e instanceof Error ? e.message : "Error";
+    const message =
+      status >= 500 && process.env.NODE_ENV === "production"
+        ? "Error interno"
+        : e instanceof Error
+          ? e.message
+          : "Error";
     return jsonError(message, status);
   }
   if (e instanceof ZodError) {
     return jsonError(e.errors.map((x) => x.message).join("; "), 400);
   }
   console.error(e);
-  return jsonError(e instanceof Error ? e.message : "Error interno", 500);
+  return jsonError(
+    process.env.NODE_ENV === "production"
+      ? "Error interno"
+      : e instanceof Error
+        ? e.message
+        : "Error interno",
+    500
+  );
 }
 
 export async function parseBody<T>(req: Request, schema: ZodSchema<T>) {
@@ -75,7 +87,12 @@ export function assertCsrf(req: Request) {
   const origin = req.headers.get("origin");
   const referer = req.headers.get("referer");
   const host = req.headers.get("host");
-  if (!host) return;
+  if (!host) {
+    if (process.env.NODE_ENV === "production") {
+      throw httpError("CSRF: Host requerido", 403);
+    }
+    return;
+  }
 
   const trusted = (process.env.LEXOPEN_TRUSTED_ORIGINS || "")
     .split(",")
@@ -86,11 +103,14 @@ export function assertCsrf(req: Request) {
     `https://${host}`,
     process.env.NEXT_PUBLIC_APP_URL,
     ...trusted,
-  ].filter(Boolean) as string[];
+  ]
+    .map(normalizeOrigin)
+    .filter((value): value is string => Boolean(value));
 
-  const okOrigin = origin && allowed.some((a) => origin === a || origin.startsWith(a));
-  const okReferer =
-    referer && allowed.some((a) => referer === a || referer.startsWith(a));
+  const okOrigin = origin ? allowed.includes(normalizeOrigin(origin) || "") : false;
+  const okReferer = referer
+    ? allowed.includes(normalizeOrigin(referer) || "")
+    : false;
 
   // Same-origin fetch from browser usually sends Origin; server-to-server may not.
   if (!origin && !referer) {
@@ -101,5 +121,16 @@ export function assertCsrf(req: Request) {
   }
   if (!okOrigin && !okReferer) {
     throw httpError("CSRF: origen no permitido", 403);
+  }
+}
+
+export function normalizeOrigin(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.origin;
+  } catch {
+    return null;
   }
 }

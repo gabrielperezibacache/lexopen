@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { handleRouteError, requireStaff } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET() {
   try {
     await requireStaff();
     const actividades = await prisma.activity.findMany({
-      include: { user: true, causa: true },
+      include: { user: { select: publicUserSelect }, causa: true },
       orderBy: { createdAt: "desc" },
       take: 40,
     });

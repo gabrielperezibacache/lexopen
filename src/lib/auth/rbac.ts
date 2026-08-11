@@ -28,5 +28,9 @@ export function canSeeConfidential(role: string) {
 }
 
 export function canImpersonate() {
-  return process.env.NODE_ENV === "development" || process.env.LEXOPEN_DEMO_SWITCHER === "1";
+  return (
+    process.env.NODE_ENV !== "production" &&
+    (process.env.NODE_ENV === "development" ||
+      process.env.LEXOPEN_DEMO_SWITCHER === "1")
+  );
 }

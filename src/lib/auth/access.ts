@@ -51,7 +51,7 @@ export function clientSiteWhere(userId: string) {
 
 export function confidentialFileWhere(role: string) {
   if (canSeeConfidential(role)) return {};
-  return { confidencial: false };
+  return { confidencial: false, privilegio: false };
 }
 
 const CLIENT_ALLOWED_PREFIXES = ["/portal", "/sites"];

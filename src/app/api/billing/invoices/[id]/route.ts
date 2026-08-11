@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireBillingManager, requireStaff } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,10 +14,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
       include: {
         cliente: true,
         causa: true,
-        author: true,
+        author: { select: publicUserSelect },
         lines: true,
         payments: { orderBy: { date: "desc" } },
-        timeEntries: { include: { user: true } },
+        timeEntries: { include: { user: { select: publicUserSelect } } },
         expenses: true,
       },
     });

@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().email().max(320),
+  password: z.string().min(1).max(256),
 });
 
 export const causaCreateSchema = z.object({
@@ -50,15 +50,14 @@ export const plazoCreateSchema = z.object({
 });
 
 export const documentoCreateSchema = z.object({
-  nombre: z.string().min(1),
-  tipo: z.string().optional(),
-  contenido: z.string().optional().nullable(),
+  nombre: z.string().min(1).max(255),
+  tipo: z.string().max(80).optional(),
+  contenido: z.string().max(25 * 1024 * 1024).optional().nullable(),
   causaId: z.string().optional().nullable(),
   autorId: z.string().optional().nullable(),
   confidencial: z.boolean().optional(),
   privilegio: z.boolean().optional(),
-  mimeType: z.string().optional().nullable(),
-  storageKey: z.string().optional().nullable(),
+  mimeType: z.string().max(150).optional().nullable(),
 });
 
 export const invoiceCreateSchema = z.object({
@@ -71,17 +70,18 @@ export const invoiceCreateSchema = z.object({
   dueDate: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   glosa: z.string().optional().nullable(),
-  timeEntryIds: z.array(z.string()).optional(),
-  expenseIds: z.array(z.string()).optional(),
+  timeEntryIds: z.array(z.string()).max(100).optional(),
+  expenseIds: z.array(z.string()).max(100).optional(),
   lines: z
     .array(
       z.object({
-        description: z.string().min(1),
+        description: z.string().min(1).max(500),
         quantity: z.coerce.number().positive().optional(),
         unitAmountClp: z.coerce.number().int(),
         tipo: z.string().optional(),
       })
     )
+    .max(100)
     .optional(),
 });
 

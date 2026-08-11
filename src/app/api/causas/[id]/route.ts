@@ -1,33 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { assertCsrf, confidentialWhere, handleRouteError, requireStaff } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-  await requireStaff();
+  const user = await requireStaff();
   const { id } = await params;
   const causa = await prisma.causa.findUnique({
     where: { id },
     include: {
       cliente: true,
-      abogado: true,
+      abogado: { select: publicUserSelect },
       partes: true,
-      documentos: { orderBy: { updatedAt: "desc" } },
+      documentos: {
+        where: confidentialWhere(user.role),
+        orderBy: { updatedAt: "desc" },
+      },
       plazos: { orderBy: { fechaLimite: "asc" } },
       notas: { orderBy: { updatedAt: "desc" } },
       minutas: {
+        where: confidentialWhere(user.role),
         include: {
-          autor: { select: { id: true, name: true } },
+          autor: { select: publicUserSelect },
           acciones: true,
         },
         orderBy: { fecha: "desc" },
         take: 20,
       },
       actividades: {
-        include: { user: true },
+        include: { user: { select: publicUserSelect } },
         orderBy: { createdAt: "desc" },
         take: 30,
       },

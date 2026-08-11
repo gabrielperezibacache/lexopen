@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, parseBody, requireBillingManager, requireStaff } from "@/lib/api";
+import {
+  assertCsrf,
+  handleRouteError,
+  httpError,
+  parseBody,
+  requireBillingManager,
+  requireStaff,
+} from "@/lib/api";
 import { paymentCreateSchema } from "@/lib/schemas";
 
 export async function GET() {
@@ -24,6 +31,28 @@ export async function POST(req: NextRequest) {
     const amountClp = body.amountClp;
 
     const payment = await prisma.$transaction(async (tx) => {
+      const invoice = body.invoiceId
+        ? await tx.invoice.findUnique({
+            where: { id: body.invoiceId },
+            select: { id: true, clienteId: true, causaId: true, status: true },
+          })
+        : null;
+      if (body.invoiceId && !invoice) {
+        throw httpError("Factura no encontrada", 404);
+      }
+      if (invoice && invoice.clienteId !== body.clienteId) {
+        throw httpError("El pago no pertenece al cliente de la factura", 400);
+      }
+      if (invoice?.status === "anulada") {
+        throw httpError("No se puede pagar una factura anulada", 409);
+      }
+      const clienteId = invoice?.clienteId || body.clienteId;
+      const cliente = await tx.cliente.findUnique({
+        where: { id: clienteId },
+        select: { id: true },
+      });
+      if (!cliente) throw httpError("Cliente no encontrado", 404);
+
       const created = await tx.payment.create({
         data: {
           date: body.date ? new Date(body.date) : new Date(),
@@ -31,7 +60,7 @@ export async function POST(req: NextRequest) {
           method: body.method || "transferencia",
           reference: body.reference || null,
           notes: body.notes || null,
-          clienteId: body.clienteId,
+          clienteId,
           invoiceId: body.invoiceId || null,
         },
         include: { cliente: true, invoice: true },

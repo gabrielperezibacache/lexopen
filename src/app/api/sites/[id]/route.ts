@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
 import { confidentialFileWhere } from "@/lib/auth/access";
+import { isCliente } from "@/lib/auth/rbac";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -11,17 +13,22 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params;
     await requireSiteAccess(id, user);
     const fileWhere = confidentialFileWhere(user.role);
+    const clientView = isCliente(user.role);
     const site = await prisma.site.findUnique({
       where: { id },
       include: {
         cliente: true,
         causa: { include: { partes: true, plazos: true } },
-        members: { include: { user: true } },
+        members: {
+          where: clientView ? { user: { role: "cliente" } } : undefined,
+          include: { user: { select: publicUserSelect } },
+        },
         folders: { include: { children: true, files: { where: fileWhere } } },
         files: { where: { folderId: null, ...fileWhere }, orderBy: { updatedAt: "desc" }, take: 20 },
         wikiPages: { orderBy: { updatedAt: "desc" }, take: 10 },
         tasks: {
-          include: { assignee: true },
+          where: clientView ? { assigneeId: user.id } : undefined,
+          include: { assignee: { select: publicUserSelect } },
           orderBy: { dueDate: "asc" },
           take: 12,
         },
@@ -31,9 +38,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
           orderBy: { updatedAt: "desc" },
           take: 8,
         },
-        workflows: { include: { instances: { take: 5, orderBy: { createdAt: "desc" } } } },
+        workflows: clientView
+          ? { where: { id: "__client_hidden__" } }
+          : { include: { instances: { take: 5, orderBy: { createdAt: "desc" } } } },
         activities: {
-          include: { user: true },
+          where: clientView ? { id: "__client_hidden__" } : undefined,
+          include: { user: { select: publicUserSelect } },
           orderBy: { createdAt: "desc" },
           take: 20,
         },

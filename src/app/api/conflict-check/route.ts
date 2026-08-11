@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handleRouteError, parseBody, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
 import { checkConflicts } from "@/lib/conflict";
 
 const schema = z.object({
@@ -15,6 +15,7 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
+    assertCsrf(req);
     await requireStaff();
     const body = await parseBody(req, schema);
     const conflicts = await checkConflicts(body);

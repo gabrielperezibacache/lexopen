@@ -22,6 +22,13 @@ const eslintConfig = [
       "desktop/dist/**",
     ],
   },
+  {
+    files: ["desktop/**/*.cjs"],
+    rules: {
+      // Electron's main/preload/config entrypoints are intentionally CommonJS.
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 ];
 
 export default eslintConfig;

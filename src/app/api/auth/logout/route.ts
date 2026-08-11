@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { ROLE_COOKIE, SESSION_COOKIE } from "@/lib/auth/session";
+import { assertCsrf } from "@/lib/api";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  assertCsrf(req);
   const res = NextResponse.json({ ok: true });
   const clear = {
     httpOnly: true,

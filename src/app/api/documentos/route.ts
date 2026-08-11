@@ -8,8 +8,10 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { documentoCreateSchema } from "@/lib/schemas";
-import { newStorageKey, putObject } from "@/lib/storage";
+import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storage";
 import { writeAudit } from "@/lib/audit";
+import { canSeeConfidential } from "@/lib/auth/rbac";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest) {
         ...(causaId ? { causaId } : {}),
         ...confidentialWhere(user.role),
       },
-      include: { causa: true, autor: true },
+      include: { causa: true, autor: { select: publicUserSelect } },
       orderBy: { updatedAt: "desc" },
     });
     return NextResponse.json(documentos);
@@ -42,11 +44,18 @@ export async function POST(req: NextRequest) {
     let tipo = body?.tipo || "otro";
     let contenido = body?.contenido || null;
     let mimeType = body?.mimeType || null;
-    let storageKey = body?.storageKey || null;
+    let storageKey: string | null = null;
     let confidencial = Boolean(body?.confidencial);
     let privilegio = Boolean(body?.privilegio);
     let causaId = body?.causaId || null;
-    let autorId = body?.autorId || user.id;
+    const autorId = user.id;
+
+    if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
+      return NextResponse.json(
+        { error: "Su rol no puede crear contenido confidencial o privilegiado" },
+        { status: 403 }
+      );
+    }
 
     if (isMultipart) {
       const form = await req.formData();
@@ -56,9 +65,20 @@ export async function POST(req: NextRequest) {
       confidencial = form.get("confidencial") === "on";
       privilegio = form.get("privilegio") === "on";
       causaId = String(form.get("causaId") || "") || null;
-      autorId = user.id;
+      if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
+        return NextResponse.json(
+          { error: "Su rol no puede crear contenido confidencial o privilegiado" },
+          { status: 403 }
+        );
+      }
       if (file && typeof (file as File).arrayBuffer === "function" && (file as File).size > 0) {
         const uploaded = file as File;
+        if (uploaded.size > MAX_STORAGE_OBJECT_BYTES) {
+          return NextResponse.json(
+            { error: `El archivo supera el límite de ${MAX_STORAGE_OBJECT_BYTES} bytes` },
+            { status: 413 }
+          );
+        }
         nombre = nombre || uploaded.name;
         mimeType = uploaded.type || "application/octet-stream";
         const key = newStorageKey("documentos", nombre);

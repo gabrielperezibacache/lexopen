@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET() {
   try {
@@ -8,7 +9,11 @@ export async function GET() {
     const workflows = await prisma.workflow.findMany({
       include: {
         site: true,
-        instances: { orderBy: { createdAt: "desc" }, take: 5, include: { actor: true } },
+        instances: {
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          include: { actor: { select: publicUserSelect } },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -20,10 +25,18 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    assertCsrf(req);
     const user = await requireStaff();
     const body = await req.json();
 
     if (body.action === "start" && body.workflowId) {
+      const workflow = await prisma.workflow.findUnique({
+        where: { id: body.workflowId },
+        select: { id: true },
+      });
+      if (!workflow) {
+        return NextResponse.json({ error: "Workflow no encontrado" }, { status: 404 });
+      }
       const instance = await prisma.workflowInstance.create({
         data: {
           workflowId: body.workflowId,
@@ -42,7 +55,27 @@ export async function POST(req: NextRequest) {
         include: { workflow: true },
       });
       if (!inst) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-      const steps = JSON.parse(inst.workflow.stepsJson) as Array<{ name: string }>;
+      if (inst.status === "approved" || inst.status === "rejected") {
+        return NextResponse.json({ error: "El workflow ya terminó" }, { status: 409 });
+      }
+      const steps = JSON.parse(inst.workflow.stepsJson) as Array<{
+        name: string;
+        role?: string;
+      }>;
+      const current = steps[inst.currentStep];
+      if (!current) {
+        return NextResponse.json({ error: "Paso de workflow inválido" }, { status: 409 });
+      }
+      if (
+        current.role &&
+        current.role !== user.role &&
+        user.role !== "admin"
+      ) {
+        return NextResponse.json(
+          { error: "Este paso requiere otro rol" },
+          { status: 403 }
+        );
+      }
       const next = inst.currentStep + 1;
       const done = next >= steps.length || body.decision === "reject";
       const updated = await prisma.workflowInstance.update({
@@ -62,6 +95,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "create") {
+      if (typeof body.name !== "string" || !body.name.trim() || !body.siteId) {
+        return NextResponse.json(
+          { error: "Nombre y site son obligatorios" },
+          { status: 400 }
+        );
+      }
+      const site = await prisma.site.findUnique({
+        where: { id: body.siteId },
+        select: { id: true },
+      });
+      if (!site) {
+        return NextResponse.json({ error: "Site no encontrado" }, { status: 404 });
+      }
       const wf = await prisma.workflow.create({
         data: {
           name: body.name,

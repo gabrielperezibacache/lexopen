@@ -245,8 +245,9 @@ export function PeopleManager({
               className="input"
               name="password"
               type="password"
-              placeholder="Contraseña (default: lexopen)"
-              minLength={6}
+              placeholder="Contraseña (mínimo 12 caracteres)"
+              minLength={12}
+              required
             />
             <div className="flex justify-end gap-2">
               <button className="btn btn-ghost" type="button" onClick={() => setUserOpen(false)}>

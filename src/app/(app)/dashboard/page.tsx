@@ -5,27 +5,7 @@ import { labelMateria } from "@/lib/chile";
 import { ArrowRight, Building2, Briefcase, ListTodo, MessageSquare } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 
-async function ensureSeeded() {
-  const count = await prisma.site.count().catch(() => 0);
-  if (count === 0) {
-    const { execFile } = await import("child_process");
-    const { promisify } = await import("util");
-    const execFileAsync = promisify(execFile);
-    await execFileAsync("npx", ["prisma", "db", "push", "--skip-generate"], {
-      cwd: process.cwd(),
-      env: process.env,
-    }).catch(() => undefined);
-    await execFileAsync("npx", ["tsx", "prisma/seed.ts"], {
-      cwd: process.cwd(),
-      env: process.env,
-    });
-  }
-}
-
 export default async function DashboardPage() {
-  if (process.env.NODE_ENV === "development") {
-    await ensureSeeded();
-  }
   const user = await getCurrentUser();
 
   const [sites, causas, tasksOpen, unread, sitesList, tasks, actividades, minutasRecientes] =

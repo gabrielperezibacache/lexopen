@@ -17,7 +17,10 @@ export async function GET(_req: Request, { params }: Params) {
     if (!file) {
       return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
     }
-    if (file.confidencial && !canSeeConfidential(user.role)) {
+    if (
+      (file.confidencial || file.privilegio) &&
+      !canSeeConfidential(user.role)
+    ) {
       return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
     }
     const body = file.storageKey

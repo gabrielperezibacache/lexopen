@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    const user = await requireUser();
+    const user = await requireStaff();
     const { id } = await params;
     await requireSiteAccess(id, user);
     const tasks = await prisma.task.findMany({
       where: { siteId: id },
-      include: { assignee: true, creator: true, comments: true },
+      include: {
+        assignee: { select: publicUserSelect },
+        creator: { select: publicUserSelect },
+        comments: true,
+      },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
     });
     return NextResponse.json(tasks);
@@ -23,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function POST(req: NextRequest, { params }: Params) {
   try {
     assertCsrf(req);
-    const user = await requireUser();
+    const user = await requireStaff();
     const { id } = await params;
     await requireSiteAccess(id, user);
     const body = await req.json();
@@ -66,7 +71,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     assertCsrf(req);
-    const user = await requireUser();
+    const user = await requireStaff();
     const { id } = await params;
     await requireSiteAccess(id, user);
     const body = await req.json();

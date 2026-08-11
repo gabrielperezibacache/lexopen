@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { exportCausaToObsidian, syncAllCausasToObsidian, getObsidianConfig } from "@/lib/integrations/obsidian";
 
 export async function GET() {
@@ -19,6 +19,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    assertCsrf(req);
     await requireStaff();
     const body = await req.json().catch(() => ({}));
     if (body.action === "sync-all") {

@@ -4,6 +4,7 @@ import { assertCsrf, handleRouteError, parseBody, requireBillingManager, require
 import { DEFAULT_HOURLY_CLP } from "@/lib/billing";
 import { ufToClp } from "@/lib/uf";
 import { timeEntrySchema } from "@/lib/schemas";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 function minutesBetween(start: Date, end: Date) {
   return Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
           causaId ? { causaId } : {},
         ],
       },
-      include: { user: true, causa: true, cliente: true },
+      include: { user: { select: publicUserSelect }, causa: true, cliente: true },
       orderBy: { date: "desc" },
     });
     if (req.nextUrl.searchParams.get("format") === "csv") {
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
         clienteId: body.clienteId || null,
         causaId: body.causaId || null,
       },
-      include: { user: true, causa: true, cliente: true },
+      include: { user: { select: publicUserSelect }, causa: true, cliente: true },
     });
     return NextResponse.json(entry, { status: 201 });
   } catch (e) {
@@ -120,7 +121,12 @@ export async function PATCH(req: NextRequest) {
           approved: body.action === "approve",
           approverId: body.action === "approve" ? user.id : null,
         },
-        include: { user: true, causa: true, cliente: true, approver: true },
+        include: {
+          user: { select: publicUserSelect },
+          causa: true,
+          cliente: true,
+          approver: { select: publicUserSelect },
+        },
       });
       return NextResponse.json(entry);
     }

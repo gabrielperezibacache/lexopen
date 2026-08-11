@@ -64,6 +64,9 @@ async function wipe() {
 }
 
 async function main() {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("El seed demo está bloqueado en producción.");
+  }
   await wipe();
 
   const password = await bcrypt.hash("lexopen", 10);

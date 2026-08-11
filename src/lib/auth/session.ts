@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
 import { canImpersonate, isStaff } from "@/lib/auth/rbac";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export const SESSION_COOKIE = "lexopen_session";
 export const ROLE_COOKIE = "lexopen_role";
@@ -94,7 +95,10 @@ export async function listUsers() {
     const me = await getCurrentUser();
     return me ? [me] : [];
   }
-  return prisma.user.findMany({ orderBy: { name: "asc" } });
+  return prisma.user.findMany({
+    select: publicUserSelect,
+    orderBy: { name: "asc" },
+  });
 }
 
 export function buildSessionCookieValue(userId: string) {

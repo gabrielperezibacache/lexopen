@@ -14,7 +14,10 @@ export async function GET(_req: Request, { params }: Params) {
     if (!doc) {
       return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
     }
-    if (doc.confidencial && !canSeeConfidential(user.role)) {
+    if (
+      (doc.confidencial || doc.privilegio) &&
+      !canSeeConfidential(user.role)
+    ) {
       return NextResponse.json({ error: "Documento confidencial" }, { status: 403 });
     }
 
