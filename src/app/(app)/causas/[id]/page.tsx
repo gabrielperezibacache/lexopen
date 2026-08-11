@@ -6,7 +6,12 @@ import { StatusBadge, formatDate, formatDateTime } from "@/components/ui";
 import { CausaActions } from "@/components/CausaActions";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
+import { PjudMonitorPanel } from "@/components/pjud/PjudMonitorPanel";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
+import {
+  diasEntre,
+  semaforoPorDiasSinMovimiento,
+} from "@/lib/pjud/classify";
 import {
   isPlaceholderDriveFolderId,
   isRealDriveFolderId,
@@ -45,6 +50,10 @@ export default async function CausaDetailPage({ params }: Params) {
     },
   });
   if (!causa) notFound();
+
+  const ultimoMov = causa.movimientos[0] || null;
+  const diasSinMovimiento = ultimoMov ? diasEntre(ultimoMov.fecha) : null;
+  const semaforo = semaforoPorDiasSinMovimiento(diasSinMovimiento);
 
   const ultimaMinuta = causa.minutas[0];
   const accionesAbiertas = causa.minutas.reduce(
@@ -287,24 +296,33 @@ export default async function CausaDetailPage({ params }: Params) {
         </div>
       </section>
 
+      <PjudMonitorPanel
+        causaId={causa.id}
+        monitoreoActivo={causa.pjudMonitoreoActivo}
+        lastSyncAt={causa.pjudLastSyncAt}
+        lastSyncStatus={causa.pjudLastSyncStatus}
+        lastSyncNote={causa.pjudLastSyncNote}
+        diasSinMovimiento={diasSinMovimiento}
+        semaforo={semaforo}
+        movimientos={causa.movimientos.map((m) => ({
+          id: m.id,
+          titulo: m.titulo,
+          detalle: m.detalle,
+          fuente: m.fuente,
+          tipo: m.tipo,
+          referencia: m.referencia,
+          relevante: m.relevante,
+          fecha: m.fecha,
+        }))}
+      />
+
       <section className="panel rounded-3xl p-5">
-        <h2 className="text-lg font-semibold">Movimientos</h2>
+        <h2 className="text-lg font-semibold">Carga manual / CSV</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+          Alternativa al sync: registre un movimiento o importe CSV exportado
+          desde la consulta oficial del PJUD.
+        </p>
         <CausaMovimientoForm causaId={causa.id} />
-        <div className="mt-5 space-y-3">
-          {causa.movimientos.map((m) => (
-            <div key={m.id} className="rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="font-medium">{m.titulo}</div>
-                <span className="badge badge-ink">{m.fuente}</span>
-              </div>
-              <div className="mt-1 text-xs text-[var(--ink-soft)]/65">{formatDate(m.fecha)}</div>
-              {m.detalle && <p className="mt-2 text-[var(--ink-soft)]/80">{m.detalle}</p>}
-            </div>
-          ))}
-          {causa.movimientos.length === 0 && (
-            <p className="text-sm text-[var(--ink-soft)]/65">Sin movimientos registrados.</p>
-          )}
-        </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">

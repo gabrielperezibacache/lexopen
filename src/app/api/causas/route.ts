@@ -13,7 +13,7 @@ import { checkConflicts } from "@/lib/conflict";
 import { writeAudit } from "@/lib/audit";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { publicUserSelect } from "@/lib/auth/public-user";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { canSeeConfidential, isStaff } from "@/lib/auth/rbac";
 
 export async function GET(req: NextRequest) {
   try {
@@ -70,6 +70,18 @@ export async function POST(req: NextRequest) {
       return jsonError("Solo abogados o admin pueden omitir un conflicto bloqueante", 403);
     }
 
+    let abogadoId = user.id;
+    if (body.abogadoId) {
+      const assigned = await prisma.user.findUnique({
+        where: { id: body.abogadoId },
+        select: { id: true, role: true },
+      });
+      if (!assigned || !isStaff(assigned.role)) {
+        return jsonError("El responsable debe ser un usuario del estudio", 400);
+      }
+      abogadoId = assigned.id;
+    }
+
     if (body.rit && !validarRit(body.rit)) {
       return jsonError("RIT inválido (ej. C-4521-2025)", 400);
     }
@@ -117,7 +129,7 @@ export async function POST(req: NextRequest) {
         fechaNotificacion: parseLocalDateInput(body.fechaNotificacion || undefined),
         fechaIngreso: new Date(),
         clienteId: body.clienteId || null,
-        abogadoId: body.abogadoId || user.id,
+        abogadoId,
         conflictCheckedAt: new Date(),
         conflictStatus: blocked.length
           ? "blocked"

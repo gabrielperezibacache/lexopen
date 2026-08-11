@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { assertCsrf, confidentialWhere, handleRouteError, requireStaff } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { isStaff } from "@/lib/auth/rbac";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -81,7 +82,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     );
   }
 
+  if (typeof data.abogadoId === "string") {
+    const assigned = await prisma.user.findUnique({
+      where: { id: data.abogadoId },
+      select: { id: true, role: true },
+    });
+    if (!assigned || !isStaff(assigned.role)) {
+      return NextResponse.json(
+        { error: "El responsable debe ser un usuario del estudio" },
+        { status: 400 }
+      );
+    }
+  }
+
   const prev = await prisma.causa.findUnique({ where: { id } });
+  if (!prev) {
+    return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+  }
   const causa = await prisma.causa.update({
     where: { id },
     data,

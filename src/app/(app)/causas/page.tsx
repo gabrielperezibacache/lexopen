@@ -53,9 +53,14 @@ export default async function CausasPage({
             RIT, RUC, tribunal, etapa procesal y equipo responsable.
           </p>
         </div>
-        <Link href="/causas/nueva" className="btn btn-primary">
-          <Plus size={16} /> Nueva causa
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/causas/monitoreo" className="btn btn-secondary">
+            Monitoreo PJUD
+          </Link>
+          <Link href="/causas/nueva" className="btn btn-primary">
+            <Plus size={16} /> Nueva causa
+          </Link>
+        </div>
       </div>
 
       <CausasFilters />

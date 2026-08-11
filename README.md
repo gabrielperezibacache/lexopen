@@ -104,6 +104,10 @@ etapas procesales, días hábiles/calendario simplificados y valores UF. El moto
 plazos es una ayuda operativa: **no reemplaza el cómputo oficial del tribunal ni la
 revisión de un abogado**.
 
+Incluye también monitoreo de causas estilo CaseTracking con semáforos, timeline
+clasificado, alertas y conectores PJUD partner API o demo/CSV etiquetados. No se
+realizan scrapers ocultos ni se presenta el corpus demo como fuente oficial.
+
 La jurisprudencia incluida en el seed es un **corpus de demostración**. No es una
 fuente oficial, exhaustiva ni necesariamente actualizada.
 
@@ -198,7 +202,6 @@ Abra `http://localhost:3000/login`. Para una experiencia de demostración, el se
 crea usuarios y contenido ficticio; consulte [Usuarios y datos demo](#-usuarios-y-datos-demo).
 
 ### Comandos de base de datos
-
 | Comando | Uso |
 | --- | --- |
 | `npm run db:migrate` | Aplica las migraciones versionadas; es el comando apropiado para despliegues. |
@@ -258,6 +261,9 @@ variables más relevantes:
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | No | OAuth de Google Drive y Calendar. |
 | `HERMES_API_URL`, `HERMES_API_KEY` | No | Endpoint y credencial de la API compatible con OpenAI. |
 | `HERMES_ALLOW_DEMO` | No | Permite una respuesta local claramente marcada si Hermes no está disponible. |
+| `PJUD_API_URL`, `PJUD_API_KEY` | No | Conector partner para sincronizar movimientos judiciales. |
+| `PJUD_ALLOW_DEMO` | No | Permite movimientos PJUD simulados y etiquetados como demo. |
+| `CRON_SECRET` | No | Protege la sincronización de cartera desde un scheduler externo. |
 | `OBSIDIAN_VAULT_PATH` | No | Vault local para exportaciones en desarrollo. |
 | `OBSIDIAN_REST_URL`, `OBSIDIAN_REST_TOKEN` | No | Obsidian Local REST API y token Bearer. |
 | `LEXOPEN_DESKTOP`, `LEXOPEN_DATA_DIR`, `LEXOPEN_DESKTOP_MODE` | Desktop | Activan y configuran el modo Host/Cliente de Electron. |

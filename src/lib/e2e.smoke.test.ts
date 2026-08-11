@@ -33,6 +33,7 @@ assert.equal(isClientAllowedPath("/sites/abc"), false);
 assert.equal(isClientAllowedPath("/sites/abc/archivos"), true);
 assert.equal(isClientAllowedPath("/sites/abc/qa"), true);
 assert.equal(isClientAllowedPath("/causas"), false);
+assert.equal(isClientAllowedPath("/causas/monitoreo"), false);
 assert.equal(isClientAllowedPath("/facturacion/horas"), false);
 assert.equal(isClientAllowedPath("/auditoria"), false);
 
