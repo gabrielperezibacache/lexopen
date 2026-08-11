@@ -130,8 +130,10 @@ y publica los artefactos en GitHub Releases.
 
 Electron Builder firma automáticamente cuando el workflow recibe estos secrets:
 
-- `CSC_LINK`: certificado Windows (`.p12`) o certificado de firma macOS.
-- `CSC_KEY_PASSWORD`: contraseña del certificado.
+- `MAC_CSC_LINK`: certificado macOS Developer ID Application (`.p12`).
+- `MAC_CSC_KEY_PASSWORD`: contraseña del certificado macOS.
+- `WIN_CSC_LINK`: certificado Windows Code Signing (`.pfx`/`.p12`).
+- `WIN_CSC_KEY_PASSWORD`: contraseña del certificado Windows.
 - `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`: notarización macOS.
 
 Sin esos secrets el workflow genera artefactos válidos pero sin firma. La firma y
