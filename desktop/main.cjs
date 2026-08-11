@@ -3,6 +3,7 @@
  * mode=host → Postgres embebido + Next; mode=client → BrowserWindow a URL Tailscale.
  */
 const { app, BrowserWindow, ipcMain, shell, dialog, Menu } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const {
   readConfig,
@@ -25,6 +26,11 @@ let hostHandle = null;
 let lastStatus = { phase: "idle", message: "Iniciando…" };
 let lastRemoteVersion = null;
 let shuttingDown = false;
+let updaterConfigured = false;
+let updaterCheckPromise = null;
+let interactiveUpdateCheck = false;
+let updateDownloadedInfo = null;
+let updatePromptActive = false;
 
 function bundledVersion() {
   return (
@@ -37,6 +43,136 @@ function sendStatus(partial) {
   lastStatus = { ...lastStatus, ...partial, at: new Date().toISOString() };
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("desktop:status", lastStatus);
+  }
+}
+
+function configureAutoUpdater() {
+  if (updaterConfigured || !app.isPackaged) return;
+  updaterConfigured = true;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.allowPrerelease = false;
+
+  autoUpdater.on("checking-for-update", () => {
+    sendStatus({ phase: "checking-update", message: "Buscando actualizaciones…" });
+  });
+  autoUpdater.on("update-available", (info) => {
+    sendStatus({
+      phase: "update-available",
+      message: `Actualización v${info.version} disponible`,
+      updateVersion: info.version,
+    });
+    void promptDownloadUpdate(info);
+  });
+  autoUpdater.on("update-not-available", () => {
+    sendStatus({ phase: "ready", message: "LexOpen está actualizado." });
+    if (interactiveUpdateCheck) {
+      void dialog.showMessageBox({
+        type: "info",
+        title: "LexOpen",
+        message: "No hay actualizaciones disponibles.",
+      });
+    }
+    interactiveUpdateCheck = false;
+  });
+  autoUpdater.on("update-downloaded", (info) => {
+    updateDownloadedInfo = info;
+    sendStatus({
+      phase: "update-downloaded",
+      message: `Actualización v${info.version} lista para instalar`,
+      updateVersion: info.version,
+    });
+    void promptInstallUpdate(info);
+  });
+  autoUpdater.on("error", (error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    sendStatus({ phase: "update-error", message });
+    if (interactiveUpdateCheck) {
+      void dialog.showErrorBox("Actualizaciones", message);
+    }
+    interactiveUpdateCheck = false;
+  });
+}
+
+async function checkForUpdates(interactive = false) {
+  if (!app.isPackaged) {
+    if (interactive) {
+      await dialog.showMessageBox({
+        type: "info",
+        title: "LexOpen",
+        message: "La búsqueda de actualizaciones solo está disponible en el instalador.",
+      });
+    }
+    return null;
+  }
+  configureAutoUpdater();
+  if (updaterCheckPromise) return updaterCheckPromise;
+  interactiveUpdateCheck = interactive;
+  updaterCheckPromise = autoUpdater
+    .checkForUpdates()
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      if (interactive) {
+        dialog.showErrorBox("Actualizaciones", message);
+      }
+      interactiveUpdateCheck = false;
+      return null;
+    })
+    .finally(() => {
+      updaterCheckPromise = null;
+    });
+  return updaterCheckPromise;
+}
+
+async function promptDownloadUpdate(info) {
+  if (updatePromptActive || updateDownloadedInfo) return;
+  updatePromptActive = true;
+  try {
+    const result = await dialog.showMessageBox({
+      type: "info",
+      title: "Actualización disponible",
+      message: `LexOpen ${info.version} está disponible.`,
+      detail:
+        "La descarga no detendrá el Host. La instalación requerirá cerrar LexOpen y conservará sus datos.",
+      buttons: ["Descargar", "Más tarde"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (result.response === 0) {
+      sendStatus({ phase: "downloading-update", message: "Descargando actualización…" });
+      await autoUpdater.downloadUpdate();
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    dialog.showErrorBox("Actualizaciones", message);
+  } finally {
+    updatePromptActive = false;
+  }
+}
+
+async function promptInstallUpdate(info) {
+  if (updatePromptActive) return;
+  updatePromptActive = true;
+  try {
+    const result = await dialog.showMessageBox({
+      type: "info",
+      title: "Actualización descargada",
+      message: `LexOpen ${info.version} está lista.`,
+      detail:
+        "Se cerrará el Host de forma ordenada y la instalación conservará la carpeta de datos.",
+      buttons: ["Reiniciar e instalar", "Más tarde"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (result.response === 0) {
+      await stopHostForMaintenance();
+      autoUpdater.quitAndInstall(false, true);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    dialog.showErrorBox("Actualizaciones", message);
+  } finally {
+    updatePromptActive = false;
   }
 }
 
@@ -286,6 +422,10 @@ async function boot() {
             click: () => void restoreHostBackup(),
           },
           {
+            label: "Buscar actualizaciones…",
+            click: () => void checkForUpdates(true),
+          },
+          {
             label: "Versión y estado",
             click: () => {
               const state = readAppState(defaultDataDir());
@@ -477,6 +617,8 @@ app.whenReady().then(() => {
     );
     process.env.LEXOPEN_PRISMA_ROOT = path.join(process.resourcesPath, "prisma");
   }
+  configureAutoUpdater();
+  setTimeout(() => void checkForUpdates(false), 8000);
   void boot();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) void boot();

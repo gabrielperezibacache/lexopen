@@ -82,6 +82,12 @@ Flujo operativo:
 3. Arrancar → log `Actualización reconocida: x → y` → `prisma migrate deploy` → listo.
 4. Clientes: si usan Desktop, recarga automática; si usan navegador, F5.
 
+En una instalación empaquetada, LexOpen comprueba GitHub Releases, no descarga
+silenciosamente y pide confirmación antes de descargar. Tras la descarga, solicita
+confirmación para cerrar ordenadamente el Host e instalar la actualización. La
+carpeta de datos se conserva; releases sin firma o sin metadata válida deben
+actualizarse manualmente.
+
 Datos del Host:
 
 | SO | Ruta típica |
@@ -145,6 +151,4 @@ notarización son necesarias para evitar advertencias de SmartScreen y Gatekeepe
 
 - Un solo Host activo (no multi-maestro).
 - La firma/notarización depende de los certificados del estudio y secrets del workflow.
-- El Host reconoce la versión nueva y los clientes Electron recargan la interfaz;
-  la descarga e instalación automática (`electron-updater`) todavía no está
-  implementada: las actualizaciones se instalan manualmente desde GitHub Releases.
+- Durante desarrollo (`electron .`) no se consulta el canal de actualizaciones.

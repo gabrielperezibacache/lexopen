@@ -346,8 +346,9 @@ La guía documenta macOS 12+ y Windows 10/11 como plataformas principales. El
 builder contiene un target AppImage para Linux. Los tags `vX.Y.Z` activan
 `.github/workflows/desktop-release.yml`, que compila los tres sistemas y publica
 los artefactos. La firma/notarización requiere certificados configurados como
-secrets; sin ellos los instaladores son unsigned. Las actualizaciones siguen
-siendo manuales desde GitHub Releases.
+secrets; sin ellos los instaladores son unsigned. En builds empaquetados, LexOpen
+consulta releases, pide confirmación para descargar y detiene el Host de forma
+ordenada antes de instalar; durante desarrollo no se consulta el canal.
 
 El Host conserva configuración y datos fuera del directorio de la aplicación; los
 clientes desktop detectan cambios de versión del Host y recargan la interfaz. La
