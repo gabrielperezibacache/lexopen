@@ -24,7 +24,7 @@
     "tsx": "^4.19.4"
   },
   "devDependencies": {
-    "electron": "^35.1.2",
+    "electron": "^43.3.0",
     "electron-builder": "^26.0.12"
   }
 }
