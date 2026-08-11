@@ -47,11 +47,7 @@ jobs:
     env:
       # Electron Builder signs when these secrets are present. Without them,
       # the workflow still produces unsigned artifacts for internal testing.
-      CSC_LINK: ${{ secrets.CSC_LINK }}
-      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      SIGNING_CERT: ${{ secrets.CSC_LINK }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -71,10 +67,21 @@ jobs:
           test "$tag_version" = "$desktop_version"
       - run: npm ci
       - run: npm --prefix desktop ci
-      - name: Build installer
+      - name: Build installer without signing
+        if: env.SIGNING_CERT == ''
         shell: bash
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK == '' && 'false' || 'true' }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run desktop:dist:${{ matrix.target }}
+      - name: Build installer with signing
+        if: env.SIGNING_CERT != ''
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run desktop:dist:${{ matrix.target }}
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4

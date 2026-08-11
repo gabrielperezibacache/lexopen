@@ -1,6 +1,6 @@
 {
   "name": "lexopen",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": false,
   "license": "AGPL-3.0-or-later",
   "description": "LexOpen — clon open-source de HighQ para estudios jurídicos en Chile, con Obsidian, Hermes Agent y Google Workspace.",
