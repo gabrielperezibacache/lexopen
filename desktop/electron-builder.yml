@@ -1,0 +1,51 @@
+appId: cl.perezibacache.lexopen
+productName: LexOpen
+copyright: Copyright © LexOpen contributors
+directories:
+  output: dist
+  buildResources: build
+files:
+  - main.cjs
+  - preload.cjs
+  - config.cjs
+  - host-runtime.mjs
+  - renderer/**/*
+  - package.json
+extraResources:
+  - from: ../.next/standalone
+    to: app-standalone
+    filter:
+      - "**/*"
+  - from: ../.next/static
+    to: app-standalone/.next/static
+    filter:
+      - "**/*"
+  - from: ../public
+    to: app-standalone/public
+    filter:
+      - "**/*"
+  - from: ../prisma
+    to: prisma
+    filter:
+      - "**/*"
+mac:
+  category: public.app-category.business
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: false
+  gatekeeperAssess: false
+win:
+  target:
+    - nsis
+    - zip
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+linux:
+  target:
+    - AppImage
+  category: Office
+extraMetadata:
+  main: main.cjs

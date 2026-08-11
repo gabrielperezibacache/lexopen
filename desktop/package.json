@@ -1,0 +1,24 @@
+{
+  "name": "lexopen-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LexOpen Desktop — host local del estudio + cliente remoto (Tailscale)",
+  "main": "main.cjs",
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --mac --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "test": "node config.test.cjs"
+  },
+  "dependencies": {
+    "embedded-postgres": "^17.5.0-beta.15",
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "electron": "^35.1.2",
+    "electron-builder": "^26.0.12"
+  }
+}

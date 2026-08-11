@@ -52,6 +52,19 @@ cargar datos demo.
 
 Abra http://localhost:3000/login e ingrese con un usuario demo.
 
+### Desktop (PC principal + Tailscale)
+
+Instalable en **macOS / Windows**: un PC actúa como **Host** (Postgres embebido + LexOpen);
+el resto abre sesiones remotas contra esa misma instalación vía URL Tailscale
+(modo Cliente o navegador). Guía: [`docs/DESKTOP.md`](docs/DESKTOP.md).
+
+```bash
+npm run desktop:install
+npm run desktop:test
+npm run desktop:dev          # asistente Host / Cliente
+# npm run desktop:dist       # .dmg / .exe (tras desktop:build)
+```
+
 Variables relevantes:
 - `SESSION_SECRET`: obligatorio en producción para firmar sesiones y proteger tokens OAuth.
 - `HERMES_ALLOW_DEMO=1`: habilita respuestas demo cuando Hermes Agent no está disponible.

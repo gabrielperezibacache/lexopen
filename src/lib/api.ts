@@ -77,10 +77,15 @@ export function assertCsrf(req: Request) {
   const host = req.headers.get("host");
   if (!host) return;
 
+  const trusted = (process.env.LEXOPEN_TRUSTED_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   const allowed = [
     `http://${host}`,
     `https://${host}`,
     process.env.NEXT_PUBLIC_APP_URL,
+    ...trusted,
   ].filter(Boolean) as string[];
 
   const okOrigin = origin && allowed.some((a) => origin === a || origin.startsWith(a));

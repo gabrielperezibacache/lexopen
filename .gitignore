@@ -47,3 +47,8 @@ yarn-error.log*
 /obsidian-vault/**
 !/obsidian-vault/.gitkeep
 /*.db
+
+# desktop packaging
+/desktop/node_modules
+/desktop/dist
+/desktop/data

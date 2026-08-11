@@ -9,13 +9,19 @@
     "build": "prisma generate && next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint .",
-    "test": "tsx src/lib/integrations/drive-folder.test.ts && tsx src/lib/minutas.render.test.ts && tsx src/lib/minutas.api-contract.test.ts && tsx src/lib/chile.test.ts && tsx src/lib/plazos.test.ts && tsx src/lib/maturity.integration.test.ts && tsx src/lib/e2e.smoke.test.ts",
+    "test": "tsx src/lib/integrations/drive-folder.test.ts && tsx src/lib/minutas.render.test.ts && tsx src/lib/minutas.api-contract.test.ts && tsx src/lib/chile.test.ts && tsx src/lib/plazos.test.ts && tsx src/lib/maturity.integration.test.ts && tsx src/lib/e2e.smoke.test.ts && tsx src/lib/api.csrf-origins.test.ts && node desktop/config.test.cjs",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:migrate": "prisma migrate deploy",
     "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
     "postinstall": "prisma generate",
-    "setup": "prisma db push && tsx prisma/seed.ts"
+    "setup": "prisma db push && tsx prisma/seed.ts",
+    "desktop:install": "npm --prefix desktop install",
+    "desktop:dev": "npm --prefix desktop run dev",
+    "desktop:host": "node desktop/host-runtime.mjs",
+    "desktop:test": "node desktop/config.test.cjs",
+    "desktop:build": "LEXOPEN_STANDALONE=1 npm run build",
+    "desktop:dist": "npm run desktop:build && npm --prefix desktop run dist"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

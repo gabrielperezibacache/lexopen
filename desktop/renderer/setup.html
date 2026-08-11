@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>LexOpen — Configuración</title>
+    <link rel="stylesheet" href="setup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <p class="eyebrow">LexOpen Desktop</p>
+        <h1>Servidor del estudio o acceso remoto</h1>
+        <p class="lede">
+          Un PC principal guarda usuarios y datos. El resto se conecta por
+          Tailscale a esa misma instalación.
+        </p>
+      </header>
+
+      <p id="status" class="status" role="status"></p>
+
+      <section class="modes">
+        <label class="card">
+          <input type="radio" name="mode" value="host" checked />
+          <div>
+            <strong>Este PC es el servidor</strong>
+            <span>Postgres embebido + LexOpen. Aquí crea usuarios del estudio.</span>
+          </div>
+        </label>
+        <label class="card">
+          <input type="radio" name="mode" value="client" />
+          <div>
+            <strong>Conectar a un servidor</strong>
+            <span>URL Tailscale del PC principal (misma base de datos remota).</span>
+          </div>
+        </label>
+      </section>
+
+      <section id="host-fields" class="fields">
+        <label>
+          Puerto local
+          <input id="port" type="number" min="1024" max="65535" value="3000" />
+        </label>
+        <label>
+          URL Tailscale / pública (opcional)
+          <input
+            id="publicUrl"
+            type="url"
+            placeholder="http://pc-estudio.tailXXXX.ts.net:3000"
+          />
+        </label>
+        <label class="check">
+          <input id="seedDemo" type="checkbox" />
+          Cargar datos demo la primera vez
+        </label>
+      </section>
+
+      <section id="client-fields" class="fields hidden">
+        <label>
+          URL del PC principal
+          <input
+            id="remoteUrl"
+            type="url"
+            placeholder="http://pc-estudio.tailXXXX.ts.net:3000"
+            required
+          />
+        </label>
+        <p class="hint">
+          En el Host: instale Tailscale y comparta el hostname MagicDNS, o ejecute
+          <code>tailscale serve --bg 3000</code>.
+        </p>
+      </section>
+
+      <footer>
+        <button id="continue" type="button">Continuar</button>
+        <p id="error" class="error" hidden></p>
+        <p class="meta">
+          Datos del Host:
+          <code id="dataDir"></code>
+        </p>
+      </footer>
+    </main>
+    <script src="setup.js"></script>
+  </body>
+</html>
