@@ -58,11 +58,23 @@ async function verifyToken(token: string): Promise<boolean> {
     return process.env.NODE_ENV === "development";
   }
   const parts = token.split(".");
-  if (parts.length !== 3) return false;
-  const [userId, expStr, sig] = parts;
+  if (parts.length !== 4) return false;
+  const [userId, expStr, versionStr, sig] = parts;
   const expiresAt = Number(expStr);
-  if (!userId || !Number.isFinite(expiresAt) || expiresAt < Date.now()) return false;
-  const expected = await hmacSha256Hex(`${userId}.${expiresAt}`, secret);
+  const sessionVersion = Number(versionStr);
+  if (
+    !userId ||
+    !Number.isFinite(expiresAt) ||
+    expiresAt < Date.now() ||
+    !Number.isInteger(sessionVersion) ||
+    sessionVersion < 0
+  ) {
+    return false;
+  }
+  const expected = await hmacSha256Hex(
+    `${userId}.${expiresAt}.${sessionVersion}`,
+    secret
+  );
   return timingSafeEqualHex(sig, expected);
 }
 

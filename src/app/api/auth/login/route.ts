@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const session = buildSessionCookieValue(user.id);
+    const session = buildSessionCookieValue(user.id, user.sessionVersion);
     const res = NextResponse.json({
       ok: true,
       user: {

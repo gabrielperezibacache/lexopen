@@ -8,6 +8,7 @@ process.env.SESSION_SECRET =
 import assert from "node:assert/strict";
 import {
   buildSessionCookieValue,
+  signSessionToken,
   verifySessionToken,
   sessionSecret,
 } from "@/lib/auth/session";
@@ -21,7 +22,10 @@ const session = buildSessionCookieValue("user_smoke_1");
 const parsed = verifySessionToken(session.value);
 assert.ok(parsed);
 assert.equal(parsed!.userId, "user_smoke_1");
+assert.equal(parsed!.sessionVersion, 0);
 assert.ok(parsed!.expiresAt > Date.now());
+const rotated = signSessionToken("user_smoke_1", Date.now() + 60_000, 1);
+assert.equal(verifySessionToken(rotated)!.sessionVersion, 1);
 
 assert.equal(isClientAllowedPath("/portal"), true);
 assert.equal(isClientAllowedPath("/cuenta"), true);

@@ -17,20 +17,37 @@ export function sessionSecret() {
   return secret || "lexopen-dev-session-secret-change-me";
 }
 
-export function signSessionToken(userId: string, expiresAt: number) {
-  const payload = `${userId}.${expiresAt}`;
+export function signSessionToken(
+  userId: string,
+  expiresAt: number,
+  sessionVersion = 0
+) {
+  const payload = `${userId}.${expiresAt}.${sessionVersion}`;
   const sig = createHmac("sha256", sessionSecret()).update(payload).digest("hex");
   return `${payload}.${sig}`;
 }
 
-export function verifySessionToken(token: string): { userId: string; expiresAt: number } | null {
+export function verifySessionToken(token: string): {
+  userId: string;
+  expiresAt: number;
+  sessionVersion: number;
+} | null {
   const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  const [userId, expStr, sig] = parts;
+  if (parts.length !== 4) return null;
+  const [userId, expStr, versionStr, sig] = parts;
   const expiresAt = Number(expStr);
-  if (!userId || !Number.isFinite(expiresAt) || expiresAt < Date.now()) return null;
+  const sessionVersion = Number(versionStr);
+  if (
+    !userId ||
+    !Number.isFinite(expiresAt) ||
+    expiresAt < Date.now() ||
+    !Number.isInteger(sessionVersion) ||
+    sessionVersion < 0
+  ) {
+    return null;
+  }
   const expected = createHmac("sha256", sessionSecret())
-    .update(`${userId}.${expiresAt}`)
+    .update(`${userId}.${expiresAt}.${sessionVersion}`)
     .digest("hex");
   try {
     const a = Buffer.from(sig);
@@ -39,7 +56,7 @@ export function verifySessionToken(token: string): { userId: string; expiresAt: 
   } catch {
     return null;
   }
-  return { userId, expiresAt };
+  return { userId, expiresAt, sessionVersion };
 }
 
 export async function getCurrentUser() {
@@ -57,7 +74,9 @@ export async function getCurrentUser() {
 
   const parsed = verifySessionToken(raw);
   if (!parsed) return null;
-  return prisma.user.findUnique({ where: { id: parsed.userId } });
+  const user = await prisma.user.findUnique({ where: { id: parsed.userId } });
+  if (!user || user.sessionVersion !== parsed.sessionVersion) return null;
+  return user;
 }
 
 export async function requireUser() {
@@ -101,10 +120,10 @@ export async function listUsers() {
   });
 }
 
-export function buildSessionCookieValue(userId: string) {
+export function buildSessionCookieValue(userId: string, sessionVersion = 0) {
   const expiresAt = Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000;
   return {
-    value: signSessionToken(userId, expiresAt),
+    value: signSessionToken(userId, expiresAt, sessionVersion),
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   };
 }

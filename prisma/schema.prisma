@@ -38,6 +38,7 @@ model User {
   name      String
   role      String   @default("abogado") // admin | abogado | asistente | cliente
   password  String
+  sessionVersion Int @default(0)
   avatarColor String @default("#1f6f78")
   title     String?
   createdAt DateTime @default(now())
