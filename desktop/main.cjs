@@ -18,6 +18,7 @@ let mainWindow = null;
 let hostHandle = null;
 let lastStatus = { phase: "idle", message: "Iniciando…" };
 let lastRemoteVersion = null;
+let shuttingDown = false;
 
 function bundledVersion() {
   return (
@@ -69,6 +70,12 @@ async function probeRemote(url) {
     });
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
     const body = await res.json().catch(() => ({}));
+    if (body.ok !== true) {
+      return {
+        ok: false,
+        error: body.error || `Health check no disponible (${body.db || "desconocido"})`,
+      };
+    }
     return {
       ok: true,
       url: base,
@@ -311,6 +318,10 @@ ipcMain.handle("desktop:open-external", async (_e, url) => {
 });
 
 ipcMain.handle("desktop:retry", async () => {
+  if (hostHandle?.stop) {
+    await hostHandle.stop().catch(() => undefined);
+    hostHandle = null;
+  }
   await boot();
   return lastStatus;
 });
@@ -333,7 +344,12 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+  if (shuttingDown) return;
+  event.preventDefault();
+  shuttingDown = true;
   if (clientWatchTimer) clearInterval(clientWatchTimer);
-  if (hostHandle?.stop) void hostHandle.stop();
+  Promise.resolve(hostHandle?.stop?.())
+    .catch(() => undefined)
+    .finally(() => app.exit(0));
 });

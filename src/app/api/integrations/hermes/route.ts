@@ -38,16 +38,35 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     if (body.action === "save-config") {
+      if (user.role !== "admin") {
+        return NextResponse.json(
+          { error: "Solo admin puede configurar Hermes" },
+          { status: 403 }
+        );
+      }
+      const apiUrl = body.config?.apiUrl;
+      if (
+        apiUrl !== undefined &&
+        (!isSafeHttpUrl(apiUrl) || apiUrl.length > 500)
+      ) {
+        return NextResponse.json({ error: "URL de Hermes inválida" }, { status: 400 });
+      }
       await prisma.integrationConfig.upsert({
         where: { provider: "hermes" },
         create: {
           provider: "hermes",
           enabled: Boolean(body.enabled ?? true),
-          configJson: JSON.stringify(body.config || {}),
+          configJson: JSON.stringify({
+            ...(body.config || {}),
+            ...(apiUrl ? { apiUrl: String(apiUrl).replace(/\/+$/, "") } : {}),
+          }),
         },
         update: {
           enabled: Boolean(body.enabled ?? true),
-          configJson: JSON.stringify(body.config || {}),
+          configJson: JSON.stringify({
+            ...(body.config || {}),
+            ...(apiUrl ? { apiUrl: String(apiUrl).replace(/\/+$/, "") } : {}),
+          }),
         },
       });
       return NextResponse.json({ ok: true });
@@ -103,9 +122,10 @@ export async function POST(req: Request) {
       }
     }
 
+    const chatUserId = user.role === "admin" && body.userId ? body.userId : user.id;
     const result = await askHermes({
       causaId: body.causaId,
-      userId: body.userId || user.id,
+      userId: chatUserId,
       messages: [
         { role: "system", content: legalSystemPrompt(context) },
         { role: "user", content: body.prompt || "Resume el estado procesal y sugiere próximos pasos." },
@@ -135,7 +155,7 @@ export async function POST(req: Request) {
           messagesJson: JSON.stringify([...previous, ...nextMessages]),
           demoMode: existing?.demoMode || result.source === "demo",
           causaId: body.causaId || existing?.causaId || null,
-          userId: body.userId || user.id,
+          userId: chatUserId,
         },
       });
     } else {
@@ -145,7 +165,7 @@ export async function POST(req: Request) {
           messagesJson: JSON.stringify(nextMessages),
           demoMode: result.source === "demo",
           causaId: body.causaId || null,
-          userId: body.userId || user.id,
+          userId: chatUserId,
         },
       });
     }
@@ -153,5 +173,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ ...result, chat });
   } catch (e) {
     return handleRouteError(e);
+  }
+}
+
+function isSafeHttpUrl(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
   }
 }

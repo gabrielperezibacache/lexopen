@@ -86,6 +86,7 @@ function run(cmd, args, opts = {}) {
       stdio: "inherit",
       shell: process.platform === "win32",
     });
+    child.on("error", reject);
     child.on("exit", (code) => {
       if (code === 0) resolve();
       else reject(new Error(`${cmd} ${args.join(" ")} → exit ${code}`));
@@ -93,8 +94,59 @@ function run(cmd, args, opts = {}) {
   });
 }
 
+function bundledModuleFile(name, file) {
+  const candidates = [
+    path.join(__dirname, "node_modules", name, file),
+    process.resourcesPath
+      ? path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", name, file)
+      : null,
+    path.join(repoRoot, "node_modules", name, file),
+  ].filter(Boolean);
+  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+}
+
+function runtimeEnv(env = {}) {
+  return process.versions.electron
+    ? { ...env, ELECTRON_RUN_AS_NODE: "1" }
+    : env;
+}
+
+function runBundledTool(name, file, args, opts = {}) {
+  const entry = bundledModuleFile(name, file);
+  if (!entry) return null;
+  return run(process.execPath, [entry, ...args], {
+    ...opts,
+    env: runtimeEnv(opts.env),
+  });
+}
+
+function stopChild(child) {
+  if (!child || child.exitCode !== null || child.killed) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      if (child.exitCode === null) child.kill("SIGKILL");
+      resolve();
+    }, 10_000);
+    child.once("exit", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    child.kill("SIGTERM");
+  });
+}
+
 async function migrate() {
   const schema = path.join(prismaRoot, "schema.prisma");
+  const bundled = runBundledTool(
+    "prisma",
+    "build/index.js",
+    ["migrate", "deploy", "--schema", schema],
+    { cwd: repoRoot, env: { DATABASE_URL: process.env.DATABASE_URL } }
+  );
+  if (bundled) {
+    await bundled;
+    return;
+  }
   await run("npx", ["prisma", "migrate", "deploy", "--schema", schema], {
     cwd: repoRoot,
     env: { DATABASE_URL: process.env.DATABASE_URL },
@@ -108,7 +160,12 @@ async function maybeSeed(seedDemo, dataDir) {
     console.log("[lexopen-host] Seed demo ya aplicado — no se vuelve a ejecutar.");
     return;
   }
-  await run("npx", ["tsx", "prisma/seed.ts"]);
+  const bundled = runBundledTool("tsx", "dist/cli.mjs", ["prisma/seed.ts"], {
+    cwd: repoRoot,
+    env: { DATABASE_URL: process.env.DATABASE_URL },
+  });
+  if (bundled) await bundled;
+  else await run("npx", ["tsx", "prisma/seed.ts"]);
   fs.writeFileSync(marker, new Date().toISOString(), "utf8");
 }
 
@@ -141,6 +198,9 @@ function startNextServer(port) {
   console.log(
     "[lexopen-host] Usando `next start` (empaquetado: LEXOPEN_STANDALONE=1 npm run build)."
   );
+  if (process.versions.electron) {
+    throw new Error("Falta .next/standalone/server.js en el instalador de LexOpen.");
+  }
   return spawn("npx", ["next", "start", "-H", "0.0.0.0", "-p", String(port)], {
     cwd: repoRoot,
     env,
@@ -153,7 +213,8 @@ async function waitForHealth(url, attempts = 60) {
   for (let i = 0; i < attempts; i++) {
     try {
       const res = await fetch(`${url}/api/health`);
-      if (res.ok) return true;
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && body.ok === true) return true;
     } catch {
       /* retry */
     }
@@ -225,20 +286,24 @@ export async function startHost(options = {}) {
   const url = localAppUrl(host.port);
   const ok = await waitForHealth(url);
   if (!ok) {
-    console.warn("[lexopen-host] Health check lento; la ventana puede reintentar.");
+    await stopChild(child);
+    await pg.stop().catch(() => undefined);
+    throw new Error("[lexopen-host] Health check falló; el servidor no está listo.");
   }
 
+  let stopPromise = null;
   const stop = async () => {
-    if (child && !child.killed) child.kill("SIGTERM");
-    try {
-      await pg.stop();
-    } catch (e) {
-      console.warn("[lexopen-host] pg.stop:", e);
-    }
+    if (stopPromise) return stopPromise;
+    stopPromise = (async () => {
+      await stopChild(child);
+      try {
+        await pg.stop();
+      } catch (e) {
+        console.warn("[lexopen-host] pg.stop:", e);
+      }
+    })();
+    return stopPromise;
   };
-
-  process.on("SIGINT", () => void stop().then(() => process.exit(0)));
-  process.on("SIGTERM", () => void stop().then(() => process.exit(0)));
 
   return {
     url,
@@ -257,8 +322,19 @@ const isMain =
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
-  startHost().catch((e) => {
-    console.error(e);
-    process.exit(1);
-  });
+  let hostHandle;
+  const shutdown = () =>
+    Promise.resolve(hostHandle?.stop?.())
+      .catch((e) => console.warn("[lexopen-host] shutdown:", e))
+      .finally(() => process.exit(0));
+  process.once("SIGINT", () => void shutdown());
+  process.once("SIGTERM", () => void shutdown());
+  startHost()
+    .then((handle) => {
+      hostHandle = handle;
+    })
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    });
 }

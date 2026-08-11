@@ -13,6 +13,7 @@ import { checkConflicts } from "@/lib/conflict";
 import { writeAudit } from "@/lib/audit";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { canSeeConfidential } from "@/lib/auth/rbac";
 
 export async function GET(req: NextRequest) {
   try {
@@ -64,6 +65,10 @@ export async function POST(req: NextRequest) {
     assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, causaCreateSchema);
+
+    if (body.conflictOverride && !canSeeConfidential(user.role)) {
+      return jsonError("Solo abogados o admin pueden omitir un conflicto bloqueante", 403);
+    }
 
     if (body.rit && !validarRit(body.rit)) {
       return jsonError("RIT inválido (ej. C-4521-2025)", 400);

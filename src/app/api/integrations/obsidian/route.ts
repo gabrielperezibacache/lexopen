@@ -31,6 +31,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, result });
     }
     if (body.action === "save-config") {
+      const user = await requireStaff();
+      if (user.role !== "admin") {
+        return NextResponse.json(
+          { error: "Solo admin puede configurar Obsidian" },
+          { status: 403 }
+        );
+      }
       await prisma.integrationConfig.upsert({
         where: { provider: "obsidian" },
         create: {

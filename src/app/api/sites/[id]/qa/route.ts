@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,7 +13,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const threads = await prisma.qaThread.findMany({
       where: { siteId: id },
       include: {
-        posts: { include: { author: true }, orderBy: { createdAt: "asc" } },
+        posts: {
+          include: { author: { select: publicUserSelect } },
+          orderBy: { createdAt: "asc" },
+        },
       },
       orderBy: { updatedAt: "desc" },
     });
@@ -66,14 +70,14 @@ export async function POST(req: NextRequest, { params }: Params) {
         data: {
           threadId: body.threadId,
           body: body.body,
-          isAnswer: Boolean(body.isAnswer),
+          isAnswer: user.role !== "cliente" && Boolean(body.isAnswer),
           authorId: user.id,
         },
       });
       await prisma.qaThread.update({
         where: { id: thread.id },
         data: {
-          status: body.isAnswer ? "answered" : undefined,
+          status: user.role !== "cliente" && body.isAnswer ? "answered" : undefined,
           updatedAt: new Date(),
         },
       });

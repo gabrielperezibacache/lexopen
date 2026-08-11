@@ -24,7 +24,9 @@ assert.equal(parsed!.userId, "user_smoke_1");
 assert.ok(parsed!.expiresAt > Date.now());
 
 assert.equal(isClientAllowedPath("/portal"), true);
-assert.equal(isClientAllowedPath("/sites/abc"), true);
+assert.equal(isClientAllowedPath("/sites/abc"), false);
+assert.equal(isClientAllowedPath("/sites/abc/archivos"), true);
+assert.equal(isClientAllowedPath("/sites/abc/qa"), true);
 assert.equal(isClientAllowedPath("/causas"), false);
 assert.equal(isClientAllowedPath("/facturacion/horas"), false);
 assert.equal(isClientAllowedPath("/auditoria"), false);

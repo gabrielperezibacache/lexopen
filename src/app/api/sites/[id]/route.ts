@@ -18,7 +18,22 @@ export async function GET(_req: NextRequest, { params }: Params) {
       where: { id },
       include: {
         cliente: true,
-        causa: { include: { partes: true, plazos: true } },
+        causa: clientView
+          ? {
+              select: {
+                id: true,
+                titulo: true,
+                rit: true,
+                ruc: true,
+                tribunal: true,
+                materia: true,
+                procedimiento: true,
+                estado: true,
+                etapa: true,
+                caratula: true,
+              },
+            }
+          : { include: { partes: true, plazos: true } },
         members: {
           where: clientView ? { user: { role: "cliente" } } : undefined,
           include: { user: { select: publicUserSelect } },

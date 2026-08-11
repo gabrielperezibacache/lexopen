@@ -34,6 +34,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
+    const declaredLength = Number(req.headers.get("content-length") || 0);
+    if (declaredLength > MAX_STORAGE_OBJECT_BYTES * 2) {
+      return NextResponse.json(
+        { error: `La solicitud supera el límite de ${MAX_STORAGE_OBJECT_BYTES} bytes` },
+        { status: 413 }
+      );
+    }
     const user = await requireStaff();
     const isMultipart = req.headers.get("content-type")?.includes("multipart/form-data");
     const body = isMultipart

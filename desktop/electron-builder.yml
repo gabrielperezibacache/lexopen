@@ -28,6 +28,18 @@ extraResources:
     to: prisma
     filter:
       - "**/*"
+  - from: ../src
+    to: app-standalone/src
+    filter:
+      - "**/*"
+  - from: ../tsconfig.json
+    to: app-standalone/tsconfig.json
+  - from: ../next-env.d.ts
+    to: app-standalone/next-env.d.ts
+asarUnpack:
+  - "node_modules/prisma/**"
+  - "node_modules/@prisma/engines/**"
+  - "node_modules/tsx/**"
 mac:
   category: public.app-category.business
   target:

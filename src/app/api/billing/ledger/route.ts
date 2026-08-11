@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, parseBody, requireBillingManager, requireStaff } from "@/lib/api";
+import {
+  assertCsrf,
+  handleRouteError,
+  httpError,
+  parseBody,
+  requireBillingManager,
+  requireStaff,
+} from "@/lib/api";
 import { ledgerCreateSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
@@ -45,6 +52,52 @@ export async function POST(req: NextRequest) {
     const creditClp = body.creditClp || 0;
 
     const entry = await prisma.$transaction(async (tx) => {
+      const cliente = await tx.cliente.findUnique({
+        where: { id: body.clienteId },
+        select: { id: true },
+      });
+      if (!cliente) throw httpError("Cliente no encontrado", 404);
+      if (debitClp > 0 && creditClp > 0) {
+        throw httpError("Un movimiento no puede tener débito y crédito simultáneamente", 400);
+      }
+
+      if (body.causaId) {
+        const causa = await tx.causa.findUnique({
+          where: { id: body.causaId },
+          select: { clienteId: true },
+        });
+        if (!causa) throw httpError("Causa no encontrada", 404);
+        if (causa.clienteId && causa.clienteId !== body.clienteId) {
+          throw httpError("La causa no pertenece al cliente", 400);
+        }
+      }
+      if (body.invoiceId) {
+        const invoice = await tx.invoice.findUnique({
+          where: { id: body.invoiceId },
+          select: { clienteId: true, causaId: true },
+        });
+        if (!invoice) throw httpError("Factura no encontrada", 404);
+        if (invoice.clienteId !== body.clienteId) {
+          throw httpError("La factura no pertenece al cliente", 400);
+        }
+        if (body.causaId && invoice.causaId && invoice.causaId !== body.causaId) {
+          throw httpError("La factura no pertenece a la causa", 400);
+        }
+      }
+      if (body.paymentId) {
+        const payment = await tx.payment.findUnique({
+          where: { id: body.paymentId },
+          select: { clienteId: true, invoiceId: true },
+        });
+        if (!payment) throw httpError("Pago no encontrado", 404);
+        if (payment.clienteId !== body.clienteId) {
+          throw httpError("El pago no pertenece al cliente", 400);
+        }
+        if (body.invoiceId && payment.invoiceId && payment.invoiceId !== body.invoiceId) {
+          throw httpError("El pago no pertenece a la factura", 400);
+        }
+      }
+
       const last = await tx.ledgerEntry.findFirst({
         where: { clienteId: body.clienteId },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],

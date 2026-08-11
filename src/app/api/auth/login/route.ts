@@ -18,9 +18,11 @@ const schema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip") ||
-      "unknown";
+      process.env.LEXOPEN_TRUSTED_PROXY === "1"
+        ? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          req.headers.get("x-real-ip") ||
+          "unknown"
+        : "unknown";
     const limited = rateLimit(`login:${ip}`, 20, 15 * 60 * 1000);
     if (!limited.ok) {
       return NextResponse.json(

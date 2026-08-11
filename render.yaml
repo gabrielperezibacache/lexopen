@@ -26,6 +26,8 @@ services:
         value: "0"
       - key: LEXOPEN_DEMO_SWITCHER
         value: "0"
+      - key: LEXOPEN_TRUSTED_PROXY
+        value: "1"
       - key: HERMES_API_URL
         sync: false
       - key: HERMES_API_KEY

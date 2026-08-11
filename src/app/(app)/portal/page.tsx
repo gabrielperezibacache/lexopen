@@ -27,7 +27,10 @@ export default async function PortalPage() {
         orderBy: { updatedAt: "desc" },
       },
       tasks: {
-        where: { status: { not: "done" } },
+        where: {
+          status: { not: "done" },
+          ...(isCliente(user.role) ? { assigneeId: user.id } : {}),
+        },
         take: 3,
         orderBy: { dueDate: "asc" },
       },

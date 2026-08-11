@@ -80,6 +80,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function POST(req: NextRequest, { params }: Params) {
   try {
     assertCsrf(req);
+    const declaredLength = Number(req.headers.get("content-length") || 0);
+    if (declaredLength > MAX_STORAGE_OBJECT_BYTES * 2) {
+      return NextResponse.json(
+        { error: `La solicitud supera el límite de ${MAX_STORAGE_OBJECT_BYTES} bytes` },
+        { status: 413 }
+      );
+    }
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);

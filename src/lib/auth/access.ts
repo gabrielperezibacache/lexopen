@@ -54,13 +54,11 @@ export function confidentialFileWhere(role: string) {
   return { confidencial: false, privilegio: false };
 }
 
-const CLIENT_ALLOWED_PREFIXES = ["/portal", "/sites"];
-
 export function isClientAllowedPath(pathname: string) {
   if (!pathname) return true;
-  return CLIENT_ALLOWED_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
-  );
+  if (pathname === "/portal" || pathname.startsWith("/portal/")) return true;
+  if (pathname === "/sites") return true;
+  return /^\/sites\/[^/]+\/(archivos|qa)(?:\/.*)?$/.test(pathname);
 }
 
 /** Server layout gate for (app) routes. */

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 import { isCliente } from "@/lib/auth/rbac";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     await requireSiteAccess(id, user);
     const pages = await prisma.wikiPage.findMany({
       where: { siteId: id },
-      include: { author: true },
+      include: { author: { select: publicUserSelect } },
       orderBy: { title: "asc" },
     });
     return NextResponse.json(pages);

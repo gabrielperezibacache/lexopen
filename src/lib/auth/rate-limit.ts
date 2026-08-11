@@ -5,6 +5,11 @@ const buckets = new Map<string, Bucket>();
 /** Simple in-memory rate limiter (per-process). Good enough for single-instance self-host. */
 export function rateLimit(key: string, limit: number, windowMs: number) {
   const now = Date.now();
+  if (buckets.size > 10_000) {
+    for (const [bucketKey, bucket] of buckets) {
+      if (bucket.resetAt <= now) buckets.delete(bucketKey);
+    }
+  }
   const current = buckets.get(key);
   if (!current || current.resetAt <= now) {
     buckets.set(key, { count: 1, resetAt: now + windowMs });

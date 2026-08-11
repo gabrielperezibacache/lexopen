@@ -33,13 +33,31 @@ export async function askHermes(params: {
   userId?: string;
 }) {
   const config = await getHermesConfig();
+  let apiUrl: URL;
+  try {
+    apiUrl = new URL(config.apiUrl);
+    if (
+      (apiUrl.protocol !== "http:" && apiUrl.protocol !== "https:") ||
+      apiUrl.username ||
+      apiUrl.password
+    ) {
+      throw new Error("URL de Hermes inválida");
+    }
+  } catch {
+    return {
+      source: "error" as const,
+      content: "",
+      requireApproval: true,
+      note: "La URL de Hermes no es válida.",
+    };
+  }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
   if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
 
   try {
-    const res = await fetch(`${config.apiUrl}/chat/completions`, {
+    const res = await fetch(`${apiUrl.toString().replace(/\/+$/, "")}/chat/completions`, {
       method: "POST",
       headers,
       body: JSON.stringify({

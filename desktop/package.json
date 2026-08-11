@@ -14,8 +14,10 @@
     "test": "node config.test.cjs"
   },
   "dependencies": {
+    "electron-store": "^8.2.0",
     "embedded-postgres": "^17.5.0-beta.15",
-    "electron-store": "^8.2.0"
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.4"
   },
   "devDependencies": {
     "electron": "^35.1.2",

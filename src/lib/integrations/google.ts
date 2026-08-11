@@ -161,8 +161,8 @@ export async function exchangeGoogleCode(code: string) {
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Google token error: ${text}`);
+    console.error("Google token exchange failed", res.status);
+    throw new Error("Google token exchange failed");
   }
 
   const tokens = (await res.json()) as {
@@ -293,8 +293,8 @@ export async function pushPlazoToGoogleCalendar(plazoId: string) {
   );
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Calendar API: ${text}`);
+    console.error("Google Calendar API failed", res.status);
+    throw new Error("Google Calendar API failed");
   }
 
   const event = await res.json();
@@ -331,7 +331,8 @@ async function uploadMarkdownToDrive(opts: {
   );
 
   if (!res.ok) {
-    throw new Error(await res.text());
+    console.error("Google Drive upload failed", res.status);
+    throw new Error("Google Drive upload failed");
   }
 
   return (await res.json()) as { id: string; name?: string; webViewLink?: string };
@@ -525,7 +526,8 @@ export async function createCausaDriveFolder(
   });
 
   if (!res.ok) {
-    throw new Error(await res.text());
+    console.error("Google Drive folder creation failed", res.status);
+    throw new Error("Google Drive folder creation failed");
   }
 
   const folder = (await res.json()) as { id: string; name?: string };
