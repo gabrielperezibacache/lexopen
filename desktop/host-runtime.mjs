@@ -335,6 +335,7 @@ export async function startHost(options = {}) {
     const bootstrapToken = needsSetup
       ? process.env.LEXOPEN_BOOTSTRAP_TOKEN || ""
       : null;
+    const recoveryToken = process.env.LEXOPEN_RECOVERY_TOKEN || "";
     if (needsSetup && !bootstrapToken) {
       throw new Error(
         "[lexopen-host] No hay token de configuración inicial; revise el archivo .env del Host."
@@ -371,6 +372,7 @@ export async function startHost(options = {}) {
       version,
       needsSetup,
       bootstrapToken,
+      recoveryToken,
       updateRecognized: recognition.changed,
       previousVersion: recognition.previousVersion,
     };

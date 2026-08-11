@@ -426,6 +426,24 @@ async function boot() {
             click: () => void checkForUpdates(true),
           },
           {
+            label: "Recuperar contraseña admin…",
+            click: () => {
+              if (!hostHandle?.recoveryToken) {
+                dialog.showErrorBox(
+                  "LexOpen",
+                  "La recuperación local requiere un Host activo."
+                );
+                return;
+              }
+              loadAppUrl(
+                `${hostHandle.url}/recovery?token=${encodeURIComponent(
+                  hostHandle.recoveryToken
+                )}`,
+                hostHandle.version
+              );
+            },
+          },
+          {
             label: "Versión y estado",
             click: () => {
               const state = readAppState(defaultDataDir());

@@ -333,6 +333,8 @@ para iniciar el estudio.
 El menú desktop incluye **Crear respaldo…** y **Restaurar respaldo…**. El respaldo
 detiene brevemente el Host para copiar de forma consistente PostgreSQL embebido,
 documentos, vault y configuración; contiene secretos y debe guardarse cifrado.
+Si se pierde la contraseña del administrador, **Recuperar contraseña admin…** abre
+un flujo local protegido por token y revoca las sesiones anteriores.
 
 Para generar instaladores de macOS y Windows:
 

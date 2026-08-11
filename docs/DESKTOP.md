@@ -147,6 +147,8 @@ notarización son necesarias para evitar advertencias de SmartScreen y Gatekeepe
   El respaldo contiene secretos (`.env`): guárdelo en un disco cifrado.
 - Restauración: use **LexOpen → Restaurar respaldo…**. La aplicación conserva el
   estado anterior temporalmente y lo revierte si el Host restaurado no puede arrancar.
+- Recuperación: use **LexOpen → Recuperar contraseña admin…** solo con acceso físico
+  al Host. El token local no debe compartirse; al restablecer se invalidan las sesiones.
 
 ## Limitaciones actuales (v0.1 desktop)
 
