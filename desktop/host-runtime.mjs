@@ -96,10 +96,10 @@ function run(cmd, args, opts = {}) {
 
 function bundledModuleFile(name, file) {
   const candidates = [
-    path.join(__dirname, "node_modules", name, file),
     process.resourcesPath
       ? path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", name, file)
       : null,
+    path.join(__dirname, "node_modules", name, file),
     path.join(repoRoot, "node_modules", name, file),
   ].filter(Boolean);
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
