@@ -10,16 +10,17 @@ assert.notEqual(
   fingerprint("Resolución", new Date(2026, 7, 12, 12), "R-1")
 );
 
-const previousNodeEnv = process.env.NODE_ENV;
-const previousDemo = process.env.PJUD_ALLOW_DEMO;
-process.env.NODE_ENV = "production";
-process.env.PJUD_ALLOW_DEMO = "0";
+const env = process.env as Record<string, string | undefined>;
+const previousNodeEnv = env.NODE_ENV;
+const previousDemo = env.PJUD_ALLOW_DEMO;
+env.NODE_ENV = "production";
+env.PJUD_ALLOW_DEMO = "0";
 assert.equal(pjudDemoAllowed(), false);
-process.env.PJUD_ALLOW_DEMO = "1";
+env.PJUD_ALLOW_DEMO = "1";
 assert.equal(pjudDemoAllowed(), true);
-if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-else process.env.NODE_ENV = previousNodeEnv;
-if (previousDemo === undefined) delete process.env.PJUD_ALLOW_DEMO;
-else process.env.PJUD_ALLOW_DEMO = previousDemo;
+if (previousNodeEnv === undefined) delete env.NODE_ENV;
+else env.NODE_ENV = previousNodeEnv;
+if (previousDemo === undefined) delete env.PJUD_ALLOW_DEMO;
+else env.PJUD_ALLOW_DEMO = previousDemo;
 
 console.log("pjud/provider.test.ts OK");

@@ -156,7 +156,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         action: "causa.movimientos.import",
         entityType: "Causa",
         entityId: id,
-        after: { count: created.length },
+        after: { count: created },
       });
       return NextResponse.json({ rows: created }, { status: 201 });
     }

@@ -53,7 +53,22 @@ export default function MonitoreoCausasPage() {
   }
 
   useEffect(() => {
-    load().catch(() => undefined);
+    let active = true;
+    fetch("/api/causas/monitoreo")
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudo cargar el monitoreo");
+        return res.json();
+      })
+      .then((data) => {
+        if (!active) return;
+        setItems(data.items || []);
+        setResumen(data.resumen || null);
+        setProvider(data.provider || null);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, []);
 
   const filtered = useMemo(() => {
