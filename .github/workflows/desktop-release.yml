@@ -39,7 +39,7 @@ jobs:
             os: ubuntu-latest
             target: linux
           - name: macOS
-            os: macos-13
+            os: macos-14
             target: mac
           - name: Windows
             os: windows-latest
