@@ -214,13 +214,15 @@ async function waitForHealth(url, attempts = 60) {
     try {
       const res = await fetch(`${url}/api/health`);
       const body = await res.json().catch(() => ({}));
-      if (res.ok && body.ok === true) return true;
+      if (res.ok && body.ok === true) {
+        return { ok: true, needsSetup: Boolean(body.needsSetup) };
+      }
     } catch {
       /* retry */
     }
     await new Promise((r) => setTimeout(r, 500));
   }
-  return false;
+  return { ok: false, needsSetup: false };
 }
 
 export async function startHost(options = {}) {
@@ -284,11 +286,28 @@ export async function startHost(options = {}) {
 
   const child = startNextServer(host.port);
   const url = localAppUrl(host.port);
-  const ok = await waitForHealth(url);
-  if (!ok) {
+  const health = await waitForHealth(url);
+  if (!health.ok) {
     await stopChild(child);
     await pg.stop().catch(() => undefined);
     throw new Error("[lexopen-host] Health check falló; el servidor no está listo.");
+  }
+  const needsSetup = health.needsSetup;
+  const bootstrapToken = needsSetup
+    ? process.env.LEXOPEN_BOOTSTRAP_TOKEN || ""
+    : null;
+  if (needsSetup && !bootstrapToken) {
+    await stopChild(child);
+    await pg.stop().catch(() => undefined);
+    throw new Error(
+      "[lexopen-host] No hay token de configuración inicial; revise el archivo .env del Host."
+    );
+  }
+  if (needsSetup) {
+    console.log(
+      "[lexopen-host] Configuración inicial:",
+      `${url}/setup?token=${bootstrapToken}`
+    );
   }
 
   let stopPromise = null;
@@ -313,6 +332,8 @@ export async function startHost(options = {}) {
     child,
     dataDir,
     version,
+    needsSetup,
+    bootstrapToken,
     updateRecognized: recognition.changed,
     previousVersion: recognition.previousVersion,
   };

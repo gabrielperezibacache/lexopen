@@ -326,6 +326,10 @@ npm run desktop:test
 npm run desktop:dev
 ```
 
+En una instalación Host limpia, LexOpen abre `/setup` para crear el primer
+administrador con una contraseña propia; el seed demo es opcional y no es necesario
+para iniciar el estudio.
+
 Para generar instaladores de macOS y Windows:
 
 ```bash

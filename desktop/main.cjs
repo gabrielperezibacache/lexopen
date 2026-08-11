@@ -108,18 +108,23 @@ async function startHostMode(cfg) {
     port: cfg.port,
     pgPort: cfg.pgPort,
   });
-  const msg = hostHandle.updateRecognized
+  const targetUrl = hostHandle.needsSetup
+    ? `${hostHandle.url}/setup?token=${encodeURIComponent(hostHandle.bootstrapToken)}`
+    : hostHandle.url;
+  const msg = hostHandle.needsSetup
+    ? "Configuración inicial requerida"
+    : hostHandle.updateRecognized
     ? `Actualización v${hostHandle.previousVersion} → v${hostHandle.version} reconocida · datos intactos`
     : `Servidor listo · v${hostHandle.version}`;
   sendStatus({
-    phase: "ready",
+    phase: hostHandle.needsSetup ? "setup" : "ready",
     message: msg,
-    url: hostHandle.url,
+    url: targetUrl,
     publicUrl: hostHandle.publicUrl,
     version: hostHandle.version,
     updateRecognized: hostHandle.updateRecognized,
   });
-  return hostHandle.url;
+  return targetUrl;
 }
 
 async function boot() {

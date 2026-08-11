@@ -6,8 +6,10 @@ const ROLE_COOKIE = "lexopen_role";
 const PUBLIC_PATHS = [
   "/",
   "/login",
+  "/setup",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/setup",
   "/api/health",
 ];
 

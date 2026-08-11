@@ -35,6 +35,7 @@ const PRESERVE_IF_SET = new Set([
   "NEXT_PUBLIC_APP_URL",
   "LEXOPEN_TRUSTED_ORIGINS",
   "LEXOPEN_TRUSTED_PROXY",
+  "LEXOPEN_BOOTSTRAP_TOKEN",
   "STORAGE_PATH",
   "OBSIDIAN_VAULT_PATH",
   "OBSIDIAN_REST_URL",
@@ -290,6 +291,7 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
       `http://127.0.0.1:${port}`,
       `http://localhost:${port}`,
     ].join(","),
+    LEXOPEN_BOOTSTRAP_TOKEN: crypto.randomBytes(32).toString("hex"),
   };
 
   const merged = mergeEnvPreserveUser(existing, defaults);

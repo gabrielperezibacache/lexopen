@@ -58,13 +58,17 @@ const host = ensureHostEnv(tmp, {
 });
 assert.match(host.databaseUrl, /54330/);
 assert.equal(host.storagePath, storageDir(tmp));
+const env1 = fs.readFileSync(envPath(tmp), "utf8");
+const bootstrapToken = env1.match(/^LEXOPEN_BOOTSTRAP_TOKEN=(.+)$/m)[1];
+assert.match(bootstrapToken, /^[a-f0-9]{64}$/);
 
 // segunda pasada: no reescribe SESSION_SECRET ni añade basura
-const secret1 = fs.readFileSync(envPath(tmp), "utf8").match(/^SESSION_SECRET=(.+)$/m)[1];
+const secret1 = env1.match(/^SESSION_SECRET=(.+)$/m)[1];
 fs.appendFileSync(envPath(tmp), "LLM_API_KEY=sk-estudio\n");
 ensureHostEnv(tmp, { port: 3010, pgPort: 54330, publicUrl: "http://pc.ts.net:3010" });
 const env2 = fs.readFileSync(envPath(tmp), "utf8");
 assert.match(env2, new RegExp(`SESSION_SECRET=${secret1}`));
+assert.match(env2, new RegExp(`LEXOPEN_BOOTSTRAP_TOKEN=${bootstrapToken}`));
 assert.match(env2, /LLM_API_KEY=sk-estudio/);
 
 const r1 = recognizeAppVersion("0.1.0", tmp);
