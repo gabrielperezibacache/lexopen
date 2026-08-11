@@ -52,7 +52,9 @@ function loadEnvFile(file) {
 }
 
 async function startEmbeddedPostgres(dataDir, pgPort) {
-  const modPath = require.resolve("embedded-postgres");
+  const modPath =
+    bundledModuleFile("embedded-postgres", "dist/index.js") ||
+    require.resolve("embedded-postgres");
   const EmbeddedPostgres = (await import(pathToFileURL(modPath).href)).default;
   const databaseDir = pgDataDir(dataDir);
   const alreadyInitialized = fs.existsSync(path.join(databaseDir, "PG_VERSION"));
