@@ -32,14 +32,15 @@ assert.ok(
 assert.equal(normalizeOrigin("https://app.example/path"), "https://app.example");
 assert.equal(normalizeOrigin("https://app.example.attacker"), "https://app.example.attacker");
 
-const previousNodeEnv = process.env.NODE_ENV;
-const previousAppUrl = process.env.NEXT_PUBLIC_APP_URL;
-const previousTrusted = process.env.LEXOPEN_TRUSTED_ORIGINS;
-const previousRelax = process.env.LEXOPEN_RELAX_CSRF;
-process.env.NODE_ENV = "production";
-delete process.env.NEXT_PUBLIC_APP_URL;
-process.env.LEXOPEN_TRUSTED_ORIGINS = "https://app.example";
-delete process.env.LEXOPEN_RELAX_CSRF;
+const env = process.env as Record<string, string | undefined>;
+const previousNodeEnv = env.NODE_ENV;
+const previousAppUrl = env.NEXT_PUBLIC_APP_URL;
+const previousTrusted = env.LEXOPEN_TRUSTED_ORIGINS;
+const previousRelax = env.LEXOPEN_RELAX_CSRF;
+env.NODE_ENV = "production";
+delete env.NEXT_PUBLIC_APP_URL;
+env.LEXOPEN_TRUSTED_ORIGINS = "https://app.example";
+delete env.LEXOPEN_RELAX_CSRF;
 
 assert.doesNotThrow(() =>
   assertCsrf(
@@ -64,13 +65,13 @@ assert.throws(() =>
   )
 );
 
-if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-else process.env.NODE_ENV = previousNodeEnv;
-if (previousAppUrl === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
-else process.env.NEXT_PUBLIC_APP_URL = previousAppUrl;
-if (previousTrusted === undefined) delete process.env.LEXOPEN_TRUSTED_ORIGINS;
-else process.env.LEXOPEN_TRUSTED_ORIGINS = previousTrusted;
-if (previousRelax === undefined) delete process.env.LEXOPEN_RELAX_CSRF;
-else process.env.LEXOPEN_RELAX_CSRF = previousRelax;
+if (previousNodeEnv === undefined) delete env.NODE_ENV;
+else env.NODE_ENV = previousNodeEnv;
+if (previousAppUrl === undefined) delete env.NEXT_PUBLIC_APP_URL;
+else env.NEXT_PUBLIC_APP_URL = previousAppUrl;
+if (previousTrusted === undefined) delete env.LEXOPEN_TRUSTED_ORIGINS;
+else env.LEXOPEN_TRUSTED_ORIGINS = previousTrusted;
+if (previousRelax === undefined) delete env.LEXOPEN_RELAX_CSRF;
+else env.LEXOPEN_RELAX_CSRF = previousRelax;
 
 console.log("api.csrf-origins.test.ts OK");
