@@ -179,12 +179,12 @@ function resolveServerEntry() {
 
 function startNextServer(port) {
   const resolved = resolveServerEntry();
-  const env = {
+  const env = runtimeEnv({
     ...process.env,
     PORT: String(port),
     HOSTNAME: "0.0.0.0",
     NODE_ENV: "production",
-  };
+  });
 
   if (resolved.type === "standalone") {
     console.log("[lexopen-host] Usando Next standalone:", resolved.entry);
