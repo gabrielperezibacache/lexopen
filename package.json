@@ -34,9 +34,9 @@
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "lucide-react": "^0.511.0",
-    "next": "15.5.21",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "next": "^16.3.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "zod": "^3.25.28"
   },
   "devDependencies": {
@@ -47,7 +47,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.5.21",
+    "eslint-config-next": "^16.3.0",
     "prisma": "5.22.0",
     "tailwindcss": "^4",
     "tsx": "^4.19.4",
