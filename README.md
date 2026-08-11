@@ -247,10 +247,12 @@ variables más relevantes:
 | `PORT` | No | Puerto HTTP; por defecto `3000`. |
 | `NEXT_PUBLIC_APP_URL` | No | URL canónica de la aplicación. |
 | `LEXOPEN_TRUSTED_ORIGINS` | No | Orígenes adicionales permitidos para validaciones CSRF, separados por coma. |
+| `LEXOPEN_TRUSTED_PROXY` | No | Permite usar `X-Forwarded-For` para rate limiting solo detrás de un proxy confiable. |
 | `LEXOPEN_DEMO_SWITCHER` | No | Habilita el cambio entre usuarios demo; solo desarrollo/demo. |
 | `LEXOPEN_OPEN_ACCESS` | No | Bypass de autenticación únicamente fuera de producción; no lo habilite en un entorno real. |
 | `LEXOPEN_RELAX_CSRF` | No | Relaja controles para CI; no lo habilite en producción. |
 | `STORAGE_PATH` | No | Directorio local para archivos cuando no se configura S3. |
+| `LEXOPEN_REQUIRE_PERSISTENT_STORAGE` | No | Con `1`, `/api/health` devuelve `503` si producción no tiene storage persistente. |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | No | Bucket y endpoint de almacenamiento S3-compatible. |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | No | Credenciales del bucket S3-compatible. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | No | OAuth de Google Drive y Calendar. |
@@ -297,9 +299,10 @@ revisión del abogado responsable.
 ### Almacenamiento de archivos
 
 El adaptador usa S3-compatible cuando están configuradas las credenciales mínimas;
-de lo contrario escribe en `STORAGE_PATH` o `./storage`. En Render el filesystem
-local es efímero: use S3, R2 u otro object storage persistente para documentos que
-deban sobrevivir a reinicios o despliegues.
+en desarrollo o desktop puede escribir en `STORAGE_PATH` o `./storage`. En un web
+service de producción, el backend local no se usa para evitar perder documentos:
+configure S3, R2 u otro object storage persistente. En Render el filesystem local
+es efímero.
 
 ## 🖥️ Aplicación desktop
 

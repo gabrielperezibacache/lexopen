@@ -109,6 +109,13 @@ export async function putObject(opts: {
     error.status = 503;
     throw error;
   }
+  if (!persistentStorageReady()) {
+    const error = new Error(
+      "El almacenamiento local no es persistente en producción; configure S3-compatible"
+    ) as Error & { status: number };
+    error.status = 503;
+    throw error;
+  }
 
   if (storageConfigured()) {
     const bucket = process.env.S3_BUCKET!;

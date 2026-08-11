@@ -18,15 +18,17 @@ export async function GET() {
   const time = new Date().toISOString();
   const storage = storageMode();
   const storageReady = persistentStorageReady();
+  const storageRequired = process.env.LEXOPEN_REQUIRE_PERSISTENT_STORAGE === "1";
   try {
     await prisma.$queryRaw`SELECT 1`;
-    if (!storageReady) {
+    if (!storageReady && storageRequired) {
       return NextResponse.json(
         {
           ok: false,
           db: "up",
           storage,
           storageReady,
+          storageRequired,
           time,
           error: "Almacenamiento persistente no configurado",
           ...base,
@@ -45,6 +47,10 @@ export async function GET() {
         db: "up",
         storage,
         storageReady,
+        storageRequired,
+        ...(storageReady
+          ? {}
+          : { warning: "Almacenamiento local no persistente" }),
         time,
         ...base,
       },
@@ -61,6 +67,7 @@ export async function GET() {
         db: "down",
         storage,
         storageReady,
+        storageRequired,
         time,
         ...base,
       },
