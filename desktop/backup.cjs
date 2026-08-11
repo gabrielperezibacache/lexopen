@@ -82,6 +82,9 @@ async function createDataBackup(dataDir, destination, metadata = {}) {
 
   try {
     await fs.cp(source, temporary, { recursive: true, force: false });
+    if (await exists(path.join(temporary, ".env"))) {
+      await fs.chmod(path.join(temporary, ".env"), 0o600);
+    }
     const manifest = {
       formatVersion: BACKUP_FORMAT_VERSION,
       type: "lexopen-host-data",
@@ -130,6 +133,9 @@ async function restoreDataDirectory(dataDir, backupDir) {
   try {
     await fs.cp(root, target, { recursive: true, force: false });
     await fs.rm(path.join(target, "manifest.json"), { force: true });
+    if (await exists(path.join(target, ".env"))) {
+      await fs.chmod(path.join(target, ".env"), 0o600);
+    }
     return { rollback, manifest };
   } catch (error) {
     await fs.rm(target, { recursive: true, force: true });

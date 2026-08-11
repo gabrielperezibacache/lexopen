@@ -226,7 +226,14 @@ async function restoreHostBackup() {
     await stopHostForMaintenance();
     replacement = await restoreDataDirectory(defaultDataDir(), backupDir);
     await restartHostAfterMaintenance(cfg);
-    await finalizeRestore(replacement.rollback);
+    try {
+      await finalizeRestore(replacement.rollback);
+    } catch (cleanupError) {
+      console.warn(
+        "[lexopen-desktop] No se pudo eliminar el rollback anterior",
+        cleanupError
+      );
+    }
     await dialog.showMessageBox({
       type: "info",
       title: "Restauración completada",
