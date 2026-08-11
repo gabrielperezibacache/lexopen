@@ -78,5 +78,24 @@ assert.equal(readAppState(tmp).lastAppVersion, "0.2.0");
 const r3 = recognizeAppVersion("0.2.0", tmp);
 assert.equal(r3.changed, false);
 
+// STORAGE_PATH bajo cwd/instalador se corrige a dataDir/storage
+const {
+  isUnsafeStoragePath,
+  storageDir: storageDirFn,
+} = require("./config.cjs");
+assert.equal(isUnsafeStoragePath(path.join(process.cwd(), "storage"), tmp), true);
+assert.equal(isUnsafeStoragePath(storageDirFn(tmp), tmp), false);
+fs.writeFileSync(
+  envPath(tmp),
+  `SESSION_SECRET=${secret1}\nSTORAGE_PATH=${path.join(process.cwd(), "storage")}\n`,
+  "utf8"
+);
+const fixedHost = ensureHostEnv(tmp, { port: 3010, pgPort: 54330 });
+assert.equal(fixedHost.storagePath, storageDirFn(tmp));
+assert.match(
+  fs.readFileSync(envPath(tmp), "utf8"),
+  new RegExp(storageDirFn(tmp).replace(/\\/g, "\\\\"))
+);
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log("desktop/config.test.cjs OK");

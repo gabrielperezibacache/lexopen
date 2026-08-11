@@ -62,8 +62,11 @@ el resto abre sesiones remotas contra esa misma instalación vía URL Tailscale
 npm run desktop:install
 npm run desktop:test
 npm run desktop:dev          # asistente Host / Cliente
-# npm run desktop:dist       # .dmg / .exe (tras desktop:build)
+npm run desktop:dist         # build standalone + .dmg / .exe
 ```
+
+Requiere Node 22 (ver `.nvmrc`). Las actualizaciones del instalador **no** borran
+`Application Support` / `%APPDATA%\LexOpen` (config, Postgres, documentos).
 
 Variables relevantes:
 - `SESSION_SECRET`: obligatorio en producción para firmar sesiones y proteger tokens OAuth.

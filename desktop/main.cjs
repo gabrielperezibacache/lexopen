@@ -18,6 +18,9 @@ let mainWindow = null;
 let hostHandle = null;
 let lastStatus = { phase: "idle", message: "Iniciando…" };
 let lastRemoteVersion = null;
+let clientWatchTimer = null;
+let booting = false;
+let quitting = false;
 
 function bundledVersion() {
   return (
@@ -33,7 +36,8 @@ function sendStatus(partial) {
   }
 }
 
-function createWindow(loadUrl) {
+function ensureWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -46,16 +50,14 @@ function createWindow(loadUrl) {
       nodeIntegration: false,
     },
   });
-
-  if (loadUrl) {
-    mainWindow.loadURL(loadUrl);
-  } else {
-    mainWindow.loadFile(path.join(__dirname, "renderer", "setup.html"));
-  }
-
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+  return mainWindow;
+}
+
+function showSetup() {
+  ensureWindow().loadFile(path.join(__dirname, "renderer", "setup.html"));
 }
 
 async function probeRemote(url) {
@@ -67,13 +69,17 @@ async function probeRemote(url) {
       cache: "no-store",
       headers: { "Cache-Control": "no-cache" },
     });
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
     const body = await res.json().catch(() => ({}));
+    // 503 con version = Host vivo (p. ej. DB momentánea); sigue sirviendo updates
+    if (!res.ok && !body.version && body.ok !== true) {
+      return { ok: false, error: `HTTP ${res.status}` };
+    }
     return {
       ok: true,
       url: base,
       version: body.version || null,
       updateRecognized: Boolean(body.updateRecognized),
+      degraded: !res.ok,
     };
   } catch (e) {
     return {
@@ -84,20 +90,28 @@ async function probeRemote(url) {
 }
 
 function loadAppUrl(url, version) {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const win = ensureWindow();
   const v = version || bundledVersion();
   const sep = url.includes("?") ? "&" : "?";
-  // Cache-bust inmediato tras publicar/actualizar el Host
-  mainWindow.loadURL(`${url}${sep}lexopen_v=${encodeURIComponent(v)}`);
+  win.loadURL(`${url}${sep}lexopen_v=${encodeURIComponent(v)}`);
+}
+
+async function stopHostIfRunning() {
+  if (!hostHandle?.stop) return;
+  try {
+    await hostHandle.stop();
+  } catch {
+    /* ignore */
+  }
+  hostHandle = null;
 }
 
 async function startHostMode(cfg) {
+  await stopHostIfRunning();
   sendStatus({ phase: "starting-host", message: "Arrancando servidor local…" });
   const { startHost } = await import("./host-runtime.mjs");
   hostHandle = await startHost({
     dataDir: defaultDataDir(),
-    // No pasar seedDemo/publicUrl salvo que el usuario los cambie en el asistente:
-    // startHost lee desktop-config.json existente y preserve .env.
     port: cfg.port,
     pgPort: cfg.pgPort,
   });
@@ -115,8 +129,7 @@ async function startHostMode(cfg) {
   return hostHandle.url;
 }
 
-async function boot() {
-  const cfg = readConfig();
+function buildMenu() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
@@ -126,9 +139,11 @@ async function boot() {
             label: "Cambiar modo (asistente)",
             click: () => {
               writeConfig({ mode: null });
-              if (mainWindow) {
-                mainWindow.loadFile(path.join(__dirname, "renderer", "setup.html"));
-              }
+              showSetup();
+              sendStatus({
+                phase: "setup",
+                message: "Configure Host o Cliente",
+              });
             },
           },
           {
@@ -160,53 +175,7 @@ async function boot() {
       { role: "viewMenu" },
     ])
   );
-
-  if (!cfg.mode) {
-    createWindow(null);
-    sendStatus({ phase: "setup", message: "Configure Host o Cliente" });
-    return;
-  }
-
-  if (cfg.mode === "client") {
-    createWindow(null);
-    sendStatus({ phase: "probing", message: "Comprobando servidor remoto…" });
-    const probe = await probeRemote(cfg.remoteUrl);
-    if (!probe.ok) {
-      sendStatus({
-        phase: "error",
-        message: `No se alcanza el servidor: ${probe.error}. ¿Tailscale conectado y el PC principal encendido?`,
-      });
-      mainWindow.loadFile(path.join(__dirname, "renderer", "setup.html"));
-      return;
-    }
-    lastRemoteVersion = probe.version;
-    sendStatus({
-      phase: "ready",
-      message: probe.version
-        ? `Conectado · Host v${probe.version}`
-        : "Conectado",
-      url: probe.url,
-      version: probe.version,
-    });
-    loadAppUrl(probe.url, probe.version);
-    startClientVersionWatch(cfg.remoteUrl);
-    return;
-  }
-
-  // host
-  createWindow(null);
-  try {
-    const url = await startHostMode(cfg);
-    loadAppUrl(url, hostHandle?.version);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    sendStatus({ phase: "error", message: msg });
-    dialog.showErrorBox("LexOpen Host", msg);
-    mainWindow.loadFile(path.join(__dirname, "renderer", "setup.html"));
-  }
 }
-
-let clientWatchTimer = null;
 
 function startClientVersionWatch(remoteUrl) {
   if (clientWatchTimer) clearInterval(clientWatchTimer);
@@ -228,7 +197,61 @@ function startClientVersionWatch(remoteUrl) {
         lastRemoteVersion = probe.version;
       }
     })();
-  }, 15000);
+  }, 10000);
+}
+
+async function boot() {
+  if (booting) return lastStatus;
+  booting = true;
+  try {
+    buildMenu();
+    const cfg = readConfig();
+    ensureWindow();
+
+    if (!cfg.mode) {
+      showSetup();
+      sendStatus({ phase: "setup", message: "Configure Host o Cliente" });
+      return lastStatus;
+    }
+
+    if (cfg.mode === "client") {
+      sendStatus({ phase: "probing", message: "Comprobando servidor remoto…" });
+      const probe = await probeRemote(cfg.remoteUrl);
+      if (!probe.ok) {
+        sendStatus({
+          phase: "error",
+          message: `No se alcanza el servidor: ${probe.error}. ¿Tailscale conectado y el PC principal encendido?`,
+        });
+        showSetup();
+        return lastStatus;
+      }
+      lastRemoteVersion = probe.version;
+      sendStatus({
+        phase: "ready",
+        message: probe.version
+          ? `Conectado · Host v${probe.version}`
+          : "Conectado",
+        url: probe.url,
+        version: probe.version,
+      });
+      loadAppUrl(probe.url, probe.version);
+      startClientVersionWatch(cfg.remoteUrl);
+      return lastStatus;
+    }
+
+    try {
+      const url = await startHostMode(cfg);
+      loadAppUrl(url, hostHandle?.version);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      sendStatus({ phase: "error", message: msg });
+      dialog.showErrorBox("LexOpen Host", msg);
+      showSetup();
+    }
+    return lastStatus;
+  } finally {
+    booting = false;
+  }
 }
 
 ipcMain.handle("desktop:get-state", async () => {
@@ -254,13 +277,8 @@ ipcMain.handle("desktop:save-setup", async (_e, payload) => {
     return { ok: false, error: "Indique la URL del PC principal (Tailscale)." };
   }
 
-  // Solo el asistente escribe preferencias de modo; no se toca en updates.
   writeConfig({ mode, remoteUrl, port, pgPort, seedDemo, publicUrl });
-
-  if (hostHandle?.stop) {
-    await hostHandle.stop().catch(() => undefined);
-    hostHandle = null;
-  }
+  await stopHostIfRunning();
 
   if (mode === "client") {
     sendStatus({ phase: "probing", message: "Comprobando servidor…" });
@@ -280,7 +298,7 @@ ipcMain.handle("desktop:save-setup", async (_e, payload) => {
       url: probe.url,
       version: probe.version,
     });
-    if (mainWindow) loadAppUrl(probe.url, probe.version);
+    loadAppUrl(probe.url, probe.version);
     startClientVersionWatch(remoteUrl);
     return { ok: true, url: probe.url, version: probe.version };
   }
@@ -288,7 +306,7 @@ ipcMain.handle("desktop:save-setup", async (_e, payload) => {
   try {
     const cfg = readConfig();
     const url = await startHostMode(cfg);
-    if (mainWindow) loadAppUrl(url, hostHandle?.version);
+    loadAppUrl(url, hostHandle?.version);
     return {
       ok: true,
       url,
@@ -310,10 +328,7 @@ ipcMain.handle("desktop:open-external", async (_e, url) => {
   }
 });
 
-ipcMain.handle("desktop:retry", async () => {
-  await boot();
-  return lastStatus;
-});
+ipcMain.handle("desktop:retry", async () => boot());
 
 app.whenReady().then(() => {
   if (app.isPackaged) {
@@ -333,7 +348,11 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (e) => {
+  if (quitting) return;
+  if (!hostHandle?.stop && !clientWatchTimer) return;
+  e.preventDefault();
+  quitting = true;
   if (clientWatchTimer) clearInterval(clientWatchTimer);
-  if (hostHandle?.stop) void hostHandle.stop();
+  void stopHostIfRunning().finally(() => app.exit(0));
 });

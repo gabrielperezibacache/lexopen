@@ -11,6 +11,10 @@ files:
   - host-runtime.mjs
   - renderer/**/*
   - package.json
+  - node_modules/**/*
+asarUnpack:
+  - "**/node_modules/embedded-postgres/**"
+  - "**/node_modules/@embedded-postgres/**"
 extraResources:
   - from: ../.next/standalone
     to: app-standalone
@@ -26,6 +30,14 @@ extraResources:
       - "**/*"
   - from: ../prisma
     to: prisma
+    filter:
+      - "**/*"
+  - from: ../node_modules/prisma
+    to: prisma-cli
+    filter:
+      - "**/*"
+  - from: ../node_modules/@prisma
+    to: prisma-engines
     filter:
       - "**/*"
 mac:

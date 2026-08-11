@@ -13,6 +13,7 @@ import {
   isStaff,
 } from "@/lib/auth/rbac";
 import { requireSiteAccess, httpError } from "@/lib/auth/access";
+import { buildAllowedOrigins, isAllowedOrigin } from "@/lib/csrf";
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -77,20 +78,14 @@ export function assertCsrf(req: Request) {
   const host = req.headers.get("host");
   if (!host) return;
 
-  const trusted = (process.env.LEXOPEN_TRUSTED_ORIGINS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const allowed = [
-    `http://${host}`,
-    `https://${host}`,
-    process.env.NEXT_PUBLIC_APP_URL,
-    ...trusted,
-  ].filter(Boolean) as string[];
+  const allowed = buildAllowedOrigins({
+    host,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    trustedCsv: process.env.LEXOPEN_TRUSTED_ORIGINS,
+  });
 
-  const okOrigin = origin && allowed.some((a) => origin === a || origin.startsWith(a));
-  const okReferer =
-    referer && allowed.some((a) => referer === a || referer.startsWith(a));
+  const okOrigin = isAllowedOrigin(origin, allowed);
+  const okReferer = isAllowedOrigin(referer, allowed);
 
   // Same-origin fetch from browser usually sends Origin; server-to-server may not.
   if (!origin && !referer) {

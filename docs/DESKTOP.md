@@ -37,7 +37,7 @@ No se sincronizan copias locales: **siempre** se trabaja contra la instalación 
 ## Flujo de instalación (estudio)
 
 1. En el **PC principal**, instalar LexOpen Desktop y elegir **«Este PC es el servidor del estudio»**.
-2. Completar el asistente (puerto, secreto de sesión, opcionalmente cargar datos demo).
+2. Completar el asistente (puerto, URL Tailscale opcional, opcionalmente cargar datos demo). El `SESSION_SECRET` se genera solo en la carpeta de datos.
 3. Crear usuarios reales en LexOpen (People / configuración) — roles admin, abogado, asistente, cliente.
 4. Instalar **Tailscale** en el Host y en cada laptop. Anotar el hostname MagicDNS, p. ej. `pc-estudio.tailXXXX.ts.net`.
 5. En cada otro equipo: instalar LexOpen Desktop → **«Conectar a un servidor»** → URL  
@@ -124,4 +124,6 @@ npm run desktop:dist                 # electron-builder → .dmg / .exe
 
 - Un solo Host activo (no multi-maestro).
 - Los instaladores firmados/notarizados (Apple/Windows SmartScreen) requieren certificados del estudio; el build genera artefactos sin firma.
-- Actualización automática (`electron-updater`) está preparada vía releases GitHub; hay que publicar tags `v*`.
+- La actualización es **manual** (instalar el nuevo `.dmg`/`.exe` encima). No hay `electron-updater` todavía; al arrancar se reconoce la versión y se migran datos sin pisar config.
+- En desarrollo (`npm run desktop:host`) se requiere Node 22 en el PATH; el instalador empaquetado lleva el runtime de Electron.
+- El secreto de sesión no se pide en el asistente: se genera una vez en `.env` de la carpeta de datos.

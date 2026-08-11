@@ -93,8 +93,59 @@ function run(cmd, args, opts = {}) {
   });
 }
 
+function killChild(child) {
+  if (!child || child.killed) return;
+  try {
+    if (process.platform === "win32") {
+      spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+        stdio: "ignore",
+        shell: true,
+      });
+    } else {
+      child.kill("SIGTERM");
+    }
+  } catch {
+    try {
+      child.kill();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function resolvePrismaCli() {
+  const resources =
+    process.resourcesPath ||
+    process.env.LEXOPEN_RESOURCES ||
+    path.dirname(prismaRoot);
+  const candidates = [
+    process.env.LEXOPEN_PRISMA_CLI,
+    path.join(resources, "prisma-cli", "build", "index.js"),
+    path.join(repoRoot, "node_modules", "prisma", "build", "index.js"),
+    path.join(
+      path.dirname(__dirname),
+      "node_modules",
+      "prisma",
+      "build",
+      "index.js"
+    ),
+  ].filter(Boolean);
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
 async function migrate() {
   const schema = path.join(prismaRoot, "schema.prisma");
+  const prismaCli = resolvePrismaCli();
+  if (prismaCli) {
+    await run(process.execPath, [prismaCli, "migrate", "deploy", "--schema", schema], {
+      cwd: repoRoot,
+      env: { DATABASE_URL: process.env.DATABASE_URL },
+    });
+    return;
+  }
   await run("npx", ["prisma", "migrate", "deploy", "--schema", schema], {
     cwd: repoRoot,
     env: { DATABASE_URL: process.env.DATABASE_URL },
@@ -229,7 +280,7 @@ export async function startHost(options = {}) {
   }
 
   const stop = async () => {
-    if (child && !child.killed) child.kill("SIGTERM");
+    killChild(child);
     try {
       await pg.stop();
     } catch (e) {
