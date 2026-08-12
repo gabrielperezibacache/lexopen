@@ -1,7 +1,54 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { prisma } from "@/lib/db";
+import {
+  fetchSafeOutbound,
+  isCloudMetadataHostname,
+  isLoopbackHostname,
+  isSafeOutboundHttpUrl,
+} from "@/lib/net/safe-url";
 import { newStorageKey, putObject } from "@/lib/storage";
+import { resolveDocumentoExport } from "@/lib/integrations/obsidian-docs";
+
+function assertObsidianRestUrl(restUrl: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(restUrl);
+  } catch {
+    throw new Error("OBSIDIAN_REST_URL inválida");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("OBSIDIAN_REST_URL debe ser http(s)");
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error("OBSIDIAN_REST_URL no puede incluir credenciales");
+  }
+  if (isCloudMetadataHostname(parsed.hostname)) {
+    throw new Error("OBSIDIAN_REST_URL apunta a un host de metadata bloqueado");
+  }
+
+  const allowPrivate =
+    process.env.NODE_ENV !== "production" ||
+    process.env.OBSIDIAN_ALLOW_PRIVATE_URL === "1";
+
+  if (
+    isSafeOutboundHttpUrl(restUrl, {
+      allowHttp: true,
+      allowLoopback: allowPrivate,
+    })
+  ) {
+    return;
+  }
+
+  // Local Obsidian Local REST API is loopback-only when private is allowed.
+  if (allowPrivate && isLoopbackHostname(parsed.hostname)) {
+    return;
+  }
+
+  throw new Error(
+    "OBSIDIAN_REST_URL no permitida (SSRF). Use loopback o active OBSIDIAN_ALLOW_PRIVATE_URL=1 solo en Host local."
+  );
+}
 
 export type ObsidianConfig = {
   vaultPath: string;
@@ -37,7 +84,14 @@ async function writeExportFile(opts: {
 }) {
   const restUrl = process.env.OBSIDIAN_REST_URL?.replace(/\/$/, "");
   if (restUrl) {
-    const res = await fetch(`${restUrl}/vault/${encodeURIComponent(opts.relativePath)}`, {
+    assertObsidianRestUrl(restUrl);
+    const target = `${restUrl}/vault/${encodeURIComponent(opts.relativePath)}`;
+    const allowPrivate =
+      process.env.NODE_ENV !== "production" ||
+      process.env.OBSIDIAN_ALLOW_PRIVATE_URL === "1";
+    const res = await fetchSafeOutbound(target, {
+      allowHttp: true,
+      allowLoopback: allowPrivate,
       method: "PUT",
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
@@ -167,19 +221,27 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
   if (config.syncDocumentos) {
     const docsDir = path.join(dir, "Documentos");
     for (const doc of causa.documentos) {
-      if (!doc.contenido) continue;
-      const file = sanitize(doc.nombre.endsWith(".md") ? doc.nombre : `${doc.nombre}.md`);
+      const resolved = resolveDocumentoExport(doc);
+      if (!resolved) continue;
+      const localPath = path.join(docsDir, resolved.relativeFile);
+      const relativePath = path.join(
+        config.folderPrefix,
+        "Causas",
+        folderName,
+        "Documentos",
+        resolved.relativeFile
+      );
       await writeExportFile({
-        localPath: path.join(docsDir, file),
-        relativePath: path.join(config.folderPrefix, "Causas", folderName, "Documentos", file),
-        content: doc.contenido,
+        localPath,
+        relativePath,
+        content: resolved.body,
         vaultPath: config.vaultPath,
         storageKeys,
       });
       files += 1;
       await prisma.documento.update({
         where: { id: doc.id },
-        data: { obsidianPath: path.join(config.folderPrefix, "Causas", folderName, "Documentos", file) },
+        data: { obsidianPath: relativePath },
       });
     }
   }

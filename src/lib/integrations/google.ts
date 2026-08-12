@@ -404,26 +404,53 @@ export async function pushDocumentoToDrive(
     };
   }
 
-  let content = doc.contenido ?? "";
-  if (doc.storageKey) {
+  const mime = (doc.mimeType || "").toLowerCase();
+  const isTextMime =
+    !mime ||
+    mime.startsWith("text/") ||
+    mime === "application/json" ||
+    mime === "application/markdown";
+
+  let content = (doc.contenido || "").trim();
+  let uploadName = doc.nombre;
+  let fromExtracted = false;
+
+  if (doc.storageKey && isTextMime) {
     const stored = await getObject(doc.storageKey);
     if (!stored) throw new Error("Contenido no encontrado en almacenamiento");
-    const mime = (doc.mimeType || "").toLowerCase();
-    if (
-      mime &&
-      !mime.startsWith("text/") &&
-      mime !== "application/json" &&
-      mime !== "application/markdown"
-    ) {
-      throw new Error(
-        "Solo se pueden subir a Drive documentos de texto/markdown desde LexOpen"
-      );
-    }
     content = Buffer.from(stored).toString("utf8");
+  } else if (!isTextMime || !content) {
+    const extracted = (doc.extractedMarkdown || "").trim();
+    if (extracted) {
+      content = extracted;
+      fromExtracted = true;
+      if (!uploadName.toLowerCase().endsWith(".md")) {
+        uploadName = `${uploadName.replace(/\.[^.]+$/i, "") || uploadName}.md`;
+      }
+    } else if (doc.extractionStatus === "needs_ocr" || doc.extractionStatus === "pending") {
+      return {
+        status: "needs_ocr" as const,
+        message:
+          "No hay texto indexado aún. Espere OCR/extracción o reintente el procesamiento antes de subir a Drive.",
+      };
+    } else {
+      return {
+        status: "unsupported" as const,
+        message:
+          "Solo se sube a Drive texto/markdown o el Markdown extraído del documento. Este archivo no tiene texto indexado.",
+      };
+    }
+  }
+
+  if (!content.trim()) {
+    return {
+      status: "unsupported" as const,
+      message: "El documento no tiene contenido de texto para subir a Drive.",
+    };
   }
 
   const file = await uploadMarkdownToDrive({
-    name: doc.nombre,
+    name: uploadName,
     content,
     folderId: realFolder,
     accessToken: config.accessToken,
@@ -433,7 +460,15 @@ export async function pushDocumentoToDrive(
     where: { id: doc.id },
     data: { googleDriveId: file.id },
   });
-  return { status: "uploaded" as const, file, folderId: realFolder };
+  return {
+    status: "uploaded" as const,
+    file,
+    folderId: realFolder,
+    fromExtracted,
+    message: fromExtracted
+      ? "Subido a Drive el Markdown extraído (el binario original permanece en LexOpen)."
+      : undefined,
+  };
 }
 
 /** Vincula una causa a una carpeta de Drive existente (URL o ID). */

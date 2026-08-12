@@ -3,16 +3,33 @@
  * Shared by Hermes and other outbound HTTP integrations.
  */
 
+export function isCloudMetadataHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    host === "metadata.google.internal" ||
+    host === "metadata" ||
+    host === "169.254.169.254" ||
+    host === "169.254.170.2"
+  );
+}
+
+export function isLoopbackHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "0.0.0.0"
+  );
+}
+
 export function isPrivateOrLocalHostname(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (
-    host === "localhost" ||
-    host === "metadata.google.internal" ||
-    host === "metadata" ||
+    isLoopbackHostname(host) ||
+    isCloudMetadataHostname(host) ||
     host.endsWith(".local") ||
-    host.endsWith(".internal") ||
-    host === "::1" ||
-    host === "0.0.0.0"
+    host.endsWith(".internal")
   ) {
     return true;
   }
@@ -32,7 +49,7 @@ export function isPrivateOrLocalHostname(hostname: string): boolean {
 /** True when URL is http(s), has no credentials, and host is not private. */
 export function isSafeOutboundHttpUrl(
   value: unknown,
-  opts?: { allowHttp?: boolean }
+  opts?: { allowHttp?: boolean; allowLoopback?: boolean }
 ): boolean {
   if (typeof value !== "string" || !value.trim()) return false;
   try {
@@ -46,9 +63,29 @@ export function isSafeOutboundHttpUrl(
       return false;
     }
     if (url.username || url.password) return false;
+    if (isCloudMetadataHostname(url.hostname)) return false;
+    if (opts?.allowLoopback && isLoopbackHostname(url.hostname)) return true;
     if (isPrivateOrLocalHostname(url.hostname)) return false;
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Outbound fetch that never follows redirects (blocks redirect-based SSRF).
+ * Re-validates the URL immediately before the request.
+ */
+export async function fetchSafeOutbound(
+  url: string,
+  init?: RequestInit & { allowHttp?: boolean; allowLoopback?: boolean }
+): Promise<Response> {
+  const { allowHttp, allowLoopback, ...rest } = init || {};
+  if (!isSafeOutboundHttpUrl(url, { allowHttp, allowLoopback })) {
+    throw new Error("URL de salida no permitida (SSRF)");
+  }
+  return fetch(url, {
+    ...rest,
+    redirect: "error",
+  });
 }

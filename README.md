@@ -54,7 +54,7 @@
 - [Integraciones](#-integraciones)
 - [Aplicación desktop](#-aplicación-desktop)
 - [API](#-api)
-- [Despliegue en Render](#-despliegue-en-render)
+- [Producción en Host local](#-producción-en-host-local)
 - [Seguridad y límites actuales](#-seguridad-y-límites-actuales)
 - [Desarrollo y pruebas](#-desarrollo-y-pruebas)
 - [Estructura del repositorio](#-estructura-del-repositorio)
@@ -95,7 +95,7 @@ es ofrecer una base abierta, extensible y centrada en el trabajo diario de un es
 | **Wiki, blog y Q&A** | Base de conocimiento en Markdown, publicaciones, preguntas por espacio y respuestas oficiales. |
 | **Workflows** | Aprobaciones manuales multi-paso para escritos y publicación de información en portales. |
 | **Portal cliente** | Sites visibles para clientes, documentos compartidos y comunicación contextual por Q&A. |
-| **Búsqueda e inteligencia** | Búsqueda unificada de sites, causas, archivos, tareas, wiki, minutas y jurisprudencia; consola Hermes con aprobación humana. |
+| **Búsqueda e inteligencia** | Búsqueda unificada (incluye documentos por causa); copiloto con alcance de carpeta investigativa, ranking documental y aprobación humana. |
 | **Facturación** | Horas, gastos, tarifas horarias, cuota litis, retainers, documentos internos de cobro, pagos y provisiones. |
 | **Auditoría y acceso** | Sesiones firmadas, roles `admin`/`abogado`/`asistente`/`cliente`, filtros de confidencialidad y eventos de auditoría. |
 
@@ -143,8 +143,11 @@ Después de ejecutar el seed, una primera exploración útil es:
    el contenido compartido.
 5. Revisar **Facturación** para ver horas, gastos, facturas, pagos y provisiones en
    pesos chilenos.
-6. Probar **Jurisprudencia**, **Agente Hermes** e **Integraciones** para distinguir
-   los datos demo de las conexiones externas reales.
+6. Probar **Documentos** (Incorporar → Carpeta), la ficha de causa C-4521 y el
+   **copiloto** en `/agente`: acote la carpeta investigativa `Escritos/` o reanude
+   el chat demo «Montos reclamados en Escritos».
+7. Probar **Jurisprudencia** e **Integraciones** para distinguir los datos demo
+   de las conexiones externas reales (Google Drive, Obsidian, Hermes).
 
 El seed crea cinco sites, tres causas, cuatro usuarios, jurisprudencia demo y datos
 de facturación. Todos los datos son ficticios y están pensados para mostrar los
@@ -397,13 +400,21 @@ crea usuarios y contenido ficticio; consulte [Usuarios y datos demo](#-usuarios-
 
 ### Ejecutar en modo producción local
 
+La vía recomendada es el Host web local (PostgreSQL embebido + datos en disco):
+
 ```bash
+LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
+```
+
+Si ya tiene un Postgres propio en la máquina:
+
+```bash
+npm run setup:production   # migraciones, sin seed demo
 npm run build
 npm run start
 ```
 
-El servidor escucha en `0.0.0.0` y usa `PORT` (por defecto `3000`), por lo que
-funciona tanto localmente como detrás de un proxy o en Render.
+El servidor escucha en `0.0.0.0` y usa `PORT` (por defecto `3000`).
 
 ## 👥 Usuarios demo y pasar a producción
 
@@ -462,8 +473,8 @@ variables más relevantes:
 | `LEXOPEN_OPEN_ACCESS` | No | Bypass de autenticación únicamente fuera de producción; no lo habilite en un entorno real. |
 | `LEXOPEN_RELAX_CSRF` | No | Relaja controles para CI; no lo habilite en producción. |
 | `STORAGE_PATH` | No | Directorio local para archivos cuando no se configura S3. |
-| `LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE` | Host web local | Permite almacenamiento local persistente fuera de Render. |
-| `LEXOPEN_REQUIRE_PERSISTENT_STORAGE` | No | Con `1`, `/api/health` devuelve `503` si producción no tiene storage persistente. |
+| `LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE` | Host web local | `1` permite almacenamiento en disco local en producción (`web:host`). |
+| `LEXOPEN_REQUIRE_PERSISTENT_STORAGE` | No | Con `1`, `/api/health` devuelve `503` si no hay storage persistente listo. |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | No | Bucket y endpoint de almacenamiento S3-compatible. |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | No | Credenciales del bucket S3-compatible. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | No | OAuth de Google Drive y Calendar. |
@@ -477,7 +488,7 @@ variables más relevantes:
 | `CAPTCHA_SOLVER_PROVIDER`, `CAPTCHA_SOLVER_API_KEY` | No | `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster`. Key opcional solo en `nopecha`. |
 | `PJUD_CLAVEUNICA_SCRAPE` | No | `1` = permite login ClaveÚnica automatizado (Mis Causas). |
 | `PJUD_SECRETS_KEY` | No | Clave AES para vault ClaveÚnica (fallback SESSION_SECRET). |
-| `PJUD_SCRAPER_ALLOW_PRIVATE` | No | `1` = permite sidecar en red privada / Render internal. |
+| `PJUD_SCRAPER_ALLOW_PRIVATE` | No | `1` = permite sidecar en localhost / red privada del Host. |
 | `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` | No | Scheduler local Mis Causas (Host web). |
 | `PJUD_ALLOW_DEMO` | No | Permite movimientos PJUD simulados y etiquetados como demo. |
 | `PJUD_WEBHOOK_SECRET` | No | Firma HMAC de webhooks asíncronos de un proveedor PJUD. |
@@ -514,7 +525,8 @@ un flujo de envío o sincronización de Gmail.
 ### Obsidian
 
 Exporta una causa a Markdown con índice, partes, plazos, notas, minutas y documentos
-no confidenciales. Puede escribir en un vault local durante el desarrollo, usar
+no confidenciales (prioriza `extractedMarkdown` y respeta subcarpetas
+`Documentos/<ruta>/…`). Puede escribir en un vault local durante el desarrollo, usar
 Obsidian Local REST API o conservar los objetos mediante el backend de storage.
 
 ### Hermes Agent / IA multi-proveedor
@@ -526,13 +538,16 @@ proveedor en **Configuración → Endpoints de IA** o con variables de entorno:
 - o `HERMES_API_URL` / `HERMES_API_KEY` (compat)
 
 Presets: OpenAI, Azure OpenAI, Groq, Ollama (local), Hermes Agent, o URL custom.
-Las solicitudes van a `POST {apiUrl}/chat/completions`. Las respuestas se guardan
-como historial de chat y requieren aprobación humana. Con `LLM_ALLOW_DEMO=1` (o
-`HERMES_ALLOW_DEMO=1`), una respuesta local de demostración se identifica
-explícitamente como tal.
+Las solicitudes van a `POST {apiUrl}/chat/completions`. El context pack ancla la
+respuesta a la causa, la **carpeta investigativa** (`ruta`), documentos rankeados
+por la pregunta, VDR/wiki del espacio vinculado y plazos. En `/agente` se puede
+acotar por carpeta o documentos; el alcance y las fuentes se restauran al reanudar
+el chat. Las respuestas se guardan como historial y requieren aprobación humana.
+Con `LLM_ALLOW_DEMO=1` (o `HERMES_ALLOW_DEMO=1`), una respuesta local de
+demostración se identifica explícitamente como tal.
 
-El copiloto no es asesoría jurídica automática: no presente ni envíe un texto
-generado sin revisión del abogado responsable.
+No es asesoría jurídica automática: no presente ni envíe un texto generado sin
+revisión del abogado responsable.
 
 ### Procesamiento documental local
 
@@ -544,11 +559,13 @@ LexOpen integra localmente:
   clasificar PDFs como texto, mixtos o escaneados y detectar páginas que requieren
   OCR.
 
-Al subir un documento desde **Documentos**, LexOpen conserva el original y genera
-Markdown extraído cuando es posible. Los PDFs escaneados usan Tesseract local
-mediante un binding nativo que renderiza internamente; `pdftoppm` solo queda como
-fallback para plataformas sin ese binding. Si falta OCR, el documento queda marcado
-como `Requiere OCR`. Ningún archivo se envía a Firecrawl.
+Desde **Documentos** o la ficha de causa puede incorporar archivos o una **carpeta
+investigativa** completa (se preserva `ruta`). LexOpen conserva el original y genera
+Markdown extraído cuando es posible; ese texto alimenta el copiloto y la exportación
+a Obsidian/Drive. Los PDFs escaneados usan Tesseract local mediante un binding nativo
+que renderiza internamente; `pdftoppm` solo queda como fallback para plataformas sin
+ese binding. Si falta OCR, el documento queda marcado como `Requiere OCR`. Ningún
+archivo se envía a Firecrawl.
 Ambas dependencias y el fallback OCR se ejecutan localmente; los bindings nativos
 se cargan según la plataforma del Host.
 El procesamiento se ejecuta en una cola local en segundo plano: la carga no espera
@@ -558,10 +575,9 @@ reintento cuando faltan binarios o el procesamiento falla.
 ### Almacenamiento de archivos
 
 El adaptador usa S3-compatible cuando están configuradas las credenciales mínimas;
-en desarrollo o desktop puede escribir en `STORAGE_PATH` o `./storage`. En un web
-service de producción, el backend local no se usa para evitar perder documentos:
-configure S3, R2 u otro object storage persistente. En Render el filesystem local
-es efímero.
+en el Host local / desktop escribe en `STORAGE_PATH` dentro de `LEXOPEN_DATA_DIR`
+(persistente en disco del PC). No hace falta object storage en la nube para
+producción local.
 
 ## 🖥️ Aplicación desktop
 
@@ -652,28 +668,28 @@ Para explorar contratos concretos, consulte las route handlers y los schemas Zod
 junto a cada módulo. Los ejemplos mutantes necesitan cookies de sesión y, según la
 ruta, validación de origen; un `curl` anónimo no es una prueba válida de autorización.
 
-## ☁️ Despliegue en Render
+## 🏠 Producción en Host local
 
-El archivo [`render.yaml`](render.yaml) define un Blueprint con:
+LexOpen en producción corre **en su PC/servidor local**, no en Render ni otro
+SaaS de hosting. Un único Host guarda Postgres, documentos y secretos en disco.
 
-- PostgreSQL 16 administrado;
-- un web service Node;
-- migraciones Prisma en el build;
-- `npm run start`;
-- health check en `/api/health`.
+```bash
+git clone https://github.com/gabrielperezibacache/lexopen.git
+cd lexopen
+npm ci
+LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
+```
 
-Flujo recomendado:
+1. Abra el enlace `/setup?token=…` que imprime el Host y cree el admin del estudio
+   (sin seed demo).
+2. Compruebe `curl http://127.0.0.1:3000/api/health` → `db: "up"`, `storageReady: true`.
+3. Opcional: active arranque automático con `deploy/systemd`, `deploy/launchd` o
+   `deploy/windows` (ver [`docs/WEB-HOST.md`](docs/WEB-HOST.md)).
+4. Respalde con `npm run web:backup` hacia un disco externo cifrado.
 
-1. Cree un Blueprint desde este repositorio.
-2. Configure las credenciales opcionales de Hermes, Google y S3 en Render.
-3. Mantenga `HERMES_ALLOW_DEMO=0` y `LEXOPEN_DEMO_SWITCHER=0`.
-4. Use object storage persistente para documentos y configure un dominio/TLS o una
-   red privada apropiada.
-5. Verifique migraciones, respaldos y permisos antes de abrir el servicio a usuarios.
-
-El plan gratuito de Render puede suspender servicios inactivos y no constituye por
-sí mismo una arquitectura de alta disponibilidad. El filesystem del web service es
-efímero y no debe usarse como respaldo.
+Demos deben permanecer apagadas (`LEXOPEN_DEMO_SWITCHER=0`, `HERMES_ALLOW_DEMO=0`,
+`PJUD_ALLOW_DEMO=0`). El sidecar PJUD y los crons de sync/digest también son
+locales (`npm run pjud:host` + intervalos en el `.env` del data dir).
 
 ## 🔐 Seguridad y límites actuales
 
@@ -682,15 +698,23 @@ Controles implementados en el código:
 - cookies de sesión `HttpOnly`, `SameSite=Lax` y `Secure` en producción;
 - tokens de sesión firmados con HMAC y contraseñas con bcrypt;
 - roles de servidor y filtros de contenido confidencial;
-- cifrado AES-256-GCM de tokens Google cuando existe `SESSION_SECRET`;
-- validación de origen en muchas operaciones mutantes;
+- cifrado AES-256-GCM de tokens Google / ClaveÚnica cuando existe `SESSION_SECRET`
+  (o `PJUD_SECRETS_KEY`);
+- CSRF Origin/Referer en mutaciones de API (incluido login); en producción el
+  header `Host` no amplía la allowlist si hay `NEXT_PUBLIC_APP_URL` /
+  `LEXOPEN_TRUSTED_ORIGINS`;
+- headers de seguridad progresivos (`X-Frame-Options`, `nosniff`, CSP
+  `frame-ancestors`, etc.);
+- salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
+  Hermes y Obsidian;
+- `instrumentation` falla al arrancar si flags peligrosas están en producción;
 - registros de auditoría con actor, acción, entidad y cambios;
 - aislamiento de Node en Electron mediante context isolation.
+- atajos demo del login ocultos en builds de producción.
 
 La revisión del repositorio también identifica límites que deben considerarse antes
 de producción:
 
-- la protección CSRF no está aplicada de forma uniforme a todas las mutaciones;
 - el rate limit de login es por proceso y no ofrece protección distribuida;
 - el portal cliente no debe presentarse como estrictamente de solo lectura sin una
   revisión adicional de permisos;
@@ -706,9 +730,9 @@ de producción:
   ni integración con el SII;
 - la integración live con PJUD es opt-in (partner API, sidecar scrape o
   Playwright+CAPTCHA / ClaveÚnica) y no es una API oficial del Poder Judicial;
-- `LEXOPEN_OPEN_ACCESS`, `LEXOPEN_RELAX_CSRF`, credenciales demo, compatibilidad de
-  contraseñas en texto plano y el fallback demo de Hermes no deben activarse en
-  producción.
+- `LEXOPEN_OPEN_ACCESS`, `LEXOPEN_RELAX_CSRF`, `LEXOPEN_DEMO_SWITCHER`,
+  `LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS` y fallbacks demo de Hermes/PJUD no deben
+  activarse en producción (varias de estas flags ya hacen fallar el arranque).
 
 Estas limitaciones son parte del estado `0.1.4`, no un sustituto de un análisis de
 seguridad, privacidad o cumplimiento para una organización concreta.
@@ -756,9 +780,10 @@ Para cambios que afecten datos, permisos o integraciones:
 │   ├── migrations/          # migraciones versionadas
 │   └── seed.ts              # corpus y usuarios demo
 ├── desktop/                 # shell Electron Host/Cliente
+├── deploy/                  # systemd / launchd / Windows del Host local
 ├── docs/DESKTOP.md          # operación de la aplicación desktop
+├── docs/WEB-HOST.md         # Host web 100% local
 ├── public/                  # assets públicos
-├── render.yaml              # Blueprint de despliegue Render
 ├── .env.example             # configuración local de referencia
 └── .github/workflows/ci.yml # validación continua
 ```

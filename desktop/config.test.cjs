@@ -63,6 +63,13 @@ const bootstrapToken = env1.match(/^LEXOPEN_BOOTSTRAP_TOKEN=(.+)$/m)[1];
 assert.match(bootstrapToken, /^[a-f0-9]{64}$/);
 const recoveryToken = env1.match(/^LEXOPEN_RECOVERY_TOKEN=(.+)$/m)[1];
 assert.match(recoveryToken, /^[a-f0-9]{64}$/);
+assert.match(env1, /HERMES_ALLOW_DEMO=0/);
+assert.match(env1, /PJUD_ALLOW_DEMO=0/);
+assert.match(env1, /LEXOPEN_DEMO_SWITCHER=0/);
+assert.match(env1, /PJUD_SCRAPER_URL=http:\/\/127\.0\.0\.1:8787/);
+assert.match(env1, /PJUD_SCRAPER_ALLOW_PRIVATE=1/);
+assert.match(env1, /^CRON_SECRET=[a-f0-9]{48}$/m);
+assert.match(env1, /^PJUD_SCRAPER_KEY=[a-f0-9]{48}$/m);
 
 // segunda pasada: no reescribe SESSION_SECRET ni añade basura
 const secret1 = env1.match(/^SESSION_SECRET=(.+)$/m)[1];

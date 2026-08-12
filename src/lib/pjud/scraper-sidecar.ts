@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { classifyMovimiento } from "@/lib/pjud/classify";
+import { isCloudMetadataHostname } from "@/lib/net/safe-url";
 import {
   fingerprint,
   type PjudCausaRef,
@@ -115,6 +116,7 @@ export async function probeScraperSidecarHealth(
     const res = await fetch(`${base}/health`, {
       method: "GET",
       headers: { Accept: "application/json" },
+      redirect: "error",
       signal: AbortSignal.timeout(timeoutMs),
     });
     const body = (await res.json().catch(() => ({}))) as {
@@ -161,6 +163,10 @@ function scraperBaseUrl() {
     (parsedBase.protocol !== "http:" && parsedBase.protocol !== "https:")
   ) {
     throw new Error("PJUD_SCRAPER_URL no cumple las restricciones de seguridad");
+  }
+  // Never allow cloud metadata endpoints, even with PJUD_SCRAPER_ALLOW_PRIVATE=1.
+  if (isCloudMetadataHostname(parsedBase.hostname)) {
+    throw new Error("PJUD_SCRAPER_URL apunta a un host de metadata bloqueado");
   }
   if (process.env.NODE_ENV === "production") {
     if (privateHost) {

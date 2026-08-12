@@ -254,27 +254,105 @@ async function main() {
       {
         nombre: "Demanda de cobro de pesos.md",
         tipo: "escrito",
+        ruta: "Escritos",
         contenido: "# Demanda de cobro de pesos\n\nEn lo principal...",
+        extractedMarkdown:
+          "# Demanda de cobro de pesos\n\nSe demanda a SERVIU el cobro de $120.000.000 por obras ejecutadas y no pagadas conforme al contrato de 15.01.2024. Petitorio: se declare la obligación de pago más reajustes e intereses.",
+        extractionStatus: "completed",
         causaId: causa1.id,
         autorId: abogado.id,
-        obsidianPath: "Causas/C-4521-2025/Demanda.md",
+        obsidianPath: "Causas/C-4521-2025/Documentos/Escritos/Demanda-de-cobro-de-pesos.md",
       },
       {
         nombre: "Contrato de obra.pdf",
         tipo: "contrato",
+        ruta: "Contratos",
         contenido: "Contrato de construcción 15.01.2024",
+        extractedMarkdown:
+          "# Contrato de obra\n\nFecha: 15.01.2024. Mandante: SERVIU Región de Valparaíso. Contratista: Constructora Andes SpA. Precio: $120.000.000. Plazo de ejecución: 180 días. Cláusula de multa por atraso: 0,5% semanal.",
+        extractionStatus: "completed",
+        causaId: causa1.id,
+        autorId: abogado.id,
+      },
+      {
+        nombre: "Acta inspeccion.pdf",
+        tipo: "evidencia",
+        ruta: "Evidencia",
+        contenido: null,
+        extractedMarkdown: null,
+        extractionStatus: "needs_ocr",
+        causaId: causa1.id,
+        autorId: abogado.id,
+      },
+      {
+        nombre: "Contestacion SERVIU.md",
+        tipo: "escrito",
+        ruta: "Escritos",
+        contenido: "# Contestación\n\n…",
+        extractedMarkdown:
+          "# Contestación SERVIU\n\nLa recurrida niega la deuda y sostiene que las partidas 3 y 4 no fueron recepcionadas. Ofrece liquidación parcial de $45.000.000.",
+        extractionStatus: "completed",
         causaId: causa1.id,
         autorId: abogado.id,
       },
       {
         nombre: "Demanda laboral — tutela.md",
         tipo: "escrito",
+        ruta: "Escritos",
         contenido: "# Demanda laboral\n\nFundamentos...",
+        extractedMarkdown:
+          "# Demanda laboral — tutela\n\nSe alega vulneración de derechos fundamentales (integridad psíquica) con ocasión del despido. Se pide nulidad del despido y indemnizaciones.",
+        extractionStatus: "completed",
         causaId: causa2.id,
         autorId: admin.id,
-        obsidianPath: "Causas/O-1189-2025/Demanda-tutela.md",
+        obsidianPath: "Causas/O-1189-2025/Documentos/Escritos/Demanda-laboral-tutela.md",
       },
     ],
+  });
+
+  const docsCausa1 = await prisma.documento.findMany({
+    where: { causaId: causa1.id },
+    select: { id: true, nombre: true, ruta: true, extractionStatus: true },
+    orderBy: { nombre: "asc" },
+  });
+  const escritosDocs = docsCausa1.filter((d) => d.ruta === "Escritos");
+  await prisma.agentChat.create({
+    data: {
+      title: "[Preguntar a documentos] Montos reclamados en Escritos",
+      demoMode: true,
+      causaId: causa1.id,
+      userId: abogado.id,
+      messagesJson: JSON.stringify([
+        {
+          role: "user",
+          content: "Según los escritos indexados, ¿qué montos se reclaman?",
+          utility: "doc_qa",
+        },
+        {
+          role: "assistant",
+          content:
+            "Según Escritos/Demanda de cobro de pesos.md, se reclaman $120.000.000 por obras ejecutadas y no pagadas. La contestación SERVIU ofrece liquidación parcial de $45.000.000. [demo]",
+          source: "demo",
+          utility: "doc_qa",
+          sources: escritosDocs.map((d) => ({
+            type: "documento",
+            id: d.id,
+            label: `${d.ruta}/${d.nombre}`,
+            href: `/causas/${causa1.id}`,
+            downloadHref: `/api/documentos/${d.id}/markdown`,
+          })),
+          suggestedActions: [
+            { label: "Abrir causa", href: `/causas/${causa1.id}` },
+            { label: "Documentos", href: "/documentos" },
+          ],
+          documentScope: {
+            rutaPrefix: "Escritos",
+            documentoIds: escritosDocs.map((d) => d.id),
+            sourcesDocumentos: escritosDocs.length,
+          },
+        },
+      ]),
+    },
   });
 
   const in7 = new Date();

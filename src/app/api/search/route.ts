@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
         sites: [],
         causas: [],
         files: [],
+        documentos: [],
         tasks: [],
         jurisprudencia: [],
         wiki: [],
@@ -45,6 +46,7 @@ export async function GET(req: NextRequest) {
         sites,
         causas: [],
         files: [],
+        documentos: [],
         tasks: [],
         jurisprudencia: [],
         wiki: [],
@@ -60,7 +62,7 @@ export async function GET(req: NextRequest) {
 
     const ftsIds = await ftsCausaIds(prisma, q, 10);
 
-    const [sites, causas, files, tasks, jurisprudencia, wiki, minutas] =
+    const [sites, causas, files, documentos, tasks, jurisprudencia, wiki, minutas] =
       await Promise.all([
         prisma.site.findMany({
           where: {
@@ -99,6 +101,26 @@ export async function GET(req: NextRequest) {
             ],
           },
           include: { site: true },
+          take: 10,
+        }),
+        prisma.documento.findMany({
+          where: {
+            AND: [
+              minutaFilter,
+              {
+                OR: [
+                  { nombre: textMatch(q) },
+                  { ruta: textMatch(q) },
+                  { tipo: textMatch(q) },
+                  { extractedMarkdown: textMatch(q) },
+                  { contenido: textMatch(q) },
+                ],
+              },
+            ],
+          },
+          include: {
+            causa: { select: { id: true, rit: true, titulo: true } },
+          },
           take: 10,
         }),
         prisma.task.findMany({
@@ -152,6 +174,7 @@ export async function GET(req: NextRequest) {
       sites,
       causas,
       files,
+      documentos,
       tasks,
       jurisprudencia,
       wiki,

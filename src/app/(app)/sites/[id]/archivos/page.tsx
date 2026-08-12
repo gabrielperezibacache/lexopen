@@ -59,15 +59,35 @@ export default async function SiteFilesPage({ params }: Params) {
             ? "Documentos compartidos con usted (etiqueta «cliente»). El resto del data room permanece interno."
             : "VDR / Archivos del espacio — carpetas, versiones, comentarios y metadatos. Los documentos por causa están en Documentos. Etiquete con «cliente» para compartir al portal."}
         </p>
-        {!clientView && <SiteFileActions siteId={site.id} />}
+        {!clientView && (
+          <SiteFileActions
+            siteId={site.id}
+            folders={folders.map((f) => ({
+              id: f.id,
+              name: f.name,
+              parentId: f.parentId,
+            }))}
+          />
+        )}
       </div>
 
       <div className="space-y-4">
         {folders.length === 0 && rootFiles.length === 0 && (
           <EmptyState
             title="Data room vacío"
-            description="Suba el primer archivo o cree una carpeta para organizar el VDR de este espacio."
-            action={!clientView ? <SiteFileActions siteId={site.id} /> : undefined}
+            description="Suba el primer archivo, cree una carpeta o importe una carpeta del disco para organizar el VDR."
+            action={
+              !clientView ? (
+                <SiteFileActions
+                  siteId={site.id}
+                  folders={folders.map((f) => ({
+                    id: f.id,
+                    name: f.name,
+                    parentId: f.parentId,
+                  }))}
+                />
+              ) : undefined
+            }
           />
         )}
         {folders.map((folder) => (

@@ -30,16 +30,16 @@ export default function MisCausasPage() {
   const [result, setResult] = useState<SyncResult | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
     fetch("/api/pjud/mis-causas")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (cancelled || !data) return;
+        if (!active || !data) return;
         setStatus(data.status || null);
       })
       .catch(() => undefined);
     return () => {
-      cancelled = true;
+      active = false;
     };
   }, []);
 

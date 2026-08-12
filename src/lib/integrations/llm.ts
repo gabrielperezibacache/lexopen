@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/db";
-import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
+import {
+  fetchSafeOutbound,
+  isLoopbackHostname,
+  isSafeOutboundHttpUrl,
+} from "@/lib/net/safe-url";
 import { safeJsonParse } from "@/lib/safe-json";
 
 export type LlmPreset =
@@ -162,12 +166,24 @@ export function applyPreset(
   };
 }
 
-function isAllowedLlmUrl(value: string) {
-  const allowLocal =
+function allowLocalLlmUrl() {
+  return (
     process.env.NODE_ENV !== "production" ||
     process.env.HERMES_ALLOW_PRIVATE_URL === "1" ||
-    process.env.LLM_ALLOW_PRIVATE_URL === "1";
-  if (isSafeOutboundHttpUrl(value, { allowHttp: allowLocal })) return true;
+    process.env.LLM_ALLOW_PRIVATE_URL === "1"
+  );
+}
+
+function isAllowedLlmUrl(value: string) {
+  const allowLocal = allowLocalLlmUrl();
+  if (
+    isSafeOutboundHttpUrl(value, {
+      allowHttp: allowLocal || process.env.NODE_ENV !== "production",
+      allowLoopback: allowLocal,
+    })
+  ) {
+    return true;
+  }
   try {
     const url = new URL(value);
     return (
@@ -175,7 +191,7 @@ function isAllowedLlmUrl(value: string) {
       (url.protocol === "http:" || url.protocol === "https:") &&
       !url.username &&
       !url.password &&
-      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+      isLoopbackHostname(url.hostname)
     );
   } catch {
     return false;
@@ -304,21 +320,22 @@ export async function askLlm(params: {
     "Content-Type": "application/json",
   };
   if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
+  const allowLocal = allowLocalLlmUrl();
 
   try {
-    const res = await fetch(
-      `${apiUrl.toString().replace(/\/+$/, "")}/chat/completions`,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          model: config.model,
-          messages: params.messages,
-          temperature: 0.2,
-        }),
-        signal: AbortSignal.timeout(params.timeoutMs || 45_000),
-      }
-    );
+    const endpoint = `${apiUrl.toString().replace(/\/+$/, "")}/chat/completions`;
+    const res = await fetchSafeOutbound(endpoint, {
+      allowHttp: allowLocal || process.env.NODE_ENV !== "production",
+      allowLoopback: allowLocal,
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: config.model,
+        messages: params.messages,
+        temperature: 0.2,
+      }),
+      signal: AbortSignal.timeout(params.timeoutMs || 45_000),
+    });
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -455,7 +472,9 @@ recuerda el hilo y cita fuentes verificables del propio host).
 Reglas:
 - Español chileno formal y claro.
 - NO inventes sentencias, RIT, artículos ni hechos que no estén en el contexto.
-- Si falta información, dilo y propone qué dato pedir o revisar en LexOpen.
+- Cuando cites documentos, usa relativePath (carpeta/archivo) del contexto.
+- Si un documento aparece sin excerpt o con needs_ocr/pending, no inventes su contenido.
+- Si falta información, dilo y propone qué dato pedir o revisar en LexOpen (p. ej. reintentar OCR).
 - Etiqueta borradores como BORRADOR y marca [REVISAR] lo incierto.
 - Plazos: el motor LexOpen es estimación interna, no cómputo oficial del tribunal.
 - No sustituyas el criterio profesional ni presentes textos como listos para tribunal sin revisión humana.
