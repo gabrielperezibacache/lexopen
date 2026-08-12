@@ -69,13 +69,23 @@ function parseMovementDate(value?: string) {
   return parsed || new Date();
 }
 
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, { params }: Params) {
   try {
     await requireStaff();
     const { id } = await params;
+    const rawLimit = Number(req.nextUrl.searchParams.get("limit") || 200);
+    const rawOffset = Number(req.nextUrl.searchParams.get("offset") || 0);
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(Math.trunc(rawLimit), 1), 200)
+      : 200;
+    const offset = Number.isFinite(rawOffset)
+      ? Math.max(Math.trunc(rawOffset), 0)
+      : 0;
     const rows = await prisma.causaMovimiento.findMany({
       where: { causaId: id },
       orderBy: { fecha: "desc" },
+      skip: offset,
+      take: limit,
     });
     return NextResponse.json(rows);
   } catch (e) {

@@ -31,7 +31,7 @@ export default async function CausaDetailPage({ params }: Params) {
       plazos: { orderBy: { fechaLimite: "asc" } },
       notas: { orderBy: { updatedAt: "desc" } },
       etapaHistorial: { orderBy: { createdAt: "desc" } },
-      movimientos: { orderBy: { fecha: "desc" } },
+      movimientos: { orderBy: { fecha: "desc" }, take: 200 },
       minutas: {
         include: {
           autor: { select: { name: true } },
