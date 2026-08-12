@@ -12,6 +12,12 @@ export type PjudFetchedMovimiento = {
   tipo?: string;
   relevante?: boolean;
   fuente: "pjud" | "demo";
+  cuaderno?: string | null;
+  folio?: string | null;
+  etapa?: string | null;
+  tramite?: string | null;
+  esReceptor?: boolean;
+  documentoRef?: string | null;
 };
 
 export type PjudCausaRef = {
@@ -28,18 +34,72 @@ export type PjudFetchResult = {
   movimientos: PjudFetchedMovimiento[];
   note: string;
   demo: boolean;
+  sala?: string | null;
 };
+
+const partnerMovementSchema = z.object({
+  id: z.string().max(255).optional(),
+  titulo: z.string().trim().min(1).max(2000),
+  detalle: z.string().max(20_000).optional().nullable(),
+  fecha: z.string().min(1).max(100),
+  referencia: z.string().max(500).optional().nullable(),
+  cuaderno: z.string().max(200).optional().nullable(),
+  folio: z.string().max(100).optional().nullable(),
+  etapa: z.string().max(200).optional().nullable(),
+  tramite: z.string().max(200).optional().nullable(),
+  esReceptor: z.boolean().optional(),
+  receptor: z.boolean().optional(),
+  documentoRef: z.string().max(500).optional().nullable(),
+  documentoUrl: z.string().max(500).optional().nullable(),
+});
 
 function fingerprint(titulo: string, fecha: Date, referencia?: string | null) {
   const raw = `${titulo.trim().toLowerCase()}|${fecha.toISOString().slice(0, 10)}|${referencia || ""}`;
   return createHash("sha1").update(raw).digest("hex").slice(0, 24);
 }
 
+function mapPartnerMovement(
+  m: z.infer<typeof partnerMovementSchema>,
+  fuente: "pjud" | "demo"
+): PjudFetchedMovimiento {
+  const fecha = parseLocalDateInput(m.fecha);
+  if (!fecha) throw new Error(`Fecha PJUD inválida: ${m.fecha}`);
+  const classified = classifyMovimiento(m.titulo, m.detalle);
+    const esReceptor =
+      Boolean(m.esReceptor ?? m.receptor) ||
+      (classified.tipo === "notificacion" &&
+        /receptor|c[eé]dula|notificaci[oó]n/i.test(
+          `${m.titulo} ${m.detalle || ""}`
+        ));
+  return {
+    externalId: m.id
+      ? `${fuente === "demo" ? "demo" : "pjud"}:${m.id}`
+      : `${fuente === "demo" ? "demo" : "pjud"}:${fingerprint(m.titulo, fecha, m.referencia)}`,
+    titulo: m.titulo,
+    detalle: m.detalle || null,
+    fecha,
+    referencia: m.referencia || null,
+    tipo: classified.tipo,
+    relevante: classified.relevante || esReceptor,
+    fuente,
+    cuaderno: m.cuaderno || "Principal",
+    folio: m.folio || null,
+    etapa: m.etapa || null,
+    tramite: m.tramite || null,
+    esReceptor,
+    documentoRef: m.documentoRef || m.documentoUrl || null,
+  };
+}
+
 /**
  * Proveedor partner/API (OpenAPI-compatible esperado).
  * Env: PJUD_API_URL, PJUD_API_KEY
  * Contrato: GET {PJUD_API_URL}/causas/lookup?rit=&tribunal=
- * Response: { movimientos: [{ id, titulo, detalle?, fecha, referencia? }] }
+ * Response: {
+ *   sala?,
+ *   movimientos: [{ id, titulo, detalle?, fecha, referencia?, cuaderno?, folio?,
+ *                   etapa?, tramite?, esReceptor?, documentoRef? }]
+ * }
  */
 async function fetchFromPartnerApi(causa: PjudCausaRef): Promise<PjudFetchResult | null> {
   const rawBase = process.env.PJUD_API_URL?.trim();
@@ -83,45 +143,22 @@ async function fetchFromPartnerApi(causa: PjudCausaRef): Promise<PjudFetchResult
   }
   const data = z
     .object({
-      movimientos: z
-        .array(
-          z.object({
-            id: z.string().max(255).optional(),
-            titulo: z.string().trim().min(1).max(2000),
-            detalle: z.string().max(20_000).optional(),
-            fecha: z.string().min(1).max(100),
-            referencia: z.string().max(500).optional(),
-          })
-        )
-        .max(5000)
-        .optional(),
+      sala: z.string().max(200).optional().nullable(),
+      movimientos: z.array(partnerMovementSchema).max(5000).optional(),
     })
     .passthrough()
     .parse(JSON.parse(responseText));
 
-  const movimientos = (data.movimientos || []).map((m) => {
-    const fecha = parseLocalDateInput(m.fecha);
-    if (!fecha) throw new Error(`Fecha PJUD inválida: ${m.fecha}`);
-    const classified = classifyMovimiento(m.titulo, m.detalle);
-    return {
-      externalId: m.id
-        ? `pjud:${m.id}`
-        : `pjud:${fingerprint(m.titulo, fecha, m.referencia)}`,
-      titulo: m.titulo,
-      detalle: m.detalle || null,
-      fecha,
-      referencia: m.referencia || null,
-      tipo: classified.tipo,
-      relevante: classified.relevante,
-      fuente: "pjud" as const,
-    };
-  });
+  const movimientos = (data.movimientos || []).map((m) =>
+    mapPartnerMovement(m, "pjud")
+  );
 
   return {
     provider: "api",
     movimientos,
     note: `Sincronizado vía proveedor PJUD (${movimientos.length} ítems).`,
     demo: false,
+    sala: data.sala || null,
   };
 }
 
@@ -149,8 +186,8 @@ function isPrivateHostname(hostname: string) {
 }
 
 /**
- * Simulador etiquetado (CaseTracking-like UX sin scrapear ofpj.pjud.cl).
- * Solo si PJUD_ALLOW_DEMO=1 o desarrollo.
+ * Demo etiquetado con fidelidad CausaMonitor (cuadernos, receptor, escritos).
+ * Solo si PJUD_ALLOW_DEMO=1 o desarrollo. No scrapea ofpj.pjud.cl.
  */
 function fetchDemoMovimientos(causa: PjudCausaRef): PjudFetchResult {
   const now = new Date();
@@ -162,36 +199,123 @@ function fetchDemoMovimientos(causa: PjudCausaRef): PjudFetchResult {
   };
 
   const rit = causa.rit || "SIN-RIT";
-  const samples = [
+  const samples: Array<{
+    titulo: string;
+    detalle: string;
+    fecha: Date;
+    referencia: string;
+    cuaderno: string;
+    folio: string;
+    etapa?: string;
+    tramite?: string;
+    esReceptor?: boolean;
+    documentoRef?: string;
+  }> = [
     {
       titulo: "Proveído: téngase por presentada demanda",
       detalle: `Ingreso en ${causa.tribunal}. Carátula: ${causa.caratula || causa.titulo}.`,
-      fecha: day(18),
+      fecha: day(45),
       referencia: `${rit}-P1`,
+      cuaderno: "Principal",
+      folio: "1",
+      etapa: "Ingreso",
+      tramite: "Proveído",
     },
     {
       titulo: "Resolución: tiene por interpuesta demanda y confiere traslado",
       detalle: "Plazo de 15 días hábiles para contestar.",
-      fecha: day(14),
+      fecha: day(40),
       referencia: `${rit}-R1`,
+      cuaderno: "Principal",
+      folio: "3",
+      etapa: "Traslado",
+      tramite: "Resolución",
     },
     {
-      titulo: "Certificado de notificación a demandado",
-      detalle: "Notificación por cédula en domicilio registrado.",
-      fecha: day(9),
-      referencia: `${rit}-N1`,
+      titulo: "Notificación receptor: cédula a demandado",
+      detalle: "Receptor judicial notifica por cédula en domicilio registrado.",
+      fecha: day(35),
+      referencia: `${rit}-NR1`,
+      cuaderno: "Principal",
+      folio: "5",
+      etapa: "Notificación",
+      tramite: "Cédula",
+      esReceptor: true,
+      documentoRef: `receptor/${rit}-NR1`,
+    },
+    {
+      titulo: "Notificación receptor: segunda cédula",
+      detalle: "Segunda diligencia de notificación en el mismo domicilio.",
+      fecha: day(30),
+      referencia: `${rit}-NR2`,
+      cuaderno: "Principal",
+      folio: "6",
+      etapa: "Notificación",
+      tramite: "Cédula",
+      esReceptor: true,
     },
     {
       titulo: "Escrito: contestación de la demanda",
-      detalle: "Parte demandada acompaña documentos.",
-      fecha: day(4),
+      detalle: "Parte demandada acompaña documentos y excepciones.",
+      fecha: day(22),
       referencia: `${rit}-E1`,
+      cuaderno: "Principal",
+      folio: "8",
+      etapa: "Contestación",
+      tramite: "Escrito",
+      documentoRef: `escrito/${rit}-E1`,
     },
     {
       titulo: "Citación a audiencia de conciliación",
       detalle: "Audiencia fijada en sala del tribunal.",
-      fecha: day(1),
+      fecha: day(14),
       referencia: `${rit}-A1`,
+      cuaderno: "Principal",
+      folio: "12",
+      etapa: "Audiencia",
+      tramite: "Citación",
+    },
+    {
+      titulo: "Acta de audiencia de conciliación",
+      detalle: "Sin acuerdo. Se ordena continuar el procedimiento.",
+      fecha: day(10),
+      referencia: `${rit}-A2`,
+      cuaderno: "Principal",
+      folio: "14",
+      etapa: "Audiencia",
+      tramite: "Acta",
+    },
+    {
+      titulo: "Escrito: recurso de apelación",
+      detalle: "Se deduce apelación contra resolución interlocutoria.",
+      fecha: day(7),
+      referencia: `${rit}-AP1`,
+      cuaderno: "Apelación",
+      folio: "1",
+      etapa: "Apelación",
+      tramite: "Escrito",
+      documentoRef: `escrito/${rit}-AP1`,
+    },
+    {
+      titulo: "Proveído: téngase por interpuesto recurso de apelación",
+      detalle: "Se elevan autos a la Corte de Apelaciones.",
+      fecha: day(4),
+      referencia: `${rit}-AP2`,
+      cuaderno: "Apelación",
+      folio: "2",
+      etapa: "Apelación",
+      tramite: "Proveído",
+    },
+    {
+      titulo: "Notificación receptor: resolución de elevación",
+      detalle: "Receptor certifica notificación de la resolución que eleva la apelación.",
+      fecha: day(1),
+      referencia: `${rit}-NR3`,
+      cuaderno: "Apelación",
+      folio: "3",
+      etapa: "Notificación",
+      tramite: "Cédula",
+      esReceptor: true,
     },
   ];
 
@@ -204,8 +328,14 @@ function fetchDemoMovimientos(causa: PjudCausaRef): PjudFetchResult {
       fecha: m.fecha,
       referencia: m.referencia,
       tipo: classified.tipo,
-      relevante: classified.relevante,
+      relevante: classified.relevante || Boolean(m.esReceptor),
       fuente: "demo" as const,
+      cuaderno: m.cuaderno,
+      folio: m.folio,
+      etapa: m.etapa || null,
+      tramite: m.tramite || null,
+      esReceptor: Boolean(m.esReceptor),
+      documentoRef: m.documentoRef || null,
     };
   });
 
@@ -213,8 +343,9 @@ function fetchDemoMovimientos(causa: PjudCausaRef): PjudFetchResult {
     provider: "demo",
     movimientos,
     note:
-      "⚠ Modo demo: movimientos simulados para UX de monitoreo. No son datos oficiales del PJUD. Configure PJUD_API_URL para un conector real.",
+      "⚠ Modo demo (paridad CausaMonitor): cuadernos, receptor y escritos simulados. No son datos oficiales del PJUD. Configure PJUD_API_URL para un conector real.",
     demo: true,
+    sala: "Sala 1",
   };
 }
 
@@ -226,6 +357,12 @@ export function pjudDemoAllowed() {
 
 export function pjudProviderConfigured() {
   return Boolean(process.env.PJUD_API_URL?.trim());
+}
+
+export function pjudSyncIntervalMs() {
+  const raw = Number(process.env.PJUD_SYNC_INTERVAL_MINUTES || 1440);
+  const minutes = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 60 * 24 * 14) : 1440;
+  return minutes * 60 * 1000;
 }
 
 export async function fetchPjudMovimientos(
@@ -242,7 +379,7 @@ export async function fetchPjudMovimientos(
     provider: "none",
     movimientos: [],
     note:
-      "Sin proveedor PJUD configurado (PJUD_API_URL). Active PJUD_ALLOW_DEMO=1 solo para simulación etiquetada, o conecte un partner API.",
+      "Sin proveedor PJUD configurado (PJUD_API_URL). Active PJUD_ALLOW_DEMO=1 solo para simulación etiquetada, o conecte un partner API / importe CSV oficial.",
     demo: false,
   };
 }

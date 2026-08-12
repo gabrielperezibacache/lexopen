@@ -14,6 +14,7 @@ import { fingerprint } from "@/lib/pjud/provider";
 import {
   MOVIMIENTOS_CSV_HEADER,
   parseMovimientosCsv,
+  parseReceptorFlag,
   MAX_CSV_BYTES,
   MAX_CSV_ROWS,
   serializeMovimientosCsv,
@@ -61,6 +62,12 @@ export async function GET(req: NextRequest, { params }: Params) {
           fecha: true,
           referencia: true,
           externalId: true,
+          cuaderno: true,
+          folio: true,
+          etapa: true,
+          tramite: true,
+          esReceptor: true,
+          documentoRef: true,
         },
       });
       return new NextResponse(
@@ -127,15 +134,25 @@ export async function POST(req: NextRequest, { params }: Params) {
         }
         const fecha = parseMovementDate(row.fecha);
         const classified = classifyMovimiento(row.titulo, row.detalle);
+        const esReceptor =
+          parseReceptorFlag(row.receptor) ||
+          (classified.tipo === "notificacion" &&
+            /receptor|c[eé]dula/i.test(`${row.titulo} ${row.detalle}`));
         return {
           causaId: id,
           titulo: row.titulo,
           detalle: row.detalle || null,
           fuente: "import",
           tipo: classified.tipo,
-          relevante: classified.relevante,
+          relevante: classified.relevante || esReceptor,
           referencia: row.referencia || null,
           externalId: `import:${row.externalId || fingerprint(row.titulo, fecha, row.referencia)}`,
+          cuaderno: row.cuaderno.trim() || "Principal",
+          folio: row.folio.trim() || null,
+          etapa: row.etapa.trim() || null,
+          tramite: row.tramite.trim() || null,
+          esReceptor,
+          documentoRef: row.documento.trim() || null,
           fecha,
         };
       });
@@ -177,6 +194,29 @@ export async function POST(req: NextRequest, { params }: Params) {
           skipDuplicates: true,
         });
         const skipped = rows.length - createdRows.count;
+        await tx.causa.update({
+          where: { id },
+          data: {
+            pjudMonitoreoActivo: true,
+            pjudLastSyncAt: new Date(),
+            pjudLastSyncStatus: "ok",
+            pjudLastSyncNote: `Import CSV: ${createdRows.count} nuevos, ${skipped} repetidos.`,
+            pjudFailCount: 0,
+          },
+        });
+        await tx.pjudSyncJob.create({
+          data: {
+            causaId: id,
+            status: "ok",
+            trigger: "import",
+            attempts: 1,
+            inserted: createdRows.count,
+            skipped,
+            note: `Import CSV: ${createdRows.count} nuevos`,
+            startedAt: new Date(),
+            finishedAt: new Date(),
+          },
+        });
         await tx.activity.create({
           data: {
             tipo: "alerta",

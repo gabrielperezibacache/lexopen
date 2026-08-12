@@ -308,8 +308,11 @@ export default async function CausaDetailPage({ params }: Params) {
         causaId={causa.id}
         monitoreoActivo={causa.pjudMonitoreoActivo}
         lastSyncAt={causa.pjudLastSyncAt}
+        nextSyncAt={causa.pjudNextSyncAt}
         lastSyncStatus={causa.pjudLastSyncStatus}
         lastSyncNote={causa.pjudLastSyncNote}
+        failCount={causa.pjudFailCount}
+        sala={causa.sala}
         diasSinMovimiento={diasSinMovimiento}
         semaforo={semaforo}
         movimientos={causa.movimientos.map((m) => ({
@@ -321,6 +324,12 @@ export default async function CausaDetailPage({ params }: Params) {
           referencia: m.referencia,
           relevante: m.relevante,
           fecha: m.fecha,
+          cuaderno: m.cuaderno,
+          folio: m.folio,
+          etapa: m.etapa,
+          tramite: m.tramite,
+          esReceptor: m.esReceptor,
+          documentoRef: m.documentoRef,
         }))}
       />
 

@@ -1,6 +1,7 @@
 export const MAX_CSV_BYTES = 5 * 1024 * 1024;
 export const MAX_CSV_ROWS = 1000;
-export const MOVIMIENTOS_CSV_HEADER = "titulo,detalle,fecha,referencia,id";
+export const MOVIMIENTOS_CSV_HEADER =
+  "titulo,detalle,fecha,referencia,id,cuaderno,folio,etapa,tramite,receptor,documento";
 
 export type CsvMovimientoRow = {
   titulo: string;
@@ -8,6 +9,12 @@ export type CsvMovimientoRow = {
   fecha: string;
   referencia: string;
   externalId: string;
+  cuaderno: string;
+  folio: string;
+  etapa: string;
+  tramite: string;
+  receptor: string;
+  documento: string;
 };
 
 export type CsvMovimientoExportRow = {
@@ -16,6 +23,12 @@ export type CsvMovimientoExportRow = {
   fecha: string;
   referencia?: string | null;
   externalId?: string | null;
+  cuaderno?: string | null;
+  folio?: string | null;
+  etapa?: string | null;
+  tramite?: string | null;
+  esReceptor?: boolean | null;
+  documentoRef?: string | null;
 };
 
 export class CsvImportError extends Error {
@@ -34,11 +47,13 @@ function parseCsvLine(line: string) {
   let quoted = false;
   for (let i = 0; i < line.length; i += 1) {
     const ch = line[i];
-    if (ch === '"' && line[i + 1] === '"') {
-      current += '"';
-      i += 1;
-    } else if (ch === '"') {
-      quoted = !quoted;
+    if (ch === '"') {
+      if (quoted && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        quoted = !quoted;
+      }
     } else if (ch === "," && !quoted) {
       cells.push(current.trim());
       current = "";
@@ -72,6 +87,12 @@ export function parseMovimientosCsv(csv: string): CsvMovimientoRow[] {
   const dateIndex = indexOf("fecha", "date");
   const referenceIndex = indexOf("referencia", "reference", "ref");
   const externalIdIndex = indexOf("externalid", "external_id", "id", "identificador");
+  const cuadernoIndex = indexOf("cuaderno", "notebook");
+  const folioIndex = indexOf("folio");
+  const etapaIndex = indexOf("etapa");
+  const tramiteIndex = indexOf("tramite", "trámite");
+  const receptorIndex = indexOf("receptor", "esreceptor", "es_receptor");
+  const documentoIndex = indexOf("documento", "documentoref", "documento_ref", "documentoUrl");
   const valueAt = (row: string[], index: number) => (index >= 0 ? row[index] || "" : "");
 
   return lines
@@ -84,9 +105,20 @@ export function parseMovimientosCsv(csv: string): CsvMovimientoRow[] {
         fecha: valueAt(row, dateIndex) || row[2] || "",
         referencia: valueAt(row, referenceIndex),
         externalId: valueAt(row, externalIdIndex),
+        cuaderno: valueAt(row, cuadernoIndex),
+        folio: valueAt(row, folioIndex),
+        etapa: valueAt(row, etapaIndex),
+        tramite: valueAt(row, tramiteIndex),
+        receptor: valueAt(row, receptorIndex),
+        documento: valueAt(row, documentoIndex),
       };
     })
     .filter((row) => row.titulo.trim());
+}
+
+export function parseReceptorFlag(value: string | undefined | null) {
+  const raw = (value || "").trim().toLowerCase();
+  return ["1", "true", "si", "sí", "yes", "x", "receptor"].includes(raw);
 }
 
 function csvCell(value: unknown) {
@@ -102,7 +134,13 @@ export function serializeMovimientosCsv(rows: CsvMovimientoExportRow[]) {
         row.detalle,
         row.fecha,
         row.referencia,
-        row.externalId?.replace(/^import:/, ""),
+        row.externalId?.replace(/^(import|pjud|demo):/, ""),
+        row.cuaderno || "Principal",
+        row.folio,
+        row.etapa,
+        row.tramite,
+        row.esReceptor ? "1" : "",
+        row.documentoRef,
       ]
         .map(csvCell)
         .join(",")

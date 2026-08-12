@@ -176,11 +176,12 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
 
 Sin proveedor externo, exporte el CSV desde la consulta oficial y use el
 importador de movimientos de la ficha de la causa. El formato recomendado es
-`titulo,detalle,fecha,referencia,id`; LexOpen clasifica las filas, fuerza
-`fuente=import` y omite reimportaciones con la misma clave determinista. La
-ficha incluye enlaces para descargar la plantilla exacta y exportar hasta 1.000
-movimientos del timeline. La vista previa valida el archivo antes de escribir
-en PostgreSQL.
+`titulo,detalle,fecha,referencia,id,cuaderno,folio,etapa,tramite,receptor,documento`
+(el encabezado corto `titulo,detalle,fecha,referencia,id` sigue siendo válido);
+LexOpen clasifica las filas, fuerza `fuente=import` y omite reimportaciones con
+la misma clave determinista. La ficha incluye enlaces para descargar la plantilla
+exacta y exportar hasta 1.000 movimientos del timeline. La vista previa valida el
+archivo antes de escribir en PostgreSQL.
 
 #### Webhook de un proveedor PJUD
 
@@ -212,7 +213,10 @@ El cuerpo mínimo identifica la causa y contiene movimientos:
       "titulo": "Resolución: proveído",
       "detalle": "Texto recibido del proveedor",
       "fecha": "2026-08-12",
-      "referencia": "R-1"
+      "referencia": "R-1",
+      "cuaderno": "Principal",
+      "folio": "3",
+      "esReceptor": false
     }
   ]
 }

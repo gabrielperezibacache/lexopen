@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { labelMovimientoTipo } from "@/lib/pjud/classify";
@@ -14,14 +14,23 @@ type Movimiento = {
   referencia: string | null;
   relevante: boolean;
   fecha: string | Date;
+  cuaderno?: string | null;
+  folio?: string | null;
+  etapa?: string | null;
+  tramite?: string | null;
+  esReceptor?: boolean;
+  documentoRef?: string | null;
 };
 
 type Props = {
   causaId: string;
   monitoreoActivo: boolean;
   lastSyncAt: string | Date | null;
+  nextSyncAt?: string | Date | null;
   lastSyncStatus: string | null;
   lastSyncNote: string | null;
+  failCount?: number;
+  sala?: string | null;
   movimientos: Movimiento[];
   diasSinMovimiento: number | null;
   semaforo: "verde" | "amarillo" | "rojo" | "gris";
@@ -41,17 +50,66 @@ const SEM_LABEL: Record<string, string> = {
   gris: "Sin datos",
 };
 
+type Tab = "historial" | "cuadernos" | "receptor" | "escritos";
+
 function fmt(d: string | Date) {
   const date = typeof d === "string" ? new Date(d) : d;
   return date.toLocaleDateString("es-CL");
+}
+
+function fmtDateTime(d: string | Date | null | undefined) {
+  if (!d) return "—";
+  const date = typeof d === "string" ? new Date(d) : d;
+  return date.toLocaleString("es-CL", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
+function MovementCard({ m }: { m: Movimiento }) {
+  return (
+    <article
+      className={`rounded-2xl border px-3 py-2 text-sm ${
+        m.relevante || m.esReceptor
+          ? "border-[var(--copper)]/40 bg-[var(--copper)]/5"
+          : "border-[var(--line)] bg-white/70"
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="font-medium">{m.titulo}</div>
+        <div className="flex flex-wrap gap-1">
+          <span className="badge badge-ink">{labelMovimientoTipo(m.tipo)}</span>
+          <span className="badge badge-ink">{m.fuente}</span>
+          {m.cuaderno && <span className="badge badge-ink">{m.cuaderno}</span>}
+          {m.esReceptor && <span className="badge badge-ink">receptor</span>}
+          {m.relevante && <span className="badge badge-ink">relevante</span>}
+        </div>
+      </div>
+      <div className="mt-1 text-xs text-[var(--ink-soft)]/65">
+        {fmt(m.fecha)}
+        {m.folio ? ` · Folio ${m.folio}` : ""}
+        {m.referencia ? ` · Ref. ${m.referencia}` : ""}
+        {m.tramite ? ` · ${m.tramite}` : ""}
+      </div>
+      {m.detalle && (
+        <p className="mt-2 text-[var(--ink-soft)]/80">{m.detalle}</p>
+      )}
+      {m.documentoRef && (
+        <p className="mt-1 text-xs text-[var(--sea)]">Doc: {m.documentoRef}</p>
+      )}
+    </article>
+  );
 }
 
 export function PjudMonitorPanel({
   causaId,
   monitoreoActivo,
   lastSyncAt,
+  nextSyncAt,
   lastSyncStatus,
   lastSyncNote,
+  failCount = 0,
+  sala,
   movimientos,
   diasSinMovimiento,
   semaforo,
@@ -59,8 +117,38 @@ export function PjudMonitorPanel({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [tab, setTab] = useState<Tab>("historial");
+  const [cuadernoFilter, setCuadernoFilter] = useState<string>("todos");
 
-  async function action(act: "sync" | "enable" | "disable") {
+  const cuadernos = useMemo(() => {
+    const set = new Set(
+      movimientos.map((m) => m.cuaderno || "Principal").filter(Boolean)
+    );
+    return [...set].sort();
+  }, [movimientos]);
+
+  const receptor = useMemo(
+    () => movimientos.filter((m) => m.esReceptor),
+    [movimientos]
+  );
+  const escritos = useMemo(
+    () => movimientos.filter((m) => m.tipo === "escrito"),
+    [movimientos]
+  );
+
+  const visible = useMemo(() => {
+    if (tab === "receptor") return receptor;
+    if (tab === "escritos") return escritos;
+    if (tab === "cuadernos" && cuadernoFilter !== "todos") {
+      return movimientos.filter(
+        (m) => (m.cuaderno || "Principal") === cuadernoFilter
+      );
+    }
+    if (tab === "cuadernos") return movimientos;
+    return movimientos;
+  }, [tab, receptor, escritos, movimientos, cuadernoFilter]);
+
+  async function action(act: "sync" | "enable" | "disable" | "retry") {
     setBusy(true);
     setMsg("");
     const res = await fetch(`/api/causas/${causaId}/pjud`, {
@@ -74,9 +162,9 @@ export function PjudMonitorPanel({
       setMsg(data.error || "Error");
       return;
     }
-    if (act === "sync") {
+    if (act === "sync" || act === "retry") {
       setMsg(
-        `${data.demo ? "[DEMO] " : ""}+${data.inserted || 0} nuevos · ${data.skipped || 0} ya conocidos. ${data.note || ""}`
+        `${data.demo ? "[DEMO] " : ""}+${data.inserted || 0} nuevos · ${data.skipped || 0} ya conocidos · receptor ${data.receptorCount || 0}. ${data.note || ""}`
       );
     } else {
       setMsg(act === "enable" ? "Monitoreo activado." : "Monitoreo desactivado.");
@@ -84,15 +172,20 @@ export function PjudMonitorPanel({
     router.refresh();
   }
 
+  const failed =
+    lastSyncStatus === "failed" ||
+    lastSyncStatus === "error" ||
+    failCount > 0;
+
   return (
     <section className="panel space-y-5 rounded-3xl p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Seguimiento judicial (PJUD)</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--ink-soft)]/75">
-            Estilo CaseTracking: sincronice movimientos, clasifique proveídos /
-            audiencias y reciba alertas. Sin scrapers ocultos — partner API o
-            demo etiquetado / import CSV.
+            Experiencia tipo CausaMonitor: cuadernos, notificaciones de receptor,
+            escritos, sync y reintento de fallidos — con partner API, webhook,
+            demo etiquetado o CSV oficial. Sin scrapers ocultos ni ClaveÚnica.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
@@ -108,10 +201,27 @@ export function PjudMonitorPanel({
         <span className="rounded-full border border-[var(--line)] px-2 py-1">
           {monitoreoActivo ? "Monitoreo ON" : "Monitoreo OFF"}
         </span>
+        {sala && (
+          <span className="rounded-full border border-[var(--line)] px-2 py-1">
+            Sala: {sala}
+          </span>
+        )}
         <span className="rounded-full border border-[var(--line)] px-2 py-1">
-          Último sync: {lastSyncAt ? fmt(lastSyncAt) : "nunca"}
+          Último sync: {fmtDateTime(lastSyncAt)}
           {lastSyncStatus ? ` · ${lastSyncStatus}` : ""}
         </span>
+        <span className="rounded-full border border-[var(--line)] px-2 py-1">
+          Próximo sync: {fmtDateTime(nextSyncAt)}
+        </span>
+        <span className="rounded-full border border-[var(--line)] px-2 py-1">
+          {cuadernos.length} cuaderno(s) · {receptor.length} receptor ·{" "}
+          {escritos.length} escrito(s)
+        </span>
+        {failed && (
+          <span className="rounded-full border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700">
+            Fallido{failCount ? ` ×${failCount}` : ""}
+          </span>
+        )}
       </div>
       {lastSyncNote && (
         <p className="text-xs text-[var(--copper)]" role="status">
@@ -128,6 +238,16 @@ export function PjudMonitorPanel({
         >
           {busy ? "Sincronizando…" : "Sincronizar ahora"}
         </button>
+        {failed && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={busy}
+            onClick={() => action("retry")}
+          >
+            Reintentar fallido
+          </button>
+        )}
         {monitoreoActivo ? (
           <button
             type="button"
@@ -157,39 +277,80 @@ export function PjudMonitorPanel({
         </p>
       )}
 
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["historial", `Historial (${movimientos.length})`],
+            ["cuadernos", `Cuadernos (${cuadernos.length})`],
+            ["receptor", `Receptor (${receptor.length})`],
+            ["escritos", `Escritos (${escritos.length})`],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`rounded-full border px-3 py-1 text-sm ${
+              tab === key
+                ? "border-[var(--sea)] bg-[var(--sea)]/10 text-[var(--ink)]"
+                : "border-[var(--line)] text-[var(--ink-soft)]/75"
+            }`}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "cuadernos" && cuadernos.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={`rounded-full border px-3 py-1 text-xs ${
+              cuadernoFilter === "todos"
+                ? "border-[var(--sea)] bg-[var(--sea)]/10"
+                : "border-[var(--line)]"
+            }`}
+            onClick={() => setCuadernoFilter("todos")}
+          >
+            Todos
+          </button>
+          {cuadernos.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`rounded-full border px-3 py-1 text-xs ${
+                cuadernoFilter === c
+                  ? "border-[var(--sea)] bg-[var(--sea)]/10"
+                  : "border-[var(--line)]"
+              }`}
+              onClick={() => setCuadernoFilter(c)}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-3">
         <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
-          Timeline de movimientos
+          {tab === "receptor"
+            ? "Notificaciones de receptor"
+            : tab === "escritos"
+              ? "Escritos"
+              : tab === "cuadernos"
+                ? "Movimientos por cuaderno"
+                : "Timeline de movimientos"}
         </h3>
-        {movimientos.map((m) => (
-          <article
-            key={m.id}
-            className={`rounded-2xl border px-3 py-2 text-sm ${
-              m.relevante
-                ? "border-[var(--copper)]/40 bg-[var(--copper)]/5"
-                : "border-[var(--line)] bg-white/70"
-            }`}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="font-medium">{m.titulo}</div>
-              <div className="flex flex-wrap gap-1">
-                <span className="badge badge-ink">{labelMovimientoTipo(m.tipo)}</span>
-                <span className="badge badge-ink">{m.fuente}</span>
-                {m.relevante && <span className="badge badge-ink">relevante</span>}
-              </div>
-            </div>
-            <div className="mt-1 text-xs text-[var(--ink-soft)]/65">
-              {fmt(m.fecha)}
-              {m.referencia ? ` · Ref. ${m.referencia}` : ""}
-            </div>
-            {m.detalle && (
-              <p className="mt-2 text-[var(--ink-soft)]/80">{m.detalle}</p>
-            )}
-          </article>
+        {visible.map((m) => (
+          <MovementCard key={m.id} m={m} />
         ))}
-        {movimientos.length === 0 && (
+        {visible.length === 0 && (
           <p className="text-sm text-[var(--ink-soft)]/65">
-            Sin movimientos. Sincronice o importe CSV desde la consulta oficial.
+            {tab === "receptor"
+              ? "Sin notificaciones de receptor. Sincronice o importe CSV con columna receptor=1."
+              : tab === "escritos"
+                ? "Sin escritos clasificados."
+                : "Sin movimientos. Sincronice o importe CSV desde la consulta oficial."}
           </p>
         )}
       </div>

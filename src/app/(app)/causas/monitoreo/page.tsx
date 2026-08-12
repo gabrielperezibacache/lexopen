@@ -9,22 +9,39 @@ type Item = {
   titulo: string;
   rit: string | null;
   tribunal: string;
+  sala: string | null;
   materia: string;
   etapa: string;
   abogado: { id: string; name: string } | null;
   cliente: { id: string; razonSocial: string } | null;
   monitoreoActivo: boolean;
   lastSyncAt: string | null;
+  nextSyncAt: string | null;
   lastSyncStatus: string | null;
+  lastSyncNote: string | null;
+  failCount: number;
+  failed: boolean;
   movimientosCount: number;
   lastMovimiento: {
     titulo: string;
     fecha: string;
     tipo: string;
     fuente: string;
+    cuaderno?: string | null;
   } | null;
   diasSinMovimiento: number | null;
   semaforo: Semaforo;
+};
+
+type Fallido = {
+  jobId: string;
+  causaId: string;
+  rit: string | null;
+  titulo: string;
+  tribunal: string;
+  lastError: string | null;
+  failCount: number;
+  createdAt: string;
 };
 
 const DOT: Record<Semaforo, string> = {
@@ -34,11 +51,26 @@ const DOT: Record<Semaforo, string> = {
   gris: "bg-slate-300",
 };
 
+function fmtShort(value: string | null) {
+  if (!value) return "nunca";
+  return new Date(value).toLocaleString("es-CL", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
 export default function MonitoreoCausasPage() {
   const [items, setItems] = useState<Item[]>([]);
+  const [fallidos, setFallidos] = useState<Fallido[]>([]);
   const [resumen, setResumen] = useState<Record<string, number> | null>(null);
-  const [provider, setProvider] = useState<{ honesty?: string; apiConfigured?: boolean } | null>(null);
-  const [filter, setFilter] = useState<"todas" | Semaforo | "monitoreadas">("todas");
+  const [provider, setProvider] = useState<{
+    honesty?: string;
+    apiConfigured?: boolean;
+    syncIntervalMinutes?: number;
+  } | null>(null);
+  const [filter, setFilter] = useState<
+    "todas" | Semaforo | "monitoreadas" | "fallidas"
+  >("todas");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -48,6 +80,7 @@ export default function MonitoreoCausasPage() {
     if (!res.ok) return;
     const data = await res.json();
     setItems(data.items || []);
+    setFallidos(data.fallidos || []);
     setResumen(data.resumen || null);
     setProvider(data.provider || null);
   }
@@ -62,6 +95,7 @@ export default function MonitoreoCausasPage() {
       .then((data) => {
         if (!active) return;
         setItems(data.items || []);
+        setFallidos(data.fallidos || []);
         setResumen(data.resumen || null);
         setProvider(data.provider || null);
       })
@@ -74,10 +108,16 @@ export default function MonitoreoCausasPage() {
   const filtered = useMemo(() => {
     return items.filter((i) => {
       if (filter === "monitoreadas" && !i.monitoreoActivo) return false;
-      if (filter !== "todas" && filter !== "monitoreadas" && i.semaforo !== filter)
+      if (filter === "fallidas" && !i.failed) return false;
+      if (
+        filter !== "todas" &&
+        filter !== "monitoreadas" &&
+        filter !== "fallidas" &&
+        i.semaforo !== filter
+      )
         return false;
       if (!q.trim()) return true;
-      const hay = `${i.rit} ${i.titulo} ${i.tribunal} ${i.cliente?.razonSocial || ""}`.toLowerCase();
+      const hay = `${i.rit} ${i.titulo} ${i.tribunal} ${i.sala || ""} ${i.cliente?.razonSocial || ""}`.toLowerCase();
       return hay.includes(q.trim().toLowerCase());
     });
   }, [items, filter, q]);
@@ -88,13 +128,31 @@ export default function MonitoreoCausasPage() {
     const res = await fetch("/api/causas/monitoreo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ action: "sync" }),
     });
     const data = await res.json().catch(() => ({}));
     setBusy(false);
     setMsg(
       res.ok
         ? `Sync cartera: ${data.synced} causas · +${(data.results || []).reduce((s: number, r: { inserted?: number }) => s + (r.inserted || 0), 0)} movimientos`
+        : data.error || "Error"
+    );
+    await load();
+  }
+
+  async function retryFallidos() {
+    setBusy(true);
+    setMsg("");
+    const res = await fetch("/api/causas/monitoreo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "retry-fallidos" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    setMsg(
+      res.ok
+        ? `Reintento fallidos: ${data.synced} causas`
         : data.error || "Error"
     );
     await load();
@@ -109,30 +167,52 @@ export default function MonitoreoCausasPage() {
           </p>
           <h1 className="display mt-2 text-4xl">Monitoreo de causas</h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Cartera con semáforos, último movimiento y sync PJUD — experiencia
-            inspirada en CaseTracking, con conectores honestos.
+            Cartera con semáforos, salas, próximo sync y cola de fallidos —
+            paridad CausaMonitor con conectores honestos (API / CSV / demo /
+            webhook).
           </p>
         </div>
-        <button className="btn btn-primary" type="button" disabled={busy} onClick={syncAll}>
-          {busy ? "Sincronizando…" : "Sincronizar monitoreadas"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {fallidos.length > 0 && (
+            <button
+              className="btn btn-secondary"
+              type="button"
+              disabled={busy}
+              onClick={retryFallidos}
+            >
+              Reintentar fallidos
+            </button>
+          )}
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={busy}
+            onClick={syncAll}
+          >
+            {busy ? "Sincronizando…" : "Sincronizar monitoreadas"}
+          </button>
+        </div>
       </div>
 
       {provider?.honesty && (
         <p className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-[var(--copper)]">
           {provider.honesty}
+          {provider.syncIntervalMinutes
+            ? ` Intervalo: cada ${provider.syncIntervalMinutes} min.`
+            : ""}
         </p>
       )}
       {msg && <p className="text-sm text-[var(--ink-soft)]/80">{msg}</p>}
 
       {resumen && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           {[
             { label: "Cartera", value: resumen.total },
             { label: "Monitoreadas", value: resumen.monitoreadas },
             { label: "Al día", value: resumen.verdes },
             { label: "Atenuar", value: resumen.amarillas },
             { label: "Críticas", value: resumen.rojas },
+            { label: "Fallidas", value: resumen.fallidas },
           ].map((s) => (
             <div key={s.label} className="panel rounded-2xl px-4 py-3">
               <div className="text-xs uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
@@ -144,11 +224,43 @@ export default function MonitoreoCausasPage() {
         </div>
       )}
 
+      {fallidos.length > 0 && (
+        <section className="rounded-3xl border border-rose-200 bg-rose-50/60 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-rose-800">
+            Fallidos ({fallidos.length})
+          </h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            {fallidos.slice(0, 8).map((f) => (
+              <li
+                key={f.jobId}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-100 pb-2"
+              >
+                <div>
+                  <Link
+                    href={`/causas/${f.causaId}`}
+                    className="font-medium text-[var(--sea)]"
+                  >
+                    {f.rit || f.titulo}
+                  </Link>
+                  <div className="text-xs text-rose-800/80">
+                    {f.lastError || "Error de sync"} ·×{f.failCount || 1}
+                  </div>
+                </div>
+                <span className="text-xs text-rose-700/70">
+                  {fmtShort(f.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {(
           [
             ["todas", "Todas"],
             ["monitoreadas", "Monitoreadas"],
+            ["fallidas", "Fallidas"],
             ["verde", "Al día"],
             ["amarillo", "Amarillas"],
             ["rojo", "Rojas"],
@@ -170,7 +282,7 @@ export default function MonitoreoCausasPage() {
         ))}
         <input
           className="input ml-auto max-w-xs"
-          placeholder="Buscar RIT, título, cliente…"
+          placeholder="Buscar RIT, título, sala, cliente…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -182,7 +294,7 @@ export default function MonitoreoCausasPage() {
             <tr>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Causa</th>
-              <th className="px-4 py-3">Tribunal</th>
+              <th className="px-4 py-3">Tribunal / Sala</th>
               <th className="px-4 py-3">Último movimiento</th>
               <th className="px-4 py-3">Días</th>
               <th className="px-4 py-3">Sync</th>
@@ -193,27 +305,52 @@ export default function MonitoreoCausasPage() {
               <tr key={i.id} className="border-b border-[var(--line)]/70">
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${DOT[i.semaforo]}`} />
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${DOT[i.semaforo]}`}
+                    />
                     {labelSemaforo(i.semaforo)}
+                    {i.failed && (
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-rose-700">
+                        fallido
+                      </span>
+                    )}
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/causas/${i.id}`} className="font-medium text-[var(--sea)]">
+                  <Link
+                    href={`/causas/${i.id}`}
+                    className="font-medium text-[var(--sea)]"
+                  >
                     {i.rit || i.titulo}
                   </Link>
                   <div className="text-xs text-[var(--ink-soft)]/60">
-                    {i.cliente?.razonSocial || "—"} · {i.abogado?.name || "Sin abogado"}
+                    {i.cliente?.razonSocial || "—"} ·{" "}
+                    {i.abogado?.name || "Sin abogado"}
                     {i.monitoreoActivo ? " · ON" : ""}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-[var(--ink-soft)]/80">{i.tribunal}</td>
+                <td className="px-4 py-3 text-[var(--ink-soft)]/80">
+                  <div>{i.tribunal}</div>
+                  {i.sala && (
+                    <div className="text-xs text-[var(--ink-soft)]/60">
+                      Sala {i.sala}
+                    </div>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   {i.lastMovimiento ? (
                     <>
-                      <div className="max-w-xs truncate">{i.lastMovimiento.titulo}</div>
+                      <div className="max-w-xs truncate">
+                        {i.lastMovimiento.titulo}
+                      </div>
                       <div className="text-xs text-[var(--ink-soft)]/60">
-                        {new Date(i.lastMovimiento.fecha).toLocaleDateString("es-CL")} ·{" "}
-                        {i.lastMovimiento.fuente}
+                        {new Date(i.lastMovimiento.fecha).toLocaleDateString(
+                          "es-CL"
+                        )}{" "}
+                        · {i.lastMovimiento.fuente}
+                        {i.lastMovimiento.cuaderno
+                          ? ` · ${i.lastMovimiento.cuaderno}`
+                          : ""}
                       </div>
                     </>
                   ) : (
@@ -221,19 +358,25 @@ export default function MonitoreoCausasPage() {
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  {i.diasSinMovimiento === null ? "—" : `${i.diasSinMovimiento}d`}
+                  {i.diasSinMovimiento === null
+                    ? "—"
+                    : `${i.diasSinMovimiento}d`}
                 </td>
                 <td className="px-4 py-3 text-xs text-[var(--ink-soft)]/65">
-                  {i.lastSyncAt
-                    ? new Date(i.lastSyncAt).toLocaleDateString("es-CL")
-                    : "nunca"}
-                  {i.lastSyncStatus ? ` · ${i.lastSyncStatus}` : ""}
+                  <div>
+                    Último: {fmtShort(i.lastSyncAt)}
+                    {i.lastSyncStatus ? ` · ${i.lastSyncStatus}` : ""}
+                  </div>
+                  <div>Próximo: {fmtShort(i.nextSyncAt)}</div>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-[var(--ink-soft)]/65">
+                <td
+                  colSpan={6}
+                  className="px-4 py-8 text-center text-[var(--ink-soft)]/65"
+                >
                   No hay causas con este filtro.
                 </td>
               </tr>

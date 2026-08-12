@@ -120,6 +120,12 @@ export async function POST(req: NextRequest) {
         movement.detalle
       );
       const providerId = movement.externalId || movement.id;
+      const esReceptor =
+        Boolean(movement.esReceptor ?? movement.receptor) ||
+        (classified.tipo === "notificacion" &&
+          /receptor|c[eé]dula|notificaci[oó]n/i.test(
+            `${movement.titulo} ${movement.detalle || ""}`
+          ));
       return {
         externalId: providerId
           ? `pjud:${providerId}`
@@ -133,7 +139,13 @@ export async function POST(req: NextRequest) {
         fecha,
         referencia: movement.referencia || null,
         tipo: classified.tipo,
-        relevante: classified.relevante,
+        relevante: classified.relevante || esReceptor,
+        cuaderno: movement.cuaderno || "Principal",
+        folio: movement.folio || null,
+        etapa: movement.etapa || null,
+        tramite: movement.tramite || null,
+        esReceptor,
+        documentoRef: movement.documentoRef || movement.documentoUrl || null,
       };
     });
 
@@ -155,10 +167,26 @@ export async function POST(req: NextRequest) {
           pjudLastSyncAt: new Date(),
           pjudLastSyncStatus: status,
           pjudLastSyncNote: note,
+          pjudFailCount: status === "error" ? { increment: 1 } : 0,
           pjudExternalKey:
             causa.pjudExternalKey ||
             payload.externalKey ||
             `${causa.rit || payload.rit || payload.ruc || ""}|${causa.tribunal}`,
+          ...(payload.sala ? { sala: payload.sala } : {}),
+        },
+      });
+      await tx.pjudSyncJob.create({
+        data: {
+          causaId: causa.id,
+          status: status === "error" ? "failed" : "ok",
+          trigger: "webhook",
+          attempts: 1,
+          inserted: created.count,
+          skipped: movimientos.length - created.count,
+          note,
+          lastError: status === "error" ? note : null,
+          startedAt: new Date(),
+          finishedAt: new Date(),
         },
       });
 

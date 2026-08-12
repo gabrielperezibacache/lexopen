@@ -105,13 +105,16 @@ etapas procesales, días hábiles/calendario simplificados y valores UF. El moto
 plazos es una ayuda operativa: **no reemplaza el cómputo oficial del tribunal ni la
 revisión de un abogado**.
 
-Incluye también monitoreo de causas estilo CaseTracking con semáforos, timeline
-clasificado, alertas y conectores PJUD partner API o demo/CSV etiquetados. No se
-realizan scrapers ocultos ni se presenta el corpus demo como fuente oficial.
+Incluye también monitoreo de causas estilo CausaMonitor/CaseTracking con
+semáforos, cuadernos, receptor, escritos, cola de fallidos, timeline clasificado,
+alertas y conectores PJUD partner API, webhook, demo o CSV etiquetados. No se
+realizan scrapers ocultos, no se custodia ClaveÚnica ni se presenta el corpus
+demo como fuente oficial.
 
 Sin proveedor externo, la alternativa local es exportar el CSV desde la consulta
 oficial e importarlo en la ficha de la causa. El importador acepta
-`titulo,detalle,fecha,referencia,id`, clasifica los movimientos y omite
+`titulo,detalle,fecha,referencia,id,cuaderno,folio,etapa,tramite,receptor,documento`
+(compatible con el encabezado corto), clasifica los movimientos y omite
 reimportaciones determinísticamente; la ficha ofrece plantilla y exportación
 compatible para respaldo local, además de una vista previa que no modifica la
 base de datos.
@@ -348,6 +351,7 @@ variables más relevantes:
 | `PJUD_API_URL`, `PJUD_API_KEY` | No | Conector partner para sincronizar movimientos judiciales. |
 | `PJUD_ALLOW_DEMO` | No | Permite movimientos PJUD simulados y etiquetados como demo. |
 | `PJUD_WEBHOOK_SECRET` | No | Firma HMAC de webhooks asíncronos de un proveedor PJUD. |
+| `PJUD_SYNC_INTERVAL_MINUTES` | No | Intervalo del próximo sync (default 1440 = diario). |
 | `CRON_SECRET` | No | Protege la sincronización de cartera desde un scheduler externo. |
 | `OBSIDIAN_VAULT_PATH` | No | Vault local para exportaciones en desarrollo. |
 | `OBSIDIAN_REST_URL`, `OBSIDIAN_REST_TOKEN` | No | Obsidian Local REST API y token Bearer. |
@@ -358,8 +362,9 @@ No incluya secretos reales en commits. Para producción, genere un
 
 Los proveedores PJUD que trabajan de forma asíncrona pueden usar
 `POST /api/integrations/pjud/webhook` con `x-pjud-timestamp` y
-`x-pjud-signature`. Consulte [`docs/WEB-HOST.md`](docs/WEB-HOST.md) para el
-contrato firmado, la ventana anti-replay y el formato normalizado de movimientos.
+`x-pjud-signature`. Consulte [`docs/PJUD.md`](docs/PJUD.md) y
+[`docs/WEB-HOST.md`](docs/WEB-HOST.md) para el contrato firmado, cuadernos /
+receptor, la ventana anti-replay y el formato normalizado de movimientos.
 
 ## 🔌 Integraciones
 

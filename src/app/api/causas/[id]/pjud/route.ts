@@ -21,15 +21,27 @@ export async function GET(_req: NextRequest, { params }: Params) {
         id: true,
         rit: true,
         tribunal: true,
+        sala: true,
         pjudMonitoreoActivo: true,
         pjudLastSyncAt: true,
+        pjudNextSyncAt: true,
         pjudLastSyncStatus: true,
         pjudLastSyncNote: true,
         pjudExternalKey: true,
+        pjudFailCount: true,
       },
     });
     if (!causa) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
-    return NextResponse.json({ causa, provider: providerStatusPublic() });
+    const recentJobs = await prisma.pjudSyncJob.findMany({
+      where: { causaId: id },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+    return NextResponse.json({
+      causa,
+      jobs: recentJobs,
+      provider: providerStatusPublic(),
+    });
   } catch (e) {
     return handleRouteError(e);
   }
@@ -43,7 +55,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await parseBody(
       req,
       z.object({
-        action: z.enum(["sync", "enable", "disable"]),
+        action: z.enum(["sync", "enable", "disable", "retry"]),
       })
     );
 
@@ -59,13 +71,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ ok: true, causa });
     }
 
-    // sync: force even if disabled so first sync can activate via enable first —
-    // require enabled OR enable automatically on explicit sync (CaseTracking UX)
     await setMonitoreoActivo(id, true);
-    const result = await syncCausaPjud(id, { actorId: user.id, force: true });
+    const result = await syncCausaPjud(id, {
+      actorId: user.id,
+      force: true,
+      trigger: body.action === "retry" ? "retry" : "manual",
+    });
     await writeAudit({
       actorId: user.id,
-      action: "pjud.sync",
+      action: body.action === "retry" ? "pjud.retry" : "pjud.sync",
       entityType: "Causa",
       entityId: id,
       after: result,

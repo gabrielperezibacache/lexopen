@@ -10,6 +10,14 @@ const movementSchema = z.object({
   detalle: z.string().max(20_000).optional().nullable(),
   fecha: z.string().trim().min(1).max(100),
   referencia: z.string().max(500).optional().nullable(),
+  cuaderno: z.string().max(200).optional().nullable(),
+  folio: z.string().max(100).optional().nullable(),
+  etapa: z.string().max(200).optional().nullable(),
+  tramite: z.string().max(200).optional().nullable(),
+  esReceptor: z.boolean().optional(),
+  receptor: z.boolean().optional(),
+  documentoRef: z.string().max(500).optional().nullable(),
+  documentoUrl: z.string().max(500).optional().nullable(),
 });
 
 export const pjudWebhookPayloadSchema = z
@@ -21,6 +29,7 @@ export const pjudWebhookPayloadSchema = z
     rit: z.string().trim().min(1).max(100).optional().nullable(),
     ruc: z.string().trim().min(1).max(100).optional().nullable(),
     tribunal: z.string().trim().min(1).max(255).optional(),
+    sala: z.string().max(200).optional().nullable(),
     movimientos: z.array(movementSchema).max(5_000).default([]),
   })
   .passthrough()

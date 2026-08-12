@@ -218,12 +218,14 @@ model Causa {
   googleDriveFolderId   String?
   googleDriveFolderName String?
   googleDriveFolderUrl  String?
-  /// Monitoreo estilo CaseTracking (PJUD / proveedor)
+  /// Monitoreo estilo CaseTracking / CausaMonitor (PJUD / proveedor)
   pjudMonitoreoActivo   Boolean   @default(false)
   pjudLastSyncAt        DateTime?
-  pjudLastSyncStatus    String?   // never | ok | partial | error | demo | disabled
+  pjudNextSyncAt        DateTime?
+  pjudLastSyncStatus    String?   // never | ok | partial | error | demo | disabled | failed
   pjudLastSyncNote      String?
   pjudExternalKey       String?   // clave proveedor (RIT|tribunal)
+  pjudFailCount         Int       @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -248,12 +250,15 @@ model Causa {
   etapaHistorial  EtapaHistorial[]
   agentChats      AgentChat[]
   movimientos     CausaMovimiento[]
+  pjudSyncJobs    PjudSyncJob[]
 
   @@index([rit])
   @@index([ruc])
   @@index([estado])
   @@index([pjudMonitoreoActivo])
   @@index([pjudLastSyncAt])
+  @@index([pjudNextSyncAt])
+  @@index([pjudLastSyncStatus])
 }
 
 model EtapaHistorial {
@@ -277,6 +282,14 @@ model CausaMovimiento {
   /// ID externo del proveedor para deduplicar sync
   externalId  String?
   relevante   Boolean  @default(false)
+  /// Cuaderno judicial (Principal, Apelación, …) — paridad CausaMonitor
+  cuaderno    String?
+  folio       String?
+  etapa       String?
+  tramite     String?
+  /// Notificación de receptor / actuación de notificación
+  esReceptor  Boolean  @default(false)
+  documentoRef String?
   fecha       DateTime @default(now())
   createdAt   DateTime @default(now())
   causaId     String
@@ -285,6 +298,30 @@ model CausaMovimiento {
   @@index([causaId, fecha])
   @@index([externalId])
   @@index([tipo])
+  @@index([causaId, cuaderno])
+  @@index([causaId, esReceptor])
+}
+
+/// Cola de sync PJUD (éxitos + fallidos reintentables), estilo CausaMonitor
+model PjudSyncJob {
+  id         String    @id @default(cuid())
+  causaId    String
+  causa      Causa     @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  /// pending | running | ok | failed
+  status     String    @default("pending")
+  /// manual | cron | retry | webhook | import
+  trigger    String    @default("manual")
+  attempts   Int       @default(0)
+  lastError  String?
+  note       String?
+  inserted   Int       @default(0)
+  skipped    Int       @default(0)
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([causaId, createdAt])
 }
 
 model AgentChat {
