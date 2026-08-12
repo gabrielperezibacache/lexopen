@@ -197,6 +197,7 @@ export async function POST(req: NextRequest) {
         clienteId,
         autorId,
       },
+      select: documentoListSelect,
     });
 
     if (processingBytes) {

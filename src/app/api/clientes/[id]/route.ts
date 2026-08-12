@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
   assertCsrf,
+  confidentialWhere,
   handleRouteError,
   parseBody,
   requireStaff,
@@ -9,20 +10,25 @@ import {
 import { clienteUpdateSchema } from "@/lib/schemas";
 import { writeAudit } from "@/lib/audit";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
+import { documentoListSelect } from "@/lib/sites/file-select";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const { id } = await params;
     const cliente = await prisma.cliente.findUnique({
       where: { id },
       include: {
         abogado: { select: { id: true, name: true, email: true } },
         documentos: {
+          where: confidentialWhere(user.role),
           orderBy: { updatedAt: "desc" },
-          include: { autor: { select: { id: true, name: true } } },
+          select: {
+            ...documentoListSelect,
+            autor: { select: { id: true, name: true } },
+          },
         },
         causas: {
           orderBy: { updatedAt: "desc" },

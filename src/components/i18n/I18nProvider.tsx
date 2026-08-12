@@ -4,7 +4,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   useTransition,
@@ -36,18 +35,15 @@ export function I18nProvider({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const [locale, setLocaleState] = useState<Locale>(initialLocale);
+  const [override, setOverride] = useState<Locale | null>(null);
   const [pending, startTransition] = useTransition();
+  const locale = override ?? initialLocale;
   const dict = useMemo(() => getDictionary(locale), [locale]);
-
-  useEffect(() => {
-    setLocaleState(initialLocale);
-  }, [initialLocale]);
 
   const setLocale = useCallback(
     async (next: Locale) => {
       if (next === locale) return;
-      setLocaleState(next);
+      setOverride(next);
       await fetch("/api/locale", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

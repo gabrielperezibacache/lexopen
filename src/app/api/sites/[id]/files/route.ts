@@ -88,7 +88,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
           take: 3,
           select: fileVersionListSelect,
         },
-        comments: true,
+        // Internal staff notes must not leak to the client portal.
+        ...(clientView
+          ? {}
+          : {
+              comments: {
+                orderBy: { createdAt: "desc" as const },
+                take: 5,
+                select: {
+                  id: true,
+                  body: true,
+                  createdAt: true,
+                  authorId: true,
+                },
+              },
+            }),
       },
       orderBy: { name: "asc" },
     });
