@@ -25,10 +25,11 @@ export default async function PeoplePage() {
       <ModuleHeader
         eyebrow="Directorio del estudio"
         title="Personas"
-        subtitle="Usuarios, roles y grupos con acceso a espacios."
+        subtitle="Crear, editar y administrar usuarios, roles y grupos con acceso a espacios."
       />
       <PeopleManager
         canManage={isAdmin(me.role)}
+        currentUserId={me.id}
         initialUsers={users.map((u) => ({
           id: u.id,
           name: u.name,

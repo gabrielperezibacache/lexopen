@@ -75,7 +75,7 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
 
   const s = organization.settings;
   return (
-    <form onSubmit={onSubmit} className="panel space-y-8 rounded-3xl p-5 md:p-6">
+    <form id="estudio" onSubmit={onSubmit} className="panel space-y-8 rounded-3xl p-5 md:p-6">
       <section>
         <h2 className="text-lg font-semibold">Datos del estudio</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
@@ -154,6 +154,10 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
 
       <section>
         <h2 className="text-lg font-semibold">Integraciones</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+          El resto de conectores (IA, Obsidian, Google, PJUD) se editan en las secciones
+          siguientes de esta página.
+        </p>
         <label className="mt-3 flex items-start gap-3 text-sm">
           <input
             className="mt-1"
@@ -162,9 +166,11 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
             defaultChecked={s?.hermesAllowDemo ?? true}
           />
           <span>
-            <span className="font-medium">Permitir respuestas demo de Hermes</span>
+            <span className="font-medium">Permitir respuestas demo del asistente IA</span>
             <span className="mt-0.5 block text-[var(--ink-soft)]/65">
-              Si el agente no está disponible, LexOpen responde con contenido de demostración.
+              Fallback del estudio si el proveedor (OpenAI, Hermes, Ollama, etc.) no
+              responde. También puede configurarse por proveedor en el panel de
+              endpoints de IA más abajo.
             </span>
           </span>
         </label>

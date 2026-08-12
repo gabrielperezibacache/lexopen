@@ -49,7 +49,7 @@ function IntegracionesInner() {
   const [obsidianMsg, setObsidianMsg] = useState("");
   const [obsidianMode, setObsidianMode] = useState("");
   const [google, setGoogle] = useState<GoogleStatus | null>(null);
-  const [hermesInfo, setHermesInfo] = useState("");
+  const [llmInfo, setLlmInfo] = useState("");
   const [captcha, setCaptcha] = useState<CaptchaStatus | null>(null);
 
   useEffect(() => {
@@ -69,16 +69,16 @@ function IntegracionesInner() {
         )
       )
       .catch(() => setObsidianMode("storage"));
-    fetch("/api/integrations/hermes")
+    fetch("/api/integrations/llm")
       .then((r) => r.json())
       .then((d) =>
-        setHermesInfo(
-          `API: ${d.config?.apiUrl || "—"} · modelo ${d.config?.model || "—"} · ${
-            d.enabled ? "habilitado" : "deshabilitado"
-          }`
+        setLlmInfo(
+          `${d.config?.preset || "custom"} · ${d.config?.apiUrl || "—"} · modelo ${
+            d.config?.model || "—"
+          } · ${d.enabled ? "habilitado" : "deshabilitado"}`
         )
       )
-      .catch(() => setHermesInfo("No disponible"));
+      .catch(() => setLlmInfo("No disponible"));
     fetch("/api/pjud/captcha")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setCaptcha(d))
@@ -110,8 +110,8 @@ function IntegracionesInner() {
         </p>
         <h1 className="display mt-2 text-4xl">Integraciones</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Obsidian (vault Markdown), copiloto IA / Hermes, Google Workspace y
-          PJUD (scrape / ClaveÚnica / sidecar).
+          Obsidian (vault Markdown), copiloto IA multi-proveedor (OpenAI / custom /
+          Hermes), Google Workspace y PJUD (scrape / ClaveÚnica / sidecar).
         </p>
       </div>
 
@@ -149,16 +149,21 @@ function IntegracionesInner() {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <h2 className="text-xl font-semibold">Copiloto IA (Hermes)</h2>
+          <h2 className="text-xl font-semibold">Copiloto IA</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
-            Utilidades tipo Julia.cl: briefing, Q&A documental, borradores, plazos,
-            investigación y casos similares, con fuentes del estudio. Si Hermes no
-            está disponible, responde en modo demo etiquetado.
+            API compatible con OpenAI Chat Completions: OpenAI, Azure, Groq, Ollama,
+            Hermes u otro endpoint custom. Utilidades tipo Julia.cl con fuentes del
+            estudio. Configure proveedor y API key en Configuración.
           </p>
-          <p className="mt-4 text-xs text-[var(--ink-soft)]/65">{hermesInfo || "Cargando…"}</p>
-          <a href="/agente" className="btn btn-secondary mt-5 inline-flex">
-            Abrir copiloto
-          </a>
+          <p className="mt-4 text-xs text-[var(--ink-soft)]/65">{llmInfo || "Cargando…"}</p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <a href="/agente" className="btn btn-secondary inline-flex">
+              Abrir copiloto
+            </a>
+            <a href="/configuracion#llm-settings" className="btn btn-ghost inline-flex">
+              Configurar endpoint
+            </a>
+          </div>
         </section>
 
         <section className="panel rounded-3xl p-5">
@@ -311,11 +316,20 @@ function IntegracionesInner() {
 
       <section className="panel rounded-3xl p-5">
         <h2 className="text-lg font-semibold">Variables de entorno</h2>
-        <pre className="mt-3 overflow-x-auto rounded-2xl bg-[var(--ink)] p-4 text-xs text-white/85">{`HERMES_API_URL=http://localhost:8642/v1
+        <pre className="mt-3 overflow-x-auto rounded-2xl bg-[var(--ink)] p-4 text-xs text-white/85">{`# IA multi-proveedor (prioridad sobre HERMES_*)
+LLM_API_URL=https://api.openai.com/v1
+LLM_API_KEY=
+LLM_MODEL=gpt-4o-mini
+LLM_ALLOW_DEMO=0
+# Compat Hermes Agent
+HERMES_API_URL=http://localhost:8642/v1
+HERMES_API_KEY=
 OBSIDIAN_VAULT_PATH=./obsidian-vault
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback
+PJUD_API_URL=
+PJUD_API_KEY=
 PJUD_SCRAPER_URL=http://127.0.0.1:8787
 PJUD_SCRAPER_ALLOW_PRIVATE=1
 PJUD_PUBLIC_SCRAPE=1

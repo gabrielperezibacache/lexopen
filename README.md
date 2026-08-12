@@ -478,8 +478,10 @@ variables más relevantes:
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | No | Bucket y endpoint de almacenamiento S3-compatible. |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | No | Credenciales del bucket S3-compatible. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | No | OAuth de Google Drive y Calendar. |
-| `HERMES_API_URL`, `HERMES_API_KEY` | No | Endpoint y credencial de la API compatible con OpenAI. |
-| `HERMES_ALLOW_DEMO` | No | Permite una respuesta local claramente marcada si Hermes no está disponible. |
+| `HERMES_API_URL`, `HERMES_API_KEY` | No | Compat: endpoint Hermes Agent (fallback si no hay `LLM_*`). |
+| `HERMES_ALLOW_DEMO` | No | Compat: permite demo si el proveedor no está disponible. |
+| `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL` | No | Endpoint multi-proveedor OpenAI-compatible (OpenAI, Azure, Groq, Ollama, Hermes, custom). Prioridad sobre `HERMES_*`. |
+| `LLM_ALLOW_DEMO` | No | Demo etiquetado si el proveedor IA no responde (`0` = fail-closed). |
 | `PJUD_API_URL`, `PJUD_API_KEY` | No | Conector partner para sincronizar movimientos judiciales. |
 | `PJUD_SCRAPER_URL`, `PJUD_SCRAPER_KEY` | No | Sidecar scrape (lookup + Mis Causas), estilo CausaMonitor. |
 | `PJUD_PUBLIC_SCRAPE` | No | `1` = scrape OJV in-process (Playwright + CAPTCHA). |
@@ -527,14 +529,22 @@ no confidenciales (prioriza `extractedMarkdown` y respeta subcarpetas
 `Documentos/<ruta>/…`). Puede escribir en un vault local durante el desarrollo, usar
 Obsidian Local REST API o conservar los objetos mediante el backend de storage.
 
-### Copiloto IA (Hermes)
+### Hermes Agent / IA multi-proveedor
 
-Envía solicitudes a `POST {HERMES_API_URL}/chat/completions` con formato compatible
-con OpenAI. El context pack ancla la respuesta a la causa, la **carpeta investigativa**
-(`ruta`), documentos rankeados por la pregunta, VDR/wiki del espacio vinculado y
-plazos. En `/agente` se puede acotar por carpeta o documentos; el alcance y las
-fuentes se restauran al reanudar el chat. Con `HERMES_ALLOW_DEMO=1`, una respuesta
-local de demostración se identifica explícitamente como tal.
+El copiloto usa cualquier API compatible con OpenAI Chat Completions. Configure el
+proveedor en **Configuración → Endpoints de IA** o con variables de entorno:
+
+- `LLM_API_URL` / `LLM_API_KEY` / `LLM_MODEL` (prioridad)
+- o `HERMES_API_URL` / `HERMES_API_KEY` (compat)
+
+Presets: OpenAI, Azure OpenAI, Groq, Ollama (local), Hermes Agent, o URL custom.
+Las solicitudes van a `POST {apiUrl}/chat/completions`. El context pack ancla la
+respuesta a la causa, la **carpeta investigativa** (`ruta`), documentos rankeados
+por la pregunta, VDR/wiki del espacio vinculado y plazos. En `/agente` se puede
+acotar por carpeta o documentos; el alcance y las fuentes se restauran al reanudar
+el chat. Las respuestas se guardan como historial y requieren aprobación humana.
+Con `LLM_ALLOW_DEMO=1` (o `HERMES_ALLOW_DEMO=1`), una respuesta local de
+demostración se identifica explícitamente como tal.
 
 No es asesoría jurídica automática: no presente ni envíe un texto generado sin
 revisión del abogado responsable.
@@ -652,7 +662,7 @@ Principales grupos de endpoints:
 | Minutas | `/api/minutas`, `/api/minutas/plantillas` |
 | Colaboración | `/api/messages`, `/api/notifications`, `/api/people` |
 | Facturación | `/api/billing/*` |
-| Integraciones | `/api/integrations/google`, `/api/integrations/obsidian`, `/api/integrations/hermes` |
+| Integraciones | `/api/integrations/google`, `/api/integrations/obsidian`, `/api/integrations/llm`, `/api/integrations/hermes` |
 
 Para explorar contratos concretos, consulte las route handlers y los schemas Zod
 junto a cada módulo. Los ejemplos mutantes necesitan cookies de sesión y, según la
