@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Causa" ADD COLUMN IF NOT EXISTS "proximaTabla" TIMESTAMP(3);
+ALTER TABLE "Causa" ADD COLUMN IF NOT EXISTS "proximaTablaNota" TEXT;

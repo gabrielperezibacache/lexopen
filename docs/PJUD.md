@@ -145,7 +145,16 @@ En Render, el Blueprint define `lexopen-pjud-scraper` (`type: pserv`) con `npx p
 
 Con `PJUD_PDF_BACKUP=1`, tras sync (también backfill) se descargan links `documentoRef` públicos seguros (anti-SSRF), se rechazan HTML/login walls, y se guardan como `Documento`; el movimiento queda con `doc:<id>` y la ficha muestra link LexOpen.
 
+## Programación de salas
+
+Paridad CausaMonitor (tablas de Cortes):
+
+- `src/lib/pjud/salas.ts` — parse HTML de tabla + match por RIT contra cartera
+- Campos `Causa.proximaTabla` / `proximaTablaNota`
+- Fixture/demo offline en tests de seguimiento
+
 ## Alta rápida / CSV cartera
+
 
 - UI en `/causas/monitoreo` (panel ROL / RUT + **Importar/Exportar CSV**)
 - API `POST /api/pjud/lookup` con `action: add-rol | preview-rol | buscar-rut`

@@ -11,6 +11,8 @@ type Item = {
   rit: string | null;
   tribunal: string;
   sala: string | null;
+  proximaTabla?: string | null;
+  proximaTablaNota?: string | null;
   materia: string;
   etapa: string;
   abogado: { id: string; name: string } | null;
@@ -394,6 +396,15 @@ export default function MonitoreoCausasPage() {
                   {i.sala && (
                     <div className="text-xs text-[var(--ink-soft)]/60">
                       Sala {i.sala}
+                    </div>
+                  )}
+                  {i.proximaTabla && (
+                    <div className="text-xs text-[var(--copper)]">
+                      Tabla{" "}
+                      {new Date(i.proximaTabla).toLocaleDateString("es-CL")}
+                      {i.proximaTablaNota
+                        ? ` · ${i.proximaTablaNota.replace(/^En tabla:\s*/, "")}`
+                        : ""}
                     </div>
                   )}
                 </td>

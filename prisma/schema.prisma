@@ -211,6 +211,9 @@ model Causa {
   ruc           String?
   tribunal      String
   sala          String?
+  /// Próxima aparición en tabla de Corte (paridad CausaMonitor salas)
+  proximaTabla      DateTime?
+  proximaTablaNota  String?
   cuaderno      String?
   materia       String
   procedimiento String?

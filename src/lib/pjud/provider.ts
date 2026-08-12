@@ -163,10 +163,12 @@ function isPrivateHostname(hostname: string) {
 }
 
 /**
- * Demo etiquetado con fidelidad CausaMonitor (cuadernos, receptor, escritos).
- * Solo si PJUD_ALLOW_DEMO=1 o desarrollo. No scrapea ofpj.pjud.cl.
+ * Demo etiquetado con fidelidad CausaMonitor (cuadernos, receptor, escritos
+ * por resolver, sala). Solo si PJUD_ALLOW_DEMO=1 o desarrollo.
  */
-function fetchDemoMovimientos(causa: PjudCausaRef): PjudFetchResult {
+export function buildCausaMonitorDemoFetch(
+  causa: PjudCausaRef
+): PjudFetchResult {
   const now = new Date();
   const day = (offset: number) => {
     const d = new Date(now);
@@ -243,6 +245,17 @@ function fetchDemoMovimientos(causa: PjudCausaRef): PjudFetchResult {
       documentoRef: `escrito/${rit}-E1`,
     },
     {
+      titulo: "Escrito por resolver — solicitud de oficio",
+      detalle: "Escrito pendiente de resolución en cuaderno principal.",
+      fecha: day(18),
+      referencia: `${rit}-EP1`,
+      cuaderno: "Principal",
+      folio: "9",
+      etapa: "Tramitación",
+      tramite: "Escrito por resolver",
+      documentoRef: `escrito/${rit}-EP1`,
+    },
+    {
       titulo: "Citación a audiencia de conciliación",
       detalle: "Audiencia fijada en sala del tribunal.",
       fecha: day(14),
@@ -298,6 +311,7 @@ function fetchDemoMovimientos(causa: PjudCausaRef): PjudFetchResult {
 
   const movimientos = samples.map((m) => {
     const classified = classifyMovimiento(m.titulo, m.detalle);
+    const pendienteResolucion = Boolean(classified.pendienteResolucion);
     return {
       externalId: `demo:${fingerprint(m.titulo, m.fecha, m.referencia)}`,
       titulo: m.titulo,
@@ -305,13 +319,15 @@ function fetchDemoMovimientos(causa: PjudCausaRef): PjudFetchResult {
       fecha: m.fecha,
       referencia: m.referencia,
       tipo: classified.tipo,
-      relevante: classified.relevante || Boolean(m.esReceptor),
+      relevante:
+        classified.relevante || Boolean(m.esReceptor) || pendienteResolucion,
       fuente: "demo" as const,
       cuaderno: m.cuaderno,
       folio: m.folio,
       etapa: m.etapa || null,
       tramite: m.tramite || null,
       esReceptor: Boolean(m.esReceptor),
+      pendienteResolucion,
       documentoRef: m.documentoRef || null,
     };
   });
@@ -320,10 +336,14 @@ function fetchDemoMovimientos(causa: PjudCausaRef): PjudFetchResult {
     provider: "demo",
     movimientos,
     note:
-      "⚠ Modo demo (paridad CausaMonitor): cuadernos, receptor y escritos simulados. No son datos oficiales del PJUD. Configure PJUD_API_URL para un conector real.",
+      "⚠ Modo demo (paridad CausaMonitor): cuadernos, receptor, escritos por resolver y sala simulados. No son datos oficiales del PJUD.",
     demo: true,
     sala: "Sala 1",
   };
+}
+
+function fetchDemoMovimientos(causa: PjudCausaRef): PjudFetchResult {
+  return buildCausaMonitorDemoFetch(causa);
 }
 
 export function pjudDemoAllowed() {

@@ -389,6 +389,8 @@ export async function listCarteraMonitoreo() {
       ruc: c.ruc,
       tribunal: c.tribunal,
       sala: c.sala,
+      proximaTabla: c.proximaTabla,
+      proximaTablaNota: c.proximaTablaNota,
       materia: c.materia,
       etapa: c.etapa,
       estado: c.estado,

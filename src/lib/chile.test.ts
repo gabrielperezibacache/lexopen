@@ -11,4 +11,7 @@ assert(validarRit("C-4521-2025"), "rit letter");
 assert(validarRit("71345-2025"), "rit corte");
 assert(!validarRit("abc"), "bad rit");
 
+import { TRIBUNALES_CHILE } from "./chile";
+assert(TRIBUNALES_CHILE.length >= 40, "tribunales ampliados para paridad CM");
+
 console.log("chile.test.ts OK");
