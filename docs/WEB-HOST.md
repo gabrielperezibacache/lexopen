@@ -6,65 +6,40 @@ ejecuta LexOpen y PostgreSQL; el resto accede desde Safari, Chrome o Firefox.
 ## Requisitos del Host
 
 - Node.js 22.x.
-- PostgreSQL 16 o compatible.
-- Tailscale si habrá acceso desde otros equipos o fuera de la LAN.
 - Un directorio local persistente para documentos.
+- Tailscale es opcional; una LAN aislada también funciona.
 
 El Host puede ser Windows, macOS o Linux. Los clientes solo necesitan navegador y
 acceso de red al Host.
 
 ## Instalación
 
-Desde el repositorio:
+Desde el repositorio, en el PC que será Host:
 
 ```bash
 git clone https://github.com/gabrielperezibacache/lexopen.git
 cd lexopen
 npm ci
-cp .env.example .env
+LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
 ```
 
-Cree una base vacía llamada `lexopen` y configure `.env`:
+`web:host` instala el runtime desktop si falta, compila solo cuando es necesario,
+inicia PostgreSQL embebido, aplica migraciones y arranca Next.js. No requiere una
+instancia PostgreSQL separada ni servicios cloud.
 
-```dotenv
-DATABASE_URL=postgresql://lexopen:lexopen@127.0.0.1:5432/lexopen
-SESSION_SECRET=<secreto-aleatorio-de-al-menos-16-caracteres>
-LEXOPEN_BOOTSTRAP_TOKEN=<token-aleatorio-hexadecimal>
-STORAGE_PATH=/ruta/persistente/lexopen/storage
-LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE=1
-LEXOPEN_REQUIRE_PERSISTENT_STORAGE=1
-LEXOPEN_DEMO_SWITCHER=0
-HERMES_ALLOW_DEMO=0
-```
-
-Genere secretos desde macOS/Linux con:
-
-```bash
-openssl rand -hex 32
-```
-
-No exponga `LEXOPEN_BOOTSTRAP_TOKEN`: solo se usa para crear el primer admin.
-
-Prepare el schema y compile la aplicación:
-
-```bash
-npm run db:migrate
-npm run build
-npm run start
-```
-
-`npm run start` escucha en `0.0.0.0` y usa `PORT` (por defecto `3000`).
+Si no define `LEXOPEN_DATA_DIR`, la configuración queda en la carpeta de datos
+predeterminada del sistema. El servidor escucha en `0.0.0.0:3000`.
 
 ## Primera configuración
 
-En el Host abra:
+El comando imprime un enlace de configuración inicial. Ábralo en el Host:
 
 ```text
 http://127.0.0.1:3000/setup?token=<LEXOPEN_BOOTSTRAP_TOKEN>
 ```
 
 Cree el administrador, inicie sesión y cree los usuarios del estudio. Después de
-configurar la instalación, el token deja de ser válido.
+configurar la instalación, el token deja de ser válido. No comparta ese enlace.
 
 Compruebe el estado:
 
@@ -76,20 +51,21 @@ Debe mostrar `db: "up"`, `storageReady: true` y `needsSetup: false`.
 
 ## Acceso desde los clientes
 
-Instale Tailscale en el Host y en cada equipo cliente. Con todos los equipos en el
-mismo tailnet:
+Para una LAN completamente local, obtenga la IP privada del Host y configure en el
+`.env` del directorio de datos:
 
-```bash
-tailscale serve --bg 3000
-tailscale serve status
+```dotenv
+LEXOPEN_TRUSTED_ORIGINS=http://127.0.0.1:3000,http://IP-DEL-HOST:3000
 ```
 
-Use en los clientes la URL HTTPS mostrada por `tailscale serve status`. Configure
-esa URL exacta en `NEXT_PUBLIC_APP_URL` y `LEXOPEN_TRUSTED_ORIGINS`, reinicie
-LexOpen y acceda desde el navegador.
+Reinicie LexOpen y abra desde cada cliente:
 
-No use port-forwarding del router. Para una LAN aislada también puede usar
-`http://hostname-del-host:3000`, pero HTTPS/Tailscale es preferible.
+```text
+http://IP-DEL-HOST:3000
+```
+
+Tailscale sigue siendo opcional para acceso remoto; no es necesario para una red
+local sin Internet.
 
 ## Operación y respaldos
 
