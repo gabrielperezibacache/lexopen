@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Fraunces, Sora } from "next/font/google";
 import { CsrfFetchPatch } from "@/components/CsrfFetchPatch";
+import { I18nProvider } from "@/components/i18n/I18nProvider";
+import { getDictionary } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n/server";
 import "./globals.css";
 
 const sora = Sora({
@@ -14,11 +17,14 @@ const fraunces = Fraunces({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "LexOpen — Operaciones jurídicas open source",
-  description:
-    "Clon open-source de HighQ para estudios jurídicos en Chile. Causas, jurisprudencia, Obsidian, Hermes Agent y Google Workspace.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  return {
+    title: dict.meta.title,
+    description: dict.meta.description,
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -27,12 +33,13 @@ export default async function RootLayout({
 }>) {
   // Per-request CSP nonces require dynamic rendering (see Next.js CSP guide).
   await connection();
+  const locale = await getLocale();
 
   return (
-    <html lang="es">
+    <html lang={locale}>
       <body className={`${sora.variable} ${fraunces.variable} antialiased`}>
         <CsrfFetchPatch />
-        {children}
+        <I18nProvider locale={locale}>{children}</I18nProvider>
       </body>
     </html>
   );

@@ -1,18 +1,29 @@
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { es, enUS } from "date-fns/locale";
+import type { Locale } from "@/lib/i18n";
 
-export function formatDate(value?: string | Date | null) {
-  if (!value) return "—";
-  const d = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return "—";
-  return format(d, "dd MMM yyyy", { locale: es });
+function dateFnsLocale(locale?: Locale | string | null) {
+  return locale === "en" ? enUS : es;
 }
 
-export function formatDateTime(value?: string | Date | null) {
+export function formatDate(
+  value?: string | Date | null,
+  locale?: Locale | string | null
+) {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return "—";
-  return format(d, "dd MMM yyyy · HH:mm", { locale: es });
+  return format(d, "dd MMM yyyy", { locale: dateFnsLocale(locale) });
+}
+
+export function formatDateTime(
+  value?: string | Date | null,
+  locale?: Locale | string | null
+) {
+  if (!value) return "—";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
+  return format(d, "dd MMM yyyy · HH:mm", { locale: dateFnsLocale(locale) });
 }
 
 export function StatusBadge({
