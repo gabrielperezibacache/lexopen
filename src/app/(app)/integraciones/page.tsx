@@ -52,6 +52,9 @@ function IntegracionesInner() {
   const [hermesInfo, setHermesInfo] = useState("");
   const [hermesEnabled, setHermesEnabled] = useState(true);
   const [hermesApiUrl, setHermesApiUrl] = useState("");
+  const [hermesModel, setHermesModel] = useState("hermes-legal");
+  const [hermesApiKey, setHermesApiKey] = useState("");
+  const [hermesRequireApproval, setHermesRequireApproval] = useState(true);
   const [hermesBusy, setHermesBusy] = useState(false);
   const [hermesMsg, setHermesMsg] = useState("");
   const [captcha, setCaptcha] = useState<CaptchaStatus | null>(null);
@@ -78,6 +81,9 @@ function IntegracionesInner() {
       .then((d) => {
         setHermesEnabled(Boolean(d.enabled));
         setHermesApiUrl(d.config?.apiUrl || "");
+        setHermesModel(d.config?.model || "hermes-legal");
+        setHermesApiKey(d.config?.apiKey ? "••••" : "");
+        setHermesRequireApproval(d.config?.requireApproval !== false);
         setHermesInfo(
           `API: ${d.config?.apiUrl || "—"} · modelo ${d.config?.model || "—"} · ${
             d.enabled ? "habilitado" : "deshabilitado"
@@ -174,7 +180,12 @@ function IntegracionesInner() {
                 body: JSON.stringify({
                   action: "save-config",
                   enabled: hermesEnabled,
-                  config: { apiUrl: hermesApiUrl },
+                  config: {
+                    apiUrl: hermesApiUrl,
+                    model: hermesModel,
+                    apiKey: hermesApiKey,
+                    requireApproval: hermesRequireApproval,
+                  },
                 }),
               });
               const data = await res.json().catch(() => ({}));
@@ -185,7 +196,7 @@ function IntegracionesInner() {
               }
               setHermesMsg("Configuración guardada.");
               setHermesInfo(
-                `API: ${hermesApiUrl || "—"} · ${
+                `API: ${hermesApiUrl || "—"} · modelo ${hermesModel || "—"} · ${
                   hermesEnabled ? "habilitado" : "deshabilitado"
                 }`
               );
@@ -199,6 +210,14 @@ function IntegracionesInner() {
               />
               Integración habilitada
             </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={hermesRequireApproval}
+                onChange={(e) => setHermesRequireApproval(e.target.checked)}
+              />
+              Requiere aprobación humana
+            </label>
             <div>
               <label className="mb-1 block text-sm font-medium">
                 URL API (OpenAI-compatible)
@@ -208,6 +227,28 @@ function IntegracionesInner() {
                 value={hermesApiUrl}
                 onChange={(e) => setHermesApiUrl(e.target.value)}
                 placeholder="http://localhost:8642/v1"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Modelo</label>
+              <input
+                className="input"
+                value={hermesModel}
+                onChange={(e) => setHermesModel(e.target.value)}
+                placeholder="hermes-legal"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                API key (opcional)
+              </label>
+              <input
+                className="input"
+                type="password"
+                value={hermesApiKey}
+                onChange={(e) => setHermesApiKey(e.target.value)}
+                placeholder="••••"
+                autoComplete="off"
               />
             </div>
             <div className="flex flex-wrap gap-2">

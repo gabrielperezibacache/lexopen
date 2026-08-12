@@ -40,6 +40,32 @@ type SourceRef = {
   href?: string;
 };
 
+
+function SourceChip({
+  s,
+  className,
+}: {
+  s: SourceRef;
+  className: string;
+}) {
+  const label = `${s.type}: ${s.label}`;
+  if (!s.href) {
+    return <span className={className}>{label}</span>;
+  }
+  if (s.href.startsWith("/api/")) {
+    return (
+      <a href={s.href} className={className} target="_blank" rel="noreferrer">
+        {label}
+      </a>
+    );
+  }
+  return (
+    <Link href={s.href} className={className}>
+      {label}
+    </Link>
+  );
+}
+
 function AgenteInner() {
   const sp = useSearchParams();
   const [causas, setCausas] = useState<CausaOption[]>([]);
@@ -47,6 +73,9 @@ function AgenteInner() {
   const [utility, setUtility] = useState(sp.get("utility") || "copilot");
   const [causaId, setCausaId] = useState(sp.get("causaId") || "");
   const [documentoId, setDocumentoId] = useState(sp.get("documentoId") || "");
+  const [docs, setDocs] = useState<{ id: string; nombre: string }[]>([]);
+  const [allowDemoApproval, setAllowDemoApproval] = useState(false);
+  const [lastSource, setLastSource] = useState("");
   const [prompt, setPrompt] = useState("");
   const [reply, setReply] = useState("");
   const [meta, setMeta] = useState("");
@@ -131,6 +160,39 @@ function AgenteInner() {
     };
   }, [causaId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!causaId) {
+      queueMicrotask(() => {
+        if (!cancelled) setDocs([]);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+    queueMicrotask(() => {
+      fetch(`/api/documentos?causaId=${encodeURIComponent(causaId)}`)
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) => {
+          if (cancelled) return;
+          const list = Array.isArray(data) ? data : [];
+          setDocs(
+            list.map((d: { id: string; nombre: string }) => ({
+              id: d.id,
+              nombre: d.nombre,
+            }))
+          );
+        })
+        .catch(() => {
+          if (!cancelled) setDocs([]);
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [causaId]);
+
+
   function selectUtility(u: Utility) {
     setUtility(u.id);
     setPrompt(u.starter);
@@ -175,6 +237,8 @@ function AgenteInner() {
       .reverse()
       .find((m) => m.role === "assistant");
     applyAssistantMeta(lastAssistant, chat.demoMode);
+    setLastSource(lastAssistant?.source || (chat.demoMode ? "demo" : ""));
+    setAllowDemoApproval(false);
     setApproveMsg("");
   }
 
@@ -222,6 +286,8 @@ function AgenteInner() {
         return;
       }
       setReply(data.content || data.note || data.error || "Sin respuesta");
+      setLastSource(data.source || "");
+      setAllowDemoApproval(false);
       setSources(Array.isArray(data.sources) ? data.sources : []);
       setActions(
         Array.isArray(data.suggestedActions) ? data.suggestedActions : []
@@ -325,6 +391,7 @@ function AgenteInner() {
           action: "approve-to-minuta",
           causaId,
           chatId,
+          allowDemoApproval,
           utilityLabel:
             utilities.find((u) => u.id === utility)?.label || utility,
         }),
@@ -652,17 +719,25 @@ function AgenteInner() {
               ))}
             </select>
           </div>
-          {documentoId && (
-            <p className="text-xs text-[var(--ink-soft)]/70">
-              Documento anclado: <code>{documentoId.slice(0, 10)}…</code>{" "}
-              <button
-                type="button"
-                className="text-[var(--sea)] underline"
-                onClick={() => setDocumentoId("")}
+
+          {(utility === "doc_qa" || docs.length > 0) && causaId && (
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Documento anclado (opcional)
+              </label>
+              <select
+                className="select"
+                value={documentoId}
+                onChange={(e) => setDocumentoId(e.target.value)}
               >
-                quitar
-              </button>
-            </p>
+                <option value="">Todos los documentos indexados</option>
+                {docs.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
           <div>
             <label className="mb-1 block text-sm font-medium">Instrucción</label>
@@ -688,18 +763,14 @@ function AgenteInner() {
               <ul className="mt-2 flex flex-wrap gap-2">
                 {sources.slice(0, 16).map((s) => (
                   <li key={`${s.type}-${s.id}`}>
-                    {s.href ? (
-                      <Link
-                        href={s.href}
-                        className="rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs text-[var(--sea)]"
-                      >
-                        {s.type}: {s.label}
-                      </Link>
-                    ) : (
-                      <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs">
-                        {s.type}: {s.label}
-                      </span>
-                    )}
+                    <SourceChip
+                      s={s}
+                      className={
+                        s.href
+                          ? "rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs text-[var(--sea)]"
+                          : "rounded-full border border-[var(--line)] px-3 py-1 text-xs"
+                      }
+                    />
                   </li>
                 ))}
               </ul>
@@ -726,11 +797,25 @@ function AgenteInner() {
             Este borrador no es asesoría automática. Apruébelo para guardarlo
             como minuta de la causa, o descártelo.
           </p>
+          {lastSource === "demo" && (
+            <label className="flex items-center gap-2 text-sm text-[var(--ink-soft)]/80">
+              <input
+                type="checkbox"
+                checked={allowDemoApproval}
+                onChange={(e) => setAllowDemoApproval(e.target.checked)}
+              />
+              Confirmo guardar borrador demo como minuta de prueba
+            </label>
+          )}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               className="btn btn-primary"
-              disabled={approveBusy || !causaId}
+              disabled={
+                approveBusy ||
+                !causaId ||
+                (lastSource === "demo" && !allowDemoApproval)
+              }
               onClick={() => void approveToMinuta()}
             >
               {approveBusy ? "Guardando…" : "Aprobar y guardar minuta"}
@@ -801,18 +886,14 @@ function AgenteInner() {
                     <ul className="mt-3 flex flex-wrap gap-2">
                       {m.sources.slice(0, 8).map((s) => (
                         <li key={`${i}-${s.type}-${s.id}`}>
-                          {s.href ? (
-                            <Link
-                              href={s.href}
-                              className="rounded-full border border-[var(--line)] bg-white px-2 py-0.5 text-[11px] text-[var(--sea)]"
-                            >
-                              {s.type}: {s.label}
-                            </Link>
-                          ) : (
-                            <span className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[11px]">
-                              {s.type}: {s.label}
-                            </span>
-                          )}
+                          <SourceChip
+                            s={s}
+                            className={
+                              s.href
+                                ? "rounded-full border border-[var(--line)] bg-white px-2 py-0.5 text-[11px] text-[var(--sea)]"
+                                : "rounded-full border border-[var(--line)] px-2 py-0.5 text-[11px]"
+                            }
+                          />
                         </li>
                       ))}
                     </ul>

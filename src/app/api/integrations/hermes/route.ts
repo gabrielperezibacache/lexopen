@@ -73,32 +73,55 @@ export async function POST(req: Request) {
           { status: 403 }
         );
       }
-      const apiUrl = body.config?.apiUrl;
-      if (
-        apiUrl !== undefined &&
-        (!isSafeHttpUrl(apiUrl) || apiUrl.length > 500)
-      ) {
-        return NextResponse.json(
-          { error: "URL de Hermes inválida" },
-          { status: 400 }
-        );
+      const existing = await prisma.integrationConfig.findUnique({
+        where: { provider: "hermes" },
+      });
+      const prev = safeJsonParse<Record<string, unknown>>(
+        existing?.configJson || "{}",
+        {}
+      );
+      const nextConfig: Record<string, unknown> = { ...prev };
+
+      const apiUrlRaw = body.config?.apiUrl;
+      if (apiUrlRaw !== undefined && apiUrlRaw !== null) {
+        const apiUrl = String(apiUrlRaw).trim();
+        if (apiUrl) {
+          if (!isSafeHttpUrl(apiUrl) || apiUrl.length > 500) {
+            return NextResponse.json(
+              { error: "URL de Hermes inválida" },
+              { status: 400 }
+            );
+          }
+          nextConfig.apiUrl = apiUrl.replace(/\/+$/, "");
+        }
+        // URL vacía: conservar la anterior (no borrar)
       }
+
+      if (typeof body.config?.model === "string" && body.config.model.trim()) {
+        nextConfig.model = body.config.model.trim().slice(0, 120);
+      }
+      if (typeof body.config?.requireApproval === "boolean") {
+        nextConfig.requireApproval = body.config.requireApproval;
+      }
+      const apiKeyRaw = body.config?.apiKey;
+      if (typeof apiKeyRaw === "string") {
+        const key = apiKeyRaw.trim();
+        if (key && key !== "••••") {
+          nextConfig.apiKey = key.slice(0, 500);
+        }
+        // "••••" o vacío: conservar clave previa
+      }
+
       await prisma.integrationConfig.upsert({
         where: { provider: "hermes" },
         create: {
           provider: "hermes",
           enabled: Boolean(body.enabled ?? true),
-          configJson: JSON.stringify({
-            ...(body.config || {}),
-            ...(apiUrl ? { apiUrl: String(apiUrl).replace(/\/+$/, "") } : {}),
-          }),
+          configJson: JSON.stringify(nextConfig),
         },
         update: {
           enabled: Boolean(body.enabled ?? true),
-          configJson: JSON.stringify({
-            ...(body.config || {}),
-            ...(apiUrl ? { apiUrl: String(apiUrl).replace(/\/+$/, "") } : {}),
-          }),
+          configJson: JSON.stringify(nextConfig),
         },
       });
       return NextResponse.json({ ok: true });
@@ -227,6 +250,16 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      if (lastAssistant.source === "demo" && !body.allowDemoApproval) {
+        return NextResponse.json(
+          {
+            error:
+              "Este borrador es modo demo. Márquelo explícitamente para guardar como minuta de prueba, o conecte Hermes.",
+            code: "demo_approval_required",
+          },
+          { status: 400 }
+        );
+      }
       if (lastAssistant.discarded) {
         return NextResponse.json(
           { error: "Este borrador ya fue descartado" },
@@ -279,10 +312,19 @@ export async function POST(req: Request) {
         );
       }
 
+      const isDemo = lastAssistant.source === "demo";
       const fecha = new Date();
-      const titulo = `Borrador copiloto — ${utilityLabel}`.slice(0, 160);
-      const hechos =
-        "Borrador generado por el copiloto LexOpen y aprobado por un humano. Revisar antes de usar como acta definitiva.";
+      const titulo = (
+        isDemo
+          ? `[DEMO] Borrador copiloto — ${utilityLabel}`
+          : `Borrador copiloto — ${utilityLabel}`
+      ).slice(0, 160);
+      const hechos = isDemo
+        ? "BORRADOR DEMO (Hermes no conectado). Generado por el copiloto LexOpen en modo local y aprobado explícitamente como prueba. No usar como acta definitiva."
+        : "Borrador generado por el copiloto LexOpen y aprobado por un humano. Revisar antes de usar como acta definitiva.";
+      const riesgos = isDemo
+        ? "Procedencia: copiloto IA en MODO DEMO. No proviene de Hermes real."
+        : "Procedencia: copiloto IA. Requiere revisión humana antes de presentación o comunicación al cliente.";
       const markdown = renderMinutaMarkdown({
         tipo: "reunion",
         titulo,
@@ -290,8 +332,7 @@ export async function POST(req: Request) {
         modalidad: "presencial",
         resumenEjecutivo: content.slice(0, 50_000),
         hechosRelevantes: hechos,
-        riesgosAlertas:
-          "Procedencia: copiloto IA. Requiere revisión humana antes de presentación o comunicación al cliente.",
+        riesgosAlertas: riesgos,
         causa,
         autorName: user.name,
         acciones: [],
@@ -318,8 +359,7 @@ export async function POST(req: Request) {
             participantes: "",
             resumenEjecutivo: content.slice(0, 50_000),
             hechosRelevantes: hechos,
-            riesgosAlertas:
-              "Procedencia: copiloto IA. Requiere revisión humana antes de presentación o comunicación al cliente.",
+            riesgosAlertas: riesgos,
             causaId: causa.id,
             autorId: user.id,
             documentoId: documento.id,
