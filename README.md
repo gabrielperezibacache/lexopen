@@ -386,8 +386,9 @@ LexOpen integra localmente:
   OCR.
 
 Al subir un documento desde **Documentos**, LexOpen conserva el original y genera
-Markdown extraído cuando es posible. Los PDFs escaneados se procesan con Tesseract
-local si `OCR_ENABLED=1` y existen `tesseract` y `pdftoppm`; si no, quedan marcados
+Markdown extraído cuando es posible. Los PDFs escaneados usan Tesseract local
+mediante un binding nativo que renderiza internamente; `pdftoppm` solo queda como
+fallback para plataformas sin ese binding. Si falta OCR, el documento queda marcado
 como `Requiere OCR`. Ningún archivo se envía a Firecrawl.
 Ambas dependencias y el fallback OCR se ejecutan localmente; los bindings nativos
 se cargan según la plataforma del Host.

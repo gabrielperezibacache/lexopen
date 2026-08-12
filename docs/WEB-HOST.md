@@ -51,20 +51,22 @@ Debe mostrar `db: "up"`, `storageReady: true` y `needsSetup: false`.
 
 ## OCR local para PDFs escaneados
 
-El OCR es opcional. `pdf-inspector` detecta las páginas escaneadas y LexOpen usa
-Tesseract + `pdftoppm` localmente cuando están disponibles:
+El OCR es opcional. `pdf-inspector` detecta las páginas escaneadas y LexOpen usa el
+binding nativo de `pdfdown-ocr`, que requiere únicamente Tesseract y renderiza las
+páginas internamente:
 
 ```bash
 # Debian/Ubuntu
-sudo apt install tesseract-ocr tesseract-ocr-spa poppler-utils
+sudo apt install tesseract-ocr tesseract-ocr-spa
 
 # macOS con Homebrew
-brew install tesseract tesseract-lang poppler
+brew install tesseract tesseract-lang
 ```
 
-En Windows instale Tesseract y Poppler, y configure `OCR_TESSERACT_BIN` y
-`OCR_PDFTOPPM_BIN` con sus rutas completas. Puede ajustar el idioma con
-`OCR_LANGUAGE=spa+eng` y limitar el consumo con `OCR_MAX_PAGES` y
+En Windows instale Tesseract y Poppler: el binding OCR nativo actual no publica
+binario Windows y LexOpen usa el fallback `pdftoppm`. Configure
+`OCR_TESSERACT_BIN` y `OCR_PDFTOPPM_BIN` con sus rutas completas. Puede ajustar el
+idioma con `OCR_LANGUAGE=spa+eng` y limitar el consumo con `OCR_MAX_PAGES` y
 `OCR_TIMEOUT_MS`. Si faltan los binarios, el original se conserva y el documento
 queda marcado como `Requiere OCR`.
 

@@ -36,6 +36,77 @@ function configuredPages(pageCount: number, pages: number[]) {
   };
 }
 
+async function tryPdfDownOcr(
+  bytes: Buffer,
+  selected: { pages: number[]; truncated: boolean }
+): Promise<OcrPdfResult | null> {
+  let extractTextWithOcrPerPageAsync: (
+    input: Buffer,
+    options: { lang: string; minTextLength: number; maxThreads: number }
+  ) => Promise<Array<{ page: number; text: string; source: string }>>;
+  try {
+    ({ extractTextWithOcrPerPageAsync } = await import(
+      "@d0paminedriven/pdfdown-ocr"
+    ));
+  } catch {
+    return null;
+  }
+
+  try {
+    const allPages = await extractTextWithOcrPerPageAsync(bytes, {
+      lang: process.env.OCR_LANGUAGE || "spa+eng",
+      minTextLength: 10,
+      maxThreads: Math.max(
+        1,
+        Math.min(Number(process.env.OCR_MAX_THREADS || 2), 8)
+      ),
+    });
+    const selectedSet = new Set(
+      selected.pages.flatMap((page) => [page, page + 1])
+    );
+    const pages = allPages.filter(
+      (page) => selectedSet.has(page.page) || page.source === "Ocr"
+    );
+    const pagesProcessed = pages
+      .filter((page) => page.text.trim())
+      .map((page) => page.page);
+    const pagesFailed = pages
+      .filter((page) => !page.text.trim())
+      .map((page) => page.page);
+    const markdown = pages
+      .filter((page) => page.text.trim())
+      .map((page) => `## Página ${page.page}\n\n${page.text.trim()}`)
+      .join("\n\n");
+    return {
+      status: pagesProcessed.length
+        ? pagesFailed.length || selected.truncated
+          ? "failed"
+          : "completed"
+        : "failed",
+      markdown: markdown || null,
+      pagesProcessed,
+      pagesFailed,
+      reason: selected.truncated ? "page_limit" : undefined,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    if (
+      commandError(error) === "ENOENT" ||
+      message.includes("tesseract") ||
+      message.includes("tessdata")
+    ) {
+      return {
+        status: "unavailable",
+        markdown: null,
+        pagesProcessed: [],
+        pagesFailed: selected.pages,
+        reason: "tesseract_missing",
+      };
+    }
+    return null;
+  }
+}
+
 export async function ocrPdfPages(
   bytes: Buffer,
   pageCount: number,
@@ -61,6 +132,9 @@ export async function ocrPdfPages(
       reason: "no_pages",
     };
   }
+
+  const bundledOcr = await tryPdfDownOcr(bytes, selected);
+  if (bundledOcr) return bundledOcr;
 
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "lexopen-ocr-"));
   const pdfPath = path.join(root, "document.pdf");
