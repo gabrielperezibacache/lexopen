@@ -1,12 +1,7 @@
 import { prisma } from "@/lib/db";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { confidentialWhere } from "@/lib/api";
 import { getObject } from "@/lib/storage";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
-
-function confidentialWhere(role: string) {
-  if (canSeeConfidential(role)) return {};
-  return { confidencial: false };
-}
 
 const MAX_CHARS = 16000;
 const TEXT_MIME = /^(text\/|application\/(json|xml)|.*\+(json|xml))/i;

@@ -1,11 +1,7 @@
 import { prisma } from "@/lib/db";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { confidentialWhere } from "@/lib/api";
 import { getObject } from "@/lib/storage";
 import { buildClienteFolderContext } from "@/lib/integrations/client-folder-context";
-
-function confWhere(role: string) {
-  return canSeeConfidential(role) ? {} : { confidencial: false };
-}
 
 async function textFromDoc(doc: {
   nombre: string;
@@ -56,7 +52,7 @@ export async function buildActionContext(opts: {
         tramites: { orderBy: { orden: "asc" }, take: 40 },
         plazos: { orderBy: { fechaLimite: "asc" }, take: 20 },
         minutas: {
-          where: confWhere(opts.userRole),
+          where: confidentialWhere(opts.userRole),
           orderBy: { fecha: "desc" },
           take: 5,
           select: {
@@ -67,7 +63,7 @@ export async function buildActionContext(opts: {
           },
         },
         documentos: {
-          where: confWhere(opts.userRole),
+          where: confidentialWhere(opts.userRole),
           orderBy: { updatedAt: "desc" },
           take: 8,
           select: { id: true, nombre: true, tipo: true },
@@ -78,8 +74,11 @@ export async function buildActionContext(opts: {
   }
 
   if (opts.documentoId) {
-    const doc = await prisma.documento.findUnique({
-      where: { id: opts.documentoId },
+    const doc = await prisma.documento.findFirst({
+      where: {
+        id: opts.documentoId,
+        ...confidentialWhere(opts.userRole),
+      },
       include: {
         causa: { select: { id: true, titulo: true, rit: true } },
         cliente: { select: { id: true, razonSocial: true } },

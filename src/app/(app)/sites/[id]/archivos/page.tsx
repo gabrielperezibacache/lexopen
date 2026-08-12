@@ -21,15 +21,34 @@ export default async function SiteFilesPage({ params }: Params) {
   });
   if (!site) notFound();
 
+  const fileInclude = {
+    versions: {
+      orderBy: { version: "desc" as const },
+      take: 3,
+      select: {
+        id: true,
+        version: true,
+        note: true,
+        createdAt: true,
+        authorId: true,
+      },
+    },
+    ...(clientView
+      ? {}
+      : {
+          comments: {
+            include: { author: { select: publicUserSelect } },
+            orderBy: { createdAt: "desc" as const },
+            take: 3,
+          },
+        }),
+  };
   const folders = await prisma.folder.findMany({
     where: { siteId: id },
     include: {
       files: {
         where: fileWhere,
-        include: {
-          versions: { orderBy: { version: "desc" }, take: 3 },
-          comments: { include: { author: { select: publicUserSelect } } },
-        },
+        include: fileInclude,
         orderBy: { name: "asc" },
       },
     },
@@ -37,10 +56,7 @@ export default async function SiteFilesPage({ params }: Params) {
   });
   const rootFiles = await prisma.siteFile.findMany({
     where: { siteId: id, folderId: null, ...fileWhere },
-    include: {
-      versions: { orderBy: { version: "desc" }, take: 3 },
-      comments: { include: { author: { select: publicUserSelect } } },
-    },
+    include: fileInclude,
   });
 
   return (
@@ -102,7 +118,10 @@ export default async function SiteFilesPage({ params }: Params) {
                       v{f.version} · {formatDate(f.updatedAt)}
                       {f.tags ? ` · ${f.tags}` : ""}
                     </div>
-                    {f.comments[0] && (
+                    {!clientView &&
+                      "comments" in f &&
+                      Array.isArray(f.comments) &&
+                      f.comments[0] && (
                       <div className="mt-2 text-xs text-[var(--ink-soft)]/80">
                         {f.comments[0].author?.name}: {f.comments[0].body}
                       </div>

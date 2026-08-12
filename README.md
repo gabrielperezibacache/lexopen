@@ -846,6 +846,9 @@ Controles implementados en el código:
 - SSRF: bloqueo IPv6 ULA/mapped, nip.io/sslip.io; PDF backup solo `*.pjud.cl`;
   listados sin cuerpos/`storageKey`; miembros de site y visibilidad cliente
   admin-only;
+- ACL confidencial en CRM/IA (`clientes`, `documentos` PATCH, contexto AI);
+  cron de plazos con `verifyCronSecret`; Q&A portal con límites; comentarios
+  de archivos ocultos al portal cliente;
 - salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
   Hermes y Obsidian;
 - `instrumentation` falla al arrancar si flags peligrosas están en producción;

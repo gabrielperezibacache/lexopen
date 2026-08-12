@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { verifyCronSecret } from "@/lib/security/cron-secret";
 import { startOfDay } from "@/lib/plazos";
 
 function authorizedByCron(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
   const header =
     req.headers.get("x-cron-secret") ||
     req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  return header === secret;
+  return verifyCronSecret(header);
 }
 
 /** Genera notificaciones para plazos próximos (staff o cron con CRON_SECRET). */

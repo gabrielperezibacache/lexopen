@@ -6,8 +6,10 @@ import {
   parseBody,
   requireStaff,
 } from "@/lib/api";
+import { canSeeConfidential } from "@/lib/auth/rbac";
 import { documentoUpdateSchema } from "@/lib/schemas";
 import { writeAudit } from "@/lib/audit";
+import { documentoListSelect } from "@/lib/sites/file-select";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -20,7 +22,28 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!existing) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
+    if (
+      (existing.confidencial || existing.privilegio) &&
+      !canSeeConfidential(user.role)
+    ) {
+      return NextResponse.json(
+        { error: "Documento confidencial" },
+        { status: 403 }
+      );
+    }
     const body = await parseBody(req, documentoUpdateSchema);
+    if (
+      (body.confidencial === true || body.privilegio === true) &&
+      !canSeeConfidential(user.role)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Su rol no puede marcar documentos como confidenciales o privilegiados",
+        },
+        { status: 403 }
+      );
+    }
     const documento = await prisma.documento.update({
       where: { id },
       data: {
@@ -33,14 +56,25 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           ? { privilegio: body.privilegio }
           : {}),
       },
+      select: documentoListSelect,
     });
     await writeAudit({
       actorId: user.id,
       action: "documento.update",
       entityType: "Documento",
       entityId: id,
-      before: existing,
-      after: documento,
+      before: {
+        nombre: existing.nombre,
+        tipo: existing.tipo,
+        confidencial: existing.confidencial,
+        privilegio: existing.privilegio,
+      },
+      after: {
+        nombre: documento.nombre,
+        tipo: documento.tipo,
+        confidencial: documento.confidencial,
+        privilegio: documento.privilegio,
+      },
     });
     return NextResponse.json(documento);
   } catch (e) {
