@@ -18,6 +18,7 @@ import {
   buildLocalBriefingMarkdown,
   formatPlazoEstimate,
 } from "@/lib/ai/local-assist";
+import { buildAiSuggestedActions } from "@/lib/ai/suggested-actions";
 import { safeJsonParse } from "@/lib/safe-json";
 import {
   formatLocalDate,
@@ -158,96 +159,99 @@ export async function POST(req: Request) {
 
     if (body.action === "approve-to-minuta") {
       const causaId = String(body.causaId || "").trim();
+      const chatId = String(body.chatId || "").trim();
       if (!causaId) {
         return NextResponse.json(
           { error: "Se requiere causaId para guardar el borrador como minuta" },
           { status: 400 }
         );
       }
+      if (!chatId) {
+        return NextResponse.json(
+          {
+            error:
+              "Se requiere chatId: solo se aprueban borradores persistidos del copiloto",
+          },
+          { status: 400 }
+        );
+      }
 
       let content = "";
       let utilityLabel = String(body.utilityLabel || "Copiloto");
-      let chatToUpdate: { id: string; messagesJson: string; causaId: string | null } | null =
-        null;
-
-      if (body.chatId) {
-        const existing = await prisma.agentChat.findFirst({
-          where: {
-            id: String(body.chatId),
-            ...(user.role === "admin" ? {} : { userId: user.id }),
+      const existing = await prisma.agentChat.findFirst({
+        where: {
+          id: chatId,
+          ...(user.role === "admin" ? {} : { userId: user.id }),
+        },
+      });
+      if (!existing) {
+        return NextResponse.json(
+          { error: "Chat no encontrado" },
+          { status: 404 }
+        );
+      }
+      if (existing.causaId && existing.causaId !== causaId) {
+        return NextResponse.json(
+          {
+            error:
+              "La causa seleccionada no coincide con la del chat del copiloto",
           },
-        });
-        if (!existing) {
-          return NextResponse.json(
-            { error: "Chat no encontrado" },
-            { status: 404 }
-          );
-        }
-        if (existing.causaId && existing.causaId !== causaId) {
-          return NextResponse.json(
-            {
-              error:
-                "La causa seleccionada no coincide con la del chat del copiloto",
-            },
-            { status: 400 }
-          );
-        }
-        chatToUpdate = existing;
-        const prev = safeJsonParse<
-          Array<{
-            role?: string;
-            content?: string;
-            utility?: string;
-            source?: string;
-            discarded?: boolean;
-            requireApproval?: boolean;
-            approvedMinutaId?: string;
-          }>
-        >(existing.messagesJson, []);
-        const lastAssistant = [...prev]
-          .reverse()
-          .find((m) => m.role === "assistant" && m.content?.trim());
-        if (!lastAssistant) {
-          return NextResponse.json(
-            { error: "No hay borrador de asistente para aprobar" },
-            { status: 400 }
-          );
-        }
-        if (lastAssistant.source === "error") {
-          return NextResponse.json(
-            { error: "No se puede aprobar una respuesta de error" },
-            { status: 400 }
-          );
-        }
-        if (lastAssistant.discarded) {
-          return NextResponse.json(
-            { error: "Este borrador ya fue descartado" },
-            { status: 400 }
-          );
-        }
-        if (lastAssistant.approvedMinutaId) {
-          return NextResponse.json(
-            {
-              error: "Este borrador ya fue aprobado",
-              minutaId: lastAssistant.approvedMinutaId,
-              href: `/causas/${causaId}/minutas/${lastAssistant.approvedMinutaId}`,
-            },
-            { status: 409 }
-          );
-        }
-        if (lastAssistant.requireApproval === false) {
-          return NextResponse.json(
-            { error: "Este borrador no está pendiente de aprobación" },
-            { status: 400 }
-          );
-        }
-        // Siempre usar el contenido persistido del chat (no confiar en el cliente)
-        content = String(lastAssistant.content || "").trim();
-        if (lastAssistant.utility) {
-          utilityLabel = getAiUtility(lastAssistant.utility).label;
-        }
-      } else {
-        content = String(body.content || "").trim();
+          { status: 400 }
+        );
+      }
+      const chatToUpdate = existing;
+      const prev = safeJsonParse<
+        Array<{
+          role?: string;
+          content?: string;
+          utility?: string;
+          source?: string;
+          discarded?: boolean;
+          requireApproval?: boolean;
+          approvedMinutaId?: string;
+        }>
+      >(existing.messagesJson, []);
+      const lastAssistant = [...prev]
+        .reverse()
+        .find((m) => m.role === "assistant" && m.content?.trim());
+      if (!lastAssistant) {
+        return NextResponse.json(
+          { error: "No hay borrador de asistente para aprobar" },
+          { status: 400 }
+        );
+      }
+      if (lastAssistant.source === "error") {
+        return NextResponse.json(
+          { error: "No se puede aprobar una respuesta de error" },
+          { status: 400 }
+        );
+      }
+      if (lastAssistant.discarded) {
+        return NextResponse.json(
+          { error: "Este borrador ya fue descartado" },
+          { status: 400 }
+        );
+      }
+      if (lastAssistant.approvedMinutaId) {
+        return NextResponse.json(
+          {
+            error: "Este borrador ya fue aprobado",
+            minutaId: lastAssistant.approvedMinutaId,
+            href: `/causas/${causaId}/minutas/${lastAssistant.approvedMinutaId}`,
+          },
+          { status: 409 }
+        );
+      }
+      if (lastAssistant.requireApproval === false) {
+        return NextResponse.json(
+          { error: "Este borrador no está pendiente de aprobación" },
+          { status: 400 }
+        );
+      }
+      // Solo contenido persistido del chat
+      content = String(lastAssistant.content || "").trim();
+      if (lastAssistant.utility) {
+        utilityLabel = getAiUtility(lastAssistant.utility).label;
       }
 
       if (!content) {
@@ -432,12 +436,82 @@ export async function POST(req: Request) {
     const chatUserId =
       user.role === "admin" && body.userId ? body.userId : user.id;
 
-    let result = await askHermes({
-      causaId: body.causaId,
-      userId: chatUserId,
-      utilityLabel: utility.label,
-      messages,
+    // Si el chat pertenece a otra causa, forzar hilo nuevo
+    if (body.chatId && body.causaId) {
+      const bound = await prisma.agentChat.findFirst({
+        where: {
+          id: String(body.chatId),
+          ...(user.role === "admin" ? {} : { userId: user.id }),
+        },
+        select: { causaId: true },
+      });
+      if (bound?.causaId && bound.causaId !== body.causaId) {
+        return NextResponse.json(
+          {
+            error:
+              "Este chat pertenece a otra causa. Inicie una conversación nueva.",
+            code: "causa_mismatch",
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Respetar toggle: disabled → error o demo local (sin llamar a la red)
+    const hermesRow = await prisma.integrationConfig.findUnique({
+      where: { provider: "hermes" },
     });
+    let result: Awaited<ReturnType<typeof askHermes>>;
+    if (hermesRow && hermesRow.enabled === false) {
+      const firm = await prisma.firmSettings.findFirst({
+        select: { hermesAllowDemo: true },
+      });
+      const allowDemo =
+        process.env.HERMES_ALLOW_DEMO === "1" ||
+        process.env.NODE_ENV === "development" ||
+        firm?.hermesAllowDemo === true;
+      if (!allowDemo) {
+        return NextResponse.json(
+          {
+            source: "error",
+            content: "",
+            chat: null,
+            utility: { id: utility.id, label: utility.label },
+            sources: pack.sources,
+            alerts: pack.alerts,
+            suggestedActions: buildAiSuggestedActions({
+              utility: utility.id,
+              causaId: body.causaId,
+            }),
+            requireApproval: false,
+            note: "La integración Hermes está deshabilitada en Integraciones.",
+            error: "hermes_disabled",
+          },
+          { status: 503 }
+        );
+      }
+      result = {
+        source: "demo",
+        content: [
+          "## Copiloto LexOpen (demo local)",
+          "",
+          `**Modo:** ${utility.label}`,
+          `**Consulta:** ${prompt.slice(0, 500)}`,
+          "",
+          "> Integración Hermes deshabilitada en Configuración → Integraciones.",
+          "> **Aprobación humana requerida.**",
+        ].join("\n"),
+        requireApproval: true,
+        note: "⚠ Integración Hermes deshabilitada — respuesta demo local.",
+      };
+    } else {
+      result = await askHermes({
+        causaId: body.causaId,
+        userId: chatUserId,
+        utilityLabel: utility.label,
+        messages,
+      });
+    }
 
     // Prefacio local con alertas / briefing cuando aplica
     if (utility.id === "briefing") {
@@ -461,20 +535,10 @@ export async function POST(req: Request) {
       };
     }
 
-    const suggestedActions = [
-      body.causaId
-        ? { label: "Abrir causa", href: `/causas/${body.causaId}` }
-        : null,
-      body.causaId
-        ? {
-            label: "Nueva minuta",
-            href: `/causas/${body.causaId}/minuta/nueva`,
-          }
-        : null,
-      { label: "Plazos", href: "/plazos" },
-      { label: "Jurisprudencia", href: "/jurisprudencia" },
-      { label: "Monitoreo PJUD", href: "/causas/monitoreo" },
-    ].filter(Boolean) as { label: string; href: string }[];
+    const suggestedActions = buildAiSuggestedActions({
+      utility: utility.id,
+      causaId: body.causaId,
+    });
 
     // No persistir turns vacíos o de error (evita contaminar el hilo)
     if (result.source === "error" || !String(result.content || "").trim()) {

@@ -26,15 +26,20 @@ export default async function DocumentosPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          Repositorio por causa
-        </p>
-        <h1 className="display mt-2 text-4xl">Documentos</h1>
-        <p className="mt-2 text-[var(--ink-soft)]/80">
-          Escritos, contratos y memos vinculados a causas — sincronizable con Obsidian y Google Drive.
-          El VDR por espacio está en Espacios → Archivos.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
+            Repositorio por causa
+          </p>
+          <h1 className="display mt-2 text-4xl">Documentos</h1>
+          <p className="mt-2 text-[var(--ink-soft)]/80">
+            Escritos, contratos y memos vinculados a causas — sincronizable con Obsidian y Google Drive.
+            El VDR por espacio está en Espacios → Archivos.
+          </p>
+        </div>
+        <Link className="btn btn-secondary" href="/agente?utility=doc_qa">
+          Preguntar con IA
+        </Link>
       </div>
 
       <DocumentOcrStatus />
@@ -71,6 +76,17 @@ export default async function DocumentosPage() {
                     >
                       Descargar
                     </a>
+                    {d.causaId && (
+                      <>
+                        {" · "}
+                        <Link
+                          href={`/agente?causaId=${d.causaId}&utility=doc_qa`}
+                          className="text-xs text-[var(--sea)]"
+                        >
+                          Preguntar IA
+                        </Link>
+                      </>
+                    )}
                     {d.obsidianPath && (
                       <div className="text-xs text-[var(--ink-soft)]/60">
                         Obsidian: {d.obsidianPath}

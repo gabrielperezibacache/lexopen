@@ -48,6 +48,12 @@ export function CausaActions({ causaId }: { causaId: string }) {
           Briefing IA
         </Link>
         <Link
+          href={`/agente?causaId=${causaId}&utility=doc_qa`}
+          className="btn btn-ghost w-full sm:w-auto"
+        >
+          Preguntar a docs
+        </Link>
+        <Link
           href={`/agente?causaId=${causaId}&utility=copilot`}
           className="btn btn-ghost w-full sm:w-auto"
         >

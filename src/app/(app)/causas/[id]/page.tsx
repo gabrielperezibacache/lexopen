@@ -362,7 +362,15 @@ export default async function CausaDetailPage({ params }: Params) {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <h2 className="text-lg font-semibold">Documentos</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Documentos</h2>
+            <Link
+              href={`/agente?causaId=${causa.id}&utility=doc_qa`}
+              className="text-sm text-[var(--sea)]"
+            >
+              Preguntar con IA
+            </Link>
+          </div>
           <div className="mt-4 space-y-3">
             {causa.documentos.map((d) => (
               <div key={d.id} className="rounded-2xl border border-[var(--line)] px-3 py-2 text-sm">

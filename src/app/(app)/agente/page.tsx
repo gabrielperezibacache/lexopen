@@ -198,6 +198,13 @@ function AgenteInner() {
         }),
       });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data.code === "causa_mismatch") {
+        setChatId("");
+        setReply(data.error || "Inicie un chat nuevo para esta causa");
+        setMeta("Causa distinta al chat");
+        setRequireApproval(false);
+        return;
+      }
       setReply(data.content || data.error || "Sin respuesta");
       setSources(Array.isArray(data.sources) ? data.sources : []);
       setActions(
@@ -285,6 +292,12 @@ function AgenteInner() {
       setApproveMsg("Seleccione una causa para guardar la minuta.");
       return;
     }
+    if (!chatId) {
+      setApproveMsg(
+        "Genere primero una respuesta del copiloto (se requiere chat guardado)."
+      );
+      return;
+    }
     setApproveBusy(true);
     setApproveMsg("");
     try {
@@ -294,8 +307,7 @@ function AgenteInner() {
         body: JSON.stringify({
           action: "approve-to-minuta",
           causaId,
-          chatId: chatId || undefined,
-          content: chatId ? undefined : reply || undefined,
+          chatId,
           utilityLabel:
             utilities.find((u) => u.id === utility)?.label || utility,
         }),
@@ -599,7 +611,20 @@ function AgenteInner() {
             <select
               className="select"
               value={causaId}
-              onChange={(e) => setCausaId(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setCausaId(next);
+                // Evitar reutilizar un hilo de otra causa
+                setChatId("");
+                setMessages([]);
+                setReply("");
+                setMeta("");
+                setSources([]);
+                setActions([]);
+                setRequireApproval(false);
+                setApproveMsg("");
+                setApproveHref("");
+              }}
             >
               <option value="">Sin causa específica</option>
               {causas.map((c) => (
