@@ -89,6 +89,7 @@ es ofrecer una base abierta, extensible y centrada en el trabajo diario de un es
 | --- | --- |
 | **Sites / Workspaces** | Matters, VDR, knowledge, client portal y proyectos; miembros, grupos, feed de actividad y navegación por espacio. |
 | **Archivos** | Carpetas, metadata, etiquetas, comentarios, versionado y contenido Markdown/texto; almacenamiento local o S3-compatible. |
+| **Clientes / CRM** | Ficha de cliente, abogado responsable, carpeta documental, checklist de trámites por causa y chat IA acotado a la carpeta. |
 | **Causas** | RIT/RUC, tribunal, materia, etapa, partes, abogado responsable, movimientos, notas, documentos y revisión de conflictos. |
 | **Minutas** | Flujos guiados para audiencias, reuniones y llamadas; resumen, acuerdos, próximos pasos y acciones que pueden generar tareas/plazos. |
 | **Plazos y calendario** | Seguimiento de plazos procesales, tareas con vencimiento, calendario unificado y conversión UF/CLP. |

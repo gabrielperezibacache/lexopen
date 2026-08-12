@@ -21,15 +21,19 @@ import { documentoListSelect } from "@/lib/sites/file-select";
 export async function GET(req: NextRequest) {
   try {
     const user = await requireStaff();
-    const causaId = new URL(req.url).searchParams.get("causaId");
+    const sp = new URL(req.url).searchParams;
+    const causaId = sp.get("causaId");
+    const clienteId = sp.get("clienteId");
     const documentos = await prisma.documento.findMany({
       where: {
         ...(causaId ? { causaId } : {}),
+        ...(clienteId ? { clienteId } : {}),
         ...confidentialWhere(user.role),
       },
       select: {
         ...documentoListSelect,
         causa: true,
+        cliente: { select: { id: true, razonSocial: true } },
         autor: { select: publicUserSelect },
       },
       orderBy: { updatedAt: "desc" },
@@ -64,6 +68,7 @@ export async function POST(req: NextRequest) {
     let confidencial = Boolean(body?.confidencial);
     let privilegio = Boolean(body?.privilegio);
     let causaId = body?.causaId || null;
+    let clienteId = body?.clienteId || null;
     let ruta = body?.ruta?.trim() || null;
     if (ruta && ruta.length > 1000) {
       return NextResponse.json({ error: "Ruta demasiado larga" }, { status: 400 });
@@ -92,6 +97,7 @@ export async function POST(req: NextRequest) {
       confidencial = form.get("confidencial") === "on";
       privilegio = form.get("privilegio") === "on";
       causaId = String(form.get("causaId") || "") || null;
+      clienteId = String(form.get("clienteId") || "") || null;
       const rutaField = String(form.get("ruta") || "").trim();
       const relativeHint = String(form.get("relativePath") || "").trim();
       if (rutaField) {
@@ -188,6 +194,7 @@ export async function POST(req: NextRequest) {
         confidencial,
         privilegio,
         causaId,
+        clienteId,
         autorId,
       },
     });

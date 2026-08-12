@@ -55,9 +55,11 @@ model User {
   updatedAt DateTime @updatedAt
 
   causasAsignadas Causa[]          @relation("AbogadoResponsable")
+  clientesAsignados Cliente[]      @relation("ClienteAbogado")
   documentos      Documento[]
   actividades     Activity[]
   plazos          Plazo[]
+  tramites        Tramite[]        @relation("TramiteResponsable")
   siteMemberships SiteMember[]
   tasksAssigned   Task[]           @relation("TaskAssignee")
   tasksCreated    Task[]           @relation("TaskCreator")
@@ -190,11 +192,18 @@ model Cliente {
   rut         String?
   email       String?
   telefono    String?
-  tipo        String   @default("persona")
+  tipo        String   @default("persona") // persona | empresa
+  estado      String   @default("activo") // activo | inactivo
+  notas       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  abogadoId String?
+  abogado   User? @relation("ClienteAbogado", fields: [abogadoId], references: [id])
+
   causas          Causa[]
+  documentos      Documento[]
+  agentChats      AgentChat[]
   sites           Site[]
   feeArrangements FeeArrangement[]
   timeEntries     TimeEntry[]
@@ -202,6 +211,10 @@ model Cliente {
   invoices        Invoice[]
   payments        Payment[]
   ledgerEntries   LedgerEntry[]
+
+  @@index([razonSocial])
+  @@index([rut])
+  @@index([estado])
 }
 
 model Causa {
@@ -254,6 +267,7 @@ model Causa {
   partes          Parte[]
   documentos      Documento[]
   plazos          Plazo[]
+  tramites        Tramite[]
   actividades     Activity[]
   notas           Nota[]
   minutas         Minuta[]
@@ -275,6 +289,27 @@ model Causa {
   @@index([pjudLastSyncAt])
   @@index([pjudNextSyncAt])
   @@index([pjudLastSyncStatus])
+}
+
+model Tramite {
+  id           String    @id @default(cuid())
+  titulo       String
+  detalle      String?
+  estado       String    @default("pendiente") // pendiente | en_curso | hecho | cancelado
+  fechaLimite  DateTime?
+  fechaHecho   DateTime?
+  orden        Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  causaId String
+  causa   Causa @relation(fields: [causaId], references: [id], onDelete: Cascade)
+
+  responsableId String?
+  responsable   User? @relation("TramiteResponsable", fields: [responsableId], references: [id])
+
+  @@index([causaId, estado])
+  @@index([fechaLimite])
 }
 
 model EtapaHistorial {
@@ -345,15 +380,20 @@ model PjudSyncJob {
 
 model AgentChat {
   id        String   @id @default(cuid())
-  title     String   @default("Consulta Hermes")
+  title     String   @default("Consulta IA")
   messagesJson String @default("[]")
   demoMode  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   causaId   String?
   causa     Causa?   @relation(fields: [causaId], references: [id], onDelete: SetNull)
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([clienteId])
+  @@index([causaId])
 }
 
 /// Minuta post-audiencia, reunión o llamada — handoff entre abogados del estudio
@@ -498,11 +538,14 @@ model Documento {
 
   causaId String?
   causa   Causa? @relation(fields: [causaId], references: [id], onDelete: SetNull)
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   autorId String?
   autor   User?  @relation(fields: [autorId], references: [id])
   minutas Minuta[]
 
   @@index([causaId])
+  @@index([clienteId])
 }
 
 model Plazo {

@@ -40,6 +40,7 @@ export const documentoListSelect = {
   obsidianPath: true,
   googleDriveId: true,
   causaId: true,
+  clienteId: true,
   autorId: true,
   createdAt: true,
   updatedAt: true,

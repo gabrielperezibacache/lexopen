@@ -54,6 +54,7 @@ export const PURGE_DATA_MODELS = [
   "documento",
   "parte",
   "etapaHistorial",
+  "tramite",
   "causaMovimiento",
   "pjudSyncJob",
   "agentChat",
