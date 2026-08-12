@@ -47,10 +47,13 @@ assert.equal(
 
 env.NODE_ENV = "production";
 env.LEXOPEN_OPEN_ACCESS = "1";
+// Isolate from CI/workflow env (often sets LEXOPEN_RELAX_CSRF=1).
+delete env.LEXOPEN_RELAX_CSRF;
+delete env.LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS;
+delete env.LEXOPEN_DEMO_SWITCHER;
 assert.deepEqual(forbiddenProductionFlags(), ["LEXOPEN_OPEN_ACCESS"]);
 assert.throws(() => assertSafeProductionEnv(), /LEXOPEN_OPEN_ACCESS/);
 delete env.LEXOPEN_OPEN_ACCESS;
-delete env.LEXOPEN_RELAX_CSRF;
 assert.doesNotThrow(() => assertSafeProductionEnv());
 
 if (prevCron === undefined) delete env.CRON_SECRET;
