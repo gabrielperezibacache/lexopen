@@ -127,6 +127,26 @@ export const es = {
     languageHelp:
       "Afecta navegación, login y textos de la plataforma. El contenido jurídico chileno (RIT, plazos, minutas) permanece en español cuando corresponde.",
   },
+  crm: {
+    eyebrow: "CRM",
+    title: "Clientes",
+    subtitle:
+      "Seguimiento por cliente: causas, trámites pendientes/hechos y carpeta documental con asistente IA.",
+    searchPlaceholder: "Buscar RUT, nombre, email…",
+    filterAll: "Todos",
+    filterActive: "Activos",
+    filterInactive: "Inactivos",
+    filter: "Filtrar",
+    colClient: "Cliente",
+    colRut: "RUT",
+    colCases: "Causas",
+    colPending: "Trámites pend.",
+    colDocs: "Docs",
+    colLawyer: "Abogado",
+    colStatus: "Estado",
+    empty: "No hay clientes con esos filtros.",
+    noEmail: "sin email",
+  },
 };
 
 type DeepStringify<T> = T extends string

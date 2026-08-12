@@ -52,6 +52,7 @@
 ## Índice
 
 - [Qué es LexOpen](#-qué-es-lexopen)
+- [Qué aporta al estudio](#-qué-aporta-al-estudio)
 - [Qué resuelve](#-qué-resuelve)
 - [Recorrido de la demo](#-recorrido-de-la-demo)
 - [Arquitectura](#-arquitectura)
@@ -91,6 +92,22 @@ seguimiento:
 
 La propuesta no es reemplazar el criterio profesional ni las fuentes oficiales:
 es ofrecer una base abierta, extensible y centrada en el trabajo diario de un estudio.
+
+## 💼 Qué aporta al estudio
+
+LexOpen concentra en una sola plataforma lo que suele repartirse entre planillas,
+chats, carpetas y herramientas desconectadas. Está pensado para abogados,
+paralegales y socios que necesitan trazabilidad procesal, handoff limpio y una
+relación ordenada con el cliente — con código auditable (AGPL-3.0).
+
+| Situación en el estudio | Cómo ayuda LexOpen |
+| --- | --- |
+| El expediente vive en drives y chats dispersos | **Espacios de trabajo** con archivos, wiki, tareas, Q&A y flujos de aprobación |
+| Plazos fatales se pierden entre agendas | **Plazos procesales** (hábiles/corridos), calendario, alertas y sync a Google Calendar |
+| Un abogado entra a una causa “a medias” | **Minutas de handoff** post-audiencia / reunión / llamada → tareas y plazos |
+| El cliente pide estado y nadie tiene el hilo | **CRM**: cliente → causas → trámites → documentos + portal cliente |
+| La facturación no habla con el matter | **Horas, gastos, boletas/facturas, UF y cuenta corriente** ligados a la causa |
+| La IA genérica inventa fuera del expediente | **Acciones IA** con contexto de causa/cliente y revisión humana |
 
 ## ✨ Qué resuelve
 
@@ -539,8 +556,9 @@ variables más relevantes:
 | `PJUD_WEBHOOK_SECRET` | No | Firma HMAC de webhooks asíncronos de un proveedor PJUD. |
 | `PJUD_SYNC_INTERVAL_MINUTES` | No | Intervalo del próximo sync (default 240 = 4h). |
 | `CRON_SECRET` | No | Protege cron locales/externos (`x-cron-secret`: PJUD, digest, alertas de plazos). |
-| `PLAZOS_ALERTAS_INTERVAL_MINUTES` | No | Host web: minutos entre `POST /api/plazos/alertas` (0 = off). |
+| `PLAZOS_ALERTAS_INTERVAL_MINUTES` | No | Host/Desktop: minutos entre `POST /api/plazos/alertas` (0 = off). |
 | `PLAZOS_ALERTAS_DAYS` | No | Ventana en días de plazos a notificar (default 3). |
+| `PLAZOS_ALERTAS_EMAIL` | No | `1` = también email por Gmail OAuth (además de in-app). |
 | `OBSIDIAN_VAULT_PATH` | No | Vault local para exportaciones en desarrollo. |
 | `OBSIDIAN_REST_URL`, `OBSIDIAN_REST_TOKEN` | No | Obsidian Local REST API y token Bearer. |
 | `LEXOPEN_DESKTOP`, `LEXOPEN_DATA_DIR`, `LEXOPEN_DESKTOP_MODE` | Desktop | Activan y configuran el modo Host/Cliente de Electron. |

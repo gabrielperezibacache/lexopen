@@ -112,6 +112,11 @@ npm run desktop:host
 npm run desktop:dev
 ```
 
+El Host Desktop (`desktop/host-runtime.mjs`) puede programar sync PJUD, digest y
+alertas de plazos contra su propio endpoint cuando el `.env` del directorio de
+datos define `CRON_SECRET` y los intervalos (`PJUD_*_INTERVAL_MINUTES`,
+`PLAZOS_ALERTAS_INTERVAL_MINUTES`). Detalle en [`WEB-HOST.md`](./WEB-HOST.md).
+
 Build de instaladores (en la máquina objetivo o CI):
 
 ```bash

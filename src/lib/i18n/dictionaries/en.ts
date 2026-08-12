@@ -129,4 +129,24 @@ export const en: Dictionary = {
     languageHelp:
       "Affects navigation, login and platform chrome. Chilean legal content (RIT, deadlines, minutes) stays in Spanish where appropriate.",
   },
+  crm: {
+    eyebrow: "CRM",
+    title: "Clients",
+    subtitle:
+      "Client tracking: matters, open/done filings, and a document folder with scoped AI assist.",
+    searchPlaceholder: "Search tax ID, name, email…",
+    filterAll: "All",
+    filterActive: "Active",
+    filterInactive: "Inactive",
+    filter: "Filter",
+    colClient: "Client",
+    colRut: "Tax ID",
+    colCases: "Matters",
+    colPending: "Open filings",
+    colDocs: "Docs",
+    colLawyer: "Lawyer",
+    colStatus: "Status",
+    empty: "No clients match those filters.",
+    noEmail: "no email",
+  },
 };

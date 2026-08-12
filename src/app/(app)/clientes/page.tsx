@@ -4,6 +4,7 @@ import { requireStaffPage } from "@/lib/auth/access";
 import { NewClienteForm } from "@/components/clientes/NewClienteForm";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
 import { StatusBadge } from "@/components/ui";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function ClientesPage({
   searchParams,
@@ -11,6 +12,7 @@ export default async function ClientesPage({
   searchParams: Promise<{ q?: string; estado?: string }>;
 }) {
   await requireStaffPage();
+  const { t } = await getI18n();
   const sp = await searchParams;
   const q = sp.q?.trim();
   const estado = sp.estado;
@@ -57,12 +59,11 @@ export default async function ClientesPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            CRM
+            {t("crm.eyebrow")}
           </p>
-          <h1 className="display mt-2 text-4xl">Clientes</h1>
+          <h1 className="display mt-2 text-4xl">{t("crm.title")}</h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Seguimiento por cliente: causas, trámites pendientes/hechos y carpeta
-            documental con asistente IA.
+            {t("crm.subtitle")}
           </p>
         </div>
         <NewClienteForm abogados={abogados} />
@@ -73,15 +74,15 @@ export default async function ClientesPage({
           className="input max-w-xs"
           name="q"
           defaultValue={q || ""}
-          placeholder="Buscar RUT, nombre, email…"
+          placeholder={t("crm.searchPlaceholder")}
         />
         <select className="select" name="estado" defaultValue={estado || ""}>
-          <option value="">Todos</option>
-          <option value="activo">Activos</option>
-          <option value="inactivo">Inactivos</option>
+          <option value="">{t("crm.filterAll")}</option>
+          <option value="activo">{t("crm.filterActive")}</option>
+          <option value="inactivo">{t("crm.filterInactive")}</option>
         </select>
         <button className="btn btn-secondary" type="submit">
-          Filtrar
+          {t("crm.filter")}
         </button>
       </form>
 
@@ -90,13 +91,13 @@ export default async function ClientesPage({
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[var(--ink)] text-white/90">
               <tr>
-                <th className="px-4 py-3 font-medium">Cliente</th>
-                <th className="px-4 py-3 font-medium">RUT</th>
-                <th className="px-4 py-3 font-medium">Causas</th>
-                <th className="px-4 py-3 font-medium">Trámites pend.</th>
-                <th className="px-4 py-3 font-medium">Docs</th>
-                <th className="px-4 py-3 font-medium">Abogado</th>
-                <th className="px-4 py-3 font-medium">Estado</th>
+                <th className="px-4 py-3 font-medium">{t("crm.colClient")}</th>
+                <th className="px-4 py-3 font-medium">{t("crm.colRut")}</th>
+                <th className="px-4 py-3 font-medium">{t("crm.colCases")}</th>
+                <th className="px-4 py-3 font-medium">{t("crm.colPending")}</th>
+                <th className="px-4 py-3 font-medium">{t("crm.colDocs")}</th>
+                <th className="px-4 py-3 font-medium">{t("crm.colLawyer")}</th>
+                <th className="px-4 py-3 font-medium">{t("crm.colStatus")}</th>
               </tr>
             </thead>
             <tbody>
@@ -115,16 +116,14 @@ export default async function ClientesPage({
                         {c.razonSocial}
                       </Link>
                       <div className="text-xs text-[var(--ink-soft)]/60">
-                        {c.tipo} · {c.email || "sin email"}
+                        {c.tipo} · {c.email || t("crm.noEmail")}
                       </div>
                     </td>
                     <td className="px-4 py-3">{c.rut || "—"}</td>
                     <td className="px-4 py-3">{c._count.causas}</td>
                     <td className="px-4 py-3">{pend}</td>
                     <td className="px-4 py-3">{c._count.documentos}</td>
-                    <td className="px-4 py-3">
-                      {c.abogado?.name || "—"}
-                    </td>
+                    <td className="px-4 py-3">{c.abogado?.name || "—"}</td>
                     <td className="px-4 py-3">
                       <StatusBadge
                         estado={c.estado === "activo" ? "activa" : "suspendida"}
@@ -139,7 +138,7 @@ export default async function ClientesPage({
                     colSpan={7}
                     className="px-4 py-10 text-center text-[var(--ink-soft)]/70"
                   >
-                    No hay clientes con esos filtros.
+                    {t("crm.empty")}
                   </td>
                 </tr>
               )}
