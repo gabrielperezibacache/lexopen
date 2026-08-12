@@ -94,6 +94,7 @@ async function waitForScraper(url, timeoutMs = 60_000) {
     try {
       const res = await fetch(`${url}/health`, {
         signal: AbortSignal.timeout(2_000),
+        redirect: "error",
       });
       const body = await res.json().catch(() => ({}));
       if (res.ok && (body.ok === true || body.status === "ok")) {

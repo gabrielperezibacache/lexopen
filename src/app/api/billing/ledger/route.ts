@@ -7,13 +7,12 @@ import {
   httpError,
   parseBody,
   requireBillingManager,
-  requireStaff,
 } from "@/lib/api";
 import { ledgerCreateSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    await requireBillingManager();
     const clienteId = req.nextUrl.searchParams.get("clienteId");
     const entries = await prisma.ledgerEntry.findMany({
       where: clienteId ? { clienteId } : undefined,

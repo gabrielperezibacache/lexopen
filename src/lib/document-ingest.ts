@@ -44,7 +44,17 @@ export function normalizeIngestPath(input: string): IngestPathParts | null {
     .filter(Boolean);
 
   if (segments.length === 0) return null;
-  if (segments.some((seg) => SKIP_DIR_SEGMENTS.has(seg.toLowerCase()))) return null;
+  if (
+    segments.some(
+      (seg) =>
+        seg === "." ||
+        seg === ".." ||
+        seg.includes("\0") ||
+        SKIP_DIR_SEGMENTS.has(seg.toLowerCase())
+    )
+  ) {
+    return null;
+  }
 
   const cleaned = segments;
 

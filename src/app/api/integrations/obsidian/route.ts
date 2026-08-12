@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { exportCausaToObsidian, syncAllCausasToObsidian, getObsidianConfig } from "@/lib/integrations/obsidian";
+import {
+  assertAllowedVaultPath,
+  sanitizeVaultFolderPrefix,
+} from "@/lib/integrations/obsidian-path";
 
 export async function GET() {
   try {
@@ -39,13 +43,28 @@ export async function POST(req: Request) {
         );
       }
       const cfg = body.config || {};
-      const vaultPath = String(cfg.vaultPath || "").trim().slice(0, 500);
-      const folderPrefix = String(cfg.folderPrefix || "LexOpen")
-        .trim()
-        .slice(0, 80);
-      if (!vaultPath) {
+      const vaultPathRaw = String(cfg.vaultPath || "").trim().slice(0, 500);
+      if (!vaultPathRaw) {
         return NextResponse.json(
           { error: "vaultPath es requerido" },
+          { status: 400 }
+        );
+      }
+      let vaultPath: string;
+      let folderPrefix: string;
+      try {
+        vaultPath = assertAllowedVaultPath(vaultPathRaw);
+        folderPrefix = sanitizeVaultFolderPrefix(
+          String(cfg.folderPrefix || "LexOpen").trim().slice(0, 80)
+        );
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Configuración Obsidian inválida",
+          },
           { status: 400 }
         );
       }
@@ -56,7 +75,7 @@ export async function POST(req: Request) {
           enabled: Boolean(body.enabled ?? true),
           configJson: JSON.stringify({
             vaultPath,
-            folderPrefix: folderPrefix || "LexOpen",
+            folderPrefix,
             syncNotes: Boolean(cfg.syncNotes ?? true),
             syncDocumentos: Boolean(cfg.syncDocumentos ?? true),
           }),
@@ -65,7 +84,7 @@ export async function POST(req: Request) {
           enabled: Boolean(body.enabled ?? true),
           configJson: JSON.stringify({
             vaultPath,
-            folderPrefix: folderPrefix || "LexOpen",
+            folderPrefix,
             syncNotes: Boolean(cfg.syncNotes ?? true),
             syncDocumentos: Boolean(cfg.syncDocumentos ?? true),
           }),

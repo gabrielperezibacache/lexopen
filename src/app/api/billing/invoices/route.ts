@@ -7,7 +7,6 @@ import {
   httpError,
   parseBody,
   requireBillingManager,
-  requireStaff,
 } from "@/lib/api";
 import { computeInvoiceTotals, nextInvoiceNumber } from "@/lib/billing";
 import { invoiceCreateSchema } from "@/lib/schemas";
@@ -15,7 +14,7 @@ import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    await requireBillingManager();
     const status = req.nextUrl.searchParams.get("status");
     const invoices = await prisma.invoice.findMany({
       where: status ? { status } : undefined,

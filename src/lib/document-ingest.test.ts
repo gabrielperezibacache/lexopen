@@ -28,6 +28,10 @@ function main() {
   assert.equal(normalizeIngestPath("Carpeta/.DS_Store"), null);
   assert.equal(normalizeIngestPath("Carpeta/._hidden.pdf"), null);
   assert.equal(normalizeIngestPath("node_modules/pkg/index.js"), null);
+  assert.equal(normalizeIngestPath("../etc/passwd"), null);
+  assert.equal(normalizeIngestPath("Carpeta/../secreto.pdf"), null);
+  assert.equal(normalizeIngestPath("Carpeta/./demanda.pdf"), null);
+  assert.equal(normalizeIngestPath("Carpeta/\0x.pdf"), null);
 
   assert.equal(inferDocumentoTipo("Escritos/demanda.pdf"), "escrito");
   assert.equal(inferDocumentoTipo("contratos/mandato.docx"), "contrato");

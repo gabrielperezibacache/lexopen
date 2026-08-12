@@ -139,6 +139,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "create-group") {
+      if (!isAdmin(actor.role)) {
+        return NextResponse.json(
+          { error: "Solo admin puede crear grupos" },
+          { status: 403 }
+        );
+      }
       const data = createGroupSchema.parse(body);
       const group = await prisma.group.create({
         data: {

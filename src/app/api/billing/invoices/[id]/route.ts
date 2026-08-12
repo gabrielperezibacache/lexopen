@@ -7,7 +7,6 @@ import {
   httpError,
   parseBody,
   requireBillingManager,
-  requireStaff,
 } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { invoiceUpdateSchema } from "@/lib/schemas";
@@ -16,7 +15,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    await requireStaff();
+    await requireBillingManager();
     const { id } = await params;
     const invoice = await prisma.invoice.findUnique({
       where: { id },

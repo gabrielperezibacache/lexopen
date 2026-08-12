@@ -120,13 +120,22 @@ async function loadConfigRow() {
   });
 }
 
+function isLegacyPlaintextApiKey(raw: string | undefined) {
+  return Boolean(raw && raw !== "••••" && !raw.startsWith("enc:v2:"));
+}
+
 function resolveStoredApiKey(raw: string | undefined, fallback?: string) {
   if (raw === "••••" || raw === "") return fallback;
   if (!raw) return fallback;
-  // Prefer vault decrypt; allow legacy plaintext until next save re-encrypts.
-  const decrypted = decryptSecret(raw, { strict: false });
-  return decrypted || fallback;
+  if (raw.startsWith("enc:v2:")) {
+    return decryptSecret(raw, { strict: true }) || fallback;
+  }
+  // Legacy plaintext — accepted once so getLlmConfig can re-encrypt on save.
+  return raw;
 }
+
+/** Prevents getLlmConfig → saveLlmConfig → getLlmConfig recursion during migration. */
+let migratingPlaintextApiKey = false;
 
 export async function getLlmConfig(): Promise<LlmConfig> {
   const defaults = defaultsFromEnv();
@@ -137,6 +146,7 @@ export async function getLlmConfig(): Promise<LlmConfig> {
   const parsed = row
     ? safeJsonParse<Partial<LlmConfig>>(row.configJson, {})
     : {};
+  const hadPlaintextKey = isLegacyPlaintextApiKey(parsed.apiKey);
   const merged: LlmConfig = {
     ...defaults,
     ...parsed,
@@ -146,6 +156,20 @@ export async function getLlmConfig(): Promise<LlmConfig> {
     merged.allowDemo = Boolean(firm.hermesAllowDemo);
   }
   if (!merged.preset) merged.preset = inferPreset(merged.apiUrl);
+  // One-shot upgrade: rewrite plaintext API keys as enc:v2.
+  if (hadPlaintextKey && merged.apiKey && !migratingPlaintextApiKey) {
+    migratingPlaintextApiKey = true;
+    void saveLlmConfig({
+      enabled: row?.enabled,
+      config: { apiKey: merged.apiKey },
+    })
+      .catch((error) => {
+        console.warn("[llm] no se pudo migrar API key plaintext → enc:v2", error);
+      })
+      .finally(() => {
+        migratingPlaintextApiKey = false;
+      });
+  }
   return merged;
 }
 

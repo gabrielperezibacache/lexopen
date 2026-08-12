@@ -56,6 +56,11 @@ function configureAutoUpdater() {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
+  autoUpdater.allowDowngrade = false;
+  // Prefer signed updates when the platform supports verification.
+  if ("verifyUpdateCodeSignature" in autoUpdater) {
+    autoUpdater.verifyUpdateCodeSignature = true;
+  }
 
   autoUpdater.on("checking-for-update", () => {
     sendStatus({ phase: "checking-update", message: "Buscando actualizaciones…" });

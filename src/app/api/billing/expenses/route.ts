@@ -5,14 +5,13 @@ import {
   handleRouteError,
   parseBody,
   requireBillingManager,
-  requireStaff,
 } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { expenseCreateSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    await requireBillingManager();
     const unbilled = req.nextUrl.searchParams.get("unbilled");
     const expenses = await prisma.expense.findMany({
       where: unbilled === "1" ? { billable: true, billed: false } : undefined,

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import { handleRouteError, requireBillingManager } from "@/lib/api";
 import { renderInvoiceHtml } from "@/lib/billing-pdf";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    await requireStaff();
+    await requireBillingManager();
     const { id } = await params;
     const invoice = await prisma.invoice.findUnique({
       where: { id },
