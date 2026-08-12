@@ -8,11 +8,13 @@ const FERIADOS_FIJOS = [
   "01-01", // Año Nuevo
   "05-01", // Trabajo
   "05-21", // Glorias Navales
+  "06-20", // Día Nacional de los Pueblos Indígenas (puede variar)
   "06-29", // San Pedro y San Pablo (puede moverse; simplificado)
   "07-16", // Carmen
   "08-15", // Asunción
   "09-18", // Independencia
   "09-19", // Glorias del Ejército
+  "09-20", // Fiestas Patrias adicional cuando aplica (simplificado)
   "10-12", // Encuentro de Dos Mundos (puede moverse)
   "10-31", // Iglesias Evangélicas
   "11-01", // Todos los Santos

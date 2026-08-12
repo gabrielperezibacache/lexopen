@@ -1,0 +1,120 @@
+<!-- @dsCard group="Website" viewport="1280x760" name="Proyectos" subtitle="Página independiente: proyectos de la firma, con Altazor AI, Minimal PDF, MCP Legal Chile y LexOpen destacados" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Proyectos — Pérez Ibacache & Asociados</title>
+<link rel="stylesheet" href="./styles.css" />
+<style>
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: var(--font-body); background: var(--surface-page); color: var(--text-body); }
+
+  @keyframes heroReveal {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes bgPulse {
+    0%,100% { opacity: 0.05; }
+    50%      { opacity: 0.085; }
+  }
+  .hero-el { animation: heroReveal 0.8s var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both; }
+  .hero-el.d1 { animation-delay: 0.05s; }
+  .hero-el.d2 { animation-delay: 0.16s; }
+  .hero-bg-pulse { animation: bgPulse 5s ease-in-out infinite; }
+
+  .js-enabled [data-anim] {
+    opacity: 0;
+    transform: translateY(16px);
+    will-change: opacity, transform;
+  }
+  [data-anim].is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.7s var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                transform 0.7s var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+  }
+  .d1.is-visible { transition-delay: 0.06s; }
+  .d2.is-visible { transition-delay: 0.12s; }
+  .d3.is-visible { transition-delay: 0.18s; }
+
+  .card-lift {
+    height: 100%;
+    transition: transform var(--dur-slow, 360ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                box-shadow var(--dur-slow, 360ms) ease;
+  }
+  .card-lift > * { height: 100%; }
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md, 0 4px 12px rgba(2,55,57,0.08));
+  }
+  .pj-back:hover { color: var(--text-brand) !important; }
+  .pj-cta-link:hover { background: var(--action-hover) !important; border-color: var(--action-hover) !important; }
+  .pj-cta-secondary:hover { background: var(--teal-900) !important; color: var(--action-text) !important; }
+
+  body.anim-done .hero-el,
+  body.anim-done [data-anim] { opacity: 1 !important; transform: none !important; }
+
+  @media (max-width: 960px) {
+    .altazor-grid,
+    .minimal-pdf-grid,
+    .mcp-grid,
+    .lexopen-grid { grid-template-columns: 1fr !important; }
+    .more-projects-grid { grid-template-columns: 1fr !important; }
+    .pj-hero { padding-top: var(--space-2); }
+  }
+  @media (max-width: 720px) {
+    .altazor-grid > div:last-child,
+    .minimal-pdf-grid > div:first-child,
+    .mcp-grid > div:first-child,
+    .lexopen-grid > div:last-child { padding: var(--space-6) !important; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .hero-el, .hero-bg-pulse { animation: none !important; opacity: 1 !important; transform: none !important; }
+    .js-enabled [data-anim] { opacity: 1; transform: none; }
+    [data-anim].is-visible { transition: none; }
+    .card-lift { transition: none !important; }
+    .card-lift:hover { transform: none; }
+  }
+</style>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="./_ds_bundle.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+  'use strict';
+  document.documentElement.classList.add('js-enabled');
+  var seen = new WeakSet();
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+  function scan() {
+    document.querySelectorAll('[data-anim]').forEach(function (el) {
+      if (!seen.has(el)) { seen.add(el); io.observe(el); }
+    });
+  }
+  function boot() {
+    scan();
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 200); });
+  } else { setTimeout(boot, 200); }
+  setTimeout(function () { document.body.classList.add('anim-done'); }, 2400);
+}());
+</script>
+<script type="text/babel" src="Proyectos.jsx"></script>
+<script type="text/babel">
+  ReactDOM.createRoot(document.getElementById("root")).render(<ProyectosPage />);
+</script>
+</body>
+</html>

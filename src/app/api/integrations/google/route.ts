@@ -17,6 +17,7 @@ import {
   unlinkCausaDriveFolder,
   updateGoogleSyncOptions,
 } from "@/lib/integrations/google";
+import { sendGmailMessage } from "@/lib/integrations/gmail";
 
 const OAUTH_STATE_COOKIE = "google_oauth_state";
 /** Cookie scoped to callback path so it is not sent on other API calls. */
@@ -199,6 +200,39 @@ export async function POST(req: Request) {
         },
       });
       return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "test-gmail") {
+      if (user.role !== "admin") {
+        return NextResponse.json(
+          { error: "Solo admin puede enviar prueba Gmail" },
+          { status: 403 }
+        );
+      }
+      const to =
+        typeof body.to === "string" && body.to.includes("@")
+          ? body.to.trim()
+          : user.email;
+      if (!to) {
+        return NextResponse.json(
+          { error: "Indique un destinatario o conecte un usuario con email" },
+          { status: 400 }
+        );
+      }
+      try {
+        await sendGmailMessage({
+          to,
+          subject: "LexOpen · prueba Gmail",
+          text: "Este es un mensaje de prueba enviado desde LexOpen (Google Workspace).",
+          html: "<p>Este es un mensaje de prueba enviado desde <strong>LexOpen</strong> (Google Workspace).</p>",
+        });
+        return NextResponse.json({ ok: true, to });
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Error Gmail" },
+          { status: 400 }
+        );
+      }
     }
 
     if (body.action === "save-config") {

@@ -5,10 +5,11 @@ import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
 import { ClipboardPen } from "lucide-react";
 import { requireStaff } from "@/lib/auth/session";
 import { confidentialWhere } from "@/lib/api";
+import { MinutaPlantillasManager } from "@/components/minutas/MinutaPlantillasManager";
 
 export default async function MinutasPage() {
   const user = await requireStaff();
-  const [minutas, causas, accionesAbiertasTotal] = await Promise.all([
+  const [minutas, causas, accionesAbiertasTotal, plantillas] = await Promise.all([
     prisma.minuta.findMany({
       where: confidentialWhere(user.role),
       include: {
@@ -32,6 +33,10 @@ export default async function MinutasPage() {
         estado: { in: [...ACCIONES_ABIERTAS] },
         minuta: confidentialWhere(user.role),
       },
+    }),
+    prisma.minutaPlantilla.findMany({
+      orderBy: [{ tipo: "asc" }, { nombre: "asc" }],
+      take: 50,
     }),
   ]);
 
@@ -100,6 +105,10 @@ export default async function MinutasPage() {
           </p>
         )}
       </section>
+
+      {(user.role === "admin" || user.role === "abogado") && (
+        <MinutaPlantillasManager plantillas={plantillas} />
+      )}
 
       <section className="panel overflow-hidden rounded-3xl">
         <div className="border-b border-[var(--line)] px-5 py-4">

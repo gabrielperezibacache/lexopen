@@ -18,6 +18,7 @@ export function GoogleSettingsForm() {
   const [message, setMessage] = useState("");
   const [ok, setOk] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [testingGmail, setTestingGmail] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,6 +235,35 @@ export function GoogleSettingsForm() {
             }}
           >
             Desconectar
+          </button>
+        )}
+        {state.connected && (
+          <button
+            className="btn btn-secondary"
+            type="button"
+            disabled={testingGmail}
+            onClick={async () => {
+              setTestingGmail(true);
+              setMessage("");
+              const res = await fetch("/api/integrations/google", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  action: "test-gmail",
+                  to: state.connectedEmail || undefined,
+                }),
+              });
+              const data = await res.json().catch(() => ({}));
+              setOk(res.ok);
+              setMessage(
+                res.ok
+                  ? `Prueba Gmail enviada a ${data.to || state.connectedEmail || "destino"}`
+                  : data.error || "Error al enviar prueba Gmail"
+              );
+              setTestingGmail(false);
+            }}
+          >
+            {testingGmail ? "Enviando…" : "Probar Gmail"}
           </button>
         )}
       </div>
