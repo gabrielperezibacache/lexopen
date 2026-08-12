@@ -71,6 +71,7 @@ export default function MonitoreoCausasPage() {
     publicScrapeReady?: boolean;
     claveUnicaScrapeEnabled?: boolean;
     liveIngestConfigured?: boolean;
+    pdfBackupEnabled?: boolean;
     syncIntervalMinutes?: number;
   } | null>(null);
   const [filter, setFilter] = useState<
@@ -200,7 +201,16 @@ export default function MonitoreoCausasPage() {
       </div>
 
       {provider?.honesty && (
-        <p className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-[var(--copper)]">
+        <p
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            provider.liveIngestConfigured
+              ? "border-[var(--line)] bg-white/70 text-[var(--copper)]"
+              : "border-rose-300/60 bg-rose-50 text-rose-900"
+          }`}
+        >
+          {!provider.liveIngestConfigured && (
+            <strong className="mr-1">Ingest live no listo (fail-closed).</strong>
+          )}
           {provider.honesty}
           {provider.syncIntervalMinutes
             ? ` Intervalo: cada ${provider.syncIntervalMinutes} min.`
@@ -210,6 +220,7 @@ export default function MonitoreoCausasPage() {
           {provider.scraperSidecarConfigured ? "ON" : "OFF"} · Scrape{" "}
           {provider.publicScrapeReady ? "ON" : "OFF"} · ClaveÚnica{" "}
           {provider.claveUnicaScrapeEnabled ? "ON" : "OFF"}
+          {provider.pdfBackupEnabled ? " · PDF backup ON" : ""}
         </p>
       )}
       {msg && <p className="text-sm text-[var(--ink-soft)]/80">{msg}</p>}

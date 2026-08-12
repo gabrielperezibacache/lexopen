@@ -12,6 +12,7 @@ import {
   type PjudFetchResult,
 } from "@/lib/pjud/provider";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
+import { pdfBackupEnabled, backupMovimientoDocuments } from "@/lib/pjud/pdf-backup";
 import { publicScrapeEnabled, publicScrapeReady } from "@/lib/pjud/public-scrape";
 import { scraperSidecarConfigured } from "@/lib/pjud/scraper-sidecar";
 import { pjudWebhookConfigured } from "@/lib/pjud/webhook";
@@ -47,6 +48,7 @@ export async function syncCausaPjud(
     actorId?: string | null;
     force?: boolean;
     trigger?: "manual" | "cron" | "retry" | "webhook" | "import";
+    existingJobId?: string | null;
   }
 ): Promise<SyncCausaResult> {
   const trigger = opts?.trigger || "manual";
@@ -84,15 +86,24 @@ export async function syncCausaPjud(
     };
   }
 
-  const job = await prisma.pjudSyncJob.create({
-    data: {
-      causaId,
-      status: "running",
-      trigger,
-      attempts: 1,
-      startedAt: new Date(),
-    },
-  });
+  const job = opts?.existingJobId
+    ? await prisma.pjudSyncJob.update({
+        where: { id: opts.existingJobId },
+        data: {
+          status: "running",
+          trigger,
+          startedAt: new Date(),
+        },
+      })
+    : await prisma.pjudSyncJob.create({
+        data: {
+          causaId,
+          status: "running",
+          trigger,
+          attempts: 1,
+          startedAt: new Date(),
+        },
+      });
 
   let fetchResult: PjudFetchResult;
   try {
@@ -269,6 +280,16 @@ export async function syncCausaPjud(
     }
   });
 
+  let pdfBackedUp = 0;
+  if (inserted > 0 && pdfBackupEnabled()) {
+    try {
+      const backup = await backupMovimientoDocuments(causaId);
+      pdfBackedUp = backup.saved;
+    } catch {
+      /* PDF backup is best-effort */
+    }
+  }
+
   const latest = await prisma.causaMovimiento.findFirst({
     where: { causaId },
     orderBy: { fecha: "desc" },
@@ -289,7 +310,10 @@ export async function syncCausaPjud(
     skipped,
     provider: fetchResult.provider,
     demo: fetchResult.demo,
-    note: fetchResult.note,
+    note:
+      pdfBackedUp > 0
+        ? `${fetchResult.note} · PDF backup ${pdfBackedUp}`
+        : fetchResult.note,
     status: fetchResult.demo ? "demo" : "ok",
     jobId: job.id,
     lastMovimientoAt: latest?.fecha.toISOString() || null,
@@ -475,6 +499,7 @@ export function providerStatusPublic() {
     claveUnicaScrapeEnabled: process.env.PJUD_CLAVEUNICA_SCRAPE === "1",
     liveIngestConfigured: pjudLiveIngestConfigured(),
     webhookConfigured: pjudWebhookConfigured(),
+    pdfBackupEnabled: pdfBackupEnabled(),
     demoAllowed:
       process.env.PJUD_ALLOW_DEMO === "1" ||
       (process.env.NODE_ENV !== "production" &&
@@ -486,6 +511,6 @@ export function providerStatusPublic() {
         : scraperSidecarConfigured()
           ? "Scraper sidecar activo (PJUD_SCRAPER_URL) — flujo CausaMonitor."
           : "Scrape OJV in-process activo (CAPTCHA) — ToS risk / opt-in."
-      : "Sin ingest live: active PJUD_SCRAPER_URL o PJUD_PUBLIC_SCRAPE=1+CAPTCHA, partner API, demo o CSV. ClaveÚnica requiere PJUD_CLAVEUNICA_SCRAPE=1.",
+      : "Sin ingest live: configure PJUD_SCRAPER_URL (sidecar) o PJUD_PUBLIC_SCRAPE=1+CAPTCHA+Playwright, partner API, demo o CSV. El sync de producción está fail-closed hasta entonces. ClaveÚnica requiere PJUD_CLAVEUNICA_SCRAPE=1.",
   };
 }

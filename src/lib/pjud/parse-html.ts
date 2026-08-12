@@ -32,6 +32,28 @@ function isHeaderRow(cells: string[]) {
   return looksLikeColumnHeader || looksLikeHeaderSentence;
 }
 
+/** Absolute OJV download URL from a table row's anchors (href). */
+export function extractDocumentoHrefFromRowHtml(rowHtml: string): string | null {
+  const anchorRe = /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = anchorRe.exec(rowHtml)) !== null) {
+    const href = (match[1] || "").trim();
+    if (!href || href === "#" || /^javascript:/i.test(href)) continue;
+    const text = stripTags(match[2] || "").toLowerCase();
+    const looksLikeDoc =
+      /\.(pdf|doc|docx)(\?|$)/i.test(href) ||
+      /documento|descarg|archivo|anexo|escrito|pdf/i.test(href) ||
+      /descarg|pdf|documento|ver\s*doc/i.test(text);
+    if (!looksLikeDoc) continue;
+    if (/^https?:\/\//i.test(href)) return href;
+    if (href.startsWith("/")) {
+      return `https://oficinajudicialvirtual.pjud.cl${href}`;
+    }
+    return `https://oficinajudicialvirtual.pjud.cl/${href.replace(/^\.\//, "")}`;
+  }
+  return null;
+}
+
 /**
  * Parse OJV/historiales HTML tables into movimientos.
  * Rows without a parseable fecha are skipped (never invent "today").
@@ -94,6 +116,7 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
       (c, idx) => idx === 0 && /^\d{1,5}$/.test(c)
     );
     const folio = folioCandidate || String(folioSeq);
+    const documentoRef = extractDocumentoHrefFromRowHtml(rowMatch[1]);
 
     movimientos.push({
       externalId: `scrape:${fingerprint(titulo, fecha, folio)}`,
@@ -113,7 +136,7 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
           /prove[ií]do|resoluci[oó]n|escrito|c[eé]dula/i.test(c)
         ) || null,
       esReceptor,
-      documentoRef: null,
+      documentoRef,
     });
   }
 

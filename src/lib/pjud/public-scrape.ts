@@ -30,8 +30,36 @@ export function publicScrapeEnabled() {
   return process.env.PJUD_PUBLIC_SCRAPE === "1";
 }
 
+export async function playwrightAvailable() {
+  try {
+    const pw = await import("playwright");
+    return Boolean(pw.chromium);
+  } catch {
+    return false;
+  }
+}
+
 export function publicScrapeReady() {
   return publicScrapeEnabled() && captchaSolverConfigured();
+}
+
+/** Fail-closed check used before launching browsers. */
+export async function assertPublicScrapeRuntime() {
+  if (!publicScrapeEnabled()) {
+    throw new PjudScrapeError(
+      "PJUD_PUBLIC_SCRAPE!=1: scrape público deshabilitado (kill switch)."
+    );
+  }
+  if (!captchaSolverConfigured()) {
+    throw new PjudScrapeError(
+      "Configure CAPTCHA_SOLVER_PROVIDER + CAPTCHA_SOLVER_API_KEY para scrapear OJV."
+    );
+  }
+  if (!(await playwrightAvailable())) {
+    throw new PjudScrapeError(
+      "Playwright/Chromium no disponible. Instale `playwright` (`npx playwright install chromium`) o use PJUD_SCRAPER_URL."
+    );
+  }
 }
 
 export class PjudScrapeError extends Error {
@@ -93,9 +121,17 @@ async function loadPlaywright() {
 }
 
 async function solveNewSession(signal?: AbortSignal): Promise<PjudSession> {
+  await assertPublicScrapeRuntime();
   assertSolveBudget();
   const { chromium } = await loadPlaywright();
-  const browser = await chromium.launch({ headless: true });
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+  } catch (error) {
+    throw new PjudScrapeError(
+      `Chromium no arranca: ${error instanceof Error ? error.message : String(error)}. Ejecute npx playwright install chromium.`
+    );
+  }
   try {
     const context = await browser.newContext({
       userAgent:

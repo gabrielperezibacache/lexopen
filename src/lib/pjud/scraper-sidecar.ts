@@ -67,7 +67,11 @@ export function scraperSidecarConfigured() {
 function scraperBaseUrl() {
   const rawBase = process.env.PJUD_SCRAPER_URL?.trim();
   if (!rawBase) return null;
-  const parsedBase = new URL(rawBase);
+  // Render fromService hostport is "host:port" without scheme.
+  const withScheme = /^https?:\/\//i.test(rawBase)
+    ? rawBase
+    : `http://${rawBase}`;
+  const parsedBase = new URL(withScheme);
   const allowPrivate = process.env.PJUD_SCRAPER_ALLOW_PRIVATE === "1";
   const privateHost = isPrivateHostname(parsedBase.hostname);
   if (

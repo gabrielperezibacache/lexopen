@@ -1,0 +1,3 @@
+ALTER TABLE "FirmSettings" ADD COLUMN IF NOT EXISTS "pjudDigestLastAt" TIMESTAMP(3);
+ALTER TABLE "FirmSettings" ADD COLUMN IF NOT EXISTS "pjudDigestLastStatus" TEXT;
+ALTER TABLE "FirmSettings" ADD COLUMN IF NOT EXISTS "pjudDigestLastNote" TEXT;

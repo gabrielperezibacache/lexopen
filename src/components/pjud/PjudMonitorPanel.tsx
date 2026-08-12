@@ -66,7 +66,19 @@ function fmtDateTime(d: string | Date | null | undefined) {
   });
 }
 
+function documentoHref(ref: string | null | undefined) {
+  if (!ref) return null;
+  if (ref.startsWith("doc:")) {
+    const id = ref.slice(4).trim();
+    return id ? `/api/documentos/${id}/content` : null;
+  }
+  if (ref.startsWith("lexopen:")) return null;
+  if (/^https?:\/\//i.test(ref)) return ref;
+  return null;
+}
+
 function MovementCard({ m }: { m: Movimiento }) {
+  const docUrl = documentoHref(m.documentoRef);
   return (
     <article
       className={`rounded-2xl border px-3 py-2 text-sm ${
@@ -94,8 +106,24 @@ function MovementCard({ m }: { m: Movimiento }) {
       {m.detalle && (
         <p className="mt-2 text-[var(--ink-soft)]/80">{m.detalle}</p>
       )}
-      {m.documentoRef && (
-        <p className="mt-1 text-xs text-[var(--sea)]">Doc: {m.documentoRef}</p>
+      {docUrl && (
+        <p className="mt-1 text-xs">
+          <a
+            className="text-[var(--sea)] underline-offset-2 hover:underline"
+            href={docUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {m.documentoRef?.startsWith("doc:")
+              ? "Ver documento LexOpen"
+              : "Ver documento (OJV)"}
+          </a>
+        </p>
+      )}
+      {!docUrl && m.documentoRef && (
+        <p className="mt-1 text-xs text-[var(--ink-soft)]/55">
+          Ref. doc: {m.documentoRef}
+        </p>
       )}
     </article>
   );

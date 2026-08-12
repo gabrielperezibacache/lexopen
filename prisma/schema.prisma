@@ -37,6 +37,9 @@ model FirmSettings {
   claveUnicaLastSyncAt     DateTime?
   claveUnicaLastSyncStatus String?
   claveUnicaLastSyncNote   String?
+  pjudDigestLastAt         DateTime?
+  pjudDigestLastStatus     String?
+  pjudDigestLastNote       String?
 }
 
 model User {

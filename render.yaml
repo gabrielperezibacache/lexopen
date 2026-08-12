@@ -20,6 +20,8 @@ services:
           property: connectionString
       - key: SESSION_SECRET
         generateValue: true
+      - key: PJUD_SECRETS_KEY
+        generateValue: true
       - key: NEXT_PUBLIC_APP_NAME
         value: LexOpen
       - key: HERMES_ALLOW_DEMO
@@ -51,9 +53,14 @@ services:
       - key: PJUD_API_KEY
         sync: false
       - key: PJUD_SCRAPER_URL
-        sync: false
+        fromService:
+          name: lexopen-pjud-scraper
+          type: pserv
+          property: hostport
       - key: PJUD_SCRAPER_KEY
         sync: false
+      - key: PJUD_SCRAPER_ALLOW_PRIVATE
+        value: "1"
       - key: PJUD_PUBLIC_SCRAPE
         value: "0"
       - key: CAPTCHA_SOLVER_PROVIDER
@@ -64,30 +71,80 @@ services:
         value: "0"
       - key: PJUD_ALLOW_DEMO
         value: "0"
+      - key: PJUD_PDF_BACKUP
+        value: "0"
       - key: CRON_SECRET
         sync: false
 
-# Optional cron (set ALERTS_URL to your web service URL):
-# - type: cron
-#   name: lexopen-pjud-sync
-#   runtime: node
-#   schedule: "0 */6 * * *"
-#   buildCommand: npm install
-#   startCommand: curl -fsS -X POST "$ALERTS_URL/api/causas/monitoreo" -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d "{}"
-#   envVars:
-#     - key: ALERTS_URL
-#       sync: false
-#     - key: CRON_SECRET
-#       sync: false
-# Optional Mis Causas cron (requires ClaveÚnica + scrape/sidecar):
-# - type: cron
-#   name: lexopen-mis-causas
-#   runtime: node
-#   schedule: "0 8 * * *"
-#   buildCommand: npm install
-#   startCommand: curl -fsS -X POST "$ALERTS_URL/api/pjud/mis-causas" -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d "{\"syncMovimientos\":true}"
-#   envVars:
-#     - key: ALERTS_URL
-#       sync: false
-#     - key: CRON_SECRET
-#       sync: false
+  # Sidecar scrape privado (Playwright + CAPTCHA). Red interna Render.
+  - type: pserv
+    name: lexopen-pjud-scraper
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npx playwright install chromium --with-deps
+    startCommand: npm run pjud:scraper
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PORT
+        value: "10000"
+      - key: PJUD_PUBLIC_SCRAPE
+        value: "1"
+      - key: PJUD_CLAVEUNICA_SCRAPE
+        value: "1"
+      - key: PJUD_SCRAPER_KEY
+        sync: false
+      - key: CAPTCHA_SOLVER_PROVIDER
+        sync: false
+      - key: CAPTCHA_SOLVER_API_KEY
+        sync: false
+      - key: PJUD_CAUSAS_DAILY_SOLVE_BUDGET
+        value: "50"
+
+  # Cartera due-based cada 6h (UTC)
+  - type: cron
+    name: lexopen-pjud-sync
+    runtime: node
+    schedule: "0 */6 * * *"
+    buildCommand: npm install
+    startCommand: curl -fsS -X POST "http://$WEB_HOSTPORT/api/causas/monitoreo" -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d "{}"
+    envVars:
+      - key: WEB_HOSTPORT
+        fromService:
+          name: lexopen
+          type: web
+          property: hostport
+      - key: CRON_SECRET
+        sync: false
+
+  # Mis Causas ~08:00 America/Santiago (11:00 UTC estándar)
+  - type: cron
+    name: lexopen-mis-causas
+    runtime: node
+    schedule: "0 11 * * *"
+    buildCommand: npm install
+    startCommand: curl -fsS -X POST "http://$WEB_HOSTPORT/api/pjud/mis-causas" -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d "{\"syncMovimientos\":true}"
+    envVars:
+      - key: WEB_HOSTPORT
+        fromService:
+          name: lexopen
+          type: web
+          property: hostport
+      - key: CRON_SECRET
+        sync: false
+
+  # Digest email/in-app ~08:00 America/Santiago (11:00 UTC)
+  - type: cron
+    name: lexopen-pjud-digest
+    runtime: node
+    schedule: "0 11 * * *"
+    buildCommand: npm install
+    startCommand: curl -fsS -X POST "http://$WEB_HOSTPORT/api/pjud/digest" -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d "{}"
+    envVars:
+      - key: WEB_HOSTPORT
+        fromService:
+          name: lexopen
+          type: web
+          property: hostport
+      - key: CRON_SECRET
+        sync: false

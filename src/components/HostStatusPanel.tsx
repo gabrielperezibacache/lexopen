@@ -76,6 +76,11 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
             Demo {yesNo(pjud.demoAllowed)} · CU scrape{" "}
             {yesNo(Boolean(pjud.claveUnicaScrapeEnabled))} · CAPTCHA{" "}
             {yesNo(Boolean(pjud.captchaConfigured))}
+            {" · "}
+            Fallidos {pjud.failedJobs ?? 0}
+            {pjud.digest?.lastStatus
+              ? ` · Digest ${pjud.digest.lastStatus}`
+              : " · Digest —"}
           </div>
         </div>
       </div>
@@ -107,9 +112,21 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
             <dd className="text-right font-medium">{counts.activeCauses}</dd>
             <dt className="text-[var(--ink-soft)]/65">Causas monitoreadas</dt>
             <dd className="text-right font-medium">{counts.monitoredCauses}</dd>
+            <dt className="text-[var(--ink-soft)]/65">Jobs PJUD fallidos</dt>
+            <dd className="text-right font-medium">
+              {counts.failedPjudJobs ?? pjud.failedJobs ?? 0}
+            </dd>
             <dt className="text-[var(--ink-soft)]/65">Facturas abiertas</dt>
             <dd className="text-right font-medium">{counts.openInvoices}</dd>
           </dl>
+          {pjud.digest?.lastNote && (
+            <p className="mt-3 text-xs text-[var(--ink-soft)]/70">
+              Digest: {pjud.digest.lastNote}
+              {pjud.digest.lastAt
+                ? ` · ${new Date(pjud.digest.lastAt).toLocaleString("es-CL")}`
+                : ""}
+            </p>
+          )}
         </div>
       </div>
 

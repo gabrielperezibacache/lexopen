@@ -218,6 +218,70 @@ async function startLocalMisCausasScheduler(dataDir) {
   return timer;
 }
 
+async function startLocalDigestScheduler(dataDir) {
+  const config = readConfig(dataDir);
+  const env = {
+    ...process.env,
+    ...readEnvFile(path.join(dataDir, ".env")),
+  };
+  const intervalMinutes = Number(env.PJUD_DIGEST_INTERVAL_MINUTES || 0);
+  if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) return null;
+
+  const secret = env.CRON_SECRET;
+  if (!secret) {
+    console.warn(
+      "[web-host] PJUD_DIGEST_INTERVAL_MINUTES está configurado, pero falta CRON_SECRET; scheduler digest desactivado."
+    );
+    return null;
+  }
+
+  const port = Number(env.PORT || config.port || 3000);
+  const baseUrl = `http://127.0.0.1:${port}`;
+  if (!(await waitForHost(baseUrl))) {
+    console.warn(
+      "[web-host] No se pudo iniciar el scheduler digest: health no disponible."
+    );
+    return null;
+  }
+
+  const run = async () => {
+    try {
+      const response = await fetch(`${baseUrl}/api/pjud/digest`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-cron-secret": secret,
+        },
+        body: "{}",
+        signal: AbortSignal.timeout(120_000),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        console.warn(
+          "[web-host] Digest PJUD falló:",
+          body.error || response.status
+        );
+        return;
+      }
+      console.log(
+        `[web-host] Digest PJUD: ${body.causas || 0} causas · email ${body.emailed || 0} · in-app ${body.notified || 0}.`
+      );
+    } catch (error) {
+      console.warn(
+        "[web-host] Digest PJUD falló:",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  };
+
+  await run();
+  const timer = setInterval(() => void run(), intervalMinutes * 60_000);
+  console.log(
+    `[web-host] Scheduler digest PJUD activo cada ${intervalMinutes} minutos.`
+  );
+  return timer;
+}
+
 if (!fs.existsSync(desktopRuntime)) {
   runSetup(["run", "desktop:install"], "Instalando runtime local de PostgreSQL");
 }
@@ -231,6 +295,7 @@ const dataDir = path.resolve(
 );
 let schedulerTimer = null;
 let misCausasSchedulerTimer = null;
+let digestSchedulerTimer = null;
 let backupScheduler = null;
 let child = null;
 const expectedChildExits = new WeakSet();
@@ -241,6 +306,7 @@ async function shutdown(exitCode = 0) {
   shuttingDown = true;
   if (schedulerTimer) clearInterval(schedulerTimer);
   if (misCausasSchedulerTimer) clearInterval(misCausasSchedulerTimer);
+  if (digestSchedulerTimer) clearInterval(digestSchedulerTimer);
   if (backupScheduler) {
     await backupScheduler.stop().catch((error) => {
       console.warn("[web-host] No se pudo detener el scheduler de backups:", error);
@@ -335,6 +401,20 @@ void startLocalMisCausasScheduler(dataDir)
   .catch((error) => {
     console.warn(
       "[web-host] No se pudo iniciar el scheduler Mis Causas:",
+      error instanceof Error ? error.message : String(error)
+    );
+  });
+void startLocalDigestScheduler(dataDir)
+  .then((timer) => {
+    if (shuttingDown) {
+      if (timer) clearInterval(timer);
+    } else {
+      digestSchedulerTimer = timer;
+    }
+  })
+  .catch((error) => {
+    console.warn(
+      "[web-host] No se pudo iniciar el scheduler digest:",
       error instanceof Error ? error.message : String(error)
     );
   });

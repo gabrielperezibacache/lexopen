@@ -4,6 +4,7 @@ import { persistentStorageReady, storageMode } from "@/lib/storage";
 import {
   getDocumentProcessingQueueStatus,
 } from "@/lib/document-processing-queue";
+import { getDigestStatus } from "@/lib/pjud/digest";
 import { providerStatusPublic } from "@/lib/pjud/sync";
 import { getLocalBackupHealth } from "@/lib/backup-health";
 
@@ -20,6 +21,8 @@ export async function getHostStatus() {
     openInvoices,
     ocr,
     backups,
+    failedPjudJobs,
+    digest,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.site.count(),
@@ -40,6 +43,12 @@ export async function getHostStatus() {
     }),
     getOcrCapability(),
     getLocalBackupHealth(),
+    prisma.pjudSyncJob.count({ where: { status: "failed" } }),
+    getDigestStatus().catch(() => ({
+      lastAt: null,
+      lastStatus: null,
+      lastNote: null,
+    })),
   ]);
 
   return {
@@ -58,7 +67,18 @@ export async function getHostStatus() {
       pathConfigured: Boolean(process.env.STORAGE_PATH),
     },
     ocr,
-    pjud: providerStatusPublic(),
+    pjud: {
+      ...providerStatusPublic(),
+      failedJobs: failedPjudJobs,
+      digest: {
+        lastAt:
+          digest.lastAt instanceof Date
+            ? digest.lastAt.toISOString()
+            : digest.lastAt || null,
+        lastStatus: digest.lastStatus,
+        lastNote: digest.lastNote,
+      },
+    },
     backups,
     queue: getDocumentProcessingQueueStatus(),
     counts: {
@@ -71,6 +91,7 @@ export async function getHostStatus() {
       failedDocuments,
       invoices,
       openInvoices,
+      failedPjudJobs,
     },
   };
 }

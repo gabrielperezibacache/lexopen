@@ -12,7 +12,7 @@
     "build": "prisma generate && next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint .",
-    "test": "tsx src/lib/pjud/classify.test.ts && tsx src/lib/pjud/provider.test.ts && tsx src/lib/pjud/concurrency.test.ts && tsx src/lib/pjud/webhook.test.ts && tsx src/lib/pjud/import-csv.test.ts && tsx src/lib/pjud/scrape-claveunica.test.ts && tsx src/lib/pjud/parse-html.test.ts && tsx src/lib/backup-health.test.ts && tsx src/lib/billing.test.ts && tsx src/lib/integrations/drive-folder.test.ts && tsx src/lib/minutas.render.test.ts && tsx src/lib/minutas.api-contract.test.ts && tsx src/lib/chile.test.ts && tsx src/lib/auth/bootstrap.test.ts && tsx src/lib/auth/safe-next.test.ts && tsx src/lib/auth/client-tags.test.ts && tsx src/lib/plazos.test.ts && tsx src/lib/maturity.integration.test.ts && tsx src/lib/storage.test.ts && tsx src/lib/document-processing.test.ts && tsx src/lib/e2e.smoke.test.ts && tsx src/lib/api.csrf-origins.test.ts && tsx src/lib/csrf.test.ts && node desktop/config.test.cjs && node desktop/backup.test.cjs && node desktop/host-runtime.test.mjs && node scripts/web-backup-scheduler.test.mjs && node --check scripts/web-host.mjs && node --check scripts/web-backup.mjs && node --check scripts/web-backup-scheduler.mjs && node --check scripts/web-restore.mjs && node --check scripts/e2e-server.mjs",
+    "test": "tsx src/lib/pjud/classify.test.ts && tsx src/lib/pjud/provider.test.ts && tsx src/lib/pjud/concurrency.test.ts && tsx src/lib/pjud/webhook.test.ts && tsx src/lib/pjud/import-csv.test.ts && tsx src/lib/pjud/scrape-claveunica.test.ts && tsx src/lib/pjud/parse-html.test.ts && tsx src/lib/pjud/scraper-server.test.ts && tsx src/lib/pjud/digest.test.ts && tsx src/lib/pjud/queue.test.ts && tsx src/lib/backup-health.test.ts && tsx src/lib/billing.test.ts && tsx src/lib/integrations/drive-folder.test.ts && tsx src/lib/minutas.render.test.ts && tsx src/lib/minutas.api-contract.test.ts && tsx src/lib/chile.test.ts && tsx src/lib/auth/bootstrap.test.ts && tsx src/lib/auth/safe-next.test.ts && tsx src/lib/auth/client-tags.test.ts && tsx src/lib/plazos.test.ts && tsx src/lib/maturity.integration.test.ts && tsx src/lib/storage.test.ts && tsx src/lib/document-processing.test.ts && tsx src/lib/e2e.smoke.test.ts && tsx src/lib/api.csrf-origins.test.ts && tsx src/lib/csrf.test.ts && node desktop/config.test.cjs && node desktop/backup.test.cjs && node desktop/host-runtime.test.mjs && node scripts/web-backup-scheduler.test.mjs && node --check scripts/web-host.mjs && node --check scripts/web-backup.mjs && node --check scripts/web-backup-scheduler.mjs && node --check scripts/web-restore.mjs && node --check scripts/e2e-server.mjs && node --check scripts/pjud-scraper-worker.mjs",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:migrate": "prisma migrate deploy",
@@ -32,6 +32,7 @@
     "web:host": "node scripts/web-host.mjs",
     "web:backup": "node scripts/web-backup.mjs",
     "web:restore": "node scripts/web-restore.mjs",
+    "pjud:scraper": "tsx src/lib/pjud/scraper-server.ts",
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium"
   },
@@ -50,6 +51,7 @@
     "dotenv": "^16.4.7",
     "lucide-react": "^0.511.0",
     "next": "^16.3.0",
+    "playwright": "^1.62.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^3.25.28"
