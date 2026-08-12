@@ -322,7 +322,7 @@ function startNextServer(port, bindHost = "127.0.0.1") {
 async function waitForHealth(url, attempts = 60) {
   for (let i = 0; i < attempts; i++) {
     try {
-      const res = await fetch(`${url}/api/health`);
+      const res = await fetch(`${url}/api/health`, { redirect: "error" });
       const body = await res.json().catch(() => ({}));
       if (res.ok && body.ok === true) {
         return { ok: true, needsSetup: Boolean(body.needsSetup) };

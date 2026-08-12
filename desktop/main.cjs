@@ -180,6 +180,60 @@ async function promptInstallUpdate(info) {
   }
 }
 
+function collectDesktopAppUrls() {
+  const cfg = readConfig();
+  return [
+    hostHandle?.url,
+    hostHandle?.publicUrl,
+    cfg.publicUrl,
+    cfg.remoteUrl,
+    localAppUrl(cfg.port || 3000),
+    process.env.NEXT_PUBLIC_APP_URL,
+  ].filter(Boolean);
+}
+
+function isAllowedDesktopNavigation(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "file:") {
+      const rendererRoot = path.resolve(__dirname, "renderer");
+      let filePath = decodeURIComponent(parsed.pathname);
+      if (process.platform === "win32" && /^\/[A-Za-z]:/.test(filePath)) {
+        filePath = filePath.slice(1);
+      }
+      const resolved = path.resolve(filePath);
+      return (
+        resolved === rendererRoot ||
+        resolved.startsWith(rendererRoot + path.sep)
+      );
+    }
+    return isAllowedExternalUrl(url, {
+      appUrls: collectDesktopAppUrls(),
+      extraHosts: ["github.com", "www.github.com"],
+    });
+  } catch {
+    return false;
+  }
+}
+
+function attachWindowGuards(win) {
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (
+      isAllowedExternalUrl(url, {
+        appUrls: collectDesktopAppUrls(),
+        extraHosts: ["github.com", "www.github.com", "render.com", "docs.render.com"],
+      })
+    ) {
+      void shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
+  win.webContents.on("will-navigate", (event, url) => {
+    if (isAllowedDesktopNavigation(url)) return;
+    event.preventDefault();
+  });
+}
+
 function ensureWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
   mainWindow = new BrowserWindow({
@@ -192,8 +246,10 @@ function ensureWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
+  attachWindowGuards(mainWindow);
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -212,6 +268,7 @@ async function probeRemote(url) {
       signal: AbortSignal.timeout(8000),
       cache: "no-store",
       headers: { "Cache-Control": "no-cache" },
+      redirect: "error",
     });
     const body = await res.json().catch(() => ({}));
     // 503 con version = Host vivo (p. ej. DB momentánea); sigue sirviendo updates
@@ -652,18 +709,9 @@ ipcMain.handle("desktop:save-setup", async (_e, payload) => {
 });
 
 ipcMain.handle("desktop:open-external", async (_e, url) => {
-  const cfg = readConfig();
-  const appUrls = [
-    hostHandle?.url,
-    hostHandle?.publicUrl,
-    cfg.publicUrl,
-    cfg.remoteUrl,
-    localAppUrl(cfg.port || 3000),
-    process.env.NEXT_PUBLIC_APP_URL,
-  ].filter(Boolean);
   if (
     !isAllowedExternalUrl(url, {
-      appUrls,
+      appUrls: collectDesktopAppUrls(),
       extraHosts: ["github.com", "www.github.com", "render.com", "docs.render.com"],
     })
   ) {

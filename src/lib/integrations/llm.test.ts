@@ -5,6 +5,7 @@ import {
   LLM_PRESET_CATALOG,
   legalSystemPrompt,
 } from "./llm";
+import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
 
 assert.ok(LLM_PRESETS.openai.apiUrl.includes("openai.com"));
 assert.ok(LLM_PRESETS.groq.apiUrl.includes("groq.com"));
@@ -30,5 +31,10 @@ assert.match(prompt, /Andes/);
 
 const legacy = legalSystemPrompt("contexto legacy");
 assert.match(legacy, /contexto legacy/);
+
+const sealed = encryptSecret("sk-test-llm-key");
+assert.match(sealed, /^enc:v2:/);
+assert.equal(decryptSecret(sealed, { strict: true }), "sk-test-llm-key");
+assert.equal(decryptSecret("sk-legacy-plain", { strict: false }), "sk-legacy-plain");
 
 console.log("integrations/llm.test.ts OK");
