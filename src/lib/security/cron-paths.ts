@@ -27,3 +27,14 @@ export function cronSecretMatches(
   for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return out === 0;
 }
+
+/** Same gate used by `src/proxy.ts` before allowing session-less cron POSTs. */
+export function isAuthorizedCronRequest(
+  pathname: string,
+  providedSecret: string | null | undefined,
+  expectedSecret: string | null | undefined = process.env.CRON_SECRET
+): boolean {
+  return (
+    isCronApiPath(pathname) && cronSecretMatches(providedSecret, expectedSecret)
+  );
+}

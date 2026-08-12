@@ -159,6 +159,47 @@ assert.match(
   /LEXOPEN_DEMO_SWITCHER=0/
 );
 
+// Upgrade: copied .env.example Hermes/PJUD demo flags become fail-closed 0
+const hermesDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-hermes-demo-"));
+fs.writeFileSync(
+  envPath(hermesDir),
+  [
+    "SESSION_SECRET=abcdefghijklmnopqrstuvwxyz12",
+    "HERMES_ALLOW_DEMO=1",
+    "PJUD_ALLOW_DEMO=1",
+    "",
+  ].join("\n"),
+  "utf8"
+);
+ensureHostEnv(hermesDir, {
+  port: 3043,
+  pgPort: 54343,
+  publicUrl: "http://127.0.0.1:3043",
+});
+const hermesEnv = fs.readFileSync(envPath(hermesDir), "utf8");
+assert.match(hermesEnv, /HERMES_ALLOW_DEMO=0/);
+assert.match(hermesEnv, /PJUD_ALLOW_DEMO=0/);
+const keepHermesDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-keep-hermes-"));
+fs.writeFileSync(
+  envPath(keepHermesDir),
+  [
+    "SESSION_SECRET=abcdefghijklmnopqrstuvwxyz12",
+    "HERMES_ALLOW_DEMO=1",
+    "LEXOPEN_KEEP_HERMES_DEMO=1",
+    "",
+  ].join("\n"),
+  "utf8"
+);
+ensureHostEnv(keepHermesDir, {
+  port: 3044,
+  pgPort: 54344,
+  publicUrl: "http://127.0.0.1:3044",
+});
+assert.match(
+  fs.readFileSync(envPath(keepHermesDir), "utf8"),
+  /HERMES_ALLOW_DEMO=1/
+);
+
 // segunda pasada: no reescribe SESSION_SECRET ni añade basura
 const secret1 = env1.match(/^SESSION_SECRET=(.+)$/m)[1];
 fs.appendFileSync(envPath(tmp), "LLM_API_KEY=sk-estudio\n");

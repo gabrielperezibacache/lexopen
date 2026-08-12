@@ -70,8 +70,9 @@ Use esta lista antes de cargar información real del estudio:
    posibles (no a una carpeta temporal del instalador).
 2. **Sin demo:** en el `.env` del data dir,
    `LEXOPEN_DEMO_SWITCHER=0`, `HERMES_ALLOW_DEMO=0`, `LLM_ALLOW_DEMO=0`,
-   `PJUD_ALLOW_DEMO=0`. No use `npm run db:seed` / `setup` / `db:reset` con datos
-   reales; prefiera `npm run setup:production` o el arranque de `web:host`.
+   `PJUD_ALLOW_DEMO=0`. `web:host` fuerza esos valores a `0` si venía un
+   `.env` copiado con `=1` (salvo `LEXOPEN_KEEP_*_DEMO=1`). No use
+   `npm run db:seed` / `setup` / `db:reset` con datos reales.
 3. **Primer admin:** abra `/setup?token=…` una sola vez; elimine o rote
    `LEXOPEN_BOOTSTRAP_TOKEN` después.
 4. **Health:** `curl http://127.0.0.1:3000/api/health` → `db: "up"` y, en
