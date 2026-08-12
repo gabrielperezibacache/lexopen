@@ -2,7 +2,8 @@
 
 1. Fork y rama `cursor/<feature>-xxxx` o `feat/<nombre>`.
 2. `npm run setup && npm run dev` para datos demo Chile.
-3. Mantenga el español en la UI orientada al estudio.
+3. Mantenga el español en la UI orientada a la práctica jurídica en Chile
+   (abogados independientes y estudios).
 4. No agregue secretos reales a commits; use `.env.example`.
 5. PR con descripción de módulos tocados (causas, jurisprudencia, integraciones).
 
