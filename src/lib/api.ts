@@ -18,6 +18,7 @@ import {
   isAllowedOrigin,
   normalizeOrigin,
 } from "@/lib/csrf";
+import { assertCsrfDoubleSubmit } from "@/lib/auth/csrf-token";
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -135,6 +136,23 @@ export function assertCsrf(req: Request) {
   }
   if (!okOrigin && !okReferer) {
     throw httpError("CSRF: origen no permitido", 403);
+  }
+
+  // Defense in depth: double-submit when a session exists (prod).
+  // Skip bootstrap auth endpoints that mint the CSRF cookie.
+  let pathname = "";
+  try {
+    pathname = new URL(req.url).pathname;
+  } catch {
+    pathname = "";
+  }
+  const skipDoubleSubmit = [
+    "/api/auth/login",
+    "/api/auth/recover",
+    "/api/setup",
+  ].includes(pathname);
+  if (!skipDoubleSubmit) {
+    assertCsrfDoubleSubmit(req);
   }
 }
 

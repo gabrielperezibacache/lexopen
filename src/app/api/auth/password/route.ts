@@ -9,6 +9,8 @@ import {
   SESSION_COOKIE,
   buildSessionCookieValue,
 } from "@/lib/auth/session";
+import { baseCookieOptions } from "@/lib/auth/cookie-options";
+import { appendCsrfCookie } from "@/lib/auth/csrf-token";
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,20 +47,13 @@ export async function POST(req: NextRequest) {
       user.role
     );
     const response = NextResponse.json({ ok: true });
-    const cookieBase = {
-      sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: session.maxAge,
-    };
-    response.cookies.set(SESSION_COOKIE, session.value, {
-      ...cookieBase,
-      httpOnly: true,
-    });
+    const cookieBase = baseCookieOptions({ maxAge: session.maxAge });
+    response.cookies.set(SESSION_COOKIE, session.value, cookieBase);
     response.cookies.set(ROLE_COOKIE, user.role, {
       ...cookieBase,
       httpOnly: false,
     });
+    appendCsrfCookie(response);
     return response;
   } catch (e) {
     return handleRouteError(e);

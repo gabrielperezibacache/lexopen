@@ -215,6 +215,27 @@ async function saveGoogleConfig(config: GoogleConfig, enabled = true) {
   });
 }
 
+/** Actualiza opciones de sync sin tocar tokens OAuth. */
+export async function updateGoogleSyncOptions(opts: {
+  enabled?: boolean;
+  syncDrive?: boolean;
+  syncCalendar?: boolean;
+}) {
+  const current = await getGoogleConfig();
+  const row = await prisma.integrationConfig.findUnique({
+    where: { provider: "google" },
+  });
+  await saveGoogleConfig(
+    {
+      ...current,
+      syncDrive: opts.syncDrive ?? current.syncDrive,
+      syncCalendar: opts.syncCalendar ?? current.syncCalendar,
+    },
+    opts.enabled ?? row?.enabled ?? Boolean(current.accessToken)
+  );
+  return getGoogleConfig();
+}
+
 /** Refresca el access token si está por expirar (buffer 60s). */
 export async function ensureGoogleAccessToken(): Promise<GoogleConfig> {
   const config = await getGoogleConfig();

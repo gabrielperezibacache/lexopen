@@ -8,8 +8,10 @@ import {
 } from "@/lib/auth/session";
 import { hashPassword, looksHashed, verifyPassword } from "@/lib/auth/password";
 import { canImpersonate } from "@/lib/auth/rbac";
-import { rateLimit } from "@/lib/auth/rate-limit";
+import { rateLimitAsync, rateLimitAuthFailure } from "@/lib/auth/rate-limit";
 import { assertCsrf, handleRouteError } from "@/lib/api";
+import { baseCookieOptions } from "@/lib/auth/cookie-options";
+import { appendCsrfCookie } from "@/lib/auth/csrf-token";
 
 const schema = z.object({
   email: z.string().email(),
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
           req.headers.get("x-real-ip") ||
           "unknown"
         : "direct";
-    const limited = rateLimit(`login:${ip}`, 40, 15 * 60 * 1000);
+    const limited = await rateLimitAsync(`login:${ip}`, 40, 15 * 60 * 1000);
     if (!limited.ok) {
       return NextResponse.json(
         { error: "Demasiados intentos. Espere e intente de nuevo." },
@@ -45,7 +47,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const emailLimited = rateLimit(`login-email:${email}`, 10, 15 * 60 * 1000);
+    const emailLimited = await rateLimitAsync(
+      `login-email:${email}`,
+      10,
+      15 * 60 * 1000
+    );
     if (!emailLimited.ok) {
       return NextResponse.json(
         { error: "Demasiados intentos para este usuario." },
@@ -55,11 +61,35 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
+      const failed = await rateLimitAuthFailure(`login-fail:${email}`);
+      if (!failed.ok) {
+        return NextResponse.json(
+          { error: "Demasiados intentos. Espere e intente de nuevo." },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(Math.ceil((failed.retryAfterMs || 60000) / 1000)),
+            },
+          }
+        );
+      }
       return NextResponse.json({ error: "Credenciales inválidas" }, { status: 401 });
     }
 
     const ok = await verifyPassword(body.password, user.password);
     if (!ok) {
+      const failed = await rateLimitAuthFailure(`login-fail:${email}`);
+      if (!failed.ok) {
+        return NextResponse.json(
+          { error: "Demasiados intentos. Espere e intente de nuevo." },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(Math.ceil((failed.retryAfterMs || 60000) / 1000)),
+            },
+          }
+        );
+      }
       return NextResponse.json({ error: "Credenciales inválidas" }, { status: 401 });
     }
 
@@ -86,19 +116,14 @@ export async function POST(req: NextRequest) {
       },
       demoSwitcher: canImpersonate(),
     });
-    const cookieBase = {
-      httpOnly: true,
-      sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: session.maxAge,
-    };
+    const cookieBase = baseCookieOptions({ maxAge: session.maxAge });
     res.cookies.set(SESSION_COOKIE, session.value, cookieBase);
     // UX hint only — authorization uses the signed session token role.
     res.cookies.set(ROLE_COOKIE, user.role, {
       ...cookieBase,
       httpOnly: false,
     });
+    appendCsrfCookie(res);
     return res;
   } catch (e) {
     if (e instanceof z.ZodError) {

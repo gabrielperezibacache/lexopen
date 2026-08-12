@@ -12,7 +12,7 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
   const { app, storage, ocr, pjud, backups, queue, counts } = status;
 
   return (
-    <section className="panel space-y-5 rounded-3xl p-5" data-testid="host-status-panel">
+    <section className="panel space-y-5 rounded-3xl p-5" data-testid="host-status-panel" id="host-status">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Estado del Host</h2>

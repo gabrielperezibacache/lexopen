@@ -258,6 +258,7 @@ async function startHostMode(cfg) {
     port: cfg.port,
     pgPort: cfg.pgPort,
   });
+  // Open setup with token in the BrowserWindow only — status/IPC omits the secret.
   const targetUrl = hostHandle.needsSetup
     ? `${hostHandle.url}/setup?token=${encodeURIComponent(hostHandle.bootstrapToken)}`
     : hostHandle.url;
@@ -269,7 +270,8 @@ async function startHostMode(cfg) {
   sendStatus({
     phase: hostHandle.needsSetup ? "setup" : "ready",
     message: msg,
-    url: targetUrl,
+    url: hostHandle.url,
+    setupPending: Boolean(hostHandle.needsSetup),
     publicUrl: hostHandle.publicUrl,
     version: hostHandle.version,
     updateRecognized: hostHandle.updateRecognized,

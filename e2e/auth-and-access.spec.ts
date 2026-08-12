@@ -35,7 +35,15 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   await expect(
     page.getByRole("heading", { name: "Configuración del estudio" })
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Usuarios del estudio" })
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Crear usuario" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Estado del Host" })).toBeVisible();
+
+  await page.goto("/personas");
+  await expect(page.getByRole("heading", { name: "Personas" })).toBeVisible();
+  await expect(page.getByTestId("people-manager")).toBeVisible();
 
   await page.goto("/causas");
   await expect(page).toHaveURL(/\/causas$/);

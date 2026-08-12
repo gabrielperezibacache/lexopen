@@ -38,16 +38,37 @@ export async function POST(req: Request) {
           { status: 403 }
         );
       }
+      const cfg = body.config || {};
+      const vaultPath = String(cfg.vaultPath || "").trim().slice(0, 500);
+      const folderPrefix = String(cfg.folderPrefix || "LexOpen")
+        .trim()
+        .slice(0, 80);
+      if (!vaultPath) {
+        return NextResponse.json(
+          { error: "vaultPath es requerido" },
+          { status: 400 }
+        );
+      }
       await prisma.integrationConfig.upsert({
         where: { provider: "obsidian" },
         create: {
           provider: "obsidian",
           enabled: Boolean(body.enabled ?? true),
-          configJson: JSON.stringify(body.config || {}),
+          configJson: JSON.stringify({
+            vaultPath,
+            folderPrefix: folderPrefix || "LexOpen",
+            syncNotes: Boolean(cfg.syncNotes ?? true),
+            syncDocumentos: Boolean(cfg.syncDocumentos ?? true),
+          }),
         },
         update: {
           enabled: Boolean(body.enabled ?? true),
-          configJson: JSON.stringify(body.config || {}),
+          configJson: JSON.stringify({
+            vaultPath,
+            folderPrefix: folderPrefix || "LexOpen",
+            syncNotes: Boolean(cfg.syncNotes ?? true),
+            syncDocumentos: Boolean(cfg.syncDocumentos ?? true),
+          }),
         },
       });
       return NextResponse.json({ ok: true });

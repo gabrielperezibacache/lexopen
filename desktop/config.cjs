@@ -296,6 +296,41 @@ function normalizeRemoteUrl(url) {
   return t;
 }
 
+function isLoopbackPublicUrl(url) {
+  try {
+    const host = new URL(normalizeRemoteUrl(url) || "http://127.0.0.1").hostname;
+    return (
+      host === "127.0.0.1" ||
+      host === "localhost" ||
+      host === "::1" ||
+      host === "[::1]"
+    );
+  } catch {
+    return true;
+  }
+}
+
+/** Bind loopback by default; open LAN only when a non-local publicUrl is set. */
+function resolveBindHost(publicUrl, explicit) {
+  const forced = String(explicit || "").trim();
+  if (forced) return forced;
+  if (publicUrl && !isLoopbackPublicUrl(publicUrl)) return "0.0.0.0";
+  return "127.0.0.1";
+}
+
+function pgPasswordFromDatabaseUrl(databaseUrl) {
+  try {
+    const parsed = new URL(databaseUrl);
+    return decodeURIComponent(parsed.password || "") || null;
+  } catch {
+    return null;
+  }
+}
+
+function newPgPassword() {
+  return crypto.randomBytes(18).toString("base64url");
+}
+
 /**
  * Garantiza .env mínimo para Host sin borrar secretos ni overrides del usuario.
  * STORAGE_PATH / vault siempre bajo dataDir (sobreviven al actualizar el .app/.exe).
@@ -314,12 +349,15 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
   const publicUrl =
     normalizeRemoteUrl(opts.publicUrl || cfg.publicUrl) ||
     `http://127.0.0.1:${port}`;
+  const bindHost = resolveBindHost(publicUrl, opts.bindHost || process.env.LEXOPEN_BIND);
+  const pgPassword = newPgPassword();
 
   const defaults = {
-    DATABASE_URL: `postgresql://lexopen:lexopen@127.0.0.1:${pgPort}/lexopen`,
+    // Random DB password for new Host installs (preserved once written).
+    DATABASE_URL: `postgresql://lexopen:${encodeURIComponent(pgPassword)}@127.0.0.1:${pgPort}/lexopen`,
     SESSION_SECRET: crypto.randomBytes(24).toString("hex"),
     PORT: String(port),
-    HOSTNAME: "0.0.0.0",
+    HOSTNAME: bindHost,
     LEXOPEN_DESKTOP: "1",
     LEXOPEN_DESKTOP_MODE: "host",
     LEXOPEN_DATA_DIR: dataDir,
@@ -342,6 +380,7 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     PJUD_SCRAPER_KEY: crypto.randomBytes(24).toString("hex"),
     PJUD_SCRAPER_URL: "http://127.0.0.1:8787",
     PJUD_SCRAPER_ALLOW_PRIVATE: "1",
+    LEXOPEN_COOKIE_SECURE: publicUrl.startsWith("https://") ? "1" : "0",
   };
 
   const merged = mergeEnvPreserveUser(existing, defaults);
@@ -365,6 +404,7 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     envFile: file,
     port: Number(finalMap.PORT || port),
     pgPort,
+    bindHost: finalMap.HOSTNAME || bindHost,
     databaseUrl: finalMap.DATABASE_URL,
     publicUrl: finalMap.NEXT_PUBLIC_APP_URL || publicUrl,
     storagePath: finalMap.STORAGE_PATH || storageDir(dataDir),
@@ -405,6 +445,10 @@ module.exports = {
   serializeEnv,
   mergeEnvPreserveUser,
   normalizeRemoteUrl,
+  isLoopbackPublicUrl,
+  resolveBindHost,
+  pgPasswordFromDatabaseUrl,
+  newPgPassword,
   ensureHostEnv,
   localAppUrl,
   readPackageVersion,

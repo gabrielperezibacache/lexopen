@@ -5,7 +5,7 @@ import { assertCsrf, handleRouteError } from "@/lib/api";
 import { hashPassword } from "@/lib/auth/password";
 import { isValidBootstrapToken } from "@/lib/auth/bootstrap";
 import { writeAudit } from "@/lib/audit";
-import { rateLimit } from "@/lib/auth/rate-limit";
+import { rateLimitAsync } from "@/lib/auth/rate-limit";
 
 const recoverySchema = z.object({
   token: z.string().min(1).max(256),
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
           req.headers.get("x-real-ip") ||
           "direct"
         : "direct";
-    const limited = rateLimit(`recover:${ip}`, 10, 15 * 60 * 1000);
+    const limited = await rateLimitAsync(`recover:${ip}`, 10, 15 * 60 * 1000);
     if (!limited.ok) {
       return NextResponse.json(
         { error: "Demasiados intentos de recuperación" },
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const body = recoverySchema.parse(await req.json());
-    const tokenLimited = rateLimit(
+    const tokenLimited = await rateLimitAsync(
       `recover-token:${body.token.slice(0, 16)}`,
       8,
       15 * 60 * 1000

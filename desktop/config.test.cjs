@@ -13,6 +13,8 @@ const {
   readAppState,
   envPath,
   storageDir,
+  resolveBindHost,
+  pgPasswordFromDatabaseUrl,
 } = require("./config.cjs");
 
 assert.equal(normalizeRemoteUrl("pc.tailnet.ts.net:3000"), "http://pc.tailnet.ts.net:3000");
@@ -21,6 +23,13 @@ assert.equal(
   "https://pc.tailnet.ts.net"
 );
 assert.equal(localAppUrl(3000), "http://127.0.0.1:3000");
+assert.equal(resolveBindHost("http://127.0.0.1:3000"), "127.0.0.1");
+assert.equal(resolveBindHost("http://pc.ts.net:3000"), "0.0.0.0");
+assert.equal(resolveBindHost("http://pc.ts.net:3000", "127.0.0.1"), "127.0.0.1");
+assert.equal(
+  pgPasswordFromDatabaseUrl("postgresql://lexopen:s3cret@127.0.0.1:54329/lexopen"),
+  "s3cret"
+);
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-desktop-"));
 
@@ -57,6 +66,12 @@ const host = ensureHostEnv(tmp, {
   publicUrl: "http://pc.ts.net:3010",
 });
 assert.match(host.databaseUrl, /54330/);
+assert.equal(host.bindHost, "0.0.0.0");
+assert.match(
+  host.databaseUrl,
+  /^postgresql:\/\/lexopen:[^:@/]+@127\.0\.0\.1:54330\/lexopen$/
+);
+assert.notEqual(pgPasswordFromDatabaseUrl(host.databaseUrl), "lexopen");
 assert.equal(host.storagePath, storageDir(tmp));
 const env1 = fs.readFileSync(envPath(tmp), "utf8");
 const bootstrapToken = env1.match(/^LEXOPEN_BOOTSTRAP_TOKEN=(.+)$/m)[1];
@@ -66,10 +81,17 @@ assert.match(recoveryToken, /^[a-f0-9]{64}$/);
 assert.match(env1, /HERMES_ALLOW_DEMO=0/);
 assert.match(env1, /PJUD_ALLOW_DEMO=0/);
 assert.match(env1, /LEXOPEN_DEMO_SWITCHER=0/);
+assert.match(env1, /HOSTNAME=0\.0\.0\.0/);
 assert.match(env1, /PJUD_SCRAPER_URL=http:\/\/127\.0\.0\.1:8787/);
 assert.match(env1, /PJUD_SCRAPER_ALLOW_PRIVATE=1/);
 assert.match(env1, /^CRON_SECRET=[a-f0-9]{48}$/m);
 assert.match(env1, /^PJUD_SCRAPER_KEY=[a-f0-9]{48}$/m);
+
+const loopbackHost = ensureHostEnv(
+  fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-desktop-loop-")),
+  { port: 3020, pgPort: 54331, publicUrl: "http://127.0.0.1:3020" }
+);
+assert.equal(loopbackHost.bindHost, "127.0.0.1");
 
 // segunda pasada: no reescribe SESSION_SECRET ni añade basura
 const secret1 = env1.match(/^SESSION_SECRET=(.+)$/m)[1];

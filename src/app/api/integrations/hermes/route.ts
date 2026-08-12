@@ -7,7 +7,12 @@ import {
   legalSystemPrompt,
   type HermesMessage,
 } from "@/lib/integrations/hermes";
-import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
+import {
+  getLlmConfig,
+  publicLlmConfig,
+  saveLlmConfig,
+  LLM_PRESET_CATALOG,
+} from "@/lib/integrations/llm";
 import { buildAiContextPack } from "@/lib/ai/context-pack";
 import {
   AI_UTILITIES,
@@ -25,6 +30,7 @@ import {
   renderMinutaMarkdown,
 } from "@/lib/minutas";
 import { writeAudit } from "@/lib/audit";
+import { llmConfigSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
   try {
@@ -45,15 +51,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(chats);
     }
 
-    const row = await prisma.integrationConfig.findUnique({
-      where: { provider: "hermes" },
-    });
-    const config = await getHermesConfig();
+    const [row, llmRow] = await Promise.all([
+      prisma.integrationConfig.findUnique({ where: { provider: "hermes" } }),
+      prisma.integrationConfig.findUnique({ where: { provider: "llm" } }),
+    ]);
+    const config = await getLlmConfig();
     return NextResponse.json({
-      enabled: row?.enabled ?? true,
-      configured: Boolean(row),
-      config: { ...config, apiKey: config.apiKey ? "••••" : "" },
+      enabled: llmRow?.enabled ?? row?.enabled ?? true,
+      config: publicLlmConfig(config),
+      presets: LLM_PRESET_CATALOG,
       utilities: AI_UTILITIES,
+      // Compat: legacy HermesConfig shape
+      hermes: await getHermesConfig().then((c) => ({
+        ...c,
+        apiKey: c.apiKey ? "••••" : "",
+      })),
     });
   } catch (e) {
     return handleRouteError(e);
@@ -69,62 +81,35 @@ export async function POST(req: Request) {
     if (body.action === "save-config") {
       if (user.role !== "admin") {
         return NextResponse.json(
-          { error: "Solo admin puede configurar Hermes" },
+          { error: "Solo admin puede configurar el proveedor IA" },
           { status: 403 }
         );
       }
-      const existing = await prisma.integrationConfig.findUnique({
-        where: { provider: "hermes" },
-      });
-      const prev = safeJsonParse<Record<string, unknown>>(
-        existing?.configJson || "{}",
-        {}
-      );
-      const nextConfig: Record<string, unknown> = { ...prev };
-
-      const apiUrlRaw = body.config?.apiUrl;
-      if (apiUrlRaw !== undefined && apiUrlRaw !== null) {
-        const apiUrl = String(apiUrlRaw).trim();
-        if (apiUrl) {
-          if (!isSafeHttpUrl(apiUrl) || apiUrl.length > 500) {
-            return NextResponse.json(
-              { error: "URL de Hermes inválida" },
-              { status: 400 }
-            );
-          }
-          nextConfig.apiUrl = apiUrl.replace(/\/+$/, "");
-        }
-        // URL vacía: conservar la anterior (no borrar)
-      }
-
-      if (typeof body.config?.model === "string" && body.config.model.trim()) {
-        nextConfig.model = body.config.model.trim().slice(0, 120);
-      }
-      if (typeof body.config?.requireApproval === "boolean") {
-        nextConfig.requireApproval = body.config.requireApproval;
-      }
-      const apiKeyRaw = body.config?.apiKey;
-      if (typeof apiKeyRaw === "string") {
-        const key = apiKeyRaw.trim();
-        if (key && key !== "••••") {
-          nextConfig.apiKey = key.slice(0, 500);
-        }
-        // "••••" o vacío: conservar clave previa
-      }
-
-      await prisma.integrationConfig.upsert({
-        where: { provider: "hermes" },
-        create: {
-          provider: "hermes",
+      const parsed = llmConfigSchema.parse(body.config || {});
+      try {
+        const saved = await saveLlmConfig({
           enabled: Boolean(body.enabled ?? true),
-          configJson: JSON.stringify(nextConfig),
-        },
-        update: {
-          enabled: Boolean(body.enabled ?? true),
-          configJson: JSON.stringify(nextConfig),
-        },
-      });
-      return NextResponse.json({ ok: true });
+          config: {
+            ...parsed,
+            apiKey:
+              parsed.apiKey === null || parsed.apiKey === undefined
+                ? undefined
+                : parsed.apiKey,
+          },
+        });
+        return NextResponse.json({
+          ok: true,
+          config: publicLlmConfig(saved),
+        });
+      } catch (err) {
+        return NextResponse.json(
+          {
+            error:
+              err instanceof Error ? err.message : "URL de endpoint IA inválida",
+          },
+          { status: 400 }
+        );
+      }
     }
 
     if (body.action === "estimate-plazo") {
@@ -702,15 +687,4 @@ export async function POST(req: Request) {
   } catch (e) {
     return handleRouteError(e);
   }
-}
-
-function isSafeHttpUrl(value: unknown) {
-  if (typeof value !== "string" || value.length > 500) return false;
-  const allowLocal =
-    process.env.NODE_ENV !== "production" ||
-    process.env.HERMES_ALLOW_PRIVATE_URL === "1";
-  return isSafeOutboundHttpUrl(value, {
-    allowHttp: allowLocal,
-    allowLoopback: allowLocal,
-  });
 }

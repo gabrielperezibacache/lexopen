@@ -186,3 +186,14 @@ export const feeArrangementCreateSchema = z.object({
   clienteId: z.string().optional().nullable(),
   causaId: z.string().optional().nullable(),
 });
+
+export const llmConfigSchema = z.object({
+  preset: z
+    .enum(["openai", "azure", "groq", "ollama", "hermes", "custom"])
+    .optional(),
+  apiUrl: z.string().min(1).max(500).optional(),
+  apiKey: z.string().max(500).optional().nullable(),
+  model: z.string().min(1).max(200).optional(),
+  requireApproval: z.boolean().optional(),
+  allowDemo: z.boolean().optional(),
+});

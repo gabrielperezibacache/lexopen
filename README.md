@@ -55,6 +55,7 @@
 - [Aplicación desktop](#-aplicación-desktop)
 - [API](#-api)
 - [Producción en Host local](#-producción-en-host-local)
+- [Cómo actualizar la aplicación](#-cómo-actualizar-la-aplicación)
 - [Seguridad y límites actuales](#-seguridad-y-límites-actuales)
 - [Desarrollo y pruebas](#-desarrollo-y-pruebas)
 - [Estructura del repositorio](#-estructura-del-repositorio)
@@ -478,8 +479,10 @@ variables más relevantes:
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | No | Bucket y endpoint de almacenamiento S3-compatible. |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | No | Credenciales del bucket S3-compatible. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | No | OAuth de Google Drive y Calendar. |
-| `HERMES_API_URL`, `HERMES_API_KEY` | No | Endpoint y credencial de la API compatible con OpenAI. |
-| `HERMES_ALLOW_DEMO` | No | Permite una respuesta local claramente marcada si Hermes no está disponible. |
+| `HERMES_API_URL`, `HERMES_API_KEY` | No | Compat: endpoint Hermes Agent (fallback si no hay `LLM_*`). |
+| `HERMES_ALLOW_DEMO` | No | Compat: permite demo si el proveedor no está disponible. |
+| `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL` | No | Endpoint multi-proveedor OpenAI-compatible (OpenAI, Azure, Groq, Ollama, Hermes, custom). Prioridad sobre `HERMES_*`. |
+| `LLM_ALLOW_DEMO` | No | Demo etiquetado si el proveedor IA no responde (`0` = fail-closed). |
 | `PJUD_API_URL`, `PJUD_API_KEY` | No | Conector partner para sincronizar movimientos judiciales. |
 | `PJUD_SCRAPER_URL`, `PJUD_SCRAPER_KEY` | No | Sidecar scrape (lookup + Mis Causas), estilo CausaMonitor. |
 | `PJUD_PUBLIC_SCRAPE` | No | `1` = scrape OJV in-process (Playwright + CAPTCHA). |
@@ -527,18 +530,31 @@ no confidenciales (prioriza `extractedMarkdown` y respeta subcarpetas
 `Documentos/<ruta>/…`). Puede escribir en un vault local durante el desarrollo, usar
 Obsidian Local REST API o conservar los objetos mediante el backend de storage.
 
-### Copiloto IA (Hermes)
+### Hermes Agent / IA multi-proveedor
 
-Envía solicitudes a `POST {HERMES_API_URL}/chat/completions` con formato compatible
-con OpenAI. La consola **Copiloto IA** (`/agente`) ofrece utilidades (briefing, plazos,
-documentos, borradores, investigación con wiki/jurisprudencia) con fuentes ancladas del
-estudio. El context pack ancla la respuesta a la causa, la **carpeta investigativa**
-(`ruta`), documentos rankeados por la pregunta, VDR/wiki del espacio vinculado y
-plazos. En `/agente` se puede acotar por carpeta o documentos; el alcance y las
-fuentes se restauran al reanudar el chat. Las respuestas se guardan como historial de
-chat; los borradores se pueden aprobar y guardar como minuta de la causa. Con
-`HERMES_ALLOW_DEMO=1`, una respuesta local de demostración se identifica
-explícitamente como tal.
+El copiloto usa cualquier API compatible con OpenAI Chat Completions. Configure el
+proveedor en **Configuración → Endpoints de IA** (`LlmSettingsForm`, con prueba de
+conexión y CSRF) o con variables de entorno:
+
+- `LLM_API_URL` / `LLM_API_KEY` / `LLM_MODEL` (prioridad)
+- o `HERMES_API_URL` / `HERMES_API_KEY` (compat)
+
+Presets: OpenAI, Azure OpenAI, Groq, Ollama (local), Hermes Agent, o URL custom.
+Las solicitudes van a `POST {apiUrl}/chat/completions`. La consola **Copiloto IA**
+(`/agente`) ofrece utilidades (briefing, plazos, documentos, borradores,
+investigación con wiki/jurisprudencia) con fuentes ancladas del estudio. El context
+pack ancla la respuesta a la causa, la **carpeta investigativa** (`ruta` /
+`documentoId`), documentos rankeados por la pregunta, VDR/wiki del espacio
+vinculado y plazos. En `/agente` se puede acotar por carpeta o documentos; el
+alcance y las fuentes se restauran al reanudar el chat, y el asistente propone
+próximos pasos sugeridos (crear tarea, calcular plazo, etc.).
+
+Las respuestas se guardan como historial de chat y requieren aprobación humana:
+un borrador puede **descartarse** o **aprobarse y guardarse como minuta** de la
+causa (`approve-to-minuta`), quedando enlazado al chat para evitar aprobaciones
+duplicadas. Con `LLM_ALLOW_DEMO=1` (o `HERMES_ALLOW_DEMO=1`), una respuesta local
+de demostración se identifica explícitamente como tal y su aprobación como minuta
+exige una confirmación explícita adicional.
 
 No es asesoría jurídica automática: no presente ni envíe un texto generado sin
 revisión del abogado responsable.
@@ -656,7 +672,7 @@ Principales grupos de endpoints:
 | Minutas | `/api/minutas`, `/api/minutas/plantillas` |
 | Colaboración | `/api/messages`, `/api/notifications`, `/api/people` |
 | Facturación | `/api/billing/*` |
-| Integraciones | `/api/integrations/google`, `/api/integrations/obsidian`, `/api/integrations/hermes` |
+| Integraciones | `/api/integrations/google`, `/api/integrations/obsidian`, `/api/integrations/llm`, `/api/integrations/hermes` |
 
 Para explorar contratos concretos, consulte las route handlers y los schemas Zod
 junto a cada módulo. Los ejemplos mutantes necesitan cookies de sesión y, según la
@@ -685,6 +701,97 @@ Demos deben permanecer apagadas (`LEXOPEN_DEMO_SWITCHER=0`, `HERMES_ALLOW_DEMO=0
 `PJUD_ALLOW_DEMO=0`). El sidecar PJUD y los crons de sync/digest también son
 locales (`npm run pjud:host` + intervalos en el `.env` del data dir).
 
+## 🔄 Cómo actualizar la aplicación
+
+Actualizar LexOpen reemplaza el **código** (y aplica migraciones de base de datos).
+La carpeta de datos (`LEXOPEN_DATA_DIR`, Application Support / `%APPDATA%\LexOpen`)
+**no se borra**: PostgreSQL, documentos, vault y `.env` se conservan.
+
+### Antes de actualizar
+
+1. Avise a quienes usen el Host (la app estará unos minutos fuera de línea).
+2. Cree un respaldo con el Host **detenido**:
+
+   ```bash
+   # Host web
+   npm run web:backup -- --output /ruta/externa/lexopen-backup
+
+   # Desktop: menú LexOpen → Crear respaldo…
+   ```
+
+3. **No ejecute** `npm run db:seed`, `npm run setup`, `npm run db:reset` ni
+   `npm run db:purge-demo` sobre una instalación con datos reales.
+
+### Host web (recomendado)
+
+En el PC que ejecuta LexOpen:
+
+```bash
+# 1) Detenga el Host (Ctrl+C o systemctl/launchd/tarea programada)
+cd /ruta/al/repo/lexopen
+
+# 2) Traiga el código nuevo
+git fetch origin
+git checkout main
+git pull origin main
+
+# 3) Dependencias
+npm ci
+
+# 4) Arranque de nuevo (web:host aplica migraciones Prisma al iniciar)
+LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
+```
+
+Si usa servicio automático, reinicie el servicio después de `npm ci` (por ejemplo
+`sudo systemctl restart lexopen-web`). Detalle en [`docs/WEB-HOST.md`](docs/WEB-HOST.md).
+
+Compruebe:
+
+```bash
+curl -s http://127.0.0.1:3000/api/health
+```
+
+Debe mostrar `db: "up"`, `storageReady: true` y la nueva `version`. Los clientes
+con navegador ven la UI nueva con un refresh (F5).
+
+### Desarrollo o Postgres externo
+
+Si corre `next dev` / `next start` contra un PostgreSQL propio (no el embebido de
+`web:host`):
+
+```bash
+git pull origin main
+npm ci
+npm run db:migrate          # o: npm run setup:production
+npm run build               # si usa next start en producción
+npm run start               # o npm run dev
+```
+
+### Aplicación desktop
+
+1. Descargue el instalador nuevo desde [GitHub Releases](https://github.com/gabrielperezibacache/lexopen/releases)
+   (o acepte la actualización que ofrece el Host empaquetado).
+2. Instale **encima** en el PC Host: no se tocan `%APPDATA%\LexOpen` /
+   `~/Library/Application Support/LexOpen/`.
+3. Arranque el Host: aplicará migraciones y registrará la versión nueva.
+4. Clientes Desktop recargan solos al detectar el cambio; el navegador necesita F5.
+
+Detalle del flujo y límites del auto-update: [`docs/DESKTOP.md`](docs/DESKTOP.md).
+
+### Si algo falla
+
+1. Detenga el Host.
+2. Restaure el respaldo:
+
+   ```bash
+   npm run web:restore -- --source /ruta/externa/lexopen-backup
+   npm run web:host
+   ```
+
+   En desktop: **Restaurar respaldo…**.
+3. Abra un issue en GitHub con la versión anterior, la nueva y el error de
+   `/api/health` o de la consola del Host.
+
 ## 🔐 Seguridad y límites actuales
 
 Controles implementados en el código:
@@ -694,11 +801,15 @@ Controles implementados en el código:
 - roles de servidor y filtros de contenido confidencial;
 - cifrado AES-256-GCM de tokens Google / ClaveÚnica cuando existe `SESSION_SECRET`
   (o `PJUD_SECRETS_KEY`);
-- CSRF Origin/Referer en mutaciones de API (incluido login); en producción el
+- CSRF Origin/Referer en mutaciones de API (incluido login) más double-submit
+  (`lexopen_csrf` + `x-csrf-token`) en producción con sesión; en producción el
   header `Host` no amplía la allowlist si hay `NEXT_PUBLIC_APP_URL` /
   `LEXOPEN_TRUSTED_ORIGINS`;
-- headers de seguridad progresivos (`X-Frame-Options`, `nosniff`, CSP
-  `frame-ancestors`, etc.);
+- cookies `Secure` según URL canónica / `LEXOPEN_COOKIE_SECURE` (no solo
+  `NODE_ENV`), compatibles con Desktop Host por HTTP;
+- headers de seguridad progresivos (`X-Frame-Options`, `nosniff`, HSTS si la
+  URL es https) y CSP por request con nonce (`script-src` + `strict-dynamic`
+  vía `src/proxy.ts`);
 - salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
   Hermes y Obsidian;
 - `instrumentation` falla al arrancar si flags peligrosas están en producción;
@@ -709,7 +820,11 @@ Controles implementados en el código:
 La revisión del repositorio también identifica límites que deben considerarse antes
 de producción:
 
-- el rate limit de login es por proceso y no ofrece protección distribuida;
+- el rate limit de login usa lockout progresivo y store local
+  (`LEXOPEN_DATA_DIR/rate-limit.json`); en multi-instancia configure
+  `REDIS_URL` / `RATE_LIMIT_REDIS_URL` o Upstash REST;
+- Desktop Host enlaza `127.0.0.1` por defecto (LAN solo con URL pública) y
+  genera contraseña aleatoria de Postgres en instalaciones nuevas;
 - el portal cliente no debe presentarse como estrictamente de solo lectura sin una
   revisión adicional de permisos;
 - los campos de confidencialidad no equivalen a una implementación completa de
