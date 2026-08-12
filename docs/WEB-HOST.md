@@ -49,6 +49,11 @@ curl http://127.0.0.1:3000/api/health
 
 Debe mostrar `db: "up"`, `storageReady: true` y `needsSetup: false`.
 
+Las cargas documentales no bloquean la petición: el Host conserva el original y
+procesa Markdown/OCR en una cola local. Si se reinicia durante el procesamiento,
+la siguiente consulta a health recupera los trabajos pendientes. La tabla
+**Documentos** muestra el estado y permite reintentar.
+
 ## OCR local para PDFs escaneados
 
 El OCR es opcional. `pdf-inspector` detecta las páginas escaneadas y LexOpen usa el

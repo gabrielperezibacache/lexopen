@@ -392,6 +392,9 @@ fallback para plataformas sin ese binding. Si falta OCR, el documento queda marc
 como `Requiere OCR`. Ningún archivo se envía a Firecrawl.
 Ambas dependencias y el fallback OCR se ejecutan localmente; los bindings nativos
 se cargan según la plataforma del Host.
+El procesamiento se ejecuta en una cola local en segundo plano: la carga no espera
+al OCR, los trabajos pendientes se recuperan tras reiniciar y Documentos ofrece
+reintento cuando faltan binarios o el procesamiento falla.
 
 ### Almacenamiento de archivos
 
