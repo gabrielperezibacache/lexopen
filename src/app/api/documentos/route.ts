@@ -15,6 +15,8 @@ import { publicUserSelect } from "@/lib/auth/public-user";
 import { MAX_PROCESSING_BYTES } from "@/lib/document-processing";
 import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 import { inferDocumentoTipo, normalizeIngestPath } from "@/lib/document-ingest";
+import { sanitizeUploadMimeType } from "@/lib/security/download";
+import { documentoListSelect } from "@/lib/sites/file-select";
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,7 +27,11 @@ export async function GET(req: NextRequest) {
         ...(causaId ? { causaId } : {}),
         ...confidentialWhere(user.role),
       },
-      include: { causa: true, autor: { select: publicUserSelect } },
+      select: {
+        ...documentoListSelect,
+        causa: true,
+        autor: { select: publicUserSelect },
+      },
       orderBy: { updatedAt: "desc" },
     });
     return NextResponse.json(documentos);
@@ -130,7 +136,9 @@ export async function POST(req: NextRequest) {
         if (tipoAuto) {
           tipo = inferDocumentoTipo(ruta ? `${ruta}/${nombre}` : nombre);
         }
-        mimeType = uploaded.type || "application/octet-stream";
+        mimeType = sanitizeUploadMimeType(
+          uploaded.type || "application/octet-stream"
+        );
         const bytes = Buffer.from(await uploaded.arrayBuffer());
         processingBytes = bytes;
         extractionStatus = "pending";
@@ -144,7 +152,7 @@ export async function POST(req: NextRequest) {
       }
       if (!storageKey) {
         contenido = String(form.get("contenido") || "");
-        mimeType = mimeType || "text/plain";
+        mimeType = sanitizeUploadMimeType(mimeType || "text/plain");
       }
     } else if (tipo === "auto") {
       tipo = inferDocumentoTipo(ruta ? `${ruta}/${nombre}` : nombre);
@@ -154,12 +162,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
     }
 
+    mimeType = sanitizeUploadMimeType(mimeType || "text/markdown");
+
     if (contenido && !storageKey) {
       const key = newStorageKey("documentos", nombre);
       await putObject({
         key,
         body: contenido,
-        contentType: mimeType || "text/markdown",
+        contentType: mimeType,
       });
       storageKey = key;
     }

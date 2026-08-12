@@ -5,6 +5,7 @@
  */
 import { createRequire } from "module";
 import { spawn } from "child_process";
+import crypto from "crypto";
 import fs from "fs";
 import net from "net";
 import path from "path";
@@ -22,6 +23,10 @@ const {
   localAppUrl,
   pgDataDir,
   pgPasswordFromDatabaseUrl,
+  isLegacyPgPassword,
+  newPgPassword,
+  rewriteDatabaseUrlPassword,
+  writeEnvKey,
 } = require("./config.cjs");
 
 const repoRoot = process.env.LEXOPEN_APP_ROOT
@@ -86,6 +91,47 @@ function loadEnvFile(file) {
   }
 }
 
+async function migrateLegacyPgPassword(pg, dataDir, databaseUrl) {
+  const current =
+    pgPasswordFromDatabaseUrl(databaseUrl || process.env.DATABASE_URL || "") ||
+    "lexopen";
+  if (!isLegacyPgPassword(current)) {
+    return { databaseUrl, rotated: false };
+  }
+  const next = newPgPassword();
+  const client = typeof pg.getPgClient === "function" ? pg.getPgClient() : null;
+  if (!client) {
+    console.warn(
+      "[lexopen-host] No se pudo rotar la contraseña legacy de Postgres (sin getPgClient)."
+    );
+    return { databaseUrl, rotated: false };
+  }
+  await client.connect();
+  try {
+    // Dollar-quote avoids injection / escaping issues with the random password.
+    const tag = `pw${crypto.randomBytes(8).toString("hex")}`;
+    await client.query(
+      `ALTER USER lexopen WITH PASSWORD $${tag}$${next}$${tag}$`
+    );
+  } finally {
+    try {
+      await client.end();
+    } catch {
+      /* ignore */
+    }
+  }
+  const rewritten = rewriteDatabaseUrlPassword(
+    databaseUrl || process.env.DATABASE_URL,
+    next
+  );
+  writeEnvKey(dataDir, "DATABASE_URL", rewritten);
+  process.env.DATABASE_URL = rewritten;
+  console.log(
+    "[lexopen-host] Contraseña Postgres legacy rotada (ya no usa el default lexopen)."
+  );
+  return { databaseUrl: rewritten, rotated: true };
+}
+
 async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl) {
   const modPath =
     bundledModuleFile("embedded-postgres", "dist/index.js") ||
@@ -93,7 +139,8 @@ async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl) {
   const EmbeddedPostgres = (await import(pathToFileURL(modPath).href)).default;
   const databaseDir = pgDataDir(dataDir);
   const alreadyInitialized = fs.existsSync(path.join(databaseDir, "PG_VERSION"));
-  // Prefer password from DATABASE_URL; legacy installs may still use "lexopen".
+  // Prefer password from DATABASE_URL. Brand-new clusters may briefly use
+  // "lexopen" only when URL has no password; migrateLegacyPgPassword rotates it.
   const password =
     pgPasswordFromDatabaseUrl(databaseUrl || process.env.DATABASE_URL || "") ||
     "lexopen";
@@ -116,6 +163,7 @@ async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl) {
       console.warn("[lexopen-host] createDatabase:", msg);
     }
   }
+  await migrateLegacyPgPassword(pg, dataDir, databaseUrl);
   return pg;
 }
 
