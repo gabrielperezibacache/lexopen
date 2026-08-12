@@ -83,8 +83,9 @@ Use esta lista antes de cargar información real del estudio:
    `web:host` fuerza demos a `0` si venía un `.env` copiado con `=1`
    (salvo `LEXOPEN_KEEP_*_DEMO=1`) y **siempre** apaga las flags de
    seguridad prohibidas aunque el shell del operador las tenga en `1`
-   (p. ej. CI). No use `npm run db:seed` / `setup` / `db:reset` con datos
-   reales.
+   (p. ej. CI). El `.env` del data dir también gana sobre un `DATABASE_URL`
+   / secretos del shell (evita migrar contra otra base de CI). No use
+   `npm run db:seed` / `setup` / `db:reset` con datos reales.
 3. **Primer admin:** abra `/setup?token=…` una sola vez; elimine o rote
    `LEXOPEN_BOOTSTRAP_TOKEN` después.
 4. **Health:** `curl http://127.0.0.1:3000/api/health` → `db: "up"` y, en

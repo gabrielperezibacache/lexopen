@@ -123,6 +123,61 @@ export function applyHostFailClosedEnv(targetEnv = process.env) {
   return targetEnv;
 }
 
+/**
+ * Keys that define Host identity / secrets. The data-dir `.env` must win over
+ * a polluted parent shell (e.g. CI DATABASE_URL pointing at lexopen_e2e).
+ */
+export const HOST_ENV_FILE_WINS = [
+  "DATABASE_URL",
+  "SESSION_SECRET",
+  "STORAGE_PATH",
+  "OBSIDIAN_VAULT_PATH",
+  "PORT",
+  "HOSTNAME",
+  "NEXT_PUBLIC_APP_URL",
+  "NEXT_PUBLIC_APP_NAME",
+  "LEXOPEN_TRUSTED_ORIGINS",
+  "LEXOPEN_BOOTSTRAP_TOKEN",
+  "LEXOPEN_RECOVERY_TOKEN",
+  "CRON_SECRET",
+  "PJUD_SCRAPER_URL",
+  "PJUD_SCRAPER_KEY",
+  "PJUD_SCRAPER_ALLOW_PRIVATE",
+  "LEXOPEN_DESKTOP",
+  "LEXOPEN_DESKTOP_MODE",
+  "LEXOPEN_DATA_DIR",
+  "LEXOPEN_COOKIE_SECURE",
+  "OBSIDIAN_ALLOW_PRIVATE_URL",
+  "LEXOPEN_DEMO_SWITCHER",
+  "HERMES_ALLOW_DEMO",
+  "LLM_ALLOW_DEMO",
+  "PJUD_ALLOW_DEMO",
+  "LEXOPEN_OPEN_ACCESS",
+  "LEXOPEN_RELAX_CSRF",
+  "LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS",
+  "LEXOPEN_KEEP_LLM_DEMO",
+  "LEXOPEN_KEEP_DEMO_SWITCHER",
+  "LEXOPEN_KEEP_HERMES_DEMO",
+  "LEXOPEN_KEEP_PJUD_DEMO",
+];
+
+/** Overlay listed keys from an env file onto targetEnv (file wins). */
+export function preferEnvFileKeys(
+  file,
+  keys = HOST_ENV_FILE_WINS,
+  targetEnv = process.env
+) {
+  if (!fs.existsSync(file)) return targetEnv;
+  const fromFile = {};
+  loadEnvFile(file, fromFile);
+  for (const key of keys) {
+    if (fromFile[key] !== undefined) {
+      targetEnv[key] = fromFile[key];
+    }
+  }
+  return targetEnv;
+}
+
 /** Setup guidance that never embeds the bootstrap token. */
 export function setupPendingMessage({
   isElectron = false,
@@ -387,8 +442,8 @@ export async function startHost(options = {}) {
   process.env.LEXOPEN_DATA_DIR = dataDir;
 
   const cfg = readConfig(dataDir);
-  const port = Number(options.port || cfg.port || 3000);
-  const pgPort = Number(options.pgPort || cfg.pgPort || 54329);
+  const port = Number(options.port || process.env.PORT || cfg.port || 3000);
+  const pgPort = Number(options.pgPort || process.env.LEXOPEN_PG_PORT || cfg.pgPort || 54329);
   validateHostPorts(port, pgPort);
   // seed solo si ya estaba guardado en config; no forzar en cada update
   const seedDemo = Boolean(
@@ -419,10 +474,17 @@ export async function startHost(options = {}) {
 
   const host = ensureHostEnv(dataDir, { port, pgPort, seedDemo, publicUrl });
   loadEnvFile(host.envFile);
+  // Data-dir .env owns Host identity (never migrate/serve against a shell DATABASE_URL).
+  preferEnvFileKeys(host.envFile, HOST_ENV_FILE_WINS, process.env);
   // Strip CI/shell relaxations that would fail instrumentation in NODE_ENV=production.
   applyHostFailClosedEnv(process.env);
   // Reafirmar tras cargar .env (el archivo no debe pisar la versión del binario)
   process.env.LEXOPEN_APP_VERSION = version;
+  process.env.LEXOPEN_DATA_DIR = dataDir;
+  process.env.DATABASE_URL = host.databaseUrl || process.env.DATABASE_URL;
+  process.env.PORT = String(host.port);
+  process.env.HOSTNAME = host.bindHost || process.env.HOSTNAME || "127.0.0.1";
+  process.env.STORAGE_PATH = host.storagePath || process.env.STORAGE_PATH;
   process.env.LEXOPEN_UPDATE_RECOGNIZED = recognition.changed ? "1" : "0";
   if (host.envPreserved) {
     console.log(
