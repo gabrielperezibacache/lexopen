@@ -19,6 +19,15 @@ export const DOC_TIPOS = [
   { value: "nota_credito", label: "Nota de crédito" },
 ] as const;
 
+export const INVOICE_STATUSES = [
+  "borrador",
+  "emitida",
+  "parcialmente_pagada",
+  "pagada",
+  "vencida",
+  "anulada",
+] as const;
+
 export const EXPENSE_CATEGORIES = [
   { value: "notario", label: "Notaría" },
   { value: "receptor", label: "Receptor judicial" },
@@ -50,6 +59,14 @@ export function computeInvoiceTotals(params: {
   tipoDocumento: string;
   lines: Array<{ amountClp: number }>;
 }) {
+  if (
+    params.lines.length === 0 ||
+    params.lines.some(
+      (line) => !Number.isSafeInteger(line.amountClp) || line.amountClp < 0
+    )
+  ) {
+    throw new RangeError("Las líneas de facturación deben tener montos CLP no negativos.");
+  }
   const subtotalClp = params.lines.reduce((s, l) => s + l.amountClp, 0);
   let ivaClp = 0;
   let retencionClp = 0;
@@ -64,6 +81,20 @@ export function computeInvoiceTotals(params: {
   }
 
   return { subtotalClp, ivaClp, retencionClp, totalClp };
+}
+
+export function invoiceStatusAfterPayment(totalClp: number, paidClp: number) {
+  if (
+    !Number.isSafeInteger(totalClp) ||
+    totalClp < 0 ||
+    !Number.isSafeInteger(paidClp) ||
+    paidClp < 0 ||
+    paidClp > totalClp
+  ) {
+    throw new RangeError("El pago debe estar entre cero y el total de la factura.");
+  }
+  if (paidClp === totalClp) return "pagada";
+  return paidClp > 0 ? "parcialmente_pagada" : "emitida";
 }
 
 export function nextInvoiceNumber(seq: number, tipo: string) {

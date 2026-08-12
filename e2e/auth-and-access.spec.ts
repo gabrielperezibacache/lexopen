@@ -27,6 +27,26 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
     page.getByRole("heading", { name: "Causas judiciales" })
   ).toBeVisible();
   await expect(page.getByText("C-4521-2025")).toBeVisible();
+
+  const invoicesResponse = await page.request.get("/api/billing/invoices?status=emitida");
+  expect(invoicesResponse.ok()).toBeTruthy();
+  const invoices = (await invoicesResponse.json()) as Array<{
+    id: string;
+    clienteId: string;
+    totalClp: number;
+    paidClp: number;
+  }>;
+  const openInvoice = invoices.find((invoice) => invoice.totalClp > invoice.paidClp);
+  expect(openInvoice).toBeTruthy();
+  const overpayment = await page.request.post("/api/billing/payments", {
+    data: {
+      invoiceId: openInvoice!.id,
+      clienteId: openInvoice!.clienteId,
+      amountClp: openInvoice!.totalClp - openInvoice!.paidClp + 1,
+      method: "transferencia",
+    },
+  });
+  expect(overpayment.status()).toBe(409);
 });
 
 test("un cliente queda limitado al portal y a sus espacios", async ({ page }) => {

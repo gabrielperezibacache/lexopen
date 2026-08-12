@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp } from "@/lib/billing";
+import { publicUserSelect } from "@/lib/auth/public-user";
 import { formatDate } from "@/components/ui";
 import { TimeEntryForm } from "@/components/billing/TimeEntryForm";
 import { TimeEntryActions } from "@/components/billing/TimeEntryActions";
@@ -9,7 +10,7 @@ import Link from "next/link";
 export default async function HorasPage() {
   const [entries, causas, clientes, users] = await Promise.all([
     prisma.timeEntry.findMany({
-      include: { user: true, causa: true, cliente: true },
+      include: { user: { select: publicUserSelect }, causa: true, cliente: true },
       orderBy: { date: "desc" },
     }),
     prisma.causa.findMany({ select: { id: true, titulo: true, rit: true, clienteId: true } }),

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   assertCsrf,
@@ -9,6 +10,7 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { paymentCreateSchema } from "@/lib/schemas";
+import { invoiceStatusAfterPayment } from "@/lib/billing";
 
 export async function GET() {
   try {
@@ -34,7 +36,14 @@ export async function POST(req: NextRequest) {
       const invoice = body.invoiceId
         ? await tx.invoice.findUnique({
             where: { id: body.invoiceId },
-            select: { id: true, clienteId: true, causaId: true, status: true },
+            select: {
+              id: true,
+              clienteId: true,
+              causaId: true,
+              status: true,
+              totalClp: true,
+              paidClp: true,
+            },
           })
         : null;
       if (body.invoiceId && !invoice) {
@@ -45,6 +54,15 @@ export async function POST(req: NextRequest) {
       }
       if (invoice?.status === "anulada") {
         throw httpError("No se puede pagar una factura anulada", 409);
+      }
+      if (
+        invoice &&
+        !["emitida", "parcialmente_pagada", "vencida"].includes(invoice.status)
+      ) {
+        throw httpError("La factura aún no está emitida para recibir pagos", 409);
+      }
+      if (invoice && amountClp > invoice.totalClp - invoice.paidClp) {
+        throw httpError("El pago supera el saldo pendiente de la factura", 409);
       }
       const clienteId = invoice?.clienteId || body.clienteId;
       const cliente = await tx.cliente.findUnique({
@@ -91,12 +109,7 @@ export async function POST(req: NextRequest) {
         const inv = await tx.invoice.findUnique({ where: { id: created.invoiceId } });
         if (inv) {
           const paidClp = inv.paidClp + amountClp;
-          const status =
-            paidClp >= inv.totalClp
-              ? "pagada"
-              : paidClp > 0
-                ? "parcialmente_pagada"
-                : inv.status;
+          const status = invoiceStatusAfterPayment(inv.totalClp, paidClp);
           await tx.invoice.update({
             where: { id: inv.id },
             data: { paidClp, status },
@@ -105,7 +118,7 @@ export async function POST(req: NextRequest) {
       }
 
       return created;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return NextResponse.json(payment, { status: 201 });
   } catch (e) {

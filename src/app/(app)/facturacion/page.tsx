@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp } from "@/lib/billing";
+import { publicUserSelect } from "@/lib/auth/public-user";
 import { StatusBadge, formatDate } from "@/components/ui";
 import {
   Clock,
@@ -43,7 +44,7 @@ export default async function FacturacionPage() {
       take: 6,
     }),
     prisma.timeEntry.findMany({
-      include: { user: true, causa: true },
+      include: { user: { select: publicUserSelect }, causa: true },
       orderBy: { date: "desc" },
       take: 6,
     }),

@@ -10,7 +10,7 @@ function labelFee(tipo: string) {
 export default async function TarifasPage() {
   const [fees, clientes, causas] = await Promise.all([
     prisma.feeArrangement.findMany({
-      include: { cliente: true, causa: true, owner: true },
+      include: { cliente: true, causa: true },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.cliente.findMany({ select: { id: true, razonSocial: true } }),
