@@ -7,6 +7,9 @@ import {
   isLoopbackHostname,
   isSafeOutboundHttpUrl,
 } from "@/lib/net/safe-url";
+
+/** Never export confidential or privileged matter into the Obsidian vault. */
+const VAULT_SAFE_DOC_WHERE = { confidencial: false, privilegio: false } as const;
 import { newStorageKey, putObject } from "@/lib/storage";
 import { resolveDocumentoExport } from "@/lib/integrations/obsidian-docs";
 import {
@@ -162,12 +165,12 @@ export async function exportCausaToObsidian(causaId: string) {
     include: {
       partes: true,
       notas: true,
-      documentos: { where: { confidencial: false } },
+      documentos: { where: VAULT_SAFE_DOC_WHERE },
       plazos: true,
       cliente: true,
       abogado: true,
       minutas: {
-        where: { confidencial: false },
+        where: VAULT_SAFE_DOC_WHERE,
         include: { acciones: true },
         orderBy: { fecha: "desc" },
       },

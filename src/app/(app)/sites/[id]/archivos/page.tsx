@@ -7,6 +7,10 @@ import { SiteNav } from "@/components/sites/SiteNav";
 import { formatDate } from "@/components/ui";
 import { SiteFileActions } from "@/components/sites/SiteFileActions";
 import { EmptyState } from "@/components/EmptyState";
+import {
+  fileVersionListSelect,
+  siteFileListSelect,
+} from "@/lib/sites/file-select";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -21,17 +25,12 @@ export default async function SiteFilesPage({ params }: Params) {
   });
   if (!site) notFound();
 
-  const fileInclude = {
+  const fileSelect = {
+    ...siteFileListSelect,
     versions: {
       orderBy: { version: "desc" as const },
       take: 3,
-      select: {
-        id: true,
-        version: true,
-        note: true,
-        createdAt: true,
-        authorId: true,
-      },
+      select: fileVersionListSelect,
     },
     ...(clientView
       ? {}
@@ -48,7 +47,7 @@ export default async function SiteFilesPage({ params }: Params) {
     include: {
       files: {
         where: fileWhere,
-        include: fileInclude,
+        select: fileSelect,
         orderBy: { name: "asc" },
       },
     },
@@ -56,7 +55,7 @@ export default async function SiteFilesPage({ params }: Params) {
   });
   const rootFiles = await prisma.siteFile.findMany({
     where: { siteId: id, folderId: null, ...fileWhere },
-    include: fileInclude,
+    select: fileSelect,
   });
 
   return (

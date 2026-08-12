@@ -7,7 +7,18 @@ export async function GET() {
   try {
     await requireStaff();
     const actividades = await prisma.activity.findMany({
-      include: { user: { select: publicUserSelect }, causa: true },
+      include: {
+        user: { select: publicUserSelect },
+        causa: {
+          select: {
+            id: true,
+            titulo: true,
+            rit: true,
+            estado: true,
+            tribunal: true,
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
       take: 40,
     });

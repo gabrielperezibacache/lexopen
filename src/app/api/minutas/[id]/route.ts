@@ -9,6 +9,7 @@ import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { writeAudit } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { documentoListSelect } from "@/lib/sites/file-select";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -28,7 +29,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       },
       autor: { select: publicUserSelect },
       acciones: true,
-      documento: true,
+      documento: { select: documentoListSelect },
     },
   });
   if (!minuta) {
@@ -176,7 +177,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       causa: true,
       autor: { select: publicUserSelect },
       acciones: true,
-      documento: true,
     },
   });
   if (!current) {
