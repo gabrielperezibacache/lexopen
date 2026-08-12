@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { handleRouteError, requireBillingManager } from "@/lib/api";
 import { renderInvoiceHtml } from "@/lib/billing-pdf";
+import { downloadResponseHeaders } from "@/lib/security/download";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -40,11 +41,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
       glosa: invoice.glosa,
     });
 
+    // text/html is not inline-safe → attachment + nosniff (avoids XSS via HTML body).
     return new NextResponse(html, {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Content-Disposition": `inline; filename="${invoice.number}.html"`,
-      },
+      headers: downloadResponseHeaders(`${invoice.number}.html`, "text/html"),
     });
   } catch (e) {
     return handleRouteError(e);

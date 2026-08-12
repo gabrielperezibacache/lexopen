@@ -17,5 +17,17 @@ assert.match(contentDispositionFor("x.html", "text/html"), /^attachment;/);
 const headers = downloadResponseHeaders("doc.pdf", "application/pdf");
 assert.equal(headers["X-Content-Type-Options"], "nosniff");
 assert.equal(headers["Content-Type"], "application/pdf");
+assert.equal(headers["Cache-Control"], "private, no-store");
+
+const csv = downloadResponseHeaders("export.csv", "text/csv");
+assert.match(csv["Content-Type"], /text\/csv; charset=utf-8/);
+assert.match(csv["Content-Disposition"], /^attachment;/);
+
+const md = downloadResponseHeaders("nota.md", "text/markdown");
+assert.match(md["Content-Disposition"], /^inline;/);
+
+const html = downloadResponseHeaders("boleta.html", "text/html");
+assert.match(html["Content-Disposition"], /^attachment;/);
+assert.equal(html["X-Content-Type-Options"], "nosniff");
 
 console.log("security/download.test.ts OK");

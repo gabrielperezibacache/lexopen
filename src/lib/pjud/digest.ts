@@ -281,8 +281,7 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
   const built = await buildPjudDigest();
   const appUrl = (
     process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.RENDER_EXTERNAL_URL ||
-    "http://localhost:3000"
+    "http://127.0.0.1:3000"
   ).replace(/\/$/, "");
 
   const google = await getGoogleConfig().catch(() => null);

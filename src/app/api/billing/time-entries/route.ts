@@ -13,6 +13,7 @@ import { DEFAULT_HOURLY_CLP } from "@/lib/billing";
 import { ufToClp } from "@/lib/uf";
 import { timeEntrySchema } from "@/lib/schemas";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { downloadResponseHeaders } from "@/lib/security/download";
 
 function minutesBetween(start: Date, end: Date) {
   return Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
@@ -56,10 +57,7 @@ export async function GET(req: NextRequest) {
         ),
       ].join("\n");
       return new NextResponse(csv, {
-        headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": 'attachment; filename="time-entries.csv"',
-        },
+        headers: downloadResponseHeaders("time-entries.csv", "text/csv"),
       });
     }
     return NextResponse.json(entries);

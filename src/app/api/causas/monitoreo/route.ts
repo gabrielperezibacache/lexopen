@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
+import { downloadResponseHeaders } from "@/lib/security/download";
 import { writeAudit } from "@/lib/audit";
 import {
   listCarteraMonitoreo,
@@ -47,11 +48,7 @@ export async function GET(req: NextRequest) {
         }))
       );
       return new NextResponse(csv, {
-        headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": 'attachment; filename="cartera-pjud.csv"',
-          "Cache-Control": "no-store",
-        },
+        headers: downloadResponseHeaders("cartera-pjud.csv", "text/csv"),
       });
     }
     const fallidos = await listFallidosMonitoreo(20);

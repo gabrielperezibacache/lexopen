@@ -59,7 +59,7 @@ export function PjudSettingsPanel() {
           <h2 className="text-lg font-semibold">PJUD / monitoreo judicial</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
             Valores efectivos del entorno (solo lectura). Cámbielos en{" "}
-            <code>.env</code> / Render y reinicie el host. Credenciales y sync
+            <code>.env</code> del Host y reinicie. Credenciales y sync
             ClaveÚnica se gestionan en Mis Causas.
           </p>
         </div>

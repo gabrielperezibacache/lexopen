@@ -33,6 +33,27 @@ export function warnProductionFlags(): string[] {
   return listedProductionFlags(WARN_PRODUCTION_FLAGS);
 }
 
+const WEAK_SESSION_SECRET_RE =
+  /change-me|dev-session-secret|lexopen-dev|password|secret123/i;
+
+/** Throws if SESSION_SECRET is missing/short/placeholder in production. */
+export function assertProductionSessionSecret(
+  secret = process.env.SESSION_SECRET
+) {
+  if (process.env.NODE_ENV !== "production") return;
+  const value = secret?.trim() || "";
+  if (!value || value.length < 16) {
+    throw new Error(
+      "LexOpen: SESSION_SECRET es obligatorio en producción (mín. 16 caracteres)."
+    );
+  }
+  if (WEAK_SESSION_SECRET_RE.test(value)) {
+    throw new Error(
+      "LexOpen: SESSION_SECRET de ejemplo/débil no permitido en producción. Genere un valor aleatorio."
+    );
+  }
+}
+
 /** Throws if a hard-forbidden security flag is set in production. */
 export function assertSafeProductionEnv() {
   const bad = forbiddenProductionFlags();
@@ -41,6 +62,7 @@ export function assertSafeProductionEnv() {
       `LexOpen: flags de seguridad prohibidas en producción: ${bad.join(", ")}. Desactívelas (≠1) y reinicie.`
     );
   }
+  assertProductionSessionSecret();
   const warnings = warnProductionFlags();
   for (const flag of warnings) {
     console.warn(
