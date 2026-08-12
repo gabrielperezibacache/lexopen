@@ -433,7 +433,7 @@ export async function fetchPjudMovimientos(
         provider: "none",
         movimientos: [],
         note:
-          "PJUD_PUBLIC_SCRAPE=1 pero falta CAPTCHA_SOLVER_PROVIDER/API_KEY (o PJUD_SCRAPER_URL local).",
+          "PJUD_PUBLIC_SCRAPE=1 pero falta CAPTCHA_SOLVER_PROVIDER/API_KEY (o PJUD_SCRAPER_URL local). Use nopecha (free) u otro BYOK.",
         demo: false,
       };
     }

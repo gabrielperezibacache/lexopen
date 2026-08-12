@@ -11,7 +11,7 @@ import {
   pjudSyncIntervalMs,
   type PjudFetchResult,
 } from "@/lib/pjud/provider";
-import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
+import { captchaSolverConfigured, captchaSolverStatusPublic } from "@/lib/pjud/captcha-solver";
 import { pdfBackupEnabled, backupMovimientoDocuments } from "@/lib/pjud/pdf-backup";
 import { publicScrapeEnabled, publicScrapeReady } from "@/lib/pjud/public-scrape";
 import { scraperSidecarConfigured } from "@/lib/pjud/scraper-sidecar";
@@ -484,6 +484,7 @@ export function providerStatusPublic() {
     publicScrapeEnabled: publicScrapeEnabled(),
     publicScrapeReady: publicScrapeReady(),
     captchaConfigured: captchaSolverConfigured(),
+    captcha: captchaSolverStatusPublic(),
     claveUnicaScrapeEnabled: process.env.PJUD_CLAVEUNICA_SCRAPE === "1",
     liveIngestConfigured: pjudLiveIngestConfigured(),
     webhookConfigured: pjudWebhookConfigured(),

@@ -28,6 +28,20 @@ const missing = spawnSync(process.execPath, [script, "--check-only"], {
 assert.notEqual(missing.status, 0);
 assert.match(missing.stderr || missing.stdout || "", /CAPTCHA_SOLVER/);
 
+// nopecha without key should pass (free tier)
+const nopecha = spawnSync(process.execPath, [script, "--check-only"], {
+  cwd: root,
+  env: {
+    ...process.env,
+    CAPTCHA_SOLVER_PROVIDER: "nopecha",
+    CAPTCHA_SOLVER_API_KEY: "",
+    PJUD_SCRAPER_KEY: "test-scraper-key",
+  },
+  encoding: "utf8",
+});
+assert.equal(nopecha.status, 0, nopecha.stderr || nopecha.stdout);
+assert.match(nopecha.stdout || "", /check-only OK/);
+
 // --check-only with CAPTCHA configured should pass
 const ok = spawnSync(process.execPath, [script, "--check-only"], {
   cwd: root,

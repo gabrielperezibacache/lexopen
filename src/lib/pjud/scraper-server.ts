@@ -20,7 +20,10 @@ import {
   scrapeMisCausasWithClaveUnica,
   PjudScrapeError,
 } from "@/lib/pjud/public-scrape";
-import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
+import {
+  captchaSolverConfigured,
+  captchaSolverStatusPublic,
+} from "@/lib/pjud/captcha-solver";
 import {
   fetchSalasPortalHtml,
   probePjudOnline,
@@ -121,6 +124,7 @@ export function createScraperServer() {
           scrapeEnabled: publicScrapeEnabled(),
           scrapeReady: ready,
           captcha: captchaSolverConfigured(),
+          captchaProviders: captchaSolverStatusPublic(),
         });
       }
 

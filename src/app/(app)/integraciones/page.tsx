@@ -170,8 +170,11 @@ function IntegracionesInner() {
       <section className="panel rounded-3xl p-5">
         <h2 className="text-xl font-semibold">PJUD / CausaMonitor</h2>
         <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
-          Ingest live vía partner API, scraper sidecar o scrape OJV (CAPTCHA).
-          Mis Causas con ClaveÚnica cifrada en{" "}
+          Ingest live vía partner API, scraper sidecar o scrape OJV (CAPTCHA
+          BYOK). Proveedores: <code>nopecha</code> (free ~100/día IP
+          residencial), <code>2captcha</code>, <code>capsolver</code>,{" "}
+          <code>anticaptcha</code>, <code>capmonster</code>. Sin CAPTCHA puede
+          usar CSV/demo. Mis Causas con ClaveÚnica cifrada en{" "}
           <a href="/causas/mis-causas" className="text-[var(--sea)]">
             /causas/mis-causas
           </a>
@@ -197,7 +200,8 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback
 PJUD_SCRAPER_URL=
 PJUD_PUBLIC_SCRAPE=0
 PJUD_CLAVEUNICA_SCRAPE=0
-CAPTCHA_SOLVER_PROVIDER=
+# nopecha (free) | 2captcha | capsolver | anticaptcha | capmonster
+CAPTCHA_SOLVER_PROVIDER=nopecha
 CAPTCHA_SOLVER_API_KEY=
 PJUD_SECRETS_KEY=`}</pre>
       </section>

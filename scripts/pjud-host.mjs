@@ -8,8 +8,8 @@
  *   # otra terminal: npm run web:host  (o npm run dev)
  *
  * Env mínimas (en .env o entorno):
- *   CAPTCHA_SOLVER_PROVIDER=2captcha|capsolver
- *   CAPTCHA_SOLVER_API_KEY=...
+ *   CAPTCHA_SOLVER_PROVIDER=nopecha|2captcha|capsolver|anticaptcha|capmonster
+ *   CAPTCHA_SOLVER_API_KEY=...   (opcional para nopecha free tier)
  *   PJUD_SCRAPER_KEY=...   (recomendado)
  *
  * Flags:
@@ -120,12 +120,24 @@ function chromiumHint() {
 
 function validateEnv(env) {
   const missing = [];
+  const providers = [
+    "nopecha",
+    "2captcha",
+    "capsolver",
+    "anticaptcha",
+    "capmonster",
+  ];
   const provider = env.CAPTCHA_SOLVER_PROVIDER?.trim().toLowerCase();
   const key = env.CAPTCHA_SOLVER_API_KEY?.trim();
-  if (!provider || !["2captcha", "capsolver"].includes(provider)) {
-    missing.push("CAPTCHA_SOLVER_PROVIDER=2captcha|capsolver");
+  const keyOptional =
+    !key || key.toLowerCase() === "free" || key.toLowerCase() === "none";
+  if (!provider || !providers.includes(provider)) {
+    missing.push(
+      "CAPTCHA_SOLVER_PROVIDER=nopecha|2captcha|capsolver|anticaptcha|capmonster"
+    );
+  } else if (provider !== "nopecha" && keyOptional) {
+    missing.push(`CAPTCHA_SOLVER_API_KEY (requerido para ${provider})`);
   }
-  if (!key) missing.push("CAPTCHA_SOLVER_API_KEY");
   return { missing, provider, key };
 }
 

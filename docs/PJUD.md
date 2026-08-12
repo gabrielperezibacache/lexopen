@@ -97,7 +97,7 @@ Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 | Variable | Efecto |
 |----------|--------|
 | `PJUD_PUBLIC_SCRAPE=1` | Habilita scrape OJV in-process |
-| `CAPTCHA_SOLVER_PROVIDER` + `CAPTCHA_SOLVER_API_KEY` | 2captcha \| capsolver |
+| `CAPTCHA_SOLVER_PROVIDER` + `CAPTCHA_SOLVER_API_KEY` | Elegible: `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster`. Key opcional solo en `nopecha`. |
 | `PJUD_SCRAPER_URL` | Microservicio (`POST /causas/lookup`, `/mis-causas`, `/causas/buscar`). Acepta `http://host:port` (Render `fromService` hostport) |
 | `PJUD_SCRAPER_ALLOW_PRIVATE=1` | Permite sidecar en red privada (Render `.internal`) |
 | `PJUD_CLAVEUNICA_SCRAPE=1` | Automatiza login ClaveÚnica → Mis Causas (vía CM `/api/pjud-credentials`) |
@@ -145,10 +145,25 @@ PJUD_SCRAPER_URL=http://127.0.0.1:8787
 PJUD_SCRAPER_ALLOW_PRIVATE=1
 PJUD_SCRAPER_KEY=<misma que el sidecar>
 PJUD_PUBLIC_SCRAPE=1
-CAPTCHA_SOLVER_PROVIDER=2captcha   # o capsolver
-CAPTCHA_SOLVER_API_KEY=...
+CAPTCHA_SOLVER_PROVIDER=nopecha   # free tier; o 2captcha|capsolver|anticaptcha|capmonster
+CAPTCHA_SOLVER_API_KEY=           # opcional en nopecha; requerida en los demás
 PJUD_ALLOW_DEMO=0
 ```
+
+### Proveedores CAPTCHA (BYOK)
+
+LexOpen no vende solves: el estudio elige proveedor. Catálogo en
+`captchaSolverStatusPublic()` / health del sidecar.
+
+| Provider | Free tier | Key |
+|----------|-----------|-----|
+| `nopecha` | ~100/día, IP residencial | Opcional |
+| `2captcha` | No (depósito mínimo) | Sí |
+| `capsolver` | A veces créditos de prueba | Sí |
+| `anticaptcha` | No | Sí |
+| `capmonster` | No | Sí |
+
+Sin CAPTCHA configurado: CSV / demo / partner API siguen disponibles (app gratis).
 
 ## Sidecar de referencia (in-repo)
 
