@@ -52,8 +52,30 @@ const args = parseArgs([
   "/tmp/x.env",
   "--health",
   "http://127.0.0.1:3000",
+  "--effective",
 ]);
 assert.equal(args.envFile, "/tmp/x.env");
 assert.equal(args.healthUrl, "http://127.0.0.1:3000");
+assert.equal(args.effective, true);
+
+const fileOnly = resolveCheckEnv({
+  fromFile: {
+    SESSION_SECRET: "production-grade-session-secret-32",
+    HERMES_ALLOW_DEMO: "0",
+  },
+  processEnv: { HERMES_ALLOW_DEMO: "1", LEXOPEN_RELAX_CSRF: "1" },
+  dataDir: "/tmp/lexopen",
+  effective: false,
+});
+assert.equal(fileOnly.HERMES_ALLOW_DEMO, "0");
+assert.equal(fileOnly.LEXOPEN_RELAX_CSRF, undefined);
+
+const effective = resolveCheckEnv({
+  fromFile: { HERMES_ALLOW_DEMO: "1" },
+  processEnv: { HERMES_ALLOW_DEMO: "0" },
+  dataDir: "/tmp/lexopen",
+  effective: true,
+});
+assert.equal(effective.HERMES_ALLOW_DEMO, "0");
 
 console.log("scripts/prod-host-check.test.mjs OK");

@@ -141,22 +141,23 @@ async function probeHealth(url) {
 async function main() {
   const args = parseArgs();
   if (args.help) {
-    console.log(`Usage: npm run prod:check -- [--data-dir DIR] [--env FILE] [--health URL]
+    console.log(`Usage: npm run prod:check -- [--data-dir DIR] [--env FILE] [--health URL] [--effective]
 
-Checks Host production readiness against the data-dir .env (and optional health).`);
+Checks Host production readiness against the data-dir .env (and optional health).
+By default only the .env file is evaluated (shell/CI env does not pollute).
+Pass --effective to overlay process.env (systemd/launchd parent wins).`);
     process.exit(0);
   }
 
   const dataDir = args.dataDir || process.env.LEXOPEN_DATA_DIR || defaultDataDir();
   const file = args.envFile || envPath(dataDir);
   const fromFile = readEnvFile(file);
-  const env = {
-    ...fromFile,
-    ...Object.fromEntries(
-      Object.entries(process.env).filter(([, v]) => v !== undefined)
-    ),
-    LEXOPEN_DATA_DIR: process.env.LEXOPEN_DATA_DIR || fromFile.LEXOPEN_DATA_DIR || dataDir,
-  };
+  const env = resolveCheckEnv({
+    fromFile,
+    processEnv: process.env,
+    dataDir,
+    effective: args.effective,
+  });
 
   console.log(`[prod-check] data dir: ${dataDir}`);
   console.log(`[prod-check] env file: ${fs.existsSync(file) ? file : "(missing)"}`);
