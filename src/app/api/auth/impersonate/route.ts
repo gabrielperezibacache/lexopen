@@ -35,7 +35,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
-    const session = buildSessionCookieValue(target.id, target.sessionVersion);
+    const session = buildSessionCookieValue(
+      target.id,
+      target.sessionVersion,
+      target.role
+    );
     const res = NextResponse.json({
       ok: true,
       user: {

@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { safeJsonParse } from "@/lib/safe-json";
 
 type CausaOption = { id: string; titulo: string; rit: string | null };
 type ChatMessage = { role: "user" | "assistant"; content: string; source?: string };
@@ -35,7 +36,11 @@ function AgenteInner() {
   useEffect(() => {
     let active = true;
     fetch("/api/causas")
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) return [];
+        const data = await r.json();
+        return Array.isArray(data) ? data : [];
+      })
       .then((data: CausaOption[]) => {
         if (active) setCausas(data);
       })
@@ -45,7 +50,7 @@ function AgenteInner() {
     fetch("/api/integrations/hermes?chats=1")
       .then((r) => (r.ok ? r.json() : []))
       .then((data: AgentChat[]) => {
-        if (active) setChats(data);
+        if (active) setChats(Array.isArray(data) ? data : []);
       })
       .catch(() => {
         if (active) setChats([]);
@@ -57,9 +62,11 @@ function AgenteInner() {
 
   function resumeChat(chat: AgentChat) {
     setChatId(chat.id);
-    const parsed = JSON.parse(chat.messagesJson || "[]") as ChatMessage[];
-    setMessages(parsed);
-    const lastAssistant = [...parsed].reverse().find((m) => m.role === "assistant");
+    const parsed = safeJsonParse<ChatMessage[]>(chat.messagesJson, []);
+    setMessages(Array.isArray(parsed) ? parsed : []);
+    const lastAssistant = [...(Array.isArray(parsed) ? parsed : [])]
+      .reverse()
+      .find((m) => m.role === "assistant");
     setReply(lastAssistant?.content || "");
     setMeta(chat.demoMode ? "Historial · modo demo" : "Historial · Hermes Agent");
   }
@@ -69,32 +76,43 @@ function AgenteInner() {
     setBusy(true);
     setReply("");
     setMeta("");
-    const res = await fetch("/api/integrations/hermes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ causaId: causaId || undefined, prompt, chatId: chatId || undefined }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    setReply(data.content || data.error || "Sin respuesta");
-    if (data.chat) {
-      setChatId(data.chat.id);
-      setMessages(JSON.parse(data.chat.messagesJson || "[]"));
-      await loadChats();
+    try {
+      const res = await fetch("/api/integrations/hermes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          causaId: causaId || undefined,
+          prompt,
+          chatId: chatId || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setReply(data.content || data.error || "Sin respuesta");
+      if (data.chat) {
+        setChatId(data.chat.id);
+        const parsed = safeJsonParse<ChatMessage[]>(data.chat.messagesJson, []);
+        setMessages(Array.isArray(parsed) ? parsed : []);
+        await loadChats();
+      }
+      setMeta(
+        [
+          data.source === "hermes"
+            ? "Fuente: Hermes Agent"
+            : data.source === "error"
+              ? "Error de Hermes"
+              : "Fuente: demo local",
+          data.requireApproval ? "Requiere aprobación humana" : null,
+          data.note || null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      );
+    } catch {
+      setReply("No se pudo contactar al agente");
+      setMeta("Error de red");
+    } finally {
+      setBusy(false);
     }
-    setMeta(
-      [
-        data.source === "hermes"
-          ? "Fuente: Hermes Agent"
-          : data.source === "error"
-            ? "Error de Hermes"
-            : "Fuente: demo local",
-        data.requireApproval ? "Requiere aprobación humana" : null,
-        data.note || null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    );
   }
 
   return (

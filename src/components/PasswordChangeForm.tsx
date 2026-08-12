@@ -45,8 +45,8 @@ export function PasswordChangeForm() {
       <div>
         <h2 className="text-lg font-semibold">Cambiar contraseña</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-          Use una contraseña propia de al menos 12 caracteres. Las sesiones actuales
-          permanecen activas.
+          Use una contraseña propia de al menos 12 caracteres. Las demás sesiones
+          se invalidan; esta sesión se renueva automáticamente.
         </p>
       </div>
       <label className="block text-sm">

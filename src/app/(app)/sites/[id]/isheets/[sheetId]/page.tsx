@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { ISheetTable } from "@/components/sites/ISheetTable";
+import { safeJsonParse } from "@/lib/safe-json";
 
 type Params = { params: Promise<{ id: string; sheetId: string }> };
 
@@ -38,7 +39,7 @@ export default async function ISheetDetailPage({ params }: Params) {
         }))}
         rows={sheet.rows.map((r) => ({
           id: r.id,
-          data: JSON.parse(r.dataJson) as Record<string, string>,
+          data: safeJsonParse<Record<string, string>>(r.dataJson, {}),
         }))}
       />
     </div>

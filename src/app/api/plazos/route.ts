@@ -11,13 +11,17 @@ import { plazoCreateSchema } from "@/lib/schemas";
 import { calcularVencimiento } from "@/lib/plazos";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { writeAudit } from "@/lib/audit";
+import { publicUserSelect } from "@/lib/auth/public-user";
 import { z } from "zod";
 
 export async function GET() {
   try {
     await requireStaff();
     const plazos = await prisma.plazo.findMany({
-      include: { causa: true, responsable: true },
+      include: {
+        causa: true,
+        responsable: { select: publicUserSelect },
+      },
       orderBy: { fechaLimite: "asc" },
     });
     return NextResponse.json(plazos);

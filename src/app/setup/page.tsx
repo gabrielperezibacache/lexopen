@@ -28,23 +28,28 @@ function SetupForm() {
     }
 
     setBusy(true);
-    const response = await fetch("/api/setup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token,
-        name: form.get("name"),
-        email: form.get("email"),
-        password,
-      }),
-    });
-    const data = await response.json().catch(() => ({}));
-    setBusy(false);
-    if (!response.ok) {
-      setError(data.error || "No se pudo configurar la instalación.");
-      return;
+    try {
+      const response = await fetch("/api/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          name: form.get("name"),
+          email: form.get("email"),
+          password,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error || "No se pudo configurar la instalación.");
+        return;
+      }
+      setComplete(true);
+    } catch {
+      setError("No se pudo configurar la instalación.");
+    } finally {
+      setBusy(false);
     }
-    setComplete(true);
   }
 
   if (complete) {

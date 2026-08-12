@@ -52,7 +52,9 @@ export default async function SitesPage() {
           {sites.map((s) => (
             <Link
               key={s.id}
-              href={`/sites/${s.id}`}
+              href={
+                isCliente(user.role) ? `/sites/${s.id}/archivos` : `/sites/${s.id}`
+              }
               className="panel group rounded-3xl p-5 transition hover:-translate-y-0.5 hover:shadow-[var(--shadow)]"
             >
               <div className="flex items-start justify-between gap-3">

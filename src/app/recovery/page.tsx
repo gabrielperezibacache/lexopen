@@ -28,22 +28,27 @@ function RecoveryForm() {
     }
 
     setBusy(true);
-    const response = await fetch("/api/auth/recover", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token,
-        email: form.get("email"),
-        newPassword,
-      }),
-    });
-    const data = await response.json().catch(() => ({}));
-    setBusy(false);
-    if (!response.ok) {
-      setError(data.error || "No se pudo restablecer la contraseña.");
-      return;
+    try {
+      const response = await fetch("/api/auth/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          email: form.get("email"),
+          newPassword,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error || "No se pudo restablecer la contraseña.");
+        return;
+      }
+      setComplete(true);
+    } catch {
+      setError("No se pudo restablecer la contraseña.");
+    } finally {
+      setBusy(false);
     }
-    setComplete(true);
   }
 
   if (complete) {

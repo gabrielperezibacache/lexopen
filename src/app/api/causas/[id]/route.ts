@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, confidentialWhere, handleRouteError, requireStaff } from "@/lib/api";
+import {
+  assertCsrf,
+  confidentialWhere,
+  handleRouteError,
+  requireRole,
+  requireStaff,
+} from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { isStaff } from "@/lib/auth/rbac";
@@ -137,7 +143,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
   assertCsrf(_req);
-  const user = await requireStaff();
+  const user = await requireRole("admin");
   const { id } = await params;
   await prisma.causa.delete({ where: { id } });
   await writeAudit({

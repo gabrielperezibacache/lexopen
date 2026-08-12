@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const SESSION_COOKIE = "lexopen_session";
-const ROLE_COOKIE = "lexopen_role";
 
 const PUBLIC_PATHS = [
   "/",
@@ -15,6 +14,8 @@ const PUBLIC_PATHS = [
   "/api/integrations/pjud/webhook",
   "/api/health",
 ];
+
+const VALID_ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
 
 function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -54,15 +55,20 @@ async function hmacSha256Hex(payload: string, secret: string) {
   return toHex(sig);
 }
 
-async function verifyToken(token: string): Promise<boolean> {
+async function verifyToken(
+  token: string
+): Promise<{ userId: string; role: string } | null> {
   const secret = sessionSecret();
-  if (!secret) return false;
+  if (!secret) return null;
   if (!token.includes(".")) {
-    return process.env.NODE_ENV === "development";
+    // Legacy unsigned cookie: no trusted role in Edge; treat as non-client.
+    return process.env.NODE_ENV === "development"
+      ? { userId: token, role: "abogado" }
+      : null;
   }
   const parts = token.split(".");
-  if (parts.length !== 4) return false;
-  const [userId, expStr, versionStr, sig] = parts;
+  if (parts.length !== 5) return null;
+  const [userId, expStr, versionStr, role, sig] = parts;
   const expiresAt = Number(expStr);
   const sessionVersion = Number(versionStr);
   if (
@@ -70,15 +76,17 @@ async function verifyToken(token: string): Promise<boolean> {
     !Number.isFinite(expiresAt) ||
     expiresAt < Date.now() ||
     !Number.isInteger(sessionVersion) ||
-    sessionVersion < 0
+    sessionVersion < 0 ||
+    !VALID_ROLES.has(role)
   ) {
-    return false;
+    return null;
   }
   const expected = await hmacSha256Hex(
-    `${userId}.${expiresAt}.${sessionVersion}`,
+    `${userId}.${expiresAt}.${sessionVersion}.${role}`,
     secret
   );
-  return timingSafeEqualHex(sig, expected);
+  if (!timingSafeEqualHex(sig, expected)) return null;
+  return { userId, role };
 }
 
 function isClientAllowedPath(pathname: string) {
@@ -96,11 +104,6 @@ function isClientAllowedPath(pathname: string) {
     pathname === "/api/health" ||
     pathname.startsWith("/api/search")
   );
-}
-
-function withPathHeader(req: NextRequest, res: NextResponse) {
-  // Also set request header for RSC layouts
-  return res;
 }
 
 export async function middleware(req: NextRequest) {
@@ -136,7 +139,8 @@ export async function middleware(req: NextRequest) {
   }
 
   const token = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!token || !(await verifyToken(token))) {
+  const session = token ? await verifyToken(token) : null;
+  if (!session) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
@@ -145,8 +149,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  const role = req.cookies.get(ROLE_COOKIE)?.value;
-  if (role === "cliente" && !isClientAllowedPath(pathname)) {
+  // Role ACL comes from the signed session token — never from a forgeable cookie.
+  if (session.role === "cliente" && !isClientAllowedPath(pathname)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         { error: "Acceso restringido al portal cliente" },
@@ -156,7 +160,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/portal", req.url));
   }
 
-  return withPathHeader(req, pass());
+  return pass();
 }
 
 export const config = {

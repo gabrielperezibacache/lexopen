@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { clientSiteWhere, confidentialFileWhere, isClientAllowedPath } from "@/lib/auth/access";
+import {
+  clientSiteWhere,
+  clientVisibleFileWhere,
+  confidentialFileWhere,
+  isClientAllowedPath,
+} from "@/lib/auth/access";
 import { validarRuc, validarRut } from "@/lib/chile";
 import { calcularVencimiento } from "@/lib/plazos";
 
@@ -14,8 +19,19 @@ assert.deepEqual(confidentialFileWhere("cliente"), {
   privilegio: false,
 });
 assert.deepEqual(confidentialFileWhere("admin"), {});
+assert.deepEqual(clientVisibleFileWhere("cliente"), {
+  confidencial: false,
+  privilegio: false,
+  tags: { contains: "cliente" },
+});
+assert.deepEqual(clientVisibleFileWhere("asistente"), {
+  confidencial: false,
+  privilegio: false,
+});
+assert.deepEqual(clientVisibleFileWhere("abogado"), {});
 
 assert.equal(isClientAllowedPath("/portal"), true);
+assert.equal(isClientAllowedPath(""), false);
 assert.equal(isClientAllowedPath("/sites/site_1"), false);
 assert.equal(isClientAllowedPath("/sites/site_1/archivos"), true);
 assert.equal(isClientAllowedPath("/sites/site_1/qa"), true);

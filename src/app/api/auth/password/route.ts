@@ -39,7 +39,11 @@ export async function POST(req: NextRequest) {
       entityType: "User",
       entityId: user.id,
     });
-    const session = buildSessionCookieValue(user.id, nextSessionVersion);
+    const session = buildSessionCookieValue(
+      user.id,
+      nextSessionVersion,
+      user.role
+    );
     const response = NextResponse.json({ ok: true });
     const cookieBase = {
       sameSite: "lax" as const,

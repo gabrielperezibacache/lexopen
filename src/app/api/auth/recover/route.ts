@@ -27,30 +27,30 @@ export async function POST(req: NextRequest) {
 
     const admin = await prisma.user.findFirst({
       where: { email: body.email.toLowerCase(), role: "admin" },
-      select: { id: true, name: true, email: true },
+      select: { id: true },
     });
-    if (!admin) {
-      return NextResponse.json(
-        { error: "Administrador no encontrado" },
-        { status: 404 }
-      );
+    // Constant response avoids admin email enumeration.
+    if (admin) {
+      await prisma.user.update({
+        where: { id: admin.id },
+        data: {
+          password: await hashPassword(body.newPassword),
+          sessionVersion: { increment: 1 },
+        },
+      });
+      await writeAudit({
+        actorId: null,
+        action: "user.password_recovery",
+        entityType: "User",
+        entityId: admin.id,
+        after: { source: "local recovery token" },
+      });
     }
-
-    await prisma.user.update({
-      where: { id: admin.id },
-      data: {
-        password: await hashPassword(body.newPassword),
-        sessionVersion: { increment: 1 },
-      },
+    return NextResponse.json({
+      ok: true,
+      message:
+        "Si el administrador existe, la contraseña fue actualizada. Inicie sesión con la nueva clave.",
     });
-    await writeAudit({
-      actorId: null,
-      action: "user.password_recovery",
-      entityType: "User",
-      entityId: admin.id,
-      after: { source: "local recovery token" },
-    });
-    return NextResponse.json({ ok: true, user: admin });
   } catch (e) {
     return handleRouteError(e);
   }

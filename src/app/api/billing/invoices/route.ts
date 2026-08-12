@@ -148,7 +148,15 @@ export async function POST(req: NextRequest) {
 
       if (!lines.length) throw httpError("La factura necesita al menos una línea", 400);
 
-      const totals = computeInvoiceTotals({ tipoDocumento, lines });
+      const firm = await tx.firmSettings.findFirst({
+        select: { ivaPct: true, defaultRetencionPct: true },
+      });
+      const totals = computeInvoiceTotals({
+        tipoDocumento,
+        lines,
+        ivaRate: firm?.ivaPct,
+        retencionRate: firm?.defaultRetencionPct,
+      });
       let number = body.number || "";
       if (!number) {
         const count = await tx.invoice.count();

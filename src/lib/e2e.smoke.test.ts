@@ -18,17 +18,25 @@ import { validarRit, validarRut } from "@/lib/chile";
 
 assert.ok(sessionSecret().length >= 16);
 
-const session = buildSessionCookieValue("user_smoke_1");
+const session = buildSessionCookieValue("user_smoke_1", 0, "abogado");
 const parsed = verifySessionToken(session.value);
 assert.ok(parsed);
 assert.equal(parsed!.userId, "user_smoke_1");
 assert.equal(parsed!.sessionVersion, 0);
+assert.equal(parsed!.role, "abogado");
 assert.ok(parsed!.expiresAt > Date.now());
-const rotated = signSessionToken("user_smoke_1", Date.now() + 60_000, 1);
+const rotated = signSessionToken("user_smoke_1", Date.now() + 60_000, 1, "admin");
 assert.equal(verifySessionToken(rotated)!.sessionVersion, 1);
+assert.equal(verifySessionToken(rotated)!.role, "admin");
+// Forged/legacy 4-part tokens must not verify.
+assert.equal(
+  verifySessionToken(`${"user_smoke_1"}.${Date.now() + 60_000}.0.deadbeef`),
+  null
+);
 
 assert.equal(isClientAllowedPath("/portal"), true);
 assert.equal(isClientAllowedPath("/cuenta"), true);
+assert.equal(isClientAllowedPath(""), false);
 assert.equal(isClientAllowedPath("/sites/abc"), false);
 assert.equal(isClientAllowedPath("/sites/abc/archivos"), true);
 assert.equal(isClientAllowedPath("/sites/abc/qa"), true);

@@ -35,6 +35,34 @@ assert.deepEqual(
   }
 );
 
+assert.deepEqual(
+  computeInvoiceTotals({
+    tipoDocumento: "factura_afecta",
+    lines: [{ amountClp: 100_000 }],
+    ivaRate: 0.1,
+  }),
+  {
+    subtotalClp: 100_000,
+    ivaClp: 10_000,
+    retencionClp: 0,
+    totalClp: 110_000,
+  }
+);
+
+assert.deepEqual(
+  computeInvoiceTotals({
+    tipoDocumento: "boleta_honorarios",
+    lines: [{ amountClp: 100_000 }],
+    retencionRate: 0.1,
+  }),
+  {
+    subtotalClp: 100_000,
+    ivaClp: 0,
+    retencionClp: 10_000,
+    totalClp: 90_000,
+  }
+);
+
 assert.equal(invoiceStatusAfterPayment(100_000, 0), "emitida");
 assert.equal(invoiceStatusAfterPayment(100_000, 40_000), "parcialmente_pagada");
 assert.equal(invoiceStatusAfterPayment(100_000, 100_000), "pagada");

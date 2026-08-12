@@ -140,9 +140,22 @@ export async function PATCH(req: NextRequest) {
     if (!before) {
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
+    if (before.role === "admin" && data.role !== "admin") {
+      const adminCount = await prisma.user.count({ where: { role: "admin" } });
+      if (adminCount <= 1) {
+        return NextResponse.json(
+          { error: "No se puede degradar al único administrador" },
+          { status: 409 }
+        );
+      }
+    }
     const user = await prisma.user.update({
       where: { id: data.userId },
-      data: { role: data.role },
+      data: {
+        role: data.role,
+        // Invalidate outstanding sessions so the signed role in the token is refreshed.
+        sessionVersion: { increment: 1 },
+      },
     });
     await writeAudit({
       actorId: actor.id,

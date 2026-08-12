@@ -13,33 +13,70 @@ type Msg = {
   sender: { id: string; name: string };
   receiver: { id: string; name: string };
 };
-type User = { id: string; name: string; email: string };
+type User = { id: string; name: string; email: string; role?: string };
 
 export default function MessagesPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   async function load() {
-    const [m, me] = await Promise.all([
-      fetch("/api/messages").then((r) => r.json()),
-      fetch("/api/auth/me").then((r) => r.json()),
+    const [mRes, peopleRes, meRes] = await Promise.all([
+      fetch("/api/messages"),
+      fetch("/api/people"),
+      fetch("/api/auth/me"),
     ]);
+    const m = await mRes.json().catch(() => []);
+    const people = await peopleRes.json().catch(() => ({}));
+    const me = await meRes.json().catch(() => ({}));
     setMessages(Array.isArray(m) ? m : []);
-    setUsers(me.users || []);
+    const directory = Array.isArray(people.users)
+      ? people.users
+      : Array.isArray(me.users)
+        ? me.users
+        : [];
+    const myId = me.user?.id || me.id;
+    setUsers(
+      directory.filter(
+        (u: User) =>
+          u.id !== myId &&
+          (!u.role || u.role === "admin" || u.role === "abogado" || u.role === "asistente")
+      )
+    );
     setLoaded(true);
   }
 
   useEffect(() => {
     let active = true;
     Promise.all([
-      fetch("/api/messages").then((r) => r.json()),
-      fetch("/api/auth/me").then((r) => r.json()),
+      fetch("/api/messages"),
+      fetch("/api/people"),
+      fetch("/api/auth/me"),
     ])
-      .then(([m, me]) => {
+      .then(async ([mRes, peopleRes, meRes]) => {
+        const m = await mRes.json().catch(() => []);
+        const people = await peopleRes.json().catch(() => ({}));
+        const me = await meRes.json().catch(() => ({}));
         if (!active) return;
         setMessages(Array.isArray(m) ? m : []);
-        setUsers(me.users || []);
+        const directory = Array.isArray(people.users)
+          ? people.users
+          : Array.isArray(me.users)
+            ? me.users
+            : [];
+        const myId = me.user?.id || me.id;
+        setUsers(
+          directory.filter(
+            (u: User) =>
+              u.id !== myId &&
+              (!u.role ||
+                u.role === "admin" ||
+                u.role === "abogado" ||
+                u.role === "asistente")
+          )
+        );
         setLoaded(true);
       })
       .catch(() => {
@@ -55,18 +92,32 @@ export default function MessagesPage() {
 
   async function send(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        receiverId: fd.get("receiverId"),
-        subject: fd.get("subject"),
-        body: fd.get("body"),
-      }),
-    });
-    e.currentTarget.reset();
-    load();
+    setBusy(true);
+    setError("");
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          receiverId: fd.get("receiverId"),
+          subject: fd.get("subject"),
+          body: fd.get("body"),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "No se pudo enviar el mensaje");
+        return;
+      }
+      form.reset();
+      await load();
+    } catch {
+      setError("No se pudo enviar el mensaje");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -81,6 +132,11 @@ export default function MessagesPage() {
           </Link>
         }
       />
+      {error && (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          {error}
+        </p>
+      )}
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <section className="panel rounded-3xl p-5">
           <h2 className="font-semibold">Bandeja</h2>
@@ -117,8 +173,8 @@ export default function MessagesPage() {
             </select>
             <input className="input" name="subject" placeholder="Asunto" />
             <textarea className="textarea" name="body" required placeholder="Mensaje" />
-            <button className="btn btn-primary" type="submit">
-              Enviar
+            <button className="btn btn-primary" type="submit" disabled={busy || users.length === 0}>
+              {busy ? "Enviando…" : "Enviar"}
             </button>
           </form>
         </section>

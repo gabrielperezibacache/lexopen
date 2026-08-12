@@ -20,7 +20,7 @@ export default async function SiteQaPage({ params }: Params) {
   });
   if (!site) notFound();
   const threads = await prisma.qaThread.findMany({
-    where: { siteId: id, ...(clientView ? { status: "open" } : {}) },
+    where: { siteId: id },
     include: {
       posts: {
         include: { author: { select: publicUserSelect } },

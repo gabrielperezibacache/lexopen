@@ -10,6 +10,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
+    if (isCliente(user.role)) {
+      return NextResponse.json(
+        { error: "Acceso restringido al portal cliente" },
+        { status: 403 }
+      );
+    }
     const sheets = await prisma.iSheet.findMany({
       where: { siteId: id },
       include: {

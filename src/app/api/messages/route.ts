@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { isStaff } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
 
 export async function GET() {
   try {
-    const user = await requireUser();
+    const user = await requireStaff();
     const messages = await prisma.message.findMany({
       where: { OR: [{ receiverId: user.id }, { senderId: user.id }] },
       include: {
@@ -24,7 +25,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
-    const user = await requireUser();
+    const user = await requireStaff();
     const body = await req.json();
     if (
       typeof body.receiverId !== "string" ||
@@ -37,9 +38,9 @@ export async function POST(req: NextRequest) {
     }
     const receiver = await prisma.user.findUnique({
       where: { id: body.receiverId },
-      select: { id: true },
+      select: { id: true, role: true },
     });
-    if (!receiver) {
+    if (!receiver || !isStaff(receiver.role)) {
       return NextResponse.json({ error: "Destinatario no encontrado" }, { status: 404 });
     }
     const msg = await prisma.message.create({

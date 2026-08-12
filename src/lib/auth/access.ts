@@ -54,8 +54,18 @@ export function confidentialFileWhere(role: string) {
   return { confidencial: false, privilegio: false };
 }
 
+/** Files shared with clients must be tagged `cliente` and non-confidential. */
+export function clientVisibleFileWhere(role: string) {
+  const base = confidentialFileWhere(role);
+  if (!isCliente(role)) return base;
+  return {
+    ...base,
+    tags: { contains: "cliente" },
+  };
+}
+
 export function isClientAllowedPath(pathname: string) {
-  if (!pathname) return true;
+  if (!pathname) return false;
   if (pathname === "/portal" || pathname.startsWith("/portal/")) return true;
   if (pathname === "/cuenta" || pathname.startsWith("/cuenta/")) return true;
   if (pathname === "/sites") return true;
@@ -70,7 +80,8 @@ export async function enforceAppAccess() {
   const h = await headers();
   const path = h.get("x-lexopen-pathname") || "";
 
-  if (isCliente(user.role) && path && !isClientAllowedPath(path)) {
+  // Fail closed: missing pathname header must not skip the client path gate.
+  if (isCliente(user.role) && !isClientAllowedPath(path)) {
     redirect("/portal");
   }
 

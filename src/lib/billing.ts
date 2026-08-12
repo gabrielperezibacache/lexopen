@@ -58,6 +58,10 @@ export function clp(n: number) {
 export function computeInvoiceTotals(params: {
   tipoDocumento: string;
   lines: Array<{ amountClp: number }>;
+  /** Fraction, e.g. 0.19. Falls back to IVA_RATE. */
+  ivaRate?: number;
+  /** Fraction, e.g. 0.1375. Falls back to BOLETA_RETENCION_RATE. */
+  retencionRate?: number;
 }) {
   if (
     params.lines.length === 0 ||
@@ -67,16 +71,24 @@ export function computeInvoiceTotals(params: {
   ) {
     throw new RangeError("Las líneas de facturación deben tener montos CLP no negativos.");
   }
+  const ivaRate =
+    typeof params.ivaRate === "number" && Number.isFinite(params.ivaRate)
+      ? params.ivaRate
+      : IVA_RATE;
+  const retencionRate =
+    typeof params.retencionRate === "number" && Number.isFinite(params.retencionRate)
+      ? params.retencionRate
+      : BOLETA_RETENCION_RATE;
   const subtotalClp = params.lines.reduce((s, l) => s + l.amountClp, 0);
   let ivaClp = 0;
   let retencionClp = 0;
   let totalClp = subtotalClp;
 
   if (params.tipoDocumento === "factura_afecta") {
-    ivaClp = Math.round(subtotalClp * IVA_RATE);
+    ivaClp = Math.round(subtotalClp * ivaRate);
     totalClp = subtotalClp + ivaClp;
   } else if (params.tipoDocumento === "boleta_honorarios") {
-    retencionClp = Math.round(subtotalClp * BOLETA_RETENCION_RATE);
+    retencionClp = Math.round(subtotalClp * retencionRate);
     totalClp = subtotalClp - retencionClp;
   }
 

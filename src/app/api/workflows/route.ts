@@ -58,10 +58,16 @@ export async function POST(req: NextRequest) {
       if (inst.status === "approved" || inst.status === "rejected") {
         return NextResponse.json({ error: "El workflow ya terminó" }, { status: 409 });
       }
-      const steps = JSON.parse(inst.workflow.stepsJson) as Array<{
-        name: string;
-        role?: string;
-      }>;
+      let steps: Array<{ name: string; role?: string }> = [];
+      try {
+        const parsed = JSON.parse(inst.workflow.stepsJson);
+        steps = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return NextResponse.json(
+          { error: "Definición de workflow inválida" },
+          { status: 400 }
+        );
+      }
       const current = steps[inst.currentStep];
       if (!current) {
         return NextResponse.json({ error: "Paso de workflow inválido" }, { status: 409 });

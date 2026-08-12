@@ -3,6 +3,7 @@ import { StatusBadge, formatDate } from "@/components/ui";
 import Link from "next/link";
 import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
 import { PlazoForm } from "@/components/PlazoForm";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Props = { searchParams: Promise<{ mes?: string }> };
 
@@ -26,7 +27,7 @@ export default async function PlazosPage({ searchParams }: Props) {
   const [plazos, causas, responsables] = await Promise.all([
     prisma.plazo.findMany({
       where: { fechaLimite: { gte: start, lt: end } },
-      include: { causa: true, responsable: true },
+      include: { causa: true, responsable: { select: publicUserSelect } },
       orderBy: { fechaLimite: "asc" },
     }),
     prisma.causa.findMany({

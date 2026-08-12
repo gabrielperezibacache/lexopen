@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Scale } from "lucide-react";
+import { safeAppPath } from "@/lib/auth/safe-next";
 
 const DEMO_USERS = [
   { email: "socio@estudio.cl", label: "Socia / admin" },
@@ -24,23 +25,28 @@ function LoginForm() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: fd.get("email"),
-        password: fd.get("password"),
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) {
-      setError(data.error || "No se pudo iniciar sesión");
-      return;
+    try {
+      const fd = new FormData(e.currentTarget);
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: fd.get("email"),
+          password: fd.get("password"),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "No se pudo iniciar sesión");
+        return;
+      }
+      router.push(safeAppPath(next));
+      router.refresh();
+    } catch {
+      setError("No se pudo iniciar sesión");
+    } finally {
+      setBusy(false);
     }
-    router.push(next.startsWith("/") ? next : "/dashboard");
-    router.refresh();
   }
 
   return (

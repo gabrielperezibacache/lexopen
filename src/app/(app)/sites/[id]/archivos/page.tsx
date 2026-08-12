@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { assertSitePageAccess, confidentialFileWhere } from "@/lib/auth/access";
+import { assertSitePageAccess, clientVisibleFileWhere } from "@/lib/auth/access";
 import { isCliente } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { SiteNav } from "@/components/sites/SiteNav";
@@ -14,7 +14,7 @@ export default async function SiteFilesPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
   const clientView = isCliente(user.role);
-  const fileWhere = confidentialFileWhere(user.role);
+  const fileWhere = clientVisibleFileWhere(user.role);
   const site = await prisma.site.findUnique({
     where: { id },
     select: { id: true, name: true, tipo: true, color: true },
@@ -55,8 +55,9 @@ export default async function SiteFilesPage({ params }: Params) {
       />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--ink-soft)]/75">
-          VDR / Archivos del espacio — carpetas, versiones, comentarios y metadatos.
-          Los documentos por causa están en Documentos.
+          {clientView
+            ? "Documentos compartidos con usted (etiqueta «cliente»). El resto del data room permanece interno."
+            : "VDR / Archivos del espacio — carpetas, versiones, comentarios y metadatos. Los documentos por causa están en Documentos. Etiquete con «cliente» para compartir al portal."}
         </p>
         {!clientView && <SiteFileActions siteId={site.id} />}
       </div>

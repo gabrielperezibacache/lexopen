@@ -23,19 +23,53 @@ type Results = {
 
 const EXAMPLES = ["tutela", "Andes", "audiencia", "C-4521", "plazo"];
 
+const EMPTY_RESULTS = (q: string): Results => ({
+  q,
+  sites: [],
+  causas: [],
+  files: [],
+  tasks: [],
+  jurisprudencia: [],
+  wiki: [],
+  minutas: [],
+});
+
 export default function SearchPage() {
   const [results, setResults] = useState<Results | null>(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
+  const [error, setError] = useState("");
 
   async function runSearch(q: string) {
     const trimmed = q.trim();
     if (!trimmed) return;
     setBusy(true);
     setQuery(trimmed);
-    const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
-    setResults(await res.json());
-    setBusy(false);
+    setError("");
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setResults(EMPTY_RESULTS(trimmed));
+        setError(data.error || "No se pudo completar la búsqueda");
+        return;
+      }
+      setResults({
+        q: trimmed,
+        sites: Array.isArray(data.sites) ? data.sites : [],
+        causas: Array.isArray(data.causas) ? data.causas : [],
+        files: Array.isArray(data.files) ? data.files : [],
+        tasks: Array.isArray(data.tasks) ? data.tasks : [],
+        jurisprudencia: Array.isArray(data.jurisprudencia) ? data.jurisprudencia : [],
+        wiki: Array.isArray(data.wiki) ? data.wiki : [],
+        minutas: Array.isArray(data.minutas) ? data.minutas : [],
+      });
+    } catch {
+      setResults(EMPTY_RESULTS(trimmed));
+      setError("No se pudo completar la búsqueda");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -63,6 +97,12 @@ export default function SearchPage() {
           {busy ? "…" : "Buscar"}
         </button>
       </form>
+
+      {error && (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          {error}
+        </p>
+      )}
 
       {!results && (
         <section className="panel rounded-3xl p-6">

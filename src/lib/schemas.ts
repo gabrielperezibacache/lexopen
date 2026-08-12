@@ -155,3 +155,32 @@ export const timeEntrySchema = z.object({
   stoppedAt: z.string().optional().nullable(),
   stopTimer: z.boolean().optional(),
 });
+
+export const expenseCreateSchema = z.object({
+  date: billingDate.optional().nullable(),
+  description: z.string().min(1).max(500),
+  category: z.string().max(80).optional(),
+  amountClp: z.coerce.number().int().positive().max(1_000_000_000),
+  billable: z.boolean().optional(),
+  reimbursable: z.boolean().optional(),
+  vendor: z.string().max(200).optional().nullable(),
+  clienteId: z.string().optional().nullable(),
+  causaId: z.string().optional().nullable(),
+});
+
+export const feeArrangementCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  tipo: z
+    .enum(["hourly", "flat", "retainer", "cuota_litis", "mixed"])
+    .optional(),
+  currency: z.string().max(8).optional(),
+  rateHourlyClp: z.coerce.number().int().nonnegative().max(1_000_000_000).optional().nullable(),
+  rateHourlyUf: z.coerce.number().nonnegative().max(1_000_000).optional().nullable(),
+  flatFeeClp: z.coerce.number().int().nonnegative().max(1_000_000_000).optional().nullable(),
+  retainerClp: z.coerce.number().int().nonnegative().max(1_000_000_000).optional().nullable(),
+  cuotaLitisPct: z.coerce.number().nonnegative().max(100).optional().nullable(),
+  billingCapClp: z.coerce.number().int().nonnegative().max(1_000_000_000).optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
+  clienteId: z.string().optional().nullable(),
+  causaId: z.string().optional().nullable(),
+});

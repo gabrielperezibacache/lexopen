@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
-import { confidentialFileWhere } from "@/lib/auth/access";
+import { clientVisibleFileWhere } from "@/lib/auth/access";
 import { isCliente } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
 
@@ -12,7 +12,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
-    const fileWhere = confidentialFileWhere(user.role);
+    const fileWhere = clientVisibleFileWhere(user.role);
     const clientView = isCliente(user.role);
     const site = await prisma.site.findUnique({
       where: { id },
@@ -40,14 +40,19 @@ export async function GET(_req: NextRequest, { params }: Params) {
         },
         folders: { include: { children: true, files: { where: fileWhere } } },
         files: { where: { folderId: null, ...fileWhere }, orderBy: { updatedAt: "desc" }, take: 20 },
-        wikiPages: { orderBy: { updatedAt: "desc" }, take: 10 },
+        // Clients must not receive internal knowledge bases via API.
+        wikiPages: clientView
+          ? { where: { id: "__client_hidden__" } }
+          : { orderBy: { updatedAt: "desc" }, take: 10 },
         tasks: {
           where: clientView ? { assigneeId: user.id } : undefined,
           include: { assignee: { select: publicUserSelect } },
           orderBy: { dueDate: "asc" },
           take: 12,
         },
-        isheets: { include: { _count: { select: { rows: true, columns: true } } } },
+        isheets: clientView
+          ? { where: { id: "__client_hidden__" } }
+          : { include: { _count: { select: { rows: true, columns: true } } } },
         qaThreads: {
           include: { _count: { select: { posts: true } } },
           orderBy: { updatedAt: "desc" },
@@ -62,7 +67,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
           orderBy: { createdAt: "desc" },
           take: 20,
         },
-        blogPosts: { orderBy: { createdAt: "desc" }, take: 5 },
+        blogPosts: clientView
+          ? { where: { id: "__client_hidden__" } }
+          : { orderBy: { createdAt: "desc" }, take: 5 },
         _count: {
           select: { files: true, tasks: true, members: true, wikiPages: true },
         },

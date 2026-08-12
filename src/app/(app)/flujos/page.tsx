@@ -4,13 +4,15 @@ import { ModuleHeader } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { WorkflowActions } from "@/components/sites/WorkflowActions";
 import { EmptyState } from "@/components/EmptyState";
+import { safeJsonParse } from "@/lib/safe-json";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export default async function WorkflowsGlobalPage() {
   const workflows = await prisma.workflow.findMany({
     include: {
       site: true,
       instances: {
-        include: { actor: true },
+        include: { actor: { select: publicUserSelect } },
         orderBy: { createdAt: "desc" },
         take: 6,
       },
@@ -35,7 +37,7 @@ export default async function WorkflowsGlobalPage() {
       ) : null}
       <div className="space-y-4">
         {workflows.map((w) => {
-          const steps = JSON.parse(w.stepsJson) as Array<{ name: string }>;
+          const steps = safeJsonParse<Array<{ name: string }>>(w.stepsJson, []);
           return (
             <section key={w.id} className="panel rounded-3xl p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">

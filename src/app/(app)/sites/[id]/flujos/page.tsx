@@ -4,6 +4,7 @@ import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { WorkflowActions } from "@/components/sites/WorkflowActions";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,7 +17,7 @@ export default async function SiteWorkflowsPage({ params }: Params) {
     where: { siteId: id },
     include: {
       instances: {
-        include: { actor: true },
+        include: { actor: { select: publicUserSelect } },
         orderBy: { createdAt: "desc" },
         take: 8,
       },
@@ -36,7 +37,17 @@ export default async function SiteWorkflowsPage({ params }: Params) {
           </div>
         )}
         {workflows.map((w) => {
-          const steps = JSON.parse(w.stepsJson) as Array<{ name: string; role: string }>;
+          const steps = (() => {
+            try {
+              const parsed = JSON.parse(w.stepsJson) as Array<{
+                name: string;
+                role: string;
+              }>;
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [] as Array<{ name: string; role: string }>;
+            }
+          })();
           return (
             <section key={w.id} className="panel rounded-3xl p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">

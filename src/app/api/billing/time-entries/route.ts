@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, parseBody, requireBillingManager, requireStaff } from "@/lib/api";
+import {
+  assertCsrf,
+  handleRouteError,
+  httpError,
+  parseBody,
+  requireBillingManager,
+  requireStaff,
+} from "@/lib/api";
+import { canManageBilling } from "@/lib/auth/rbac";
 import { DEFAULT_HOURLY_CLP } from "@/lib/billing";
 import { ufToClp } from "@/lib/uf";
 import { timeEntrySchema } from "@/lib/schemas";
@@ -87,6 +95,15 @@ export async function POST(req: NextRequest) {
     if (rateClp == null) rateClp = DEFAULT_HOURLY_CLP;
 
     const amountClp = Math.round(hours * rateClp);
+    const targetUserId =
+      body.userId && body.userId !== user.id
+        ? canManageBilling(user.role)
+          ? body.userId
+          : null
+        : user.id;
+    if (body.userId && body.userId !== user.id && !targetUserId) {
+      throw httpError("Solo facturación puede cargar horas de otro usuario", 403);
+    }
     const entry = await prisma.timeEntry.create({
       data: {
         date: body.date ? new Date(body.date) : new Date(),
@@ -97,7 +114,7 @@ export async function POST(req: NextRequest) {
         amountClp,
         activityCode: body.activityCode || "general",
         startedAt: timerStartedAt && !timerStoppedAt ? timerStartedAt : null,
-        userId: body.userId || user.id,
+        userId: targetUserId || user.id,
         clienteId: body.clienteId || null,
         causaId: body.causaId || null,
       },
@@ -131,11 +148,17 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(entry);
     }
 
-    await requireStaff();
+    const user = await requireStaff();
     if (body.action === "stop" && body.id) {
       const current = await prisma.timeEntry.findUnique({ where: { id: body.id } });
       if (!current?.startedAt) {
         return NextResponse.json({ error: "Timer no iniciado" }, { status: 400 });
+      }
+      if (current.userId !== user.id && !canManageBilling(user.role)) {
+        return NextResponse.json(
+          { error: "Solo puede detener sus propios timers" },
+          { status: 403 }
+        );
       }
       const stoppedAt = body.stoppedAt ? new Date(body.stoppedAt) : new Date();
       const hours = minutesBetween(current.startedAt, stoppedAt) / 60;
@@ -149,6 +172,25 @@ export async function PATCH(req: NextRequest) {
         },
       });
       return NextResponse.json(entry);
+    }
+
+    // Marking billed / adjusting amounts is a billing-manager concern.
+    if (
+      body.billed !== undefined ||
+      body.amountClp !== undefined ||
+      body.hours !== undefined
+    ) {
+      await requireBillingManager();
+    } else if (body.billable !== undefined || body.description !== undefined) {
+      const current = await prisma.timeEntry.findUnique({ where: { id: body.id } });
+      if (!current) {
+        return NextResponse.json({ error: "Entrada no encontrada" }, { status: 404 });
+      }
+      if (current.userId !== user.id && !canManageBilling(user.role)) {
+        return NextResponse.json({ error: "Prohibido" }, { status: 403 });
+      }
+    } else {
+      await requireBillingManager();
     }
 
     const entry = await prisma.timeEntry.update({

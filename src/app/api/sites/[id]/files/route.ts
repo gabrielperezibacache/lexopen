@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
-import { confidentialFileWhere } from "@/lib/auth/access";
+import { clientVisibleFileWhere } from "@/lib/auth/access";
 import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
 import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storage";
 
@@ -57,7 +57,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
-    const fileWhere = confidentialFileWhere(user.role);
+    const fileWhere = clientVisibleFileWhere(user.role);
     const folders = await prisma.folder.findMany({
       where: { siteId: id },
       include: {

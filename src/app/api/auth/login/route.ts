@@ -17,27 +17,31 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const ip =
-      process.env.LEXOPEN_TRUSTED_PROXY === "1"
-        ? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-          req.headers.get("x-real-ip") ||
-          "unknown"
-        : "unknown";
-    const limited = rateLimit(`login:${ip}`, 20, 15 * 60 * 1000);
-    if (!limited.ok) {
-      return NextResponse.json(
-        { error: "Demasiados intentos. Espere e intente de nuevo." },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(Math.ceil((limited.retryAfterMs || 60000) / 1000)),
-          },
-        }
-      );
-    }
-
     const body = schema.parse(await req.json());
     const email = body.email.trim().toLowerCase();
+
+    // Only trust forwarded IPs behind an explicit reverse proxy.
+    if (process.env.LEXOPEN_TRUSTED_PROXY === "1") {
+      const ip =
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        req.headers.get("x-real-ip") ||
+        "unknown";
+      const limited = rateLimit(`login:${ip}`, 20, 15 * 60 * 1000);
+      if (!limited.ok) {
+        return NextResponse.json(
+          { error: "Demasiados intentos. Espere e intente de nuevo." },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(
+                Math.ceil((limited.retryAfterMs || 60000) / 1000)
+              ),
+            },
+          }
+        );
+      }
+    }
+
     const emailLimited = rateLimit(`login-email:${email}`, 10, 15 * 60 * 1000);
     if (!emailLimited.ok) {
       return NextResponse.json(
@@ -64,7 +68,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const session = buildSessionCookieValue(user.id, user.sessionVersion);
+    const session = buildSessionCookieValue(
+      user.id,
+      user.sessionVersion,
+      user.role
+    );
     const res = NextResponse.json({
       ok: true,
       user: {
@@ -83,9 +91,10 @@ export async function POST(req: NextRequest) {
       maxAge: session.maxAge,
     };
     res.cookies.set(SESSION_COOKIE, session.value, cookieBase);
+    // UX hint only — authorization uses the signed session token role.
     res.cookies.set(ROLE_COOKIE, user.role, {
       ...cookieBase,
-      httpOnly: false, // middleware role gate (not a secret)
+      httpOnly: false,
     });
     return res;
   } catch (e) {

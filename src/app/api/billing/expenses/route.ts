@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import {
+  assertCsrf,
+  handleRouteError,
+  parseBody,
+  requireBillingManager,
+  requireStaff,
+} from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { expenseCreateSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,14 +28,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
-    const user = await requireStaff();
-    const body = await req.json();
+    const user = await requireBillingManager();
+    const body = await parseBody(req, expenseCreateSchema);
     const expense = await prisma.expense.create({
       data: {
         date: body.date ? new Date(body.date) : new Date(),
         description: body.description,
         category: body.category || "otro",
-        amountClp: Number(body.amountClp),
+        amountClp: body.amountClp,
         billable: body.billable !== false,
         reimbursable: body.reimbursable !== false,
         vendor: body.vendor || null,

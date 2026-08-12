@@ -7,6 +7,7 @@ import { publicUserSelect } from "@/lib/auth/public-user";
 export const SESSION_COOKIE = "lexopen_session";
 export const ROLE_COOKIE = "lexopen_role";
 const SESSION_DAYS = 14;
+const ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
 
 export function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -20,9 +21,11 @@ export function sessionSecret() {
 export function signSessionToken(
   userId: string,
   expiresAt: number,
-  sessionVersion = 0
+  sessionVersion = 0,
+  role = "cliente"
 ) {
-  const payload = `${userId}.${expiresAt}.${sessionVersion}`;
+  const safeRole = ROLES.has(role) ? role : "cliente";
+  const payload = `${userId}.${expiresAt}.${sessionVersion}.${safeRole}`;
   const sig = createHmac("sha256", sessionSecret()).update(payload).digest("hex");
   return `${payload}.${sig}`;
 }
@@ -31,10 +34,11 @@ export function verifySessionToken(token: string): {
   userId: string;
   expiresAt: number;
   sessionVersion: number;
+  role: string;
 } | null {
   const parts = token.split(".");
-  if (parts.length !== 4) return null;
-  const [userId, expStr, versionStr, sig] = parts;
+  if (parts.length !== 5) return null;
+  const [userId, expStr, versionStr, role, sig] = parts;
   const expiresAt = Number(expStr);
   const sessionVersion = Number(versionStr);
   if (
@@ -42,12 +46,13 @@ export function verifySessionToken(token: string): {
     !Number.isFinite(expiresAt) ||
     expiresAt < Date.now() ||
     !Number.isInteger(sessionVersion) ||
-    sessionVersion < 0
+    sessionVersion < 0 ||
+    !ROLES.has(role)
   ) {
     return null;
   }
   const expected = createHmac("sha256", sessionSecret())
-    .update(`${userId}.${expiresAt}.${sessionVersion}`)
+    .update(`${userId}.${expiresAt}.${sessionVersion}.${role}`)
     .digest("hex");
   try {
     const a = Buffer.from(sig);
@@ -56,7 +61,7 @@ export function verifySessionToken(token: string): {
   } catch {
     return null;
   }
-  return { userId, expiresAt, sessionVersion };
+  return { userId, expiresAt, sessionVersion, role };
 }
 
 export async function getCurrentUser() {
@@ -120,10 +125,14 @@ export async function listUsers() {
   });
 }
 
-export function buildSessionCookieValue(userId: string, sessionVersion = 0) {
+export function buildSessionCookieValue(
+  userId: string,
+  sessionVersion = 0,
+  role = "cliente"
+) {
   const expiresAt = Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000;
   return {
-    value: signSessionToken(userId, expiresAt, sessionVersion),
+    value: signSessionToken(userId, expiresAt, sessionVersion, role),
     maxAge: SESSION_DAYS * 24 * 60 * 60,
   };
 }

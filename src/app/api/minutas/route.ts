@@ -6,6 +6,7 @@ import {
   handleRouteError,
   requireStaff,
 } from "@/lib/api";
+import { canSeeConfidential } from "@/lib/auth/rbac";
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { pushMinutaToDrive } from "@/lib/integrations/google";
 import { writeAudit } from "@/lib/audit";
@@ -91,6 +92,12 @@ export async function POST(req: NextRequest) {
   });
   if (!causa) {
     return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
+  }
+  if (Boolean(body.confidencial) && !canSeeConfidential(user.role)) {
+    return NextResponse.json(
+      { error: "Su rol no puede crear minutas confidenciales" },
+      { status: 403 }
+    );
   }
 
   const fecha = body.fecha

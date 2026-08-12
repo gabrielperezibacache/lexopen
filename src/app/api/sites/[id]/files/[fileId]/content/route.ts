@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
 import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { getObject } from "@/lib/storage";
 
 type Params = { params: Promise<{ id: string; fileId: string }> };
+
+function isClientSharedTag(tags: string | null | undefined) {
+  return (tags || "")
+    .split(/[,;]+/)
+    .map((t) => t.trim().toLowerCase())
+    .includes("cliente");
+}
 
 export async function GET(_req: Request, { params }: Params) {
   try {
@@ -22,6 +29,12 @@ export async function GET(_req: Request, { params }: Params) {
       !canSeeConfidential(user.role)
     ) {
       return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
+    }
+    if (isCliente(user.role) && !isClientSharedTag(file.tags)) {
+      return NextResponse.json(
+        { error: "Archivo no compartido con el portal cliente" },
+        { status: 403 }
+      );
     }
     const body = file.storageKey
       ? await getObject(file.storageKey)

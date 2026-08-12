@@ -31,19 +31,31 @@ import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
 import { useState } from "react";
 
-const primary = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  roles?: Array<"admin" | "abogado" | "asistente">;
+};
+
+const primary: NavItem[] = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
   { href: "/sites", label: "Espacios", icon: Building2 },
   { href: "/causas", label: "Causas", icon: Briefcase },
   { href: "/causas/monitoreo", label: "Monitoreo PJUD", icon: Radar },
   { href: "/minutas", label: "Minutas", icon: ClipboardPen },
-  { href: "/facturacion", label: "Facturación", icon: CircleDollarSign },
+  {
+    href: "/facturacion",
+    label: "Facturación",
+    icon: CircleDollarSign,
+    roles: ["admin", "abogado", "asistente"],
+  },
   { href: "/tareas", label: "Tareas", icon: ListTodo },
   { href: "/calendario", label: "Calendario", icon: CalendarDays },
   { href: "/buscar", label: "Buscar", icon: Search },
 ];
 
-const collab = [
+const collab: NavItem[] = [
   { href: "/mensajes", label: "Mensajes", icon: MessageSquare },
   { href: "/flujos", label: "Flujos", icon: GitBranch },
   { href: "/personas", label: "Personas", icon: Users },
@@ -51,19 +63,31 @@ const collab = [
   { href: "/plazos", label: "Plazos", icon: CalendarClock },
 ];
 
-const intel = [
+const intel: NavItem[] = [
   { href: "/jurisprudencia", label: "Jurisprudencia", icon: BookOpen },
   { href: "/agente", label: "Agente Hermes", icon: Bot },
   { href: "/portal", label: "Portal cliente", icon: DoorOpen },
-  { href: "/integraciones", label: "Integraciones", icon: Puzzle },
-  { href: "/auditoria", label: "Auditoría", icon: Shield },
-  { href: "/configuracion", label: "Configuración", icon: Settings },
+  {
+    href: "/integraciones",
+    label: "Integraciones",
+    icon: Puzzle,
+    roles: ["admin", "abogado"],
+  },
+  { href: "/auditoria", label: "Auditoría", icon: Shield, roles: ["admin"] },
+  { href: "/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
 ];
 
-const clienteNav = [
+const clienteNav: NavItem[] = [
   { href: "/portal", label: "Portal cliente", icon: DoorOpen },
   { href: "/sites", label: "Espacios", icon: Building2 },
+  { href: "/cuenta", label: "Mi cuenta", icon: Settings },
 ];
+
+function filterNav(links: NavItem[], role?: string | null) {
+  return links.filter(
+    (l) => !l.roles || (role != null && l.roles.includes(role as "admin" | "abogado" | "asistente"))
+  );
+}
 
 function NavGroup({
   title,
@@ -72,7 +96,7 @@ function NavGroup({
   onNavigate,
 }: {
   title: string;
-  links: typeof primary;
+  links: NavItem[];
   pathname: string;
   onNavigate?: () => void;
 }) {
@@ -135,12 +159,32 @@ export function AppSidebar({
 
       <nav className="flex-1 overflow-y-auto p-3">
         {isCliente ? (
-          <NavGroup title="Portal" links={clienteNav} pathname={pathname} onNavigate={() => setOpen(false)} />
+          <NavGroup
+            title="Portal"
+            links={clienteNav}
+            pathname={pathname}
+            onNavigate={() => setOpen(false)}
+          />
         ) : (
           <>
-            <NavGroup title="Espacio de trabajo" links={primary} pathname={pathname} onNavigate={() => setOpen(false)} />
-            <NavGroup title="Colaboración" links={collab} pathname={pathname} onNavigate={() => setOpen(false)} />
-            <NavGroup title="Inteligencia" links={intel} pathname={pathname} onNavigate={() => setOpen(false)} />
+            <NavGroup
+              title="Espacio de trabajo"
+              links={filterNav(primary, role)}
+              pathname={pathname}
+              onNavigate={() => setOpen(false)}
+            />
+            <NavGroup
+              title="Colaboración"
+              links={filterNav(collab, role)}
+              pathname={pathname}
+              onNavigate={() => setOpen(false)}
+            />
+            <NavGroup
+              title="Inteligencia"
+              links={filterNav(intel, role)}
+              pathname={pathname}
+              onNavigate={() => setOpen(false)}
+            />
           </>
         )}
       </nav>
@@ -168,6 +212,7 @@ export function AppSidebar({
     <>
       <button
         type="button"
+        data-mobile-nav-toggle
         className="fixed bottom-4 right-4 z-40 grid h-12 w-12 place-items-center rounded-full bg-[var(--ink)] text-white shadow-lg md:hidden"
         onClick={() => setOpen((v) => !v)}
         aria-label="Abrir menú"

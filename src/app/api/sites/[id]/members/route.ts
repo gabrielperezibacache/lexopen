@@ -11,11 +11,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
+    if (isCliente(user.role)) {
+      return NextResponse.json(
+        { error: "Acceso restringido al portal cliente" },
+        { status: 403 }
+      );
+    }
     const members = await prisma.siteMember.findMany({
-      where: {
-        siteId: id,
-        ...(isCliente(user.role) ? { user: { role: "cliente" } } : {}),
-      },
+      where: { siteId: id },
       include: { user: { select: publicUserSelect } },
     });
     return NextResponse.json(members);
