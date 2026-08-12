@@ -4,7 +4,10 @@ import {
   getAiUtility,
   inferAiUtility,
 } from "@/lib/ai/utilities";
-import { formatPlazoEstimate } from "@/lib/ai/local-assist";
+import {
+  buildLocalBriefingMarkdown,
+  formatPlazoEstimate,
+} from "@/lib/ai/local-assist";
 
 assert.ok(AI_UTILITIES.length >= 6);
 assert.equal(getAiUtility("doc_qa").id, "doc_qa");
@@ -23,5 +26,20 @@ const est = formatPlazoEstimate({
 assert.ok(!("error" in est));
 assert.match(est.vencimiento, /^\d{4}-\d{2}-\d{2}$/);
 assert.match(est.disclaimer, /Estimación interna/);
+
+const briefing = buildLocalBriefingMarkdown({
+  causaLabel: "C-1",
+  alerts: ["Plazo fatal"],
+  sourcesCount: 4,
+  folderIndex: [
+    { carpeta: "Escritos", count: 2, withText: 2, needsOcr: 0 },
+    { carpeta: "Evidencia", count: 1, withText: 0, needsOcr: 1 },
+  ],
+  documentScope: { rutaPrefix: "Escritos", selectedCount: 2 },
+});
+assert.match(briefing, /Carpeta investigativa/);
+assert.match(briefing, /Escritos/);
+assert.match(briefing, /Alcance documental/);
+assert.match(briefing, /OCR\/pendiente/);
 
 console.log("ai/utilities.test.ts OK");

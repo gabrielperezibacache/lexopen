@@ -181,12 +181,33 @@ export async function POST(req: Request) {
       messages,
     });
 
+    const suggestedActions = [
+      body.causaId
+        ? { label: "Abrir causa", href: `/causas/${body.causaId}` }
+        : null,
+      { label: "Documentos", href: "/documentos" },
+      { label: "Plazos", href: "/plazos" },
+      { label: "Jurisprudencia", href: "/jurisprudencia" },
+      { label: "Monitoreo PJUD", href: "/causas/monitoreo" },
+    ].filter(Boolean) as Array<{ label: string; href: string }>;
+
+    const documentScope = {
+      documentoIds,
+      rutaPrefix,
+      sourcesDocumentos: pack.sources.filter((s) => s.type === "documento").length,
+    };
+
     // Prefacio local con alertas / briefing cuando aplica
-    if (utility.id === "briefing" && pack.alerts.length) {
+    if (utility.id === "briefing") {
       const local = buildLocalBriefingMarkdown({
         causaLabel: pack.sources.find((s) => s.type === "causa")?.label || "—",
         alerts: pack.alerts,
         sourcesCount: pack.sources.length,
+        folderIndex: pack.folderIndex,
+        documentScope: {
+          rutaPrefix,
+          selectedCount: documentoIds?.length || null,
+        },
       });
       if (result.content) {
         result = {
@@ -210,6 +231,10 @@ export async function POST(req: Request) {
         content: result.content,
         source: result.source,
         utility: utility.id,
+        sources: pack.sources,
+        alerts: pack.alerts,
+        suggestedActions,
+        documentScope,
       },
     ];
     let chat;
@@ -254,20 +279,9 @@ export async function POST(req: Request) {
       utility: { id: utility.id, label: utility.label },
       sources: pack.sources,
       alerts: pack.alerts,
-      suggestedActions: [
-        body.causaId
-          ? { label: "Abrir causa", href: `/causas/${body.causaId}` }
-          : null,
-        { label: "Documentos", href: "/documentos" },
-        { label: "Plazos", href: "/plazos" },
-        { label: "Jurisprudencia", href: "/jurisprudencia" },
-        { label: "Monitoreo PJUD", href: "/causas/monitoreo" },
-      ].filter(Boolean),
-      documentScope: {
-        documentoIds,
-        rutaPrefix,
-        sourcesDocumentos: pack.sources.filter((s) => s.type === "documento").length,
-      },
+      suggestedActions,
+      documentScope,
+      folderIndex: pack.folderIndex,
     });
   } catch (e) {
     return handleRouteError(e);

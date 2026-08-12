@@ -35,6 +35,12 @@ export type AiContextPack = {
   text: string;
   sources: AiSourceRef[];
   alerts: string[];
+  folderIndex: Array<{
+    carpeta: string;
+    count: number;
+    withText: number;
+    needsOcr: number;
+  }>;
 };
 
 function utilitiesWantDocuments(utility: AiUtilityId) {
@@ -60,6 +66,7 @@ export async function buildAiContextPack(opts: {
   const sources: AiSourceRef[] = [];
   const alerts: string[] = [];
   const blocks: string[] = [];
+  let folderIndexRows: AiContextPack["folderIndex"] = [];
   const conf = confidentialWhere(opts.role);
   const budget = excerptBudgetForUtility(opts.utility);
 
@@ -219,6 +226,14 @@ export async function buildAiContextPack(opts: {
         const ranked = rankDocumentsForAi(scoped, opts.prompt);
         const selected = ranked.slice(0, budget.maxDocs);
         const folderIndex = buildFolderIndex(ranked);
+        folderIndexRows = Object.entries(folderIndex)
+          .map(([carpeta, info]) => ({
+            carpeta,
+            count: info.count,
+            withText: info.withText,
+            needsOcr: info.needsOcr,
+          }))
+          .sort((a, b) => b.count - a.count);
 
         if (Object.keys(folderIndex).length) {
           blocks.push(
@@ -248,7 +263,9 @@ export async function buildAiContextPack(opts: {
                 type: "documento",
                 id: d.id,
                 label: d.relativePath,
-                href: `/api/documentos/${d.id}/markdown`,
+                href: opts.causaId
+                  ? `/causas/${opts.causaId}`
+                  : "/documentos",
               });
             }
           }
@@ -498,5 +515,5 @@ export async function buildAiContextPack(opts: {
     ? blocks.join("\n\n")
     : "(Sin causa ni corpus adicional; responde de forma general y señala límites.)";
 
-  return { text, sources, alerts };
+  return { text, sources, alerts, folderIndex: folderIndexRows };
 }

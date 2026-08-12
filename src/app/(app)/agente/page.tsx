@@ -6,11 +6,23 @@ import { useSearchParams } from "next/navigation";
 import { safeJsonParse } from "@/lib/safe-json";
 
 type CausaOption = { id: string; titulo: string; rit: string | null };
+type SourceRef = {
+  type: string;
+  id: string;
+  label: string;
+  href?: string;
+};
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   source?: string;
   utility?: string;
+  sources?: SourceRef[];
+  suggestedActions?: Array<{ label: string; href: string }>;
+  documentScope?: {
+    documentoIds?: string[] | null;
+    rutaPrefix?: string | null;
+  };
 };
 type AgentChat = {
   id: string;
@@ -18,18 +30,13 @@ type AgentChat = {
   messagesJson: string;
   demoMode: boolean;
   updatedAt: string;
+  causaId?: string | null;
 };
 type Utility = {
   id: string;
   label: string;
   short: string;
   starter: string;
-};
-type SourceRef = {
-  type: string;
-  id: string;
-  label: string;
-  href?: string;
 };
 type DocOption = {
   id: string;
@@ -55,7 +62,7 @@ function AgenteInner() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [docs, setDocs] = useState<DocOption[]>([]);
-  const [rutaPrefix, setRutaPrefix] = useState("");
+  const [rutaPrefix, setRutaPrefix] = useState(sp.get("rutaPrefix") || "");
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
   async function loadChats() {
@@ -167,14 +174,26 @@ function AgenteInner() {
   function resumeChat(chat: AgentChat) {
     setChatId(chat.id);
     const parsed = safeJsonParse<ChatMessage[]>(chat.messagesJson, []);
-    setMessages(Array.isArray(parsed) ? parsed : []);
-    const lastAssistant = [...(Array.isArray(parsed) ? parsed : [])]
-      .reverse()
-      .find((m) => m.role === "assistant");
+    const list = Array.isArray(parsed) ? parsed : [];
+    setMessages(list);
+    const lastAssistant = [...list].reverse().find((m) => m.role === "assistant");
+    const lastUser = [...list].reverse().find((m) => m.role === "user");
     setReply(lastAssistant?.content || "");
     setMeta(chat.demoMode ? "Historial · modo demo" : "Historial · copiloto");
-    setSources([]);
-    setActions([]);
+    setSources(Array.isArray(lastAssistant?.sources) ? lastAssistant.sources : []);
+    setActions(
+      Array.isArray(lastAssistant?.suggestedActions)
+        ? lastAssistant.suggestedActions
+        : []
+    );
+    if (chat.causaId) setCausaId(chat.causaId);
+    const scope = lastAssistant?.documentScope;
+    if (scope?.rutaPrefix) setRutaPrefix(scope.rutaPrefix);
+    else setRutaPrefix("");
+    if (Array.isArray(scope?.documentoIds)) setSelectedDocIds(scope.documentoIds);
+    else setSelectedDocIds([]);
+    const util = lastAssistant?.utility || lastUser?.utility;
+    if (util) setUtility(util);
   }
 
   async function onSubmit(e: FormEvent) {
