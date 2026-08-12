@@ -36,22 +36,31 @@ export function warnProductionFlags(): string[] {
 const WEAK_SESSION_SECRET_RE =
   /change-me|dev-session-secret|lexopen-dev|password|secret123/i;
 
+/** True when SESSION_SECRET is long enough and not a known placeholder. */
+export function isStrongSessionSecret(
+  secret: string | null | undefined
+): boolean {
+  const value = secret?.trim() || "";
+  if (value.length < 16) return false;
+  if (WEAK_SESSION_SECRET_RE.test(value)) return false;
+  return true;
+}
+
 /** Throws if SESSION_SECRET is missing/short/placeholder in production. */
 export function assertProductionSessionSecret(
   secret = process.env.SESSION_SECRET
 ) {
   if (process.env.NODE_ENV !== "production") return;
+  if (isStrongSessionSecret(secret)) return;
   const value = secret?.trim() || "";
   if (!value || value.length < 16) {
     throw new Error(
       "LexOpen: SESSION_SECRET es obligatorio en producción (mín. 16 caracteres)."
     );
   }
-  if (WEAK_SESSION_SECRET_RE.test(value)) {
-    throw new Error(
-      "LexOpen: SESSION_SECRET de ejemplo/débil no permitido en producción. Genere un valor aleatorio."
-    );
-  }
+  throw new Error(
+    "LexOpen: SESSION_SECRET de ejemplo/débil no permitido en producción. Genere un valor aleatorio."
+  );
 }
 
 /** Throws if a hard-forbidden security flag is set in production. */

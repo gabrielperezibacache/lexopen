@@ -535,6 +535,7 @@ variables más relevantes:
 | `LEXOPEN_TRUSTED_PROXY` | No | Permite usar `X-Forwarded-For` para rate limiting solo detrás de un proxy confiable. |
 | `LEXOPEN_DEMO_SWITCHER` | No | Habilita el cambio entre usuarios demo; solo desarrollo/demo. |
 | `LEXOPEN_BOOTSTRAP_TOKEN` | Setup limpio | Token de un uso para crear el primer admin en `/setup` tras instalación o `db:purge-demo`. |
+| `LEXOPEN_RECOVERY_TOKEN` | Host / emergencia | Token para `/recovery` (reset de admin). Se rota tras un uso exitoso; léalo del `.env` del data dir. |
 | `LEXOPEN_OPEN_ACCESS` | No | Bypass de autenticación únicamente fuera de producción; no lo habilite en un entorno real. |
 | `LEXOPEN_RELAX_CSRF` | No | Relaja controles para CI; no lo habilite en producción. |
 | `STORAGE_PATH` | No | Directorio local para archivos cuando no se configura S3. |

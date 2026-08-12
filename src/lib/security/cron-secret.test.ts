@@ -4,6 +4,7 @@ import {
   assertProductionSessionSecret,
   assertSafeProductionEnv,
   forbiddenProductionFlags,
+  isStrongSessionSecret,
   warnProductionFlags,
 } from "@/lib/security/production-env";
 import {
@@ -81,11 +82,13 @@ delete env.LEXOPEN_OPEN_ACCESS;
 assert.doesNotThrow(() => assertSafeProductionEnv());
 
 env.SESSION_SECRET = "change-me-in-production";
+assert.equal(isStrongSessionSecret(env.SESSION_SECRET), false);
 assert.throws(() => assertProductionSessionSecret(), /débil|ejemplo/);
 assert.throws(() => assertSafeProductionEnv(), /SESSION_SECRET/);
 env.SESSION_SECRET = "short";
 assert.throws(() => assertProductionSessionSecret(), /mín/);
 env.SESSION_SECRET = "production-grade-session-secret-32";
+assert.equal(isStrongSessionSecret(env.SESSION_SECRET), true);
 assert.doesNotThrow(() => assertSafeProductionEnv());
 
 env.LLM_ALLOW_DEMO = "1";
