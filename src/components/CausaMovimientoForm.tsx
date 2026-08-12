@@ -7,6 +7,7 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -30,13 +31,20 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
   async function onImport(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setImporting(true);
+    setImportMessage("");
     const fd = new FormData(e.currentTarget);
-    await fetch(`/api/causas/${causaId}/movimientos`, {
+    const response = await fetch(`/api/causas/${causaId}/movimientos`, {
       method: "POST",
       body: fd,
     });
+    const data = await response.json().catch(() => ({}));
     setImporting(false);
     e.currentTarget.reset();
+    setImportMessage(
+      response.ok
+        ? `Importados: ${data.rows || 0} nuevos · omitidos: ${data.skipped || 0} repetidos.`
+        : data.error || "No se pudo importar el CSV."
+    );
     router.refresh();
   }
 
@@ -64,7 +72,7 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
         className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/60 p-3 text-sm"
       >
         <span className="text-[var(--ink-soft)]/75">
-          Importar CSV (titulo,detalle,fecha,fuente)
+          Importar CSV (titulo,detalle,fecha,referencia,id)
         </span>
         <input
           className="input max-w-xs"
@@ -76,6 +84,11 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
         <button className="btn btn-secondary" disabled={importing} type="submit">
           {importing ? "Importando..." : "Importar movimientos"}
         </button>
+        {importMessage && (
+          <span className="basis-full text-xs text-[var(--ink-soft)]/75" role="status">
+            {importMessage}
+          </span>
+        )}
       </form>
     </div>
   );

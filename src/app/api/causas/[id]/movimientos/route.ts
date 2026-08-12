@@ -10,58 +10,14 @@ import {
 } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { classifyMovimiento } from "@/lib/pjud/classify";
+import { fingerprint } from "@/lib/pjud/provider";
+import {
+  parseMovimientosCsv,
+  MAX_CSV_BYTES,
+} from "@/lib/pjud/import-csv";
 import { parseLocalDateInput } from "@/lib/minutas";
 
-const MAX_CSV_BYTES = 5 * 1024 * 1024;
-const MAX_CSV_ROWS = 1000;
-
 type Params = { params: Promise<{ id: string }> };
-
-function parseCsvLine(line: string) {
-  const cells: string[] = [];
-  let current = "";
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"' && line[i + 1] === '"') {
-      current += '"';
-      i += 1;
-    } else if (ch === '"') {
-      quoted = !quoted;
-    } else if (ch === "," && !quoted) {
-      cells.push(current.trim());
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-  cells.push(current.trim());
-  return cells;
-}
-
-function parseMovimientosCsv(csv: string) {
-  if (Buffer.byteLength(csv, "utf8") > MAX_CSV_BYTES) {
-    throw httpError("El CSV supera el límite de 5 MB", 413);
-  }
-  const lines = csv.split(/\r?\n/).filter((line) => line.trim());
-  if (lines.length === 0) return [];
-  if (lines.length - 1 > MAX_CSV_ROWS) {
-    throw httpError(`El CSV supera el límite de ${MAX_CSV_ROWS} filas`, 413);
-  }
-  const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
-  return lines
-    .slice(1)
-    .map((line) => {
-      const row = parseCsvLine(line);
-      const get = (name: string) => row[headers.indexOf(name)] || "";
-      return {
-        titulo: get("titulo") || get("title") || row[0] || "",
-        detalle: get("detalle") || get("detail") || row[1] || "",
-        fecha: get("fecha") || get("date") || row[2] || "",
-      };
-    })
-    .filter((row) => row.titulo.trim());
-}
 
 function parseMovementDate(value?: string) {
   const parsed = parseLocalDateInput(value);
@@ -127,6 +83,10 @@ export async function POST(req: NextRequest, { params }: Params) {
         });
         if (!causa) throw httpError("Causa no encontrada", 404);
         const movimientos = rows.map((row) => {
+          if (!row.fecha.trim()) {
+            throw httpError("Cada fila CSV debe incluir una fecha", 400);
+          }
+          const fecha = parseMovementDate(row.fecha);
           const classified = classifyMovimiento(row.titulo, row.detalle);
           return {
             causaId: id,
@@ -135,16 +95,20 @@ export async function POST(req: NextRequest, { params }: Params) {
             fuente: "import",
             tipo: classified.tipo,
             relevante: classified.relevante,
-            fecha: parseMovementDate(row.fecha),
+            referencia: row.referencia || null,
+            externalId: `import:${row.externalId || fingerprint(row.titulo, fecha, row.referencia)}`,
+            fecha,
           };
         });
         const createdRows = await tx.causaMovimiento.createMany({
           data: movimientos,
+          skipDuplicates: true,
         });
+        const skipped = rows.length - createdRows.count;
         await tx.activity.create({
           data: {
             tipo: "alerta",
-            mensaje: `Movimientos importados: ${createdRows.count}`,
+            mensaje: `Movimientos importados: ${createdRows.count} nuevos, ${skipped} repetidos`,
             causaId: id,
             userId: user.id,
           },
@@ -153,22 +117,25 @@ export async function POST(req: NextRequest, { params }: Params) {
           await tx.notification.create({
             data: {
               title: `Movimientos importados · ${causa.rit || causa.titulo}`,
-              body: `${createdRows.count} movimientos cargados desde CSV.`,
+              body: `${createdRows.count} movimientos nuevos cargados desde CSV.`,
               href: `/causas/${id}`,
               userId: causa.abogadoId,
             },
           });
         }
-        return createdRows.count;
+        return { created: createdRows.count, skipped };
       });
       await writeAudit({
         actorId: user.id,
         action: "causa.movimientos.import",
         entityType: "Causa",
         entityId: id,
-        after: { count: created },
+        after: created,
       });
-      return NextResponse.json({ rows: created }, { status: 201 });
+      return NextResponse.json(
+        { rows: created.created, skipped: created.skipped },
+        { status: 201 }
+      );
     }
     const body = await parseBody(
       req,

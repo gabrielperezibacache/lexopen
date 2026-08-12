@@ -174,6 +174,11 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   servicio. Si `PJUD_API_URL` está vacío y `PJUD_ALLOW_DEMO=0`, no se consultará
   ninguna fuente externa.
 
+Sin proveedor externo, exporte el CSV desde la consulta oficial y use el
+importador de movimientos de la ficha de la causa. El formato recomendado es
+`titulo,detalle,fecha,referencia,id`; LexOpen clasifica las filas, fuerza
+`fuente=import` y omite reimportaciones con la misma clave determinista.
+
 #### Webhook de un proveedor PJUD
 
 Los proveedores que entregan resultados de forma asíncrona pueden enviar un
