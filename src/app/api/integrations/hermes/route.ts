@@ -541,10 +541,14 @@ export async function POST(req: Request) {
       const firm = await prisma.firmSettings.findFirst({
         select: { hermesAllowDemo: true },
       });
+      // Env fail-closed: firm flag alone must not reopen demo in production.
       const allowDemo =
         process.env.HERMES_ALLOW_DEMO === "1" ||
-        process.env.NODE_ENV === "development" ||
-        firm?.hermesAllowDemo === true;
+        process.env.LLM_ALLOW_DEMO === "1" ||
+        (process.env.NODE_ENV === "development" &&
+          process.env.HERMES_ALLOW_DEMO !== "0" &&
+          process.env.LLM_ALLOW_DEMO !== "0" &&
+          firm?.hermesAllowDemo === true);
       if (!allowDemo) {
         return NextResponse.json(
           {

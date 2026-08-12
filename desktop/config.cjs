@@ -46,6 +46,8 @@ const PRESERVE_IF_SET = new Set([
   "OBSIDIAN_VAULT_PATH",
   "OBSIDIAN_REST_URL",
   "OBSIDIAN_REST_TOKEN",
+  "OBSIDIAN_ALLOW_PRIVATE_URL",
+  "LEXOPEN_KEEP_LLM_DEMO",
   "S3_BUCKET",
   "S3_REGION",
   "S3_ENDPOINT",
@@ -391,8 +393,11 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     // seedDemo may still load sample data without turning on LEXOPEN_DEMO_SWITCHER.
     LEXOPEN_DEMO_SWITCHER: "0",
     HERMES_ALLOW_DEMO: "0",
-    LLM_ALLOW_DEMO: "1",
+    // Fail-closed: demo LLM replies stay off unless the estudio opts in.
+    LLM_ALLOW_DEMO: "0",
     PJUD_ALLOW_DEMO: "0",
+    // Host local: Obsidian Local REST on loopback is expected.
+    OBSIDIAN_ALLOW_PRIVATE_URL: "1",
     NEXT_PUBLIC_APP_NAME: "LexOpen",
     NEXT_PUBLIC_APP_URL: publicUrl,
     LEXOPEN_TRUSTED_ORIGINS: [
@@ -417,6 +422,18 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
   if (isUnsafeStoragePath(finalMap.STORAGE_PATH, dataDir)) {
     const forced = parseEnvFile(finalText);
     forced.map.STORAGE_PATH = storageDir(dataDir);
+    finalMap = forced.map;
+    finalText = serializeEnv(forced.map, forced.order);
+  }
+
+  // Upgrade older Host installs that defaulted LLM_ALLOW_DEMO=1.
+  // Opt back in with LEXOPEN_KEEP_LLM_DEMO=1 in the data-dir .env.
+  if (
+    finalMap.LLM_ALLOW_DEMO === "1" &&
+    finalMap.LEXOPEN_KEEP_LLM_DEMO !== "1"
+  ) {
+    const forced = parseEnvFile(finalText);
+    forced.map.LLM_ALLOW_DEMO = "0";
     finalMap = forced.map;
     finalText = serializeEnv(forced.map, forced.order);
   }

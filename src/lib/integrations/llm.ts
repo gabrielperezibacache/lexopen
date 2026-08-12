@@ -155,6 +155,18 @@ export async function getLlmConfig(): Promise<LlmConfig> {
   if (parsed.allowDemo === undefined && firm) {
     merged.allowDemo = Boolean(firm.hermesAllowDemo);
   }
+  // Env fail-closed wins over firm/DB/stored config in production Host.
+  if (
+    process.env.LLM_ALLOW_DEMO === "0" ||
+    process.env.HERMES_ALLOW_DEMO === "0"
+  ) {
+    merged.allowDemo = false;
+  } else if (
+    process.env.LLM_ALLOW_DEMO === "1" ||
+    process.env.HERMES_ALLOW_DEMO === "1"
+  ) {
+    merged.allowDemo = true;
+  }
   if (!merged.preset) merged.preset = inferPreset(merged.apiUrl);
   // One-shot upgrade: rewrite plaintext API keys as enc:v2.
   if (hadPlaintextKey && merged.apiKey && !migratingPlaintextApiKey) {

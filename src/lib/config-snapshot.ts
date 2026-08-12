@@ -93,7 +93,7 @@ export async function getConfigSnapshot() {
       dataDirectoryConfigured: host.app.dataDirectoryConfigured,
     },
     firm: {
-      hermesAllowDemo: firm?.hermesAllowDemo ?? true,
+      hermesAllowDemo: firm?.hermesAllowDemo ?? false,
       defaultRetencionPct: firm?.defaultRetencionPct ?? 0.1375,
       ivaPct: firm?.ivaPct ?? 0.19,
     },

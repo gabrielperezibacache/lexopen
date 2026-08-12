@@ -29,7 +29,7 @@ model FirmSettings {
   emisorDireccion String?
   defaultRetencionPct Float @default(0.1375)
   ivaPct          Float   @default(0.19)
-  hermesAllowDemo Boolean @default(true)
+  hermesAllowDemo Boolean @default(false)
   /// ClaveÚnica del estudio (AES-GCM) — flujo CausaMonitor / OJV Mis Causas
   claveUnicaRut            String?
   claveUnicaPasswordEnc    String?

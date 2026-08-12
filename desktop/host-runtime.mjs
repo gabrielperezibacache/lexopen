@@ -87,7 +87,11 @@ function loadEnvFile(file) {
     if (i === -1) continue;
     const key = trimmed.slice(0, i);
     const value = trimmed.slice(i + 1);
-    process.env[key] = value;
+    // Do not override env already set by systemd/launchd/parent process
+    // (fail-closed demo flags from deploy units must win over a stale .env).
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
   }
 }
 
@@ -418,10 +422,18 @@ export async function startHost(options = {}) {
       );
     }
     if (needsSetup) {
-      // Never print the bootstrap token to logs (open via Desktop IPC instead).
-      console.log(
-        "[lexopen-host] Configuración inicial pendiente: abra /setup desde la app Desktop (el token no se imprime en logs)."
-      );
+      // Never print the bootstrap token (Desktop IPC or manual paste from .env).
+      if (process.versions.electron) {
+        console.log(
+          "[lexopen-host] Configuración inicial pendiente: abra /setup desde la app Desktop (el token no se imprime en logs)."
+        );
+      } else {
+        console.log(
+          "[lexopen-host] Configuración inicial pendiente: abra http://127.0.0.1:" +
+            host.port +
+            "/setup y pegue LEXOPEN_BOOTSTRAP_TOKEN desde el archivo .env del data dir (el token no se imprime en logs)."
+        );
+      }
     }
 
     let hostSchedulers = null;

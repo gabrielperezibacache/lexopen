@@ -63,4 +63,29 @@ const trimmed = sanitizeLlmMessages(
 assert.equal(trimmed.length, 6);
 assert.equal(trimmed[0]?.role, "system");
 
+// Production fail-closed: unset / explicit 0 must not enable demo.
+function envAllowsDemo(env: {
+  NODE_ENV?: string;
+  LLM_ALLOW_DEMO?: string;
+  HERMES_ALLOW_DEMO?: string;
+}) {
+  return (
+    env.LLM_ALLOW_DEMO === "1" ||
+    env.HERMES_ALLOW_DEMO === "1" ||
+    (env.LLM_ALLOW_DEMO !== "0" &&
+      env.HERMES_ALLOW_DEMO !== "0" &&
+      env.NODE_ENV !== "production")
+  );
+}
+assert.equal(envAllowsDemo({ NODE_ENV: "production" }), false);
+assert.equal(
+  envAllowsDemo({ NODE_ENV: "production", LLM_ALLOW_DEMO: "0" }),
+  false
+);
+assert.equal(
+  envAllowsDemo({ NODE_ENV: "production", LLM_ALLOW_DEMO: "1" }),
+  true
+);
+assert.equal(envAllowsDemo({ NODE_ENV: "development" }), true);
+
 console.log("integrations/llm.test.ts OK");
