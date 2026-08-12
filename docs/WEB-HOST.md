@@ -152,6 +152,7 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
 
   El respaldo incluye PostgreSQL, documentos, vault y configuración. Contiene
   `.env`, por lo que debe guardarse en un disco cifrado.
+
 - Para restaurar, mantenga el Host detenido y ejecute:
 
   ```bash
@@ -160,6 +161,7 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   ```
 
   La restauración conserva un rollback temporal hasta verificar el arranque.
+
 - Verifique periódicamente `/api/health`, espacio libre y backups restaurables.
 - Para PJUD, `CRON_SECRET` permite un scheduler externo; Render no programa este
   sync cuando se usa un Host local.
