@@ -168,7 +168,7 @@ const dataDir = path.resolve(
 let schedulerTimer = null;
 let backupScheduler = null;
 let child = null;
-let expectedChildExit = false;
+const expectedChildExits = new WeakSet();
 let shuttingDown = false;
 
 async function shutdown(exitCode = 0) {
@@ -199,7 +199,7 @@ function startHostProcess() {
   child = current;
   current.once("exit", (code, signal) => {
     if (child === current) child = null;
-    if (expectedChildExit || shuttingDown) return;
+    if (expectedChildExits.has(current) || shuttingDown) return;
     console.error(
       `[web-host] El proceso del Host terminó inesperadamente (code=${code}, signal=${signal || "none"}).`
     );
@@ -212,12 +212,8 @@ async function stopCurrentHost() {
   const current = child;
   if (!current) return;
   child = null;
-  expectedChildExit = true;
-  try {
-    await stopChild(current);
-  } finally {
-    expectedChildExit = false;
-  }
+  expectedChildExits.add(current);
+  await stopChild(current);
 }
 
 process.once("SIGINT", () => void shutdown(0));
