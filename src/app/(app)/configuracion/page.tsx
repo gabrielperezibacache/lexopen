@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth/session";
 import { ModuleHeader } from "@/components/sites/SiteNav";
+import { LanguageSettingsPanel } from "@/components/i18n/LanguageSettingsPanel";
 import { FirmSettingsForm } from "@/components/FirmSettingsForm";
 import { LlmSettingsForm } from "@/components/LlmSettingsForm";
 import { ObsidianSettingsForm } from "@/components/config/ObsidianSettingsForm";
@@ -43,6 +44,7 @@ export default async function ConfiguracionPage() {
         subtitle="Identidad, usuarios, tributario, IA, Obsidian, Google, PJUD, entorno del host e integraciones."
       />
       <ConfigSectionNav />
+      <LanguageSettingsPanel />
       <FirmSettingsForm organization={settingsOrganization} />
       <UsersAdminPanel
         currentUserId={me.id}

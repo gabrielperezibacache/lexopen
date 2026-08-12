@@ -1,17 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState, Suspense } from "react";
+import { FormEvent, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Scale } from "lucide-react";
 import { safeAppPath } from "@/lib/auth/safe-next";
-
-const DEMO_USERS = [
-  { email: "socio@estudio.cl", label: "Socia / admin" },
-  { email: "abogado@estudio.cl", label: "Abogado" },
-  { email: "asistente@estudio.cl", label: "Asistente" },
-  { email: "cliente@andes.cl", label: "Cliente (portal)" },
-];
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 /** Demo shortcuts are build-time stripped from production client bundles. */
 const SHOW_DEMO_LOGIN = process.env.NODE_ENV !== "production";
@@ -23,6 +18,17 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState(SHOW_DEMO_LOGIN ? "socio@estudio.cl" : "");
+  const { t } = useI18n();
+
+  const demoUsers = useMemo(
+    () => [
+      { email: "socio@estudio.cl", label: t("login.roles.admin") },
+      { email: "abogado@estudio.cl", label: t("login.roles.lawyer") },
+      { email: "asistente@estudio.cl", label: t("login.roles.assistant") },
+      { email: "cliente@andes.cl", label: t("login.roles.client") },
+    ],
+    [t]
+  );
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -40,13 +46,13 @@ function LoginForm() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "No se pudo iniciar sesión");
+        setError(data.error || t("login.error"));
         return;
       }
       router.push(safeAppPath(next));
       router.refresh();
     } catch {
-      setError("No se pudo iniciar sesión");
+      setError(t("login.error"));
     } finally {
       setBusy(false);
     }
@@ -58,6 +64,9 @@ function LoginForm() {
       <div className="pointer-events-none absolute -left-16 bottom-10 h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(31,111,120,0.18),transparent_70%)]" />
 
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
+        <div className="mb-4 flex justify-end">
+          <LanguageSwitcher variant="compact" />
+        </div>
         <Link href="/" className="mb-8 flex items-center gap-3">
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] text-white">
             <Scale size={20} />
@@ -65,22 +74,20 @@ function LoginForm() {
           <div>
             <div className="display text-2xl">LexOpen</div>
             <div className="text-xs uppercase tracking-[0.16em] text-[var(--ink-soft)]/65">
-              Acceso al estudio
+              {t("login.access")}
             </div>
           </div>
         </Link>
 
         <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
           <div>
-            <h1 className="display text-3xl">Iniciar sesión</h1>
+            <h1 className="display text-3xl">{t("login.title")}</h1>
             <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
-              {SHOW_DEMO_LOGIN
-                ? "Use un usuario demo o sus credenciales del estudio."
-                : "Ingrese con las credenciales del estudio."}
+              {SHOW_DEMO_LOGIN ? t("login.subtitle") : t("login.subtitleProd")}
             </p>
           </div>
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">Email</span>
+            <span className="mb-1 block text-[var(--ink-soft)]/70">{t("login.email")}</span>
             <input
               className="input"
               name="email"
@@ -92,7 +99,7 @@ function LoginForm() {
             />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">Contraseña</span>
+            <span className="mb-1 block text-[var(--ink-soft)]/70">{t("login.password")}</span>
             <input
               className="input"
               name="password"
@@ -108,17 +115,17 @@ function LoginForm() {
             </p>
           )}
           <button className="btn btn-primary w-full" disabled={busy} type="submit">
-            {busy ? "Entrando…" : "Entrar"}
+            {busy ? t("login.submitting") : t("login.submit")}
           </button>
         </form>
 
         {SHOW_DEMO_LOGIN && (
           <div className="panel mt-4 rounded-3xl p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-soft)]/55">
-              Usuarios demo · contraseña lexopen
+              {t("login.demoUsers")}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {DEMO_USERS.map((u) => (
+              {demoUsers.map((u) => (
                 <button
                   key={u.email}
                   type="button"

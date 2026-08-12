@@ -21,6 +21,7 @@ const PUBLIC_PATHS = [
   "/api/auth/recover",
   "/api/integrations/pjud/webhook",
   "/api/health",
+  "/api/locale",
 ];
 
 const VALID_ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
