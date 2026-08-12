@@ -12,8 +12,8 @@ export function looksHashed(value: string) {
 
 export async function verifyPassword(plain: string, hashed: string) {
   if (!looksHashed(hashed)) {
-    // One-shot legacy: only allow plaintext compare outside production
-    if (process.env.NODE_ENV === "production" && process.env.LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS !== "1") {
+    // Legacy plaintext: never in production (LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS ignored there).
+    if (process.env.NODE_ENV === "production") {
       return false;
     }
     return plain === hashed;

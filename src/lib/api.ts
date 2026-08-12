@@ -116,8 +116,9 @@ export function assertCsrf(req: Request) {
   const okReferer = isAllowedOrigin(referer, allowed);
 
   // Same-origin fetch from browser usually sends Origin; server-to-server may not.
+  // LEXOPEN_RELAX_CSRF is ignored in production (fail-closed).
   if (!origin && !referer) {
-    if (process.env.NODE_ENV === "production" && process.env.LEXOPEN_RELAX_CSRF !== "1") {
+    if (process.env.NODE_ENV === "production") {
       throw httpError("CSRF: Origin/Referer requerido", 403);
     }
     return;

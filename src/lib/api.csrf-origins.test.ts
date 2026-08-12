@@ -55,6 +55,17 @@ assert.throws(() =>
   )
 );
 
+// LEXOPEN_RELAX_CSRF must not weaken production CSRF.
+env.LEXOPEN_RELAX_CSRF = "1";
+assert.throws(() =>
+  assertCsrf(
+    new Request("https://app.example/api/change", {
+      method: "POST",
+      headers: { host: "app.example" },
+    })
+  )
+);
+
 if (previousNodeEnv === undefined) delete env.NODE_ENV;
 else env.NODE_ENV = previousNodeEnv;
 if (previousAppUrl === undefined) delete env.NEXT_PUBLIC_APP_URL;

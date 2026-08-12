@@ -9,6 +9,7 @@ import {
 import { hashPassword, looksHashed, verifyPassword } from "@/lib/auth/password";
 import { canImpersonate } from "@/lib/auth/rbac";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { assertCsrf, handleRouteError } from "@/lib/api";
 
 const schema = z.object({
   email: z.string().email(),
@@ -17,29 +18,31 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    assertCsrf(req);
     const body = schema.parse(await req.json());
     const email = body.email.trim().toLowerCase();
 
     // Only trust forwarded IPs behind an explicit reverse proxy.
-    if (process.env.LEXOPEN_TRUSTED_PROXY === "1") {
-      const ip =
-        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-        req.headers.get("x-real-ip") ||
-        "unknown";
-      const limited = rateLimit(`login:${ip}`, 20, 15 * 60 * 1000);
-      if (!limited.ok) {
-        return NextResponse.json(
-          { error: "Demasiados intentos. Espere e intente de nuevo." },
-          {
-            status: 429,
-            headers: {
-              "Retry-After": String(
-                Math.ceil((limited.retryAfterMs || 60000) / 1000)
-              ),
-            },
-          }
-        );
-      }
+    // Without a trusted proxy, still apply a coarse shared bucket to slow sprays.
+    const ip =
+      process.env.LEXOPEN_TRUSTED_PROXY === "1"
+        ? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          req.headers.get("x-real-ip") ||
+          "unknown"
+        : "direct";
+    const limited = rateLimit(`login:${ip}`, 40, 15 * 60 * 1000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: "Demasiados intentos. Espere e intente de nuevo." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(
+              Math.ceil((limited.retryAfterMs || 60000) / 1000)
+            ),
+          },
+        }
+      );
     }
 
     const emailLimited = rateLimit(`login-email:${email}`, 10, 15 * 60 * 1000);
@@ -101,6 +104,6 @@ export async function POST(req: NextRequest) {
     if (e instanceof z.ZodError) {
       return NextResponse.json({ error: "Email y contraseña requeridos" }, { status: 400 });
     }
-    return NextResponse.json({ error: "Error de autenticación" }, { status: 500 });
+    return handleRouteError(e);
   }
 }

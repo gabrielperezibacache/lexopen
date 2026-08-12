@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/session";
+import { isStaff } from "@/lib/auth/rbac";
 import { persistentStorageReady, storageMode } from "@/lib/storage";
 import { recoverPendingDocumentProcessing } from "@/lib/document-processing-queue";
 import { getOcrCapability } from "@/lib/local-ocr";
 
-function desktopPayload() {
+function desktopDetails() {
   return {
     desktop: process.env.LEXOPEN_DESKTOP === "1",
     desktopMode: process.env.LEXOPEN_DESKTOP_MODE || null,
@@ -15,66 +17,75 @@ function desktopPayload() {
   };
 }
 
+function noStoreJson(body: Record<string, unknown>, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
+  });
+}
+
 export async function GET() {
-  const base = desktopPayload();
   const time = new Date().toISOString();
   const storage = storageMode();
   const storageReady = persistentStorageReady();
   const storageRequired = process.env.LEXOPEN_REQUIRE_PERSISTENT_STORAGE === "1";
+  const user = await getCurrentUser().catch(() => null);
+  const staff = Boolean(user && isStaff(user.role));
+  const desktopRuntime = process.env.LEXOPEN_DESKTOP === "1";
+
   try {
     const userRows = await prisma.$queryRaw<Array<{ exists: boolean }>>`
       SELECT EXISTS (SELECT 1 FROM "User") AS "exists"
     `;
     const needsSetup = !Boolean(userRows[0]?.exists);
-    const ocr = await getOcrCapability();
+
+    // Public probe: minimal fields for load balancers / web-host / desktop bootstrap.
+    const publicBody: Record<string, unknown> = {
+      ok: true,
+      db: "up",
+      storage,
+      storageReady,
+      storageRequired,
+      needsSetup,
+      time,
+    };
+
+    // Detailed recon (OCR, desktop URL/version) only for staff or local desktop runtime.
+    if (staff || desktopRuntime) {
+      const ocr = await getOcrCapability();
+      publicBody.ocr = ocr;
+      if (staff) {
+        Object.assign(publicBody, desktopDetails());
+      } else {
+        publicBody.desktop = true;
+        publicBody.version = process.env.LEXOPEN_APP_VERSION || null;
+      }
+    }
+
     void recoverPendingDocumentProcessing().catch((error) => {
       console.error("document processing recovery failed", error);
     });
+
     if (!storageReady && storageRequired) {
-      return NextResponse.json(
+      return noStoreJson(
         {
+          ...publicBody,
           ok: false,
-          db: "up",
-          storage,
-          storageReady,
-          storageRequired,
-          needsSetup,
-          ocr,
-          time,
           error: "Almacenamiento persistente no configurado",
-          ...base,
         },
-        {
-          status: 503,
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate",
-          },
-        }
+        503
       );
     }
-    return NextResponse.json(
-      {
-        ok: true,
-        db: "up",
-        storage,
-        storageReady,
-        storageRequired,
-        needsSetup,
-        ocr,
-        ...(storageReady
-          ? {}
-          : { warning: "Almacenamiento local no persistente" }),
-        time,
-        ...base,
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate",
-        },
-      }
-    );
+
+    if (!storageReady) {
+      publicBody.warning = "Almacenamiento local no persistente";
+    }
+
+    return noStoreJson(publicBody);
   } catch {
-    return NextResponse.json(
+    return noStoreJson(
       {
         ok: false,
         db: "down",
@@ -82,16 +93,9 @@ export async function GET() {
         storageReady,
         storageRequired,
         needsSetup: null,
-        ocr: null,
         time,
-        ...base,
       },
-      {
-        status: 503,
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate",
-        },
-      }
+      503
     );
   }
 }
