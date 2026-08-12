@@ -3,6 +3,7 @@ import {
   MAX_PROCESSING_BYTES,
   processDocumentBytes,
 } from "@/lib/document-processing";
+import { ocrPdfPages } from "@/lib/local-ocr";
 
 async function main() {
   const csv = await processDocumentBytes(
@@ -18,6 +19,14 @@ async function main() {
   );
   assert.equal(tooLarge.status, "failed");
   assert.equal(tooLarge.metadata.errorCode, "resourceLimit");
+
+  const previousOcrEnabled = process.env.OCR_ENABLED;
+  process.env.OCR_ENABLED = "0";
+  const disabledOcr = await ocrPdfPages(Buffer.from("pdf"), 1, [0]);
+  assert.equal(disabledOcr.status, "unavailable");
+  assert.equal(disabledOcr.reason, "disabled");
+  if (previousOcrEnabled === undefined) delete process.env.OCR_ENABLED;
+  else process.env.OCR_ENABLED = previousOcrEnabled;
 
   console.log("document-processing.test.ts OK");
 }

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { toMarkdownBytes, formatFromExtension } from "@firecrawl/anydoc";
 import { classifyPdfAsync } from "@firecrawl/pdf-inspector";
+import { ocrPdfPages } from "@/lib/local-ocr";
 
 export const MAX_PROCESSING_BYTES = 25 * 1024 * 1024;
 
@@ -41,11 +42,23 @@ export async function processDocumentBytes(
   if (isPdf(name, bytes)) {
     try {
       const classification = await classifyPdfAsync(bytes);
-      if (classification.pdfType === "Scanned" || classification.pdfType === "ImageBased") {
+      const requiresOcr =
+        classification.pdfType === "Scanned" ||
+        classification.pdfType === "ImageBased" ||
+        classification.pagesNeedingOcr.length > 0;
+      let markdown: string | null = null;
+      if (!requiresOcr || classification.pdfType === "Mixed") {
+        try {
+          markdown = (await toMarkdownBytes(bytes)).trim() || null;
+        } catch {
+          markdown = null;
+        }
+      }
+      if (!requiresOcr) {
         return {
           format: "pdf",
-          status: "needs_ocr",
-          markdown: null,
+          status: markdown ? "completed" : "unsupported",
+          markdown,
           metadata: {
             pdfType: classification.pdfType,
             pageCount: classification.pageCount,
@@ -55,16 +68,27 @@ export async function processDocumentBytes(
         };
       }
 
-      const markdown = await toMarkdownBytes(bytes);
+      const ocr = await ocrPdfPages(
+        bytes,
+        classification.pageCount,
+        classification.pagesNeedingOcr
+      );
+      const combined = [markdown, ocr.markdown]
+        .filter((value): value is string => Boolean(value))
+        .join("\n\n---\n\n");
       return {
         format: "pdf",
-        status: classification.pagesNeedingOcr.length ? "needs_ocr" : "completed",
-        markdown: markdown.trim() || null,
+        status: ocr.status === "completed" ? "completed" : "needs_ocr",
+        markdown: combined || null,
         metadata: {
           pdfType: classification.pdfType,
           pageCount: classification.pageCount,
           pagesNeedingOcr: classification.pagesNeedingOcr,
           confidence: classification.confidence,
+          ocrStatus: ocr.status,
+          ocrReason: ocr.reason,
+          ocrPagesProcessed: ocr.pagesProcessed,
+          ocrPagesFailed: ocr.pagesFailed,
         },
       };
     } catch (error) {

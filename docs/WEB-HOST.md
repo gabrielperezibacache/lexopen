@@ -49,6 +49,25 @@ curl http://127.0.0.1:3000/api/health
 
 Debe mostrar `db: "up"`, `storageReady: true` y `needsSetup: false`.
 
+## OCR local para PDFs escaneados
+
+El OCR es opcional. `pdf-inspector` detecta las páginas escaneadas y LexOpen usa
+Tesseract + `pdftoppm` localmente cuando están disponibles:
+
+```bash
+# Debian/Ubuntu
+sudo apt install tesseract-ocr tesseract-ocr-spa poppler-utils
+
+# macOS con Homebrew
+brew install tesseract tesseract-lang poppler
+```
+
+En Windows instale Tesseract y Poppler, y configure `OCR_TESSERACT_BIN` y
+`OCR_PDFTOPPM_BIN` con sus rutas completas. Puede ajustar el idioma con
+`OCR_LANGUAGE=spa+eng` y limitar el consumo con `OCR_MAX_PAGES` y
+`OCR_TIMEOUT_MS`. Si faltan los binarios, el original se conserva y el documento
+queda marcado como `Requiere OCR`.
+
 ## Acceso desde los clientes
 
 Para una LAN completamente local, obtenga la IP privada del Host y configure en el
