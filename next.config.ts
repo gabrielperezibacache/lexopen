@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /* Hide the floating "N" Next.js Dev Tools badge in development.
+     Compile/runtime errors still surface via the error overlay. */
+  devIndicators: false,
   serverExternalPackages: [
     "@firecrawl/anydoc",
     "@firecrawl/pdf-inspector",
