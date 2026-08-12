@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, httpError } from "@/lib/api";
 import { hashPassword } from "@/lib/auth/password";
-import { rateLimit } from "@/lib/auth/rate-limit";
+import { rateLimitAsync } from "@/lib/auth/rate-limit";
 import {
   BOOTSTRAP_TOKEN_ENV,
   isValidBootstrapToken,
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
           req.headers.get("x-real-ip") ||
           "direct"
         : "direct";
-    const limited = rateLimit(`setup:${ip}`, 8, 15 * 60 * 1000);
+    const limited = await rateLimitAsync(`setup:${ip}`, 8, 15 * 60 * 1000);
     if (!limited.ok) {
       return NextResponse.json(
         { error: "Demasiados intentos de instalación" },
