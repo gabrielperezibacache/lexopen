@@ -64,6 +64,14 @@ la siguiente consulta a health recupera los trabajos pendientes. La tabla
 
 ## Checklist de producción
 
+Validación automática del `.env` del Host (y health opcional):
+
+```bash
+LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run prod:check
+# Con Host en marcha:
+npm run prod:check -- --health http://127.0.0.1:3000
+```
+
 Use esta lista antes de cargar información real del estudio:
 
 1. **Datos persistentes:** `LEXOPEN_DATA_DIR` apunta a un disco local con backups

@@ -789,7 +789,9 @@ LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
 Demos deben permanecer apagadas (`LEXOPEN_DEMO_SWITCHER=0`, `HERMES_ALLOW_DEMO=0`,
 `LLM_ALLOW_DEMO=0`, `PJUD_ALLOW_DEMO=0`). El sidecar PJUD y los crons de
 sync/digest/plazos también son locales (`npm run pjud:host` + intervalos en el
-`.env` del data dir). Checklist operativo: [`docs/WEB-HOST.md`](docs/WEB-HOST.md#checklist-de-producción).
+`.env` del data dir). Checklist operativo:
+[`docs/WEB-HOST.md`](docs/WEB-HOST.md#checklist-de-producción) y
+`npm run prod:check`.
 
 ## 🔄 Cómo actualizar la aplicación
 
