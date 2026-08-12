@@ -119,15 +119,39 @@ export function evaluateHostEnv(env = {}) {
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const out = { envFile: null, healthUrl: null, dataDir: null };
+  const out = {
+    envFile: null,
+    healthUrl: null,
+    dataDir: null,
+    effective: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--env" && argv[i + 1]) out.envFile = argv[++i];
     else if (a === "--health" && argv[i + 1]) out.healthUrl = argv[++i];
     else if (a === "--data-dir" && argv[i + 1]) out.dataDir = argv[++i];
+    else if (a === "--effective") out.effective = true;
     else if (a === "--help" || a === "-h") out.help = true;
   }
   return out;
+}
+
+/** Build the env map under evaluation (file-first; optional process overlay). */
+export function resolveCheckEnv({
+  fromFile = {},
+  processEnv = process.env,
+  dataDir,
+  effective = false,
+} = {}) {
+  const base = { ...fromFile };
+  if (effective) {
+    for (const [key, value] of Object.entries(processEnv)) {
+      if (value !== undefined) base[key] = value;
+    }
+  }
+  base.LEXOPEN_DATA_DIR =
+    processEnv.LEXOPEN_DATA_DIR || fromFile.LEXOPEN_DATA_DIR || dataDir;
+  return base;
 }
 
 async function probeHealth(url) {

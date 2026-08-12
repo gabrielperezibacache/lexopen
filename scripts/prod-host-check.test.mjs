@@ -3,6 +3,7 @@ import {
   evaluateHostEnv,
   isStrongSessionSecret,
   parseArgs,
+  resolveCheckEnv,
 } from "./prod-host-check.mjs";
 
 assert.equal(isStrongSessionSecret("change-me-in-production"), false);
