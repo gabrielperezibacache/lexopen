@@ -97,8 +97,22 @@ local sin Internet.
 
 - Mantenga el Host encendido y con permisos de escritura sobre `STORAGE_PATH`.
 - No ejecute `npm run db:seed`, `npm run setup` ni `npm run db:reset` con datos reales.
-- El menú de backup pertenece a Electron; en modo web haga un `pg_dump` y copie
-  `STORAGE_PATH` con el servicio detenido, preferentemente a un disco cifrado.
+- Para crear un respaldo web, detenga el Host y ejecute:
+
+  ```bash
+  npm run web:backup -- --output /ruta/externa/lexopen-backup
+  ```
+
+  El respaldo incluye PostgreSQL, documentos, vault y configuración. Contiene
+  `.env`, por lo que debe guardarse en un disco cifrado.
+- Para restaurar, mantenga el Host detenido y ejecute:
+
+  ```bash
+  npm run web:restore -- --source /ruta/externa/lexopen-backup
+  npm run web:host
+  ```
+
+  La restauración conserva un rollback temporal hasta verificar el arranque.
 - Verifique periódicamente `/api/health`, espacio libre y backups restaurables.
 - Para PJUD, `CRON_SECRET` permite un scheduler externo; Render no programa este
   sync cuando se usa un Host local.
