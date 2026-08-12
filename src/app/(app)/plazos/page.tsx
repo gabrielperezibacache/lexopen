@@ -49,14 +49,19 @@ export default async function PlazosPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          Gestión de términos
-        </p>
-        <h1 className="display mt-2 text-4xl">Plazos</h1>
-        <p className="mt-2 text-[var(--ink-soft)]/80">
-          Plazos procesales, audiencias e internos. Envíelos a Google Calendar con un clic.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
+            Gestión de términos
+          </p>
+          <h1 className="display mt-2 text-4xl">Plazos</h1>
+          <p className="mt-2 text-[var(--ink-soft)]/80">
+            Plazos procesales, audiencias e internos. Envíelos a Google Calendar con un clic.
+          </p>
+        </div>
+        <Link className="btn btn-secondary" href="/agente?utility=plazos">
+          Analizar con copiloto
+        </Link>
       </div>
 
       <PlazoForm

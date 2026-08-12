@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, Suspense, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { safeJsonParse } from "@/lib/safe-json";
 
@@ -11,6 +11,10 @@ type ChatMessage = {
   content: string;
   source?: string;
   utility?: string;
+  sources?: SourceRef[];
+  suggestedActions?: { label: string; href: string }[];
+  alerts?: string[];
+  requireApproval?: boolean;
 };
 type AgentChat = {
   id: string;
@@ -18,6 +22,7 @@ type AgentChat = {
   messagesJson: string;
   demoMode: boolean;
   updatedAt: string;
+  causaId?: string | null;
 };
 type Utility = {
   id: string;
@@ -43,13 +48,28 @@ function AgenteInner() {
   const [meta, setMeta] = useState("");
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [actions, setActions] = useState<{ label: string; href: string }[]>([]);
+  const [requireApproval, setRequireApproval] = useState(false);
   const [chatId, setChatId] = useState("");
   const [chats, setChats] = useState<AgentChat[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
+  const [approveBusy, setApproveBusy] = useState(false);
+  const [approveMsg, setApproveMsg] = useState("");
+  const [plazoDesde, setPlazoDesde] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+  const [plazoDias, setPlazoDias] = useState("5");
+  const [plazoComputo, setPlazoComputo] = useState<"habiles" | "corridos">(
+    "habiles"
+  );
+  const [plazoPreview, setPlazoPreview] = useState("");
+  const autoRan = useRef(false);
 
-  async function loadChats() {
-    const res = await fetch("/api/integrations/hermes?chats=1");
+  async function loadChats(filterCausaId?: string) {
+    const q = filterCausaId
+      ? `?chats=1&causaId=${encodeURIComponent(filterCausaId)}`
+      : "?chats=1";
+    const res = await fetch(`/api/integrations/hermes${q}`);
     if (res.ok) setChats(await res.json());
   }
 
@@ -82,54 +102,77 @@ function AgenteInner() {
         }
       })
       .catch(() => undefined);
-    fetch("/api/integrations/hermes?chats=1")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: AgentChat[]) => {
-        if (active) setChats(Array.isArray(data) ? data : []);
-      })
-      .catch(() => {
-        if (active) setChats([]);
-      });
+    loadChats(sp.get("causaId") || undefined).catch(() => {
+      if (active) setChats([]);
+    });
     return () => {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    loadChats(causaId || undefined).catch(() => undefined);
+  }, [causaId]);
+
   function selectUtility(u: Utility) {
     setUtility(u.id);
     setPrompt(u.starter);
   }
 
-  function resumeChat(chat: AgentChat) {
-    setChatId(chat.id);
-    const parsed = safeJsonParse<ChatMessage[]>(chat.messagesJson, []);
-    setMessages(Array.isArray(parsed) ? parsed : []);
-    const lastAssistant = [...(Array.isArray(parsed) ? parsed : [])]
-      .reverse()
-      .find((m) => m.role === "assistant");
-    setReply(lastAssistant?.content || "");
-    setMeta(chat.demoMode ? "Historial · modo demo" : "Historial · copiloto");
-    setSources([]);
-    setActions([]);
+  function applyAssistantMeta(last: ChatMessage | undefined, demo?: boolean) {
+    setReply(last?.content || "");
+    setSources(Array.isArray(last?.sources) ? last!.sources! : []);
+    setActions(
+      Array.isArray(last?.suggestedActions) ? last!.suggestedActions! : []
+    );
+    setRequireApproval(Boolean(last?.requireApproval));
+    setMeta(
+      [
+        last?.utility ? `Modo: ${last.utility}` : null,
+        demo || last?.source === "demo"
+          ? "Historial · modo demo"
+          : last?.source === "error"
+            ? "Error"
+            : "Historial · copiloto",
+        last?.requireApproval ? "Requiere aprobación humana" : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    );
   }
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
+  function resumeChat(chat: AgentChat) {
+    setChatId(chat.id);
+    if (chat.causaId) setCausaId(chat.causaId);
+    const parsed = safeJsonParse<ChatMessage[]>(chat.messagesJson, []);
+    const list = Array.isArray(parsed) ? parsed : [];
+    setMessages(list);
+    const lastAssistant = [...list]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    applyAssistantMeta(lastAssistant, chat.demoMode);
+    setApproveMsg("");
+  }
+
+  async function sendPrompt(nextPrompt: string, nextUtility?: string) {
+    const u = nextUtility || utility;
     setBusy(true);
     setReply("");
     setMeta("");
     setSources([]);
     setActions([]);
+    setRequireApproval(false);
+    setApproveMsg("");
     try {
       const res = await fetch("/api/integrations/hermes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           causaId: causaId || undefined,
-          prompt,
+          prompt: nextPrompt,
           chatId: chatId || undefined,
-          utility,
+          utility: u,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -138,11 +181,12 @@ function AgenteInner() {
       setActions(
         Array.isArray(data.suggestedActions) ? data.suggestedActions : []
       );
+      setRequireApproval(Boolean(data.requireApproval));
       if (data.chat) {
         setChatId(data.chat.id);
         const parsed = safeJsonParse<ChatMessage[]>(data.chat.messagesJson, []);
         setMessages(Array.isArray(parsed) ? parsed : []);
-        await loadChats();
+        await loadChats(causaId || undefined);
       }
       setMeta(
         [
@@ -164,6 +208,102 @@ function AgenteInner() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    await sendPrompt(prompt);
+  }
+
+  useEffect(() => {
+    if (autoRan.current) return;
+    if (sp.get("run") !== "1") return;
+    if (!utilities.length) return;
+    autoRan.current = true;
+    const u =
+      utilities.find((x) => x.id === (sp.get("utility") || utility)) ||
+      utilities[0];
+    const starter = prompt || u.starter;
+    setUtility(u.id);
+    setPrompt(starter);
+    void sendPrompt(starter, u.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [utilities]);
+
+  async function approveToMinuta() {
+    if (!causaId) {
+      setApproveMsg("Seleccione una causa para guardar la minuta.");
+      return;
+    }
+    setApproveBusy(true);
+    setApproveMsg("");
+    try {
+      const res = await fetch("/api/integrations/hermes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approve-to-minuta",
+          causaId,
+          chatId: chatId || undefined,
+          content: reply || undefined,
+          utilityLabel:
+            utilities.find((u) => u.id === utility)?.label || utility,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setApproveMsg(data.error || "No se pudo guardar la minuta");
+        return;
+      }
+      setRequireApproval(false);
+      setApproveMsg(`Minuta guardada. Abrir: ${data.href}`);
+      if (data.href) {
+        setActions((prev) => [
+          { label: "Ver minuta aprobada", href: data.href },
+          ...prev.filter((a) => a.href !== data.href),
+        ]);
+      }
+    } catch {
+      setApproveMsg("Error de red al guardar la minuta");
+    } finally {
+      setApproveBusy(false);
+    }
+  }
+
+  function discardDraft() {
+    setReply("");
+    setRequireApproval(false);
+    setApproveMsg("");
+    setMeta((m) => m.replace(/ · Requiere aprobación humana/, ""));
+  }
+
+  async function estimatePlazo() {
+    setPlazoPreview("");
+    const res = await fetch("/api/integrations/hermes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "estimate-plazo",
+        desde: plazoDesde,
+        dias: Number(plazoDias || 0),
+        tipoComputo: plazoComputo,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data.error) {
+      setPlazoPreview(data.error);
+      return;
+    }
+    setPlazoPreview(
+      [
+        `Vencimiento estimado: ${data.vencimiento}`,
+        `Urgencia: ${data.urgencia}`,
+        `Días restantes: ${data.diasRestantes}`,
+        data.disclaimer,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    );
   }
 
   return (
@@ -202,6 +342,64 @@ function AgenteInner() {
         </div>
       )}
 
+      {utility === "plazos" && (
+        <section className="panel space-y-3 rounded-3xl p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
+            Cálculo interno de plazo
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Desde</label>
+              <input
+                className="input"
+                type="date"
+                value={plazoDesde}
+                onChange={(e) => setPlazoDesde(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Días</label>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                value={plazoDias}
+                onChange={(e) => setPlazoDias(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Cómputo</label>
+              <select
+                className="select"
+                value={plazoComputo}
+                onChange={(e) =>
+                  setPlazoComputo(
+                    e.target.value === "corridos" ? "corridos" : "habiles"
+                  )
+                }
+              >
+                <option value="habiles">Hábiles</option>
+                <option value="corridos">Corridos</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                className="btn btn-secondary w-full"
+                type="button"
+                onClick={() => void estimatePlazo()}
+              >
+                Estimar
+              </button>
+            </div>
+          </div>
+          {plazoPreview && (
+            <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--line)] bg-white/70 p-3 font-sans text-sm">
+              {plazoPreview}
+            </pre>
+          )}
+        </section>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <aside className="panel rounded-3xl p-4">
           <div className="mb-3 flex items-center justify-between">
@@ -216,11 +414,18 @@ function AgenteInner() {
                 setMeta("");
                 setSources([]);
                 setActions([]);
+                setRequireApproval(false);
+                setApproveMsg("");
               }}
             >
               Nuevo
             </button>
           </div>
+          {causaId && (
+            <p className="mb-2 text-xs text-[var(--ink-soft)]/65">
+              Filtrado por causa seleccionada
+            </p>
+          )}
           <div className="space-y-2">
             {chats.map((chat) => (
               <button
@@ -249,10 +454,18 @@ function AgenteInner() {
         </aside>
 
         <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
-          {messages.length === 0 && !reply && (
+          {messages.length === 0 && !reply && !busy && (
             <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white/50 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
               Elija una utilidad y una causa (recomendado). El copiloto ancla la
-              respuesta a plazos, movimientos y documentos indexados del host.
+              respuesta a plazos, movimientos, wiki y documentos indexados del
+              host.
+            </div>
+          )}
+          {busy && (
+            <div className="animate-pulse space-y-2 rounded-2xl border border-[var(--line)] bg-white/60 p-4">
+              <div className="h-3 w-1/3 rounded bg-[var(--line)]" />
+              <div className="h-3 w-full rounded bg-[var(--line)]" />
+              <div className="h-3 w-5/6 rounded bg-[var(--line)]" />
             </div>
           )}
           <div>
@@ -321,6 +534,43 @@ function AgenteInner() {
                 </Link>
               ))}
             </div>
+          )}
+        </section>
+      )}
+
+      {(requireApproval || approveMsg) && reply && (
+        <section className="panel space-y-3 rounded-3xl border border-[var(--copper)]/40 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--copper)]">
+            Revisión humana
+          </h2>
+          <p className="text-sm text-[var(--ink-soft)]/80">
+            Este borrador no es asesoría automática. Apruébelo para guardarlo
+            como minuta de la causa, o descártelo.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={approveBusy || !causaId}
+              onClick={() => void approveToMinuta()}
+            >
+              {approveBusy ? "Guardando…" : "Aprobar y guardar minuta"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={discardDraft}
+            >
+              Descartar borrador
+            </button>
+          </div>
+          {!causaId && (
+            <p className="text-xs text-[var(--ink-soft)]/70">
+              Seleccione una causa para habilitar el guardado como minuta.
+            </p>
+          )}
+          {approveMsg && (
+            <p className="text-sm text-[var(--sea)]">{approveMsg}</p>
           )}
         </section>
       )}

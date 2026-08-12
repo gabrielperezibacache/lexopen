@@ -116,7 +116,12 @@ export async function buildAiContextPack(opts: {
       });
       blocks.push(`PLAZOS:\n${JSON.stringify(plazoLines, null, 2)}`);
 
-      if (opts.utility === "briefing" || opts.utility === "copilot" || opts.utility === "draft") {
+      if (
+        opts.utility === "briefing" ||
+        opts.utility === "copilot" ||
+        opts.utility === "draft" ||
+        opts.utility === "plazos"
+      ) {
         const movs = causa.movimientos.map((m) => ({
           fecha: m.fecha,
           titulo: m.titulo,
@@ -177,7 +182,7 @@ export async function buildAiContextPack(opts: {
             type: "minuta",
             id: m.id,
             label: m.titulo,
-            href: `/causas/${causa.id}`,
+            href: `/causas/${causa.id}/minutas/${m.id}`,
           });
         }
       }
@@ -231,6 +236,55 @@ export async function buildAiContextPack(opts: {
       }
     } else if (opts.utility === "research") {
       alerts.push("Sin hits de jurisprudencia en el corpus local LexOpen.");
+    }
+
+    const wikiNeedle = needle.length >= 2 ? needle : "proceso";
+    const wikiPages = await prisma.wikiPage.findMany({
+      where: {
+        published: true,
+        OR: [
+          { title: { contains: wikiNeedle, mode: "insensitive" } },
+          { content: { contains: wikiNeedle, mode: "insensitive" } },
+        ],
+      },
+      include: { site: { select: { id: true, name: true } } },
+      take: 6,
+      orderBy: { updatedAt: "desc" },
+    });
+    const wikiFinal =
+      wikiPages.length > 0
+        ? wikiPages
+        : opts.utility === "research"
+          ? await prisma.wikiPage.findMany({
+              where: { published: true },
+              include: { site: { select: { id: true, name: true } } },
+              take: 4,
+              orderBy: { updatedAt: "desc" },
+            })
+          : [];
+    if (wikiFinal.length) {
+      blocks.push(
+        `WIKI_ESTUDIO:\n${JSON.stringify(
+          wikiFinal.map((w) => ({
+            id: w.id,
+            title: w.title,
+            site: w.site.name,
+            excerpt: (w.content || "").slice(0, 1200),
+          })),
+          null,
+          2
+        )}`
+      );
+      for (const w of wikiFinal) {
+        sources.push({
+          type: "wiki",
+          id: w.id,
+          label: `${w.site.name}: ${w.title}`,
+          href: `/sites/${w.site.id}/wiki`,
+        });
+      }
+    } else if (opts.utility === "research") {
+      alerts.push("Sin hits de wiki del estudio en LexOpen.");
     }
   }
 

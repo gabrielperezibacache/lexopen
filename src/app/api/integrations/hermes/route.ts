@@ -19,6 +19,11 @@ import {
   formatPlazoEstimate,
 } from "@/lib/ai/local-assist";
 import { safeJsonParse } from "@/lib/safe-json";
+import {
+  formatLocalDate,
+  renderMinutaMarkdown,
+} from "@/lib/minutas";
+import { writeAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -104,6 +109,129 @@ export async function POST(req: Request) {
         tipoComputo: body.tipoComputo === "corridos" ? "corridos" : "habiles",
       });
       return NextResponse.json({ ok: !("error" in estimate), ...estimate });
+    }
+
+    if (body.action === "approve-to-minuta") {
+      const causaId = String(body.causaId || "").trim();
+      if (!causaId) {
+        return NextResponse.json(
+          { error: "Se requiere causaId para guardar el borrador como minuta" },
+          { status: 400 }
+        );
+      }
+
+      let content = String(body.content || "").trim();
+      let utilityLabel = String(body.utilityLabel || "Copiloto");
+      if (!content && body.chatId) {
+        const existing = await prisma.agentChat.findFirst({
+          where: {
+            id: String(body.chatId),
+            ...(user.role === "admin" ? {} : { userId: user.id }),
+          },
+        });
+        if (!existing) {
+          return NextResponse.json(
+            { error: "Chat no encontrado" },
+            { status: 404 }
+          );
+        }
+        const prev = safeJsonParse<
+          Array<{ role?: string; content?: string; utility?: string }>
+        >(existing.messagesJson, []);
+        const lastAssistant = [...prev]
+          .reverse()
+          .find((m) => m.role === "assistant" && m.content?.trim());
+        content = String(lastAssistant?.content || "").trim();
+        if (lastAssistant?.utility) {
+          utilityLabel = getAiUtility(lastAssistant.utility).label;
+        }
+      }
+      if (!content) {
+        return NextResponse.json(
+          { error: "No hay contenido aprobado para guardar" },
+          { status: 400 }
+        );
+      }
+
+      const causa = await prisma.causa.findUnique({
+        where: { id: causaId },
+        select: {
+          id: true,
+          titulo: true,
+          rit: true,
+          tribunal: true,
+          materia: true,
+        },
+      });
+      if (!causa) {
+        return NextResponse.json(
+          { error: "Causa no encontrada" },
+          { status: 404 }
+        );
+      }
+
+      const fecha = new Date();
+      const titulo = `Borrador copiloto — ${utilityLabel}`.slice(0, 160);
+      const hechos =
+        "Borrador generado por el copiloto LexOpen y aprobado por un humano. Revisar antes de usar como acta definitiva.";
+      const markdown = renderMinutaMarkdown({
+        tipo: "reunion",
+        titulo,
+        fecha,
+        modalidad: "presencial",
+        resumenEjecutivo: content.slice(0, 50_000),
+        hechosRelevantes: hechos,
+        riesgosAlertas:
+          "Procedencia: copiloto IA. Requiere revisión humana antes de presentación o comunicación al cliente.",
+        causa,
+        autorName: user.name,
+        acciones: [],
+      });
+      const docNombre = `Minuta reunion — ${titulo} — ${formatLocalDate(fecha)}.md`;
+
+      const minuta = await prisma.$transaction(async (tx) => {
+        const documento = await tx.documento.create({
+          data: {
+            nombre: docNombre,
+            tipo: "minuta",
+            mimeType: "text/markdown",
+            contenido: markdown,
+            causaId: causa.id,
+            autorId: user.id,
+          },
+        });
+        return tx.minuta.create({
+          data: {
+            tipo: "reunion",
+            titulo,
+            fecha,
+            modalidad: "presencial",
+            participantes: "",
+            resumenEjecutivo: content.slice(0, 50_000),
+            hechosRelevantes: hechos,
+            riesgosAlertas:
+              "Procedencia: copiloto IA. Requiere revisión humana antes de presentación o comunicación al cliente.",
+            causaId: causa.id,
+            autorId: user.id,
+            documentoId: documento.id,
+          },
+        });
+      });
+
+      await writeAudit({
+        action: "minuta.create",
+        entityType: "minuta",
+        entityId: minuta.id,
+        actorId: user.id,
+        after: { from: "copiloto", utility: utilityLabel, causaId },
+      }).catch(() => undefined);
+
+      const href = `/causas/${causa.id}/minutas/${minuta.id}`;
+      return NextResponse.json({
+        ok: true,
+        minutaId: minuta.id,
+        href,
+      });
     }
 
     const prompt =
@@ -193,6 +321,38 @@ export async function POST(req: Request) {
       };
     }
 
+    const suggestedActions = [
+      body.causaId
+        ? { label: "Abrir causa", href: `/causas/${body.causaId}` }
+        : null,
+      body.causaId
+        ? {
+            label: "Nueva minuta",
+            href: `/causas/${body.causaId}/minuta/nueva`,
+          }
+        : null,
+      { label: "Plazos", href: "/plazos" },
+      { label: "Jurisprudencia", href: "/jurisprudencia" },
+      { label: "Monitoreo PJUD", href: "/causas/monitoreo" },
+    ].filter(Boolean) as { label: string; href: string }[];
+
+    // No persistir turns vacíos o de error (evita contaminar el hilo)
+    if (result.source === "error" || !String(result.content || "").trim()) {
+      return NextResponse.json(
+        {
+          ...result,
+          content: result.content || "El copiloto no devolvió contenido.",
+          chat: null,
+          utility: { id: utility.id, label: utility.label },
+          sources: pack.sources,
+          alerts: pack.alerts,
+          suggestedActions,
+          requireApproval: true,
+        },
+        { status: result.source === "error" ? 502 : 200 }
+      );
+    }
+
     const nextMessages = [
       { role: "user", content: prompt, utility: utility.id },
       {
@@ -200,6 +360,10 @@ export async function POST(req: Request) {
         content: result.content,
         source: result.source,
         utility: utility.id,
+        sources: pack.sources,
+        suggestedActions,
+        alerts: pack.alerts,
+        requireApproval: Boolean(result.requireApproval),
       },
     ];
     let chat;
@@ -244,14 +408,8 @@ export async function POST(req: Request) {
       utility: { id: utility.id, label: utility.label },
       sources: pack.sources,
       alerts: pack.alerts,
-      suggestedActions: [
-        body.causaId
-          ? { label: "Abrir causa", href: `/causas/${body.causaId}` }
-          : null,
-        { label: "Plazos", href: "/plazos" },
-        { label: "Jurisprudencia", href: "/jurisprudencia" },
-        { label: "Monitoreo PJUD", href: "/causas/monitoreo" },
-      ].filter(Boolean),
+      suggestedActions,
+      requireApproval: Boolean(result.requireApproval),
     });
   } catch (e) {
     return handleRouteError(e);

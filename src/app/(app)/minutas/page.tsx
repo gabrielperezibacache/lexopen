@@ -50,9 +50,14 @@ export default async function MinutasPage() {
             puede retomar la tramitación con el resumen y los próximos pasos.
           </p>
         </div>
-        <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
-          <div className="text-[var(--ink-soft)]/65">Acciones abiertas</div>
-          <div className="display text-3xl">{pendientes}</div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link className="btn btn-secondary" href="/agente?utility=draft">
+            Borrador con IA
+          </Link>
+          <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
+            <div className="text-[var(--ink-soft)]/65">Acciones abiertas</div>
+            <div className="display text-3xl">{pendientes}</div>
+          </div>
         </div>
       </div>
 

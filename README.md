@@ -518,8 +518,10 @@ Obsidian Local REST API o conservar los objetos mediante el backend de storage.
 ### Hermes Agent
 
 Envía solicitudes a `POST {HERMES_API_URL}/chat/completions` con formato compatible
-con OpenAI. Las respuestas se guardan como historial de chat y requieren aprobación
-humana en el flujo de la aplicación. Con `HERMES_ALLOW_DEMO=1`, una respuesta local
+con OpenAI. La consola **Copiloto IA** (`/agente`) ofrece utilidades (briefing, plazos,
+documentos, borradores, investigación con wiki/jurisprudencia) con fuentes ancladas del
+estudio. Las respuestas se guardan como historial de chat; los borradores se pueden
+aprobar y guardar como minuta de la causa. Con `HERMES_ALLOW_DEMO=1`, una respuesta local
 de demostración se identifica explícitamente como tal.
 
 Hermes no es asesoría jurídica automática: no presente ni envíe un texto generado sin
