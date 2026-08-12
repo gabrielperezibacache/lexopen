@@ -416,8 +416,9 @@ export default async function CausaDetailPage({ params }: Params) {
                     documentId={d.id}
                     googleDriveId={d.googleDriveId}
                     hasText={Boolean(
-                      (d.extractedMarkdown || "").trim()
+                      (d.extractedMarkdown || d.contenido || "").trim()
                     )}
+                    hasBinary={Boolean(d.storageKey)}
                   />
                 </div>
               </div>

@@ -96,6 +96,7 @@ export default async function DocumentosPage() {
                         hasText={Boolean(
                           (d.extractedMarkdown || d.contenido || "").trim()
                         )}
+                        hasBinary={Boolean(d.storageKey)}
                       />
                     </div>
                     {d.obsidianPath && (

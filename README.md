@@ -512,14 +512,22 @@ receptor, la ventana anti-replay y el formato normalizado de movimientos.
 
 El flujo OAuth almacena tokens cifrados con `SESSION_SECRET` y permite:
 
-- crear o vincular carpetas reales de Drive por causa;
-- subir documentos y minutas a una carpeta real;
-- crear eventos de Calendar a partir de plazos.
+- crear (recomendado) o vincular carpetas reales de Drive por causa;
+- subir el **archivo original** (PDF/DOCX/etc.) o el Markdown como Google Doc;
+- actualizar el mismo archivo en Drive al re-subir (sin duplicar);
+- listar archivos visibles en la carpeta de la causa;
+- crear eventos de Calendar a partir de plazos;
+- enviar digests PJUD por Gmail cuando la cuenta está conectada.
 
-Sin OAuth, el entorno de desarrollo puede mostrar **stubs locales**. Esos marcadores
-no son carpetas de Drive y nunca deben confundirse con archivos reales. Aunque la
-configuración solicita el scope de Gmail, el repositorio no implementa actualmente
-un flujo de envío o sincronización de Gmail.
+Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y
+`GOOGLE_REDIRECT_URI`, luego **Conectar Google** en Integraciones o
+Configuración. Los toggles «Integración habilitada», «Sincronizar Drive» y
+«Sincronizar Calendar» se respetan en las operaciones.
+
+Scope `drive.file`: LexOpen opera sobre carpetas/archivos que crea o que el
+usuario abre con la app. Preferir «Crear carpeta en Drive» frente a pegar un ID
+ajeno. Sin OAuth, el entorno de desarrollo puede mostrar **stubs locales** — no
+son carpetas reales de Drive.
 
 ### Obsidian
 

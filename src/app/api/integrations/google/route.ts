@@ -2,11 +2,15 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { baseCookieOptions } from "@/lib/auth/cookie-options";
 import {
+  GoogleIntegrationError,
   createCausaDriveFolder,
   getGoogleAuthUrl,
   getGoogleConfig,
+  googleCredentialsConfigured,
   linkCausaDriveFolder,
+  listCausaDriveFolder,
   pushDocumentoToDrive,
   pushMinutaToDrive,
   pushPlazoToGoogleCalendar,
@@ -14,35 +18,50 @@ import {
   updateGoogleSyncOptions,
 } from "@/lib/integrations/google";
 
+const OAUTH_STATE_COOKIE = "google_oauth_state";
+/** Cookie scoped to callback path so it is not sent on other API calls. */
+const OAUTH_STATE_PATH = "/api/integrations/google/callback";
+
+function googleErrorResponse(e: unknown) {
+  if (e instanceof GoogleIntegrationError) {
+    const status =
+      e.code === "disabled" || e.code === "sync_off"
+        ? 403
+        : e.code === "needs_oauth" || e.code === "needs_reconnect"
+          ? 401
+          : e.code === "credentials_missing"
+            ? 503
+            : 400;
+    return NextResponse.json(
+      { error: e.message, code: e.code },
+      { status }
+    );
+  }
+  return null;
+}
+
 export async function GET() {
   try {
     await requireStaff();
-    const row = await prisma.integrationConfig.findUnique({ where: { provider: "google" } });
+    const row = await prisma.integrationConfig.findUnique({
+      where: { provider: "google" },
+    });
     const config = await getGoogleConfig();
-    const state = randomBytes(24).toString("base64url");
-    const authUrl = getGoogleAuthUrl(state);
-    const res = NextResponse.json({
-      enabled: row?.enabled ?? false,
+    // Do NOT mint OAuth state here — every status poll would invalidate prior
+    // "Conectar" links. Use POST action "start-oauth" instead.
+    return NextResponse.json({
+      enabled: row?.enabled ?? Boolean(config.accessToken),
       connected: Boolean(config.accessToken),
       connectedEmail: config.connectedEmail || null,
-      authUrl,
+      authUrl: null,
+      canStartOauth: googleCredentialsConfigured(),
       config: {
         syncDrive: config.syncDrive,
         syncCalendar: config.syncCalendar,
         scopes: config.scopes,
       },
-      credentialsConfigured: Boolean(
-        process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-      ),
+      credentialsConfigured: googleCredentialsConfigured(),
     });
-    if (authUrl) {
-      const { baseCookieOptions } = await import("@/lib/auth/cookie-options");
-      res.cookies.set("google_oauth_state", state, {
-        ...baseCookieOptions({ maxAge: 10 * 60 }),
-        path: "/api/integrations/google/callback",
-      });
-    }
-    return res;
   } catch (e) {
     return handleRouteError(e);
   }
@@ -53,6 +72,27 @@ export async function POST(req: Request) {
     assertCsrf(req);
     const user = await requireStaff();
     const body = await req.json();
+
+    if (body.action === "start-oauth") {
+      const state = randomBytes(24).toString("base64url");
+      const authUrl = getGoogleAuthUrl(state);
+      if (!authUrl) {
+        return NextResponse.json(
+          {
+            error:
+              "Configure GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el entorno",
+            code: "credentials_missing",
+          },
+          { status: 503 }
+        );
+      }
+      const res = NextResponse.json({ authUrl, ok: true });
+      res.cookies.set(OAUTH_STATE_COOKIE, state, {
+        ...baseCookieOptions({ maxAge: 10 * 60 }),
+        path: OAUTH_STATE_PATH,
+      });
+      return res;
+    }
 
     if (body.action === "push-plazo" && body.plazoId) {
       const result = await pushPlazoToGoogleCalendar(body.plazoId);
@@ -65,9 +105,12 @@ export async function POST(req: Request) {
         });
         return NextResponse.json(result);
       } catch (e) {
-        return NextResponse.json(
-          { error: e instanceof Error ? e.message : "Error Drive" },
-          { status: 400 }
+        return (
+          googleErrorResponse(e) ||
+          NextResponse.json(
+            { error: e instanceof Error ? e.message : "Error Drive" },
+            { status: 400 }
+          )
         );
       }
     }
@@ -78,9 +121,26 @@ export async function POST(req: Request) {
         });
         return NextResponse.json(result);
       } catch (e) {
-        return NextResponse.json(
-          { error: e instanceof Error ? e.message : "Error Drive" },
-          { status: 400 }
+        return (
+          googleErrorResponse(e) ||
+          NextResponse.json(
+            { error: e instanceof Error ? e.message : "Error Drive" },
+            { status: 400 }
+          )
+        );
+      }
+    }
+    if (body.action === "list-causa-folder" && body.causaId) {
+      try {
+        const result = await listCausaDriveFolder(body.causaId);
+        return NextResponse.json(result);
+      } catch (e) {
+        return (
+          googleErrorResponse(e) ||
+          NextResponse.json(
+            { error: e instanceof Error ? e.message : "Error al listar" },
+            { status: 400 }
+          )
         );
       }
     }
@@ -89,9 +149,12 @@ export async function POST(req: Request) {
         const result = await linkCausaDriveFolder(body.causaId, body.folderRef);
         return NextResponse.json(result);
       } catch (e) {
-        return NextResponse.json(
-          { error: e instanceof Error ? e.message : "Error al vincular" },
-          { status: 400 }
+        return (
+          googleErrorResponse(e) ||
+          NextResponse.json(
+            { error: e instanceof Error ? e.message : "Error al vincular" },
+            { status: 400 }
+          )
         );
       }
     }
@@ -103,9 +166,12 @@ export async function POST(req: Request) {
         });
         return NextResponse.json(result);
       } catch (e) {
-        return NextResponse.json(
-          { error: e instanceof Error ? e.message : "Error al crear carpeta" },
-          { status: 400 }
+        return (
+          googleErrorResponse(e) ||
+          NextResponse.json(
+            { error: e instanceof Error ? e.message : "Error al crear carpeta" },
+            { status: 400 }
+          )
         );
       }
     }
@@ -161,6 +227,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ error: "Acción no válida" }, { status: 400 });
   } catch (e) {
-    return handleRouteError(e);
+    return googleErrorResponse(e) || handleRouteError(e);
   }
 }

@@ -22,12 +22,56 @@ export type GoogleConfig = {
   tokenExpiresAt?: number;
 };
 
+export type GoogleErrorCode =
+  | "disabled"
+  | "sync_off"
+  | "needs_oauth"
+  | "needs_reconnect"
+  | "credentials_missing"
+  | "api_error";
+
+export class GoogleIntegrationError extends Error {
+  code: GoogleErrorCode;
+  constructor(code: GoogleErrorCode, message: string) {
+    super(message);
+    this.name = "GoogleIntegrationError";
+    this.code = code;
+  }
+}
+
 const TOKEN_PREFIX = "enc:v2:";
 const LEGACY_TOKEN_PREFIX = "enc:v1:";
+
+const DEFAULT_SCOPES = [
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/gmail.send",
+  "openid",
+  "email",
+  "profile",
+];
 
 /** Never follow redirects on Google API calls (SSRF / token leak via Location). */
 function googleFetch(input: string, init?: RequestInit) {
   return fetch(input, { ...init, redirect: "error" });
+}
+
+async function readGoogleError(res: Response): Promise<string> {
+  try {
+    const text = await res.text();
+    if (!text) return `HTTP ${res.status}`;
+    try {
+      const json = JSON.parse(text) as {
+        error?: { message?: string; status?: string };
+      };
+      if (json.error?.message) return json.error.message;
+    } catch {
+      // not JSON
+    }
+    return text.slice(0, 240);
+  } catch {
+    return `HTTP ${res.status}`;
+  }
 }
 
 function encryptToken(value: string | undefined) {
@@ -95,19 +139,50 @@ function decryptGoogleConfig(config: GoogleConfig): GoogleConfig {
   };
 }
 
+export function googleCredentialsConfigured() {
+  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+}
+
+export function googleRedirectUri() {
+  return (
+    process.env.GOOGLE_REDIRECT_URI ||
+    "http://localhost:3000/api/integrations/google/callback"
+  );
+}
+
+/** Pure gate used by API + tests. */
+export function assertGoogleFeatureEnabled(opts: {
+  enabled: boolean;
+  syncDrive?: boolean;
+  syncCalendar?: boolean;
+  feature: "drive" | "calendar";
+}) {
+  if (!opts.enabled) {
+    throw new GoogleIntegrationError(
+      "disabled",
+      "La integración Google está deshabilitada en Configuración."
+    );
+  }
+  if (opts.feature === "drive" && opts.syncDrive === false) {
+    throw new GoogleIntegrationError(
+      "sync_off",
+      "Sincronización de Drive desactivada en Configuración."
+    );
+  }
+  if (opts.feature === "calendar" && opts.syncCalendar === false) {
+    throw new GoogleIntegrationError(
+      "sync_off",
+      "Sincronización de Calendar desactivada en Configuración."
+    );
+  }
+}
+
 export async function getGoogleConfig(): Promise<GoogleConfig> {
   const row = await prisma.integrationConfig.findUnique({
     where: { provider: "google" },
   });
   const defaults: GoogleConfig = {
-    scopes: [
-      "https://www.googleapis.com/auth/drive.file",
-      "https://www.googleapis.com/auth/calendar.events",
-      "https://www.googleapis.com/auth/gmail.send",
-      "openid",
-      "email",
-      "profile",
-    ],
+    scopes: DEFAULT_SCOPES,
     syncDrive: true,
     syncCalendar: true,
   };
@@ -118,11 +193,19 @@ export async function getGoogleConfig(): Promise<GoogleConfig> {
   });
 }
 
+export async function isGoogleIntegrationEnabled(): Promise<boolean> {
+  const row = await prisma.integrationConfig.findUnique({
+    where: { provider: "google" },
+    select: { enabled: true },
+  });
+  if (row) return row.enabled;
+  const config = await getGoogleConfig();
+  return Boolean(config.accessToken);
+}
+
 export function getGoogleAuthUrl(state = "lexopen") {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri =
-    process.env.GOOGLE_REDIRECT_URI ||
-    "http://localhost:3000/api/integrations/google/callback";
+  const redirectUri = googleRedirectUri();
   if (!clientId) return null;
 
   const params = new URLSearchParams({
@@ -147,12 +230,13 @@ export function getGoogleAuthUrl(state = "lexopen") {
 export async function exchangeGoogleCode(code: string) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri =
-    process.env.GOOGLE_REDIRECT_URI ||
-    "http://localhost:3000/api/integrations/google/callback";
+  const redirectUri = googleRedirectUri();
 
   if (!clientId || !clientSecret) {
-    throw new Error("GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET no configurados");
+    throw new GoogleIntegrationError(
+      "credentials_missing",
+      "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET no configurados"
+    );
   }
 
   const res = await googleFetch("https://oauth2.googleapis.com/token", {
@@ -168,8 +252,12 @@ export async function exchangeGoogleCode(code: string) {
   });
 
   if (!res.ok) {
-    console.error("Google token exchange failed", res.status);
-    throw new Error("Google token exchange failed");
+    const detail = await readGoogleError(res);
+    console.error("Google token exchange failed", res.status, detail);
+    throw new GoogleIntegrationError(
+      "api_error",
+      `Google token exchange failed: ${detail}`
+    );
   }
 
   const tokens = (await res.json()) as {
@@ -241,18 +329,39 @@ export async function updateGoogleSyncOptions(opts: {
   return getGoogleConfig();
 }
 
-/** Refresca el access token si está por expirar (buffer 60s). */
+async function clearGoogleAccessToken(config: GoogleConfig) {
+  const next: GoogleConfig = {
+    ...config,
+    accessToken: undefined,
+    tokenExpiresAt: undefined,
+  };
+  await saveGoogleConfig(next, true);
+  return next;
+}
+
+/** Refresca el access token si está por expirar (buffer 60s). Fail-closed. */
 export async function ensureGoogleAccessToken(): Promise<GoogleConfig> {
   const config = await getGoogleConfig();
   if (!config.accessToken) return config;
 
   const expiresAt = config.tokenExpiresAt || 0;
   if (expiresAt > Date.now() + 60_000) return config;
-  if (!config.refreshToken) return config;
+  if (!config.refreshToken) {
+    await clearGoogleAccessToken(config);
+    throw new GoogleIntegrationError(
+      "needs_reconnect",
+      "El token de Google expiró y no hay refresh token. Reconecte OAuth."
+    );
+  }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return config;
+  if (!clientId || !clientSecret) {
+    throw new GoogleIntegrationError(
+      "credentials_missing",
+      "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET no configurados"
+    );
+  }
 
   const res = await googleFetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -265,7 +374,15 @@ export async function ensureGoogleAccessToken(): Promise<GoogleConfig> {
     }),
   });
 
-  if (!res.ok) return config;
+  if (!res.ok) {
+    const detail = await readGoogleError(res);
+    console.error("Google token refresh failed", res.status, detail);
+    await clearGoogleAccessToken(config);
+    throw new GoogleIntegrationError(
+      "needs_reconnect",
+      `No se pudo renovar el token de Google (${detail}). Reconecte OAuth.`
+    );
+  }
 
   const tokens = (await res.json()) as {
     access_token: string;
@@ -280,6 +397,174 @@ export async function ensureGoogleAccessToken(): Promise<GoogleConfig> {
   return next;
 }
 
+async function requireDriveSession() {
+  const enabled = await isGoogleIntegrationEnabled();
+  const config = await ensureGoogleAccessToken();
+  assertGoogleFeatureEnabled({
+    enabled,
+    syncDrive: config.syncDrive,
+    feature: "drive",
+  });
+  if (!config.accessToken) {
+    throw new GoogleIntegrationError(
+      "needs_oauth",
+      "Google Drive no conectado. Autorice OAuth en Integraciones."
+    );
+  }
+  return config;
+}
+
+async function requireCalendarSession() {
+  const enabled = await isGoogleIntegrationEnabled();
+  const config = await ensureGoogleAccessToken();
+  assertGoogleFeatureEnabled({
+    enabled,
+    syncCalendar: config.syncCalendar,
+    feature: "calendar",
+  });
+  if (!config.accessToken) {
+    throw new GoogleIntegrationError(
+      "needs_oauth",
+      "Google Calendar no conectado. Autorice OAuth en Integraciones."
+    );
+  }
+  return config;
+}
+
+function isTextMime(mime: string) {
+  const m = mime.toLowerCase();
+  return (
+    !m ||
+    m.startsWith("text/") ||
+    m === "application/json" ||
+    m === "application/markdown" ||
+    m === "application/xml"
+  );
+}
+
+type DriveFileResult = {
+  id: string;
+  name?: string;
+  webViewLink?: string;
+  updated?: boolean;
+};
+
+/** Crea o actualiza un archivo en Drive (binario u opcionalmente Google Doc). */
+export async function uploadFileToDrive(opts: {
+  name: string;
+  content: Buffer | string;
+  contentMimeType: string;
+  /** Si true, Drive convierte el texto a Google Doc. */
+  convertToGoogleDoc?: boolean;
+  folderId?: string | null;
+  existingFileId?: string | null;
+  accessToken: string;
+}): Promise<DriveFileResult> {
+  const bytes =
+    typeof opts.content === "string"
+      ? Buffer.from(opts.content, "utf8")
+      : opts.content;
+
+  if (opts.existingFileId && isRealDriveFolderId(opts.existingFileId)) {
+    const updateUrl = `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(
+      opts.existingFileId
+    )}?uploadType=media&fields=id,name,webViewLink`;
+    const updateRes = await googleFetch(updateUrl, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${opts.accessToken}`,
+        "Content-Type": opts.convertToGoogleDoc
+          ? "text/plain"
+          : opts.contentMimeType || "application/octet-stream",
+      },
+      body: new Uint8Array(bytes),
+    });
+    if (updateRes.ok) {
+      const file = (await updateRes.json()) as DriveFileResult;
+      return { ...file, updated: true };
+    }
+    if (updateRes.status !== 404) {
+      const detail = await readGoogleError(updateRes);
+      console.error("Google Drive update failed", updateRes.status, detail);
+      throw new GoogleIntegrationError(
+        "api_error",
+        `Google Drive update failed: ${detail}`
+      );
+    }
+    // 404 → crear de nuevo
+  }
+
+  const metadata: Record<string, unknown> = {
+    name: opts.convertToGoogleDoc
+      ? opts.name.replace(/\.md$/i, "") || opts.name
+      : opts.name,
+    mimeType: opts.convertToGoogleDoc
+      ? "application/vnd.google-apps.document"
+      : opts.contentMimeType || "application/octet-stream",
+  };
+  if (opts.folderId && isRealDriveFolderId(opts.folderId)) {
+    metadata.parents = [opts.folderId];
+  }
+
+  const boundary = `lexopen_${randomBytes(8).toString("hex")}`;
+  const metaPart = Buffer.from(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`,
+    "utf8"
+  );
+  const contentHeader = Buffer.from(
+    `--${boundary}\r\nContent-Type: ${
+      opts.convertToGoogleDoc
+        ? "text/plain; charset=UTF-8"
+        : opts.contentMimeType || "application/octet-stream"
+    }\r\n\r\n`,
+    "utf8"
+  );
+  const closing = Buffer.from(`\r\n--${boundary}--`, "utf8");
+  const body = Buffer.concat([metaPart, contentHeader, bytes, closing]);
+
+  const res = await googleFetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${opts.accessToken}`,
+        "Content-Type": `multipart/related; boundary=${boundary}`,
+      },
+      body: new Uint8Array(body),
+    }
+  );
+
+  if (!res.ok) {
+    const detail = await readGoogleError(res);
+    console.error("Google Drive upload failed", res.status, detail);
+    throw new GoogleIntegrationError(
+      "api_error",
+      `Google Drive upload failed: ${detail}`
+    );
+  }
+
+  return (await res.json()) as DriveFileResult;
+}
+
+/** @deprecated Prefer uploadFileToDrive. Kept for call-site clarity. */
+async function uploadMarkdownToDrive(opts: {
+  name: string;
+  content: string;
+  folderId?: string | null;
+  existingFileId?: string | null;
+  accessToken: string;
+}) {
+  return uploadFileToDrive({
+    name: opts.name,
+    content: opts.content,
+    contentMimeType: "text/plain",
+    convertToGoogleDoc: true,
+    folderId: opts.folderId,
+    existingFileId: opts.existingFileId,
+    accessToken: opts.accessToken,
+  });
+}
+
 /** Crea un evento de Calendar o un stub local si no hay token. */
 export async function pushPlazoToGoogleCalendar(plazoId: string) {
   const plazo = await prisma.plazo.findUnique({
@@ -288,18 +573,33 @@ export async function pushPlazoToGoogleCalendar(plazoId: string) {
   });
   if (!plazo) throw new Error("Plazo no encontrado");
 
-  const config = await ensureGoogleAccessToken();
-  if (!config.accessToken) {
-    return {
-      status: "stub" as const,
-      message:
-        "Google Workspace no conectado. Conecte OAuth para crear el evento en Calendar.",
-      draftEvent: {
-        summary: `[LexOpen] ${plazo.titulo}`,
-        description: `${plazo.descripcion ?? ""}\nCausa: ${plazo.causa?.titulo ?? "—"} (${plazo.causa?.rit ?? ""})`,
-        start: plazo.fechaLimite.toISOString(),
-      },
-    };
+  let config: GoogleConfig;
+  try {
+    config = await requireCalendarSession();
+  } catch (e) {
+    if (
+      e instanceof GoogleIntegrationError &&
+      (e.code === "needs_oauth" ||
+        e.code === "disabled" ||
+        e.code === "sync_off" ||
+        e.code === "needs_reconnect")
+    ) {
+      return {
+        status:
+          e.code === "needs_reconnect"
+            ? ("needs_reconnect" as const)
+            : e.code === "sync_off" || e.code === "disabled"
+              ? ("blocked" as const)
+              : ("stub" as const),
+        message: e.message,
+        draftEvent: {
+          summary: `[LexOpen] ${plazo.titulo}`,
+          description: `${plazo.descripcion ?? ""}\nCausa: ${plazo.causa?.titulo ?? "—"} (${plazo.causa?.rit ?? ""})`,
+          start: plazo.fechaLimite.toISOString(),
+        },
+      };
+    }
+    throw e;
   }
 
   const end = new Date(plazo.fechaLimite.getTime() + 60 * 60 * 1000);
@@ -321,52 +621,19 @@ export async function pushPlazoToGoogleCalendar(plazoId: string) {
   );
 
   if (!res.ok) {
-    console.error("Google Calendar API failed", res.status);
-    throw new Error("Google Calendar API failed");
+    const detail = await readGoogleError(res);
+    console.error("Google Calendar API failed", res.status, detail);
+    throw new GoogleIntegrationError(
+      "api_error",
+      `Google Calendar API failed: ${detail}`
+    );
   }
 
   const event = await res.json();
   return { status: "created" as const, event };
 }
 
-async function uploadMarkdownToDrive(opts: {
-  name: string;
-  content: string;
-  folderId?: string | null;
-  accessToken: string;
-}) {
-  const metadata: Record<string, unknown> = {
-    name: opts.name.replace(/\.md$/i, "") || opts.name,
-    mimeType: "application/vnd.google-apps.document",
-  };
-  if (opts.folderId) {
-    metadata.parents = [opts.folderId];
-  }
-
-  const boundary = "lexopen_boundary";
-  const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: text/plain\r\n\r\n${opts.content}\r\n--${boundary}--`;
-
-  const res = await googleFetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${opts.accessToken}`,
-        "Content-Type": `multipart/related; boundary=${boundary}`,
-      },
-      body,
-    }
-  );
-
-  if (!res.ok) {
-    console.error("Google Drive upload failed", res.status);
-    throw new Error("Google Drive upload failed");
-  }
-
-  return (await res.json()) as { id: string; name?: string; webViewLink?: string };
-}
-
-/** Sube un documento de texto a Drive (carpeta de la causa si existe). */
+/** Sube un documento a Drive (binario original o Markdown → Google Doc). */
 export async function pushDocumentoToDrive(
   documentoId: string,
   opts?: { role?: string }
@@ -383,23 +650,9 @@ export async function pushDocumentoToDrive(
   ) {
     throw new Error("Documento confidencial o privilegiado");
   }
-  const config = await ensureGoogleAccessToken();
+
   const folderId = doc.causa?.googleDriveFolderId || null;
   const realFolder = isRealDriveFolderId(folderId) ? folderId : null;
-
-  if (!config.accessToken) {
-    return {
-      status: "stub" as const,
-      message: realFolder
-        ? `Google Drive no conectado. El archivo iría a la carpeta ${realFolder}.`
-        : "Google Drive no conectado. OAuth requerido.",
-      draft: {
-        name: doc.nombre,
-        mimeType: "text/markdown",
-        parents: realFolder ? [realFolder] : undefined,
-      },
-    };
-  }
 
   if (folderId && isPlaceholderDriveFolderId(folderId)) {
     return {
@@ -409,22 +662,80 @@ export async function pushDocumentoToDrive(
     };
   }
 
+  let config: GoogleConfig;
+  try {
+    config = await requireDriveSession();
+  } catch (e) {
+    if (
+      e instanceof GoogleIntegrationError &&
+      (e.code === "needs_oauth" ||
+        e.code === "disabled" ||
+        e.code === "sync_off" ||
+        e.code === "needs_reconnect")
+    ) {
+      return {
+        status:
+          e.code === "needs_reconnect"
+            ? ("needs_reconnect" as const)
+            : e.code === "needs_oauth"
+              ? ("stub" as const)
+              : ("blocked" as const),
+        message: e.message,
+        draft: {
+          name: doc.nombre,
+          mimeType: doc.mimeType || "application/octet-stream",
+          parents: realFolder ? [realFolder] : undefined,
+        },
+      };
+    }
+    throw e;
+  }
+
   const mime = (doc.mimeType || "").toLowerCase();
-  const isTextMime =
-    !mime ||
-    mime.startsWith("text/") ||
-    mime === "application/json" ||
-    mime === "application/markdown";
+  const existingId =
+    doc.googleDriveId && isRealDriveFolderId(doc.googleDriveId)
+      ? doc.googleDriveId
+      : null;
+
+  // Prefer original binary from storage when not plain text.
+  if (doc.storageKey && !isTextMime(mime)) {
+    const stored = await getObject(doc.storageKey);
+    if (stored && stored.length > 0) {
+      const file = await uploadFileToDrive({
+        name: doc.nombre,
+        content: stored,
+        contentMimeType: mime || "application/octet-stream",
+        convertToGoogleDoc: false,
+        folderId: realFolder,
+        existingFileId: existingId,
+        accessToken: config.accessToken!,
+      });
+      await prisma.documento.update({
+        where: { id: doc.id },
+        data: { googleDriveId: file.id },
+      });
+      return {
+        status: "uploaded" as const,
+        file,
+        folderId: realFolder,
+        updated: Boolean(file.updated),
+        kind: "binary" as const,
+        message: file.updated
+          ? "Archivo actualizado en Google Drive."
+          : "Archivo original subido a Google Drive.",
+      };
+    }
+  }
 
   let content = (doc.contenido || "").trim();
   let uploadName = doc.nombre;
   let fromExtracted = false;
 
-  if (doc.storageKey && isTextMime) {
+  if (doc.storageKey && isTextMime(mime)) {
     const stored = await getObject(doc.storageKey);
     if (!stored) throw new Error("Contenido no encontrado en almacenamiento");
     content = Buffer.from(stored).toString("utf8");
-  } else if (!isTextMime || !content) {
+  } else if (!isTextMime(mime) || !content) {
     const extracted = (doc.extractedMarkdown || "").trim();
     if (extracted) {
       content = extracted;
@@ -432,7 +743,10 @@ export async function pushDocumentoToDrive(
       if (!uploadName.toLowerCase().endsWith(".md")) {
         uploadName = `${uploadName.replace(/\.[^.]+$/i, "") || uploadName}.md`;
       }
-    } else if (doc.extractionStatus === "needs_ocr" || doc.extractionStatus === "pending") {
+    } else if (
+      doc.extractionStatus === "needs_ocr" ||
+      doc.extractionStatus === "pending"
+    ) {
       return {
         status: "needs_ocr" as const,
         message:
@@ -442,7 +756,7 @@ export async function pushDocumentoToDrive(
       return {
         status: "unsupported" as const,
         message:
-          "Solo se sube a Drive texto/markdown o el Markdown extraído del documento. Este archivo no tiene texto indexado.",
+          "No hay binario en storage ni Markdown extraído para subir a Drive.",
       };
     }
   }
@@ -458,7 +772,8 @@ export async function pushDocumentoToDrive(
     name: uploadName,
     content,
     folderId: realFolder,
-    accessToken: config.accessToken,
+    existingFileId: existingId,
+    accessToken: config.accessToken!,
   });
 
   await prisma.documento.update({
@@ -470,9 +785,15 @@ export async function pushDocumentoToDrive(
     file,
     folderId: realFolder,
     fromExtracted,
-    message: fromExtracted
-      ? "Subido a Drive el Markdown extraído (el binario original permanece en LexOpen)."
-      : undefined,
+    updated: Boolean(file.updated),
+    kind: "google_doc" as const,
+    message: file.updated
+      ? fromExtracted
+        ? "Google Doc actualizado con el Markdown extraído."
+        : "Google Doc actualizado en Drive."
+      : fromExtracted
+        ? "Subido a Drive el Markdown extraído como Google Doc (el binario original permanece en LexOpen)."
+        : "Texto subido a Drive como Google Doc.",
   };
 }
 
@@ -493,32 +814,82 @@ export async function linkCausaDriveFolder(causaId: string, folderRef: string) {
   const causa = await prisma.causa.findUnique({ where: { id: causaId } });
   if (!causa) throw new Error("Causa no encontrada");
 
-  const config = await ensureGoogleAccessToken();
+  let config: GoogleConfig;
+  try {
+    config = await requireDriveSession();
+  } catch (e) {
+    if (
+      e instanceof GoogleIntegrationError &&
+      (e.code === "needs_oauth" ||
+        e.code === "disabled" ||
+        e.code === "sync_off" ||
+        e.code === "needs_reconnect")
+    ) {
+      if (process.env.NODE_ENV === "production") {
+        throw new GoogleIntegrationError(
+          e.code === "needs_oauth" ? "needs_oauth" : e.code,
+          e.code === "needs_oauth"
+            ? "Google OAuth requerido para vincular carpetas Drive en producción."
+            : e.message
+        );
+      }
+      // Dev: allow offline link of a real-looking ID without verification.
+      const folderName =
+        causa.rit || causa.titulo.slice(0, 80) || "Carpeta LexOpen";
+      const updated = await prisma.causa.update({
+        where: { id: causaId },
+        data: {
+          googleDriveFolderId: parsed.folderId,
+          googleDriveFolderUrl: parsed.folderUrl,
+          googleDriveFolderName: folderName,
+        },
+      });
+      await prisma.activity.create({
+        data: {
+          tipo: "drive",
+          mensaje: `Carpeta Google Drive vinculada (sin verificar): ${folderName}`,
+          causaId,
+        },
+      });
+      return {
+        status: "linked_offline" as const,
+        message:
+          "Carpeta guardada sin verificar (OAuth no conectado). Al conectar Google se podrá validar el acceso.",
+        causa: updated,
+        folder: {
+          id: parsed.folderId,
+          name: folderName,
+          url: parsed.folderUrl,
+        },
+      };
+    }
+    throw e;
+  }
+
   let folderName =
     causa.rit || causa.titulo.slice(0, 80) || "Carpeta LexOpen";
   let folderUrl = parsed.folderUrl;
 
-  if (config.accessToken) {
-    const res = await googleFetch(
-      `https://www.googleapis.com/drive/v3/files/${parsed.folderId}?fields=id,name,webViewLink,mimeType`,
-      { headers: { Authorization: `Bearer ${config.accessToken}` } }
+  const res = await googleFetch(
+    `https://www.googleapis.com/drive/v3/files/${parsed.folderId}?fields=id,name,webViewLink,mimeType`,
+    { headers: { Authorization: `Bearer ${config.accessToken}` } }
+  );
+  if (!res.ok) {
+    const detail = await readGoogleError(res);
+    throw new Error(
+      `No se pudo verificar la carpeta en Drive (${detail}). Con el scope drive.file prefiera «Crear carpeta en Drive» o una carpeta creada por LexOpen.`
     );
-    if (!res.ok) {
-      throw new Error(
-        "No se pudo verificar la carpeta en Drive (¿scope drive.file o carpeta no accesible?). Prefiera «Crear carpeta en Drive»."
-      );
-    }
-    const meta = (await res.json()) as {
-      name?: string;
-      mimeType?: string;
-      webViewLink?: string;
-    };
-    if (meta.mimeType !== "application/vnd.google-apps.folder") {
-      throw new Error("El ID no corresponde a una carpeta de Google Drive.");
-    }
-    if (meta.name) folderName = meta.name;
-    if (meta.webViewLink) folderUrl = meta.webViewLink;
   }
+  const meta = (await res.json()) as {
+    name?: string;
+    mimeType?: string;
+    webViewLink?: string;
+  };
+  if (meta.mimeType !== "application/vnd.google-apps.folder") {
+    throw new Error("El ID no corresponde a una carpeta de Google Drive.");
+  }
+  if (meta.name) folderName = meta.name;
+  if (meta.webViewLink) folderUrl = meta.webViewLink;
 
   const updated = await prisma.causa.update({
     where: { id: causaId },
@@ -538,10 +909,7 @@ export async function linkCausaDriveFolder(causaId: string, folderRef: string) {
   });
 
   return {
-    status: config.accessToken ? ("linked" as const) : ("linked_offline" as const),
-    message: config.accessToken
-      ? undefined
-      : "Carpeta guardada sin verificar (OAuth no conectado). Al conectar Google se podrá validar el acceso.",
+    status: "linked" as const,
     causa: updated,
     folder: {
       id: parsed.folderId,
@@ -567,36 +935,52 @@ export async function createCausaDriveFolder(
     [causa.rit, causa.titulo].filter(Boolean).join(" — ").slice(0, 120) ||
     "Causa LexOpen";
 
-  const config = await ensureGoogleAccessToken();
-
-  if (!config.accessToken) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("Google OAuth requerido para crear carpetas Drive en producción");
+  let config: GoogleConfig;
+  try {
+    config = await requireDriveSession();
+  } catch (e) {
+    if (
+      e instanceof GoogleIntegrationError &&
+      (e.code === "needs_oauth" ||
+        e.code === "disabled" ||
+        e.code === "sync_off" ||
+        e.code === "needs_reconnect")
+    ) {
+      if (process.env.NODE_ENV === "production") {
+        throw new GoogleIntegrationError(
+          e.code === "needs_oauth" ? "needs_oauth" : e.code,
+          e.code === "needs_oauth"
+            ? "Google OAuth requerido para crear carpetas Drive en producción"
+            : e.message
+        );
+      }
+      if (e.code !== "needs_oauth") throw e;
+      const stubId = makeStubFolderId(causa.id);
+      const url = stubFolderUrl(stubId);
+      const updated = await prisma.causa.update({
+        where: { id: causaId },
+        data: {
+          googleDriveFolderId: stubId,
+          googleDriveFolderUrl: url,
+          googleDriveFolderName: `${name} (stub local)`,
+        },
+      });
+      await prisma.activity.create({
+        data: {
+          tipo: "drive",
+          mensaje: `Carpeta Drive (modo stub) preparada: ${name}`,
+          causaId,
+        },
+      });
+      return {
+        status: "stub" as const,
+        message:
+          "Google no conectado: se guardó un marcador local (no es una carpeta real de Drive). Conecte OAuth y use «Crear carpeta en Drive».",
+        causa: updated,
+        folder: { id: stubId, name: `${name} (stub local)`, url },
+      };
     }
-    const stubId = makeStubFolderId(causa.id);
-    const url = stubFolderUrl(stubId);
-    const updated = await prisma.causa.update({
-      where: { id: causaId },
-      data: {
-        googleDriveFolderId: stubId,
-        googleDriveFolderUrl: url,
-        googleDriveFolderName: `${name} (stub local)`,
-      },
-    });
-    await prisma.activity.create({
-      data: {
-        tipo: "drive",
-        mensaje: `Carpeta Drive (modo stub) preparada: ${name}`,
-        causaId,
-      },
-    });
-    return {
-      status: "stub" as const,
-      message:
-        "Google no conectado: se guardó un marcador local (no es una carpeta real de Drive). Conecte OAuth y use «Crear carpeta en Drive».",
-      causa: updated,
-      folder: { id: stubId, name: `${name} (stub local)`, url },
-    };
+    throw e;
   }
 
   const metadata: Record<string, unknown> = {
@@ -617,8 +1001,12 @@ export async function createCausaDriveFolder(
   });
 
   if (!res.ok) {
-    console.error("Google Drive folder creation failed", res.status);
-    throw new Error("Google Drive folder creation failed");
+    const detail = await readGoogleError(res);
+    console.error("Google Drive folder creation failed", res.status, detail);
+    throw new GoogleIntegrationError(
+      "api_error",
+      `Google Drive folder creation failed: ${detail}`
+    );
   }
 
   const folder = (await res.json()) as { id: string; name?: string };
@@ -667,6 +1055,67 @@ export async function unlinkCausaDriveFolder(causaId: string) {
   return { status: "unlinked" as const, causa: updated };
 }
 
+/** Lista archivos de la carpeta Drive de la causa (creados/visibles con drive.file). */
+export async function listCausaDriveFolder(causaId: string) {
+  const causa = await prisma.causa.findUnique({
+    where: { id: causaId },
+    select: {
+      id: true,
+      googleDriveFolderId: true,
+      googleDriveFolderName: true,
+    },
+  });
+  if (!causa) throw new Error("Causa no encontrada");
+  if (!isRealDriveFolderId(causa.googleDriveFolderId)) {
+    return {
+      status: "needs_real_folder" as const,
+      message: "Vincule o cree una carpeta real de Google Drive en la causa.",
+      files: [] as Array<{
+        id: string;
+        name: string;
+        mimeType: string;
+        webViewLink?: string;
+        modifiedTime?: string;
+      }>,
+    };
+  }
+
+  const config = await requireDriveSession();
+  const q = `'${causa.googleDriveFolderId}' in parents and trashed=false`;
+  const params = new URLSearchParams({
+    q,
+    pageSize: "50",
+    fields: "files(id,name,mimeType,webViewLink,modifiedTime)",
+    orderBy: "modifiedTime desc",
+  });
+  const res = await googleFetch(
+    `https://www.googleapis.com/drive/v3/files?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${config.accessToken}` } }
+  );
+  if (!res.ok) {
+    const detail = await readGoogleError(res);
+    throw new GoogleIntegrationError(
+      "api_error",
+      `No se pudo listar la carpeta Drive: ${detail}`
+    );
+  }
+  const data = (await res.json()) as {
+    files?: Array<{
+      id: string;
+      name: string;
+      mimeType: string;
+      webViewLink?: string;
+      modifiedTime?: string;
+    }>;
+  };
+  return {
+    status: "ok" as const,
+    folderId: causa.googleDriveFolderId,
+    folderName: causa.googleDriveFolderName,
+    files: data.files || [],
+  };
+}
+
 /** Sube el Markdown de una minuta a la carpeta Drive de la causa. */
 export async function pushMinutaToDrive(
   minutaId: string,
@@ -686,7 +1135,6 @@ export async function pushMinutaToDrive(
     throw new Error("Minuta confidencial");
   }
 
-  const config = await ensureGoogleAccessToken();
   const folderId = minuta.causa.googleDriveFolderId;
   let content =
     minuta.documento?.contenido ||
@@ -705,22 +1153,49 @@ export async function pushMinutaToDrive(
     };
   }
 
-  if (!config.accessToken) {
-    return {
-      status: "stub" as const,
-      message: `Drive no conectado. La minuta quedaría en la carpeta de la causa (${folderId}). Conecte OAuth en Integraciones.`,
-      draft: {
-        name,
-        parents: [folderId],
-      },
-    };
+  let config: GoogleConfig;
+  try {
+    config = await requireDriveSession();
+  } catch (e) {
+    if (
+      e instanceof GoogleIntegrationError &&
+      (e.code === "needs_oauth" ||
+        e.code === "disabled" ||
+        e.code === "sync_off" ||
+        e.code === "needs_reconnect")
+    ) {
+      return {
+        status:
+          e.code === "needs_reconnect"
+            ? ("needs_reconnect" as const)
+            : e.code === "needs_oauth"
+              ? ("stub" as const)
+              : ("blocked" as const),
+        message: e.message,
+        draft: {
+          name,
+          parents: [folderId],
+        },
+      };
+    }
+    throw e;
   }
+
+  const existingId =
+    (minuta.googleDriveFileId && isRealDriveFolderId(minuta.googleDriveFileId)
+      ? minuta.googleDriveFileId
+      : null) ||
+    (minuta.documento?.googleDriveId &&
+    isRealDriveFolderId(minuta.documento.googleDriveId)
+      ? minuta.documento.googleDriveId
+      : null);
 
   const file = await uploadMarkdownToDrive({
     name,
     content,
     folderId,
-    accessToken: config.accessToken,
+    existingFileId: existingId,
+    accessToken: config.accessToken!,
   });
 
   await prisma.minuta.update({
@@ -734,5 +1209,13 @@ export async function pushMinutaToDrive(
     });
   }
 
-  return { status: "uploaded" as const, file, folderId };
+  return {
+    status: "uploaded" as const,
+    file,
+    folderId,
+    updated: Boolean(file.updated),
+    message: file.updated
+      ? "Minuta actualizada en la carpeta Drive de la causa."
+      : undefined,
+  };
 }
