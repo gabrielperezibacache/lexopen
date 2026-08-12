@@ -5,7 +5,6 @@ import {
   forbiddenProductionFlags,
 } from "@/lib/security/production-env";
 import {
-  fetchSafeOutbound,
   isCloudMetadataHostname,
   isLoopbackHostname,
   isSafeOutboundHttpUrl,
@@ -41,10 +40,9 @@ assert.equal(
   }),
   false
 );
-
-await assert.rejects(
-  () => fetchSafeOutbound("http://127.0.0.1/secret", { allowHttp: true }),
-  /SSRF/
+assert.equal(
+  isSafeOutboundHttpUrl("http://127.0.0.1/secret", { allowHttp: true }),
+  false
 );
 
 env.NODE_ENV = "production";

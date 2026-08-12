@@ -106,10 +106,20 @@ export function assertCsrf(req: Request) {
     return;
   }
 
+  // In production, if canonical/trusted origins are configured, do not trust
+  // the request Host header alone (mitigates Host-header confusion behind proxies).
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const trustedCsv = process.env.LEXOPEN_TRUSTED_ORIGINS;
+  const configuredOrigins = Boolean(appUrl?.trim() || trustedCsv?.trim());
+  const trustHost = !(
+    process.env.NODE_ENV === "production" && configuredOrigins
+  );
+
   const allowed = buildAllowedOrigins({
     host,
-    appUrl: process.env.NEXT_PUBLIC_APP_URL,
-    trustedCsv: process.env.LEXOPEN_TRUSTED_ORIGINS,
+    appUrl,
+    trustedCsv,
+    trustHost,
   });
 
   const okOrigin = isAllowedOrigin(origin, allowed);
