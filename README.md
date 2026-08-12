@@ -645,26 +645,31 @@ ruta, validación de origen; un `curl` anónimo no es una prueba válida de auto
 
 ## ☁️ Despliegue en Render
 
-El archivo [`render.yaml`](render.yaml) define un Blueprint con:
+El archivo [`render.yaml`](render.yaml) define un Blueprint de **producción** con:
 
-- PostgreSQL 16 administrado;
-- un web service Node;
-- migraciones Prisma en el build;
-- `npm run start`;
+- PostgreSQL 16 administrado (`basic-256mb`, no free);
+- web service Node siempre encendido (`starter`);
+- sidecar privado PJUD + crons de sync/digest;
+- migraciones Prisma en el build (`migrate deploy`, **sin** seed demo);
+- `LEXOPEN_BOOTSTRAP_TOKEN` generado para el primer admin en `/setup`;
+- demos desactivadas (`HERMES_ALLOW_DEMO=0`, `LEXOPEN_DEMO_SWITCHER=0`, `PJUD_ALLOW_DEMO=0`);
 - health check en `/api/health`.
 
-Flujo recomendado:
+### Desplegar ahora
 
-1. Cree un Blueprint desde este repositorio.
-2. Configure las credenciales opcionales de Hermes, Google y S3 en Render.
-3. Mantenga `HERMES_ALLOW_DEMO=0` y `LEXOPEN_DEMO_SWITCHER=0`.
-4. Use object storage persistente para documentos y configure un dominio/TLS o una
-   red privada apropiada.
-5. Verifique migraciones, respaldos y permisos antes de abrir el servicio a usuarios.
+1. Abra el Blueprint:
+   [dashboard.render.com/blueprint/new?repo=https://github.com/gabrielperezibacache/lexopen](https://dashboard.render.com/blueprint/new?repo=https://github.com/gabrielperezibacache/lexopen)
+2. Elija la rama con este `render.yaml` (o `main` cuando esté fusionado) y pulse **Apply**.
+3. Rellene los secretos opcionales marcados `sync: false` (S3, Hermes, Google, CAPTCHA).
+   **S3 es necesario** si va a subir documentos reales (el disco del web service es efímero).
+4. Cuando el servicio `lexopen` esté live, copie `LEXOPEN_BOOTSTRAP_TOKEN` desde
+   Environment y abra `https://<servicio>.onrender.com/setup?token=<token>`.
+5. Cree el administrador del estudio, luego fije `NEXT_PUBLIC_APP_URL` a la URL
+   pública (o su dominio) y redeploye si hace falta.
 
-El plan gratuito de Render puede suspender servicios inactivos y no constituye por
-sí mismo una arquitectura de alta disponibilidad. El filesystem del web service es
-efímero y no debe usarse como respaldo.
+> El plan gratuito de Render no es adecuado para producción: el web se apaga tras
+> inactividad y Postgres free caduca a los 30 días. Este Blueprint usa planes de pago
+> mínimos. No es alta disponibilidad por sí solo; configure respaldos externos.
 
 ## 🔐 Seguridad y límites actuales
 
