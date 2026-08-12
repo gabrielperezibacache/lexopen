@@ -135,7 +135,7 @@ export function IntegrationsOverviewPanel() {
                 <h3 className="font-semibold">{card.title}</h3>
                 <span
                   className={`badge ${
-                    card.ok ? "badge-sea" : "badge-muted"
+                    card.ok ? "badge-sea" : "badge-pendiente"
                   }`}
                 >
                   {card.ok ? "Activo" : "Pendiente"}
