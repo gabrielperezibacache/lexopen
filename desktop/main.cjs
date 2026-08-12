@@ -20,6 +20,7 @@ const {
   restoreDataDirectory,
   rollbackRestore,
 } = require("./backup.cjs");
+const { isAllowedExternalUrl } = require("./external-url.cjs");
 
 let mainWindow = null;
 let hostHandle = null;
@@ -239,6 +240,21 @@ function loadAppUrl(url, version) {
   win.loadURL(`${url}${sep}lexopen_v=${encodeURIComponent(v)}`);
 }
 
+async function setOneTimeHostCookie(baseUrl, name, value) {
+  const win = ensureWindow();
+  const secure = String(baseUrl).startsWith("https://");
+  await win.webContents.session.cookies.set({
+    url: baseUrl,
+    name,
+    value,
+    path: "/",
+    httpOnly: true,
+    secure,
+    sameSite: "strict",
+    expirationDate: Math.floor(Date.now() / 1000) + 60 * 60,
+  });
+}
+
 async function stopHostIfRunning() {
   if (!hostHandle?.stop) return;
   try {
@@ -258,9 +274,16 @@ async function startHostMode(cfg) {
     port: cfg.port,
     pgPort: cfg.pgPort,
   });
-  // Open setup with token in the BrowserWindow only — status/IPC omits the secret.
+  // Setup token goes into an httpOnly cookie — never the address bar / status IPC.
+  if (hostHandle.needsSetup && hostHandle.bootstrapToken) {
+    await setOneTimeHostCookie(
+      hostHandle.url,
+      "lexopen_setup_token",
+      hostHandle.bootstrapToken
+    );
+  }
   const targetUrl = hostHandle.needsSetup
-    ? `${hostHandle.url}/setup?token=${encodeURIComponent(hostHandle.bootstrapToken)}`
+    ? `${hostHandle.url}/setup`
     : hostHandle.url;
   const msg = hostHandle.needsSetup
     ? "Configuración inicial requerida"
@@ -446,12 +469,14 @@ function buildMenu() {
                 );
                 return;
               }
-              loadAppUrl(
-                `${hostHandle.url}/recovery?token=${encodeURIComponent(
+              void (async () => {
+                await setOneTimeHostCookie(
+                  hostHandle.url,
+                  "lexopen_recovery_token",
                   hostHandle.recoveryToken
-                )}`,
-                hostHandle.version
-              );
+                );
+                loadAppUrl(`${hostHandle.url}/recovery`, hostHandle.version);
+              })();
             },
           },
           {
@@ -627,9 +652,25 @@ ipcMain.handle("desktop:save-setup", async (_e, payload) => {
 });
 
 ipcMain.handle("desktop:open-external", async (_e, url) => {
-  if (typeof url === "string" && /^https?:\/\//i.test(url)) {
-    await shell.openExternal(url);
+  const cfg = readConfig();
+  const appUrls = [
+    hostHandle?.url,
+    hostHandle?.publicUrl,
+    cfg.publicUrl,
+    cfg.remoteUrl,
+    localAppUrl(cfg.port || 3000),
+    process.env.NEXT_PUBLIC_APP_URL,
+  ].filter(Boolean);
+  if (
+    !isAllowedExternalUrl(url, {
+      appUrls,
+      extraHosts: ["github.com", "www.github.com", "render.com", "docs.render.com"],
+    })
+  ) {
+    return { ok: false, error: "URL no permitida" };
   }
+  await shell.openExternal(url);
+  return { ok: true };
 });
 
 ipcMain.handle("desktop:retry", async () => {

@@ -829,8 +829,10 @@ de producción:
 - Desktop Host enlaza `127.0.0.1` por defecto (LAN solo con URL pública),
   genera contraseña aleatoria de Postgres en instalaciones nuevas y rota el
   default legacy `lexopen` al arrancar;
-- logout invalida la sesión (`sessionVersion`); descargas fuerzan `attachment`
-  salvo MIME seguros; listados/búsqueda no devuelven cuerpos de archivo;
+- logout invalida la sesión (`sessionVersion`); el `proxy` también comprueba la
+  versión en BD; descargas fuerzan `attachment` salvo MIME seguros; listados/
+  búsqueda no devuelven cuerpos de archivo; setup/recovery usan cookie httpOnly
+  (Desktop no pone el token en la URL); `openExternal` del Desktop tiene allowlist;
 - el portal cliente no debe presentarse como estrictamente de solo lectura sin una
   revisión adicional de permisos;
 - los campos de confidencialidad no equivalen a una implementación completa de

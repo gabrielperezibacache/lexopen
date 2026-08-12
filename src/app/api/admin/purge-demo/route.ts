@@ -16,7 +16,7 @@ export async function GET() {
     return NextResponse.json({
       ...detection,
       confirmPhrase: PURGE_CONFIRM_PHRASE,
-      hint: "Tras purgar, configure LEXOPEN_BOOTSTRAP_TOKEN y visite /setup?token=…",
+      hint: "Tras purgar, configure LEXOPEN_BOOTSTRAP_TOKEN y abra /setup (Desktop o ?token= de un solo uso)",
     });
   } catch (e) {
     return handleRouteError(e);
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       ...result,
       before,
       next:
-        "Defina LEXOPEN_BOOTSTRAP_TOKEN en el entorno y abra /setup?token=… para crear el admin del estudio. Desactive LEXOPEN_DEMO_SWITCHER, HERMES_ALLOW_DEMO y PJUD_ALLOW_DEMO.",
+        "Defina LEXOPEN_BOOTSTRAP_TOKEN en el entorno y abra /setup (Desktop o enlace ?token= de un solo uso; el proxy lo convierte en cookie). Desactive LEXOPEN_DEMO_SWITCHER, HERMES_ALLOW_DEMO y PJUD_ALLOW_DEMO.",
     });
   } catch (e) {
     return handleRouteError(e);

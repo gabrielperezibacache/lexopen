@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildContentSecurityPolicy } from "@/lib/security/headers";
+import { sessionVersionMatches } from "@/lib/auth/session-version";
+import {
+  RECOVERY_TOKEN_COOKIE,
+  SETUP_TOKEN_COOKIE,
+  setupCookieOptions,
+} from "@/lib/auth/setup-cookies";
 
 const SESSION_COOKIE = "lexopen_session";
 const CSRF_COOKIE = "lexopen_csrf";
@@ -57,16 +63,30 @@ async function hmacSha256Hex(payload: string, secret: string) {
   return toHex(sig);
 }
 
+async function lookupSessionVersion(userId: string) {
+  try {
+    const { prisma } = await import("@/lib/db");
+    return await prisma.user.findUnique({
+      where: { id: userId },
+      select: { sessionVersion: true, role: true },
+    });
+  } catch (error) {
+    console.warn("[proxy] session lookup failed", error);
+    return null;
+  }
+}
+
 async function verifyToken(
   token: string
 ): Promise<{ userId: string; role: string } | null> {
   const secret = sessionSecret();
   if (!secret) return null;
   if (!token.includes(".")) {
-    // Legacy unsigned cookie: no trusted role in Edge; treat as non-client.
-    return process.env.NODE_ENV === "development"
-      ? { userId: token, role: "abogado" }
-      : null;
+    // Legacy unsigned cookie: development only, and only if the user still exists.
+    if (process.env.NODE_ENV !== "development") return null;
+    const row = await lookupSessionVersion(token);
+    if (!row || !VALID_ROLES.has(row.role)) return null;
+    return { userId: token, role: row.role };
   }
   const parts = token.split(".");
   if (parts.length !== 5) return null;
@@ -88,7 +108,12 @@ async function verifyToken(
     secret
   );
   if (!timingSafeEqualHex(sig, expected)) return null;
-  return { userId, role };
+
+  const row = await lookupSessionVersion(userId);
+  const matched = sessionVersionMatches(row, sessionVersion, VALID_ROLES);
+  if (!matched.ok) return null;
+  // Prefer DB role so ACL tracks role changes after session minting.
+  return { userId, role: matched.role };
 }
 
 function isClientAllowedPath(pathname: string) {
@@ -178,10 +203,31 @@ function attachRequestNonce(req: NextRequest, nonce: string) {
   return requestHeaders;
 }
 
+/** Move ?token= into an httpOnly cookie and redirect to a clean URL. */
+function migrateQueryToken(req: NextRequest, nonce: string) {
+  const { pathname } = req.nextUrl;
+  if (pathname !== "/setup" && pathname !== "/recovery") return null;
+  if (!req.nextUrl.searchParams.has("token")) return null;
+
+  const token = String(req.nextUrl.searchParams.get("token") || "").slice(0, 256);
+  const clean = req.nextUrl.clone();
+  clean.searchParams.delete("token");
+  const res = withSecurityHeaders(req, NextResponse.redirect(clean), nonce);
+  if (token) {
+    const name =
+      pathname === "/setup" ? SETUP_TOKEN_COOKIE : RECOVERY_TOKEN_COOKIE;
+    res.cookies.set(name, token, setupCookieOptions(cookieSecureFlag()));
+  }
+  return res;
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const nonce = newCspNonce();
   const requestHeaders = attachRequestNonce(req, nonce);
+
+  const migrated = migrateQueryToken(req, nonce);
+  if (migrated) return migrated;
 
   const pass = () =>
     withSecurityHeaders(
@@ -198,7 +244,6 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith("/favicon") ||
     pathname.match(/\.(svg|png|jpg|css|js|ico|webp)$/)
   ) {
-    // Mint CSRF cookie early for login/setup forms (Origin + double-submit).
     return pass();
   }
 
@@ -230,7 +275,7 @@ export async function proxy(req: NextRequest) {
     return withSecurityHeaders(req, NextResponse.redirect(login), nonce);
   }
 
-  // Role ACL comes from the signed session token — never from a forgeable cookie.
+  // Role ACL comes from the DB-backed session — never from a forgeable cookie.
   if (session.role === "cliente" && !isClientAllowedPath(pathname)) {
     if (pathname.startsWith("/api/")) {
       return withSecurityHeaders(

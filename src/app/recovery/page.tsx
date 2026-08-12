@@ -2,12 +2,9 @@
 
 import Link from "next/link";
 import { FormEvent, Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Scale } from "lucide-react";
 
 function RecoveryForm() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token") || "";
   const [error, setError] = useState("");
   const [complete, setComplete] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -29,11 +26,12 @@ function RecoveryForm() {
 
     setBusy(true);
     try {
+      const manualToken = String(form.get("token") || "").trim();
       const response = await fetch("/api/auth/recover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token,
+          ...(manualToken ? { token: manualToken } : {}),
           email: form.get("email"),
           newPassword,
         }),
@@ -71,15 +69,11 @@ function RecoveryForm() {
       <div>
         <h1 className="display text-3xl">Recuperar administrador</h1>
         <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
-          Use esta pantalla únicamente desde el menú del Host local. El token no
-          debe compartirse ni enviarse por correo.
+          Use esta pantalla únicamente desde el menú del Host local. El token se
+          entrega en cookie httpOnly y no debe compartirse ni enviarse por
+          correo.
         </p>
       </div>
-      {!token && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Abra la recuperación desde LexOpen Desktop en el PC principal.
-        </p>
-      )}
       <label className="block text-sm">
         <span className="mb-1 block text-[var(--ink-soft)]/70">Email del administrador</span>
         <input className="input" name="email" type="email" required maxLength={320} />
@@ -108,12 +102,27 @@ function RecoveryForm() {
           autoComplete="new-password"
         />
       </label>
+      <details className="text-sm text-[var(--ink-soft)]/75">
+        <summary className="cursor-pointer">Token manual (servidor sin Desktop)</summary>
+        <label className="mt-2 block">
+          <span className="mb-1 block text-[var(--ink-soft)]/70">
+            LEXOPEN_RECOVERY_TOKEN
+          </span>
+          <input
+            className="input"
+            name="token"
+            type="password"
+            maxLength={256}
+            autoComplete="off"
+          />
+        </label>
+      </details>
       {error && (
         <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {error}
         </p>
       )}
-      <button className="btn btn-primary w-full" disabled={!token || busy} type="submit">
+      <button className="btn btn-primary w-full" disabled={busy} type="submit">
         {busy ? "Restableciendo…" : "Restablecer contraseña"}
       </button>
     </form>
