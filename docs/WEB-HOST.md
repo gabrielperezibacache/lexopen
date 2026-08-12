@@ -76,10 +76,15 @@ Use esta lista antes de cargar información real del estudio:
 
 1. **Datos persistentes:** `LEXOPEN_DATA_DIR` apunta a un disco local con backups
    posibles (no a una carpeta temporal del instalador).
-2. **Sin demo:** en el `.env` del data dir,
+2. **Sin demo ni relajaciones CI:** en el `.env` del data dir,
    `LEXOPEN_DEMO_SWITCHER=0`, `HERMES_ALLOW_DEMO=0`, `LLM_ALLOW_DEMO=0`,
-   `PJUD_ALLOW_DEMO=0`. `web:host` fuerza esos valores a `0` si venía un
-   `.env` copiado con `=1` (salvo `LEXOPEN_KEEP_*_DEMO=1`). No use
+   `PJUD_ALLOW_DEMO=0`, y también `LEXOPEN_RELAX_CSRF=0`,
+   `LEXOPEN_OPEN_ACCESS=0`, `LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS=0`.
+   `web:host` fuerza demos a `0` si venía un `.env` copiado con `=1`
+   (salvo `LEXOPEN_KEEP_*_DEMO=1`) y **siempre** apaga las flags de
+   seguridad prohibidas aunque el shell del operador las tenga en `1`
+   (p. ej. CI). El `.env` del data dir también gana sobre un `DATABASE_URL`
+   / secretos del shell (evita migrar contra otra base de CI). No use
    `npm run db:seed` / `setup` / `db:reset` con datos reales.
 3. **Primer admin:** abra `/setup?token=…` una sola vez; elimine o rote
    `LEXOPEN_BOOTSTRAP_TOKEN` después.
