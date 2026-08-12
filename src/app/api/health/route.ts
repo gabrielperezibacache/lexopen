@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { persistentStorageReady, storageMode } from "@/lib/storage";
+import { recoverPendingDocumentProcessing } from "@/lib/document-processing-queue";
 
 function desktopPayload() {
   return {
@@ -24,6 +25,9 @@ export async function GET() {
       SELECT EXISTS (SELECT 1 FROM "User") AS "exists"
     `;
     const needsSetup = !Boolean(userRows[0]?.exists);
+    void recoverPendingDocumentProcessing().catch((error) => {
+      console.error("document processing recovery failed", error);
+    });
     if (!storageReady && storageRequired) {
       return NextResponse.json(
         {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { DocumentoUploadForm } from "@/components/DocumentoUploadForm";
 import { EmptyState } from "@/components/EmptyState";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { DocumentProcessingAction } from "@/components/DocumentProcessingAction";
 
 export default async function DocumentosPage() {
   const [documentos, causas] = await Promise.all([
@@ -87,7 +88,9 @@ export default async function DocumentosPage() {
                   </td>
                   <td className="px-4 py-3">{d.autor?.name || "—"}</td>
                   <td className="px-4 py-3 text-xs">
-                    {d.extractionStatus === "completed" && d.extractedMarkdown ? (
+                    {d.extractionStatus === "pending" || d.extractionStatus === "processing" ? (
+                      <span className="text-[var(--ink-soft)]/65">Procesando…</span>
+                    ) : d.extractionStatus === "completed" && d.extractedMarkdown ? (
                       <a
                         href={`/api/documentos/${d.id}/markdown`}
                         className="text-[var(--sea)]"
@@ -95,11 +98,20 @@ export default async function DocumentosPage() {
                         Markdown listo
                       </a>
                     ) : d.extractionStatus === "needs_ocr" ? (
-                      <span className="text-[var(--copper)]">Requiere OCR</span>
+                      <span className="text-[var(--copper)]">
+                        Requiere OCR{" "}
+                        <DocumentProcessingAction documentId={d.id} />
+                      </span>
                     ) : d.extractionStatus === "unsupported" ? (
-                      <span className="text-[var(--ink-soft)]/65">Formato no soportado</span>
+                      <span className="text-[var(--ink-soft)]/65">
+                        Formato no soportado{" "}
+                        <DocumentProcessingAction documentId={d.id} />
+                      </span>
                     ) : d.extractionStatus === "failed" ? (
-                      <span className="text-red-700">Error de extracción</span>
+                      <span className="text-red-700">
+                        Error de extracción{" "}
+                        <DocumentProcessingAction documentId={d.id} />
+                      </span>
                     ) : (
                       "No procesado"
                     )}

@@ -12,10 +12,8 @@ import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storag
 import { writeAudit } from "@/lib/audit";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
-import {
-  MAX_PROCESSING_BYTES,
-  processDocumentBytes,
-} from "@/lib/document-processing";
+import { MAX_PROCESSING_BYTES } from "@/lib/document-processing";
+import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,6 +61,7 @@ export async function POST(req: NextRequest) {
     let extractedMarkdown: string | null = null;
     let extractionStatus: string | null = null;
     let extractionJson: string | null = null;
+    let processingBytes: Buffer | null = null;
 
     if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
       return NextResponse.json(
@@ -96,13 +95,8 @@ export async function POST(req: NextRequest) {
         nombre = nombre || uploaded.name;
         mimeType = uploaded.type || "application/octet-stream";
         const bytes = Buffer.from(await uploaded.arrayBuffer());
-        const processed = await processDocumentBytes(nombre, bytes);
-        extractedMarkdown = processed.markdown;
-        extractionStatus = processed.status;
-        extractionJson = JSON.stringify({
-          format: processed.format,
-          ...processed.metadata,
-        });
+        processingBytes = bytes;
+        extractionStatus = "pending";
         const key = newStorageKey("documentos", nombre);
         await putObject({
           key,
@@ -139,7 +133,7 @@ export async function POST(req: NextRequest) {
         mimeType,
         storageKey,
         extractedMarkdown,
-        extractionStatus,
+        extractionStatus: processingBytes ? "pending" : extractionStatus,
         extractionJson,
         confidencial,
         privilegio,
@@ -147,6 +141,14 @@ export async function POST(req: NextRequest) {
         autorId,
       },
     });
+
+    if (processingBytes) {
+      enqueueDocumentProcessing({
+        id: doc.id,
+        name: doc.nombre,
+        bytes: processingBytes,
+      });
+    }
 
     if (doc.causaId) {
       await prisma.activity.create({
