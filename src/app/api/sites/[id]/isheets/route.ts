@@ -16,11 +16,26 @@ export async function GET(_req: NextRequest, { params }: Params) {
         { status: 403 }
       );
     }
+    const sheetId = _req.nextUrl.searchParams.get("sheetId");
+    if (sheetId) {
+      const sheet = await prisma.iSheet.findFirst({
+        where: { id: sheetId, siteId: id },
+        include: {
+          columns: { orderBy: { position: "asc" } },
+          rows: { orderBy: { createdAt: "asc" } },
+          _count: { select: { rows: true } },
+        },
+      });
+      if (!sheet) {
+        return NextResponse.json({ error: "iSheet no encontrada" }, { status: 404 });
+      }
+      return NextResponse.json(sheet);
+    }
+    // List: metadata + columns/counts only — row payloads load via ?sheetId=
     const sheets = await prisma.iSheet.findMany({
       where: { siteId: id },
       include: {
         columns: { orderBy: { position: "asc" } },
-        rows: { orderBy: { createdAt: "asc" } },
         _count: { select: { rows: true } },
       },
     });

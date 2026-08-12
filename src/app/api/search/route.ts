@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { confidentialWhere, handleRouteError, requireUser } from "@/lib/api";
+import {
+  confidentialWhere,
+  handleRouteError,
+  minutaConfidentialWhere,
+  requireUser,
+} from "@/lib/api";
 import { clientSiteWhere, confidentialFileWhere } from "@/lib/auth/access";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
 import { ftsCausaIds } from "@/lib/search";
@@ -53,7 +58,8 @@ export async function GET(req: NextRequest) {
     }
 
     const confFilter = confidentialFileWhere(user.role);
-    const minutaFilter = confidentialWhere(user.role);
+    const docFilter = confidentialWhere(user.role);
+    const minutaFilter = minutaConfidentialWhere(user.role);
 
     if (isCliente(user.role)) {
       const sites = await prisma.site.findMany({
@@ -198,7 +204,7 @@ export async function GET(req: NextRequest) {
         prisma.documento.findMany({
           where: {
             AND: [
-              minutaFilter,
+              docFilter,
               {
                 OR: [
                   { nombre: textMatch(q) },

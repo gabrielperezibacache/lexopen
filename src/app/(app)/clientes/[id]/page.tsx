@@ -33,7 +33,17 @@ export default async function ClienteDetailPage({
         documentos: {
           where: confidentialWhere(user.role),
           orderBy: { updatedAt: "desc" },
-          include: { autor: { select: { name: true } }, causa: true },
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true,
+            ruta: true,
+            extractionStatus: true,
+            updatedAt: true,
+            causaId: true,
+            autor: { select: { name: true } },
+            causa: { select: { id: true, rit: true, titulo: true } },
+          },
         },
         causas: {
           orderBy: { updatedAt: "desc" },

@@ -2,6 +2,7 @@ import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeGoogleCode } from "@/lib/integrations/google";
 import { requireStaff } from "@/lib/api";
+import { isAdmin } from "@/lib/auth/rbac";
 import { baseCookieOptions } from "@/lib/auth/cookie-options";
 
 const OAUTH_STATE_COOKIE = "google_oauth_state";
@@ -49,7 +50,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    await requireStaff();
+    const user = await requireStaff();
+    if (!isAdmin(user.role)) {
+      return clearOauthState(
+        NextResponse.redirect(
+          new URL("/integraciones?google=forbidden", req.url)
+        )
+      );
+    }
     await exchangeGoogleCode(code);
     return clearOauthState(
       NextResponse.redirect(new URL("/integraciones?google=connected", req.url))

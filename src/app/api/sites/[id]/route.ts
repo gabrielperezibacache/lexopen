@@ -56,7 +56,17 @@ export async function GET(_req: NextRequest, { params }: Params) {
         // Clients must not receive internal knowledge bases via API.
         wikiPages: clientView
           ? { where: { id: "__client_hidden__" } }
-          : { orderBy: { updatedAt: "desc" }, take: 10 },
+          : {
+              orderBy: { updatedAt: "desc" },
+              take: 10,
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+                published: true,
+                updatedAt: true,
+              },
+            },
         tasks: {
           where: clientView ? { assigneeId: user.id } : undefined,
           include: { assignee: { select: publicUserSelect } },
@@ -83,7 +93,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
         },
         blogPosts: clientView
           ? { where: { id: "__client_hidden__" } }
-          : { orderBy: { createdAt: "desc" }, take: 5 },
+          : {
+              orderBy: { createdAt: "desc" },
+              take: 5,
+              select: {
+                id: true,
+                title: true,
+                createdAt: true,
+              },
+            },
         _count: clientView
           ? {
               select: {

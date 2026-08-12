@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { confidentialWhere } from "@/lib/api";
+import { confidentialWhere, minutaConfidentialWhere } from "@/lib/api";
 import { getObject } from "@/lib/storage";
 import { buildClienteFolderContext } from "@/lib/integrations/client-folder-context";
 
@@ -52,7 +52,7 @@ export async function buildActionContext(opts: {
         tramites: { orderBy: { orden: "asc" }, take: 40 },
         plazos: { orderBy: { fechaLimite: "asc" }, take: 20 },
         minutas: {
-          where: confidentialWhere(opts.userRole),
+          where: minutaConfidentialWhere(opts.userRole),
           orderBy: { fecha: "desc" },
           take: 5,
           select: {

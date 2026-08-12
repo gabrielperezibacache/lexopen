@@ -9,13 +9,21 @@ import { DocumentOcrStatus } from "@/components/DocumentOcrStatus";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { requireStaff } from "@/lib/auth/session";
 import { confidentialWhere } from "@/lib/api";
+import { documentoListSelect } from "@/lib/sites/file-select";
 
 export default async function DocumentosPage() {
   const user = await requireStaff();
-  const [documentos, causas] = await Promise.all([
+  const [rawDocumentos, causas] = await Promise.all([
     prisma.documento.findMany({
       where: confidentialWhere(user.role),
-      include: { causa: true, autor: { select: publicUserSelect } },
+      select: {
+        ...documentoListSelect,
+        contenido: true,
+        extractedMarkdown: true,
+        storageKey: true,
+        causa: { select: { id: true, rit: true, titulo: true } },
+        autor: { select: publicUserSelect },
+      },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.causa.findMany({
@@ -24,6 +32,15 @@ export default async function DocumentosPage() {
       take: 100,
     }),
   ]);
+
+  const documentos = rawDocumentos.map(
+    ({ contenido, extractedMarkdown, storageKey, ...rest }) => ({
+      ...rest,
+      hasText: Boolean((extractedMarkdown || contenido || "").trim()),
+      hasMarkdown: Boolean(extractedMarkdown?.trim()),
+      hasBinary: Boolean(storageKey),
+    })
+  );
 
   return (
     <div className="space-y-6">
@@ -93,10 +110,8 @@ export default async function DocumentosPage() {
                       <DocumentDriveAction
                         documentId={d.id}
                         googleDriveId={d.googleDriveId}
-                        hasText={Boolean(
-                          (d.extractedMarkdown || d.contenido || "").trim()
-                        )}
-                        hasBinary={Boolean(d.storageKey)}
+                        hasText={d.hasText}
+                        hasBinary={d.hasBinary}
                       />
                     </div>
                     {d.obsidianPath && (
@@ -124,7 +139,7 @@ export default async function DocumentosPage() {
                   <td className="px-4 py-3 text-xs">
                     {d.extractionStatus === "pending" || d.extractionStatus === "processing" ? (
                       <span className="text-[var(--ink-soft)]/65">Procesando…</span>
-                    ) : d.extractionStatus === "completed" && d.extractedMarkdown ? (
+                    ) : d.extractionStatus === "completed" && d.hasMarkdown ? (
                       <a
                         href={`/api/documentos/${d.id}/markdown`}
                         className="text-[var(--sea)]"

@@ -75,9 +75,16 @@ export async function requireBillingManager() {
   return user;
 }
 
+/** Documents / site files — both confidencial and privilegio flags. */
 export function confidentialWhere(userRole: string) {
   if (canSeeConfidential(userRole)) return {};
   return { confidencial: false, privilegio: false };
+}
+
+/** Minutas only have `confidencial` (no `privilegio` column). */
+export function minutaConfidentialWhere(userRole: string) {
+  if (canSeeConfidential(userRole)) return {};
+  return { confidencial: false };
 }
 
 export function portalBlockedResponse(userRole: string) {

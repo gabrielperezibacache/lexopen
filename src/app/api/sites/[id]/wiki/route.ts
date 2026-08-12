@@ -6,7 +6,18 @@ import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_req: NextRequest, { params }: Params) {
+const wikiListSelect = {
+  id: true,
+  title: true,
+  slug: true,
+  published: true,
+  updatedAt: true,
+  createdAt: true,
+  authorId: true,
+  siteId: true,
+};
+
+export async function GET(req: NextRequest, { params }: Params) {
   try {
     const user = await requireUser();
     const { id } = await params;
@@ -17,9 +28,23 @@ export async function GET(_req: NextRequest, { params }: Params) {
         { status: 403 }
       );
     }
+    const pageId = req.nextUrl.searchParams.get("id");
+    if (pageId) {
+      const page = await prisma.wikiPage.findFirst({
+        where: { id: pageId, siteId: id },
+        include: { author: { select: publicUserSelect } },
+      });
+      if (!page) {
+        return NextResponse.json({ error: "Página no encontrada" }, { status: 404 });
+      }
+      return NextResponse.json(page);
+    }
     const pages = await prisma.wikiPage.findMany({
       where: { siteId: id },
-      include: { author: { select: publicUserSelect } },
+      select: {
+        ...wikiListSelect,
+        author: { select: publicUserSelect },
+      },
       orderBy: { title: "asc" },
     });
     return NextResponse.json(pages);
@@ -55,6 +80,10 @@ export async function POST(req: NextRequest, { params }: Params) {
         authorId: user.id,
         published: body.published !== false,
       },
+      select: {
+        ...wikiListSelect,
+        content: true,
+      },
     });
     await prisma.activity.create({
       data: {
@@ -85,6 +114,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
     const current = await prisma.wikiPage.findFirst({
       where: { id: body.id, siteId: id },
+      select: { id: true, title: true },
     });
     if (!current) {
       return NextResponse.json({ error: "Página no encontrada" }, { status: 404 });
@@ -95,6 +125,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         ...(body.title !== undefined ? { title: body.title } : {}),
         ...(body.content !== undefined ? { content: body.content } : {}),
         ...(body.published !== undefined ? { published: Boolean(body.published) } : {}),
+      },
+      select: {
+        ...wikiListSelect,
+        content: true,
       },
     });
     await prisma.activity.create({
