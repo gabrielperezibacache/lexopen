@@ -11,6 +11,7 @@ type SourceRef = {
   id: string;
   label: string;
   href?: string;
+  downloadHref?: string;
 };
 type ChatMessage = {
   role: "user" | "assistant";
@@ -300,6 +301,8 @@ function AgenteInner() {
                 setMeta("");
                 setSources([]);
                 setActions([]);
+                setRutaPrefix("");
+                setSelectedDocIds([]);
               }}
             >
               Nuevo
@@ -375,6 +378,7 @@ function AgenteInner() {
                 </label>
                 <select
                   className="select"
+                  aria-label="Carpeta investigativa"
                   value={rutaPrefix}
                   onChange={(e) => {
                     setRutaPrefix(e.target.value);
@@ -460,18 +464,27 @@ function AgenteInner() {
               </h2>
               <ul className="mt-2 flex flex-wrap gap-2">
                 {sources.slice(0, 16).map((s) => (
-                  <li key={`${s.type}-${s.id}`}>
+                  <li
+                    key={`${s.type}-${s.id}`}
+                    className="inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs"
+                  >
                     {s.href ? (
-                      <Link
-                        href={s.href}
-                        className="rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs text-[var(--sea)]"
-                      >
+                      <Link href={s.href} className="text-[var(--sea)]">
                         {s.type}: {s.label}
                       </Link>
                     ) : (
-                      <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs">
+                      <span>
                         {s.type}: {s.label}
                       </span>
+                    )}
+                    {s.downloadHref && (
+                      <a
+                        href={s.downloadHref}
+                        className="text-[var(--ink-soft)]/70 underline"
+                        title="Descargar Markdown extraído"
+                      >
+                        MD
+                      </a>
                     )}
                   </li>
                 ))}

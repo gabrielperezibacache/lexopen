@@ -7,10 +7,13 @@ export function DocumentDriveAction({
   documentId,
   googleDriveId,
   disabled,
+  hasText = true,
 }: {
   documentId: string;
   googleDriveId?: string | null;
   disabled?: boolean;
+  /** False when there is no contenido/extractedMarkdown yet. */
+  hasText?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -35,14 +38,18 @@ export function DocumentDriveAction({
         setMsg(
           data.message ||
             (data.status === "uploaded"
-              ? "Subido a Drive"
+              ? "Subido texto/MD a Drive"
               : data.status === "stub"
                 ? "Modo stub: conecte Google OAuth"
                 : data.status === "needs_real_folder"
                   ? "Vincule una carpeta real en la causa"
-                  : String(data.status))
+                  : data.status === "needs_ocr"
+                    ? "Requiere OCR/extracción primero"
+                    : data.status === "unsupported"
+                      ? "Sin texto indexado para subir"
+                      : String(data.status))
         );
-        router.refresh();
+        if (data.status === "uploaded") router.refresh();
       } catch {
         setError("Error de red");
       }
@@ -54,10 +61,19 @@ export function DocumentDriveAction({
       <button
         type="button"
         className="text-xs text-[var(--sea)] underline disabled:opacity-50"
-        disabled={pending || disabled}
+        disabled={pending || disabled || !hasText}
+        title={
+          hasText
+            ? "Sube texto o Markdown extraído a la carpeta Drive de la causa"
+            : "Sin texto indexado (OCR/extracción pendiente)"
+        }
         onClick={push}
       >
-        {pending ? "Subiendo…" : googleDriveId ? "Re-subir a Drive" : "Subir a Drive"}
+        {pending
+          ? "Subiendo…"
+          : googleDriveId
+            ? "Re-subir MD a Drive"
+            : "Subir MD a Drive"}
       </button>
       {msg && <span className="text-[10px] text-[var(--sea)]">{msg}</span>}
       {error && <span className="text-[10px] text-red-700">{error}</span>}

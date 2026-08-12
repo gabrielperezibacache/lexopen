@@ -390,9 +390,20 @@ export default async function CausaDetailPage({ params }: Params) {
                   >
                     Descargar
                   </a>
+                  {d.extractionStatus === "completed" && d.extractedMarkdown && (
+                    <a
+                      href={`/api/documentos/${d.id}/markdown`}
+                      className="text-xs text-[var(--sea)]"
+                    >
+                      Markdown
+                    </a>
+                  )}
                   <DocumentDriveAction
                     documentId={d.id}
                     googleDriveId={d.googleDriveId}
+                    hasText={Boolean(
+                      (d.extractedMarkdown || "").trim()
+                    )}
                   />
                 </div>
               </div>

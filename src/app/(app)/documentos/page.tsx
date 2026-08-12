@@ -85,6 +85,9 @@ export default async function DocumentosPage() {
                       <DocumentDriveAction
                         documentId={d.id}
                         googleDriveId={d.googleDriveId}
+                        hasText={Boolean(
+                          (d.extractedMarkdown || d.contenido || "").trim()
+                        )}
                       />
                     </div>
                     {d.obsidianPath && (

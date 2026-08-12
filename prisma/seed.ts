@@ -310,6 +310,51 @@ async function main() {
     ],
   });
 
+  const docsCausa1 = await prisma.documento.findMany({
+    where: { causaId: causa1.id },
+    select: { id: true, nombre: true, ruta: true, extractionStatus: true },
+    orderBy: { nombre: "asc" },
+  });
+  const escritosDocs = docsCausa1.filter((d) => d.ruta === "Escritos");
+  await prisma.agentChat.create({
+    data: {
+      title: "[Preguntar a documentos] Montos reclamados en Escritos",
+      demoMode: true,
+      causaId: causa1.id,
+      userId: abogado.id,
+      messagesJson: JSON.stringify([
+        {
+          role: "user",
+          content: "Según los escritos indexados, ¿qué montos se reclaman?",
+          utility: "doc_qa",
+        },
+        {
+          role: "assistant",
+          content:
+            "Según Escritos/Demanda de cobro de pesos.md, se reclaman $120.000.000 por obras ejecutadas y no pagadas. La contestación SERVIU ofrece liquidación parcial de $45.000.000. [demo]",
+          source: "demo",
+          utility: "doc_qa",
+          sources: escritosDocs.map((d) => ({
+            type: "documento",
+            id: d.id,
+            label: `${d.ruta}/${d.nombre}`,
+            href: `/causas/${causa1.id}`,
+            downloadHref: `/api/documentos/${d.id}/markdown`,
+          })),
+          suggestedActions: [
+            { label: "Abrir causa", href: `/causas/${causa1.id}` },
+            { label: "Documentos", href: "/documentos" },
+          ],
+          documentScope: {
+            rutaPrefix: "Escritos",
+            documentoIds: escritosDocs.map((d) => d.id),
+            sourcesDocumentos: escritosDocs.length,
+          },
+        },
+      ]),
+    },
+  });
+
   const in7 = new Date();
   in7.setDate(in7.getDate() + 7);
   const in3 = new Date();

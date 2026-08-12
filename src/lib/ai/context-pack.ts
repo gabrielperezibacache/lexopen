@@ -5,6 +5,7 @@
 
 import { prisma } from "@/lib/db";
 import { confidentialWhere } from "@/lib/api";
+import { confidentialFileWhere } from "@/lib/auth/access";
 import { clasificarUrgencia, diasRestantes } from "@/lib/plazos";
 import type { AiUtilityId } from "@/lib/ai/utilities";
 import {
@@ -29,6 +30,8 @@ export type AiSourceRef = {
   id: string;
   label: string;
   href?: string;
+  /** Optional secondary download (e.g. extracted markdown). */
+  downloadHref?: string;
 };
 
 export type AiContextPack = {
@@ -68,6 +71,7 @@ export async function buildAiContextPack(opts: {
   const blocks: string[] = [];
   let folderIndexRows: AiContextPack["folderIndex"] = [];
   const conf = confidentialWhere(opts.role);
+  const fileConf = confidentialFileWhere(opts.role);
   const budget = excerptBudgetForUtility(opts.utility);
 
   if (opts.causaId) {
@@ -110,7 +114,7 @@ export async function buildAiContextPack(opts: {
                 name: true,
                 parentId: true,
                 files: {
-                  where: conf,
+                  where: fileConf,
                   select: {
                     id: true,
                     name: true,
@@ -126,7 +130,7 @@ export async function buildAiContextPack(opts: {
               },
             },
             files: {
-              where: { folderId: null, ...conf },
+              where: { folderId: null, ...fileConf },
               select: {
                 id: true,
                 name: true,
@@ -266,6 +270,7 @@ export async function buildAiContextPack(opts: {
                 href: opts.causaId
                   ? `/causas/${opts.causaId}`
                   : "/documentos",
+                downloadHref: `/api/documentos/${d.id}/markdown`,
               });
             }
           }

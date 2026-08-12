@@ -75,12 +75,6 @@ export function CausaActions({ causaId }: { causaId: string }) {
         >
           Preguntar a documentos
         </Link>
-        <Link
-          href={`/agente?causaId=${causaId}&utility=briefing`}
-          className="btn btn-ghost w-full sm:w-auto"
-        >
-          Briefing con carpeta
-        </Link>
       </div>
       {msg && (
         <p className="max-w-md rounded-2xl border border-[var(--line)] bg-white/80 p-3 text-xs text-[var(--ink-soft)]/80">
