@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 import { buildSecurityHeaders } from "./src/lib/security/headers";
 
-const securityHeaders = buildSecurityHeaders();
+// CSP is applied per-request from src/proxy.ts with a fresh nonce.
+const securityHeaders = buildSecurityHeaders({ includeCsp: false });
 
 const nextConfig: NextConfig = {
   /* Hide the floating "N" Next.js Dev Tools badge in development.

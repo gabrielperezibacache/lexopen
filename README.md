@@ -798,8 +798,9 @@ Controles implementados en el código:
   `LEXOPEN_TRUSTED_ORIGINS`;
 - cookies `Secure` según URL canónica / `LEXOPEN_COOKIE_SECURE` (no solo
   `NODE_ENV`), compatibles con Desktop Host por HTTP;
-- headers de seguridad progresivos (`X-Frame-Options`, `nosniff`, CSP con
-  `default-src 'self'`, HSTS si la URL es https);
+- headers de seguridad progresivos (`X-Frame-Options`, `nosniff`, HSTS si la
+  URL es https) y CSP por request con nonce (`script-src` + `strict-dynamic`
+  vía `src/proxy.ts`);
 - salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
   Hermes y Obsidian;
 - `instrumentation` falla al arrancar si flags peligrosas están en producción;
@@ -810,9 +811,9 @@ Controles implementados en el código:
 La revisión del repositorio también identifica límites que deben considerarse antes
 de producción:
 
-- el rate limit de login es por proceso (con lockout progresivo) y puede
-  persistir en `LEXOPEN_DATA_DIR/rate-limit.json`; no sustituye Redis en
-  despliegues multi-instancia;
+- el rate limit de login usa lockout progresivo y store local
+  (`LEXOPEN_DATA_DIR/rate-limit.json`); en multi-instancia configure
+  `REDIS_URL` / `RATE_LIMIT_REDIS_URL` o Upstash REST;
 - Desktop Host enlaza `127.0.0.1` por defecto (LAN solo con URL pública) y
   genera contraseña aleatoria de Postgres en instalaciones nuevas;
 - el portal cliente no debe presentarse como estrictamente de solo lectura sin una

@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { redisFixedWindowIncr } from "@/lib/auth/redis-rate-limit";
 
 type Bucket = { count: number; resetAt: number };
 
@@ -81,8 +82,14 @@ function prune(now: number) {
   }
 }
 
-/** In-memory rate limiter; optionally mirrors to LEXOPEN_DATA_DIR/rate-limit.json. */
-export function rateLimit(key: string, limit: number, windowMs: number) {
+export type RateLimitResult = {
+  ok: boolean;
+  remaining: number;
+  retryAfterMs?: number;
+};
+
+/** Local in-memory / file-backed limiter (sync). Prefer rateLimitAsync in routes. */
+export function rateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
   const now = Date.now();
   void loadFileStore();
   prune(now);
@@ -104,21 +111,48 @@ export function rateLimit(key: string, limit: number, windowMs: number) {
 }
 
 /**
+ * Distributed-aware limiter: Redis/Upstash when configured, else local store.
+ */
+export async function rateLimitAsync(
+  key: string,
+  limit: number,
+  windowMs: number
+): Promise<RateLimitResult> {
+  const remote = await redisFixedWindowIncr(key, windowMs);
+  if (remote) {
+    if (remote.count > limit) {
+      return {
+        ok: false,
+        remaining: 0,
+        retryAfterMs: remote.ttlMs,
+      };
+    }
+    return { ok: true, remaining: Math.max(0, limit - remote.count) };
+  }
+  return rateLimit(key, limit, windowMs);
+}
+
+/**
  * Progressive lockout for auth failures: short window first, then longer ban.
  * Call on failed login/recover attempts.
  */
-export function rateLimitAuthFailure(
+export async function rateLimitAuthFailure(
   key: string,
-  opts?: { softLimit?: number; softWindowMs?: number; hardLimit?: number; hardWindowMs?: number }
+  opts?: {
+    softLimit?: number;
+    softWindowMs?: number;
+    hardLimit?: number;
+    hardWindowMs?: number;
+  }
 ) {
   const softLimit = opts?.softLimit ?? 8;
   const softWindowMs = opts?.softWindowMs ?? 15 * 60 * 1000;
   const hardLimit = opts?.hardLimit ?? 20;
   const hardWindowMs = opts?.hardWindowMs ?? 60 * 60 * 1000;
 
-  const soft = rateLimit(`auth-soft:${key}`, softLimit, softWindowMs);
+  const soft = await rateLimitAsync(`auth-soft:${key}`, softLimit, softWindowMs);
   if (!soft.ok) {
-    const hard = rateLimit(`auth-hard:${key}`, hardLimit, hardWindowMs);
+    const hard = await rateLimitAsync(`auth-hard:${key}`, hardLimit, hardWindowMs);
     if (!hard.ok) {
       return {
         ok: false as const,

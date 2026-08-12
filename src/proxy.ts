@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildContentSecurityPolicy } from "@/lib/security/headers";
 
 const SESSION_COOKIE = "lexopen_session";
 const CSRF_COOKIE = "lexopen_csrf";
@@ -127,27 +128,69 @@ function newEdgeCsrfToken() {
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function withCsrfCookie(req: NextRequest, res: NextResponse) {
-  if (req.cookies.get(CSRF_COOKIE)?.value) return res;
-  res.cookies.set(CSRF_COOKIE, newEdgeCsrfToken(), {
-    httpOnly: false,
-    sameSite: "lax",
-    secure: cookieSecureFlag(),
-    path: "/",
-    maxAge: 14 * 24 * 60 * 60,
+function newCspNonce() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function httpsEnabled() {
+  return Boolean(process.env.NEXT_PUBLIC_APP_URL?.startsWith("https://"));
+}
+
+function withSecurityHeaders(
+  req: NextRequest,
+  res: NextResponse,
+  nonce: string
+) {
+  const csp = buildContentSecurityPolicy({
+    https: httpsEnabled(),
+    nonce,
+    isDev: process.env.NODE_ENV === "development",
   });
+  res.headers.set("Content-Security-Policy", csp);
+  if (!req.cookies.get(CSRF_COOKIE)?.value) {
+    res.cookies.set(CSRF_COOKIE, newEdgeCsrfToken(), {
+      httpOnly: false,
+      sameSite: "lax",
+      secure: cookieSecureFlag(),
+      path: "/",
+      maxAge: 14 * 24 * 60 * 60,
+    });
+  }
   return res;
 }
 
-export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+function attachRequestNonce(req: NextRequest, nonce: string) {
   const requestHeaders = new Headers(req.headers);
-  requestHeaders.set("x-lexopen-pathname", pathname);
+  requestHeaders.set("x-lexopen-pathname", req.nextUrl.pathname);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set(
+    "Content-Security-Policy",
+    buildContentSecurityPolicy({
+      https: httpsEnabled(),
+      nonce,
+      isDev: process.env.NODE_ENV === "development",
+    })
+  );
+  return requestHeaders;
+}
+
+export async function proxy(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  const nonce = newCspNonce();
+  const requestHeaders = attachRequestNonce(req, nonce);
 
   const pass = () =>
-    NextResponse.next({
-      request: { headers: requestHeaders },
-    });
+    withSecurityHeaders(
+      req,
+      NextResponse.next({
+        request: { headers: requestHeaders },
+      }),
+      nonce
+    );
 
   if (
     PUBLIC_PATHS.includes(pathname) ||
@@ -156,13 +199,6 @@ export async function middleware(req: NextRequest) {
     pathname.match(/\.(svg|png|jpg|css|js|ico|webp)$/)
   ) {
     // Mint CSRF cookie early for login/setup forms (Origin + double-submit).
-    if (
-      pathname === "/login" ||
-      pathname === "/setup" ||
-      pathname === "/recovery"
-    ) {
-      return withCsrfCookie(req, pass());
-    }
     return pass();
   }
 
@@ -183,30 +219,47 @@ export async function middleware(req: NextRequest) {
   const session = token ? await verifyToken(token) : null;
   if (!session) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      return withSecurityHeaders(
+        req,
+        NextResponse.json({ error: "No autenticado" }, { status: 401 }),
+        nonce
+      );
     }
     const login = new URL("/login", req.url);
     login.searchParams.set("next", pathname);
-    return withCsrfCookie(req, NextResponse.redirect(login));
+    return withSecurityHeaders(req, NextResponse.redirect(login), nonce);
   }
 
   // Role ACL comes from the signed session token — never from a forgeable cookie.
   if (session.role === "cliente" && !isClientAllowedPath(pathname)) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        { error: "Acceso restringido al portal cliente" },
-        { status: 403 }
+      return withSecurityHeaders(
+        req,
+        NextResponse.json(
+          { error: "Acceso restringido al portal cliente" },
+          { status: 403 }
+        ),
+        nonce
       );
     }
-    return withCsrfCookie(
+    return withSecurityHeaders(
       req,
-      NextResponse.redirect(new URL("/portal", req.url))
+      NextResponse.redirect(new URL("/portal", req.url)),
+      nonce
     );
   }
 
-  return withCsrfCookie(req, pass());
+  return pass();
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image).*)"],
+  matcher: [
+    {
+      source: "/((?!_next/static|_next/image).*)",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" },
+      ],
+    },
+  ],
 };
