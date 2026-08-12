@@ -813,6 +813,8 @@ Controles implementados en el código:
 - headers de seguridad progresivos (`X-Frame-Options`, `nosniff`, HSTS si la
   URL es https) y CSP por request con nonce (`script-src` + `strict-dynamic`
   vía `src/proxy.ts`);
+- `/api/health` y `GET /api/setup` no publican `needsSetup`/storage fuera de
+  loopback o staff; fetches Google/captcha/Upstash/GitHub usan `redirect: error`;
 - salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
   Hermes y Obsidian;
 - `instrumentation` falla al arrancar si flags peligrosas están en producción;
