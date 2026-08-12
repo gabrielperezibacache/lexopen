@@ -159,11 +159,7 @@ export function DocumentoIngestForm({
         prev.map((r, idx) => (idx === i ? { ...r, status: "uploading", message: undefined } : r))
       );
       try {
-        const resolvedTipo =
-          tipo === "auto"
-            ? inferDocumentoTipo(row.relativePath)
-            : tipo;
-        const result = await uploadOne(row, resolvedCausaId, tipo === "auto" ? "auto" : resolvedTipo);
+        const result = await uploadOne(row, resolvedCausaId, tipo);
         uploaded += 1;
         setRows((prev) =>
           prev.map((r, idx) =>
