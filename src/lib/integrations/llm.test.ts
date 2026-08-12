@@ -35,6 +35,7 @@ assert.match(legacy, /contexto legacy/);
 const sealed = encryptSecret("sk-test-llm-key");
 assert.match(sealed, /^enc:v2:/);
 assert.equal(decryptSecret(sealed, { strict: true }), "sk-test-llm-key");
+assert.equal(decryptSecret("sk-legacy-plain", { strict: true }), undefined);
 assert.equal(decryptSecret("sk-legacy-plain", { strict: false }), "sk-legacy-plain");
 
 console.log("integrations/llm.test.ts OK");

@@ -84,6 +84,7 @@ async function waitForHost(url) {
     try {
       const response = await fetch(`${url}/api/health`, {
         signal: AbortSignal.timeout(2_000),
+        redirect: "error",
       });
       const body = await response.json().catch(() => ({}));
       if (response.ok && body.ok === true) return true;
@@ -129,6 +130,7 @@ async function startLocalPjudScheduler(dataDir) {
         },
         body: "{}",
         signal: AbortSignal.timeout(120_000),
+        redirect: "error",
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -190,6 +192,7 @@ async function startLocalMisCausasScheduler(dataDir) {
         },
         body: JSON.stringify({ syncMovimientos: true }),
         signal: AbortSignal.timeout(300_000),
+        redirect: "error",
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -254,6 +257,7 @@ async function startLocalDigestScheduler(dataDir) {
         },
         body: "{}",
         signal: AbortSignal.timeout(120_000),
+        redirect: "error",
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {

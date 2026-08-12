@@ -9,6 +9,12 @@ import {
 } from "@/lib/net/safe-url";
 import { newStorageKey, putObject } from "@/lib/storage";
 import { resolveDocumentoExport } from "@/lib/integrations/obsidian-docs";
+import {
+  assertAllowedVaultPath,
+  defaultObsidianVaultRoot,
+  resolveUnderVault,
+  sanitizeVaultFolderPrefix,
+} from "@/lib/integrations/obsidian-path";
 
 function assertObsidianRestUrl(restUrl: string) {
   let parsed: URL;
@@ -62,13 +68,35 @@ export async function getObsidianConfig(): Promise<ObsidianConfig> {
     where: { provider: "obsidian" },
   });
   const defaults: ObsidianConfig = {
-    vaultPath: process.env.OBSIDIAN_VAULT_PATH || "./obsidian-vault",
+    vaultPath: defaultObsidianVaultRoot(),
     folderPrefix: "LexOpen",
     syncNotes: true,
     syncDocumentos: true,
   };
   if (!row) return defaults;
-  return { ...defaults, ...(JSON.parse(row.configJson) as Partial<ObsidianConfig>) };
+  const parsed = JSON.parse(row.configJson) as Partial<ObsidianConfig>;
+  let vaultPath = defaults.vaultPath;
+  try {
+    vaultPath = assertAllowedVaultPath(
+      String(parsed.vaultPath || defaults.vaultPath)
+    );
+  } catch {
+    vaultPath = defaults.vaultPath;
+  }
+  let folderPrefix = defaults.folderPrefix;
+  try {
+    folderPrefix = sanitizeVaultFolderPrefix(
+      String(parsed.folderPrefix || defaults.folderPrefix)
+    );
+  } catch {
+    folderPrefix = defaults.folderPrefix;
+  }
+  return {
+    ...defaults,
+    ...parsed,
+    vaultPath,
+    folderPrefix,
+  };
 }
 
 function sanitize(name: string) {
@@ -108,8 +136,13 @@ async function writeExportFile(opts: {
   }
 
   if (opts.vaultPath && process.env.NODE_ENV !== "production") {
-    await fs.mkdir(path.dirname(opts.localPath), { recursive: true });
-    await fs.writeFile(opts.localPath, opts.content, "utf8");
+    // localPath must already be confined via resolveUnderVault by callers.
+    const confined = resolveUnderVault(
+      opts.vaultPath,
+      path.relative(path.resolve(opts.vaultPath), opts.localPath)
+    );
+    await fs.mkdir(path.dirname(confined), { recursive: true });
+    await fs.writeFile(confined, opts.content, "utf8");
   }
   const stored = await putObject({
     key: newStorageKey("obsidian", opts.relativePath),
@@ -140,7 +173,9 @@ export async function exportCausaToObsidian(causaId: string) {
   if (!causa) throw new Error("Causa no encontrada");
 
   const folderName = sanitize(causa.rit || causa.titulo);
-  const dir = path.join(config.vaultPath, config.folderPrefix, "Causas", folderName);
+  const vaultRoot = assertAllowedVaultPath(config.vaultPath);
+  const folderPrefix = sanitizeVaultFolderPrefix(config.folderPrefix);
+  const dir = resolveUnderVault(vaultRoot, folderPrefix, "Causas", folderName);
   const storageKeys: string[] = [];
   let files = 0;
 
@@ -177,29 +212,41 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
 
   await writeExportFile({
     localPath: path.join(dir, "Index.md"),
-    relativePath: path.join(config.folderPrefix, "Causas", folderName, "Index.md"),
+    relativePath: path.posix.join(folderPrefix, "Causas", folderName, "Index.md"),
     content: indexMd,
-    vaultPath: config.vaultPath,
+    vaultPath: vaultRoot,
     storageKeys,
   });
   files += 1;
 
   if (config.syncNotes) {
-    const notesDir = path.join(dir, "Notas");
+    const notesDir = resolveUnderVault(vaultRoot, folderPrefix, "Causas", folderName, "Notas");
     for (const nota of causa.notas) {
       const file = `${sanitize(nota.titulo)}.md`;
       await writeExportFile({
         localPath: path.join(notesDir, file),
-        relativePath: path.join(config.folderPrefix, "Causas", folderName, "Notas", file),
+        relativePath: path.posix.join(
+          folderPrefix,
+          "Causas",
+          folderName,
+          "Notas",
+          file
+        ),
         content: `---\ntags: [${nota.tags}]\n---\n\n# ${nota.titulo}\n\n${nota.contenido}\n`,
-        vaultPath: config.vaultPath,
+        vaultPath: vaultRoot,
         storageKeys,
       });
       files += 1;
     }
   }
 
-  const minutasDir = path.join(dir, "Minutas");
+  const minutasDir = resolveUnderVault(
+    vaultRoot,
+    folderPrefix,
+    "Causas",
+    folderName,
+    "Minutas"
+  );
   for (const minuta of causa.minutas) {
     const file = `${sanitize(minuta.titulo)}.md`;
     const acciones = minuta.acciones
@@ -210,32 +257,50 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
       .join("\n");
     await writeExportFile({
       localPath: path.join(minutasDir, file),
-      relativePath: path.join(config.folderPrefix, "Causas", folderName, "Minutas", file),
+      relativePath: path.posix.join(
+        folderPrefix,
+        "Causas",
+        folderName,
+        "Minutas",
+        file
+      ),
       content: `---\ntipo: ${minuta.tipo}\nfecha: ${minuta.fecha.toISOString()}\n---\n\n# ${minuta.titulo}\n\n## Resumen\n${minuta.resumenEjecutivo}\n\n## Próximos pasos\n${acciones || minuta.proximosPasos || "_Sin acciones_"}\n`,
-      vaultPath: config.vaultPath,
+      vaultPath: vaultRoot,
       storageKeys,
     });
     files += 1;
   }
 
   if (config.syncDocumentos) {
-    const docsDir = path.join(dir, "Documentos");
     for (const doc of causa.documentos) {
       const resolved = resolveDocumentoExport(doc);
       if (!resolved) continue;
-      const localPath = path.join(docsDir, resolved.relativeFile);
-      const relativePath = path.join(
-        config.folderPrefix,
+      const relativeFile = resolved.relativeFile.replace(/\\/g, "/");
+      if (
+        relativeFile.split("/").some((seg) => seg === "." || seg === "..")
+      ) {
+        continue;
+      }
+      const localPath = resolveUnderVault(
+        vaultRoot,
+        folderPrefix,
         "Causas",
         folderName,
         "Documentos",
-        resolved.relativeFile
+        ...relativeFile.split("/")
+      );
+      const relativePath = path.posix.join(
+        folderPrefix,
+        "Causas",
+        folderName,
+        "Documentos",
+        relativeFile
       );
       await writeExportFile({
         localPath,
         relativePath,
         content: resolved.body,
-        vaultPath: config.vaultPath,
+        vaultPath: vaultRoot,
         storageKeys,
       });
       files += 1;

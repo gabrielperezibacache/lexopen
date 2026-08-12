@@ -20,7 +20,7 @@ function minutesBetween(start: Date, end: Date) {
 
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const unbilled = req.nextUrl.searchParams.get("unbilled");
     const causaId = req.nextUrl.searchParams.get("causaId");
     const entries = await prisma.timeEntry.findMany({
@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
         AND: [
           unbilled === "1" ? { billable: true, billed: false } : {},
           causaId ? { causaId } : {},
+          canManageBilling(user.role) ? {} : { userId: user.id },
         ],
       },
       include: { user: { select: publicUserSelect }, causa: true, cliente: true },

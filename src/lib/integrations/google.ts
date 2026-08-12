@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { getObject } from "@/lib/storage";
 import {
@@ -10,6 +9,11 @@ import {
   parseGoogleDriveFolderRef,
   stubFolderUrl,
 } from "@/lib/integrations/drive-folder";
+import {
+  decryptGoogleToken,
+  encryptGoogleToken,
+  isGoogleLegacyToken,
+} from "@/lib/integrations/google-crypto";
 
 export type GoogleConfig = {
   scopes: string[];
@@ -22,76 +26,24 @@ export type GoogleConfig = {
   tokenExpiresAt?: number;
 };
 
-const TOKEN_PREFIX = "enc:v2:";
-const LEGACY_TOKEN_PREFIX = "enc:v1:";
-
 /** Never follow redirects on Google API calls (SSRF / token leak via Location). */
 function googleFetch(input: string, init?: RequestInit) {
   return fetch(input, { ...init, redirect: "error" });
 }
 
-function encryptToken(value: string | undefined) {
-  const secret = process.env.SESSION_SECRET;
-  if (!value || value.startsWith(TOKEN_PREFIX)) return value;
-  if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("SESSION_SECRET requerido para guardar tokens Google");
-    }
-    return value;
-  }
-  const key = createHash("sha256").update(secret).digest();
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `${TOKEN_PREFIX}${iv.toString("base64url")}.${tag.toString("base64url")}.${encrypted.toString("base64url")}`;
-}
-
-function decryptToken(value: string | undefined) {
-  const secret = process.env.SESSION_SECRET;
-  if (!value) return value;
-  if (!secret) return value.startsWith(TOKEN_PREFIX) ? undefined : value;
-  if (value.startsWith(LEGACY_TOKEN_PREFIX)) {
-    try {
-      const raw = Buffer.from(value.slice(LEGACY_TOKEN_PREFIX.length), "base64");
-      const key = Buffer.from(secret, "utf8");
-      return Buffer.from(raw.map((byte, idx) => byte ^ key[idx % key.length])).toString("utf8");
-    } catch {
-      return undefined;
-    }
-  }
-  if (!value.startsWith(TOKEN_PREFIX)) return value;
-  try {
-    const [ivRaw, tagRaw, encryptedRaw] = value.slice(TOKEN_PREFIX.length).split(".");
-    const key = createHash("sha256").update(secret).digest();
-    const decipher = createDecipheriv(
-      "aes-256-gcm",
-      key,
-      Buffer.from(ivRaw, "base64url")
-    );
-    decipher.setAuthTag(Buffer.from(tagRaw, "base64url"));
-    return Buffer.concat([
-      decipher.update(Buffer.from(encryptedRaw, "base64url")),
-      decipher.final(),
-    ]).toString("utf8");
-  } catch {
-    return undefined;
-  }
-}
-
 function encryptGoogleConfig(config: GoogleConfig): GoogleConfig {
   return {
     ...config,
-    accessToken: encryptToken(config.accessToken),
-    refreshToken: encryptToken(config.refreshToken),
+    accessToken: encryptGoogleToken(config.accessToken),
+    refreshToken: encryptGoogleToken(config.refreshToken),
   };
 }
 
 function decryptGoogleConfig(config: GoogleConfig): GoogleConfig {
   return {
     ...config,
-    accessToken: decryptToken(config.accessToken),
-    refreshToken: decryptToken(config.refreshToken),
+    accessToken: decryptGoogleToken(config.accessToken),
+    refreshToken: decryptGoogleToken(config.refreshToken),
   };
 }
 
@@ -112,10 +64,25 @@ export async function getGoogleConfig(): Promise<GoogleConfig> {
     syncCalendar: true,
   };
   if (!row) return defaults;
-  return decryptGoogleConfig({
+  const stored = JSON.parse(row.configJson) as Partial<GoogleConfig>;
+  const hadLegacyXor = [stored.accessToken, stored.refreshToken].some((token) =>
+    isGoogleLegacyToken(token)
+  );
+  const config = decryptGoogleConfig({
     ...defaults,
-    ...(JSON.parse(row.configJson) as Partial<GoogleConfig>),
+    ...stored,
   });
+  // One-shot upgrade: rewrite XOR tokens as AES-GCM enc:v2.
+  if (
+    hadLegacyXor &&
+    (config.accessToken || config.refreshToken) &&
+    process.env.SESSION_SECRET
+  ) {
+    void saveGoogleConfig(config, row.enabled).catch((error) => {
+      console.warn("[google] no se pudo migrar tokens enc:v1 → enc:v2", error);
+    });
+  }
+  return config;
 }
 
 export function getGoogleAuthUrl(state = "lexopen") {

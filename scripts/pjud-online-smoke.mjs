@@ -32,7 +32,8 @@ async function fetchJson(url, init) {
   const res = await fetch(url, {
     ...init,
     signal: AbortSignal.timeout(init?.timeoutMs || 120_000),
-  });
+        redirect: "error",
+      });
   const text = await res.text();
   let body;
   try {

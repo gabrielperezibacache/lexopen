@@ -7,14 +7,13 @@ import {
   httpError,
   parseBody,
   requireBillingManager,
-  requireStaff,
 } from "@/lib/api";
 import { paymentCreateSchema } from "@/lib/schemas";
 import { invoiceStatusAfterPayment } from "@/lib/billing";
 
 export async function GET() {
   try {
-    await requireStaff();
+    await requireBillingManager();
     const payments = await prisma.payment.findMany({
       include: { cliente: true, invoice: true },
       orderBy: { date: "desc" },

@@ -817,7 +817,10 @@ Controles implementados en el código:
   loopback o staff; fetches Google/captcha/Upstash/GitHub usan `redirect: error`;
 - CSP prod: `style-src` con nonce + `style-src-attr 'unsafe-inline'`; salas
   Playwright allowlist `salas.pjud.cl`; scraper PJUD enlaza loopback; API keys
-  LLM cifradas en reposo; Desktop con `sandbox` + allowlist de navegación;
+  LLM cifradas en reposo (`enc:v2`, migración de plaintext); tokens Google
+  migran `enc:v1`→`enc:v2` y rechazan plaintext; rutas Obsidian/ingest
+  confinadas; billing GET y creación de grupos con ACL más estricta; Desktop
+  con `sandbox`, allowlist de navegación y updater sin downgrade;
 - salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
   Hermes y Obsidian;
 - `instrumentation` falla al arrancar si flags peligrosas están en producción;

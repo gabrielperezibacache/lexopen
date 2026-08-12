@@ -5,14 +5,13 @@ import {
   handleRouteError,
   parseBody,
   requireBillingManager,
-  requireStaff,
 } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { feeArrangementCreateSchema } from "@/lib/schemas";
 
 export async function GET() {
   try {
-    await requireStaff();
+    await requireBillingManager();
     const fees = await prisma.feeArrangement.findMany({
       include: { cliente: true, causa: true, owner: { select: publicUserSelect } },
       orderBy: { updatedAt: "desc" },
