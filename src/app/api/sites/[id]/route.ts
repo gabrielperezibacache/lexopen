@@ -18,7 +18,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const site = await prisma.site.findUnique({
       where: { id },
       include: {
-        cliente: true,
+        cliente: clientView
+          ? { select: { id: true, razonSocial: true } }
+          : true,
         causa: clientView
           ? {
               select: {
@@ -65,6 +67,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
           ? { where: { id: "__client_hidden__" } }
           : { include: { _count: { select: { rows: true, columns: true } } } },
         qaThreads: {
+          where: clientView ? { status: "open" } : undefined,
           include: { _count: { select: { posts: true } } },
           orderBy: { updatedAt: "desc" },
           take: 8,
@@ -81,12 +84,34 @@ export async function GET(_req: NextRequest, { params }: Params) {
         blogPosts: clientView
           ? { where: { id: "__client_hidden__" } }
           : { orderBy: { createdAt: "desc" }, take: 5 },
-        _count: {
-          select: { files: true, tasks: true, members: true, wikiPages: true },
-        },
+        _count: clientView
+          ? {
+              select: {
+                tasks: true,
+                members: true,
+              },
+            }
+          : {
+              select: { files: true, tasks: true, members: true, wikiPages: true },
+            },
       },
     });
     if (!site) return NextResponse.json({ error: "Site no encontrado" }, { status: 404 });
+
+    if (clientView) {
+      const visibleFiles = await prisma.siteFile.count({
+        where: { siteId: id, ...fileWhere },
+      });
+      return NextResponse.json({
+        ...site,
+        _count: {
+          ...site._count,
+          files: visibleFiles,
+          wikiPages: 0,
+        },
+      });
+    }
+
     return NextResponse.json(site);
   } catch (e) {
     return handleRouteError(e);

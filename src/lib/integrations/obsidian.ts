@@ -16,6 +16,10 @@ import {
   sanitizeVaultFolderPrefix,
 } from "@/lib/integrations/obsidian-path";
 
+/** Never export confidential or privileged matter into the Obsidian vault. */
+const VAULT_SAFE_DOC_WHERE = { confidencial: false, privilegio: false } as const;
+const VAULT_SAFE_MINUTA_WHERE = { confidencial: false } as const;
+
 function assertObsidianRestUrl(restUrl: string) {
   let parsed: URL;
   try {
@@ -269,19 +273,24 @@ export async function exportCausaToObsidian(
       include: {
         partes: true,
         notas: true,
-        documentos: { where: { confidencial: false } },
+        documentos: { where: VAULT_SAFE_DOC_WHERE },
         plazos: true,
         cliente: true,
         abogado: true,
         minutas: {
-          where: { confidencial: false },
+          where: VAULT_SAFE_MINUTA_WHERE,
           include: { acciones: true },
           orderBy: { fecha: "desc" },
         },
       },
     }),
     prisma.minuta.count({ where: { causaId, confidencial: true } }),
-    prisma.documento.count({ where: { causaId, confidencial: true } }),
+    prisma.documento.count({
+      where: {
+        causaId,
+        OR: [{ confidencial: true }, { privilegio: true }],
+      },
+    }),
   ]);
   if (!causa) throw new Error("Causa no encontrada");
 

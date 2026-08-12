@@ -14,7 +14,22 @@ export default async function JurisprudenciaPage({
   const q = (sp.q || "").trim().toLowerCase();
   const materia = sp.materia;
 
-  const all = await prisma.jurisprudencia.findMany({ orderBy: { fecha: "desc" } });
+  const all = await prisma.jurisprudencia.findMany({
+    orderBy: { fecha: "desc" },
+    select: {
+      id: true,
+      rol: true,
+      tribunal: true,
+      sala: true,
+      caratula: true,
+      descripcion: true,
+      doctrina: true,
+      materia: true,
+      tags: true,
+      fuente: true,
+      fecha: true,
+    },
+  });
   const items = all.filter((j) => {
     if (materia && j.materia !== materia) return false;
     if (!q) return true;

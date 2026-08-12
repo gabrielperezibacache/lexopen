@@ -11,6 +11,28 @@ import {
 
 const textMatch = (q: string) => ({ contains: q, mode: "insensitive" as const });
 
+const causaSearchSelect = {
+  id: true,
+  titulo: true,
+  rit: true,
+  ruc: true,
+  tribunal: true,
+  materia: true,
+  estado: true,
+  etapa: true,
+  caratula: true,
+  updatedAt: true,
+};
+
+const clienteSearchSelect = {
+  id: true,
+  razonSocial: true,
+  rut: true,
+  email: true,
+  tipo: true,
+  estado: true,
+};
+
 export async function GET(req: NextRequest) {
   try {
     const user = await requireUser();
@@ -45,6 +67,13 @@ export async function GET(req: NextRequest) {
               ],
             },
           ],
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          tipo: true,
+          description: true,
         },
         take: 10,
       });
@@ -90,6 +119,13 @@ export async function GET(req: NextRequest) {
               { slug: textMatch(q) },
             ],
           },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            tipo: true,
+            description: true,
+          },
           take: 10,
         }),
         prisma.causa.findMany({
@@ -103,6 +139,7 @@ export async function GET(req: NextRequest) {
                   { tribunal: textMatch(q) },
                 ],
               },
+          select: causaSearchSelect,
           take: 10,
         }),
         prisma.cliente.findMany({
@@ -114,13 +151,19 @@ export async function GET(req: NextRequest) {
               { notas: textMatch(q) },
             ],
           },
+          select: clienteSearchSelect,
           take: 10,
         }),
         prisma.tramite.findMany({
           where: {
             OR: [{ titulo: textMatch(q) }, { detalle: textMatch(q) }],
           },
-          include: {
+          select: {
+            id: true,
+            titulo: true,
+            estado: true,
+            fechaLimite: true,
+            causaId: true,
             causa: {
               select: {
                 id: true,
@@ -178,7 +221,13 @@ export async function GET(req: NextRequest) {
           where: {
             OR: [{ title: textMatch(q) }, { description: textMatch(q) }],
           },
-          include: { site: true },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            siteId: true,
+            site: { select: { id: true, name: true } },
+          },
           take: 10,
         }),
         prisma.jurisprudencia.findMany({
@@ -190,13 +239,28 @@ export async function GET(req: NextRequest) {
               { tags: textMatch(q) },
             ],
           },
+          select: {
+            id: true,
+            rol: true,
+            caratula: true,
+            tribunal: true,
+            materia: true,
+            fecha: true,
+            tags: true,
+          },
           take: 10,
         }),
         prisma.wikiPage.findMany({
           where: {
             OR: [{ title: textMatch(q) }, { content: textMatch(q) }],
           },
-          include: { site: true },
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            siteId: true,
+            site: { select: { id: true, name: true } },
+          },
           take: 10,
         }),
         prisma.minuta.findMany({
@@ -214,7 +278,12 @@ export async function GET(req: NextRequest) {
               },
             ],
           },
-          include: {
+          select: {
+            id: true,
+            titulo: true,
+            tipo: true,
+            causaId: true,
+            fecha: true,
             causa: { select: { id: true, rit: true, titulo: true } },
           },
           take: 10,

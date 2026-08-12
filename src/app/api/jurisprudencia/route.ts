@@ -3,6 +3,20 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { handleRouteError, requireStaff } from "@/lib/api";
 
+const listSelect = {
+  id: true,
+  rol: true,
+  tribunal: true,
+  sala: true,
+  caratula: true,
+  descripcion: true,
+  doctrina: true,
+  materia: true,
+  tags: true,
+  fuente: true,
+  fecha: true,
+} satisfies Prisma.JurisprudenciaSelect;
+
 export async function GET(req: NextRequest) {
   try {
     await requireStaff();
@@ -10,6 +24,7 @@ export async function GET(req: NextRequest) {
     const q = searchParams.get("q")?.trim() || "";
     const materia = searchParams.get("materia")?.trim() || "";
     const tribunal = searchParams.get("tribunal")?.trim() || "";
+    const includeTexto = searchParams.get("full") === "1";
 
     const where: Prisma.JurisprudenciaWhereInput = {
       AND: [
@@ -37,8 +52,23 @@ export async function GET(req: NextRequest) {
     const filtered = await prisma.jurisprudencia.findMany({
       where,
       orderBy: { fecha: "desc" },
-      take: 200,
+      take: includeTexto ? 50 : 200,
+      select: includeTexto
+        ? { ...listSelect, texto: true }
+        : listSelect,
     });
+
+    if (!includeTexto) {
+      return NextResponse.json(
+        filtered.map((row) => ({
+          ...row,
+          doctrina:
+            row.doctrina && row.doctrina.length > 1200
+              ? `${row.doctrina.slice(0, 1200)}…`
+              : row.doctrina,
+        }))
+      );
+    }
 
     return NextResponse.json(filtered);
   } catch (e) {

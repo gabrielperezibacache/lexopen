@@ -883,6 +883,8 @@ Controles implementados en el código:
 - ACL confidencial en CRM/IA (`clientes`, `documentos` PATCH, contexto AI);
   cron de plazos con `verifyCronSecret`; Q&A portal con límites; comentarios
   de archivos ocultos al portal cliente;
+- búsqueda/minutas/actividad/jurisprudencia sin cuerpos largos; portal site
+  sin notas CRM ni Q&A cerrados; Obsidian omite `privilegio` y sync admin-only;
 - salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
   Hermes y Obsidian;
 - `instrumentation` falla al arrancar si flags peligrosas están en producción;

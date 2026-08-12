@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { isAdmin } from "@/lib/auth/rbac";
 import {
   describeObsidianMode,
   exportCausaToObsidian,
@@ -33,8 +34,16 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     assertCsrf(req);
-    await requireStaff();
+    const user = await requireStaff();
     const body = await req.json().catch(() => ({}));
+    if (body.action === "sync-all" || body.action === "sync-causa") {
+      if (!isAdmin(user.role)) {
+        return NextResponse.json(
+          { error: "Solo admin puede sincronizar Obsidian" },
+          { status: 403 }
+        );
+      }
+    }
     if (body.action === "sync-all") {
       const results = await syncAllCausasToObsidian();
       const ok = results.filter((r) => r.ok).length;
@@ -52,8 +61,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, result });
     }
     if (body.action === "save-config") {
-      const user = await requireStaff();
-      if (user.role !== "admin") {
+      if (!isAdmin(user.role)) {
         return NextResponse.json(
           { error: "Solo admin puede configurar Obsidian" },
           { status: 403 }

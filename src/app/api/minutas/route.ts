@@ -11,6 +11,7 @@ import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { pushMinutaToDrive } from "@/lib/integrations/google";
 import { writeAudit } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { documentoListSelect } from "@/lib/sites/file-select";
 import { calcularVencimiento } from "@/lib/plazos";
 import {
   formatLocalDate,
@@ -342,7 +343,7 @@ export async function POST(req: NextRequest) {
       causa: true,
       autor: { select: publicUserSelect },
       acciones: true,
-      documento: true,
+      documento: { select: documentoListSelect },
     },
   });
 
