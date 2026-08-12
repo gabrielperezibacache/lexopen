@@ -114,6 +114,19 @@ cifrada → Mis Causas, timeline clasificado y alertas. Conectores: partner API,
 scraper, webhook, demo o CSV. El scrape y ClaveÚnica van desactivados por
 defecto (kill switches); no se presentan como API oficial de PJUD.
 
+> [!WARNING]
+> **Seguimiento PJUD mediante scraping.** Al activar las funciones de
+> seguimiento PJUD, LexOpen opera por *scraping* (consulta automatizada de las
+> interfaces web del Poder Judicial), porque **no existe una API oficial** del
+> Poder Judicial para esta función. Ese uso implica **costos y riesgos**
+> (disponibilidad, bloqueos, cambios de portal, ToS, integridad de datos y
+> custodia de credenciales) que **debe asumir quien active y use** esas
+> funciones. LexOpen incorpora límites, kill switches y bloqueos orientados a
+> mantener la seguridad operacional bajo estándares similares a los de
+> aplicaciones de pago que realizan la misma función; eso no elimina el riesgo
+> ni convierte el scrape en un canal oficial. Detalle: [`docs/PJUD.md`](docs/PJUD.md)
+> y el aviso adicional en [`LICENSE`](LICENSE).
+
 **Copiloto IA:** entiende la petición, recuerda el hilo, busca en
 causas/documentos del estudio y responde con fuentes del host. Utilidades:
 briefing, Q&A documental, borradores, plazos, investigación y casos similares.
@@ -864,6 +877,8 @@ de producción:
   ni integración con el SII;
 - la integración live con PJUD es opt-in (partner API, sidecar scrape o
   Playwright+CAPTCHA / ClaveÚnica) y no es una API oficial del Poder Judicial;
+  quien active el scrape asume el costo y el riesgo de ese mecanismo (véase el
+  aviso en Licencia y el WARNING de la [Capa Chile](#capa-chile));
 - `LEXOPEN_OPEN_ACCESS`, `LEXOPEN_RELAX_CSRF`, `LEXOPEN_DEMO_SWITCHER`,
   `LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS` y fallbacks demo de Hermes/PJUD no deben
   activarse en producción (varias de estas flags ya hacen fallar el arranque).
@@ -941,3 +956,10 @@ si el problema afecta a web, desktop, base de datos o una integración.
 ## 📄 Licencia
 
 LexOpen se distribuye bajo [`AGPL-3.0-or-later`](LICENSE).
+
+Además del AGPL, el archivo de licencia incluye un **aviso adicional sobre
+seguimiento PJUD**: las funciones de monitoreo/seguimiento de causas del Poder
+Judicial, al activarse, funcionan mediante scraping y no mediante una API
+oficial; el usuario asume el costo y el riesgo de ese uso. Se han incorporado
+límites y bloqueos para mantener la seguridad operacional bajo estándares
+similares a los de aplicaciones de pago que cumplen la misma función.

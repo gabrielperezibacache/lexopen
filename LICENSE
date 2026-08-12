@@ -659,3 +659,67 @@ specific requirements.
 if any, to sign a "copyright disclaimer" for the program, if necessary.
 For more information on this, and how to apply and follow the GNU AGPL, see
 <https://www.gnu.org/licenses/>.
+
+================================================================================
+ADDITIONAL TERMS — PJUD CASE TRACKING / AVISO ADICIONAL — SEGUIMIENTO PJUD
+================================================================================
+
+These additional terms supplement the GNU Affero General Public License v3 (or
+any later version) for LexOpen, pursuant to section 7 of that License. They do
+not modify the AGPL text above.
+
+Estos términos adicionales complementan la GNU Affero General Public License
+v3 (o cualquier versión posterior) respecto de LexOpen, de conformidad con la
+sección 7 de dicha licencia. No modifican el texto del AGPL precedente.
+
+---------------------------------------------------------------------------
+English
+---------------------------------------------------------------------------
+
+Activation of LexOpen's PJUD (Poder Judicial de Chile) case-tracking features
+operates by means of web scraping of publicly facing judicial portals and
+related interfaces. There is no official API from the Poder Judicial for this
+capability.
+
+By enabling and using those features, you acknowledge and assume the costs and
+risks associated with scraping-based operation, including without limitation
+service availability, rate limits or blocks, portal or CAPTCHA changes, terms
+of use of third-party systems, data integrity, and custody of credentials
+(such as ClaveÚnica) where configured.
+
+LexOpen includes operational limits, kill switches, and blocking controls
+intended to keep operational security under standards similar to those of
+paid applications that perform the same function. Those controls do not
+eliminate the risks described above, do not create an official channel with
+the Poder Judicial, and do not constitute a warranty regarding uninterrupted,
+lawful, or complete access to judicial data.
+
+Use of the PJUD tracking features is optional and disabled by default. If you
+do not accept these risks, do not enable scraping, sidecar, or ClaveÚnica
+automation flags.
+
+---------------------------------------------------------------------------
+Español
+---------------------------------------------------------------------------
+
+La activación de las funciones de seguimiento de causas PJUD (Poder Judicial
+de Chile) en LexOpen opera mediante scraping de los portales e interfaces web
+del Poder Judicial. No existe una API oficial del Poder Judicial para esta
+capacidad.
+
+Al activar y usar dichas funciones, usted reconoce y asume el costo y el
+riesgo asociados al uso de scraping, incluyendo, sin limitarse a,
+disponibilidad del servicio, límites o bloqueos, cambios de portal o CAPTCHA,
+términos de uso de sistemas de terceros, integridad de los datos y custodia
+de credenciales (como ClaveÚnica) cuando estén configuradas.
+
+LexOpen incorpora límites, interruptores de apagado (kill switches) y
+bloqueos orientados a mantener la seguridad operacional bajo estándares
+similares a los de aplicaciones de pago que realizan la misma función. Esos
+controles no eliminan los riesgos descritos, no crean un canal oficial con el
+Poder Judicial y no constituyen garantía de acceso ininterrumpido, lícito o
+completo a la información judicial.
+
+El uso de las funciones de seguimiento PJUD es opcional y está desactivado
+por defecto. Si no acepta estos riesgos, no active las banderas de scraping,
+sidecar o automatización con ClaveÚnica.
