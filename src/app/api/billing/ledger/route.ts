@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   assertCsrf,
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
         },
         include: { cliente: true, causa: true },
       });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     return NextResponse.json(entry, { status: 201 });
   } catch (e) {
     return handleRouteError(e);

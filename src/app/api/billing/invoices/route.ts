@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   assertCsrf,
@@ -40,9 +41,16 @@ export async function POST(req: NextRequest) {
     const user = await requireBillingManager();
     const body = await parseBody(req, invoiceCreateSchema);
     const tipoDocumento = body.tipoDocumento || "boleta_honorarios";
+    const invoiceStatus = body.status || "borrador";
 
     const timeIds = [...new Set(body.timeEntryIds || [])] as string[];
     const expenseIds = [...new Set(body.expenseIds || [])] as string[];
+    if (invoiceStatus === "borrador" && (timeIds.length || expenseIds.length)) {
+      throw httpError(
+        "Las horas y gastos seleccionados solo pueden asociarse a una factura emitida",
+        400
+      );
+    }
 
     const invoice = await prisma.$transaction(async (tx) => {
       const cliente = await tx.cliente.findUnique({
@@ -168,7 +176,7 @@ export async function POST(req: NextRequest) {
         data: {
           number,
           tipoDocumento,
-          status: body.status || "borrador",
+          status: invoiceStatus,
           issueDate: body.issueDate ? new Date(body.issueDate) : new Date(),
           dueDate: body.dueDate ? new Date(body.dueDate) : null,
           ...totals,
@@ -223,7 +231,7 @@ export async function POST(req: NextRequest) {
       }
 
       return created;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return NextResponse.json(invoice, { status: 201 });
   } catch (e) {

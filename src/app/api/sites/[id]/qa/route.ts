@@ -11,7 +11,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params;
     await requireSiteAccess(id, user);
     const threads = await prisma.qaThread.findMany({
-      where: { siteId: id },
+      where: {
+        siteId: id,
+        ...(user.role === "cliente" ? { status: "open" } : {}),
+      },
       include: {
         posts: {
           include: { author: { select: publicUserSelect } },
@@ -63,9 +66,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (body.action === "reply" && body.threadId) {
       const thread = await prisma.qaThread.findFirst({
         where: { id: body.threadId, siteId: id },
-        select: { id: true },
+        select: { id: true, status: true },
       });
       if (!thread) return NextResponse.json({ error: "Hilo no encontrado" }, { status: 404 });
+      if (user.role === "cliente" && thread.status !== "open") {
+        return NextResponse.json(
+          { error: "El hilo ya no acepta respuestas del portal" },
+          { status: 403 }
+        );
+      }
       const post = await prisma.qaPost.create({
         data: {
           threadId: body.threadId,

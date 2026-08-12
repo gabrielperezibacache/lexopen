@@ -10,7 +10,13 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
   return btoa(binary);
 }
 
-export function SiteFileActions({ siteId }: { siteId: string }) {
+export function SiteFileActions({
+  siteId,
+  canEdit = true,
+}: {
+  siteId: string;
+  canEdit?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState<"file" | "folder" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,6 +54,8 @@ export function SiteFileActions({ siteId }: { siteId: string }) {
     setOpen(null);
     router.refresh();
   }
+
+  if (!canEdit) return null;
 
   return (
     <div className="flex gap-2">

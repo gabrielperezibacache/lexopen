@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
   httpError,
+  parseBody,
   requireBillingManager,
   requireStaff,
 } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { invoiceUpdateSchema } from "@/lib/schemas";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -39,27 +42,29 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     await requireBillingManager();
     const { id } = await params;
-    const body = await req.json();
+    const body = await parseBody(req, invoiceUpdateSchema);
     const invoice = await prisma.$transaction(async (tx) => {
       const current = await tx.invoice.findUnique({ where: { id } });
       if (!current) throw httpError("No encontrada", 404);
 
-      if (
-        body.paidClp !== undefined &&
-        (!Number.isInteger(Number(body.paidClp)) ||
-          Number(body.paidClp) < 0 ||
-          Number(body.paidClp) > current.totalClp)
-      ) {
-        throw httpError("Monto pagado inválido", 400);
+      if (body.status === "emitida" && current.status !== "borrador") {
+        throw httpError("Solo se pueden emitir facturas en borrador", 409);
+      }
+      if (body.status === "anulada" && current.status !== "borrador") {
+        throw httpError(
+          "Solo se pueden anular facturas en borrador; registre una nota de crédito para una emitida",
+          409
+        );
       }
 
       const updated = await tx.invoice.update({
         where: { id },
         data: {
-          status: body.status,
-          notes: body.notes,
-          dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
-          paidClp: body.paidClp,
+          ...(body.status !== undefined ? { status: body.status } : {}),
+          ...(body.notes !== undefined ? { notes: body.notes } : {}),
+          ...(body.dueDate !== undefined
+            ? { dueDate: body.dueDate ? new Date(body.dueDate) : null }
+            : {}),
         },
         include: { cliente: true, lines: true, payments: true },
       });
@@ -86,14 +91,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
               debitClp: updated.totalClp,
               creditClp: 0,
               balanceClp: prev - updated.totalClp,
-              date: new Date(),
+              date: updated.issueDate,
             },
           });
         }
       }
 
       return updated;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return NextResponse.json(invoice);
   } catch (e) {

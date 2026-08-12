@@ -17,7 +17,7 @@ export default async function FacturasPage() {
     }),
     prisma.timeEntry.findMany({
       where: { billable: true, billed: false },
-      include: { causa: true, user: true },
+      include: { causa: true },
       orderBy: { date: "desc" },
     }),
     prisma.expense.findMany({

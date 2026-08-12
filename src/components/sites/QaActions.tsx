@@ -7,10 +7,12 @@ export function QaActions({
   siteId,
   threadId,
   reply,
+  canMarkAnswer = true,
 }: {
   siteId: string;
   threadId?: string;
   reply?: boolean;
+  canMarkAnswer?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -55,9 +57,11 @@ export function QaActions({
         ) : (
           <form onSubmit={onSubmit} className="mt-2 space-y-2">
             <textarea className="textarea" name="body" required placeholder="Respuesta" />
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="isAnswer" /> Marcar como respuesta oficial
-            </label>
+            {canMarkAnswer && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="isAnswer" /> Marcar como respuesta oficial
+              </label>
+            )}
             <div className="flex gap-2">
               <button className="btn btn-primary" type="submit">
                 Enviar

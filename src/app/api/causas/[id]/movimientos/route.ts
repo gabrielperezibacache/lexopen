@@ -10,58 +10,18 @@ import {
 } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { classifyMovimiento } from "@/lib/pjud/classify";
+import { fingerprint } from "@/lib/pjud/provider";
+import {
+  MOVIMIENTOS_CSV_HEADER,
+  parseMovimientosCsv,
+  MAX_CSV_BYTES,
+  MAX_CSV_ROWS,
+  serializeMovimientosCsv,
+} from "@/lib/pjud/import-csv";
 import { parseLocalDateInput } from "@/lib/minutas";
 
-const MAX_CSV_BYTES = 5 * 1024 * 1024;
-const MAX_CSV_ROWS = 1000;
-
 type Params = { params: Promise<{ id: string }> };
-
-function parseCsvLine(line: string) {
-  const cells: string[] = [];
-  let current = "";
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"' && line[i + 1] === '"') {
-      current += '"';
-      i += 1;
-    } else if (ch === '"') {
-      quoted = !quoted;
-    } else if (ch === "," && !quoted) {
-      cells.push(current.trim());
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-  cells.push(current.trim());
-  return cells;
-}
-
-function parseMovimientosCsv(csv: string) {
-  if (Buffer.byteLength(csv, "utf8") > MAX_CSV_BYTES) {
-    throw httpError("El CSV supera el límite de 5 MB", 413);
-  }
-  const lines = csv.split(/\r?\n/).filter((line) => line.trim());
-  if (lines.length === 0) return [];
-  if (lines.length - 1 > MAX_CSV_ROWS) {
-    throw httpError(`El CSV supera el límite de ${MAX_CSV_ROWS} filas`, 413);
-  }
-  const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
-  return lines
-    .slice(1)
-    .map((line) => {
-      const row = parseCsvLine(line);
-      const get = (name: string) => row[headers.indexOf(name)] || "";
-      return {
-        titulo: get("titulo") || get("title") || row[0] || "",
-        detalle: get("detalle") || get("detail") || row[1] || "",
-        fecha: get("fecha") || get("date") || row[2] || "",
-      };
-    })
-    .filter((row) => row.titulo.trim());
-}
+const MAX_PREVIEW_ROWS = 100;
 
 function parseMovementDate(value?: string) {
   const parsed = parseLocalDateInput(value);
@@ -73,6 +33,52 @@ export async function GET(req: NextRequest, { params }: Params) {
   try {
     await requireStaff();
     const { id } = await params;
+    if (
+      req.nextUrl.searchParams.get("format") === "csv" &&
+      req.nextUrl.searchParams.get("template") === "1"
+    ) {
+      return new NextResponse(`${MOVIMIENTOS_CSV_HEADER}\r\n`, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition":
+            'attachment; filename="plantilla-movimientos-pjud.csv"',
+        },
+      });
+    }
+    if (req.nextUrl.searchParams.get("format") === "csv") {
+      const causa = await prisma.causa.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (!causa) return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
+      const rows = await prisma.causaMovimiento.findMany({
+        where: { causaId: id },
+        orderBy: { fecha: "desc" },
+        take: MAX_CSV_ROWS,
+        select: {
+          titulo: true,
+          detalle: true,
+          fecha: true,
+          referencia: true,
+          externalId: true,
+        },
+      });
+      return new NextResponse(
+        serializeMovimientosCsv(
+          rows.map((row) => ({
+            ...row,
+            fecha: row.fecha.toISOString().slice(0, 10),
+          }))
+        ),
+        {
+          headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition":
+              'attachment; filename="movimientos-pjud.csv"',
+          },
+        }
+      );
+    }
     const rawLimit = Number(req.nextUrl.searchParams.get("limit") || 200);
     const rawOffset = Number(req.nextUrl.searchParams.get("offset") || 0);
     const limit = Number.isFinite(rawLimit)
@@ -115,6 +121,46 @@ export async function POST(req: NextRequest, { params }: Params) {
           { status: 400 }
         );
       }
+      const movimientos = rows.map((row) => {
+        if (!row.fecha.trim()) {
+          throw httpError("Cada fila CSV debe incluir una fecha", 400);
+        }
+        const fecha = parseMovementDate(row.fecha);
+        const classified = classifyMovimiento(row.titulo, row.detalle);
+        return {
+          causaId: id,
+          titulo: row.titulo,
+          detalle: row.detalle || null,
+          fuente: "import",
+          tipo: classified.tipo,
+          relevante: classified.relevante,
+          referencia: row.referencia || null,
+          externalId: `import:${row.externalId || fingerprint(row.titulo, fecha, row.referencia)}`,
+          fecha,
+        };
+      });
+      if (req.nextUrl.searchParams.get("preview") === "1") {
+        const causa = await prisma.causa.findUnique({
+          where: { id },
+          select: { id: true },
+        });
+        if (!causa) {
+          return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
+        }
+        return NextResponse.json({
+          preview: true,
+          total: movimientos.length,
+          truncated: movimientos.length > MAX_PREVIEW_ROWS,
+          rows: movimientos.slice(0, MAX_PREVIEW_ROWS).map((row) => ({
+            titulo: row.titulo,
+            fecha: row.fecha.toISOString(),
+            referencia: row.referencia,
+            externalId: row.externalId,
+            tipo: row.tipo,
+            relevante: row.relevante,
+          })),
+        });
+      }
       const created = await prisma.$transaction(async (tx) => {
         const causa = await tx.causa.findUnique({
           where: { id },
@@ -126,25 +172,15 @@ export async function POST(req: NextRequest, { params }: Params) {
           },
         });
         if (!causa) throw httpError("Causa no encontrada", 404);
-        const movimientos = rows.map((row) => {
-          const classified = classifyMovimiento(row.titulo, row.detalle);
-          return {
-            causaId: id,
-            titulo: row.titulo,
-            detalle: row.detalle || null,
-            fuente: "import",
-            tipo: classified.tipo,
-            relevante: classified.relevante,
-            fecha: parseMovementDate(row.fecha),
-          };
-        });
         const createdRows = await tx.causaMovimiento.createMany({
           data: movimientos,
+          skipDuplicates: true,
         });
+        const skipped = rows.length - createdRows.count;
         await tx.activity.create({
           data: {
             tipo: "alerta",
-            mensaje: `Movimientos importados: ${createdRows.count}`,
+            mensaje: `Movimientos importados: ${createdRows.count} nuevos, ${skipped} repetidos`,
             causaId: id,
             userId: user.id,
           },
@@ -153,22 +189,25 @@ export async function POST(req: NextRequest, { params }: Params) {
           await tx.notification.create({
             data: {
               title: `Movimientos importados · ${causa.rit || causa.titulo}`,
-              body: `${createdRows.count} movimientos cargados desde CSV.`,
+              body: `${createdRows.count} movimientos nuevos cargados desde CSV.`,
               href: `/causas/${id}`,
               userId: causa.abogadoId,
             },
           });
         }
-        return createdRows.count;
+        return { created: createdRows.count, skipped };
       });
       await writeAudit({
         actorId: user.id,
         action: "causa.movimientos.import",
         entityType: "Causa",
         entityId: id,
-        after: { count: created },
+        after: created,
       });
-      return NextResponse.json({ rows: created }, { status: 201 });
+      return NextResponse.json(
+        { rows: created.created, skipped: created.skipped },
+        { status: 201 }
+      );
     }
     const body = await parseBody(
       req,

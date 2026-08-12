@@ -52,3 +52,6 @@ yarn-error.log*
 /desktop/node_modules
 /desktop/dist
 /desktop/data
+/playwright-report/
+/test-results/
+/.tmp/

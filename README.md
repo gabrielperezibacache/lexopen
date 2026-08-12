@@ -109,6 +109,13 @@ Incluye también monitoreo de causas estilo CaseTracking con semáforos, timelin
 clasificado, alertas y conectores PJUD partner API o demo/CSV etiquetados. No se
 realizan scrapers ocultos ni se presenta el corpus demo como fuente oficial.
 
+Sin proveedor externo, la alternativa local es exportar el CSV desde la consulta
+oficial e importarlo en la ficha de la causa. El importador acepta
+`titulo,detalle,fecha,referencia,id`, clasifica los movimientos y omite
+reimportaciones determinísticamente; la ficha ofrece plantilla y exportación
+compatible para respaldo local, además de una vista previa que no modifica la
+base de datos.
+
 La jurisprudencia incluida en el seed es un **corpus de demostración**. No es una
 fuente oficial, exhaustiva ni necesariamente actualizada.
 
@@ -224,6 +231,10 @@ LEXOPEN_TRUSTED_ORIGINS=http://127.0.0.1:3000,http://IP-PRIVADA-DEL-HOST:3000
 - Los datos quedan en `LEXOPEN_DATA_DIR` o en la carpeta predeterminada del sistema.
 - No configure S3, Google, Hermes o PJUD si necesita una instalación completamente local.
 - Detenga el Host con `Ctrl+C` antes de copiar el directorio de datos como respaldo.
+- Para activar backups locales con rotación, configure
+  `LEXOPEN_BACKUP_INTERVAL_MINUTES`, `LEXOPEN_BACKUP_DIR` y
+  `LEXOPEN_BACKUP_KEEP` en el `.env` del Host. El scheduler detiene brevemente
+  PostgreSQL para copiarlo de forma consistente y conserva los últimos respaldos.
 - No ejecute `npm run db:seed`, `npm run setup` ni `npm run db:reset` con datos reales.
 
 Guía ampliada: [`docs/WEB-HOST.md`](docs/WEB-HOST.md).
@@ -336,6 +347,7 @@ variables más relevantes:
 | `HERMES_ALLOW_DEMO` | No | Permite una respuesta local claramente marcada si Hermes no está disponible. |
 | `PJUD_API_URL`, `PJUD_API_KEY` | No | Conector partner para sincronizar movimientos judiciales. |
 | `PJUD_ALLOW_DEMO` | No | Permite movimientos PJUD simulados y etiquetados como demo. |
+| `PJUD_WEBHOOK_SECRET` | No | Firma HMAC de webhooks asíncronos de un proveedor PJUD. |
 | `CRON_SECRET` | No | Protege la sincronización de cartera desde un scheduler externo. |
 | `OBSIDIAN_VAULT_PATH` | No | Vault local para exportaciones en desarrollo. |
 | `OBSIDIAN_REST_URL`, `OBSIDIAN_REST_TOKEN` | No | Obsidian Local REST API y token Bearer. |
@@ -343,6 +355,11 @@ variables más relevantes:
 
 No incluya secretos reales en commits. Para producción, genere un
 `SESSION_SECRET` nuevo, use HTTPS/Tailscale y desactive todas las banderas demo.
+
+Los proveedores PJUD que trabajan de forma asíncrona pueden usar
+`POST /api/integrations/pjud/webhook` con `x-pjud-timestamp` y
+`x-pjud-signature`. Consulte [`docs/WEB-HOST.md`](docs/WEB-HOST.md) para el
+contrato firmado, la ventana anti-replay y el formato normalizado de movimientos.
 
 ## 🔌 Integraciones
 
@@ -539,7 +556,9 @@ de producción:
   privilegio abogado-cliente;
 - la auditoría es de mejor esfuerzo: un fallo al persistirla no necesariamente
   bloquea la operación;
-- no hay topología multi-Host, alta disponibilidad ni backups automáticos incluidos;
+- no hay topología multi-Host ni alta disponibilidad; los backups automáticos
+  locales son opcionales, requieren almacenamiento separado y no sustituyen una
+  copia externa cifrada;
 - la jurisprudencia y los plazos son datos/ayudas de demo, no fuentes oficiales;
 - los documentos de facturación son control interno y no constituyen DTE electrónico
   ni integración con el SII;
@@ -562,11 +581,16 @@ npm test               # pruebas de utilidades, contratos, smoke y desktop
 npm run build          # Prisma generate + next build
 npm run start          # servidor Next en modo producción
 npm run desktop:test   # configuración del cliente Electron
+npm run e2e:install    # descarga Chromium para las pruebas de navegador
+E2E_DATABASE_URL=postgresql://lexopen:lexopen@127.0.0.1:5432/lexopen_e2e npm run e2e
 ```
 
-La suite actual usa scripts ejecutables con `tsx` y assertions; no existe todavía
-una suite de navegador Playwright/Cypress. El workflow de GitHub Actions ejecuta
-PostgreSQL 16, `npm ci`, migraciones, tests, lint y build en cada push a `main` o
+`npm run e2e` reinicia y siembra la base indicada por `E2E_DATABASE_URL`; el
+script rechaza hosts remotos y nombres de base que no incluyan `e2e` o `test`.
+Use siempre una base local desechable. Playwright inicia un Next.js de prueba,
+valida login staff, redirección del portal cliente y protección de rutas. El
+workflow de GitHub Actions instala Chromium con sus dependencias y ejecuta
+PostgreSQL 16, migraciones, tests, lint, build y E2E en cada push a `main` o
 ramas `cursor/**`, y en pull requests.
 
 Para cambios que afecten datos, permisos o integraciones:

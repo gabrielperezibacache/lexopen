@@ -65,39 +65,54 @@ export const documentoCreateSchema = z.object({
   mimeType: z.string().max(150).optional().nullable(),
 });
 
+const billingDate = z
+  .string()
+  .max(64)
+  .refine((value) => !Number.isNaN(Date.parse(value)), "Fecha inválida");
+
 export const invoiceCreateSchema = z.object({
   clienteId: z.string().min(1),
   causaId: z.string().optional().nullable(),
-  tipoDocumento: z.string().optional(),
-  status: z.string().optional(),
-  number: z.string().optional().nullable(),
-  issueDate: z.string().optional().nullable(),
-  dueDate: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  glosa: z.string().optional().nullable(),
+  tipoDocumento: z
+    .enum(["boleta_honorarios", "factura_afecta", "factura_exenta", "nota_credito"])
+    .optional(),
+  status: z.enum(["borrador", "emitida"]).optional(),
+  number: z.string().trim().min(1).max(60).optional().nullable(),
+  issueDate: billingDate.optional().nullable(),
+  dueDate: billingDate.optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
+  glosa: z.string().max(5000).optional().nullable(),
   timeEntryIds: z.array(z.string()).max(100).optional(),
   expenseIds: z.array(z.string()).max(100).optional(),
   lines: z
     .array(
       z.object({
         description: z.string().min(1).max(500),
-        quantity: z.coerce.number().positive().optional(),
-        unitAmountClp: z.coerce.number().int(),
-        tipo: z.string().optional(),
+        quantity: z.coerce.number().positive().max(1_000_000).optional(),
+        unitAmountClp: z.coerce.number().int().nonnegative().max(1_000_000_000),
+        tipo: z.string().max(40).optional(),
       })
     )
     .max(100)
     .optional(),
 });
 
+export const invoiceUpdateSchema = z.object({
+  status: z.enum(["emitida", "anulada"]).optional(),
+  dueDate: billingDate.optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
+}).strict();
+
 export const paymentCreateSchema = z.object({
   clienteId: z.string().min(1),
   invoiceId: z.string().optional().nullable(),
-  date: z.string().optional().nullable(),
-  amountClp: z.coerce.number().int().positive(),
-  method: z.string().optional(),
-  reference: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
+  date: billingDate.optional().nullable(),
+  amountClp: z.coerce.number().int().positive().max(1_000_000_000),
+  method: z
+    .enum(["transferencia", "cheque", "efectivo", "tarjeta", "retencion"])
+    .optional(),
+  reference: z.string().max(200).optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
 });
 
 export const siteCreateSchema = z.object({

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { assertSitePageAccess } from "@/lib/auth/access";
+import { isCliente } from "@/lib/auth/rbac";
+import { publicUserSelect } from "@/lib/auth/public-user";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDateTime } from "@/components/ui";
 import { QaActions } from "@/components/sites/QaActions";
@@ -10,31 +12,45 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteQaPage({ params }: Params) {
   const { id } = await params;
-  await assertSitePageAccess(id);
-  const site = await prisma.site.findUnique({ where: { id } });
+  const user = await assertSitePageAccess(id);
+  const clientView = isCliente(user.role);
+  const site = await prisma.site.findUnique({
+    where: { id },
+    select: { id: true, name: true, tipo: true, color: true },
+  });
   if (!site) notFound();
   const threads = await prisma.qaThread.findMany({
-    where: { siteId: id },
+    where: { siteId: id, ...(clientView ? { status: "open" } : {}) },
     include: {
-      posts: { include: { author: true }, orderBy: { createdAt: "asc" } },
+      posts: {
+        include: { author: { select: publicUserSelect } },
+        orderBy: { createdAt: "asc" },
+      },
     },
     orderBy: { updatedAt: "desc" },
   });
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/qa" />
+      <SiteNav
+        siteId={site.id}
+        siteName={site.name}
+        tipo={site.tipo}
+        color={site.color}
+        active="/qa"
+        clientView={clientView}
+      />
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
           Q&A del espacio — hilos con cliente y equipo, con respuestas oficiales.
         </p>
-        <QaActions siteId={site.id} />
+        <QaActions siteId={site.id} canMarkAnswer={!clientView} />
       </div>
       {threads.length === 0 && (
         <EmptyState
           title="Sin hilos de Q&A"
           description="Abra una pregunta para el cliente o el equipo. Las respuestas oficiales quedan marcadas."
-          action={<QaActions siteId={site.id} />}
+          action={<QaActions siteId={site.id} canMarkAnswer={!clientView} />}
         />
       )}
       <div className="space-y-4">
@@ -65,7 +81,12 @@ export default async function SiteQaPage({ params }: Params) {
                 </div>
               ))}
             </div>
-            <QaActions siteId={site.id} threadId={t.id} reply />
+            <QaActions
+              siteId={site.id}
+              threadId={t.id}
+              reply
+              canMarkAnswer={!clientView}
+            />
           </article>
         ))}
       </div>

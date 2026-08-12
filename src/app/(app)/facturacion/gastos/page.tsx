@@ -7,7 +7,7 @@ import { ExpenseForm } from "@/components/billing/ExpenseForm";
 export default async function GastosPage() {
   const [expenses, causas, clientes] = await Promise.all([
     prisma.expense.findMany({
-      include: { author: true, causa: true, cliente: true },
+      include: { causa: true, cliente: true },
       orderBy: { date: "desc" },
     }),
     prisma.causa.findMany({ select: { id: true, titulo: true, rit: true, clienteId: true } }),

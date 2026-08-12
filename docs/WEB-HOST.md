@@ -105,8 +105,8 @@ servicio y prepare el directorio de datos:
 
 ```bash
 sudo useradd --system --home /var/lib/lexopen --shell /usr/sbin/nologin lexopen
-sudo mkdir -p /opt/lexopen /var/lib/lexopen
-sudo chown -R lexopen:lexopen /opt/lexopen /var/lib/lexopen
+sudo mkdir -p /opt/lexopen /var/lib/lexopen /var/lib/lexopen-backups
+sudo chown -R lexopen:lexopen /opt/lexopen /var/lib/lexopen /var/lib/lexopen-backups
 sudo cp deploy/systemd/lexopen-web.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now lexopen-web
@@ -173,3 +173,90 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   `web:host` ejecutará la sincronización contra su propio endpoint sin crear otro
   servicio. Si `PJUD_API_URL` está vacío y `PJUD_ALLOW_DEMO=0`, no se consultará
   ninguna fuente externa.
+
+Sin proveedor externo, exporte el CSV desde la consulta oficial y use el
+importador de movimientos de la ficha de la causa. El formato recomendado es
+`titulo,detalle,fecha,referencia,id`; LexOpen clasifica las filas, fuerza
+`fuente=import` y omite reimportaciones con la misma clave determinista. La
+ficha incluye enlaces para descargar la plantilla exacta y exportar hasta 1.000
+movimientos del timeline. La vista previa valida el archivo antes de escribir
+en PostgreSQL.
+
+#### Webhook de un proveedor PJUD
+
+Los proveedores que entregan resultados de forma asíncrona pueden enviar un
+webhook a:
+
+```text
+POST /api/integrations/pjud/webhook
+```
+
+Configure `PJUD_WEBHOOK_SECRET`. El request debe incluir:
+
+```text
+x-pjud-timestamp: <Unix timestamp en segundos>
+x-pjud-signature: sha256=<HMAC-SHA256(PJUD_WEBHOOK_SECRET, timestamp + "." + cuerpo)>
+```
+
+El cuerpo mínimo identifica la causa y contiene movimientos:
+
+```json
+{
+  "operationId": "provider-operation-id",
+  "rit": "C-4521-2025",
+  "tribunal": "1º Juzgado Civil de Santiago",
+  "status": "ok",
+  "movimientos": [
+    {
+      "id": "provider-movement-id",
+      "titulo": "Resolución: proveído",
+      "detalle": "Texto recibido del proveedor",
+      "fecha": "2026-08-12",
+      "referencia": "R-1"
+    }
+  ]
+}
+```
+
+La firma solo se acepta durante cinco minutos, el endpoint deduplica por ID
+externo y no requiere sesión de usuario. El webhook no inventa una fuente PJUD:
+requiere un proveedor autorizado, sus credenciales y el contrato de payload
+correspondiente.
+
+### Backups automáticos con rotación
+
+El Host web puede crear respaldos locales periódicos sin depender de la nube.
+Configure estas variables en el `.env` de `LEXOPEN_DATA_DIR`:
+
+```dotenv
+LEXOPEN_BACKUP_INTERVAL_MINUTES=360
+LEXOPEN_BACKUP_DIR=/ruta/externa/lexopen-backups
+LEXOPEN_BACKUP_KEEP=14
+```
+
+`LEXOPEN_BACKUP_INTERVAL_MINUTES=0` desactiva la función. Si
+`LEXOPEN_BACKUP_DIR` queda vacío, LexOpen usa un directorio hermano de
+`LEXOPEN_DATA_DIR` con sufijo `-backups`; nunca guarda los respaldos dentro de los
+datos activos. La retención admite entre 1 y 365 respaldos.
+
+Cada ejecución detiene brevemente Next.js y PostgreSQL embebido, copia el estado
+de forma consistente, conserva los últimos respaldos válidos y vuelve a iniciar
+el Host. Una ejecución en curso no se duplica gracias a un bloqueo del directorio
+de backups. Si el reinicio posterior falla, revise los logs y no elimine el último
+respaldo válido. Los respaldos contienen `.env`, PostgreSQL y documentos: deben
+guardarse en un disco con acceso restringido y, para recuperación ante desastre,
+copiarse además a un medio externo cifrado.
+
+Los templates de `deploy/systemd`, `deploy/launchd` y `deploy/windows` ejecutan
+`scripts/web-host.mjs`, por lo que esta configuración también funciona cuando el
+Host se inicia como servicio del sistema. Para una ejecución manual de rotación,
+mantenga el Host detenido y use:
+
+```bash
+npm run web:backup -- --rotate \
+  --backup-dir /ruta/externa/lexopen-backups \
+  --keep 14
+```
+
+El comando manual también valida que no exista `postmaster.pid`; no copie
+`pgdata` mientras PostgreSQL esté activo.

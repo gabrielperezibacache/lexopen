@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { clp, DOC_TIPOS } from "@/lib/billing";
+import { publicUserSelect } from "@/lib/auth/public-user";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { InvoiceActions } from "@/components/billing/InvoiceActions";
 
@@ -14,10 +15,10 @@ export default async function InvoiceDetailPage({ params }: Params) {
     include: {
       cliente: true,
       causa: true,
-      author: true,
+      author: { select: publicUserSelect },
       lines: true,
       payments: { orderBy: { date: "desc" } },
-      timeEntries: { include: { user: true } },
+      timeEntries: { include: { user: { select: publicUserSelect } } },
       expenses: true,
     },
   });
