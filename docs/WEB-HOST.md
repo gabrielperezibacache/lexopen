@@ -172,11 +172,14 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   CRON_SECRET=<secreto-aleatorio>
   PJUD_SYNC_INTERVAL_MINUTES=240
   PJUD_SYNC_CONCURRENCY=5
+  # Opcional: notificaciones in-app de plazos próximos
+  PLAZOS_ALERTAS_INTERVAL_MINUTES=60
+  PLAZOS_ALERTAS_DAYS=3
   ```
 
-  `web:host` ejecutará la sincronización contra su propio endpoint sin crear otro
-  servicio. LexOpen corre en **su host**; puede usar APIs externas (OJV, CAPTCHA,
-  `PJUD_API_URL`).
+  `web:host` ejecutará la sincronización (y las alertas de plazos, si las activa)
+  contra su propio endpoint sin crear otro servicio. LexOpen corre en **su host**;
+  puede usar APIs externas (OJV, CAPTCHA, `PJUD_API_URL`).
 
   **Setup recomendado PJUD:** `npm run pjud:chromium` (una vez) → configure
   `CAPTCHA_SOLVER_*` → `npm run pjud:host` (sidecar `:8787`) → en otra terminal

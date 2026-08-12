@@ -286,6 +286,79 @@ async function startLocalDigestScheduler(dataDir) {
   return timer;
 }
 
+async function startLocalPlazosAlertasScheduler(dataDir) {
+  const config = readConfig(dataDir);
+  const env = {
+    ...process.env,
+    ...readEnvFile(path.join(dataDir, ".env")),
+  };
+  const intervalMinutes = Number(env.PLAZOS_ALERTAS_INTERVAL_MINUTES || 0);
+  if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) return null;
+
+  const secret = env.CRON_SECRET;
+  if (!secret) {
+    console.warn(
+      "[web-host] PLAZOS_ALERTAS_INTERVAL_MINUTES está configurado, pero falta CRON_SECRET; scheduler de alertas desactivado."
+    );
+    return null;
+  }
+
+  const daysRaw = Number(env.PLAZOS_ALERTAS_DAYS || 3);
+  const days = Number.isFinite(daysRaw)
+    ? Math.max(0, Math.min(30, Math.trunc(daysRaw)))
+    : 3;
+
+  const port = Number(env.PORT || config.port || 3000);
+  const baseUrl = `http://127.0.0.1:${port}`;
+  if (!(await waitForHost(baseUrl))) {
+    console.warn(
+      "[web-host] No se pudo iniciar el scheduler de alertas de plazos: health no disponible."
+    );
+    return null;
+  }
+
+  const run = async () => {
+    try {
+      const response = await fetch(
+        `${baseUrl}/api/plazos/alertas?days=${days}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-cron-secret": secret,
+          },
+          body: "{}",
+          signal: AbortSignal.timeout(60_000),
+          redirect: "error",
+        }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        console.warn(
+          "[web-host] Alertas de plazos fallaron:",
+          body.error || response.status
+        );
+        return;
+      }
+      console.log(
+        `[web-host] Alertas plazos: ${body.plazos || 0} plazos · ${body.notifications || 0} notificaciones (ventana ${body.days ?? days}d).`
+      );
+    } catch (error) {
+      console.warn(
+        "[web-host] Alertas de plazos fallaron:",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  };
+
+  await run();
+  const timer = setInterval(() => void run(), intervalMinutes * 60_000);
+  console.log(
+    `[web-host] Scheduler alertas de plazos activo cada ${intervalMinutes} minutos (ventana ${days}d).`
+  );
+  return timer;
+}
+
 if (!fs.existsSync(desktopRuntime)) {
   runSetup(["run", "desktop:install"], "Instalando runtime local de PostgreSQL");
 }
@@ -300,6 +373,7 @@ const dataDir = path.resolve(
 let schedulerTimer = null;
 let misCausasSchedulerTimer = null;
 let digestSchedulerTimer = null;
+let plazosAlertasSchedulerTimer = null;
 let backupScheduler = null;
 let child = null;
 const expectedChildExits = new WeakSet();
@@ -311,6 +385,7 @@ async function shutdown(exitCode = 0) {
   if (schedulerTimer) clearInterval(schedulerTimer);
   if (misCausasSchedulerTimer) clearInterval(misCausasSchedulerTimer);
   if (digestSchedulerTimer) clearInterval(digestSchedulerTimer);
+  if (plazosAlertasSchedulerTimer) clearInterval(plazosAlertasSchedulerTimer);
   if (backupScheduler) {
     await backupScheduler.stop().catch((error) => {
       console.warn("[web-host] No se pudo detener el scheduler de backups:", error);
@@ -419,6 +494,21 @@ void startLocalDigestScheduler(dataDir)
   .catch((error) => {
     console.warn(
       "[web-host] No se pudo iniciar el scheduler digest:",
+      error instanceof Error ? error.message : String(error)
+    );
+  });
+
+void startLocalPlazosAlertasScheduler(dataDir)
+  .then((timer) => {
+    if (shuttingDown) {
+      if (timer) clearInterval(timer);
+    } else {
+      plazosAlertasSchedulerTimer = timer;
+    }
+  })
+  .catch((error) => {
+    console.warn(
+      "[web-host] No se pudo iniciar el scheduler de alertas de plazos:",
       error instanceof Error ? error.message : String(error)
     );
   });

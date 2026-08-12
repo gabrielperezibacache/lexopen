@@ -168,6 +168,12 @@ export async function getConfigSnapshot() {
         syncMinutes: envNumber(env, "PJUD_SYNC_INTERVAL_MINUTES", 240),
         misCausasMinutes: envNumber(env, "PJUD_MIS_CAUSAS_INTERVAL_MINUTES", 0),
         digestMinutes: envNumber(env, "PJUD_DIGEST_INTERVAL_MINUTES", 0),
+        plazosAlertasMinutes: envNumber(
+          env,
+          "PLAZOS_ALERTAS_INTERVAL_MINUTES",
+          0
+        ),
+        plazosAlertasDays: envNumber(env, "PLAZOS_ALERTAS_DAYS", 3),
         concurrency: envNumber(env, "PJUD_SYNC_CONCURRENCY", 5),
         dailySolveBudget: envNumber(env, "PJUD_CAUSAS_DAILY_SOLVE_BUDGET", 50),
         sessionTtlMs: envNumber(env, "PJUD_SESSION_TTL_MS", 1_500_000),
