@@ -10,39 +10,62 @@ export async function GET(req: NextRequest) {
     const user = await requireUser();
     const tipo = req.nextUrl.searchParams.get("tipo");
     const q = req.nextUrl.searchParams.get("q")?.trim();
-    const sites = await prisma.site.findMany({
-      where: {
-        AND: [
-          tipo ? { tipo } : {},
-          q
-            ? {
-                OR: [
-                  { name: { contains: q, mode: "insensitive" } },
-                  { description: { contains: q, mode: "insensitive" } },
-                  { slug: { contains: q, mode: "insensitive" } },
-                ],
-              }
-            : {},
-          isCliente(user.role)
-            ? clientSiteWhere(user.id)
-            : {},
-        ],
-      },
-      include: {
-        cliente: true,
-        causa: true,
-        _count: {
+    const where = {
+      AND: [
+        tipo ? { tipo } : {},
+        q
+          ? {
+              OR: [
+                { name: { contains: q, mode: "insensitive" as const } },
+                { description: { contains: q, mode: "insensitive" as const } },
+                { slug: { contains: q, mode: "insensitive" as const } },
+              ],
+            }
+          : {},
+        isCliente(user.role) ? clientSiteWhere(user.id) : {},
+      ],
+    };
+    const sites = isCliente(user.role)
+      ? await prisma.site.findMany({
+          where,
           select: {
-            files: true,
-            tasks: true,
-            members: true,
-            isheets: true,
-            qaThreads: true,
+            id: true,
+            name: true,
+            description: true,
+            tipo: true,
+            color: true,
+            isClientVisible: true,
+            updatedAt: true,
+            cliente: { select: { razonSocial: true } },
+            _count: {
+              select: {
+                files: true,
+                tasks: true,
+                members: true,
+                isheets: true,
+                qaThreads: true,
+              },
+            },
           },
-        },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+          orderBy: { updatedAt: "desc" },
+        })
+      : await prisma.site.findMany({
+          where,
+          include: {
+            cliente: true,
+            causa: true,
+            _count: {
+              select: {
+                files: true,
+                tasks: true,
+                members: true,
+                isheets: true,
+                qaThreads: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
+        });
     return NextResponse.json(sites);
   } catch (e) {
     return handleRouteError(e);

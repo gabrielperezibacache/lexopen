@@ -15,27 +15,24 @@ export default async function PortalPage() {
         ? { members: { some: { userId: user.id } } }
         : {}),
     },
-    include: {
-      cliente: true,
-      causa: true,
+    select: {
+      id: true,
+      name: true,
+      tipo: true,
+      cliente: { select: { razonSocial: true } },
+      causa: { select: { rit: true, tribunal: true } },
       files: {
         where: {
           tags: { contains: "cliente" },
           confidencial: false,
         },
+        select: { id: true, name: true },
         take: 5,
         orderBy: { updatedAt: "desc" },
       },
-      tasks: {
-        where: {
-          status: { not: "done" },
-          ...(isCliente(user.role) ? { assigneeId: user.id } : {}),
-        },
-        take: 3,
-        orderBy: { dueDate: "asc" },
-      },
       qaThreads: {
         where: { status: "open" },
+        select: { id: true, subject: true },
         take: 3,
         orderBy: { updatedAt: "desc" },
       },

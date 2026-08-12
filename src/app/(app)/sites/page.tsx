@@ -19,9 +19,14 @@ export default async function SitesPage() {
   const user = await requireUser();
   const sites = await prisma.site.findMany({
     where: isCliente(user.role) ? clientSiteWhere(user.id) : undefined,
-    include: {
-      cliente: true,
-      causa: true,
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      tipo: true,
+      color: true,
+      cliente: { select: { razonSocial: true } },
+      causa: { select: { rit: true } },
       _count: { select: { files: true, tasks: true, members: true, isheets: true } },
     },
     orderBy: { updatedAt: "desc" },

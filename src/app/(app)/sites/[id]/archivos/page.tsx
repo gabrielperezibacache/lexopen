@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { assertSitePageAccess, confidentialFileWhere } from "@/lib/auth/access";
+import { isCliente } from "@/lib/auth/rbac";
+import { publicUserSelect } from "@/lib/auth/public-user";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { formatDate } from "@/components/ui";
 import { SiteFileActions } from "@/components/sites/SiteFileActions";
@@ -11,8 +13,12 @@ type Params = { params: Promise<{ id: string }> };
 export default async function SiteFilesPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
+  const clientView = isCliente(user.role);
   const fileWhere = confidentialFileWhere(user.role);
-  const site = await prisma.site.findUnique({ where: { id } });
+  const site = await prisma.site.findUnique({
+    where: { id },
+    select: { id: true, name: true, tipo: true, color: true },
+  });
   if (!site) notFound();
 
   const folders = await prisma.folder.findMany({
@@ -22,7 +28,7 @@ export default async function SiteFilesPage({ params }: Params) {
         where: fileWhere,
         include: {
           versions: { orderBy: { version: "desc" }, take: 3 },
-          comments: { include: { author: true } },
+          comments: { include: { author: { select: publicUserSelect } } },
         },
         orderBy: { name: "asc" },
       },
@@ -33,19 +39,26 @@ export default async function SiteFilesPage({ params }: Params) {
     where: { siteId: id, folderId: null, ...fileWhere },
     include: {
       versions: { orderBy: { version: "desc" }, take: 3 },
-      comments: { include: { author: true } },
+      comments: { include: { author: { select: publicUserSelect } } },
     },
   });
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/archivos" />
+      <SiteNav
+        siteId={site.id}
+        siteName={site.name}
+        tipo={site.tipo}
+        color={site.color}
+        active="/archivos"
+        clientView={clientView}
+      />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--ink-soft)]/75">
           VDR / Archivos del espacio — carpetas, versiones, comentarios y metadatos.
           Los documentos por causa están en Documentos.
         </p>
-        <SiteFileActions siteId={site.id} />
+        {!clientView && <SiteFileActions siteId={site.id} />}
       </div>
 
       <div className="space-y-4">
@@ -53,7 +66,7 @@ export default async function SiteFilesPage({ params }: Params) {
           <EmptyState
             title="Data room vacío"
             description="Suba el primer archivo o cree una carpeta para organizar el VDR de este espacio."
-            action={<SiteFileActions siteId={site.id} />}
+            action={!clientView ? <SiteFileActions siteId={site.id} /> : undefined}
           />
         )}
         {folders.map((folder) => (

@@ -29,19 +29,25 @@ export function SiteNav({
   tipo,
   color,
   active,
+  clientView = false,
 }: {
   siteId: string;
   siteName: string;
   tipo: string;
   color: string;
   active: string;
+  clientView?: boolean;
 }) {
+  const visibleTabs = clientView
+    ? tabs.filter((tab) => tab.href === "/archivos" || tab.href === "/qa")
+    : tabs;
+
   return (
     <div className="mb-6 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/sites" className="text-sm text-[var(--sea)]">
-            ← Espacios
+          <Link href={clientView ? "/portal" : "/sites"} className="text-sm text-[var(--sea)]">
+            {clientView ? "← Portal" : "← Espacios"}
           </Link>
           <div className="mt-2 flex items-center gap-3">
             <span className="h-4 w-4 rounded-full" style={{ background: color }} />
@@ -54,7 +60,7 @@ export function SiteNav({
       </div>
       <div className="-mx-1 overflow-x-auto border-b border-[var(--line)] pb-1">
         <div className="flex min-w-max gap-1 px-1">
-          {tabs.map((t) => {
+          {visibleTabs.map((t) => {
             const href = `/sites/${siteId}${t.href}`;
             const isActive = active === t.href;
             return (
