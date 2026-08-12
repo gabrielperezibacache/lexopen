@@ -44,6 +44,16 @@ assert.equal(
   isSafeOutboundHttpUrl("http://127.0.0.1/secret", { allowHttp: true }),
   false
 );
+assert.equal(
+  isSafeOutboundHttpUrl("https://[::ffff:a9fe:a9fe]/latest", {
+    allowHttp: false,
+  }),
+  false
+);
+assert.equal(
+  isSafeOutboundHttpUrl("https://10.0.0.1.nip.io/x", { allowHttp: false }),
+  false
+);
 
 env.NODE_ENV = "production";
 env.LEXOPEN_OPEN_ACCESS = "1";

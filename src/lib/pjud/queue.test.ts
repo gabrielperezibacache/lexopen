@@ -29,6 +29,18 @@ assert.equal(
 assert.equal(isBackupableDocumentoRef("doc:abc"), false);
 assert.equal(isBackupableDocumentoRef("http://127.0.0.1/secret.pdf"), false);
 assert.equal(isBackupableDocumentoRef("http://169.254.169.254/latest"), false);
+assert.equal(
+  isBackupableDocumentoRef("https://[::ffff:169.254.169.254]/x.pdf"),
+  false
+);
+assert.equal(
+  isBackupableDocumentoRef("https://evil.example.com/files/a.pdf"),
+  false
+);
+assert.equal(
+  isBackupableDocumentoRef("https://www.pjud.cl/files/a.pdf"),
+  true
+);
 
 const prevConc = process.env.PJUD_SYNC_CONCURRENCY;
 delete process.env.PJUD_SYNC_CONCURRENCY;

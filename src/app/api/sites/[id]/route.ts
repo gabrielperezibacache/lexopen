@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
 import { clientVisibleFileWhere } from "@/lib/auth/access";
-import { isCliente } from "@/lib/auth/rbac";
+import { isAdmin, isCliente } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { siteFileListSelect } from "@/lib/sites/file-select";
 
@@ -96,9 +96,16 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     assertCsrf(req);
-    await requireStaff();
+    const actor = await requireStaff();
     const { id } = await params;
+    await requireSiteAccess(id, actor);
     const body = await req.json();
+    if (body.isClientVisible !== undefined && !isAdmin(actor.role)) {
+      return NextResponse.json(
+        { error: "Solo admin puede cambiar la visibilidad del portal cliente" },
+        { status: 403 }
+      );
+    }
     const site = await prisma.site.update({
       where: { id },
       data: {
@@ -107,7 +114,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         tipo: body.tipo,
         status: body.status,
         color: body.color,
-        isClientVisible: body.isClientVisible,
+        ...(body.isClientVisible !== undefined
+          ? { isClientVisible: Boolean(body.isClientVisible) }
+          : {}),
       },
     });
     return NextResponse.json(site);

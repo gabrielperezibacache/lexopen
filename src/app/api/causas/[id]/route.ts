@@ -10,6 +10,7 @@ import {
 import { writeAudit } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { isStaff } from "@/lib/auth/rbac";
+import { documentoListSelect } from "@/lib/sites/file-select";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -26,6 +27,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       documentos: {
         where: confidentialWhere(user.role),
         orderBy: { updatedAt: "desc" },
+        select: documentoListSelect,
       },
       plazos: { orderBy: { fechaLimite: "asc" } },
       notas: { orderBy: { updatedAt: "desc" } },
