@@ -37,6 +37,11 @@ const PRESERVE_IF_SET = new Set([
   "LEXOPEN_TRUSTED_PROXY",
   "LEXOPEN_BOOTSTRAP_TOKEN",
   "LEXOPEN_RECOVERY_TOKEN",
+  "PJUD_ALLOW_DEMO",
+  "PJUD_SCRAPER_URL",
+  "PJUD_SCRAPER_KEY",
+  "PJUD_SCRAPER_ALLOW_PRIVATE",
+  "CRON_SECRET",
   "STORAGE_PATH",
   "OBSIDIAN_VAULT_PATH",
   "OBSIDIAN_REST_URL",
@@ -323,6 +328,7 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     LEXOPEN_DEMO_SWITCHER: opts.seedDemo || cfg.seedDemo ? "1" : "0",
     HERMES_ALLOW_DEMO: "0",
     LLM_ALLOW_DEMO: "1",
+    PJUD_ALLOW_DEMO: "0",
     NEXT_PUBLIC_APP_NAME: "LexOpen",
     NEXT_PUBLIC_APP_URL: publicUrl,
     LEXOPEN_TRUSTED_ORIGINS: [
@@ -332,6 +338,10 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     ].join(","),
     LEXOPEN_BOOTSTRAP_TOKEN: crypto.randomBytes(32).toString("hex"),
     LEXOPEN_RECOVERY_TOKEN: crypto.randomBytes(32).toString("hex"),
+    CRON_SECRET: crypto.randomBytes(24).toString("hex"),
+    PJUD_SCRAPER_KEY: crypto.randomBytes(24).toString("hex"),
+    PJUD_SCRAPER_URL: "http://127.0.0.1:8787",
+    PJUD_SCRAPER_ALLOW_PRIVATE: "1",
   };
 
   const merged = mergeEnvPreserveUser(existing, defaults);
