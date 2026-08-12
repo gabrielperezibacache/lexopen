@@ -107,18 +107,16 @@ etapas procesales, días hábiles/calendario simplificados y valores UF. El moto
 plazos es una ayuda operativa: **no reemplaza el cómputo oficial del tribunal ni la
 revisión de un abogado**.
 
-Incluye también monitoreo de causas estilo CausaMonitor/CaseTracking: semáforos,
-cuadernos, receptor, escritos, cola de fallidos, scrape OJV opt-in (CAPTCHA) o
-sidecar, ClaveÚnica cifrada → Mis Causas, timeline clasificado y alertas.
-Conectores: partner API, scraper, webhook, demo o CSV. El scrape y ClaveÚnica
-van desactivados por defecto (kill switches); no se presentan como API oficial
-de PJUD.
+Incluye también monitoreo de causas PJUD: semáforos, cuadernos, receptor,
+escritos, cola de fallidos, scrape OJV opt-in (CAPTCHA) o sidecar, ClaveÚnica
+cifrada → Mis Causas, timeline clasificado y alertas. Conectores: partner API,
+scraper, webhook, demo o CSV. El scrape y ClaveÚnica van desactivados por
+defecto (kill switches); no se presentan como API oficial de PJUD.
 
-**Copiloto IA** (inspirado en asistentes tipo [Julia.cl](https://www.julia.cl/asistente)):
-entiende la petición, recuerda el hilo, busca en causas/documentos del estudio y
-responde con fuentes del host. Utilidades: briefing, Q&A documental, borradores,
-plazos, investigación y casos similares. Todo como ayuda operativa con revisión
-humana — no asesoría automática.
+**Copiloto IA:** entiende la petición, recuerda el hilo, busca en
+causas/documentos del estudio y responde con fuentes del host. Utilidades:
+briefing, Q&A documental, borradores, plazos, investigación y casos similares.
+Todo como ayuda operativa con revisión humana — no asesoría automática.
 
 Sin proveedor externo, la alternativa local es exportar el CSV desde la consulta
 oficial e importarlo en la ficha de la causa. El importador acepta
@@ -484,7 +482,7 @@ variables más relevantes:
 | `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL` | No | Endpoint multi-proveedor OpenAI-compatible (OpenAI, Azure, Groq, Ollama, Hermes, custom). Prioridad sobre `HERMES_*`. |
 | `LLM_ALLOW_DEMO` | No | Demo etiquetado si el proveedor IA no responde (`0` = fail-closed). |
 | `PJUD_API_URL`, `PJUD_API_KEY` | No | Conector partner para sincronizar movimientos judiciales. |
-| `PJUD_SCRAPER_URL`, `PJUD_SCRAPER_KEY` | No | Sidecar scrape (lookup + Mis Causas), estilo CausaMonitor. |
+| `PJUD_SCRAPER_URL`, `PJUD_SCRAPER_KEY` | No | Sidecar scrape (lookup + Mis Causas). |
 | `PJUD_PUBLIC_SCRAPE` | No | `1` = scrape OJV in-process (Playwright + CAPTCHA). |
 | `CAPTCHA_SOLVER_PROVIDER`, `CAPTCHA_SOLVER_API_KEY` | No | `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster`. Key opcional solo en `nopecha`. |
 | `PJUD_CLAVEUNICA_SCRAPE` | No | `1` = permite login ClaveÚnica automatizado (Mis Causas). |
