@@ -47,6 +47,7 @@
 - [Recorrido de la demo](#-recorrido-de-la-demo)
 - [Arquitectura](#-arquitectura)
 - [Inicio rápido](#-inicio-rápido)
+- [Instalación web 100% local](#-instalación-web-100-local)
 - [Usuarios y datos demo](#-usuarios-y-datos-demo)
 - [Configuración](#-configuración)
 - [Integraciones](#-integraciones)
@@ -155,6 +156,77 @@ En el modo desktop, un único **Host** ejecuta LexOpen y PostgreSQL embebido. Lo
 equipos restantes actúan como clientes contra esa misma instalación, normalmente a
 través de Tailscale o de una LAN privada. No se crea una base de datos separada por
 laptop.
+
+## 🌐 Instalación web 100% local
+
+Esta es la opción recomendada si no desea instalar Electron en cada equipo.
+Un único PC ejecuta LexOpen y PostgreSQL embebido; los demás equipos usan el
+navegador. No requiere Render, S3, Tailscale ni servicios externos durante la
+ejecución.
+
+### Requisitos del Host
+
+- Node.js 22.x y npm.
+- Git.
+- Un directorio local con espacio para PostgreSQL y documentos.
+- Red LAN si habrá clientes en otros equipos.
+
+### Instalación
+
+```bash
+git clone https://github.com/gabrielperezibacache/lexopen.git
+cd lexopen
+npm ci
+npm run web:host
+```
+
+`web:host` instala el runtime local si falta, compila solo cuando es necesario,
+inicia PostgreSQL embebido, aplica migraciones y arranca la web en
+`0.0.0.0:3000`.
+
+Para elegir dónde guardar todos los datos:
+
+```bash
+# macOS / Linux
+LEXOPEN_DATA_DIR=/ruta/lexopen-data npm run web:host
+
+# Windows PowerShell
+$env:LEXOPEN_DATA_DIR="$HOME\LexOpenData"; npm run web:host
+```
+
+### Primer acceso
+
+El comando imprime un enlace `/setup?token=...`. Ábralo en el Host, cree el
+administrador e inicie sesión. Después cree los usuarios del estudio desde
+**Personas**.
+
+En el Host:
+
+```text
+http://127.0.0.1:3000
+```
+
+Desde otro equipo de la LAN:
+
+```text
+http://IP-PRIVADA-DEL-HOST:3000
+```
+
+Para acceso LAN, agregue el origen exacto al `.env` dentro de
+`LEXOPEN_DATA_DIR` y reinicie:
+
+```dotenv
+LEXOPEN_TRUSTED_ORIGINS=http://127.0.0.1:3000,http://IP-PRIVADA-DEL-HOST:3000
+```
+
+### Datos y operación
+
+- Los datos quedan en `LEXOPEN_DATA_DIR` o en la carpeta predeterminada del sistema.
+- No configure S3, Google, Hermes o PJUD si necesita una instalación completamente local.
+- Detenga el Host con `Ctrl+C` antes de copiar el directorio de datos como respaldo.
+- No ejecute `npm run db:seed`, `npm run setup` ni `npm run db:reset` con datos reales.
+
+Guía ampliada: [`docs/WEB-HOST.md`](docs/WEB-HOST.md).
 
 ## 🚀 Inicio rápido
 
