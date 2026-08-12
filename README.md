@@ -347,14 +347,27 @@ Abra `http://localhost:3000/login` e ingrese con `socio@estudio.cl` / `lexopen`.
 
 ### B · Estudio real desde cero (sin demo)
 
-**Opción B1 — instalación limpia (recomendado si aún no cargó el seed):**
+**Recomendado — Host local** (`web:host` genera secretos y demos en `0`):
+
+```bash
+git clone https://github.com/gabrielperezibacache/lexopen.git
+cd lexopen
+npm ci
+LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
+# Abra /setup y pegue LEXOPEN_BOOTSTRAP_TOKEN desde el .env del data dir
+```
+
+Detalle: [`docs/WEB-HOST.md`](docs/WEB-HOST.md#checklist-de-producción).
+
+**Opción B1 — Postgres externo + Next** (solo si no usa el Host embebido):
 
 ```bash
 git clone https://github.com/gabrielperezibacache/lexopen.git
 cd lexopen
 cp .env.example .env
-# Edite .env: SESSION_SECRET fuerte, LEXOPEN_DEMO_SWITCHER=0,
-# HERMES_ALLOW_DEMO=0, PJUD_ALLOW_DEMO=0
+# Obligatorio: SESSION_SECRET aleatorio fuerte (≥16, no "change-me…"),
+# LEXOPEN_DEMO_SWITCHER=0, HERMES_ALLOW_DEMO=0, LLM_ALLOW_DEMO=0, PJUD_ALLOW_DEMO=0
+# No arranque producción con el .env.example sin editar (el boot fallará).
 
 docker run --name lexopen-postgres \
   -e POSTGRES_USER=lexopen -e POSTGRES_PASSWORD=lexopen \

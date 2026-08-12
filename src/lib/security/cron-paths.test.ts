@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   CRON_API_PATHS,
   cronSecretMatches,
+  isAuthorizedCronRequest,
   isCronApiPath,
 } from "@/lib/security/cron-paths";
 
@@ -17,5 +18,19 @@ assert.equal(cronSecretMatches("abc", "ab"), false);
 assert.equal(cronSecretMatches(null, "abc"), false);
 assert.equal(cronSecretMatches("abc", ""), false);
 assert.equal(cronSecretMatches("abc", undefined), false);
+
+assert.equal(
+  isAuthorizedCronRequest("/api/plazos/alertas", "secret", "secret"),
+  true
+);
+assert.equal(
+  isAuthorizedCronRequest("/api/plazos/alertas", "wrong", "secret"),
+  false
+);
+assert.equal(isAuthorizedCronRequest("/api/health", "secret", "secret"), false);
+assert.equal(
+  isAuthorizedCronRequest("/api/causas/monitoreo", null, "secret"),
+  false
+);
 
 console.log("security/cron-paths.test.ts OK");

@@ -6,10 +6,7 @@ import {
   SETUP_TOKEN_COOKIE,
   setupCookieOptions,
 } from "@/lib/auth/setup-cookies";
-import {
-  cronSecretMatches,
-  isCronApiPath,
-} from "@/lib/security/cron-paths";
+import { isAuthorizedCronRequest } from "@/lib/security/cron-paths";
 import { isStrongSessionSecret } from "@/lib/security/production-env";
 
 const SESSION_COOKIE = "lexopen_session";
@@ -260,11 +257,7 @@ export async function proxy(req: NextRequest) {
 
   // Host schedulers authenticate with x-cron-secret (no session cookie).
   if (
-    isCronApiPath(pathname) &&
-    cronSecretMatches(
-      req.headers.get("x-cron-secret"),
-      process.env.CRON_SECRET
-    )
+    isAuthorizedCronRequest(pathname, req.headers.get("x-cron-secret"))
   ) {
     return pass();
   }

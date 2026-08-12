@@ -49,6 +49,8 @@ const PRESERVE_IF_SET = new Set([
   "OBSIDIAN_ALLOW_PRIVATE_URL",
   "LEXOPEN_KEEP_LLM_DEMO",
   "LEXOPEN_KEEP_DEMO_SWITCHER",
+  "LEXOPEN_KEEP_HERMES_DEMO",
+  "LEXOPEN_KEEP_PJUD_DEMO",
   "S3_BUCKET",
   "S3_REGION",
   "S3_ENDPOINT",
@@ -427,24 +429,22 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     finalText = serializeEnv(forced.map, forced.order);
   }
 
-  // Upgrade older / copied .env that left demo flags on (forbidden in prod boot).
+  // Upgrade older / copied .env that left demo flags on.
   // Opt back in only with explicit KEEP_* keys in the data-dir .env.
   {
     const forced = parseEnvFile(finalText);
+    const demos = [
+      ["LLM_ALLOW_DEMO", "LEXOPEN_KEEP_LLM_DEMO"],
+      ["LEXOPEN_DEMO_SWITCHER", "LEXOPEN_KEEP_DEMO_SWITCHER"],
+      ["HERMES_ALLOW_DEMO", "LEXOPEN_KEEP_HERMES_DEMO"],
+      ["PJUD_ALLOW_DEMO", "LEXOPEN_KEEP_PJUD_DEMO"],
+    ];
     let changed = false;
-    if (
-      forced.map.LLM_ALLOW_DEMO === "1" &&
-      forced.map.LEXOPEN_KEEP_LLM_DEMO !== "1"
-    ) {
-      forced.map.LLM_ALLOW_DEMO = "0";
-      changed = true;
-    }
-    if (
-      forced.map.LEXOPEN_DEMO_SWITCHER === "1" &&
-      forced.map.LEXOPEN_KEEP_DEMO_SWITCHER !== "1"
-    ) {
-      forced.map.LEXOPEN_DEMO_SWITCHER = "0";
-      changed = true;
+    for (const [flag, keep] of demos) {
+      if (forced.map[flag] === "1" && forced.map[keep] !== "1") {
+        forced.map[flag] = "0";
+        changed = true;
+      }
     }
     if (changed) {
       finalMap = forced.map;
