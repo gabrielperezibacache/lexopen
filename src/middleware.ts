@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const SESSION_COOKIE = "lexopen_session";
+const CSRF_COOKIE = "lexopen_csrf";
 
 const PUBLIC_PATHS = [
   "/",
@@ -108,6 +109,36 @@ function isClientAllowedPath(pathname: string) {
   );
 }
 
+function cookieSecureFlag() {
+  const explicit = process.env.LEXOPEN_COOKIE_SECURE;
+  if (explicit === "1") return true;
+  if (explicit === "0") return false;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "";
+  if (appUrl.startsWith("https://")) return true;
+  if (appUrl.startsWith("http://")) return false;
+  return (
+    process.env.NODE_ENV === "production" && process.env.LEXOPEN_DESKTOP !== "1"
+  );
+}
+
+function newEdgeCsrfToken() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function withCsrfCookie(req: NextRequest, res: NextResponse) {
+  if (req.cookies.get(CSRF_COOKIE)?.value) return res;
+  res.cookies.set(CSRF_COOKIE, newEdgeCsrfToken(), {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: cookieSecureFlag(),
+    path: "/",
+    maxAge: 14 * 24 * 60 * 60,
+  });
+  return res;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const requestHeaders = new Headers(req.headers);
@@ -124,6 +155,14 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/favicon") ||
     pathname.match(/\.(svg|png|jpg|css|js|ico|webp)$/)
   ) {
+    // Mint CSRF cookie early for login/setup forms (Origin + double-submit).
+    if (
+      pathname === "/login" ||
+      pathname === "/setup" ||
+      pathname === "/recovery"
+    ) {
+      return withCsrfCookie(req, pass());
+    }
     return pass();
   }
 
@@ -148,7 +187,7 @@ export async function middleware(req: NextRequest) {
     }
     const login = new URL("/login", req.url);
     login.searchParams.set("next", pathname);
-    return NextResponse.redirect(login);
+    return withCsrfCookie(req, NextResponse.redirect(login));
   }
 
   // Role ACL comes from the signed session token — never from a forgeable cookie.
@@ -159,10 +198,13 @@ export async function middleware(req: NextRequest) {
         { status: 403 }
       );
     }
-    return NextResponse.redirect(new URL("/portal", req.url));
+    return withCsrfCookie(
+      req,
+      NextResponse.redirect(new URL("/portal", req.url))
+    );
   }
 
-  return pass();
+  return withCsrfCookie(req, pass());
 }
 
 export const config = {

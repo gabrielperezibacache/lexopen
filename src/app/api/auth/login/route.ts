@@ -10,6 +10,8 @@ import { hashPassword, looksHashed, verifyPassword } from "@/lib/auth/password";
 import { canImpersonate } from "@/lib/auth/rbac";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { assertCsrf, handleRouteError } from "@/lib/api";
+import { baseCookieOptions } from "@/lib/auth/cookie-options";
+import { appendCsrfCookie } from "@/lib/auth/csrf-token";
 
 const schema = z.object({
   email: z.string().email(),
@@ -86,19 +88,14 @@ export async function POST(req: NextRequest) {
       },
       demoSwitcher: canImpersonate(),
     });
-    const cookieBase = {
-      httpOnly: true,
-      sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: session.maxAge,
-    };
+    const cookieBase = baseCookieOptions({ maxAge: session.maxAge });
     res.cookies.set(SESSION_COOKIE, session.value, cookieBase);
     // UX hint only — authorization uses the signed session token role.
     res.cookies.set(ROLE_COOKIE, user.role, {
       ...cookieBase,
       httpOnly: false,
     });
+    appendCsrfCookie(res);
     return res;
   } catch (e) {
     if (e instanceof z.ZodError) {
