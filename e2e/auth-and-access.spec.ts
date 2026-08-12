@@ -59,6 +59,7 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   expect(exportHref).not.toContain("template=1");
   expect(templateHref).toContain("format=csv");
   expect(templateHref).toContain("template=1");
+  await expect(page.getByRole("button", { name: "Vista previa" })).toBeVisible();
 
   const invoicesResponse = await page.request.get("/api/billing/invoices?status=emitida");
   expect(invoicesResponse.ok()).toBeTruthy();

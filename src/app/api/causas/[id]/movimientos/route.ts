@@ -21,6 +21,7 @@ import {
 import { parseLocalDateInput } from "@/lib/minutas";
 
 type Params = { params: Promise<{ id: string }> };
+const MAX_PREVIEW_ROWS = 100;
 
 function parseMovementDate(value?: string) {
   const parsed = parseLocalDateInput(value);
@@ -120,6 +121,46 @@ export async function POST(req: NextRequest, { params }: Params) {
           { status: 400 }
         );
       }
+      const movimientos = rows.map((row) => {
+        if (!row.fecha.trim()) {
+          throw httpError("Cada fila CSV debe incluir una fecha", 400);
+        }
+        const fecha = parseMovementDate(row.fecha);
+        const classified = classifyMovimiento(row.titulo, row.detalle);
+        return {
+          causaId: id,
+          titulo: row.titulo,
+          detalle: row.detalle || null,
+          fuente: "import",
+          tipo: classified.tipo,
+          relevante: classified.relevante,
+          referencia: row.referencia || null,
+          externalId: `import:${row.externalId || fingerprint(row.titulo, fecha, row.referencia)}`,
+          fecha,
+        };
+      });
+      if (req.nextUrl.searchParams.get("preview") === "1") {
+        const causa = await prisma.causa.findUnique({
+          where: { id },
+          select: { id: true },
+        });
+        if (!causa) {
+          return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
+        }
+        return NextResponse.json({
+          preview: true,
+          total: movimientos.length,
+          truncated: movimientos.length > MAX_PREVIEW_ROWS,
+          rows: movimientos.slice(0, MAX_PREVIEW_ROWS).map((row) => ({
+            titulo: row.titulo,
+            fecha: row.fecha.toISOString(),
+            referencia: row.referencia,
+            externalId: row.externalId,
+            tipo: row.tipo,
+            relevante: row.relevante,
+          })),
+        });
+      }
       const created = await prisma.$transaction(async (tx) => {
         const causa = await tx.causa.findUnique({
           where: { id },
@@ -131,24 +172,6 @@ export async function POST(req: NextRequest, { params }: Params) {
           },
         });
         if (!causa) throw httpError("Causa no encontrada", 404);
-        const movimientos = rows.map((row) => {
-          if (!row.fecha.trim()) {
-            throw httpError("Cada fila CSV debe incluir una fecha", 400);
-          }
-          const fecha = parseMovementDate(row.fecha);
-          const classified = classifyMovimiento(row.titulo, row.detalle);
-          return {
-            causaId: id,
-            titulo: row.titulo,
-            detalle: row.detalle || null,
-            fuente: "import",
-            tipo: classified.tipo,
-            relevante: classified.relevante,
-            referencia: row.referencia || null,
-            externalId: `import:${row.externalId || fingerprint(row.titulo, fecha, row.referencia)}`,
-            fecha,
-          };
-        });
         const createdRows = await tx.causaMovimiento.createMany({
           data: movimientos,
           skipDuplicates: true,

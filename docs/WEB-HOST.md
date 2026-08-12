@@ -179,7 +179,8 @@ importador de movimientos de la ficha de la causa. El formato recomendado es
 `titulo,detalle,fecha,referencia,id`; LexOpen clasifica las filas, fuerza
 `fuente=import` y omite reimportaciones con la misma clave determinista. La
 ficha incluye enlaces para descargar la plantilla exacta y exportar hasta 1.000
-movimientos del timeline.
+movimientos del timeline. La vista previa valida el archivo antes de escribir
+en PostgreSQL.
 
 #### Webhook de un proveedor PJUD
 
