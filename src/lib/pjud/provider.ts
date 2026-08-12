@@ -356,12 +356,12 @@ export function pjudSyncIntervalMs() {
 export async function fetchPjudMovimientos(
   causa: PjudCausaRef
 ): Promise<PjudFetchResult> {
-  // LOCAL-FIRST (LexOpen self-host): sidecar / scrape in-process antes que
-  // partner API externo. Datos y ClaveÚnica viven en Postgres local.
+  // Self-hosted LexOpen: datos/vault en este host. APIs externas (OJV,
+  // CAPTCHA, partner) están permitidas; no se usa un host SaaS ajeno.
   let sidecarError: Error | null = null;
   let scrapeError: Error | null = null;
 
-  // 1) Sidecar local (localhost / red privada del host)
+  // 1) Sidecar en su despliegue (localhost / red privada)
   if (scraperSidecarConfigured()) {
     try {
       const fromSidecar = await fetchFromScraperSidecar(causa);
@@ -379,7 +379,7 @@ export async function fetchPjudMovimientos(
     }
   }
 
-  // 2) Scrape OJV in-process (mismo host; CAPTCHA solver es el único hop externo opt-in)
+  // 2) Scrape OJV in-process (Playwright en este host; CAPTCHA = API externa OK)
   if (publicScrapeReady()) {
     try {
       const scraped = await scrapeCausaByRol(causa);
@@ -419,7 +419,7 @@ export async function fetchPjudMovimientos(
     }
   }
 
-  // 3) Partner API opcional (externo; no requerido para instalación 100% local)
+  // 3) Partner API (externa, permitida — no es “host” de LexOpen)
   const fromApi = await fetchFromPartnerApi(causa);
   if (fromApi) {
     if (sidecarError || scrapeError) {
@@ -431,7 +431,7 @@ export async function fetchPjudMovimientos(
         .join("; ");
       return {
         ...fromApi,
-        note: `${fromApi.note} · fallback partner tras fallo local (${reasons})`,
+        note: `${fromApi.note} · fallback partner tras fallo de sidecar/scrape (${reasons})`,
       };
     }
     return fromApi;
@@ -445,7 +445,7 @@ export async function fetchPjudMovimientos(
       .map((e) => (e as Error).message)
       .join("; ");
     if (prefix) {
-      demo.note = `⚠ Ingest local falló (${prefix}). ${demo.note}`;
+      demo.note = `⚠ Sidecar/scrape falló (${prefix}). ${demo.note}`;
     }
     return demo;
   }
@@ -457,7 +457,7 @@ export async function fetchPjudMovimientos(
       ? `Sidecar falló: ${sidecarError.message}`
       : scrapeError
         ? `Scrape local falló: ${scrapeError.message}`
-        : "Sin conector PJUD local. Configure PJUD_SCRAPER_URL (localhost) o PJUD_PUBLIC_SCRAPE=1 + CAPTCHA, o CSV; partner API es opcional.",
+        : "Sin conector PJUD. Configure PJUD_SCRAPER_URL, PJUD_PUBLIC_SCRAPE=1+CAPTCHA, PJUD_API_URL (partner) o CSV. El host de LexOpen sigue siendo el suyo.",
     demo: false,
   };
 }

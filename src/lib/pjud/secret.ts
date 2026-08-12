@@ -1,8 +1,8 @@
 /**
- * Vault local de secretos PJUD / ClaveÚnica.
- * Las credenciales **no salen** de este host: cifrado AES-256-GCM en Postgres
- * (`FirmSettings`), paridad conceptual con CM `/api/pjud-credentials` pero
- * self-hosted (sin Supabase/SaaS ajeno).
+ * Vault de secretos PJUD / ClaveÚnica en el host LexOpen (Postgres).
+ * Cifrado AES-256-GCM en reposo; no plaintext por API. Puede usarse junto a
+ * APIs externas (OJV, CAPTCHA, partner); lo que no se externaliza es el *host*
+ * que custodia la cartera.
  *
  * Token `enc:v2:<iv>.<tag>.<ciphertext>` · clave `PJUD_SECRETS_KEY` (preferida)
  * o `SESSION_SECRET`.

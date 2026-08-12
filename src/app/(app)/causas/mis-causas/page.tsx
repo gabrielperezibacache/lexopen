@@ -114,20 +114,19 @@ export default function MisCausasPage() {
         </p>
         <h1 className="display mt-2 text-4xl">Mis Causas</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Todo local: la ClaveÚnica se cifra en el vault de este host (AES-GCM /
-          Postgres) y no se envía a CausaMonitor ni a otro SaaS. Con ella se lista
-          Mis Causas en OJV y se enciende monitoreo + sync (scrape o sidecar en
-          localhost).
+          LexOpen corre en su host: la ClaveÚnica se cifra aquí (AES-GCM /
+          Postgres) y no la custodia CausaMonitor ni otro SaaS. El login OJV y
+          CAPTCHA sí usan APIs externas. Con las credenciales se lista Mis Causas
+          y se enciende monitoreo + sync (scrape o sidecar).
         </p>
       </div>
 
       <div className="rounded-3xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
-        Riesgo ToS / seguridad: LexOpen automatiza login ClaveÚnica solo con
+        Riesgo ToS / seguridad: automatiza login ClaveÚnica solo con
         <code className="mx-1">PJUD_CLAVEUNICA_SCRAPE=1</code> y
-        scrape/sidecar locales. La contraseña nunca sale en plaintext por API;
-        solo descifrado en este servidor al sincronizar. Prefiera
-        <code className="mx-1">PJUD_SCRAPER_URL=http://127.0.0.1:…</code> si el
-        WAF de PJUD bloquea el proceso web.
+        scrape/sidecar. La contraseña no sale en plaintext por API; solo se
+        descifra en este servidor al sincronizar. Sidecar típico:
+        <code className="mx-1">PJUD_SCRAPER_URL=http://127.0.0.1:…</code>
       </div>
 
       <section className="panel space-y-4 rounded-3xl p-5">

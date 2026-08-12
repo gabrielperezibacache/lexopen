@@ -1,21 +1,22 @@
 # PJUD / CausaMonitor parity (scrape + ClaveÚnica)
 
-## Principio: todo local
+## Principio: host local, APIs externas OK
 
-LexOpen **no** depende de CausaMonitor SaaS ni de un backend cloud ajeno. La
-paridad es de *producto/flujo*; la ejecución es **self-hosted**:
+**Local** = dónde corre LexOpen y dónde se guardan datos/secretos (self-hosted).
+**No** implica “cero red”: puede llamar APIs externas mientras el *host* de la
+app (Postgres, vault ClaveÚnica, cola, sidecar) sea el suyo — no CausaMonitor
+SaaS ni otro backend ajeno que custodie su cartera.
 
-| Qué | Dónde vive |
-|-----|------------|
-| Causas, movimientos, cola `PjudSyncJob`, digest | Postgres del host |
-| ClaveÚnica (RUT + password) | Vault AES-256-GCM en `FirmSettings` (mismo Postgres) |
-| Scrape / Mis Causas | Sidecar o Playwright **en este host** (`localhost` / red privada) |
-| PDF backup | Object storage local o S3 que usted configure |
-| CSV | Import/export sin proveedor externo |
+| Qué | Dónde |
+|-----|--------|
+| App, Postgres, `PjudSyncJob`, digest, vault ClaveÚnica | **Su host** (web:host / VPS / Render propio) |
+| Consulta OJV / ClaveÚnica gob / CAPTCHA solver / partner API / Gmail | **APIs externas permitidas** (salida de red) |
+| Sidecar Playwright | Mismo despliegue o `localhost` / red privada suya |
+| CSV | Offline respecto de OJV; útil como respaldo |
 
-Orden de ingest (**local primero**): sidecar → scrape in-process → partner API
-opcional → demo/CSV. El único hop externo típico del scrape live es el solver
-CAPTCHA (opt-in). Sin él, use CSV desde la consulta oficial.
+Orden de ingest práctico: sidecar → scrape in-process → partner API → demo/CSV.
+Partner y CAPTCHA son llamadas externas válidas; lo que no se usa es un *host*
+externo para LexOpen mismo.
 
 LexOpen toma como referencia el **modelo operativo** de CausaMonitor
 (`app.causamonitor.com` + `api.causamonitor.com`), no el flujo MCP de
@@ -81,13 +82,13 @@ Kill switches, presupuesto CAPTCHA diario y cache TTL (`PJUD_CAUSAS_CACHE_TTL_MS
 
 Kill switch: `PJUD_CLAVEUNICA_SCRAPE=1` (+ scrape/sidecar).
 
-## Orden de ingest al sincronizar (local primero)
+## Orden de ingest al sincronizar
 
-1. `PJUD_SCRAPER_URL` (sidecar en **localhost** / red privada del host)
+1. `PJUD_SCRAPER_URL` (sidecar en su host / red privada)
 2. Scrape in-process (`PJUD_PUBLIC_SCRAPE=1` + CAPTCHA solver + Playwright/Chromium)
-3. `PJUD_API_URL` (partner **opcional** / externo)
+3. `PJUD_API_URL` (partner API externa — permitida)
 4. Demo (`PJUD_ALLOW_DEMO`)
-5. CSV / webhook (100% offline respecto de OJV)
+5. CSV / webhook
 
 Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 

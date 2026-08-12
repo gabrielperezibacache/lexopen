@@ -173,9 +173,9 @@ export default function MonitoreoCausasPage() {
           </p>
           <h1 className="display mt-2 text-4xl">Monitoreo de causas</h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Cartera local con semáforos, salas, próximo sync y cola de fallidos —
-            paridad de flujo CausaMonitor; datos y vault en este host (scrape /
-            sidecar / ClaveÚnica / CSV).
+            Cartera en su host con semáforos, sync y cola — paridad de flujo
+            CausaMonitor. Puede llamar OJV/CAPTCHA/partner; los datos y el vault
+            quedan aquí (scrape / sidecar / ClaveÚnica / CSV).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
