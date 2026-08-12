@@ -154,11 +154,25 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
       }
       const prev = safeJsonParse<
-        Array<Record<string, unknown> & { role?: string }>
+        Array<
+          Record<string, unknown> & {
+            role?: string;
+            approvedMinutaId?: string;
+          }
+        >
       >(existing.messagesJson, []);
       let marked = false;
       for (let i = prev.length - 1; i >= 0; i -= 1) {
         if (prev[i]?.role === "assistant") {
+          if (prev[i]?.approvedMinutaId) {
+            return NextResponse.json(
+              {
+                error: "Este borrador ya fue aprobado; no se puede descartar",
+                code: "already_approved",
+              },
+              { status: 400 }
+            );
+          }
           prev[i] = {
             ...prev[i],
             requireApproval: false,

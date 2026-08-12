@@ -380,6 +380,12 @@ export default async function CausaDetailPage({ params }: Params) {
                   {d.googleDriveId ? ` · Drive: ${d.googleDriveId}` : ""}
                   {d.obsidianPath ? ` · Obsidian: ${d.obsidianPath}` : ""}
                 </div>
+                <Link
+                  href={`/agente?causaId=${causa.id}&utility=doc_qa&documentoId=${d.id}`}
+                  className="mt-1 inline-block text-xs text-[var(--sea)]"
+                >
+                  Preguntar IA
+                </Link>
               </div>
             ))}
             {causa.documentos.length === 0 && (

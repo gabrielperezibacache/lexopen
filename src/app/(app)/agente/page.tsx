@@ -236,10 +236,15 @@ function AgenteInner() {
     const lastAssistant = [...list]
       .reverse()
       .find((m) => m.role === "assistant");
+    const lastUser = [...list].reverse().find((m) => m.role === "user");
+    const restoredUtility =
+      lastAssistant?.utility || lastUser?.utility || utility;
+    if (restoredUtility) setUtility(restoredUtility);
     applyAssistantMeta(lastAssistant, chat.demoMode);
     setLastSource(lastAssistant?.source || (chat.demoMode ? "demo" : ""));
     setAllowDemoApproval(false);
     setApproveMsg("");
+    setApproveHref("");
   }
 
   async function sendPrompt(
@@ -302,18 +307,37 @@ function AgenteInner() {
         await loadChats(causaId || undefined);
       } else if (data.source === "error" || !res.ok) {
         // Mostrar el error en el hilo aunque no se persista
-        setMessages((prev) => [
-          ...prev,
-          { role: "user", content: nextPrompt, utility: u },
-          {
-            role: "assistant",
-            content:
-              data.content || data.note || data.error || "Sin respuesta",
-            source: "error",
-            utility: u,
-            requireApproval: false,
-          },
-        ]);
+        setMessages((prev) => {
+          const next: ChatMessage[] = [
+            ...prev,
+            { role: "user", content: nextPrompt, utility: u },
+            {
+              role: "assistant",
+              content:
+                data.content || data.note || data.error || "Sin respuesta",
+              source: "error",
+              utility: u,
+              requireApproval: false,
+            },
+          ];
+          const pending = [...next]
+            .reverse()
+            .find(
+              (m) =>
+                m.role === "assistant" &&
+                m.source !== "error" &&
+                m.requireApproval &&
+                !m.discarded &&
+                !m.approvedMinutaId
+            );
+          if (pending) {
+            setRequireApproval(true);
+            setReply(pending.content);
+            setLastSource(pending.source || "");
+            setSources(Array.isArray(pending.sources) ? pending.sources : []);
+          }
+          return next;
+        });
       }
       setMeta(
         [
@@ -793,46 +817,50 @@ function AgenteInner() {
           <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--copper)]">
             Revisión humana
           </h2>
-          <p className="text-sm text-[var(--ink-soft)]/80">
-            Este borrador no es asesoría automática. Apruébelo para guardarlo
-            como minuta de la causa, o descártelo.
-          </p>
-          {lastSource === "demo" && (
-            <label className="flex items-center gap-2 text-sm text-[var(--ink-soft)]/80">
-              <input
-                type="checkbox"
-                checked={allowDemoApproval}
-                onChange={(e) => setAllowDemoApproval(e.target.checked)}
-              />
-              Confirmo guardar borrador demo como minuta de prueba
-            </label>
-          )}
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={
-                approveBusy ||
-                !causaId ||
-                (lastSource === "demo" && !allowDemoApproval)
-              }
-              onClick={() => void approveToMinuta()}
-            >
-              {approveBusy ? "Guardando…" : "Aprobar y guardar minuta"}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={discardDraft}
-            >
-              Descartar borrador
-            </button>
-          </div>
-          {!causaId && (
-            <p className="text-xs text-[var(--ink-soft)]/70">
-              Seleccione una causa para habilitar el guardado como minuta.
-            </p>
-          )}
+          {requireApproval ? (
+            <>
+              <p className="text-sm text-[var(--ink-soft)]/80">
+                Este borrador no es asesoría automática. Apruébelo para
+                guardarlo como minuta de la causa, o descártelo.
+              </p>
+              {lastSource === "demo" && (
+                <label className="flex items-center gap-2 text-sm text-[var(--ink-soft)]/80">
+                  <input
+                    type="checkbox"
+                    checked={allowDemoApproval}
+                    onChange={(e) => setAllowDemoApproval(e.target.checked)}
+                  />
+                  Confirmo guardar borrador demo como minuta de prueba
+                </label>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={
+                    approveBusy ||
+                    !causaId ||
+                    (lastSource === "demo" && !allowDemoApproval)
+                  }
+                  onClick={() => void approveToMinuta()}
+                >
+                  {approveBusy ? "Guardando…" : "Aprobar y guardar minuta"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={discardDraft}
+                >
+                  Descartar borrador
+                </button>
+              </div>
+              {!causaId && (
+                <p className="text-xs text-[var(--ink-soft)]/70">
+                  Seleccione una causa para habilitar el guardado como minuta.
+                </p>
+              )}
+            </>
+          ) : null}
           {approveMsg && (
             <p className="text-sm text-[var(--sea)]">
               {approveMsg}{" "}
