@@ -67,8 +67,48 @@ const items: DigestItem[] = [
   },
 ];
 
+assert.equal(
+  isDigestRelevantMovimiento(
+    { relevante: false, esReceptor: false, pendienteResolucion: true },
+    "verde"
+  ),
+  true
+);
+
 const text = formatDigestText(items, "https://app.example");
 assert.match(text, /C-1-2024/);
 assert.match(text, /semáforo rojo/);
+
+const sectioned = formatDigestText(
+  [
+    {
+      causaId: "c2",
+      rit: "C-2-2024",
+      titulo: "Demo 2",
+      tribunal: "Civil",
+      semaforo: "verde",
+      movimientos: [
+        {
+          titulo: "Cédula de notificación",
+          fecha: new Date("2026-08-01"),
+          tipo: "notificacion",
+          esReceptor: true,
+          relevante: true,
+        },
+        {
+          titulo: "Escrito por resolver",
+          fecha: new Date("2026-08-02"),
+          tipo: "escrito",
+          esReceptor: false,
+          relevante: true,
+          pendienteResolucion: true,
+        },
+      ],
+    },
+  ],
+  "https://app.example"
+);
+assert.match(sectioned, /Receptor:/);
+assert.match(sectioned, /Escritos por resolver:/);
 
 console.log("pjud/digest.test.ts OK");

@@ -179,6 +179,43 @@ export default function MonitoreoCausasPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <a className="btn btn-secondary" href="/api/causas/monitoreo?format=csv">
+            Exportar CSV
+          </a>
+          <label className="btn btn-secondary cursor-pointer">
+            Importar CSV
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              disabled={busy}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                setBusy(true);
+                setMsg("");
+                const csv = await file.text();
+                const res = await fetch("/api/causas/monitoreo", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    action: "import-cartera",
+                    csv,
+                    syncNow: false,
+                  }),
+                });
+                const data = await res.json().catch(() => ({}));
+                setBusy(false);
+                setMsg(
+                  res.ok
+                    ? `CSV cartera: ${data.imported} filas · ${data.created} nuevas (sync diferido)`
+                    : data.error || "Error al importar CSV"
+                );
+                await load();
+              }}
+            />
+          </label>
           {fallidos.length > 0 && (
             <button
               className="btn btn-secondary"

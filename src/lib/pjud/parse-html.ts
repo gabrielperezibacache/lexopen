@@ -109,6 +109,7 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
     const esReceptor =
       classified.tipo === "notificacion" ||
       /receptor|c[eé]dula|notificaci[oó]n/i.test(titulo);
+    const pendienteResolucion = Boolean(classified.pendienteResolucion);
     const cuaderno =
       cells.find((c) => /principal|apelaci[oó]n|incidente|exhorto/i.test(c)) ||
       "Principal";
@@ -125,7 +126,7 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
       fecha,
       referencia: folio,
       tipo: classified.tipo,
-      relevante: classified.relevante || esReceptor,
+      relevante: classified.relevante || esReceptor || pendienteResolucion,
       fuente: "pjud",
       cuaderno,
       folio,
@@ -136,6 +137,7 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
           /prove[ií]do|resoluci[oó]n|escrito|c[eé]dula/i.test(c)
         ) || null,
       esReceptor,
+      pendienteResolucion,
       documentoRef,
     });
   }

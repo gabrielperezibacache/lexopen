@@ -75,6 +75,10 @@ services:
         value: "0"
       - key: PJUD_PDF_BACKUP
         value: "0"
+      - key: PJUD_SYNC_INTERVAL_MINUTES
+        value: "240"
+      - key: PJUD_SYNC_CONCURRENCY
+        value: "5"
 
   # Sidecar scrape privado (Playwright + CAPTCHA). Red interna Render.
   - type: pserv
@@ -104,11 +108,11 @@ services:
       - key: PJUD_CAUSAS_DAILY_SOLVE_BUDGET
         value: "50"
 
-  # Cartera due-based cada 6h (UTC)
+  # Cartera due-based cada 4h (UTC) — alineado a PJUD_SYNC_INTERVAL_MINUTES=240
   - type: cron
     name: lexopen-pjud-sync
     runtime: node
-    schedule: "0 */6 * * *"
+    schedule: "0 */4 * * *"
     buildCommand: npm install
     startCommand: curl -fsS -X POST "http://$WEB_HOSTPORT/api/causas/monitoreo" -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d "{}"
     envVars:
@@ -123,11 +127,11 @@ services:
           type: web
           envVarKey: CRON_SECRET
 
-  # Mis Causas ~08:00 America/Santiago (11:00 UTC estándar)
+  # Mis Causas ~07:00 America/Santiago (10:00 UTC estándar) — antes del digest 08:00
   - type: cron
     name: lexopen-mis-causas
     runtime: node
-    schedule: "0 11 * * *"
+    schedule: "0 10 * * *"
     buildCommand: npm install
     startCommand: curl -fsS -X POST "http://$WEB_HOSTPORT/api/pjud/mis-causas" -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d "{\"syncMovimientos\":true}"
     envVars:
@@ -142,7 +146,7 @@ services:
           type: web
           envVarKey: CRON_SECRET
 
-  # Digest ~09:00 America/Santiago (12:00 UTC) — after Mis Causas enqueue/sync
+  # Digest ~08:00 America/Santiago (12:00 UTC estándar) — estilo CausaMonitor 8 AM
   - type: cron
     name: lexopen-pjud-digest
     runtime: node

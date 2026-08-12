@@ -302,6 +302,8 @@ model CausaMovimiento {
   tramite     String?
   /// Notificación de receptor / actuación de notificación
   esReceptor  Boolean  @default(false)
+  /// Escrito / presentación aún pendiente de resolución (paridad CausaMonitor)
+  pendienteResolucion Boolean @default(false)
   documentoRef String?
   fecha       DateTime @default(now())
   createdAt   DateTime @default(now())
@@ -313,6 +315,7 @@ model CausaMovimiento {
   @@index([tipo])
   @@index([causaId, cuaderno])
   @@index([causaId, esReceptor])
+  @@index([causaId, pendienteResolucion])
 }
 
 /// Cola de sync PJUD (éxitos + fallidos reintentables), estilo CausaMonitor

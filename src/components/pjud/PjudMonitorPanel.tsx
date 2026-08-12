@@ -19,6 +19,7 @@ type Movimiento = {
   etapa?: string | null;
   tramite?: string | null;
   esReceptor?: boolean;
+  pendienteResolucion?: boolean;
   documentoRef?: string | null;
 };
 
@@ -94,6 +95,9 @@ function MovementCard({ m }: { m: Movimiento }) {
           <span className="badge badge-ink">{m.fuente}</span>
           {m.cuaderno && <span className="badge badge-ink">{m.cuaderno}</span>}
           {m.esReceptor && <span className="badge badge-ink">receptor</span>}
+          {m.pendienteResolucion && (
+            <span className="badge badge-ink">por resolver</span>
+          )}
           {m.relevante && <span className="badge badge-ink">relevante</span>}
         </div>
       </div>
@@ -160,7 +164,12 @@ export function PjudMonitorPanel({
     [movimientos]
   );
   const escritos = useMemo(
-    () => movimientos.filter((m) => m.tipo === "escrito"),
+    () =>
+      movimientos.filter(
+        (m) =>
+          m.pendienteResolucion ||
+          (m.tipo === "escrito" && (m.relevante || m.pendienteResolucion))
+      ),
     [movimientos]
   );
 
@@ -311,7 +320,7 @@ export function PjudMonitorPanel({
             ["historial", `Historial (${movimientos.length})`],
             ["cuadernos", `Cuadernos (${cuadernos.length})`],
             ["receptor", `Receptor (${receptor.length})`],
-            ["escritos", `Escritos (${escritos.length})`],
+            ["escritos", `Por resolver (${escritos.length})`],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -364,7 +373,7 @@ export function PjudMonitorPanel({
           {tab === "receptor"
             ? "Notificaciones de receptor"
             : tab === "escritos"
-              ? "Escritos"
+              ? "Escritos por resolver"
               : tab === "cuadernos"
                 ? "Movimientos por cuaderno"
                 : "Timeline de movimientos"}
@@ -377,7 +386,7 @@ export function PjudMonitorPanel({
             {tab === "receptor"
               ? "Sin notificaciones de receptor. Sincronice o importe CSV con columna receptor=1."
               : tab === "escritos"
-                ? "Sin escritos clasificados."
+                ? "Sin escritos por resolver."
                 : "Sin movimientos. Sincronice o importe CSV desde la consulta oficial."}
           </p>
         )}

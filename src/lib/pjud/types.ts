@@ -14,6 +14,7 @@ export type PjudFetchedMovimiento = {
   etapa?: string | null;
   tramite?: string | null;
   esReceptor?: boolean;
+  pendienteResolucion?: boolean;
   documentoRef?: string | null;
 };
 

@@ -46,6 +46,7 @@ function mapPartnerMovement(
         /receptor|c[eé]dula|notificaci[oó]n/i.test(
           `${m.titulo} ${m.detalle || ""}`
         ));
+  const pendienteResolucion = Boolean(classified.pendienteResolucion);
   return {
     externalId: m.id
       ? `${fuente === "demo" ? "demo" : "pjud"}:${m.id}`
@@ -55,13 +56,14 @@ function mapPartnerMovement(
     fecha,
     referencia: m.referencia || null,
     tipo: classified.tipo,
-    relevante: classified.relevante || esReceptor,
+    relevante: classified.relevante || esReceptor || pendienteResolucion,
     fuente,
     cuaderno: m.cuaderno || "Principal",
     folio: m.folio || null,
     etapa: m.etapa || null,
     tramite: m.tramite || null,
     esReceptor,
+    pendienteResolucion,
     documentoRef: m.documentoRef || m.documentoUrl || null,
   };
 }
@@ -343,8 +345,11 @@ export function pjudLiveIngestConfigured() {
 }
 
 export function pjudSyncIntervalMs() {
-  const raw = Number(process.env.PJUD_SYNC_INTERVAL_MINUTES || 1440);
-  const minutes = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 60 * 24 * 14) : 1440;
+  // CausaMonitor Pro: actualización ~cada 4h. Default 240 min (antes 1440
+  // anulaba el cron de cartera porque nextSyncAt quedaba a 24h).
+  const raw = Number(process.env.PJUD_SYNC_INTERVAL_MINUTES || 240);
+  const minutes =
+    Number.isFinite(raw) && raw > 0 ? Math.min(raw, 60 * 24 * 14) : 240;
   return minutes * 60 * 1000;
 }
 

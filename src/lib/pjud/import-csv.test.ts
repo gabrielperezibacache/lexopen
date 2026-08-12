@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import {
   MAX_CSV_ROWS,
   MOVIMIENTOS_CSV_HEADER,
+  CAUSAS_CSV_HEADER,
   parseMovimientosCsv,
+  parseCausasCsv,
   parseReceptorFlag,
   serializeMovimientosCsv,
+  serializeCausasCsv,
 } from "@/lib/pjud/import-csv";
 
 assert.equal(
@@ -83,5 +86,26 @@ assert.throws(
     ),
   /supera el límite/
 );
+
+assert.equal(CAUSAS_CSV_HEADER, "rit,tribunal,titulo,ruc,materia");
+const causas = parseCausasCsv(
+  "rit,tribunal,titulo,ruc,materia\nC-100-2024,1º Juzgado Civil de Santiago,Demo,,Civil\n"
+);
+assert.equal(causas.length, 1);
+assert.equal(causas[0].rit, "C-100-2024");
+assert.equal(causas[0].tribunal, "1º Juzgado Civil de Santiago");
+const causasRound = parseCausasCsv(
+  serializeCausasCsv([
+    {
+      rit: "C-1-2024",
+      tribunal: "Civil Santiago",
+      titulo: 'Causa "A"',
+      ruc: null,
+      materia: "Civil",
+    },
+  ])
+);
+assert.equal(causasRound[0].rit, "C-1-2024");
+assert.equal(causasRound[0].titulo, 'Causa "A"');
 
 console.log("pjud/import-csv.test.ts OK");

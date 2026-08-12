@@ -359,7 +359,7 @@ variables más relevantes:
 | `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` | No | Scheduler local Mis Causas (Host web). |
 | `PJUD_ALLOW_DEMO` | No | Permite movimientos PJUD simulados y etiquetados como demo. |
 | `PJUD_WEBHOOK_SECRET` | No | Firma HMAC de webhooks asíncronos de un proveedor PJUD. |
-| `PJUD_SYNC_INTERVAL_MINUTES` | No | Intervalo del próximo sync (default 1440 = diario). |
+| `PJUD_SYNC_INTERVAL_MINUTES` | No | Intervalo del próximo sync (default 240 = 4h). |
 | `CRON_SECRET` | No | Protege la sincronización de cartera desde un scheduler externo. |
 | `OBSIDIAN_VAULT_PATH` | No | Vault local para exportaciones en desarrollo. |
 | `OBSIDIAN_REST_URL`, `OBSIDIAN_REST_TOKEN` | No | Obsidian Local REST API y token Bearer. |

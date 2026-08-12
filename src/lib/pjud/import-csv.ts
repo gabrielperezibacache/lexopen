@@ -147,3 +147,74 @@ export function serializeMovimientosCsv(rows: CsvMovimientoExportRow[]) {
     ),
   ].join("\r\n") + "\r\n";
 }
+
+export const CAUSAS_CSV_HEADER = "rit,tribunal,titulo,ruc,materia";
+
+export type CsvCausaRow = {
+  rit: string;
+  tribunal: string;
+  titulo: string;
+  ruc: string;
+  materia: string;
+};
+
+export type CsvCausaExportRow = {
+  rit: string | null;
+  tribunal: string;
+  titulo: string;
+  ruc?: string | null;
+  materia?: string | null;
+};
+
+/** Importación masiva de cartera (paridad CausaMonitor CSV). */
+export function parseCausasCsv(csv: string): CsvCausaRow[] {
+  if (Buffer.byteLength(csv, "utf8") > MAX_CSV_BYTES) {
+    throw new CsvImportError("El CSV supera el límite de 5 MB", 413);
+  }
+  const lines = csv.split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length === 0) return [];
+  if (lines.length - 1 > MAX_CSV_ROWS) {
+    throw new CsvImportError(
+      `El CSV supera el límite de ${MAX_CSV_ROWS} filas`,
+      413
+    );
+  }
+  const headers = parseCsvLine(lines[0]).map((header, index) =>
+    (index === 0 ? header.replace(/^\uFEFF/, "") : header).toLowerCase()
+  );
+  const indexOf = (...names: string[]) =>
+    names.map((name) => headers.indexOf(name)).find((index) => index >= 0) ?? -1;
+  const ritIndex = indexOf("rit", "rol", "causa");
+  const tribunalIndex = indexOf("tribunal", "juzgado", "corte");
+  const tituloIndex = indexOf("titulo", "title", "caratula", "carátula");
+  const rucIndex = indexOf("ruc");
+  const materiaIndex = indexOf("materia", "competencia");
+  const valueAt = (row: string[], index: number) => (index >= 0 ? row[index] || "" : "");
+
+  return lines
+    .slice(1)
+    .map((line) => {
+      const row = parseCsvLine(line);
+      return {
+        rit: (valueAt(row, ritIndex) || row[0] || "").trim(),
+        tribunal: (valueAt(row, tribunalIndex) || row[1] || "").trim(),
+        titulo: (valueAt(row, tituloIndex) || row[2] || "").trim(),
+        ruc: (valueAt(row, rucIndex) || "").trim(),
+        materia: (valueAt(row, materiaIndex) || "").trim(),
+      };
+    })
+    .filter((row) => row.rit && row.tribunal);
+}
+
+export function serializeCausasCsv(rows: CsvCausaExportRow[]) {
+  return (
+    [
+      CAUSAS_CSV_HEADER,
+      ...rows.map((row) =>
+        [row.rit, row.tribunal, row.titulo, row.ruc, row.materia]
+          .map(csvCell)
+          .join(",")
+      ),
+    ].join("\r\n") + "\r\n"
+  );
+}

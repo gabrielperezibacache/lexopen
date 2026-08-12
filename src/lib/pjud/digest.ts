@@ -19,6 +19,7 @@ export type DigestItem = {
     tipo: string;
     esReceptor: boolean;
     relevante: boolean;
+    pendienteResolucion?: boolean;
   }>;
 };
 
@@ -38,6 +39,7 @@ export function selectDigestCausa(opts: {
     tipo: string;
     esReceptor: boolean;
     relevante: boolean;
+    pendienteResolucion?: boolean;
   }>;
   lastMovimientoAt: Date | null;
 }): { include: boolean; semaforo: Semaforo; movimientos: DigestItem["movimientos"] } {
@@ -107,6 +109,7 @@ export async function buildPjudDigest(opts?: { since?: Date }) {
         tipo: m.tipo,
         esReceptor: m.esReceptor,
         relevante: m.relevante,
+        pendienteResolucion: m.pendienteResolucion,
       })),
       lastMovimientoAt: last?.fecha || null,
     });
@@ -140,20 +143,70 @@ export async function buildPjudDigest(opts?: { since?: Date }) {
 
 /** Pure filter used by digest aggregation (testable). */
 export function isDigestRelevantMovimiento(
-  m: { relevante: boolean; esReceptor: boolean },
+  m: {
+    relevante: boolean;
+    esReceptor: boolean;
+    pendienteResolucion?: boolean;
+    tipo?: string;
+  },
   semaforo: string
 ) {
-  return m.relevante || m.esReceptor || semaforo === "rojo";
+  return (
+    m.relevante ||
+    m.esReceptor ||
+    Boolean(m.pendienteResolucion) ||
+    (m.tipo === "escrito" && Boolean(m.pendienteResolucion)) ||
+    semaforo === "rojo"
+  );
+}
+
+function partitionDigestMovimientos(movimientos: DigestItem["movimientos"]) {
+  const receptor = movimientos.filter((m) => m.esReceptor);
+  const escritos = movimientos.filter(
+    (m) => m.pendienteResolucion || (m.tipo === "escrito" && m.relevante)
+  );
+  const otros = movimientos.filter(
+    (m) => !m.esReceptor && !(m.pendienteResolucion || (m.tipo === "escrito" && m.relevante))
+  );
+  return { receptor, escritos, otros };
 }
 
 export function formatDigestText(items: DigestItem[], appUrl: string) {
   return items
     .map((item) => {
-      const movs = item.movimientos
-        .slice(0, 5)
-        .map((m) => `  - ${m.fecha.toISOString().slice(0, 10)} ${m.titulo}`)
-        .join("\n");
-      return `${item.rit || item.titulo} [${item.semaforo}]\n${item.tribunal}\n${appUrl}/causas/${item.causaId}\n${movs || "  - Sin movimientos nuevos; semáforo rojo"}`;
+      const { receptor, escritos, otros } = partitionDigestMovimientos(
+        item.movimientos
+      );
+      const sections: string[] = [];
+      if (receptor.length) {
+        sections.push(
+          "  Receptor:",
+          ...receptor
+            .slice(0, 5)
+            .map((m) => `  - ${m.fecha.toISOString().slice(0, 10)} ${m.titulo}`)
+        );
+      }
+      if (escritos.length) {
+        sections.push(
+          "  Escritos por resolver:",
+          ...escritos
+            .slice(0, 5)
+            .map((m) => `  - ${m.fecha.toISOString().slice(0, 10)} ${m.titulo}`)
+        );
+      }
+      if (otros.length || (!receptor.length && !escritos.length)) {
+        sections.push(
+          "  Movimientos:",
+          ...(otros.length
+            ? otros
+                .slice(0, 5)
+                .map(
+                  (m) => `  - ${m.fecha.toISOString().slice(0, 10)} ${m.titulo}`
+                )
+            : ["  - Sin movimientos nuevos; semáforo rojo"])
+        );
+      }
+      return `${item.rit || item.titulo} [${item.semaforo}]\n${item.tribunal}\n${appUrl}/causas/${item.causaId}\n${sections.join("\n")}`;
     })
     .join("\n\n");
 }
@@ -165,24 +218,45 @@ function formatDigestHtml(
 ) {
   const rows = items
     .map((item) => {
-      const movs = item.movimientos
-        .slice(0, 5)
-        .map(
-          (m) =>
-            `<li>${m.fecha.toISOString().slice(0, 10)} — ${escapeHtml(m.titulo)}${
-              m.esReceptor ? " (receptor)" : ""
-            }</li>`
-        )
-        .join("");
+      const { receptor, escritos, otros } = partitionDigestMovimientos(
+        item.movimientos
+      );
+      const section = (
+        title: string,
+        list: DigestItem["movimientos"],
+        tag?: string
+      ) => {
+        if (!list.length) return "";
+        const lis = list
+          .slice(0, 5)
+          .map(
+            (m) =>
+              `<li>${m.fecha.toISOString().slice(0, 10)} — ${escapeHtml(m.titulo)}${
+                tag ? ` (${tag})` : ""
+              }</li>`
+          )
+          .join("");
+        return `<h4 style="margin:8px 0 4px">${title}</h4><ul>${lis}</ul>`;
+      };
+      const body =
+        section("Receptor", receptor, "receptor") +
+        section("Escritos por resolver", escritos, "escrito") +
+        section("Movimientos", otros.length ? otros : item.movimientos.length ? [] : [{
+          titulo: "Sin movimientos nuevos; semáforo rojo",
+          fecha: new Date(),
+          tipo: "otro",
+          esReceptor: false,
+          relevante: false,
+        }]);
       return `<h3><a href="${appUrl}/causas/${item.causaId}">${escapeHtml(
         item.rit || item.titulo
       )}</a> · ${escapeHtml(item.semaforo)}</h3>
       <p>${escapeHtml(item.tribunal)}</p>
-      <ul>${movs || "<li>Sin movimientos nuevos; semáforo rojo</li>"}</ul>`;
+      ${body || "<p>Sin novedades listadas</p>"}`;
     })
     .join("\n");
   return `<p>Hola ${escapeHtml(recipientName)},</p>
-<p>Resumen PJUD LexOpen (últimas actualizaciones):</p>
+<p>Resumen PJUD LexOpen (~08:00, estilo CausaMonitor):</p>
 ${rows}
 <p style="color:#666;font-size:12px">Digest automático LexOpen · verifique siempre en el portal oficial.</p>`;
 }

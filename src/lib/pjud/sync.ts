@@ -32,6 +32,7 @@ export type SyncCausaResult = {
   semaforo: Semaforo;
   cuadernos?: string[];
   receptorCount?: number;
+  escritosPendientes?: number;
 };
 
 function externalKey(rit: string | null, tribunal: string) {
@@ -223,6 +224,7 @@ export async function syncCausaPjud(
         etapa: m.etapa || null,
         tramite: m.tramite || null,
         esReceptor: Boolean(m.esReceptor),
+        pendienteResolucion: Boolean(m.pendienteResolucion),
         documentoRef: m.documentoRef || null,
         fecha: m.fecha,
       })),
@@ -311,6 +313,14 @@ export async function syncCausaPjud(
     ),
   ];
   const receptorCount = fetchResult.movimientos.filter((m) => m.esReceptor).length;
+  const escritosPendientes = fetchResult.movimientos.filter(
+    (m) => m.pendienteResolucion
+  ).length;
+  const noteExtras = [
+    receptorCount ? `${receptorCount} receptor` : null,
+    escritosPendientes ? `${escritosPendientes} escritos por resolver` : null,
+    pdfBackedUp > 0 ? `PDF backup ${pdfBackedUp}` : null,
+  ].filter(Boolean);
 
   return {
     causaId,
@@ -318,10 +328,9 @@ export async function syncCausaPjud(
     skipped,
     provider: fetchResult.provider,
     demo: fetchResult.demo,
-    note:
-      pdfBackedUp > 0
-        ? `${fetchResult.note} · PDF backup ${pdfBackedUp}`
-        : fetchResult.note,
+    note: noteExtras.length
+      ? `${fetchResult.note} · ${noteExtras.join(" · ")}`
+      : fetchResult.note,
     status: fetchResult.demo ? "demo" : "ok",
     jobId: job.id,
     lastMovimientoAt: latest?.fecha.toISOString() || null,
@@ -330,6 +339,7 @@ export async function syncCausaPjud(
     semaforo: semaforoPorDiasSinMovimiento(dias),
     cuadernos,
     receptorCount,
+    escritosPendientes,
   };
 }
 
@@ -376,6 +386,7 @@ export async function listCarteraMonitoreo() {
       id: c.id,
       titulo: c.titulo,
       rit: c.rit,
+      ruc: c.ruc,
       tribunal: c.tribunal,
       sala: c.sala,
       materia: c.materia,

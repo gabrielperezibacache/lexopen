@@ -14,6 +14,12 @@ import {
   runDueSyncPipeline,
   getPjudQueueStatus,
 } from "@/lib/pjud/queue";
+import {
+  CsvImportError,
+  parseCausasCsv,
+  serializeCausasCsv,
+} from "@/lib/pjud/import-csv";
+import { addCausaByRol } from "@/lib/pjud/lookup";
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,6 +33,25 @@ export async function GET(req: NextRequest) {
       });
     }
     const items = await listCarteraMonitoreo();
+    const format = req.nextUrl.searchParams.get("format");
+    if (format === "csv") {
+      const csv = serializeCausasCsv(
+        items.map((i) => ({
+          rit: i.rit,
+          tribunal: i.tribunal,
+          titulo: i.titulo,
+          ruc: i.ruc,
+          materia: i.materia,
+        }))
+      );
+      return new NextResponse(csv, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": 'attachment; filename="cartera-pjud.csv"',
+          "Cache-Control": "no-store",
+        },
+      });
+    }
     const fallidos = await listFallidosMonitoreo(20);
     const queue = await getPjudQueueStatus().catch(() => null);
     const resumen = {
@@ -69,16 +94,86 @@ export async function POST(req: NextRequest) {
       req,
       z
         .object({
-          action: z.enum(["sync", "retry-fallidos", "process-queue"]).optional(),
+          action: z
+            .enum(["sync", "retry-fallidos", "process-queue", "import-cartera"])
+            .optional(),
           causaIds: z.array(z.string().min(1).max(100)).max(100).optional(),
           limit: z.number().int().min(1).max(200).optional(),
+          csv: z.string().max(5_000_000).optional(),
+          syncNow: z.boolean().optional(),
         })
         .optional()
     ).catch(() => ({
       action: "sync" as const,
       causaIds: undefined,
       limit: undefined,
+      csv: undefined,
+      syncNow: undefined,
     }));
+
+    if (body?.action === "import-cartera") {
+      if (!body.csv?.trim()) {
+        return NextResponse.json(
+          { error: "CSV requerido (rit,tribunal,…)" },
+          { status: 400 }
+        );
+      }
+      let rows;
+      try {
+        rows = parseCausasCsv(body.csv);
+      } catch (error) {
+        if (error instanceof CsvImportError) {
+          return NextResponse.json(
+            { error: error.message },
+            { status: error.status }
+          );
+        }
+        throw error;
+      }
+      const results = [];
+      for (const row of rows.slice(0, body.limit || 200)) {
+        try {
+          results.push(
+            await addCausaByRol({
+              rit: row.rit,
+              tribunal: row.tribunal,
+              titulo: row.titulo || undefined,
+              ruc: row.ruc || null,
+              materia: row.materia || undefined,
+              actorId,
+              syncNow: body.syncNow === true,
+            })
+          );
+        } catch (e) {
+          results.push({
+            causaId: "",
+            created: false,
+            sync: null,
+            note: e instanceof Error ? e.message : "Error",
+            rit: row.rit,
+            tribunal: row.tribunal,
+          });
+        }
+      }
+      if (actorId) {
+        await writeAudit({
+          actorId,
+          action: "pjud.import-cartera",
+          entityType: "Causa",
+          after: {
+            rows: rows.length,
+            created: results.filter((r) => r.created).length,
+          },
+        });
+      }
+      return NextResponse.json({
+        ok: true,
+        imported: results.length,
+        created: results.filter((r) => r.created).length,
+        results,
+        provider: providerStatusPublic(),
+      });
+    }
 
     if (body?.action === "retry-fallidos") {
       const requeued = await requeueFailedJobs({

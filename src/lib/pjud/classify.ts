@@ -40,14 +40,49 @@ const RULES: Array<{ tipo: MovimientoTipo; relevante: boolean; re: RegExp }> = [
   },
 ];
 
+/** Escritos / presentaciones aún sin proveído — señal CausaMonitor "escritos por resolver". */
+export function isEscritoPendienteResolucion(
+  titulo: string,
+  detalle?: string | null
+) {
+  const text = `${titulo} ${detalle || ""}`;
+  if (/\bescritos?\s+por\s+resolver\b/i.test(text)) return true;
+  if (
+    /\b(por\s+resolver|pendiente\s+de\s+resoluci[oó]n|sin\s+prove[ií]do|pendiente\s+de\s+prove[ií]do)\b/i.test(
+      text
+    )
+  ) {
+    return /\b(escrito|presentaci[oó]n|demanda|recurso|solicitud|petici[oó]n)\b/i.test(
+      text
+    );
+  }
+  return false;
+}
+
 export function classifyMovimiento(titulo: string, detalle?: string | null) {
   const text = `${titulo} ${detalle || ""}`;
+  const pendienteResolucion = isEscritoPendienteResolucion(titulo, detalle);
+  if (pendienteResolucion) {
+    return {
+      tipo: "escrito" as const,
+      relevante: true,
+      pendienteResolucion: true,
+    };
+  }
   for (const rule of RULES) {
     if (rule.re.test(text)) {
-      return { tipo: rule.tipo, relevante: rule.relevante };
+      return {
+        tipo: rule.tipo,
+        relevante: rule.relevante,
+        pendienteResolucion: false,
+      };
     }
   }
-  return { tipo: "otro" as const, relevante: false };
+  return {
+    tipo: "otro" as const,
+    relevante: false,
+    pendienteResolucion: false,
+  };
 }
 
 export function labelMovimientoTipo(tipo: string) {

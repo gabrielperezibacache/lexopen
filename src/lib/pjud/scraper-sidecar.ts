@@ -124,6 +124,7 @@ function mapMovements(
         /receptor|c[eé]dula|notificaci[oó]n/i.test(
           `${m.titulo} ${m.detalle || ""}`
         ));
+    const pendienteResolucion = Boolean(classified.pendienteResolucion);
     return {
       externalId: m.id
         ? `scrape:${m.id}`
@@ -133,13 +134,14 @@ function mapMovements(
       fecha,
       referencia: m.referencia || null,
       tipo: classified.tipo,
-      relevante: classified.relevante || esReceptor,
+      relevante: classified.relevante || esReceptor || pendienteResolucion,
       fuente: "pjud" as const,
       cuaderno: m.cuaderno || "Principal",
       folio: m.folio || null,
       etapa: m.etapa || null,
       tramite: m.tramite || null,
       esReceptor,
+      pendienteResolucion,
       documentoRef: m.documentoRef || null,
     };
   });

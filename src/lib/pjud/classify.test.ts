@@ -12,6 +12,20 @@ assert.equal(classifyMovimiento("Proveído: téngase presente").tipo, "proveido"
 assert.equal(classifyMovimiento("Sentencia definitiva").tipo, "resolucion");
 assert.equal(classifyMovimiento("Certificado de notificación").tipo, "notificacion");
 assert.equal(classifyMovimiento("Escrito de contestación").tipo, "escrito");
+assert.equal(classifyMovimiento("Escrito de contestación").relevante, false);
+assert.equal(
+  classifyMovimiento("Escrito por resolver — demanda principal").tipo,
+  "escrito"
+);
+assert.equal(
+  classifyMovimiento("Escrito por resolver — demanda principal").relevante,
+  true
+);
+assert.equal(
+  classifyMovimiento("Escrito por resolver — demanda principal")
+    .pendienteResolucion,
+  true
+);
 assert.equal(classifyMovimiento("Plazo fatal de 5 días hábiles").tipo, "plazo");
 assert.equal(classifyMovimiento("Otros antecedentes").tipo, "otro");
 

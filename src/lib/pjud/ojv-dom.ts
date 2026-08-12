@@ -45,6 +45,8 @@ export const OJV = {
     'a[href*="historia" i], a:has-text("Historia"), a:has-text("Movimientos"), a[href*="anexo" i]',
   receptorTab:
     'a[href*="receptor" i], a:has-text("Receptor"), a[href*="notific" i]',
+  escritosTab:
+    'a[href*="escrito" i], a:has-text("Escrito"), a:has-text("Escritos"), a:has-text("por resolver")',
   sweetAlert: ".sweet-alert.showSweetAlert.visible",
   sweetConfirm:
     ".sweet-alert.showSweetAlert.visible button.confirm, .sweet-alert.visible button.confirm",

@@ -382,6 +382,86 @@ async function openFirstCauseModal(page: PlaywrightPage) {
   return true;
 }
 
+async function modalInnerHtml(page: PlaywrightPage) {
+  return page.evaluate(() => {
+    const mo = document.querySelector(".modal.in");
+    return mo ? mo.innerHTML : "";
+  });
+}
+
+/** Merge scrape rows by externalId; prefer receptor / pendiente flags. */
+export function mergePjudMovimientos(
+  base: PjudFetchedMovimiento[],
+  extra: PjudFetchedMovimiento[]
+) {
+  const map = new Map<string, PjudFetchedMovimiento>();
+  for (const m of [...base, ...extra]) {
+    const prev = map.get(m.externalId);
+    if (!prev) {
+      map.set(m.externalId, m);
+      continue;
+    }
+    map.set(m.externalId, {
+      ...prev,
+      ...m,
+      esReceptor: Boolean(prev.esReceptor || m.esReceptor),
+      pendienteResolucion: Boolean(
+        prev.pendienteResolucion || m.pendienteResolucion
+      ),
+      relevante: Boolean(
+        prev.relevante || m.relevante || m.esReceptor || m.pendienteResolucion
+      ),
+      documentoRef: m.documentoRef || prev.documentoRef,
+    });
+  }
+  return [...map.values()].sort(
+    (a, b) => b.fecha.getTime() - a.fecha.getTime()
+  );
+}
+
+async function scrapeModalTabs(
+  page: PlaywrightPage
+): Promise<PjudFetchedMovimiento[]> {
+  let movimientos = parseMovimientosFromHtml(
+    (await modalInnerHtml(page)) || (await page.content())
+  );
+
+  const receptor = page.locator(`${OJV.modal} ${OJV.receptorTab}`);
+  if ((await receptor.count()) > 0) {
+    await receptor.first().click().catch(() => undefined);
+    await delay(700);
+    const receptorHtml = (await modalInnerHtml(page)) || (await page.content());
+    const receptorMovs = parseMovimientosFromHtml(receptorHtml).map((m) => ({
+      ...m,
+      esReceptor: true,
+      relevante: true,
+      tipo: m.tipo === "otro" ? "notificacion" : m.tipo,
+    }));
+    movimientos = mergePjudMovimientos(movimientos, receptorMovs);
+  }
+
+  const escritos = page.locator(`${OJV.modal} ${OJV.escritosTab}`);
+  if ((await escritos.count()) > 0) {
+    await escritos.first().click().catch(() => undefined);
+    await delay(700);
+    const escritosHtml = (await modalInnerHtml(page)) || (await page.content());
+    const escritoMovs = parseMovimientosFromHtml(escritosHtml).map((m) => {
+      const pendiente =
+        m.pendienteResolucion ||
+        /por\s+resolver|pendiente/i.test(`${m.titulo} ${m.detalle || ""}`);
+      return {
+        ...m,
+        tipo: "escrito" as const,
+        pendienteResolucion: pendiente || m.pendienteResolucion,
+        relevante: true,
+      };
+    });
+    movimientos = mergePjudMovimientos(movimientos, escritoMovs);
+  }
+
+  return movimientos;
+}
+
 async function extractEbookRef(page: PlaywrightPage): Promise<string | null> {
   return page.evaluate(() => {
     const mo = document.querySelector(".modal.in");
@@ -594,14 +674,13 @@ async function scrapeCausaByRolOnce(
     const modalOk = await openFirstCauseModal(page);
     let html = await page.content();
     if (modalOk) {
-      const modalHtml = await page.evaluate(() => {
-        const mo = document.querySelector(".modal.in");
-        return mo ? mo.innerHTML : "";
-      });
+      const modalHtml = await modalInnerHtml(page);
       if (modalHtml) html = modalHtml;
     }
 
-    let movimientos = parseMovimientosFromHtml(html);
+    let movimientos = modalOk
+      ? await scrapeModalTabs(page)
+      : parseMovimientosFromHtml(html);
     if (movimientos.length === 0) {
       // Fallback: list rows themselves as coarse movimientos
       const list = parseVerDetalleJuridicaHtml(await page.content());
@@ -613,12 +692,13 @@ async function scrapeCausaByRolOnce(
         referencia: row.rit,
         tipo: "otro" as const,
         relevante: false,
-        fuente: "pjud",
+        fuente: "pjud" as const,
         cuaderno: "Principal",
         folio: String(idx + 1),
         etapa: null,
         tramite: null,
         esReceptor: false,
+        pendienteResolucion: false,
         documentoRef: null,
       }));
     }

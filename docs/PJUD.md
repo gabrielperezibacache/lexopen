@@ -83,6 +83,7 @@ Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 | `PJUD_SECRETS_KEY` | Vault AES-256-GCM local para password ClaveÚnica (fallback: `SESSION_SECRET`) |
 | `PJUD_CAUSAS_DAILY_SOLVE_BUDGET` | Tope diario de CAPTCHA (default 50) |
 | `PJUD_SYNC_CONCURRENCY` | Parallelismo del worker de cola (default **5**, como CM) |
+| `PJUD_SYNC_INTERVAL_MINUTES` | Intervalo `pjudNextSyncAt` tras sync OK (default **240** = 4h) |
 | `PJUD_PDF_BACKUP=1` | Tras sync, descarga `documentoRef` http(s) → `Documento` LexOpen |
 | `CRON_SECRET` | Autoriza crons (`x-cron-secret`) |
 
@@ -107,14 +108,14 @@ En Render, el Blueprint define `lexopen-pjud-scraper` (`type: pserv`) con `npx p
 - `GET /api/pjud/queue` → stats estilo CM (`waiting`/`active`/`completed`/`failed`/`delayed`).
 - Fallos aplican **backoff** exponencial sobre el intervalo base (`pjudFailCount`).
 - Retry fallidos: `action: retry-fallidos` re-encola solo esos jobs.
-- Render: cartera cada 6h; Mis Causas ~08:00 Santiago (`0 11 * * *` UTC); digest ~09:00 Santiago (`0 12 * * *` UTC, tras Mis Causas).
+- Render: cartera cada **4h** (`0 */4 * * *`, alineado a `PJUD_SYNC_INTERVAL_MINUTES=240`); Mis Causas ~07:00 Santiago (`0 10 * * *` UTC); digest ~08:00 Santiago (`0 12 * * *` UTC).
 - `CRON_SECRET` y `PJUD_SCRAPER_KEY` se generan en el web y se copian a crons/sidecar (`fromService.envVarKey`) para evitar desalineación.
 - Host local: `PJUD_SYNC_INTERVAL_MINUTES`, `PJUD_MIS_CAUSAS_INTERVAL_MINUTES`, `PJUD_DIGEST_INTERVAL_MINUTES` en `scripts/web-host.mjs`.
 
-## Digest email (~09:00 Santiago)
+## Digest email (~08:00 Santiago)
 
 - `POST /api/pjud/digest` (cron secret o staff)
-- Incluye movimientos relevantes/receptor **y** causas con semáforo rojo aunque no haya novedades recientes (usa último movimiento global para el semáforo)
+- Secciones estilo CausaMonitor: **Receptor**, **Escritos por resolver**, **Movimientos** + causas rojo sin novedad
 - Causas sin abogado se enrutan a admins/staff
 - Envía vía Gmail API si Google está conectado (`gmail.send`); si no, solo notificaciones in-app
 - Estado en Host status (`FirmSettings.pjudDigestLast*` + cola pending/running)
@@ -123,10 +124,12 @@ En Render, el Blueprint define `lexopen-pjud-scraper` (`type: pserv`) con `npx p
 
 Con `PJUD_PDF_BACKUP=1`, tras sync (también backfill) se descargan links `documentoRef` públicos seguros (anti-SSRF), se rechazan HTML/login walls, y se guardan como `Documento`; el movimiento queda con `doc:<id>` y la ficha muestra link LexOpen.
 
-## Alta rápida
+## Alta rápida / CSV cartera
 
-- UI en `/causas/monitoreo` (panel ROL / RUT)
+- UI en `/causas/monitoreo` (panel ROL / RUT + **Importar/Exportar CSV**)
 - API `POST /api/pjud/lookup` con `action: add-rol | preview-rol | buscar-rut`
+- CSV: `GET /api/causas/monitoreo?format=csv` · `POST` `action: import-cartera` con `{ csv }`
+- Header: `rit,tribunal,titulo,ruc,materia`
 
 ## ClaveÚnica (vault local cifrado)
 
