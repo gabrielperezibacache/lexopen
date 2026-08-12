@@ -7,12 +7,14 @@ const plazos = buildAiSuggestedActions({
 });
 assert.ok(plazos.some((a) => a.href.includes("/plazos?causaId=c1")));
 assert.ok(plazos.some((a) => a.href === "/causas/c1"));
+assert.ok(!plazos.some((a) => a.label === "Nueva minuta"));
 
 const docQa = buildAiSuggestedActions({
   utility: "doc_qa",
   causaId: "c1",
 });
 assert.ok(docQa.some((a) => a.href.includes("/documentos?causaId=c1")));
+assert.ok(!docQa.some((a) => a.href === "/causas/monitoreo"));
 
 const research = buildAiSuggestedActions({
   utility: "research",
@@ -22,6 +24,9 @@ assert.ok(research.some((a) => a.href === "/jurisprudencia"));
 assert.ok(!research.some((a) => a.label === "Abrir causa"));
 
 const draft = buildAiSuggestedActions({ utility: "draft", causaId: "c9" });
-assert.ok(draft.some((a) => a.href === "/causas/c9/minuta/nueva"));
+assert.equal(
+  draft.filter((a) => a.href === "/causas/c9/minuta/nueva").length,
+  1
+);
 
 console.log("ai/suggested-actions.test.ts OK");

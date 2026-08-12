@@ -50,7 +50,8 @@ export async function GET(req: NextRequest) {
     });
     const config = await getHermesConfig();
     return NextResponse.json({
-      enabled: row?.enabled ?? false,
+      enabled: row?.enabled ?? true,
+      configured: Boolean(row),
       config: { ...config, apiKey: config.apiKey ? "••••" : "" },
       utilities: AI_UTILITIES,
     });
@@ -376,6 +377,7 @@ export async function POST(req: Request) {
 
     const pack = await buildAiContextPack({
       causaId: body.causaId || null,
+      documentoId: body.documentoId || null,
       utility: utility.id,
       prompt,
       role: user.role,
@@ -474,7 +476,8 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             source: "error",
-            content: "",
+            content:
+              "La integración Hermes está deshabilitada en Integraciones. Habilítela o active el modo demo (HERMES_ALLOW_DEMO).",
             chat: null,
             utility: { id: utility.id, label: utility.label },
             sources: pack.sources,
@@ -545,7 +548,10 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           ...result,
-          content: result.content || "El copiloto no devolvió contenido.",
+          content:
+            result.content ||
+            result.note ||
+            "El copiloto no devolvió contenido.",
           chat: null,
           utility: { id: utility.id, label: utility.label },
           sources: pack.sources,

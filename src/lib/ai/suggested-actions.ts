@@ -8,49 +8,56 @@ export function buildAiSuggestedActions(opts: {
   causaId?: string | null;
 }): AiSuggestedAction[] {
   const causaId = opts.causaId || "";
-  const actions: Array<AiSuggestedAction | null> = [
-    causaId
-      ? { label: "Abrir causa", href: `/causas/${causaId}` }
-      : null,
-    causaId
-      ? {
-          label: "Nueva minuta",
-          href: `/causas/${causaId}/minuta/nueva`,
-        }
-      : null,
-    opts.utility === "plazos"
-      ? {
-          label: "Crear plazo",
-          href: causaId ? `/plazos?causaId=${encodeURIComponent(causaId)}` : "/plazos",
-        }
-      : null,
-    opts.utility === "doc_qa" || opts.utility === "briefing"
-      ? {
-          label: "Documentos",
-          href: causaId
-            ? `/documentos?causaId=${encodeURIComponent(causaId)}`
-            : "/documentos",
-        }
-      : null,
-    opts.utility === "research" || opts.utility === "similar"
-      ? { label: "Jurisprudencia", href: "/jurisprudencia" }
-      : { label: "Jurisprudencia", href: "/jurisprudencia" },
-    { label: "Monitoreo PJUD", href: "/causas/monitoreo" },
-    opts.utility === "draft" && causaId
-      ? {
-          label: "Wizard minuta",
-          href: `/causas/${causaId}/minuta/nueva`,
-        }
-      : null,
-  ];
+  const actions: AiSuggestedAction[] = [];
+
+  if (causaId) {
+    actions.push({ label: "Abrir causa", href: `/causas/${causaId}` });
+  }
+
+  if (opts.utility === "plazos") {
+    actions.push({
+      label: "Crear plazo",
+      href: causaId
+        ? `/plazos?causaId=${encodeURIComponent(causaId)}`
+        : "/plazos",
+    });
+  } else if (opts.utility === "doc_qa" || opts.utility === "briefing") {
+    actions.push({
+      label: "Documentos",
+      href: causaId
+        ? `/documentos?causaId=${encodeURIComponent(causaId)}`
+        : "/documentos",
+    });
+  } else if (opts.utility === "research" || opts.utility === "similar") {
+    actions.push({ label: "Jurisprudencia", href: "/jurisprudencia" });
+  } else if (opts.utility === "draft" && causaId) {
+    actions.push({
+      label: "Nueva minuta",
+      href: `/causas/${causaId}/minuta/nueva`,
+    });
+  } else if (causaId) {
+    actions.push({
+      label: "Nueva minuta",
+      href: `/causas/${causaId}/minuta/nueva`,
+    });
+  }
+
+  if (opts.utility === "copilot" || opts.utility === "briefing") {
+    actions.push({ label: "Monitoreo PJUD", href: "/causas/monitoreo" });
+  }
+
+  if (
+    opts.utility !== "research" &&
+    opts.utility !== "similar" &&
+    (opts.utility === "copilot" || opts.utility === "draft")
+  ) {
+    actions.push({ label: "Jurisprudencia", href: "/jurisprudencia" });
+  }
 
   const seen = new Set<string>();
-  const out: AiSuggestedAction[] = [];
-  for (const a of actions) {
-    if (!a) continue;
-    if (seen.has(a.href)) continue;
+  return actions.filter((a) => {
+    if (seen.has(a.href)) return false;
     seen.add(a.href);
-    out.push(a);
-  }
-  return out;
+    return true;
+  });
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { safeJsonParse } from "@/lib/safe-json";
+import { MarkdownView } from "@/lib/markdown";
 
 type CausaOption = { id: string; titulo: string; rit: string | null };
 type ChatMessage = {
@@ -45,6 +46,7 @@ function AgenteInner() {
   const [utilities, setUtilities] = useState<Utility[]>([]);
   const [utility, setUtility] = useState(sp.get("utility") || "copilot");
   const [causaId, setCausaId] = useState(sp.get("causaId") || "");
+  const [documentoId, setDocumentoId] = useState(sp.get("documentoId") || "");
   const [prompt, setPrompt] = useState("");
   const [reply, setReply] = useState("");
   const [meta, setMeta] = useState("");
@@ -176,8 +178,14 @@ function AgenteInner() {
     setApproveMsg("");
   }
 
-  async function sendPrompt(nextPrompt: string, nextUtility?: string) {
+  async function sendPrompt(
+    nextPrompt: string,
+    nextUtility?: string,
+    opts?: { chatIdOverride?: string | null; retrying?: boolean }
+  ) {
     const u = nextUtility || utility;
+    const activeChatId =
+      opts && "chatIdOverride" in opts ? opts.chatIdOverride || "" : chatId;
     setBusy(true);
     setReply("");
     setMeta("");
@@ -192,20 +200,28 @@ function AgenteInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           causaId: causaId || undefined,
+          documentoId: documentoId || undefined,
           prompt: nextPrompt,
-          chatId: chatId || undefined,
+          chatId: activeChatId || undefined,
           utility: u,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 409 && data.code === "causa_mismatch") {
         setChatId("");
+        if (!opts?.retrying) {
+          await sendPrompt(nextPrompt, u, {
+            chatIdOverride: null,
+            retrying: true,
+          });
+          return;
+        }
         setReply(data.error || "Inicie un chat nuevo para esta causa");
         setMeta("Causa distinta al chat");
         setRequireApproval(false);
         return;
       }
-      setReply(data.content || data.error || "Sin respuesta");
+      setReply(data.content || data.note || data.error || "Sin respuesta");
       setSources(Array.isArray(data.sources) ? data.sources : []);
       setActions(
         Array.isArray(data.suggestedActions) ? data.suggestedActions : []
@@ -225,7 +241,8 @@ function AgenteInner() {
           { role: "user", content: nextPrompt, utility: u },
           {
             role: "assistant",
-            content: data.content || data.error || "Sin respuesta",
+            content:
+              data.content || data.note || data.error || "Sin respuesta",
             source: "error",
             utility: u,
             requireApproval: false,
@@ -616,6 +633,7 @@ function AgenteInner() {
                 setCausaId(next);
                 // Evitar reutilizar un hilo de otra causa
                 setChatId("");
+                setDocumentoId("");
                 setMessages([]);
                 setReply("");
                 setMeta("");
@@ -634,6 +652,18 @@ function AgenteInner() {
               ))}
             </select>
           </div>
+          {documentoId && (
+            <p className="text-xs text-[var(--ink-soft)]/70">
+              Documento anclado: <code>{documentoId.slice(0, 10)}…</code>{" "}
+              <button
+                type="button"
+                className="text-[var(--sea)] underline"
+                onClick={() => setDocumentoId("")}
+              >
+                quitar
+              </button>
+            </p>
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium">Instrucción</label>
             <textarea
@@ -756,9 +786,15 @@ function AgenteInner() {
                   {m.discarded ? " · descartado" : ""}
                   {m.approvedMinutaId ? " · aprobado" : ""}
                 </div>
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                  {m.content}
-                </pre>
+                {m.role === "assistant" ? (
+                  <div className="prose-sm max-w-none text-sm leading-relaxed text-[var(--ink)]">
+                    <MarkdownView content={m.content} />
+                  </div>
+                ) : (
+                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                    {m.content}
+                  </pre>
+                )}
                 {m.role === "assistant" &&
                   Array.isArray(m.sources) &&
                   m.sources.length > 0 && (
@@ -794,9 +830,9 @@ function AgenteInner() {
               {meta}
             </p>
           )}
-          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-            {reply}
-          </pre>
+          <div className="text-sm leading-relaxed">
+            <MarkdownView content={reply} />
+          </div>
         </section>
       )}
     </div>

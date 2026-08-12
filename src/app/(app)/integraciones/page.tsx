@@ -50,6 +50,10 @@ function IntegracionesInner() {
   const [obsidianMode, setObsidianMode] = useState("");
   const [google, setGoogle] = useState<GoogleStatus | null>(null);
   const [hermesInfo, setHermesInfo] = useState("");
+  const [hermesEnabled, setHermesEnabled] = useState(true);
+  const [hermesApiUrl, setHermesApiUrl] = useState("");
+  const [hermesBusy, setHermesBusy] = useState(false);
+  const [hermesMsg, setHermesMsg] = useState("");
   const [captcha, setCaptcha] = useState<CaptchaStatus | null>(null);
 
   useEffect(() => {
@@ -71,13 +75,15 @@ function IntegracionesInner() {
       .catch(() => setObsidianMode("storage"));
     fetch("/api/integrations/hermes")
       .then((r) => r.json())
-      .then((d) =>
+      .then((d) => {
+        setHermesEnabled(Boolean(d.enabled));
+        setHermesApiUrl(d.config?.apiUrl || "");
         setHermesInfo(
           `API: ${d.config?.apiUrl || "—"} · modelo ${d.config?.model || "—"} · ${
             d.enabled ? "habilitado" : "deshabilitado"
-          }`
-        )
-      )
+          }${d.configured === false ? " · sin fila de config (activo por defecto)" : ""}`
+        );
+      })
       .catch(() => setHermesInfo("No disponible"));
     fetch("/api/pjud/captcha")
       .then((r) => (r.ok ? r.json() : null))
@@ -156,9 +162,66 @@ function IntegracionesInner() {
             está disponible, responde en modo demo etiquetado.
           </p>
           <p className="mt-4 text-xs text-[var(--ink-soft)]/65">{hermesInfo || "Cargando…"}</p>
-          <Link href="/agente" className="btn btn-secondary mt-5 inline-flex">
-            Abrir copiloto
-          </Link>
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setHermesBusy(true);
+              setHermesMsg("");
+              const res = await fetch("/api/integrations/hermes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  action: "save-config",
+                  enabled: hermesEnabled,
+                  config: { apiUrl: hermesApiUrl },
+                }),
+              });
+              const data = await res.json().catch(() => ({}));
+              setHermesBusy(false);
+              if (!res.ok) {
+                setHermesMsg(data.error || "No se pudo guardar (¿admin?)");
+                return;
+              }
+              setHermesMsg("Configuración guardada.");
+              setHermesInfo(
+                `API: ${hermesApiUrl || "—"} · ${
+                  hermesEnabled ? "habilitado" : "deshabilitado"
+                }`
+              );
+            }}
+          >
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={hermesEnabled}
+                onChange={(e) => setHermesEnabled(e.target.checked)}
+              />
+              Integración habilitada
+            </label>
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                URL API (OpenAI-compatible)
+              </label>
+              <input
+                className="input"
+                value={hermesApiUrl}
+                onChange={(e) => setHermesApiUrl(e.target.value)}
+                placeholder="http://localhost:8642/v1"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn btn-primary" type="submit" disabled={hermesBusy}>
+                {hermesBusy ? "Guardando…" : "Guardar Hermes"}
+              </button>
+              <Link href="/agente" className="btn btn-secondary inline-flex">
+                Abrir copiloto
+              </Link>
+            </div>
+            {hermesMsg && (
+              <p className="text-sm text-[var(--ink-soft)]/75">{hermesMsg}</p>
+            )}
+          </form>
         </section>
 
         <section className="panel rounded-3xl p-5">

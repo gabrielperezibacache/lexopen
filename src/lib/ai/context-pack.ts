@@ -23,6 +23,7 @@ export type AiContextPack = {
 
 export async function buildAiContextPack(opts: {
   causaId?: string | null;
+  documentoId?: string | null;
   utility: AiUtilityId;
   prompt: string;
   role: string;
@@ -31,9 +32,18 @@ export async function buildAiContextPack(opts: {
   const alerts: string[] = [];
   const blocks: string[] = [];
 
-  if (opts.causaId) {
+  let causaId = opts.causaId || null;
+  if (!causaId && opts.documentoId) {
+    const doc = await prisma.documento.findUnique({
+      where: { id: opts.documentoId },
+      select: { causaId: true },
+    });
+    causaId = doc?.causaId || null;
+  }
+
+  if (causaId) {
     const causa = await prisma.causa.findUnique({
-      where: { id: opts.causaId },
+      where: { id: causaId },
       include: {
         partes: true,
         plazos: { orderBy: { fechaLimite: "asc" }, take: 20 },
@@ -98,7 +108,7 @@ export async function buildAiContextPack(opts: {
           type: "plazo",
           id: p.id,
           label: `${p.titulo} (${urg}, ${dias}d)`,
-          href: `/plazos`,
+          href: `/plazos?causaId=${encodeURIComponent(causa.id)}`,
         });
         if (p.esFatal && (urg === "critico" || urg === "vencido" || urg === "proximo")) {
           alerts.push(`Plazo${p.esFatal ? " fatal" : ""} «${p.titulo}»: ${urg} (${dias} días).`);
@@ -147,23 +157,58 @@ export async function buildAiContextPack(opts: {
         opts.utility === "copilot" ||
         opts.utility === "briefing"
       ) {
-        const docs = causa.documentos.map((d) => {
+        let docsList = [...causa.documentos];
+        if (opts.documentoId) {
+          const pinned = docsList.find((d) => d.id === opts.documentoId);
+          if (pinned) {
+            docsList = [pinned, ...docsList.filter((d) => d.id !== pinned.id)];
+          } else {
+            const extra = await prisma.documento.findFirst({
+              where: {
+                id: opts.documentoId,
+                causaId: causa.id,
+                ...(canSeeConfidential(opts.role)
+                  ? {}
+                  : { confidencial: false }),
+              },
+              select: {
+                id: true,
+                nombre: true,
+                extractedMarkdown: true,
+                extractionStatus: true,
+                confidencial: true,
+              },
+            });
+            if (extra) docsList = [extra, ...docsList];
+            else
+              alerts.push(
+                "El documento indicado no está disponible o no pertenece a esta causa."
+              );
+          }
+        }
+        const docs = docsList.map((d) => {
           const md = (d.extractedMarkdown || "").trim();
+          const pinned = opts.documentoId === d.id;
           if (md) {
             sources.push({
               type: "documento",
               id: d.id,
-              label: d.nombre,
-              href: `/causas/${causa.id}`,
+              label: pinned ? `★ ${d.nombre}` : d.nombre,
+              href: `/api/documentos/${d.id}/markdown`,
             });
           } else if (opts.utility === "doc_qa") {
-            alerts.push(`Documento «${d.nombre}» sin texto indexado (OCR/extracción pendiente).`);
+            alerts.push(
+              `Documento «${d.nombre}» sin texto indexado (OCR/extracción pendiente).`
+            );
           }
           return {
             id: d.id,
             nombre: d.nombre,
+            pinned,
             extractionStatus: d.extractionStatus,
-            excerpt: md ? md.slice(0, 6000) : null,
+            excerpt: md
+              ? md.slice(0, pinned ? 14_000 : 6000)
+              : null,
           };
         });
         blocks.push(`DOCUMENTOS_INDEXADOS:\n${JSON.stringify(docs, null, 2)}`);

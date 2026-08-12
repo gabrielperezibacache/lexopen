@@ -80,7 +80,7 @@ export default async function DocumentosPage() {
                       <>
                         {" · "}
                         <Link
-                          href={`/agente?causaId=${d.causaId}&utility=doc_qa`}
+                          href={`/agente?causaId=${d.causaId}&utility=doc_qa&documentoId=${d.id}`}
                           className="text-xs text-[var(--sea)]"
                         >
                           Preguntar IA
