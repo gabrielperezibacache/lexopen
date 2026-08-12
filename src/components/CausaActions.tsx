@@ -17,10 +17,21 @@ export function CausaActions({ causaId }: { causaId: string }) {
     });
     const data = await res.json();
     setBusy(false);
+    if (!res.ok) {
+      setMsg(data.error || "Error");
+      return;
+    }
+    const result = data.result || {};
+    const skipped =
+      (result.skippedConfidential?.minutas || 0) +
+      (result.skippedConfidential?.documentos || 0);
+    const warnCount = Array.isArray(result.warnings)
+      ? result.warnings.length
+      : 0;
     setMsg(
-      res.ok
-        ? `Obsidian sync: ${data.result?.files ?? 0} archivos`
-        : data.error || "Error"
+      `Obsidian (${result.mode || "storage"}): ${result.files ?? 0} archivo(s)` +
+        (skipped ? ` · ${skipped} confidencial(es) omitido(s)` : "") +
+        (warnCount ? ` · ${warnCount} aviso(s)` : "")
     );
   }
 

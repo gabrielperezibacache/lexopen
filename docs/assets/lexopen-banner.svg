@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="LexOpen — Legal workspaces for Chile">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0c1c24"/>
+      <stop offset="0.55" stop-color="#1a3340"/>
+      <stop offset="1" stop-color="#1f6f78"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="900" y1="40" x2="1180" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#c47a3a" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#c47a3a" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#f3f6f4" stroke-opacity="0.06"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="420" fill="url(#bg)"/>
+  <rect width="1280" height="420" fill="url(#grid)"/>
+  <ellipse cx="1040" cy="180" rx="260" ry="160" fill="url(#glow)"/>
+  <g fill="#f3f6f4" fill-opacity="0.08">
+    <rect x="860" y="110" width="28" height="220" rx="4"/>
+    <rect x="908" y="130" width="28" height="200" rx="4"/>
+    <rect x="956" y="90" width="28" height="240" rx="4"/>
+    <rect x="1004" y="150" width="28" height="180" rx="4"/>
+    <rect x="1052" y="120" width="28" height="210" rx="4"/>
+    <path d="M840 110h256l-18-40H858z"/>
+  </g>
+  <path d="M1120 70c18 28 22 54 10 86-8 22-6 40 8 62 12 18 10 40-4 58-10 14-8 30 2 44" fill="none" stroke="#2a8f99" stroke-width="3" stroke-opacity="0.55" stroke-linecap="round"/>
+  <text x="72" y="168" font-family="Georgia, 'Times New Roman', serif" font-size="84" font-weight="700" fill="#f3f6f4">LexOpen</text>
+  <rect x="74" y="188" width="168" height="6" rx="3" fill="#c47a3a"/>
+  <text x="74" y="240" font-family="ui-sans-serif, system-ui, sans-serif" font-size="28" fill="#d6c4a8">Legal workspaces open-source para Chile</text>
+  <text x="74" y="286" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" fill="#f3f6f4" fill-opacity="0.72">Causas · CRM · IA · Facturación · VDR · Plazos · Obsidian</text>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#0c1c24">
+    <rect x="74" y="320" width="118" height="36" rx="18" fill="#f3f6f4"/>
+    <text x="96" y="343">AGPL-3.0</text>
+    <rect x="206" y="320" width="132" height="36" rx="18" fill="#c47a3a"/>
+    <text x="228" y="343" fill="#f3f6f4">Next.js 15</text>
+    <rect x="352" y="320" width="148" height="36" rx="18" fill="#2a8f99"/>
+    <text x="372" y="343" fill="#f3f6f4">Postgres</text>
+  </g>
+</svg>

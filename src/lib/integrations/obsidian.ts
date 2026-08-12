@@ -7,7 +7,7 @@ import {
   isLoopbackHostname,
   isSafeOutboundHttpUrl,
 } from "@/lib/net/safe-url";
-import { newStorageKey, putObject } from "@/lib/storage";
+import { putObject } from "@/lib/storage";
 import { resolveDocumentoExport } from "@/lib/integrations/obsidian-docs";
 import {
   assertAllowedVaultPath,
@@ -37,8 +37,7 @@ function assertObsidianRestUrl(restUrl: string) {
     process.env.NODE_ENV !== "production" ||
     process.env.OBSIDIAN_ALLOW_PRIVATE_URL === "1";
   // Production: HTTPS only for non-loopback; loopback may use http when allowed.
-  const allowHttp =
-    allowPrivate || process.env.NODE_ENV !== "production";
+  const allowHttp = allowPrivate || process.env.NODE_ENV !== "production";
 
   if (
     isSafeOutboundHttpUrl(restUrl, {
@@ -65,6 +64,92 @@ export type ObsidianConfig = {
   syncNotes: boolean;
   syncDocumentos: boolean;
 };
+
+export type ObsidianExportMode = "rest" | "storage" | "local+storage";
+
+export type ObsidianExportResult = {
+  vaultPath: string;
+  storageKeys: string[];
+  files: number;
+  skippedConfidential: { minutas: number; documentos: number };
+  mode: ObsidianExportMode;
+  restConfigured: boolean;
+  warnings: string[];
+};
+
+export function obsidianRestConfigured() {
+  return Boolean(process.env.OBSIDIAN_REST_URL?.trim());
+}
+
+export function obsidianRestToken() {
+  return (
+    process.env.OBSIDIAN_REST_TOKEN ||
+    process.env.OBSIDIAN_REST_API_KEY ||
+    ""
+  );
+}
+
+export function sanitizeFilename(name: string) {
+  const cleaned = name
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .trim();
+  return cleaned || "sin-titulo";
+}
+
+export function yamlEscape(value: string) {
+  if (value === "") return '""';
+  if (/[:#{}[\],&*?|>!%@`]/.test(value) || /^\s|\s$/.test(value)) {
+    return JSON.stringify(value);
+  }
+  return value;
+}
+
+export function formatLocalDate(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Stable storage key so re-exports overwrite instead of duplicating. */
+export function stableObsidianKey(relativePath: string) {
+  const safe = relativePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  return `obsidian/${safe}`;
+}
+
+/** Encode each path segment for Obsidian Local REST API. */
+export function encodeVaultPath(relativePath: string) {
+  return relativePath
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
+}
+
+export function describeObsidianMode() {
+  if (obsidianRestConfigured()) {
+    return {
+      mode: "rest" as const,
+      label: "Obsidian Local REST API",
+      detail: process.env.OBSIDIAN_REST_URL,
+    };
+  }
+  if (process.env.NODE_ENV === "production") {
+    return {
+      mode: "storage" as const,
+      label: "Object storage / filesystem efímero",
+      detail: "Sin OBSIDIAN_REST_URL — export a storage (S3 o ./storage)",
+    };
+  }
+  return {
+    mode: "local+storage" as const,
+    label: "Vault local + storage",
+    detail: process.env.OBSIDIAN_VAULT_PATH || defaultObsidianVaultRoot(),
+  };
+}
 
 export async function getObsidianConfig(): Promise<ObsidianConfig> {
   const row = await prisma.integrationConfig.findUnique({
@@ -102,40 +187,42 @@ export async function getObsidianConfig(): Promise<ObsidianConfig> {
   };
 }
 
-function sanitize(name: string) {
-  return name.replace(/[<>:"/\\|?*]/g, "-").trim();
-}
-
 async function writeExportFile(opts: {
   localPath: string;
   relativePath: string;
   content: string;
   vaultPath?: string | null;
   storageKeys: string[];
-}) {
+  warnings: string[];
+}): Promise<ObsidianExportMode> {
   const restUrl = process.env.OBSIDIAN_REST_URL?.replace(/\/$/, "");
+  const relative = opts.relativePath.replace(/\\/g, "/");
+
   if (restUrl) {
     assertObsidianRestUrl(restUrl);
-    const target = `${restUrl}/vault/${encodeURIComponent(opts.relativePath)}`;
+    const target = `${restUrl}/vault/${encodeVaultPath(relative)}`;
     const allowPrivate =
       process.env.NODE_ENV !== "production" ||
       process.env.OBSIDIAN_ALLOW_PRIVATE_URL === "1";
+    const token = obsidianRestToken();
     const res = await fetchSafeOutbound(target, {
       allowHttp: true,
       allowLoopback: allowPrivate,
       method: "PUT",
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
-        ...(process.env.OBSIDIAN_REST_TOKEN
-          ? { Authorization: `Bearer ${process.env.OBSIDIAN_REST_TOKEN}` }
-          : {}),
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: opts.content,
     });
     if (!res.ok) {
-      throw new Error(`Obsidian REST PUT failed: ${res.status}`);
+      const text = await res.text().catch(() => "");
+      throw new Error(
+        `Obsidian REST PUT failed (${res.status}) ${relative}: ${text.slice(0, 120)}`
+      );
     }
-    return;
+    return "rest";
   }
 
   if (opts.vaultPath && process.env.NODE_ENV !== "production") {
@@ -144,53 +231,86 @@ async function writeExportFile(opts: {
       opts.vaultPath,
       path.relative(path.resolve(opts.vaultPath), opts.localPath)
     );
-    await fs.mkdir(path.dirname(confined), { recursive: true });
-    await fs.writeFile(confined, opts.content, "utf8");
+    try {
+      await fs.mkdir(path.dirname(confined), { recursive: true });
+      await fs.writeFile(confined, opts.content, "utf8");
+      const stored = await putObject({
+        key: stableObsidianKey(relative),
+        body: opts.content,
+        contentType: "text/markdown; charset=utf-8",
+      });
+      opts.storageKeys.push(stored.key);
+      return "local+storage";
+    } catch (e) {
+      opts.warnings.push(
+        `No se pudo escribir vault local ${opts.localPath}: ${
+          e instanceof Error ? e.message : "error"
+        }`
+      );
+    }
   }
+
   const stored = await putObject({
-    key: newStorageKey("obsidian", opts.relativePath),
+    key: stableObsidianKey(relative),
     body: opts.content,
-    contentType: "text/markdown",
+    contentType: "text/markdown; charset=utf-8",
   });
   opts.storageKeys.push(stored.key);
+  return "storage";
 }
 
-export async function exportCausaToObsidian(causaId: string) {
+export async function exportCausaToObsidian(
+  causaId: string
+): Promise<ObsidianExportResult> {
   const config = await getObsidianConfig();
-  const causa = await prisma.causa.findUnique({
-    where: { id: causaId },
-    include: {
-      partes: true,
-      notas: true,
-      documentos: { where: { confidencial: false } },
-      plazos: true,
-      cliente: true,
-      abogado: true,
-      minutas: {
-        where: { confidencial: false },
-        include: { acciones: true },
-        orderBy: { fecha: "desc" },
+  const [causa, skippedMinutas, skippedDocs] = await Promise.all([
+    prisma.causa.findUnique({
+      where: { id: causaId },
+      include: {
+        partes: true,
+        notas: true,
+        documentos: { where: { confidencial: false } },
+        plazos: true,
+        cliente: true,
+        abogado: true,
+        minutas: {
+          where: { confidencial: false },
+          include: { acciones: true },
+          orderBy: { fecha: "desc" },
+        },
       },
-    },
-  });
+    }),
+    prisma.minuta.count({ where: { causaId, confidencial: true } }),
+    prisma.documento.count({ where: { causaId, confidencial: true } }),
+  ]);
   if (!causa) throw new Error("Causa no encontrada");
 
-  const folderName = sanitize(causa.rit || causa.titulo);
+  const skippedConfidential = {
+    minutas: skippedMinutas,
+    documentos: skippedDocs,
+  };
+
+  const folderName = sanitizeFilename(causa.rit || causa.titulo);
   const vaultRoot = assertAllowedVaultPath(config.vaultPath);
   const folderPrefix = sanitizeVaultFolderPrefix(config.folderPrefix);
   const dir = resolveUnderVault(vaultRoot, folderPrefix, "Causas", folderName);
   const storageKeys: string[] = [];
+  const warnings: string[] = [];
   let files = 0;
+  let lastMode: ObsidianExportMode = obsidianRestConfigured()
+    ? "rest"
+    : "storage";
 
   const indexMd = `---
-rit: ${causa.rit ?? ""}
-ruc: ${causa.ruc ?? ""}
-tribunal: ${causa.tribunal}
-materia: ${causa.materia}
-estado: ${causa.estado}
-etapa: ${causa.etapa}
-google_drive_folder: ${causa.googleDriveFolderId ?? ""}
-lexopen_id: ${causa.id}
+rit: ${yamlEscape(causa.rit ?? "")}
+ruc: ${yamlEscape(causa.ruc ?? "")}
+tribunal: ${yamlEscape(causa.tribunal)}
+materia: ${yamlEscape(causa.materia)}
+estado: ${yamlEscape(causa.estado)}
+etapa: ${yamlEscape(causa.etapa)}
+google_drive_folder: ${yamlEscape(causa.googleDriveFolderId ?? "")}
+lexopen_id: ${yamlEscape(causa.id)}
+exported_at: ${yamlEscape(new Date().toISOString())}
 ---
 
 # ${causa.titulo}
@@ -204,29 +324,62 @@ lexopen_id: ${causa.id}
 ${causa.resumen ?? "_Sin resumen_"}
 
 ## Partes
-${causa.partes.map((p) => `- **${p.rol}:** ${p.nombre}${p.rut ? ` (${p.rut})` : ""}`).join("\n")}
+${
+  causa.partes
+    .map((p) => `- **${p.rol}:** ${p.nombre}${p.rut ? ` (${p.rut})` : ""}`)
+    .join("\n") || "_Sin partes_"
+}
 
 ## Plazos
-${causa.plazos.map((p) => `- [ ] ${p.titulo} — ${p.fechaLimite.toISOString().slice(0, 10)} (${p.estado})`).join("\n") || "_Sin plazos_"}
+${
+  causa.plazos
+    .map(
+      (p) =>
+        `- [ ] ${p.titulo} — ${formatLocalDate(p.fechaLimite)} (${p.estado})${
+          p.esFatal ? " · FATAL" : ""
+        }`
+    )
+    .join("\n") || "_Sin plazos_"
+}
 
 ## Minutas
-${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.titulo}]] — ${m.fecha.toISOString().slice(0, 10)}`).join("\n") || "_Sin minutas_"}
+${
+  causa.minutas
+    .map(
+      (m) =>
+        `- [[Minutas/${sanitizeFilename(m.titulo)}|${m.tipo}: ${m.titulo}]] — ${formatLocalDate(m.fecha)}`
+    )
+    .join("\n") || "_Sin minutas exportables_"
+}
+
+${
+  skippedConfidential.minutas || skippedConfidential.documentos
+    ? `\n> Nota LexOpen: se omitieron ${skippedConfidential.minutas} minuta(s) y ${skippedConfidential.documentos} documento(s) confidenciales.\n`
+    : ""
+}
 `;
 
-  await writeExportFile({
+  lastMode = await writeExportFile({
     localPath: path.join(dir, "Index.md"),
     relativePath: path.posix.join(folderPrefix, "Causas", folderName, "Index.md"),
     content: indexMd,
     vaultPath: vaultRoot,
     storageKeys,
+    warnings,
   });
   files += 1;
 
   if (config.syncNotes) {
-    const notesDir = resolveUnderVault(vaultRoot, folderPrefix, "Causas", folderName, "Notas");
+    const notesDir = resolveUnderVault(
+      vaultRoot,
+      folderPrefix,
+      "Causas",
+      folderName,
+      "Notas"
+    );
     for (const nota of causa.notas) {
-      const file = `${sanitize(nota.titulo)}.md`;
-      await writeExportFile({
+      const file = `${sanitizeFilename(nota.titulo)}.md`;
+      lastMode = await writeExportFile({
         localPath: path.join(notesDir, file),
         relativePath: path.posix.join(
           folderPrefix,
@@ -235,9 +388,10 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
           "Notas",
           file
         ),
-        content: `---\ntags: [${nota.tags}]\n---\n\n# ${nota.titulo}\n\n${nota.contenido}\n`,
+        content: `---\ntags: [${nota.tags}]\nlexopen_nota_id: ${yamlEscape(nota.id)}\n---\n\n# ${nota.titulo}\n\n${nota.contenido}\n`,
         vaultPath: vaultRoot,
         storageKeys,
+        warnings,
       });
       files += 1;
     }
@@ -251,14 +405,16 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
     "Minutas"
   );
   for (const minuta of causa.minutas) {
-    const file = `${sanitize(minuta.titulo)}.md`;
+    const file = `${sanitizeFilename(minuta.titulo)}.md`;
     const acciones = minuta.acciones
       .map(
         (a) =>
-          `- [${a.estado === "hecha" ? "x" : " "}] ${a.descripcion}${a.responsable ? ` (@${a.responsable})` : ""}`
+          `- [${a.estado === "hecha" ? "x" : " "}] ${a.descripcion}${
+            a.responsable ? ` (@${a.responsable})` : ""
+          }${a.fechaLimite ? ` — ${formatLocalDate(a.fechaLimite)}` : ""}`
       )
       .join("\n");
-    await writeExportFile({
+    lastMode = await writeExportFile({
       localPath: path.join(minutasDir, file),
       relativePath: path.posix.join(
         folderPrefix,
@@ -267,9 +423,33 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
         "Minutas",
         file
       ),
-      content: `---\ntipo: ${minuta.tipo}\nfecha: ${minuta.fecha.toISOString()}\n---\n\n# ${minuta.titulo}\n\n## Resumen\n${minuta.resumenEjecutivo}\n\n## Próximos pasos\n${acciones || minuta.proximosPasos || "_Sin acciones_"}\n`,
+      content: `---
+tipo: ${yamlEscape(minuta.tipo)}
+fecha: ${yamlEscape(formatLocalDate(minuta.fecha))}
+lexopen_minuta_id: ${yamlEscape(minuta.id)}
+confidencial: false
+---
+
+# ${minuta.titulo}
+
+## Resumen
+${minuta.resumenEjecutivo}
+
+## Hechos relevantes
+${minuta.hechosRelevantes || "_—_"}
+
+## Acuerdos
+${minuta.acuerdos || "_—_"}
+
+## Próximos pasos
+${acciones || minuta.proximosPasos || "_Sin acciones_"}
+
+## Riesgos
+${minuta.riesgosAlertas || "_—_"}
+`,
       vaultPath: vaultRoot,
       storageKeys,
+      warnings,
     });
     files += 1;
   }
@@ -277,11 +457,16 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
   if (config.syncDocumentos) {
     for (const doc of causa.documentos) {
       const resolved = resolveDocumentoExport(doc);
-      if (!resolved) continue;
+      if (!resolved) {
+        if (doc.storageKey) {
+          warnings.push(
+            `Documento binario omitido (sin Markdown): ${doc.nombre}`
+          );
+        }
+        continue;
+      }
       const relativeFile = resolved.relativeFile.replace(/\\/g, "/");
-      if (
-        relativeFile.split("/").some((seg) => seg === "." || seg === "..")
-      ) {
+      if (relativeFile.split("/").some((seg) => seg === "." || seg === "..")) {
         continue;
       }
       const localPath = resolveUnderVault(
@@ -299,12 +484,13 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
         "Documentos",
         relativeFile
       );
-      await writeExportFile({
+      lastMode = await writeExportFile({
         localPath,
         relativePath,
         content: resolved.body,
         vaultPath: vaultRoot,
         storageKeys,
+        warnings,
       });
       files += 1;
       await prisma.documento.update({
@@ -318,15 +504,39 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
     vaultPath: dir,
     storageKeys,
     files,
-    mode: process.env.OBSIDIAN_REST_URL ? "rest" : "storage",
+    skippedConfidential,
+    mode: lastMode,
+    restConfigured: obsidianRestConfigured(),
+    warnings,
   };
 }
 
 export async function syncAllCausasToObsidian() {
-  const causas = await prisma.causa.findMany({ select: { id: true } });
-  const results = [];
+  const causas = await prisma.causa.findMany({
+    select: { id: true, titulo: true, rit: true },
+    orderBy: { updatedAt: "desc" },
+  });
+  const results: Array<
+    ObsidianExportResult & { causaId: string; ok: boolean; error?: string }
+  > = [];
   for (const c of causas) {
-    results.push(await exportCausaToObsidian(c.id));
+    try {
+      const result = await exportCausaToObsidian(c.id);
+      results.push({ ...result, causaId: c.id, ok: true });
+    } catch (e) {
+      results.push({
+        causaId: c.id,
+        ok: false,
+        error: e instanceof Error ? e.message : "Error",
+        vaultPath: "",
+        storageKeys: [],
+        files: 0,
+        skippedConfidential: { minutas: 0, documentos: 0 },
+        mode: obsidianRestConfigured() ? "rest" : "storage",
+        restConfigured: obsidianRestConfigured(),
+        warnings: [],
+      });
+    }
   }
   return results;
 }

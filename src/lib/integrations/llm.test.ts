@@ -4,6 +4,7 @@ import {
   LLM_PRESETS,
   LLM_PRESET_CATALOG,
   legalSystemPrompt,
+  sanitizeLlmMessages,
 } from "./llm";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
 
@@ -37,5 +38,29 @@ assert.match(sealed, /^enc:v2:/);
 assert.equal(decryptSecret(sealed, { strict: true }), "sk-test-llm-key");
 assert.equal(decryptSecret("sk-legacy-plain", { strict: true }), undefined);
 assert.equal(decryptSecret("sk-legacy-plain", { strict: false }), "sk-legacy-plain");
+
+const sanitized = sanitizeLlmMessages([
+  { role: "system", content: "sys" },
+  { role: "user", content: "  " },
+  { role: "user", content: "hola" },
+  { role: "assistant", content: "ok" },
+  { role: "user", content: "x".repeat(20_000) },
+]);
+assert.equal(sanitized.length, 4);
+assert.equal(sanitized[0]?.role, "system");
+assert.ok((sanitized.at(-1)?.content.length ?? 0) <= 12000);
+
+const trimmed = sanitizeLlmMessages(
+  [
+    { role: "system", content: "sys" },
+    ...Array.from({ length: 40 }, (_, i) => ({
+      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
+      content: `m${i}`,
+    })),
+  ],
+  6
+);
+assert.equal(trimmed.length, 6);
+assert.equal(trimmed[0]?.role, "system");
 
 console.log("integrations/llm.test.ts OK");

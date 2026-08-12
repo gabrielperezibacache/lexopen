@@ -307,6 +307,32 @@ export async function saveLlmConfig(input: {
   return { ...next, apiUrl: payload.apiUrl };
 }
 
+/** Trim/filter chat messages before sending to any OpenAI-compatible provider. */
+export function sanitizeLlmMessages(
+  messages: LlmMessage[],
+  maxMessages = 24,
+  maxChars = 12000
+): LlmMessage[] {
+  const cleaned = messages
+    .filter(
+      (m) =>
+        m &&
+        (m.role === "system" || m.role === "user" || m.role === "assistant") &&
+        typeof m.content === "string" &&
+        m.content.trim()
+    )
+    .map((m) => ({
+      role: m.role,
+      content: m.content.trim().slice(0, maxChars),
+    }));
+  if (cleaned.length <= maxMessages) return cleaned;
+  const system = cleaned.filter((m) => m.role === "system").slice(0, 1);
+  const rest = cleaned
+    .filter((m) => m.role !== "system")
+    .slice(-(maxMessages - system.length));
+  return [...system, ...rest];
+}
+
 export async function askLlm(params: {
   messages: LlmMessage[];
   causaId?: string;
@@ -315,6 +341,18 @@ export async function askLlm(params: {
   timeoutMs?: number;
 }) {
   const config = await getLlmConfig();
+  const messages = sanitizeLlmMessages(params.messages);
+  if (!messages.some((m) => m.role === "user")) {
+    return {
+      source: "error" as const,
+      content: "",
+      requireApproval: true,
+      provider: config.preset,
+      model: config.model,
+      note: "Prompt vacío: indique una instrucción para el copiloto.",
+    };
+  }
+
   let apiUrl: URL;
   try {
     apiUrl = new URL(config.apiUrl);
@@ -361,7 +399,7 @@ export async function askLlm(params: {
       headers,
       body: JSON.stringify({
         model: config.model,
-        messages: params.messages,
+        messages,
         temperature: 0.2,
       }),
       signal: AbortSignal.timeout(params.timeoutMs || 45_000),
