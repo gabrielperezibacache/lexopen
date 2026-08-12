@@ -1,5 +1,6 @@
 export const MAX_CSV_BYTES = 5 * 1024 * 1024;
 export const MAX_CSV_ROWS = 1000;
+export const MOVIMIENTOS_CSV_HEADER = "titulo,detalle,fecha,referencia,id";
 
 export type CsvMovimientoRow = {
   titulo: string;

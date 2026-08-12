@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import {
   MAX_CSV_ROWS,
+  MOVIMIENTOS_CSV_HEADER,
   parseMovimientosCsv,
 } from "@/lib/pjud/import-csv";
+
+assert.equal(MOVIMIENTOS_CSV_HEADER, "titulo,detalle,fecha,referencia,id");
 
 const rows = parseMovimientosCsv(
   "\uFEFFtitulo,detalle,fecha,referencia,id\n" +

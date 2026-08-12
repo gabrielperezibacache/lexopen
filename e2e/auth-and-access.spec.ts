@@ -43,6 +43,17 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
     page.getByRole("heading", { name: "Causas judiciales" })
   ).toBeVisible();
   await expect(page.getByText("C-4521-2025")).toBeVisible();
+  const causeHref = await page
+    .getByRole("link", { name: /C-4521-2025/ })
+    .first()
+    .getAttribute("href");
+  expect(causeHref).toBeTruthy();
+  await page.goto(causeHref!);
+  const templateHref = await page
+    .getByRole("link", { name: "Descargar plantilla" })
+    .getAttribute("href");
+  expect(templateHref).toContain("format=csv");
+  expect(templateHref).toContain("template=1");
 
   const invoicesResponse = await page.request.get("/api/billing/invoices?status=emitida");
   expect(invoicesResponse.ok()).toBeTruthy();

@@ -177,7 +177,8 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
 Sin proveedor externo, exporte el CSV desde la consulta oficial y use el
 importador de movimientos de la ficha de la causa. El formato recomendado es
 `titulo,detalle,fecha,referencia,id`; LexOpen clasifica las filas, fuerza
-`fuente=import` y omite reimportaciones con la misma clave determinista.
+`fuente=import` y omite reimportaciones con la misma clave determinista. La
+ficha incluye un enlace para descargar la plantilla exacta.
 
 #### Webhook de un proveedor PJUD
 

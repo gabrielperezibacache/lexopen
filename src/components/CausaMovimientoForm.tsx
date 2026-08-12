@@ -74,6 +74,13 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
         <span className="text-[var(--ink-soft)]/75">
           Importar CSV (titulo,detalle,fecha,referencia,id)
         </span>
+        <a
+          className="btn btn-ghost"
+          download
+          href={`/api/causas/${causaId}/movimientos?format=csv&template=1`}
+        >
+          Descargar plantilla
+        </a>
         <input
           className="input max-w-xs"
           type="file"

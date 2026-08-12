@@ -12,6 +12,7 @@ import { writeAudit } from "@/lib/audit";
 import { classifyMovimiento } from "@/lib/pjud/classify";
 import { fingerprint } from "@/lib/pjud/provider";
 import {
+  MOVIMIENTOS_CSV_HEADER,
   parseMovimientosCsv,
   MAX_CSV_BYTES,
 } from "@/lib/pjud/import-csv";
@@ -29,6 +30,18 @@ export async function GET(req: NextRequest, { params }: Params) {
   try {
     await requireStaff();
     const { id } = await params;
+    if (
+      req.nextUrl.searchParams.get("format") === "csv" &&
+      req.nextUrl.searchParams.get("template") === "1"
+    ) {
+      return new NextResponse(`${MOVIMIENTOS_CSV_HEADER}\r\n`, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition":
+            'attachment; filename="plantilla-movimientos-pjud.csv"',
+        },
+      });
+    }
     const rawLimit = Number(req.nextUrl.searchParams.get("limit") || 200);
     const rawOffset = Number(req.nextUrl.searchParams.get("offset") || 0);
     const limit = Number.isFinite(rawLimit)
