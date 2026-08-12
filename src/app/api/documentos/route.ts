@@ -58,9 +58,9 @@ export async function POST(req: NextRequest) {
     let privilegio = Boolean(body?.privilegio);
     let causaId = body?.causaId || null;
     const autorId = user.id;
-    let extractedMarkdown: string | null = null;
+    const extractedMarkdown: string | null = null;
     let extractionStatus: string | null = null;
-    let extractionJson: string | null = null;
+    const extractionJson: string | null = null;
     let processingBytes: Buffer | null = null;
 
     if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
