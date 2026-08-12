@@ -7,6 +7,18 @@ LexOpen replica el flujo de datos de CausaMonitor:
 3. Cartera con semáforos, cuadernos, receptor, fallidos
 4. **Cola durable** `PjudSyncJob` (due-based) + digest diario + backup PDF opcional
 
+## Scrape OJV (cómo trabaja)
+
+LexOpen sigue el flujo DOM real de Oficina Judicial Virtual (misma familia que scrapers de campo tipo `consulta_causas_pjud` + sesión CAPTCHA de `mcp-legal-chile`):
+
+1. `home/index.php` → `accesoConsultaCausas()` (sesión invitado)
+2. Tab `#BusJuridica` (RUT) o tab ROL/RIT
+3. `#jurCompetencia` + `#jurTribunal` / `#corteJur`
+4. `#btnConConsultaJur` → espera `#loadPreJuridica`
+5. Filas `#verDetalleJuridica` → modal `.modal.in` (`table.table-titulos`, historia, e-book)
+
+Kill switches, presupuesto CAPTCHA diario y cache TTL (`PJUD_CAUSAS_CACHE_TTL_MS`) aplican. Resultados = integridad *candidate*.
+
 ## Orden de ingest al sincronizar
 
 1. `PJUD_API_URL` (partner)

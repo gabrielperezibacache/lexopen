@@ -206,3 +206,79 @@ export function parseCausasListFromHtml(html: string): Array<{
   }
   return items;
 }
+
+export type VerDetalleRow = {
+  rit: string;
+  tribunal: string;
+  caratula: string | null;
+  ruc: string | null;
+  estado: string | null;
+  fecha: string | null;
+  fechaDate: Date | null;
+};
+
+/**
+ * Parse `#verDetalleJuridica` result rows (Consulta Unificada OJV).
+ * First TD is usually the detail link; remaining TDs vary by competencia.
+ */
+export function parseVerDetalleJuridicaHtml(html: string): VerDetalleRow[] {
+  const out: VerDetalleRow[] = [];
+  const tableMatch =
+    html.match(
+      /id=["']verDetalleJuridica["'][^>]*>([\s\S]*?)(?:<\/table>|<\/tbody>)/i
+    ) || html.match(/verDetalleJuridica[\s\S]*?<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+  const chunk = tableMatch?.[1] || html;
+  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+  let rowMatch: RegExpExecArray | null;
+  const seen = new Set<string>();
+
+  while ((rowMatch = rowRe.exec(chunk)) !== null) {
+    if (/pagination|<nav/i.test(rowMatch[1])) continue;
+    const cells: string[] = [];
+    let cellMatch: RegExpExecArray | null;
+    cellRe.lastIndex = 0;
+    while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
+      cells.push(stripTags(cellMatch[1]));
+    }
+    if (cells.length < 2) continue;
+    // Skip leading empty / icon cell when present
+    const dataCells =
+      cells[0].length <= 2 || /ver|detalle|^\s*$/i.test(cells[0])
+        ? cells.slice(1)
+        : cells;
+    const joined = dataCells.join(" ");
+    const ritMatch =
+      joined.match(/\b([A-ZÁÉÍÓÚÑ]{1,4}-\d{1,6}-\d{4})\b/i) ||
+      joined.match(/\b(\d{1,6}-\d{4})\b/);
+    if (!ritMatch) continue;
+    const rit = ritMatch[1].toUpperCase();
+    const tribunal =
+      dataCells.find((c) =>
+        /juzgado|corte|tribunal oral|tribunal constitucional|^tribunal\b/i.test(c)
+      ) ||
+      dataCells.find((c) => /civil|laboral|cobranza|garant/i.test(c)) ||
+      "Tribunal no identificado";
+    const key = `${rit}|${tribunal}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const fechaRaw =
+      dataCells.find((c) => /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(c)) || null;
+    const fechaNorm = fechaRaw ? normalizeChileanDate(fechaRaw) : null;
+    out.push({
+      rit,
+      tribunal,
+      caratula:
+        dataCells.find((c) => /\bvs\.?\b|\/|con\b/i.test(c)) ||
+        dataCells.find((c) => c.length > 8 && c !== rit && c !== tribunal) ||
+        null,
+      ruc: dataCells.find((c) => /\d{1,3}-\d{8,}-\d|\d{7,8}-[\dkK]/i.test(c)) || null,
+      estado:
+        dataCells.find((c) => /tramitaci|terminad|archiv|vigente|activ/i.test(c)) ||
+        null,
+      fecha: fechaNorm,
+      fechaDate: fechaNorm ? parseLocalDateInput(fechaNorm) : null,
+    });
+  }
+  return out;
+}
