@@ -8,6 +8,7 @@ import {
   isSafeOutboundHttpUrl,
 } from "@/lib/net/safe-url";
 import { newStorageKey, putObject } from "@/lib/storage";
+import { resolveDocumentoExport } from "@/lib/integrations/obsidian-docs";
 
 function assertObsidianRestUrl(restUrl: string) {
   let parsed: URL;
@@ -220,19 +221,27 @@ ${causa.minutas.map((m) => `- [[Minutas/${sanitize(m.titulo)}|${m.tipo}: ${m.tit
   if (config.syncDocumentos) {
     const docsDir = path.join(dir, "Documentos");
     for (const doc of causa.documentos) {
-      if (!doc.contenido) continue;
-      const file = sanitize(doc.nombre.endsWith(".md") ? doc.nombre : `${doc.nombre}.md`);
+      const resolved = resolveDocumentoExport(doc);
+      if (!resolved) continue;
+      const localPath = path.join(docsDir, resolved.relativeFile);
+      const relativePath = path.join(
+        config.folderPrefix,
+        "Causas",
+        folderName,
+        "Documentos",
+        resolved.relativeFile
+      );
       await writeExportFile({
-        localPath: path.join(docsDir, file),
-        relativePath: path.join(config.folderPrefix, "Causas", folderName, "Documentos", file),
-        content: doc.contenido,
+        localPath,
+        relativePath,
+        content: resolved.body,
         vaultPath: config.vaultPath,
         storageKeys,
       });
       files += 1;
       await prisma.documento.update({
         where: { id: doc.id },
-        data: { obsidianPath: path.join(config.folderPrefix, "Causas", folderName, "Documentos", file) },
+        data: { obsidianPath: relativePath },
       });
     }
   }

@@ -1,16 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, Suspense, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { safeJsonParse } from "@/lib/safe-json";
 
 type CausaOption = { id: string; titulo: string; rit: string | null };
+type SourceRef = {
+  type: string;
+  id: string;
+  label: string;
+  href?: string;
+  downloadHref?: string;
+};
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   source?: string;
   utility?: string;
+  sources?: SourceRef[];
+  suggestedActions?: Array<{ label: string; href: string }>;
+  documentScope?: {
+    documentoIds?: string[] | null;
+    rutaPrefix?: string | null;
+  };
 };
 type AgentChat = {
   id: string;
@@ -18,6 +31,7 @@ type AgentChat = {
   messagesJson: string;
   demoMode: boolean;
   updatedAt: string;
+  causaId?: string | null;
 };
 type Utility = {
   id: string;
@@ -25,11 +39,12 @@ type Utility = {
   short: string;
   starter: string;
 };
-type SourceRef = {
-  type: string;
+type DocOption = {
   id: string;
-  label: string;
-  href?: string;
+  nombre: string;
+  ruta: string | null;
+  tipo: string;
+  extractionStatus: string | null;
 };
 
 function AgenteInner() {
@@ -47,6 +62,9 @@ function AgenteInner() {
   const [chats, setChats] = useState<AgentChat[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
+  const [docs, setDocs] = useState<DocOption[]>([]);
+  const [rutaPrefix, setRutaPrefix] = useState(sp.get("rutaPrefix") || "");
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
   async function loadChats() {
     const res = await fetch("/api/integrations/hermes?chats=1");
@@ -96,22 +114,87 @@ function AgenteInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!causaId) return;
+    let active = true;
+    fetch(`/api/documentos?causaId=${encodeURIComponent(causaId)}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: DocOption[]) => {
+        if (!active) return;
+        setDocs(
+          Array.isArray(data)
+            ? data.map((d) => ({
+                id: d.id,
+                nombre: d.nombre,
+                ruta: d.ruta ?? null,
+                tipo: d.tipo || "otro",
+                extractionStatus: d.extractionStatus ?? null,
+              }))
+            : []
+        );
+      })
+      .catch(() => {
+        if (active) setDocs([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [causaId]);
+
+  const folderPrefixes = useMemo(() => {
+    const set = new Set<string>();
+    for (const d of docs) {
+      if (!d.ruta) continue;
+      const parts = d.ruta.replace(/\\/g, "/").split("/").filter(Boolean);
+      if (parts[0]) set.add(parts[0]);
+      if (parts.length > 1) set.add(parts.slice(0, 2).join("/"));
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "es"));
+  }, [docs]);
+
+  const visibleDocs = useMemo(() => {
+    if (!rutaPrefix) return docs;
+    const needle = rutaPrefix.toLowerCase();
+    return docs.filter((d) => {
+      const ruta = (d.ruta || "").toLowerCase();
+      return ruta === needle || ruta.startsWith(`${needle}/`);
+    });
+  }, [docs, rutaPrefix]);
+
   function selectUtility(u: Utility) {
     setUtility(u.id);
     setPrompt(u.starter);
   }
 
+  function toggleDoc(id: string) {
+    setSelectedDocIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id].slice(0, 40)
+    );
+  }
+
   function resumeChat(chat: AgentChat) {
     setChatId(chat.id);
     const parsed = safeJsonParse<ChatMessage[]>(chat.messagesJson, []);
-    setMessages(Array.isArray(parsed) ? parsed : []);
-    const lastAssistant = [...(Array.isArray(parsed) ? parsed : [])]
-      .reverse()
-      .find((m) => m.role === "assistant");
+    const list = Array.isArray(parsed) ? parsed : [];
+    setMessages(list);
+    const lastAssistant = [...list].reverse().find((m) => m.role === "assistant");
+    const lastUser = [...list].reverse().find((m) => m.role === "user");
     setReply(lastAssistant?.content || "");
     setMeta(chat.demoMode ? "Historial · modo demo" : "Historial · copiloto");
-    setSources([]);
-    setActions([]);
+    setSources(Array.isArray(lastAssistant?.sources) ? lastAssistant.sources : []);
+    setActions(
+      Array.isArray(lastAssistant?.suggestedActions)
+        ? lastAssistant.suggestedActions
+        : []
+    );
+    if (chat.causaId) setCausaId(chat.causaId);
+    const scope = lastAssistant?.documentScope;
+    if (scope?.rutaPrefix) setRutaPrefix(scope.rutaPrefix);
+    else setRutaPrefix("");
+    if (Array.isArray(scope?.documentoIds)) setSelectedDocIds(scope.documentoIds);
+    else setSelectedDocIds([]);
+    const util = lastAssistant?.utility || lastUser?.utility;
+    if (util) setUtility(util);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -130,6 +213,8 @@ function AgenteInner() {
           prompt,
           chatId: chatId || undefined,
           utility,
+          rutaPrefix: rutaPrefix || undefined,
+          documentoIds: selectedDocIds.length ? selectedDocIds : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -174,9 +259,9 @@ function AgenteInner() {
         </p>
         <h1 className="display mt-2 text-4xl">Asistente LexOpen</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Entiende lo que pide, recuerda el hilo, busca en la causa y documentos
-          del estudio, y responde con fuentes verificables del host. Borradores
-          siempre sujetos a revisión humana (estilo Julia.cl / Hermes).
+          Entiende lo que pide, recuerda el hilo y ancla la respuesta a la carpeta
+          investigativa, documentos indexados (OCR/Markdown), VDR vinculado y plazos
+          del host. Borradores siempre sujetos a revisión humana.
         </p>
       </div>
 
@@ -216,6 +301,8 @@ function AgenteInner() {
                 setMeta("");
                 setSources([]);
                 setActions([]);
+                setRutaPrefix("");
+                setSelectedDocIds([]);
               }}
             >
               Nuevo
@@ -251,8 +338,8 @@ function AgenteInner() {
         <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
           {messages.length === 0 && !reply && (
             <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white/50 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
-              Elija una utilidad y una causa (recomendado). El copiloto ancla la
-              respuesta a plazos, movimientos y documentos indexados del host.
+              Elija una utilidad y una causa. Puede acotar por carpeta investigativa
+              o documentos concretos; el ranking prioriza coincidencias con su pregunta.
             </div>
           )}
           <div>
@@ -262,7 +349,12 @@ function AgenteInner() {
             <select
               className="select"
               value={causaId}
-              onChange={(e) => setCausaId(e.target.value)}
+              onChange={(e) => {
+                setCausaId(e.target.value);
+                setDocs([]);
+                setRutaPrefix("");
+                setSelectedDocIds([]);
+              }}
             >
               <option value="">Sin causa específica</option>
               {causas.map((c) => (
@@ -272,6 +364,86 @@ function AgenteInner() {
               ))}
             </select>
           </div>
+          {causaId && (
+            <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-white/60 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">Alcance documental</h3>
+                <Link
+                  href={causaId ? `/causas/${causaId}` : "/documentos"}
+                  className="text-xs text-[var(--sea)]"
+                >
+                  Incorporar carpeta
+                </Link>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[var(--ink-soft)]/70">
+                  Carpeta investigativa
+                </label>
+                <select
+                  className="select"
+                  aria-label="Carpeta investigativa"
+                  value={rutaPrefix}
+                  onChange={(e) => {
+                    setRutaPrefix(e.target.value);
+                    setSelectedDocIds([]);
+                  }}
+                >
+                  <option value="">Toda la causa (ranking automático)</option>
+                  {folderPrefixes.map((f) => (
+                    <option key={f} value={f}>
+                      {f}/
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {visibleDocs.length > 0 ? (
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <label className="text-xs font-medium text-[var(--ink-soft)]/70">
+                      Documentos ({selectedDocIds.length || "auto"} / {visibleDocs.length})
+                    </label>
+                    <button
+                      type="button"
+                      className="text-xs text-[var(--sea)]"
+                      onClick={() => setSelectedDocIds([])}
+                    >
+                      Usar ranking automático
+                    </button>
+                  </div>
+                  <ul className="max-h-40 space-y-1 overflow-y-auto text-sm">
+                    {visibleDocs.slice(0, 40).map((d) => {
+                      const path = d.ruta ? `${d.ruta}/${d.nombre}` : d.nombre;
+                      const checked = selectedDocIds.includes(d.id);
+                      return (
+                        <li key={d.id}>
+                          <label className="flex cursor-pointer items-start gap-2 rounded-lg px-1 py-1 hover:bg-white/80">
+                            <input
+                              type="checkbox"
+                              className="mt-1"
+                              checked={checked}
+                              onChange={() => toggleDoc(d.id)}
+                            />
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium">{path}</span>
+                              <span className="text-[11px] text-[var(--ink-soft)]/60">
+                                {d.tipo}
+                                {d.extractionStatus ? ` · ${d.extractionStatus}` : ""}
+                              </span>
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--ink-soft)]/65">
+                  Sin documentos en esta causa. Incorpore una carpeta investigativa desde
+                  Documentos o la ficha de la causa.
+                </p>
+              )}
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium">Instrucción</label>
             <textarea
@@ -295,18 +467,27 @@ function AgenteInner() {
               </h2>
               <ul className="mt-2 flex flex-wrap gap-2">
                 {sources.slice(0, 16).map((s) => (
-                  <li key={`${s.type}-${s.id}`}>
+                  <li
+                    key={`${s.type}-${s.id}`}
+                    className="inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs"
+                  >
                     {s.href ? (
-                      <Link
-                        href={s.href}
-                        className="rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs text-[var(--sea)]"
-                      >
+                      <Link href={s.href} className="text-[var(--sea)]">
                         {s.type}: {s.label}
                       </Link>
                     ) : (
-                      <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs">
+                      <span>
                         {s.type}: {s.label}
                       </span>
+                    )}
+                    {s.downloadHref && (
+                      <a
+                        href={s.downloadHref}
+                        className="text-[var(--ink-soft)]/70 underline"
+                        title="Descargar Markdown extraído"
+                      >
+                        MD
+                      </a>
                     )}
                   </li>
                 ))}

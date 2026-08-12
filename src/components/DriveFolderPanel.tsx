@@ -67,7 +67,7 @@ export function DriveFolderPanel({
           <h2 className="text-lg font-semibold">Google Drive</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
             Enlace el expediente digital de la causa a una carpeta determinada.
-            Documentos y minutas se suben ahí.
+            Tras incorporar documentos o minutas en LexOpen, puede subirlos ahí.
           </p>
         </div>
         <FolderOpen className="text-[var(--copper)]" size={20} />

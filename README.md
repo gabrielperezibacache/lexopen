@@ -95,7 +95,7 @@ es ofrecer una base abierta, extensible y centrada en el trabajo diario de un es
 | **Wiki, blog y Q&A** | Base de conocimiento en Markdown, publicaciones, preguntas por espacio y respuestas oficiales. |
 | **Workflows** | Aprobaciones manuales multi-paso para escritos y publicación de información en portales. |
 | **Portal cliente** | Sites visibles para clientes, documentos compartidos y comunicación contextual por Q&A. |
-| **Búsqueda e inteligencia** | Búsqueda unificada de sites, causas, archivos, tareas, wiki, minutas y jurisprudencia; consola Hermes con aprobación humana. |
+| **Búsqueda e inteligencia** | Búsqueda unificada (incluye documentos por causa); copiloto con alcance de carpeta investigativa, ranking documental y aprobación humana. |
 | **Facturación** | Horas, gastos, tarifas horarias, cuota litis, retainers, documentos internos de cobro, pagos y provisiones. |
 | **Auditoría y acceso** | Sesiones firmadas, roles `admin`/`abogado`/`asistente`/`cliente`, filtros de confidencialidad y eventos de auditoría. |
 
@@ -143,8 +143,11 @@ Después de ejecutar el seed, una primera exploración útil es:
    el contenido compartido.
 5. Revisar **Facturación** para ver horas, gastos, facturas, pagos y provisiones en
    pesos chilenos.
-6. Probar **Jurisprudencia**, **Agente Hermes** e **Integraciones** para distinguir
-   los datos demo de las conexiones externas reales.
+6. Probar **Documentos** (Incorporar → Carpeta), la ficha de causa C-4521 y el
+   **copiloto** en `/agente`: acote la carpeta investigativa `Escritos/` o reanude
+   el chat demo «Montos reclamados en Escritos».
+7. Probar **Jurisprudencia** e **Integraciones** para distinguir los datos demo
+   de las conexiones externas reales (Google Drive, Obsidian, Hermes).
 
 El seed crea cinco sites, tres causas, cuatro usuarios, jurisprudencia demo y datos
 de facturación. Todos los datos son ficticios y están pensados para mostrar los
@@ -520,17 +523,20 @@ un flujo de envío o sincronización de Gmail.
 ### Obsidian
 
 Exporta una causa a Markdown con índice, partes, plazos, notas, minutas y documentos
-no confidenciales. Puede escribir en un vault local durante el desarrollo, usar
+no confidenciales (prioriza `extractedMarkdown` y respeta subcarpetas
+`Documentos/<ruta>/…`). Puede escribir en un vault local durante el desarrollo, usar
 Obsidian Local REST API o conservar los objetos mediante el backend de storage.
 
-### Hermes Agent
+### Copiloto IA (Hermes)
 
 Envía solicitudes a `POST {HERMES_API_URL}/chat/completions` con formato compatible
-con OpenAI. Las respuestas se guardan como historial de chat y requieren aprobación
-humana en el flujo de la aplicación. Con `HERMES_ALLOW_DEMO=1`, una respuesta local
-de demostración se identifica explícitamente como tal.
+con OpenAI. El context pack ancla la respuesta a la causa, la **carpeta investigativa**
+(`ruta`), documentos rankeados por la pregunta, VDR/wiki del espacio vinculado y
+plazos. En `/agente` se puede acotar por carpeta o documentos; el alcance y las
+fuentes se restauran al reanudar el chat. Con `HERMES_ALLOW_DEMO=1`, una respuesta
+local de demostración se identifica explícitamente como tal.
 
-Hermes no es asesoría jurídica automática: no presente ni envíe un texto generado sin
+No es asesoría jurídica automática: no presente ni envíe un texto generado sin
 revisión del abogado responsable.
 
 ### Procesamiento documental local
@@ -543,11 +549,13 @@ LexOpen integra localmente:
   clasificar PDFs como texto, mixtos o escaneados y detectar páginas que requieren
   OCR.
 
-Al subir un documento desde **Documentos**, LexOpen conserva el original y genera
-Markdown extraído cuando es posible. Los PDFs escaneados usan Tesseract local
-mediante un binding nativo que renderiza internamente; `pdftoppm` solo queda como
-fallback para plataformas sin ese binding. Si falta OCR, el documento queda marcado
-como `Requiere OCR`. Ningún archivo se envía a Firecrawl.
+Desde **Documentos** o la ficha de causa puede incorporar archivos o una **carpeta
+investigativa** completa (se preserva `ruta`). LexOpen conserva el original y genera
+Markdown extraído cuando es posible; ese texto alimenta el copiloto y la exportación
+a Obsidian/Drive. Los PDFs escaneados usan Tesseract local mediante un binding nativo
+que renderiza internamente; `pdftoppm` solo queda como fallback para plataformas sin
+ese binding. Si falta OCR, el documento queda marcado como `Requiere OCR`. Ningún
+archivo se envía a Firecrawl.
 Ambas dependencias y el fallback OCR se ejecutan localmente; los bindings nativos
 se cargan según la plataforma del Host.
 El procesamiento se ejecuta en una cola local en segundo plano: la carga no espera

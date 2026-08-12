@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { fetchSafeOutbound, isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
 import { newStorageKey, putObject } from "@/lib/storage";
+import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 
 export function pdfBackupEnabled() {
   return process.env.PJUD_PDF_BACKUP === "1";
@@ -99,8 +100,14 @@ export async function backupMovimientoDocuments(causaId: string) {
           mimeType: mime,
           storageKey: key,
           causaId,
+          ruta: "PJUD",
           extractionStatus: "pending",
         },
+      });
+      enqueueDocumentProcessing({
+        id: doc.id,
+        name: doc.nombre,
+        bytes: buf,
       });
       await prisma.causaMovimiento.update({
         where: { id: mov.id },

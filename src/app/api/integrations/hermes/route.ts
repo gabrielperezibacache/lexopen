@@ -113,11 +113,21 @@ export async function POST(req: Request) {
       body.utility || inferAiUtility(prompt)
     );
 
+    const documentoIds = Array.isArray(body.documentoIds)
+      ? body.documentoIds.map((id: unknown) => String(id)).filter(Boolean).slice(0, 40)
+      : null;
+    const rutaPrefix =
+      typeof body.rutaPrefix === "string" && body.rutaPrefix.trim()
+        ? body.rutaPrefix.trim().slice(0, 500)
+        : null;
+
     const pack = await buildAiContextPack({
       causaId: body.causaId || null,
       utility: utility.id,
       prompt,
       role: user.role,
+      documentoIds,
+      rutaPrefix,
     });
 
     // Historial multi-turno (estilo Julia: recuerda la conversación)
@@ -171,12 +181,33 @@ export async function POST(req: Request) {
       messages,
     });
 
+    const suggestedActions = [
+      body.causaId
+        ? { label: "Abrir causa", href: `/causas/${body.causaId}` }
+        : null,
+      { label: "Documentos", href: "/documentos" },
+      { label: "Plazos", href: "/plazos" },
+      { label: "Jurisprudencia", href: "/jurisprudencia" },
+      { label: "Monitoreo PJUD", href: "/causas/monitoreo" },
+    ].filter(Boolean) as Array<{ label: string; href: string }>;
+
+    const documentScope = {
+      documentoIds,
+      rutaPrefix,
+      sourcesDocumentos: pack.sources.filter((s) => s.type === "documento").length,
+    };
+
     // Prefacio local con alertas / briefing cuando aplica
-    if (utility.id === "briefing" && pack.alerts.length) {
+    if (utility.id === "briefing") {
       const local = buildLocalBriefingMarkdown({
         causaLabel: pack.sources.find((s) => s.type === "causa")?.label || "—",
         alerts: pack.alerts,
         sourcesCount: pack.sources.length,
+        folderIndex: pack.folderIndex,
+        documentScope: {
+          rutaPrefix,
+          selectedCount: documentoIds?.length || null,
+        },
       });
       if (result.content) {
         result = {
@@ -200,6 +231,10 @@ export async function POST(req: Request) {
         content: result.content,
         source: result.source,
         utility: utility.id,
+        sources: pack.sources,
+        alerts: pack.alerts,
+        suggestedActions,
+        documentScope,
       },
     ];
     let chat;
@@ -244,14 +279,9 @@ export async function POST(req: Request) {
       utility: { id: utility.id, label: utility.label },
       sources: pack.sources,
       alerts: pack.alerts,
-      suggestedActions: [
-        body.causaId
-          ? { label: "Abrir causa", href: `/causas/${body.causaId}` }
-          : null,
-        { label: "Plazos", href: "/plazos" },
-        { label: "Jurisprudencia", href: "/jurisprudencia" },
-        { label: "Monitoreo PJUD", href: "/causas/monitoreo" },
-      ].filter(Boolean),
+      suggestedActions,
+      documentScope,
+      folderIndex: pack.folderIndex,
     });
   } catch (e) {
     return handleRouteError(e);
