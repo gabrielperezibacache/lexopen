@@ -356,26 +356,47 @@ export async function fetchPjudMovimientos(
   if (fromApi) return fromApi;
 
   // 2) Sidecar scraper (microservicio CausaMonitor-like)
-  try {
-    const fromSidecar = await fetchFromScraperSidecar(causa);
-    if (fromSidecar) return fromSidecar;
-  } catch (error) {
-    if (scraperSidecarConfigured() && !publicScrapeReady() && !pjudDemoAllowed()) {
-      throw error;
+  let sidecarError: Error | null = null;
+  if (scraperSidecarConfigured()) {
+    try {
+      const fromSidecar = await fetchFromScraperSidecar(causa);
+      if (fromSidecar) return fromSidecar;
+    } catch (error) {
+      sidecarError =
+        error instanceof Error ? error : new Error(String(error));
+      // Only fall through if in-process scrape is ready; never silently to demo
+      // when a production sidecar was expected.
+      if (!publicScrapeReady()) {
+        if (pjudDemoAllowed() && process.env.NODE_ENV !== "production") {
+          // keep going to demo in non-prod
+        } else {
+          throw sidecarError;
+        }
+      }
     }
-    // Si hay scrape in-process o demo, continúa
   }
 
   // 3) Scrape in-process OJV + CAPTCHA (opt-in)
   if (publicScrapeReady()) {
-    const scraped = await scrapeCausaByRol(causa);
-    return {
-      provider: "scrape",
-      movimientos: scraped.movimientos,
-      note: scraped.note,
-      demo: false,
-      sala: scraped.sala,
-    };
+    try {
+      const scraped = await scrapeCausaByRol(causa);
+      return {
+        provider: "scrape",
+        movimientos: scraped.movimientos,
+        note: scraped.note,
+        demo: false,
+        sala: scraped.sala,
+      };
+    } catch (error) {
+      if (sidecarError) {
+        throw new Error(
+          `Sidecar falló (${sidecarError.message}); scrape in-process también falló: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+      throw error;
+    }
   }
 
   if (publicScrapeEnabled() && !captchaSolverConfigured()) {
@@ -390,14 +411,19 @@ export async function fetchPjudMovimientos(
 
   // 4) Demo etiquetado
   if (pjudDemoAllowed()) {
-    return fetchDemoMovimientos(causa);
+    const demo = fetchDemoMovimientos(causa);
+    if (sidecarError) {
+      demo.note = `⚠ Sidecar falló (${sidecarError.message}). ${demo.note}`;
+    }
+    return demo;
   }
 
   return {
     provider: "none",
     movimientos: [],
-    note:
-      "Sin conector PJUD. Configure PJUD_API_URL, PJUD_SCRAPER_URL, o PJUD_PUBLIC_SCRAPE=1 + CAPTCHA solver; o PJUD_ALLOW_DEMO=1 / CSV.",
+    note: sidecarError
+      ? `Sidecar falló: ${sidecarError.message}`
+      : "Sin conector PJUD. Configure PJUD_API_URL, PJUD_SCRAPER_URL, o PJUD_PUBLIC_SCRAPE=1 + CAPTCHA solver; o PJUD_ALLOW_DEMO=1 / CSV.",
     demo: false,
   };
 }

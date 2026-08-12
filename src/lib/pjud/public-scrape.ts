@@ -5,20 +5,19 @@
  * Usa Playwright + 2Captcha/CapSolver (mismo diseño que mcp-legal-chile).
  */
 
-import { classifyMovimiento } from "@/lib/pjud/classify";
 import {
   captchaSolverConfigured,
   CaptchaSolveError,
   CaptchaSolverConfigError,
   solveImageCaptcha,
 } from "@/lib/pjud/captcha-solver";
-import type { MisCausasItem } from "@/lib/pjud/types";
 import {
-  fingerprint,
-  type PjudCausaRef,
-  type PjudFetchedMovimiento,
-} from "@/lib/pjud/types";
-import { parseLocalDateInput } from "@/lib/minutas";
+  parseCausasListFromHtml,
+  parseMovimientosFromHtml,
+  parseSalaFromHtml,
+} from "@/lib/pjud/parse-html";
+import type { MisCausasItem } from "@/lib/pjud/types";
+import { type PjudCausaRef, type PjudFetchedMovimiento } from "@/lib/pjud/types";
 
 export type { MisCausasItem } from "@/lib/pjud/types";
 
@@ -176,87 +175,6 @@ function invalidateSession() {
   currentSession = undefined;
 }
 
-function stripTags(s: string) {
-  return s
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] {
-  const movimientos: PjudFetchedMovimiento[] = [];
-  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-  let rowMatch: RegExpExecArray | null;
-  let folioSeq = 0;
-  while ((rowMatch = rowRe.exec(html)) !== null) {
-    const cells: string[] = [];
-    let cellMatch: RegExpExecArray | null;
-    cellRe.lastIndex = 0;
-    while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
-      cells.push(stripTags(cellMatch[1]));
-    }
-    if (cells.length < 2) continue;
-    const joined = cells.join(" | ");
-    if (/tribunal|carátula|litigante|rol\b|rit\b/i.test(joined) && cells.length <= 3) {
-      continue;
-    }
-    const fechaCell =
-      cells.find((c) => /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(c)) ||
-      cells.find((c) => /\d{4}-\d{2}-\d{2}/.test(c));
-    const titulo =
-      cells.find(
-        (c) =>
-          c.length > 8 &&
-          !/^\d+$/.test(c) &&
-          !/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(c)
-      ) || cells[cells.length - 1];
-    if (!titulo || titulo.length < 4) continue;
-    if (/^(folio|fecha|trámite|tramite|etapa|descargar)$/i.test(titulo)) continue;
-
-    const fecha =
-      parseLocalDateInput(
-        (fechaCell || "").replace(
-          /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/,
-          (_, d, m, y) => {
-            const year = y.length === 2 ? `20${y}` : y;
-            return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-          }
-        )
-      ) || new Date();
-
-    folioSeq += 1;
-    const classified = classifyMovimiento(titulo, joined);
-    const esReceptor =
-      classified.tipo === "notificacion" ||
-      /receptor|c[eé]dula|notificaci[oó]n/i.test(titulo);
-    const cuaderno =
-      cells.find((c) => /principal|apelaci[oó]n|incidente|exhorto/i.test(c)) ||
-      "Principal";
-    const folio =
-      cells.find((c) => /^\d{1,5}$/.test(c)) || String(folioSeq);
-
-    movimientos.push({
-      externalId: `scrape:${fingerprint(titulo, fecha, folio)}`,
-      titulo,
-      detalle: joined.slice(0, 4000),
-      fecha,
-      referencia: folio,
-      tipo: classified.tipo,
-      relevante: classified.relevante || esReceptor,
-      fuente: "pjud",
-      cuaderno,
-      folio,
-      etapa: cells.find((c) => /etapa|ingreso|traslado|audiencia/i.test(c)) || null,
-      tramite: cells.find((c) => /prove[ií]do|resoluci[oó]n|escrito|c[eé]dula/i.test(c)) || null,
-      esReceptor,
-      documentoRef: null,
-    });
-  }
-  return movimientos.slice(0, 500);
-}
-
 async function submitSearch(
   session: PjudSession,
   formValues: Record<string, string>,
@@ -290,9 +208,18 @@ async function submitSearch(
     }
 
     for (const [selector, value] of Object.entries(formValues)) {
-      const field = page.locator(selector);
+      const field = page.locator(selector).first();
       if ((await field.count()) === 0) continue;
-      await field.fill(value).catch(() => undefined);
+      const tag = await field.evaluate((el) => el.tagName.toLowerCase()).catch(() => "");
+      if (tag === "select") {
+        await field
+          .selectOption({ label: value })
+          .catch(async () => {
+            await field.selectOption({ value }).catch(() => undefined);
+          });
+      } else {
+        await field.fill(value).catch(() => undefined);
+      }
     }
     const submitButton = page.locator(
       'button[type="submit"], input[type="submit"]'
@@ -306,9 +233,8 @@ async function submitSearch(
         .click()
         .catch(() => undefined),
     ]);
-    // Prefer detail tabs if present (historial / cuaderno)
     const detailLink = page.locator(
-      'a:has-text("Ver"), a:has-text("Detalle"), a:has-text("Historia"), a[href*="causa"]'
+      'a:has-text("Historia"), a:has-text("Detalle"), a:has-text("Ver causa"), a:has-text("Ver")'
     );
     if ((await detailLink.count()) > 0) {
       await Promise.all([
@@ -352,7 +278,6 @@ export async function scrapeCausaByRol(
     throw new PjudScrapeError("Se requiere RIT/ROL o RUC para scrapear la causa.");
   }
 
-  const session = await getValidSession(signal);
   const formValues: Record<string, string> = {};
   if (causa.rit) {
     formValues['input[name*="rol" i], input[name*="rit" i]'] = causa.rit;
@@ -367,9 +292,11 @@ export async function scrapeCausaByRol(
 
   let html: string;
   try {
+    const session = await getValidSession(signal);
     ({ html } = await submitSearch(session, formValues, signal));
   } catch (error) {
     if (error instanceof PjudScrapeError) {
+      invalidateSession();
       const fresh = await getValidSession(signal);
       ({ html } = await submitSearch(fresh, formValues, signal));
     } else {
@@ -378,8 +305,8 @@ export async function scrapeCausaByRol(
   }
 
   const movimientos = parseMovimientosFromHtml(html);
+  const sala = parseSalaFromHtml(html);
   if (movimientos.length === 0) {
-    // Still mark sync attempt — CausaMonitor would timeout to Fallidos
     throw new PjudScrapeError(
       `Sin movimientos parseables para ${causa.rit || causa.ruc}. Portal: ${PJUD_CONSULTA_URL}`
     );
@@ -387,10 +314,45 @@ export async function scrapeCausaByRol(
 
   return {
     movimientos,
-    sala: null,
-    note: `Scrape OJV (CAPTCHA): ${movimientos.length} movimiento(s). No oficial; verifique en ${PJUD_CONSULTA_URL}`,
+    sala,
+    note: `Scrape OJV (CAPTCHA): ${movimientos.length} movimiento(s)${sala ? ` · ${sala}` : ""}. No oficial; verifique en ${PJUD_CONSULTA_URL}`,
     portalUrl: PJUD_CONSULTA_URL,
   };
+}
+
+/**
+ * Busca causas públicas por RUT de litigante (Consulta Unificada).
+ */
+export async function scrapeCausasByRut(
+  rut: string,
+  signal?: AbortSignal
+): Promise<MisCausasItem[]> {
+  if (!publicScrapeReady()) {
+    throw new PjudScrapeError(
+      "Scrape público no listo (PJUD_PUBLIC_SCRAPE + CAPTCHA)."
+    );
+  }
+  const formValues: Record<string, string> = {
+    'input[name*="rut" i], input[name*="run" i]': rut.trim(),
+  };
+  let html: string;
+  try {
+    const session = await getValidSession(signal);
+    ({ html } = await submitSearch(session, formValues, signal));
+  } catch (error) {
+    if (error instanceof PjudScrapeError) {
+      invalidateSession();
+      const fresh = await getValidSession(signal);
+      ({ html } = await submitSearch(fresh, formValues, signal));
+    } else {
+      throw error;
+    }
+  }
+  const items = parseCausasListFromHtml(html);
+  if (items.length === 0) {
+    throw new PjudScrapeError(`Sin causas para RUT ${rut} en Consulta Unificada.`);
+  }
+  return items;
 }
 
 /**
@@ -491,30 +453,7 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
     }
 
     const html = await page.content();
-    const items: MisCausasItem[] = [];
-    const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-    const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-    let rowMatch: RegExpExecArray | null;
-    while ((rowMatch = rowRe.exec(html)) !== null) {
-      const cells: string[] = [];
-      let cellMatch: RegExpExecArray | null;
-      cellRe.lastIndex = 0;
-      while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
-        cells.push(stripTags(cellMatch[1]));
-      }
-      const joined = cells.join(" ");
-      const ritMatch = joined.match(/\b([A-Z]?\-?\d{1,6}-\d{4})\b/i);
-      if (!ritMatch) continue;
-      const tribunal =
-        cells.find((c) => /juzgado|corte|tribunal/i.test(c)) || "Tribunal no identificado";
-      items.push({
-        rit: ritMatch[1].toUpperCase(),
-        tribunal,
-        caratula: cells.find((c) => /\bvs\.?\b|\/|con\b/i.test(c)) || cells[0],
-        ruc: cells.find((c) => /\d{1,3}-\d{8,}-\d/.test(c)) || null,
-        estado: cells.find((c) => /tramitaci|terminad|archiv/i.test(c)) || null,
-      });
-    }
+    const items = parseCausasListFromHtml(html);
 
     if (items.length === 0) {
       throw new PjudScrapeError(

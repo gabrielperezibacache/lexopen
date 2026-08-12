@@ -354,6 +354,9 @@ variables más relevantes:
 | `PJUD_PUBLIC_SCRAPE` | No | `1` = scrape OJV in-process (Playwright + CAPTCHA). |
 | `CAPTCHA_SOLVER_PROVIDER`, `CAPTCHA_SOLVER_API_KEY` | No | `2captcha` o `capsolver` para el scrape in-process. |
 | `PJUD_CLAVEUNICA_SCRAPE` | No | `1` = permite login ClaveÚnica automatizado (Mis Causas). |
+| `PJUD_SECRETS_KEY` | No | Clave AES para vault ClaveÚnica (fallback SESSION_SECRET). |
+| `PJUD_SCRAPER_ALLOW_PRIVATE` | No | `1` = permite sidecar en red privada / Render internal. |
+| `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` | No | Scheduler local Mis Causas (Host web). |
 | `PJUD_ALLOW_DEMO` | No | Permite movimientos PJUD simulados y etiquetados como demo. |
 | `PJUD_WEBHOOK_SECRET` | No | Firma HMAC de webhooks asíncronos de un proveedor PJUD. |
 | `PJUD_SYNC_INTERVAL_MINUTES` | No | Intervalo del próximo sync (default 1440 = diario). |

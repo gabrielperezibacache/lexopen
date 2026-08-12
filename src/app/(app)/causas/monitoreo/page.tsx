@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { labelSemaforo, type Semaforo } from "@/lib/pjud/classify";
+import { PjudQuickAddPanel } from "@/components/pjud/PjudQuickAddPanel";
 
 type Item = {
   id: string;
@@ -66,6 +67,10 @@ export default function MonitoreoCausasPage() {
   const [provider, setProvider] = useState<{
     honesty?: string;
     apiConfigured?: boolean;
+    scraperSidecarConfigured?: boolean;
+    publicScrapeReady?: boolean;
+    claveUnicaScrapeEnabled?: boolean;
+    liveIngestConfigured?: boolean;
     syncIntervalMinutes?: number;
   } | null>(null);
   const [filter, setFilter] = useState<
@@ -168,8 +173,8 @@ export default function MonitoreoCausasPage() {
           <h1 className="display mt-2 text-4xl">Monitoreo de causas</h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
             Cartera con semáforos, salas, próximo sync y cola de fallidos —
-            paridad CausaMonitor con conectores honestos (API / CSV / demo /
-            webhook).
+            paridad CausaMonitor (API / scrape / sidecar / ClaveÚnica / CSV /
+            demo).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -200,9 +205,16 @@ export default function MonitoreoCausasPage() {
           {provider.syncIntervalMinutes
             ? ` Intervalo: cada ${provider.syncIntervalMinutes} min.`
             : ""}
+          {" · "}
+          API {provider.apiConfigured ? "ON" : "OFF"} · Sidecar{" "}
+          {provider.scraperSidecarConfigured ? "ON" : "OFF"} · Scrape{" "}
+          {provider.publicScrapeReady ? "ON" : "OFF"} · ClaveÚnica{" "}
+          {provider.claveUnicaScrapeEnabled ? "ON" : "OFF"}
         </p>
       )}
       {msg && <p className="text-sm text-[var(--ink-soft)]/80">{msg}</p>}
+
+      <PjudQuickAddPanel />
 
       {resumen && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">

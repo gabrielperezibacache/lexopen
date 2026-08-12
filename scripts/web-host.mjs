@@ -154,6 +154,70 @@ async function startLocalPjudScheduler(dataDir) {
   return timer;
 }
 
+async function startLocalMisCausasScheduler(dataDir) {
+  const config = readConfig(dataDir);
+  const env = {
+    ...process.env,
+    ...readEnvFile(path.join(dataDir, ".env")),
+  };
+  const intervalMinutes = Number(env.PJUD_MIS_CAUSAS_INTERVAL_MINUTES || 0);
+  if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) return null;
+
+  const secret = env.CRON_SECRET;
+  if (!secret) {
+    console.warn(
+      "[web-host] PJUD_MIS_CAUSAS_INTERVAL_MINUTES está configurado, pero falta CRON_SECRET; scheduler Mis Causas desactivado."
+    );
+    return null;
+  }
+
+  const port = Number(env.PORT || config.port || 3000);
+  const baseUrl = `http://127.0.0.1:${port}`;
+  if (!(await waitForHost(baseUrl))) {
+    console.warn(
+      "[web-host] No se pudo iniciar el scheduler Mis Causas: health no disponible."
+    );
+    return null;
+  }
+
+  const sync = async () => {
+    try {
+      const response = await fetch(`${baseUrl}/api/pjud/mis-causas`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-cron-secret": secret,
+        },
+        body: JSON.stringify({ syncMovimientos: true }),
+        signal: AbortSignal.timeout(300_000),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        console.warn(
+          "[web-host] Sync Mis Causas falló:",
+          body.error || response.status
+        );
+        return;
+      }
+      console.log(
+        `[web-host] Mis Causas: ${body.listed || 0} listadas · ${body.created || 0} nuevas.`
+      );
+    } catch (error) {
+      console.warn(
+        "[web-host] Sync Mis Causas falló:",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  };
+
+  await sync();
+  const timer = setInterval(() => void sync(), intervalMinutes * 60_000);
+  console.log(
+    `[web-host] Scheduler Mis Causas activo cada ${intervalMinutes} minutos.`
+  );
+  return timer;
+}
+
 if (!fs.existsSync(desktopRuntime)) {
   runSetup(["run", "desktop:install"], "Instalando runtime local de PostgreSQL");
 }
@@ -166,6 +230,7 @@ const dataDir = path.resolve(
   process.env.LEXOPEN_DATA_DIR || defaultDataDir()
 );
 let schedulerTimer = null;
+let misCausasSchedulerTimer = null;
 let backupScheduler = null;
 let child = null;
 const expectedChildExits = new WeakSet();
@@ -175,6 +240,7 @@ async function shutdown(exitCode = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
   if (schedulerTimer) clearInterval(schedulerTimer);
+  if (misCausasSchedulerTimer) clearInterval(misCausasSchedulerTimer);
   if (backupScheduler) {
     await backupScheduler.stop().catch((error) => {
       console.warn("[web-host] No se pudo detener el scheduler de backups:", error);
@@ -254,6 +320,21 @@ void startLocalPjudScheduler(dataDir)
   .catch((error) => {
     console.warn(
       "[web-host] No se pudo iniciar el scheduler PJUD:",
+      error instanceof Error ? error.message : String(error)
+    );
+  });
+
+void startLocalMisCausasScheduler(dataDir)
+  .then((timer) => {
+    if (shuttingDown) {
+      if (timer) clearInterval(timer);
+    } else {
+      misCausasSchedulerTimer = timer;
+    }
+  })
+  .catch((error) => {
+    console.warn(
+      "[web-host] No se pudo iniciar el scheduler Mis Causas:",
       error instanceof Error ? error.message : String(error)
     );
   });

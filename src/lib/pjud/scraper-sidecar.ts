@@ -37,12 +37,16 @@ function isPrivateHostname(hostname: string) {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (
     host === "localhost" ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
     host === "metadata.google.internal" ||
     host === "::1" ||
     host === "0.0.0.0"
   ) {
     return true;
   }
+  // Render private network DNS: *.render.internal
+  if (host.endsWith(".render.internal")) return true;
   const octets = host.split(".").map(Number);
   if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet))) {
     return false;
@@ -64,15 +68,26 @@ function scraperBaseUrl() {
   const rawBase = process.env.PJUD_SCRAPER_URL?.trim();
   if (!rawBase) return null;
   const parsedBase = new URL(rawBase);
+  const allowPrivate = process.env.PJUD_SCRAPER_ALLOW_PRIVATE === "1";
+  const privateHost = isPrivateHostname(parsedBase.hostname);
   if (
-    (process.env.NODE_ENV === "production" && parsedBase.protocol !== "https:") ||
-    (parsedBase.protocol !== "http:" && parsedBase.protocol !== "https:") ||
     parsedBase.username ||
     parsedBase.password ||
-    (process.env.NODE_ENV === "production" &&
-      isPrivateHostname(parsedBase.hostname))
+    (parsedBase.protocol !== "http:" && parsedBase.protocol !== "https:")
   ) {
     throw new Error("PJUD_SCRAPER_URL no cumple las restricciones de seguridad");
+  }
+  if (process.env.NODE_ENV === "production") {
+    if (privateHost) {
+      if (!allowPrivate) {
+        throw new Error(
+          "PJUD_SCRAPER_URL apunta a red privada; set PJUD_SCRAPER_ALLOW_PRIVATE=1 para sidecar interno (Render)."
+        );
+      }
+      // Private sidecar may use http on Render private network
+    } else if (parsedBase.protocol !== "https:") {
+      throw new Error("PJUD_SCRAPER_URL público requiere https en producción");
+    }
   }
   return parsedBase.toString().replace(/\/$/, "");
 }

@@ -72,7 +72,8 @@ function IntegracionesInner() {
         </p>
         <h1 className="display mt-2 text-4xl">Integraciones</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Obsidian (vault Markdown), Hermes Agent (API) y Google Workspace (OAuth Drive / Calendar / Gmail).
+          Obsidian (vault Markdown), Hermes Agent (API), Google Workspace y
+          PJUD (scrape / ClaveÚnica / sidecar).
         </p>
       </div>
 
@@ -167,12 +168,38 @@ function IntegracionesInner() {
       </div>
 
       <section className="panel rounded-3xl p-5">
+        <h2 className="text-xl font-semibold">PJUD / CausaMonitor</h2>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
+          Ingest live vía partner API, scraper sidecar o scrape OJV (CAPTCHA).
+          Mis Causas con ClaveÚnica cifrada en{" "}
+          <a href="/causas/mis-causas" className="text-[var(--sea)]">
+            /causas/mis-causas
+          </a>
+          . Detalle en <code>docs/PJUD.md</code>.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a href="/causas/monitoreo" className="btn btn-secondary">
+            Monitoreo
+          </a>
+          <a href="/causas/mis-causas" className="btn btn-ghost">
+            Mis Causas CU
+          </a>
+        </div>
+      </section>
+
+      <section className="panel rounded-3xl p-5">
         <h2 className="text-lg font-semibold">Variables de entorno</h2>
         <pre className="mt-3 overflow-x-auto rounded-2xl bg-[var(--ink)] p-4 text-xs text-white/85">{`HERMES_API_URL=http://localhost:8642/v1
 OBSIDIAN_VAULT_PATH=./obsidian-vault
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback`}</pre>
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback
+PJUD_SCRAPER_URL=
+PJUD_PUBLIC_SCRAPE=0
+PJUD_CLAVEUNICA_SCRAPE=0
+CAPTCHA_SOLVER_PROVIDER=
+CAPTCHA_SOLVER_API_KEY=
+PJUD_SECRETS_KEY=`}</pre>
       </section>
     </div>
   );

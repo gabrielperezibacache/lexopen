@@ -1,0 +1,221 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+type Mode = "rol" | "rut";
+
+export function PjudQuickAddPanel() {
+  const router = useRouter();
+  const [mode, setMode] = useState<Mode>("rol");
+  const [tribunales, setTribunales] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [rutHits, setRutHits] = useState<
+    Array<{ rit: string; tribunal: string; caratula?: string | null }>
+  >([]);
+
+  useEffect(() => {
+    fetch("/api/pjud/lookup")
+      .then((r) => r.json())
+      .then((d) => setTribunales(d.tribunales || []))
+      .catch(() => undefined);
+  }, []);
+
+  async function onAddRol(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setMsg("");
+    const fd = new FormData(e.currentTarget);
+    const res = await fetch("/api/pjud/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "add-rol",
+        rit: fd.get("rit"),
+        tribunal: fd.get("tribunal"),
+        titulo: fd.get("titulo") || undefined,
+        syncNow: true,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setMsg(data.error || "No se pudo agregar la causa");
+      return;
+    }
+    setMsg(
+      `${data.note} Sync: +${data.sync?.inserted ?? 0} movimientos (${data.sync?.status || "—"})`
+    );
+    if (data.causaId) router.push(`/causas/${data.causaId}`);
+  }
+
+  async function onBuscarRut(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setMsg("");
+    setRutHits([]);
+    const fd = new FormData(e.currentTarget);
+    const res = await fetch("/api/pjud/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "buscar-rut", rut: fd.get("rut") }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setMsg(data.error || "Búsqueda por RUT falló");
+      return;
+    }
+    setRutHits(data.causas || []);
+    setMsg(`${data.count || 0} causa(s) encontradas.`);
+  }
+
+  async function addFromHit(hit: {
+    rit: string;
+    tribunal: string;
+    caratula?: string | null;
+  }) {
+    setBusy(true);
+    setMsg("");
+    const res = await fetch("/api/pjud/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "add-rol",
+        rit: hit.rit,
+        tribunal: hit.tribunal,
+        titulo: hit.caratula || hit.rit,
+        syncNow: true,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setMsg(data.error || "No se pudo agregar");
+      return;
+    }
+    if (data.causaId) router.push(`/causas/${data.causaId}`);
+  }
+
+  return (
+    <section className="panel space-y-4 rounded-3xl p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Alta rápida PJUD</h2>
+          <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+            Flujo CausaMonitor: agregar por ROL o buscar por RUT, activar
+            monitoreo y sincronizar de inmediato.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className={`rounded-full border px-3 py-1 text-sm ${
+              mode === "rol"
+                ? "border-[var(--sea)] bg-[var(--sea)]/10"
+                : "border-[var(--line)]"
+            }`}
+            onClick={() => setMode("rol")}
+          >
+            Por ROL
+          </button>
+          <button
+            type="button"
+            className={`rounded-full border px-3 py-1 text-sm ${
+              mode === "rut"
+                ? "border-[var(--sea)] bg-[var(--sea)]/10"
+                : "border-[var(--line)]"
+            }`}
+            onClick={() => setMode("rut")}
+          >
+            Por RUT
+          </button>
+        </div>
+      </div>
+
+      {mode === "rol" ? (
+        <form onSubmit={onAddRol} className="grid gap-3 md:grid-cols-4">
+          <input
+            className="input"
+            name="rit"
+            required
+            placeholder="ROL/RIT (C-100-2024)"
+          />
+          <select className="input md:col-span-2" name="tribunal" required defaultValue="">
+            <option value="" disabled>
+              Tribunal
+            </option>
+            {tribunales.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <button className="btn btn-primary" disabled={busy} type="submit">
+            {busy ? "Agregando…" : "Agregar y sync"}
+          </button>
+          <input
+            className="input md:col-span-4"
+            name="titulo"
+            placeholder="Carátula opcional"
+          />
+        </form>
+      ) : (
+        <form onSubmit={onBuscarRut} className="flex flex-wrap gap-2">
+          <input
+            className="input max-w-xs"
+            name="rut"
+            required
+            placeholder="RUT litigante (12.345.678-9)"
+          />
+          <button className="btn btn-secondary" disabled={busy} type="submit">
+            {busy ? "Buscando…" : "Buscar causas"}
+          </button>
+        </form>
+      )}
+
+      {msg && (
+        <p className="text-sm text-[var(--ink-soft)]/80" role="status">
+          {msg}
+        </p>
+      )}
+
+      {rutHits.length > 0 && (
+        <ul className="space-y-2 text-sm">
+          {rutHits.map((hit) => (
+            <li
+              key={`${hit.rit}-${hit.tribunal}`}
+              className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)]/60 pb-2"
+            >
+              <div>
+                <div className="font-medium">{hit.rit}</div>
+                <div className="text-xs text-[var(--ink-soft)]/65">
+                  {hit.tribunal}
+                  {hit.caratula ? ` · ${hit.caratula}` : ""}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={busy}
+                onClick={() => addFromHit(hit)}
+              >
+                Agregar
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="text-xs text-[var(--ink-soft)]/60">
+        Requiere scrape/sidecar activo. También puede usar{" "}
+        <Link href="/causas/mis-causas" className="text-[var(--sea)]">
+          Mis Causas (ClaveÚnica)
+        </Link>
+        .
+      </p>
+    </section>
+  );
+}

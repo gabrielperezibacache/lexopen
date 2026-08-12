@@ -178,6 +178,38 @@ export default function MisCausasPage() {
           >
             {busy ? "Sincronizando…" : "Sincronizar Mis Causas"}
           </button>
+          {status?.hasPassword && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setMsg("");
+                const res = await fetch("/api/pjud/claveunica", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    action: status.enabled ? "disable" : "enable",
+                  }),
+                });
+                const data = await res.json().catch(() => ({}));
+                setBusy(false);
+                if (!res.ok) {
+                  setMsg(data.error || "No se pudo cambiar el estado");
+                  return;
+                }
+                setStatus(data);
+                setMsg(
+                  status.enabled
+                    ? "ClaveÚnica deshabilitada."
+                    : "ClaveÚnica habilitada."
+                );
+              }}
+            >
+              {status.enabled ? "Deshabilitar" : "Habilitar"}
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-ghost"

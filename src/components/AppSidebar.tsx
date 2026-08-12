@@ -43,7 +43,7 @@ const primary: NavItem[] = [
   { href: "/sites", label: "Espacios", icon: Building2 },
   { href: "/causas", label: "Causas", icon: Briefcase },
   { href: "/causas/monitoreo", label: "Monitoreo PJUD", icon: Radar },
-  { href: "/causas/mis-causas", label: "Mis Causas CU", icon: Shield },
+  { href: "/causas/mis-causas", label: "Mis Causas CU", icon: Shield, roles: ["admin", "abogado"] },
   { href: "/minutas", label: "Minutas", icon: ClipboardPen },
   {
     href: "/facturacion",

@@ -60,14 +60,22 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
             PJUD
           </div>
           <div className="mt-2 font-semibold">
-            {pjud.apiConfigured
-              ? "Partner configurado"
+            {pjud.liveIngestConfigured
+              ? pjud.apiConfigured
+                ? "Partner API"
+                : pjud.scraperSidecarConfigured
+                  ? "Scraper sidecar"
+                  : pjud.publicScrapeReady
+                    ? "Scrape OJV"
+                    : "Ingest listo"
               : pjud.webhookConfigured
-                ? "Webhook configurado"
-                : "Sin partner"}
+                ? "Webhook"
+                : "Sin ingest live"}
           </div>
           <div className="mt-1 text-xs text-[var(--ink-soft)]/65">
-            Demo permitido: {yesNo(pjud.demoAllowed)}
+            Demo {yesNo(pjud.demoAllowed)} · CU scrape{" "}
+            {yesNo(Boolean(pjud.claveUnicaScrapeEnabled))} · CAPTCHA{" "}
+            {yesNo(Boolean(pjud.captchaConfigured))}
           </div>
         </div>
       </div>

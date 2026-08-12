@@ -20,11 +20,18 @@ LexOpen replica el flujo de datos de CausaMonitor:
 |----------|--------|
 | `PJUD_PUBLIC_SCRAPE=1` | Habilita scrape OJV in-process |
 | `CAPTCHA_SOLVER_PROVIDER` + `CAPTCHA_SOLVER_API_KEY` | 2captcha \| capsolver |
-| `PJUD_SCRAPER_URL` | Microservicio externo (`POST /causas/lookup`, `POST /mis-causas`) |
+| `PJUD_SCRAPER_URL` | Microservicio externo (`POST /causas/lookup`, `POST /mis-causas`, `POST /causas/buscar`) |
+| `PJUD_SCRAPER_ALLOW_PRIVATE=1` | Permite sidecar HTTP en red privada (Render `.internal`) |
 | `PJUD_CLAVEUNICA_SCRAPE=1` | Permite automatizar login ClaveÚnica |
+| `PJUD_SECRETS_KEY` | Vault AES dedicado (recomendado vs reutilizar SESSION_SECRET) |
 | `PJUD_CAUSAS_DAILY_SOLVE_BUDGET` | Tope diario de CAPTCHA (default 50) |
 
 Sin estos flags, LexOpen **no** scrapea ni usa ClaveÚnica.
+
+## Alta rápida
+
+- UI en `/causas/monitoreo` (panel ROL / RUT)
+- API `POST /api/pjud/lookup` con `action: add-rol | preview-rol | buscar-rut`
 
 ## ClaveÚnica
 

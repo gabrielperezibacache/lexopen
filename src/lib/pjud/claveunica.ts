@@ -1,15 +1,39 @@
 import { prisma } from "@/lib/db";
+import { validarRut } from "@/lib/chile";
 import { decryptSecret, encryptSecret, maskRut } from "@/lib/pjud/secret";
 import {
   scrapeMisCausasWithClaveUnica,
   type MisCausasItem,
 } from "@/lib/pjud/public-scrape";
-import { fetchMisCausasFromSidecar } from "@/lib/pjud/scraper-sidecar";
+import {
+  fetchMisCausasFromSidecar,
+  scraperSidecarConfigured,
+} from "@/lib/pjud/scraper-sidecar";
 import { syncCausaPjud } from "@/lib/pjud/sync";
 
 async function getOrCreateFirmSettings() {
+  const orgs = await prisma.organization.findMany({
+    include: { settings: true },
+    orderBy: { createdAt: "asc" },
+    take: 5,
+  });
+  if (orgs.length > 1) {
+    const withCu = orgs.find(
+      (o) => o.settings?.claveUnicaPasswordEnc || o.settings?.claveUnicaRut
+    );
+    if (withCu) {
+      return {
+        org: withCu,
+        settings:
+          withCu.settings ||
+          (await prisma.firmSettings.create({
+            data: { organizationId: withCu.id },
+          })),
+      };
+    }
+  }
   const org =
-    (await prisma.organization.findFirst({ include: { settings: true } })) ||
+    orgs[0] ||
     (await prisma.organization.create({
       data: {},
       include: { settings: true },
@@ -31,7 +55,7 @@ export async function getClaveUnicaStatus() {
     lastSyncStatus: settings.claveUnicaLastSyncStatus,
     lastSyncNote: settings.claveUnicaLastSyncNote,
     scrapeFlag: process.env.PJUD_CLAVEUNICA_SCRAPE === "1",
-    sidecar: Boolean(process.env.PJUD_SCRAPER_URL?.trim()),
+    sidecar: scraperSidecarConfigured(),
   };
 }
 
@@ -41,15 +65,19 @@ export async function saveClaveUnicaCredentials(opts: {
   enabled?: boolean;
 }) {
   const { settings } = await getOrCreateFirmSettings();
-  const rut = opts.rut.trim();
-  if (!/^[\d.]{7,12}-[\dkK]$/.test(rut.replace(/\./g, ""))) {
-    // soft check — allow dotted RUT
-    if (!/\d/.test(rut)) throw new Error("RUT ClaveÚnica inválido");
+  const raw = opts.rut.trim();
+  const normalized = raw.replace(/\./g, "").replace(/\s/g, "").toUpperCase();
+  const dashed = normalized.includes("-")
+    ? normalized
+    : `${normalized.slice(0, -1)}-${normalized.slice(-1)}`;
+  if (!validarRut(raw) && !validarRut(dashed)) {
+    throw new Error("RUT ClaveÚnica inválido");
   }
+  const storedRut = validarRut(raw) ? raw : dashed;
   return prisma.firmSettings.update({
     where: { id: settings.id },
     data: {
-      claveUnicaRut: rut,
+      claveUnicaRut: storedRut,
       claveUnicaPasswordEnc: encryptSecret(opts.password),
       claveUnicaEnabled: opts.enabled ?? true,
       claveUnicaLastSyncNote: "Credenciales actualizadas (AES-GCM).",
@@ -87,20 +115,49 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
   if (!settings.claveUnicaRut || !settings.claveUnicaPasswordEnc) {
     throw new Error("Configure RUT y contraseña ClaveÚnica primero.");
   }
-  const password = decryptSecret(settings.claveUnicaPasswordEnc);
+  const password = decryptSecret(settings.claveUnicaPasswordEnc, {
+    strict: true,
+  });
   if (!password) {
-    throw new Error("No se pudo descifrar la contraseña ClaveÚnica.");
+    throw new Error(
+      "No se pudo descifrar la contraseña ClaveÚnica (re-guarde con PJUD_SECRETS_KEY/SESSION_SECRET)."
+    );
   }
 
-  const fromSidecar = await fetchMisCausasFromSidecar({
-    rut: settings.claveUnicaRut,
-    password,
-  });
-  if (fromSidecar) return fromSidecar;
+  if (scraperSidecarConfigured()) {
+    try {
+      const fromSidecar = await fetchMisCausasFromSidecar({
+        rut: settings.claveUnicaRut,
+        password,
+      });
+      if (fromSidecar) return fromSidecar;
+    } catch (error) {
+      if (process.env.PJUD_CLAVEUNICA_SCRAPE !== "1") throw error;
+    }
+  }
 
   return scrapeMisCausasWithClaveUnica({
     rut: settings.claveUnicaRut,
     password,
+  });
+}
+
+async function findExistingCausa(item: MisCausasItem) {
+  if (item.ruc) {
+    const byRuc = await prisma.causa.findFirst({
+      where: { ruc: item.ruc },
+      select: { id: true },
+    });
+    if (byRuc) return byRuc;
+  }
+  const byRitTribunal = await prisma.causa.findFirst({
+    where: { rit: item.rit, tribunal: item.tribunal },
+    select: { id: true },
+  });
+  if (byRitTribunal) return byRitTribunal;
+  return prisma.causa.findFirst({
+    where: { rit: item.rit },
+    select: { id: true },
   });
 }
 
@@ -130,16 +187,7 @@ export async function syncMisCausas(opts?: {
   const syncResults = [];
 
   for (const item of items) {
-    const existing = await prisma.causa.findFirst({
-      where: {
-        OR: [
-          { rit: item.rit, tribunal: item.tribunal },
-          ...(item.ruc ? [{ ruc: item.ruc, tribunal: item.tribunal }] : []),
-        ],
-      },
-      select: { id: true },
-    });
-
+    const existing = await findExistingCausa(item);
     let causaId = existing?.id;
     if (!causaId) {
       const createdCausa = await prisma.causa.create({
@@ -169,6 +217,8 @@ export async function syncMisCausas(opts?: {
           pjudFromMisCausas: true,
           pjudMonitoreoActivo: true,
           pjudSource: "claveunica",
+          ...(item.tribunal ? { tribunal: item.tribunal } : {}),
+          ...(item.ruc ? { ruc: item.ruc } : {}),
         },
       });
       linked.push(causaId);
