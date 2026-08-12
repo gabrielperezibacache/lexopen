@@ -1,11 +1,12 @@
 import { prisma } from "@/lib/db";
 import { formatDate } from "@/components/ui";
 import Link from "next/link";
-import { DocumentoUploadForm } from "@/components/DocumentoUploadForm";
+import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { EmptyState } from "@/components/EmptyState";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { DocumentProcessingAction } from "@/components/DocumentProcessingAction";
 import { DocumentOcrStatus } from "@/components/DocumentOcrStatus";
+import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { requireStaff } from "@/lib/auth/session";
 import { confidentialWhere } from "@/lib/api";
 
@@ -32,18 +33,19 @@ export default async function DocumentosPage() {
         </p>
         <h1 className="display mt-2 text-4xl">Documentos</h1>
         <p className="mt-2 text-[var(--ink-soft)]/80">
-          Escritos, contratos y memos vinculados a causas — sincronizable con Obsidian y Google Drive.
-          El VDR por espacio está en Espacios → Archivos.
+          Incorporación de escritos, carpetas investigativas y memos vinculados a causas —
+          con extracción Markdown/OCR, Obsidian y Google Drive. El VDR por espacio está en
+          Espacios → Archivos.
         </p>
       </div>
 
       <DocumentOcrStatus />
-      <DocumentoUploadForm causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))} />
+      <DocumentoIngestForm causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))} />
 
       {documentos.length === 0 ? (
         <EmptyState
           title="Sin documentos por causa"
-          description="Suba un escrito o memo vinculado a una causa. Para el VDR del matter use Espacios → Archivos."
+          description="Incorpore un escrito o una carpeta investigativa vinculada a una causa. Para el VDR del matter use Espacios → Archivos."
           actionLabel="Ver espacios"
           actionHref="/sites"
         />
@@ -65,12 +67,21 @@ export default async function DocumentosPage() {
                 <tr key={d.id} className="table-row">
                   <td className="px-4 py-3">
                     <div className="font-medium">{d.nombre}</div>
-                    <a
-                      href={`/api/documentos/${d.id}/content`}
-                      className="text-xs text-[var(--sea)]"
-                    >
-                      Descargar
-                    </a>
+                    {d.ruta && (
+                      <div className="text-xs text-[var(--ink-soft)]/60">{d.ruta}/</div>
+                    )}
+                    <div className="mt-1 flex flex-wrap items-center gap-3">
+                      <a
+                        href={`/api/documentos/${d.id}/content`}
+                        className="text-xs text-[var(--sea)]"
+                      >
+                        Descargar
+                      </a>
+                      <DocumentDriveAction
+                        documentId={d.id}
+                        googleDriveId={d.googleDriveId}
+                      />
+                    </div>
                     {d.obsidianPath && (
                       <div className="text-xs text-[var(--ink-soft)]/60">
                         Obsidian: {d.obsidianPath}

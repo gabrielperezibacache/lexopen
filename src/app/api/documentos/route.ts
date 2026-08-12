@@ -14,6 +14,7 @@ import { canSeeConfidential } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { MAX_PROCESSING_BYTES } from "@/lib/document-processing";
 import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
+import { inferDocumentoTipo, normalizeIngestPath } from "@/lib/document-ingest";
 
 export async function GET(req: NextRequest) {
   try {
@@ -57,11 +58,16 @@ export async function POST(req: NextRequest) {
     let confidencial = Boolean(body?.confidencial);
     let privilegio = Boolean(body?.privilegio);
     let causaId = body?.causaId || null;
+    let ruta = body?.ruta?.trim() || null;
+    if (ruta && ruta.length > 1000) {
+      return NextResponse.json({ error: "Ruta demasiado larga" }, { status: 400 });
+    }
     const autorId = user.id;
     const extractedMarkdown: string | null = null;
     let extractionStatus: string | null = null;
     const extractionJson: string | null = null;
     let processingBytes: Buffer | null = null;
+    let tipoAuto = false;
 
     if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
       return NextResponse.json(
@@ -74,10 +80,26 @@ export async function POST(req: NextRequest) {
       const form = await req.formData();
       const file = form.get("file");
       nombre = String(form.get("nombre") || "");
-      tipo = String(form.get("tipo") || "otro");
+      const tipoRaw = String(form.get("tipo") || "otro");
+      tipoAuto = tipoRaw === "auto" || tipoRaw === "";
+      tipo = tipoAuto ? "otro" : tipoRaw;
       confidencial = form.get("confidencial") === "on";
       privilegio = form.get("privilegio") === "on";
       causaId = String(form.get("causaId") || "") || null;
+      const rutaField = String(form.get("ruta") || "").trim();
+      const relativeHint = String(form.get("relativePath") || "").trim();
+      if (rutaField) {
+        const normalized = normalizeIngestPath(
+          rutaField.endsWith("/") ? `${rutaField}x` : `${rutaField}/x`
+        );
+        ruta = normalized?.ruta || null;
+      } else if (relativeHint) {
+        const normalized = normalizeIngestPath(relativeHint);
+        if (normalized) {
+          ruta = normalized.ruta;
+          nombre = nombre || normalized.nombre;
+        }
+      }
       if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
         return NextResponse.json(
           { error: "Su rol no puede crear contenido confidencial o privilegiado" },
@@ -92,7 +114,22 @@ export async function POST(req: NextRequest) {
             { status: 413 }
           );
         }
+        const fromBrowser =
+          typeof (uploaded as File & { webkitRelativePath?: string }).webkitRelativePath ===
+            "string" &&
+          (uploaded as File & { webkitRelativePath?: string }).webkitRelativePath
+            ? normalizeIngestPath(
+                (uploaded as File & { webkitRelativePath?: string }).webkitRelativePath!
+              )
+            : null;
+        if (fromBrowser) {
+          ruta = ruta || fromBrowser.ruta;
+          nombre = nombre || fromBrowser.nombre;
+        }
         nombre = nombre || uploaded.name;
+        if (tipoAuto) {
+          tipo = inferDocumentoTipo(ruta ? `${ruta}/${nombre}` : nombre);
+        }
         mimeType = uploaded.type || "application/octet-stream";
         const bytes = Buffer.from(await uploaded.arrayBuffer());
         processingBytes = bytes;
@@ -109,6 +146,8 @@ export async function POST(req: NextRequest) {
         contenido = String(form.get("contenido") || "");
         mimeType = mimeType || "text/plain";
       }
+    } else if (tipo === "auto") {
+      tipo = inferDocumentoTipo(ruta ? `${ruta}/${nombre}` : nombre);
     }
 
     if (!nombre) {
@@ -132,6 +171,7 @@ export async function POST(req: NextRequest) {
         contenido,
         mimeType,
         storageKey,
+        ruta,
         extractedMarkdown,
         extractionStatus: processingBytes ? "pending" : extractionStatus,
         extractionJson,

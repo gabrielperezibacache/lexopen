@@ -63,6 +63,8 @@ export const documentoCreateSchema = z.object({
   confidencial: z.boolean().optional(),
   privilegio: z.boolean().optional(),
   mimeType: z.string().max(150).optional().nullable(),
+  /** Relative folder path inside an investigative folder (no filename). */
+  ruta: z.string().max(1000).optional().nullable(),
 });
 
 const billingDate = z
