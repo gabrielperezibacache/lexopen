@@ -35,12 +35,10 @@ export async function GET() {
       ),
     });
     if (authUrl) {
+      const { baseCookieOptions } = await import("@/lib/auth/cookie-options");
       res.cookies.set("google_oauth_state", state, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        ...baseCookieOptions({ maxAge: 10 * 60 }),
         path: "/api/integrations/google/callback",
-        maxAge: 10 * 60,
       });
     }
     return res;

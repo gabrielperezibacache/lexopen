@@ -690,11 +690,14 @@ Controles implementados en el código:
 - roles de servidor y filtros de contenido confidencial;
 - cifrado AES-256-GCM de tokens Google / ClaveÚnica cuando existe `SESSION_SECRET`
   (o `PJUD_SECRETS_KEY`);
-- CSRF Origin/Referer en mutaciones de API (incluido login); en producción el
+- CSRF Origin/Referer en mutaciones de API (incluido login) más double-submit
+  (`lexopen_csrf` + `x-csrf-token`) en producción con sesión; en producción el
   header `Host` no amplía la allowlist si hay `NEXT_PUBLIC_APP_URL` /
   `LEXOPEN_TRUSTED_ORIGINS`;
-- headers de seguridad progresivos (`X-Frame-Options`, `nosniff`, CSP
-  `frame-ancestors`, etc.);
+- cookies `Secure` según URL canónica / `LEXOPEN_COOKIE_SECURE` (no solo
+  `NODE_ENV`), compatibles con Desktop Host por HTTP;
+- headers de seguridad progresivos (`X-Frame-Options`, `nosniff`, CSP con
+  `default-src 'self'`, HSTS si la URL es https);
 - salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
   Hermes y Obsidian;
 - `instrumentation` falla al arrancar si flags peligrosas están en producción;

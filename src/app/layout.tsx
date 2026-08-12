@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Sora } from "next/font/google";
+import { CsrfFetchPatch } from "@/components/CsrfFetchPatch";
 import "./globals.css";
 
 const sora = Sora({
@@ -26,6 +27,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`${sora.variable} ${fraunces.variable} antialiased`}>
+        <CsrfFetchPatch />
         {children}
       </body>
     </html>

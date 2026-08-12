@@ -9,6 +9,8 @@ import {
 } from "@/lib/auth/session";
 import { canImpersonate } from "@/lib/auth/rbac";
 import { assertCsrf, handleRouteError } from "@/lib/api";
+import { baseCookieOptions } from "@/lib/auth/cookie-options";
+import { appendCsrfCookie } from "@/lib/auth/csrf-token";
 
 const schema = z.object({
   userId: z.string().min(1).optional(),
@@ -49,14 +51,10 @@ export async function POST(req: NextRequest) {
         role: target.role,
       },
     });
-    const cookieBase = {
-      sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: session.maxAge,
-    };
-    res.cookies.set(SESSION_COOKIE, session.value, { ...cookieBase, httpOnly: true });
+    const cookieBase = baseCookieOptions({ maxAge: session.maxAge });
+    res.cookies.set(SESSION_COOKIE, session.value, cookieBase);
     res.cookies.set(ROLE_COOKIE, target.role, { ...cookieBase, httpOnly: false });
+    appendCsrfCookie(res);
     return res;
   } catch (e) {
     return handleRouteError(e);
