@@ -718,7 +718,11 @@ Controles implementados en el código:
 La revisión del repositorio también identifica límites que deben considerarse antes
 de producción:
 
-- el rate limit de login es por proceso y no ofrece protección distribuida;
+- el rate limit de login es por proceso (con lockout progresivo) y puede
+  persistir en `LEXOPEN_DATA_DIR/rate-limit.json`; no sustituye Redis en
+  despliegues multi-instancia;
+- Desktop Host enlaza `127.0.0.1` por defecto (LAN solo con URL pública) y
+  genera contraseña aleatoria de Postgres en instalaciones nuevas;
 - el portal cliente no debe presentarse como estrictamente de solo lectura sin una
   revisión adicional de permisos;
 - los campos de confidencialidad no equivalen a una implementación completa de
