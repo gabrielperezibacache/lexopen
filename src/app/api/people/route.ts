@@ -3,29 +3,50 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { isAdmin } from "@/lib/auth/rbac";
-import { hashPassword } from "@/lib/auth/password";
 import { writeAudit } from "@/lib/audit";
-import { publicUserSelect, toPublicUser } from "@/lib/auth/public-user";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import {
+  createStudioUser,
+  deleteStudioUser,
+  updateStudioUser,
+} from "@/lib/users-admin";
+
+const roleEnum = z.enum(["admin", "abogado", "asistente", "cliente"]);
 
 const createUserSchema = z.object({
   action: z.literal("create-user"),
-  name: z.string().min(2),
-  email: z.string().email(),
-  role: z.enum(["admin", "abogado", "asistente", "cliente"]),
-  title: z.string().optional().nullable(),
+  name: z.string().min(2).max(200),
+  email: z.string().email().max(320),
+  role: roleEnum,
+  title: z.string().max(200).optional().nullable(),
+  password: z.string().min(12).max(256),
+});
+
+const updateUserSchema = z.object({
+  action: z.literal("update-user"),
+  userId: z.string().min(1),
+  name: z.string().min(2).max(200).optional(),
+  email: z.string().email().max(320).optional(),
+  role: roleEnum.optional(),
+  title: z.string().max(200).optional().nullable(),
   password: z.string().min(12).max(256).optional(),
 });
 
 const updateRoleSchema = z.object({
   action: z.literal("update-role"),
   userId: z.string().min(1),
-  role: z.enum(["admin", "abogado", "asistente", "cliente"]),
+  role: roleEnum,
+});
+
+const deleteUserSchema = z.object({
+  action: z.literal("delete-user"),
+  userId: z.string().min(1),
 });
 
 const createGroupSchema = z.object({
   action: z.literal("create-group"),
-  name: z.string().min(2),
-  description: z.string().optional().nullable(),
+  name: z.string().min(2).max(200),
+  description: z.string().max(2000).optional().nullable(),
   memberIds: z.array(z.string()).optional(),
 });
 
@@ -41,13 +62,20 @@ export async function GET() {
           role: true,
           title: true,
           avatarColor: true,
-          siteMemberships: { include: { site: { select: { id: true, name: true } } } },
-          groupMembers: { include: { group: { select: { id: true, name: true } } } },
+          createdAt: true,
+          siteMemberships: {
+            include: { site: { select: { id: true, name: true } } },
+          },
+          groupMembers: {
+            include: { group: { select: { id: true, name: true } } },
+          },
         },
         orderBy: { name: "asc" },
       }),
       prisma.group.findMany({
-        include: { members: { include: { user: { select: { id: true, name: true } } } } },
+        include: {
+          members: { include: { user: { select: { id: true, name: true } } } },
+        },
         orderBy: { name: "asc" },
       }),
     ]);
@@ -65,39 +93,36 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "create-user") {
       if (!isAdmin(actor.role)) {
-        return NextResponse.json({ error: "Solo admin puede crear usuarios" }, { status: 403 });
-      }
-      const data = createUserSchema.parse(body);
-      const email = data.email.trim().toLowerCase();
-      const exists = await prisma.user.findUnique({ where: { email } });
-      if (exists) {
-        return NextResponse.json({ error: "Ya existe un usuario con ese email" }, { status: 409 });
-      }
-      if (!data.password) {
         return NextResponse.json(
-          { error: "Defina una contraseña de al menos 12 caracteres" },
-          { status: 400 }
+          { error: "Solo admin puede crear usuarios" },
+          { status: 403 }
         );
       }
-      const password = await hashPassword(data.password);
-      const user = await prisma.user.create({
-        data: {
-          name: data.name.trim(),
-          email,
-          role: data.role,
-          title: data.title || null,
-          password,
-          avatarColor: pickColor(data.name),
-        },
-      });
-      await writeAudit({
+      const data = createUserSchema.parse(body);
+      const user = await createStudioUser({
         actorId: actor.id,
-        action: "user.create",
-        entityType: "User",
-        entityId: user.id,
-        after: { email: user.email, role: user.role },
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        title: data.title,
+        password: data.password,
       });
-      return NextResponse.json(toPublicUser(user), { status: 201 });
+      return NextResponse.json(user, { status: 201 });
+    }
+
+    if (body.action === "delete-user") {
+      if (!isAdmin(actor.role)) {
+        return NextResponse.json(
+          { error: "Solo admin puede eliminar usuarios" },
+          { status: 403 }
+        );
+      }
+      const data = deleteUserSchema.parse(body);
+      const result = await deleteStudioUser({
+        actorId: actor.id,
+        userId: data.userId,
+      });
+      return NextResponse.json(result);
     }
 
     if (body.action === "create-group") {
@@ -110,7 +135,9 @@ export async function POST(req: NextRequest) {
             ? { create: data.memberIds.map((userId) => ({ userId })) }
             : undefined,
         },
-        include: { members: { include: { user: { select: publicUserSelect } } } },
+        include: {
+          members: { include: { user: { select: publicUserSelect } } },
+        },
       });
       await writeAudit({
         actorId: actor.id,
@@ -133,47 +160,39 @@ export async function PATCH(req: NextRequest) {
     assertCsrf(req);
     const actor = await requireStaff();
     if (!isAdmin(actor.role)) {
-      return NextResponse.json({ error: "Solo admin puede cambiar roles" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Solo admin puede administrar usuarios" },
+        { status: 403 }
+      );
     }
-    const data = updateRoleSchema.parse(await req.json());
-    const before = await prisma.user.findUnique({ where: { id: data.userId } });
-    if (!before) {
-      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
-    }
-    if (before.role === "admin" && data.role !== "admin") {
-      const adminCount = await prisma.user.count({ where: { role: "admin" } });
-      if (adminCount <= 1) {
-        return NextResponse.json(
-          { error: "No se puede degradar al único administrador" },
-          { status: 409 }
-        );
-      }
-    }
-    const user = await prisma.user.update({
-      where: { id: data.userId },
-      data: {
+    const body = await req.json();
+
+    if (body.action === "update-user") {
+      const data = updateUserSchema.parse(body);
+      const user = await updateStudioUser({
+        actorId: actor.id,
+        userId: data.userId,
+        name: data.name,
+        email: data.email,
+        title: data.title,
         role: data.role,
-        // Invalidate outstanding sessions so the signed role in the token is refreshed.
-        sessionVersion: { increment: 1 },
-      },
-    });
-    await writeAudit({
-      actorId: actor.id,
-      action: "user.role_update",
-      entityType: "User",
-      entityId: user.id,
-      before: { role: before.role },
-      after: { role: user.role },
-    });
-    return NextResponse.json(toPublicUser(user));
+        password: data.password,
+      });
+      return NextResponse.json(user);
+    }
+
+    if (body.action === "update-role") {
+      const data = updateRoleSchema.parse(body);
+      const user = await updateStudioUser({
+        actorId: actor.id,
+        userId: data.userId,
+        role: data.role,
+      });
+      return NextResponse.json(user);
+    }
+
+    return NextResponse.json({ error: "Acción no soportada" }, { status: 400 });
   } catch (e) {
     return handleRouteError(e);
   }
-}
-
-function pickColor(name: string) {
-  const palette = ["#1f6f78", "#c47a3a", "#2f5d50", "#6b4f3a", "#3d5a80", "#8b5e34"];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash + name.charCodeAt(i) * (i + 1)) % palette.length;
-  return palette[hash];
 }

@@ -1,5 +1,7 @@
 const ACTION_LABELS: Record<string, string> = {
   "user.create": "Usuario creado",
+  "user.update": "Usuario actualizado",
+  "user.delete": "Usuario eliminado",
   "user.role_update": "Rol actualizado",
   "group.create": "Grupo creado",
   "causa.create": "Causa creada",

@@ -2,6 +2,7 @@
 
 const SECTIONS = [
   { id: "estudio", label: "Estudio" },
+  { id: "usuarios", label: "Usuarios" },
   { id: "llm-settings", label: "IA" },
   { id: "obsidian-settings", label: "Obsidian" },
   { id: "google-settings", label: "Google" },
