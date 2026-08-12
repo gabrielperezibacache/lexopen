@@ -255,6 +255,7 @@ variables más relevantes:
 | `LEXOPEN_OPEN_ACCESS` | No | Bypass de autenticación únicamente fuera de producción; no lo habilite en un entorno real. |
 | `LEXOPEN_RELAX_CSRF` | No | Relaja controles para CI; no lo habilite en producción. |
 | `STORAGE_PATH` | No | Directorio local para archivos cuando no se configura S3. |
+| `LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE` | Host web local | Permite almacenamiento local persistente fuera de Render. |
 | `LEXOPEN_REQUIRE_PERSISTENT_STORAGE` | No | Con `1`, `/api/health` devuelve `503` si producción no tiene storage persistente. |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | No | Bucket y endpoint de almacenamiento S3-compatible. |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | No | Credenciales del bucket S3-compatible. |
@@ -324,6 +325,8 @@ PC principal / Host
 ```
 
 Guía detallada: [`docs/DESKTOP.md`](docs/DESKTOP.md).
+Para usar solo navegador sin instalar Electron en clientes, consulte
+[`docs/WEB-HOST.md`](docs/WEB-HOST.md).
 
 ```bash
 npm install

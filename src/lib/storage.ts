@@ -34,7 +34,9 @@ export function persistentStorageReady() {
   return (
     storageMode() === "s3" ||
     process.env.NODE_ENV !== "production" ||
-    process.env.LEXOPEN_DESKTOP === "1"
+    process.env.LEXOPEN_DESKTOP === "1" ||
+    (process.env.LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE === "1" &&
+      Boolean(process.env.STORAGE_PATH))
   );
 }
 

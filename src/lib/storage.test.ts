@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   MAX_STORAGE_OBJECT_BYTES,
   getObject,
+  persistentStorageReady,
   putObject,
   storageMode,
 } from "@/lib/storage";
@@ -17,6 +18,21 @@ async function main() {
   delete process.env.S3_SECRET_ACCESS_KEY;
 
   assert.equal(storageMode(), "local");
+  const env = process.env as Record<string, string | undefined>;
+  const previousNodeEnv = env.NODE_ENV;
+  const previousLocalProduction = env.LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE;
+  env.NODE_ENV = "production";
+  env.LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE = "1";
+  assert.equal(persistentStorageReady(), true);
+  env.LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE = "0";
+  assert.equal(persistentStorageReady(), false);
+  if (previousNodeEnv === undefined) delete env.NODE_ENV;
+  else env.NODE_ENV = previousNodeEnv;
+  if (previousLocalProduction === undefined) {
+    delete env.LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE;
+  } else {
+    env.LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE = previousLocalProduction;
+  }
 
   await putObject({ key: "documents/example.txt", body: "contenido" });
   assert.equal(
