@@ -113,11 +113,21 @@ export async function POST(req: Request) {
       body.utility || inferAiUtility(prompt)
     );
 
+    const documentoIds = Array.isArray(body.documentoIds)
+      ? body.documentoIds.map((id: unknown) => String(id)).filter(Boolean).slice(0, 40)
+      : null;
+    const rutaPrefix =
+      typeof body.rutaPrefix === "string" && body.rutaPrefix.trim()
+        ? body.rutaPrefix.trim().slice(0, 500)
+        : null;
+
     const pack = await buildAiContextPack({
       causaId: body.causaId || null,
       utility: utility.id,
       prompt,
       role: user.role,
+      documentoIds,
+      rutaPrefix,
     });
 
     // Historial multi-turno (estilo Julia: recuerda la conversación)
@@ -248,10 +258,16 @@ export async function POST(req: Request) {
         body.causaId
           ? { label: "Abrir causa", href: `/causas/${body.causaId}` }
           : null,
+        { label: "Documentos", href: "/documentos" },
         { label: "Plazos", href: "/plazos" },
         { label: "Jurisprudencia", href: "/jurisprudencia" },
         { label: "Monitoreo PJUD", href: "/causas/monitoreo" },
       ].filter(Boolean),
+      documentScope: {
+        documentoIds,
+        rutaPrefix,
+        sourcesDocumentos: pack.sources.filter((s) => s.type === "documento").length,
+      },
     });
   } catch (e) {
     return handleRouteError(e);

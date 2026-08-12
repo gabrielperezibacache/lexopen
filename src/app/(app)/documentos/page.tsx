@@ -34,8 +34,13 @@ export default async function DocumentosPage() {
         <h1 className="display mt-2 text-4xl">Documentos</h1>
         <p className="mt-2 text-[var(--ink-soft)]/80">
           Incorporación de escritos, carpetas investigativas y memos vinculados a causas —
-          con extracción Markdown/OCR, Obsidian y Google Drive. El VDR por espacio está en
-          Espacios → Archivos.
+          con extracción Markdown/OCR para el copiloto IA, Obsidian y Google Drive. El VDR
+          por espacio está en Espacios → Archivos.
+        </p>
+        <p className="mt-2 text-sm">
+          <Link href="/agente" className="text-[var(--sea)]">
+            Preguntar al copiloto sobre estos documentos →
+          </Link>
         </p>
       </div>
 

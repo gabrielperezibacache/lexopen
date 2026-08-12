@@ -69,6 +69,12 @@ export function CausaActions({ causaId }: { causaId: string }) {
         >
           Abrir copiloto
         </Link>
+        <Link
+          href={`/agente?causaId=${causaId}&utility=doc_qa`}
+          className="btn btn-ghost w-full sm:w-auto"
+        >
+          Preguntar a documentos
+        </Link>
       </div>
       {msg && (
         <p className="max-w-md rounded-2xl border border-[var(--line)] bg-white/80 p-3 text-xs text-[var(--ink-soft)]/80">

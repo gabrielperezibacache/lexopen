@@ -12,6 +12,7 @@ assert.equal(getAiUtility("nope").id, "copilot");
 assert.equal(inferAiUtility("revisa el plazo fatal"), "plazos");
 assert.equal(inferAiUtility("redacta un memorial"), "draft");
 assert.equal(inferAiUtility("qué dice el documento PDF"), "doc_qa");
+assert.equal(inferAiUtility("revisa la carpeta investigativa"), "doc_qa");
 assert.equal(inferAiUtility("busca jurisprudencia"), "research");
 
 const est = formatPlazoEstimate({
