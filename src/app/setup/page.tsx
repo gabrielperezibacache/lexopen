@@ -2,12 +2,9 @@
 
 import Link from "next/link";
 import { FormEvent, Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Scale } from "lucide-react";
 
 function SetupForm() {
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token") || "";
   const [error, setError] = useState("");
   const [complete, setComplete] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -29,11 +26,12 @@ function SetupForm() {
 
     setBusy(true);
     try {
+      const manualToken = String(form.get("token") || "").trim();
       const response = await fetch("/api/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token,
+          ...(manualToken ? { token: manualToken } : {}),
           name: form.get("name"),
           email: form.get("email"),
           password,
@@ -73,14 +71,10 @@ function SetupForm() {
         <h1 className="display text-3xl">Configurar LexOpen</h1>
         <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
           Cree el primer administrador del estudio. Este paso solo funciona
-          durante la primera ejecución del Host.
+          durante la primera ejecución del Host. El token viaja en cookie
+          httpOnly (no en la barra de direcciones).
         </p>
       </div>
-      {!token && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Abra esta pantalla desde el asistente del PC principal.
-        </p>
-      )}
       <label className="block text-sm">
         <span className="mb-1 block text-[var(--ink-soft)]/70">Nombre completo</span>
         <input className="input" name="name" required minLength={2} maxLength={120} />
@@ -113,17 +107,32 @@ function SetupForm() {
           autoComplete="new-password"
         />
       </label>
+      <details className="text-sm text-[var(--ink-soft)]/75">
+        <summary className="cursor-pointer">Token manual (servidor sin Desktop)</summary>
+        <label className="mt-2 block">
+          <span className="mb-1 block text-[var(--ink-soft)]/70">
+            LEXOPEN_BOOTSTRAP_TOKEN
+          </span>
+          <input
+            className="input"
+            name="token"
+            type="password"
+            maxLength={256}
+            autoComplete="off"
+          />
+        </label>
+      </details>
       {error && (
         <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {error}
         </p>
       )}
-      <button className="btn btn-primary w-full" disabled={!token || busy} type="submit">
+      <button className="btn btn-primary w-full" disabled={busy} type="submit">
         {busy ? "Configurando…" : "Crear administrador"}
       </button>
       <p className="text-xs text-[var(--ink-soft)]/60">
-        No comparta el enlace de configuración ni use esta pantalla para una
-        instalación ya configurada.
+        Abra esta pantalla desde LexOpen Desktop o con un enlace de un solo uso;
+        el proxy convierte <code>?token=</code> en cookie y limpia la URL.
       </p>
     </form>
   );

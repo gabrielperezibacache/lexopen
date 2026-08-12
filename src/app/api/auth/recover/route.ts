@@ -7,9 +7,14 @@ import { isValidBootstrapToken } from "@/lib/auth/bootstrap";
 import { writeAudit } from "@/lib/audit";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
 import { rotateDesktopEnvSecret } from "@/lib/auth/env-secrets";
+import {
+  RECOVERY_TOKEN_COOKIE,
+  setupCookieOptions,
+} from "@/lib/auth/setup-cookies";
+import { cookieSecureFlag } from "@/lib/auth/cookie-options";
 
 const recoverySchema = z.object({
-  token: z.string().min(1).max(256),
+  token: z.string().max(256).optional(),
   email: z.string().trim().email().max(320),
   newPassword: z.string().min(12).max(256),
 });
@@ -31,8 +36,12 @@ export async function POST(req: NextRequest) {
       );
     }
     const body = recoverySchema.parse(await req.json());
+    const token =
+      (body.token || "").trim() ||
+      req.cookies.get(RECOVERY_TOKEN_COOKIE)?.value ||
+      "";
     const tokenLimited = await rateLimitAsync(
-      `recover-token:${body.token.slice(0, 16)}`,
+      `recover-token:${token.slice(0, 16) || "none"}`,
       8,
       15 * 60 * 1000
     );
@@ -42,12 +51,7 @@ export async function POST(req: NextRequest) {
         { status: 429 }
       );
     }
-    if (
-      !isValidBootstrapToken(
-        body.token,
-        process.env.LEXOPEN_RECOVERY_TOKEN
-      )
-    ) {
+    if (!isValidBootstrapToken(token, process.env.LEXOPEN_RECOVERY_TOKEN)) {
       return NextResponse.json({ error: "Token de recuperación inválido" }, { status: 403 });
     }
 
@@ -74,11 +78,16 @@ export async function POST(req: NextRequest) {
       // One-time use: rotate recovery token after a successful reset.
       await rotateDesktopEnvSecret("LEXOPEN_RECOVERY_TOKEN");
     }
-    return NextResponse.json({
+    const res = NextResponse.json({
       ok: true,
       message:
         "Si el administrador existe, la contraseña fue actualizada. Inicie sesión con la nueva clave.",
     });
+    res.cookies.set(RECOVERY_TOKEN_COOKIE, "", {
+      ...setupCookieOptions(cookieSecureFlag()),
+      maxAge: 0,
+    });
+    return res;
   } catch (e) {
     return handleRouteError(e);
   }

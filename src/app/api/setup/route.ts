@@ -10,9 +10,14 @@ import {
   isValidBootstrapToken,
 } from "@/lib/auth/bootstrap";
 import { clearDesktopEnvSecret } from "@/lib/auth/env-secrets";
+import {
+  SETUP_TOKEN_COOKIE,
+  setupCookieOptions,
+} from "@/lib/auth/setup-cookies";
+import { cookieSecureFlag } from "@/lib/auth/cookie-options";
 
 const setupSchema = z.object({
-  token: z.string().min(1).max(256),
+  token: z.string().max(256).optional(),
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(320),
   password: z.string().min(12).max(256),
@@ -47,8 +52,12 @@ export async function POST(req: NextRequest) {
       );
     }
     const body = setupSchema.parse(await req.json());
+    const token =
+      (body.token || "").trim() ||
+      req.cookies.get(SETUP_TOKEN_COOKIE)?.value ||
+      "";
     const expectedToken = process.env[BOOTSTRAP_TOKEN_ENV];
-    if (!isValidBootstrapToken(body.token, expectedToken)) {
+    if (!isValidBootstrapToken(token, expectedToken)) {
       return NextResponse.json({ error: "Token de instalación inválido" }, { status: 403 });
     }
 
@@ -83,7 +92,12 @@ export async function POST(req: NextRequest) {
 
     // The user-count guard is the source of truth; clear process + Desktop .env.
     await clearDesktopEnvSecret(BOOTSTRAP_TOKEN_ENV);
-    return NextResponse.json({ ok: true, user }, { status: 201 });
+    const res = NextResponse.json({ ok: true, user }, { status: 201 });
+    res.cookies.set(SETUP_TOKEN_COOKIE, "", {
+      ...setupCookieOptions(cookieSecureFlag()),
+      maxAge: 0,
+    });
+    return res;
   } catch (e) {
     return handleRouteError(e);
   }

@@ -120,7 +120,7 @@ export function PurgeDemoPanel() {
               <code>export LEXOPEN_BOOTSTRAP_TOKEN=$(openssl rand -hex 24)</code>
             </li>
             <li>
-              Abra <code>/setup?token=…</code> y cree el admin del estudio
+              Abra <code>/setup</code> (Desktop o enlace de un solo uso) y cree el admin del estudio
             </li>
           </ol>
         </div>
