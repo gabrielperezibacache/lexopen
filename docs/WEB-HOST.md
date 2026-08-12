@@ -163,5 +163,13 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   La restauración conserva un rollback temporal hasta verificar el arranque.
 
 - Verifique periódicamente `/api/health`, espacio libre y backups restaurables.
-- Para PJUD, `CRON_SECRET` permite un scheduler externo; Render no programa este
-  sync cuando se usa un Host local.
+- Para activar el scheduler PJUD local, configure en el `.env` del directorio de datos:
+
+  ```dotenv
+  CRON_SECRET=<secreto-aleatorio>
+  PJUD_SYNC_INTERVAL_MINUTES=360
+  ```
+
+  `web:host` ejecutará la sincronización contra su propio endpoint sin crear otro
+  servicio. Si `PJUD_API_URL` está vacío y `PJUD_ALLOW_DEMO=0`, no se consultará
+  ninguna fuente externa.
