@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="LexOpen — Legal workspaces for Chile">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="LexOpen — operaciones jurídicas open source para Chile">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="420" gradientUnits="userSpaceOnUse">
       <stop stop-color="#0c1c24"/>
@@ -25,16 +25,17 @@
     <path d="M840 110h256l-18-40H858z"/>
   </g>
   <path d="M1120 70c18 28 22 54 10 86-8 22-6 40 8 62 12 18 10 40-4 58-10 14-8 30 2 44" fill="none" stroke="#2a8f99" stroke-width="3" stroke-opacity="0.55" stroke-linecap="round"/>
-  <text x="72" y="168" font-family="Georgia, 'Times New Roman', serif" font-size="84" font-weight="700" fill="#f3f6f4">LexOpen</text>
-  <rect x="74" y="188" width="168" height="6" rx="3" fill="#c47a3a"/>
-  <text x="74" y="240" font-family="ui-sans-serif, system-ui, sans-serif" font-size="28" fill="#d6c4a8">Legal workspaces open-source para Chile</text>
-  <text x="74" y="286" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" fill="#f3f6f4" fill-opacity="0.72">Causas · CRM · IA · Facturación · VDR · Plazos · Obsidian</text>
+  <text x="72" y="158" font-family="Georgia, 'Times New Roman', serif" font-size="84" font-weight="700" fill="#f3f6f4">LexOpen</text>
+  <rect x="74" y="178" width="168" height="6" rx="3" fill="#c47a3a"/>
+  <text x="74" y="228" font-family="ui-sans-serif, system-ui, sans-serif" font-size="26" fill="#d6c4a8">Operaciones jurídicas open source para Chile</text>
+  <text x="74" y="268" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" fill="#f3f6f4" fill-opacity="0.78">Abogados independientes · Estudios · Causas propias</text>
+  <text x="74" y="304" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16" fill="#f3f6f4" fill-opacity="0.62">Plazos · CRM · Facturación · PJUD · Host local</text>
   <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#0c1c24">
-    <rect x="74" y="320" width="118" height="36" rx="18" fill="#f3f6f4"/>
-    <text x="96" y="343">AGPL-3.0</text>
-    <rect x="206" y="320" width="132" height="36" rx="18" fill="#c47a3a"/>
-    <text x="228" y="343" fill="#f3f6f4">Next.js 15</text>
-    <rect x="352" y="320" width="148" height="36" rx="18" fill="#2a8f99"/>
-    <text x="372" y="343" fill="#f3f6f4">Postgres</text>
+    <rect x="74" y="340" width="118" height="36" rx="18" fill="#f3f6f4"/>
+    <text x="96" y="363">AGPL-3.0</text>
+    <rect x="206" y="340" width="132" height="36" rx="18" fill="#c47a3a"/>
+    <text x="228" y="363" fill="#f3f6f4">Next.js 16</text>
+    <rect x="352" y="340" width="148" height="36" rx="18" fill="#2a8f99"/>
+    <text x="372" y="363" fill="#f3f6f4">Postgres</text>
   </g>
 </svg>

@@ -3,9 +3,12 @@
     <img src="docs/assets/lexopen-logo.svg" width="96" alt="LexOpen logo">
   </p>
   <h1>LexOpen</h1>
-  <p><strong>Operaciones jurídicas open source para estudios de abogados en Chile</strong></p>
+  <p><strong>Operaciones jurídicas open source para Chile</strong></p>
   <p>
-    Workspaces · causas · plazos · colaboración · facturación · integraciones
+    Para <em>abogados independientes</em> y <em>estudios</em> que gestionan sus propias causas
+  </p>
+  <p>
+    Causas · plazos · CRM · workspaces · facturación · PJUD · IA · Host local
   </p>
   <p>
     <a href="https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml">
@@ -23,26 +26,27 @@
     <a href="https://www.postgresql.org/">
       <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1.svg?logo=postgresql&logoColor=white" alt="PostgreSQL 16">
     </a>
+    <a href="https://nextjs.org/">
+      <img src="https://img.shields.io/badge/Next.js-16-black.svg?logo=nextdotjs&logoColor=white" alt="Next.js 16">
+    </a>
   </p>
   <p>
+    <a href="#-para-quién-es">Para quién</a> ·
     <a href="#-empezar-gu%C3%ADa-sencilla">Empezar</a> ·
     <a href="#-qu%C3%A9-resuelve">Qué resuelve</a> ·
-    <a href="docs/DESKTOP.md">Desktop</a> ·
+    <a href="docs/WEB-HOST.md">Host local</a> ·
     <a href="CONTRIBUTING.md">Contribuir</a>
   </p>
   <p>
-    <img src="docs/assets/lexopen-hero.jpg" alt="LexOpen — operaciones jurídicas para Chile" width="100%">
-  </p>
-  <p>
-    <img src="docs/assets/lexopen-banner.svg" alt="Banner LexOpen" width="100%">
+    <img src="docs/assets/lexopen-hero.jpg" alt="LexOpen — causas y operaciones jurídicas en Chile" width="100%">
   </p>
 </div>
 
 > [!IMPORTANT]
 > **Estado del proyecto:** LexOpen está en la versión `0.1.4` y debe considerarse un
 > prototipo funcional / base para pilotos e iteraciones. Antes de cargar información
-> real, revise seguridad, permisos, respaldos, cumplimiento y fuentes jurídicas según
-> las necesidades de su organización.
+> real de clientes o causas, revise seguridad, permisos, respaldos, cumplimiento y
+> fuentes jurídicas según las necesidades de su práctica (solo o en equipo).
 
 > [!NOTE]
 > LexOpen está inspirado en el modelo de workspaces de
@@ -52,7 +56,7 @@
 ## Índice
 
 - [Qué es LexOpen](#-qué-es-lexopen)
-- [Qué aporta al estudio](#-qué-aporta-al-estudio)
+- [Para quién es](#-para-quién-es)
 - [Qué resuelve](#-qué-resuelve)
 - [Recorrido de la demo](#-recorrido-de-la-demo)
 - [Arquitectura](#-arquitectura)
@@ -76,35 +80,41 @@
 
 LexOpen reúne en una sola aplicación las operaciones que normalmente quedan
 repartidas entre carpetas, hojas de cálculo, correo, notas y herramientas de
-seguimiento:
+seguimiento. Corre en un **Host local** (su PC o un servidor del estudio): los datos
+de causas y clientes quedan bajo su control.
 
 - **Espacios de trabajo tipo site:** matters, VDR/data rooms, conocimiento, proyectos y
   portales de clientes.
 - **Gestión de causas chilenas:** RIT/RUC, tribunal, carátula, partes, etapas,
   movimientos, documentos, notas y conflictos de interés.
 - **Colaboración trazable:** tareas, calendario, plazos, minutas, comentarios, Q&A,
-  workflows, mensajes, notificaciones y actividad.
-- **Operación económica interna:** horas, gastos, tarifas, facturas/boletas,
-  retenciones, pagos y cuenta corriente de clientes.
+  workflows, mensajes, notificaciones y actividad — útil en equipo y también como
+  agenda personal del abogado que trabaja solo.
+- **Operación económica:** horas, gastos, tarifas, facturas/boletas, retenciones,
+  UF y cuenta corriente de clientes.
 - **Puentes hacia otras herramientas:** Google Drive/Calendar, exportación Markdown a
-  Obsidian, almacenamiento S3-compatible y un agente Hermes con API compatible con
-  OpenAI.
+  Obsidian, almacenamiento S3-compatible y un agente con API compatible con OpenAI.
 
-La propuesta no es reemplazar el criterio profesional ni las fuentes oficiales:
-es ofrecer una base abierta, extensible y centrada en el trabajo diario de un estudio.
+No reemplaza el criterio profesional ni las fuentes oficiales: es una base abierta y
+extensible para el trabajo diario de quien litiga o asesora en Chile.
 
-## 💼 Qué aporta al estudio
+## 👤 Para quién es
 
-LexOpen concentra en una sola plataforma lo que suele repartirse entre planillas,
-chats, carpetas y herramientas desconectadas. Está pensado para abogados,
-paralegales y socios que necesitan trazabilidad procesal, handoff limpio y una
-relación ordenada con el cliente — con código auditable (AGPL-3.0).
+LexOpen está pensado tanto para quien ejerce **por cuenta propia** como para
+**estudios** con varios roles. El mismo Host sirve una práctica de una persona o un
+equipo con abogados, asistentes y portal de clientes — código auditable (AGPL-3.0).
 
-| Situación en el estudio | Cómo ayuda LexOpen |
+| Perfil | Cómo encaja LexOpen |
+| --- | --- |
+| **Abogado/a independiente** | Lleva causas, plazos, clientes, documentos y cobros en un solo lugar, sin depender de un SaaS ni de un equipo de TI. |
+| **Estudio pequeño o mediano** | Comparte el Host en LAN/Tailscale; roles `admin` / `abogado` / `asistente` / `cliente` y handoff entre colegas. |
+| **Equipo mixto** | Paralegales y socios trabajan sobre el mismo expediente con auditoría y permisos. |
+
+| Situación habitual | Cómo ayuda LexOpen |
 | --- | --- |
 | El expediente vive en drives y chats dispersos | **Espacios de trabajo** con archivos, wiki, tareas, Q&A y flujos de aprobación |
 | Plazos fatales se pierden entre agendas | **Plazos procesales** (hábiles/corridos), calendario, alertas y sync a Google Calendar |
-| Un abogado entra a una causa “a medias” | **Minutas de handoff** post-audiencia / reunión / llamada → tareas y plazos |
+| Hay que retomar una causa días después (o pasarla a un colega) | **Minutas** post-audiencia / reunión / llamada → tareas y plazos |
 | El cliente pide estado y nadie tiene el hilo | **CRM**: cliente → causas → trámites → documentos + portal cliente |
 | La facturación no habla con el matter | **Horas, gastos, boletas/facturas, UF y cuenta corriente** ligados a la causa |
 | La IA genérica inventa fuera del expediente | **Acciones IA** con contexto de causa/cliente y revisión humana |
@@ -154,7 +164,7 @@ defecto (kill switches); no se presentan como API oficial de PJUD.
 > y el aviso adicional en [`LICENSE`](LICENSE).
 
 **Copiloto IA:** entiende la petición, recuerda el hilo, busca en
-causas/documentos del estudio y responde con fuentes del host. Utilidades:
+causas/documentos de su práctica y responde con fuentes del host. Utilidades:
 briefing, Q&A documental, borradores, plazos, investigación y casos similares.
 Todo como ayuda operativa con revisión humana — no asesoría automática.
 
@@ -222,11 +232,11 @@ flujos principales.
 
 ```mermaid
 flowchart LR
-  subgraph Estudio
-    A[Abogados] --> B[LexOpen]
-    C[Paralegales] --> B
+  subgraph Practica["Su práctica"]
+    A[Abogado independiente] --> B[LexOpen Host]
+    C[Equipo del estudio] --> B
   end
-  B --> D[(Postgres)]
+  B --> D[(Postgres local)]
   B --> E[Documentos / S3]
   B --> F[IA OpenAI-compatible]
   B --> G[Google Workspace]
@@ -235,17 +245,16 @@ flowchart LR
   J --> B
 ```
 
-En el modo desktop, un único **Host** ejecuta LexOpen y PostgreSQL embebido. Los
-equipos restantes actúan como clientes contra esa misma instalación, normalmente a
-través de Tailscale o de una LAN privada. No se crea una base de datos separada por
-laptop.
+Un único **Host** ejecuta LexOpen y PostgreSQL embebido: puede ser el notebook del
+abogado que trabaja solo o un PC del estudio. Otros equipos (si los hay) entran por
+navegador vía LAN o Tailscale. No se crea una base de datos separada por laptop.
 
 ## 🌐 Instalación web 100% local
 
-Esta es la opción recomendada si no desea instalar Electron en cada equipo.
-Un único PC ejecuta LexOpen y PostgreSQL embebido; los demás equipos usan el
-navegador. No requiere Render, S3, Tailscale ni servicios externos durante la
-ejecución.
+Opción recomendada para producción local (con o sin Electron en cada equipo).
+Un único PC ejecuta LexOpen y PostgreSQL embebido; usted — y, si aplica, su equipo —
+usan el navegador. No requiere Render, S3, Tailscale ni servicios externos durante
+la ejecución.
 
 ### Requisitos del Host
 
@@ -280,9 +289,9 @@ $env:LEXOPEN_DATA_DIR="$HOME\LexOpenData"; npm run web:host
 ### Primer acceso
 
 Abra `/setup` en el Host y pegue `LEXOPEN_BOOTSTRAP_TOKEN` desde el `.env`
-del data dir (el token no se imprime en logs). Cree el
-administrador e inicie sesión. Después cree los usuarios del estudio desde
-**Personas**.
+del data dir (el token no se imprime en logs). Cree el administrador (puede ser
+usted mismo si ejerce de forma independiente) e inicie sesión. Si trabaja en
+equipo, agregue colegas y clientes desde **Personas**.
 
 En el Host:
 
@@ -323,7 +332,7 @@ Hay **dos caminos**. Elija uno:
 | Camino | Para qué | Resultado |
 | --- | --- | --- |
 | **A · Probar la demo** | Conocer LexOpen con datos de ejemplo | Usuarios `*@estudio.cl` / contraseña `lexopen` |
-| **B · Estudio real (producción)** | Empezar la base de datos del estudio desde cero | Sin datos ficticios; usted crea el primer admin |
+| **B · Práctica real (producción)** | Empezar su base (solo o estudio) desde cero | Sin datos ficticios; usted crea el primer admin |
 
 ### A · Probar la demo (5 minutos)
 
@@ -345,8 +354,9 @@ npm run dev
 
 Abra `http://localhost:3000/login` e ingrese con `socio@estudio.cl` / `lexopen`.
 
-### B · Estudio real desde cero (sin demo)
+### B · Práctica real desde cero (sin demo)
 
+Ideal para un abogado independiente o para un estudio que quiere datos limpios.
 **Recomendado — Host local** (`web:host` genera secretos y demos en `0`):
 
 ```bash
@@ -384,8 +394,10 @@ npm run dev
 # o producción: npm run build && npm run start
 ```
 
-En `/setup?token=…` cree el admin del estudio (nombre, email, contraseña ≥12).
-Luego configure la organización en **Configuración** y agregue abogados/clientes reales.
+En `/setup?token=…` cree el administrador (nombre, email, contraseña ≥12). En
+**Configuración** complete los datos de su práctica (nombre o razón social, RUT,
+emisor). Si trabaja solo puede quedarse como único usuario; si hay equipo, agregue
+abogados, asistentes y clientes reales.
 
 **Opción B2 — ya probó la demo y quiere borrar todo para producción:**
 
@@ -415,6 +427,10 @@ escriba `ELIMINAR DATOS DEMO`.
 Detalle ampliado: [Usuarios demo y pasar a producción](#-usuarios-demo-y-pasar-a-producción).
 
 ## 🚀 Inicio rápido
+
+Para **uso real** (abogado independiente o estudio), prefiera
+[Empezar → camino B](#b--práctica-real-desde-cero-sin-demo) con `web:host`.
+Esta sección resume el flujo de desarrollo / demo con Postgres externo.
 
 ### Requisitos
 
@@ -502,7 +518,7 @@ Todos usan la contraseña `lexopen`:
 
 | Email | Rol | Uso recomendado |
 | --- | --- | --- |
-| `socio@estudio.cl` | `admin` | Configuración, aprobación y visión completa del estudio. |
+| `socio@estudio.cl` | `admin` | Configuración, aprobación y visión completa de la práctica. |
 | `abogado@estudio.cl` | `abogado` | Causas, estrategia, minutas, documentos y colaboración. |
 | `asistente@estudio.cl` | `asistente` | Tareas, documentos, plazos y apoyo operativo. |
 | `cliente@andes.cl` | `cliente` | Recorrido del portal y contenido compartido. |
@@ -510,7 +526,7 @@ Todos usan la contraseña `lexopen`:
 El selector de usuarios demo aparece en desarrollo o cuando
 `LEXOPEN_DEMO_SWITCHER=1`. **Desactívelo antes de cualquier uso real.**
 
-### Cómo pasar de demo a base del estudio
+### Cómo pasar de demo a práctica real
 
 1. **Respalde** si necesita conservar algo (CSV de causas, documentos externos).
 2. **Purgue** los datos ficticios:
@@ -527,8 +543,8 @@ El selector de usuarios demo aparece en desarrollo o cuando
    export LEXOPEN_BOOTSTRAP_TOKEN="$(openssl rand -hex 24)"
    # Abra /setup?token=$LEXOPEN_BOOTSTRAP_TOKEN
    ```
-5. Configure el estudio en **Configuración** (razón social, RUT, emisor) y cree
-   los usuarios del equipo.
+5. Configure su práctica en **Configuración** (nombre o razón social, RUT, emisor)
+   y, si aplica, cree los usuarios del equipo.
 
 Por defecto la purga **conserva** catálogos Chile (tribunales, UF, plantillas de
 minuta). Para borrarlos también: `npm run db:purge-demo -- --yes --wipe-catalogs`.
@@ -631,7 +647,7 @@ conexión y CSRF) o con variables de entorno:
 Presets: OpenAI, Azure OpenAI, Groq, Ollama (local), Hermes Agent, o URL custom.
 Las solicitudes van a `POST {apiUrl}/chat/completions`. La consola **Copiloto IA**
 (`/agente`) ofrece utilidades (briefing, plazos, documentos, borradores,
-investigación con wiki/jurisprudencia) con fuentes ancladas del estudio. El context
+investigación con wiki/jurisprudencia) con fuentes ancladas de su práctica. El context
 pack ancla la respuesta a la causa, la **carpeta investigativa** (`ruta` /
 `documentoId`), documentos rankeados por la pregunta, VDR/wiki del espacio
 vinculado y plazos. En `/agente` se puede acotar por carpeta o documentos; el
@@ -704,7 +720,7 @@ npm run desktop:dev
 
 En una instalación Host limpia, LexOpen abre `/setup` para crear el primer
 administrador con una contraseña propia; el seed demo es opcional y no es necesario
-para iniciar el estudio.
+para iniciar su práctica.
 
 Requiere Node 22 (ver [`.nvmrc`](.nvmrc)). Las actualizaciones del instalador no
 borran `Application Support` / `%APPDATA%\LexOpen` (config, Postgres, documentos).
@@ -769,8 +785,9 @@ ruta, validación de origen; un `curl` anónimo no es una prueba válida de auto
 
 ## 🏠 Producción en Host local
 
-LexOpen en producción corre **en su PC/servidor local**, no en Render ni otro
-SaaS de hosting. Un único Host guarda Postgres, documentos y secretos en disco.
+LexOpen en producción corre **en su PC o un servidor local**, no en Render ni otro
+SaaS de hosting. Un único Host guarda Postgres, documentos y secretos en disco —
+adecuado para un independiente en su notebook o para el PC central de un estudio.
 
 ```bash
 git clone https://github.com/gabrielperezibacache/lexopen.git
@@ -780,7 +797,7 @@ LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
 ```
 
 1. Abra `/setup` y pegue `LEXOPEN_BOOTSTRAP_TOKEN` del `.env` del data dir; cree
-   el admin del estudio (sin seed demo).
+   el administrador (sin seed demo).
 2. Compruebe `curl http://127.0.0.1:3000/api/health` → `db: "up"`, `storageReady: true`.
 3. Opcional: active arranque automático con `deploy/systemd`, `deploy/launchd` o
    `deploy/windows` (ver [`docs/WEB-HOST.md`](docs/WEB-HOST.md)).
@@ -795,9 +812,9 @@ sync/digest/plazos también son locales (`npm run pjud:host` + intervalos en el
 
 ## 🔄 Cómo actualizar la aplicación
 
-Cuando GitHub Releases publica una versión más nueva que la del Host, el personal
-del estudio ve un **aviso en la aplicación** con los pasos de actualización (se
-puede descartar por versión). También puede desactivar la consulta con
+Cuando GitHub Releases publica una versión más nueva que la del Host, quien usa
+la instalación ve un **aviso en la aplicación** con los pasos de actualización
+(se puede descartar por versión). También puede desactivar la consulta con
 `LEXOPEN_UPDATE_CHECK=0`.
 
 Actualizar LexOpen reemplaza el **código** (y aplica migraciones de base de datos).
@@ -1028,7 +1045,8 @@ antes de abrir un pull request.
 En resumen:
 
 1. cree una rama descriptiva;
-2. mantenga en español la UI orientada al estudio;
+2. mantenga en español la UI orientada a la práctica jurídica en Chile
+   (abogados independientes y estudios);
 3. no incluya secretos ni datos reales;
 4. cubra cambios de dominio con pruebas;
 5. describa en el PR los módulos afectados y las decisiones relevantes.
