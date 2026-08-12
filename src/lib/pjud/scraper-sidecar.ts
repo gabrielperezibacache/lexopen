@@ -11,7 +11,10 @@
 import { z } from "zod";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { classifyMovimiento } from "@/lib/pjud/classify";
-import { isCloudMetadataHostname } from "@/lib/net/safe-url";
+import {
+  isCloudMetadataHostname,
+  isPrivateOrLocalHostname,
+} from "@/lib/net/safe-url";
 import {
   fingerprint,
   type PjudCausaRef,
@@ -34,33 +37,6 @@ const movementSchema = z.object({
   receptor: z.boolean().optional(),
   documentoRef: z.string().max(500).optional().nullable(),
 });
-
-function isPrivateHostname(hostname: string) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (
-    host === "localhost" ||
-    host.endsWith(".local") ||
-    host.endsWith(".internal") ||
-    host === "metadata.google.internal" ||
-    host === "::1" ||
-    host === "0.0.0.0"
-  ) {
-    return true;
-  }
-  // Render private network DNS: *.render.internal
-  if (host.endsWith(".render.internal")) return true;
-  const octets = host.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet))) {
-    return false;
-  }
-  return (
-    octets[0] === 10 ||
-    octets[0] === 127 ||
-    (octets[0] === 169 && octets[1] === 254) ||
-    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
-    (octets[0] === 192 && octets[1] === 168)
-  );
-}
 
 export function scraperSidecarConfigured() {
   return Boolean(process.env.PJUD_SCRAPER_URL?.trim());
@@ -156,7 +132,7 @@ function scraperBaseUrl() {
     : `http://${rawBase}`;
   const parsedBase = new URL(withScheme);
   const allowPrivate = process.env.PJUD_SCRAPER_ALLOW_PRIVATE === "1";
-  const privateHost = isPrivateHostname(parsedBase.hostname);
+  const privateHost = isPrivateOrLocalHostname(parsedBase.hostname);
   if (
     parsedBase.username ||
     parsedBase.password ||

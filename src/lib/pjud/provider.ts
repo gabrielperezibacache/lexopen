@@ -1,4 +1,5 @@
 import { parseLocalDateInput } from "@/lib/minutas";
+import { isPrivateOrLocalHostname } from "@/lib/net/safe-url";
 import { classifyMovimiento } from "@/lib/pjud/classify";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import {
@@ -88,7 +89,7 @@ async function fetchFromPartnerApi(causa: PjudCausaRef): Promise<PjudFetchResult
     parsedBase.username ||
     parsedBase.password ||
     (process.env.NODE_ENV === "production" &&
-      isPrivateHostname(parsedBase.hostname))
+      isPrivateOrLocalHostname(parsedBase.hostname))
   ) {
     throw new Error("PJUD_API_URL no cumple las restricciones de seguridad");
   }
@@ -137,29 +138,6 @@ async function fetchFromPartnerApi(causa: PjudCausaRef): Promise<PjudFetchResult
     demo: false,
     sala: data.sala || null,
   };
-}
-
-function isPrivateHostname(hostname: string) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (
-    host === "localhost" ||
-    host === "metadata.google.internal" ||
-    host === "::1" ||
-    host === "0.0.0.0"
-  ) {
-    return true;
-  }
-  const octets = host.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet))) {
-    return false;
-  }
-  return (
-    octets[0] === 10 ||
-    octets[0] === 127 ||
-    (octets[0] === 169 && octets[1] === 254) ||
-    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
-    (octets[0] === 192 && octets[1] === 168)
-  );
 }
 
 /**

@@ -36,10 +36,13 @@ function assertObsidianRestUrl(restUrl: string) {
   const allowPrivate =
     process.env.NODE_ENV !== "production" ||
     process.env.OBSIDIAN_ALLOW_PRIVATE_URL === "1";
+  // Production: HTTPS only for non-loopback; loopback may use http when allowed.
+  const allowHttp =
+    allowPrivate || process.env.NODE_ENV !== "production";
 
   if (
     isSafeOutboundHttpUrl(restUrl, {
-      allowHttp: true,
+      allowHttp,
       allowLoopback: allowPrivate,
     })
   ) {

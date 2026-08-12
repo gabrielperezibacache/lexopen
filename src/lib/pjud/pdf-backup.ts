@@ -13,15 +13,31 @@ export function looksLikePdf(buf: Buffer) {
   return buf.subarray(0, 5).toString("utf8") === "%PDF-";
 }
 
+/** PJUD document hosts only — not arbitrary public HTTPS (SSRF / data exfil). */
+function isAllowedPjudDocumentoHost(hostname: string) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "pjud.cl" || host === "www.pjud.cl") return true;
+  return host.endsWith(".pjud.cl") && host.length > ".pjud.cl".length;
+}
+
 export function isBackupableDocumentoRef(ref: string | null | undefined) {
   if (!ref?.trim()) return false;
   const value = ref.trim();
   if (value.startsWith("doc:") || value.startsWith("lexopen:")) return false;
   if (!/^https?:\/\//i.test(value)) return false;
-  // OJV and public hosts only — block SSRF to private/metadata.
-  return isSafeOutboundHttpUrl(value, {
-    allowHttp: process.env.NODE_ENV !== "production",
-  });
+  // OJV / pjud.cl hosts only — block SSRF to private/metadata and unrelated HTTPS.
+  if (
+    !isSafeOutboundHttpUrl(value, {
+      allowHttp: process.env.NODE_ENV !== "production",
+    })
+  ) {
+    return false;
+  }
+  try {
+    return isAllowedPjudDocumentoHost(new URL(value).hostname);
+  } catch {
+    return false;
+  }
 }
 
 /**

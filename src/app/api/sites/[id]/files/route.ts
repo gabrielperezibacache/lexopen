@@ -191,6 +191,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             },
           },
         },
+        select: siteFileListSelect,
       });
       await prisma.activity.create({
         data: {
@@ -242,7 +243,13 @@ export async function POST(req: NextRequest, { params }: Params) {
             },
           },
         },
-        include: { versions: { orderBy: { version: "desc" } } },
+        select: {
+          ...siteFileListSelect,
+          versions: {
+            orderBy: { version: "desc" },
+            select: fileVersionListSelect,
+          },
+        },
       });
       return NextResponse.json(file);
     }

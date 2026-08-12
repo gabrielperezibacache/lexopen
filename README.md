@@ -843,6 +843,9 @@ Controles implementados en el código:
   migran `enc:v1`→`enc:v2` y rechazan plaintext; rutas Obsidian/ingest
   confinadas; billing GET y creación de grupos con ACL más estricta; Desktop
   con `sandbox`, allowlist de navegación y updater sin downgrade;
+- SSRF: bloqueo IPv6 ULA/mapped, nip.io/sslip.io; PDF backup solo `*.pjud.cl`;
+  listados sin cuerpos/`storageKey`; miembros de site y visibilidad cliente
+  admin-only;
 - salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
   Hermes y Obsidian;
 - `instrumentation` falla al arrancar si flags peligrosas están en producción;
