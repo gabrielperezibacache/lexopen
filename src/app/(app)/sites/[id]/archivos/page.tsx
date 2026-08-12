@@ -21,28 +21,27 @@ export default async function SiteFilesPage({ params }: Params) {
   });
   if (!site) notFound();
 
-  const fileInclude = {
-    versions: {
-      orderBy: { version: "desc" as const },
-      take: 3,
-      select: {
-        id: true,
-        version: true,
-        note: true,
-        createdAt: true,
-        authorId: true,
-      },
+  const versionsInclude = {
+    orderBy: { version: "desc" as const },
+    take: 3,
+    select: {
+      id: true,
+      version: true,
+      note: true,
+      createdAt: true,
+      authorId: true,
     },
-    ...(clientView
-      ? {}
-      : {
-          comments: {
-            include: { author: { select: publicUserSelect } },
-            orderBy: { createdAt: "desc" as const },
-            take: 3,
-          },
-        }),
   };
+  const fileInclude = clientView
+    ? { versions: versionsInclude }
+    : {
+        versions: versionsInclude,
+        comments: {
+          include: { author: { select: publicUserSelect } },
+          orderBy: { createdAt: "desc" as const },
+          take: 3,
+        },
+      };
   const folders = await prisma.folder.findMany({
     where: { siteId: id },
     include: {
@@ -119,13 +118,23 @@ export default async function SiteFilesPage({ params }: Params) {
                       {f.tags ? ` · ${f.tags}` : ""}
                     </div>
                     {!clientView &&
-                      "comments" in f &&
-                      Array.isArray(f.comments) &&
-                      f.comments[0] && (
-                      <div className="mt-2 text-xs text-[var(--ink-soft)]/80">
-                        {f.comments[0].author?.name}: {f.comments[0].body}
-                      </div>
-                    )}
+                      (() => {
+                        const comments = (
+                          f as {
+                            comments?: Array<{
+                              body: string;
+                              author?: { name?: string | null } | null;
+                            }>;
+                          }
+                        ).comments;
+                        const first = comments?.[0];
+                        if (!first) return null;
+                        return (
+                          <div className="mt-2 text-xs text-[var(--ink-soft)]/80">
+                            {first.author?.name}: {first.body}
+                          </div>
+                        );
+                      })()}
                   </div>
                   <div className="text-xs text-[var(--ink-soft)]/60">
                     <a

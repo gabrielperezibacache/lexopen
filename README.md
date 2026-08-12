@@ -538,7 +538,9 @@ variables más relevantes:
 | `PJUD_ALLOW_DEMO` | No | Permite movimientos PJUD simulados y etiquetados como demo. |
 | `PJUD_WEBHOOK_SECRET` | No | Firma HMAC de webhooks asíncronos de un proveedor PJUD. |
 | `PJUD_SYNC_INTERVAL_MINUTES` | No | Intervalo del próximo sync (default 240 = 4h). |
-| `CRON_SECRET` | No | Protege la sincronización de cartera desde un scheduler externo. |
+| `CRON_SECRET` | No | Protege cron locales/externos (`x-cron-secret`: PJUD, digest, alertas de plazos). |
+| `PLAZOS_ALERTAS_INTERVAL_MINUTES` | No | Host web: minutos entre `POST /api/plazos/alertas` (0 = off). |
+| `PLAZOS_ALERTAS_DAYS` | No | Ventana en días de plazos a notificar (default 3). |
 | `OBSIDIAN_VAULT_PATH` | No | Vault local para exportaciones en desarrollo. |
 | `OBSIDIAN_REST_URL`, `OBSIDIAN_REST_TOKEN` | No | Obsidian Local REST API y token Bearer. |
 | `LEXOPEN_DESKTOP`, `LEXOPEN_DATA_DIR`, `LEXOPEN_DESKTOP_MODE` | Desktop | Activan y configuran el modo Host/Cliente de Electron. |
@@ -718,7 +720,7 @@ Principales grupos de endpoints:
 | Grupo | Ejemplos |
 | --- | --- |
 | Auth y salud | `/api/auth/*`, `/api/health` |
-| Causas y plazos | `/api/causas`, `/api/plazos`, `/api/uf`, `/api/conflict-check` |
+| Causas y plazos | `/api/causas`, `/api/plazos`, `/api/plazos/alertas`, `/api/uf`, `/api/conflict-check` |
 | Sites | `/api/sites/*`, `/api/tasks`, `/api/workflows` |
 | Documentos y búsqueda | `/api/documentos`, `/api/search`, `/api/jurisprudencia` |
 | Minutas | `/api/minutas`, `/api/minutas/plantillas` |
