@@ -88,10 +88,16 @@ Use esta lista antes de cargar información real del estudio:
    `deploy/windows` tras validar el Host a mano.
 10. **Respaldo restaurable:** al menos un `npm run web:backup` hacia medio
     externo cifrado y una prueba de `web:restore` en un entorno de ensayo.
-11. **Evite `npm start` solo** para producción del estudio: use `web:host`
-    (Postgres embebido, secretos, schedulers). Si usa Postgres externo +
-    `npm start`, defina `SESSION_SECRET` aleatorio (≥16), demos en `0` y
-    `LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE=1` (o S3) para documentos.
+11. **Evite `cp .env.example` + `npm start`** para el estudio: ese ejemplo deja
+    demos/secretos de desarrollo y el boot de producción falla a propósito.
+    Use `web:host` (Postgres embebido, secretos, schedulers). Si usa Postgres
+    externo + `npm start`, defina `SESSION_SECRET` aleatorio fuerte (≥16, no
+    placeholder), demos en `0` y `LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE=1`
+    (o S3) para documentos.
+12. **URLs privadas:** `OBSIDIAN_ALLOW_PRIVATE_URL=1` y
+    `PJUD_SCRAPER_ALLOW_PRIVATE=1` son normales en loopback del Host. Si publica
+    el servicio fuera de la máquina, revise que el sidecar Obsidian/PJUD no
+    quede expuesto sin autenticación.
 
 ## OCR local para PDFs escaneados
 
@@ -132,7 +138,16 @@ como `NEXT_PUBLIC_APP_URL`, el Host ya enlaza `0.0.0.0` automáticamente.
 Reinicie LexOpen y abra desde cada cliente la URL pública configurada.
 
 Recuperación de admin (si pierde la contraseña): abra `/recovery` y pegue
-`LEXOPEN_RECOVERY_TOKEN` desde el mismo `.env` del data dir.
+`LEXOPEN_RECOVERY_TOKEN` desde el mismo `.env` del data dir. Un reset exitoso
+**rota** ese token: copie el nuevo valor del `.env` (o regenerado por el Host)
+antes del siguiente uso.
+
+### Rate limit en Host
+
+El login usa un store local (`$LEXOPEN_DATA_DIR/rate-limit.json`). Un único
+proceso Host es el caso normal. Si ejecuta varias instancias contra el mismo
+data dir, configure `REDIS_URL`, `RATE_LIMIT_REDIS_URL` o Upstash REST para
+compartir el contador.
 
 Tailscale sigue siendo opcional para acceso remoto; no es necesario para una red
 local sin Internet.

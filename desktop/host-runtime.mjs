@@ -77,7 +77,8 @@ function appVersion() {
   return readPackageVersion(rootPkg);
 }
 
-function loadEnvFile(file) {
+/** Load .env into process.env without overriding keys already set by the parent. */
+export function loadEnvFile(file, targetEnv = process.env) {
   if (!fs.existsSync(file)) return;
   const text = fs.readFileSync(file, "utf8");
   for (const line of text.split("\n")) {
@@ -89,10 +90,25 @@ function loadEnvFile(file) {
     const value = trimmed.slice(i + 1);
     // Do not override env already set by systemd/launchd/parent process
     // (fail-closed demo flags from deploy units must win over a stale .env).
-    if (process.env[key] === undefined) {
-      process.env[key] = value;
+    if (targetEnv[key] === undefined) {
+      targetEnv[key] = value;
     }
   }
+}
+
+/** Setup guidance that never embeds the bootstrap token. */
+export function setupPendingMessage({
+  isElectron = false,
+  port = 3000,
+} = {}) {
+  if (isElectron) {
+    return "[lexopen-host] Configuración inicial pendiente: abra /setup desde la app Desktop (el token no se imprime en logs).";
+  }
+  return (
+    "[lexopen-host] Configuración inicial pendiente: abra http://127.0.0.1:" +
+    port +
+    "/setup y pegue LEXOPEN_BOOTSTRAP_TOKEN desde el archivo .env del data dir (el token no se imprime en logs)."
+  );
 }
 
 async function migrateLegacyPgPassword(pg, dataDir, databaseUrl) {
@@ -422,18 +438,12 @@ export async function startHost(options = {}) {
       );
     }
     if (needsSetup) {
-      // Never print the bootstrap token (Desktop IPC or manual paste from .env).
-      if (process.versions.electron) {
-        console.log(
-          "[lexopen-host] Configuración inicial pendiente: abra /setup desde la app Desktop (el token no se imprime en logs)."
-        );
-      } else {
-        console.log(
-          "[lexopen-host] Configuración inicial pendiente: abra http://127.0.0.1:" +
-            host.port +
-            "/setup y pegue LEXOPEN_BOOTSTRAP_TOKEN desde el archivo .env del data dir (el token no se imprime en logs)."
-        );
-      }
+      console.log(
+        setupPendingMessage({
+          isElectron: Boolean(process.versions.electron),
+          port: host.port,
+        })
+      );
     }
 
     let hostSchedulers = null;

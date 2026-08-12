@@ -24,7 +24,7 @@
     "desktop:install": "npm --prefix desktop install",
     "desktop:dev": "npm --prefix desktop run dev",
     "desktop:host": "node desktop/host-runtime.mjs",
-    "desktop:test": "node desktop/config.test.cjs",
+    "desktop:test": "node desktop/config.test.cjs && node desktop/external-url.test.cjs && node desktop/backup.test.cjs && node desktop/host-runtime.test.mjs",
     "desktop:build": "cross-env LEXOPEN_STANDALONE=1 npm run build",
     "desktop:dist:mac": "npm run desktop:build && npm --prefix desktop run dist:mac",
     "desktop:dist:win": "npm run desktop:build && npm --prefix desktop run dist:win",

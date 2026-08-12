@@ -3,6 +3,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
 import { canImpersonate, isStaff } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { isStrongSessionSecret } from "@/lib/security/production-env";
 
 export const SESSION_COOKIE = "lexopen_session";
 export const ROLE_COOKIE = "lexopen_role";
@@ -11,9 +12,11 @@ const ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
 
 export function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
-  if (secret && secret.length >= 16) return secret;
+  if (isStrongSessionSecret(secret)) return secret!.trim();
   if (process.env.NODE_ENV === "production") {
-    throw new Error("SESSION_SECRET es obligatorio en producción (mín. 16 chars)");
+    throw new Error(
+      "SESSION_SECRET es obligatorio en producción (mín. 16 chars, no placeholder)"
+    );
   }
   return secret || "lexopen-dev-session-secret-change-me";
 }

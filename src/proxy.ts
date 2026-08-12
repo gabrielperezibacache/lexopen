@@ -10,6 +10,7 @@ import {
   cronSecretMatches,
   isCronApiPath,
 } from "@/lib/security/cron-paths";
+import { isStrongSessionSecret } from "@/lib/security/production-env";
 
 const SESSION_COOKIE = "lexopen_session";
 const CSRF_COOKIE = "lexopen_csrf";
@@ -32,7 +33,7 @@ const VALID_ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
 
 function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
-  if (secret && secret.length >= 16) return secret;
+  if (isStrongSessionSecret(secret)) return secret!.trim();
   if (process.env.NODE_ENV === "production") {
     return "";
   }

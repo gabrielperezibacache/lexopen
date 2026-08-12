@@ -142,6 +142,23 @@ ensureHostEnv(keepDemoDir, {
 });
 assert.match(fs.readFileSync(envPath(keepDemoDir), "utf8"), /LLM_ALLOW_DEMO=1/);
 
+// Upgrade: copied .env.example DEMO_SWITCHER=1 becomes fail-closed 0
+const switcherDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-switcher-"));
+fs.writeFileSync(
+  envPath(switcherDir),
+  "SESSION_SECRET=abcdefghijklmnopqrstuvwxyz12\nLEXOPEN_DEMO_SWITCHER=1\n",
+  "utf8"
+);
+ensureHostEnv(switcherDir, {
+  port: 3042,
+  pgPort: 54342,
+  publicUrl: "http://127.0.0.1:3042",
+});
+assert.match(
+  fs.readFileSync(envPath(switcherDir), "utf8"),
+  /LEXOPEN_DEMO_SWITCHER=0/
+);
+
 // segunda pasada: no reescribe SESSION_SECRET ni añade basura
 const secret1 = env1.match(/^SESSION_SECRET=(.+)$/m)[1];
 fs.appendFileSync(envPath(tmp), "LLM_API_KEY=sk-estudio\n");
