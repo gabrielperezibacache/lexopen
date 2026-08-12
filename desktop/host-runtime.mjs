@@ -1,5 +1,6 @@
 /**
- * Arranca Postgres embebido + migraciones + servidor Next en 0.0.0.0.
+ * Arranca Postgres embebido + migraciones + servidor Next.
+ * Bind: 127.0.0.1 por defecto; 0.0.0.0 solo con URL pública no-local o LEXOPEN_BIND.
  * Datos/config del usuario viven en LEXOPEN_DATA_DIR (fuera del instalador).
  */
 import { createRequire } from "module";
@@ -20,6 +21,7 @@ const {
   readPackageVersion,
   localAppUrl,
   pgDataDir,
+  pgPasswordFromDatabaseUrl,
 } = require("./config.cjs");
 
 const repoRoot = process.env.LEXOPEN_APP_ROOT
@@ -84,17 +86,21 @@ function loadEnvFile(file) {
   }
 }
 
-async function startEmbeddedPostgres(dataDir, pgPort) {
+async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl) {
   const modPath =
     bundledModuleFile("embedded-postgres", "dist/index.js") ||
     require.resolve("embedded-postgres");
   const EmbeddedPostgres = (await import(pathToFileURL(modPath).href)).default;
   const databaseDir = pgDataDir(dataDir);
   const alreadyInitialized = fs.existsSync(path.join(databaseDir, "PG_VERSION"));
+  // Prefer password from DATABASE_URL; legacy installs may still use "lexopen".
+  const password =
+    pgPasswordFromDatabaseUrl(databaseUrl || process.env.DATABASE_URL || "") ||
+    "lexopen";
   const pg = new EmbeddedPostgres({
     databaseDir,
     user: "lexopen",
-    password: "lexopen",
+    password,
     port: pgPort,
     persistent: true,
   });
@@ -232,12 +238,13 @@ function resolveServerEntry() {
   return { type: "next", entry: null };
 }
 
-function startNextServer(port) {
+function startNextServer(port, bindHost = "127.0.0.1") {
   const resolved = resolveServerEntry();
+  const host = bindHost || "127.0.0.1";
   const env = runtimeEnv({
     ...process.env,
     PORT: String(port),
-    HOSTNAME: "0.0.0.0",
+    HOSTNAME: host,
     NODE_ENV: "production",
   });
 
@@ -256,7 +263,7 @@ function startNextServer(port) {
   if (process.versions.electron) {
     throw new Error("Falta .next/standalone/server.js en el instalador de LexOpen.");
   }
-  return spawn("npx", ["next", "start", "-H", "0.0.0.0", "-p", String(port)], {
+  return spawn("npx", ["next", "start", "-H", host, "-p", String(port)], {
     cwd: repoRoot,
     env,
     stdio: "inherit",
@@ -328,10 +335,11 @@ export async function startHost(options = {}) {
     );
   }
 
+  const bindHost = host.bindHost || process.env.HOSTNAME || "127.0.0.1";
   console.log("[lexopen-host] Datos en", dataDir);
   console.log("[lexopen-host] Postgres :", host.pgPort, "·", pgDataDir(dataDir));
   console.log("[lexopen-host] Storage  :", host.storagePath);
-  console.log("[lexopen-host] App      :", localAppUrl(host.port), "(bind 0.0.0.0)");
+  console.log("[lexopen-host] App      :", localAppUrl(host.port), `(bind ${bindHost})`);
   if (host.publicUrl) {
     console.log("[lexopen-host] URL pública:", host.publicUrl);
   }
@@ -340,12 +348,12 @@ export async function startHost(options = {}) {
   let child = null;
   try {
     await assertPortAvailable(pgPort, "PostgreSQL");
-    pg = await startEmbeddedPostgres(dataDir, pgPort);
+    pg = await startEmbeddedPostgres(dataDir, pgPort, host.databaseUrl);
     await migrate();
     await maybeSeed(seedDemo, dataDir);
-    await assertPortAvailable(host.port, "LexOpen", "0.0.0.0");
+    await assertPortAvailable(host.port, "LexOpen", bindHost);
 
-    child = startNextServer(host.port);
+    child = startNextServer(host.port, bindHost);
     const url = localAppUrl(host.port);
     const health = await waitForHealth(url);
     if (!health.ok) {
@@ -362,9 +370,9 @@ export async function startHost(options = {}) {
       );
     }
     if (needsSetup) {
+      // Never print the bootstrap token to logs (open via Desktop IPC instead).
       console.log(
-        "[lexopen-host] Configuración inicial:",
-        `${url}/setup?token=${bootstrapToken}`
+        "[lexopen-host] Configuración inicial pendiente: abra /setup desde la app Desktop (el token no se imprime en logs)."
       );
     }
 
