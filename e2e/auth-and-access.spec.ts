@@ -43,10 +43,9 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
     page.getByRole("heading", { name: "Causas judiciales" })
   ).toBeVisible();
   await expect(page.getByText("C-4521-2025")).toBeVisible();
-  const causeHref = await page
+  const causeRow = page.locator("tr").filter({ hasText: "C-4521-2025" }).first();
+  const causeHref = await causeRow
     .locator('a[href^="/causas/"]')
-    .filter({ hasText: "C-4521-2025" })
-    .first()
     .getAttribute("href");
   expect(causeHref).toBeTruthy();
   await page.goto(causeHref!);
