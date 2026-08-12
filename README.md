@@ -1,5 +1,8 @@
 <div align="center">
-  <h1>⚖️ LexOpen</h1>
+  <p>
+    <img src="docs/assets/lexopen-logo.svg" width="96" alt="LexOpen logo">
+  </p>
+  <h1>LexOpen</h1>
   <p><strong>Operaciones jurídicas open source para estudios de abogados en Chile</strong></p>
   <p>
     Workspaces · causas · plazos · colaboración · facturación · integraciones
@@ -26,6 +29,12 @@
     <a href="#-qu%C3%A9-resuelve">Qué resuelve</a> ·
     <a href="docs/DESKTOP.md">Desktop</a> ·
     <a href="CONTRIBUTING.md">Contribuir</a>
+  </p>
+  <p>
+    <img src="docs/assets/lexopen-hero.jpg" alt="LexOpen — operaciones jurídicas para Chile" width="100%">
+  </p>
+  <p>
+    <img src="docs/assets/lexopen-banner.svg" alt="Banner LexOpen" width="100%">
   </p>
 </div>
 
@@ -168,6 +177,14 @@ flujos principales.
 
 ## 🏗️ Arquitectura
 
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="Arquitectura LexOpen" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/assets/modules.svg" alt="Mapa de módulos LexOpen" width="100%">
+</p>
+
 ```text
 ┌───────────────────────────────┐
 │ Navegador / Electron Client   │
@@ -184,6 +201,21 @@ flujos principales.
 │ causas, sites, usuarios, etc. │──────▶│ Google · Obsidian · Hermes  │
 └───────────────────────────────┘       │ S3-compatible storage       │
                                         └─────────────────────────────┘
+```
+
+```mermaid
+flowchart LR
+  subgraph Estudio
+    A[Abogados] --> B[LexOpen]
+    C[Paralegales] --> B
+  end
+  B --> D[(Postgres)]
+  B --> E[Documentos / S3]
+  B --> F[IA OpenAI-compatible]
+  B --> G[Google Workspace]
+  B --> H[Obsidian]
+  I[Cliente] --> J[Portal]
+  J --> B
 ```
 
 En el modo desktop, un único **Host** ejecuta LexOpen y PostgreSQL embebido. Los

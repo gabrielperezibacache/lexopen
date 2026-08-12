@@ -60,15 +60,17 @@ function IntegracionesInner() {
       .catch(() => setGoogle(null));
     fetch("/api/integrations/obsidian")
       .then((r) => r.json())
-      .then((d) =>
+      .then((d) => {
+        const label = d.mode?.label || d.mode?.mode;
+        const detail = d.mode?.detail;
         setObsidianMode(
-          process.env.NODE_ENV === "production"
-            ? d.config?.vaultPath
-              ? "storage/REST"
-              : "storage"
+          label
+            ? detail
+              ? `${label} · ${detail}`
+              : String(label)
             : d.config?.vaultPath || "storage"
-        )
-      )
+        );
+      })
       .catch(() => setObsidianMode("storage"));
     fetch("/api/integrations/llm")
       .then((r) => r.json())
@@ -96,7 +98,9 @@ function IntegracionesInner() {
     const data = await res.json();
     setObsidianMsg(
       res.ok
-        ? `Exportación completa: ${data.synced} causas (${data.results?.[0]?.mode || "storage"}).`
+        ? `Exportación: ${data.synced ?? 0} ok` +
+            (data.failed ? `, ${data.failed} con error` : "") +
+            ` · ${data.mode?.label || data.results?.[0]?.mode || "storage"}`
         : data.error || "Error"
     );
   }

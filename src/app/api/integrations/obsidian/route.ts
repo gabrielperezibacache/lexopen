@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { exportCausaToObsidian, syncAllCausasToObsidian, getObsidianConfig } from "@/lib/integrations/obsidian";
+import {
+  describeObsidianMode,
+  exportCausaToObsidian,
+  getObsidianConfig,
+  syncAllCausasToObsidian,
+} from "@/lib/integrations/obsidian";
 import {
   assertAllowedVaultPath,
   sanitizeVaultFolderPrefix,
@@ -10,11 +15,15 @@ import {
 export async function GET() {
   try {
     await requireStaff();
-    const row = await prisma.integrationConfig.findUnique({ where: { provider: "obsidian" } });
+    const row = await prisma.integrationConfig.findUnique({
+      where: { provider: "obsidian" },
+    });
     const config = await getObsidianConfig();
+    const mode = describeObsidianMode();
     return NextResponse.json({
       enabled: row?.enabled ?? false,
       config,
+      mode,
     });
   } catch (e) {
     return handleRouteError(e);
@@ -28,7 +37,15 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     if (body.action === "sync-all") {
       const results = await syncAllCausasToObsidian();
-      return NextResponse.json({ ok: true, synced: results.length, results });
+      const ok = results.filter((r) => r.ok).length;
+      const failed = results.length - ok;
+      return NextResponse.json({
+        ok: true,
+        synced: ok,
+        failed,
+        results,
+        mode: describeObsidianMode(),
+      });
     }
     if (body.action === "sync-causa" && body.causaId) {
       const result = await exportCausaToObsidian(body.causaId);
