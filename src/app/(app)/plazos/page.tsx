@@ -6,7 +6,17 @@ import { PlazoForm } from "@/components/PlazoForm";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { requireStaff } from "@/lib/auth/session";
 
-type Props = { searchParams: Promise<{ mes?: string }> };
+type Props = {
+  searchParams: Promise<{
+    mes?: string;
+    causaId?: string;
+    fechaLimite?: string;
+    desde?: string;
+    dias?: string;
+    computo?: string;
+    titulo?: string;
+  }>;
+};
 
 function monthBounds(value?: string) {
   const now = new Date();
@@ -67,6 +77,14 @@ export default async function PlazosPage({ searchParams }: Props) {
       <PlazoForm
         causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))}
         responsables={responsables.map((u) => ({ id: u.id, label: u.name }))}
+        defaults={{
+          causaId: sp.causaId || "",
+          fechaNotificacion: sp.desde || "",
+          diasPlazo: sp.dias || "",
+          tipoComputo: sp.computo === "corridos" ? "corridos" : "habiles",
+          fechaLimite: sp.fechaLimite || "",
+          titulo: sp.titulo || "",
+        }}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

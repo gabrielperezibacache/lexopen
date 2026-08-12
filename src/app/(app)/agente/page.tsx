@@ -79,36 +79,39 @@ function AgenteInner() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/causas")
-      .then(async (r) => {
-        if (!r.ok) return [];
-        const data = await r.json();
-        return Array.isArray(data) ? data : [];
-      })
-      .then((data: CausaOption[]) => {
-        if (active) setCausas(data);
-      })
-      .catch(() => {
-        if (active) setCausas([]);
+    const boot = () => {
+      fetch("/api/causas")
+        .then(async (r) => {
+          if (!r.ok) return [];
+          const data = await r.json();
+          return Array.isArray(data) ? data : [];
+        })
+        .then((data: CausaOption[]) => {
+          if (active) setCausas(data);
+        })
+        .catch(() => {
+          if (active) setCausas([]);
+        });
+      fetch("/api/integrations/hermes?utilities=1")
+        .then((r) => (r.ok ? r.json() : { utilities: [] }))
+        .then((data: { utilities?: Utility[] }) => {
+          if (!active) return;
+          const list = Array.isArray(data.utilities) ? data.utilities : [];
+          setUtilities(list);
+          if (!prompt && list.length) {
+            const current =
+              list.find((u) => u.id === (sp.get("utility") || "copilot")) ||
+              list[0];
+            setPrompt(current.starter);
+            setUtility(current.id);
+          }
+        })
+        .catch(() => undefined);
+      loadChats(sp.get("causaId") || undefined).catch(() => {
+        if (active) setChats([]);
       });
-    fetch("/api/integrations/hermes?utilities=1")
-      .then((r) => (r.ok ? r.json() : { utilities: [] }))
-      .then((data: { utilities?: Utility[] }) => {
-        if (!active) return;
-        const list = Array.isArray(data.utilities) ? data.utilities : [];
-        setUtilities(list);
-        if (!prompt && list.length) {
-          const current =
-            list.find((u) => u.id === (sp.get("utility") || "copilot")) ||
-            list[0];
-          setPrompt(current.starter);
-          setUtility(current.id);
-        }
-      })
-      .catch(() => undefined);
-    loadChats(sp.get("causaId") || undefined).catch(() => {
-      if (active) setChats([]);
-    });
+    };
+    queueMicrotask(boot);
     return () => {
       active = false;
     };
@@ -116,7 +119,14 @@ function AgenteInner() {
   }, []);
 
   useEffect(() => {
-    loadChats(causaId || undefined).catch(() => undefined);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      loadChats(causaId || undefined).catch(() => undefined);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [causaId]);
 
   function selectUtility(u: Utility) {
@@ -201,6 +211,19 @@ function AgenteInner() {
         const parsed = safeJsonParse<ChatMessage[]>(data.chat.messagesJson, []);
         setMessages(Array.isArray(parsed) ? parsed : []);
         await loadChats(causaId || undefined);
+      } else if (data.source === "error" || !res.ok) {
+        // Mostrar el error en el hilo aunque no se persista
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: nextPrompt, utility: u },
+          {
+            role: "assistant",
+            content: data.content || data.error || "Sin respuesta",
+            source: "error",
+            utility: u,
+            requireApproval: false,
+          },
+        ]);
       }
       setMeta(
         [
@@ -219,6 +242,17 @@ function AgenteInner() {
     } catch {
       setReply("No se pudo contactar al copiloto");
       setMeta("Error de red");
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: nextPrompt, utility: u },
+        {
+          role: "assistant",
+          content: "No se pudo contactar al copiloto",
+          source: "error",
+          utility: u,
+          requireApproval: false,
+        },
+      ]);
     } finally {
       setBusy(false);
     }
@@ -238,9 +272,11 @@ function AgenteInner() {
       utilities.find((x) => x.id === (sp.get("utility") || utility)) ||
       utilities[0];
     const starter = prompt || u.starter;
-    setUtility(u.id);
-    setPrompt(starter);
-    void sendPrompt(starter, u.id);
+    queueMicrotask(() => {
+      setUtility(u.id);
+      setPrompt(starter);
+      void sendPrompt(starter, u.id);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [utilities]);
 
@@ -259,12 +295,18 @@ function AgenteInner() {
           action: "approve-to-minuta",
           causaId,
           chatId: chatId || undefined,
-          content: reply || undefined,
+          content: chatId ? undefined : reply || undefined,
           utilityLabel:
             utilities.find((u) => u.id === utility)?.label || utility,
         }),
       });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data.href) {
+        setRequireApproval(false);
+        setApproveMsg(data.error || "Este borrador ya fue aprobado.");
+        setApproveHref(data.href);
+        return;
+      }
       if (!res.ok) {
         setApproveMsg(data.error || "No se pudo guardar la minuta");
         setApproveHref("");
@@ -463,7 +505,16 @@ function AgenteInner() {
                   >
                     Insertar en la instrucción
                   </button>
-                  <Link href="/plazos" className="btn btn-secondary">
+                  <Link
+                    href={`/plazos?${new URLSearchParams({
+                      ...(causaId ? { causaId } : {}),
+                      desde: plazoDesde,
+                      dias: plazoDias,
+                      computo: plazoComputo,
+                      fechaLimite: plazoVencimiento,
+                    }).toString()}`}
+                    className="btn btn-secondary"
+                  >
                     Ir a crear plazo
                   </Link>
                 </div>

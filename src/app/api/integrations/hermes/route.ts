@@ -165,7 +165,7 @@ export async function POST(req: Request) {
         );
       }
 
-      let content = String(body.content || "").trim();
+      let content = "";
       let utilityLabel = String(body.utilityLabel || "Copiloto");
       let chatToUpdate: { id: string; messagesJson: string; causaId: string | null } | null =
         null;
@@ -201,29 +201,53 @@ export async function POST(req: Request) {
             source?: string;
             discarded?: boolean;
             requireApproval?: boolean;
+            approvedMinutaId?: string;
           }>
         >(existing.messagesJson, []);
         const lastAssistant = [...prev]
           .reverse()
           .find((m) => m.role === "assistant" && m.content?.trim());
-        if (lastAssistant?.source === "error") {
+        if (!lastAssistant) {
+          return NextResponse.json(
+            { error: "No hay borrador de asistente para aprobar" },
+            { status: 400 }
+          );
+        }
+        if (lastAssistant.source === "error") {
           return NextResponse.json(
             { error: "No se puede aprobar una respuesta de error" },
             { status: 400 }
           );
         }
-        if (lastAssistant?.discarded) {
+        if (lastAssistant.discarded) {
           return NextResponse.json(
             { error: "Este borrador ya fue descartado" },
             { status: 400 }
           );
         }
-        if (!content) {
-          content = String(lastAssistant?.content || "").trim();
+        if (lastAssistant.approvedMinutaId) {
+          return NextResponse.json(
+            {
+              error: "Este borrador ya fue aprobado",
+              minutaId: lastAssistant.approvedMinutaId,
+              href: `/causas/${causaId}/minutas/${lastAssistant.approvedMinutaId}`,
+            },
+            { status: 409 }
+          );
         }
-        if (lastAssistant?.utility) {
+        if (lastAssistant.requireApproval === false) {
+          return NextResponse.json(
+            { error: "Este borrador no está pendiente de aprobación" },
+            { status: 400 }
+          );
+        }
+        // Siempre usar el contenido persistido del chat (no confiar en el cliente)
+        content = String(lastAssistant.content || "").trim();
+        if (lastAssistant.utility) {
           utilityLabel = getAiUtility(lastAssistant.utility).label;
         }
+      } else {
+        content = String(body.content || "").trim();
       }
 
       if (!content) {
@@ -364,19 +388,30 @@ export async function POST(req: Request) {
       });
       if (existing) {
         const prev = safeJsonParse<
-          Array<{ role: string; content: string }>
+          Array<{
+            role: string;
+            content: string;
+            discarded?: boolean;
+            source?: string;
+          }>
         >(existing.messagesJson, []);
-        for (const m of prev.slice(-12)) {
+        for (const m of prev.slice(-16)) {
           if (
             (m.role === "user" || m.role === "assistant") &&
             typeof m.content === "string" &&
-            m.content.trim()
+            m.content.trim() &&
+            !m.discarded &&
+            m.source !== "error"
           ) {
             history.push({
               role: m.role,
               content: m.content.slice(0, 12_000),
             });
           }
+        }
+        // Mantener como máximo 12 mensajes útiles
+        if (history.length > 12) {
+          history.splice(0, history.length - 12);
         }
       }
     }
@@ -405,7 +440,7 @@ export async function POST(req: Request) {
     });
 
     // Prefacio local con alertas / briefing cuando aplica
-    if (utility.id === "briefing" && pack.alerts.length) {
+    if (utility.id === "briefing") {
       const local = buildLocalBriefingMarkdown({
         causaLabel: pack.sources.find((s) => s.type === "causa")?.label || "—",
         alerts: pack.alerts,

@@ -141,7 +141,12 @@ export async function buildAiContextPack(opts: {
         blocks.push(`MOVIMIENTOS_RECIENTES:\n${JSON.stringify(movs, null, 2)}`);
       }
 
-      if (opts.utility === "doc_qa" || opts.utility === "draft" || opts.utility === "copilot") {
+      if (
+        opts.utility === "doc_qa" ||
+        opts.utility === "draft" ||
+        opts.utility === "copilot" ||
+        opts.utility === "briefing"
+      ) {
         const docs = causa.documentos.map((d) => {
           const md = (d.extractedMarkdown || "").trim();
           if (md) {
@@ -234,11 +239,14 @@ export async function buildAiContextPack(opts: {
         )}`
       );
       for (const j of jurisFinal) {
+        const q = (j.rol || j.caratula || "").trim();
         sources.push({
           type: "jurisprudencia",
           id: j.id,
           label: j.rol || j.caratula || j.id,
-          href: `/jurisprudencia`,
+          href: q
+            ? `/jurisprudencia?q=${encodeURIComponent(q.slice(0, 80))}`
+            : `/jurisprudencia`,
         });
       }
       if (!juris.length && opts.utility === "research") {

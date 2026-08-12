@@ -37,7 +37,14 @@ export default function MisCausasPage() {
   }
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      void load();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function saveCredentials(e: FormEvent<HTMLFormElement>) {

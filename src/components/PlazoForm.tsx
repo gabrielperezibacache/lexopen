@@ -5,22 +5,36 @@ import { useRouter } from "next/navigation";
 
 type Option = { id: string; label: string };
 
+export type PlazoFormDefaults = {
+  causaId?: string;
+  fechaNotificacion?: string;
+  diasPlazo?: string;
+  tipoComputo?: "habiles" | "corridos";
+  fechaLimite?: string;
+  titulo?: string;
+};
+
 export function PlazoForm({
   causas,
   responsables,
+  defaults,
 }: {
   causas: Option[];
   responsables: Option[];
+  defaults?: PlazoFormDefaults;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [fechaNotificacion, setFechaNotificacion] = useState("");
-  const [diasPlazo, setDiasPlazo] = useState("");
-  const [tipoComputo, setTipoComputo] = useState<"habiles" | "corridos">(
-    "habiles"
+  const [causaId, setCausaId] = useState(defaults?.causaId || "");
+  const [fechaNotificacion, setFechaNotificacion] = useState(
+    defaults?.fechaNotificacion || ""
   );
-  const [fechaLimite, setFechaLimite] = useState("");
+  const [diasPlazo, setDiasPlazo] = useState(defaults?.diasPlazo || "");
+  const [tipoComputo, setTipoComputo] = useState<"habiles" | "corridos">(
+    defaults?.tipoComputo === "corridos" ? "corridos" : "habiles"
+  );
+  const [fechaLimite, setFechaLimite] = useState(defaults?.fechaLimite || "");
   const [estimate, setEstimate] = useState<{
     vencimiento?: string;
     urgencia?: string;
@@ -30,12 +44,12 @@ export function PlazoForm({
   } | null>(null);
 
   useEffect(() => {
-    if (!fechaNotificacion || !diasPlazo || Number(diasPlazo) < 1) {
-      setEstimate(null);
-      return;
-    }
     let cancelled = false;
-    const t = setTimeout(() => {
+    const t = window.setTimeout(() => {
+      if (!fechaNotificacion || !diasPlazo || Number(diasPlazo) < 1) {
+        if (!cancelled) setEstimate(null);
+        return;
+      }
       fetch("/api/integrations/hermes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -56,7 +70,7 @@ export function PlazoForm({
     }, 250);
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      window.clearTimeout(t);
     };
   }, [fechaNotificacion, diasPlazo, tipoComputo]);
 
@@ -74,7 +88,7 @@ export function PlazoForm({
       tipoComputo,
       esFatal: fd.get("esFatal") === "on",
       tipo: String(fd.get("tipo") || "procesal"),
-      causaId: String(fd.get("causaId") || "") || null,
+      causaId: causaId || null,
       responsableId: String(fd.get("responsableId") || "") || null,
     };
     const res = await fetch("/api/plazos", {
@@ -89,6 +103,7 @@ export function PlazoForm({
       return;
     }
     e.currentTarget.reset();
+    setCausaId("");
     setFechaNotificacion("");
     setDiasPlazo("");
     setTipoComputo("habiles");
@@ -108,12 +123,18 @@ export function PlazoForm({
           className="input"
           name="titulo"
           required
+          defaultValue={defaults?.titulo || ""}
           placeholder="Ej. Contestar demanda"
         />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium">Causa</label>
-        <select className="select" name="causaId" defaultValue="">
+        <select
+          className="select"
+          name="causaId"
+          value={causaId}
+          onChange={(e) => setCausaId(e.target.value)}
+        >
           <option value="">Sin causa</option>
           {causas.map((c) => (
             <option key={c.id} value={c.id}>
