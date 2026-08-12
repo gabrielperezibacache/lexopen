@@ -12,6 +12,8 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
       "desktop/**",
+      // Espejo estático del sitio del estudio (bundle generado, no código LexOpen)
+      "docs/perezibacache-site/**",
     ],
   },
   {

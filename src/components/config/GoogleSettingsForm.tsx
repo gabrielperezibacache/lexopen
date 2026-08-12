@@ -17,6 +17,7 @@ export function GoogleSettingsForm() {
   const [state, setState] = useState<GoogleState | null>(null);
   const [message, setMessage] = useState("");
   const [ok, setOk] = useState(false);
+  const [testingGmail, setTestingGmail] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,8 +109,9 @@ export function GoogleSettingsForm() {
       <div>
         <h2 className="text-lg font-semibold">Google Workspace</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-          OAuth para Drive (carpetas por causa), Calendar (plazos) y Gmail. Credenciales
-          de aplicación: <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>.
+          OAuth para Drive (carpetas por causa), Calendar (plazos) y Gmail
+          (digests PJUD). Credenciales de aplicación:{" "}
+          <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>.
         </p>
       </div>
 
@@ -190,6 +192,35 @@ export function GoogleSettingsForm() {
             }}
           >
             Desconectar
+          </button>
+        )}
+        {state.connected && (
+          <button
+            className="btn btn-secondary"
+            type="button"
+            disabled={testingGmail}
+            onClick={async () => {
+              setTestingGmail(true);
+              setMessage("");
+              const res = await fetch("/api/integrations/google", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  action: "test-gmail",
+                  to: state.connectedEmail || undefined,
+                }),
+              });
+              const data = await res.json().catch(() => ({}));
+              setOk(res.ok);
+              setMessage(
+                res.ok
+                  ? `Prueba Gmail enviada a ${data.to || state.connectedEmail || "destino"}`
+                  : data.error || "Error al enviar prueba Gmail"
+              );
+              setTestingGmail(false);
+            }}
+          >
+            {testingGmail ? "Enviando…" : "Probar Gmail"}
           </button>
         )}
       </div>

@@ -1,0 +1,333 @@
+<!-- @dsCard group="Website" viewport="1280x760" name="Sitio Web — Inicio" subtitle="Marketing site: hero, enfoque, áreas, equipo y contacto" -->
+<!-- @startingPoint section="Website" subtitle="Full marketing site for the firm" viewport="1280x900" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pérez Ibacache & Asociados — Estudio Jurídico</title>
+<link rel="stylesheet" href="./styles.css" />
+<style>
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: var(--font-body); background: var(--surface-page); color: var(--text-body); }
+  img { max-width: 100%; height: auto; }
+
+  /* ── Hero entrance ────────────────────────────────── */
+  @keyframes heroReveal {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes heroMediaIn {
+    from { opacity: 0; transform: scale(1.04); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes bgPulse {
+    0%,100% { opacity: 0.05; }
+    50%      { opacity: 0.085; }
+  }
+  @keyframes scrollHint {
+    0%,100% { transform: translateY(0); opacity: 0.4; }
+    50%      { transform: translateY(6px); opacity: 0.7; }
+  }
+  .hero-el { animation: heroReveal 0.9s var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both; }
+  .hero-el.d1 { animation-delay: 0.05s; }
+  .hero-el.d2 { animation-delay: 0.16s; }
+  .hero-el.d3 { animation-delay: 0.28s; }
+  .hero-el.d4 { animation-delay: 0.40s; }
+  .hero-el.d5 { animation-delay: 0.52s; }
+  .hero-media img {
+    animation: heroMediaIn 1.2s var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+  }
+  .hero-bg-pulse { animation: bgPulse 6s ease-in-out infinite; }
+  .scroll-bounce { animation: scrollHint 2.6s ease-in-out infinite; }
+  .hero-secondary-cta:hover {
+    background: rgba(226, 242, 249, 0.1) !important;
+    border-color: rgba(226, 242, 249, 0.5) !important;
+  }
+  .hero-primary-cta:hover {
+    filter: brightness(1.03);
+    transform: translateY(-1px);
+  }
+
+  /* ── Scroll reveal ────────────────────────────────── */
+  .js-enabled [data-anim] {
+    opacity: 0;
+    transform: translateY(18px);
+    will-change: opacity, transform;
+  }
+  [data-anim].is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.75s var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                transform 0.75s var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+  }
+  .d1.is-visible { transition-delay: 0.05s; }
+  .d2.is-visible { transition-delay: 0.10s; }
+  .d3.is-visible { transition-delay: 0.15s; }
+  .d4.is-visible { transition-delay: 0.20s; }
+  .d5.is-visible { transition-delay: 0.25s; }
+  .d6.is-visible { transition-delay: 0.30s; }
+  .d7.is-visible { transition-delay: 0.35s; }
+  .d8.is-visible { transition-delay: 0.40s; }
+
+  /* ── Interactive polish ───────────────────────────── */
+  .card-lift {
+    height: 100%;
+    transition: transform var(--dur-slow, 360ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                box-shadow var(--dur-slow, 360ms) var(--ease-standard, ease);
+  }
+  .card-lift > * { height: 100%; }
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md, 0 4px 12px rgba(2,55,57,0.08));
+  }
+  .card-lift:hover img {
+    transform: scale(1.03);
+  }
+  .area-row {
+    position: relative;
+    transition: background var(--dur-base, 200ms) var(--ease-standard, ease),
+                padding-left var(--dur-base, 200ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+    cursor: default;
+  }
+  .area-row::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 18%; bottom: 18%;
+    width: 2px;
+    background: var(--teal-500);
+    border-radius: 1px;
+    transform: scaleY(0);
+    transform-origin: center;
+    transition: transform var(--dur-base, 200ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+  }
+  .area-row:hover { background: rgba(2, 55, 57, 0.035) !important; }
+  .area-row:hover::before { transform: scaleY(1); }
+  .news-row {
+    transition: background var(--dur-base, 200ms) ease, transform var(--dur-base, 200ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+    border-radius: var(--radius-md);
+    margin: 0 calc(-1 * var(--space-3));
+    padding-left: var(--space-3) !important;
+    padding-right: var(--space-3) !important;
+  }
+  .news-row:hover { background: rgba(2, 55, 57, 0.03); }
+  .news-row:hover h4 { color: var(--text-brand) !important; }
+  .team-grid .card-lift .team-bio {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .footer-link {
+    display: block;
+    padding: 9px 0 !important;
+    min-height: 40px;
+    transition: color var(--dur-base) var(--ease-standard);
+  }
+  .footer-link:hover { color: var(--teal-100) !important; }
+
+  /* ── Nav ──────────────────────────────────────────── */
+  .site-header {
+    transition: box-shadow var(--dur-base) var(--ease-standard),
+                background var(--dur-base) var(--ease-standard);
+  }
+  .site-header.is-scrolled {
+    background: rgba(255,255,255,0.94) !important;
+    box-shadow: var(--shadow-xs, 0 1px 2px rgba(2,55,57,0.06));
+  }
+  .nav-link { position: relative; white-space: nowrap; transition: color var(--dur-base, 200ms) var(--ease-standard, ease); }
+  .nav-link:hover { color: var(--text-brand) !important; }
+  .nav-link::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px;
+    background: var(--text-brand); border-radius: 1px;
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 0.24s var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+  }
+  .nav-link:hover::after, .nav-link.is-active::after { transform: scaleX(1); }
+
+  .mobile-nav { display: none; }
+  .mobile-nav.is-open { display: block; animation: heroReveal 0.28s var(--ease-out, cubic-bezier(0.16,1,0.3,1)); }
+
+  body.anim-done .hero-el,
+  body.anim-done .hero-media img,
+  body.anim-done [data-anim] { opacity: 1 !important; transform: none !important; }
+
+  /* ── Section rhythm helpers ───────────────────────── */
+  .section-pad { padding-left: var(--space-6); padding-right: var(--space-6); }
+
+  /* ── Responsive: tablet ───────────────────────────── */
+  @media (max-width: 1100px) {
+    .site-nav-desktop { gap: var(--space-4) !important; }
+    .areas-grid { gap: 0 var(--space-7) !important; }
+  }
+  @media (max-width: 960px) {
+    .site-nav-desktop,
+    .header-cta-desktop { display: none !important; }
+    .nav-toggle { display: inline-flex !important; }
+    .roles-grid,
+    .team-grid { grid-template-columns: 1fr !important; gap: var(--space-6) !important; }
+    .areas-grid { grid-template-columns: 1fr !important; gap: 0 !important; }
+    .noticias-grid,
+    .contacto-grid { grid-template-columns: 1fr !important; }
+    .hero-media img { object-position: 62% 12% !important; }
+    .hero-color-wash { opacity: 0.36 !important; }
+    .hero-veil {
+      background: linear-gradient(180deg,
+        rgba(1,31,32,0.5) 0%,
+        rgba(1,31,32,0.68) 28%,
+        rgba(1,31,32,0.86) 52%,
+        rgba(1,31,32,0.94) 72%,
+        rgba(1,31,32,0.97) 100%) !important;
+    }
+    .hero-content-inner { max-width: 100% !important; }
+    .footer-grid { flex-direction: column !important; gap: var(--space-7) !important; }
+  }
+  @media (max-width: 720px) {
+    .contacto-fields { grid-template-columns: 1fr !important; }
+    .hero-fullbleed { min-height: min(86vh, 760px) !important; }
+    .hero-color-wash { opacity: 0.4 !important; }
+    .hero-veil {
+      background: linear-gradient(180deg,
+        rgba(1,31,32,0.4) 0%,
+        rgba(1,31,32,0.66) 35%,
+        rgba(1,31,32,0.9) 62%,
+        rgba(1,31,32,0.97) 100%) !important;
+    }
+    .hero-fullbleed .hero-copy {
+      padding-left: var(--space-5) !important;
+      padding-right: var(--space-5) !important;
+      padding-bottom: var(--space-8) !important;
+    }
+    .section-pad-sm { padding-left: var(--space-5) !important; padding-right: var(--space-5) !important; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .hero-el, .hero-bg-pulse, .scroll-bounce, .hero-media img, .mobile-nav.is-open {
+      animation: none !important; opacity: 1 !important; transform: none !important;
+    }
+    .js-enabled [data-anim] { opacity: 1; transform: none; }
+    [data-anim].is-visible { transition: none; }
+    .card-lift, .area-row, .news-row, .hero-primary-cta { transition: none !important; }
+    .card-lift:hover, .hero-primary-cta:hover { transform: none; }
+    .area-row::before { display: none; }
+  }
+</style>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="./_ds_bundle.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+  'use strict';
+  document.documentElement.classList.add('js-enabled');
+  var seen = new WeakSet();
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+  function scan() {
+    document.querySelectorAll('[data-anim]').forEach(function (el) {
+      if (!seen.has(el)) { seen.add(el); io.observe(el); }
+    });
+  }
+  function boot() {
+    scan();
+    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 200); });
+  } else { setTimeout(boot, 200); }
+  setTimeout(function () { document.body.classList.add('anim-done'); }, 2600);
+
+  var raf = null;
+  window.addEventListener('scroll', function () {
+    if (raf) return;
+    raf = requestAnimationFrame(function () {
+      raf = null;
+      var y = window.scrollY || 0;
+      var header = document.querySelector('.site-header');
+      if (header) header.classList.toggle('is-scrolled', y > 8);
+      var el = document.querySelector('[data-parallax]');
+      if (el && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        el.style.transform = 'translateY(calc(-50% + ' + (y * 0.14) + 'px))';
+      }
+    });
+  }, { passive: true });
+
+  function navigateWithTransition(href) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      window.location.href = href;
+      return;
+    }
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:#011f20;opacity:0;z-index:9999;pointer-events:none;transition:opacity 0.35s ease';
+    document.body.appendChild(overlay);
+    setTimeout(function () { overlay.style.opacity = '1'; }, 10);
+    setTimeout(function () { window.location.href = href; }, 380);
+  }
+  window.navigateWithTransition = navigateWithTransition;
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest('a[href="proyectos.html"]');
+    if (link) { e.preventDefault(); navigateWithTransition('proyectos.html'); }
+  });
+}());
+</script>
+<script type="text/babel" src="Header.jsx"></script>
+<script type="text/babel" src="Hero.jsx"></script>
+<script type="text/babel" src="Sections.jsx"></script>
+<script type="text/babel" src="TeamContact.jsx"></script>
+<script type="text/babel">
+  function App() {
+    const [active, setActive] = React.useState("inicio");
+    const onNav = (id) => {
+      setActive(id);
+      const el = document.getElementById(id);
+      if (el) window.scrollTo({ top: id === "inicio" ? 0 : el.offsetTop - 76, behavior: "smooth" });
+    };
+
+    React.useEffect(() => {
+      const ids = ["inicio", "enfoque", "areas", "equipo", "noticias", "ubicacion", "contacto"];
+      const sections = ids.map((id) => document.getElementById(id)).filter(Boolean);
+      if (!sections.length) return undefined;
+
+      const spy = new IntersectionObserver(
+        (entries) => {
+          const visible = entries
+            .filter((e) => e.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+          if (visible[0]?.target?.id) {
+            const id = visible[0].target.id;
+            setActive(id === "ubicacion" ? "contacto" : id);
+          }
+        },
+        { rootMargin: "-30% 0px -55% 0px", threshold: [0, 0.25, 0.5, 0.75] }
+      );
+      sections.forEach((s) => spy.observe(s));
+      return () => spy.disconnect();
+    }, []);
+
+    return (
+      <React.Fragment>
+        <SiteHeader active={active} onNav={onNav} />
+        <main>
+          <Hero onNav={onNav} />
+          <Enfoque />
+          <Equipo />
+          <Noticias />
+          <Ubicacion />
+          <Contacto />
+        </main>
+        <SiteFooter onNav={onNav} />
+      </React.Fragment>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
