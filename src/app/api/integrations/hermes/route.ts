@@ -7,7 +7,12 @@ import {
   legalSystemPrompt,
   type HermesMessage,
 } from "@/lib/integrations/hermes";
-import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
+import {
+  getLlmConfig,
+  publicLlmConfig,
+  saveLlmConfig,
+  LLM_PRESET_CATALOG,
+} from "@/lib/integrations/llm";
 import { buildAiContextPack } from "@/lib/ai/context-pack";
 import {
   AI_UTILITIES,
@@ -19,6 +24,7 @@ import {
   formatPlazoEstimate,
 } from "@/lib/ai/local-assist";
 import { safeJsonParse } from "@/lib/safe-json";
+import { llmConfigSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
   try {
@@ -39,14 +45,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(chats);
     }
 
-    const row = await prisma.integrationConfig.findUnique({
-      where: { provider: "hermes" },
-    });
-    const config = await getHermesConfig();
+    const [row, llmRow] = await Promise.all([
+      prisma.integrationConfig.findUnique({ where: { provider: "hermes" } }),
+      prisma.integrationConfig.findUnique({ where: { provider: "llm" } }),
+    ]);
+    const config = await getLlmConfig();
     return NextResponse.json({
-      enabled: row?.enabled ?? false,
-      config: { ...config, apiKey: config.apiKey ? "••••" : "" },
+      enabled: llmRow?.enabled ?? row?.enabled ?? true,
+      config: publicLlmConfig(config),
+      presets: LLM_PRESET_CATALOG,
       utilities: AI_UTILITIES,
+      // Compat: legacy HermesConfig shape
+      hermes: await getHermesConfig().then((c) => ({
+        ...c,
+        apiKey: c.apiKey ? "••••" : "",
+      })),
     });
   } catch (e) {
     return handleRouteError(e);
@@ -62,39 +75,35 @@ export async function POST(req: Request) {
     if (body.action === "save-config") {
       if (user.role !== "admin") {
         return NextResponse.json(
-          { error: "Solo admin puede configurar Hermes" },
+          { error: "Solo admin puede configurar el proveedor IA" },
           { status: 403 }
         );
       }
-      const apiUrl = body.config?.apiUrl;
-      if (
-        apiUrl !== undefined &&
-        (!isSafeHttpUrl(apiUrl) || apiUrl.length > 500)
-      ) {
+      const parsed = llmConfigSchema.parse(body.config || {});
+      try {
+        const saved = await saveLlmConfig({
+          enabled: Boolean(body.enabled ?? true),
+          config: {
+            ...parsed,
+            apiKey:
+              parsed.apiKey === null || parsed.apiKey === undefined
+                ? undefined
+                : parsed.apiKey,
+          },
+        });
+        return NextResponse.json({
+          ok: true,
+          config: publicLlmConfig(saved),
+        });
+      } catch (err) {
         return NextResponse.json(
-          { error: "URL de Hermes inválida" },
+          {
+            error:
+              err instanceof Error ? err.message : "URL de endpoint IA inválida",
+          },
           { status: 400 }
         );
       }
-      await prisma.integrationConfig.upsert({
-        where: { provider: "hermes" },
-        create: {
-          provider: "hermes",
-          enabled: Boolean(body.enabled ?? true),
-          configJson: JSON.stringify({
-            ...(body.config || {}),
-            ...(apiUrl ? { apiUrl: String(apiUrl).replace(/\/+$/, "") } : {}),
-          }),
-        },
-        update: {
-          enabled: Boolean(body.enabled ?? true),
-          configJson: JSON.stringify({
-            ...(body.config || {}),
-            ...(apiUrl ? { apiUrl: String(apiUrl).replace(/\/+$/, "") } : {}),
-          }),
-        },
-      });
-      return NextResponse.json({ ok: true });
     }
 
     if (body.action === "estimate-plazo") {
@@ -255,25 +264,5 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     return handleRouteError(e);
-  }
-}
-
-function isSafeHttpUrl(value: unknown) {
-  if (typeof value !== "string" || value.length > 500) return false;
-  const allowLocal =
-    process.env.NODE_ENV !== "production" ||
-    process.env.HERMES_ALLOW_PRIVATE_URL === "1";
-  if (isSafeOutboundHttpUrl(value, { allowHttp: allowLocal })) return true;
-  try {
-    const url = new URL(value);
-    return (
-      allowLocal &&
-      (url.protocol === "http:" || url.protocol === "https:") &&
-      !url.username &&
-      !url.password &&
-      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
-    );
-  } catch {
-    return false;
   }
 }

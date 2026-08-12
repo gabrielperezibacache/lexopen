@@ -38,6 +38,14 @@ services:
         sync: false
       - key: HERMES_API_KEY
         sync: false
+      - key: LLM_API_URL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_ALLOW_DEMO
+        value: "0"
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
