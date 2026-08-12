@@ -33,5 +33,12 @@ assert.equal(
   isSafeOutboundHttpUrl("http://localhost:8642/v1", { allowHttp: true }),
   false
 );
+assert.equal(
+  isSafeOutboundHttpUrl("http://localhost:8642/v1", {
+    allowHttp: true,
+    allowLoopback: true,
+  }),
+  true
+);
 
 console.log("client-tags + safe-url OK");

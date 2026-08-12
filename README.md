@@ -680,15 +680,23 @@ Controles implementados en el código:
 - cookies de sesión `HttpOnly`, `SameSite=Lax` y `Secure` en producción;
 - tokens de sesión firmados con HMAC y contraseñas con bcrypt;
 - roles de servidor y filtros de contenido confidencial;
-- cifrado AES-256-GCM de tokens Google cuando existe `SESSION_SECRET`;
-- validación de origen en muchas operaciones mutantes;
+- cifrado AES-256-GCM de tokens Google / ClaveÚnica cuando existe `SESSION_SECRET`
+  (o `PJUD_SECRETS_KEY`);
+- CSRF Origin/Referer en mutaciones de API (incluido login); en producción el
+  header `Host` no amplía la allowlist si hay `NEXT_PUBLIC_APP_URL` /
+  `LEXOPEN_TRUSTED_ORIGINS`;
+- headers de seguridad progresivos (`X-Frame-Options`, `nosniff`, CSP
+  `frame-ancestors`, etc.);
+- salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
+  Hermes y Obsidian;
+- `instrumentation` falla al arrancar si flags peligrosas están en producción;
 - registros de auditoría con actor, acción, entidad y cambios;
 - aislamiento de Node en Electron mediante context isolation.
+- atajos demo del login ocultos en builds de producción.
 
 La revisión del repositorio también identifica límites que deben considerarse antes
 de producción:
 
-- la protección CSRF no está aplicada de forma uniforme a todas las mutaciones;
 - el rate limit de login es por proceso y no ofrece protección distribuida;
 - el portal cliente no debe presentarse como estrictamente de solo lectura sin una
   revisión adicional de permisos;
@@ -704,9 +712,9 @@ de producción:
   ni integración con el SII;
 - la integración live con PJUD es opt-in (partner API, sidecar scrape o
   Playwright+CAPTCHA / ClaveÚnica) y no es una API oficial del Poder Judicial;
-- `LEXOPEN_OPEN_ACCESS`, `LEXOPEN_RELAX_CSRF`, credenciales demo, compatibilidad de
-  contraseñas en texto plano y el fallback demo de Hermes no deben activarse en
-  producción.
+- `LEXOPEN_OPEN_ACCESS`, `LEXOPEN_RELAX_CSRF`, `LEXOPEN_DEMO_SWITCHER`,
+  `LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS` y fallbacks demo de Hermes/PJUD no deben
+  activarse en producción (varias de estas flags ya hacen fallar el arranque).
 
 Estas limitaciones son parte del estado `0.1.4`, no un sustituto de un análisis de
 seguridad, privacidad o cumplimiento para una organización concreta.

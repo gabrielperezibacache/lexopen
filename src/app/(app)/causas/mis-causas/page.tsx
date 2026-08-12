@@ -37,7 +37,16 @@ export default function MisCausasPage() {
   }
 
   useEffect(() => {
-    void load();
+    let active = true;
+    fetch("/api/pjud/mis-causas")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (active && data) setStatus(data.status || null);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function saveCredentials(e: FormEvent<HTMLFormElement>) {

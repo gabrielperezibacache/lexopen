@@ -17,6 +17,8 @@ export function buildAllowedOrigins(opts: {
   host?: string | null;
   appUrl?: string | null;
   trustedCsv?: string | null;
+  /** When false, Host is ignored (prefer fixed app/trusted origins). */
+  trustHost?: boolean;
 }): string[] {
   const trusted = (opts.trustedCsv || "")
     .split(",")
@@ -24,9 +26,11 @@ export function buildAllowedOrigins(opts: {
     .filter(Boolean)
     .map((s) => normalizeOrigin(s) || s.replace(/\/+$/, ""));
 
-  const fromHost = opts.host
-    ? [`http://${opts.host}`, `https://${opts.host}`]
-    : [];
+  const trustHost = opts.trustHost !== false;
+  const fromHost =
+    trustHost && opts.host
+      ? [`http://${opts.host}`, `https://${opts.host}`]
+      : [];
   const fromApp = opts.appUrl ? [normalizeOrigin(opts.appUrl) || opts.appUrl] : [];
 
   const all = [...fromHost, ...fromApp, ...trusted].filter(Boolean) as string[];

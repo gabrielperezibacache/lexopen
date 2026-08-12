@@ -13,13 +13,16 @@ const DEMO_USERS = [
   { email: "cliente@andes.cl", label: "Cliente (portal)" },
 ];
 
+/** Demo shortcuts are build-time stripped from production client bundles. */
+const SHOW_DEMO_LOGIN = process.env.NODE_ENV !== "production";
+
 function LoginForm() {
   const router = useRouter();
   const sp = useSearchParams();
   const next = sp.get("next") || "/dashboard";
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [email, setEmail] = useState("socio@estudio.cl");
+  const [email, setEmail] = useState(SHOW_DEMO_LOGIN ? "socio@estudio.cl" : "");
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -71,7 +74,9 @@ function LoginForm() {
           <div>
             <h1 className="display text-3xl">Iniciar sesión</h1>
             <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
-              Use un usuario demo o sus credenciales del estudio.
+              {SHOW_DEMO_LOGIN
+                ? "Use un usuario demo o sus credenciales del estudio."
+                : "Ingrese con las credenciales del estudio."}
             </p>
           </div>
           <label className="block text-sm">
@@ -93,7 +98,7 @@ function LoginForm() {
               name="password"
               type="password"
               required
-              defaultValue="lexopen"
+              defaultValue={SHOW_DEMO_LOGIN ? "lexopen" : ""}
               autoComplete="current-password"
             />
           </label>
@@ -107,23 +112,25 @@ function LoginForm() {
           </button>
         </form>
 
-        <div className="panel mt-4 rounded-3xl p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-soft)]/55">
-            Usuarios demo · contraseña lexopen
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {DEMO_USERS.map((u) => (
-              <button
-                key={u.email}
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setEmail(u.email)}
-              >
-                {u.label}
-              </button>
-            ))}
+        {SHOW_DEMO_LOGIN && (
+          <div className="panel mt-4 rounded-3xl p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-soft)]/55">
+              Usuarios demo · contraseña lexopen
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {DEMO_USERS.map((u) => (
+                <button
+                  key={u.email}
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setEmail(u.email)}
+                >
+                  {u.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

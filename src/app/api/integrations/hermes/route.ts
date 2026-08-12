@@ -263,17 +263,8 @@ function isSafeHttpUrl(value: unknown) {
   const allowLocal =
     process.env.NODE_ENV !== "production" ||
     process.env.HERMES_ALLOW_PRIVATE_URL === "1";
-  if (isSafeOutboundHttpUrl(value, { allowHttp: allowLocal })) return true;
-  try {
-    const url = new URL(value);
-    return (
-      allowLocal &&
-      (url.protocol === "http:" || url.protocol === "https:") &&
-      !url.username &&
-      !url.password &&
-      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
-    );
-  } catch {
-    return false;
-  }
+  return isSafeOutboundHttpUrl(value, {
+    allowHttp: allowLocal,
+    allowLoopback: allowLocal,
+  });
 }

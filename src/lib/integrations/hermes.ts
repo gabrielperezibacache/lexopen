@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/db";
-import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
+import {
+  fetchSafeOutbound,
+  isLoopbackHostname,
+  isSafeOutboundHttpUrl,
+} from "@/lib/net/safe-url";
 import { safeJsonParse } from "@/lib/safe-json";
 
 export type HermesConfig = {
@@ -40,20 +44,20 @@ export async function askHermes(params: {
 }) {
   const config = await getHermesConfig();
   let apiUrl: URL;
+  let allowLocal = false;
   try {
     apiUrl = new URL(config.apiUrl);
-    // In development, localhost Hermes is intentional; block private hosts in production.
-    const allowLocal =
+    // Loopback Hermes is intentional locally; production needs HERMES_ALLOW_PRIVATE_URL=1.
+    allowLocal =
       process.env.NODE_ENV !== "production" ||
       process.env.HERMES_ALLOW_PRIVATE_URL === "1";
+    const allowHttp = allowLocal || process.env.NODE_ENV !== "production";
     if (
       !isSafeOutboundHttpUrl(config.apiUrl, {
-        allowHttp: allowLocal || process.env.NODE_ENV !== "production",
+        allowHttp,
+        allowLoopback: allowLocal,
       }) &&
-      !(
-        allowLocal &&
-        (apiUrl.hostname === "localhost" || apiUrl.hostname === "127.0.0.1")
-      )
+      !(allowLocal && isLoopbackHostname(apiUrl.hostname))
     ) {
       return {
         source: "error" as const,
@@ -83,7 +87,10 @@ export async function askHermes(params: {
   if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
 
   try {
-    const res = await fetch(`${apiUrl.toString().replace(/\/+$/, "")}/chat/completions`, {
+    const endpoint = `${apiUrl.toString().replace(/\/+$/, "")}/chat/completions`;
+    const res = await fetchSafeOutbound(endpoint, {
+      allowHttp: allowLocal || process.env.NODE_ENV !== "production",
+      allowLoopback: allowLocal,
       method: "POST",
       headers,
       body: JSON.stringify({

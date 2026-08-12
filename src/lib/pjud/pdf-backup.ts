@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
+import { fetchSafeOutbound, isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
 import { newStorageKey, putObject } from "@/lib/storage";
 
 export function pdfBackupEnabled() {
@@ -53,8 +53,9 @@ export async function backupMovimientoDocuments(causaId: string) {
 
     try {
       const parsed = new URL(ref!);
-      const res = await fetch(ref!, {
-        redirect: "follow",
+      // Never follow redirects — validated URL must be the final hop (SSRF).
+      const res = await fetchSafeOutbound(ref!, {
+        allowHttp: process.env.NODE_ENV !== "production",
         signal: AbortSignal.timeout(45_000),
         headers: { Accept: "application/pdf,*/*" },
       });

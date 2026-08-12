@@ -198,6 +198,7 @@ export default function MonitoreoCausasPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- API CSV download */}
           <a className="btn btn-secondary" href="/api/causas/monitoreo?format=csv">
             Exportar CSV
           </a>
