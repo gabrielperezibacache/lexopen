@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { dueSyncWhere } from "@/lib/pjud/queue";
+import { dueSyncWhere, pjudSyncConcurrency } from "@/lib/pjud/queue";
 import {
   isBackupableDocumentoRef,
   looksLikePdf,
@@ -29,5 +29,15 @@ assert.equal(
 assert.equal(isBackupableDocumentoRef("doc:abc"), false);
 assert.equal(isBackupableDocumentoRef("http://127.0.0.1/secret.pdf"), false);
 assert.equal(isBackupableDocumentoRef("http://169.254.169.254/latest"), false);
+
+const prevConc = process.env.PJUD_SYNC_CONCURRENCY;
+delete process.env.PJUD_SYNC_CONCURRENCY;
+assert.equal(pjudSyncConcurrency(), 5);
+process.env.PJUD_SYNC_CONCURRENCY = "3";
+assert.equal(pjudSyncConcurrency(), 3);
+process.env.PJUD_SYNC_CONCURRENCY = "99";
+assert.equal(pjudSyncConcurrency(), 10);
+if (prevConc === undefined) delete process.env.PJUD_SYNC_CONCURRENCY;
+else process.env.PJUD_SYNC_CONCURRENCY = prevConc;
 
 console.log("pjud/queue.test.ts OK");

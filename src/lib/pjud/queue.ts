@@ -3,6 +3,15 @@ import { mapWithConcurrency } from "@/lib/pjud/concurrency";
 import { syncCausaPjud, type SyncCausaResult } from "@/lib/pjud/sync";
 
 const DEFAULT_BATCH = 40;
+/**
+ * Concurrency del worker de sync — CausaMonitor API usa worker.concurrency=5
+ * (`GET https://api.causamonitor.com/api/health`).
+ */
+export function pjudSyncConcurrency() {
+  const n = Number(process.env.PJUD_SYNC_CONCURRENCY || 5);
+  if (!Number.isFinite(n) || n < 1) return 5;
+  return Math.min(Math.floor(n), 10);
+}
 /** Jobs stuck in `running` longer than this are reclaimed to pending. */
 const STUCK_RUNNING_MS = Number(
   process.env.PJUD_SYNC_STUCK_MS || 30 * 60_000
@@ -114,7 +123,8 @@ export async function processPendingSyncJobs(opts?: {
   });
 
   const results: SyncCausaResult[] = [];
-  await mapWithConcurrency(pending, opts?.concurrency || 2, async (job) => {
+  const concurrency = opts?.concurrency ?? pjudSyncConcurrency();
+  await mapWithConcurrency(pending, concurrency, async (job) => {
     await prisma.pjudSyncJob.update({
       where: { id: job.id },
       data: {
@@ -216,10 +226,16 @@ export async function requeueFailedJobs(opts?: {
   return created;
 }
 
+/**
+ * Estado de cola durable `PjudSyncJob`.
+ * Shape compatible con CausaMonitor `GET /api/queue/stats`
+ * (`waiting` / `active` / `completed` / `failed` / `delayed`) más aliases LexOpen.
+ */
 export async function getPjudQueueStatus() {
-  const [pending, running, failed, okToday] = await Promise.all([
+  const [waiting, active, completed, failed, okToday] = await Promise.all([
     prisma.pjudSyncJob.count({ where: { status: "pending" } }),
     prisma.pjudSyncJob.count({ where: { status: "running" } }),
+    prisma.pjudSyncJob.count({ where: { status: "ok" } }),
     prisma.pjudSyncJob.count({ where: { status: "failed" } }),
     prisma.pjudSyncJob.count({
       where: {
@@ -228,5 +244,17 @@ export async function getPjudQueueStatus() {
       },
     }),
   ]);
-  return { pending, running, failed, okToday };
+  return {
+    // CausaMonitor / Bull-style
+    waiting,
+    active,
+    completed,
+    failed,
+    delayed: 0,
+    // LexOpen aliases (Host status UI)
+    pending: waiting,
+    running: active,
+    okToday,
+    workerConcurrency: pjudSyncConcurrency(),
+  };
 }

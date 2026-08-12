@@ -132,9 +132,11 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
           )}
           {pjud.queue && (
             <p className="mt-2 text-xs text-[var(--ink-soft)]/70">
-              Cola PJUD: {pjud.queue.pending} pending · {pjud.queue.running}{" "}
-              running · {pjud.queue.failed} failed · {pjud.queue.okToday} ok
-              (24h)
+              Cola PJUD (estilo CausaMonitor): {pjud.queue.waiting ?? pjud.queue.pending}{" "}
+              waiting · {pjud.queue.active ?? pjud.queue.running} active ·{" "}
+              {pjud.queue.failed} failed · {pjud.queue.completed ?? pjud.queue.okToday}{" "}
+              completed · concurrency{" "}
+              {pjud.queue.workerConcurrency ?? pjud.syncConcurrency ?? 5}
             </p>
           )}
         </div>

@@ -1,13 +1,16 @@
 /**
- * Scrape Oficina Judicial Virtual (flujo CausaMonitor / consulta pública).
+ * Scrape Oficina Judicial Virtual — acceso invitado (flujo CausaMonitor).
  *
  * OPT-IN + ToS risk: requiere PJUD_PUBLIC_SCRAPE=1 y solver CAPTCHA.
- * Flujo DOM alineado a scrapers de campo (consulta_causas_pjud) + diseño
- * mcp-legal-chile (sesión CAPTCHA reutilizable + presupuesto diario).
+ * Flujo DOM = portal OJV real (selectores de campo tipo consulta_causas_pjud).
+ * NO depende de mcp-legal-chile (flujo MCP no comprobado en producción).
  *
- * Invited path:
+ * Invited path (igual que CausaMonitor / FAQ “acceso de invitado”):
  *   home → accesoConsultaCausas() → tab RUT/ROL → competencia/tribunal →
  *   #btnConConsultaJur → #verDetalleJuridica → modal causa (historia/PDF).
+ *
+ * A escala: sesión CAPTCHA reutilizable + presupuesto diario de solves
+ * (mismo patrón operativo que un worker de cola con concurrency acotada).
  */
 
 import {

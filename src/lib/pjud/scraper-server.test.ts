@@ -15,6 +15,9 @@ async function main() {
   const body = await health.json();
   assert.equal(body.ok, true);
   assert.equal(body.service, "lexopen-pjud-scraper");
+  assert.equal(typeof body.workerRunning, "boolean");
+  assert.ok(body.worker && typeof body.worker.running === "boolean");
+  assert.equal(typeof body.timestamp, "string");
 
   const missing = await fetch(`http://127.0.0.1:${port}/nope`);
   assert.equal(missing.status, 404);

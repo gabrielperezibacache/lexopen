@@ -1,15 +1,29 @@
 # PJUD / CausaMonitor parity (scrape + ClaveÚnica)
 
-LexOpen replica el flujo de datos de CausaMonitor:
+LexOpen replica el **modelo operativo de CausaMonitor** (`app.causamonitor.com` + `api.causamonitor.com`), no el flujo MCP de `mcp-legal-chile` (sin prueba de producción).
 
-1. **Consulta pública** por ROL/RIT (scrape OJV o sidecar)
-2. **ClaveÚnica** cifrada → listado **Mis Causas** → monitoreo + sync
-3. Cartera con semáforos, cuadernos, receptor, fallidos
-4. **Cola durable** `PjudSyncJob` (due-based) + digest diario + backup PDF opcional
+## Arquitectura de referencia (CausaMonitor, inspeccionada)
 
-## Scrape OJV (cómo trabaja)
+| Pieza | CausaMonitor | LexOpen |
+|-------|--------------|---------|
+| UI | Next.js (`app.causamonitor.com`) | Next.js LexOpen |
+| API casos | `GET /api/cases`, sync autenticado | `/api/causas/monitoreo`, `/api/pjud/*` |
+| Cola | Redis (Bull-style: waiting/active/completed/failed/delayed) | Postgres `PjudSyncJob` |
+| Worker | Proceso con **concurrency 5** (`/api/health`) | Sidecar Playwright + `processPendingSyncJobs` (`PJUD_SYNC_CONCURRENCY`, default **5**) |
+| Stats cola | `GET /api/queue/stats` (público) | `GET /api/pjud/queue` (staff) + Host status |
+| Digest | `POST /api/cron/digest` | `POST /api/pjud/digest` |
+| Auth datos | Supabase Auth | Sesión LexOpen |
+| Scrape | **Acceso invitado OJV** (FAQ: no exige clave PJUD) | Mismo: guest OJV; ClaveÚnica es opt-in extra |
 
-LexOpen sigue el flujo DOM real de Oficina Judicial Virtual (misma familia que scrapers de campo tipo `consulta_causas_pjud` + sesión CAPTCHA de `mcp-legal-chile`):
+Flujo producto CausaMonitor (marketing + API):
+
+1. Alta por ROL / CSV / RUT empresa  
+2. Worker escanea de madrugada (cola + concurrency)  
+3. Resumen ~08:00 + PDF backup + receptor / escritos / salas  
+
+## Scrape OJV (cómo trabaja LexOpen)
+
+Acceso **invitado** al portal (misma familia DOM que scrapers de campo `consulta_causas_pjud`):
 
 1. `home/index.php` → `accesoConsultaCausas()` (sesión invitado)
 2. Tab `#BusJuridica` (RUT) o tab ROL/RIT
@@ -17,12 +31,15 @@ LexOpen sigue el flujo DOM real de Oficina Judicial Virtual (misma familia que s
 4. `#btnConConsultaJur` → espera `#loadPreJuridica`
 5. Filas `#verDetalleJuridica` → modal `.modal.in` (`table.table-titulos`, historia, e-book)
 
+Sesión CAPTCHA reutilizable + presupuesto diario de solves (operación a escala tipo worker).  
+**No** usar heurísticas MCP no validadas como fuente de verdad del DOM.
+
 Kill switches, presupuesto CAPTCHA diario y cache TTL (`PJUD_CAUSAS_CACHE_TTL_MS`) aplican. Resultados = integridad *candidate*.
 
 ## Orden de ingest al sincronizar
 
 1. `PJUD_API_URL` (partner)
-2. `PJUD_SCRAPER_URL` (sidecar HTTP, recomendado en producción)
+2. `PJUD_SCRAPER_URL` (sidecar HTTP, recomendado en producción — análogo al worker CM)
 3. Scrape in-process (`PJUD_PUBLIC_SCRAPE=1` + CAPTCHA solver + Playwright/Chromium)
 4. Demo (`PJUD_ALLOW_DEMO`)
 5. CSV / webhook
@@ -37,9 +54,10 @@ Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 | `CAPTCHA_SOLVER_PROVIDER` + `CAPTCHA_SOLVER_API_KEY` | 2captcha \| capsolver |
 | `PJUD_SCRAPER_URL` | Microservicio (`POST /causas/lookup`, `/mis-causas`, `/causas/buscar`). Acepta `http://host:port` (Render `fromService` hostport) |
 | `PJUD_SCRAPER_ALLOW_PRIVATE=1` | Permite sidecar en red privada (Render `.internal`) |
-| `PJUD_CLAVEUNICA_SCRAPE=1` | Permite automatizar login ClaveÚnica |
+| `PJUD_CLAVEUNICA_SCRAPE=1` | Permite automatizar login ClaveÚnica (extra; CM no lo exige para monitoreo) |
 | `PJUD_SECRETS_KEY` | Vault AES-256-GCM dedicado (fallback: `SESSION_SECRET`) |
 | `PJUD_CAUSAS_DAILY_SOLVE_BUDGET` | Tope diario de CAPTCHA (default 50) |
+| `PJUD_SYNC_CONCURRENCY` | Parallelismo del worker de cola (default **5**, como CM) |
 | `PJUD_PDF_BACKUP=1` | Tras sync, descarga `documentoRef` http(s) → `Documento` LexOpen |
 | `CRON_SECRET` | Autoriza crons (`x-cron-secret`) |
 
@@ -54,11 +72,14 @@ npm run pjud:scraper
 
 Endpoints: `GET /health`, `POST /causas/lookup`, `POST /mis-causas`, `POST /causas/buscar`.
 
+`GET /health` reporta `workerRunning` / `scrapeReady` (análogo a CM `workerRunning`).
+
 En Render, el Blueprint define `lexopen-pjud-scraper` (`type: pserv`) con `npx playwright install chromium` en build, y cablea `PJUD_SCRAPER_URL` + `PJUD_SCRAPER_ALLOW_PRIVATE=1` en el web.
 
 ## Cron / cola
 
-- `POST /api/causas/monitoreo` encola causas con `pjudMonitoreoActivo` y `pjudNextSyncAt` null/`<= now` (dedupe si ya hay pending/running), reclama jobs stuck en `running`, luego procesa `PjudSyncJob` pending → running → ok/failed.
+- `POST /api/causas/monitoreo` encola causas con `pjudMonitoreoActivo` y `pjudNextSyncAt` null/`<= now` (dedupe si ya hay pending/running), reclama jobs stuck en `running`, luego procesa `PjudSyncJob` pending → running → ok/failed con concurrency `PJUD_SYNC_CONCURRENCY`.
+- `GET /api/pjud/queue` → stats estilo CM (`waiting`/`active`/`completed`/`failed`/`delayed`).
 - Fallos aplican **backoff** exponencial sobre el intervalo base (`pjudFailCount`).
 - Retry fallidos: `action: retry-fallidos` re-encola solo esos jobs.
 - Render: cartera cada 6h; Mis Causas ~08:00 Santiago (`0 11 * * *` UTC); digest ~09:00 Santiago (`0 12 * * *` UTC, tras Mis Causas).
@@ -82,7 +103,9 @@ Con `PJUD_PDF_BACKUP=1`, tras sync (también backfill) se descargan links `docum
 - UI en `/causas/monitoreo` (panel ROL / RUT)
 - API `POST /api/pjud/lookup` con `action: add-rol | preview-rol | buscar-rut`
 
-## ClaveÚnica
+## ClaveÚnica (opt-in)
+
+CausaMonitor monitorea con acceso público/invitado y **no exige** clave del Poder Judicial. LexOpen ofrece ClaveÚnica como capa extra:
 
 - UI: `/causas/mis-causas` (admin guarda RUT/password)
 - Cifrado AES-256-GCM con **`PJUD_SECRETS_KEY`** (fallback `SESSION_SECRET`)

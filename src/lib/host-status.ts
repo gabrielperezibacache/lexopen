@@ -52,10 +52,15 @@ export async function getHostStatus() {
       lastNote: null,
     })),
     getPjudQueueStatus().catch(() => ({
+      waiting: 0,
+      active: 0,
+      completed: 0,
+      failed: 0,
+      delayed: 0,
       pending: 0,
       running: 0,
-      failed: 0,
       okToday: 0,
+      workerConcurrency: 5,
     })),
   ]);
 

@@ -248,7 +248,6 @@ export async function syncMisCausas(opts?: {
       actorId: opts?.actorId,
       limit: Math.min(jobs.length || 20, 40),
       jobIds: jobs.map((j) => j.id),
-      concurrency: 2,
     });
     syncResults = processed.map((r) => ({
       causaId: r.causaId,

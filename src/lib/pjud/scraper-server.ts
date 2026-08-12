@@ -1,5 +1,8 @@
 /**
- * HTTP sidecar PJUD (referencia CausaMonitor).
+ * HTTP sidecar PJUD (worker scrape estilo CausaMonitor).
+ * CausaMonitor: app Next + API + worker Redis concurrency 5.
+ * LexOpen: web Next + este sidecar Playwright + cola Postgres `PjudSyncJob`.
+ *
  * Endpoints: GET /health, POST /causas/lookup, POST /mis-causas, POST /causas/buscar
  *
  * Run: npm run pjud:scraper
@@ -97,11 +100,20 @@ export function createScraperServer() {
       const path = url.pathname.replace(/\/$/, "") || "/";
 
       if (req.method === "GET" && (path === "/health" || path === "/")) {
+        const ready = publicScrapeReady();
         return send(res, 200, {
           ok: true,
+          status: "ok",
           service: "lexopen-pjud-scraper",
+          timestamp: new Date().toISOString(),
+          // CausaMonitor-shaped health fields (api.causamonitor.com/api/health)
+          workerRunning: ready,
+          worker: {
+            running: ready,
+            role: "ojv-guest-scrape",
+          },
           scrapeEnabled: publicScrapeEnabled(),
-          scrapeReady: publicScrapeReady(),
+          scrapeReady: ready,
           captcha: captchaSolverConfigured(),
         });
       }

@@ -475,6 +475,7 @@ export function providerStatusPublic() {
     liveIngestConfigured: pjudLiveIngestConfigured(),
     webhookConfigured: pjudWebhookConfigured(),
     pdfBackupEnabled: pdfBackupEnabled(),
+    syncConcurrency: Number(process.env.PJUD_SYNC_CONCURRENCY || 5) || 5,
     demoAllowed:
       process.env.PJUD_ALLOW_DEMO === "1" ||
       (process.env.NODE_ENV !== "production" &&
@@ -484,8 +485,8 @@ export function providerStatusPublic() {
       ? pjudProviderConfigured()
         ? "Conector partner API activo."
         : scraperSidecarConfigured()
-          ? "Scraper sidecar activo (PJUD_SCRAPER_URL) — flujo CausaMonitor."
-          : "Scrape OJV in-process activo (CAPTCHA) — ToS risk / opt-in."
-      : "Sin ingest live: configure PJUD_SCRAPER_URL (sidecar) o PJUD_PUBLIC_SCRAPE=1+CAPTCHA+Playwright, partner API, demo o CSV. El sync de producción está fail-closed hasta entonces. ClaveÚnica requiere PJUD_CLAVEUNICA_SCRAPE=1.",
+          ? "Scraper sidecar activo (PJUD_SCRAPER_URL) — worker estilo CausaMonitor (acceso invitado OJV)."
+          : "Scrape OJV in-process activo (CAPTCHA, acceso invitado) — ToS risk / opt-in."
+      : "Sin ingest live: configure PJUD_SCRAPER_URL (sidecar) o PJUD_PUBLIC_SCRAPE=1+CAPTCHA+Playwright, partner API, demo o CSV. El sync de producción está fail-closed hasta entonces. ClaveÚnica es opt-in (PJUD_CLAVEUNICA_SCRAPE=1); CausaMonitor monitorea solo con acceso público.",
   };
 }

@@ -12,6 +12,7 @@ import {
   processPendingSyncJobs,
   requeueFailedJobs,
   runDueSyncPipeline,
+  getPjudQueueStatus,
 } from "@/lib/pjud/queue";
 
 export async function GET(req: NextRequest) {
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
     }
     const items = await listCarteraMonitoreo();
     const fallidos = await listFallidosMonitoreo(20);
+    const queue = await getPjudQueueStatus().catch(() => null);
     const resumen = {
       total: items.length,
       monitoreadas: items.filter((i) => i.monitoreoActivo).length,
@@ -40,6 +42,7 @@ export async function GET(req: NextRequest) {
       items,
       fallidos,
       resumen,
+      queue,
       provider: providerStatusPublic(),
     });
   } catch (e) {
