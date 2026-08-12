@@ -54,7 +54,7 @@
 - [Integraciones](#-integraciones)
 - [Aplicación desktop](#-aplicación-desktop)
 - [API](#-api)
-- [Despliegue en Render](#-despliegue-en-render)
+- [Producción en Host local](#-producción-en-host-local)
 - [Seguridad y límites actuales](#-seguridad-y-límites-actuales)
 - [Desarrollo y pruebas](#-desarrollo-y-pruebas)
 - [Estructura del repositorio](#-estructura-del-repositorio)
@@ -397,13 +397,21 @@ crea usuarios y contenido ficticio; consulte [Usuarios y datos demo](#-usuarios-
 
 ### Ejecutar en modo producción local
 
+La vía recomendada es el Host web local (PostgreSQL embebido + datos en disco):
+
 ```bash
+LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
+```
+
+Si ya tiene un Postgres propio en la máquina:
+
+```bash
+npm run setup:production   # migraciones, sin seed demo
 npm run build
 npm run start
 ```
 
-El servidor escucha en `0.0.0.0` y usa `PORT` (por defecto `3000`), por lo que
-funciona tanto localmente como detrás de un proxy o en Render.
+El servidor escucha en `0.0.0.0` y usa `PORT` (por defecto `3000`).
 
 ## 👥 Usuarios demo y pasar a producción
 
@@ -462,8 +470,8 @@ variables más relevantes:
 | `LEXOPEN_OPEN_ACCESS` | No | Bypass de autenticación únicamente fuera de producción; no lo habilite en un entorno real. |
 | `LEXOPEN_RELAX_CSRF` | No | Relaja controles para CI; no lo habilite en producción. |
 | `STORAGE_PATH` | No | Directorio local para archivos cuando no se configura S3. |
-| `LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE` | Host web local | Permite almacenamiento local persistente fuera de Render. |
-| `LEXOPEN_REQUIRE_PERSISTENT_STORAGE` | No | Con `1`, `/api/health` devuelve `503` si producción no tiene storage persistente. |
+| `LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE` | Host web local | `1` permite almacenamiento en disco local en producción (`web:host`). |
+| `LEXOPEN_REQUIRE_PERSISTENT_STORAGE` | No | Con `1`, `/api/health` devuelve `503` si no hay storage persistente listo. |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT` | No | Bucket y endpoint de almacenamiento S3-compatible. |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | No | Credenciales del bucket S3-compatible. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | No | OAuth de Google Drive y Calendar. |
@@ -475,7 +483,7 @@ variables más relevantes:
 | `CAPTCHA_SOLVER_PROVIDER`, `CAPTCHA_SOLVER_API_KEY` | No | `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster`. Key opcional solo en `nopecha`. |
 | `PJUD_CLAVEUNICA_SCRAPE` | No | `1` = permite login ClaveÚnica automatizado (Mis Causas). |
 | `PJUD_SECRETS_KEY` | No | Clave AES para vault ClaveÚnica (fallback SESSION_SECRET). |
-| `PJUD_SCRAPER_ALLOW_PRIVATE` | No | `1` = permite sidecar en red privada / Render internal. |
+| `PJUD_SCRAPER_ALLOW_PRIVATE` | No | `1` = permite sidecar en localhost / red privada del Host. |
 | `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` | No | Scheduler local Mis Causas (Host web). |
 | `PJUD_ALLOW_DEMO` | No | Permite movimientos PJUD simulados y etiquetados como demo. |
 | `PJUD_WEBHOOK_SECRET` | No | Firma HMAC de webhooks asíncronos de un proveedor PJUD. |
@@ -549,10 +557,9 @@ reintento cuando faltan binarios o el procesamiento falla.
 ### Almacenamiento de archivos
 
 El adaptador usa S3-compatible cuando están configuradas las credenciales mínimas;
-en desarrollo o desktop puede escribir en `STORAGE_PATH` o `./storage`. En un web
-service de producción, el backend local no se usa para evitar perder documentos:
-configure S3, R2 u otro object storage persistente. En Render el filesystem local
-es efímero.
+en el Host local / desktop escribe en `STORAGE_PATH` dentro de `LEXOPEN_DATA_DIR`
+(persistente en disco del PC). No hace falta object storage en la nube para
+producción local.
 
 ## 🖥️ Aplicación desktop
 
@@ -643,28 +650,28 @@ Para explorar contratos concretos, consulte las route handlers y los schemas Zod
 junto a cada módulo. Los ejemplos mutantes necesitan cookies de sesión y, según la
 ruta, validación de origen; un `curl` anónimo no es una prueba válida de autorización.
 
-## ☁️ Despliegue en Render
+## 🏠 Producción en Host local
 
-El archivo [`render.yaml`](render.yaml) define un Blueprint con:
+LexOpen en producción corre **en su PC/servidor local**, no en Render ni otro
+SaaS de hosting. Un único Host guarda Postgres, documentos y secretos en disco.
 
-- PostgreSQL 16 administrado;
-- un web service Node;
-- migraciones Prisma en el build;
-- `npm run start`;
-- health check en `/api/health`.
+```bash
+git clone https://github.com/gabrielperezibacache/lexopen.git
+cd lexopen
+npm ci
+LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
+```
 
-Flujo recomendado:
+1. Abra el enlace `/setup?token=…` que imprime el Host y cree el admin del estudio
+   (sin seed demo).
+2. Compruebe `curl http://127.0.0.1:3000/api/health` → `db: "up"`, `storageReady: true`.
+3. Opcional: active arranque automático con `deploy/systemd`, `deploy/launchd` o
+   `deploy/windows` (ver [`docs/WEB-HOST.md`](docs/WEB-HOST.md)).
+4. Respalde con `npm run web:backup` hacia un disco externo cifrado.
 
-1. Cree un Blueprint desde este repositorio.
-2. Configure las credenciales opcionales de Hermes, Google y S3 en Render.
-3. Mantenga `HERMES_ALLOW_DEMO=0` y `LEXOPEN_DEMO_SWITCHER=0`.
-4. Use object storage persistente para documentos y configure un dominio/TLS o una
-   red privada apropiada.
-5. Verifique migraciones, respaldos y permisos antes de abrir el servicio a usuarios.
-
-El plan gratuito de Render puede suspender servicios inactivos y no constituye por
-sí mismo una arquitectura de alta disponibilidad. El filesystem del web service es
-efímero y no debe usarse como respaldo.
+Demos deben permanecer apagadas (`LEXOPEN_DEMO_SWITCHER=0`, `HERMES_ALLOW_DEMO=0`,
+`PJUD_ALLOW_DEMO=0`). El sidecar PJUD y los crons de sync/digest también son
+locales (`npm run pjud:host` + intervalos en el `.env` del data dir).
 
 ## 🔐 Seguridad y límites actuales
 
@@ -747,9 +754,10 @@ Para cambios que afecten datos, permisos o integraciones:
 │   ├── migrations/          # migraciones versionadas
 │   └── seed.ts              # corpus y usuarios demo
 ├── desktop/                 # shell Electron Host/Cliente
+├── deploy/                  # systemd / launchd / Windows del Host local
 ├── docs/DESKTOP.md          # operación de la aplicación desktop
+├── docs/WEB-HOST.md         # Host web 100% local
 ├── public/                  # assets públicos
-├── render.yaml              # Blueprint de despliegue Render
 ├── .env.example             # configuración local de referencia
 └── .github/workflows/ci.yml # validación continua
 ```
