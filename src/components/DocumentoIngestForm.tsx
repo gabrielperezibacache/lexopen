@@ -367,7 +367,7 @@ export function DocumentoIngestForm({
                       : row.status === "error"
                         ? "Error"
                         : row.status === "skipped"
-                          ? "Skip"
+                          ? "Omitido"
                           : "Pendiente"}
                 </span>
               </li>

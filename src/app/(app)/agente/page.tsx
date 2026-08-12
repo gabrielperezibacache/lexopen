@@ -368,7 +368,10 @@ function AgenteInner() {
             <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-white/60 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">Alcance documental</h3>
-                <Link href="/documentos" className="text-xs text-[var(--sea)]">
+                <Link
+                  href={causaId ? `/causas/${causaId}` : "/documentos"}
+                  className="text-xs text-[var(--sea)]"
+                >
                   Incorporar carpeta
                 </Link>
               </div>
