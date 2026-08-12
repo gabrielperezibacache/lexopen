@@ -144,6 +144,9 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
 
 - Mantenga el Host encendido y con permisos de escritura sobre `STORAGE_PATH`.
 - No ejecute `npm run db:seed`, `npm run setup` ni `npm run db:reset` con datos reales.
+- Para pasar de demo a producción: `npm run db:purge-demo -- --yes`, luego
+  `LEXOPEN_BOOTSTRAP_TOKEN` y `/setup` (o el panel en Configuración).
+  Vea el README («Empezar» / «Usuarios demo y pasar a producción»).
 - Para crear un respaldo web, detenga el Host y ejecute:
 
   ```bash

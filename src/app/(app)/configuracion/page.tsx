@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/session";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { FirmSettingsForm } from "@/components/FirmSettingsForm";
 import { HostStatusPanel } from "@/components/HostStatusPanel";
+import { PurgeDemoPanel } from "@/components/PurgeDemoPanel";
 import { getHostStatus } from "@/lib/host-status";
 
 export default async function ConfiguracionPage() {
@@ -24,6 +25,7 @@ export default async function ConfiguracionPage() {
       />
       <FirmSettingsForm organization={settingsOrganization} />
       <HostStatusPanel status={hostStatus} />
+      <PurgeDemoPanel />
     </div>
   );
 }

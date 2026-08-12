@@ -22,7 +22,7 @@
     </a>
   </p>
   <p>
-    <a href="#-inicio-r%C3%A1pido">Empezar</a> ·
+    <a href="#-empezar-gu%C3%ADa-sencilla">Empezar</a> ·
     <a href="#-qu%C3%A9-resuelve">Qué resuelve</a> ·
     <a href="docs/DESKTOP.md">Desktop</a> ·
     <a href="CONTRIBUTING.md">Contribuir</a>
@@ -46,9 +46,10 @@
 - [Qué resuelve](#-qué-resuelve)
 - [Recorrido de la demo](#-recorrido-de-la-demo)
 - [Arquitectura](#-arquitectura)
+- [Empezar (guía sencilla)](#-empezar-guía-sencilla)
 - [Inicio rápido](#-inicio-rápido)
 - [Instalación web 100% local](#-instalación-web-100-local)
-- [Usuarios y datos demo](#-usuarios-y-datos-demo)
+- [Usuarios demo y pasar a producción](#-usuarios-demo-y-pasar-a-producción)
 - [Configuración](#-configuración)
 - [Integraciones](#-integraciones)
 - [Aplicación desktop](#-aplicación-desktop)
@@ -243,6 +244,91 @@ LEXOPEN_TRUSTED_ORIGINS=http://127.0.0.1:3000,http://IP-PRIVADA-DEL-HOST:3000
 
 Guía ampliada: [`docs/WEB-HOST.md`](docs/WEB-HOST.md).
 
+## 🏁 Empezar (guía sencilla)
+
+Hay **dos caminos**. Elija uno:
+
+| Camino | Para qué | Resultado |
+| --- | --- | --- |
+| **A · Probar la demo** | Conocer LexOpen con datos de ejemplo | Usuarios `*@estudio.cl` / contraseña `lexopen` |
+| **B · Estudio real (producción)** | Empezar la base de datos del estudio desde cero | Sin datos ficticios; usted crea el primer admin |
+
+### A · Probar la demo (5 minutos)
+
+```bash
+git clone https://github.com/gabrielperezibacache/lexopen.git
+cd lexopen
+cp .env.example .env
+
+# PostgreSQL (ejemplo con Docker)
+docker run --name lexopen-postgres \
+  -e POSTGRES_USER=lexopen -e POSTGRES_PASSWORD=lexopen \
+  -e POSTGRES_DB=lexopen -p 5432:5432 -d postgres:16
+
+npm ci
+npm run db:migrate
+npm run db:seed          # carga datos ficticios (destructivo)
+npm run dev
+```
+
+Abra `http://localhost:3000/login` e ingrese con `socio@estudio.cl` / `lexopen`.
+
+### B · Estudio real desde cero (sin demo)
+
+**Opción B1 — instalación limpia (recomendado si aún no cargó el seed):**
+
+```bash
+git clone https://github.com/gabrielperezibacache/lexopen.git
+cd lexopen
+cp .env.example .env
+# Edite .env: SESSION_SECRET fuerte, LEXOPEN_DEMO_SWITCHER=0,
+# HERMES_ALLOW_DEMO=0, PJUD_ALLOW_DEMO=0
+
+docker run --name lexopen-postgres \
+  -e POSTGRES_USER=lexopen -e POSTGRES_PASSWORD=lexopen \
+  -e POSTGRES_DB=lexopen -p 5432:5432 -d postgres:16
+
+npm ci
+npm run setup:production   # solo migraciones, sin seed demo
+
+# Token de una sola vez para crear el primer administrador
+export LEXOPEN_BOOTSTRAP_TOKEN="$(openssl rand -hex 24)"
+echo "Abra: http://localhost:3000/setup?token=$LEXOPEN_BOOTSTRAP_TOKEN"
+
+npm run dev
+# o producción: npm run build && npm run start
+```
+
+En `/setup?token=…` cree el admin del estudio (nombre, email, contraseña ≥12).
+Luego configure la organización en **Configuración** y agregue abogados/clientes reales.
+
+**Opción B2 — ya probó la demo y quiere borrar todo para producción:**
+
+```bash
+# Conserva catálogos Chile (tribunales, UF, plantillas)
+npm run db:purge-demo -- --yes
+
+# En .env desactive banderas demo:
+#   LEXOPEN_DEMO_SWITCHER=0
+#   HERMES_ALLOW_DEMO=0
+#   PJUD_ALLOW_DEMO=0
+
+export LEXOPEN_BOOTSTRAP_TOKEN="$(openssl rand -hex 24)"
+npm run dev
+# Abra /setup?token=$LEXOPEN_BOOTSTRAP_TOKEN
+```
+
+También puede hacerlo desde la UI: inicie sesión como admin demo →
+**Configuración** → panel *Eliminar datos demo (pasar a producción)* →
+escriba `ELIMINAR DATOS DEMO`.
+
+> [!WARNING]
+> `db:purge-demo` y el panel de Configuración borran **causas, clientes, usuarios
+> y todo el contenido operativo**. Haga respaldo antes si hay algo que quiera conservar.
+> El schema/migraciones no se tocan.
+
+Detalle ampliado: [Usuarios demo y pasar a producción](#-usuarios-demo-y-pasar-a-producción).
+
 ## 🚀 Inicio rápido
 
 ### Requisitos
@@ -291,15 +377,17 @@ crea usuarios y contenido ficticio; consulte [Usuarios y datos demo](#-usuarios-
 ### Comandos de base de datos
 | Comando | Uso |
 | --- | --- |
-| `npm run db:migrate` | Aplica las migraciones versionadas; es el comando apropiado para despliegues. |
-| `npm run db:push` | Sincroniza el schema directamente; útil para prototipos locales, no sustituye migraciones. |
-| `npm run db:seed` | **Borra el contenido existente y lo reemplaza por datos demo.** |
-| `npm run db:reset` | Hace `db push --force-reset` y luego carga el seed; **destructivo**. |
-| `npm run setup` | Ejecuta `db:push` y el seed; **destructivo si la base ya contiene datos**. |
+| `npm run db:migrate` / `setup:production` | Aplica migraciones; **sin** cargar demo. Use esto en producción. |
+| `npm run db:push` | Sincroniza el schema directamente; útil para prototipos locales. |
+| `npm run db:seed` | **Borra el contenido y carga datos demo.** Solo desarrollo. |
+| `npm run db:purge-demo -- --yes` | **Borra datos operativos/demo** y deja la BD lista para `/setup`. |
+| `npm run db:reset` | `db push --force-reset` + seed; **destructivo**. |
+| `npm run setup` | `db:push` + seed; **destructivo** si ya hay datos. |
 
 > [!WARNING]
-> No ejecute `db:seed`, `db:reset` ni `setup` sobre una base con información real.
-> En producción use migraciones, respaldos y un procedimiento de carga controlado.
+> No ejecute `db:seed`, `db:reset`, `setup` ni `db:purge-demo` sobre una base con
+> información real sin respaldo. En producción use migraciones + `/setup` con
+> `LEXOPEN_BOOTSTRAP_TOKEN`.
 
 ### Ejecutar en modo producción local
 
@@ -311,9 +399,11 @@ npm run start
 El servidor escucha en `0.0.0.0` y usa `PORT` (por defecto `3000`), por lo que
 funciona tanto localmente como detrás de un proxy o en Render.
 
-## 👥 Usuarios y datos demo
+## 👥 Usuarios demo y pasar a producción
 
-Todos los usuarios demo utilizan la contraseña `lexopen`:
+### Usuarios del seed (solo demo)
+
+Todos usan la contraseña `lexopen`:
 
 | Email | Rol | Uso recomendado |
 | --- | --- | --- |
@@ -323,7 +413,30 @@ Todos los usuarios demo utilizan la contraseña `lexopen`:
 | `cliente@andes.cl` | `cliente` | Recorrido del portal y contenido compartido. |
 
 El selector de usuarios demo aparece en desarrollo o cuando
-`LEXOPEN_DEMO_SWITCHER=1`. Desactívelo antes de cualquier uso real.
+`LEXOPEN_DEMO_SWITCHER=1`. **Desactívelo antes de cualquier uso real.**
+
+### Cómo pasar de demo a base del estudio
+
+1. **Respalde** si necesita conservar algo (CSV de causas, documentos externos).
+2. **Purgue** los datos ficticios:
+   - CLI: `npm run db:purge-demo -- --yes`
+   - UI (admin): Configuración → *Eliminar datos demo* → frase `ELIMINAR DATOS DEMO`
+3. **Apague banderas demo** en `.env`:
+   ```dotenv
+   LEXOPEN_DEMO_SWITCHER=0
+   HERMES_ALLOW_DEMO=0
+   PJUD_ALLOW_DEMO=0
+   ```
+4. **Cree el primer administrador real:**
+   ```bash
+   export LEXOPEN_BOOTSTRAP_TOKEN="$(openssl rand -hex 24)"
+   # Abra /setup?token=$LEXOPEN_BOOTSTRAP_TOKEN
+   ```
+5. Configure el estudio en **Configuración** (razón social, RUT, emisor) y cree
+   los usuarios del equipo.
+
+Por defecto la purga **conserva** catálogos Chile (tribunales, UF, plantillas de
+minuta). Para borrarlos también: `npm run db:purge-demo -- --yes --wipe-catalogs`.
 
 ## 🔧 Configuración
 
@@ -339,6 +452,7 @@ variables más relevantes:
 | `LEXOPEN_TRUSTED_ORIGINS` | No | Orígenes adicionales permitidos para validaciones CSRF, separados por coma. |
 | `LEXOPEN_TRUSTED_PROXY` | No | Permite usar `X-Forwarded-For` para rate limiting solo detrás de un proxy confiable. |
 | `LEXOPEN_DEMO_SWITCHER` | No | Habilita el cambio entre usuarios demo; solo desarrollo/demo. |
+| `LEXOPEN_BOOTSTRAP_TOKEN` | Setup limpio | Token de un uso para crear el primer admin en `/setup` tras instalación o `db:purge-demo`. |
 | `LEXOPEN_OPEN_ACCESS` | No | Bypass de autenticación únicamente fuera de producción; no lo habilite en un entorno real. |
 | `LEXOPEN_RELAX_CSRF` | No | Relaja controles para CI; no lo habilite en producción. |
 | `STORAGE_PATH` | No | Directorio local para archivos cuando no se configura S3. |

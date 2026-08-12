@@ -1,73 +1,15 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { TRIBUNALES_CHILE } from "../src/lib/chile";
+import { purgeDemoData } from "../src/lib/demo-purge";
 
 const prisma = new PrismaClient();
-
-async function wipe() {
-  const models = [
-    "ledgerEntry",
-    "payment",
-    "invoiceLine",
-    "invoice",
-    "expense",
-    "timeEntry",
-    "feeArrangement",
-    "workflowInstance",
-    "workflow",
-    "notification",
-    "message",
-    "comment",
-    "qaPost",
-    "qaThread",
-    "iSheetRow",
-    "iSheetColumn",
-    "iSheet",
-    "blogPost",
-    "wikiPage",
-    "task",
-    "fileVersion",
-    "siteFile",
-    "folder",
-    "siteGroup",
-    "siteMember",
-    "site",
-    "groupMember",
-    "group",
-    "activity",
-    "minutaAccion",
-    "minuta",
-    "minutaPlantilla",
-    "nota",
-    "plazo",
-    "documento",
-    "parte",
-    "etapaHistorial",
-    "causaMovimiento",
-    "agentChat",
-    "causa",
-    "cliente",
-    "jurisprudencia",
-    "integrationConfig",
-    "auditEvent",
-    "ufRate",
-    "tribunal",
-    "firmSettings",
-    "organization",
-    "user",
-  ] as const;
-
-  for (const m of models) {
-    // @ts-expect-error dynamic wipe
-    await prisma[m].deleteMany();
-  }
-}
 
 async function main() {
   if (process.env.NODE_ENV === "production") {
     throw new Error("El seed demo está bloqueado en producción.");
   }
-  await wipe();
+  await purgeDemoData(prisma, { keepCatalogs: false });
 
   const password = await bcrypt.hash("lexopen", 10);
 
