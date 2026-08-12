@@ -5,6 +5,7 @@ import { DocumentoUploadForm } from "@/components/DocumentoUploadForm";
 import { EmptyState } from "@/components/EmptyState";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { DocumentProcessingAction } from "@/components/DocumentProcessingAction";
+import { DocumentOcrStatus } from "@/components/DocumentOcrStatus";
 
 export default async function DocumentosPage() {
   const [documentos, causas] = await Promise.all([
@@ -32,6 +33,7 @@ export default async function DocumentosPage() {
         </p>
       </div>
 
+      <DocumentOcrStatus />
       <DocumentoUploadForm causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))} />
 
       {documentos.length === 0 ? (

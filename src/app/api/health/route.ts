@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { persistentStorageReady, storageMode } from "@/lib/storage";
 import { recoverPendingDocumentProcessing } from "@/lib/document-processing-queue";
+import { getOcrCapability } from "@/lib/local-ocr";
 
 function desktopPayload() {
   return {
@@ -25,6 +26,7 @@ export async function GET() {
       SELECT EXISTS (SELECT 1 FROM "User") AS "exists"
     `;
     const needsSetup = !Boolean(userRows[0]?.exists);
+    const ocr = await getOcrCapability();
     void recoverPendingDocumentProcessing().catch((error) => {
       console.error("document processing recovery failed", error);
     });
@@ -37,6 +39,7 @@ export async function GET() {
           storageReady,
           storageRequired,
           needsSetup,
+          ocr,
           time,
           error: "Almacenamiento persistente no configurado",
           ...base,
@@ -57,6 +60,7 @@ export async function GET() {
         storageReady,
         storageRequired,
         needsSetup,
+        ocr,
         ...(storageReady
           ? {}
           : { warning: "Almacenamiento local no persistente" }),
@@ -78,6 +82,7 @@ export async function GET() {
         storageReady,
         storageRequired,
         needsSetup: null,
+        ocr: null,
         time,
         ...base,
       },

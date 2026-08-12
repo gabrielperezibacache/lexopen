@@ -6,6 +6,15 @@ import { promisify } from "node:util";
 
 const execFile = promisify(execFileCallback);
 const OCR_TEXT_MAX_BYTES = 10 * 1024 * 1024;
+let capabilityPromise: Promise<OcrCapability> | null = null;
+
+export type OcrCapability = {
+  enabled: boolean;
+  available: boolean;
+  provider: "pdfdown-ocr" | "tesseract-cli" | "disabled" | "unavailable";
+  version?: string;
+  reason?: string;
+};
 
 export type OcrPdfResult = {
   status: "completed" | "unavailable" | "failed";
@@ -20,6 +29,64 @@ function commandError(error: unknown) {
     return String((error as { code?: unknown }).code || "");
   }
   return "";
+}
+
+export function getOcrCapability() {
+  if (!capabilityPromise) {
+    capabilityPromise = detectOcrCapability();
+  }
+  return capabilityPromise;
+}
+
+async function detectOcrCapability(): Promise<OcrCapability> {
+  if (process.env.OCR_ENABLED === "0") {
+    return { enabled: false, available: false, provider: "disabled" };
+  }
+
+  const tesseract = process.env.OCR_TESSERACT_BIN || "tesseract";
+  let version: string | undefined;
+  try {
+    const result = await execFile(tesseract, ["--version"], {
+      timeout: 3_000,
+      maxBuffer: 128 * 1024,
+      windowsHide: true,
+      encoding: "utf8",
+    });
+    version = String(result.stdout || "").split(/\r?\n/, 1)[0] || undefined;
+  } catch (error) {
+    return {
+      enabled: true,
+      available: false,
+      provider: "unavailable",
+      reason:
+        commandError(error) === "ENOENT"
+          ? "tesseract_missing"
+          : "tesseract_unavailable",
+    };
+  }
+
+  try {
+    await import("@d0paminedriven/pdfdown-ocr");
+    return { enabled: true, available: true, provider: "pdfdown-ocr", version };
+  } catch {
+    const pdftoppm = process.env.OCR_PDFTOPPM_BIN || "pdftoppm";
+    try {
+      await execFile(pdftoppm, ["-v"], {
+        timeout: 3_000,
+        maxBuffer: 128 * 1024,
+        windowsHide: true,
+      });
+      return { enabled: true, available: true, provider: "tesseract-cli", version };
+    } catch {
+      return {
+        enabled: true,
+        available: false,
+        provider: "unavailable",
+        version,
+        reason: "ocr_binding_and_pdftoppm_missing",
+      };
+    }
+  }
 }
 
 function configuredPages(pageCount: number, pages: number[]) {
