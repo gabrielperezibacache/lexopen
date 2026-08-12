@@ -17,25 +17,11 @@ export function CausaActions({ causaId }: { causaId: string }) {
     });
     const data = await res.json();
     setBusy(false);
-    setMsg(res.ok ? `Obsidian sync: ${data.result?.files ?? 0} archivos` : data.error || "Error");
-  }
-
-  async function askCopilot() {
-    setBusy(true);
-    setMsg("");
-    const res = await fetch("/api/integrations/hermes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        causaId,
-        utility: "briefing",
-        prompt:
-          "Elabora un briefing ejecutivo del estado procesal y sugiere los próximos tres pasos, con alertas de plazos.",
-      }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    setMsg(data.content?.slice(0, 280) || data.error || "Sin respuesta");
+    setMsg(
+      res.ok
+        ? `Obsidian sync: ${data.result?.files ?? 0} archivos`
+        : data.error || "Error"
+    );
   }
 
   return (
@@ -55,16 +41,20 @@ export function CausaActions({ causaId }: { causaId: string }) {
         >
           Sync Obsidian
         </button>
-        <button
+        <Link
+          href={`/agente?causaId=${causaId}&utility=briefing&run=1`}
           className="btn btn-secondary w-full sm:w-auto"
-          disabled={busy}
-          onClick={askCopilot}
-          type="button"
         >
           Briefing IA
-        </button>
+        </Link>
         <Link
-          href={`/agente?causaId=${causaId}&utility=briefing`}
+          href={`/agente?causaId=${causaId}&utility=doc_qa`}
+          className="btn btn-ghost w-full sm:w-auto"
+        >
+          Preguntar a docs
+        </Link>
+        <Link
+          href={`/agente?causaId=${causaId}&utility=copilot`}
           className="btn btn-ghost w-full sm:w-auto"
         >
           Abrir copiloto

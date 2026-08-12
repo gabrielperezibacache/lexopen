@@ -29,26 +29,23 @@ export default function MisCausasPage() {
   const [msg, setMsg] = useState("");
   const [result, setResult] = useState<SyncResult | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    fetch("/api/pjud/mis-causas")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!active || !data) return;
-        setStatus(data.status || null);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
-
   async function load() {
     const res = await fetch("/api/pjud/mis-causas");
     if (!res.ok) return;
     const data = await res.json();
     setStatus(data.status || null);
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      void load();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function saveCredentials(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

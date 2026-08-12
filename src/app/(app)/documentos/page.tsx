@@ -27,21 +27,21 @@ export default async function DocumentosPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          Repositorio por causa
-        </p>
-        <h1 className="display mt-2 text-4xl">Documentos</h1>
-        <p className="mt-2 text-[var(--ink-soft)]/80">
-          Incorporación de escritos, carpetas investigativas y memos vinculados a causas —
-          con extracción Markdown/OCR para el copiloto IA, Obsidian y Google Drive. El VDR
-          por espacio está en Espacios → Archivos.
-        </p>
-        <p className="mt-2 text-sm">
-          <Link href="/agente" className="text-[var(--sea)]">
-            Preguntar al copiloto sobre estos documentos →
-          </Link>
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
+            Repositorio por causa
+          </p>
+          <h1 className="display mt-2 text-4xl">Documentos</h1>
+          <p className="mt-2 text-[var(--ink-soft)]/80">
+            Incorporación de escritos, carpetas investigativas y memos vinculados a causas —
+            con extracción Markdown/OCR para el copiloto IA, Obsidian y Google Drive. El VDR
+            por espacio está en Espacios → Archivos.
+          </p>
+        </div>
+        <Link className="btn btn-secondary" href="/agente?utility=doc_qa">
+          Preguntar con IA
+        </Link>
       </div>
 
       <DocumentOcrStatus />
@@ -82,6 +82,14 @@ export default async function DocumentosPage() {
                       >
                         Descargar
                       </a>
+                      {d.causaId && (
+                        <Link
+                          href={`/agente?causaId=${d.causaId}&utility=doc_qa&documentoId=${d.id}`}
+                          className="text-xs text-[var(--sea)]"
+                        >
+                          Preguntar IA
+                        </Link>
+                      )}
                       <DocumentDriveAction
                         documentId={d.id}
                         googleDriveId={d.googleDriveId}

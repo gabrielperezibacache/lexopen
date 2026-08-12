@@ -13,9 +13,16 @@ export function formatPlazoEstimate(opts: {
   if (Number.isNaN(desde.getTime())) {
     return { error: "Fecha 'desde' inválida" as const };
   }
+  const dias = Number(opts.dias);
+  if (!Number.isFinite(dias) || !Number.isInteger(dias) || dias < 1) {
+    return { error: "Indique un número entero de días mayor a 0" as const };
+  }
+  if (dias > 3650) {
+    return { error: "El plazo no puede superar 3650 días" as const };
+  }
   const vencimiento = calcularVencimiento({
     desde,
-    dias: opts.dias,
+    dias,
     tipoComputo: opts.tipoComputo || "habiles",
   });
   return {

@@ -533,19 +533,28 @@ Obsidian Local REST API o conservar los objetos mediante el backend de storage.
 ### Hermes Agent / IA multi-proveedor
 
 El copiloto usa cualquier API compatible con OpenAI Chat Completions. Configure el
-proveedor en **Configuración → Endpoints de IA** o con variables de entorno:
+proveedor en **Configuración → Endpoints de IA** (`LlmSettingsForm`, con prueba de
+conexión y CSRF) o con variables de entorno:
 
 - `LLM_API_URL` / `LLM_API_KEY` / `LLM_MODEL` (prioridad)
 - o `HERMES_API_URL` / `HERMES_API_KEY` (compat)
 
 Presets: OpenAI, Azure OpenAI, Groq, Ollama (local), Hermes Agent, o URL custom.
-Las solicitudes van a `POST {apiUrl}/chat/completions`. El context pack ancla la
-respuesta a la causa, la **carpeta investigativa** (`ruta`), documentos rankeados
-por la pregunta, VDR/wiki del espacio vinculado y plazos. En `/agente` se puede
-acotar por carpeta o documentos; el alcance y las fuentes se restauran al reanudar
-el chat. Las respuestas se guardan como historial y requieren aprobación humana.
-Con `LLM_ALLOW_DEMO=1` (o `HERMES_ALLOW_DEMO=1`), una respuesta local de
-demostración se identifica explícitamente como tal.
+Las solicitudes van a `POST {apiUrl}/chat/completions`. La consola **Copiloto IA**
+(`/agente`) ofrece utilidades (briefing, plazos, documentos, borradores,
+investigación con wiki/jurisprudencia) con fuentes ancladas del estudio. El context
+pack ancla la respuesta a la causa, la **carpeta investigativa** (`ruta` /
+`documentoId`), documentos rankeados por la pregunta, VDR/wiki del espacio
+vinculado y plazos. En `/agente` se puede acotar por carpeta o documentos; el
+alcance y las fuentes se restauran al reanudar el chat, y el asistente propone
+próximos pasos sugeridos (crear tarea, calcular plazo, etc.).
+
+Las respuestas se guardan como historial de chat y requieren aprobación humana:
+un borrador puede **descartarse** o **aprobarse y guardarse como minuta** de la
+causa (`approve-to-minuta`), quedando enlazado al chat para evitar aprobaciones
+duplicadas. Con `LLM_ALLOW_DEMO=1` (o `HERMES_ALLOW_DEMO=1`), una respuesta local
+de demostración se identifica explícitamente como tal y su aprobación como minuta
+exige una confirmación explícita adicional.
 
 No es asesoría jurídica automática: no presente ni envíe un texto generado sin
 revisión del abogado responsable.

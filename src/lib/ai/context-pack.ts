@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { confidentialWhere } from "@/lib/api";
 import { confidentialFileWhere } from "@/lib/auth/access";
 import { clasificarUrgencia, diasRestantes } from "@/lib/plazos";
-import type { AiUtilityId } from "@/lib/ai/utilities";
+import { extractSearchNeedles, type AiUtilityId } from "@/lib/ai/utilities";
 import {
   buildFolderIndex,
   documentExtractionAlerts,
@@ -60,6 +60,7 @@ function utilitiesWantDocuments(utility: AiUtilityId) {
 
 export async function buildAiContextPack(opts: {
   causaId?: string | null;
+  documentoId?: string | null;
   utility: AiUtilityId;
   prompt: string;
   role: string;
@@ -74,9 +75,18 @@ export async function buildAiContextPack(opts: {
   const fileConf = confidentialFileWhere(opts.role);
   const budget = excerptBudgetForUtility(opts.utility);
 
-  if (opts.causaId) {
+  let causaId = opts.causaId || null;
+  if (!causaId && opts.documentoId) {
+    const doc = await prisma.documento.findUnique({
+      where: { id: opts.documentoId },
+      select: { causaId: true },
+    });
+    causaId = doc?.causaId || null;
+  }
+
+  if (causaId) {
     const causa = await prisma.causa.findUnique({
-      where: { id: opts.causaId },
+      where: { id: causaId },
       include: {
         partes: true,
         plazos: { orderBy: { fechaLimite: "asc" }, take: 20 },
@@ -184,7 +194,7 @@ export async function buildAiContextPack(opts: {
           type: "plazo",
           id: p.id,
           label: `${p.titulo} (${urg}, ${dias}d)`,
-          href: `/plazos`,
+          href: `/plazos?causaId=${encodeURIComponent(causa.id)}`,
         });
         if (p.esFatal && (urg === "critico" || urg === "vencido" || urg === "proximo")) {
           alerts.push(`Plazo${p.esFatal ? " fatal" : ""} «${p.titulo}»: ${urg} (${dias} días).`);
@@ -202,7 +212,12 @@ export async function buildAiContextPack(opts: {
       });
       blocks.push(`PLAZOS:\n${JSON.stringify(plazoLines, null, 2)}`);
 
-      if (opts.utility === "briefing" || opts.utility === "copilot" || opts.utility === "draft") {
+      if (
+        opts.utility === "briefing" ||
+        opts.utility === "copilot" ||
+        opts.utility === "draft" ||
+        opts.utility === "plazos"
+      ) {
         const movs = causa.movimientos.map((m) => ({
           fecha: m.fecha,
           titulo: m.titulo,
@@ -223,12 +238,47 @@ export async function buildAiContextPack(opts: {
       }
 
       if (utilitiesWantDocuments(opts.utility)) {
-        const scoped = filterDocumentsByScope(causa.documentos as AiDocumentCandidate[], {
+        let docsList: AiDocumentCandidate[] = [...causa.documentos];
+        if (opts.documentoId && !docsList.some((d) => d.id === opts.documentoId)) {
+          const extra = await prisma.documento.findFirst({
+            where: {
+              id: opts.documentoId,
+              causaId: causa.id,
+              ...conf,
+            },
+            select: {
+              id: true,
+              nombre: true,
+              tipo: true,
+              ruta: true,
+              extractedMarkdown: true,
+              extractionStatus: true,
+              updatedAt: true,
+            },
+          });
+          if (extra) docsList = [extra, ...docsList];
+          else if (opts.utility === "doc_qa") {
+            alerts.push(
+              "El documento indicado no está disponible o no pertenece a esta causa."
+            );
+          }
+        }
+
+        const scoped = filterDocumentsByScope(docsList, {
           documentoIds: opts.documentoIds,
           rutaPrefix: opts.rutaPrefix,
         });
         const ranked = rankDocumentsForAi(scoped, opts.prompt);
-        const selected = ranked.slice(0, budget.maxDocs);
+
+        // El documento anclado explícitamente siempre queda primero y visible.
+        let selected = ranked.slice(0, budget.maxDocs);
+        if (opts.documentoId && !selected.some((d) => d.id === opts.documentoId)) {
+          const pinned = ranked.find((d) => d.id === opts.documentoId);
+          if (pinned) {
+            selected = [pinned, ...selected.slice(0, Math.max(0, budget.maxDocs - 1))];
+          }
+        }
+
         const folderIndex = buildFolderIndex(ranked);
         folderIndexRows = Object.entries(folderIndex)
           .map(([carpeta, info]) => ({
@@ -248,6 +298,7 @@ export async function buildAiContextPack(opts: {
                 alcance: {
                   rutaPrefix: opts.rutaPrefix || null,
                   documentoIds: opts.documentoIds?.length ? opts.documentoIds : null,
+                  documentoId: opts.documentoId || null,
                 },
                 carpetas: folderIndex,
               },
@@ -261,15 +312,14 @@ export async function buildAiContextPack(opts: {
 
         const docsPayload = selected.map((d) => {
           const md = (d.extractedMarkdown || "").trim();
+          const pinned = opts.documentoId === d.id;
           if (md || budget.includeEmptyInIndex) {
             if (md) {
               sources.push({
                 type: "documento",
                 id: d.id,
-                label: d.relativePath,
-                href: opts.causaId
-                  ? `/causas/${opts.causaId}`
-                  : "/documentos",
+                label: pinned ? `★ ${d.relativePath}` : d.relativePath,
+                href: opts.causaId ? `/causas/${opts.causaId}` : "/documentos",
                 downloadHref: `/api/documentos/${d.id}/markdown`,
               });
             }
@@ -277,13 +327,16 @@ export async function buildAiContextPack(opts: {
           return {
             id: d.id,
             nombre: d.nombre,
+            pinned,
             ruta: d.ruta || null,
             relativePath: d.relativePath,
             tipo: d.tipo || "otro",
             extractionStatus: d.extractionStatus,
             score: d.score,
             excerpt:
-              budget.includeExcerpts && md ? md.slice(0, budget.excerptChars) : null,
+              budget.includeExcerpts && md
+                ? md.slice(0, pinned ? Math.max(budget.excerptChars, 14_000) : budget.excerptChars)
+                : null,
           };
         });
 
@@ -426,18 +479,25 @@ export async function buildAiContextPack(opts: {
   }
 
   if (opts.utility === "research" || opts.utility === "similar" || opts.utility === "copilot") {
-    const q = opts.prompt.trim().slice(0, 200) || "civil";
-    const needle = q.slice(0, 40);
+    const needles = extractSearchNeedles(opts.prompt, 4);
+    const needleList = needles.length ? needles : ["civil"];
+    const textOr = (fields: string[]) =>
+      needleList.flatMap((needle) =>
+        fields.map((field) => ({
+          [field]: { contains: needle, mode: "insensitive" as const },
+        }))
+      );
+
     const juris = await prisma.jurisprudencia.findMany({
       where: {
-        OR: [
-          { rol: { contains: needle, mode: "insensitive" } },
-          { tribunal: { contains: needle, mode: "insensitive" } },
-          { materia: { contains: needle, mode: "insensitive" } },
-          { caratula: { contains: needle, mode: "insensitive" } },
-          { doctrina: { contains: needle, mode: "insensitive" } },
-          { descripcion: { contains: needle, mode: "insensitive" } },
-        ],
+        OR: textOr([
+          "rol",
+          "tribunal",
+          "materia",
+          "caratula",
+          "doctrina",
+          "descripcion",
+        ]),
       },
       take: 8,
       orderBy: { fecha: "desc" },
@@ -462,15 +522,74 @@ export async function buildAiContextPack(opts: {
         )}`
       );
       for (const j of jurisFinal) {
+        const q = (j.rol || j.caratula || "").trim();
         sources.push({
           type: "jurisprudencia",
           id: j.id,
           label: j.rol || j.caratula || j.id,
-          href: `/jurisprudencia`,
+          href: q
+            ? `/jurisprudencia?q=${encodeURIComponent(q.slice(0, 80))}`
+            : `/jurisprudencia`,
         });
+      }
+      if (!juris.length && opts.utility === "research") {
+        alerts.push(
+          "Sin coincidencia exacta de jurisprudencia; se muestran las más recientes del corpus local."
+        );
       }
     } else if (opts.utility === "research") {
       alerts.push("Sin hits de jurisprudencia en el corpus local LexOpen.");
+    }
+
+    const wikiPages = await prisma.wikiPage.findMany({
+      where: {
+        published: true,
+        OR: textOr(["title", "content"]),
+      },
+      include: { site: { select: { id: true, name: true } } },
+      take: 6,
+      orderBy: { updatedAt: "desc" },
+    });
+    const wikiFinal =
+      wikiPages.length > 0
+        ? wikiPages
+        : opts.utility === "research"
+          ? await prisma.wikiPage.findMany({
+              where: { published: true },
+              include: { site: { select: { id: true, name: true } } },
+              take: 4,
+              orderBy: { updatedAt: "desc" },
+            })
+          : [];
+    if (wikiFinal.length) {
+      blocks.push(
+        `WIKI_ESTUDIO:\n${JSON.stringify(
+          wikiFinal.map((w) => ({
+            id: w.id,
+            title: w.title,
+            slug: w.slug,
+            site: w.site.name,
+            excerpt: (w.content || "").slice(0, 1200),
+          })),
+          null,
+          2
+        )}`
+      );
+      for (const w of wikiFinal) {
+        sources.push({
+          type: "wiki",
+          id: w.id,
+          label: `${w.site.name}: ${w.title}`,
+          href: `/sites/${w.site.id}/wiki#${encodeURIComponent(w.slug)}`,
+        });
+      }
+      if (!wikiPages.length && opts.utility === "research") {
+        alerts.push(
+          "Sin coincidencia exacta de wiki; se muestran páginas recientes del estudio."
+        );
+      }
+    } else if (opts.utility === "research") {
+      alerts.push("Sin hits de wiki del estudio en LexOpen.");
     }
   }
 

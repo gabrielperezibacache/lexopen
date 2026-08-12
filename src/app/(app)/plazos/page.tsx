@@ -6,7 +6,17 @@ import { PlazoForm } from "@/components/PlazoForm";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { requireStaff } from "@/lib/auth/session";
 
-type Props = { searchParams: Promise<{ mes?: string }> };
+type Props = {
+  searchParams: Promise<{
+    mes?: string;
+    causaId?: string;
+    fechaLimite?: string;
+    desde?: string;
+    dias?: string;
+    computo?: string;
+    titulo?: string;
+  }>;
+};
 
 function monthBounds(value?: string) {
   const now = new Date();
@@ -49,19 +59,32 @@ export default async function PlazosPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          Gestión de términos
-        </p>
-        <h1 className="display mt-2 text-4xl">Plazos</h1>
-        <p className="mt-2 text-[var(--ink-soft)]/80">
-          Plazos procesales, audiencias e internos. Envíelos a Google Calendar con un clic.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
+            Gestión de términos
+          </p>
+          <h1 className="display mt-2 text-4xl">Plazos</h1>
+          <p className="mt-2 text-[var(--ink-soft)]/80">
+            Plazos procesales, audiencias e internos. Envíelos a Google Calendar con un clic.
+          </p>
+        </div>
+        <Link className="btn btn-secondary" href="/agente?utility=plazos">
+          Analizar con copiloto
+        </Link>
       </div>
 
       <PlazoForm
         causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))}
         responsables={responsables.map((u) => ({ id: u.id, label: u.name }))}
+        defaults={{
+          causaId: sp.causaId || "",
+          fechaNotificacion: sp.desde || "",
+          diasPlazo: sp.dias || "",
+          tipoComputo: sp.computo === "corridos" ? "corridos" : "habiles",
+          fechaLimite: sp.fechaLimite || "",
+          titulo: sp.titulo || "",
+        }}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

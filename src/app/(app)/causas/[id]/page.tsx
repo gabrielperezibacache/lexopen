@@ -366,9 +366,17 @@ export default async function CausaDetailPage({ params }: Params) {
         <section className="panel rounded-3xl p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Documentos del expediente</h2>
-            <Link href="/documentos" className="text-sm text-[var(--sea)]">
-              Ver repositorio
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={`/agente?causaId=${causa.id}&utility=doc_qa`}
+                className="text-sm text-[var(--sea)]"
+              >
+                Preguntar con IA
+              </Link>
+              <Link href="/documentos" className="text-sm text-[var(--sea)]">
+                Ver repositorio
+              </Link>
+            </div>
           </div>
           <div className="mt-4 space-y-3">
             {causa.documentos.map((d) => (
@@ -384,6 +392,12 @@ export default async function CausaDetailPage({ params }: Params) {
                   {d.obsidianPath ? ` · Obsidian: ${d.obsidianPath}` : ""}
                 </div>
                 <div className="mt-1 flex flex-wrap gap-3">
+                  <Link
+                    href={`/agente?causaId=${causa.id}&utility=doc_qa&documentoId=${d.id}`}
+                    className="text-xs text-[var(--sea)]"
+                  >
+                    Preguntar IA
+                  </Link>
                   <a
                     href={`/api/documentos/${d.id}/content`}
                     className="text-xs text-[var(--sea)]"
