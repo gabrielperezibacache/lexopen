@@ -148,14 +148,15 @@ function IntegracionesInner() {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <h2 className="text-xl font-semibold">Hermes Agent</h2>
+          <h2 className="text-xl font-semibold">Copiloto IA (Hermes)</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
-            Cliente HTTP compatible con OpenAI hacia el API server de Hermes. Si no hay agente
-            local, LexOpen responde en modo demo con guardrails.
+            Utilidades tipo Julia.cl: briefing, Q&A documental, borradores, plazos,
+            investigación y casos similares, con fuentes del estudio. Si Hermes no
+            está disponible, responde en modo demo etiquetado.
           </p>
           <p className="mt-4 text-xs text-[var(--ink-soft)]/65">{hermesInfo || "Cargando…"}</p>
           <a href="/agente" className="btn btn-secondary mt-5 inline-flex">
-            Abrir consola Hermes
+            Abrir copiloto
           </a>
         </section>
 
