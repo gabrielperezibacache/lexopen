@@ -568,11 +568,16 @@ npm test               # pruebas de utilidades, contratos, smoke y desktop
 npm run build          # Prisma generate + next build
 npm run start          # servidor Next en modo producción
 npm run desktop:test   # configuración del cliente Electron
+npm run e2e:install    # descarga Chromium para las pruebas de navegador
+E2E_DATABASE_URL=postgresql://lexopen:lexopen@127.0.0.1:5432/lexopen_e2e npm run e2e
 ```
 
-La suite actual usa scripts ejecutables con `tsx` y assertions; no existe todavía
-una suite de navegador Playwright/Cypress. El workflow de GitHub Actions ejecuta
-PostgreSQL 16, `npm ci`, migraciones, tests, lint y build en cada push a `main` o
+`npm run e2e` reinicia y siembra la base indicada por `E2E_DATABASE_URL`; el
+script rechaza hosts remotos y nombres de base que no incluyan `e2e` o `test`.
+Use siempre una base local desechable. Playwright inicia un Next.js de prueba,
+valida login staff, redirección del portal cliente y protección de rutas. El
+workflow de GitHub Actions instala Chromium con sus dependencias y ejecuta
+PostgreSQL 16, migraciones, tests, lint, build y E2E en cada push a `main` o
 ramas `cursor/**`, y en pull requests.
 
 Para cambios que afecten datos, permisos o integraciones:
