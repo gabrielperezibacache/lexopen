@@ -424,10 +424,44 @@ export async function startHost(options = {}) {
       );
     }
 
+    let hostSchedulers = null;
+    try {
+      const schedulersModule = path.join(
+        repoRoot,
+        "scripts",
+        "local-host-schedulers.mjs"
+      );
+      if (fs.existsSync(schedulersModule)) {
+        const { startLocalHostSchedulers } = await import(
+          pathToFileURL(schedulersModule).href
+        );
+        hostSchedulers = await startLocalHostSchedulers({
+          baseUrl: url,
+          env: process.env,
+          logPrefix: "lexopen-host",
+          alreadyHealthy: true,
+        });
+      } else {
+        console.warn(
+          "[lexopen-host] scripts/local-host-schedulers.mjs no empaquetado; schedulers locales omitidos."
+        );
+      }
+    } catch (e) {
+      console.warn(
+        "[lexopen-host] No se pudieron iniciar schedulers locales:",
+        e instanceof Error ? e.message : e
+      );
+    }
+
     let stopPromise = null;
     const stop = async () => {
       if (stopPromise) return stopPromise;
       stopPromise = (async () => {
+        try {
+          hostSchedulers?.stop?.();
+        } catch (e) {
+          console.warn("[lexopen-host] schedulers.stop:", e);
+        }
         await stopChild(child);
         try {
           await pg.stop();

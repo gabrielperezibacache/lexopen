@@ -174,6 +174,7 @@ export async function getConfigSnapshot() {
           0
         ),
         plazosAlertasDays: envNumber(env, "PLAZOS_ALERTAS_DAYS", 3),
+        plazosAlertasEmail: envFlag(env, "PLAZOS_ALERTAS_EMAIL"),
         concurrency: envNumber(env, "PJUD_SYNC_CONCURRENCY", 5),
         dailySolveBudget: envNumber(env, "PJUD_CAUSAS_DAILY_SOLVE_BUDGET", 50),
         sessionTtlMs: envNumber(env, "PJUD_SESSION_TTL_MS", 1_500_000),
