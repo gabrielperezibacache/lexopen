@@ -54,3 +54,4 @@ yarn-error.log*
 /desktop/data
 /playwright-report/
 /test-results/
+/.tmp/
