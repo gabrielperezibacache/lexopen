@@ -19,6 +19,8 @@ import {
 import { requireStaff } from "@/lib/auth/session";
 import { confidentialWhere } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
+import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -363,37 +365,73 @@ export default async function CausaDetailPage({ params }: Params) {
 
         <section className="panel rounded-3xl p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Documentos</h2>
-            <Link
-              href={`/agente?causaId=${causa.id}&utility=doc_qa`}
-              className="text-sm text-[var(--sea)]"
-            >
-              Preguntar con IA
-            </Link>
+            <h2 className="text-lg font-semibold">Documentos del expediente</h2>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={`/agente?causaId=${causa.id}&utility=doc_qa`}
+                className="text-sm text-[var(--sea)]"
+              >
+                Preguntar con IA
+              </Link>
+              <Link href="/documentos" className="text-sm text-[var(--sea)]">
+                Ver repositorio
+              </Link>
+            </div>
           </div>
           <div className="mt-4 space-y-3">
             {causa.documentos.map((d) => (
               <div key={d.id} className="rounded-2xl border border-[var(--line)] px-3 py-2 text-sm">
                 <div className="font-medium">{d.nombre}</div>
+                {d.ruta && (
+                  <div className="text-xs text-[var(--ink-soft)]/55">{d.ruta}/</div>
+                )}
                 <div className="text-xs text-[var(--ink-soft)]/65">
                   {d.tipo} · v{d.version}
+                  {d.extractionStatus ? ` · ${d.extractionStatus}` : ""}
                   {d.googleDriveId ? ` · Drive: ${d.googleDriveId}` : ""}
                   {d.obsidianPath ? ` · Obsidian: ${d.obsidianPath}` : ""}
                 </div>
-                <Link
-                  href={`/agente?causaId=${causa.id}&utility=doc_qa&documentoId=${d.id}`}
-                  className="mt-1 inline-block text-xs text-[var(--sea)]"
-                >
-                  Preguntar IA
-                </Link>
+                <div className="mt-1 flex flex-wrap gap-3">
+                  <Link
+                    href={`/agente?causaId=${causa.id}&utility=doc_qa&documentoId=${d.id}`}
+                    className="text-xs text-[var(--sea)]"
+                  >
+                    Preguntar IA
+                  </Link>
+                  <a
+                    href={`/api/documentos/${d.id}/content`}
+                    className="text-xs text-[var(--sea)]"
+                  >
+                    Descargar
+                  </a>
+                  {d.extractionStatus === "completed" && d.extractedMarkdown && (
+                    <a
+                      href={`/api/documentos/${d.id}/markdown`}
+                      className="text-xs text-[var(--sea)]"
+                    >
+                      Markdown
+                    </a>
+                  )}
+                  <DocumentDriveAction
+                    documentId={d.id}
+                    googleDriveId={d.googleDriveId}
+                    hasText={Boolean(
+                      (d.extractedMarkdown || "").trim()
+                    )}
+                  />
+                </div>
               </div>
             ))}
             {causa.documentos.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">Sin documentos.</p>
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Sin documentos. Incorpore archivos o una carpeta investigativa abajo.
+              </p>
             )}
           </div>
         </section>
       </div>
+
+      <DocumentoIngestForm lockedCausaId={causa.id} compact />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">

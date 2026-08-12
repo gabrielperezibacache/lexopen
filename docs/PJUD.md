@@ -9,7 +9,7 @@ SaaS ni otro backend ajeno que custodie su cartera.
 
 | Qué | Dónde |
 |-----|--------|
-| App, Postgres, `PjudSyncJob`, digest, vault ClaveÚnica | **Su host** (web:host / VPS / Render propio) |
+| App, Postgres, `PjudSyncJob`, digest, vault ClaveÚnica | **Su host local** (`web:host` / desktop) |
 | Consulta OJV / ClaveÚnica gob / CAPTCHA solver / partner API / Gmail | **APIs externas permitidas** (salida de red) |
 | Sidecar Playwright | Mismo despliegue o `localhost` / red privada suya |
 | CSV | Offline respecto de OJV; útil como respaldo |
@@ -98,8 +98,8 @@ Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 |----------|--------|
 | `PJUD_PUBLIC_SCRAPE=1` | Habilita scrape OJV in-process |
 | `CAPTCHA_SOLVER_PROVIDER` + `CAPTCHA_SOLVER_API_KEY` | Elegible: `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster`. Key opcional solo en `nopecha`. |
-| `PJUD_SCRAPER_URL` | Microservicio (`POST /causas/lookup`, `/mis-causas`, `/causas/buscar`). Acepta `http://host:port` (Render `fromService` hostport) |
-| `PJUD_SCRAPER_ALLOW_PRIVATE=1` | Permite sidecar en red privada (Render `.internal`) |
+| `PJUD_SCRAPER_URL` | Microservicio local (`POST /causas/lookup`, `/mis-causas`, `/causas/buscar`). Típico: `http://127.0.0.1:8787` |
+| `PJUD_SCRAPER_ALLOW_PRIVATE=1` | Permite sidecar en localhost / red privada del Host |
 | `PJUD_CLAVEUNICA_SCRAPE=1` | Automatiza login ClaveÚnica → Mis Causas (vía CM `/api/pjud-credentials`) |
 | `PJUD_SECRETS_KEY` | Vault AES-256-GCM local para password ClaveÚnica (fallback: `SESSION_SECRET`) |
 | `PJUD_CAUSAS_DAILY_SOLVE_BUDGET` | Tope diario de CAPTCHA (default 50) |
@@ -188,7 +188,9 @@ Endpoints: `GET /health`, `POST /causas/lookup`, `POST /mis-causas`, `POST /caus
 `GET /health` reporta `workerRunning` / `scrapeReady` / `captcha` (análogo a CM `workerRunning`).
 `POST /online/probe` (auth Bearer) valida browser + OJV guest + salas sin gastar CAPTCHA en lookup.
 
-En Render, el Blueprint define `lexopen-pjud-scraper` (`type: pserv`) con `npx playwright install chromium` en build, y cablea `PJUD_SCRAPER_URL` + `PJUD_SCRAPER_ALLOW_PRIVATE=1` en el web.
+El sidecar se ejecuta en el mismo Host: `npm run pjud:chromium` (una vez) y
+`npm run pjud:host`. En el web configure `PJUD_SCRAPER_URL=http://127.0.0.1:8787`,
+`PJUD_SCRAPER_ALLOW_PRIVATE=1` y la misma `PJUD_SCRAPER_KEY`.
 
 ## Cron / cola
 
@@ -196,9 +198,9 @@ En Render, el Blueprint define `lexopen-pjud-scraper` (`type: pserv`) con `npx p
 - `GET /api/pjud/queue` → stats estilo CM (`waiting`/`active`/`completed`/`failed`/`delayed`).
 - Fallos aplican **backoff** exponencial sobre el intervalo base (`pjudFailCount`).
 - Retry fallidos: `action: retry-fallidos` re-encola solo esos jobs.
-- Render: cartera cada **4h** (`0 */4 * * *`, alineado a `PJUD_SYNC_INTERVAL_MINUTES=240`); Mis Causas ~07:00 Santiago (`0 10 * * *` UTC); digest ~08:00 Santiago (`0 12 * * *` UTC).
-- `CRON_SECRET` y `PJUD_SCRAPER_KEY` se generan en el web y se copian a crons/sidecar (`fromService.envVarKey`) para evitar desalineación.
-- Host local: `PJUD_SYNC_INTERVAL_MINUTES`, `PJUD_MIS_CAUSAS_INTERVAL_MINUTES`, `PJUD_DIGEST_INTERVAL_MINUTES` en `scripts/web-host.mjs`.
+- Host local (`scripts/web-host.mjs`): programe con `PJUD_SYNC_INTERVAL_MINUTES=240`,
+  `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` y `PJUD_DIGEST_INTERVAL_MINUTES` (p. ej. digest
+  cercano a las 08:00 del Host) más `CRON_SECRET`.
 
 ## Digest email (~08:00 Santiago)
 

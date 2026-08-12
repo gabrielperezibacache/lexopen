@@ -26,28 +26,30 @@ export const AI_UTILITIES: AiUtilityInfo[] = [
   {
     id: "copilot",
     label: "Copiloto",
-    short: "Habla como a un colega; LexOpen entiende y responde con contexto del estudio.",
+    short:
+      "Habla como a un colega; usa la carpeta investigativa, plazos y VDR vinculados a la causa.",
     starter:
       "¿Qué debo priorizar hoy en esta causa y qué riesgos veo en los próximos 7 días?",
     systemHint:
-      "Actúa como copiloto del estudio: prioriza, sugiere siguientes pasos y señala incertidumbre.",
+      "Actúa como copiloto del estudio: prioriza con base en CARPETA_INVESTIGATIVA, DOCUMENTOS_INDEXADOS, plazos y VDR. Señala incertidumbre y documentos sin OCR.",
   },
   {
     id: "briefing",
     label: "Briefing de causa",
-    short: "Resumen estructurado: etapa, plazos, movimientos y alertas.",
+    short: "Resumen estructurado: etapa, plazos, movimientos, carpeta investigativa y alertas.",
     starter: "Elabora un briefing ejecutivo del estado procesal y próximos pasos.",
     systemHint:
-      "Entrega un briefing estructurado (estado, hechos clave, plazos, riesgos, próximos pasos). Cita solo datos del contexto.",
+      "Entrega un briefing estructurado (estado, hechos clave, plazos, mapa de carpetas investigativas, riesgos, próximos pasos). Cita solo datos del contexto.",
   },
   {
     id: "doc_qa",
     label: "Preguntar a documentos",
-    short: "Responde solo con el Markdown extraído de documentos de la causa.",
+    short:
+      "Responde solo con Markdown extraído de la carpeta investigativa / documentos seleccionados.",
     starter:
       "Según los documentos indexados de la causa, ¿qué dice sobre los montos reclamados?",
     systemHint:
-      "Responde ÚNICAMENTE con extractos del contexto documental. Si no hay texto indexado, dilo y no inventes.",
+      "Responde ÚNICAMENTE con extractos de DOCUMENTOS_INDEXADOS (y VDR si aplica). Cita relativePath. Si falta texto/OCR, dilo y no inventes.",
   },
   {
     id: "draft",
@@ -56,7 +58,7 @@ export const AI_UTILITIES: AiUtilityInfo[] = [
     starter:
       "Redacta un borrador de escrito de contestación con hechos, derecho y petitorio (borrador).",
     systemHint:
-      "Produce un BORRADOR etiquetado. No firmes ni asegures que es presentable. Marca [REVISAR] donde falten hechos.",
+      "Produce un BORRADOR etiquetado anclado a documentos indexados (relativePath). No firmes ni asegures que es presentable. Marca [REVISAR] donde falten hechos.",
   },
   {
     id: "plazos",
@@ -94,7 +96,11 @@ export function getAiUtility(id?: string | null): AiUtilityInfo {
 
 export function inferAiUtility(prompt: string): AiUtilityId {
   const p = prompt.toLowerCase();
-  if (/documento|pdf|extracto|qu[eé] dice|seg[uú]n el escrito/.test(p)) {
+  if (
+    /documento|pdf|extracto|qu[eé] dice|seg[uú]n el escrito|carpeta investigativ|expediente digital|ocr/.test(
+      p
+    )
+  ) {
     return "doc_qa";
   }
   if (/plazo|fatal|vencim|d[ií]as h[aá]biles|urgencia/.test(p)) {

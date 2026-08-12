@@ -4,22 +4,59 @@
  */
 
 import { prisma } from "@/lib/db";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { confidentialWhere } from "@/lib/api";
+import { confidentialFileWhere } from "@/lib/auth/access";
 import { clasificarUrgencia, diasRestantes } from "@/lib/plazos";
 import { extractSearchNeedles, type AiUtilityId } from "@/lib/ai/utilities";
+import {
+  buildFolderIndex,
+  documentExtractionAlerts,
+  excerptBudgetForUtility,
+  filterDocumentsByScope,
+  rankDocumentsForAi,
+  type AiDocumentCandidate,
+} from "@/lib/ai/document-context";
 
 export type AiSourceRef = {
-  type: "causa" | "documento" | "plazo" | "movimiento" | "jurisprudencia" | "wiki" | "minuta";
+  type:
+    | "causa"
+    | "documento"
+    | "plazo"
+    | "movimiento"
+    | "jurisprudencia"
+    | "wiki"
+    | "minuta"
+    | "vdr";
   id: string;
   label: string;
   href?: string;
+  /** Optional secondary download (e.g. extracted markdown). */
+  downloadHref?: string;
 };
 
 export type AiContextPack = {
   text: string;
   sources: AiSourceRef[];
   alerts: string[];
+  folderIndex: Array<{
+    carpeta: string;
+    count: number;
+    withText: number;
+    needsOcr: number;
+  }>;
 };
+
+function utilitiesWantDocuments(utility: AiUtilityId) {
+  return (
+    utility === "doc_qa" ||
+    utility === "draft" ||
+    utility === "copilot" ||
+    utility === "briefing" ||
+    utility === "research" ||
+    utility === "similar" ||
+    utility === "plazos"
+  );
+}
 
 export async function buildAiContextPack(opts: {
   causaId?: string | null;
@@ -27,10 +64,16 @@ export async function buildAiContextPack(opts: {
   utility: AiUtilityId;
   prompt: string;
   role: string;
+  documentoIds?: string[] | null;
+  rutaPrefix?: string | null;
 }): Promise<AiContextPack> {
   const sources: AiSourceRef[] = [];
   const alerts: string[] = [];
   const blocks: string[] = [];
+  let folderIndexRows: AiContextPack["folderIndex"] = [];
+  const conf = confidentialWhere(opts.role);
+  const fileConf = confidentialFileWhere(opts.role);
+  const budget = excerptBudgetForUtility(opts.utility);
 
   let causaId = opts.causaId || null;
   if (!causaId && opts.documentoId) {
@@ -49,26 +92,69 @@ export async function buildAiContextPack(opts: {
         plazos: { orderBy: { fechaLimite: "asc" }, take: 20 },
         movimientos: { orderBy: { fecha: "desc" }, take: 15 },
         documentos: {
-          where: canSeeConfidential(opts.role)
-            ? {}
-            : { confidencial: false },
+          where: conf,
           orderBy: { updatedAt: "desc" },
-          take: 8,
+          take: 80,
           select: {
             id: true,
             nombre: true,
+            tipo: true,
+            ruta: true,
             extractedMarkdown: true,
             extractionStatus: true,
             confidencial: true,
+            privilegio: true,
+            updatedAt: true,
           },
         },
         minutas: {
-          where: canSeeConfidential(opts.role) ? {} : { confidencial: false },
+          where: conf,
           include: { acciones: true },
           orderBy: { fecha: "desc" },
           take: 5,
         },
         cliente: { select: { id: true, razonSocial: true, rut: true } },
+        site: {
+          select: {
+            id: true,
+            name: true,
+            folders: {
+              select: {
+                id: true,
+                name: true,
+                parentId: true,
+                files: {
+                  where: fileConf,
+                  select: {
+                    id: true,
+                    name: true,
+                    mimeType: true,
+                    tags: true,
+                    contenido: true,
+                    folderId: true,
+                    updatedAt: true,
+                  },
+                  take: 40,
+                  orderBy: { updatedAt: "desc" },
+                },
+              },
+            },
+            files: {
+              where: { folderId: null, ...fileConf },
+              select: {
+                id: true,
+                name: true,
+                mimeType: true,
+                tags: true,
+                contenido: true,
+                folderId: true,
+                updatedAt: true,
+              },
+              take: 20,
+              orderBy: { updatedAt: "desc" },
+            },
+          },
+        },
       },
     });
 
@@ -151,67 +237,186 @@ export async function buildAiContextPack(opts: {
         blocks.push(`MOVIMIENTOS_RECIENTES:\n${JSON.stringify(movs, null, 2)}`);
       }
 
-      if (
-        opts.utility === "doc_qa" ||
-        opts.utility === "draft" ||
-        opts.utility === "copilot" ||
-        opts.utility === "briefing"
-      ) {
-        let docsList = [...causa.documentos];
-        if (opts.documentoId) {
-          const pinned = docsList.find((d) => d.id === opts.documentoId);
-          if (pinned) {
-            docsList = [pinned, ...docsList.filter((d) => d.id !== pinned.id)];
-          } else {
-            const extra = await prisma.documento.findFirst({
-              where: {
-                id: opts.documentoId,
-                causaId: causa.id,
-                ...(canSeeConfidential(opts.role)
-                  ? {}
-                  : { confidencial: false }),
-              },
-              select: {
-                id: true,
-                nombre: true,
-                extractedMarkdown: true,
-                extractionStatus: true,
-                confidencial: true,
-              },
-            });
-            if (extra) docsList = [extra, ...docsList];
-            else
-              alerts.push(
-                "El documento indicado no está disponible o no pertenece a esta causa."
-              );
+      if (utilitiesWantDocuments(opts.utility)) {
+        let docsList: AiDocumentCandidate[] = [...causa.documentos];
+        if (opts.documentoId && !docsList.some((d) => d.id === opts.documentoId)) {
+          const extra = await prisma.documento.findFirst({
+            where: {
+              id: opts.documentoId,
+              causaId: causa.id,
+              ...conf,
+            },
+            select: {
+              id: true,
+              nombre: true,
+              tipo: true,
+              ruta: true,
+              extractedMarkdown: true,
+              extractionStatus: true,
+              updatedAt: true,
+            },
+          });
+          if (extra) docsList = [extra, ...docsList];
+          else if (opts.utility === "doc_qa") {
+            alerts.push(
+              "El documento indicado no está disponible o no pertenece a esta causa."
+            );
           }
         }
-        const docs = docsList.map((d) => {
+
+        const scoped = filterDocumentsByScope(docsList, {
+          documentoIds: opts.documentoIds,
+          rutaPrefix: opts.rutaPrefix,
+        });
+        const ranked = rankDocumentsForAi(scoped, opts.prompt);
+
+        // El documento anclado explícitamente siempre queda primero y visible.
+        let selected = ranked.slice(0, budget.maxDocs);
+        if (opts.documentoId && !selected.some((d) => d.id === opts.documentoId)) {
+          const pinned = ranked.find((d) => d.id === opts.documentoId);
+          if (pinned) {
+            selected = [pinned, ...selected.slice(0, Math.max(0, budget.maxDocs - 1))];
+          }
+        }
+
+        const folderIndex = buildFolderIndex(ranked);
+        folderIndexRows = Object.entries(folderIndex)
+          .map(([carpeta, info]) => ({
+            carpeta,
+            count: info.count,
+            withText: info.withText,
+            needsOcr: info.needsOcr,
+          }))
+          .sort((a, b) => b.count - a.count);
+
+        if (Object.keys(folderIndex).length) {
+          blocks.push(
+            `CARPETA_INVESTIGATIVA:\n${JSON.stringify(
+              {
+                total: ranked.length,
+                seleccionados: selected.length,
+                alcance: {
+                  rutaPrefix: opts.rutaPrefix || null,
+                  documentoIds: opts.documentoIds?.length ? opts.documentoIds : null,
+                  documentoId: opts.documentoId || null,
+                },
+                carpetas: folderIndex,
+              },
+              null,
+              2
+            )}`
+          );
+        }
+
+        alerts.push(...documentExtractionAlerts(selected, opts.utility));
+
+        const docsPayload = selected.map((d) => {
           const md = (d.extractedMarkdown || "").trim();
           const pinned = opts.documentoId === d.id;
-          if (md) {
-            sources.push({
-              type: "documento",
-              id: d.id,
-              label: pinned ? `★ ${d.nombre}` : d.nombre,
-              href: `/api/documentos/${d.id}/markdown`,
-            });
-          } else if (opts.utility === "doc_qa") {
-            alerts.push(
-              `Documento «${d.nombre}» sin texto indexado (OCR/extracción pendiente).`
-            );
+          if (md || budget.includeEmptyInIndex) {
+            if (md) {
+              sources.push({
+                type: "documento",
+                id: d.id,
+                label: pinned ? `★ ${d.relativePath}` : d.relativePath,
+                href: opts.causaId ? `/causas/${opts.causaId}` : "/documentos",
+                downloadHref: `/api/documentos/${d.id}/markdown`,
+              });
+            }
           }
           return {
             id: d.id,
             nombre: d.nombre,
             pinned,
+            ruta: d.ruta || null,
+            relativePath: d.relativePath,
+            tipo: d.tipo || "otro",
             extractionStatus: d.extractionStatus,
-            excerpt: md
-              ? md.slice(0, pinned ? 14_000 : 6000)
-              : null,
+            score: d.score,
+            excerpt:
+              budget.includeExcerpts && md
+                ? md.slice(0, pinned ? Math.max(budget.excerptChars, 14_000) : budget.excerptChars)
+                : null,
           };
         });
-        blocks.push(`DOCUMENTOS_INDEXADOS:\n${JSON.stringify(docs, null, 2)}`);
+
+        if (docsPayload.length) {
+          blocks.push(`DOCUMENTOS_INDEXADOS:\n${JSON.stringify(docsPayload, null, 2)}`);
+        } else if (opts.utility === "doc_qa") {
+          alerts.push(
+            "No hay documentos en el alcance seleccionado. Incorpore una carpeta investigativa o amplíe el filtro."
+          );
+        } else if (causa.documentos.length === 0) {
+          alerts.push(
+            "La causa no tiene documentos incorporados. Use Documentos → Incorporar al expediente."
+          );
+        }
+
+        if (opts.rutaPrefix && !scoped.length && causa.documentos.length) {
+          alerts.push(
+            `Ningún documento coincide con la carpeta «${opts.rutaPrefix}». Revise el prefijo de ruta.`
+          );
+        }
+      }
+
+      // VDR vinculado a la causa (índice liviano + snippets de texto)
+      const site = causa.site;
+      if (
+        site &&
+        (opts.utility === "copilot" ||
+          opts.utility === "briefing" ||
+          opts.utility === "doc_qa" ||
+          opts.utility === "draft" ||
+          opts.utility === "research")
+      ) {
+        const folderNameById = new Map(site.folders.map((f) => [f.id, f.name]));
+        const folderParentById = new Map(site.folders.map((f) => [f.id, f.parentId]));
+        function folderPath(folderId: string | null | undefined): string {
+          if (!folderId) return "";
+          const parts: string[] = [];
+          let cur: string | null | undefined = folderId;
+          const guard = new Set<string>();
+          while (cur && !guard.has(cur)) {
+            guard.add(cur);
+            parts.unshift(folderNameById.get(cur) || cur);
+            cur = folderParentById.get(cur) || null;
+          }
+          return parts.join("/");
+        }
+        const vdrFiles = [
+          ...site.files.map((f) => ({ ...f, folderId: null as string | null })),
+          ...site.folders.flatMap((folder) =>
+            folder.files.map((f) => ({ ...f, folderId: folder.id as string | null }))
+          ),
+        ].slice(0, 30);
+
+        if (vdrFiles.length) {
+          const vdrPayload = vdrFiles.map((f) => {
+            const path = folderPath(f.folderId);
+            const relative = path ? `${path}/${f.name}` : f.name;
+            const text = (f.contenido || "").trim();
+            sources.push({
+              type: "vdr",
+              id: f.id,
+              label: relative,
+              href: `/sites/${site.id}/archivos`,
+            });
+            return {
+              id: f.id,
+              relativePath: relative,
+              mimeType: f.mimeType,
+              tags: f.tags || "",
+              excerpt: text ? text.slice(0, 1500) : null,
+            };
+          });
+          blocks.push(
+            `VDR_ESPACIO_VINCULADO:\n${JSON.stringify(
+              { siteId: site.id, siteName: site.name, files: vdrPayload },
+              null,
+              2
+            )}`
+          );
+        }
       }
 
       if (causa.minutas.length) {
@@ -234,6 +439,40 @@ export async function buildAiContextPack(opts: {
             label: m.titulo,
             href: `/causas/${causa.id}/minutas/${m.id}`,
           });
+        }
+      }
+
+      // Wiki del site vinculado (si research/copilot)
+      if (
+        site &&
+        (opts.utility === "research" || opts.utility === "copilot")
+      ) {
+        const wiki = await prisma.wikiPage.findMany({
+          where: { siteId: site.id },
+          take: 6,
+          orderBy: { updatedAt: "desc" },
+          select: { id: true, title: true, content: true },
+        });
+        if (wiki.length) {
+          blocks.push(
+            `WIKI_ESPACIO:\n${JSON.stringify(
+              wiki.map((w) => ({
+                id: w.id,
+                title: w.title,
+                excerpt: (w.content || "").slice(0, 1200),
+              })),
+              null,
+              2
+            )}`
+          );
+          for (const w of wiki) {
+            sources.push({
+              type: "wiki",
+              id: w.id,
+              label: w.title,
+              href: `/sites/${site.id}/wiki`,
+            });
+          }
         }
       }
     }
@@ -263,7 +502,6 @@ export async function buildAiContextPack(opts: {
       take: 8,
       orderBy: { fecha: "desc" },
     });
-    // Fallback loose if no hits
     const jurisFinal =
       juris.length > 0
         ? juris
@@ -401,5 +639,5 @@ export async function buildAiContextPack(opts: {
     ? blocks.join("\n\n")
     : "(Sin causa ni corpus adicional; responde de forma general y señala límites.)";
 
-  return { text, sources, alerts };
+  return { text, sources, alerts, folderIndex: folderIndexRows };
 }

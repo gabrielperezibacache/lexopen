@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/db";
-import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
+import {
+  fetchSafeOutbound,
+  isLoopbackHostname,
+  isSafeOutboundHttpUrl,
+} from "@/lib/net/safe-url";
 import { safeJsonParse } from "@/lib/safe-json";
 
 export type HermesConfig = {
@@ -40,20 +44,20 @@ export async function askHermes(params: {
 }) {
   const config = await getHermesConfig();
   let apiUrl: URL;
+  let allowLocal = false;
   try {
     apiUrl = new URL(config.apiUrl);
-    // In development, localhost Hermes is intentional; block private hosts in production.
-    const allowLocal =
+    // Loopback Hermes is intentional locally; production needs HERMES_ALLOW_PRIVATE_URL=1.
+    allowLocal =
       process.env.NODE_ENV !== "production" ||
       process.env.HERMES_ALLOW_PRIVATE_URL === "1";
+    const allowHttp = allowLocal || process.env.NODE_ENV !== "production";
     if (
       !isSafeOutboundHttpUrl(config.apiUrl, {
-        allowHttp: allowLocal || process.env.NODE_ENV !== "production",
+        allowHttp,
+        allowLoopback: allowLocal,
       }) &&
-      !(
-        allowLocal &&
-        (apiUrl.hostname === "localhost" || apiUrl.hostname === "127.0.0.1")
-      )
+      !(allowLocal && isLoopbackHostname(apiUrl.hostname))
     ) {
       return {
         source: "error" as const,
@@ -83,7 +87,10 @@ export async function askHermes(params: {
   if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
 
   try {
-    const res = await fetch(`${apiUrl.toString().replace(/\/+$/, "")}/chat/completions`, {
+    const endpoint = `${apiUrl.toString().replace(/\/+$/, "")}/chat/completions`;
+    const res = await fetchSafeOutbound(endpoint, {
+      allowHttp: allowLocal || process.env.NODE_ENV !== "production",
+      allowLoopback: allowLocal,
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -167,8 +174,8 @@ function buildDemoReply(prompt: string, utilityLabel?: string) {
 **Consulta:** ${prompt.slice(0, 500) || "(vacía)"}
 
 ### Qué haría el asistente con Hermes conectado
-1. Anclar la respuesta a la causa, documentos indexados y plazos del estudio.
-2. Citar fuentes locales (movimientos, PDF extraídos, jurisprudencia del corpus).
+1. Anclar la respuesta a la causa, carpeta investigativa (rutas), documentos indexados y plazos.
+2. Citar fuentes locales con relativePath (movimientos, PDF extraídos, VDR, jurisprudencia).
 3. Proponer un borrador o plan de trabajo etiquetado para revisión humana.
 
 ### Borrador sugerido
@@ -196,7 +203,9 @@ recuerda el hilo y cita fuentes verificables del propio host).
 Reglas:
 - Español chileno formal y claro.
 - NO inventes sentencias, RIT, artículos ni hechos que no estén en el contexto.
-- Si falta información, dilo y propone qué dato pedir o revisar en LexOpen.
+- Cuando cites documentos, usa relativePath (carpeta/archivo) del contexto.
+- Si un documento aparece sin excerpt o con needs_ocr/pending, no inventes su contenido.
+- Si falta información, dilo y propone qué dato pedir o revisar en LexOpen (p. ej. reintentar OCR).
 - Etiqueta borradores como BORRADOR y marca [REVISAR] lo incierto.
 - Plazos: el motor LexOpen es estimación interna, no cómputo oficial del tribunal.
 - No sustituyas el criterio profesional ni presentes textos como listos para tribunal sin revisión humana.

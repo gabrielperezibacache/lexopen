@@ -4,6 +4,7 @@ import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api
 import { writeAudit } from "@/lib/audit";
 import { getDigestStatus, runPjudDigest } from "@/lib/pjud/digest";
 import { providerStatusPublic } from "@/lib/pjud/sync";
+import { verifyCronSecret } from "@/lib/security/cron-secret";
 
 export async function GET() {
   try {
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
     const cron = req.headers.get("x-cron-secret");
     let actorId: string | null = null;
     if (cron) {
-      if (!process.env.CRON_SECRET || cron !== process.env.CRON_SECRET) {
+      if (!verifyCronSecret(cron)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
     } else {

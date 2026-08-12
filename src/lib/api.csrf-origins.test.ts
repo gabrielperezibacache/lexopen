@@ -55,6 +55,30 @@ assert.throws(() =>
   )
 );
 
+// LEXOPEN_RELAX_CSRF must not weaken production CSRF.
+env.LEXOPEN_RELAX_CSRF = "1";
+assert.throws(() =>
+  assertCsrf(
+    new Request("https://app.example/api/change", {
+      method: "POST",
+      headers: { host: "app.example" },
+    })
+  )
+);
+
+// With trusted origins configured, spoofed Host alone must not authorize Origin.
+assert.throws(() =>
+  assertCsrf(
+    new Request("https://evil.example/api/change", {
+      method: "POST",
+      headers: {
+        host: "evil.example",
+        origin: "https://evil.example",
+      },
+    })
+  )
+);
+
 if (previousNodeEnv === undefined) delete env.NODE_ENV;
 else env.NODE_ENV = previousNodeEnv;
 if (previousAppUrl === undefined) delete env.NEXT_PUBLIC_APP_URL;

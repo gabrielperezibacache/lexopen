@@ -9,6 +9,14 @@ type Results = {
   sites: Array<{ id: string; name: string; tipo: string }>;
   causas: Array<{ id: string; titulo: string; rit: string | null }>;
   files: Array<{ id: string; name: string; site: { id: string; name: string } }>;
+  documentos: Array<{
+    id: string;
+    nombre: string;
+    tipo: string;
+    ruta: string | null;
+    causaId: string | null;
+    causa: { id: string; rit: string | null; titulo: string } | null;
+  }>;
   tasks: Array<{ id: string; title: string; site: { id: string; name: string } | null }>;
   jurisprudencia: Array<{ id: string; rol: string; caratula: string | null }>;
   wiki: Array<{ id: string; title: string; site: { id: string; name: string } }>;
@@ -28,6 +36,7 @@ const EMPTY_RESULTS = (q: string): Results => ({
   sites: [],
   causas: [],
   files: [],
+  documentos: [],
   tasks: [],
   jurisprudencia: [],
   wiki: [],
@@ -59,6 +68,7 @@ export default function SearchPage() {
         sites: Array.isArray(data.sites) ? data.sites : [],
         causas: Array.isArray(data.causas) ? data.causas : [],
         files: Array.isArray(data.files) ? data.files : [],
+        documentos: Array.isArray(data.documentos) ? data.documentos : [],
         tasks: Array.isArray(data.tasks) ? data.tasks : [],
         jurisprudencia: Array.isArray(data.jurisprudencia) ? data.jurisprudencia : [],
         wiki: Array.isArray(data.wiki) ? data.wiki : [],
@@ -83,7 +93,7 @@ export default function SearchPage() {
       <ModuleHeader
         eyebrow="Búsqueda unificada"
         title="Buscar"
-        subtitle="Espacios, causas, minutas, archivos, tareas, wiki y jurisprudencia en un solo índice."
+        subtitle="Espacios, causas, documentos, minutas, archivos VDR, tareas, wiki y jurisprudencia en un solo índice."
       />
       <form onSubmit={onSubmit} className="panel mb-6 flex gap-2 rounded-3xl p-4">
         <input
@@ -144,6 +154,20 @@ export default function SearchPage() {
             }))}
           />
           <ResultBlock
+            title="Documentos"
+            items={(results.documentos || []).map((d) => ({
+              href: d.causaId ? `/causas/${d.causaId}` : "/documentos",
+              label: d.nombre,
+              meta: [
+                d.tipo,
+                d.ruta,
+                d.causa ? d.causa.rit || d.causa.titulo : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            }))}
+          />
+          <ResultBlock
             title="Minutas"
             items={(results.minutas || []).map((m) => ({
               href: `/causas/${m.causaId}/minutas/${m.id}`,
@@ -152,7 +176,7 @@ export default function SearchPage() {
             }))}
           />
           <ResultBlock
-            title="Archivos"
+            title="Archivos VDR"
             items={results.files.map((f) => ({
               href: `/sites/${f.site.id}/archivos`,
               label: f.name,
