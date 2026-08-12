@@ -49,9 +49,14 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
     .getAttribute("href");
   expect(causeHref).toBeTruthy();
   await page.goto(causeHref!);
+  const exportHref = await page
+    .getByRole("link", { name: "Exportar movimientos" })
+    .getAttribute("href");
   const templateHref = await page
     .getByRole("link", { name: "Descargar plantilla" })
     .getAttribute("href");
+  expect(exportHref).toContain("format=csv");
+  expect(exportHref).not.toContain("template=1");
   expect(templateHref).toContain("format=csv");
   expect(templateHref).toContain("template=1");
 

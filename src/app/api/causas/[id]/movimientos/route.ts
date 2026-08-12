@@ -15,6 +15,8 @@ import {
   MOVIMIENTOS_CSV_HEADER,
   parseMovimientosCsv,
   MAX_CSV_BYTES,
+  MAX_CSV_ROWS,
+  serializeMovimientosCsv,
 } from "@/lib/pjud/import-csv";
 import { parseLocalDateInput } from "@/lib/minutas";
 
@@ -41,6 +43,40 @@ export async function GET(req: NextRequest, { params }: Params) {
             'attachment; filename="plantilla-movimientos-pjud.csv"',
         },
       });
+    }
+    if (req.nextUrl.searchParams.get("format") === "csv") {
+      const causa = await prisma.causa.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (!causa) return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
+      const rows = await prisma.causaMovimiento.findMany({
+        where: { causaId: id },
+        orderBy: { fecha: "desc" },
+        take: MAX_CSV_ROWS,
+        select: {
+          titulo: true,
+          detalle: true,
+          fecha: true,
+          referencia: true,
+          externalId: true,
+        },
+      });
+      return new NextResponse(
+        serializeMovimientosCsv(
+          rows.map((row) => ({
+            ...row,
+            fecha: row.fecha.toISOString().slice(0, 10),
+          }))
+        ),
+        {
+          headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition":
+              'attachment; filename="movimientos-pjud.csv"',
+          },
+        }
+      );
     }
     const rawLimit = Number(req.nextUrl.searchParams.get("limit") || 200);
     const rawOffset = Number(req.nextUrl.searchParams.get("offset") || 0);

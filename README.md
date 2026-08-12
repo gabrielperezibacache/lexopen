@@ -112,7 +112,8 @@ realizan scrapers ocultos ni se presenta el corpus demo como fuente oficial.
 Sin proveedor externo, la alternativa local es exportar el CSV desde la consulta
 oficial e importarlo en la ficha de la causa. El importador acepta
 `titulo,detalle,fecha,referencia,id`, clasifica los movimientos y omite
-reimportaciones determinísticamente; la ficha ofrece una plantilla descargable.
+reimportaciones determinísticamente; la ficha ofrece plantilla y exportación
+compatible para respaldo local.
 
 La jurisprudencia incluida en el seed es un **corpus de demostración**. No es una
 fuente oficial, exhaustiva ni necesariamente actualizada.

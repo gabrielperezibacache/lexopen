@@ -178,7 +178,8 @@ Sin proveedor externo, exporte el CSV desde la consulta oficial y use el
 importador de movimientos de la ficha de la causa. El formato recomendado es
 `titulo,detalle,fecha,referencia,id`; LexOpen clasifica las filas, fuerza
 `fuente=import` y omite reimportaciones con la misma clave determinista. La
-ficha incluye un enlace para descargar la plantilla exacta.
+ficha incluye enlaces para descargar la plantilla exacta y exportar hasta 1.000
+movimientos del timeline.
 
 #### Webhook de un proveedor PJUD
 

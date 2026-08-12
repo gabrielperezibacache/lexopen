@@ -10,6 +10,14 @@ export type CsvMovimientoRow = {
   externalId: string;
 };
 
+export type CsvMovimientoExportRow = {
+  titulo: string;
+  detalle?: string | null;
+  fecha: string;
+  referencia?: string | null;
+  externalId?: string | null;
+};
+
 export class CsvImportError extends Error {
   status: number;
 
@@ -79,4 +87,25 @@ export function parseMovimientosCsv(csv: string): CsvMovimientoRow[] {
       };
     })
     .filter((row) => row.titulo.trim());
+}
+
+function csvCell(value: unknown) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+export function serializeMovimientosCsv(rows: CsvMovimientoExportRow[]) {
+  return [
+    MOVIMIENTOS_CSV_HEADER,
+    ...rows.map((row) =>
+      [
+        row.titulo,
+        row.detalle,
+        row.fecha,
+        row.referencia,
+        row.externalId?.replace(/^import:/, ""),
+      ]
+        .map(csvCell)
+        .join(",")
+    ),
+  ].join("\r\n") + "\r\n";
 }

@@ -77,6 +77,13 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
         <a
           className="btn btn-ghost"
           download
+          href={`/api/causas/${causaId}/movimientos?format=csv`}
+        >
+          Exportar movimientos
+        </a>
+        <a
+          className="btn btn-ghost"
+          download
           href={`/api/causas/${causaId}/movimientos?format=csv&template=1`}
         >
           Descargar plantilla
