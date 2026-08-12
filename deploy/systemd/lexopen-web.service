@@ -1,0 +1,25 @@
+[Unit]
+Description=LexOpen local web Host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lexopen
+Group=lexopen
+WorkingDirectory=/opt/lexopen
+Environment=NODE_ENV=production
+Environment=LEXOPEN_APP_ROOT=/opt/lexopen/.next/standalone
+Environment=LEXOPEN_PRISMA_ROOT=/opt/lexopen/prisma
+Environment=LEXOPEN_DATA_DIR=/var/lib/lexopen
+ExecStart=/usr/bin/node /opt/lexopen/desktop/host-runtime.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/lexopen
+
+[Install]
+WantedBy=multi-user.target

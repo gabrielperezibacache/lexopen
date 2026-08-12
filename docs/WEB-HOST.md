@@ -93,6 +93,53 @@ http://IP-DEL-HOST:3000
 Tailscale sigue siendo opcional para acceso remoto; no es necesario para una red
 local sin Internet.
 
+## Arranque automático
+
+Después de validar manualmente `npm run web:host`, puede ejecutar el Host como
+servicio del sistema:
+
+### Linux con systemd
+
+Instale el repositorio y compile una vez en `/opt/lexopen`, cree el usuario de
+servicio y prepare el directorio de datos:
+
+```bash
+sudo useradd --system --home /var/lib/lexopen --shell /usr/sbin/nologin lexopen
+sudo mkdir -p /opt/lexopen /var/lib/lexopen
+sudo chown -R lexopen:lexopen /opt/lexopen /var/lib/lexopen
+sudo cp deploy/systemd/lexopen-web.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now lexopen-web
+```
+
+Logs:
+
+```bash
+journalctl -u lexopen-web -f
+```
+
+### macOS con launchd
+
+Edite `deploy/launchd/com.lexopen.webhost.plist` para coincidir con la ruta del
+repositorio y del Node instalado. Luego:
+
+```bash
+mkdir -p "$HOME/Library/LaunchAgents"
+cp deploy/launchd/com.lexopen.webhost.plist "$HOME/Library/LaunchAgents/"
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.lexopen.webhost.plist"
+launchctl kickstart -k "gui/$(id -u)/com.lexopen.webhost"
+```
+
+### Windows
+
+Abra PowerShell como administrador y ejecute:
+
+```powershell
+.\deploy\windows\install-web-host.ps1 -ProjectPath C:\LexOpen
+```
+
+La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
+
 ## Operación y respaldos
 
 - Mantenga el Host encendido y con permisos de escritura sobre `STORAGE_PATH`.
