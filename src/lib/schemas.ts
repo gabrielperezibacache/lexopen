@@ -101,7 +101,7 @@ export const invoiceUpdateSchema = z.object({
   status: z.enum(["emitida", "anulada"]).optional(),
   dueDate: billingDate.optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
-});
+}).strict();
 
 export const paymentCreateSchema = z.object({
   clienteId: z.string().min(1),
