@@ -340,6 +340,7 @@ variables más relevantes:
 | `HERMES_ALLOW_DEMO` | No | Permite una respuesta local claramente marcada si Hermes no está disponible. |
 | `PJUD_API_URL`, `PJUD_API_KEY` | No | Conector partner para sincronizar movimientos judiciales. |
 | `PJUD_ALLOW_DEMO` | No | Permite movimientos PJUD simulados y etiquetados como demo. |
+| `PJUD_WEBHOOK_SECRET` | No | Firma HMAC de webhooks asíncronos de un proveedor PJUD. |
 | `CRON_SECRET` | No | Protege la sincronización de cartera desde un scheduler externo. |
 | `OBSIDIAN_VAULT_PATH` | No | Vault local para exportaciones en desarrollo. |
 | `OBSIDIAN_REST_URL`, `OBSIDIAN_REST_TOKEN` | No | Obsidian Local REST API y token Bearer. |
@@ -347,6 +348,11 @@ variables más relevantes:
 
 No incluya secretos reales en commits. Para producción, genere un
 `SESSION_SECRET` nuevo, use HTTPS/Tailscale y desactive todas las banderas demo.
+
+Los proveedores PJUD que trabajan de forma asíncrona pueden usar
+`POST /api/integrations/pjud/webhook` con `x-pjud-timestamp` y
+`x-pjud-signature`. Consulte [`docs/WEB-HOST.md`](docs/WEB-HOST.md) para el
+contrato firmado, la ventana anti-replay y el formato normalizado de movimientos.
 
 ## 🔌 Integraciones
 

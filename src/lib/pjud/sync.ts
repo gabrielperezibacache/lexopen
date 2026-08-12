@@ -9,6 +9,7 @@ import {
   pjudProviderConfigured,
   type PjudFetchResult,
 } from "@/lib/pjud/provider";
+import { pjudWebhookConfigured } from "@/lib/pjud/webhook";
 
 export type SyncCausaResult = {
   causaId: string;
@@ -272,6 +273,7 @@ export async function listCarteraMonitoreo() {
 export function providerStatusPublic() {
   return {
     apiConfigured: pjudProviderConfigured(),
+    webhookConfigured: pjudWebhookConfigured(),
     demoAllowed:
       process.env.PJUD_ALLOW_DEMO === "1" ||
       (process.env.NODE_ENV !== "production" &&

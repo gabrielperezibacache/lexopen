@@ -174,6 +174,47 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   servicio. Si `PJUD_API_URL` está vacío y `PJUD_ALLOW_DEMO=0`, no se consultará
   ninguna fuente externa.
 
+#### Webhook de un proveedor PJUD
+
+Los proveedores que entregan resultados de forma asíncrona pueden enviar un
+webhook a:
+
+```text
+POST /api/integrations/pjud/webhook
+```
+
+Configure `PJUD_WEBHOOK_SECRET`. El request debe incluir:
+
+```text
+x-pjud-timestamp: <Unix timestamp en segundos>
+x-pjud-signature: sha256=<HMAC-SHA256(PJUD_WEBHOOK_SECRET, timestamp + "." + cuerpo)>
+```
+
+El cuerpo mínimo identifica la causa y contiene movimientos:
+
+```json
+{
+  "operationId": "provider-operation-id",
+  "rit": "C-4521-2025",
+  "tribunal": "1º Juzgado Civil de Santiago",
+  "status": "ok",
+  "movimientos": [
+    {
+      "id": "provider-movement-id",
+      "titulo": "Resolución: proveído",
+      "detalle": "Texto recibido del proveedor",
+      "fecha": "2026-08-12",
+      "referencia": "R-1"
+    }
+  ]
+}
+```
+
+La firma solo se acepta durante cinco minutos, el endpoint deduplica por ID
+externo y no requiere sesión de usuario. El webhook no inventa una fuente PJUD:
+requiere un proveedor autorizado, sus credenciales y el contrato de payload
+correspondiente.
+
 ### Backups automáticos con rotación
 
 El Host web puede crear respaldos locales periódicos sin depender de la nube.

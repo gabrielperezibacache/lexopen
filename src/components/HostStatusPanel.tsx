@@ -60,7 +60,11 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
             PJUD
           </div>
           <div className="mt-2 font-semibold">
-            {pjud.apiConfigured ? "Partner configurado" : "Sin partner"}
+            {pjud.apiConfigured
+              ? "Partner configurado"
+              : pjud.webhookConfigured
+                ? "Webhook configurado"
+                : "Sin partner"}
           </div>
           <div className="mt-1 text-xs text-[var(--ink-soft)]/65">
             Demo permitido: {yesNo(pjud.demoAllowed)}
