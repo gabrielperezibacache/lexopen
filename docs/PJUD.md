@@ -110,16 +110,48 @@ Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 
 Sin estos flags, LexOpen **no** scrapea ni usa ClaveÚnica. Si `PJUD_PUBLIC_SCRAPE=1` pero falta Playwright/Chromium, el scrape falla con error claro (no cae a demo en prod).
 
+## Setup recomendado (host local)
+
+Opción recomendada: **sidecar Playwright + solver CAPTCHA** en el mismo host
+que LexOpen. El web habla con `127.0.0.1:8787`; CAPTCHA/OJV son APIs externas.
+
+```bash
+# 1) Una vez
+cp .env.example .env   # complete CAPTCHA_SOLVER_* y PJUD_SCRAPER_KEY
+npm run pjud:chromium
+
+# 2) Sidecar (valida CAPTCHA y espera /health)
+npm run pjud:host
+# opcional: npm run pjud:host -- --with-web
+# solo validar env: npm run pjud:host:check
+
+# 3) App (otra terminal, si no usó --with-web)
+npm run web:host   # o npm run dev
+```
+
+Variables mínimas del web (también las imprime `pjud:host`):
+
+```dotenv
+PJUD_SCRAPER_URL=http://127.0.0.1:8787
+PJUD_SCRAPER_ALLOW_PRIVATE=1
+PJUD_SCRAPER_KEY=<misma que el sidecar>
+PJUD_PUBLIC_SCRAPE=1
+CAPTCHA_SOLVER_PROVIDER=2captcha   # o capsolver
+CAPTCHA_SOLVER_API_KEY=...
+PJUD_ALLOW_DEMO=0
+```
+
 ## Sidecar de referencia (in-repo)
 
 ```bash
-npm run pjud:scraper
+npm run pjud:host      # recomendado (check CAPTCHA + health)
+npm run pjud:scraper   # solo el HTTP server
 # o: node scripts/pjud-scraper-worker.mjs
 ```
 
 Endpoints: `GET /health`, `POST /causas/lookup`, `POST /mis-causas`, `POST /causas/buscar`.
 
-`GET /health` reporta `workerRunning` / `scrapeReady` (análogo a CM `workerRunning`).
+`GET /health` reporta `workerRunning` / `scrapeReady` / `captcha` (análogo a CM `workerRunning`).
 
 En Render, el Blueprint define `lexopen-pjud-scraper` (`type: pserv`) con `npx playwright install chromium` en build, y cablea `PJUD_SCRAPER_URL` + `PJUD_SCRAPER_ALLOW_PRIVATE=1` en el web.
 

@@ -173,9 +173,14 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
 
   `web:host` ejecutará la sincronización contra su propio endpoint sin crear otro
   servicio. LexOpen corre en **su host**; puede usar APIs externas (OJV, CAPTCHA,
-  `PJUD_API_URL`). Ejemplo sidecar: `PJUD_SCRAPER_URL=http://127.0.0.1:8787` +
-  `PJUD_SCRAPER_ALLOW_PRIVATE=1`. Si no hay ingest y `PJUD_ALLOW_DEMO=0`, no se
-  inventan datos (importe CSV si hace falta).
+  `PJUD_API_URL`).
+
+  **Setup recomendado PJUD:** `npm run pjud:chromium` (una vez) → configure
+  `CAPTCHA_SOLVER_*` → `npm run pjud:host` (sidecar `:8787`) → en otra terminal
+  `npm run web:host` (o `npm run pjud:host -- --with-web`). El web necesita
+  `PJUD_SCRAPER_URL=http://127.0.0.1:8787`, `PJUD_SCRAPER_ALLOW_PRIVATE=1` y la
+  misma `PJUD_SCRAPER_KEY`. Detalle en `docs/PJUD.md`. Si no hay ingest y
+  `PJUD_ALLOW_DEMO=0`, no se inventan datos (importe CSV si hace falta).
 
 Sin proveedor configurado, exporte el CSV desde la consulta oficial y use el
 importador de movimientos de la ficha de la causa **o** el CSV de cartera en
