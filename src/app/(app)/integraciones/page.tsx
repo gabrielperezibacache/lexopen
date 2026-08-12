@@ -9,6 +9,7 @@ type GoogleStatus = {
   connected: boolean;
   connectedEmail: string | null;
   authUrl: string | null;
+  canStartOauth?: boolean;
   credentialsConfigured: boolean;
 };
 
@@ -169,8 +170,8 @@ function IntegracionesInner() {
         <section className="panel rounded-3xl p-5">
           <h2 className="text-xl font-semibold">Google Workspace</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
-            OAuth 2.0 para Drive (carpeta por causa + documentos/minutas), Calendar
-            (plazos) y Gmail. En cada causa puede vincular o crear la carpeta del
+            OAuth 2.0 para Drive (carpeta por causa + archivos/minutas), Calendar
+            (plazos) y Gmail (digests). En cada causa puede crear la carpeta del
             expediente. Configure `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`.
           </p>
           <div className="mt-4 text-sm text-[var(--ink-soft)]/75">
@@ -181,10 +182,24 @@ function IntegracionesInner() {
                 : "Credenciales no configuradas (modo stub activo)"}
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
-            {google?.authUrl ? (
-              <a href={google.authUrl} className="btn btn-primary inline-flex">
-                {google.connected ? "Reconectar Google" : "Conectar Google"}
-              </a>
+            {google?.canStartOauth || google?.credentialsConfigured ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={async () => {
+                  const res = await fetch("/api/integrations/google", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "start-oauth" }),
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (res.ok && data.authUrl) {
+                    window.location.href = data.authUrl as string;
+                  }
+                }}
+              >
+                {google?.connected ? "Reconectar Google" : "Conectar Google"}
+              </button>
             ) : (
               <button className="btn btn-ghost" type="button" disabled>
                 Configure OAuth en el entorno
@@ -207,6 +222,9 @@ function IntegracionesInner() {
                 Desconectar
               </button>
             )}
+            <a href="/configuracion#google-settings" className="btn btn-ghost inline-flex">
+              Opciones Drive/Calendar
+            </a>
           </div>
         </section>
       </div>

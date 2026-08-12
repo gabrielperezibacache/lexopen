@@ -2,23 +2,32 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { driveFileUrl, isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 
 export function DocumentDriveAction({
   documentId,
   googleDriveId,
   disabled,
   hasText = true,
+  hasBinary = false,
 }: {
   documentId: string;
   googleDriveId?: string | null;
   disabled?: boolean;
-  /** False when there is no contenido/extractedMarkdown yet. */
+  /** True when there is contenido/extractedMarkdown. */
   hasText?: boolean;
+  /** True when original bytes exist in storage (PDF/DOCX/etc.). */
+  hasBinary?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  const canUpload = hasText || hasBinary;
+  const openUrl =
+    googleDriveId && isRealDriveFolderId(googleDriveId)
+      ? driveFileUrl(googleDriveId)
+      : null;
 
   function push() {
     setMsg("");
@@ -38,16 +47,22 @@ export function DocumentDriveAction({
         setMsg(
           data.message ||
             (data.status === "uploaded"
-              ? "Subido texto/MD a Drive"
+              ? data.kind === "binary"
+                ? "Archivo subido a Drive"
+                : "Subido a Drive como Google Doc"
               : data.status === "stub"
                 ? "Modo stub: conecte Google OAuth"
-                : data.status === "needs_real_folder"
-                  ? "Vincule una carpeta real en la causa"
-                  : data.status === "needs_ocr"
-                    ? "Requiere OCR/extracción primero"
-                    : data.status === "unsupported"
-                      ? "Sin texto indexado para subir"
-                      : String(data.status))
+                : data.status === "needs_reconnect"
+                  ? "Reconecte Google OAuth"
+                  : data.status === "blocked"
+                    ? "Drive deshabilitado en Configuración"
+                    : data.status === "needs_real_folder"
+                      ? "Vincule una carpeta real en la causa"
+                      : data.status === "needs_ocr"
+                        ? "Requiere OCR/extracción primero"
+                        : data.status === "unsupported"
+                          ? "Sin contenido para subir"
+                          : String(data.status))
         );
         if (data.status === "uploaded") router.refresh();
       } catch {
@@ -58,23 +73,37 @@ export function DocumentDriveAction({
 
   return (
     <span className="inline-flex flex-col items-start gap-0.5">
-      <button
-        type="button"
-        className="text-xs text-[var(--sea)] underline disabled:opacity-50"
-        disabled={pending || disabled || !hasText}
-        title={
-          hasText
-            ? "Sube texto o Markdown extraído a la carpeta Drive de la causa"
-            : "Sin texto indexado (OCR/extracción pendiente)"
-        }
-        onClick={push}
-      >
-        {pending
-          ? "Subiendo…"
-          : googleDriveId
-            ? "Re-subir MD a Drive"
-            : "Subir MD a Drive"}
-      </button>
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="text-xs text-[var(--sea)] underline disabled:opacity-50"
+          disabled={pending || disabled || !canUpload}
+          title={
+            canUpload
+              ? hasBinary && !hasText
+                ? "Sube el archivo original a la carpeta Drive de la causa"
+                : "Sube archivo original o Markdown a la carpeta Drive de la causa"
+              : "Sin archivo ni texto indexado (OCR/extracción pendiente)"
+          }
+          onClick={push}
+        >
+          {pending
+            ? "Subiendo…"
+            : googleDriveId
+              ? "Re-subir a Drive"
+              : "Subir a Drive"}
+        </button>
+        {openUrl && (
+          <a
+            href={openUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-[var(--sea)] underline"
+          >
+            Abrir en Drive
+          </a>
+        )}
+      </span>
       {msg && <span className="text-[10px] text-[var(--sea)]">{msg}</span>}
       {error && <span className="text-[10px] text-red-700">{error}</span>}
     </span>
