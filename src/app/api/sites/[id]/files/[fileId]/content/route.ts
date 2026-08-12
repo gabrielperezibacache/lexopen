@@ -4,6 +4,7 @@ import { isClientSharedTag } from "@/lib/auth/client-tags";
 import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { getObject } from "@/lib/storage";
+import { downloadResponseHeaders } from "@/lib/security/download";
 
 type Params = { params: Promise<{ id: string; fileId: string }> };
 
@@ -37,10 +38,7 @@ export async function GET(_req: Request, { params }: Params) {
       return NextResponse.json({ error: "Contenido no encontrado" }, { status: 404 });
     }
     return new NextResponse(body as BodyInit, {
-      headers: {
-        "Content-Type": file.mimeType || "application/octet-stream",
-        "Content-Disposition": `inline; filename="${encodeURIComponent(file.name)}"`,
-      },
+      headers: downloadResponseHeaders(file.name, file.mimeType),
     });
   } catch (e) {
     return handleRouteError(e);

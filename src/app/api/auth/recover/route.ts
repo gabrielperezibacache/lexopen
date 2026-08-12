@@ -6,6 +6,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { isValidBootstrapToken } from "@/lib/auth/bootstrap";
 import { writeAudit } from "@/lib/audit";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
+import { rotateDesktopEnvSecret } from "@/lib/auth/env-secrets";
 
 const recoverySchema = z.object({
   token: z.string().min(1).max(256),
@@ -70,6 +71,8 @@ export async function POST(req: NextRequest) {
         entityId: admin.id,
         after: { source: "local recovery token" },
       });
+      // One-time use: rotate recovery token after a successful reset.
+      await rotateDesktopEnvSecret("LEXOPEN_RECOVERY_TOKEN");
     }
     return NextResponse.json({
       ok: true,

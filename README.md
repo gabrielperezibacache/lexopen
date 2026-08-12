@@ -703,6 +703,11 @@ locales (`npm run pjud:host` + intervalos en el `.env` del data dir).
 
 ## 🔄 Cómo actualizar la aplicación
 
+Cuando GitHub Releases publica una versión más nueva que la del Host, el personal
+del estudio ve un **aviso en la aplicación** con los pasos de actualización (se
+puede descartar por versión). También puede desactivar la consulta con
+`LEXOPEN_UPDATE_CHECK=0`.
+
 Actualizar LexOpen reemplaza el **código** (y aplica migraciones de base de datos).
 La carpeta de datos (`LEXOPEN_DATA_DIR`, Application Support / `%APPDATA%\LexOpen`)
 **no se borra**: PostgreSQL, documentos, vault y `.env` se conservan.
@@ -823,8 +828,11 @@ de producción:
 - el rate limit de login usa lockout progresivo y store local
   (`LEXOPEN_DATA_DIR/rate-limit.json`); en multi-instancia configure
   `REDIS_URL` / `RATE_LIMIT_REDIS_URL` o Upstash REST;
-- Desktop Host enlaza `127.0.0.1` por defecto (LAN solo con URL pública) y
-  genera contraseña aleatoria de Postgres en instalaciones nuevas;
+- Desktop Host enlaza `127.0.0.1` por defecto (LAN solo con URL pública),
+  genera contraseña aleatoria de Postgres en instalaciones nuevas y rota el
+  default legacy `lexopen` al arrancar;
+- logout invalida la sesión (`sessionVersion`); descargas fuerzan `attachment`
+  salvo MIME seguros; listados/búsqueda no devuelven cuerpos de archivo;
 - el portal cliente no debe presentarse como estrictamente de solo lectura sin una
   revisión adicional de permisos;
 - los campos de confidencialidad no equivalen a una implementación completa de

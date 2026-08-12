@@ -4,6 +4,10 @@ import { confidentialWhere, handleRouteError, requireUser } from "@/lib/api";
 import { clientSiteWhere, confidentialFileWhere } from "@/lib/auth/access";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
 import { ftsCausaIds } from "@/lib/search";
+import {
+  documentoListSelect,
+  siteFileListSelect,
+} from "@/lib/sites/file-select";
 
 const textMatch = (q: string) => ({ contains: q, mode: "insensitive" as const });
 
@@ -100,7 +104,10 @@ export async function GET(req: NextRequest) {
               },
             ],
           },
-          include: { site: true },
+          select: {
+            ...siteFileListSelect,
+            site: { select: { id: true, name: true, slug: true } },
+          },
           take: 10,
         }),
         prisma.documento.findMany({
@@ -118,7 +125,8 @@ export async function GET(req: NextRequest) {
               },
             ],
           },
-          include: {
+          select: {
+            ...documentoListSelect,
             causa: { select: { id: true, rit: true, titulo: true } },
           },
           take: 10,

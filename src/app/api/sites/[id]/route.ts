@@ -4,26 +4,9 @@ import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireU
 import { clientVisibleFileWhere } from "@/lib/auth/access";
 import { isCliente } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { siteFileListSelect } from "@/lib/sites/file-select";
 
 type Params = { params: Promise<{ id: string }> };
-
-/** List payloads must never embed file body content. */
-const siteFileListSelect = {
-  id: true,
-  name: true,
-  mimeType: true,
-  tags: true,
-  version: true,
-  sizeBytes: true,
-  confidencial: true,
-  privilegio: true,
-  folderId: true,
-  siteId: true,
-  storageKey: true,
-  updatedAt: true,
-  createdAt: true,
-  contenido: false as const,
-};
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {

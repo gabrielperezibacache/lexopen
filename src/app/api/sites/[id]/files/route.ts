@@ -5,6 +5,11 @@ import { clientVisibleFileWhere } from "@/lib/auth/access";
 import { isClientSharedTag } from "@/lib/auth/client-tags";
 import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
 import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storage";
+import { sanitizeUploadMimeType } from "@/lib/security/download";
+import {
+  fileVersionListSelect,
+  siteFileListSelect,
+} from "@/lib/sites/file-select";
 
 type Params = { params: Promise<{ id: string }> };
 const LARGE_CONTENT_BYTES = 64 * 1024;
@@ -13,7 +18,9 @@ async function prepareFileBody(siteId: string, name: string, body: Record<string
   const contenido = typeof body.contenido === "string" ? body.contenido : "";
   const contenidoBase64 =
     typeof body.contenidoBase64 === "string" ? body.contenidoBase64 : null;
-  const mimeType = typeof body.mimeType === "string" ? body.mimeType : "text/markdown";
+  const mimeType = sanitizeUploadMimeType(
+    typeof body.mimeType === "string" ? body.mimeType : "text/markdown"
+  );
   if (contenidoBase64 && !/^[A-Za-z0-9+/]*={0,2}$/.test(contenidoBase64)) {
     const error = new Error("contenidoBase64 inválido") as Error & { status: number };
     error.status = 400;
@@ -66,23 +73,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         files: {
           where: fileWhere,
           orderBy: { name: "asc" },
-          select: {
-            id: true,
-            name: true,
-            mimeType: true,
-            tags: true,
-            version: true,
-            sizeBytes: true,
-            confidencial: true,
-            privilegio: true,
-            folderId: true,
-            siteId: true,
-            storageKey: true,
-            updatedAt: true,
-            createdAt: true,
-            // Never return body content in list payloads.
-            contenido: false,
-          },
+          select: siteFileListSelect,
         },
         children: true,
       },
@@ -90,18 +81,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
     });
     const rootFiles = await prisma.siteFile.findMany({
       where: { siteId: id, folderId: null, ...fileWhere },
-      include: {
+      select: {
+        ...siteFileListSelect,
         versions: {
           orderBy: { version: "desc" },
           take: 3,
-          select: {
-            id: true,
-            version: true,
-            note: true,
-            createdAt: true,
-            authorId: true,
-            contenido: false,
-          },
+          select: fileVersionListSelect,
         },
         comments: true,
       },

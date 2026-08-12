@@ -1,6 +1,8 @@
 import { AppSidebar } from "@/components/AppSidebar";
 import { MobileMenuButton } from "@/components/MobileMenuButton";
+import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { enforceAppAccess } from "@/lib/auth/access";
+import { isStaff } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -8,6 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const unreadCount = await prisma.notification.count({
     where: { userId: user.id, read: false },
   });
+  const showUpdateBanner = isStaff(user.role);
   return (
     <div className="flex min-h-screen">
       <div className="sticky top-0 h-screen">
@@ -18,6 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="display text-lg">LexOpen</div>
           <MobileMenuButton />
         </header>
+        <UpdateAvailableBanner enabled={showUpdateBanner} />
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
       </div>
     </div>

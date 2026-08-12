@@ -15,6 +15,10 @@ const {
   storageDir,
   resolveBindHost,
   pgPasswordFromDatabaseUrl,
+  isLegacyPgPassword,
+  rewriteDatabaseUrlPassword,
+  writeEnvKey,
+  newPgPassword,
 } = require("./config.cjs");
 
 assert.equal(normalizeRemoteUrl("pc.tailnet.ts.net:3000"), "http://pc.tailnet.ts.net:3000");
@@ -30,6 +34,15 @@ assert.equal(
   pgPasswordFromDatabaseUrl("postgresql://lexopen:s3cret@127.0.0.1:54329/lexopen"),
   "s3cret"
 );
+assert.equal(isLegacyPgPassword("lexopen"), true);
+assert.equal(isLegacyPgPassword(""), true);
+assert.equal(isLegacyPgPassword("s3cret"), false);
+const rotatedUrl = rewriteDatabaseUrlPassword(
+  "postgresql://lexopen:lexopen@127.0.0.1:54329/lexopen",
+  "n3w-pass"
+);
+assert.equal(pgPasswordFromDatabaseUrl(rotatedUrl), "n3w-pass");
+assert.ok(newPgPassword().length >= 16);
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-desktop-"));
 
@@ -132,6 +145,16 @@ assert.match(
   fs.readFileSync(envPath(tmp), "utf8"),
   new RegExp(storageDirFn(tmp).replace(/\\/g, "\\\\"))
 );
+
+const writeTmp = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-env-write-"));
+fs.writeFileSync(envPath(writeTmp), "FOO=1\nDATABASE_URL=old\n", "utf8");
+writeEnvKey(writeTmp, "DATABASE_URL", "postgresql://lexopen:x@127.0.0.1:1/lexopen");
+assert.match(
+  fs.readFileSync(envPath(writeTmp), "utf8"),
+  /DATABASE_URL=postgresql:\/\/lexopen:x@127\.0\.0\.1:1\/lexopen/
+);
+assert.match(fs.readFileSync(envPath(writeTmp), "utf8"), /FOO=1/);
+fs.rmSync(writeTmp, { recursive: true, force: true });
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log("desktop/config.test.cjs OK");
