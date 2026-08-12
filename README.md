@@ -105,11 +105,12 @@ etapas procesales, días hábiles/calendario simplificados y valores UF. El moto
 plazos es una ayuda operativa: **no reemplaza el cómputo oficial del tribunal ni la
 revisión de un abogado**.
 
-Incluye también monitoreo de causas estilo CausaMonitor/CaseTracking con
-semáforos, cuadernos, receptor, escritos, cola de fallidos, timeline clasificado,
-alertas y conectores PJUD partner API, webhook, demo o CSV etiquetados. No se
-realizan scrapers ocultos, no se custodia ClaveÚnica ni se presenta el corpus
-demo como fuente oficial.
+Incluye también monitoreo de causas estilo CausaMonitor/CaseTracking: semáforos,
+cuadernos, receptor, escritos, cola de fallidos, scrape OJV opt-in (CAPTCHA) o
+sidecar, ClaveÚnica cifrada → Mis Causas, timeline clasificado y alertas.
+Conectores: partner API, scraper, webhook, demo o CSV. El scrape y ClaveÚnica
+van desactivados por defecto (kill switches); no se presentan como API oficial
+de PJUD.
 
 Sin proveedor externo, la alternativa local es exportar el CSV desde la consulta
 oficial e importarlo en la ficha de la causa. El importador acepta
@@ -349,6 +350,10 @@ variables más relevantes:
 | `HERMES_API_URL`, `HERMES_API_KEY` | No | Endpoint y credencial de la API compatible con OpenAI. |
 | `HERMES_ALLOW_DEMO` | No | Permite una respuesta local claramente marcada si Hermes no está disponible. |
 | `PJUD_API_URL`, `PJUD_API_KEY` | No | Conector partner para sincronizar movimientos judiciales. |
+| `PJUD_SCRAPER_URL`, `PJUD_SCRAPER_KEY` | No | Sidecar scrape (lookup + Mis Causas), estilo CausaMonitor. |
+| `PJUD_PUBLIC_SCRAPE` | No | `1` = scrape OJV in-process (Playwright + CAPTCHA). |
+| `CAPTCHA_SOLVER_PROVIDER`, `CAPTCHA_SOLVER_API_KEY` | No | `2captcha` o `capsolver` para el scrape in-process. |
+| `PJUD_CLAVEUNICA_SCRAPE` | No | `1` = permite login ClaveÚnica automatizado (Mis Causas). |
 | `PJUD_ALLOW_DEMO` | No | Permite movimientos PJUD simulados y etiquetados como demo. |
 | `PJUD_WEBHOOK_SECRET` | No | Firma HMAC de webhooks asíncronos de un proveedor PJUD. |
 | `PJUD_SYNC_INTERVAL_MINUTES` | No | Intervalo del próximo sync (default 1440 = diario). |
@@ -567,7 +572,8 @@ de producción:
 - la jurisprudencia y los plazos son datos/ayudas de demo, no fuentes oficiales;
 - los documentos de facturación son control interno y no constituyen DTE electrónico
   ni integración con el SII;
-- no hay integración de datos en vivo con PJUD ni con tribunales;
+- la integración live con PJUD es opt-in (partner API, sidecar scrape o
+  Playwright+CAPTCHA / ClaveÚnica) y no es una API oficial del Poder Judicial;
 - `LEXOPEN_OPEN_ACCESS`, `LEXOPEN_RELAX_CSRF`, credenciales demo, compatibilidad de
   contraseñas en texto plano y el fallback demo de Hermes no deben activarse en
   producción.

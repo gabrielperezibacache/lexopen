@@ -183,9 +183,9 @@ export function PjudMonitorPanel({
         <div>
           <h2 className="text-lg font-semibold">Seguimiento judicial (PJUD)</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--ink-soft)]/75">
-            Experiencia tipo CausaMonitor: cuadernos, notificaciones de receptor,
-            escritos, sync y reintento de fallidos — con partner API, webhook,
-            demo etiquetado o CSV oficial. Sin scrapers ocultos ni ClaveÚnica.
+            Experiencia tipo CausaMonitor: cuadernos, receptor, escritos, sync,
+            fallidos, scrape OJV opt-in y Mis Causas vía ClaveÚnica cifrada.
+            Ver /causas/mis-causas y docs/PJUD.md.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">

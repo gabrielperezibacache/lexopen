@@ -6,10 +6,14 @@ import {
 } from "@/lib/pjud/classify";
 import {
   fetchPjudMovimientos,
+  pjudLiveIngestConfigured,
   pjudProviderConfigured,
   pjudSyncIntervalMs,
   type PjudFetchResult,
 } from "@/lib/pjud/provider";
+import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
+import { publicScrapeEnabled, publicScrapeReady } from "@/lib/pjud/public-scrape";
+import { scraperSidecarConfigured } from "@/lib/pjud/scraper-sidecar";
 import { pjudWebhookConfigured } from "@/lib/pjud/webhook";
 
 export type SyncCausaResult = {
@@ -222,6 +226,7 @@ export async function syncCausaPjud(
         pjudLastSyncNote: fetchResult.note,
         pjudFailCount: 0,
         pjudExternalKey: externalKey(causa.rit, causa.tribunal),
+        pjudSource: fetchResult.provider,
         ...(fetchResult.sala ? { sala: fetchResult.sala } : {}),
       },
     });
@@ -463,14 +468,24 @@ export async function retryFallidos(opts?: {
 export function providerStatusPublic() {
   return {
     apiConfigured: pjudProviderConfigured(),
+    scraperSidecarConfigured: scraperSidecarConfigured(),
+    publicScrapeEnabled: publicScrapeEnabled(),
+    publicScrapeReady: publicScrapeReady(),
+    captchaConfigured: captchaSolverConfigured(),
+    claveUnicaScrapeEnabled: process.env.PJUD_CLAVEUNICA_SCRAPE === "1",
+    liveIngestConfigured: pjudLiveIngestConfigured(),
     webhookConfigured: pjudWebhookConfigured(),
     demoAllowed:
       process.env.PJUD_ALLOW_DEMO === "1" ||
       (process.env.NODE_ENV !== "production" &&
         process.env.PJUD_ALLOW_DEMO !== "0"),
     syncIntervalMinutes: Math.round(pjudSyncIntervalMs() / 60000),
-    honesty: pjudProviderConfigured()
-      ? "Conector partner API activo (PJUD_API_URL). UX paridad CausaMonitor sin scrapers ocultos."
-      : "Sin API partner: use sync demo etiquetado, CSV oficial o webhook. LexOpen no scrapea ofpj ni custodia ClaveÚnica.",
+    honesty: pjudLiveIngestConfigured()
+      ? pjudProviderConfigured()
+        ? "Conector partner API activo."
+        : scraperSidecarConfigured()
+          ? "Scraper sidecar activo (PJUD_SCRAPER_URL) — flujo CausaMonitor."
+          : "Scrape OJV in-process activo (CAPTCHA) — ToS risk / opt-in."
+      : "Sin ingest live: active PJUD_SCRAPER_URL o PJUD_PUBLIC_SCRAPE=1+CAPTCHA, partner API, demo o CSV. ClaveÚnica requiere PJUD_CLAVEUNICA_SCRAPE=1.",
   };
 }

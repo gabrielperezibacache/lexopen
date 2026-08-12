@@ -1,41 +1,21 @@
-import { createHash } from "crypto";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { classifyMovimiento } from "@/lib/pjud/classify";
+import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
+import {
+  publicScrapeEnabled,
+  publicScrapeReady,
+  scrapeCausaByRol,
+} from "@/lib/pjud/public-scrape";
+import { fetchFromScraperSidecar, scraperSidecarConfigured } from "@/lib/pjud/scraper-sidecar";
+import {
+  fingerprint,
+  type PjudCausaRef,
+  type PjudFetchResult,
+  type PjudFetchedMovimiento,
+} from "@/lib/pjud/types";
 import { z } from "zod";
 
-export type PjudFetchedMovimiento = {
-  externalId: string;
-  titulo: string;
-  detalle?: string | null;
-  fecha: Date;
-  referencia?: string | null;
-  tipo?: string;
-  relevante?: boolean;
-  fuente: "pjud" | "demo";
-  cuaderno?: string | null;
-  folio?: string | null;
-  etapa?: string | null;
-  tramite?: string | null;
-  esReceptor?: boolean;
-  documentoRef?: string | null;
-};
-
-export type PjudCausaRef = {
-  id: string;
-  rit: string | null;
-  ruc: string | null;
-  tribunal: string;
-  titulo: string;
-  caratula: string | null;
-};
-
-export type PjudFetchResult = {
-  provider: "api" | "demo" | "none";
-  movimientos: PjudFetchedMovimiento[];
-  note: string;
-  demo: boolean;
-  sala?: string | null;
-};
+export type { PjudCausaRef, PjudFetchResult, PjudFetchedMovimiento };
 
 const partnerMovementSchema = z.object({
   id: z.string().max(255).optional(),
@@ -52,11 +32,6 @@ const partnerMovementSchema = z.object({
   documentoRef: z.string().max(500).optional().nullable(),
   documentoUrl: z.string().max(500).optional().nullable(),
 });
-
-function fingerprint(titulo: string, fecha: Date, referencia?: string | null) {
-  const raw = `${titulo.trim().toLowerCase()}|${fecha.toISOString().slice(0, 10)}|${referencia || ""}`;
-  return createHash("sha1").update(raw).digest("hex").slice(0, 24);
-}
 
 function mapPartnerMovement(
   m: z.infer<typeof partnerMovementSchema>,
@@ -359,6 +334,14 @@ export function pjudProviderConfigured() {
   return Boolean(process.env.PJUD_API_URL?.trim());
 }
 
+export function pjudLiveIngestConfigured() {
+  return (
+    pjudProviderConfigured() ||
+    scraperSidecarConfigured() ||
+    publicScrapeReady()
+  );
+}
+
 export function pjudSyncIntervalMs() {
   const raw = Number(process.env.PJUD_SYNC_INTERVAL_MINUTES || 1440);
   const minutes = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 60 * 24 * 14) : 1440;
@@ -368,9 +351,44 @@ export function pjudSyncIntervalMs() {
 export async function fetchPjudMovimientos(
   causa: PjudCausaRef
 ): Promise<PjudFetchResult> {
+  // 1) Partner API (si hay)
   const fromApi = await fetchFromPartnerApi(causa);
   if (fromApi) return fromApi;
 
+  // 2) Sidecar scraper (microservicio CausaMonitor-like)
+  try {
+    const fromSidecar = await fetchFromScraperSidecar(causa);
+    if (fromSidecar) return fromSidecar;
+  } catch (error) {
+    if (scraperSidecarConfigured() && !publicScrapeReady() && !pjudDemoAllowed()) {
+      throw error;
+    }
+    // Si hay scrape in-process o demo, continúa
+  }
+
+  // 3) Scrape in-process OJV + CAPTCHA (opt-in)
+  if (publicScrapeReady()) {
+    const scraped = await scrapeCausaByRol(causa);
+    return {
+      provider: "scrape",
+      movimientos: scraped.movimientos,
+      note: scraped.note,
+      demo: false,
+      sala: scraped.sala,
+    };
+  }
+
+  if (publicScrapeEnabled() && !captchaSolverConfigured()) {
+    return {
+      provider: "none",
+      movimientos: [],
+      note:
+        "PJUD_PUBLIC_SCRAPE=1 pero falta CAPTCHA_SOLVER_PROVIDER/API_KEY (o PJUD_SCRAPER_URL).",
+      demo: false,
+    };
+  }
+
+  // 4) Demo etiquetado
   if (pjudDemoAllowed()) {
     return fetchDemoMovimientos(causa);
   }
@@ -379,7 +397,7 @@ export async function fetchPjudMovimientos(
     provider: "none",
     movimientos: [],
     note:
-      "Sin proveedor PJUD configurado (PJUD_API_URL). Active PJUD_ALLOW_DEMO=1 solo para simulación etiquetada, o conecte un partner API / importe CSV oficial.",
+      "Sin conector PJUD. Configure PJUD_API_URL, PJUD_SCRAPER_URL, o PJUD_PUBLIC_SCRAPE=1 + CAPTCHA solver; o PJUD_ALLOW_DEMO=1 / CSV.",
     demo: false,
   };
 }

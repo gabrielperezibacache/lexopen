@@ -1,57 +1,56 @@
-# PJUD / CausaMonitor parity
+# PJUD / CausaMonitor parity (scrape + ClaveÚnica)
 
-LexOpen replica la **experiencia operativa** de CausaMonitor (cartera con
-semáforos, cuadernos, receptor, escritos, sync, fallidos y próximo sync) sin
-clonar su scraper ni custodiar ClaveÚnica.
+LexOpen replica el flujo de datos de CausaMonitor:
 
-## Conectores admitidos
+1. **Consulta pública** por ROL/RIT (scrape OJV o sidecar)
+2. **ClaveÚnica** cifrada → listado **Mis Causas** → monitoreo + sync
+3. Cartera con semáforos, cuadernos, receptor, fallidos
 
-| Modo | Cómo | Etiqueta |
-|------|------|----------|
-| Partner API | `PJUD_API_URL` + opcional `PJUD_API_KEY` | `fuente=pjud` |
-| Webhook | `PJUD_WEBHOOK_SECRET` → `POST /api/integrations/pjud/webhook` | `fuente=pjud` |
-| CSV oficial | Export OJV / consulta pública → import en ficha | `fuente=import` |
-| Demo | `PJUD_ALLOW_DEMO=1` (o no-prod) | `fuente=demo` + nota visible |
+## Orden de ingest al sincronizar
 
-## Contrato partner `GET /causas/lookup?rit=&tribunal=`
+1. `PJUD_API_URL` (partner)
+2. `PJUD_SCRAPER_URL` (sidecar HTTP, recomendado en producción)
+3. Scrape in-process (`PJUD_PUBLIC_SCRAPE=1` + CAPTCHA solver + Playwright)
+4. Demo (`PJUD_ALLOW_DEMO`)
+5. CSV / webhook
 
-```json
-{
-  "sala": "Sala 1",
-  "movimientos": [
-    {
-      "id": "ext-1",
-      "titulo": "Notificación receptor: cédula",
-      "detalle": "…",
-      "fecha": "2026-08-12",
-      "referencia": "NR-1",
-      "cuaderno": "Principal",
-      "folio": "5",
-      "etapa": "Notificación",
-      "tramite": "Cédula",
-      "esReceptor": true,
-      "documentoRef": "receptor/NR-1"
-    }
-  ]
-}
+## Kill switches (obligatorios para scrape)
+
+| Variable | Efecto |
+|----------|--------|
+| `PJUD_PUBLIC_SCRAPE=1` | Habilita scrape OJV in-process |
+| `CAPTCHA_SOLVER_PROVIDER` + `CAPTCHA_SOLVER_API_KEY` | 2captcha \| capsolver |
+| `PJUD_SCRAPER_URL` | Microservicio externo (`POST /causas/lookup`, `POST /mis-causas`) |
+| `PJUD_CLAVEUNICA_SCRAPE=1` | Permite automatizar login ClaveÚnica |
+| `PJUD_CAUSAS_DAILY_SOLVE_BUDGET` | Tope diario de CAPTCHA (default 50) |
+
+Sin estos flags, LexOpen **no** scrapea ni usa ClaveÚnica.
+
+## ClaveÚnica
+
+- UI: `/causas/mis-causas` (admin guarda RUT/password)
+- Cifrado AES-256-GCM con `SESSION_SECRET`
+- Sync: `POST /api/pjud/mis-causas` (también vía `x-cron-secret`)
+- Importa causas, marca `pjudFromMisCausas` y dispara sync de movimientos
+
+## Sidecar (recomendado)
+
+```http
+POST /causas/lookup
+{ "rit": "C-100-2024", "tribunal": "1º Juzgado Civil de Santiago" }
+
+POST /mis-causas
+{ "rut": "12.345.678-9", "password": "…" }
 ```
 
-## CSV
+Respuesta lookup: mismo shape que partner API (`movimientos[]` con cuaderno/folio/receptor).
 
-```text
-titulo,detalle,fecha,referencia,id,cuaderno,folio,etapa,tramite,receptor,documento
-```
+## Riesgos
 
-`receptor` acepta `1|true|si|sí|yes|x|receptor`.
+- PJUD no publica API de causas; el scrape elude WAF/CAPTCHA (ToS).
+- Custodiar ClaveÚnica implica riesgo de seguridad: use cuenta del estudio, rotación, y preferir sidecar aislado.
+- Resultados scrape = integridad *candidate*; verifique en el portal oficial antes de actuar.
 
-## Cola de fallidos
+## CSV / webhook
 
-Cada sync crea un `PjudSyncJob`. Errores quedan en `/causas/monitoreo` con
-reintento (`action: "retry-fallidos"`) o por causa (`action: "retry"` en
-`/api/causas/:id/pjud`).
-
-## Qué no hace LexOpen
-
-- Scrapear `ofpj.pjud.cl` de forma oculta
-- Pedir o almacenar credenciales ClaveÚnica
-- Presentar el modo demo como datos oficiales
+Siguen disponibles como respaldo (ver `docs/WEB-HOST.md`).
