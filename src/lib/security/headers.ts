@@ -14,6 +14,17 @@ export function buildContentSecurityPolicy(opts?: {
     : // Fallback without per-request nonce (tests / static headers only).
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
 
+  // Production: nonce for <style> tags Next stamps; attributes stay inline for
+  // React style={{…}}. Development keeps style-src unsafe-inline for HMR tooling.
+  let styleSrc: string;
+  if (nonce && !isDev) {
+    styleSrc = `style-src 'self' 'nonce-${nonce}'`;
+  } else if (nonce && isDev) {
+    styleSrc = `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`;
+  } else {
+    styleSrc = "style-src 'self' 'unsafe-inline'";
+  }
+
   const directives = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -23,9 +34,8 @@ export function buildContentSecurityPolicy(opts?: {
     "object-src 'none'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    // Styles: keep unsafe-inline for CSS-in-JS / Tailwind; nonce alone can
-    // break third-party style injection that Next does not stamp.
-    "style-src 'self' 'unsafe-inline'",
+    styleSrc,
+    "style-src-attr 'unsafe-inline'",
     scriptSrc,
     "script-src-attr 'none'",
     "connect-src 'self'",

@@ -94,6 +94,14 @@ assert.match(recoveryToken, /^[a-f0-9]{64}$/);
 assert.match(env1, /HERMES_ALLOW_DEMO=0/);
 assert.match(env1, /PJUD_ALLOW_DEMO=0/);
 assert.match(env1, /LEXOPEN_DEMO_SWITCHER=0/);
+const seeded = ensureHostEnv(
+  fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-desktop-seed-")),
+  { port: 3030, pgPort: 54332, publicUrl: "http://127.0.0.1:3030", seedDemo: true }
+);
+assert.match(
+  fs.readFileSync(envPath(seeded.dataDir), "utf8"),
+  /LEXOPEN_DEMO_SWITCHER=0/
+);
 assert.match(env1, /HOSTNAME=0\.0\.0\.0/);
 assert.match(env1, /PJUD_SCRAPER_URL=http:\/\/127\.0\.0\.1:8787/);
 assert.match(env1, /PJUD_SCRAPER_ALLOW_PRIVATE=1/);

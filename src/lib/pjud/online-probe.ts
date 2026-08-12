@@ -10,6 +10,7 @@ import {
 } from "@/lib/pjud/ojv-dom";
 import { launchPjudBrowser, PjudScrapeError } from "@/lib/pjud/public-scrape";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
+import { assertSafeSalasUrl, defaultSalasUrl } from "@/lib/pjud/salas-url";
 
 export type OnlineProbeResult = {
   ok: boolean;
@@ -41,7 +42,9 @@ export type OnlineProbeResult = {
   };
 };
 
-const SALAS_URL = process.env.PJUD_SALAS_URL?.trim() || "https://salas.pjud.cl/";
+function salasPortalUrl() {
+  return assertSafeSalasUrl(defaultSalasUrl());
+}
 
 async function delay(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -153,7 +156,7 @@ export async function probePjudOnline(opts?: {
       });
       page.setDefaultTimeout(Math.min(timeoutMs, 30_000));
       try {
-        const res = await page.goto(SALAS_URL, {
+        const res = await page.goto(salasPortalUrl(), {
           waitUntil: "domcontentloaded",
           timeout: Math.min(timeoutMs, 30_000),
         });
@@ -201,7 +204,14 @@ export async function fetchSalasPortalHtml(opts?: {
   status: number | null;
   url: string;
 }> {
-  const url = opts?.url?.trim() || SALAS_URL;
+  let url: string;
+  try {
+    url = assertSafeSalasUrl(opts?.url);
+  } catch (error) {
+    throw new PjudScrapeError(
+      error instanceof Error ? error.message : String(error)
+    );
+  }
   const timeoutMs = opts?.timeoutMs ?? 45_000;
   const { browser } = await launchPjudBrowser();
   try {

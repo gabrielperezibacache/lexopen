@@ -387,7 +387,9 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     LEXOPEN_DATA_DIR: dataDir,
     STORAGE_PATH: storageDir(dataDir),
     OBSIDIAN_VAULT_PATH: vaultDir(dataDir),
-    LEXOPEN_DEMO_SWITCHER: opts.seedDemo || cfg.seedDemo ? "1" : "0",
+    // Never enable impersonation/demo switcher on Desktop Host (production Next).
+    // seedDemo may still load sample data without turning on LEXOPEN_DEMO_SWITCHER.
+    LEXOPEN_DEMO_SWITCHER: "0",
     HERMES_ALLOW_DEMO: "0",
     LLM_ALLOW_DEMO: "1",
     PJUD_ALLOW_DEMO: "0",

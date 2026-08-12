@@ -5,6 +5,7 @@ import {
   isSafeOutboundHttpUrl,
 } from "@/lib/net/safe-url";
 import { safeJsonParse } from "@/lib/safe-json";
+import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
 
 export type LlmPreset =
   | "openai"
@@ -119,6 +120,14 @@ async function loadConfigRow() {
   });
 }
 
+function resolveStoredApiKey(raw: string | undefined, fallback?: string) {
+  if (raw === "••••" || raw === "") return fallback;
+  if (!raw) return fallback;
+  // Prefer vault decrypt; allow legacy plaintext until next save re-encrypts.
+  const decrypted = decryptSecret(raw, { strict: false });
+  return decrypted || fallback;
+}
+
 export async function getLlmConfig(): Promise<LlmConfig> {
   const defaults = defaultsFromEnv();
   const [row, firm] = await Promise.all([
@@ -131,10 +140,7 @@ export async function getLlmConfig(): Promise<LlmConfig> {
   const merged: LlmConfig = {
     ...defaults,
     ...parsed,
-    apiKey:
-      parsed.apiKey === "••••" || parsed.apiKey === ""
-        ? defaults.apiKey
-        : parsed.apiKey ?? defaults.apiKey,
+    apiKey: resolveStoredApiKey(parsed.apiKey, defaults.apiKey),
   };
   if (parsed.allowDemo === undefined && firm) {
     merged.allowDemo = Boolean(firm.hermesAllowDemo);
@@ -231,7 +237,7 @@ export async function saveLlmConfig(input: {
   const payload = {
     preset: next.preset,
     apiUrl: next.apiUrl.replace(/\/+$/, ""),
-    apiKey: next.apiKey || "",
+    apiKey: next.apiKey ? encryptSecret(next.apiKey) : "",
     model: next.model,
     requireApproval: next.requireApproval,
     allowDemo: next.allowDemo,

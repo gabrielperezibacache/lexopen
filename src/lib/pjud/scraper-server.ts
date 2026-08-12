@@ -35,6 +35,11 @@ if (process.env.PJUD_PUBLIC_SCRAPE !== "0") {
 }
 
 const PORT = Number(process.env.PORT || 8787);
+/** Loopback by default — ClaveÚnica passwords must not hit a LAN-exposed bind. */
+const BIND =
+  process.env.PJUD_SCRAPER_BIND?.trim() ||
+  process.env.HOSTNAME?.trim() ||
+  "127.0.0.1";
 const MAX_BODY = 2 * 1024 * 1024;
 
 function authOk(req: http.IncomingMessage) {
@@ -225,11 +230,20 @@ export function createScraperServer() {
   });
 }
 
-export function startScraperServer(port = PORT) {
+export function startScraperServer(port = PORT, bind = BIND) {
   const server = createScraperServer();
-  server.listen(port, "0.0.0.0", () => {
+  const host = bind || "127.0.0.1";
+  if (host !== "127.0.0.1" && host !== "localhost" && host !== "::1") {
+    const key = process.env.PJUD_SCRAPER_KEY?.trim();
+    if (!key) {
+      throw new Error(
+        "PJUD_SCRAPER_KEY es obligatorio si el scraper no enlaza loopback"
+      );
+    }
+  }
+  server.listen(port, host, () => {
     console.log(
-      `[pjud-scraper] listening on 0.0.0.0:${port} scrapeReady=${publicScrapeReady()}`
+      `[pjud-scraper] listening on ${host}:${port} scrapeReady=${publicScrapeReady()}`
     );
   });
   return server;

@@ -52,6 +52,10 @@ type DocOption = {
   extractionStatus: string | null;
 };
 
+function isSafeAppHref(href: string) {
+  return href.startsWith("/") && !href.startsWith("//") && !href.includes("\\");
+}
+
 function SourceChip({
   s,
   className,
@@ -60,7 +64,7 @@ function SourceChip({
   className: string;
 }) {
   const label = `${s.type}: ${s.label}`;
-  if (!s.href) {
+  if (!s.href || !isSafeAppHref(s.href)) {
     return <span className={className}>{label}</span>;
   }
   if (s.href.startsWith("/api/")) {
