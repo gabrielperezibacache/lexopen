@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 type GoogleStatus = {
@@ -211,9 +212,9 @@ function IntegracionesInner() {
           Ingest live vía partner API, scraper sidecar o scrape OJV (CAPTCHA
           BYOK). Sin CAPTCHA puede usar CSV/demo. Mis Causas con ClaveÚnica
           cifrada en{" "}
-          <a href="/causas/mis-causas" className="text-[var(--sea)]">
+          <Link href="/causas/mis-causas" className="text-[var(--sea)]">
             /causas/mis-causas
-          </a>
+          </Link>
           . Detalle en <code>docs/PJUD.md</code>.
         </p>
         {captcha && (
@@ -299,12 +300,12 @@ function IntegracionesInner() {
           </div>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
-          <a href="/causas/monitoreo" className="btn btn-secondary">
+          <Link href="/causas/monitoreo" className="btn btn-secondary">
             Monitoreo
-          </a>
-          <a href="/causas/mis-causas" className="btn btn-ghost">
+          </Link>
+          <Link href="/causas/mis-causas" className="btn btn-ghost">
             Mis Causas CU
-          </a>
+          </Link>
         </div>
       </section>
 

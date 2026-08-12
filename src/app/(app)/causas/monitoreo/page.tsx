@@ -198,9 +198,15 @@ export default function MonitoreoCausasPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <a className="btn btn-secondary" href="/api/causas/monitoreo?format=csv">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              window.location.assign("/api/causas/monitoreo?format=csv");
+            }}
+          >
             Exportar CSV
-          </a>
+          </button>
           <label className="btn btn-secondary cursor-pointer">
             Importar CSV
             <input
