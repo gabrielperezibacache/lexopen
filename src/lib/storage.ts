@@ -8,7 +8,7 @@ export const MAX_STORAGE_OBJECT_BYTES = 25 * 1024 * 1024;
 /**
  * Almacenamiento de archivos:
  * - Si hay S3_* configurado, usa API S3-compatible (PUT/GET).
- * - Si no, escribe bajo ./storage (local; efímero en Render free).
+ * - Si no, escribe bajo ./storage (local; use LEXOPEN_DATA_DIR en Host).
  */
 
 function localRoot() {

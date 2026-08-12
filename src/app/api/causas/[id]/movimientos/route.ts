@@ -20,6 +20,7 @@ import {
   serializeMovimientosCsv,
 } from "@/lib/pjud/import-csv";
 import { parseLocalDateInput } from "@/lib/minutas";
+import { downloadResponseHeaders } from "@/lib/security/download";
 
 type Params = { params: Promise<{ id: string }> };
 const MAX_PREVIEW_ROWS = 100;
@@ -39,11 +40,10 @@ export async function GET(req: NextRequest, { params }: Params) {
       req.nextUrl.searchParams.get("template") === "1"
     ) {
       return new NextResponse(`${MOVIMIENTOS_CSV_HEADER}\r\n`, {
-        headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition":
-            'attachment; filename="plantilla-movimientos-pjud.csv"',
-        },
+        headers: downloadResponseHeaders(
+          "plantilla-movimientos-pjud.csv",
+          "text/csv"
+        ),
       });
     }
     if (req.nextUrl.searchParams.get("format") === "csv") {
@@ -78,11 +78,7 @@ export async function GET(req: NextRequest, { params }: Params) {
           }))
         ),
         {
-          headers: {
-            "Content-Type": "text/csv; charset=utf-8",
-            "Content-Disposition":
-              'attachment; filename="movimientos-pjud.csv"',
-          },
+          headers: downloadResponseHeaders("movimientos-pjud.csv", "text/csv"),
         }
       );
     }

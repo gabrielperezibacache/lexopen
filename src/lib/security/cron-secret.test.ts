@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
 import {
+  assertProductionSessionSecret,
   assertSafeProductionEnv,
   forbiddenProductionFlags,
   warnProductionFlags,
@@ -21,6 +22,7 @@ const prevHermesDemo = env.HERMES_ALLOW_DEMO;
 const prevPjudDemo = env.PJUD_ALLOW_DEMO;
 const prevHermesPrivate = env.HERMES_ALLOW_PRIVATE_URL;
 const prevLlmPrivate = env.LLM_ALLOW_PRIVATE_URL;
+const prevSession = env.SESSION_SECRET;
 
 env.CRON_SECRET = "super-secret-cron-value";
 assert.equal(verifyCronSecret("super-secret-cron-value"), true);
@@ -62,6 +64,7 @@ assert.equal(
 );
 
 env.NODE_ENV = "production";
+env.SESSION_SECRET = "production-grade-session-secret-32";
 env.LEXOPEN_OPEN_ACCESS = "1";
 // Isolate from CI/workflow env (often sets LEXOPEN_RELAX_CSRF=1).
 delete env.LEXOPEN_RELAX_CSRF;
@@ -75,6 +78,14 @@ delete env.LLM_ALLOW_PRIVATE_URL;
 assert.deepEqual(forbiddenProductionFlags(), ["LEXOPEN_OPEN_ACCESS"]);
 assert.throws(() => assertSafeProductionEnv(), /LEXOPEN_OPEN_ACCESS/);
 delete env.LEXOPEN_OPEN_ACCESS;
+assert.doesNotThrow(() => assertSafeProductionEnv());
+
+env.SESSION_SECRET = "change-me-in-production";
+assert.throws(() => assertProductionSessionSecret(), /débil|ejemplo/);
+assert.throws(() => assertSafeProductionEnv(), /SESSION_SECRET/);
+env.SESSION_SECRET = "short";
+assert.throws(() => assertProductionSessionSecret(), /mín/);
+env.SESSION_SECRET = "production-grade-session-secret-32";
 assert.doesNotThrow(() => assertSafeProductionEnv());
 
 env.LLM_ALLOW_DEMO = "1";
@@ -105,5 +116,7 @@ if (prevHermesPrivate === undefined) delete env.HERMES_ALLOW_PRIVATE_URL;
 else env.HERMES_ALLOW_PRIVATE_URL = prevHermesPrivate;
 if (prevLlmPrivate === undefined) delete env.LLM_ALLOW_PRIVATE_URL;
 else env.LLM_ALLOW_PRIVATE_URL = prevLlmPrivate;
+if (prevSession === undefined) delete env.SESSION_SECRET;
+else env.SESSION_SECRET = prevSession;
 
 console.log("security/cron-secret + production-env + safe-url OK");

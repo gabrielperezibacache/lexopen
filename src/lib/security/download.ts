@@ -7,6 +7,7 @@ const INLINE_SAFE = new Set([
   "image/webp",
   "image/gif",
   "text/plain",
+  "text/markdown",
 ]);
 
 const UPLOAD_ALLOWED = new Set([
@@ -61,11 +62,20 @@ export function contentDispositionFor(
 
 export function downloadResponseHeaders(
   filename: string,
-  mimeType: string | null | undefined
+  mimeType: string | null | undefined,
+  opts?: { charset?: string }
 ) {
   const contentType = normalizeMimeType(mimeType);
+  const charset =
+    opts?.charset ||
+    (contentType.startsWith("text/") || contentType === "application/json"
+      ? "utf-8"
+      : undefined);
+  const contentTypeHeader = charset
+    ? `${contentType}; charset=${charset}`
+    : contentType;
   return {
-    "Content-Type": contentType,
+    "Content-Type": contentTypeHeader,
     "Content-Disposition": contentDispositionFor(filename, contentType),
     "X-Content-Type-Options": "nosniff",
     "Cache-Control": "private, no-store",

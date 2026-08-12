@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { handleRouteError, requireStaff } from "@/lib/api";
+import { downloadResponseHeaders } from "@/lib/security/download";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -29,10 +30,7 @@ export async function GET(_req: Request, { params }: Params) {
       return NextResponse.json({ error: "No hay Markdown extraído" }, { status: 404 });
     }
     return new NextResponse(doc.extractedMarkdown, {
-      headers: {
-        "Content-Type": "text/markdown; charset=utf-8",
-        "Content-Disposition": `inline; filename="${encodeURIComponent(doc.nombre)}.md"`,
-      },
+      headers: downloadResponseHeaders(`${doc.nombre}.md`, "text/markdown"),
     });
   } catch (e) {
     return handleRouteError(e);

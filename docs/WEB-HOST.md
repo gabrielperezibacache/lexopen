@@ -88,6 +88,10 @@ Use esta lista antes de cargar información real del estudio:
    `deploy/windows` tras validar el Host a mano.
 10. **Respaldo restaurable:** al menos un `npm run web:backup` hacia medio
     externo cifrado y una prueba de `web:restore` en un entorno de ensayo.
+11. **Evite `npm start` solo** para producción del estudio: use `web:host`
+    (Postgres embebido, secretos, schedulers). Si usa Postgres externo +
+    `npm start`, defina `SESSION_SECRET` aleatorio (≥16), demos en `0` y
+    `LEXOPEN_ALLOW_LOCAL_PRODUCTION_STORAGE=1` (o S3) para documentos.
 
 ## OCR local para PDFs escaneados
 

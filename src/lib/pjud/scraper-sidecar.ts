@@ -148,7 +148,7 @@ function scraperBaseUrl() {
     if (privateHost) {
       if (!allowPrivate) {
         throw new Error(
-          "PJUD_SCRAPER_URL apunta a red privada; set PJUD_SCRAPER_ALLOW_PRIVATE=1 para sidecar interno (Render)."
+          "PJUD_SCRAPER_URL apunta a red privada; set PJUD_SCRAPER_ALLOW_PRIVATE=1 para sidecar interno del Host."
         );
       }
       // Private sidecar may use http on Render private network
