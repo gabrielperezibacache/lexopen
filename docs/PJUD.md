@@ -127,7 +127,16 @@ npm run pjud:host
 
 # 3) App (otra terminal, si no usó --with-web)
 npm run web:host   # o npm run dev
+
+# 4) Smoke online (browser + OJV + salas; no requiere CAPTCHA para pasar)
+npm run pjud:online
 ```
+
+El launcher usa Chromium de Playwright y, si falta el binario, **Google Chrome
+del sistema** (`channel: chrome`). `pjud:online` reporta `guestEntry` /
+`captchaLikely` en OJV y si `salas.pjud.cl` está restringido (en muchos hosts
+responde “acceso restringido”; entonces pegue HTML en `/api/pjud/salas` o use
+`demo: true` / `source: "live"` cuando el portal abra).
 
 Variables mínimas del web (también las imprime `pjud:host`):
 
@@ -149,9 +158,11 @@ npm run pjud:scraper   # solo el HTTP server
 # o: node scripts/pjud-scraper-worker.mjs
 ```
 
-Endpoints: `GET /health`, `POST /causas/lookup`, `POST /mis-causas`, `POST /causas/buscar`.
+Endpoints: `GET /health`, `POST /causas/lookup`, `POST /mis-causas`, `POST /causas/buscar`,
+`POST /online/probe`, `POST /salas/fetch`.
 
 `GET /health` reporta `workerRunning` / `scrapeReady` / `captcha` (análogo a CM `workerRunning`).
+`POST /online/probe` (auth Bearer) valida browser + OJV guest + salas sin gastar CAPTCHA en lookup.
 
 En Render, el Blueprint define `lexopen-pjud-scraper` (`type: pserv`) con `npx playwright install chromium` en build, y cablea `PJUD_SCRAPER_URL` + `PJUD_SCRAPER_ALLOW_PRIVATE=1` en el web.
 

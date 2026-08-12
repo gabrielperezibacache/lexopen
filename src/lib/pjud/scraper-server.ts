@@ -3,7 +3,8 @@
  * CausaMonitor: app Next + API + worker Redis concurrency 5.
  * LexOpen: web Next + este sidecar Playwright + cola Postgres `PjudSyncJob`.
  *
- * Endpoints: GET /health, POST /causas/lookup, POST /mis-causas, POST /causas/buscar
+ * Endpoints: GET /health, POST /causas/lookup, POST /mis-causas, POST /causas/buscar,
+ *            POST /online/probe, POST /salas/fetch
  *
  * Run: npm run pjud:scraper
  * Env: PORT, PJUD_SCRAPER_KEY, CAPTCHA_*, PJUD_PUBLIC_SCRAPE=1 (auto si no set)
@@ -20,6 +21,11 @@ import {
   PjudScrapeError,
 } from "@/lib/pjud/public-scrape";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
+import {
+  fetchSalasPortalHtml,
+  probePjudOnline,
+} from "@/lib/pjud/online-probe";
+import { parseSalasTablaHtml } from "@/lib/pjud/salas";
 
 if (process.env.PJUD_PUBLIC_SCRAPE !== "0") {
   process.env.PJUD_PUBLIC_SCRAPE = process.env.PJUD_PUBLIC_SCRAPE || "1";
@@ -164,6 +170,46 @@ export function createScraperServer() {
         if (!rut) return send(res, 400, { error: "rut requerido" });
         const causas = await scrapeCausasByRut(rut);
         return send(res, 200, { causas });
+      }
+
+      if (req.method === "POST" && path === "/online/probe") {
+        const body = await readJson(req);
+        const probe = await probePjudOnline({
+          skipOjv: Boolean(body.skipOjv),
+          skipSalas: Boolean(body.skipSalas),
+          timeoutMs: body.timeoutMs ? Number(body.timeoutMs) : undefined,
+        });
+        return send(res, probe.ok ? 200 : 503, probe);
+      }
+
+      if (req.method === "POST" && path === "/salas/fetch") {
+        const body = await readJson(req);
+        const fetched = await fetchSalasPortalHtml({
+          url: body.url ? String(body.url) : undefined,
+        });
+        if (fetched.restricted) {
+          return send(res, 200, {
+            ok: false,
+            restricted: true,
+            status: fetched.status,
+            url: fetched.url,
+            agenda: [],
+            note: "Portal salas restringido desde este host; pegue HTML en /api/pjud/salas.",
+          });
+        }
+        const agenda = parseSalasTablaHtml(fetched.html, {
+          corteDefault: body.corteDefault
+            ? String(body.corteDefault)
+            : undefined,
+        });
+        return send(res, 200, {
+          ok: true,
+          restricted: false,
+          status: fetched.status,
+          url: fetched.url,
+          agenda: agenda.slice(0, 100),
+          count: agenda.length,
+        });
       }
 
       return send(res, 404, { error: "Not found" });

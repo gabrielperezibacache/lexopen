@@ -162,15 +162,48 @@ async function delay(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function launchBrowser() {
+export type PjudBrowserLaunch = {
+  browser: import("playwright").Browser;
+  channel: "chromium" | "chrome";
+};
+
+/**
+ * Lanza Chromium de Playwright; si falta el binario empaquetado, cae a
+ * Google Chrome del sistema (`channel: "chrome"`) — útil en hosts cloud/CI.
+ */
+export async function launchPjudBrowser(): Promise<PjudBrowserLaunch> {
   const { chromium } = await loadPlaywright();
   try {
-    return await chromium.launch({ headless: true, args: BROWSER_ARGS });
-  } catch (error) {
-    throw new PjudScrapeError(
-      `Chromium no arranca: ${error instanceof Error ? error.message : String(error)}. Ejecute npx playwright install chromium.`
-    );
+    const browser = await chromium.launch({
+      headless: true,
+      args: BROWSER_ARGS,
+    });
+    return { browser, channel: "chromium" };
+  } catch (bundledError) {
+    try {
+      const browser = await chromium.launch({
+        headless: true,
+        channel: "chrome",
+        args: BROWSER_ARGS,
+      });
+      return { browser, channel: "chrome" };
+    } catch (chromeError) {
+      const bundled =
+        bundledError instanceof Error
+          ? bundledError.message
+          : String(bundledError);
+      const chrome =
+        chromeError instanceof Error ? chromeError.message : String(chromeError);
+      throw new PjudScrapeError(
+        `Browser no arranca (Chromium: ${bundled}; Chrome: ${chrome}). Ejecute npm run pjud:chromium o instale Google Chrome.`
+      );
+    }
   }
+}
+
+async function launchBrowser() {
+  const { browser } = await launchPjudBrowser();
+  return browser;
 }
 
 async function closeSweetAlerts(page: PlaywrightPage) {
