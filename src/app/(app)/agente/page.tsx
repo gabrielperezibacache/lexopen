@@ -1,11 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { safeJsonParse } from "@/lib/safe-json";
 
 type CausaOption = { id: string; titulo: string; rit: string | null };
-type ChatMessage = { role: "user" | "assistant"; content: string; source?: string };
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  source?: string;
+  utility?: string;
+};
 type AgentChat = {
   id: string;
   title: string;
@@ -13,16 +19,30 @@ type AgentChat = {
   demoMode: boolean;
   updatedAt: string;
 };
+type Utility = {
+  id: string;
+  label: string;
+  short: string;
+  starter: string;
+};
+type SourceRef = {
+  type: string;
+  id: string;
+  label: string;
+  href?: string;
+};
 
 function AgenteInner() {
   const sp = useSearchParams();
   const [causas, setCausas] = useState<CausaOption[]>([]);
+  const [utilities, setUtilities] = useState<Utility[]>([]);
+  const [utility, setUtility] = useState(sp.get("utility") || "copilot");
   const [causaId, setCausaId] = useState(sp.get("causaId") || "");
-  const [prompt, setPrompt] = useState(
-    "Redacta un memorial de alegatos preliminar y cita jurisprudencia útil para Chile."
-  );
+  const [prompt, setPrompt] = useState("");
   const [reply, setReply] = useState("");
   const [meta, setMeta] = useState("");
+  const [sources, setSources] = useState<SourceRef[]>([]);
+  const [actions, setActions] = useState<{ label: string; href: string }[]>([]);
   const [chatId, setChatId] = useState("");
   const [chats, setChats] = useState<AgentChat[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -47,6 +67,21 @@ function AgenteInner() {
       .catch(() => {
         if (active) setCausas([]);
       });
+    fetch("/api/integrations/hermes?utilities=1")
+      .then((r) => (r.ok ? r.json() : { utilities: [] }))
+      .then((data: { utilities?: Utility[] }) => {
+        if (!active) return;
+        const list = Array.isArray(data.utilities) ? data.utilities : [];
+        setUtilities(list);
+        if (!prompt && list.length) {
+          const current =
+            list.find((u) => u.id === (sp.get("utility") || "copilot")) ||
+            list[0];
+          setPrompt(current.starter);
+          setUtility(current.id);
+        }
+      })
+      .catch(() => undefined);
     fetch("/api/integrations/hermes?chats=1")
       .then((r) => (r.ok ? r.json() : []))
       .then((data: AgentChat[]) => {
@@ -58,7 +93,13 @@ function AgenteInner() {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function selectUtility(u: Utility) {
+    setUtility(u.id);
+    setPrompt(u.starter);
+  }
 
   function resumeChat(chat: AgentChat) {
     setChatId(chat.id);
@@ -68,7 +109,9 @@ function AgenteInner() {
       .reverse()
       .find((m) => m.role === "assistant");
     setReply(lastAssistant?.content || "");
-    setMeta(chat.demoMode ? "Historial · modo demo" : "Historial · Hermes Agent");
+    setMeta(chat.demoMode ? "Historial · modo demo" : "Historial · copiloto");
+    setSources([]);
+    setActions([]);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -76,6 +119,8 @@ function AgenteInner() {
     setBusy(true);
     setReply("");
     setMeta("");
+    setSources([]);
+    setActions([]);
     try {
       const res = await fetch("/api/integrations/hermes", {
         method: "POST",
@@ -84,10 +129,15 @@ function AgenteInner() {
           causaId: causaId || undefined,
           prompt,
           chatId: chatId || undefined,
+          utility,
         }),
       });
       const data = await res.json().catch(() => ({}));
       setReply(data.content || data.error || "Sin respuesta");
+      setSources(Array.isArray(data.sources) ? data.sources : []);
+      setActions(
+        Array.isArray(data.suggestedActions) ? data.suggestedActions : []
+      );
       if (data.chat) {
         setChatId(data.chat.id);
         const parsed = safeJsonParse<ChatMessage[]>(data.chat.messagesJson, []);
@@ -96,8 +146,9 @@ function AgenteInner() {
       }
       setMeta(
         [
+          data.utility?.label ? `Modo: ${data.utility.label}` : null,
           data.source === "hermes"
-            ? "Fuente: Hermes Agent"
+            ? "Fuente: Hermes"
             : data.source === "error"
               ? "Error de Hermes"
               : "Fuente: demo local",
@@ -108,7 +159,7 @@ function AgenteInner() {
           .join(" · ")
       );
     } catch {
-      setReply("No se pudo contactar al agente");
+      setReply("No se pudo contactar al copiloto");
       setMeta("Error de red");
     } finally {
       setBusy(false);
@@ -119,19 +170,42 @@ function AgenteInner() {
     <div className="space-y-6">
       <div>
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          IA jurídica
+          Copiloto legal
         </p>
-        <h1 className="display mt-2 text-4xl">Hermes Agent</h1>
+        <h1 className="display mt-2 text-4xl">Asistente LexOpen</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Integra el API server OpenAI-compatible de Hermes. Las acciones sensibles quedan
-          sujetas a aprobación del abogado.
+          Entiende lo que pide, recuerda el hilo, busca en la causa y documentos
+          del estudio, y responde con fuentes verificables del host. Borradores
+          siempre sujetos a revisión humana (estilo Julia.cl / Hermes).
         </p>
       </div>
+
+      {utilities.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {utilities.map((u) => (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => selectUtility(u)}
+              className={`rounded-2xl border px-4 py-3 text-left transition ${
+                utility === u.id
+                  ? "border-[var(--sea)] bg-[rgba(31,122,140,0.08)]"
+                  : "border-[var(--line)] bg-white/70 hover:border-[var(--sea)]/40"
+              }`}
+            >
+              <div className="font-semibold">{u.label}</div>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--ink-soft)]/75">
+                {u.short}
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <aside className="panel rounded-3xl p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">Chats</h2>
+            <h2 className="font-semibold">Conversaciones</h2>
             <button
               className="text-sm text-[var(--sea)]"
               type="button"
@@ -140,6 +214,8 @@ function AgenteInner() {
                 setMessages([]);
                 setReply("");
                 setMeta("");
+                setSources([]);
+                setActions([]);
               }}
             >
               Nuevo
@@ -151,18 +227,23 @@ function AgenteInner() {
                 key={chat.id}
                 type="button"
                 className={`w-full rounded-2xl border px-3 py-2 text-left text-sm ${
-                  chat.id === chatId ? "border-[var(--sea)] bg-[var(--sea)]/8" : "border-[var(--line)] bg-white/70"
+                  chat.id === chatId
+                    ? "border-[var(--sea)] bg-[var(--sea)]/8"
+                    : "border-[var(--line)] bg-white/70"
                 }`}
                 onClick={() => resumeChat(chat)}
               >
                 <div className="font-medium">{chat.title}</div>
                 <div className="text-xs text-[var(--ink-soft)]/60">
-                  {chat.demoMode ? "demo" : "Hermes"} · {new Date(chat.updatedAt).toLocaleDateString("es-CL")}
+                  {chat.demoMode ? "demo" : "Hermes"} ·{" "}
+                  {new Date(chat.updatedAt).toLocaleDateString("es-CL")}
                 </div>
               </button>
             ))}
             {chats.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">Sin chats guardados.</p>
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Sin chats guardados.
+              </p>
             )}
           </div>
         </aside>
@@ -170,12 +251,14 @@ function AgenteInner() {
         <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
           {messages.length === 0 && !reply && (
             <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white/50 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
-              Elija una causa (opcional), ajuste la instrucción y envíe. Si Hermes no
-              está conectado, LexOpen responde en modo demo.
+              Elija una utilidad y una causa (recomendado). El copiloto ancla la
+              respuesta a plazos, movimientos y documentos indexados del host.
             </div>
           )}
           <div>
-            <label className="mb-1 block text-sm font-medium">Causa (contexto)</label>
+            <label className="mb-1 block text-sm font-medium">
+              Causa (contexto del estudio)
+            </label>
             <select
               className="select"
               value={causaId}
@@ -198,21 +281,76 @@ function AgenteInner() {
             />
           </div>
           <button className="btn btn-primary" type="submit" disabled={busy}>
-            {busy ? "Consultando…" : "Enviar a Hermes"}
+            {busy ? "Trabajando…" : "Enviar al copiloto"}
           </button>
         </form>
       </div>
 
+      {(sources.length > 0 || actions.length > 0) && (
+        <section className="panel space-y-3 rounded-3xl p-5">
+          {sources.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
+                Fuentes del estudio
+              </h2>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {sources.slice(0, 16).map((s) => (
+                  <li key={`${s.type}-${s.id}`}>
+                    {s.href ? (
+                      <Link
+                        href={s.href}
+                        className="rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs text-[var(--sea)]"
+                      >
+                        {s.type}: {s.label}
+                      </Link>
+                    ) : (
+                      <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs">
+                        {s.type}: {s.label}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {actions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {actions.map((a) => (
+                <Link key={a.href} href={a.href} className="btn btn-secondary">
+                  {a.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {messages.length > 0 && (
         <section className="panel rounded-3xl p-6">
-          <h2 className="mb-4 text-lg font-semibold">Historial</h2>
+          {meta && (
+            <p className="mb-4 text-xs uppercase tracking-[0.12em] text-[var(--copper)]">
+              {meta}
+            </p>
+          )}
+          <h2 className="mb-4 text-lg font-semibold">Conversación</h2>
           <div className="space-y-4">
             {messages.map((m, i) => (
-              <div key={i} className="rounded-2xl border border-[var(--line)] bg-white/70 p-3">
+              <div
+                key={i}
+                className="rounded-2xl border border-[var(--line)] bg-white/70 p-3"
+              >
                 <div className="mb-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
-                  {m.role === "user" ? "Usuario" : m.source === "demo" ? "Hermes demo" : m.source === "error" ? "Hermes error" : "Hermes"}
+                  {m.role === "user"
+                    ? "Usted"
+                    : m.source === "demo"
+                      ? "Copiloto demo"
+                      : m.source === "error"
+                        ? "Error"
+                        : "Copiloto"}
                 </div>
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{m.content}</pre>
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                  {m.content}
+                </pre>
               </div>
             ))}
           </div>
@@ -221,8 +359,14 @@ function AgenteInner() {
 
       {(reply || meta) && messages.length === 0 && (
         <section className="panel rounded-3xl p-6">
-          {meta && <p className="mb-3 text-xs uppercase tracking-[0.12em] text-[var(--copper)]">{meta}</p>}
-          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{reply}</pre>
+          {meta && (
+            <p className="mb-3 text-xs uppercase tracking-[0.12em] text-[var(--copper)]">
+              {meta}
+            </p>
+          )}
+          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+            {reply}
+          </pre>
         </section>
       )}
     </div>

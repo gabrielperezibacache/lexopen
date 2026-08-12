@@ -113,6 +113,12 @@ Conectores: partner API, scraper, webhook, demo o CSV. El scrape y ClaveÚnica
 van desactivados por defecto (kill switches); no se presentan como API oficial
 de PJUD.
 
+**Copiloto IA** (inspirado en asistentes tipo [Julia.cl](https://www.julia.cl/asistente)):
+entiende la petición, recuerda el hilo, busca en causas/documentos del estudio y
+responde con fuentes del host. Utilidades: briefing, Q&A documental, borradores,
+plazos, investigación y casos similares. Todo como ayuda operativa con revisión
+humana — no asesoría automática.
+
 Sin proveedor externo, la alternativa local es exportar el CSV desde la consulta
 oficial e importarlo en la ficha de la causa. El importador acepta
 `titulo,detalle,fecha,referencia,id,cuaderno,folio,etapa,tramite,receptor,documento`

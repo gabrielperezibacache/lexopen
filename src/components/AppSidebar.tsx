@@ -66,7 +66,7 @@ const collab: NavItem[] = [
 
 const intel: NavItem[] = [
   { href: "/jurisprudencia", label: "Jurisprudencia", icon: BookOpen },
-  { href: "/agente", label: "Agente Hermes", icon: Bot },
+  { href: "/agente", label: "Copiloto IA", icon: Bot },
   { href: "/portal", label: "Portal cliente", icon: DoorOpen },
   {
     href: "/integraciones",

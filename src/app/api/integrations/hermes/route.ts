@@ -1,14 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { canSeeConfidential } from "@/lib/auth/rbac";
-import { askHermes, getHermesConfig, legalSystemPrompt } from "@/lib/integrations/hermes";
+import {
+  askHermes,
+  getHermesConfig,
+  legalSystemPrompt,
+  type HermesMessage,
+} from "@/lib/integrations/hermes";
 import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
+import { buildAiContextPack } from "@/lib/ai/context-pack";
+import {
+  AI_UTILITIES,
+  getAiUtility,
+  inferAiUtility,
+} from "@/lib/ai/utilities";
+import {
+  buildLocalBriefingMarkdown,
+  formatPlazoEstimate,
+} from "@/lib/ai/local-assist";
+import { safeJsonParse } from "@/lib/safe-json";
 
 export async function GET(req: NextRequest) {
   try {
     const user = await requireStaff();
     const causaId = req.nextUrl.searchParams.get("causaId");
+    if (req.nextUrl.searchParams.get("utilities") === "1") {
+      return NextResponse.json({ utilities: AI_UTILITIES });
+    }
     if (req.nextUrl.searchParams.get("chats") === "1" || causaId) {
       const chats = await prisma.agentChat.findMany({
         where: {
@@ -21,11 +39,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(chats);
     }
 
-    const row = await prisma.integrationConfig.findUnique({ where: { provider: "hermes" } });
+    const row = await prisma.integrationConfig.findUnique({
+      where: { provider: "hermes" },
+    });
     const config = await getHermesConfig();
     return NextResponse.json({
       enabled: row?.enabled ?? false,
       config: { ...config, apiKey: config.apiKey ? "••••" : "" },
+      utilities: AI_UTILITIES,
     });
   } catch (e) {
     return handleRouteError(e);
@@ -50,7 +71,10 @@ export async function POST(req: Request) {
         apiUrl !== undefined &&
         (!isSafeHttpUrl(apiUrl) || apiUrl.length > 500)
       ) {
-        return NextResponse.json({ error: "URL de Hermes inválida" }, { status: 400 });
+        return NextResponse.json(
+          { error: "URL de Hermes inválida" },
+          { status: 400 }
+        );
       }
       await prisma.integrationConfig.upsert({
         where: { provider: "hermes" },
@@ -73,70 +97,110 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    let context = "";
-    if (body.causaId) {
-      const causa = await prisma.causa.findUnique({
-        where: { id: body.causaId },
-        include: {
-          partes: true,
-          plazos: true,
-          minutas: {
-            where: canSeeConfidential(user.role) ? {} : { confidencial: false },
-            include: { acciones: true },
-            orderBy: { fecha: "desc" },
-            take: 5,
-          },
+    if (body.action === "estimate-plazo") {
+      const estimate = formatPlazoEstimate({
+        desde: String(body.desde || ""),
+        dias: Number(body.dias || 0),
+        tipoComputo: body.tipoComputo === "corridos" ? "corridos" : "habiles",
+      });
+      return NextResponse.json({ ok: !("error" in estimate), ...estimate });
+    }
+
+    const prompt =
+      String(body.prompt || "").trim() ||
+      "Resume el estado procesal y sugiere próximos pasos.";
+    const utility = getAiUtility(
+      body.utility || inferAiUtility(prompt)
+    );
+
+    const pack = await buildAiContextPack({
+      causaId: body.causaId || null,
+      utility: utility.id,
+      prompt,
+      role: user.role,
+    });
+
+    // Historial multi-turno (estilo Julia: recuerda la conversación)
+    const history: HermesMessage[] = [];
+    if (body.chatId) {
+      const existing = await prisma.agentChat.findFirst({
+        where: {
+          id: body.chatId,
+          ...(user.role === "admin" ? {} : { userId: user.id }),
         },
       });
-      if (causa) {
-        context = JSON.stringify(
-          {
-            titulo: causa.titulo,
-            rit: causa.rit,
-            tribunal: causa.tribunal,
-            materia: causa.materia,
-            etapa: causa.etapa,
-            caratula: causa.caratula,
-            resumen: causa.resumen,
-            googleDriveFolder: causa.googleDriveFolderUrl,
-            partes: causa.partes,
-            plazos: causa.plazos.map((p) => ({
-              titulo: p.titulo,
-              fecha: p.fechaLimite,
-              estado: p.estado,
-            })),
-            minutasRecientes: causa.minutas.map((m) => ({
-              tipo: m.tipo,
-              titulo: m.titulo,
-              fecha: m.fecha,
-              resumen: m.resumenEjecutivo,
-              proximosPasos: m.acciones.map((a) => ({
-                descripcion: a.descripcion,
-                estado: a.estado,
-                responsable: a.responsable,
-              })),
-            })),
-          },
-          null,
-          2
-        );
+      if (existing) {
+        const prev = safeJsonParse<
+          Array<{ role: string; content: string }>
+        >(existing.messagesJson, []);
+        for (const m of prev.slice(-12)) {
+          if (
+            (m.role === "user" || m.role === "assistant") &&
+            typeof m.content === "string" &&
+            m.content.trim()
+          ) {
+            history.push({
+              role: m.role,
+              content: m.content.slice(0, 12_000),
+            });
+          }
+        }
       }
     }
 
-    const chatUserId = user.role === "admin" && body.userId ? body.userId : user.id;
-    const result = await askHermes({
+    const messages: HermesMessage[] = [
+      {
+        role: "system",
+        content: legalSystemPrompt({
+          context: pack.text.slice(0, 48_000),
+          utilityHint: `${utility.label}: ${utility.systemHint}`,
+          alerts: pack.alerts,
+        }),
+      },
+      ...history,
+      { role: "user", content: prompt },
+    ];
+
+    const chatUserId =
+      user.role === "admin" && body.userId ? body.userId : user.id;
+
+    let result = await askHermes({
       causaId: body.causaId,
       userId: chatUserId,
-      messages: [
-        { role: "system", content: legalSystemPrompt(context) },
-        { role: "user", content: body.prompt || "Resume el estado procesal y sugiere próximos pasos." },
-      ],
+      utilityLabel: utility.label,
+      messages,
     });
 
-    const prompt = body.prompt || "Resume el estado procesal y sugiere próximos pasos.";
+    // Prefacio local con alertas / briefing cuando aplica
+    if (utility.id === "briefing" && pack.alerts.length) {
+      const local = buildLocalBriefingMarkdown({
+        causaLabel: pack.sources.find((s) => s.type === "causa")?.label || "—",
+        alerts: pack.alerts,
+        sourcesCount: pack.sources.length,
+      });
+      if (result.content) {
+        result = {
+          ...result,
+          content: `${local}\n---\n\n${result.content}`,
+        };
+      }
+    } else if (pack.alerts.length && result.content) {
+      result = {
+        ...result,
+        content: `> Alertas LexOpen:\n${pack.alerts
+          .map((a) => `> - ${a}`)
+          .join("\n")}\n\n${result.content}`,
+      };
+    }
+
     const nextMessages = [
-      { role: "user", content: prompt },
-      { role: "assistant", content: result.content, source: result.source },
+      { role: "user", content: prompt, utility: utility.id },
+      {
+        role: "assistant",
+        content: result.content,
+        source: result.source,
+        utility: utility.id,
+      },
     ];
     let chat;
     if (body.chatId) {
@@ -149,20 +213,23 @@ export async function POST(req: Request) {
       if (!existing) {
         return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
       }
-      const previous = existing ? JSON.parse(existing.messagesJson || "[]") : [];
+      const previous = safeJsonParse(existing.messagesJson, []);
       chat = await prisma.agentChat.update({
         where: { id: body.chatId },
         data: {
-          messagesJson: JSON.stringify([...previous, ...nextMessages]),
-          demoMode: existing?.demoMode || result.source === "demo",
-          causaId: body.causaId || existing?.causaId || null,
+          messagesJson: JSON.stringify([
+            ...(Array.isArray(previous) ? previous : []),
+            ...nextMessages,
+          ]),
+          demoMode: existing.demoMode || result.source === "demo",
+          causaId: body.causaId || existing.causaId || null,
           userId: chatUserId,
         },
       });
     } else {
       chat = await prisma.agentChat.create({
         data: {
-          title: prompt.slice(0, 80) || "Consulta Hermes",
+          title: `[${utility.label}] ${prompt.slice(0, 60)}` || "Consulta",
           messagesJson: JSON.stringify(nextMessages),
           demoMode: result.source === "demo",
           causaId: body.causaId || null,
@@ -171,7 +238,21 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({ ...result, chat });
+    return NextResponse.json({
+      ...result,
+      chat,
+      utility: { id: utility.id, label: utility.label },
+      sources: pack.sources,
+      alerts: pack.alerts,
+      suggestedActions: [
+        body.causaId
+          ? { label: "Abrir causa", href: `/causas/${body.causaId}` }
+          : null,
+        { label: "Plazos", href: "/plazos" },
+        { label: "Jurisprudencia", href: "/jurisprudencia" },
+        { label: "Monitoreo PJUD", href: "/causas/monitoreo" },
+      ].filter(Boolean),
+    });
   } catch (e) {
     return handleRouteError(e);
   }

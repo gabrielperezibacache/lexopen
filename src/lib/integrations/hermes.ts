@@ -36,6 +36,7 @@ export async function askHermes(params: {
   messages: HermesMessage[];
   causaId?: string;
   userId?: string;
+  utilityLabel?: string;
 }) {
   const config = await getHermesConfig();
   let apiUrl: URL;
@@ -90,7 +91,7 @@ export async function askHermes(params: {
         messages: params.messages,
         temperature: 0.2,
       }),
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(45_000),
     });
 
     if (!res.ok) {
@@ -139,7 +140,7 @@ export async function askHermes(params: {
       };
     }
     const lastUser = [...params.messages].reverse().find((m) => m.role === "user");
-    const demo = buildDemoReply(lastUser?.content || "");
+    const demo = buildDemoReply(lastUser?.content || "", params.utilityLabel);
     if (params.causaId) {
       await prisma.activity.create({
         data: {
@@ -159,28 +160,47 @@ export async function askHermes(params: {
   }
 }
 
-function buildDemoReply(prompt: string) {
-  return `## Análisis LexOpen × Hermes (demo)
+function buildDemoReply(prompt: string, utilityLabel?: string) {
+  return `## Copiloto LexOpen (demo local)
 
+**Modo:** ${utilityLabel || "copilot"}
 **Consulta:** ${prompt.slice(0, 500) || "(vacía)"}
 
-### Hallazgos preliminares
-1. Identifique el **RIT/RUC**, tribunal y etapa procesal antes de redactar.
-2. Cruce plazos fatales del Código de Procedimiento Civil / Código del Trabajo según materia.
-3. Revise jurisprudencia vinculada en el módulo LexOpen (doctrina + roles).
+### Qué haría el asistente con Hermes conectado
+1. Anclar la respuesta a la causa, documentos indexados y plazos del estudio.
+2. Citar fuentes locales (movimientos, PDF extraídos, jurisprudencia del corpus).
+3. Proponer un borrador o plan de trabajo etiquetado para revisión humana.
 
 ### Borrador sugerido
-- Exposición de hechos en orden cronológico.
-- Fundamentos de derecho con citas de leyes chilenas aplicables.
-- Petitorio claro y subsidiario.
+- Hechos en orden cronológico (solo con datos verificados del expediente LexOpen).
+- Fundamentos con citas **del corpus disponible**; si faltan, marcar [REVISAR].
+- Petitorio / próximos pasos operativos.
 
-> **Aprobación humana requerida:** no envíe ni presente este texto sin revisión del abogado responsable.
+> **Aprobación humana requerida.** LexOpen no reemplaza el criterio del abogado ni fuentes oficiales.
 `;
 }
 
-export function legalSystemPrompt(context?: string) {
-  return `Eres un asistente jurídico para un estudio de abogados en Chile, integrado en LexOpen (clon open-source inspirado en HighQ).
-Responde en español chileno formal. No inventes sentencias; si no tienes certeza, indícalo.
-Enfócate en: causas civiles, laborales, penales, familia y recursos constitucionales.
-${context ? `\nContexto de la causa:\n${context}` : ""}`;
+export function legalSystemPrompt(opts?: {
+  context?: string;
+  utilityHint?: string;
+  alerts?: string[];
+}) {
+  const alerts =
+    opts?.alerts?.length ?
+      `\nAlertas operativas del host:\n${opts.alerts.map((a) => `- ${a}`).join("\n")}`
+    : "";
+  return `Eres el copiloto jurídico de LexOpen para un estudio de abogados en Chile
+(inspirado en asistentes tipo Julia.cl: entiende la petición, usa contexto del estudio,
+recuerda el hilo y cita fuentes verificables del propio host).
+
+Reglas:
+- Español chileno formal y claro.
+- NO inventes sentencias, RIT, artículos ni hechos que no estén en el contexto.
+- Si falta información, dilo y propone qué dato pedir o revisar en LexOpen.
+- Etiqueta borradores como BORRADOR y marca [REVISAR] lo incierto.
+- Plazos: el motor LexOpen es estimación interna, no cómputo oficial del tribunal.
+- No sustituyas el criterio profesional ni presentes textos como listos para tribunal sin revisión humana.
+${opts?.utilityHint ? `\nModo activo: ${opts.utilityHint}` : ""}
+${alerts}
+${opts?.context ? `\nContexto anclado del estudio:\n${opts.context}` : ""}`;
 }
