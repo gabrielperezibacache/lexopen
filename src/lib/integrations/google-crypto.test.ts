@@ -18,9 +18,11 @@ async function main() {
   assert.equal(decryptGoogleToken(sealed), plain);
 
   const key = Buffer.from(process.env.SESSION_SECRET!, "utf8");
-  const xor = Buffer.from(plain, "utf8").map(
-    (byte, idx) => byte ^ key[idx % key.length]
-  );
+  const plainBuf = Buffer.from(plain, "utf8");
+  const xor = Buffer.alloc(plainBuf.length);
+  for (let idx = 0; idx < plainBuf.length; idx++) {
+    xor[idx] = plainBuf[idx]! ^ key[idx % key.length]!;
+  }
   const legacy = `${GOOGLE_TOKEN_V1_PREFIX}${xor.toString("base64")}`;
   assert.equal(isGoogleLegacyToken(legacy), true);
   assert.equal(decryptGoogleToken(legacy), plain);

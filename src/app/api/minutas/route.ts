@@ -324,7 +324,9 @@ export async function POST(req: NextRequest) {
       };
     } else {
       try {
-        driveResult = await pushMinutaToDrive(minuta.id);
+        driveResult = await pushMinutaToDrive(minuta.id, {
+          role: user.role,
+        });
       } catch (e) {
         driveResult = {
           status: "error",

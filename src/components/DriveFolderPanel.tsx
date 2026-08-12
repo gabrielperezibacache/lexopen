@@ -2,8 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FolderOpen, Link2, Unlink } from "lucide-react";
-import { isPlaceholderDriveFolderId, isRealDriveFolderId } from "@/lib/integrations/drive-folder";
+import { FolderOpen, Link2, Unlink, RefreshCw } from "lucide-react";
+import {
+  driveFileUrl,
+  isPlaceholderDriveFolderId,
+  isRealDriveFolderId,
+} from "@/lib/integrations/drive-folder";
+
+type DriveFile = {
+  id: string;
+  name: string;
+  mimeType: string;
+  webViewLink?: string;
+  modifiedTime?: string;
+};
 
 type Props = {
   causaId: string;
@@ -23,6 +35,7 @@ export function DriveFolderPanel({
   const [folderRef, setFolderRef] = useState("");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  const [files, setFiles] = useState<DriveFile[] | null>(null);
 
   const isPlaceholder = isPlaceholderDriveFolderId(folderId);
   const isReal = isRealDriveFolderId(folderId);
@@ -42,7 +55,7 @@ export function DriveFolderPanel({
     const data = await res.json();
     if (!res.ok) {
       setError(data.error || "Error");
-      return;
+      return data;
     }
     setMsg(
       data.message ||
@@ -54,10 +67,18 @@ export function DriveFolderPanel({
               ? "Marcador local guardado (no es Drive real)"
               : data.status === "unlinked"
                 ? "Carpeta desvinculada"
-                : "Listo")
+                : data.status === "ok"
+                  ? `${(data.files || []).length} archivo(s) en Drive`
+                  : "Listo")
     );
-    setFolderRef("");
-    router.refresh();
+    if (action === "list-causa-folder") {
+      setFiles(Array.isArray(data.files) ? data.files : []);
+    } else {
+      setFolderRef("");
+      setFiles(null);
+      router.refresh();
+    }
+    return data;
   }
 
   return (
@@ -66,8 +87,9 @@ export function DriveFolderPanel({
         <div>
           <h2 className="text-lg font-semibold">Google Drive</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-            Enlace el expediente digital de la causa a una carpeta determinada.
-            Tras incorporar documentos o minutas en LexOpen, puede subirlos ahí.
+            Enlace el expediente digital de la causa a una carpeta. Preferimos
+            «Crear carpeta en Drive» (scope <code>drive.file</code>). Luego puede
+            subir documentos y minutas.
           </p>
         </div>
         <FolderOpen className="text-[var(--copper)]" size={20} />
@@ -91,7 +113,7 @@ export function DriveFolderPanel({
           {isPlaceholder && (
             <p className="mt-2 text-xs text-[var(--ink-soft)]/70">
               Marcador local: no abre Google Drive. Conecte OAuth y cree una
-              carpeta real para subir minutas.
+              carpeta real para subir documentos.
             </p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -104,6 +126,19 @@ export function DriveFolderPanel({
               >
                 Abrir en Drive
               </a>
+            )}
+            {isReal && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(() => run("list-causa-folder"))
+                }
+              >
+                <RefreshCw size={14} className="mr-1 inline" />
+                Ver archivos
+              </button>
             )}
             {isPlaceholder && (
               <button
@@ -129,25 +164,68 @@ export function DriveFolderPanel({
               Desvincular
             </button>
           </div>
+          {files && (
+            <ul className="mt-3 space-y-1 border-t border-[var(--line)] pt-3 text-sm">
+              {files.length === 0 ? (
+                <li className="text-[var(--ink-soft)]/65">
+                  Carpeta vacía o sin archivos visibles para LexOpen.
+                </li>
+              ) : (
+                files.map((f) => (
+                  <li key={f.id} className="flex flex-wrap items-baseline gap-2">
+                    <span className="font-medium">{f.name}</span>
+                    <span className="text-xs text-[var(--ink-soft)]/60">
+                      {f.mimeType.replace("application/vnd.google-apps.", "")}
+                    </span>
+                    <a
+                      href={f.webViewLink || driveFileUrl(f.id)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-[var(--sea)] underline"
+                    >
+                      Abrir
+                    </a>
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
         </div>
       ) : (
         <div className="mt-4 space-y-3">
-          <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">
-              URL o ID de carpeta existente
-            </span>
-            <input
-              className="input"
-              value={folderRef}
-              onChange={(e) => setFolderRef(e.target.value)}
-              placeholder="https://drive.google.com/drive/folders/…"
-              aria-label="URL o ID de carpeta Google Drive"
-            />
-          </label>
-          <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={pending}
+            onClick={() =>
+              startTransition(() => run("create-causa-folder"))
+            }
+          >
+            Crear carpeta en Drive
+          </button>
+          <details className="rounded-2xl border border-[var(--line)] bg-white/50 p-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Vincular carpeta existente (avanzado)
+            </summary>
+            <p className="mt-2 text-xs text-[var(--ink-soft)]/70">
+              Con <code>drive.file</code> solo se pueden verificar carpetas
+              creadas o abiertas por esta app. Si falla, use «Crear carpeta».
+            </p>
+            <label className="mt-3 block text-sm">
+              <span className="mb-1 block text-[var(--ink-soft)]/70">
+                URL o ID de carpeta
+              </span>
+              <input
+                className="input"
+                value={folderRef}
+                onChange={(e) => setFolderRef(e.target.value)}
+                placeholder="https://drive.google.com/drive/folders/…"
+                aria-label="URL o ID de carpeta Google Drive"
+              />
+            </label>
             <button
               type="button"
-              className="btn btn-secondary"
+              className="btn btn-secondary mt-3"
               disabled={pending || !folderRef.trim()}
               onClick={() =>
                 startTransition(() =>
@@ -158,17 +236,7 @@ export function DriveFolderPanel({
               <Link2 size={14} className="mr-1 inline" />
               Vincular carpeta
             </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={pending}
-              onClick={() =>
-                startTransition(() => run("create-causa-folder"))
-              }
-            >
-              Crear carpeta en Drive
-            </button>
-          </div>
+          </details>
         </div>
       )}
 
