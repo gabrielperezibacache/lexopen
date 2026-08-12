@@ -6,7 +6,7 @@
 import { prisma } from "@/lib/db";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { clasificarUrgencia, diasRestantes } from "@/lib/plazos";
-import type { AiUtilityId } from "@/lib/ai/utilities";
+import { extractSearchNeedles, type AiUtilityId } from "@/lib/ai/utilities";
 
 export type AiSourceRef = {
   type: "causa" | "documento" | "plazo" | "movimiento" | "jurisprudencia" | "wiki" | "minuta";
@@ -190,18 +190,25 @@ export async function buildAiContextPack(opts: {
   }
 
   if (opts.utility === "research" || opts.utility === "similar" || opts.utility === "copilot") {
-    const q = opts.prompt.trim().slice(0, 200) || "civil";
-    const needle = q.slice(0, 40);
+    const needles = extractSearchNeedles(opts.prompt, 4);
+    const needleList = needles.length ? needles : ["civil"];
+    const textOr = (fields: string[]) =>
+      needleList.flatMap((needle) =>
+        fields.map((field) => ({
+          [field]: { contains: needle, mode: "insensitive" as const },
+        }))
+      );
+
     const juris = await prisma.jurisprudencia.findMany({
       where: {
-        OR: [
-          { rol: { contains: needle, mode: "insensitive" } },
-          { tribunal: { contains: needle, mode: "insensitive" } },
-          { materia: { contains: needle, mode: "insensitive" } },
-          { caratula: { contains: needle, mode: "insensitive" } },
-          { doctrina: { contains: needle, mode: "insensitive" } },
-          { descripcion: { contains: needle, mode: "insensitive" } },
-        ],
+        OR: textOr([
+          "rol",
+          "tribunal",
+          "materia",
+          "caratula",
+          "doctrina",
+          "descripcion",
+        ]),
       },
       take: 8,
       orderBy: { fecha: "desc" },
@@ -234,18 +241,19 @@ export async function buildAiContextPack(opts: {
           href: `/jurisprudencia`,
         });
       }
+      if (!juris.length && opts.utility === "research") {
+        alerts.push(
+          "Sin coincidencia exacta de jurisprudencia; se muestran las más recientes del corpus local."
+        );
+      }
     } else if (opts.utility === "research") {
       alerts.push("Sin hits de jurisprudencia en el corpus local LexOpen.");
     }
 
-    const wikiNeedle = needle.length >= 2 ? needle : "proceso";
     const wikiPages = await prisma.wikiPage.findMany({
       where: {
         published: true,
-        OR: [
-          { title: { contains: wikiNeedle, mode: "insensitive" } },
-          { content: { contains: wikiNeedle, mode: "insensitive" } },
-        ],
+        OR: textOr(["title", "content"]),
       },
       include: { site: { select: { id: true, name: true } } },
       take: 6,
@@ -268,6 +276,7 @@ export async function buildAiContextPack(opts: {
           wikiFinal.map((w) => ({
             id: w.id,
             title: w.title,
+            slug: w.slug,
             site: w.site.name,
             excerpt: (w.content || "").slice(0, 1200),
           })),
@@ -280,8 +289,13 @@ export async function buildAiContextPack(opts: {
           type: "wiki",
           id: w.id,
           label: `${w.site.name}: ${w.title}`,
-          href: `/sites/${w.site.id}/wiki`,
+          href: `/sites/${w.site.id}/wiki#${encodeURIComponent(w.slug)}`,
         });
+      }
+      if (!wikiPages.length && opts.utility === "research") {
+        alerts.push(
+          "Sin coincidencia exacta de wiki; se muestran páginas recientes del estudio."
+        );
       }
     } else if (opts.utility === "research") {
       alerts.push("Sin hits de wiki del estudio en LexOpen.");

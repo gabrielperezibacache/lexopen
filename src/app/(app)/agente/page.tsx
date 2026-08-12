@@ -15,6 +15,8 @@ type ChatMessage = {
   suggestedActions?: { label: string; href: string }[];
   alerts?: string[];
   requireApproval?: boolean;
+  discarded?: boolean;
+  approvedMinutaId?: string;
 };
 type AgentChat = {
   id: string;
@@ -55,6 +57,7 @@ function AgenteInner() {
   const [busy, setBusy] = useState(false);
   const [approveBusy, setApproveBusy] = useState(false);
   const [approveMsg, setApproveMsg] = useState("");
+  const [approveHref, setApproveHref] = useState("");
   const [plazoDesde, setPlazoDesde] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
@@ -63,6 +66,7 @@ function AgenteInner() {
     "habiles"
   );
   const [plazoPreview, setPlazoPreview] = useState("");
+  const [plazoVencimiento, setPlazoVencimiento] = useState("");
   const autoRan = useRef(false);
 
   async function loadChats(filterCausaId?: string) {
@@ -126,7 +130,12 @@ function AgenteInner() {
     setActions(
       Array.isArray(last?.suggestedActions) ? last!.suggestedActions! : []
     );
-    setRequireApproval(Boolean(last?.requireApproval));
+    const canApprove =
+      Boolean(last?.requireApproval) &&
+      !last?.discarded &&
+      !last?.approvedMinutaId &&
+      last?.source !== "error";
+    setRequireApproval(canApprove);
     setMeta(
       [
         last?.utility ? `Modo: ${last.utility}` : null,
@@ -135,7 +144,9 @@ function AgenteInner() {
           : last?.source === "error"
             ? "Error"
             : "Historial · copiloto",
-        last?.requireApproval ? "Requiere aprobación humana" : null,
+        canApprove ? "Requiere aprobación humana" : null,
+        last?.discarded ? "Borrador descartado" : null,
+        last?.approvedMinutaId ? "Borrador aprobado" : null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -164,6 +175,7 @@ function AgenteInner() {
     setActions([]);
     setRequireApproval(false);
     setApproveMsg("");
+    setApproveHref("");
     try {
       const res = await fetch("/api/integrations/hermes", {
         method: "POST",
@@ -181,7 +193,9 @@ function AgenteInner() {
       setActions(
         Array.isArray(data.suggestedActions) ? data.suggestedActions : []
       );
-      setRequireApproval(Boolean(data.requireApproval));
+      const canApprove =
+        Boolean(data.requireApproval) && data.source !== "error";
+      setRequireApproval(canApprove);
       if (data.chat) {
         setChatId(data.chat.id);
         const parsed = safeJsonParse<ChatMessage[]>(data.chat.messagesJson, []);
@@ -196,7 +210,7 @@ function AgenteInner() {
             : data.source === "error"
               ? "Error de Hermes"
               : "Fuente: demo local",
-          data.requireApproval ? "Requiere aprobación humana" : null,
+          canApprove ? "Requiere aprobación humana" : null,
           data.note || null,
         ]
           .filter(Boolean)
@@ -253,32 +267,69 @@ function AgenteInner() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setApproveMsg(data.error || "No se pudo guardar la minuta");
+        setApproveHref("");
         return;
       }
       setRequireApproval(false);
-      setApproveMsg(`Minuta guardada. Abrir: ${data.href}`);
+      setApproveMsg("Minuta guardada a partir del borrador aprobado.");
+      setApproveHref(data.href || "");
       if (data.href) {
         setActions((prev) => [
           { label: "Ver minuta aprobada", href: data.href },
           ...prev.filter((a) => a.href !== data.href),
         ]);
       }
+      if (data.chat?.messagesJson) {
+        const parsed = safeJsonParse<ChatMessage[]>(data.chat.messagesJson, []);
+        if (Array.isArray(parsed)) setMessages(parsed);
+      } else if (chatId) {
+        await loadChats(causaId || undefined);
+      }
     } catch {
       setApproveMsg("Error de red al guardar la minuta");
+      setApproveHref("");
     } finally {
       setApproveBusy(false);
     }
   }
 
-  function discardDraft() {
-    setReply("");
+  async function discardDraft() {
     setRequireApproval(false);
     setApproveMsg("");
-    setMeta((m) => m.replace(/ · Requiere aprobación humana/, ""));
+    setApproveHref("");
+    setMeta((m) =>
+      m
+        .replace(/ · Requiere aprobación humana/, "")
+        .concat(m.includes("descartado") ? "" : " · Borrador descartado")
+    );
+    if (!chatId) {
+      setReply("");
+      return;
+    }
+    try {
+      const res = await fetch("/api/integrations/hermes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "discard-draft", chatId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.chat) {
+        setChatId(data.chat.id);
+        const parsed = safeJsonParse<ChatMessage[]>(data.chat.messagesJson, []);
+        setMessages(Array.isArray(parsed) ? parsed : []);
+        const lastAssistant = [...(Array.isArray(parsed) ? parsed : [])]
+          .reverse()
+          .find((m) => m.role === "assistant");
+        applyAssistantMeta(lastAssistant, data.chat.demoMode);
+      }
+    } catch {
+      /* local discard already applied */
+    }
   }
 
   async function estimatePlazo() {
     setPlazoPreview("");
+    setPlazoVencimiento("");
     const res = await fetch("/api/integrations/hermes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -294,6 +345,7 @@ function AgenteInner() {
       setPlazoPreview(data.error);
       return;
     }
+    setPlazoVencimiento(data.vencimiento || "");
     setPlazoPreview(
       [
         `Vencimiento estimado: ${data.vencimiento}`,
@@ -393,9 +445,30 @@ function AgenteInner() {
             </div>
           </div>
           {plazoPreview && (
-            <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--line)] bg-white/70 p-3 font-sans text-sm">
-              {plazoPreview}
-            </pre>
+            <div className="space-y-2">
+              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--line)] bg-white/70 p-3 font-sans text-sm">
+                {plazoPreview}
+              </pre>
+              {plazoVencimiento && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() =>
+                      setPrompt(
+                        (p) =>
+                          `${p.trim()}\n\nVencimiento estimado LexOpen: ${plazoVencimiento} (${plazoDias} días ${plazoComputo} desde ${plazoDesde}).`
+                      )
+                    }
+                  >
+                    Insertar en la instrucción
+                  </button>
+                  <Link href="/plazos" className="btn btn-secondary">
+                    Ir a crear plazo
+                  </Link>
+                </div>
+              )}
+            </div>
           )}
         </section>
       )}
@@ -570,7 +643,14 @@ function AgenteInner() {
             </p>
           )}
           {approveMsg && (
-            <p className="text-sm text-[var(--sea)]">{approveMsg}</p>
+            <p className="text-sm text-[var(--sea)]">
+              {approveMsg}{" "}
+              {approveHref && (
+                <Link href={approveHref} className="underline">
+                  Abrir minuta
+                </Link>
+              )}
+            </p>
           )}
         </section>
       )}
@@ -597,10 +677,34 @@ function AgenteInner() {
                       : m.source === "error"
                         ? "Error"
                         : "Copiloto"}
+                  {m.discarded ? " · descartado" : ""}
+                  {m.approvedMinutaId ? " · aprobado" : ""}
                 </div>
                 <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
                   {m.content}
                 </pre>
+                {m.role === "assistant" &&
+                  Array.isArray(m.sources) &&
+                  m.sources.length > 0 && (
+                    <ul className="mt-3 flex flex-wrap gap-2">
+                      {m.sources.slice(0, 8).map((s) => (
+                        <li key={`${i}-${s.type}-${s.id}`}>
+                          {s.href ? (
+                            <Link
+                              href={s.href}
+                              className="rounded-full border border-[var(--line)] bg-white px-2 py-0.5 text-[11px] text-[var(--sea)]"
+                            >
+                              {s.type}: {s.label}
+                            </Link>
+                          ) : (
+                            <span className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[11px]">
+                              {s.type}: {s.label}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
               </div>
             ))}
           </div>

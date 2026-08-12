@@ -111,6 +111,51 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: !("error" in estimate), ...estimate });
     }
 
+    if (body.action === "discard-draft") {
+      const chatId = String(body.chatId || "").trim();
+      if (!chatId) {
+        return NextResponse.json(
+          { error: "Se requiere chatId para descartar el borrador" },
+          { status: 400 }
+        );
+      }
+      const existing = await prisma.agentChat.findFirst({
+        where: {
+          id: chatId,
+          ...(user.role === "admin" ? {} : { userId: user.id }),
+        },
+      });
+      if (!existing) {
+        return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
+      }
+      const prev = safeJsonParse<
+        Array<Record<string, unknown> & { role?: string }>
+      >(existing.messagesJson, []);
+      let marked = false;
+      for (let i = prev.length - 1; i >= 0; i -= 1) {
+        if (prev[i]?.role === "assistant") {
+          prev[i] = {
+            ...prev[i],
+            requireApproval: false,
+            discarded: true,
+          };
+          marked = true;
+          break;
+        }
+      }
+      if (!marked) {
+        return NextResponse.json(
+          { error: "No hay borrador de asistente para descartar" },
+          { status: 400 }
+        );
+      }
+      const chat = await prisma.agentChat.update({
+        where: { id: chatId },
+        data: { messagesJson: JSON.stringify(prev) },
+      });
+      return NextResponse.json({ ok: true, chat });
+    }
+
     if (body.action === "approve-to-minuta") {
       const causaId = String(body.causaId || "").trim();
       if (!causaId) {
@@ -122,7 +167,10 @@ export async function POST(req: Request) {
 
       let content = String(body.content || "").trim();
       let utilityLabel = String(body.utilityLabel || "Copiloto");
-      if (!content && body.chatId) {
+      let chatToUpdate: { id: string; messagesJson: string; causaId: string | null } | null =
+        null;
+
+      if (body.chatId) {
         const existing = await prisma.agentChat.findFirst({
           where: {
             id: String(body.chatId),
@@ -135,17 +183,49 @@ export async function POST(req: Request) {
             { status: 404 }
           );
         }
+        if (existing.causaId && existing.causaId !== causaId) {
+          return NextResponse.json(
+            {
+              error:
+                "La causa seleccionada no coincide con la del chat del copiloto",
+            },
+            { status: 400 }
+          );
+        }
+        chatToUpdate = existing;
         const prev = safeJsonParse<
-          Array<{ role?: string; content?: string; utility?: string }>
+          Array<{
+            role?: string;
+            content?: string;
+            utility?: string;
+            source?: string;
+            discarded?: boolean;
+            requireApproval?: boolean;
+          }>
         >(existing.messagesJson, []);
         const lastAssistant = [...prev]
           .reverse()
           .find((m) => m.role === "assistant" && m.content?.trim());
-        content = String(lastAssistant?.content || "").trim();
+        if (lastAssistant?.source === "error") {
+          return NextResponse.json(
+            { error: "No se puede aprobar una respuesta de error" },
+            { status: 400 }
+          );
+        }
+        if (lastAssistant?.discarded) {
+          return NextResponse.json(
+            { error: "Este borrador ya fue descartado" },
+            { status: 400 }
+          );
+        }
+        if (!content) {
+          content = String(lastAssistant?.content || "").trim();
+        }
         if (lastAssistant?.utility) {
           utilityLabel = getAiUtility(lastAssistant.utility).label;
         }
       }
+
       if (!content) {
         return NextResponse.json(
           { error: "No hay contenido aprobado para guardar" },
@@ -218,6 +298,30 @@ export async function POST(req: Request) {
         });
       });
 
+      let chat = null;
+      if (chatToUpdate) {
+        const prev = safeJsonParse<
+          Array<Record<string, unknown> & { role?: string }>
+        >(chatToUpdate.messagesJson, []);
+        for (let i = prev.length - 1; i >= 0; i -= 1) {
+          if (prev[i]?.role === "assistant") {
+            prev[i] = {
+              ...prev[i],
+              requireApproval: false,
+              approvedMinutaId: minuta.id,
+            };
+            break;
+          }
+        }
+        chat = await prisma.agentChat.update({
+          where: { id: chatToUpdate.id },
+          data: {
+            messagesJson: JSON.stringify(prev),
+            causaId: causaId,
+          },
+        });
+      }
+
       await writeAudit({
         action: "minuta.create",
         entityType: "minuta",
@@ -231,6 +335,7 @@ export async function POST(req: Request) {
         ok: true,
         minutaId: minuta.id,
         href,
+        chat,
       });
     }
 
@@ -347,7 +452,7 @@ export async function POST(req: Request) {
           sources: pack.sources,
           alerts: pack.alerts,
           suggestedActions,
-          requireApproval: true,
+          requireApproval: false,
         },
         { status: result.source === "error" ? 502 : 200 }
       );

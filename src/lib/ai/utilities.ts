@@ -114,3 +114,72 @@ export function inferAiUtility(prompt: string): AiUtilityId {
   }
   return "copilot";
 }
+
+/** Extrae términos útiles para contains() sobre corpus local (wiki/juris). */
+const SEARCH_STOPWORDS = new Set([
+  "para",
+  "como",
+  "esta",
+  "este",
+  "esto",
+  "estos",
+  "estas",
+  "sobre",
+  "desde",
+  "hasta",
+  "entre",
+  "donde",
+  "cuando",
+  "tiene",
+  "tengo",
+  "debe",
+  "puedo",
+  "puede",
+  "quiero",
+  "busca",
+  "buscar",
+  "segun",
+  "según",
+  "cual",
+  "cuál",
+  "que",
+  "qué",
+  "una",
+  "uno",
+  "unos",
+  "unas",
+  "los",
+  "las",
+  "del",
+  "con",
+  "por",
+  "sin",
+  "the",
+  "and",
+  "causa",
+  "causas",
+  "favor",
+  "necesito",
+  "revisa",
+  "revisar",
+  "dame",
+  "hazme",
+  "elabore",
+  "elabora",
+]);
+
+export function extractSearchNeedles(prompt: string, max = 4): string[] {
+  const tokens = (prompt || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .split(/[^a-z0-9áéíóúñü]+/i)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 4 && !SEARCH_STOPWORDS.has(t));
+  const unique: string[] = [];
+  for (const t of tokens) {
+    if (!unique.includes(t)) unique.push(t);
+    if (unique.length >= max) break;
+  }
+  return unique;
+}

@@ -68,19 +68,26 @@ export default async function MinutasPage() {
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {causas.map((c) => (
-            <Link
+            <div
               key={c.id}
-              href={`/causas/${c.id}/minuta/nueva`}
               className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 transition hover:border-[var(--sea)]/40"
             >
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <ClipboardPen size={14} className="text-[var(--copper)]" />
-                {c.rit || "Sin RIT"}
-              </div>
-              <div className="mt-1 line-clamp-2 text-xs text-[var(--ink-soft)]/70">
-                {c.titulo}
-              </div>
-            </Link>
+              <Link href={`/causas/${c.id}/minuta/nueva`} className="block">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <ClipboardPen size={14} className="text-[var(--copper)]" />
+                  {c.rit || "Sin RIT"}
+                </div>
+                <div className="mt-1 line-clamp-2 text-xs text-[var(--ink-soft)]/70">
+                  {c.titulo}
+                </div>
+              </Link>
+              <Link
+                href={`/agente?causaId=${c.id}&utility=draft`}
+                className="mt-2 inline-block text-xs text-[var(--sea)]"
+              >
+                Borrador con IA
+              </Link>
+            </div>
           ))}
         </div>
         {causas.length === 0 && (

@@ -13,6 +13,21 @@ assert.ok("error" in bad);
 assert.equal(typeof bad.error, "string");
 assert.match(String(bad.error), /inválida/i);
 
+const badDias = formatPlazoEstimate({
+  desde: "2026-08-01",
+  dias: 0,
+  tipoComputo: "habiles",
+});
+assert.ok("error" in badDias);
+assert.match(String(badDias.error), /días/i);
+
+const badNaN = formatPlazoEstimate({
+  desde: "2026-08-01",
+  dias: Number.NaN,
+  tipoComputo: "corridos",
+});
+assert.ok("error" in badNaN);
+
 const ok = formatPlazoEstimate({
   desde: "2026-08-03", // lunes
   dias: 5,

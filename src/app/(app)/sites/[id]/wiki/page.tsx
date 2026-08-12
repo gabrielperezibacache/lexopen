@@ -40,7 +40,11 @@ export default async function SiteWikiPage({ params }: Params) {
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {pages.map((p) => (
-            <article key={p.id} className="panel rounded-3xl p-5">
+            <article
+              key={p.id}
+              id={p.slug}
+              className="panel scroll-mt-24 rounded-3xl p-5"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-semibold">{p.title}</h2>
