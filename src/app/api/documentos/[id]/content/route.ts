@@ -3,6 +3,7 @@ import { handleRouteError, requireStaff } from "@/lib/api";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db";
 import { getObject } from "@/lib/storage";
+import { downloadResponseHeaders } from "@/lib/security/download";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,10 +28,7 @@ export async function GET(_req: Request, { params }: Params) {
     }
 
     return new NextResponse(body as BodyInit, {
-      headers: {
-        "Content-Type": doc.mimeType || "application/octet-stream",
-        "Content-Disposition": `inline; filename="${encodeURIComponent(doc.nombre)}"`,
-      },
+      headers: downloadResponseHeaders(doc.nombre, doc.mimeType),
     });
   } catch (e) {
     return handleRouteError(e);

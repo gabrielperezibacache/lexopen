@@ -331,6 +331,30 @@ function newPgPassword() {
   return crypto.randomBytes(18).toString("base64url");
 }
 
+function isLegacyPgPassword(password) {
+  return !password || password === "lexopen";
+}
+
+function rewriteDatabaseUrlPassword(databaseUrl, password) {
+  const parsed = new URL(databaseUrl);
+  // URL.password setter percent-encodes as needed.
+  parsed.password = password;
+  return parsed.toString();
+}
+
+/** Persist a single key into dataDir/.env without clobbering other values. */
+function writeEnvKey(dataDir, key, value) {
+  const file = envPath(dataDir);
+  const existing = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  const { map, order } = parseEnvFile(existing);
+  map[key] = value;
+  if (!order.some((item) => item.type === "key" && item.key === key)) {
+    order.push({ type: "key", key });
+  }
+  replaceFileAtomic(file, serializeEnv(map, order));
+  return map;
+}
+
 /**
  * Garantiza .env mínimo para Host sin borrar secretos ni overrides del usuario.
  * STORAGE_PATH / vault siempre bajo dataDir (sobreviven al actualizar el .app/.exe).
@@ -449,6 +473,9 @@ module.exports = {
   resolveBindHost,
   pgPasswordFromDatabaseUrl,
   newPgPassword,
+  isLegacyPgPassword,
+  rewriteDatabaseUrlPassword,
+  writeEnvKey,
   ensureHostEnv,
   localAppUrl,
   readPackageVersion,

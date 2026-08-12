@@ -8,6 +8,8 @@ assert.equal(isValidBootstrapToken(`${token}x`, token), false);
 assert.equal(isValidBootstrapToken(token.slice(0, -1), token), false);
 assert.equal(isValidBootstrapToken("", token), false);
 assert.equal(isValidBootstrapToken(token, undefined), false);
+assert.equal(isValidBootstrapToken("short", "short"), false);
+assert.equal(isValidBootstrapToken("a".repeat(31), "a".repeat(31)), false);
 
 assert.equal(
   passwordChangeSchema.safeParse({

@@ -9,6 +9,7 @@ import {
   BOOTSTRAP_TOKEN_ENV,
   isValidBootstrapToken,
 } from "@/lib/auth/bootstrap";
+import { clearDesktopEnvSecret } from "@/lib/auth/env-secrets";
 
 const setupSchema = z.object({
   token: z.string().min(1).max(256),
@@ -80,9 +81,8 @@ export async function POST(req: NextRequest) {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
 
-    // The user-count guard is the source of truth; clearing the process copy
-    // also prevents repeated attempts during the current Host lifetime.
-    process.env[BOOTSTRAP_TOKEN_ENV] = "";
+    // The user-count guard is the source of truth; clear process + Desktop .env.
+    await clearDesktopEnvSecret(BOOTSTRAP_TOKEN_ENV);
     return NextResponse.json({ ok: true, user }, { status: 201 });
   } catch (e) {
     return handleRouteError(e);
