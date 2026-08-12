@@ -109,7 +109,7 @@ function IntegracionesInner() {
         </p>
         <h1 className="display mt-2 text-4xl">Integraciones</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Obsidian (vault Markdown), Hermes Agent (API), Google Workspace y
+          Obsidian (vault Markdown), copiloto IA / Hermes, Google Workspace y
           PJUD (scrape / ClaveÚnica / sidecar).
         </p>
       </div>
