@@ -694,6 +694,11 @@ locales (`npm run pjud:host` + intervalos en el `.env` del data dir).
 
 ## 🔄 Cómo actualizar la aplicación
 
+Cuando GitHub Releases publica una versión más nueva que la del Host, el personal
+del estudio ve un **aviso en la aplicación** con los pasos de actualización (se
+puede descartar por versión). También puede desactivar la consulta con
+`LEXOPEN_UPDATE_CHECK=0`.
+
 Actualizar LexOpen reemplaza el **código** (y aplica migraciones de base de datos).
 La carpeta de datos (`LEXOPEN_DATA_DIR`, Application Support / `%APPDATA%\LexOpen`)
 **no se borra**: PostgreSQL, documentos, vault y `.env` se conservan.
