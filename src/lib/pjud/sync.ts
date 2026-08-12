@@ -38,8 +38,14 @@ function externalKey(rit: string | null, tribunal: string) {
   return `${(rit || "").toUpperCase()}|${tribunal}`.slice(0, 180);
 }
 
-function nextSyncAtFrom(now = new Date()) {
-  return new Date(now.getTime() + pjudSyncIntervalMs());
+function nextSyncAtFrom(now = new Date(), failCount = 0) {
+  const base = pjudSyncIntervalMs();
+  // Exponential backoff on repeated failures (cap 8× interval).
+  const factor =
+    failCount <= 0
+      ? 1
+      : Math.min(8, 2 ** Math.min(Math.max(failCount - 1, 0), 3));
+  return new Date(now.getTime() + base * factor);
 }
 
 export async function syncCausaPjud(
@@ -117,7 +123,8 @@ export async function syncCausaPjud(
     });
   } catch (e) {
     const note = e instanceof Error ? e.message : "Error de sync";
-    const next = nextSyncAtFrom();
+    const failCountAfter = (causa.pjudFailCount || 0) + 1;
+    const next = nextSyncAtFrom(new Date(), failCountAfter);
     await prisma.$transaction([
       prisma.causa.update({
         where: { id: causaId },
@@ -144,7 +151,8 @@ export async function syncCausaPjud(
   }
 
   if (fetchResult.provider === "none") {
-    const next = nextSyncAtFrom();
+    const failCountAfter = (causa.pjudFailCount || 0) + 1;
+    const next = nextSyncAtFrom(new Date(), failCountAfter);
     await prisma.$transaction([
       prisma.causa.update({
         where: { id: causaId },
@@ -281,7 +289,7 @@ export async function syncCausaPjud(
   });
 
   let pdfBackedUp = 0;
-  if (inserted > 0 && pdfBackupEnabled()) {
+  if (pdfBackupEnabled()) {
     try {
       const backup = await backupMovimientoDocuments(causaId);
       pdfBackedUp = backup.saved;
@@ -442,51 +450,18 @@ export async function retryFallidos(opts?: {
   causaIds?: string[];
   limit?: number;
 }) {
-  const where = opts?.causaIds?.length
-    ? { id: { in: opts.causaIds }, pjudMonitoreoActivo: true }
-    : {
-        pjudMonitoreoActivo: true,
-        OR: [
-          { pjudLastSyncStatus: "failed" },
-          { pjudLastSyncStatus: "error" },
-          { pjudFailCount: { gt: 0 } },
-        ],
-      };
-
-  const causas = await prisma.causa.findMany({
-    where,
-    select: { id: true },
-    take: opts?.limit || 50,
+  const { requeueFailedJobs, processPendingSyncJobs } = await import(
+    "@/lib/pjud/queue"
+  );
+  const requeued = await requeueFailedJobs({
+    causaIds: opts?.causaIds,
+    limit: opts?.limit,
   });
-
-  const results = [];
-  for (const c of causas) {
-    try {
-      results.push(
-        await syncCausaPjud(c.id, {
-          actorId: opts?.actorId,
-          force: true,
-          trigger: "retry",
-        })
-      );
-    } catch (e) {
-      results.push({
-        causaId: c.id,
-        inserted: 0,
-        skipped: 0,
-        provider: "none" as const,
-        demo: false,
-        note: e instanceof Error ? e.message : "Error",
-        status: "failed",
-        jobId: null,
-        lastMovimientoAt: null,
-        nextSyncAt: null,
-        diasSinMovimiento: null,
-        semaforo: "gris" as const,
-      });
-    }
-  }
-  return results;
+  return processPendingSyncJobs({
+    actorId: opts?.actorId,
+    limit: opts?.limit,
+    jobIds: requeued.map((j) => j.id),
+  });
 }
 
 export function providerStatusPublic() {

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import {
   diasEntre,
   semaforoPorDiasSinMovimiento,
+  type Semaforo,
 } from "@/lib/pjud/classify";
 import { getGoogleConfig } from "@/lib/integrations/google";
 import { sendGmailMessage } from "@/lib/integrations/gmail";
@@ -29,6 +30,34 @@ async function firmSettings() {
   return prisma.firmSettings.create({ data: { organizationId: org.id } });
 }
 
+/** Pure: pick digest-worthy rows given recent movs + overall semáforo. */
+export function selectDigestCausa(opts: {
+  recentMovimientos: Array<{
+    titulo: string;
+    fecha: Date;
+    tipo: string;
+    esReceptor: boolean;
+    relevante: boolean;
+  }>;
+  lastMovimientoAt: Date | null;
+}): { include: boolean; semaforo: Semaforo; movimientos: DigestItem["movimientos"] } {
+  const dias = opts.lastMovimientoAt
+    ? diasEntre(opts.lastMovimientoAt)
+    : null;
+  const semaforo = semaforoPorDiasSinMovimiento(dias);
+  const relevant = opts.recentMovimientos.filter((m) =>
+    isDigestRelevantMovimiento(m, semaforo)
+  );
+  if (relevant.length === 0 && semaforo !== "rojo") {
+    return { include: false, semaforo, movimientos: [] };
+  }
+  return {
+    include: true,
+    semaforo,
+    movimientos: relevant.length ? relevant : opts.recentMovimientos,
+  };
+}
+
 export async function buildPjudDigest(opts?: { since?: Date }) {
   const settings = await firmSettings();
   const since =
@@ -41,41 +70,55 @@ export async function buildPjudDigest(opts?: { since?: Date }) {
     include: {
       abogado: { select: { id: true, email: true, name: true, role: true } },
       movimientos: {
-        where: { fecha: { gte: since } },
         orderBy: { fecha: "desc" },
-        take: 20,
+        take: 1,
       },
     },
   });
+
+  const recentByCausa = await prisma.causaMovimiento.findMany({
+    where: {
+      causaId: { in: causas.map((c) => c.id) },
+      fecha: { gte: since },
+    },
+    orderBy: { fecha: "desc" },
+  });
+  const recentMap = new Map<string, typeof recentByCausa>();
+  for (const m of recentByCausa) {
+    const list = recentMap.get(m.causaId) || [];
+    if (list.length < 20) list.push(m);
+    recentMap.set(m.causaId, list);
+  }
 
   const items: DigestItem[] = [];
   const byAbogado = new Map<
     string,
     { email: string; name: string; items: DigestItem[] }
   >();
+  const unassigned: DigestItem[] = [];
 
   for (const c of causas) {
-    const last = c.movimientos[0];
-    const dias = last ? diasEntre(last.fecha) : null;
-    const semaforo = semaforoPorDiasSinMovimiento(dias);
-    const relevant = c.movimientos.filter((m) =>
-      isDigestRelevantMovimiento(m, semaforo)
-    );
-    if (relevant.length === 0 && semaforo !== "rojo") continue;
-
-    const item: DigestItem = {
-      causaId: c.id,
-      rit: c.rit,
-      titulo: c.titulo,
-      tribunal: c.tribunal,
-      semaforo,
-      movimientos: (relevant.length ? relevant : c.movimientos).map((m) => ({
+    const last = c.movimientos[0] || null;
+    const recent = recentMap.get(c.id) || [];
+    const picked = selectDigestCausa({
+      recentMovimientos: recent.map((m) => ({
         titulo: m.titulo,
         fecha: m.fecha,
         tipo: m.tipo,
         esReceptor: m.esReceptor,
         relevante: m.relevante,
       })),
+      lastMovimientoAt: last?.fecha || null,
+    });
+    if (!picked.include) continue;
+
+    const item: DigestItem = {
+      causaId: c.id,
+      rit: c.rit,
+      titulo: c.titulo,
+      tribunal: c.tribunal,
+      semaforo: picked.semaforo,
+      movimientos: picked.movimientos,
     };
     items.push(item);
 
@@ -87,10 +130,12 @@ export async function buildPjudDigest(opts?: { since?: Date }) {
       };
       bucket.items.push(item);
       byAbogado.set(c.abogado.id, bucket);
+    } else {
+      unassigned.push(item);
     }
   }
 
-  return { since, items, byAbogado, settingsId: settings.id };
+  return { since, items, byAbogado, unassigned, settingsId: settings.id };
 }
 
 /** Pure filter used by digest aggregation (testable). */
@@ -108,7 +153,7 @@ export function formatDigestText(items: DigestItem[], appUrl: string) {
         .slice(0, 5)
         .map((m) => `  - ${m.fecha.toISOString().slice(0, 10)} ${m.titulo}`)
         .join("\n");
-      return `${item.rit || item.titulo} [${item.semaforo}]\n${item.tribunal}\n${appUrl}/causas/${item.causaId}\n${movs}`;
+      return `${item.rit || item.titulo} [${item.semaforo}]\n${item.tribunal}\n${appUrl}/causas/${item.causaId}\n${movs || "  - Sin movimientos nuevos; semáforo rojo"}`;
     })
     .join("\n\n");
 }
@@ -150,6 +195,14 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;");
 }
 
+async function staffRecipients() {
+  return prisma.user.findMany({
+    where: { role: { in: ["admin", "abogado"] } },
+    select: { id: true, email: true, name: true, role: true },
+    take: 20,
+  });
+}
+
 export async function runPjudDigest(opts?: { dryRun?: boolean }) {
   const built = await buildPjudDigest();
   const appUrl = (
@@ -161,10 +214,32 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
   const google = await getGoogleConfig().catch(() => null);
   const canEmail = Boolean(google?.accessToken);
   const sent: string[] = [];
+  const emailFailed: string[] = [];
   const notified: string[] = [];
+
+  // Route unassigned causas to admins (or first staff).
+  if (built.unassigned.length) {
+    const staff = await staffRecipients();
+    const admins = staff.filter((u) => u.role === "admin");
+    const targets = (admins.length ? admins : staff).filter((u) => u.email);
+    for (const user of targets) {
+      const bucket = built.byAbogado.get(user.id) || {
+        email: user.email,
+        name: user.name,
+        items: [],
+      };
+      // Avoid duplicating causas already assigned to this user.
+      const existingIds = new Set(bucket.items.map((i) => i.causaId));
+      for (const item of built.unassigned) {
+        if (!existingIds.has(item.causaId)) bucket.items.push(item);
+      }
+      built.byAbogado.set(user.id, bucket);
+    }
+  }
 
   if (!opts?.dryRun) {
     for (const [userId, bucket] of built.byAbogado) {
+      if (!bucket.items.length) continue;
       const subject = `LexOpen PJUD · ${bucket.items.length} causa(s) con novedades`;
       if (canEmail) {
         try {
@@ -176,7 +251,7 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
           });
           sent.push(bucket.email);
         } catch {
-          // fall through to in-app
+          emailFailed.push(bucket.email);
         }
       }
       await prisma.notification.create({
@@ -193,14 +268,23 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
       notified.push(userId);
     }
 
+    const status =
+      canEmail && sent.length
+        ? emailFailed.length
+          ? "partial-email"
+          : "emailed"
+        : "in-app";
+
     await prisma.firmSettings.update({
       where: { id: built.settingsId },
       data: {
         pjudDigestLastAt: new Date(),
-        pjudDigestLastStatus: canEmail && sent.length ? "emailed" : "in-app",
-        pjudDigestLastNote: `Digest: ${built.items.length} causas · email ${sent.length} · in-app ${notified.length}${
+        pjudDigestLastStatus: status,
+        pjudDigestLastNote: `Digest: ${built.items.length} causas · email ${sent.length}${
+          emailFailed.length ? ` (falló ${emailFailed.length})` : ""
+        } · in-app ${notified.length}${
           canEmail ? "" : " (Gmail no conectado)"
-        }`,
+        } · sin abogado ${built.unassigned.length}`,
       },
     });
   }
@@ -209,7 +293,9 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
     dryRun: Boolean(opts?.dryRun),
     causas: built.items.length,
     emailed: sent.length,
+    emailFailed: emailFailed.length,
     notified: notified.length,
+    unassigned: built.unassigned.length,
     gmailConfigured: canEmail,
     since: built.since.toISOString(),
     sample: built.items.slice(0, 5),

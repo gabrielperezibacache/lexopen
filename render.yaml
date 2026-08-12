@@ -22,6 +22,10 @@ services:
         generateValue: true
       - key: PJUD_SECRETS_KEY
         generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: PJUD_SCRAPER_KEY
+        generateValue: true
       - key: NEXT_PUBLIC_APP_NAME
         value: LexOpen
       - key: HERMES_ALLOW_DEMO
@@ -57,8 +61,6 @@ services:
           name: lexopen-pjud-scraper
           type: pserv
           property: hostport
-      - key: PJUD_SCRAPER_KEY
-        sync: false
       - key: PJUD_SCRAPER_ALLOW_PRIVATE
         value: "1"
       - key: PJUD_PUBLIC_SCRAPE
@@ -73,8 +75,6 @@ services:
         value: "0"
       - key: PJUD_PDF_BACKUP
         value: "0"
-      - key: CRON_SECRET
-        sync: false
 
   # Sidecar scrape privado (Playwright + CAPTCHA). Red interna Render.
   - type: pserv
@@ -93,7 +93,10 @@ services:
       - key: PJUD_CLAVEUNICA_SCRAPE
         value: "1"
       - key: PJUD_SCRAPER_KEY
-        sync: false
+        fromService:
+          name: lexopen
+          type: web
+          envVarKey: PJUD_SCRAPER_KEY
       - key: CAPTCHA_SOLVER_PROVIDER
         sync: false
       - key: CAPTCHA_SOLVER_API_KEY
@@ -115,7 +118,10 @@ services:
           type: web
           property: hostport
       - key: CRON_SECRET
-        sync: false
+        fromService:
+          name: lexopen
+          type: web
+          envVarKey: CRON_SECRET
 
   # Mis Causas ~08:00 America/Santiago (11:00 UTC estándar)
   - type: cron
@@ -131,13 +137,16 @@ services:
           type: web
           property: hostport
       - key: CRON_SECRET
-        sync: false
+        fromService:
+          name: lexopen
+          type: web
+          envVarKey: CRON_SECRET
 
-  # Digest email/in-app ~08:00 America/Santiago (11:00 UTC)
+  # Digest ~09:00 America/Santiago (12:00 UTC) — after Mis Causas enqueue/sync
   - type: cron
     name: lexopen-pjud-digest
     runtime: node
-    schedule: "0 11 * * *"
+    schedule: "0 12 * * *"
     buildCommand: npm install
     startCommand: curl -fsS -X POST "http://$WEB_HOSTPORT/api/pjud/digest" -H "x-cron-secret: $CRON_SECRET" -H "content-type: application/json" -d "{}"
     envVars:
@@ -147,4 +156,7 @@ services:
           type: web
           property: hostport
       - key: CRON_SECRET
-        sync: false
+        fromService:
+          name: lexopen
+          type: web
+          envVarKey: CRON_SECRET

@@ -78,6 +78,9 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
             {yesNo(Boolean(pjud.captchaConfigured))}
             {" · "}
             Fallidos {pjud.failedJobs ?? 0}
+            {pjud.queue
+              ? ` · Cola ${pjud.queue.pending}p/${pjud.queue.running}r`
+              : ""}
             {pjud.digest?.lastStatus
               ? ` · Digest ${pjud.digest.lastStatus}`
               : " · Digest —"}
@@ -125,6 +128,13 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
               {pjud.digest.lastAt
                 ? ` · ${new Date(pjud.digest.lastAt).toLocaleString("es-CL")}`
                 : ""}
+            </p>
+          )}
+          {pjud.queue && (
+            <p className="mt-2 text-xs text-[var(--ink-soft)]/70">
+              Cola PJUD: {pjud.queue.pending} pending · {pjud.queue.running}{" "}
+              running · {pjud.queue.failed} failed · {pjud.queue.okToday} ok
+              (24h)
             </p>
           )}
         </div>

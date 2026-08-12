@@ -9,7 +9,7 @@ import {
   fetchMisCausasFromSidecar,
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
-import { syncCausaPjud } from "@/lib/pjud/sync";
+import { enqueueDueSyncJobs, processPendingSyncJobs } from "@/lib/pjud/queue";
 
 async function getOrCreateFirmSettings() {
   const orgs = await prisma.organization.findMany({
@@ -184,7 +184,7 @@ export async function syncMisCausas(opts?: {
 
   const created: string[] = [];
   const linked: string[] = [];
-  const syncResults = [];
+  const causaIdsForSync: string[] = [];
 
   for (const item of items) {
     const existing = await findExistingCausa(item);
@@ -205,6 +205,7 @@ export async function syncMisCausas(opts?: {
           pjudFromMisCausas: true,
           pjudSource: "claveunica",
           pjudLastSyncStatus: "never",
+          pjudNextSyncAt: new Date(),
           pjudLastSyncNote: "Importada desde Mis Causas (ClaveÚnica).",
         },
       });
@@ -217,31 +218,44 @@ export async function syncMisCausas(opts?: {
           pjudFromMisCausas: true,
           pjudMonitoreoActivo: true,
           pjudSource: "claveunica",
+          pjudNextSyncAt: new Date(),
           ...(item.tribunal ? { tribunal: item.tribunal } : {}),
           ...(item.ruc ? { ruc: item.ruc } : {}),
         },
       });
       linked.push(causaId);
     }
+    causaIdsForSync.push(causaId);
+  }
 
-    if (opts?.syncMovimientos !== false) {
-      try {
-        syncResults.push(
-          await syncCausaPjud(causaId, {
-            actorId: opts?.actorId,
-            force: true,
-            trigger: "manual",
-          })
-        );
-      } catch (error) {
-        syncResults.push({
-          causaId,
-          status: "failed",
-          note: error instanceof Error ? error.message : "Error sync",
-          inserted: 0,
-        });
-      }
-    }
+  let syncResults: Array<{
+    causaId: string;
+    status: string;
+    note?: string;
+    inserted?: number;
+  }> = [];
+  let enqueued = 0;
+
+  if (opts?.syncMovimientos !== false && causaIdsForSync.length) {
+    // Enqueue durable jobs instead of N serial scrapes (avoids cron timeouts).
+    const jobs = await enqueueDueSyncJobs({
+      causaIds: causaIdsForSync,
+      trigger: "cron",
+      limit: Math.min(causaIdsForSync.length, 100),
+    });
+    enqueued = jobs.length;
+    const processed = await processPendingSyncJobs({
+      actorId: opts?.actorId,
+      limit: Math.min(jobs.length || 20, 40),
+      jobIds: jobs.map((j) => j.id),
+      concurrency: 2,
+    });
+    syncResults = processed.map((r) => ({
+      causaId: r.causaId,
+      status: r.status,
+      note: r.note,
+      inserted: r.inserted,
+    }));
   }
 
   await prisma.firmSettings.update({
@@ -249,7 +263,7 @@ export async function syncMisCausas(opts?: {
     data: {
       claveUnicaLastSyncAt: new Date(),
       claveUnicaLastSyncStatus: "ok",
-      claveUnicaLastSyncNote: `Mis Causas: ${items.length} listadas · ${created.length} nuevas · ${linked.length} ya existentes.`,
+      claveUnicaLastSyncNote: `Mis Causas: ${items.length} listadas · ${created.length} nuevas · ${linked.length} ya existentes · encoladas ${enqueued}.`,
     },
   });
 
@@ -257,6 +271,7 @@ export async function syncMisCausas(opts?: {
     listed: items.length,
     created: created.length,
     linked: linked.length,
+    enqueued,
     items,
     syncResults,
   };

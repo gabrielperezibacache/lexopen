@@ -5,7 +5,7 @@ import {
   scrapeCausasByRut,
   publicScrapeReady,
 } from "@/lib/pjud/public-scrape";
-import { fetchFromScraperSidecar, scraperSidecarConfigured } from "@/lib/pjud/scraper-sidecar";
+import { fetchFromScraperSidecar, buscarCausasByRutFromSidecar, scraperSidecarConfigured } from "@/lib/pjud/scraper-sidecar";
 import { syncCausaPjud } from "@/lib/pjud/sync";
 import type { MisCausasItem } from "@/lib/pjud/types";
 
@@ -95,29 +95,11 @@ export async function buscarPorRut(rut: string): Promise<MisCausasItem[]> {
   }
 
   if (scraperSidecarConfigured()) {
-    // Sidecar may support RUT search via lookup with rut field — optional extension
     try {
-      const base = process.env.PJUD_SCRAPER_URL?.replace(/\/$/, "");
-      if (base) {
-        const res = await fetch(`${base}/causas/buscar`, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            ...(process.env.PJUD_SCRAPER_KEY
-              ? { Authorization: `Bearer ${process.env.PJUD_SCRAPER_KEY}` }
-              : {}),
-          },
-          body: JSON.stringify({ rut }),
-          signal: AbortSignal.timeout(90_000),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { causas?: MisCausasItem[] };
-          if (data.causas?.length) return data.causas;
-        }
-      }
+      const causas = await buscarCausasByRutFromSidecar(rut);
+      if (causas?.length) return causas;
     } catch {
-      // fall through
+      // fall through to in-process scrape
     }
   }
 

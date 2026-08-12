@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
       const results = await processPendingSyncJobs({
         actorId,
         limit: body.limit,
+        jobIds: requeued.map((j) => j.id),
       });
       if (actorId) {
         await writeAudit({

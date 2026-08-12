@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   formatDigestText,
   isDigestRelevantMovimiento,
+  selectDigestCausa,
   type DigestItem,
 } from "@/lib/pjud/digest";
 
@@ -25,28 +26,49 @@ assert.equal(
   false
 );
 
+// Quiet red causa (no recent movs) must still be included via lastMovimientoAt age.
+const quietRed = selectDigestCausa({
+  recentMovimientos: [],
+  lastMovimientoAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+});
+assert.equal(quietRed.include, true);
+assert.equal(quietRed.semaforo, "rojo");
+
+const freshGreen = selectDigestCausa({
+  recentMovimientos: [],
+  lastMovimientoAt: new Date(),
+});
+assert.equal(freshGreen.include, false);
+assert.equal(freshGreen.semaforo, "verde");
+
+const withRelevant = selectDigestCausa({
+  recentMovimientos: [
+    {
+      titulo: "Proveído",
+      fecha: new Date(),
+      tipo: "resolucion",
+      esReceptor: false,
+      relevante: true,
+    },
+  ],
+  lastMovimientoAt: new Date(),
+});
+assert.equal(withRelevant.include, true);
+assert.equal(withRelevant.movimientos.length, 1);
+
 const items: DigestItem[] = [
   {
     causaId: "c1",
     rit: "C-1-2024",
     titulo: "Demo",
     tribunal: "1º Civil",
-    semaforo: "amarillo",
-    movimientos: [
-      {
-        titulo: "Proveído",
-        fecha: new Date("2026-08-12T12:00:00.000Z"),
-        tipo: "resolucion",
-        esReceptor: false,
-        relevante: true,
-      },
-    ],
+    semaforo: "rojo",
+    movimientos: [],
   },
 ];
 
 const text = formatDigestText(items, "https://app.example");
 assert.match(text, /C-1-2024/);
-assert.match(text, /https:\/\/app\.example\/causas\/c1/);
-assert.match(text, /Proveído/);
+assert.match(text, /semáforo rojo/);
 
 console.log("pjud/digest.test.ts OK");

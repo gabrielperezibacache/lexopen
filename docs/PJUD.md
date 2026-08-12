@@ -46,21 +46,24 @@ En Render, el Blueprint define `lexopen-pjud-scraper` (`type: pserv`) con `npx p
 
 ## Cron / cola
 
-- `POST /api/causas/monitoreo` encola causas con `pjudMonitoreoActivo` y `pjudNextSyncAt` null/`<= now`, luego procesa `PjudSyncJob` pending → running → ok/failed.
-- Retry fallidos: `action: retry-fallidos` re-encola.
-- Render: cartera cada 6h; Mis Causas + digest ~08:00 America/Santiago (`0 11 * * *` UTC estándar).
+- `POST /api/causas/monitoreo` encola causas con `pjudMonitoreoActivo` y `pjudNextSyncAt` null/`<= now` (dedupe si ya hay pending/running), reclama jobs stuck en `running`, luego procesa `PjudSyncJob` pending → running → ok/failed.
+- Fallos aplican **backoff** exponencial sobre el intervalo base (`pjudFailCount`).
+- Retry fallidos: `action: retry-fallidos` re-encola solo esos jobs.
+- Render: cartera cada 6h; Mis Causas ~08:00 Santiago (`0 11 * * *` UTC); digest ~09:00 Santiago (`0 12 * * *` UTC, tras Mis Causas).
+- `CRON_SECRET` y `PJUD_SCRAPER_KEY` se generan en el web y se copian a crons/sidecar (`fromService.envVarKey`) para evitar desalineación.
 - Host local: `PJUD_SYNC_INTERVAL_MINUTES`, `PJUD_MIS_CAUSAS_INTERVAL_MINUTES`, `PJUD_DIGEST_INTERVAL_MINUTES` en `scripts/web-host.mjs`.
 
-## Digest email (08:00)
+## Digest email (~09:00 Santiago)
 
 - `POST /api/pjud/digest` (cron secret o staff)
-- Agrupa movimientos relevantes / receptor / semáforo rojo desde última digest o 24h
+- Incluye movimientos relevantes/receptor **y** causas con semáforo rojo aunque no haya novedades recientes (usa último movimiento global para el semáforo)
+- Causas sin abogado se enrutan a admins/staff
 - Envía vía Gmail API si Google está conectado (`gmail.send`); si no, solo notificaciones in-app
-- Estado en Host status (`FirmSettings.pjudDigestLast*`)
+- Estado en Host status (`FirmSettings.pjudDigestLast*` + cola pending/running)
 
 ## Backup PDF
 
-Con `PJUD_PDF_BACKUP=1`, tras sync exitoso se descargan links `documentoRef` absolutos y se guardan como `Documento`; el movimiento queda con `doc:<id>` y la ficha muestra link LexOpen.
+Con `PJUD_PDF_BACKUP=1`, tras sync (también backfill) se descargan links `documentoRef` públicos seguros (anti-SSRF), se rechazan HTML/login walls, y se guardan como `Documento`; el movimiento queda con `doc:<id>` y la ficha muestra link LexOpen.
 
 ## Alta rápida
 

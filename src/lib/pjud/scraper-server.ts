@@ -27,7 +27,10 @@ const MAX_BODY = 2 * 1024 * 1024;
 
 function authOk(req: http.IncomingMessage) {
   const key = process.env.PJUD_SCRAPER_KEY?.trim();
-  if (!key) return true;
+  if (!key) {
+    // Fail-closed in production: require a shared secret with the web service.
+    return process.env.NODE_ENV !== "production";
+  }
   const header = req.headers.authorization || "";
   return header === `Bearer ${key}`;
 }

@@ -1,8 +1,26 @@
 import { prisma } from "@/lib/db";
+import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
 import { newStorageKey, putObject } from "@/lib/storage";
 
 export function pdfBackupEnabled() {
   return process.env.PJUD_PDF_BACKUP === "1";
+}
+
+/** True when buffer looks like a PDF (%PDF). */
+export function looksLikePdf(buf: Buffer) {
+  if (buf.byteLength < 5) return false;
+  return buf.subarray(0, 5).toString("utf8") === "%PDF-";
+}
+
+export function isBackupableDocumentoRef(ref: string | null | undefined) {
+  if (!ref?.trim()) return false;
+  const value = ref.trim();
+  if (value.startsWith("doc:") || value.startsWith("lexopen:")) return false;
+  if (!/^https?:\/\//i.test(value)) return false;
+  // OJV and public hosts only — block SSRF to private/metadata.
+  return isSafeOutboundHttpUrl(value, {
+    allowHttp: process.env.NODE_ENV !== "production",
+  });
 }
 
 /**
@@ -28,26 +46,14 @@ export async function backupMovimientoDocuments(causaId: string) {
 
   for (const mov of movimientos) {
     const ref = mov.documentoRef?.trim();
-    if (!ref) {
-      skipped += 1;
-      continue;
-    }
-    if (ref.startsWith("doc:") || ref.startsWith("lexopen:")) {
-      skipped += 1;
-      continue;
-    }
-    if (!/^https?:\/\//i.test(ref)) {
+    if (!isBackupableDocumentoRef(ref)) {
       skipped += 1;
       continue;
     }
 
     try {
-      const parsed = new URL(ref);
-      if (parsed.protocol !== "https:" && process.env.NODE_ENV === "production") {
-        skipped += 1;
-        continue;
-      }
-      const res = await fetch(ref, {
+      const parsed = new URL(ref!);
+      const res = await fetch(ref!, {
         redirect: "follow",
         signal: AbortSignal.timeout(45_000),
         headers: { Accept: "application/pdf,*/*" },
@@ -56,22 +62,40 @@ export async function backupMovimientoDocuments(causaId: string) {
         skipped += 1;
         continue;
       }
-      const contentType = res.headers.get("content-type") || "application/octet-stream";
+      const contentType =
+        res.headers.get("content-type") || "application/octet-stream";
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.byteLength < 100 || buf.byteLength > 20 * 1024 * 1024) {
         skipped += 1;
         continue;
       }
+      // Reject HTML login walls / CAPTCHA pages masquerading as downloads.
+      if (
+        !looksLikePdf(buf) &&
+        !/pdf|octet-stream|msword|officedocument/i.test(contentType)
+      ) {
+        skipped += 1;
+        continue;
+      }
+      if (
+        /text\/html/i.test(contentType) ||
+        /^\s*<(!DOCTYPE|html|head|body)/i.test(buf.subarray(0, 200).toString("utf8"))
+      ) {
+        skipped += 1;
+        continue;
+      }
+
       const filename =
         parsed.pathname.split("/").filter(Boolean).pop() ||
         `pjud-${mov.folio || mov.id}.pdf`;
       const key = newStorageKey(`pjud/${causaId}`, filename);
-      await putObject({ key, body: buf, contentType });
+      const mime = looksLikePdf(buf) ? "application/pdf" : contentType;
+      await putObject({ key, body: buf, contentType: mime });
       const doc = await prisma.documento.create({
         data: {
           nombre: filename,
           tipo: mov.esReceptor ? "notificacion" : "escrito",
-          mimeType: contentType,
+          mimeType: mime,
           storageKey: key,
           causaId,
           extractionStatus: "pending",

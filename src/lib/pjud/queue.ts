@@ -3,6 +3,10 @@ import { mapWithConcurrency } from "@/lib/pjud/concurrency";
 import { syncCausaPjud, type SyncCausaResult } from "@/lib/pjud/sync";
 
 const DEFAULT_BATCH = 40;
+/** Jobs stuck in `running` longer than this are reclaimed to pending. */
+const STUCK_RUNNING_MS = Number(
+  process.env.PJUD_SYNC_STUCK_MS || 30 * 60_000
+);
 
 export function dueSyncWhere(opts?: {
   causaIds?: string[];
@@ -23,6 +27,38 @@ export function dueSyncWhere(opts?: {
   };
 }
 
+export async function reclaimStuckRunningJobs(opts?: { olderThanMs?: number }) {
+  const cutoff = new Date(
+    Date.now() - (opts?.olderThanMs || STUCK_RUNNING_MS)
+  );
+  const result = await prisma.pjudSyncJob.updateMany({
+    where: {
+      status: "running",
+      OR: [{ startedAt: { lt: cutoff } }, { startedAt: null, createdAt: { lt: cutoff } }],
+    },
+    data: {
+      status: "pending",
+      lastError: "Reclamado: job stuck en running",
+      note: "Reclaim stuck running → pending",
+      startedAt: null,
+    },
+  });
+  return result.count;
+}
+
+async function causaIdsWithActiveJobs(causaIds: string[]) {
+  if (!causaIds.length) return new Set<string>();
+  const active = await prisma.pjudSyncJob.findMany({
+    where: {
+      causaId: { in: causaIds },
+      status: { in: ["pending", "running"] },
+    },
+    select: { causaId: true },
+    distinct: ["causaId"],
+  });
+  return new Set(active.map((j) => j.causaId));
+}
+
 export async function enqueueDueSyncJobs(opts?: {
   causaIds?: string[];
   trigger?: "cron" | "manual" | "retry";
@@ -31,15 +67,20 @@ export async function enqueueDueSyncJobs(opts?: {
   const trigger = opts?.trigger || "cron";
   const limit = Math.min(Math.max(opts?.limit || DEFAULT_BATCH, 1), 200);
 
+  await reclaimStuckRunningJobs();
+
   const causas = await prisma.causa.findMany({
     where: dueSyncWhere({ causaIds: opts?.causaIds }),
     select: { id: true },
     orderBy: [{ pjudNextSyncAt: "asc" }, { updatedAt: "asc" }],
-    take: limit,
+    take: limit * 2, // over-fetch to allow dedupe
   });
 
+  const busy = await causaIdsWithActiveJobs(causas.map((c) => c.id));
   const jobs = [];
   for (const c of causas) {
+    if (jobs.length >= limit) break;
+    if (busy.has(c.id)) continue;
     const job = await prisma.pjudSyncJob.create({
       data: {
         causaId: c.id,
@@ -48,6 +89,7 @@ export async function enqueueDueSyncJobs(opts?: {
         attempts: 0,
       },
     });
+    busy.add(c.id);
     jobs.push(job);
   }
   return jobs;
@@ -57,10 +99,16 @@ export async function processPendingSyncJobs(opts?: {
   actorId?: string | null;
   concurrency?: number;
   limit?: number;
+  jobIds?: string[];
 }) {
   const limit = Math.min(Math.max(opts?.limit || DEFAULT_BATCH, 1), 100);
+  await reclaimStuckRunningJobs();
+
   const pending = await prisma.pjudSyncJob.findMany({
-    where: { status: "pending" },
+    where: {
+      status: "pending",
+      ...(opts?.jobIds?.length ? { id: { in: opts.jobIds } } : {}),
+    },
     orderBy: { createdAt: "asc" },
     take: limit,
   });
@@ -128,6 +176,7 @@ export async function runDueSyncPipeline(opts?: {
   const results = await processPendingSyncJobs({
     actorId: opts?.actorId,
     limit: opts?.limit,
+    jobIds: enqueued.map((j) => j.id),
   });
   return { enqueued: enqueued.length, synced: results.length, results };
 }
@@ -136,6 +185,8 @@ export async function requeueFailedJobs(opts?: {
   causaIds?: string[];
   limit?: number;
 }) {
+  await reclaimStuckRunningJobs();
+
   const failed = await prisma.pjudSyncJob.findMany({
     where: {
       status: "failed",
@@ -146,8 +197,10 @@ export async function requeueFailedJobs(opts?: {
     distinct: ["causaId"],
   });
 
+  const busy = await causaIdsWithActiveJobs(failed.map((j) => j.causaId));
   const created = [];
   for (const job of failed) {
+    if (busy.has(job.causaId)) continue;
     created.push(
       await prisma.pjudSyncJob.create({
         data: {
@@ -158,6 +211,22 @@ export async function requeueFailedJobs(opts?: {
         },
       })
     );
+    busy.add(job.causaId);
   }
   return created;
+}
+
+export async function getPjudQueueStatus() {
+  const [pending, running, failed, okToday] = await Promise.all([
+    prisma.pjudSyncJob.count({ where: { status: "pending" } }),
+    prisma.pjudSyncJob.count({ where: { status: "running" } }),
+    prisma.pjudSyncJob.count({ where: { status: "failed" } }),
+    prisma.pjudSyncJob.count({
+      where: {
+        status: "ok",
+        finishedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+    }),
+  ]);
+  return { pending, running, failed, okToday };
 }

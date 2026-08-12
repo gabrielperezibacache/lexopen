@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -8,6 +8,7 @@ type Mode = "rol" | "rut";
 
 export function PjudQuickAddPanel() {
   const router = useRouter();
+  const rolFormRef = useRef<HTMLFormElement>(null);
   const [mode, setMode] = useState<Mode>("rol");
   const [tribunales, setTribunales] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -15,6 +16,12 @@ export function PjudQuickAddPanel() {
   const [rutHits, setRutHits] = useState<
     Array<{ rit: string; tribunal: string; caratula?: string | null }>
   >([]);
+  const [preview, setPreview] = useState<{
+    count?: number;
+    sala?: string | null;
+    note?: string;
+    sample?: Array<{ titulo: string; fecha: string; esReceptor?: boolean }>;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/pjud/lookup")
@@ -23,16 +30,19 @@ export function PjudQuickAddPanel() {
       .catch(() => undefined);
   }, []);
 
-  async function onAddRol(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function submitRol(action: "add-rol" | "preview-rol") {
+    const form = rolFormRef.current;
+    if (!form) return;
+    if (!form.reportValidity()) return;
     setBusy(true);
     setMsg("");
-    const fd = new FormData(e.currentTarget);
+    if (action === "preview-rol") setPreview(null);
+    const fd = new FormData(form);
     const res = await fetch("/api/pjud/lookup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        action: "add-rol",
+        action,
         rit: fd.get("rit"),
         tribunal: fd.get("tribunal"),
         titulo: fd.get("titulo") || undefined,
@@ -42,7 +52,21 @@ export function PjudQuickAddPanel() {
     const data = await res.json().catch(() => ({}));
     setBusy(false);
     if (!res.ok) {
-      setMsg(data.error || "No se pudo agregar la causa");
+      setMsg(
+        data.error ||
+          (action === "preview-rol"
+            ? "No se pudo previsualizar"
+            : "No se pudo agregar la causa")
+      );
+      return;
+    }
+    if (action === "preview-rol") {
+      setPreview(data);
+      setMsg(
+        `Preview ${data.provider || ""}: ${data.count ?? 0} movimientos${
+          data.sala ? ` · sala ${data.sala}` : ""
+        }`
+      );
       return;
     }
     setMsg(
@@ -136,14 +160,19 @@ export function PjudQuickAddPanel() {
       </div>
 
       {mode === "rol" ? (
-        <form onSubmit={onAddRol} className="grid gap-3 md:grid-cols-4">
+        <form ref={rolFormRef} className="grid gap-3 md:grid-cols-4">
           <input
             className="input"
             name="rit"
             required
             placeholder="ROL/RIT (C-100-2024)"
           />
-          <select className="input md:col-span-2" name="tribunal" required defaultValue="">
+          <select
+            className="input md:col-span-2"
+            name="tribunal"
+            required
+            defaultValue=""
+          >
             <option value="" disabled>
               Tribunal
             </option>
@@ -153,9 +182,24 @@ export function PjudQuickAddPanel() {
               </option>
             ))}
           </select>
-          <button className="btn btn-primary" disabled={busy} type="submit">
-            {busy ? "Agregando…" : "Agregar y sync"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="btn btn-secondary"
+              disabled={busy}
+              type="button"
+              onClick={() => void submitRol("preview-rol")}
+            >
+              Preview
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={busy}
+              type="button"
+              onClick={() => void submitRol("add-rol")}
+            >
+              {busy ? "…" : "Agregar y sync"}
+            </button>
+          </div>
           <input
             className="input md:col-span-4"
             name="titulo"
@@ -180,6 +224,17 @@ export function PjudQuickAddPanel() {
         <p className="text-sm text-[var(--ink-soft)]/80" role="status">
           {msg}
         </p>
+      )}
+
+      {preview?.sample && preview.sample.length > 0 && (
+        <ul className="space-y-1 text-xs text-[var(--ink-soft)]/75">
+          {preview.sample.slice(0, 5).map((row, idx) => (
+            <li key={`${row.fecha}-${idx}`}>
+              {row.fecha} — {row.titulo}
+              {row.esReceptor ? " (receptor)" : ""}
+            </li>
+          ))}
+        </ul>
       )}
 
       {rutHits.length > 0 && (

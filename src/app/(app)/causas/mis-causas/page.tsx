@@ -122,7 +122,7 @@ export default function MisCausasPage() {
         Riesgo ToS / seguridad: LexOpen automatiza login ClaveÚnica solo con
         <code className="mx-1">PJUD_CLAVEUNICA_SCRAPE=1</code> y
         scrape/sidecar activos. La contraseña se cifra con AES-GCM
-        (SESSION_SECRET). Prefiera un sidecar dedicado si el WAF de PJUD bloquea
+        (PJUD_SECRETS_KEY, fallback SESSION_SECRET). Prefiera un sidecar dedicado si el WAF de PJUD bloquea
         este host.
       </div>
 

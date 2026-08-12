@@ -64,6 +64,11 @@ export function scraperSidecarConfigured() {
   return Boolean(process.env.PJUD_SCRAPER_URL?.trim());
 }
 
+/** Normalized base URL (adds http:// for Render hostport). */
+export function getScraperSidecarBaseUrl() {
+  return scraperBaseUrl();
+}
+
 function scraperBaseUrl() {
   const rawBase = process.env.PJUD_SCRAPER_URL?.trim();
   if (!rawBase) return null;
@@ -200,6 +205,39 @@ export async function fetchMisCausasFromSidecar(opts: {
   });
   if (!res.ok) {
     throw new Error(`Scraper Mis Causas HTTP ${res.status}`);
+  }
+  const data = z
+    .object({
+      causas: z
+        .array(
+          z.object({
+            rit: z.string().min(1).max(100),
+            tribunal: z.string().min(1).max(255),
+            caratula: z.string().max(2000).optional().nullable(),
+            ruc: z.string().max(100).optional().nullable(),
+            estado: z.string().max(200).optional().nullable(),
+          })
+        )
+        .max(2000),
+    })
+    .parse(await res.json());
+  return data.causas;
+}
+
+export async function buscarCausasByRutFromSidecar(
+  rut: string
+): Promise<MisCausasItem[] | null> {
+  const base = scraperBaseUrl();
+  if (!base) return null;
+  const res = await fetch(`${base}/causas/buscar`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ rut }),
+    redirect: "error",
+    signal: AbortSignal.timeout(90_000),
+  });
+  if (!res.ok) {
+    throw new Error(`Scraper buscar RUT HTTP ${res.status}`);
   }
   const data = z
     .object({
