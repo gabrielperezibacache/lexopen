@@ -375,6 +375,22 @@ de demostración se identifica explícitamente como tal.
 Hermes no es asesoría jurídica automática: no presente ni envíe un texto generado sin
 revisión del abogado responsable.
 
+### Procesamiento documental local
+
+LexOpen integra localmente:
+
+- [`@firecrawl/anydoc`](https://github.com/firecrawl/anydoc) para convertir Word,
+  PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV y PDFs a Markdown.
+- [`@firecrawl/pdf-inspector`](https://github.com/firecrawl/pdf-inspector) para
+  clasificar PDFs como texto, mixtos o escaneados y detectar páginas que requieren
+  OCR.
+
+Al subir un documento desde **Documentos**, LexOpen conserva el original y genera
+Markdown extraído cuando es posible. Los documentos escaneados quedan marcados como
+`Requiere OCR`; estas librerías no realizan OCR ni envían archivos a Firecrawl.
+Ambas dependencias se distribuyen bajo MIT y sus bindings nativos se cargan según la
+plataforma del Host.
+
 ### Almacenamiento de archivos
 
 El adaptador usa S3-compatible cuando están configuradas las credenciales mínimas;
