@@ -50,6 +50,19 @@ const createGroupSchema = z.object({
   memberIds: z.array(z.string()).optional(),
 });
 
+const updateGroupSchema = z.object({
+  action: z.literal("update-group"),
+  groupId: z.string().min(1),
+  name: z.string().min(2).max(200).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  memberIds: z.array(z.string()).optional(),
+});
+
+const deleteGroupSchema = z.object({
+  action: z.literal("delete-group"),
+  groupId: z.string().min(1),
+});
+
 export async function GET() {
   try {
     await requireStaff();
@@ -147,6 +160,84 @@ export async function POST(req: NextRequest) {
         after: { name: group.name },
       });
       return NextResponse.json(group, { status: 201 });
+    }
+
+    if (body.action === "update-group") {
+      if (!isAdmin(actor.role)) {
+        return NextResponse.json(
+          { error: "Solo admin puede editar grupos" },
+          { status: 403 }
+        );
+      }
+      const data = updateGroupSchema.parse(body);
+      const before = await prisma.group.findUnique({
+        where: { id: data.groupId },
+        include: { members: true },
+      });
+      if (!before) {
+        return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
+      }
+      if (data.memberIds) {
+        await prisma.groupMember.deleteMany({ where: { groupId: data.groupId } });
+        if (data.memberIds.length) {
+          await prisma.groupMember.createMany({
+            data: data.memberIds.map((userId) => ({
+              groupId: data.groupId,
+              userId,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+      const group = await prisma.group.update({
+        where: { id: data.groupId },
+        data: {
+          ...(data.name !== undefined ? { name: data.name.trim() } : {}),
+          ...(data.description !== undefined
+            ? { description: data.description || null }
+            : {}),
+        },
+        include: {
+          members: { include: { user: { select: publicUserSelect } } },
+        },
+      });
+      await writeAudit({
+        actorId: actor.id,
+        action: "group.update",
+        entityType: "Group",
+        entityId: group.id,
+        before: { name: before.name, members: before.members.length },
+        after: {
+          name: group.name,
+          members: group.members.length,
+        },
+      });
+      return NextResponse.json(group);
+    }
+
+    if (body.action === "delete-group") {
+      if (!isAdmin(actor.role)) {
+        return NextResponse.json(
+          { error: "Solo admin puede eliminar grupos" },
+          { status: 403 }
+        );
+      }
+      const data = deleteGroupSchema.parse(body);
+      const before = await prisma.group.findUnique({
+        where: { id: data.groupId },
+      });
+      if (!before) {
+        return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
+      }
+      await prisma.group.delete({ where: { id: data.groupId } });
+      await writeAudit({
+        actorId: actor.id,
+        action: "group.delete",
+        entityType: "Group",
+        entityId: data.groupId,
+        before: { name: before.name },
+      });
+      return NextResponse.json({ ok: true, id: data.groupId });
     }
 
     return NextResponse.json({ error: "Acción no soportada" }, { status: 400 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -49,6 +50,7 @@ export function PeopleManager({
   const [userOpen, setUserOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [groupOpen, setGroupOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<GroupRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -194,6 +196,57 @@ export function PeopleManager({
     await reload();
   }
 
+  async function saveGroup(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingGroup) return;
+    setError(null);
+    setOkMsg(null);
+    setBusy(true);
+    const fd = new FormData(e.currentTarget);
+    const memberIds = fd.getAll("memberIds").map(String).filter(Boolean);
+    const res = await fetch("/api/people", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "update-group",
+        groupId: editingGroup.id,
+        name: fd.get("name"),
+        description: fd.get("description") || null,
+        memberIds,
+      }),
+    });
+    setBusy(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "No se pudo actualizar el grupo");
+      return;
+    }
+    setEditingGroup(null);
+    setOkMsg("Grupo actualizado");
+    await reload();
+  }
+
+  async function deleteGroup(group: GroupRow) {
+    const ok = window.confirm(`¿Eliminar el grupo «${group.name}»?`);
+    if (!ok) return;
+    setError(null);
+    setOkMsg(null);
+    setBusy(true);
+    const res = await fetch("/api/people", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete-group", groupId: group.id }),
+    });
+    setBusy(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "No se pudo eliminar el grupo");
+      return;
+    }
+    setOkMsg("Grupo eliminado");
+    await reload();
+  }
+
   return (
     <div className="space-y-4" data-testid="people-manager">
       {error && (
@@ -237,18 +290,18 @@ export function PeopleManager({
           Nuevo grupo
         </button>
         {!compact && canManage && (
-          <a href="/configuracion#usuarios" className="btn btn-ghost text-sm">
+          <Link href="/configuracion#usuarios" className="btn btn-ghost text-sm">
             Ver en Configuración
-          </a>
+          </Link>
         )}
         {compact && (
-          <a href="/personas" className="btn btn-ghost text-sm">
+          <Link href="/personas" className="btn btn-ghost text-sm">
             Abrir Personas
-          </a>
+          </Link>
         )}
       </div>
 
-      <div className={`grid gap-6 ${compact ? "" : "lg:grid-cols-2"}`}>
+      <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Usuarios</h2>
@@ -350,46 +403,71 @@ export function PeopleManager({
           )}
         </section>
 
-        {!compact && (
-          <section className="panel rounded-3xl p-5">
+        <section className="panel rounded-3xl p-5">
+          <div className="flex items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Grupos</h2>
-            {groups.length === 0 ? (
-              <div className="mt-4">
-                <EmptyState
-                  title="Sin grupos"
-                  description="Agrupe abogados o equipos para compartir acceso a espacios."
-                  action={
-                    <button
-                      className="btn btn-primary"
-                      type="button"
-                      onClick={() => setGroupOpen(true)}
-                    >
-                      Nuevo grupo
-                    </button>
-                  }
-                />
-              </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {groups.map((g) => (
-                  <div
-                    key={g.id}
-                    className="rounded-2xl border border-[var(--line)] px-4 py-3"
+            <span className="text-xs text-[var(--ink-soft)]/60">
+              {groups.length} grupos
+            </span>
+          </div>
+          {groups.length === 0 ? (
+            <div className="mt-4">
+              <EmptyState
+                title="Sin grupos"
+                description="Agrupe abogados o equipos para compartir acceso a espacios."
+                action={
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    onClick={() => setGroupOpen(true)}
                   >
-                    <div className="font-medium">{g.name}</div>
-                    <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-                      {g.description || "Sin descripción"}
-                    </p>
-                    <div className="mt-2 text-xs text-[var(--ink-soft)]/65">
-                      {g.members.map((m) => m.user.name).join(", ") ||
-                        "Sin miembros"}
-                    </div>
+                    Nuevo grupo
+                  </button>
+                }
+              />
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {groups.map((g) => (
+                <div
+                  key={g.id}
+                  className="rounded-2xl border border-[var(--line)] px-4 py-3"
+                >
+                  <div className="font-medium">{g.name}</div>
+                  <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+                    {g.description || "Sin descripción"}
+                  </p>
+                  <div className="mt-2 text-xs text-[var(--ink-soft)]/65">
+                    {g.members.map((m) => m.user.name).join(", ") ||
+                      "Sin miembros"}
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+                  {canManage && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        className="btn btn-ghost text-xs"
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setEditingGroup(g);
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="btn btn-ghost text-xs text-rose-800"
+                        type="button"
+                        disabled={busy}
+                        onClick={() => deleteGroup(g)}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
       {userOpen && (
@@ -549,6 +627,58 @@ export function PeopleManager({
               </button>
               <button className="btn btn-primary" type="submit">
                 Crear
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {editingGroup && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <form
+            onSubmit={saveGroup}
+            className="panel w-full max-w-md space-y-3 rounded-3xl p-6"
+          >
+            <h3 className="text-lg font-semibold">Editar grupo</h3>
+            <input
+              className="input"
+              name="name"
+              required
+              defaultValue={editingGroup.name}
+            />
+            <textarea
+              className="textarea"
+              name="description"
+              placeholder="Descripción"
+              defaultValue={editingGroup.description || ""}
+            />
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">
+                Miembros (Ctrl/Cmd para múltiple)
+              </span>
+              <select
+                className="select min-h-[120px]"
+                name="memberIds"
+                multiple
+                defaultValue={editingGroup.members.map((m) => m.user.id)}
+              >
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex justify-end gap-2">
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => setEditingGroup(null)}
+              >
+                Cancelar
+              </button>
+              <button className="btn btn-primary" type="submit" disabled={busy}>
+                {busy ? "Guardando…" : "Guardar"}
               </button>
             </div>
           </form>

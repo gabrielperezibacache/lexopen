@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PeopleManager } from "@/components/PeopleManager";
 
 type UserRow = {
@@ -36,12 +37,12 @@ export function UsersAdminPanel({
       <div className="panel rounded-3xl p-5 md:p-6">
         <h2 className="text-lg font-semibold">Usuarios del estudio</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-          Crear, editar roles/contraseñas y eliminar cuentas del equipo. Los
-          clientes usan el portal; admin, abogado y asistente acceden a LexOpen
-          interno. También disponible en{" "}
-          <a href="/personas" className="text-[var(--sea)]">
+          Crear, editar y eliminar usuarios y grupos del estudio. Los clientes
+          usan el portal; admin, abogado y asistente acceden a LexOpen interno.
+          También disponible en{" "}
+          <Link href="/personas" className="text-[var(--sea)]">
             Personas
-          </a>
+          </Link>
           .
         </p>
       </div>
