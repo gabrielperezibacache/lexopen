@@ -6,6 +6,10 @@ import {
   SETUP_TOKEN_COOKIE,
   setupCookieOptions,
 } from "@/lib/auth/setup-cookies";
+import {
+  cronSecretMatches,
+  isCronApiPath,
+} from "@/lib/security/cron-paths";
 
 const SESSION_COOKIE = "lexopen_session";
 const CSRF_COOKIE = "lexopen_csrf";
@@ -250,6 +254,17 @@ export async function proxy(req: NextRequest) {
 
   // Google OAuth callback stays public but must still pass pathname header
   if (pathname === "/api/integrations/google/callback") {
+    return pass();
+  }
+
+  // Host schedulers authenticate with x-cron-secret (no session cookie).
+  if (
+    isCronApiPath(pathname) &&
+    cronSecretMatches(
+      req.headers.get("x-cron-secret"),
+      process.env.CRON_SECRET
+    )
+  ) {
     return pass();
   }
 

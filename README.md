@@ -265,7 +265,7 @@ npm run web:host
 
 `web:host` instala el runtime local si falta, compila solo cuando es necesario,
 inicia PostgreSQL embebido, aplica migraciones y arranca la web en
-`0.0.0.0:3000`.
+`127.0.0.1:3000` (LAN/Tailscale: vea [`docs/WEB-HOST.md`](docs/WEB-HOST.md)).
 
 Para elegir dónde guardar todos los datos:
 
@@ -279,7 +279,8 @@ $env:LEXOPEN_DATA_DIR="$HOME\LexOpenData"; npm run web:host
 
 ### Primer acceso
 
-El comando imprime un enlace `/setup?token=...`. Ábralo en el Host, cree el
+Abra `/setup` en el Host y pegue `LEXOPEN_BOOTSTRAP_TOKEN` desde el `.env`
+del data dir (el token no se imprime en logs). Cree el
 administrador e inicie sesión. Después cree los usuarios del estudio desde
 **Personas**.
 
@@ -476,7 +477,9 @@ npm run build
 npm run start
 ```
 
-El servidor escucha en `0.0.0.0` y usa `PORT` (por defecto `3000`).
+`npm start` enlaza `0.0.0.0` (útil detrás de un proxy). El Host embebido
+(`web:host`) usa `127.0.0.1` por defecto; vea [`docs/WEB-HOST.md`](docs/WEB-HOST.md)
+para LAN/Tailscale.
 
 ## 👥 Usuarios demo y pasar a producción
 
@@ -762,8 +765,8 @@ npm ci
 LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
 ```
 
-1. Abra el enlace `/setup?token=…` que imprime el Host y cree el admin del estudio
-   (sin seed demo).
+1. Abra `/setup` y pegue `LEXOPEN_BOOTSTRAP_TOKEN` del `.env` del data dir; cree
+   el admin del estudio (sin seed demo).
 2. Compruebe `curl http://127.0.0.1:3000/api/health` → `db: "up"`, `storageReady: true`.
 3. Opcional: active arranque automático con `deploy/systemd`, `deploy/launchd` o
    `deploy/windows` (ver [`docs/WEB-HOST.md`](docs/WEB-HOST.md)).

@@ -92,8 +92,10 @@ assert.match(bootstrapToken, /^[a-f0-9]{64}$/);
 const recoveryToken = env1.match(/^LEXOPEN_RECOVERY_TOKEN=(.+)$/m)[1];
 assert.match(recoveryToken, /^[a-f0-9]{64}$/);
 assert.match(env1, /HERMES_ALLOW_DEMO=0/);
+assert.match(env1, /LLM_ALLOW_DEMO=0/);
 assert.match(env1, /PJUD_ALLOW_DEMO=0/);
 assert.match(env1, /LEXOPEN_DEMO_SWITCHER=0/);
+assert.match(env1, /OBSIDIAN_ALLOW_PRIVATE_URL=1/);
 const seeded = ensureHostEnv(
   fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-desktop-seed-")),
   { port: 3030, pgPort: 54332, publicUrl: "http://127.0.0.1:3030", seedDemo: true }
@@ -113,6 +115,32 @@ const loopbackHost = ensureHostEnv(
   { port: 3020, pgPort: 54331, publicUrl: "http://127.0.0.1:3020" }
 );
 assert.equal(loopbackHost.bindHost, "127.0.0.1");
+
+// Upgrade: older Host .env with LLM_ALLOW_DEMO=1 becomes fail-closed 0
+const demoUpgradeDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-llm-demo-"));
+fs.writeFileSync(
+  envPath(demoUpgradeDir),
+  "SESSION_SECRET=abcdefghijklmnopqrstuvwxyz12\nLLM_ALLOW_DEMO=1\n",
+  "utf8"
+);
+ensureHostEnv(demoUpgradeDir, {
+  port: 3040,
+  pgPort: 54340,
+  publicUrl: "http://127.0.0.1:3040",
+});
+assert.match(fs.readFileSync(envPath(demoUpgradeDir), "utf8"), /LLM_ALLOW_DEMO=0/);
+const keepDemoDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-llm-keep-"));
+fs.writeFileSync(
+  envPath(keepDemoDir),
+  "SESSION_SECRET=abcdefghijklmnopqrstuvwxyz12\nLLM_ALLOW_DEMO=1\nLEXOPEN_KEEP_LLM_DEMO=1\n",
+  "utf8"
+);
+ensureHostEnv(keepDemoDir, {
+  port: 3041,
+  pgPort: 54341,
+  publicUrl: "http://127.0.0.1:3041",
+});
+assert.match(fs.readFileSync(envPath(keepDemoDir), "utf8"), /LLM_ALLOW_DEMO=1/);
 
 // segunda pasada: no reescribe SESSION_SECRET ni añade basura
 const secret1 = env1.match(/^SESSION_SECRET=(.+)$/m)[1];

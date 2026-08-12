@@ -28,18 +28,24 @@ inicia PostgreSQL embebido, aplica migraciones y arranca Next.js. No requiere un
 instancia PostgreSQL separada ni servicios cloud.
 
 Si no define `LEXOPEN_DATA_DIR`, la configuración queda en la carpeta de datos
-predeterminada del sistema. El servidor escucha en `0.0.0.0:3000`.
+predeterminada del sistema. Por defecto el Host enlaza **solo loopback**
+(`127.0.0.1:3000`). Para LAN o Tailscale debe publicar una URL y/o
+`LEXOPEN_BIND` (ver [Acceso desde los clientes](#acceso-desde-los-clientes)).
 
 ## Primera configuración
 
-El comando imprime un enlace de configuración inicial. Ábralo en el Host:
+`web:host` **no imprime** el token en logs. Abra en el Host:
 
 ```text
-http://127.0.0.1:3000/setup?token=<LEXOPEN_BOOTSTRAP_TOKEN>
+http://127.0.0.1:3000/setup
 ```
 
+Pegue `LEXOPEN_BOOTSTRAP_TOKEN` desde `$LEXOPEN_DATA_DIR/.env` (o Application
+Support / `%APPDATA%\LexOpen\.env`). En la app Desktop el flujo abre `/setup`
+con cookie automáticamente.
+
 Cree el administrador, inicie sesión y cree los usuarios del estudio. Después de
-configurar la instalación, el token deja de ser válido. No comparta ese enlace.
+configurar la instalación, el token deja de ser válido. No comparta ese valor.
 
 Compruebe el estado:
 
@@ -106,18 +112,23 @@ queda marcado como `Requiere OCR`.
 
 ## Acceso desde los clientes
 
-Para una LAN completamente local, obtenga la IP privada del Host y configure en el
-`.env` del directorio de datos:
+Por defecto el Host solo escucha en `127.0.0.1`. Para LAN o Tailscale, configure
+en el `.env` del directorio de datos (ejemplo con IP privada):
 
 ```dotenv
+NEXT_PUBLIC_APP_URL=http://IP-DEL-HOST:3000
 LEXOPEN_TRUSTED_ORIGINS=http://127.0.0.1:3000,http://IP-DEL-HOST:3000
+LEXOPEN_BIND=0.0.0.0
+HOSTNAME=0.0.0.0
 ```
 
-Reinicie LexOpen y abra desde cada cliente:
+Con una URL Tailscale no loopback (`http://pc-estudio.tailXXXX.ts.net:3000`)
+como `NEXT_PUBLIC_APP_URL`, el Host ya enlaza `0.0.0.0` automáticamente.
 
-```text
-http://IP-DEL-HOST:3000
-```
+Reinicie LexOpen y abra desde cada cliente la URL pública configurada.
+
+Recuperación de admin (si pierde la contraseña): abra `/recovery` y pegue
+`LEXOPEN_RECOVERY_TOKEN` desde el mismo `.env` del data dir.
 
 Tailscale sigue siendo opcional para acceso remoto; no es necesario para una red
 local sin Internet.

@@ -163,7 +163,7 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
             className="mt-1"
             type="checkbox"
             name="hermesAllowDemo"
-            defaultChecked={s?.hermesAllowDemo ?? true}
+            defaultChecked={s?.hermesAllowDemo ?? false}
           />
           <span>
             <span className="font-medium">Permitir respuestas demo del asistente IA</span>
