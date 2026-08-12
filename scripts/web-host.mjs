@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { createLocalBackupScheduler } from "./web-backup-scheduler.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
@@ -49,6 +50,35 @@ function readEnvFile(file) {
   );
 }
 
+function killChild(child) {
+  if (!child || child.killed || child.exitCode !== null) return;
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+      stdio: "ignore",
+      shell: true,
+    });
+    return;
+  }
+  child.kill("SIGTERM");
+}
+
+function stopChild(child) {
+  if (!child || child.exitCode !== null || child.killed) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      if (child.exitCode === null) child.kill("SIGKILL");
+      resolve();
+    }, 10_000);
+    child.once("exit", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    killChild(child);
+  });
+}
+
 async function waitForHost(url) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
@@ -67,7 +97,10 @@ async function waitForHost(url) {
 
 async function startLocalPjudScheduler(dataDir) {
   const config = readConfig(dataDir);
-  const env = readEnvFile(path.join(dataDir, ".env"));
+  const env = {
+    ...process.env,
+    ...readEnvFile(path.join(dataDir, ".env")),
+  };
   const intervalMinutes = Number(env.PJUD_SYNC_INTERVAL_MINUTES || 0);
   if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) return null;
 
@@ -129,35 +162,102 @@ if (!fs.existsSync(standaloneServer)) {
 }
 
 console.log("[web-host] Iniciando Host web local en el navegador");
-const child = spawn(npm, ["run", "desktop:host"], {
-  cwd: root,
-  env: {
-    ...process.env,
-    NODE_ENV: "production",
-    LEXOPEN_DESKTOP: "1",
-  },
-  shell,
-  stdio: "inherit",
-});
 const dataDir = path.resolve(
   process.env.LEXOPEN_DATA_DIR || defaultDataDir()
 );
 let schedulerTimer = null;
-void startLocalPjudScheduler(dataDir).then((timer) => {
-  schedulerTimer = timer;
+let backupScheduler = null;
+let child = null;
+let expectedChildExit = false;
+let shuttingDown = false;
+
+async function shutdown(exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  if (schedulerTimer) clearInterval(schedulerTimer);
+  if (backupScheduler) {
+    await backupScheduler.stop().catch((error) => {
+      console.warn("[web-host] No se pudo detener el scheduler de backups:", error);
+    });
+  }
+  await stopCurrentHost();
+  process.exit(exitCode);
+}
+
+function startHostProcess() {
+  console.log("[web-host] Iniciando proceso del Host local");
+  const current = spawn(npm, ["run", "desktop:host"], {
+    cwd: root,
+    env: {
+      ...process.env,
+      NODE_ENV: "production",
+      LEXOPEN_DESKTOP: "1",
+    },
+    shell,
+    stdio: "inherit",
+  });
+  child = current;
+  current.once("exit", (code, signal) => {
+    if (child === current) child = null;
+    if (expectedChildExit || shuttingDown) return;
+    console.error(
+      `[web-host] El proceso del Host terminó inesperadamente (code=${code}, signal=${signal || "none"}).`
+    );
+    void shutdown(signal ? 1 : code ?? 1);
+  });
+  return current;
+}
+
+async function stopCurrentHost() {
+  const current = child;
+  if (!current) return;
+  child = null;
+  expectedChildExit = true;
+  try {
+    await stopChild(current);
+  } finally {
+    expectedChildExit = false;
+  }
+}
+
+process.once("SIGINT", () => void shutdown(0));
+process.once("SIGTERM", () => void shutdown(0));
+
+startHostProcess();
+const initialEnv = {
+  ...process.env,
+  ...readEnvFile(path.join(dataDir, ".env")),
+};
+const initialPort = Number(
+  initialEnv.PORT || readConfig(dataDir).port || 3000
+);
+const initialUrl = `http://127.0.0.1:${initialPort}`;
+if (!(await waitForHost(initialUrl))) {
+  console.error("[web-host] Health no disponible después de iniciar el Host.");
+  await shutdown(1);
+}
+
+backupScheduler = createLocalBackupScheduler({
+  dataDir,
+  env: initialEnv,
+  baseUrl: initialUrl,
+  getChild: () => child,
+  stopHost: stopCurrentHost,
+  startHost: startHostProcess,
+  waitForHost,
 });
 
-const forwardSignal = (signal) => {
-  if (schedulerTimer) clearInterval(schedulerTimer);
-  if (!child.killed) child.kill(signal);
-};
-process.once("SIGINT", () => forwardSignal("SIGINT"));
-process.once("SIGTERM", () => forwardSignal("SIGTERM"));
-child.once("exit", (code, signal) => {
-  if (schedulerTimer) clearInterval(schedulerTimer);
-  if (signal) {
-    process.exitCode = 1;
-  } else {
-    process.exitCode = code ?? 1;
-  }
-});
+void startLocalPjudScheduler(dataDir)
+  .then((timer) => {
+    if (shuttingDown) {
+      if (timer) clearInterval(timer);
+    } else {
+      schedulerTimer = timer;
+    }
+  })
+  .catch((error) => {
+    console.warn(
+      "[web-host] No se pudo iniciar el scheduler PJUD:",
+      error instanceof Error ? error.message : String(error)
+    );
+  });

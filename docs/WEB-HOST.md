@@ -105,8 +105,8 @@ servicio y prepare el directorio de datos:
 
 ```bash
 sudo useradd --system --home /var/lib/lexopen --shell /usr/sbin/nologin lexopen
-sudo mkdir -p /opt/lexopen /var/lib/lexopen
-sudo chown -R lexopen:lexopen /opt/lexopen /var/lib/lexopen
+sudo mkdir -p /opt/lexopen /var/lib/lexopen /var/lib/lexopen-backups
+sudo chown -R lexopen:lexopen /opt/lexopen /var/lib/lexopen /var/lib/lexopen-backups
 sudo cp deploy/systemd/lexopen-web.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now lexopen-web
@@ -173,3 +173,41 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   `web:host` ejecutará la sincronización contra su propio endpoint sin crear otro
   servicio. Si `PJUD_API_URL` está vacío y `PJUD_ALLOW_DEMO=0`, no se consultará
   ninguna fuente externa.
+
+### Backups automáticos con rotación
+
+El Host web puede crear respaldos locales periódicos sin depender de la nube.
+Configure estas variables en el `.env` de `LEXOPEN_DATA_DIR`:
+
+```dotenv
+LEXOPEN_BACKUP_INTERVAL_MINUTES=360
+LEXOPEN_BACKUP_DIR=/ruta/externa/lexopen-backups
+LEXOPEN_BACKUP_KEEP=14
+```
+
+`LEXOPEN_BACKUP_INTERVAL_MINUTES=0` desactiva la función. Si
+`LEXOPEN_BACKUP_DIR` queda vacío, LexOpen usa un directorio hermano de
+`LEXOPEN_DATA_DIR` con sufijo `-backups`; nunca guarda los respaldos dentro de los
+datos activos. La retención admite entre 1 y 365 respaldos.
+
+Cada ejecución detiene brevemente Next.js y PostgreSQL embebido, copia el estado
+de forma consistente, conserva los últimos respaldos válidos y vuelve a iniciar
+el Host. Una ejecución en curso no se duplica gracias a un bloqueo del directorio
+de backups. Si el reinicio posterior falla, revise los logs y no elimine el último
+respaldo válido. Los respaldos contienen `.env`, PostgreSQL y documentos: deben
+guardarse en un disco con acceso restringido y, para recuperación ante desastre,
+copiarse además a un medio externo cifrado.
+
+Los templates de `deploy/systemd`, `deploy/launchd` y `deploy/windows` ejecutan
+`scripts/web-host.mjs`, por lo que esta configuración también funciona cuando el
+Host se inicia como servicio del sistema. Para una ejecución manual de rotación,
+mantenga el Host detenido y use:
+
+```bash
+npm run web:backup -- --rotate \
+  --backup-dir /ruta/externa/lexopen-backups \
+  --keep 14
+```
+
+El comando manual también valida que no exista `postmaster.pid`; no copie
+`pgdata` mientras PostgreSQL esté activo.

@@ -4,7 +4,7 @@ param(
 )
 
 $node = (Get-Command node -ErrorAction Stop).Source
-$runtime = Join-Path $ProjectPath "desktop\host-runtime.mjs"
+$runtime = Join-Path $ProjectPath "scripts\web-host.mjs"
 
 if (-not (Test-Path $runtime)) {
   throw "No se encontró $runtime. Clone el repositorio y ejecute npm ci, npm run desktop:install y npm run desktop:build."

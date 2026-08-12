@@ -224,6 +224,10 @@ LEXOPEN_TRUSTED_ORIGINS=http://127.0.0.1:3000,http://IP-PRIVADA-DEL-HOST:3000
 - Los datos quedan en `LEXOPEN_DATA_DIR` o en la carpeta predeterminada del sistema.
 - No configure S3, Google, Hermes o PJUD si necesita una instalación completamente local.
 - Detenga el Host con `Ctrl+C` antes de copiar el directorio de datos como respaldo.
+- Para activar backups locales con rotación, configure
+  `LEXOPEN_BACKUP_INTERVAL_MINUTES`, `LEXOPEN_BACKUP_DIR` y
+  `LEXOPEN_BACKUP_KEEP` en el `.env` del Host. El scheduler detiene brevemente
+  PostgreSQL para copiarlo de forma consistente y conserva los últimos respaldos.
 - No ejecute `npm run db:seed`, `npm run setup` ni `npm run db:reset` con datos reales.
 
 Guía ampliada: [`docs/WEB-HOST.md`](docs/WEB-HOST.md).
@@ -539,7 +543,9 @@ de producción:
   privilegio abogado-cliente;
 - la auditoría es de mejor esfuerzo: un fallo al persistirla no necesariamente
   bloquea la operación;
-- no hay topología multi-Host, alta disponibilidad ni backups automáticos incluidos;
+- no hay topología multi-Host ni alta disponibilidad; los backups automáticos
+  locales son opcionales, requieren almacenamiento separado y no sustituyen una
+  copia externa cifrada;
 - la jurisprudencia y los plazos son datos/ayudas de demo, no fuentes oficiales;
 - los documentos de facturación son control interno y no constituyen DTE electrónico
   ni integración con el SII;
