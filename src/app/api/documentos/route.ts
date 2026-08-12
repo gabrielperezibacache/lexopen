@@ -12,6 +12,10 @@ import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storag
 import { writeAudit } from "@/lib/audit";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import {
+  MAX_PROCESSING_BYTES,
+  processDocumentBytes,
+} from "@/lib/document-processing";
 
 export async function GET(req: NextRequest) {
   try {
@@ -56,6 +60,9 @@ export async function POST(req: NextRequest) {
     let privilegio = Boolean(body?.privilegio);
     let causaId = body?.causaId || null;
     const autorId = user.id;
+    let extractedMarkdown: string | null = null;
+    let extractionStatus: string | null = null;
+    let extractionJson: string | null = null;
 
     if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
       return NextResponse.json(
@@ -80,7 +87,7 @@ export async function POST(req: NextRequest) {
       }
       if (file && typeof (file as File).arrayBuffer === "function" && (file as File).size > 0) {
         const uploaded = file as File;
-        if (uploaded.size > MAX_STORAGE_OBJECT_BYTES) {
+        if (uploaded.size > MAX_STORAGE_OBJECT_BYTES || uploaded.size > MAX_PROCESSING_BYTES) {
           return NextResponse.json(
             { error: `El archivo supera el límite de ${MAX_STORAGE_OBJECT_BYTES} bytes` },
             { status: 413 }
@@ -88,10 +95,18 @@ export async function POST(req: NextRequest) {
         }
         nombre = nombre || uploaded.name;
         mimeType = uploaded.type || "application/octet-stream";
+        const bytes = Buffer.from(await uploaded.arrayBuffer());
+        const processed = await processDocumentBytes(nombre, bytes);
+        extractedMarkdown = processed.markdown;
+        extractionStatus = processed.status;
+        extractionJson = JSON.stringify({
+          format: processed.format,
+          ...processed.metadata,
+        });
         const key = newStorageKey("documentos", nombre);
         await putObject({
           key,
-          body: Buffer.from(await uploaded.arrayBuffer()),
+          body: bytes,
           contentType: mimeType,
         });
         storageKey = key;
@@ -123,6 +138,9 @@ export async function POST(req: NextRequest) {
         contenido,
         mimeType,
         storageKey,
+        extractedMarkdown,
+        extractionStatus,
+        extractionJson,
         confidencial,
         privilegio,
         causaId,

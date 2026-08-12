@@ -3,11 +3,12 @@ import { formatDate } from "@/components/ui";
 import Link from "next/link";
 import { DocumentoUploadForm } from "@/components/DocumentoUploadForm";
 import { EmptyState } from "@/components/EmptyState";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 export default async function DocumentosPage() {
   const [documentos, causas] = await Promise.all([
     prisma.documento.findMany({
-      include: { causa: true, autor: true },
+      include: { causa: true, autor: { select: publicUserSelect } },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.causa.findMany({
@@ -48,6 +49,7 @@ export default async function DocumentosPage() {
                 <th className="px-4 py-3 font-medium">Tipo</th>
                 <th className="px-4 py-3 font-medium">Causa</th>
                 <th className="px-4 py-3 font-medium">Autor</th>
+                <th className="px-4 py-3 font-medium">Procesamiento</th>
                 <th className="px-4 py-3 font-medium">Actualizado</th>
               </tr>
             </thead>
@@ -84,6 +86,24 @@ export default async function DocumentosPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">{d.autor?.name || "—"}</td>
+                  <td className="px-4 py-3 text-xs">
+                    {d.extractionStatus === "completed" && d.extractedMarkdown ? (
+                      <a
+                        href={`/api/documentos/${d.id}/markdown`}
+                        className="text-[var(--sea)]"
+                      >
+                        Markdown listo
+                      </a>
+                    ) : d.extractionStatus === "needs_ocr" ? (
+                      <span className="text-[var(--copper)]">Requiere OCR</span>
+                    ) : d.extractionStatus === "unsupported" ? (
+                      <span className="text-[var(--ink-soft)]/65">Formato no soportado</span>
+                    ) : d.extractionStatus === "failed" ? (
+                      <span className="text-red-700">Error de extracción</span>
+                    ) : (
+                      "No procesado"
+                    )}
+                  </td>
                   <td className="px-4 py-3">{formatDate(d.updatedAt)}</td>
                 </tr>
               ))}

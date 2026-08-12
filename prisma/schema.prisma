@@ -429,6 +429,9 @@ model Documento {
   contenido     String?
   ruta          String?
   storageKey    String?
+  extractedMarkdown String?
+  extractionStatus String?
+  extractionJson String?
   confidencial  Boolean  @default(false)
   privilegio    Boolean  @default(false)
   version       Int      @default(1)
