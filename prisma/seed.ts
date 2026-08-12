@@ -131,6 +131,9 @@ async function main() {
       email: "legal@andes.cl",
       telefono: "+56 2 2345 6789",
       tipo: "empresa",
+      estado: "activo",
+      notas: "Cliente corporativo — litigio civil y recursos.",
+      abogadoId: abogado.id,
     },
   });
   const cliente2 = await prisma.cliente.create({
@@ -140,6 +143,9 @@ async function main() {
       email: "jcmunoz@correo.cl",
       telefono: "+56 9 8765 4321",
       tipo: "persona",
+      estado: "activo",
+      notas: "Tutela laboral — seguimiento cercano de plazos.",
+      abogadoId: admin.id,
     },
   });
 
@@ -249,8 +255,85 @@ async function main() {
     },
   });
 
+  await prisma.tramite.createMany({
+    data: [
+      {
+        causaId: causa1.id,
+        titulo: "Preparar lista de testigos",
+        detalle: "Coordinar con cliente Andes antes de audiencia de prueba.",
+        estado: "pendiente",
+        fechaLimite: new Date("2026-08-20"),
+        orden: 1,
+        responsableId: abogado.id,
+      },
+      {
+        causaId: causa1.id,
+        titulo: "Notificar demanda a demandado",
+        detalle: "Gestión ya realizada ante receptor.",
+        estado: "hecho",
+        fechaHecho: new Date("2025-04-01"),
+        orden: 0,
+        responsableId: asistente.id,
+      },
+      {
+        causaId: causa1.id,
+        titulo: "Solicitar oficios a conservador",
+        estado: "en_curso",
+        fechaLimite: new Date("2026-08-15"),
+        orden: 2,
+        responsableId: asistente.id,
+      },
+      {
+        causaId: causa2.id,
+        titulo: "Presentar contestación / réplica tutela",
+        estado: "pendiente",
+        fechaLimite: new Date("2026-08-12"),
+        orden: 1,
+        responsableId: admin.id,
+      },
+      {
+        causaId: causa2.id,
+        titulo: "Recopilar liquidaciones de sueldo",
+        estado: "hecho",
+        fechaHecho: new Date("2025-12-10"),
+        orden: 0,
+        responsableId: asistente.id,
+      },
+      {
+        causaId: causa3.id,
+        titulo: "Preparar alegatos en Corte",
+        estado: "pendiente",
+        fechaLimite: new Date("2026-09-01"),
+        orden: 1,
+        responsableId: abogado.id,
+      },
+    ],
+  });
+
   await prisma.documento.createMany({
     data: [
+      {
+        nombre: "Ficha KYC Andes.md",
+        tipo: "otro",
+        contenido:
+          "# KYC Constructora Andes SpA\n\nCliente corporativo desde 2024.\nContacto legal: legal@andes.cl\nNotas: preferir minutas post-audiencia el mismo día.",
+        extractedMarkdown:
+          "# KYC Constructora Andes SpA\n\nCliente corporativo desde 2024.\nContacto legal: legal@andes.cl\nNotas: preferir minutas post-audiencia el mismo día.",
+        extractionStatus: "completed",
+        clienteId: cliente1.id,
+        autorId: abogado.id,
+      },
+      {
+        nombre: "Mandato judicial Muñoz.md",
+        tipo: "contrato",
+        contenido:
+          "# Mandato\n\nJuan Carlos Muñoz Sepúlveda otorga mandato a Estudio LexOpen para tutela laboral O-1189-2025.",
+        extractedMarkdown:
+          "# Mandato\n\nJuan Carlos Muñoz Sepúlveda otorga mandato a Estudio LexOpen para tutela laboral O-1189-2025.",
+        extractionStatus: "completed",
+        clienteId: cliente2.id,
+        autorId: admin.id,
+      },
       {
         nombre: "Demanda de cobro de pesos.md",
         tipo: "escrito",
@@ -260,6 +343,7 @@ async function main() {
           "# Demanda de cobro de pesos\n\nSe demanda a SERVIU el cobro de $120.000.000 por obras ejecutadas y no pagadas conforme al contrato de 15.01.2024. Petitorio: se declare la obligación de pago más reajustes e intereses.",
         extractionStatus: "completed",
         causaId: causa1.id,
+        clienteId: cliente1.id,
         autorId: abogado.id,
         obsidianPath: "Causas/C-4521-2025/Documentos/Escritos/Demanda-de-cobro-de-pesos.md",
       },
@@ -272,6 +356,7 @@ async function main() {
           "# Contrato de obra\n\nFecha: 15.01.2024. Mandante: SERVIU Región de Valparaíso. Contratista: Constructora Andes SpA. Precio: $120.000.000. Plazo de ejecución: 180 días. Cláusula de multa por atraso: 0,5% semanal.",
         extractionStatus: "completed",
         causaId: causa1.id,
+        clienteId: cliente1.id,
         autorId: abogado.id,
       },
       {

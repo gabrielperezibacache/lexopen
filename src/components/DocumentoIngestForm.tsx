@@ -25,6 +25,8 @@ type Props = {
   causas?: CausaOption[];
   /** When set, causa is locked (e.g. from causa detail). */
   lockedCausaId?: string | null;
+  /** Associate uploads with a CRM client folder. */
+  lockedClienteId?: string | null;
   compact?: boolean;
   onComplete?: () => void;
 };
@@ -75,6 +77,7 @@ function buildRows(fileList: FileList | null): FileRow[] {
 export function DocumentoIngestForm({
   causas = [],
   lockedCausaId = null,
+  lockedClienteId = null,
   compact = false,
   onComplete,
 }: Props) {
@@ -111,6 +114,7 @@ export function DocumentoIngestForm({
     if (row.ruta) fd.set("ruta", row.ruta);
     fd.set("relativePath", row.relativePath);
     if (resolvedCausaId) fd.set("causaId", resolvedCausaId);
+    if (lockedClienteId) fd.set("clienteId", lockedClienteId);
     if (confidencial) fd.set("confidencial", "on");
     if (privilegio) fd.set("privilegio", "on");
 

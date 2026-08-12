@@ -7,6 +7,7 @@ import { CausaActions } from "@/components/CausaActions";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
 import { PjudMonitorPanel } from "@/components/pjud/PjudMonitorPanel";
+import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
 import {
   diasEntre,
@@ -16,49 +17,62 @@ import {
   isPlaceholderDriveFolderId,
   isRealDriveFolderId,
 } from "@/lib/integrations/drive-folder";
+import { labelConflictStatus } from "@/lib/conflict";
 import { requireStaff } from "@/lib/auth/session";
 import { confidentialWhere } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
+import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function CausaDetailPage({ params }: Params) {
   const user = await requireStaff();
   const { id } = await params;
-  const causa = await prisma.causa.findUnique({
-    where: { id },
-    include: {
-      cliente: true,
-      abogado: { select: publicUserSelect },
-      partes: true,
-      documentos: {
-        where: confidentialWhere(user.role),
-        orderBy: { updatedAt: "desc" },
-      },
-      plazos: { orderBy: { fechaLimite: "asc" } },
-      notas: { orderBy: { updatedAt: "desc" } },
-      etapaHistorial: { orderBy: { createdAt: "desc" } },
-      movimientos: { orderBy: { fecha: "desc" }, take: 200 },
-      minutas: {
-        where: confidentialWhere(user.role),
-        include: {
-          autor: { select: { name: true } },
-          acciones: {
-            where: { estado: { in: [...ACCIONES_ABIERTAS] } },
-          },
+  const [causa, responsables] = await Promise.all([
+    prisma.causa.findUnique({
+      where: { id },
+      include: {
+        cliente: true,
+        abogado: { select: publicUserSelect },
+        partes: true,
+        documentos: {
+          where: confidentialWhere(user.role),
+          orderBy: { updatedAt: "desc" },
         },
-        orderBy: { fecha: "desc" },
-        take: 12,
+        plazos: { orderBy: { fechaLimite: "asc" } },
+        tramites: {
+          orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
+          include: { responsable: { select: { id: true, name: true } } },
+        },
+        notas: { orderBy: { updatedAt: "desc" } },
+        etapaHistorial: { orderBy: { createdAt: "desc" } },
+        movimientos: { orderBy: { fecha: "desc" }, take: 200 },
+        minutas: {
+          where: confidentialWhere(user.role),
+          include: {
+            autor: { select: { name: true } },
+            acciones: {
+              where: { estado: { in: [...ACCIONES_ABIERTAS] } },
+            },
+          },
+          orderBy: { fecha: "desc" },
+          take: 12,
+        },
+        actividades: {
+          include: { user: { select: publicUserSelect } },
+          orderBy: { createdAt: "desc" },
+          take: 30,
+        },
       },
-      actividades: {
-        include: { user: { select: publicUserSelect } },
-        orderBy: { createdAt: "desc" },
-        take: 30,
-      },
-    },
-  });
+    }),
+    prisma.user.findMany({
+      where: { role: { in: ["admin", "abogado", "asistente"] } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
   if (!causa) notFound();
 
   const ultimoMov = causa.movimientos[0] || null;
@@ -203,7 +217,18 @@ export default async function CausaDetailPage({ params }: Params) {
             </div>
             <div>
               <dt className="text-[var(--ink-soft)]/60">Cliente</dt>
-              <dd className="font-medium">{causa.cliente?.razonSocial || "—"}</dd>
+              <dd className="font-medium">
+                {causa.cliente ? (
+                  <Link
+                    href={`/clientes/${causa.cliente.id}`}
+                    className="text-[var(--sea)] hover:underline"
+                  >
+                    {causa.cliente.razonSocial}
+                  </Link>
+                ) : (
+                  "—"
+                )}
+              </dd>
             </div>
             <div>
               <dt className="text-[var(--ink-soft)]/60">Abogado</dt>
@@ -212,7 +237,7 @@ export default async function CausaDetailPage({ params }: Params) {
             <div>
               <dt className="text-[var(--ink-soft)]/60">Conflicto</dt>
               <dd className="font-medium">
-                {causa.conflictStatus}
+                {labelConflictStatus(causa.conflictStatus)}
                 {causa.conflictCheckedAt ? ` · ${formatDate(causa.conflictCheckedAt)}` : ""}
               </dd>
             </div>
@@ -233,6 +258,20 @@ export default async function CausaDetailPage({ params }: Params) {
           folderUrl={causa.googleDriveFolderUrl}
         />
       </div>
+
+      <section id="tramites" className="panel scroll-mt-24 rounded-3xl p-5">
+        <h2 className="mb-3 text-lg font-semibold">Trámites</h2>
+        <p className="mb-4 text-sm text-[var(--ink-soft)]/70">
+          Checklist operativo de la causa. Puede generar tareas o plazos desde
+          cada ítem.
+        </p>
+        <TramitesPanel
+          causaId={causa.id}
+          tramites={causa.tramites}
+          materia={causa.materia}
+          responsables={responsables}
+        />
+      </section>
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="panel rounded-3xl p-5 md:col-span-2">
@@ -420,6 +459,7 @@ export default async function CausaDetailPage({ params }: Params) {
                     )}
                   />
                 </div>
+                <DocumentoAiActions documentoId={d.id} causaId={causa.id} />
               </div>
             ))}
             {causa.documentos.length === 0 && (

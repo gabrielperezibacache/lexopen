@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth/session";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
 import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
 import { EmptyState } from "@/components/EmptyState";
+import { labelTramiteEstado } from "@/lib/tramites";
 
 export default async function PortalPage() {
   const user = await requireUser();
@@ -21,7 +22,25 @@ export default async function PortalPage() {
       name: true,
       tipo: true,
       cliente: { select: { razonSocial: true } },
-      causa: { select: { id: true, rit: true, tribunal: true, updatedAt: true } },
+      causa: {
+        select: {
+          id: true,
+          rit: true,
+          tribunal: true,
+          updatedAt: true,
+          tramites: {
+            where: { estado: { in: ["pendiente", "en_curso", "hecho"] } },
+            orderBy: [{ orden: "asc" }, { fechaLimite: "asc" }],
+            take: 8,
+            select: {
+              id: true,
+              titulo: true,
+              estado: true,
+              fechaLimite: true,
+            },
+          },
+        },
+      },
       files: {
         where: {
           AND: [
@@ -117,6 +136,36 @@ export default async function PortalPage() {
                   )}
                 </ul>
               </div>
+
+              {s.causa && (
+                <div className="mt-5">
+                  <h3 className="text-sm font-semibold">Trámites de la causa</h3>
+                  <p className="mt-1 text-xs text-[var(--ink-soft)]/55">
+                    Vista informativa (solo lectura).
+                  </p>
+                  <ul className="mt-2 space-y-1.5">
+                    {s.causa.tramites.map((t) => (
+                      <li
+                        key={t.id}
+                        className="flex flex-wrap items-baseline justify-between gap-2 text-sm text-[var(--ink-soft)]/85"
+                      >
+                        <span>{t.titulo}</span>
+                        <span className="text-xs text-[var(--ink-soft)]/55">
+                          {labelTramiteEstado(t.estado)}
+                          {t.fechaLimite
+                            ? ` · ${formatDate(t.fechaLimite)}`
+                            : ""}
+                        </span>
+                      </li>
+                    ))}
+                    {s.causa.tramites.length === 0 && (
+                      <li className="text-sm text-[var(--ink-soft)]/60">
+                        Sin trámites publicados aún.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
 
               <div className="mt-5">
                 <div className="flex items-center justify-between gap-2">

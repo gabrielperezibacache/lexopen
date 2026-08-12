@@ -2,57 +2,130 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDate, StatusBadge } from "@/components/ui";
 import { labelMateria } from "@/lib/chile";
-import { ArrowRight, Building2, Briefcase, ListTodo, MessageSquare } from "lucide-react";
+import { TRAMITES_ABIERTOS, isTramiteVencido } from "@/lib/tramites";
+import {
+  ArrowRight,
+  Briefcase,
+  ListTodo,
+  ContactRound,
+  AlertTriangle,
+} from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+  const now = new Date();
 
-  const [sites, causas, tasksOpen, unread, sitesList, tasks, actividades, minutasRecientes] =
-    await Promise.all([
-      prisma.site.count({ where: { status: "active" } }),
-      prisma.causa.count({ where: { estado: "activa" } }),
-      prisma.task.count({ where: { status: { in: ["todo", "in_progress", "blocked"] } } }),
-      user
-        ? prisma.notification.count({ where: { userId: user.id, read: false } })
-        : Promise.resolve(0),
-      prisma.site.findMany({
-        include: { _count: { select: { files: true, tasks: true } }, causa: true },
-        orderBy: { updatedAt: "desc" },
-        take: 6,
-      }),
-      prisma.task.findMany({
-        where: {
-          status: { not: "done" },
-          ...(user ? { assigneeId: user.id } : {}),
+  const [
+    causas,
+    tasksOpen,
+    unread,
+    clientesActivos,
+    tramitesPendientesCount,
+    sitesList,
+    tasks,
+    actividades,
+    minutasRecientes,
+    tramitesPendientes,
+    tramitesVencidos,
+  ] = await Promise.all([
+    prisma.causa.count({ where: { estado: "activa" } }),
+    prisma.task.count({ where: { status: { in: ["todo", "in_progress", "blocked"] } } }),
+    user
+      ? prisma.notification.count({ where: { userId: user.id, read: false } })
+      : Promise.resolve(0),
+    prisma.cliente.count({ where: { estado: "activo" } }),
+    prisma.tramite.count({
+      where: { estado: { in: [...TRAMITES_ABIERTOS] } },
+    }),
+    prisma.site.findMany({
+      include: { _count: { select: { files: true, tasks: true } }, causa: true },
+      orderBy: { updatedAt: "desc" },
+      take: 6,
+    }),
+    prisma.task.findMany({
+      where: {
+        status: { not: "done" },
+        ...(user ? { assigneeId: user.id } : {}),
+      },
+      include: { site: true, assignee: true },
+      orderBy: { dueDate: "asc" },
+      take: 6,
+    }),
+    prisma.activity.findMany({
+      include: { user: true, site: true, causa: true },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+    prisma.minuta.findMany({
+      include: {
+        causa: { select: { id: true, rit: true, titulo: true } },
+        acciones: {
+          where: { estado: { in: ["pendiente", "en_curso"] } },
         },
-        include: { site: true, assignee: true },
-        orderBy: { dueDate: "asc" },
-        take: 6,
-      }),
-      prisma.activity.findMany({
-        include: { user: true, site: true, causa: true },
-        orderBy: { createdAt: "desc" },
-        take: 8,
-      }),
-      prisma.minuta.findMany({
-        include: {
-          causa: { select: { id: true, rit: true, titulo: true } },
-          acciones: {
-            where: { estado: { in: ["pendiente", "en_curso"] } },
+      },
+      orderBy: { fecha: "desc" },
+      take: 5,
+    }),
+    prisma.tramite.findMany({
+      where: { estado: { in: [...TRAMITES_ABIERTOS] } },
+      include: {
+        causa: {
+          select: {
+            id: true,
+            rit: true,
+            titulo: true,
+            cliente: { select: { id: true, razonSocial: true } },
           },
         },
-        orderBy: { fecha: "desc" },
-        take: 5,
-      }),
-    ]);
+        responsable: { select: { name: true } },
+      },
+      orderBy: [{ fechaLimite: "asc" }, { orden: "asc" }],
+      take: 8,
+    }),
+    prisma.tramite.findMany({
+      where: {
+        estado: { in: [...TRAMITES_ABIERTOS] },
+        fechaLimite: { lt: now },
+      },
+      include: {
+        causa: {
+          select: {
+            id: true,
+            rit: true,
+            titulo: true,
+            cliente: { select: { id: true, razonSocial: true } },
+          },
+        },
+      },
+      orderBy: { fechaLimite: "asc" },
+      take: 6,
+    }),
+  ]);
 
   const stats = [
-    { label: "Espacios activos", value: sites, icon: Building2 },
-    { label: "Causas activas", value: causas, icon: Briefcase },
-    { label: "Tareas abiertas", value: tasksOpen, icon: ListTodo },
-    { label: "Notificaciones", value: unread, icon: MessageSquare },
+    { label: "Clientes activos", value: clientesActivos, icon: ContactRound, href: "/clientes" },
+    { label: "Causas activas", value: causas, icon: Briefcase, href: "/causas" },
+    {
+      label: "Trámites vencidos",
+      value: tramitesVencidos.length,
+      icon: AlertTriangle,
+      href: "/clientes",
+    },
+    { label: "Tareas abiertas", value: tasksOpen, icon: ListTodo, href: "/tareas" },
   ];
+
+  function tramiteHref(t: {
+    causa: {
+      id: string;
+      cliente: { id: string } | null;
+    };
+  }) {
+    if (t.causa.cliente) {
+      return `/clientes/${t.causa.cliente.id}?causa=${t.causa.id}`;
+    }
+    return `/causas/${t.causa.id}#tramites`;
+  }
 
   return (
     <div className="space-y-8">
@@ -65,13 +138,12 @@ export default async function DashboardPage() {
             {user ? `Hola, ${user.name.split(" ")[0]}` : "Inicio"}
           </h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Espacios, causas Chile, minutas de handoff y actividad reciente en un
-            solo panel de control.
+            Clientes, causas, trámites pendientes, minutas y actividad del estudio.
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href="/minutas" className="btn btn-secondary">
-            Minutas
+          <Link href="/clientes" className="btn btn-secondary">
+            Clientes
           </Link>
           <Link href="/causas/nueva" className="btn btn-primary">
             Nueva causa <ArrowRight size={16} />
@@ -80,16 +152,66 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="panel rounded-3xl p-5">
+        {stats.map(({ label, value, icon: Icon, href }) => (
+          <Link key={label} href={href} className="panel rounded-3xl p-5 transition hover:border-[var(--sea)]/40">
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--ink-soft)]/70">{label}</span>
               <Icon size={18} className="text-[var(--copper)]" />
             </div>
             <div className="display mt-3 text-4xl">{value}</div>
-          </div>
+          </Link>
         ))}
       </div>
+
+      <section className="panel rounded-3xl p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Trámites a seguir</h2>
+            <p className="text-sm text-[var(--ink-soft)]/70">
+              {tramitesPendientesCount} abiertos
+              {tramitesVencidos.length > 0
+                ? ` · ${tramitesVencidos.length} vencidos`
+                : ""}
+              {unread > 0 ? ` · ${unread} notificaciones` : ""}
+            </p>
+          </div>
+          <Link href="/clientes" className="text-sm text-[var(--sea)]">
+            Ver clientes
+          </Link>
+        </div>
+        <div className="space-y-3">
+          {(tramitesVencidos.length ? tramitesVencidos : tramitesPendientes).map(
+            (t) => (
+              <Link
+                key={t.id}
+                href={tramiteHref(t)}
+                className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+              >
+                <div>
+                  <div className="font-medium">{t.titulo}</div>
+                  <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                    {t.causa.cliente?.razonSocial || "Sin cliente"} ·{" "}
+                    {t.causa.rit || t.causa.titulo}
+                    {t.fechaLimite ? ` · ${formatDate(t.fechaLimite)}` : ""}
+                  </div>
+                </div>
+                <StatusBadge
+                  estado={
+                    isTramiteVencido(t.estado, t.fechaLimite, now)
+                      ? "vencido"
+                      : "pendiente"
+                  }
+                />
+              </Link>
+            )
+          )}
+          {tramitesPendientes.length === 0 && (
+            <p className="text-sm text-[var(--ink-soft)]/65">
+              Sin trámites abiertos. Revise las fichas de cliente o causa.
+            </p>
+          )}
+        </div>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">

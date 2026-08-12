@@ -8,6 +8,24 @@ type Results = {
   q: string;
   sites: Array<{ id: string; name: string; tipo: string }>;
   causas: Array<{ id: string; titulo: string; rit: string | null }>;
+  clientes?: Array<{
+    id: string;
+    razonSocial: string;
+    rut: string | null;
+    estado: string;
+  }>;
+  tramites?: Array<{
+    id: string;
+    titulo: string;
+    estado: string;
+    causa: {
+      id: string;
+      rit: string | null;
+      titulo: string;
+      clienteId: string | null;
+      cliente: { id: string; razonSocial: string } | null;
+    };
+  }>;
   files: Array<{ id: string; name: string; site: { id: string; name: string } }>;
   documentos: Array<{
     id: string;
@@ -15,7 +33,9 @@ type Results = {
     tipo: string;
     ruta: string | null;
     causaId: string | null;
+    clienteId?: string | null;
     causa: { id: string; rit: string | null; titulo: string } | null;
+    cliente?: { id: string; razonSocial: string } | null;
   }>;
   tasks: Array<{ id: string; title: string; site: { id: string; name: string } | null }>;
   jurisprudencia: Array<{ id: string; rol: string; caratula: string | null }>;
@@ -35,6 +55,8 @@ const EMPTY_RESULTS = (q: string): Results => ({
   q,
   sites: [],
   causas: [],
+  clientes: [],
+  tramites: [],
   files: [],
   documentos: [],
   tasks: [],
@@ -67,6 +89,8 @@ export default function SearchPage() {
         q: trimmed,
         sites: Array.isArray(data.sites) ? data.sites : [],
         causas: Array.isArray(data.causas) ? data.causas : [],
+        clientes: Array.isArray(data.clientes) ? data.clientes : [],
+        tramites: Array.isArray(data.tramites) ? data.tramites : [],
         files: Array.isArray(data.files) ? data.files : [],
         documentos: Array.isArray(data.documentos) ? data.documentos : [],
         tasks: Array.isArray(data.tasks) ? data.tasks : [],
@@ -154,14 +178,43 @@ export default function SearchPage() {
             }))}
           />
           <ResultBlock
+            title="Clientes"
+            items={(results.clientes || []).map((c) => ({
+              href: `/clientes/${c.id}`,
+              label: c.razonSocial,
+              meta: [c.rut, c.estado].filter(Boolean).join(" · "),
+            }))}
+          />
+          <ResultBlock
+            title="Trámites"
+            items={(results.tramites || []).map((t) => ({
+              href: t.causa.clienteId
+                ? `/clientes/${t.causa.clienteId}?causa=${t.causa.id}`
+                : `/causas/${t.causa.id}#tramites`,
+              label: t.titulo,
+              meta: [
+                t.estado,
+                t.causa.cliente?.razonSocial,
+                t.causa.rit || t.causa.titulo,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            }))}
+          />
+          <ResultBlock
             title="Documentos"
             items={(results.documentos || []).map((d) => ({
-              href: d.causaId ? `/causas/${d.causaId}` : "/documentos",
+              href: d.cliente
+                ? `/clientes/${d.cliente.id}`
+                : d.causaId
+                  ? `/causas/${d.causaId}`
+                  : "/documentos",
               label: d.nombre,
               meta: [
                 d.tipo,
                 d.ruta,
-                d.causa ? d.causa.rit || d.causa.titulo : null,
+                d.cliente?.razonSocial ||
+                  (d.causa ? d.causa.rit || d.causa.titulo : null),
               ]
                 .filter(Boolean)
                 .join(" · "),

@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   MATERIAS,
   ETAPAS,
@@ -19,8 +19,10 @@ type ConflictHit = {
   severity: "warning" | "blocked";
 };
 
-export default function NuevaCausaPage() {
+function NuevaCausaInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const clienteIdFromQuery = searchParams.get("clienteId") || "";
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [conflicts, setConflicts] = useState<ConflictHit[]>([]);
@@ -92,6 +94,7 @@ export default function NuevaCausaPage() {
       etapa: String(fd.get("etapa")),
       caratula: String(fd.get("caratula") || ""),
       resumen: String(fd.get("resumen") || ""),
+      clienteId: clienteIdFromQuery || null,
       conflictOverride: fd.get("conflictOverride") === "on",
       conflictNotes: String(fd.get("conflictNotes") || ""),
       partes,
@@ -239,5 +242,13 @@ export default function NuevaCausaPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function NuevaCausaPage() {
+  return (
+    <Suspense fallback={<div className="panel h-40 animate-pulse rounded-3xl" />}>
+      <NuevaCausaInner />
+    </Suspense>
   );
 }

@@ -9,6 +9,24 @@ export type ConflictHit = {
   severity: "warning" | "blocked";
 };
 
+export function labelConflictStatus(status: string | null | undefined) {
+  const map: Record<string, string> = {
+    clear: "sin hallazgos",
+    warning: "advertencia",
+    blocked: "bloqueante",
+    idle: "sin revisar",
+  };
+  return map[status || ""] || status || "—";
+}
+
+export function labelConflictSeverity(severity: string | null | undefined) {
+  const map: Record<string, string> = {
+    warning: "advertencia",
+    blocked: "bloqueante",
+  };
+  return map[severity || ""] || severity || "—";
+}
+
 /** Busca conflictos de partes/RUT en causas activas. */
 export async function checkConflicts(opts: {
   partes: Array<{ nombre: string; rut?: string | null }>;
