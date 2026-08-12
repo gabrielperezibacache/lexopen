@@ -1,9 +1,11 @@
 /**
- * Vault local de secretos PJUD / ClaveÚnica (paridad CausaMonitor
- * `/api/pjud-credentials`: credenciales cifradas en reposo, no plaintext).
+ * Vault local de secretos PJUD / ClaveÚnica.
+ * Las credenciales **no salen** de este host: cifrado AES-256-GCM en Postgres
+ * (`FirmSettings`), paridad conceptual con CM `/api/pjud-credentials` pero
+ * self-hosted (sin Supabase/SaaS ajeno).
  *
- * AES-256-GCM · token `enc:v2:<iv>.<tag>.<ciphertext>` · clave
- * `PJUD_SECRETS_KEY` (preferida) o `SESSION_SECRET`.
+ * Token `enc:v2:<iv>.<tag>.<ciphertext>` · clave `PJUD_SECRETS_KEY` (preferida)
+ * o `SESSION_SECRET`.
  */
 
 import {

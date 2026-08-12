@@ -167,15 +167,19 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
 
   ```dotenv
   CRON_SECRET=<secreto-aleatorio>
-  PJUD_SYNC_INTERVAL_MINUTES=360
+  PJUD_SYNC_INTERVAL_MINUTES=240
+  PJUD_SYNC_CONCURRENCY=5
   ```
 
   `web:host` ejecutará la sincronización contra su propio endpoint sin crear otro
-  servicio. Si `PJUD_API_URL` está vacío y `PJUD_ALLOW_DEMO=0`, no se consultará
-  ninguna fuente externa.
+  servicio. Instalación **100% local**: deje `PJUD_API_URL` vacío; use
+  `PJUD_SCRAPER_URL=http://127.0.0.1:8787` + `PJUD_SCRAPER_ALLOW_PRIVATE=1`, o
+  scrape in-process. Si no hay ingest live y `PJUD_ALLOW_DEMO=0`, no se consultará
+  ninguna fuente externa (importe CSV desde la consulta oficial).
 
 Sin proveedor externo, exporte el CSV desde la consulta oficial y use el
-importador de movimientos de la ficha de la causa. El formato recomendado es
+importador de movimientos de la ficha de la causa **o** el CSV de cartera en
+`/causas/monitoreo`. El formato de movimientos es
 `titulo,detalle,fecha,referencia,id,cuaderno,folio,etapa,tramite,receptor,documento`
 (el encabezado corto `titulo,detalle,fecha,referencia,id` sigue siendo válido);
 LexOpen clasifica las filas, fuerza `fuente=import` y omite reimportaciones con

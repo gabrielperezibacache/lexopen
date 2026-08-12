@@ -114,19 +114,20 @@ export default function MisCausasPage() {
         </p>
         <h1 className="display mt-2 text-4xl">Mis Causas</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Paridad CausaMonitor: además del acceso invitado, puedes ingresar con
-          ClaveÚnica. La contraseña se cifra en vault local (AES-GCM) del
-          estudio, se lista Mis Causas en OJV y se enciende monitoreo + sync
-          (scrape o sidecar).
+          Todo local: la ClaveÚnica se cifra en el vault de este host (AES-GCM /
+          Postgres) y no se envía a CausaMonitor ni a otro SaaS. Con ella se lista
+          Mis Causas en OJV y se enciende monitoreo + sync (scrape o sidecar en
+          localhost).
         </p>
       </div>
 
       <div className="rounded-3xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
         Riesgo ToS / seguridad: LexOpen automatiza login ClaveÚnica solo con
         <code className="mx-1">PJUD_CLAVEUNICA_SCRAPE=1</code> y
-        scrape/sidecar activos. La contraseña se cifra con AES-GCM
-        (PJUD_SECRETS_KEY, fallback SESSION_SECRET). Prefiera un sidecar dedicado si el WAF de PJUD bloquea
-        este host.
+        scrape/sidecar locales. La contraseña nunca sale en plaintext por API;
+        solo descifrado en este servidor al sincronizar. Prefiera
+        <code className="mx-1">PJUD_SCRAPER_URL=http://127.0.0.1:…</code> si el
+        WAF de PJUD bloquea el proceso web.
       </div>
 
       <section className="panel space-y-4 rounded-3xl p-5">

@@ -356,12 +356,12 @@ export function pjudSyncIntervalMs() {
 export async function fetchPjudMovimientos(
   causa: PjudCausaRef
 ): Promise<PjudFetchResult> {
-  // 1) Partner API (si hay)
-  const fromApi = await fetchFromPartnerApi(causa);
-  if (fromApi) return fromApi;
-
-  // 2) Sidecar scraper (microservicio CausaMonitor-like)
+  // LOCAL-FIRST (LexOpen self-host): sidecar / scrape in-process antes que
+  // partner API externo. Datos y ClaveÚnica viven en Postgres local.
   let sidecarError: Error | null = null;
+  let scrapeError: Error | null = null;
+
+  // 1) Sidecar local (localhost / red privada del host)
   if (scraperSidecarConfigured()) {
     try {
       const fromSidecar = await fetchFromScraperSidecar(causa);
@@ -369,11 +369,9 @@ export async function fetchPjudMovimientos(
     } catch (error) {
       sidecarError =
         error instanceof Error ? error : new Error(String(error));
-      // Only fall through if in-process scrape is ready; never silently to demo
-      // when a production sidecar was expected.
-      if (!publicScrapeReady()) {
+      if (!publicScrapeReady() && !pjudProviderConfigured()) {
         if (pjudDemoAllowed() && process.env.NODE_ENV !== "production") {
-          // keep going to demo in non-prod
+          // fall through to demo in non-prod
         } else {
           throw sidecarError;
         }
@@ -381,7 +379,7 @@ export async function fetchPjudMovimientos(
     }
   }
 
-  // 3) Scrape in-process OJV + CAPTCHA (opt-in)
+  // 2) Scrape OJV in-process (mismo host; CAPTCHA solver es el único hop externo opt-in)
   if (publicScrapeReady()) {
     try {
       const scraped = await scrapeCausaByRol(causa);
@@ -393,32 +391,61 @@ export async function fetchPjudMovimientos(
         sala: scraped.sala,
       };
     } catch (error) {
-      if (sidecarError) {
-        throw new Error(
-          `Sidecar falló (${sidecarError.message}); scrape in-process también falló: ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        );
+      scrapeError = error instanceof Error ? error : new Error(String(error));
+      if (!pjudProviderConfigured()) {
+        if (sidecarError) {
+          throw new Error(
+            `Sidecar falló (${sidecarError.message}); scrape in-process también falló: ${scrapeError.message}`
+          );
+        }
+        if (pjudDemoAllowed() && process.env.NODE_ENV !== "production") {
+          // fall through
+        } else {
+          throw scrapeError;
+        }
       }
-      throw error;
     }
   }
 
-  if (publicScrapeEnabled() && !captchaSolverConfigured()) {
-    return {
-      provider: "none",
-      movimientos: [],
-      note:
-        "PJUD_PUBLIC_SCRAPE=1 pero falta CAPTCHA_SOLVER_PROVIDER/API_KEY (o PJUD_SCRAPER_URL).",
-      demo: false,
-    };
+  if (publicScrapeEnabled() && !captchaSolverConfigured() && !scraperSidecarConfigured()) {
+    if (!pjudProviderConfigured()) {
+      return {
+        provider: "none",
+        movimientos: [],
+        note:
+          "PJUD_PUBLIC_SCRAPE=1 pero falta CAPTCHA_SOLVER_PROVIDER/API_KEY (o PJUD_SCRAPER_URL local).",
+        demo: false,
+      };
+    }
+  }
+
+  // 3) Partner API opcional (externo; no requerido para instalación 100% local)
+  const fromApi = await fetchFromPartnerApi(causa);
+  if (fromApi) {
+    if (sidecarError || scrapeError) {
+      const reasons = [
+        sidecarError ? `sidecar: ${sidecarError.message}` : null,
+        scrapeError ? `scrape: ${scrapeError.message}` : null,
+      ]
+        .filter(Boolean)
+        .join("; ");
+      return {
+        ...fromApi,
+        note: `${fromApi.note} · fallback partner tras fallo local (${reasons})`,
+      };
+    }
+    return fromApi;
   }
 
   // 4) Demo etiquetado
   if (pjudDemoAllowed()) {
     const demo = fetchDemoMovimientos(causa);
-    if (sidecarError) {
-      demo.note = `⚠ Sidecar falló (${sidecarError.message}). ${demo.note}`;
+    const prefix = [sidecarError, scrapeError]
+      .filter(Boolean)
+      .map((e) => (e as Error).message)
+      .join("; ");
+    if (prefix) {
+      demo.note = `⚠ Ingest local falló (${prefix}). ${demo.note}`;
     }
     return demo;
   }
@@ -428,7 +455,9 @@ export async function fetchPjudMovimientos(
     movimientos: [],
     note: sidecarError
       ? `Sidecar falló: ${sidecarError.message}`
-      : "Sin conector PJUD. Configure PJUD_API_URL, PJUD_SCRAPER_URL, o PJUD_PUBLIC_SCRAPE=1 + CAPTCHA solver; o PJUD_ALLOW_DEMO=1 / CSV.",
+      : scrapeError
+        ? `Scrape local falló: ${scrapeError.message}`
+        : "Sin conector PJUD local. Configure PJUD_SCRAPER_URL (localhost) o PJUD_PUBLIC_SCRAPE=1 + CAPTCHA, o CSV; partner API es opcional.",
     demo: false,
   };
 }

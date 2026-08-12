@@ -1,6 +1,7 @@
 /**
- * Sidecar HTTP scraper (microservicio estilo CausaMonitor worker).
+ * Sidecar HTTP scraper (proceso local / red privada del host).
  * Env: PJUD_SCRAPER_URL (+ opcional PJUD_SCRAPER_KEY)
+ * Preferir `http://127.0.0.1:8787` con PJUD_SCRAPER_ALLOW_PRIVATE=1.
  *
  * Contratos:
  *   POST {url}/causas/lookup  { rit, ruc?, tribunal }

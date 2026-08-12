@@ -1,8 +1,28 @@
 # PJUD / CausaMonitor parity (scrape + ClaveÚnica)
 
-LexOpen replica el **modelo operativo de CausaMonitor** (`app.causamonitor.com` + `api.causamonitor.com`), no el flujo MCP de `mcp-legal-chile` (sin prueba de producción).
+## Principio: todo local
+
+LexOpen **no** depende de CausaMonitor SaaS ni de un backend cloud ajeno. La
+paridad es de *producto/flujo*; la ejecución es **self-hosted**:
+
+| Qué | Dónde vive |
+|-----|------------|
+| Causas, movimientos, cola `PjudSyncJob`, digest | Postgres del host |
+| ClaveÚnica (RUT + password) | Vault AES-256-GCM en `FirmSettings` (mismo Postgres) |
+| Scrape / Mis Causas | Sidecar o Playwright **en este host** (`localhost` / red privada) |
+| PDF backup | Object storage local o S3 que usted configure |
+| CSV | Import/export sin proveedor externo |
+
+Orden de ingest (**local primero**): sidecar → scrape in-process → partner API
+opcional → demo/CSV. El único hop externo típico del scrape live es el solver
+CAPTCHA (opt-in). Sin él, use CSV desde la consulta oficial.
+
+LexOpen toma como referencia el **modelo operativo** de CausaMonitor
+(`app.causamonitor.com` + `api.causamonitor.com`), no el flujo MCP de
+`mcp-legal-chile` (sin prueba de producción).
 
 ## Arquitectura de referencia (CausaMonitor, inspeccionada)
+
 
 | Pieza | CausaMonitor | LexOpen |
 |-------|--------------|---------|
@@ -61,13 +81,13 @@ Kill switches, presupuesto CAPTCHA diario y cache TTL (`PJUD_CAUSAS_CACHE_TTL_MS
 
 Kill switch: `PJUD_CLAVEUNICA_SCRAPE=1` (+ scrape/sidecar).
 
-## Orden de ingest al sincronizar
+## Orden de ingest al sincronizar (local primero)
 
-1. `PJUD_API_URL` (partner)
-2. `PJUD_SCRAPER_URL` (sidecar HTTP, recomendado en producción — análogo al worker CM)
-3. Scrape in-process (`PJUD_PUBLIC_SCRAPE=1` + CAPTCHA solver + Playwright/Chromium)
+1. `PJUD_SCRAPER_URL` (sidecar en **localhost** / red privada del host)
+2. Scrape in-process (`PJUD_PUBLIC_SCRAPE=1` + CAPTCHA solver + Playwright/Chromium)
+3. `PJUD_API_URL` (partner **opcional** / externo)
 4. Demo (`PJUD_ALLOW_DEMO`)
-5. CSV / webhook
+5. CSV / webhook (100% offline respecto de OJV)
 
 Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 

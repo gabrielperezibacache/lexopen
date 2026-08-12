@@ -493,11 +493,17 @@ export function providerStatusPublic() {
         process.env.PJUD_ALLOW_DEMO !== "0"),
     syncIntervalMinutes: Math.round(pjudSyncIntervalMs() / 60000),
     honesty: pjudLiveIngestConfigured()
-      ? pjudProviderConfigured()
-        ? "Conector partner API activo."
+      ? pjudProviderConfigured() &&
+        !scraperSidecarConfigured() &&
+        !publicScrapeReady()
+        ? "Conector partner API activo (externo). Preferible sidecar/scrape local."
         : scraperSidecarConfigured()
-          ? "Scraper sidecar activo (PJUD_SCRAPER_URL) — worker estilo CausaMonitor (acceso invitado OJV)."
-          : "Scrape OJV in-process activo (CAPTCHA, acceso invitado) — ToS risk / opt-in."
-      : "Sin ingest live: configure PJUD_SCRAPER_URL (sidecar) o PJUD_PUBLIC_SCRAPE=1+CAPTCHA+Playwright, partner API, demo o CSV. El sync de producción está fail-closed hasta entonces. ClaveÚnica (paridad CM /api/pjud-credentials): PJUD_CLAVEUNICA_SCRAPE=1 + vault AES-GCM local.",
+          ? "Ingest local: scraper sidecar (PJUD_SCRAPER_URL) — datos y cola en este host."
+          : publicScrapeReady()
+            ? "Ingest local: scrape OJV in-process (CAPTCHA opt-in externo). Vault ClaveÚnica en Postgres local."
+            : pjudProviderConfigured()
+              ? "Conector partner API activo (externo)."
+              : "Ingest live listo."
+      : "Sin ingest live local: configure PJUD_SCRAPER_URL (localhost) o PJUD_PUBLIC_SCRAPE=1+CAPTCHA+Playwright, o CSV. Partner API es opcional. ClaveÚnica queda cifrada solo en este host (PJUD_SECRETS_KEY).",
   };
 }
