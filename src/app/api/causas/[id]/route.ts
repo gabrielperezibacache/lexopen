@@ -4,6 +4,7 @@ import {
   assertCsrf,
   confidentialWhere,
   handleRouteError,
+  minutaConfidentialWhere,
   requireRole,
   requireStaff,
 } from "@/lib/api";
@@ -32,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       plazos: { orderBy: { fechaLimite: "asc" } },
       notas: { orderBy: { updatedAt: "desc" } },
       minutas: {
-        where: confidentialWhere(user.role),
+        where: minutaConfidentialWhere(user.role),
         include: {
           autor: { select: publicUserSelect },
           acciones: true,

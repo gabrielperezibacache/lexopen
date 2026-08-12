@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
   assertCsrf,
-  confidentialWhere,
   handleRouteError,
+  minutaConfidentialWhere,
   requireStaff,
 } from "@/lib/api";
 import { canSeeConfidential } from "@/lib/auth/rbac";
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
   const minutas = await prisma.minuta.findMany({
     where: {
       ...(causaId ? { causaId } : {}),
-      ...confidentialWhere(user.role),
+      ...minutaConfidentialWhere(user.role),
     },
     include: {
       causa: { select: { id: true, titulo: true, rit: true, tribunal: true } },

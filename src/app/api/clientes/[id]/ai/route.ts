@@ -21,6 +21,16 @@ export async function GET(_req: NextRequest, { params }: Params) {
         clienteId: id,
         ...(user.role === "admin" ? {} : { userId: user.id }),
       },
+      select: {
+        id: true,
+        title: true,
+        demoMode: true,
+        updatedAt: true,
+        createdAt: true,
+        clienteId: true,
+        causaId: true,
+        userId: true,
+      },
       orderBy: { updatedAt: "desc" },
       take: 30,
     });
@@ -101,7 +111,19 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
     }
 
-    return NextResponse.json({ ...result, chat });
+    return NextResponse.json({
+      ...result,
+      chat: chat
+        ? {
+            id: chat.id,
+            title: chat.title,
+            demoMode: chat.demoMode,
+            updatedAt: chat.updatedAt,
+            clienteId: chat.clienteId,
+            causaId: chat.causaId,
+          }
+        : null,
+    });
   } catch (e) {
     return handleRouteError(e);
   }

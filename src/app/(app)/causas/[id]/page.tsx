@@ -19,7 +19,8 @@ import {
 } from "@/lib/integrations/drive-folder";
 import { labelConflictStatus } from "@/lib/conflict";
 import { requireStaff } from "@/lib/auth/session";
-import { confidentialWhere } from "@/lib/api";
+import { confidentialWhere, minutaConfidentialWhere } from "@/lib/api";
+import { documentoListSelect } from "@/lib/sites/file-select";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
@@ -40,6 +41,12 @@ export default async function CausaDetailPage({ params }: Params) {
         documentos: {
           where: confidentialWhere(user.role),
           orderBy: { updatedAt: "desc" },
+          select: {
+            ...documentoListSelect,
+            contenido: true,
+            extractedMarkdown: true,
+            storageKey: true,
+          },
         },
         plazos: { orderBy: { fechaLimite: "asc" } },
         tramites: {
@@ -50,7 +57,7 @@ export default async function CausaDetailPage({ params }: Params) {
         etapaHistorial: { orderBy: { createdAt: "desc" } },
         movimientos: { orderBy: { fecha: "desc" }, take: 200 },
         minutas: {
-          where: confidentialWhere(user.role),
+          where: minutaConfidentialWhere(user.role),
           include: {
             autor: { select: { name: true } },
             acciones: {
@@ -74,6 +81,15 @@ export default async function CausaDetailPage({ params }: Params) {
     }),
   ]);
   if (!causa) notFound();
+
+  const documentos = causa.documentos.map(
+    ({ contenido, extractedMarkdown, storageKey, ...rest }) => ({
+      ...rest,
+      hasText: Boolean((extractedMarkdown || contenido || "").trim()),
+      hasMarkdown: Boolean(extractedMarkdown?.trim()),
+      hasBinary: Boolean(storageKey),
+    })
+  );
 
   const ultimoMov = causa.movimientos[0] || null;
   const diasSinMovimiento = ultimoMov ? diasEntre(ultimoMov.fecha) : null;
@@ -418,7 +434,7 @@ export default async function CausaDetailPage({ params }: Params) {
             </div>
           </div>
           <div className="mt-4 space-y-3">
-            {causa.documentos.map((d) => (
+            {documentos.map((d) => (
               <div key={d.id} className="rounded-2xl border border-[var(--line)] px-3 py-2 text-sm">
                 <div className="font-medium">{d.nombre}</div>
                 {d.ruta && (
@@ -443,7 +459,7 @@ export default async function CausaDetailPage({ params }: Params) {
                   >
                     Descargar
                   </a>
-                  {d.extractionStatus === "completed" && d.extractedMarkdown && (
+                  {d.extractionStatus === "completed" && d.hasMarkdown && (
                     <a
                       href={`/api/documentos/${d.id}/markdown`}
                       className="text-xs text-[var(--sea)]"
@@ -454,16 +470,14 @@ export default async function CausaDetailPage({ params }: Params) {
                   <DocumentDriveAction
                     documentId={d.id}
                     googleDriveId={d.googleDriveId}
-                    hasText={Boolean(
-                      (d.extractedMarkdown || d.contenido || "").trim()
-                    )}
-                    hasBinary={Boolean(d.storageKey)}
+                    hasText={d.hasText}
+                    hasBinary={d.hasBinary}
                   />
                 </div>
                 <DocumentoAiActions documentoId={d.id} causaId={causa.id} />
               </div>
             ))}
-            {causa.documentos.length === 0 && (
+            {documentos.length === 0 && (
               <p className="text-sm text-[var(--ink-soft)]/65">
                 Sin documentos. Incorpore archivos o una carpeta investigativa abajo.
               </p>

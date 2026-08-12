@@ -33,7 +33,7 @@ type ChatMessage = {
 type AgentChat = {
   id: string;
   title: string;
-  messagesJson: string;
+  messagesJson?: string;
   demoMode: boolean;
   updatedAt: string;
   causaId?: string | null;
@@ -273,10 +273,20 @@ function AgenteInner() {
     );
   }
 
-  function resumeChat(chat: AgentChat) {
+  async function resumeChat(chat: AgentChat) {
     setChatId(chat.id);
     if (chat.causaId) setCausaId(chat.causaId);
-    const parsed = safeJsonParse<ChatMessage[]>(chat.messagesJson, []);
+    let messagesJson = chat.messagesJson;
+    if (!messagesJson) {
+      const q = new URLSearchParams({ chats: "1", chatId: chat.id });
+      if (chat.causaId) q.set("causaId", chat.causaId);
+      const res = await fetch(`/api/integrations/hermes?${q.toString()}`);
+      if (res.ok) {
+        const full = (await res.json()) as AgentChat;
+        messagesJson = full.messagesJson;
+      }
+    }
+    const parsed = safeJsonParse<ChatMessage[]>(messagesJson || "[]", []);
     const list = Array.isArray(parsed) ? parsed : [];
     setMessages(list);
     const lastAssistant = [...list]
@@ -736,7 +746,7 @@ function AgenteInner() {
                     ? "border-[var(--sea)] bg-[var(--sea)]/8"
                     : "border-[var(--line)] bg-white/70"
                 }`}
-                onClick={() => resumeChat(chat)}
+                onClick={() => void resumeChat(chat)}
               >
                 <div className="font-medium">{chat.title}</div>
                 <div className="text-xs text-[var(--ink-soft)]/60">

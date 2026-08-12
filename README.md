@@ -903,6 +903,8 @@ Controles implementados en el código:
   de archivos ocultos al portal cliente;
 - búsqueda/minutas/actividad/jurisprudencia sin cuerpos largos; portal site
   sin notas CRM ni Q&A cerrados; Obsidian omite `privilegio` y sync admin-only;
+- `minutaConfidentialWhere` (Minuta sin `privilegio`); Google OAuth
+  connect/disconnect solo admin; wiki/iSheet/chat lists sin cuerpos;
 - salida HTTP endurecida (`redirect: error` / `fetchSafeOutbound`) para PDF PJUD,
   Hermes y Obsidian;
 - `instrumentation` falla al arrancar si flags peligrosas están en producción;

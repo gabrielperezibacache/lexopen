@@ -40,10 +40,34 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ utilities: AI_UTILITIES });
     }
     if (req.nextUrl.searchParams.get("chats") === "1" || causaId) {
+      const chatId = req.nextUrl.searchParams.get("chatId");
+      if (chatId) {
+        const chat = await prisma.agentChat.findFirst({
+          where: {
+            id: chatId,
+            ...(causaId ? { causaId } : {}),
+            ...(user.role === "admin" ? {} : { userId: user.id }),
+          },
+        });
+        if (!chat) {
+          return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
+        }
+        return NextResponse.json(chat);
+      }
       const chats = await prisma.agentChat.findMany({
         where: {
           ...(causaId ? { causaId } : {}),
           ...(user.role === "admin" ? {} : { userId: user.id }),
+        },
+        select: {
+          id: true,
+          title: true,
+          demoMode: true,
+          updatedAt: true,
+          createdAt: true,
+          causaId: true,
+          clienteId: true,
+          userId: true,
         },
         orderBy: { updatedAt: "desc" },
         take: 50,

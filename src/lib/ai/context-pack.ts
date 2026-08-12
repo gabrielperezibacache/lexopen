@@ -4,7 +4,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { confidentialWhere } from "@/lib/api";
+import { confidentialWhere, minutaConfidentialWhere } from "@/lib/api";
 import { confidentialFileWhere } from "@/lib/auth/access";
 import { clasificarUrgencia, diasRestantes } from "@/lib/plazos";
 import { extractSearchNeedles, type AiUtilityId } from "@/lib/ai/utilities";
@@ -72,6 +72,7 @@ export async function buildAiContextPack(opts: {
   const blocks: string[] = [];
   let folderIndexRows: AiContextPack["folderIndex"] = [];
   const conf = confidentialWhere(opts.role);
+  const minutaConf = minutaConfidentialWhere(opts.role);
   const fileConf = confidentialFileWhere(opts.role);
   const budget = excerptBudgetForUtility(opts.utility);
 
@@ -108,7 +109,7 @@ export async function buildAiContextPack(opts: {
           },
         },
         minutas: {
-          where: conf,
+          where: minutaConf,
           include: { acciones: true },
           orderBy: { fecha: "desc" },
           take: 5,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { isAdmin } from "@/lib/auth/rbac";
 import { baseCookieOptions } from "@/lib/auth/cookie-options";
 import {
   GoogleIntegrationError,
@@ -75,6 +76,12 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     if (body.action === "start-oauth") {
+      if (!isAdmin(user.role)) {
+        return NextResponse.json(
+          { error: "Solo admin puede conectar Google Workspace" },
+          { status: 403 }
+        );
+      }
       const state = randomBytes(24).toString("base64url");
       const authUrl = getGoogleAuthUrl(state);
       if (!authUrl) {
@@ -181,6 +188,12 @@ export async function POST(req: Request) {
       return NextResponse.json(result);
     }
     if (body.action === "disconnect") {
+      if (!isAdmin(user.role)) {
+        return NextResponse.json(
+          { error: "Solo admin puede desconectar Google Workspace" },
+          { status: 403 }
+        );
+      }
       const config = await getGoogleConfig();
       const rest = {
         scopes: config.scopes,
@@ -203,7 +216,7 @@ export async function POST(req: Request) {
     }
 
     if (body.action === "test-gmail") {
-      if (user.role !== "admin") {
+      if (!isAdmin(user.role)) {
         return NextResponse.json(
           { error: "Solo admin puede enviar prueba Gmail" },
           { status: 403 }
@@ -236,7 +249,7 @@ export async function POST(req: Request) {
     }
 
     if (body.action === "save-config") {
-      if (user.role !== "admin") {
+      if (!isAdmin(user.role)) {
         return NextResponse.json(
           { error: "Solo admin puede configurar Google" },
           { status: 403 }

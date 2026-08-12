@@ -4,14 +4,14 @@ import { formatDateTime, StatusBadge } from "@/components/ui";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
 import { ClipboardPen } from "lucide-react";
 import { requireStaff } from "@/lib/auth/session";
-import { confidentialWhere } from "@/lib/api";
+import { minutaConfidentialWhere } from "@/lib/api";
 import { MinutaPlantillasManager } from "@/components/minutas/MinutaPlantillasManager";
 
 export default async function MinutasPage() {
   const user = await requireStaff();
   const [minutas, causas, accionesAbiertasTotal, plantillas] = await Promise.all([
     prisma.minuta.findMany({
-      where: confidentialWhere(user.role),
+      where: minutaConfidentialWhere(user.role),
       include: {
         causa: { select: { id: true, titulo: true, rit: true } },
         autor: { select: { name: true } },
@@ -31,7 +31,7 @@ export default async function MinutasPage() {
     prisma.minutaAccion.count({
       where: {
         estado: { in: [...ACCIONES_ABIERTAS] },
-        minuta: confidentialWhere(user.role),
+        minuta: minutaConfidentialWhere(user.role),
       },
     }),
     prisma.minutaPlantilla.findMany({
