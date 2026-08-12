@@ -11,6 +11,7 @@ import {
   pushMinutaToDrive,
   pushPlazoToGoogleCalendar,
   unlinkCausaDriveFolder,
+  updateGoogleSyncOptions,
 } from "@/lib/integrations/google";
 
 export async function GET() {
@@ -134,6 +135,30 @@ export async function POST(req: Request) {
         },
       });
       return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "save-config") {
+      if (user.role !== "admin") {
+        return NextResponse.json(
+          { error: "Solo admin puede configurar Google" },
+          { status: 403 }
+        );
+      }
+      const saved = await updateGoogleSyncOptions({
+        enabled: body.enabled,
+        syncDrive: body.config?.syncDrive,
+        syncCalendar: body.config?.syncCalendar,
+      });
+      return NextResponse.json({
+        ok: true,
+        config: {
+          syncDrive: saved.syncDrive,
+          syncCalendar: saved.syncCalendar,
+          scopes: saved.scopes,
+        },
+        connected: Boolean(saved.accessToken),
+        connectedEmail: saved.connectedEmail || null,
+      });
     }
 
     return NextResponse.json({ error: "Acción no válida" }, { status: 400 });

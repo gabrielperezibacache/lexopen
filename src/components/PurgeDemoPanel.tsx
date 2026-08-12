@@ -56,7 +56,7 @@ export function PurgeDemoPanel() {
 
   if (!info) {
     return (
-      <section className="panel rounded-3xl border border-[var(--line)] p-5">
+      <section id="purge-demo" className="panel rounded-3xl border border-[var(--line)] p-5">
         <h2 className="text-lg font-semibold">Datos demo → producción</h2>
         <p className="mt-2 text-sm text-[var(--ink-soft)]/70">Cargando estado…</p>
       </section>
@@ -64,7 +64,7 @@ export function PurgeDemoPanel() {
   }
 
   return (
-    <section className="panel space-y-4 rounded-3xl border border-rose-200/80 bg-rose-50/40 p-5">
+    <section id="purge-demo" className="panel space-y-4 rounded-3xl border border-rose-200/80 bg-rose-50/40 p-5">
       <div>
         <h2 className="text-lg font-semibold text-rose-950">
           Eliminar datos demo (pasar a producción)

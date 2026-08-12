@@ -104,6 +104,7 @@ export function IntegrationsOverviewPanel() {
 
   return (
     <section
+      id="integraciones-overview"
       className="panel space-y-4 rounded-3xl p-5 md:p-6"
       data-testid="integrations-overview-panel"
     >

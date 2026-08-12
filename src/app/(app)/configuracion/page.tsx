@@ -3,6 +3,11 @@ import { requireRole } from "@/lib/auth/session";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { FirmSettingsForm } from "@/components/FirmSettingsForm";
 import { LlmSettingsForm } from "@/components/LlmSettingsForm";
+import { ObsidianSettingsForm } from "@/components/config/ObsidianSettingsForm";
+import { GoogleSettingsForm } from "@/components/config/GoogleSettingsForm";
+import { PjudSettingsPanel } from "@/components/config/PjudSettingsPanel";
+import { RuntimeSettingsPanel } from "@/components/config/RuntimeSettingsPanel";
+import { ConfigSectionNav } from "@/components/config/ConfigSectionNav";
 import { IntegrationsOverviewPanel } from "@/components/IntegrationsOverviewPanel";
 import { HostStatusPanel } from "@/components/HostStatusPanel";
 import { PurgeDemoPanel } from "@/components/PurgeDemoPanel";
@@ -23,12 +28,17 @@ export default async function ConfiguracionPage() {
       <ModuleHeader
         eyebrow="Administración"
         title="Configuración del estudio"
-        subtitle="Datos de la organización, emisor tributario, endpoints de IA (OpenAI / custom), APIs e integraciones."
+        subtitle="Todo lo modificable del estudio: identidad, tributario, IA, Obsidian, Google, PJUD, entorno del host e integraciones."
       />
+      <ConfigSectionNav />
       <FirmSettingsForm organization={settingsOrganization} />
       <div id="llm-settings">
         <LlmSettingsForm />
       </div>
+      <ObsidianSettingsForm />
+      <GoogleSettingsForm />
+      <PjudSettingsPanel />
+      <RuntimeSettingsPanel />
       <IntegrationsOverviewPanel />
       <HostStatusPanel status={hostStatus} />
       <PurgeDemoPanel />

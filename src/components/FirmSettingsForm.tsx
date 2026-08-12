@@ -75,7 +75,7 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
 
   const s = organization.settings;
   return (
-    <form onSubmit={onSubmit} className="panel space-y-8 rounded-3xl p-5 md:p-6">
+    <form id="estudio" onSubmit={onSubmit} className="panel space-y-8 rounded-3xl p-5 md:p-6">
       <section>
         <h2 className="text-lg font-semibold">Datos del estudio</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
@@ -154,6 +154,10 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
 
       <section>
         <h2 className="text-lg font-semibold">Integraciones</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+          El resto de conectores (IA, Obsidian, Google, PJUD) se editan en las secciones
+          siguientes de esta página.
+        </p>
         <label className="mt-3 flex items-start gap-3 text-sm">
           <input
             className="mt-1"
