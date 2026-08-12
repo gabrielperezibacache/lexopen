@@ -64,6 +64,7 @@ export async function sendGmailMessage(opts: {
       },
       body: JSON.stringify({ raw: toBase64Url(mime) }),
       signal: AbortSignal.timeout(30_000),
+      redirect: "error",
     }
   );
   if (!res.ok) {

@@ -15,6 +15,9 @@ import {
   setupCookieOptions,
 } from "@/lib/auth/setup-cookies";
 import { cookieSecureFlag } from "@/lib/auth/cookie-options";
+import { isLoopbackHttpRequest } from "@/lib/net/loopback-request";
+import { getCurrentUser } from "@/lib/auth/session";
+import { isStaff } from "@/lib/auth/rbac";
 
 const setupSchema = z.object({
   token: z.string().max(256).optional(),
@@ -23,8 +26,18 @@ const setupSchema = z.object({
   password: z.string().min(12).max(256),
 });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const user = await getCurrentUser().catch(() => null);
+    const allowed =
+      isLoopbackHttpRequest(req) || Boolean(user && isStaff(user.role));
+    if (!allowed) {
+      // Avoid advertising an empty install to the public internet.
+      return NextResponse.json(
+        { needsSetup: false },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
     const userCount = await prisma.user.count();
     return NextResponse.json(
       { needsSetup: userCount === 0 },

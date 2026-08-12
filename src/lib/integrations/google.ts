@@ -25,6 +25,11 @@ export type GoogleConfig = {
 const TOKEN_PREFIX = "enc:v2:";
 const LEGACY_TOKEN_PREFIX = "enc:v1:";
 
+/** Never follow redirects on Google API calls (SSRF / token leak via Location). */
+function googleFetch(input: string, init?: RequestInit) {
+  return fetch(input, { ...init, redirect: "error" });
+}
+
 function encryptToken(value: string | undefined) {
   const secret = process.env.SESSION_SECRET;
   if (!value || value.startsWith(TOKEN_PREFIX)) return value;
@@ -150,7 +155,7 @@ export async function exchangeGoogleCode(code: string) {
     throw new Error("GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET no configurados");
   }
 
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await googleFetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -175,7 +180,7 @@ export async function exchangeGoogleCode(code: string) {
 
   let email: string | undefined;
   try {
-    const profile = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    const profile = await googleFetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
     if (profile.ok) {
@@ -249,7 +254,7 @@ export async function ensureGoogleAccessToken(): Promise<GoogleConfig> {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) return config;
 
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await googleFetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -298,7 +303,7 @@ export async function pushPlazoToGoogleCalendar(plazoId: string) {
   }
 
   const end = new Date(plazo.fechaLimite.getTime() + 60 * 60 * 1000);
-  const res = await fetch(
+  const res = await googleFetch(
     "https://www.googleapis.com/calendar/v3/calendars/primary/events",
     {
       method: "POST",
@@ -341,7 +346,7 @@ async function uploadMarkdownToDrive(opts: {
   const boundary = "lexopen_boundary";
   const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: text/plain\r\n\r\n${opts.content}\r\n--${boundary}--`;
 
-  const res = await fetch(
+  const res = await googleFetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
     {
       method: "POST",
@@ -494,7 +499,7 @@ export async function linkCausaDriveFolder(causaId: string, folderRef: string) {
   let folderUrl = parsed.folderUrl;
 
   if (config.accessToken) {
-    const res = await fetch(
+    const res = await googleFetch(
       `https://www.googleapis.com/drive/v3/files/${parsed.folderId}?fields=id,name,webViewLink,mimeType`,
       { headers: { Authorization: `Bearer ${config.accessToken}` } }
     );
@@ -602,7 +607,7 @@ export async function createCausaDriveFolder(
     metadata.parents = [opts.parentFolderId];
   }
 
-  const res = await fetch("https://www.googleapis.com/drive/v3/files", {
+  const res = await googleFetch("https://www.googleapis.com/drive/v3/files", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${config.accessToken}`,

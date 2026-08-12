@@ -89,6 +89,11 @@ export class CaptchaSolveError extends Error {
   }
 }
 
+/** Fixed-host captcha APIs — never follow redirects. */
+function captchaFetch(input: string | URL, init?: RequestInit) {
+  return fetch(input, { ...init, redirect: "error" });
+}
+
 export function isCaptchaSolverProvider(
   value: string | undefined | null
 ): value is CaptchaSolverProvider {
@@ -257,7 +262,7 @@ async function solveWith2Captcha(
     body: normalizeImageBase64(imageBase64),
     json: "1",
   });
-  const submit = await fetch("https://2captcha.com/in.php", {
+  const submit = await captchaFetch("https://2captcha.com/in.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -272,7 +277,7 @@ async function solveWith2Captcha(
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL_MS);
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-    const poll = await fetch(
+    const poll = await captchaFetch(
       `https://2captcha.com/res.php?key=${encodeURIComponent(apiKey)}&action=get&id=${encodeURIComponent(captchaId)}&json=1`,
       { signal }
     );
@@ -292,7 +297,7 @@ async function solveWithCapSolverStyle(
   apiKey: string,
   signal?: AbortSignal
 ) {
-  const create = await fetch(`${endpointBase}/createTask`, {
+  const create = await captchaFetch(`${endpointBase}/createTask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -323,7 +328,7 @@ async function solveWithCapSolverStyle(
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL_MS);
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-    const poll = await fetch(`${endpointBase}/getTaskResult`, {
+    const poll = await captchaFetch(`${endpointBase}/getTaskResult`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientKey: apiKey, taskId: createJson.taskId }),
@@ -412,7 +417,7 @@ async function solveWithNopeCha(
   };
   if (apiKey) body.key = apiKey;
 
-  const submit = await fetch(
+  const submit = await captchaFetch(
     "https://api.nopecha.com/v1/recognition/textcaptcha",
     {
       method: "POST",
@@ -454,7 +459,7 @@ async function solveWithNopeCha(
     const url = new URL("https://api.nopecha.com/v1/recognition/textcaptcha");
     url.searchParams.set("id", jobId);
     if (apiKey) url.searchParams.set("key", apiKey);
-    const poll = await fetch(url, { headers, signal });
+    const poll = await captchaFetch(url, { headers, signal });
     const pollJson = (await poll.json().catch(() => ({}))) as {
       data?: string[];
       message?: string;

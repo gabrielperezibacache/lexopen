@@ -134,6 +134,7 @@ async function upstashIncr(key: string, windowMs: number): Promise<RedisWindowRe
       ["PTTL", key],
     ]),
     signal: AbortSignal.timeout(2_000),
+    redirect: "error",
   });
   if (!res.ok) throw new Error(`Upstash HTTP ${res.status}`);
   const data = (await res.json()) as Array<{ result: number | string | null }>;

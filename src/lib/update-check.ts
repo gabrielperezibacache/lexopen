@@ -82,6 +82,7 @@ export async function checkForAppUpdate(opts?: {
       },
       signal: AbortSignal.timeout(8_000),
       cache: "no-store",
+      redirect: "error",
     });
 
     if (res.status === 404) {

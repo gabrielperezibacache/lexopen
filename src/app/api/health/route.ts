@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isStaff } from "@/lib/auth/rbac";
 import { persistentStorageReady, storageMode } from "@/lib/storage";
 import { recoverPendingDocumentProcessing } from "@/lib/document-processing-queue";
 import { getOcrCapability } from "@/lib/local-ocr";
+import { isLoopbackHttpRequest } from "@/lib/net/loopback-request";
 
 function desktopDetails() {
   return {
@@ -26,7 +27,7 @@ function noStoreJson(body: Record<string, unknown>, status = 200) {
   });
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const time = new Date().toISOString();
   const storage = storageMode();
   const storageReady = persistentStorageReady();
@@ -34,6 +35,9 @@ export async function GET() {
   const user = await getCurrentUser().catch(() => null);
   const staff = Boolean(user && isStaff(user.role));
   const desktopRuntime = process.env.LEXOPEN_DESKTOP === "1";
+  const localProbe = isLoopbackHttpRequest(req);
+  // Bootstrap / storage details stay off the public internet surface.
+  const privileged = staff || localProbe;
 
   try {
     const userRows = await prisma.$queryRaw<Array<{ exists: boolean }>>`
@@ -41,19 +45,22 @@ export async function GET() {
     `;
     const needsSetup = !Boolean(userRows[0]?.exists);
 
-    // Public probe: minimal fields for load balancers / web-host / desktop bootstrap.
+    // Public probe: minimal fields for load balancers.
     const publicBody: Record<string, unknown> = {
       ok: true,
       db: "up",
-      storage,
-      storageReady,
-      storageRequired,
-      needsSetup,
       time,
     };
 
-    // Detailed recon (OCR, desktop URL/version) only for staff or local desktop runtime.
-    if (staff || desktopRuntime) {
+    if (privileged) {
+      publicBody.storage = storage;
+      publicBody.storageReady = storageReady;
+      publicBody.storageRequired = storageRequired;
+      publicBody.needsSetup = needsSetup;
+    }
+
+    // Detailed recon (OCR, desktop URL/version) only for staff or local desktop.
+    if (staff || (desktopRuntime && localProbe)) {
       const ocr = await getOcrCapability();
       publicBody.ocr = ocr;
       if (staff) {
@@ -73,29 +80,31 @@ export async function GET() {
         {
           ...publicBody,
           ok: false,
-          error: "Almacenamiento persistente no configurado",
+          ...(privileged
+            ? { error: "Almacenamiento persistente no configurado" }
+            : {}),
         },
         503
       );
     }
 
-    if (!storageReady) {
+    if (privileged && !storageReady) {
       publicBody.warning = "Almacenamiento local no persistente";
     }
 
     return noStoreJson(publicBody);
   } catch {
-    return noStoreJson(
-      {
-        ok: false,
-        db: "down",
-        storage,
-        storageReady,
-        storageRequired,
-        needsSetup: null,
-        time,
-      },
-      503
-    );
+    const body: Record<string, unknown> = {
+      ok: false,
+      db: "down",
+      time,
+    };
+    if (privileged) {
+      body.storage = storage;
+      body.storageReady = storageReady;
+      body.storageRequired = storageRequired;
+      body.needsSetup = null;
+    }
+    return noStoreJson(body, 503);
   }
 }
