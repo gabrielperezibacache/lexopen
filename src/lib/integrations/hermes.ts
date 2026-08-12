@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
+import { safeJsonParse } from "@/lib/safe-json";
 
 export type HermesConfig = {
   apiUrl: string;
@@ -18,7 +20,10 @@ export async function getHermesConfig(): Promise<HermesConfig> {
     requireApproval: true,
   };
   if (!row) return defaults;
-  return { ...defaults, ...(JSON.parse(row.configJson) as Partial<HermesConfig>) };
+  return {
+    ...defaults,
+    ...safeJsonParse<Partial<HermesConfig>>(row.configJson, {}),
+  };
 }
 
 export type HermesMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -36,6 +41,26 @@ export async function askHermes(params: {
   let apiUrl: URL;
   try {
     apiUrl = new URL(config.apiUrl);
+    // In development, localhost Hermes is intentional; block private hosts in production.
+    const allowLocal =
+      process.env.NODE_ENV !== "production" ||
+      process.env.HERMES_ALLOW_PRIVATE_URL === "1";
+    if (
+      !isSafeOutboundHttpUrl(config.apiUrl, {
+        allowHttp: allowLocal || process.env.NODE_ENV !== "production",
+      }) &&
+      !(
+        allowLocal &&
+        (apiUrl.hostname === "localhost" || apiUrl.hostname === "127.0.0.1")
+      )
+    ) {
+      return {
+        source: "error" as const,
+        content: "",
+        requireApproval: true,
+        note: "La URL de Hermes no está permitida (SSRF / host privado).",
+      };
+    }
     if (
       (apiUrl.protocol !== "http:" && apiUrl.protocol !== "https:") ||
       apiUrl.username ||
@@ -96,16 +121,20 @@ export async function askHermes(params: {
       requireApproval: config.requireApproval,
     };
   } catch (err) {
+    const firm = await prisma.firmSettings.findFirst({
+      select: { hermesAllowDemo: true },
+    });
     const allowDemo =
       process.env.HERMES_ALLOW_DEMO === "1" ||
-      process.env.NODE_ENV === "development";
+      process.env.NODE_ENV === "development" ||
+      firm?.hermesAllowDemo === true;
     if (!allowDemo) {
       return {
         source: "error" as const,
         content: "",
         requireApproval: true,
         note:
-          "Hermes Agent no está alcanzable. Modo demo deshabilitado (HERMES_ALLOW_DEMO≠1).",
+          "Hermes Agent no está alcanzable. Modo demo deshabilitado (HERMES_ALLOW_DEMO≠1 / firm settings).",
         error: err instanceof Error ? err.message : "unreachable",
       };
     }

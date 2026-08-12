@@ -3,6 +3,7 @@ import { formatDate, StatusBadge } from "@/components/ui";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
+import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
 import { EmptyState } from "@/components/EmptyState";
 
 export default async function PortalPage() {
@@ -23,8 +24,10 @@ export default async function PortalPage() {
       causa: { select: { id: true, rit: true, tribunal: true, updatedAt: true } },
       files: {
         where: {
-          tags: { contains: "cliente" },
-          confidencial: false,
+          AND: [
+            { confidencial: false, privilegio: false },
+            clientSharedTagPrismaWhere(),
+          ],
         },
         select: { id: true, name: true },
         take: 5,

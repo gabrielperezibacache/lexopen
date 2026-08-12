@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
 import { canSeeConfidential, isCliente, isStaff } from "@/lib/auth/rbac";
+import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
 
 export function httpError(message: string, status: number) {
   const err = new Error(message) as Error & { status: number };
@@ -54,13 +55,12 @@ export function confidentialFileWhere(role: string) {
   return { confidencial: false, privilegio: false };
 }
 
-/** Files shared with clients must be tagged `cliente` and non-confidential. */
+/** Files shared with clients must be tagged exact token `cliente` and non-confidential. */
 export function clientVisibleFileWhere(role: string) {
   const base = confidentialFileWhere(role);
   if (!isCliente(role)) return base;
   return {
-    ...base,
-    tags: { contains: "cliente" },
+    AND: [base, clientSharedTagPrismaWhere()],
   };
 }
 
@@ -68,6 +68,8 @@ export function isClientAllowedPath(pathname: string) {
   if (!pathname) return false;
   if (pathname === "/portal" || pathname.startsWith("/portal/")) return true;
   if (pathname === "/cuenta" || pathname.startsWith("/cuenta/")) return true;
+  if (pathname === "/notificaciones" || pathname.startsWith("/notificaciones/"))
+    return true;
   if (pathname === "/sites") return true;
   return /^\/sites\/[^/]+\/(archivos|qa)(?:\/.*)?$/.test(pathname);
 }

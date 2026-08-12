@@ -30,6 +30,21 @@ export async function POST(req: NextRequest) {
     assertCsrf(req);
     const user = await requireBillingManager();
     const body = await parseBody(req, expenseCreateSchema);
+    if (body.causaId && body.clienteId) {
+      const causa = await prisma.causa.findUnique({
+        where: { id: body.causaId },
+        select: { clienteId: true },
+      });
+      if (!causa) {
+        return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
+      }
+      if (causa.clienteId && causa.clienteId !== body.clienteId) {
+        return NextResponse.json(
+          { error: "La causa no pertenece al cliente indicado" },
+          { status: 400 }
+        );
+      }
+    }
     const expense = await prisma.expense.create({
       data: {
         date: body.date ? new Date(body.date) : new Date(),

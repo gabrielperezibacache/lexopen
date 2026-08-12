@@ -67,9 +67,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
 
+  const existingMinuta = await prisma.minuta.findUnique({
+    where: { id },
+    select: { id: true, confidencial: true },
+  });
+  if (!existingMinuta) {
+    return NextResponse.json({ error: "Minuta no encontrada" }, { status: 404 });
+  }
+  if (existingMinuta.confidencial && !canSeeConfidential(user.role)) {
+    return NextResponse.json({ error: "Minuta confidencial" }, { status: 403 });
+  }
+  if (body.confidencial === true && !canSeeConfidential(user.role)) {
+    return NextResponse.json(
+      { error: "Su rol no puede marcar minutas como confidenciales" },
+      { status: 403 }
+    );
+  }
+
   if (body.action === "push-drive") {
     try {
-      const result = await pushMinutaToDrive(id);
+      const result = await pushMinutaToDrive(id, { role: user.role });
       if (
         result.status === "needs_real_folder" ||
         result.status === "stub"
@@ -142,9 +159,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           data: { estado: "pendiente" },
         });
       } else if (body.estado === "cancelada") {
+        // Cancelación ≠ cumplimiento: mantener el plazo abierto.
         await prisma.plazo.update({
           where: { id: accion.plazoId },
-          data: { estado: "cumplido" },
+          data: { estado: "pendiente" },
         });
       }
     }

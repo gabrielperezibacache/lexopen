@@ -80,6 +80,7 @@ const intel: NavItem[] = [
 const clienteNav: NavItem[] = [
   { href: "/portal", label: "Portal cliente", icon: DoorOpen },
   { href: "/sites", label: "Espacios", icon: Building2 },
+  { href: "/notificaciones", label: "Notificaciones", icon: Bell },
   { href: "/cuenta", label: "Mi cuenta", icon: Settings },
 ];
 
@@ -190,19 +191,17 @@ export function AppSidebar({
       </nav>
 
       <div className="space-y-2 border-t border-white/10 p-3">
-        {!isCliente && (
-          <Link href="/notificaciones" className="nav-link" onClick={() => setOpen(false)}>
-            <Bell size={16} />
-            <span className="flex flex-1 items-center justify-between gap-2">
-              Notificaciones
-              {unreadCount > 0 && (
-                <span className="rounded-full bg-[var(--copper)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-            </span>
-          </Link>
-        )}
+        <Link href="/notificaciones" className="nav-link" onClick={() => setOpen(false)}>
+          <Bell size={16} />
+          <span className="flex flex-1 items-center justify-between gap-2">
+            Notificaciones
+            {unreadCount > 0 && (
+              <span className="rounded-full bg-[var(--copper)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </span>
+        </Link>
         <UserSwitcher />
       </div>
     </>

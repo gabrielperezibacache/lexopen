@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireStaff } from "@/lib/auth/session";
+import { requireRole } from "@/lib/auth/session";
 import { formatDateTime } from "@/components/ui";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import {
@@ -15,7 +15,7 @@ type Props = {
 };
 
 export default async function AuditoriaPage({ searchParams }: Props) {
-  await requireStaff();
+  await requireRole("admin");
   const sp = await searchParams;
   const actionFilter = (sp.action || "").trim();
   const actorFilter = (sp.actor || "").trim();

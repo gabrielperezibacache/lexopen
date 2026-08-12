@@ -193,6 +193,23 @@ export async function PATCH(req: NextRequest) {
       await requireBillingManager();
     }
 
+    const current = await prisma.timeEntry.findUnique({ where: { id: body.id } });
+    if (!current) {
+      return NextResponse.json({ error: "Entrada no encontrada" }, { status: 404 });
+    }
+    if (current.invoiceId && (body.hours !== undefined || body.amountClp !== undefined)) {
+      return NextResponse.json(
+        { error: "No se pueden ajustar horas/monto de una entrada ya facturada" },
+        { status: 409 }
+      );
+    }
+    if (body.billed === true && !current.invoiceId && body.invoiceId == null) {
+      return NextResponse.json(
+        { error: "Marcar como facturado requiere una factura asociada" },
+        { status: 400 }
+      );
+    }
+
     const entry = await prisma.timeEntry.update({
       where: { id: body.id },
       data: {

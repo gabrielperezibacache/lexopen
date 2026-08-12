@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { handleRouteError, requireStaff } from "@/lib/api";
 
@@ -6,33 +7,37 @@ export async function GET(req: NextRequest) {
   try {
     await requireStaff();
     const { searchParams } = new URL(req.url);
-    const q = searchParams.get("q")?.trim().toLowerCase() || "";
-    const materia = searchParams.get("materia");
-    const tribunal = searchParams.get("tribunal");
+    const q = searchParams.get("q")?.trim() || "";
+    const materia = searchParams.get("materia")?.trim() || "";
+    const tribunal = searchParams.get("tribunal")?.trim() || "";
 
-    const all = await prisma.jurisprudencia.findMany({
+    const where: Prisma.JurisprudenciaWhereInput = {
+      AND: [
+        materia ? { materia } : {},
+        tribunal
+          ? { tribunal: { contains: tribunal, mode: "insensitive" } }
+          : {},
+        q
+          ? {
+              OR: [
+                { rol: { contains: q, mode: "insensitive" } },
+                { tribunal: { contains: q, mode: "insensitive" } },
+                { caratula: { contains: q, mode: "insensitive" } },
+                { descripcion: { contains: q, mode: "insensitive" } },
+                { doctrina: { contains: q, mode: "insensitive" } },
+                { texto: { contains: q, mode: "insensitive" } },
+                { tags: { contains: q, mode: "insensitive" } },
+                { materia: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {},
+      ],
+    };
+
+    const filtered = await prisma.jurisprudencia.findMany({
+      where,
       orderBy: { fecha: "desc" },
-    });
-
-    const filtered = all.filter((j) => {
-      if (materia && j.materia !== materia) return false;
-      if (tribunal && !j.tribunal.toLowerCase().includes(tribunal.toLowerCase()))
-        return false;
-      if (!q) return true;
-      const hay = [
-        j.rol,
-        j.tribunal,
-        j.caratula,
-        j.descripcion,
-        j.doctrina,
-        j.texto,
-        j.tags,
-        j.materia,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
+      take: 200,
     });
 
     return NextResponse.json(filtered);

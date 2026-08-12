@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { askHermes, getHermesConfig, legalSystemPrompt } from "@/lib/integrations/hermes";
+import { isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
 
 export async function GET(req: NextRequest) {
   try {
@@ -177,13 +178,19 @@ export async function POST(req: Request) {
 }
 
 function isSafeHttpUrl(value: unknown) {
-  if (typeof value !== "string" || !value.trim()) return false;
+  if (typeof value !== "string" || value.length > 500) return false;
+  const allowLocal =
+    process.env.NODE_ENV !== "production" ||
+    process.env.HERMES_ALLOW_PRIVATE_URL === "1";
+  if (isSafeOutboundHttpUrl(value, { allowHttp: allowLocal })) return true;
   try {
     const url = new URL(value);
     return (
+      allowLocal &&
       (url.protocol === "http:" || url.protocol === "https:") &&
       !url.username &&
-      !url.password
+      !url.password &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
     );
   } catch {
     return false;

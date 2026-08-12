@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
 import { PlazoForm } from "@/components/PlazoForm";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { requireStaff } from "@/lib/auth/session";
 
 type Props = { searchParams: Promise<{ mes?: string }> };
 
@@ -22,6 +23,7 @@ function monthParam(date: Date) {
 }
 
 export default async function PlazosPage({ searchParams }: Props) {
+  await requireStaff();
   const sp = await searchParams;
   const { start, end } = monthBounds(sp.mes);
   const [plazos, causas, responsables] = await Promise.all([

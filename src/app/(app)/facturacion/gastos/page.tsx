@@ -3,8 +3,10 @@ import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp } from "@/lib/billing";
 import { formatDate } from "@/components/ui";
 import { ExpenseForm } from "@/components/billing/ExpenseForm";
+import { requireStaff } from "@/lib/auth/session";
 
 export default async function GastosPage() {
+  await requireStaff();
   const [expenses, causas, clientes] = await Promise.all([
     prisma.expense.findMany({
       include: { causa: true, cliente: true },

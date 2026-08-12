@@ -104,7 +104,10 @@ export async function PATCH(req: NextRequest) {
     assertCsrf(req);
     const user = await requireStaff();
     const body = z
-      .object({ id: z.string(), estado: z.string() })
+      .object({
+        id: z.string(),
+        estado: z.enum(["pendiente", "cumplido", "vencido", "suspendido"]),
+      })
       .parse(await req.json());
     const plazo = await prisma.plazo.update({
       where: { id: body.id },

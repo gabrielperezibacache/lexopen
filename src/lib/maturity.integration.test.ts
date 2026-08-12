@@ -20,9 +20,22 @@ assert.deepEqual(confidentialFileWhere("cliente"), {
 });
 assert.deepEqual(confidentialFileWhere("admin"), {});
 assert.deepEqual(clientVisibleFileWhere("cliente"), {
-  confidencial: false,
-  privilegio: false,
-  tags: { contains: "cliente" },
+  AND: [
+    { confidencial: false, privilegio: false },
+    {
+      OR: [
+        { tags: "cliente" },
+        { tags: { startsWith: "cliente," } },
+        { tags: { startsWith: "cliente;" } },
+        { tags: { endsWith: ",cliente" } },
+        { tags: { endsWith: ";cliente" } },
+        { tags: { contains: ",cliente," } },
+        { tags: { contains: ";cliente;" } },
+        { tags: { contains: ",cliente;" } },
+        { tags: { contains: ";cliente," } },
+      ],
+    },
+  ],
 });
 assert.deepEqual(clientVisibleFileWhere("asistente"), {
   confidencial: false,
@@ -32,6 +45,7 @@ assert.deepEqual(clientVisibleFileWhere("abogado"), {});
 
 assert.equal(isClientAllowedPath("/portal"), true);
 assert.equal(isClientAllowedPath(""), false);
+assert.equal(isClientAllowedPath("/notificaciones"), true);
 assert.equal(isClientAllowedPath("/sites/site_1"), false);
 assert.equal(isClientAllowedPath("/sites/site_1/archivos"), true);
 assert.equal(isClientAllowedPath("/sites/site_1/qa"), true);

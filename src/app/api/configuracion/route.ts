@@ -13,8 +13,8 @@ const schema = z.object({
   emisorRut: z.string().optional().nullable(),
   emisorGiro: z.string().optional().nullable(),
   emisorDireccion: z.string().optional().nullable(),
-  defaultRetencionPct: z.coerce.number().nonnegative(),
-  ivaPct: z.coerce.number().nonnegative(),
+  defaultRetencionPct: z.coerce.number().min(0).max(1),
+  ivaPct: z.coerce.number().min(0).max(1),
   hermesAllowDemo: z.boolean().optional(),
 });
 

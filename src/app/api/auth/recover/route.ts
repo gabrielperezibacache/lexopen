@@ -5,6 +5,7 @@ import { assertCsrf, handleRouteError } from "@/lib/api";
 import { hashPassword } from "@/lib/auth/password";
 import { isValidBootstrapToken } from "@/lib/auth/bootstrap";
 import { writeAudit } from "@/lib/audit";
+import { rateLimit } from "@/lib/auth/rate-limit";
 
 const recoverySchema = z.object({
   token: z.string().min(1).max(256),
@@ -15,7 +16,31 @@ const recoverySchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
+    const ip =
+      process.env.LEXOPEN_TRUSTED_PROXY === "1"
+        ? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          req.headers.get("x-real-ip") ||
+          "direct"
+        : "direct";
+    const limited = rateLimit(`recover:${ip}`, 10, 15 * 60 * 1000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: "Demasiados intentos de recuperación" },
+        { status: 429 }
+      );
+    }
     const body = recoverySchema.parse(await req.json());
+    const tokenLimited = rateLimit(
+      `recover-token:${body.token.slice(0, 16)}`,
+      8,
+      15 * 60 * 1000
+    );
+    if (!tokenLimited.ok) {
+      return NextResponse.json(
+        { error: "Demasiados intentos de recuperación" },
+        { status: 429 }
+      );
+    }
     if (
       !isValidBootstrapToken(
         body.token,

@@ -6,10 +6,14 @@ import { EmptyState } from "@/components/EmptyState";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { DocumentProcessingAction } from "@/components/DocumentProcessingAction";
 import { DocumentOcrStatus } from "@/components/DocumentOcrStatus";
+import { requireStaff } from "@/lib/auth/session";
+import { confidentialWhere } from "@/lib/api";
 
 export default async function DocumentosPage() {
+  const user = await requireStaff();
   const [documentos, causas] = await Promise.all([
     prisma.documento.findMany({
+      where: confidentialWhere(user.role),
       include: { causa: true, autor: { select: publicUserSelect } },
       orderBy: { updatedAt: "desc" },
     }),

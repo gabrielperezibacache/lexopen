@@ -66,10 +66,16 @@ export default async function SitesPage() {
                 {s.description || "Sin descripción"}
               </p>
               <div className="mt-4 flex flex-wrap gap-3 text-xs text-[var(--ink-soft)]/65">
-                <span>{s._count.files} archivos</span>
-                <span>{s._count.tasks} tareas</span>
-                <span>{s._count.isheets} iSheets</span>
-                <span>{s._count.members} personas</span>
+                {isCliente(user.role) ? (
+                  <span>Documentos y Q&A compartidos</span>
+                ) : (
+                  <>
+                    <span>{s._count.files} archivos</span>
+                    <span>{s._count.tasks} tareas</span>
+                    <span>{s._count.isheets} iSheets</span>
+                    <span>{s._count.members} personas</span>
+                  </>
+                )}
               </div>
               {(s.causa || s.cliente) && (
                 <div className="mt-3 text-xs text-[var(--copper)]">

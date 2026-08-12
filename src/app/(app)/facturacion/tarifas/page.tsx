@@ -2,12 +2,14 @@ import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp, FEE_TIPOS } from "@/lib/billing";
 import { FeeForm } from "@/components/billing/FeeForm";
+import { requireStaff } from "@/lib/auth/session";
 
 function labelFee(tipo: string) {
   return FEE_TIPOS.find((f) => f.value === tipo)?.label || tipo;
 }
 
 export default async function TarifasPage() {
+  await requireStaff();
   const [fees, clientes, causas] = await Promise.all([
     prisma.feeArrangement.findMany({
       include: { cliente: true, causa: true },

@@ -5,6 +5,9 @@ import { formatDateTime } from "@/components/ui";
 import { labelModalidadMinuta, labelTipoMinuta } from "@/lib/minutas";
 import { MinutaDetailActions } from "@/components/minutas/MinutaDetailActions";
 import { driveFileUrl } from "@/lib/integrations/drive-folder";
+import { requireStaff } from "@/lib/auth/session";
+import { canSeeConfidential } from "@/lib/auth/rbac";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = {
   params: Promise<{ id: string; minutaId: string }>;
@@ -12,18 +15,22 @@ type Params = {
 };
 
 export default async function MinutaDetailPage({ params, searchParams }: Params) {
+  const user = await requireStaff();
   const { id, minutaId } = await params;
   const sp = await searchParams;
   const minuta = await prisma.minuta.findUnique({
     where: { id: minutaId },
     include: {
       causa: true,
-      autor: true,
+      autor: { select: publicUserSelect },
       acciones: true,
       documento: true,
     },
   });
   if (!minuta || minuta.causaId !== id) notFound();
+  if (minuta.confidencial && !canSeeConfidential(user.role)) {
+    notFound();
+  }
 
   const rank: Record<string, number> = {
     pendiente: 0,

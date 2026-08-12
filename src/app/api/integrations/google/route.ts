@@ -52,7 +52,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     assertCsrf(req);
-    await requireStaff();
+    const user = await requireStaff();
     const body = await req.json();
 
     if (body.action === "push-plazo" && body.plazoId) {
@@ -60,12 +60,30 @@ export async function POST(req: Request) {
       return NextResponse.json(result);
     }
     if (body.action === "push-documento" && body.documentoId) {
-      const result = await pushDocumentoToDrive(body.documentoId);
-      return NextResponse.json(result);
+      try {
+        const result = await pushDocumentoToDrive(body.documentoId, {
+          role: user.role,
+        });
+        return NextResponse.json(result);
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Error Drive" },
+          { status: 400 }
+        );
+      }
     }
     if (body.action === "push-minuta" && body.minutaId) {
-      const result = await pushMinutaToDrive(body.minutaId);
-      return NextResponse.json(result);
+      try {
+        const result = await pushMinutaToDrive(body.minutaId, {
+          role: user.role,
+        });
+        return NextResponse.json(result);
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Error Drive" },
+          { status: 400 }
+        );
+      }
     }
     if (body.action === "link-causa-folder" && body.causaId && body.folderRef) {
       try {

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EXPENSE_CATEGORIES } from "@/lib/billing";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function ExpenseForm({
   causas,
@@ -13,14 +14,17 @@ export function ExpenseForm({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    const fd = new FormData(e.currentTarget);
+    setError("");
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     const causaId = String(fd.get("causaId") || "");
     const causa = causas.find((c) => c.id === causaId);
-    await fetch("/api/billing/expenses", {
+    const result = await apiMutation("/api/billing/expenses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -36,12 +40,21 @@ export function ExpenseForm({
       }),
     });
     setBusy(false);
-    e.currentTarget.reset();
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    form.reset();
     router.refresh();
   }
 
   return (
     <form onSubmit={onSubmit} className="panel grid gap-3 rounded-3xl p-5 md:grid-cols-3">
+      {error && (
+        <p className="md:col-span-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          {error}
+        </p>
+      )}
       <input className="input" type="date" name="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
       <select className="select" name="category" defaultValue="notario">
         {EXPENSE_CATEGORIES.map((c) => (

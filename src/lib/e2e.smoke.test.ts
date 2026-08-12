@@ -37,6 +37,7 @@ assert.equal(
 assert.equal(isClientAllowedPath("/portal"), true);
 assert.equal(isClientAllowedPath("/cuenta"), true);
 assert.equal(isClientAllowedPath(""), false);
+assert.equal(isClientAllowedPath("/notificaciones"), true);
 assert.equal(isClientAllowedPath("/sites/abc"), false);
 assert.equal(isClientAllowedPath("/sites/abc/archivos"), true);
 assert.equal(isClientAllowedPath("/sites/abc/qa"), true);

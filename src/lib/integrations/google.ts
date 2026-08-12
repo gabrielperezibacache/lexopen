@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+import { canSeeConfidential } from "@/lib/auth/rbac";
+import { getObject } from "@/lib/storage";
 import {
   driveFolderUrl,
   isPlaceholderDriveFolderId,
@@ -339,12 +341,22 @@ async function uploadMarkdownToDrive(opts: {
 }
 
 /** Sube un documento de texto a Drive (carpeta de la causa si existe). */
-export async function pushDocumentoToDrive(documentoId: string) {
+export async function pushDocumentoToDrive(
+  documentoId: string,
+  opts?: { role?: string }
+) {
   const doc = await prisma.documento.findUnique({
     where: { id: documentoId },
     include: { causa: true },
   });
   if (!doc) throw new Error("Documento no encontrado");
+  if (
+    (doc.confidencial || doc.privilegio) &&
+    opts?.role &&
+    !canSeeConfidential(opts.role)
+  ) {
+    throw new Error("Documento confidencial o privilegiado");
+  }
   const config = await ensureGoogleAccessToken();
   const folderId = doc.causa?.googleDriveFolderId || null;
   const realFolder = isRealDriveFolderId(folderId) ? folderId : null;
@@ -371,9 +383,27 @@ export async function pushDocumentoToDrive(documentoId: string) {
     };
   }
 
+  let content = doc.contenido ?? "";
+  if (doc.storageKey) {
+    const stored = await getObject(doc.storageKey);
+    if (!stored) throw new Error("Contenido no encontrado en almacenamiento");
+    const mime = (doc.mimeType || "").toLowerCase();
+    if (
+      mime &&
+      !mime.startsWith("text/") &&
+      mime !== "application/json" &&
+      mime !== "application/markdown"
+    ) {
+      throw new Error(
+        "Solo se pueden subir a Drive documentos de texto/markdown desde LexOpen"
+      );
+    }
+    content = Buffer.from(stored).toString("utf8");
+  }
+
   const file = await uploadMarkdownToDrive({
     name: doc.nombre,
-    content: doc.contenido ?? "",
+    content,
     folderId: realFolder,
     accessToken: config.accessToken,
   });
@@ -577,23 +607,33 @@ export async function unlinkCausaDriveFolder(causaId: string) {
 }
 
 /** Sube el Markdown de una minuta a la carpeta Drive de la causa. */
-export async function pushMinutaToDrive(minutaId: string) {
+export async function pushMinutaToDrive(
+  minutaId: string,
+  opts?: { role?: string }
+) {
   const minuta = await prisma.minuta.findUnique({
     where: { id: minutaId },
     include: {
       causa: true,
       documento: true,
-      autor: true,
+      autor: { select: { id: true, name: true } },
       acciones: true,
     },
   });
   if (!minuta) throw new Error("Minuta no encontrada");
+  if (minuta.confidencial && opts?.role && !canSeeConfidential(opts.role)) {
+    throw new Error("Minuta confidencial");
+  }
 
   const config = await ensureGoogleAccessToken();
   const folderId = minuta.causa.googleDriveFolderId;
-  const content =
+  let content =
     minuta.documento?.contenido ||
     `# ${minuta.titulo}\n\n${minuta.resumenEjecutivo}`;
+  if (minuta.documento?.storageKey) {
+    const stored = await getObject(minuta.documento.storageKey);
+    if (stored) content = Buffer.from(stored).toString("utf8");
+  }
   const name = minuta.documento?.nombre || `Minuta — ${minuta.titulo}.md`;
 
   if (!folderId || isPlaceholderDriveFolderId(folderId)) {

@@ -16,23 +16,31 @@ import {
   isPlaceholderDriveFolderId,
   isRealDriveFolderId,
 } from "@/lib/integrations/drive-folder";
+import { requireStaff } from "@/lib/auth/session";
+import { confidentialWhere } from "@/lib/api";
+import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function CausaDetailPage({ params }: Params) {
+  const user = await requireStaff();
   const { id } = await params;
   const causa = await prisma.causa.findUnique({
     where: { id },
     include: {
       cliente: true,
-      abogado: true,
+      abogado: { select: publicUserSelect },
       partes: true,
-      documentos: { orderBy: { updatedAt: "desc" } },
+      documentos: {
+        where: confidentialWhere(user.role),
+        orderBy: { updatedAt: "desc" },
+      },
       plazos: { orderBy: { fechaLimite: "asc" } },
       notas: { orderBy: { updatedAt: "desc" } },
       etapaHistorial: { orderBy: { createdAt: "desc" } },
       movimientos: { orderBy: { fecha: "desc" }, take: 200 },
       minutas: {
+        where: confidentialWhere(user.role),
         include: {
           autor: { select: { name: true } },
           acciones: {
@@ -43,7 +51,7 @@ export default async function CausaDetailPage({ params }: Params) {
         take: 12,
       },
       actividades: {
-        include: { user: true },
+        include: { user: { select: publicUserSelect } },
         orderBy: { createdAt: "desc" },
         take: 30,
       },

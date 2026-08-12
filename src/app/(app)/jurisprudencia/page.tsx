@@ -2,12 +2,14 @@ import { prisma } from "@/lib/db";
 import { formatDate } from "@/components/ui";
 import { labelMateria, MATERIAS } from "@/lib/chile";
 import { JurisprudenciaSearch } from "@/components/JurisprudenciaSearch";
+import { requireStaff } from "@/lib/auth/session";
 
 export default async function JurisprudenciaPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; materia?: string }>;
 }) {
+  await requireStaff();
   const sp = await searchParams;
   const q = (sp.q || "").trim().toLowerCase();
   const materia = sp.materia;

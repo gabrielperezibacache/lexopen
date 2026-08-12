@@ -4,6 +4,7 @@ import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp } from "@/lib/billing";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { StatusBadge, formatDate } from "@/components/ui";
+import { requireStaff } from "@/lib/auth/session";
 import {
   Clock,
   Receipt,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 
 export default async function FacturacionPage() {
+  await requireStaff();
   const [
     unbilledTime,
     unbilledExpenses,

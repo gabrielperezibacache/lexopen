@@ -3,12 +3,14 @@ import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp } from "@/lib/billing";
 import { formatDate } from "@/components/ui";
 import { LedgerForm } from "@/components/billing/LedgerForm";
+import { requireStaff } from "@/lib/auth/session";
 
 export default async function CuentaCorrientePage({
   searchParams,
 }: {
   searchParams: Promise<{ clienteId?: string }>;
 }) {
+  await requireStaff();
   const sp = await searchParams;
   const clientes = await prisma.cliente.findMany({ orderBy: { razonSocial: "asc" } });
   const clienteId = sp.clienteId || clientes[0]?.id;

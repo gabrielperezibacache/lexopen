@@ -4,12 +4,14 @@ import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp, DOC_TIPOS } from "@/lib/billing";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { CreateInvoicePanel } from "@/components/billing/CreateInvoicePanel";
+import { requireStaff } from "@/lib/auth/session";
 
 function labelDoc(tipo: string) {
   return DOC_TIPOS.find((d) => d.value === tipo)?.label || tipo;
 }
 
 export default async function FacturasPage() {
+  await requireStaff();
   const [invoices, unbilledTime, unbilledExpenses, clientes, causas] = await Promise.all([
     prisma.invoice.findMany({
       include: { cliente: true, causa: true, payments: true },

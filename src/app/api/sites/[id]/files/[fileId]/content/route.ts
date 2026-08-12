@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
 import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
+import { isClientSharedTag } from "@/lib/auth/client-tags";
 import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { getObject } from "@/lib/storage";
 
 type Params = { params: Promise<{ id: string; fileId: string }> };
-
-function isClientSharedTag(tags: string | null | undefined) {
-  return (tags || "")
-    .split(/[,;]+/)
-    .map((t) => t.trim().toLowerCase())
-    .includes("cliente");
-}
 
 export async function GET(_req: Request, { params }: Params) {
   try {

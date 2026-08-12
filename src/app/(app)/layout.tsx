@@ -2,14 +2,12 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { MobileMenuButton } from "@/components/MobileMenuButton";
 import { enforceAppAccess } from "@/lib/auth/access";
 import { prisma } from "@/lib/db";
-import { isCliente } from "@/lib/auth/rbac";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await enforceAppAccess();
-  const unreadCount =
-    user && !isCliente(user.role)
-      ? await prisma.notification.count({ where: { userId: user.id, read: false } })
-      : 0;
+  const unreadCount = await prisma.notification.count({
+    where: { userId: user.id, read: false },
+  });
   return (
     <div className="flex min-h-screen">
       <div className="sticky top-0 h-screen">

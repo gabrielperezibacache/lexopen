@@ -6,8 +6,10 @@ import { WorkflowActions } from "@/components/sites/WorkflowActions";
 import { EmptyState } from "@/components/EmptyState";
 import { safeJsonParse } from "@/lib/safe-json";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { requireStaff } from "@/lib/auth/session";
 
 export default async function WorkflowsGlobalPage() {
+  await requireStaff();
   const workflows = await prisma.workflow.findMany({
     include: {
       site: true,

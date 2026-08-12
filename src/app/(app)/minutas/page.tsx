@@ -3,10 +3,14 @@ import { prisma } from "@/lib/db";
 import { formatDateTime, StatusBadge } from "@/components/ui";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
 import { ClipboardPen } from "lucide-react";
+import { requireStaff } from "@/lib/auth/session";
+import { confidentialWhere } from "@/lib/api";
 
 export default async function MinutasPage() {
+  const user = await requireStaff();
   const [minutas, causas, accionesAbiertasTotal] = await Promise.all([
     prisma.minuta.findMany({
+      where: confidentialWhere(user.role),
       include: {
         causa: { select: { id: true, titulo: true, rit: true } },
         autor: { select: { name: true } },
@@ -24,7 +28,10 @@ export default async function MinutasPage() {
       take: 8,
     }),
     prisma.minutaAccion.count({
-      where: { estado: { in: [...ACCIONES_ABIERTAS] } },
+      where: {
+        estado: { in: [...ACCIONES_ABIERTAS] },
+        minuta: confidentialWhere(user.role),
+      },
     }),
   ]);
 

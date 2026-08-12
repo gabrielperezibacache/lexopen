@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 import { clientVisibleFileWhere } from "@/lib/auth/access";
+import { isClientSharedTag } from "@/lib/auth/client-tags";
 import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
 import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storage";
 
@@ -58,19 +59,65 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params;
     await requireSiteAccess(id, user);
     const fileWhere = clientVisibleFileWhere(user.role);
+    const clientView = isCliente(user.role);
     const folders = await prisma.folder.findMany({
       where: { siteId: id },
       include: {
-        files: { where: fileWhere, orderBy: { name: "asc" } },
+        files: {
+          where: fileWhere,
+          orderBy: { name: "asc" },
+          select: {
+            id: true,
+            name: true,
+            mimeType: true,
+            tags: true,
+            version: true,
+            sizeBytes: true,
+            confidencial: true,
+            privilegio: true,
+            folderId: true,
+            siteId: true,
+            storageKey: true,
+            updatedAt: true,
+            createdAt: true,
+            // Never return body content in list payloads.
+            contenido: false,
+          },
+        },
         children: true,
       },
       orderBy: { name: "asc" },
     });
     const rootFiles = await prisma.siteFile.findMany({
       where: { siteId: id, folderId: null, ...fileWhere },
-      include: { versions: { orderBy: { version: "desc" }, take: 3 }, comments: true },
+      include: {
+        versions: {
+          orderBy: { version: "desc" },
+          take: 3,
+          select: {
+            id: true,
+            version: true,
+            note: true,
+            createdAt: true,
+            authorId: true,
+            contenido: false,
+          },
+        },
+        comments: true,
+      },
       orderBy: { name: "asc" },
     });
+    if (clientView) {
+      const filterClient = <T extends { tags: string }>(rows: T[]) =>
+        rows.filter((f) => isClientSharedTag(f.tags));
+      return NextResponse.json({
+        folders: folders.map((folder) => ({
+          ...folder,
+          files: filterClient(folder.files),
+        })),
+        rootFiles: filterClient(rootFiles),
+      });
+    }
     return NextResponse.json({ folders, rootFiles });
   } catch (e) {
     return handleRouteError(e);

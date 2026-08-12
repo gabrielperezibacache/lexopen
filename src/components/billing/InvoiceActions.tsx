@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clp } from "@/lib/billing";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function InvoiceActions({
   invoiceId,
@@ -18,23 +19,30 @@ export function InvoiceActions({
   const router = useRouter();
   const [payOpen, setPayOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function emit() {
     setBusy(true);
-    await fetch(`/api/billing/invoices/${invoiceId}`, {
+    setError("");
+    const result = await apiMutation(`/api/billing/invoices/${invoiceId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "emitida" }),
     });
     setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     router.refresh();
   }
 
   async function pay(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
+    setError("");
     const fd = new FormData(e.currentTarget);
-    await fetch("/api/billing/payments", {
+    const result = await apiMutation("/api/billing/payments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -46,12 +54,21 @@ export function InvoiceActions({
       }),
     });
     setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     setPayOpen(false);
     router.refresh();
   }
 
   return (
     <div className="flex flex-col items-end gap-2">
+      {error && (
+        <p className="max-w-xs rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          {error}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {status === "borrador" && (
           <button className="btn btn-secondary" type="button" disabled={busy} onClick={emit}>

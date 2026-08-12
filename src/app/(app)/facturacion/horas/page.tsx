@@ -6,8 +6,10 @@ import { formatDate } from "@/components/ui";
 import { TimeEntryForm } from "@/components/billing/TimeEntryForm";
 import { TimeEntryActions } from "@/components/billing/TimeEntryActions";
 import Link from "next/link";
+import { requireStaff } from "@/lib/auth/session";
 
 export default async function HorasPage() {
+  await requireStaff();
   const [entries, causas, clientes, users] = await Promise.all([
     prisma.timeEntry.findMany({
       include: { user: { select: publicUserSelect }, causa: true, cliente: true },

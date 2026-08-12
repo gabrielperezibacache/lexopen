@@ -3,8 +3,10 @@ import { formatDate } from "@/components/ui";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp } from "@/lib/billing";
 import { UfRateForm } from "@/components/billing/UfRateForm";
+import { requireStaff } from "@/lib/auth/session";
 
 export default async function UfPage() {
+  await requireStaff();
   const rates = await prisma.ufRate.findMany({
     orderBy: { date: "desc" },
     take: 90,
