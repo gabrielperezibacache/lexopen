@@ -1,3 +1,11 @@
+/**
+ * Vault local de secretos PJUD / ClaveÚnica (paridad CausaMonitor
+ * `/api/pjud-credentials`: credenciales cifradas en reposo, no plaintext).
+ *
+ * AES-256-GCM · token `enc:v2:<iv>.<tag>.<ciphertext>` · clave
+ * `PJUD_SECRETS_KEY` (preferida) o `SESSION_SECRET`.
+ */
+
 import {
   createCipheriv,
   createDecipheriv,

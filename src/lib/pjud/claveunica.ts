@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { validarRut } from "@/lib/chile";
-import { decryptSecret, encryptSecret, maskRut } from "@/lib/pjud/secret";
+import { decryptSecret, encryptSecret, maskRut, secretsKeySource } from "@/lib/pjud/secret";
 import {
   scrapeMisCausasWithClaveUnica,
   type MisCausasItem,
@@ -10,6 +10,15 @@ import {
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
 import { enqueueDueSyncJobs, processPendingSyncJobs } from "@/lib/pjud/queue";
+
+/**
+ * Credenciales ClaveÚnica del estudio — paridad CausaMonitor
+ * `POST/DELETE /api/pjud-credentials` + `GET /api/pjud-credentials/status`
+ * y `GET /api/cases/mis-causas`.
+ *
+ * Password solo en vault local AES-GCM (`FirmSettings.claveUnicaPasswordEnc`);
+ * las APIs de status nunca devuelven plaintext.
+ */
 
 async function getOrCreateFirmSettings() {
   const orgs = await prisma.organization.findMany({
@@ -51,6 +60,8 @@ export async function getClaveUnicaStatus() {
     enabled: settings.claveUnicaEnabled,
     rutMasked: maskRut(settings.claveUnicaRut),
     hasPassword: Boolean(settings.claveUnicaPasswordEnc),
+    encryption: "aes-256-gcm",
+    secretsKey: secretsKeySource(),
     lastSyncAt: settings.claveUnicaLastSyncAt,
     lastSyncStatus: settings.claveUnicaLastSyncStatus,
     lastSyncNote: settings.claveUnicaLastSyncNote,

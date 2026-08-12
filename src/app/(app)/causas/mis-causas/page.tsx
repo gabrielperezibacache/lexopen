@@ -7,6 +7,8 @@ type Status = {
   enabled: boolean;
   rutMasked: string | null;
   hasPassword: boolean;
+  encryption?: string;
+  secretsKey?: string;
   lastSyncAt: string | null;
   lastSyncStatus: string | null;
   lastSyncNote: string | null;
@@ -112,9 +114,10 @@ export default function MisCausasPage() {
         </p>
         <h1 className="display mt-2 text-4xl">Mis Causas</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Flujo CausaMonitor: guarda ClaveÚnica cifrada del estudio, lista Mis
-          Causas desde Oficina Judicial Virtual y enciende monitoreo + sync de
-          movimientos (scrape o sidecar).
+          Paridad CausaMonitor: además del acceso invitado, puedes ingresar con
+          ClaveÚnica. La contraseña se cifra en vault local (AES-GCM) del
+          estudio, se lista Mis Causas en OJV y se enciende monitoreo + sync
+          (scrape o sidecar).
         </p>
       </div>
 
@@ -138,6 +141,12 @@ export default function MisCausasPage() {
           <span className="rounded-full border border-[var(--line)] px-2 py-1">
             Password: {status?.hasPassword ? "guardada" : "ausente"}
           </span>
+          {status?.hasPassword && (
+            <span className="rounded-full border border-[var(--line)] px-2 py-1">
+              Vault: {status.encryption || "aes-256-gcm"} · key{" "}
+              {status.secretsKey || "—"}
+            </span>
+          )}
           <span className="rounded-full border border-[var(--line)] px-2 py-1">
             Flag scrape: {status?.scrapeFlag ? "ON" : "OFF"}
           </span>

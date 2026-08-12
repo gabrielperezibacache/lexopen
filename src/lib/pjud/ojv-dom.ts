@@ -1,7 +1,8 @@
 /**
  * Selectores y helpers del DOM real de Oficina Judicial Virtual.
  * Fuente de verdad: portal OJV + scrapers de campo (consulta_causas_pjud).
- * Paridad producto: CausaMonitor (acceso invitado, sin ClaveÚnica obligatoria).
+ * Paridad producto: CausaMonitor — acceso invitado **y** ClaveÚnica
+ * (credenciales cifradas en vault local).
  *
  * Flujo invitado:
  *   home → accesoConsultaCausas() → tabs (#BusJuridica / ROL) →
