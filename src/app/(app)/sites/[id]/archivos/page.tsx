@@ -118,12 +118,23 @@ export default async function SiteFilesPage({ params }: Params) {
                       {f.tags ? ` · ${f.tags}` : ""}
                     </div>
                     {!clientView &&
-                      "comments" in f &&
-                      f.comments[0] && (
-                        <div className="mt-2 text-xs text-[var(--ink-soft)]/80">
-                          {f.comments[0].author?.name}: {f.comments[0].body}
-                        </div>
-                      )}
+                      (() => {
+                        const comments = (
+                          f as {
+                            comments?: Array<{
+                              body: string;
+                              author?: { name?: string | null } | null;
+                            }>;
+                          }
+                        ).comments;
+                        const first = comments?.[0];
+                        if (!first) return null;
+                        return (
+                          <div className="mt-2 text-xs text-[var(--ink-soft)]/80">
+                            {first.author?.name}: {first.body}
+                          </div>
+                        );
+                      })()}
                   </div>
                   <div className="text-xs text-[var(--ink-soft)]/60">
                     <a
