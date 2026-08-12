@@ -5,25 +5,7 @@ import {
   getDocumentProcessingQueueStatus,
 } from "@/lib/document-processing-queue";
 import { providerStatusPublic } from "@/lib/pjud/sync";
-
-function backupConfiguration() {
-  const intervalMinutes = Number(
-    process.env.LEXOPEN_BACKUP_INTERVAL_MINUTES || 0
-  );
-  const retention = Number(process.env.LEXOPEN_BACKUP_KEEP || 7);
-  return {
-    enabled: Number.isFinite(intervalMinutes) && intervalMinutes > 0,
-    intervalMinutes:
-      Number.isFinite(intervalMinutes) && intervalMinutes > 0
-        ? intervalMinutes
-        : 0,
-    retention:
-      Number.isInteger(retention) && retention >= 1 && retention <= 365
-        ? retention
-        : null,
-    directoryConfigured: Boolean(process.env.LEXOPEN_BACKUP_DIR?.trim()),
-  };
-}
+import { getLocalBackupHealth } from "@/lib/backup-health";
 
 export async function getHostStatus() {
   const [
@@ -37,6 +19,7 @@ export async function getHostStatus() {
     invoices,
     openInvoices,
     ocr,
+    backups,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.site.count(),
@@ -56,6 +39,7 @@ export async function getHostStatus() {
       },
     }),
     getOcrCapability(),
+    getLocalBackupHealth(),
   ]);
 
   return {
@@ -75,7 +59,7 @@ export async function getHostStatus() {
     },
     ocr,
     pjud: providerStatusPublic(),
-    backups: backupConfiguration(),
+    backups,
     queue: getDocumentProcessingQueueStatus(),
     counts: {
       users,

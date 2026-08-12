@@ -108,11 +108,13 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
       <div className="rounded-2xl border border-[var(--line)] bg-white/60 p-4 text-sm">
         <span className="font-semibold">Backups automáticos:</span>{" "}
         {backups.enabled
-          ? `cada ${backups.intervalMinutes} min · retención ${backups.retention ?? "inválida"}`
+          ? `cada ${backups.intervalMinutes} min · retención ${backups.retention ?? "inválida"} · ${backups.status}`
           : "desactivados"}
         {backups.enabled && (
           <span className="ml-2 text-[var(--ink-soft)]/65">
-            Directorio externo configurado: {yesNo(backups.directoryConfigured)}
+            {backups.lastBackup
+              ? `Último: ${backups.lastBackup.name} (${backups.lastBackup.ageMinutes} min)`
+              : `Sin backup válido · directorio ${backups.directoryState}`}
           </span>
         )}
       </div>
