@@ -20,7 +20,7 @@ export default async function PortalPage() {
       name: true,
       tipo: true,
       cliente: { select: { razonSocial: true } },
-      causa: { select: { rit: true, tribunal: true } },
+      causa: { select: { id: true, rit: true, tribunal: true, updatedAt: true } },
       files: {
         where: {
           tags: { contains: "cliente" },
