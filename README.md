@@ -55,6 +55,7 @@
 - [Aplicación desktop](#-aplicación-desktop)
 - [API](#-api)
 - [Producción en Host local](#-producción-en-host-local)
+- [Cómo actualizar la aplicación](#-cómo-actualizar-la-aplicación)
 - [Seguridad y límites actuales](#-seguridad-y-límites-actuales)
 - [Desarrollo y pruebas](#-desarrollo-y-pruebas)
 - [Estructura del repositorio](#-estructura-del-repositorio)
@@ -690,6 +691,97 @@ LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
 Demos deben permanecer apagadas (`LEXOPEN_DEMO_SWITCHER=0`, `HERMES_ALLOW_DEMO=0`,
 `PJUD_ALLOW_DEMO=0`). El sidecar PJUD y los crons de sync/digest también son
 locales (`npm run pjud:host` + intervalos en el `.env` del data dir).
+
+## 🔄 Cómo actualizar la aplicación
+
+Actualizar LexOpen reemplaza el **código** (y aplica migraciones de base de datos).
+La carpeta de datos (`LEXOPEN_DATA_DIR`, Application Support / `%APPDATA%\LexOpen`)
+**no se borra**: PostgreSQL, documentos, vault y `.env` se conservan.
+
+### Antes de actualizar
+
+1. Avise a quienes usen el Host (la app estará unos minutos fuera de línea).
+2. Cree un respaldo con el Host **detenido**:
+
+   ```bash
+   # Host web
+   npm run web:backup -- --output /ruta/externa/lexopen-backup
+
+   # Desktop: menú LexOpen → Crear respaldo…
+   ```
+
+3. **No ejecute** `npm run db:seed`, `npm run setup`, `npm run db:reset` ni
+   `npm run db:purge-demo` sobre una instalación con datos reales.
+
+### Host web (recomendado)
+
+En el PC que ejecuta LexOpen:
+
+```bash
+# 1) Detenga el Host (Ctrl+C o systemctl/launchd/tarea programada)
+cd /ruta/al/repo/lexopen
+
+# 2) Traiga el código nuevo
+git fetch origin
+git checkout main
+git pull origin main
+
+# 3) Dependencias
+npm ci
+
+# 4) Arranque de nuevo (web:host aplica migraciones Prisma al iniciar)
+LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
+```
+
+Si usa servicio automático, reinicie el servicio después de `npm ci` (por ejemplo
+`sudo systemctl restart lexopen-web`). Detalle en [`docs/WEB-HOST.md`](docs/WEB-HOST.md).
+
+Compruebe:
+
+```bash
+curl -s http://127.0.0.1:3000/api/health
+```
+
+Debe mostrar `db: "up"`, `storageReady: true` y la nueva `version`. Los clientes
+con navegador ven la UI nueva con un refresh (F5).
+
+### Desarrollo o Postgres externo
+
+Si corre `next dev` / `next start` contra un PostgreSQL propio (no el embebido de
+`web:host`):
+
+```bash
+git pull origin main
+npm ci
+npm run db:migrate          # o: npm run setup:production
+npm run build               # si usa next start en producción
+npm run start               # o npm run dev
+```
+
+### Aplicación desktop
+
+1. Descargue el instalador nuevo desde [GitHub Releases](https://github.com/gabrielperezibacache/lexopen/releases)
+   (o acepte la actualización que ofrece el Host empaquetado).
+2. Instale **encima** en el PC Host: no se tocan `%APPDATA%\LexOpen` /
+   `~/Library/Application Support/LexOpen/`.
+3. Arranque el Host: aplicará migraciones y registrará la versión nueva.
+4. Clientes Desktop recargan solos al detectar el cambio; el navegador necesita F5.
+
+Detalle del flujo y límites del auto-update: [`docs/DESKTOP.md`](docs/DESKTOP.md).
+
+### Si algo falla
+
+1. Detenga el Host.
+2. Restaure el respaldo:
+
+   ```bash
+   npm run web:restore -- --source /ruta/externa/lexopen-backup
+   npm run web:host
+   ```
+
+   En desktop: **Restaurar respaldo…**.
+3. Abra un issue en GitHub con la versión anterior, la nueva y el error de
+   `/api/health` o de la consola del Host.
 
 ## 🔐 Seguridad y límites actuales
 
