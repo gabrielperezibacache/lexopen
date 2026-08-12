@@ -7,6 +7,7 @@ import {
   syncCausaPjud,
 } from "@/lib/pjud/sync";
 import { prisma } from "@/lib/db";
+import { mapWithConcurrency } from "@/lib/pjud/concurrency";
 
 export async function GET() {
   try {
@@ -48,16 +49,14 @@ export async function POST(req: NextRequest) {
     const activas = await prisma.causa.findMany({
       where: { pjudMonitoreoActivo: true, estado: "activa" },
       select: { id: true },
+      take: 500,
     });
 
-    const results = [];
-    for (const c of activas) {
+    const results = await mapWithConcurrency(activas, 3, async (c) => {
       try {
-        results.push(
-          await syncCausaPjud(c.id, { actorId, force: true })
-        );
+        return await syncCausaPjud(c.id, { actorId, force: true });
       } catch (e) {
-        results.push({
+        return {
           causaId: c.id,
           inserted: 0,
           skipped: 0,
@@ -68,9 +67,9 @@ export async function POST(req: NextRequest) {
           lastMovimientoAt: null,
           diasSinMovimiento: null,
           semaforo: "gris" as const,
-        });
+        };
       }
-    }
+    });
 
     if (actorId) {
       await writeAudit({
