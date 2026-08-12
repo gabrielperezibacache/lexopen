@@ -770,8 +770,9 @@ LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
 4. Respalde con `npm run web:backup` hacia un disco externo cifrado.
 
 Demos deben permanecer apagadas (`LEXOPEN_DEMO_SWITCHER=0`, `HERMES_ALLOW_DEMO=0`,
-`PJUD_ALLOW_DEMO=0`). El sidecar PJUD y los crons de sync/digest también son
-locales (`npm run pjud:host` + intervalos en el `.env` del data dir).
+`LLM_ALLOW_DEMO=0`, `PJUD_ALLOW_DEMO=0`). El sidecar PJUD y los crons de
+sync/digest/plazos también son locales (`npm run pjud:host` + intervalos en el
+`.env` del data dir). Checklist operativo: [`docs/WEB-HOST.md`](docs/WEB-HOST.md#checklist-de-producción).
 
 ## 🔄 Cómo actualizar la aplicación
 
@@ -942,8 +943,9 @@ de producción:
   quien active el scrape asume el costo y el riesgo de ese mecanismo (véase el
   aviso en Licencia y el WARNING de la [Capa Chile](#capa-chile));
 - `LEXOPEN_OPEN_ACCESS`, `LEXOPEN_RELAX_CSRF`, `LEXOPEN_DEMO_SWITCHER`,
-  `LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS` y fallbacks demo de Hermes/PJUD no deben
-  activarse en producción (varias de estas flags ya hacen fallar el arranque).
+  `LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS` hacen fallar el arranque en producción;
+  `HERMES_ALLOW_DEMO`, `LLM_ALLOW_DEMO`, `PJUD_ALLOW_DEMO` y URLs privadas de
+  LLM/Hermes generan advertencia al boot y deben quedar en `0` en un Host real.
 
 Estas limitaciones son parte del estado `0.1.4`, no un sustituto de un análisis de
 seguridad, privacidad o cumplimiento para una organización concreta.

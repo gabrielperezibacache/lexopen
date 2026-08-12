@@ -3,6 +3,7 @@ import { verifyCronSecret } from "@/lib/security/cron-secret";
 import {
   assertSafeProductionEnv,
   forbiddenProductionFlags,
+  warnProductionFlags,
 } from "@/lib/security/production-env";
 import {
   isCloudMetadataHostname,
@@ -15,6 +16,11 @@ const prevCron = env.CRON_SECRET;
 const prevNode = env.NODE_ENV;
 const prevOpen = env.LEXOPEN_OPEN_ACCESS;
 const prevRelax = env.LEXOPEN_RELAX_CSRF;
+const prevLlmDemo = env.LLM_ALLOW_DEMO;
+const prevHermesDemo = env.HERMES_ALLOW_DEMO;
+const prevPjudDemo = env.PJUD_ALLOW_DEMO;
+const prevHermesPrivate = env.HERMES_ALLOW_PRIVATE_URL;
+const prevLlmPrivate = env.LLM_ALLOW_PRIVATE_URL;
 
 env.CRON_SECRET = "super-secret-cron-value";
 assert.equal(verifyCronSecret("super-secret-cron-value"), true);
@@ -61,10 +67,25 @@ env.LEXOPEN_OPEN_ACCESS = "1";
 delete env.LEXOPEN_RELAX_CSRF;
 delete env.LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS;
 delete env.LEXOPEN_DEMO_SWITCHER;
+delete env.LLM_ALLOW_DEMO;
+delete env.HERMES_ALLOW_DEMO;
+delete env.PJUD_ALLOW_DEMO;
+delete env.HERMES_ALLOW_PRIVATE_URL;
+delete env.LLM_ALLOW_PRIVATE_URL;
 assert.deepEqual(forbiddenProductionFlags(), ["LEXOPEN_OPEN_ACCESS"]);
 assert.throws(() => assertSafeProductionEnv(), /LEXOPEN_OPEN_ACCESS/);
 delete env.LEXOPEN_OPEN_ACCESS;
 assert.doesNotThrow(() => assertSafeProductionEnv());
+
+env.LLM_ALLOW_DEMO = "1";
+env.HERMES_ALLOW_DEMO = "1";
+assert.deepEqual(warnProductionFlags().sort(), [
+  "HERMES_ALLOW_DEMO",
+  "LLM_ALLOW_DEMO",
+]);
+assert.doesNotThrow(() => assertSafeProductionEnv());
+delete env.LLM_ALLOW_DEMO;
+delete env.HERMES_ALLOW_DEMO;
 
 if (prevCron === undefined) delete env.CRON_SECRET;
 else env.CRON_SECRET = prevCron;
@@ -74,5 +95,15 @@ if (prevOpen === undefined) delete env.LEXOPEN_OPEN_ACCESS;
 else env.LEXOPEN_OPEN_ACCESS = prevOpen;
 if (prevRelax === undefined) delete env.LEXOPEN_RELAX_CSRF;
 else env.LEXOPEN_RELAX_CSRF = prevRelax;
+if (prevLlmDemo === undefined) delete env.LLM_ALLOW_DEMO;
+else env.LLM_ALLOW_DEMO = prevLlmDemo;
+if (prevHermesDemo === undefined) delete env.HERMES_ALLOW_DEMO;
+else env.HERMES_ALLOW_DEMO = prevHermesDemo;
+if (prevPjudDemo === undefined) delete env.PJUD_ALLOW_DEMO;
+else env.PJUD_ALLOW_DEMO = prevPjudDemo;
+if (prevHermesPrivate === undefined) delete env.HERMES_ALLOW_PRIVATE_URL;
+else env.HERMES_ALLOW_PRIVATE_URL = prevHermesPrivate;
+if (prevLlmPrivate === undefined) delete env.LLM_ALLOW_PRIVATE_URL;
+else env.LLM_ALLOW_PRIVATE_URL = prevLlmPrivate;
 
 console.log("security/cron-secret + production-env + safe-url OK");

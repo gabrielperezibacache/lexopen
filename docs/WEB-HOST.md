@@ -48,11 +48,40 @@ curl http://127.0.0.1:3000/api/health
 ```
 
 Debe mostrar `db: "up"`, `storageReady: true` y `needsSetup: false`.
+Desde fuera del Host (o sin sesión staff) el JSON público solo incluye `ok`,
+`db` y `time`; los campos de setup/storage quedan fuera de la superficie pública.
 
 Las cargas documentales no bloquean la petición: el Host conserva el original y
 procesa Markdown/OCR en una cola local. Si se reinicia durante el procesamiento,
 la siguiente consulta a health recupera los trabajos pendientes. La tabla
 **Documentos** muestra el estado y permite reintentar.
+
+## Checklist de producción
+
+Use esta lista antes de cargar información real del estudio:
+
+1. **Datos persistentes:** `LEXOPEN_DATA_DIR` apunta a un disco local con backups
+   posibles (no a una carpeta temporal del instalador).
+2. **Sin demo:** en el `.env` del data dir,
+   `LEXOPEN_DEMO_SWITCHER=0`, `HERMES_ALLOW_DEMO=0`, `LLM_ALLOW_DEMO=0`,
+   `PJUD_ALLOW_DEMO=0`. No use `npm run db:seed` / `setup` / `db:reset` con datos
+   reales; prefiera `npm run setup:production` o el arranque de `web:host`.
+3. **Primer admin:** abra `/setup?token=…` una sola vez; elimine o rote
+   `LEXOPEN_BOOTSTRAP_TOKEN` después.
+4. **Health:** `curl http://127.0.0.1:3000/api/health` → `db: "up"` y, en
+   loopback/staff, `storageReady: true`, `needsSetup: false`.
+5. **Secretos:** `SESSION_SECRET` y, si usa PJUD/cron,
+   `PJUD_SECRETS_KEY` + `CRON_SECRET` aleatorios (≥16 caracteres).
+6. **Schedulers (opcionales, recomendados en operación diaria):**
+   `PJUD_SYNC_INTERVAL_MINUTES=240`, `PLAZOS_ALERTAS_INTERVAL_MINUTES=60`,
+   `LEXOPEN_BACKUP_INTERVAL_MINUTES` + `LEXOPEN_BACKUP_DIR` **fuera** del data dir.
+7. **OCR (opcional):** Tesseract instalado si procesará PDFs escaneados.
+8. **PJUD scrape:** solo con consentimiento del estudio (ToS); preferir sidecar
+   `npm run pjud:host` + CAPTCHA BYOK. Ver `docs/PJUD.md` y el aviso en LICENSE.
+9. **Arranque automático:** `deploy/systemd`, `deploy/launchd` o
+   `deploy/windows` tras validar el Host a mano.
+10. **Respaldo restaurable:** al menos un `npm run web:backup` hacia medio
+    externo cifrado y una prueba de `web:restore` en un entorno de ensayo.
 
 ## OCR local para PDFs escaneados
 

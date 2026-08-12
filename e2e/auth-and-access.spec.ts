@@ -1,19 +1,10 @@
 import { expect, test } from "@playwright/test";
-
-async function login(
-  page: import("@playwright/test").Page,
-  email: string
-) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Contraseña").fill("lexopen");
-  await page.getByRole("button", { name: "Entrar" }).click();
-}
+import { loginAs } from "./helpers";
 
 test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   page,
 }) => {
-  await login(page, "socio@estudio.cl");
+  await loginAs(page, "socio@estudio.cl");
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(
@@ -91,7 +82,7 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
 });
 
 test("un cliente queda limitado al portal y a sus espacios", async ({ page }) => {
-  await login(page, "cliente@andes.cl");
+  await loginAs(page, "cliente@andes.cl");
 
   await expect(page).toHaveURL(/\/portal$/);
   await expect(
@@ -148,7 +139,9 @@ test("una ruta protegida redirige al login sin sesión", async ({ page }) => {
   await page.goto("/causas");
 
   await expect(page).toHaveURL(/\/login\?next=.*causas/);
+  await expect(page.locator('input[name="email"]')).toBeVisible();
+  await expect(page.locator('input[name="password"]')).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Iniciar sesión" })
+    page.getByRole("heading", { name: /Iniciar sesión|Sign in/i })
   ).toBeVisible();
 });

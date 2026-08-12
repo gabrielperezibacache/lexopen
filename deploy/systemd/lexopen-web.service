@@ -12,6 +12,11 @@ Environment=NODE_ENV=production
 Environment=LEXOPEN_APP_ROOT=/opt/lexopen/.next/standalone
 Environment=LEXOPEN_PRISMA_ROOT=/opt/lexopen/prisma
 Environment=LEXOPEN_DATA_DIR=/var/lib/lexopen
+# Fail-closed demos (override in data-dir .env only if intentional)
+Environment=LEXOPEN_DEMO_SWITCHER=0
+Environment=HERMES_ALLOW_DEMO=0
+Environment=LLM_ALLOW_DEMO=0
+Environment=PJUD_ALLOW_DEMO=0
 ExecStart=/usr/bin/node /opt/lexopen/scripts/web-host.mjs
 Restart=on-failure
 RestartSec=5

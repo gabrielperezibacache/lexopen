@@ -12,8 +12,10 @@ export const FORBIDDEN_PRODUCTION_FLAGS = [
 /** Soft-warn flags: demote integrations to demo; not a hard boot failure. */
 export const WARN_PRODUCTION_FLAGS = [
   "HERMES_ALLOW_DEMO",
+  "LLM_ALLOW_DEMO",
   "PJUD_ALLOW_DEMO",
   "HERMES_ALLOW_PRIVATE_URL",
+  "LLM_ALLOW_PRIVATE_URL",
 ] as const;
 
 export function listedProductionFlags(
