@@ -1,19 +1,10 @@
 import { expect, test } from "@playwright/test";
-
-async function login(
-  page: import("@playwright/test").Page,
-  email: string
-) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Contraseña").fill("lexopen");
-  await page.getByRole("button", { name: "Entrar" }).click();
-}
+import { loginAs } from "./helpers";
 
 test("copiloto muestra alcance documental y restaura chat con fuentes", async ({
   page,
 }) => {
-  await login(page, "abogado@estudio.cl");
+  await loginAs(page, "abogado@estudio.cl");
   await expect(page).toHaveURL(/\/dashboard$/);
 
   const causasRes = await page.request.get("/api/causas");

@@ -22,6 +22,14 @@
     <string>/Users/Shared/lexopen/prisma</string>
     <key>LEXOPEN_DATA_DIR</key>
     <string>/Users/Shared/LexOpenData</string>
+    <key>LEXOPEN_DEMO_SWITCHER</key>
+    <string>0</string>
+    <key>HERMES_ALLOW_DEMO</key>
+    <string>0</string>
+    <key>LLM_ALLOW_DEMO</key>
+    <string>0</string>
+    <key>PJUD_ALLOW_DEMO</key>
+    <string>0</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

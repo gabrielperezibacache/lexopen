@@ -11,6 +11,12 @@ export default defineConfig({
   reporter: process.env.CI ? [["line"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL,
+    // CI runners often send Accept-Language: en-US; LexOpen negotiates locale
+    // from that header when lexopen_locale is unset. Pin Spanish for e2e.
+    locale: "es-CL",
+    extraHTTPHeaders: {
+      "Accept-Language": "es-CL,es;q=0.9",
+    },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
