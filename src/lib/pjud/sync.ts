@@ -12,9 +12,12 @@ import {
   type PjudFetchResult,
 } from "@/lib/pjud/provider";
 import { captchaSolverConfigured, captchaSolverStatusPublic } from "@/lib/pjud/captcha-solver";
+import {
+  probeScraperSidecarHealth,
+  scraperSidecarConfigured,
+} from "@/lib/pjud/scraper-sidecar";
 import { pdfBackupEnabled, backupMovimientoDocuments } from "@/lib/pjud/pdf-backup";
 import { publicScrapeEnabled, publicScrapeReady } from "@/lib/pjud/public-scrape";
-import { scraperSidecarConfigured } from "@/lib/pjud/scraper-sidecar";
 import { pjudWebhookConfigured } from "@/lib/pjud/webhook";
 
 export type SyncCausaResult = {
@@ -478,13 +481,14 @@ export async function retryFallidos(opts?: {
 }
 
 export function providerStatusPublic() {
+  const captcha = captchaSolverStatusPublic();
   return {
     apiConfigured: pjudProviderConfigured(),
     scraperSidecarConfigured: scraperSidecarConfigured(),
     publicScrapeEnabled: publicScrapeEnabled(),
     publicScrapeReady: publicScrapeReady(),
     captchaConfigured: captchaSolverConfigured(),
-    captcha: captchaSolverStatusPublic(),
+    captcha,
     claveUnicaScrapeEnabled: process.env.PJUD_CLAVEUNICA_SCRAPE === "1",
     liveIngestConfigured: pjudLiveIngestConfigured(),
     webhookConfigured: pjudWebhookConfigured(),
@@ -499,10 +503,22 @@ export function providerStatusPublic() {
       ? scraperSidecarConfigured()
         ? "Sidecar en su host activo (PJUD_SCRAPER_URL). Vault ClaveÚnica en Postgres local; OJV/CAPTCHA son APIs externas OK."
         : publicScrapeReady()
-          ? "Scrape OJV in-process en su host (CAPTCHA = API externa OK). Vault ClaveÚnica local."
+          ? `Scrape OJV in-process (${captcha.provider || "CAPTCHA"} BYOK). Vault ClaveÚnica local.`
           : pjudProviderConfigured()
             ? "Partner API externa activa (PJUD_API_URL). Datos y vault siguen en su host."
             : "Ingest live listo."
-      : "Sin ingest live: configure sidecar, scrape+CAPTCHA, partner API o CSV. LexOpen corre en su host (no SaaS CausaMonitor); APIs externas sí están permitidas.",
+      : captcha.configError
+        ? `Sin ingest live: ${captcha.configError} Alternativa: CSV/demo/partner. LexOpen corre en su host.`
+        : "Sin ingest live: configure sidecar, scrape+CAPTCHA (nopecha free u otro BYOK), partner API o CSV. LexOpen corre en su host (no SaaS CausaMonitor); APIs externas sí están permitidas.",
+  };
+}
+
+/** Status + probe corto al sidecar (/health). */
+export async function providerStatusPublicAsync() {
+  const base = providerStatusPublic();
+  const sidecar = await probeScraperSidecarHealth();
+  return {
+    ...base,
+    sidecar,
   };
 }

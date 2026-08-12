@@ -17,7 +17,11 @@ async function main() {
   assert.equal(body.service, "lexopen-pjud-scraper");
   assert.equal(typeof body.workerRunning, "boolean");
   assert.ok(body.worker && typeof body.worker.running === "boolean");
-  assert.equal(typeof body.timestamp, "string");
+  assert.equal(typeof body.captcha, "boolean");
+  assert.ok(body.captchaProviders);
+  assert.equal(typeof body.captchaProviders.configured, "boolean");
+  assert.ok(Array.isArray(body.captchaProviders.providers));
+  assert.ok(body.captchaProviders.providers.length >= 5);
 
   const missing = await fetch(`http://127.0.0.1:${port}/nope`);
   assert.equal(missing.status, 404);

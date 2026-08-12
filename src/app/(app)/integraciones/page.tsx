@@ -11,12 +11,45 @@ type GoogleStatus = {
   credentialsConfigured: boolean;
 };
 
+type CaptchaStatus = {
+  ok: boolean;
+  captcha?: {
+    configured: boolean;
+    provider: string | null;
+    freeTier?: boolean;
+    keyPresent?: boolean;
+    fallbacks?: string[];
+    configError?: string | null;
+    envSnippet?: string;
+    providers?: {
+      id: string;
+      label: string;
+      freeTier: boolean;
+      keyRequired: boolean;
+      note: string;
+      url: string;
+      selected?: boolean;
+    }[];
+  };
+  sidecar?: {
+    configured: boolean;
+    reachable: boolean;
+    scrapeReady: boolean | null;
+    urlHost: string | null;
+    error: string | null;
+  };
+  publicScrapeReady?: boolean;
+  liveIngestConfigured?: boolean;
+  honesty?: string;
+};
+
 function IntegracionesInner() {
   const sp = useSearchParams();
   const [obsidianMsg, setObsidianMsg] = useState("");
   const [obsidianMode, setObsidianMode] = useState("");
   const [google, setGoogle] = useState<GoogleStatus | null>(null);
   const [hermesInfo, setHermesInfo] = useState("");
+  const [captcha, setCaptcha] = useState<CaptchaStatus | null>(null);
 
   useEffect(() => {
     fetch("/api/integrations/google")
@@ -45,6 +78,10 @@ function IntegracionesInner() {
         )
       )
       .catch(() => setHermesInfo("No disponible"));
+    fetch("/api/pjud/captcha")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setCaptcha(d))
+      .catch(() => setCaptcha(null));
   }, []);
 
   async function syncObsidian() {
@@ -171,15 +208,95 @@ function IntegracionesInner() {
         <h2 className="text-xl font-semibold">PJUD / CausaMonitor</h2>
         <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
           Ingest live vía partner API, scraper sidecar o scrape OJV (CAPTCHA
-          BYOK). Proveedores: <code>nopecha</code> (free ~100/día IP
-          residencial), <code>2captcha</code>, <code>capsolver</code>,{" "}
-          <code>anticaptcha</code>, <code>capmonster</code>. Sin CAPTCHA puede
-          usar CSV/demo. Mis Causas con ClaveÚnica cifrada en{" "}
+          BYOK). Sin CAPTCHA puede usar CSV/demo. Mis Causas con ClaveÚnica
+          cifrada en{" "}
           <a href="/causas/mis-causas" className="text-[var(--sea)]">
             /causas/mis-causas
           </a>
           . Detalle en <code>docs/PJUD.md</code>.
         </p>
+        {captcha && (
+          <div className="mt-4 space-y-3 rounded-2xl border border-[var(--line)] bg-white/70 p-4 text-sm">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[var(--ink-soft)]/80">
+              <span>
+                CAPTCHA:{" "}
+                <strong className="text-[var(--ink)]">
+                  {captcha.captcha?.configured
+                    ? captcha.captcha.provider || "on"
+                    : "off"}
+                </strong>
+                {captcha.captcha?.freeTier ? " · free tier" : ""}
+                {captcha.captcha?.keyPresent ? " · key" : ""}
+              </span>
+              <span>
+                Sidecar:{" "}
+                <strong className="text-[var(--ink)]">
+                  {!captcha.sidecar?.configured
+                    ? "no config"
+                    : captcha.sidecar.reachable
+                      ? captcha.sidecar.scrapeReady
+                        ? "ready"
+                        : "up"
+                      : "down"}
+                </strong>
+                {captcha.sidecar?.urlHost ? ` (${captcha.sidecar.urlHost})` : ""}
+              </span>
+              <span>
+                Live ingest:{" "}
+                <strong className="text-[var(--ink)]">
+                  {captcha.liveIngestConfigured ? "sí" : "no"}
+                </strong>
+              </span>
+            </div>
+            {captcha.captcha?.configError && (
+              <p className="text-amber-900">{captcha.captcha.configError}</p>
+            )}
+            {captcha.honesty && (
+              <p className="text-xs text-[var(--ink-soft)]/70">{captcha.honesty}</p>
+            )}
+            {captcha.captcha?.providers && (
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {captcha.captcha.providers.map((p) => (
+                  <li
+                    key={p.id}
+                    className={`rounded-xl border px-3 py-2 ${
+                      p.selected
+                        ? "border-[var(--sea)]/40 bg-[rgba(31,122,140,0.06)]"
+                        : "border-[var(--line)]"
+                    }`}
+                  >
+                    <div className="font-medium">
+                      {p.label}{" "}
+                      <code className="text-xs text-[var(--ink-soft)]/70">
+                        {p.id}
+                      </code>
+                      {p.freeTier ? (
+                        <span className="ml-2 text-xs text-[var(--ok)]">free</span>
+                      ) : null}
+                      {p.selected ? (
+                        <span className="ml-2 text-xs text-[var(--sea)]">activo</span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-xs text-[var(--ink-soft)]/70">{p.note}</p>
+                    <a
+                      href={p.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 inline-block text-xs text-[var(--sea)]"
+                    >
+                      Sitio →
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {captcha.captcha?.envSnippet && (
+              <pre className="overflow-x-auto rounded-xl bg-[var(--ink)] p-3 text-xs text-white/85">
+                {captcha.captcha.envSnippet}
+              </pre>
+            )}
+          </div>
+        )}
         <div className="mt-4 flex flex-wrap gap-2">
           <a href="/causas/monitoreo" className="btn btn-secondary">
             Monitoreo
@@ -197,12 +314,14 @@ OBSIDIAN_VAULT_PATH=./obsidian-vault
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback
-PJUD_SCRAPER_URL=
-PJUD_PUBLIC_SCRAPE=0
+PJUD_SCRAPER_URL=http://127.0.0.1:8787
+PJUD_SCRAPER_ALLOW_PRIVATE=1
+PJUD_PUBLIC_SCRAPE=1
 PJUD_CLAVEUNICA_SCRAPE=0
-# nopecha (free) | 2captcha | capsolver | anticaptcha | capmonster
 CAPTCHA_SOLVER_PROVIDER=nopecha
 CAPTCHA_SOLVER_API_KEY=
+# En VPS: CAPTCHA_SOLVER_FALLBACK=2captcha
+# CAPTCHA_SOLVER_FALLBACK_API_KEY=...
 PJUD_SECRETS_KEY=`}</pre>
       </section>
     </div>

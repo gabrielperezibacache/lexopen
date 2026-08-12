@@ -19,6 +19,7 @@ import {
   captchaSolverConfigured,
   CaptchaSolveError,
   CaptchaSolverConfigError,
+  captchaConfigErrorMessage,
   solveImageCaptcha,
 } from "@/lib/pjud/captcha-solver";
 import {
@@ -70,7 +71,8 @@ export async function assertPublicScrapeRuntime() {
   }
   if (!captchaSolverConfigured()) {
     throw new PjudScrapeError(
-      "Configure CAPTCHA_SOLVER_PROVIDER + CAPTCHA_SOLVER_API_KEY para scrapear OJV."
+      captchaConfigErrorMessage() ||
+        "Configure CAPTCHA_SOLVER_PROVIDER (+ API_KEY si aplica) para scrapear OJV."
     );
   }
   if (!(await playwrightAvailable())) {
@@ -773,7 +775,8 @@ export async function scrapeCausaByRol(
   }
   if (!captchaSolverConfigured()) {
     throw new PjudScrapeError(
-      "Configure CAPTCHA_SOLVER_PROVIDER + CAPTCHA_SOLVER_API_KEY para scrapear OJV."
+      captchaConfigErrorMessage() ||
+        "Configure CAPTCHA_SOLVER_PROVIDER (+ API_KEY si aplica) para scrapear OJV."
     );
   }
   if (!causa.rit && !causa.ruc) {
@@ -920,7 +923,10 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
     throw new PjudScrapeError("Active también PJUD_PUBLIC_SCRAPE=1.");
   }
   if (!captchaSolverConfigured()) {
-    throw new PjudScrapeError("CAPTCHA solver requerido para ClaveÚnica/OJV.");
+    throw new PjudScrapeError(
+      captchaConfigErrorMessage() ||
+        "CAPTCHA solver requerido para ClaveÚnica/OJV."
+    );
   }
 
   const browser = await launchBrowser();

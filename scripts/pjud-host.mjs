@@ -193,6 +193,16 @@ async function main() {
 
   if (args.has("--check-only")) {
     console.log("[pjud-host] check-only OK (CAPTCHA configurado).");
+    console.log(
+      `[pjud-host] provider=${env.CAPTCHA_SOLVER_PROVIDER || "?"} key=${
+        env.CAPTCHA_SOLVER_API_KEY &&
+        !["free", "none", ""].includes(
+          String(env.CAPTCHA_SOLVER_API_KEY).trim().toLowerCase()
+        )
+          ? "yes"
+          : "no (ok si nopecha free)"
+      } fallback=${env.CAPTCHA_SOLVER_FALLBACK || "—"}`
+    );
     console.log(`[pjud-host] Use en el web:\n  PJUD_SCRAPER_URL=${baseUrl}\n  PJUD_SCRAPER_ALLOW_PRIVATE=1\n  PJUD_SCRAPER_KEY=${env.PJUD_SCRAPER_KEY || "(vacío en dev)"}`);
     process.exit(0);
   }

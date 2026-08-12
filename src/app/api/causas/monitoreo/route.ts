@@ -6,6 +6,7 @@ import {
   listCarteraMonitoreo,
   listFallidosMonitoreo,
   providerStatusPublic,
+  providerStatusPublicAsync,
   syncCausaPjud,
 } from "@/lib/pjud/sync";
 import {
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
       const fallidos = await listFallidosMonitoreo();
       return NextResponse.json({
         fallidos,
-        provider: providerStatusPublic(),
+        provider: await providerStatusPublicAsync(),
       });
     }
     const items = await listCarteraMonitoreo();
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
       fallidos,
       resumen,
       queue,
-      provider: providerStatusPublic(),
+      provider: await providerStatusPublicAsync(),
     });
   } catch (e) {
     return handleRouteError(e);

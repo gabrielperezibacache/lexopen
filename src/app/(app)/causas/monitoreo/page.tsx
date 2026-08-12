@@ -75,6 +75,23 @@ export default function MonitoreoCausasPage() {
     liveIngestConfigured?: boolean;
     pdfBackupEnabled?: boolean;
     syncIntervalMinutes?: number;
+    captchaConfigured?: boolean;
+    captcha?: {
+      provider?: string | null;
+      freeTier?: boolean;
+      keyPresent?: boolean;
+      fallbacks?: string[];
+      configError?: string | null;
+      providers?: { id: string; label: string; freeTier: boolean; selected?: boolean }[];
+    };
+    sidecar?: {
+      configured?: boolean;
+      reachable?: boolean;
+      scrapeReady?: boolean | null;
+      captcha?: boolean | null;
+      urlHost?: string | null;
+      error?: string | null;
+    };
   } | null>(null);
   const [filter, setFilter] = useState<
     "todas" | Semaforo | "monitoreadas" | "fallidas"
@@ -256,10 +273,35 @@ export default function MonitoreoCausasPage() {
             : ""}
           {" · "}
           API {provider.apiConfigured ? "ON" : "OFF"} · Sidecar{" "}
-          {provider.scraperSidecarConfigured ? "ON" : "OFF"} · Scrape{" "}
-          {provider.publicScrapeReady ? "ON" : "OFF"} · ClaveÚnica{" "}
-          {provider.claveUnicaScrapeEnabled ? "ON" : "OFF"}
+          {provider.sidecar?.configured
+            ? provider.sidecar.reachable
+              ? `ON (${provider.sidecar.urlHost || "local"}${
+                  provider.sidecar.scrapeReady ? ", ready" : ""
+                })`
+              : `DOWN${provider.sidecar.error ? `: ${provider.sidecar.error}` : ""}`
+            : provider.scraperSidecarConfigured
+              ? "ON"
+              : "OFF"}{" "}
+          · Scrape {provider.publicScrapeReady ? "ON" : "OFF"} · CAPTCHA{" "}
+          {provider.captchaConfigured
+            ? `${provider.captcha?.provider || "on"}${
+                provider.captcha?.freeTier ? " free" : ""
+              }${provider.captcha?.keyPresent ? "+key" : ""}${
+                provider.captcha?.fallbacks?.length
+                  ? ` → ${provider.captcha.fallbacks.join(",")}`
+                  : ""
+              }`
+            : provider.captcha?.configError
+              ? "misconfig"
+              : "OFF"}{" "}
+          · ClaveÚnica {provider.claveUnicaScrapeEnabled ? "ON" : "OFF"}
           {provider.pdfBackupEnabled ? " · PDF backup ON" : ""}
+        </p>
+      )}
+      {provider?.captcha?.configError && (
+        <p className="rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <strong className="mr-1">CAPTCHA:</strong>
+          {provider.captcha.configError}
         </p>
       )}
       {msg && <p className="text-sm text-[var(--ink-soft)]/80">{msg}</p>}

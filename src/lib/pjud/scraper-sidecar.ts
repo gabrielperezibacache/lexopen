@@ -70,6 +70,81 @@ export function getScraperSidecarBaseUrl() {
   return scraperBaseUrl();
 }
 
+export type SidecarHealthProbe = {
+  configured: boolean;
+  reachable: boolean;
+  scrapeReady: boolean | null;
+  captcha: boolean | null;
+  status: number | null;
+  error: string | null;
+  urlHost: string | null;
+};
+
+/** GET /health del sidecar (timeout corto; no expone secretos). */
+export async function probeScraperSidecarHealth(
+  timeoutMs = 2_500
+): Promise<SidecarHealthProbe> {
+  if (!scraperSidecarConfigured()) {
+    return {
+      configured: false,
+      reachable: false,
+      scrapeReady: null,
+      captcha: null,
+      status: null,
+      error: null,
+      urlHost: null,
+    };
+  }
+  let base: string;
+  let urlHost: string | null = null;
+  try {
+    base = scraperBaseUrl()!;
+    urlHost = new URL(base).host;
+  } catch (error) {
+    return {
+      configured: true,
+      reachable: false,
+      scrapeReady: null,
+      captcha: null,
+      status: null,
+      error: error instanceof Error ? error.message : String(error),
+      urlHost: null,
+    };
+  }
+  try {
+    const res = await fetch(`${base}/health`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      scrapeReady?: boolean;
+      captcha?: boolean;
+      ok?: boolean;
+    };
+    return {
+      configured: true,
+      reachable: res.ok,
+      scrapeReady:
+        typeof body.scrapeReady === "boolean" ? body.scrapeReady : null,
+      captcha: typeof body.captcha === "boolean" ? body.captcha : null,
+      status: res.status,
+      error: res.ok ? null : `HTTP ${res.status}`,
+      urlHost,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      reachable: false,
+      scrapeReady: null,
+      captcha: null,
+      status: null,
+      error: error instanceof Error ? error.message : String(error),
+      urlHost,
+    };
+  }
+}
+
 function scraperBaseUrl() {
   const rawBase = process.env.PJUD_SCRAPER_URL?.trim();
   if (!rawBase) return null;

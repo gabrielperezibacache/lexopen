@@ -129,15 +129,90 @@ export function captchaSolverConfigured() {
   return true; // nopecha free-tier sin key
 }
 
+function rawProviderFromEnv() {
+  return process.env.CAPTCHA_SOLVER_PROVIDER?.trim() || "";
+}
+
+/** Lista de fallbacks: CAPTCHA_SOLVER_FALLBACK=2captcha,capsolver */
+export function fallbackProvidersFromEnv(): CaptchaSolverProvider[] {
+  const raw = process.env.CAPTCHA_SOLVER_FALLBACK?.trim();
+  if (!raw) return [];
+  const primary = providerFromEnv();
+  const out: CaptchaSolverProvider[] = [];
+  for (const part of raw.split(/[,|\s]+/)) {
+    const id = part.trim().toLowerCase();
+    if (!isCaptchaSolverProvider(id)) continue;
+    if (id === primary) continue;
+    if (!out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+function fallbackApiKeyFromEnv() {
+  const key = process.env.CAPTCHA_SOLVER_FALLBACK_API_KEY?.trim();
+  if (!key || key.toLowerCase() === "free" || key.toLowerCase() === "none") {
+    return undefined;
+  }
+  return key;
+}
+
+export function captchaEnvSnippet(provider?: CaptchaSolverProvider | null) {
+  const id = provider || providerFromEnv() || "nopecha";
+  const info = getCaptchaSolverProviderInfo(id as CaptchaSolverProvider);
+  const lines = [
+    `CAPTCHA_SOLVER_PROVIDER=${id}`,
+    info?.keyRequired
+      ? "CAPTCHA_SOLVER_API_KEY=..."
+      : "CAPTCHA_SOLVER_API_KEY=          # opcional (free tier)",
+  ];
+  const fallbacks = fallbackProvidersFromEnv();
+  if (fallbacks.length) {
+    lines.push(`CAPTCHA_SOLVER_FALLBACK=${fallbacks.join(",")}`);
+    lines.push("CAPTCHA_SOLVER_FALLBACK_API_KEY=  # key del fallback si difiere");
+  } else if (id === "nopecha") {
+    lines.push("# Opcional en VPS: CAPTCHA_SOLVER_FALLBACK=2captcha");
+    lines.push("# CAPTCHA_SOLVER_FALLBACK_API_KEY=...");
+  }
+  return lines.join("\n");
+}
+
+export function captchaConfigErrorMessage(): string | null {
+  const raw = rawProviderFromEnv();
+  if (!raw) {
+    return `CAPTCHA_SOLVER_PROVIDER no configurado. Opciones: ${CAPTCHA_SOLVER_PROVIDER_IDS.join(" | ")}. Para gratis: nopecha (IP residencial).`;
+  }
+  if (!isCaptchaSolverProvider(raw.toLowerCase())) {
+    return `CAPTCHA_SOLVER_PROVIDER="${raw}" no es válido. Use: ${CAPTCHA_SOLVER_PROVIDER_IDS.join(" | ")}.`;
+  }
+  const provider = raw.toLowerCase() as CaptchaSolverProvider;
+  const info = getCaptchaSolverProviderInfo(provider)!;
+  if (info.keyRequired && !apiKeyFromEnv()) {
+    return `CAPTCHA_SOLVER_API_KEY requerido para ${provider}.`;
+  }
+  return null;
+}
+
 export function captchaSolverStatusPublic() {
+  const raw = rawProviderFromEnv();
+  const rawLower = raw.toLowerCase();
+  const invalidProvider = Boolean(raw && !isCaptchaSolverProvider(rawLower));
   const provider = providerFromEnv();
   const info = getCaptchaSolverProviderInfo(provider);
   const key = Boolean(apiKeyFromEnv());
+  const fallbacks = fallbackProvidersFromEnv();
+  const configError = captchaConfigErrorMessage();
   return {
     configured: captchaSolverConfigured(),
     provider: provider || null,
+    rawProvider: raw || null,
+    invalidProvider,
     freeTier: Boolean(info?.freeTier),
+    keyRequired: Boolean(info?.keyRequired),
     keyPresent: key,
+    fallbacks,
+    fallbackKeyPresent: Boolean(fallbackApiKeyFromEnv()),
+    configError,
+    envSnippet: captchaEnvSnippet(provider),
     providers: CAPTCHA_SOLVER_PROVIDERS.map((p) => ({
       id: p.id,
       label: p.label,
@@ -145,6 +220,7 @@ export function captchaSolverStatusPublic() {
       keyRequired: p.keyRequired,
       note: p.note,
       url: p.url,
+      selected: p.id === provider,
     })),
   };
 }
@@ -403,26 +479,18 @@ async function solveWithNopeCha(
   throw new CaptchaSolveError(`NopeCHA timeout (${POLL_TIMEOUT_MS}ms)`);
 }
 
-export async function solveImageCaptcha(
+async function dispatchSolve(
+  provider: CaptchaSolverProvider,
   imageBase64: string,
+  apiKey: string | undefined,
   signal?: AbortSignal
 ) {
-  const provider = providerFromEnv();
-  const apiKey = apiKeyFromEnv();
-  if (!provider) {
-    throw new CaptchaSolverConfigError(
-      `CAPTCHA_SOLVER_PROVIDER no configurado. Opciones: ${CAPTCHA_SOLVER_PROVIDER_IDS.join(
-        " | "
-      )}`
-    );
-  }
   const info = getCaptchaSolverProviderInfo(provider);
   if (info?.keyRequired && !apiKey) {
     throw new CaptchaSolverConfigError(
       `CAPTCHA_SOLVER_API_KEY requerido para provider=${provider}.`
     );
   }
-
   switch (provider) {
     case "nopecha":
       return solveWithNopeCha(imageBase64, apiKey, signal);
@@ -439,4 +507,56 @@ export async function solveImageCaptcha(
       throw new CaptchaSolverConfigError(`Provider desconocido: ${_exhaustive}`);
     }
   }
+}
+
+export async function solveImageCaptcha(
+  imageBase64: string,
+  signal?: AbortSignal
+) {
+  const provider = providerFromEnv();
+  if (!provider) {
+    throw new CaptchaSolverConfigError(
+      captchaConfigErrorMessage() ||
+        `CAPTCHA_SOLVER_PROVIDER no configurado. Opciones: ${CAPTCHA_SOLVER_PROVIDER_IDS.join(
+          " | "
+        )}`
+    );
+  }
+
+  const primaryKey = apiKeyFromEnv();
+  const chain: { provider: CaptchaSolverProvider; key?: string; role: string }[] =
+    [{ provider, key: primaryKey, role: "primary" }];
+
+  const fallbackKey = fallbackApiKeyFromEnv() || primaryKey;
+  for (const fb of fallbackProvidersFromEnv()) {
+    chain.push({ provider: fb, key: fallbackKey, role: "fallback" });
+  }
+
+  let lastError: Error | null = null;
+  for (const step of chain) {
+    const info = getCaptchaSolverProviderInfo(step.provider);
+    if (info?.keyRequired && !step.key) {
+      lastError = new CaptchaSolverConfigError(
+        `Sin API key para fallback ${step.provider} (defina CAPTCHA_SOLVER_FALLBACK_API_KEY).`
+      );
+      continue;
+    }
+    try {
+      return await dispatchSolve(
+        step.provider,
+        imageBase64,
+        step.key,
+        signal
+      );
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (error instanceof CaptchaSolverConfigError && step.role === "primary") {
+        // Misconfig primaria: aún intentar fallbacks pagos si hay.
+        continue;
+      }
+      // CaptchaSolveError → try next
+      continue;
+    }
+  }
+  throw lastError || new CaptchaSolveError("No se pudo resolver el CAPTCHA.");
 }

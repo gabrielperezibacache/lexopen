@@ -6,7 +6,7 @@ import {
 } from "@/lib/document-processing-queue";
 import { getDigestStatus } from "@/lib/pjud/digest";
 import { getPjudQueueStatus } from "@/lib/pjud/queue";
-import { providerStatusPublic } from "@/lib/pjud/sync";
+import { providerStatusPublicAsync } from "@/lib/pjud/sync";
 import { getLocalBackupHealth } from "@/lib/backup-health";
 
 export async function getHostStatus() {
@@ -25,6 +25,7 @@ export async function getHostStatus() {
     failedPjudJobs,
     digest,
     pjudQueue,
+    pjudProvider,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.site.count(),
@@ -62,6 +63,7 @@ export async function getHostStatus() {
       okToday: 0,
       workerConcurrency: 5,
     })),
+    providerStatusPublicAsync(),
   ]);
 
   return {
@@ -81,7 +83,7 @@ export async function getHostStatus() {
     },
     ocr,
     pjud: {
-      ...providerStatusPublic(),
+      ...pjudProvider,
       failedJobs: failedPjudJobs,
       queue: pjudQueue,
       digest: {

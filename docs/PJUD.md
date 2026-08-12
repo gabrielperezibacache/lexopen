@@ -163,6 +163,15 @@ LexOpen no vende solves: el estudio elige proveedor. Catálogo en
 | `anticaptcha` | No | Sí |
 | `capmonster` | No | Sí |
 
+Fallback (recomendado en VPS/cloud donde NopeCHA free falla):
+
+```dotenv
+CAPTCHA_SOLVER_PROVIDER=nopecha
+CAPTCHA_SOLVER_FALLBACK=2captcha
+CAPTCHA_SOLVER_FALLBACK_API_KEY=...
+```
+
+Estado en UI: Monitoreo, Host status, Integraciones (`GET /api/pjud/captcha`).
 Sin CAPTCHA configurado: CSV / demo / partner API siguen disponibles (app gratis).
 
 ## Sidecar de referencia (in-repo)
