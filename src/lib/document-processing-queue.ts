@@ -77,6 +77,15 @@ export function enqueueDocumentProcessing(job: DocumentJob) {
   return true;
 }
 
+export function getDocumentProcessingQueueStatus() {
+  return {
+    queued: queue.length,
+    active: activeJobs,
+    recoveryStarted,
+    concurrency: MAX_CONCURRENCY,
+  };
+}
+
 export async function recoverPendingDocumentProcessing() {
   if (recoveryStarted) return;
   recoveryStarted = true;

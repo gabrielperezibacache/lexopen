@@ -21,6 +21,22 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   ).toBeVisible();
   await expect(page.getByText("Inicio del estudio")).toBeVisible();
 
+  const hostStatusResponse = await page.request.get("/api/admin/host-status");
+  expect(hostStatusResponse.ok()).toBeTruthy();
+  const hostStatus = (await hostStatusResponse.json()) as {
+    counts: { users: number; documents: number };
+    storage: { mode: string };
+  };
+  expect(hostStatus.counts.users).toBeGreaterThanOrEqual(4);
+  expect(hostStatus.counts.documents).toBeGreaterThan(0);
+  expect(["local", "s3", "incomplete"]).toContain(hostStatus.storage.mode);
+
+  await page.goto("/configuracion");
+  await expect(
+    page.getByRole("heading", { name: "Configuración del estudio" })
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Estado del Host" })).toBeVisible();
+
   await page.goto("/causas");
   await expect(page).toHaveURL(/\/causas$/);
   await expect(
@@ -58,6 +74,7 @@ test("un cliente queda limitado al portal y a sus espacios", async ({ page }) =>
   ).toBeVisible();
   await expect(page.getByText("Acceso restringido:")).toBeVisible();
   await expect(page.getByRole("link", { name: "Causas" })).toHaveCount(0);
+  expect((await page.request.get("/api/admin/host-status")).status()).toBe(403);
 
   const sitesResponse = await page.request.get("/api/sites");
   expect(sitesResponse.ok()).toBeTruthy();
