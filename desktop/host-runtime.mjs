@@ -96,6 +96,33 @@ export function loadEnvFile(file, targetEnv = process.env) {
   }
 }
 
+/**
+ * Production Host must never inherit CI/shell security relaxations
+ * (e.g. LEXOPEN_RELAX_CSRF=1 from a developer machine or cloud agent).
+ * Call after loadEnvFile so data-dir KEEP_* can still opt demos back in.
+ */
+export function applyHostFailClosedEnv(targetEnv = process.env) {
+  for (const key of [
+    "LEXOPEN_OPEN_ACCESS",
+    "LEXOPEN_RELAX_CSRF",
+    "LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS",
+  ]) {
+    targetEnv[key] = "0";
+  }
+  const demos = [
+    ["LEXOPEN_DEMO_SWITCHER", "LEXOPEN_KEEP_DEMO_SWITCHER"],
+    ["HERMES_ALLOW_DEMO", "LEXOPEN_KEEP_HERMES_DEMO"],
+    ["LLM_ALLOW_DEMO", "LEXOPEN_KEEP_LLM_DEMO"],
+    ["PJUD_ALLOW_DEMO", "LEXOPEN_KEEP_PJUD_DEMO"],
+  ];
+  for (const [flag, keep] of demos) {
+    if (targetEnv[keep] !== "1") {
+      targetEnv[flag] = "0";
+    }
+  }
+  return targetEnv;
+}
+
 /** Setup guidance that never embeds the bootstrap token. */
 export function setupPendingMessage({
   isElectron = false,
@@ -392,6 +419,8 @@ export async function startHost(options = {}) {
 
   const host = ensureHostEnv(dataDir, { port, pgPort, seedDemo, publicUrl });
   loadEnvFile(host.envFile);
+  // Strip CI/shell relaxations that would fail instrumentation in NODE_ENV=production.
+  applyHostFailClosedEnv(process.env);
   // Reafirmar tras cargar .env (el archivo no debe pisar la versión del binario)
   process.env.LEXOPEN_APP_VERSION = version;
   process.env.LEXOPEN_UPDATE_RECOGNIZED = recognition.changed ? "1" : "0";

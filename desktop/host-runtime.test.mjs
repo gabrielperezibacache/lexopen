@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  applyHostFailClosedEnv,
   loadEnvFile,
   setupPendingMessage,
   validateHostPorts,
@@ -25,6 +26,34 @@ loadEnvFile(envFile, env);
 assert.equal(env.ALREADY, "parent-wins");
 assert.equal(env.FROM_FILE, "yes");
 assert.equal(env.LLM_ALLOW_DEMO, "1");
+
+// Parent/CI shell pollution must not survive into production Host Next.
+const polluted = {
+  LEXOPEN_RELAX_CSRF: "1",
+  LEXOPEN_OPEN_ACCESS: "1",
+  LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS: "1",
+  HERMES_ALLOW_DEMO: "1",
+  LLM_ALLOW_DEMO: "1",
+  PJUD_ALLOW_DEMO: "1",
+  LEXOPEN_DEMO_SWITCHER: "1",
+};
+applyHostFailClosedEnv(polluted);
+assert.equal(polluted.LEXOPEN_RELAX_CSRF, "0");
+assert.equal(polluted.LEXOPEN_OPEN_ACCESS, "0");
+assert.equal(polluted.LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS, "0");
+assert.equal(polluted.HERMES_ALLOW_DEMO, "0");
+assert.equal(polluted.LLM_ALLOW_DEMO, "0");
+assert.equal(polluted.PJUD_ALLOW_DEMO, "0");
+assert.equal(polluted.LEXOPEN_DEMO_SWITCHER, "0");
+
+const keepDemos = {
+  HERMES_ALLOW_DEMO: "1",
+  LEXOPEN_KEEP_HERMES_DEMO: "1",
+  LEXOPEN_RELAX_CSRF: "1",
+};
+applyHostFailClosedEnv(keepDemos);
+assert.equal(keepDemos.HERMES_ALLOW_DEMO, "1");
+assert.equal(keepDemos.LEXOPEN_RELAX_CSRF, "0");
 
 const electronMsg = setupPendingMessage({ isElectron: true, port: 3000 });
 assert.match(electronMsg, /Desktop/);

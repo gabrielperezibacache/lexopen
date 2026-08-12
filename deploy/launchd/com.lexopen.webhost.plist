@@ -30,6 +30,12 @@
     <string>0</string>
     <key>PJUD_ALLOW_DEMO</key>
     <string>0</string>
+    <key>LEXOPEN_RELAX_CSRF</key>
+    <string>0</string>
+    <key>LEXOPEN_OPEN_ACCESS</key>
+    <string>0</string>
+    <key>LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS</key>
+    <string>0</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

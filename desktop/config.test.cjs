@@ -95,6 +95,9 @@ assert.match(env1, /HERMES_ALLOW_DEMO=0/);
 assert.match(env1, /LLM_ALLOW_DEMO=0/);
 assert.match(env1, /PJUD_ALLOW_DEMO=0/);
 assert.match(env1, /LEXOPEN_DEMO_SWITCHER=0/);
+assert.match(env1, /LEXOPEN_RELAX_CSRF=0/);
+assert.match(env1, /LEXOPEN_OPEN_ACCESS=0/);
+assert.match(env1, /LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS=0/);
 assert.match(env1, /OBSIDIAN_ALLOW_PRIVATE_URL=1/);
 const seeded = ensureHostEnv(
   fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-desktop-seed-")),
@@ -199,6 +202,29 @@ assert.match(
   fs.readFileSync(envPath(keepHermesDir), "utf8"),
   /HERMES_ALLOW_DEMO=1/
 );
+
+// Upgrade: CI/example forbidden security flags become fail-closed 0 (no KEEP)
+const csrfDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-csrf-"));
+fs.writeFileSync(
+  envPath(csrfDir),
+  [
+    "SESSION_SECRET=abcdefghijklmnopqrstuvwxyz12",
+    "LEXOPEN_RELAX_CSRF=1",
+    "LEXOPEN_OPEN_ACCESS=1",
+    "LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS=1",
+    "",
+  ].join("\n"),
+  "utf8"
+);
+ensureHostEnv(csrfDir, {
+  port: 3045,
+  pgPort: 54345,
+  publicUrl: "http://127.0.0.1:3045",
+});
+const csrfEnv = fs.readFileSync(envPath(csrfDir), "utf8");
+assert.match(csrfEnv, /LEXOPEN_RELAX_CSRF=0/);
+assert.match(csrfEnv, /LEXOPEN_OPEN_ACCESS=0/);
+assert.match(csrfEnv, /LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS=0/);
 
 // segunda pasada: no reescribe SESSION_SECRET ni añade basura
 const secret1 = env1.match(/^SESSION_SECRET=(.+)$/m)[1];

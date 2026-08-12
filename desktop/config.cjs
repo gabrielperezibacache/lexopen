@@ -399,6 +399,10 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     // Fail-closed: demo LLM replies stay off unless the estudio opts in.
     LLM_ALLOW_DEMO: "0",
     PJUD_ALLOW_DEMO: "0",
+    // Forbidden in production instrumentation — never leave CI/example values on.
+    LEXOPEN_OPEN_ACCESS: "0",
+    LEXOPEN_RELAX_CSRF: "0",
+    LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS: "0",
     // Host local: Obsidian Local REST on loopback is expected.
     OBSIDIAN_ALLOW_PRIVATE_URL: "1",
     NEXT_PUBLIC_APP_NAME: "LexOpen",
@@ -429,8 +433,9 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     finalText = serializeEnv(forced.map, forced.order);
   }
 
-  // Upgrade older / copied .env that left demo flags on.
-  // Opt back in only with explicit KEEP_* keys in the data-dir .env.
+  // Upgrade older / copied .env that left demo or CI security flags on.
+  // Opt demos back in only with explicit KEEP_* keys in the data-dir .env.
+  // Forbidden security flags have no KEEP opt-in on Host.
   {
     const forced = parseEnvFile(finalText);
     const demos = [
@@ -439,9 +444,20 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
       ["HERMES_ALLOW_DEMO", "LEXOPEN_KEEP_HERMES_DEMO"],
       ["PJUD_ALLOW_DEMO", "LEXOPEN_KEEP_PJUD_DEMO"],
     ];
+    const forbidden = [
+      "LEXOPEN_OPEN_ACCESS",
+      "LEXOPEN_RELAX_CSRF",
+      "LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS",
+    ];
     let changed = false;
     for (const [flag, keep] of demos) {
       if (forced.map[flag] === "1" && forced.map[keep] !== "1") {
+        forced.map[flag] = "0";
+        changed = true;
+      }
+    }
+    for (const flag of forbidden) {
+      if (forced.map[flag] === "1") {
         forced.map[flag] = "0";
         changed = true;
       }
