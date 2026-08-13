@@ -345,6 +345,90 @@ export function sanitizeLlmMessages(
   return [...system, ...rest];
 }
 
+type ChatCompletionShape = {
+  choices?: Array<{
+    message?: { content?: unknown };
+    delta?: { content?: unknown };
+    text?: unknown;
+  }>;
+  delta?: unknown;
+};
+
+function textFromContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object" && "text" in part) {
+          return String((part as { text?: unknown }).text || "");
+        }
+        return "";
+      })
+      .join("");
+  }
+  return "";
+}
+
+function contentFromCompletion(data: unknown): {
+  message: string;
+  delta: string;
+} {
+  if (!data || typeof data !== "object") return { message: "", delta: "" };
+  const obj = data as ChatCompletionShape;
+  const choice = obj.choices?.[0];
+  return {
+    message: textFromContent(choice?.message?.content) || textFromContent(choice?.text),
+    delta: textFromContent(choice?.delta?.content),
+  };
+}
+
+export function looksLikeSse(raw: string) {
+  const head = raw.trimStart().slice(0, 32);
+  return /^data\s*:/.test(head) || /\r?\ndata\s*:/.test(raw.slice(0, 2000));
+}
+
+/** JSON clásico o SSE (`data: {...}`) de /chat/completions. */
+export function parseChatCompletionBody(raw: string): string {
+  const text = raw.replace(/^\uFEFF/, "").trim();
+  if (!text) return "";
+
+  if (text.startsWith("{")) {
+    const parsed = safeJsonParse<unknown>(text, null);
+    const fromJson = contentFromCompletion(parsed).message.trim();
+    if (fromJson) return fromJson;
+  }
+
+  if (looksLikeSse(text)) {
+    let deltas = "";
+    let lastMessage = "";
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      const parsed = safeJsonParse<unknown>(payload, null);
+      const { message, delta } = contentFromCompletion(parsed);
+      if (delta) deltas += delta;
+      if (message) lastMessage = message;
+    }
+    return (deltas || lastMessage).trim();
+  }
+
+  return "";
+}
+
+export function describeLlmProviderError(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (
+    /Unexpected token ['"]d['"]/.test(msg) ||
+    /"data:\s*\{/.test(msg)
+  ) {
+    return "El proveedor respondió con un stream SSE (`data: {...}`), no JSON. LexOpen ahora lo interpreta; si persiste, use `{base}/v1` OpenAI-compatible.";
+  }
+  return msg;
+}
+
 export async function askLlm(params: {
   messages: LlmMessage[];
   causaId?: string;
@@ -398,6 +482,7 @@ export async function askLlm(params: {
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    Accept: "application/json",
   };
   if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
   const allowLocal = allowLocalLlmUrl();
@@ -413,6 +498,7 @@ export async function askLlm(params: {
         model: config.model,
         messages,
         temperature: 0.2,
+        stream: false,
       }),
       signal: AbortSignal.timeout(params.timeoutMs || 45_000),
     });
@@ -424,12 +510,18 @@ export async function askLlm(params: {
       );
     }
 
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
+    const raw = await res.text();
+    const parsed = parseChatCompletionBody(raw);
     const content =
-      data.choices?.[0]?.message?.content?.trim() ||
-      "El proveedor no devolvió contenido.";
+      parsed ||
+      (looksLikeSse(raw)
+        ? ""
+        : "El proveedor no devolvió contenido.");
+    if (!content) {
+      throw new Error(
+        "El proveedor respondió con un stream SSE sin texto usable. Use un endpoint OpenAI-compatible `{base}/v1` (LexOpen llama a `/chat/completions` con stream:false)."
+      );
+    }
 
     if (params.causaId) {
       await prisma.activity.create({
@@ -461,7 +553,7 @@ export async function askLlm(params: {
         model: config.model,
         note:
           "Proveedor IA no alcanzable. Active allowDemo en Configuración o revise endpoint/API key.",
-        error: err instanceof Error ? err.message : "unreachable",
+        error: describeLlmProviderError(err),
       };
     }
     const lastUser = [...params.messages]

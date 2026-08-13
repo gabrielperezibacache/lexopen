@@ -104,7 +104,8 @@ export function LlmSettingsForm() {
     setMessage(
       data.ok
         ? `Conexión OK · ${data.provider}/${data.model}: ${data.preview}`
-        : data.error || data.note || "Prueba fallida"
+        : [data.note, data.error].filter(Boolean).join(" — ") ||
+            "Prueba fallida"
     );
   }
 
@@ -127,7 +128,8 @@ export function LlmSettingsForm() {
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
           Proveedor OpenAI-compatible para el copiloto: OpenAI, Azure OpenAI, Groq,
           Ollama, Hermes Agent o un endpoint personalizado. LexOpen llama a{" "}
-          <code className="text-xs">{"{apiUrl}/chat/completions"}</code>.
+          <code className="text-xs">{"{apiUrl}/chat/completions"}</code>{" "}
+          (JSON; si el servidor hace stream SSE, LexOpen lo lee igual).
         </p>
       </div>
 

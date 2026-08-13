@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import {
   applyPreset,
+  describeLlmProviderError,
   LLM_PRESETS,
   LLM_PRESET_CATALOG,
   legalSystemPrompt,
+  looksLikeSse,
+  parseChatCompletionBody,
   sanitizeLlmMessages,
 } from "./llm";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
@@ -87,5 +90,40 @@ assert.equal(
   true
 );
 assert.equal(envAllowsDemo({ NODE_ENV: "development" }), true);
+
+assert.equal(
+  parseChatCompletionBody(
+    JSON.stringify({ choices: [{ message: { content: "  OK  " } }] })
+  ),
+  "OK"
+);
+assert.equal(
+  parseChatCompletionBody(
+    JSON.stringify({
+      choices: [{ message: { content: [{ type: "text", text: "Hola" }] } }],
+    })
+  ),
+  "Hola"
+);
+
+const sse = `data: {"id":"chatcmpl-1","choices":[{"delta":{"content":"O"}}]}
+
+data: {"id":"chatcmpl-1","choices":[{"delta":{"content":"K"}}]}
+
+data: [DONE]
+`;
+assert.equal(looksLikeSse(sse), true);
+assert.equal(parseChatCompletionBody(sse), "OK");
+assert.equal(
+  parseChatCompletionBody(
+    `data: {"choices":[{"message":{"content":"listo"}}]}\n\ndata: [DONE]\n`
+  ),
+  "listo"
+);
+
+const sseParseError = new SyntaxError(
+  `Unexpected token 'd', "data: {"id"... is not valid JSON`
+);
+assert.match(describeLlmProviderError(sseParseError), /stream SSE/);
 
 console.log("integrations/llm.test.ts OK");
