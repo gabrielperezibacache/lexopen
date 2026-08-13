@@ -127,9 +127,9 @@ alertas de plazos contra su propio endpoint cuando el `.env` del directorio de
 datos define `CRON_SECRET` y los intervalos (`PJUD_*_INTERVAL_MINUTES`,
 `PLAZOS_ALERTAS_INTERVAL_MINUTES`). Detalle en [`WEB-HOST.md`](./WEB-HOST.md).
 
-El canal soportado de distribución es el clon Git, no `.dmg` / `.exe`. El
-árbol aún incluye `electron-builder` y `.github/workflows/desktop-release.yml`
-por si se necesita un paquete interno; no es el flujo de instalación del README.
+El canal soportado de distribución es el clon Git. No se publican instaladores
+`.dmg` / `.exe` / `.AppImage`; los binarios de Releases anteriores fueron
+retirados para no confundirlos con el flujo de instalación.
 
 ## Seguridad
 

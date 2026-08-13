@@ -822,7 +822,8 @@ documentos, vault y configuración; contiene secretos y debe guardarse cifrado.
 Si se pierde la contraseña del administrador, **Recuperar contraseña admin…** abre
 un flujo local protegido por token y revoca las sesiones anteriores.
 
-No se publica un `.dmg` / `.exe` como canal de instalación. Actualice con
+No se publica un `.dmg` / `.exe` como canal de instalación. Los instaladores
+de Releases anteriores fueron retirados. Actualice con
 `git pull origin main && npm ci` y vuelva a arrancar el Host.
 
 ## 🔗 API
