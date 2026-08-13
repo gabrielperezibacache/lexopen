@@ -134,7 +134,7 @@ export default async function DashboardPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
             Inicio del estudio
           </p>
-          <h1 className="display mt-2 text-4xl">
+          <h1 className="display mt-2 text-2xl sm:text-3xl md:text-4xl">
             {user ? `Hola, ${user.name.split(" ")[0]}` : "Inicio"}
           </h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">

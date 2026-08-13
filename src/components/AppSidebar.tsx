@@ -22,17 +22,17 @@ import {
   Bell,
   CircleDollarSign,
   ClipboardPen,
-  Menu,
   Shield,
   Settings,
   Radar,
   ContactRound,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useI18n } from "@/components/i18n/I18nProvider";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 type NavItem = {
   href: string;
@@ -78,8 +78,8 @@ function NavGroup({
               className={cn("nav-link", best === href && "active")}
               onClick={onNavigate}
             >
-              <Icon size={16} />
-              <span>{label}</span>
+              <Icon size={16} className="shrink-0" />
+              <span className="truncate">{label}</span>
             </Link>
           ));
         })()}
@@ -88,15 +88,20 @@ function NavGroup({
   );
 }
 
-export function AppSidebar({
+function SidebarChrome({
   role,
-  unreadCount = 0,
+  unreadCount,
+  onNavigate,
+  onClose,
+  showClose,
 }: {
   role?: string | null;
-  unreadCount?: number;
+  unreadCount: number;
+  onNavigate?: () => void;
+  onClose?: () => void;
+  showClose?: boolean;
 }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
   const isCliente = role === "cliente";
   const { t } = useI18n();
 
@@ -175,29 +180,52 @@ export function AppSidebar({
     [t]
   );
 
-  const nav = (
+  return (
     <>
-      <div className="border-b border-white/10 px-5 py-5">
-        <Link href="/" className="flex items-center gap-3" onClick={() => setOpen(false)}>
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] shadow-[0_10px_24px_rgba(196,122,58,0.35)]">
-            <Scale size={18} />
-          </span>
-          <div>
-            <div className="display text-xl leading-none">LexOpen</div>
-            <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-white/55">
-              {t("brand.tagline")}
+      <div
+        className="border-b border-white/10 px-4 py-4"
+        style={
+          showClose
+            ? { paddingTop: "max(1rem, env(safe-area-inset-top))" }
+            : undefined
+        }
+      >
+        <div className="flex items-start gap-2">
+          <Link
+            href="/"
+            className="flex min-w-0 flex-1 items-center gap-3"
+            onClick={onNavigate}
+          >
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] shadow-[0_10px_24px_rgba(196,122,58,0.35)]">
+              <Scale size={18} />
+            </span>
+            <div className="min-w-0">
+              <div className="display text-xl leading-none">LexOpen</div>
+              <div className="mt-1 truncate text-[11px] uppercase tracking-[0.16em] text-white/55">
+                {t("brand.tagline")}
+              </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+          {showClose && (
+            <button
+              type="button"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-white"
+              onClick={onClose}
+              aria-label={t("common.closeMenu")}
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-3">
+      <nav className="flex-1 overflow-y-auto overscroll-contain p-3">
         {isCliente ? (
           <NavGroup
             title={t("nav.groups.portal")}
             links={clienteNav}
             pathname={pathname}
-            onNavigate={() => setOpen(false)}
+            onNavigate={onNavigate}
           />
         ) : (
           <>
@@ -205,30 +233,33 @@ export function AppSidebar({
               title={t("nav.groups.workspace")}
               links={filterNav(primary, role)}
               pathname={pathname}
-              onNavigate={() => setOpen(false)}
+              onNavigate={onNavigate}
             />
             <NavGroup
               title={t("nav.groups.collab")}
               links={filterNav(collab, role)}
               pathname={pathname}
-              onNavigate={() => setOpen(false)}
+              onNavigate={onNavigate}
             />
             <NavGroup
               title={t("nav.groups.intel")}
               links={filterNav(intel, role)}
               pathname={pathname}
-              onNavigate={() => setOpen(false)}
+              onNavigate={onNavigate}
             />
           </>
         )}
       </nav>
 
-      <div className="space-y-2 border-t border-white/10 p-3">
+      <div
+        className="space-y-2 border-t border-white/10 p-3"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
         <LanguageSwitcher variant="dark" className="w-full px-2" />
-        <Link href="/notificaciones" className="nav-link" onClick={() => setOpen(false)}>
-          <Bell size={16} />
-          <span className="flex flex-1 items-center justify-between gap-2">
-            {t("nav.notifications")}
+        <Link href="/notificaciones" className="nav-link" onClick={onNavigate}>
+          <Bell size={16} className="shrink-0" />
+          <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+            <span className="truncate">{t("nav.notifications")}</span>
             {unreadCount > 0 && (
               <span className="rounded-full bg-[var(--copper)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
                 {unreadCount > 99 ? "99+" : unreadCount}
@@ -240,37 +271,66 @@ export function AppSidebar({
       </div>
     </>
   );
+}
+
+export function AppSidebar({
+  role,
+  unreadCount = 0,
+  mobileOpen = false,
+  onMobileOpenChange,
+}: {
+  role?: string | null;
+  unreadCount?: number;
+  mobileOpen?: boolean;
+  onMobileOpenChange?: (open: boolean) => void;
+}) {
+  const { t } = useI18n();
+  const close = () => onMobileOpenChange?.(false);
 
   return (
     <>
-      <button
-        type="button"
-        data-mobile-nav-toggle
-        className="fixed bottom-4 right-4 z-40 grid h-12 w-12 place-items-center rounded-full bg-[var(--ink)] text-white shadow-lg md:hidden"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={t("common.openMenu")}
-        aria-expanded={open}
+      <div className="sticky top-0 hidden h-screen shrink-0 md:block">
+        <aside className="flex h-full w-[240px] shrink-0 flex-col bg-[linear-gradient(180deg,#0c1c24_0%,#14313d_55%,#1a3d3f_100%)] text-white">
+          <SidebarChrome role={role} unreadCount={unreadCount} />
+        </aside>
+      </div>
+
+      <div
+        className={cn(
+          "fixed inset-0 z-40 md:hidden",
+          mobileOpen ? "pointer-events-auto" : "pointer-events-none"
+        )}
+        aria-hidden={!mobileOpen}
       >
-        <Menu size={20} />
-      </button>
-
-      {open && (
-        <div className="fixed inset-0 z-30 md:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/40"
-            aria-label={t("common.closeMenu")}
-            onClick={() => setOpen(false)}
+        <button
+          type="button"
+          className={cn(
+            "absolute inset-0 bg-black/45 transition-opacity duration-200",
+            mobileOpen ? "opacity-100" : "opacity-0"
+          )}
+          aria-label={t("common.closeMenu")}
+          tabIndex={mobileOpen ? 0 : -1}
+          onClick={close}
+        />
+        <aside
+          id="lexopen-mobile-nav"
+          className={cn(
+            "absolute left-0 top-0 flex h-full w-[min(20rem,88vw)] flex-col bg-[linear-gradient(180deg,#0c1c24_0%,#14313d_55%,#1a3d3f_100%)] text-white shadow-2xl transition-transform duration-200 ease-out",
+            mobileOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+          role="dialog"
+          aria-modal="true"
+          aria-label={t("common.menu")}
+        >
+          <SidebarChrome
+            role={role}
+            unreadCount={unreadCount}
+            onNavigate={close}
+            onClose={close}
+            showClose
           />
-          <aside className="absolute left-0 top-0 flex h-full w-[270px] flex-col bg-[linear-gradient(180deg,#0c1c24_0%,#14313d_55%,#1a3d3f_100%)] text-white shadow-xl">
-            {nav}
-          </aside>
-        </div>
-      )}
-
-      <aside className="hidden h-full w-[270px] shrink-0 flex-col bg-[linear-gradient(180deg,#0c1c24_0%,#14313d_55%,#1a3d3f_100%)] text-white md:flex">
-        {nav}
-      </aside>
+        </aside>
+      </div>
     </>
   );
 }
