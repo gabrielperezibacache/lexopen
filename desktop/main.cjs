@@ -4,6 +4,7 @@
  */
 const { app, BrowserWindow, ipcMain, shell, dialog, Menu } = require("electron");
 const { autoUpdater } = require("electron-updater");
+const fs = require("fs");
 const path = require("path");
 const {
   readConfig,
@@ -247,6 +248,7 @@ function ensureWindow() {
     minWidth: 960,
     minHeight: 640,
     title: "LexOpen",
+    backgroundColor: "#f7f2e8",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -261,8 +263,37 @@ function ensureWindow() {
   return mainWindow;
 }
 
+function rendererPath(...parts) {
+  return path.join(__dirname, "renderer", ...parts);
+}
+
+/**
+ * Packaged Chromium treats each file:// URL as its own origin, so CSP `'self'`
+ * blocks sibling setup.css / setup.js inside the asar (macOS installers show
+ * a white page of unstyled HTML). Inline both into the HTML before loading.
+ */
+async function loadSetupShell(win) {
+  const css = fs.readFileSync(rendererPath("setup.css"), "utf8");
+  const js = fs.readFileSync(rendererPath("setup.js"), "utf8");
+  const html = fs
+    .readFileSync(rendererPath("setup.html"), "utf8")
+    .replace("<!--SETUP_CSS-->", `<style>\n${css}\n</style>`)
+    .replace("<!--SETUP_JS-->", `<script>\n${js}\n</script>`);
+  if (!html.includes("<style>") || !html.includes("<script>")) {
+    throw new Error("No se pudieron incrustar los estilos del asistente.");
+  }
+  const tmpDir = path.join(app.getPath("temp"), "lexopen-desktop");
+  fs.mkdirSync(tmpDir, { recursive: true });
+  const tmp = path.join(tmpDir, "setup.html");
+  fs.writeFileSync(tmp, html, "utf8");
+  await win.loadFile(tmp);
+}
+
 function showSetup() {
-  ensureWindow().loadFile(path.join(__dirname, "renderer", "setup.html"));
+  const win = ensureWindow();
+  void loadSetupShell(win).catch((error) => {
+    console.error("[lexopen-desktop] No se pudo cargar el asistente", error);
+  });
 }
 
 async function probeRemote(url) {

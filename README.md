@@ -926,7 +926,8 @@ Controles implementados en el código:
   vía `src/proxy.ts`);
 - `/api/health` y `GET /api/setup` no publican `needsSetup`/storage fuera de
   loopback o staff; fetches Google/captcha/Upstash/GitHub usan `redirect: error`;
-- CSP prod: `style-src` con nonce + `style-src-attr 'unsafe-inline'`; salas
+- CSP prod: `style-src 'self' 'unsafe-inline'` + `style-src-attr 'unsafe-inline'`
+  (el nonce queda en `script-src`; Next/React no marcan todos los `<style>`); salas
   Playwright allowlist `salas.pjud.cl`; scraper PJUD enlaza loopback; API keys
   LLM cifradas en reposo (`enc:v2`, migración de plaintext); tokens Google
   migran `enc:v1`→`enc:v2` y rechazan plaintext; rutas Obsidian/ingest

@@ -19,8 +19,8 @@ const nonced = buildContentSecurityPolicy({
 assert.match(nonced, /script-src 'self' 'nonce-abc123' 'strict-dynamic'/);
 assert.doesNotMatch(nonced, /script-src[^;]*unsafe-inline/);
 assert.doesNotMatch(nonced, /script-src[^;]*unsafe-eval/);
-assert.match(nonced, /style-src 'self' 'nonce-abc123'/);
-assert.doesNotMatch(nonced, /style-src 'self' 'nonce-abc123' 'unsafe-inline'/);
+assert.match(nonced, /style-src 'self' 'unsafe-inline'/);
+assert.doesNotMatch(nonced, /style-src 'self' 'nonce-abc123'/);
 assert.match(nonced, /style-src-attr 'unsafe-inline'/);
 
 const devNonced = buildContentSecurityPolicy({
@@ -28,7 +28,8 @@ const devNonced = buildContentSecurityPolicy({
   nonce: "dev1",
   isDev: true,
 });
-assert.match(devNonced, /style-src 'self' 'nonce-dev1' 'unsafe-inline'/);
+assert.match(devNonced, /style-src 'self' 'unsafe-inline'/);
+assert.match(devNonced, /script-src 'self' 'nonce-dev1' 'strict-dynamic' 'unsafe-eval'/);
 
 const headers = buildSecurityHeaders({ https: true });
 assert.ok(headers.some((h) => h.key === "Strict-Transport-Security"));

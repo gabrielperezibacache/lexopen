@@ -388,6 +388,17 @@ function resolveServerEntry() {
   return { type: "next", entry: null };
 }
 
+/** Fail closed if the installer omitted client CSS/JS (white unstyled HTML). */
+export function assertStandaloneStaticAssets(entry) {
+  const staticDir = path.join(path.dirname(entry), ".next", "static");
+  if (!fs.existsSync(staticDir)) {
+    throw new Error(
+      "Faltan los estilos empaquetados (.next/static). Reinstale LexOpen Desktop."
+    );
+  }
+  return staticDir;
+}
+
 function startNextServer(port, bindHost = "127.0.0.1") {
   const resolved = resolveServerEntry();
   const host = bindHost || "127.0.0.1";
@@ -399,6 +410,7 @@ function startNextServer(port, bindHost = "127.0.0.1") {
   });
 
   if (resolved.type === "standalone") {
+    assertStandaloneStaticAssets(resolved.entry);
     console.log("[lexopen-host] Usando Next standalone:", resolved.entry);
     return spawn(process.execPath, [resolved.entry], {
       cwd: path.dirname(resolved.entry),

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   applyHostFailClosedEnv,
+  assertStandaloneStaticAssets,
   loadEnvFile,
   preferEnvFileKeys,
   setupPendingMessage,
@@ -83,5 +84,15 @@ const webMsg = setupPendingMessage({ isElectron: false, port: 3010 });
 assert.match(webMsg, /127\.0\.0\.1:3010\/setup/);
 assert.match(webMsg, /LEXOPEN_BOOTSTRAP_TOKEN/);
 assert.doesNotMatch(webMsg, /token=[a-f0-9]/);
+
+const missingStatic = path.join(tmp, "server.js");
+fs.writeFileSync(missingStatic, "", "utf8");
+assert.throws(
+  () => assertStandaloneStaticAssets(missingStatic),
+  /estilos empaquetados/
+);
+const staticDir = path.join(tmp, ".next", "static");
+fs.mkdirSync(staticDir, { recursive: true });
+assert.equal(assertStandaloneStaticAssets(missingStatic), staticDir);
 
 console.log("desktop/host-runtime.test.mjs OK");

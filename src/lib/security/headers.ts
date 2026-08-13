@@ -14,16 +14,13 @@ export function buildContentSecurityPolicy(opts?: {
     : // Fallback without per-request nonce (tests / static headers only).
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
 
-  // Production: nonce for <style> tags Next stamps; attributes stay inline for
-  // React style={{…}}. Development keeps style-src unsafe-inline for HMR tooling.
-  let styleSrc: string;
-  if (nonce && !isDev) {
-    styleSrc = `style-src 'self' 'nonce-${nonce}'`;
-  } else if (nonce && isDev) {
-    styleSrc = `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`;
-  } else {
-    styleSrc = "style-src 'self' 'unsafe-inline'";
-  }
+  // Linked stylesheets ('self') plus Next/React/next/font <style> tags.
+  // A nonce on style-src makes browsers ignore 'unsafe-inline' (CSP3), and
+  // Next.js 16 / React 19 do not stamp every stylesheet with the request nonce.
+  // Packaged Desktop then renders HTML without CSS (white page, unstyled text).
+  // Script XSS is still blocked via nonce + strict-dynamic; style attributes
+  // stay on style-src-attr. Dev and prod share this style-src on purpose.
+  const styleSrc = "style-src 'self' 'unsafe-inline'";
 
   const directives = [
     "default-src 'self'",
