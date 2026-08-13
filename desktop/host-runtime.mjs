@@ -388,15 +388,39 @@ function resolveServerEntry() {
   return { type: "next", entry: null };
 }
 
-/** Fail closed if the installer omitted client CSS/JS (white unstyled HTML). */
-export function assertStandaloneStaticAssets(entry) {
-  const staticDir = path.join(path.dirname(entry), ".next", "static");
-  if (!fs.existsSync(staticDir)) {
+function copyDirIfDistinct(src, dest) {
+  if (!fs.existsSync(src)) return false;
+  if (path.resolve(src) === path.resolve(dest)) return fs.existsSync(dest);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.cpSync(src, dest, { recursive: true, force: true });
+  return true;
+}
+
+/**
+ * Next standalone does not include `.next/static` or `public`. After a clone
+ * build they live next to standalone; copy them in so CSS/JS resolve.
+ */
+export function ensureStandaloneStaticAssets(entry, appRoot = repoRoot) {
+  const standaloneDir = path.dirname(entry);
+  const destStatic = path.join(standaloneDir, ".next", "static");
+  const destPublic = path.join(standaloneDir, "public");
+  const srcStatic = path.join(appRoot, ".next", "static");
+  const srcPublic = path.join(appRoot, "public");
+
+  copyDirIfDistinct(srcStatic, destStatic);
+  copyDirIfDistinct(srcPublic, destPublic);
+
+  if (!fs.existsSync(destStatic)) {
     throw new Error(
-      "Faltan los estilos empaquetados (.next/static). Reinstale LexOpen Desktop."
+      "Faltan los estilos de Next (.next/static). En el clon ejecute: npm run desktop:build"
     );
   }
-  return staticDir;
+  return destStatic;
+}
+
+/** @deprecated Use ensureStandaloneStaticAssets */
+export function assertStandaloneStaticAssets(entry, appRoot = repoRoot) {
+  return ensureStandaloneStaticAssets(entry, appRoot);
 }
 
 function startNextServer(port, bindHost = "127.0.0.1") {
@@ -410,7 +434,7 @@ function startNextServer(port, bindHost = "127.0.0.1") {
   });
 
   if (resolved.type === "standalone") {
-    assertStandaloneStaticAssets(resolved.entry);
+    ensureStandaloneStaticAssets(resolved.entry, repoRoot);
     console.log("[lexopen-host] Usando Next standalone:", resolved.entry);
     return spawn(process.execPath, [resolved.entry], {
       cwd: path.dirname(resolved.entry),

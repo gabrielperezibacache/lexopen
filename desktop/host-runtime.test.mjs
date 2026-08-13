@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   applyHostFailClosedEnv,
-  assertStandaloneStaticAssets,
+  ensureStandaloneStaticAssets,
   loadEnvFile,
   preferEnvFileKeys,
   setupPendingMessage,
@@ -88,11 +88,31 @@ assert.doesNotMatch(webMsg, /token=[a-f0-9]/);
 const missingStatic = path.join(tmp, "server.js");
 fs.writeFileSync(missingStatic, "", "utf8");
 assert.throws(
-  () => assertStandaloneStaticAssets(missingStatic),
-  /estilos empaquetados/
+  () => ensureStandaloneStaticAssets(missingStatic, tmp),
+  /desktop:build/
 );
-const staticDir = path.join(tmp, ".next", "static");
-fs.mkdirSync(staticDir, { recursive: true });
-assert.equal(assertStandaloneStaticAssets(missingStatic), staticDir);
+
+const cloneRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-standalone-"));
+const standaloneDir = path.join(cloneRoot, ".next", "standalone");
+fs.mkdirSync(standaloneDir, { recursive: true });
+const cloneEntry = path.join(standaloneDir, "server.js");
+fs.writeFileSync(cloneEntry, "", "utf8");
+const srcStatic = path.join(cloneRoot, ".next", "static");
+fs.mkdirSync(srcStatic, { recursive: true });
+fs.writeFileSync(path.join(srcStatic, "app.css"), "body{color:navy}");
+const srcPublic = path.join(cloneRoot, "public");
+fs.mkdirSync(srcPublic, { recursive: true });
+fs.writeFileSync(path.join(srcPublic, "favicon.ico"), "ico");
+
+const destStatic = ensureStandaloneStaticAssets(cloneEntry, cloneRoot);
+assert.equal(destStatic, path.join(standaloneDir, ".next", "static"));
+assert.equal(
+  fs.readFileSync(path.join(destStatic, "app.css"), "utf8"),
+  "body{color:navy}"
+);
+assert.equal(
+  fs.readFileSync(path.join(standaloneDir, "public", "favicon.ico"), "utf8"),
+  "ico"
+);
 
 console.log("desktop/host-runtime.test.mjs OK");
