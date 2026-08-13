@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
 import { Fraunces, Sora } from "next/font/google";
 import { CsrfFetchPatch } from "@/components/CsrfFetchPatch";
@@ -6,6 +6,12 @@ import { I18nProvider } from "@/components/i18n/I18nProvider";
 import { getDictionary } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/server";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 const sora = Sora({
   variable: "--font-sora",
