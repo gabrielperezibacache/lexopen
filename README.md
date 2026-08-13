@@ -263,6 +263,8 @@ la ejecución.
 - Git.
 - Un directorio local con espacio para PostgreSQL y documentos.
 - Red LAN si habrá clientes en otros equipos.
+- **Tesseract** (opcional) para OCR de PDFs escaneados. Sin él, Documentos muestra
+  «OCR local no disponible (tesseract_missing)» y esos PDF quedan para reintento.
 
 ### Instalación
 
@@ -286,6 +288,36 @@ LEXOPEN_DATA_DIR=/ruta/lexopen-data npm run web:host
 # Windows PowerShell
 $env:LEXOPEN_DATA_DIR="$HOME\LexOpenData"; npm run web:host
 ```
+
+### OCR local (PDFs escaneados)
+
+Si al subir un escaneo ve **«OCR local no disponible (tesseract_missing)»**,
+instale Tesseract en el mismo PC del Host y reinicie LexOpen.
+
+```bash
+# macOS
+brew install tesseract tesseract-lang
+
+# Debian / Ubuntu
+sudo apt install tesseract-ocr tesseract-ocr-spa
+```
+
+En Windows instale [Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) y
+Poppler, y fije `OCR_TESSERACT_BIN` / `OCR_PDFTOPPM_BIN` en el `.env` del
+directorio de datos si no quedan en `PATH`.
+
+Luego, en el clon:
+
+```bash
+cd lexopen
+git pull origin main
+npm run web:host
+```
+
+El Host busca también `/opt/homebrew/bin` (Homebrew en Apple Silicon) aunque no
+esté en `PATH`. Recargue Documentos: debe verse «OCR local disponible». Los PDF
+marcados como «Requiere OCR» se pueden reintentar. Detalle:
+[`docs/WEB-HOST.md`](docs/WEB-HOST.md#ocr-local-para-pdfs-escaneados).
 
 ### Reabrir una instalación existente
 
@@ -706,13 +738,10 @@ LexOpen integra localmente:
 Desde **Documentos** o la ficha de causa puede incorporar archivos o una **carpeta
 investigativa** completa (se preserva `ruta`). LexOpen conserva el original y genera
 Markdown extraído cuando es posible; ese texto alimenta el copiloto y la exportación
-a Obsidian/Drive. Los PDFs escaneados usan Tesseract local mediante un binding nativo
-que renderiza internamente; `pdftoppm` solo queda como fallback para plataformas sin
-ese binding. En macOS: `brew install tesseract tesseract-lang` (el Host también busca
-`/opt/homebrew/bin` si Homebrew no está en `PATH`). En Linux:
-`sudo apt install tesseract-ocr tesseract-ocr-spa`. Si falta OCR, el documento queda
-marcado como `Requiere OCR`. Ningún
-archivo se envía a Firecrawl.
+a Obsidian/Drive. Los PDFs escaneados usan Tesseract local (instalación:
+[OCR local](#ocr-local-pdfs-escaneados)). `pdftoppm` queda como fallback si no
+hay binding nativo. Si falta OCR, el documento queda marcado como `Requiere OCR`.
+Ningún archivo se envía a Firecrawl.
 Ambas dependencias y el fallback OCR se ejecutan localmente; los bindings nativos
 se cargan según la plataforma del Host.
 El procesamiento se ejecuta en una cola local en segundo plano: la carga no espera
