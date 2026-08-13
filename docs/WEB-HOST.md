@@ -258,6 +258,15 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
 
   La restauración conserva un rollback temporal hasta verificar el arranque.
 
+- Para desinstalar los datos del Host (destructivo; requiere `--yes`):
+
+  ```bash
+  npm run web:uninstall -- --yes
+  ```
+
+  Detalle y pasos para quitar el clon / servicio: README
+  [Cómo desinstalar](../README.md#-cómo-desinstalar).
+
 - Verifique periódicamente `/api/health`, espacio libre y backups restaurables.
 - Para activar el scheduler PJUD local, configure en el `.env` del directorio de datos:
 

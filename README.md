@@ -71,6 +71,7 @@
 - [API](#-api)
 - [Producción en Host local](#-producción-en-host-local)
 - [Cómo actualizar la aplicación](#-cómo-actualizar-la-aplicación)
+- [Cómo desinstalar](#-cómo-desinstalar)
 - [Seguridad y límites actuales](#-seguridad-y-límites-actuales)
 - [Desarrollo y pruebas](#-desarrollo-y-pruebas)
 - [Estructura del repositorio](#-estructura-del-repositorio)
@@ -980,6 +981,71 @@ Los datos en Application Support / `%APPDATA%\LexOpen` no se tocan. Detalle:
    En el clon desktop: **Restaurar respaldo…**.
 3. Abra un issue en GitHub con la versión anterior, la nueva y el error de
    `/api/health` o de la consola del Host.
+
+## 🗑️ Cómo desinstalar
+
+Desinstalar LexOpen tiene dos partes: **datos del Host** (Postgres, documentos,
+`.env`) y el **clon del código**. Detenga siempre el Host antes (`Ctrl+C`, o
+pare el servicio systemd / launchd / tarea programada).
+
+### 1. Borrar los datos (comando)
+
+```bash
+# Opcional: respaldo cifrado antes de borrar
+npm run web:backup -- --output /ruta/externa/lexopen-backup
+
+# Carpeta predeterminada del sistema
+npm run web:uninstall -- --yes
+
+# Si usó LEXOPEN_DATA_DIR al instalar
+LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:uninstall -- --yes
+```
+
+`--yes` es obligatorio (borra de forma permanente). Para ver la ruta sin borrar:
+
+```bash
+npm run web:uninstall -- --dry-run
+```
+
+Rutas típicas si no definió `LEXOPEN_DATA_DIR`:
+
+| SO | Carpeta de datos |
+| --- | --- |
+| macOS | `~/Library/Application Support/LexOpen/` |
+| Windows | `%APPDATA%\LexOpen\` |
+| Linux | `~/.local/share/LexOpen/` |
+
+### 2. Quitar el código (clon)
+
+```bash
+# macOS / Linux (desde el padre del clon)
+cd .. && rm -rf lexopen
+
+# Windows PowerShell
+Remove-Item -Recurse -Force .\lexopen
+```
+
+### 3. Servicio automático (si lo instaló)
+
+```bash
+# Linux systemd
+sudo systemctl disable --now lexopen-web
+sudo rm -f /etc/systemd/system/lexopen-web.service
+sudo systemctl daemon-reload
+
+# macOS launchd
+launchctl bootout "gui/$(id -u)/com.lexopen.webhost"
+rm -f "$HOME/Library/LaunchAgents/com.lexopen.webhost.plist"
+```
+
+En Windows, elimine la tarea programada creada por
+`deploy/windows/install-web-host.ps1` (Programador de tareas).
+
+Chromium de Playwright (~150 MB) queda en la caché del usuario; opcional:
+
+```bash
+npx playwright uninstall
+```
 
 ## 🔐 Seguridad y límites actuales
 
