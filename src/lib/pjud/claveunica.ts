@@ -69,14 +69,18 @@ export async function getClaveUnicaStatus() {
   const captcha = captchaSolverConfigured();
   const blockers: string[] = [];
   if (!settings.claveUnicaEnabled) {
-    blockers.push("ClaveÚnica está deshabilitada en el estudio (Habilitar).");
+    blockers.push(
+      "La conexión está pausada. Pulse «Reanudar conexión» para volver a usarla."
+    );
   }
   if (!settings.claveUnicaRut || !settings.claveUnicaPasswordEnc) {
-    blockers.push("Faltan RUT y/o contraseña cifrada.");
+    blockers.push(
+      "Todavía no hay RUT ni contraseña guardados. Complételos abajo (solo un administrador puede hacerlo)."
+    );
   }
   if (!scrapeFlag) {
     blockers.push(
-      "Automatización bloqueada (PJUD_CLAVEUNICA_SCRAPE=0 en el .env del Host)."
+      "En este servidor la consulta automática a ClaveÚnica está apagada. Pida a quien administra el Host que la active, o revise Configuración → PJUD."
     );
   }
   const canUseSidecar = Boolean(
@@ -86,27 +90,45 @@ export async function getClaveUnicaStatus() {
   if (!canUseSidecar && !canUseInProcess) {
     if (sidecar && !sidecarHealth?.reachable) {
       blockers.push(
-        `Sidecar configurado pero no responde${
-          sidecarHealth?.error ? ` (${sidecarHealth.error})` : ""
-        }. Arranque \`npm run pjud:scraper\` o quite PJUD_SCRAPER_URL.`
+        "El servicio auxiliar de consulta judicial no está en marcha. Arránquelo o pida ayuda al administrador del Host; mientras tanto LexOpen no puede entrar a Mis Causas."
       );
-    } else if (sidecar && sidecarHealth?.reachable && sidecarHealth.scrapeReady === false) {
+    } else if (
+      sidecar &&
+      sidecarHealth?.reachable &&
+      sidecarHealth.scrapeReady === false
+    ) {
       blockers.push(
-        "Sidecar arriba pero scrape no listo (CAPTCHA/PJUD_PUBLIC_SCRAPE en el worker). Active scrape in-process o configure CAPTCHA en el sidecar."
+        "El servicio auxiliar está encendido pero aún no puede consultar el Poder Judicial (falta el resolutor de CAPTCHA). Revise Integraciones → PJUD."
       );
     }
     if (!publicScrape) {
-      blockers.push("Active PJUD_PUBLIC_SCRAPE=1 para scrape in-process.");
+      blockers.push(
+        "Falta activar la consulta directa al Poder Judicial en el servidor. Revise Integraciones → PJUD o Configuración."
+      );
     } else if (!captcha) {
       blockers.push(
-        "Configure CAPTCHA_SOLVER_PROVIDER (+ API_KEY si aplica) para scrape OJV."
+        "Falta configurar el resolutor de CAPTCHA (necesario para entrar a la Oficina Judicial Virtual). Hágalo en Integraciones → PJUD."
       );
     } else if (!(sidecar && sidecarHealth?.reachable)) {
       blockers.push(
-        "Scrape in-process no está listo (revisar Playwright/Chromium: npm run pjud:chromium)."
+        "Falta el navegador automatizado (Chromium) en este Host. En el servidor ejecute la instalación de Chromium para PJUD y reinicie LexOpen."
       );
     }
   }
+
+  let readinessLabel = "Listo para sincronizar";
+  let readinessHint =
+    "Puede traer sus causas desde la Oficina Judicial Virtual y actualizar el monitoreo.";
+  if (blockers.length) {
+    readinessLabel = "Aún no se puede sincronizar";
+    readinessHint = blockers[0];
+  }
+
+  const channelLabel = canUseSidecar
+    ? "Servicio auxiliar del Host"
+    : canUseInProcess
+      ? "Consulta directa desde LexOpen"
+      : "Sin canal de consulta";
 
   return {
     enabled: settings.claveUnicaEnabled,
@@ -124,6 +146,9 @@ export async function getClaveUnicaStatus() {
     captchaConfigured: captcha,
     readyToSync: blockers.length === 0,
     blockers,
+    readinessLabel,
+    readinessHint,
+    channelLabel,
   };
 }
 
@@ -152,7 +177,7 @@ export async function saveClaveUnicaCredentials(opts: {
       claveUnicaRut: storedRut,
       claveUnicaPasswordEnc: encryptSecret(opts.password),
       claveUnicaEnabled: opts.enabled ?? true,
-      claveUnicaLastSyncNote: "Credenciales actualizadas (AES-GCM).",
+      claveUnicaLastSyncNote: "Datos de acceso guardados de forma segura.",
     },
   });
 }
@@ -165,7 +190,7 @@ export async function clearClaveUnicaCredentials() {
       claveUnicaRut: null,
       claveUnicaPasswordEnc: null,
       claveUnicaEnabled: false,
-      claveUnicaLastSyncNote: "Credenciales ClaveÚnica eliminadas.",
+      claveUnicaLastSyncNote: "Se eliminaron los datos de ClaveÚnica de este estudio.",
       claveUnicaLastSyncStatus: "cleared",
     },
   });
@@ -379,15 +404,29 @@ export async function syncMisCausas(opts?: {
     lastSyncStatus = "partial";
   }
   const noteParts = [
-    `Mis Causas: ${items.length} listadas`,
-    `${created.length} nuevas`,
-    `${linked.length} ya existentes`,
-    `encoladas ${enqueued}`,
+    `Se encontraron ${items.length} causa${items.length === 1 ? "" : "s"}`,
+    `${created.length} nueva${created.length === 1 ? "" : "s"}`,
+    `${linked.length} ya estaba${linked.length === 1 ? "" : "n"} en LexOpen`,
   ];
-  if (syncResults.length) {
+  if (enqueued) {
     noteParts.push(
-      `movimientos: ${syncOk} ok · ${syncFailed} fallidas · +${insertedTotal} inserts`
+      `${enqueued} puesta${enqueued === 1 ? "" : "s"} en cola para actualizar movimientos`
     );
+  }
+  if (syncResults.length) {
+    if (syncFailed === 0) {
+      noteParts.push(
+        `movimientos al día (+${insertedTotal} nuevo${insertedTotal === 1 ? "" : "s"})`
+      );
+    } else if (syncOk === 0) {
+      noteParts.push(
+        `no se pudieron actualizar los movimientos (${syncFailed} con error)`
+      );
+    } else {
+      noteParts.push(
+        `${syncOk} actualizadas bien, ${syncFailed} con error (+${insertedTotal} movimientos nuevos)`
+      );
+    }
   }
 
   await prisma.firmSettings.update({
@@ -395,7 +434,7 @@ export async function syncMisCausas(opts?: {
     data: {
       claveUnicaLastSyncAt: new Date(),
       claveUnicaLastSyncStatus: lastSyncStatus,
-      claveUnicaLastSyncNote: `${noteParts.join(" · ")}.`,
+      claveUnicaLastSyncNote: `${noteParts.join(". ")}.`,
     },
   });
 

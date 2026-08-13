@@ -76,21 +76,23 @@ export function IntegrationsOverviewPanel() {
         },
         {
           id: "pjud",
-          title: "PJUD / APIs judiciales",
+          title: "Seguimiento judicial",
           ok: Boolean(
             captcha?.liveIngestConfigured ||
               captcha?.sidecar?.configured ||
               captcha?.captcha?.configured
           ),
           status: captcha?.liveIngestConfigured
-            ? "Ingest live"
+            ? "Consulta en vivo lista"
             : captcha?.sidecar?.configured
-              ? `Sidecar ${captcha.sidecar.reachable ? "up" : "down"}`
+              ? captcha.sidecar.reachable
+                ? "Servicio auxiliar activo"
+                : "Servicio auxiliar apagado"
               : captcha?.captcha?.configured
-                ? `CAPTCHA ${captcha.captcha.provider || "on"}`
-                : "Sin ingest live",
+                ? `CAPTCHA ${captcha.captcha.provider || "activo"}`
+                : "Sin consulta en vivo",
           detail:
-            "Partner API (PJUD_API_URL), scraper sidecar (PJUD_SCRAPER_URL) o scrape OJV + CAPTCHA BYOK.",
+            "Oficina Judicial Virtual, ClaveÚnica y CAPTCHA. Configure en Mis Causas e Integraciones.",
           href: "/integraciones",
         },
       ];

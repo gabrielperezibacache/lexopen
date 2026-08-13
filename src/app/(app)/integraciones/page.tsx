@@ -127,7 +127,7 @@ function IntegracionesInner() {
       <PageHeader
         eyebrow="Conectores"
         title="Integraciones"
-        subtitle="Obsidian (vault Markdown), copiloto IA multi-proveedor (OpenAI / custom / Hermes), Google Workspace y PJUD (scrape / ClaveÚnica / sidecar)."
+        subtitle="Conecte Obsidian, el copiloto IA, Google Workspace y el seguimiento judicial (Oficina Judicial Virtual / ClaveÚnica)."
       />
 
       {googleFlash && (
@@ -244,46 +244,46 @@ function IntegracionesInner() {
       </div>
 
       <section className="panel rounded-3xl p-5">
-        <h2 className="text-xl font-semibold">PJUD / CausaMonitor</h2>
+        <h2 className="text-xl font-semibold">Seguimiento judicial (PJUD)</h2>
         <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
-          Ingest live vía partner API, scraper sidecar o scrape OJV (CAPTCHA
-          BYOK). Sin CAPTCHA puede usar CSV/demo. Mis Causas con ClaveÚnica
-          cifrada en{" "}
+          LexOpen puede traer causas y movimientos desde la Oficina Judicial
+          Virtual. Para usar su cuenta ClaveÚnica, configure el acceso en{" "}
           <Link href="/causas/mis-causas" className="text-[var(--sea)]">
-            /causas/mis-causas
+            Mis Causas
           </Link>
-          . Detalle en <code>docs/PJUD.md</code>.
+          . Abajo ve el estado técnico del servidor (CAPTCHA, servicio auxiliar,
+          etc.).
         </p>
         {captcha && (
           <div className="mt-4 space-y-3 rounded-2xl border border-[var(--line)] bg-white/70 p-4 text-sm">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[var(--ink-soft)]/80">
               <span>
-                CAPTCHA:{" "}
+                Resolutor CAPTCHA:{" "}
                 <strong className="text-[var(--ink)]">
                   {captcha.captcha?.configured
-                    ? captcha.captcha.provider || "on"
-                    : "off"}
+                    ? captcha.captcha.provider || "activo"
+                    : "no configurado"}
                 </strong>
-                {captcha.captcha?.freeTier ? " · free tier" : ""}
-                {captcha.captcha?.keyPresent ? " · key" : ""}
+                {captcha.captcha?.freeTier ? " · plan gratuito" : ""}
+                {captcha.captcha?.keyPresent ? " · con clave" : ""}
               </span>
               <span>
-                Sidecar:{" "}
+                Servicio auxiliar:{" "}
                 <strong className="text-[var(--ink)]">
                   {!captcha.sidecar?.configured
-                    ? "no config"
+                    ? "no usado"
                     : captcha.sidecar.reachable
                       ? captcha.sidecar.scrapeReady
-                        ? "ready"
-                        : "up"
-                      : "down"}
+                        ? "listo"
+                        : "encendido (aún no listo)"
+                      : "apagado"}
                 </strong>
                 {captcha.sidecar?.urlHost ? ` (${captcha.sidecar.urlHost})` : ""}
               </span>
               <span>
-                Live ingest:{" "}
+                Consulta en vivo:{" "}
                 <strong className="text-[var(--ink)]">
-                  {captcha.liveIngestConfigured ? "sí" : "no"}
+                  {captcha.liveIngestConfigured ? "disponible" : "no disponible"}
                 </strong>
               </span>
             </div>
@@ -294,30 +294,40 @@ function IntegracionesInner() {
               <p className="text-xs text-[var(--ink-soft)]/70">{captcha.honesty}</p>
             )}
             {claveUnica && (
-              <div className="rounded-xl border border-[var(--line)] bg-white/60 px-3 py-2 text-xs text-[var(--ink-soft)]/80">
+              <div className="rounded-xl border border-[var(--line)] bg-white/60 px-3 py-2 text-sm text-[var(--ink-soft)]/85">
                 <div>
                   ClaveÚnica:{" "}
                   <strong className="text-[var(--ink)]">
                     {claveUnica.readyToSync
-                      ? "lista para sync"
+                      ? "lista para sincronizar"
                       : claveUnica.hasPassword
-                        ? "credenciales OK, sync bloqueado"
-                        : "sin credenciales"}
+                        ? "datos guardados, falta completar el servidor"
+                        : "aún sin datos de acceso"}
                   </strong>
-                  {claveUnica.lastSyncStatus
-                    ? ` · último ${claveUnica.lastSyncStatus}`
-                    : ""}
+                  {claveUnica.lastSyncStatus === "ok"
+                    ? " · última sync correcta"
+                    : claveUnica.lastSyncStatus === "partial"
+                      ? " · última sync parcial"
+                      : claveUnica.lastSyncStatus === "failed"
+                        ? " · última sync con errores"
+                        : ""}
                 </div>
                 {claveUnica.lastSyncNote && (
                   <p className="mt-1 text-[var(--copper)]">{claveUnica.lastSyncNote}</p>
                 )}
                 {claveUnica.blockers && claveUnica.blockers.length > 0 && (
-                  <ul className="mt-1 list-disc pl-4 text-rose-800">
+                  <ul className="mt-2 list-disc pl-4 text-rose-800">
                     {claveUnica.blockers.slice(0, 3).map((b) => (
                       <li key={b}>{b}</li>
                     ))}
                   </ul>
                 )}
+                <Link
+                  href="/causas/mis-causas"
+                  className="mt-2 inline-flex text-[var(--sea)]"
+                >
+                  Abrir Mis Causas →
+                </Link>
               </div>
             )}
             {captcha.captcha?.providers && (
