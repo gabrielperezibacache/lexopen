@@ -482,6 +482,11 @@ export async function retryFallidos(opts?: {
 
 export function providerStatusPublic() {
   const captcha = captchaSolverStatusPublic();
+  const cuFlag = process.env.PJUD_CLAVEUNICA_SCRAPE?.trim();
+  // Sync helper cannot see UI opt-in; async version overlays FirmSettings.
+  // Kill-switch (0) is always OFF; flag=1 is ON; absent is "opt-in pending".
+  const claveUnicaScrapeEnabled =
+    cuFlag === "0" ? false : cuFlag === "1" ? true : false;
   return {
     apiConfigured: pjudProviderConfigured(),
     scraperSidecarConfigured: scraperSidecarConfigured(),
@@ -489,7 +494,8 @@ export function providerStatusPublic() {
     publicScrapeReady: publicScrapeReady(),
     captchaConfigured: captchaSolverConfigured(),
     captcha,
-    claveUnicaScrapeEnabled: process.env.PJUD_CLAVEUNICA_SCRAPE === "1",
+    claveUnicaScrapeEnabled,
+    claveUnicaEnv: cuFlag ?? null,
     liveIngestConfigured: pjudLiveIngestConfigured(),
     webhookConfigured: pjudWebhookConfigured(),
     pdfBackupEnabled: pdfBackupEnabled(),

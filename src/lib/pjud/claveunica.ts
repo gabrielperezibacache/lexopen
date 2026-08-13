@@ -5,6 +5,8 @@ import { decryptSecret, encryptSecret, maskRut, secretsKeySource } from "@/lib/p
 import {
   scrapeMisCausasWithClaveUnica,
   claveUnicaAutomationAllowed,
+  publicScrapeEnabled,
+  publicScrapeReady,
   type MisCausasItem,
 } from "@/lib/pjud/public-scrape";
 import {
@@ -13,6 +15,7 @@ import {
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
 import { enqueueDueSyncJobs, processPendingSyncJobs } from "@/lib/pjud/queue";
+import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 
 /**
  * Credenciales ClaveÚnica del estudio — paridad CausaMonitor
@@ -59,6 +62,46 @@ async function getOrCreateFirmSettings() {
 
 export async function getClaveUnicaStatus() {
   const { settings } = await getOrCreateFirmSettings();
+  const scrapeFlag = claveUnicaAutomationAllowed(settings.claveUnicaEnabled);
+  const sidecar = scraperSidecarConfigured();
+  const sidecarHealth = sidecar ? await probeScraperSidecarHealth() : null;
+  const publicScrape = publicScrapeEnabled();
+  const captcha = captchaSolverConfigured();
+  const blockers: string[] = [];
+  if (!settings.claveUnicaEnabled) {
+    blockers.push("ClaveÚnica está deshabilitada en el estudio (Habilitar).");
+  }
+  if (!settings.claveUnicaRut || !settings.claveUnicaPasswordEnc) {
+    blockers.push("Faltan RUT y/o contraseña cifrada.");
+  }
+  if (!scrapeFlag) {
+    blockers.push(
+      "Automatización bloqueada (PJUD_CLAVEUNICA_SCRAPE=0 en el .env del Host)."
+    );
+  }
+  const canUseSidecar = Boolean(sidecarHealth?.reachable);
+  const canUseInProcess = publicScrapeReady();
+  if (!canUseSidecar && !canUseInProcess) {
+    if (sidecar && !sidecarHealth?.reachable) {
+      blockers.push(
+        `Sidecar configurado pero no responde${
+          sidecarHealth?.error ? ` (${sidecarHealth.error})` : ""
+        }. Arranque \`npm run pjud:scraper\` o quite PJUD_SCRAPER_URL.`
+      );
+    }
+    if (!publicScrape) {
+      blockers.push("Active PJUD_PUBLIC_SCRAPE=1 para scrape in-process.");
+    } else if (!captcha) {
+      blockers.push(
+        "Configure CAPTCHA_SOLVER_PROVIDER (+ API_KEY si aplica) para scrape OJV."
+      );
+    } else {
+      blockers.push(
+        "Scrape in-process no está listo (revisar Playwright/Chromium: npm run pjud:chromium)."
+      );
+    }
+  }
+
   return {
     enabled: settings.claveUnicaEnabled,
     rutMasked: maskRut(settings.claveUnicaRut),
@@ -68,8 +111,13 @@ export async function getClaveUnicaStatus() {
     lastSyncAt: settings.claveUnicaLastSyncAt,
     lastSyncStatus: settings.claveUnicaLastSyncStatus,
     lastSyncNote: settings.claveUnicaLastSyncNote,
-    scrapeFlag: claveUnicaAutomationAllowed(settings.claveUnicaEnabled),
-    sidecar: scraperSidecarConfigured(),
+    scrapeFlag,
+    sidecar,
+    sidecarReachable: sidecarHealth?.reachable ?? false,
+    publicScrape,
+    captchaConfigured: captcha,
+    readyToSync: blockers.length === 0,
+    blockers,
   };
 }
 
@@ -196,11 +244,14 @@ async function findExistingCausa(item: MisCausasItem) {
     });
     if (byRuc) return byRuc;
   }
-  const byRitTribunal = await prisma.causa.findFirst({
-    where: { rit: item.rit, tribunal: item.tribunal },
-    select: { id: true },
-  });
-  if (byRitTribunal) return byRitTribunal;
+  // Prefer rit+tribunal. Do not fall back to rit-only when tribunal is known —
+  // the same RIT can exist in another tribunal and would link the wrong causa.
+  if (item.tribunal) {
+    return prisma.causa.findFirst({
+      where: { rit: item.rit, tribunal: item.tribunal },
+      select: { id: true },
+    });
+  }
   return prisma.causa.findFirst({
     where: { rit: item.rit },
     select: { id: true },
@@ -303,12 +354,36 @@ export async function syncMisCausas(opts?: {
     }));
   }
 
+  const syncFailed = syncResults.filter((r) => r.status === "failed").length;
+  const syncOk = syncResults.filter((r) => r.status !== "failed").length;
+  const insertedTotal = syncResults.reduce(
+    (sum, r) => sum + (r.inserted || 0),
+    0
+  );
+  let lastSyncStatus: string = "ok";
+  if (syncResults.length > 0 && syncFailed === syncResults.length) {
+    lastSyncStatus = "partial";
+  } else if (syncFailed > 0) {
+    lastSyncStatus = "partial";
+  }
+  const noteParts = [
+    `Mis Causas: ${items.length} listadas`,
+    `${created.length} nuevas`,
+    `${linked.length} ya existentes`,
+    `encoladas ${enqueued}`,
+  ];
+  if (syncResults.length) {
+    noteParts.push(
+      `movimientos: ${syncOk} ok · ${syncFailed} fallidas · +${insertedTotal} inserts`
+    );
+  }
+
   await prisma.firmSettings.update({
     where: { id: settings.id },
     data: {
       claveUnicaLastSyncAt: new Date(),
-      claveUnicaLastSyncStatus: "ok",
-      claveUnicaLastSyncNote: `Mis Causas: ${items.length} listadas · ${created.length} nuevas · ${linked.length} ya existentes · encoladas ${enqueued}.`,
+      claveUnicaLastSyncStatus: lastSyncStatus,
+      claveUnicaLastSyncNote: `${noteParts.join(" · ")}.`,
     },
   });
 
@@ -317,6 +392,9 @@ export async function syncMisCausas(opts?: {
     created: created.length,
     linked: linked.length,
     enqueued,
+    syncOk,
+    syncFailed,
+    inserted: insertedTotal,
     items,
     syncResults,
   };

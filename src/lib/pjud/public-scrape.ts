@@ -984,6 +984,12 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
       409
     );
   }
+  if (!(await playwrightAvailable())) {
+    throw new PjudScrapeError(
+      `Playwright/Chromium no disponible. ${pjudPlaywrightInstallHint()}`,
+      502
+    );
+  }
 
   const browser = await launchBrowser();
   try {

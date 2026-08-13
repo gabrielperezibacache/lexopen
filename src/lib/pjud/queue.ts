@@ -125,14 +125,15 @@ export async function processPendingSyncJobs(opts?: {
   const results: SyncCausaResult[] = [];
   const concurrency = opts?.concurrency ?? pjudSyncConcurrency();
   await mapWithConcurrency(pending, concurrency, async (job) => {
-    await prisma.pjudSyncJob.update({
-      where: { id: job.id },
+    const claimed = await prisma.pjudSyncJob.updateMany({
+      where: { id: job.id, status: "pending" },
       data: {
         status: "running",
         attempts: { increment: 1 },
         startedAt: new Date(),
       },
     });
+    if (claimed.count === 0) return; // another worker already claimed it
     try {
       const result = await syncCausaPjud(job.causaId, {
         actorId: opts?.actorId,
