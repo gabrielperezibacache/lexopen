@@ -17,7 +17,7 @@ import {
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
 import { pdfBackupEnabled, backupMovimientoDocuments } from "@/lib/pjud/pdf-backup";
-import { publicScrapeEnabled, publicScrapeReady } from "@/lib/pjud/public-scrape";
+import { publicScrapeEnabled, publicScrapeReady, claveUnicaAutomationAllowed } from "@/lib/pjud/public-scrape";
 import { pjudWebhookConfigured } from "@/lib/pjud/webhook";
 
 export type SyncCausaResult = {
@@ -501,7 +501,7 @@ export function providerStatusPublic() {
     syncIntervalMinutes: Math.round(pjudSyncIntervalMs() / 60000),
     honesty: pjudLiveIngestConfigured()
       ? scraperSidecarConfigured()
-        ? "Sidecar en su host activo (PJUD_SCRAPER_URL). Vault ClaveÚnica en Postgres local; OJV/CAPTCHA son APIs externas OK."
+        ? "Sidecar configurado (PJUD_SCRAPER_URL). Vault ClaveÚnica en Postgres local; OJV/CAPTCHA son APIs externas OK."
         : publicScrapeReady()
           ? `Scrape OJV in-process (${captcha.provider || "CAPTCHA"} BYOK). Vault ClaveÚnica local.`
           : pjudProviderConfigured()
@@ -517,8 +517,28 @@ export function providerStatusPublic() {
 export async function providerStatusPublicAsync() {
   const base = providerStatusPublic();
   const sidecar = await probeScraperSidecarHealth();
+  let claveUnicaOptedIn = false;
+  try {
+    const { getClaveUnicaStatus } = await import("@/lib/pjud/claveunica");
+    const cu = await getClaveUnicaStatus();
+    claveUnicaOptedIn = Boolean(cu.enabled && cu.hasPassword);
+  } catch {
+    claveUnicaOptedIn = false;
+  }
+  const claveUnicaOn = claveUnicaAutomationAllowed(claveUnicaOptedIn);
+  let honesty = base.honesty;
+  if (sidecar.configured && !sidecar.reachable) {
+    honesty = publicScrapeReady()
+      ? "Sidecar (PJUD_SCRAPER_URL) no responde; se usará scrape OJV in-process. Arranque `npm run pjud:scraper` o quite esa URL del .env del Host."
+      : "Sidecar configurado pero no responde. Arranque `npm run pjud:scraper`, o active PJUD_PUBLIC_SCRAPE=1 + CAPTCHA.";
+  } else if (sidecar.configured && sidecar.reachable) {
+    honesty =
+      "Sidecar en su host activo (PJUD_SCRAPER_URL). Vault ClaveÚnica en Postgres local; OJV/CAPTCHA son APIs externas OK.";
+  }
   return {
     ...base,
     sidecar,
+    claveUnicaScrapeEnabled: claveUnicaOn,
+    honesty,
   };
 }

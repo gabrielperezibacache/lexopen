@@ -142,11 +142,12 @@ export default function MisCausasPage() {
       </div>
 
       <div className="rounded-3xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
-        Riesgo ToS / seguridad: automatiza login ClaveÚnica solo con
-        <code className="mx-1">PJUD_CLAVEUNICA_SCRAPE=1</code> y
-        scrape/sidecar. La contraseña no sale en plaintext por API; solo se
-        descifra en este servidor al sincronizar. Sidecar típico:
-        <code className="mx-1">PJUD_SCRAPER_URL=http://127.0.0.1:…</code>
+        Riesgo ToS / seguridad: guardar RUT y contraseña habilita el login
+        automatizado a OJV desde este Host. <code className="mx-1">PJUD_CLAVEUNICA_SCRAPE=0</code>
+        lo bloquea. Si el sidecar (
+        <code className="mx-1">PJUD_SCRAPER_URL</code>) no está corriendo, LexOpen
+        usa scrape in-process (Playwright + CAPTCHA). La contraseña no sale en
+        plaintext por API.
       </div>
 
       <section className="panel space-y-4 rounded-3xl p-5">

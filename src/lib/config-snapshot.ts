@@ -4,6 +4,7 @@ import { getLlmConfig, publicLlmConfig, LLM_PRESET_CATALOG } from "@/lib/integra
 import { getObsidianConfig } from "@/lib/integrations/obsidian";
 import { getGoogleConfig } from "@/lib/integrations/google";
 import { captchaEnvSnippet } from "@/lib/pjud/captcha-solver";
+import { claveUnicaAutomationAllowed } from "@/lib/pjud/public-scrape";
 
 type EnvMap = Record<string, string | undefined>;
 
@@ -138,6 +139,9 @@ export async function getConfigSnapshot() {
       lastSyncStatus: firm?.claveUnicaLastSyncStatus || null,
       lastSyncNote: firm?.claveUnicaLastSyncNote || null,
       scrapeEnvEnabled: envFlag(env, "PJUD_CLAVEUNICA_SCRAPE"),
+      scrapeAllowed: claveUnicaAutomationAllowed(
+        Boolean(firm?.claveUnicaEnabled && firm?.claveUnicaPasswordEnc)
+      ),
       manageHref: "/causas/mis-causas",
     },
     pjud: {

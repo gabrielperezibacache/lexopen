@@ -158,9 +158,9 @@ export function PjudSettingsPanel() {
           <Row label="RUT" value={claveUnica.rutMasked || "—"} />
           <Row label="Password vault" value={claveUnica.passwordSet ? "cifrada" : "no"} />
           <Row
-            label="Scrape CU (env)"
-            value={yn(claveUnica.scrapeEnvEnabled)}
-            hint="PJUD_CLAVEUNICA_SCRAPE"
+            label="Automatización CU"
+            value={yn(claveUnica.scrapeAllowed ?? claveUnica.scrapeEnvEnabled)}
+            hint="Credenciales en Mis Causas; PJUD_CLAVEUNICA_SCRAPE=0 la bloquea"
           />
           <Row
             label="Último sync"

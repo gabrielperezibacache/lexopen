@@ -9,6 +9,7 @@ import { parseClaveUnicaRut } from "@/lib/pjud/claveunica";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import {
   PjudScrapeError,
+  claveUnicaAutomationAllowed,
   publicScrapeEnabled,
   publicScrapeReady,
   scrapeMisCausasWithClaveUnica,
@@ -84,15 +85,44 @@ env.CAPTCHA_SOLVER_API_KEY = "";
 assert.equal(publicScrapeReady(), false);
 
 async function main() {
+  const prevCu = env.PJUD_CLAVEUNICA_SCRAPE;
+  delete env.PJUD_CLAVEUNICA_SCRAPE;
+  assert.equal(claveUnicaAutomationAllowed(false), false);
+  assert.equal(claveUnicaAutomationAllowed(true), true);
+  env.PJUD_CLAVEUNICA_SCRAPE = "0";
+  assert.equal(claveUnicaAutomationAllowed(true), false);
+  env.PJUD_CLAVEUNICA_SCRAPE = "1";
+  assert.equal(claveUnicaAutomationAllowed(false), true);
+  delete env.PJUD_CLAVEUNICA_SCRAPE;
+
   await assert.rejects(
     () => scrapeMisCausasWithClaveUnica({ rut: "12345678-5", password: "x" }),
     (err: unknown) => {
       assert.ok(err instanceof PjudScrapeError);
       assert.equal(err.status, 409);
-      assert.match(err.message, /PJUD_CLAVEUNICA_SCRAPE=1/);
+      assert.match(err.message, /ClaveÚnica deshabilitada/);
       return true;
     }
   );
+
+  env.PJUD_PUBLIC_SCRAPE = "0";
+  await assert.rejects(
+    () =>
+      scrapeMisCausasWithClaveUnica({
+        rut: "12345678-5",
+        password: "x",
+        optedIn: true,
+      }),
+    (err: unknown) => {
+      assert.ok(err instanceof PjudScrapeError);
+      assert.equal(err.status, 409);
+      assert.match(err.message, /PJUD_PUBLIC_SCRAPE=1/);
+      return true;
+    }
+  );
+
+  if (prevCu === undefined) delete env.PJUD_CLAVEUNICA_SCRAPE;
+  else env.PJUD_CLAVEUNICA_SCRAPE = prevCu;
 
   if (prevSecret === undefined) delete env.SESSION_SECRET;
   else env.SESSION_SECRET = prevSecret;

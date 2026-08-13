@@ -80,7 +80,10 @@ Kill switches, presupuesto CAPTCHA diario y cache TTL (`PJUD_CAUSAS_CACHE_TTL_MS
 3. Sync Mis Causas desencripta solo en servidor / sidecar, nunca expone plaintext por API
 4. Login OJV vía ClaveÚnica → parsea Mis Causas → encola sync de movimientos
 
-Kill switch: `PJUD_CLAVEUNICA_SCRAPE=1` (+ scrape/sidecar).
+Kill switch: `PJUD_CLAVEUNICA_SCRAPE=0` bloquea. Si la variable está ausente,
+guardar credenciales en Mis Causas es el opt-in. `=1` fuerza el permiso. El Host
+suele dejar `PJUD_SCRAPER_URL=http://127.0.0.1:8787` aunque el sidecar no esté
+corriendo: el sync cae a scrape in-process.
 
 ## Orden de ingest al sincronizar
 
@@ -100,7 +103,7 @@ Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 | `CAPTCHA_SOLVER_PROVIDER` + `CAPTCHA_SOLVER_API_KEY` | Elegible: `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster`. Key opcional solo en `nopecha`. |
 | `PJUD_SCRAPER_URL` | Microservicio local (`POST /causas/lookup`, `/mis-causas`, `/causas/buscar`). Típico: `http://127.0.0.1:8787` |
 | `PJUD_SCRAPER_ALLOW_PRIVATE=1` | Permite sidecar en localhost / red privada del Host |
-| `PJUD_CLAVEUNICA_SCRAPE=1` | Automatiza login ClaveÚnica → Mis Causas (vía CM `/api/pjud-credentials`) |
+| `PJUD_CLAVEUNICA_SCRAPE` | Ausente: opt-in al guardar credenciales en Mis Causas. `=1` permite. `=0` bloquea. |
 | `PJUD_SECRETS_KEY` | Vault AES-256-GCM local para password ClaveÚnica (fallback: `SESSION_SECRET`) |
 | `PJUD_CAUSAS_DAILY_SOLVE_BUDGET` | Tope diario de CAPTCHA (default 50) |
 | `PJUD_SYNC_CONCURRENCY` | Parallelismo del worker de cola (default **5**, como CM) |
@@ -108,7 +111,9 @@ Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 | `PJUD_PDF_BACKUP=1` | Tras sync, descarga `documentoRef` http(s) → `Documento` LexOpen |
 | `CRON_SECRET` | Autoriza crons (`x-cron-secret`) |
 
-Sin estos flags, LexOpen **no** scrapea ni usa ClaveÚnica. Si `PJUD_PUBLIC_SCRAPE=1` pero falta Playwright/Chromium, el scrape falla con error claro (no cae a demo en prod).
+Sin `PJUD_PUBLIC_SCRAPE=1` + CAPTCHA (o sidecar), LexOpen **no** scrapea OJV.
+ClaveÚnica además requiere opt-in en Mis Causas (o `PJUD_CLAVEUNICA_SCRAPE=1`).
+Si `PJUD_PUBLIC_SCRAPE=1` pero falta Playwright/Chromium, el scrape falla con error claro (no cae a demo en prod).
 
 ## Setup recomendado (host local)
 

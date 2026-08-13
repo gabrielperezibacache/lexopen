@@ -4,10 +4,12 @@ import { normalizarRut, validarRut } from "@/lib/chile";
 import { decryptSecret, encryptSecret, maskRut, secretsKeySource } from "@/lib/pjud/secret";
 import {
   scrapeMisCausasWithClaveUnica,
+  claveUnicaAutomationAllowed,
   type MisCausasItem,
 } from "@/lib/pjud/public-scrape";
 import {
   fetchMisCausasFromSidecar,
+  probeScraperSidecarHealth,
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
 import { enqueueDueSyncJobs, processPendingSyncJobs } from "@/lib/pjud/queue";
@@ -66,7 +68,7 @@ export async function getClaveUnicaStatus() {
     lastSyncAt: settings.claveUnicaLastSyncAt,
     lastSyncStatus: settings.claveUnicaLastSyncStatus,
     lastSyncNote: settings.claveUnicaLastSyncNote,
-    scrapeFlag: process.env.PJUD_CLAVEUNICA_SCRAPE === "1",
+    scrapeFlag: claveUnicaAutomationAllowed(settings.claveUnicaEnabled),
     sidecar: scraperSidecarConfigured(),
   };
 }
@@ -141,22 +143,49 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
     );
   }
 
+  let sidecarError: Error | null = null;
   if (scraperSidecarConfigured()) {
-    try {
-      const fromSidecar = await fetchMisCausasFromSidecar({
-        rut: settings.claveUnicaRut,
-        password,
-      });
-      if (fromSidecar) return fromSidecar;
-    } catch (error) {
-      if (process.env.PJUD_CLAVEUNICA_SCRAPE !== "1") throw error;
+    const health = await probeScraperSidecarHealth();
+    if (!health.reachable) {
+      sidecarError = new Error(health.error || "sidecar no responde");
+    } else {
+      try {
+        const fromSidecar = await fetchMisCausasFromSidecar({
+          rut: settings.claveUnicaRut,
+          password,
+        });
+        if (fromSidecar) return fromSidecar;
+      } catch (error) {
+        sidecarError = error instanceof Error ? error : new Error(String(error));
+      }
     }
   }
 
-  return scrapeMisCausasWithClaveUnica({
-    rut: settings.claveUnicaRut,
-    password,
-  });
+  if (!claveUnicaAutomationAllowed(settings.claveUnicaEnabled)) {
+    throw httpError(
+      sidecarError
+        ? `Sidecar PJUD no responde (${sidecarError.message}) y ClaveÚnica está bloqueada (PJUD_CLAVEUNICA_SCRAPE=0).`
+        : "Automatización ClaveÚnica deshabilitada (PJUD_CLAVEUNICA_SCRAPE=0).",
+      409
+    );
+  }
+
+  try {
+    return await scrapeMisCausasWithClaveUnica({
+      rut: settings.claveUnicaRut,
+      password,
+      optedIn: settings.claveUnicaEnabled,
+    });
+  } catch (error) {
+    if (sidecarError) {
+      const scrapeNote = error instanceof Error ? error.message : "scrape falló";
+      throw httpError(
+        `Sidecar PJUD no responde (${sidecarError.message}). In-process: ${scrapeNote}. Arranque \`npm run pjud:scraper\` o quite PJUD_SCRAPER_URL del .env del Host si usa scrape local.`,
+        502
+      );
+    }
+    throw error;
+  }
 }
 
 async function findExistingCausa(item: MisCausasItem) {

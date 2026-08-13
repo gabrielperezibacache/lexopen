@@ -63,6 +63,19 @@ export function publicScrapeReady() {
   return publicScrapeEnabled() && captchaSolverConfigured();
 }
 
+/**
+ * Kill switch ClaveÚnica.
+ * - `PJUD_CLAVEUNICA_SCRAPE=0` bloquea (fail-closed).
+ * - `=1` permite.
+ * - ausente: permite si el estudio ya guardó/habilitó credenciales en la UI.
+ */
+export function claveUnicaAutomationAllowed(optedIn = false) {
+  const flag = process.env.PJUD_CLAVEUNICA_SCRAPE?.trim();
+  if (flag === "0") return false;
+  if (flag === "1") return true;
+  return Boolean(optedIn);
+}
+
 export async function assertPublicScrapeRuntime() {
   if (!publicScrapeEnabled()) {
     throw new PjudScrapeError(
@@ -915,10 +928,11 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
   rut: string;
   password: string;
   signal?: AbortSignal;
+  optedIn?: boolean;
 }): Promise<MisCausasItem[]> {
-  if (process.env.PJUD_CLAVEUNICA_SCRAPE !== "1") {
+  if (!claveUnicaAutomationAllowed(opts.optedIn)) {
     throw new PjudScrapeError(
-      "Automatización ClaveÚnica deshabilitada. En el .env del Host ponga PJUD_CLAVEUNICA_SCRAPE=1 y reinicie.",
+      "Automatización ClaveÚnica deshabilitada. Guarde las credenciales en Mis Causas o ponga PJUD_CLAVEUNICA_SCRAPE=1 (PJUD_CLAVEUNICA_SCRAPE=0 la bloquea).",
       409
     );
   }

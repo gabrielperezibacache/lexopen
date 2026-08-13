@@ -260,7 +260,9 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   `CAPTCHA_SOLVER_*` → `npm run pjud:host` (sidecar `:8787`) → en otra terminal
   `npm run web:host` (o `npm run pjud:host -- --with-web`). El web necesita
   `PJUD_SCRAPER_URL=http://127.0.0.1:8787`, `PJUD_SCRAPER_ALLOW_PRIVATE=1` y la
-  misma `PJUD_SCRAPER_KEY`. Detalle en `docs/PJUD.md`. Si no hay ingest y
+  misma `PJUD_SCRAPER_KEY`. Si el sidecar no está corriendo, el Host cae a
+  scrape in-process (`PJUD_PUBLIC_SCRAPE=1` + CAPTCHA) al sincronizar Mis Causas.
+  Detalle en `docs/PJUD.md`. Si no hay ingest y
   `PJUD_ALLOW_DEMO=0`, no se inventan datos (importe CSV si hace falta).
 
 Sin proveedor configurado, exporte el CSV desde la consulta oficial y use el
