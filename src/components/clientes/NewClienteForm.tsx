@@ -53,9 +53,9 @@ export function NewClienteForm({
   return (
     <form onSubmit={onSubmit} className="panel space-y-3 rounded-3xl p-5">
       <h2 className="text-lg font-semibold">Nuevo cliente</h2>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <input
-          className="input md:col-span-2"
+          className="input sm:col-span-2"
           name="razonSocial"
           required
           placeholder="Razón social / nombre"
@@ -67,7 +67,7 @@ export function NewClienteForm({
         </select>
         <input className="input" name="email" type="email" placeholder="Email" />
         <input className="input" name="telefono" placeholder="Teléfono" />
-        <select className="select md:col-span-2" name="abogadoId" defaultValue="">
+        <select className="select sm:col-span-2" name="abogadoId" defaultValue="">
           <option value="">Sin abogado responsable</option>
           {abogados.map((a) => (
             <option key={a.id} value={a.id}>
@@ -76,7 +76,7 @@ export function NewClienteForm({
           ))}
         </select>
         <textarea
-          className="input md:col-span-2"
+          className="input sm:col-span-2"
           name="notas"
           rows={2}
           placeholder="Notas internas"

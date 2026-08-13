@@ -6,6 +6,7 @@ import { ClipboardPen } from "lucide-react";
 import { requireStaff } from "@/lib/auth/session";
 import { minutaConfidentialWhere } from "@/lib/api";
 import { MinutaPlantillasManager } from "@/components/minutas/MinutaPlantillasManager";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 export default async function MinutasPage() {
   const user = await requireStaff();
@@ -44,27 +45,22 @@ export default async function MinutasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            Continuidad del estudio
-          </p>
-          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Minutas</h1>
-          <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Traspaso tras audiencias, reuniones y llamadas. Cualquier abogado
-            puede retomar la tramitación con el resumen y los próximos pasos.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Link className="btn btn-secondary" href="/agente?utility=draft">
-            Borrador con IA
-          </Link>
-          <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
-            <div className="text-[var(--ink-soft)]/65">Acciones abiertas</div>
-            <div className="display text-3xl">{pendientes}</div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Continuidad del estudio"
+        title="Minutas"
+        subtitle="Traspaso tras audiencias, reuniones y llamadas. Cualquier abogado puede retomar la tramitación con el resumen y los próximos pasos."
+        actions={
+          <>
+            <Link className="btn btn-secondary" href="/agente?utility=draft">
+              Borrador con IA
+            </Link>
+            <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
+              <div className="text-[var(--ink-soft)]/65">Acciones abiertas</div>
+              <div className="display text-2xl sm:text-3xl">{pendientes}</div>
+            </div>
+          </>
+        }
+      />
 
       <section className="panel rounded-3xl p-5">
         <h2 className="text-lg font-semibold">Registrar ahora</h2>

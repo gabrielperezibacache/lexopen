@@ -5,6 +5,7 @@ import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
 import { PlazoForm } from "@/components/PlazoForm";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { requireStaff } from "@/lib/auth/session";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 type Props = {
   searchParams: Promise<{
@@ -59,20 +60,16 @@ export default async function PlazosPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            Gestión de términos
-          </p>
-          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Plazos</h1>
-          <p className="mt-2 text-[var(--ink-soft)]/80">
-            Plazos procesales, audiencias e internos. Envíelos a Google Calendar con un clic.
-          </p>
-        </div>
-        <Link className="btn btn-secondary" href="/agente?utility=plazos">
-          Analizar con copiloto
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Gestión de términos"
+        title="Plazos"
+        subtitle="Plazos procesales, audiencias e internos. Envíelos a Google Calendar con un clic."
+        actions={
+          <Link className="btn btn-secondary" href="/agente?utility=plazos">
+            Analizar con copiloto
+          </Link>
+        }
+      />
 
       <PlazoForm
         causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))}
@@ -87,15 +84,25 @@ export default async function PlazosPage({ searchParams }: Props) {
         }}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link className="btn btn-ghost" href={`/plazos?mes=${monthParam(prev)}`}>
-          Mes anterior
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <Link
+          className="btn btn-ghost order-2 flex-1 sm:order-1 sm:flex-none"
+          href={`/plazos?mes=${monthParam(prev)}`}
+          aria-label="Mes anterior"
+        >
+          ← <span className="sm:hidden">Ant.</span>
+          <span className="hidden sm:inline">Mes anterior</span>
         </Link>
-        <h2 className="text-lg font-semibold">
+        <h2 className="order-1 text-center text-lg font-semibold capitalize sm:order-2">
           Calendario {start.toLocaleDateString("es-CL", { month: "long", year: "numeric" })}
         </h2>
-        <Link className="btn btn-ghost" href={`/plazos?mes=${monthParam(next)}`}>
-          Mes siguiente
+        <Link
+          className="btn btn-ghost order-3 flex-1 sm:flex-none"
+          href={`/plazos?mes=${monthParam(next)}`}
+          aria-label="Mes siguiente"
+        >
+          <span className="sm:hidden">Sig.</span>
+          <span className="hidden sm:inline">Mes siguiente</span> →
         </Link>
       </div>
 

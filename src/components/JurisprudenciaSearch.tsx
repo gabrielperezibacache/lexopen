@@ -23,9 +23,9 @@ function SearchInner({
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid gap-3 rounded-3xl p-4 md:grid-cols-[1fr_220px_auto]">
+    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-4 sm:grid-cols-2 lg:grid-cols-[1fr_220px_auto]">
       <input
-        className="input"
+        className="input sm:col-span-2 lg:col-span-1"
         name="q"
         placeholder="Buscar por rol, doctrina, carátula, tags…"
         defaultValue={sp.get("q") || ""}

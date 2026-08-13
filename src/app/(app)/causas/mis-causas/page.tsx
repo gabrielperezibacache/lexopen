@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { validarRut } from "@/lib/chile";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 type Status = {
   enabled: boolean;
@@ -128,18 +129,11 @@ export default function MisCausasPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          ClaveÚnica · OJV
-        </p>
-        <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Mis Causas</h1>
-        <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          LexOpen corre en su host: la ClaveÚnica se cifra aquí (AES-GCM /
-          Postgres) y no la custodia CausaMonitor ni otro SaaS. El login OJV y
-          CAPTCHA sí usan APIs externas. Con las credenciales se lista Mis Causas
-          y se enciende monitoreo + sync (scrape o sidecar).
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="ClaveÚnica · OJV"
+        title="Mis Causas"
+        subtitle="LexOpen corre en su host: la ClaveÚnica se cifra aquí (AES-GCM / Postgres) y no la custodia CausaMonitor ni otro SaaS. El login OJV y CAPTCHA sí usan APIs externas. Con las credenciales se lista Mis Causas y se enciende monitoreo + sync (scrape o sidecar)."
+      />
 
       <div className="rounded-3xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
         Riesgo ToS / seguridad: guardar RUT y contraseña habilita el login

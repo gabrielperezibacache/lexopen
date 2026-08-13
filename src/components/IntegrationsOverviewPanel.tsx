@@ -125,7 +125,7 @@ export function IntegrationsOverviewPanel() {
       {!cards ? (
         <p className="text-sm text-[var(--ink-soft)]/65">Cargando estado…</p>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {cards.map((card) => (
             <a
               key={card.id}

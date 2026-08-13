@@ -11,6 +11,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -129,27 +130,21 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            Inicio del estudio
-          </p>
-          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">
-            {user ? `Hola, ${user.name.split(" ")[0]}` : "Inicio"}
-          </h1>
-          <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Clientes, causas, trámites pendientes, minutas y actividad del estudio.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/clientes" className="btn btn-secondary">
-            Clientes
-          </Link>
-          <Link href="/causas/nueva" className="btn btn-primary">
-            Nueva causa <ArrowRight size={16} />
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Inicio del estudio"
+        title={user ? `Hola, ${user.name.split(" ")[0]}` : "Inicio"}
+        subtitle="Clientes, causas, trámites pendientes, minutas y actividad del estudio."
+        actions={
+          <>
+            <Link href="/clientes" className="btn btn-secondary">
+              Clientes
+            </Link>
+            <Link href="/causas/nueva" className="btn btn-primary">
+              Nueva causa <ArrowRight size={16} />
+            </Link>
+          </>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(({ label, value, icon: Icon, href }) => (

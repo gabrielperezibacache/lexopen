@@ -5,6 +5,7 @@ import { FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react
 import { useSearchParams } from "next/navigation";
 import { safeJsonParse } from "@/lib/safe-json";
 import { MarkdownView } from "@/lib/markdown";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 type CausaOption = { id: string; titulo: string; rit: string | null };
 type SourceRef = {
@@ -585,17 +586,11 @@ function AgenteInner() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          Copiloto legal
-        </p>
-        <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Asistente LexOpen</h1>
-        <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Entiende lo que pide, recuerda el hilo y ancla la respuesta a la carpeta
-          investigativa, documentos indexados (OCR/Markdown), VDR vinculado y plazos
-          del host. Borradores siempre sujetos a revisión humana.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Copiloto legal"
+        title="Asistente LexOpen"
+        subtitle="Entiende lo que pide, recuerda el hilo y ancla la respuesta a la carpeta investigativa, documentos indexados (OCR/Markdown), VDR vinculado y plazos del host. Borradores siempre sujetos a revisión humana."
+      />
 
       {utilities.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

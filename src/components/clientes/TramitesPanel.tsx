@@ -241,10 +241,10 @@ export function TramitesPanel({
     return (
       <form
         onSubmit={(e) => void saveEdit(e, t.id)}
-        className="mt-2 grid gap-2 rounded-xl border border-dashed border-[var(--line)] p-2 md:grid-cols-2"
+        className="mt-2 grid grid-cols-1 gap-2 rounded-xl border border-dashed border-[var(--line)] p-2 sm:grid-cols-2"
       >
         <input
-          className="input md:col-span-2"
+          className="input sm:col-span-2"
           name="titulo"
           required
           defaultValue={t.titulo}
@@ -268,12 +268,12 @@ export function TramitesPanel({
           ))}
         </select>
         <input
-          className="input md:col-span-2"
+          className="input sm:col-span-2"
           name="detalle"
           defaultValue={t.detalle || ""}
           placeholder="Detalle opcional"
         />
-        <div className="flex gap-2 md:col-span-2">
+        <div className="flex flex-wrap gap-2 sm:col-span-2">
           <button className="btn btn-primary text-xs" disabled={busy} type="submit">
             Guardar
           </button>
@@ -327,7 +327,7 @@ export function TramitesPanel({
         </button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
             Pendientes ({pendientes.length})

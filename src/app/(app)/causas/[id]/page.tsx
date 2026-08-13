@@ -103,13 +103,13 @@ export default async function CausaDetailPage({ params }: Params) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <Link href="/causas" className="text-sm text-[var(--sea)]">
             ← Causas
           </Link>
           <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">{causa.titulo}</h1>
-          <p className="mt-2 text-[var(--ink-soft)]/80">
+          <p className="mt-2 break-words text-[var(--ink-soft)]/80">
             {causa.caratula || "Sin carátula"} · {causa.rit || "Sin RIT"}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
