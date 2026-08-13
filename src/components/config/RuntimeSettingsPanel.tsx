@@ -160,6 +160,9 @@ export function RuntimeSettingsPanel() {
           {ocr.reason && (
             <p className="mt-2 text-xs text-[var(--ink-soft)]/70">{ocr.reason}</p>
           )}
+          {ocr.hint && (
+            <p className="mt-2 text-xs text-[var(--ink-soft)]/80">{ocr.hint}</p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-[var(--line)] p-4">

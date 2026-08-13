@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import {
   applyHostFailClosedEnv,
+  ensureHostToolPath,
+  extraHostToolPathDirs,
   ensureStandaloneStaticAssets,
   loadEnvFile,
   preferEnvFileKeys,
@@ -114,5 +116,13 @@ assert.equal(
   fs.readFileSync(path.join(standaloneDir, "public", "favicon.ico"), "utf8"),
   "ico"
 );
+
+assert.ok(extraHostToolPathDirs("darwin").includes("/opt/homebrew/bin"));
+const slimPath = { PATH: "/usr/bin:/bin" };
+ensureHostToolPath(slimPath, "linux");
+assert.equal(slimPath.PATH, "/usr/bin:/bin");
+const macPath = { PATH: "/usr/bin:/bin" };
+ensureHostToolPath(macPath, "darwin");
+assert.match(macPath.PATH, /\/usr\/bin/);
 
 console.log("desktop/host-runtime.test.mjs OK");

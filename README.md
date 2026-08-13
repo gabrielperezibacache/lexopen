@@ -708,7 +708,10 @@ investigativa** completa (se preserva `ruta`). LexOpen conserva el original y ge
 Markdown extraído cuando es posible; ese texto alimenta el copiloto y la exportación
 a Obsidian/Drive. Los PDFs escaneados usan Tesseract local mediante un binding nativo
 que renderiza internamente; `pdftoppm` solo queda como fallback para plataformas sin
-ese binding. Si falta OCR, el documento queda marcado como `Requiere OCR`. Ningún
+ese binding. En macOS: `brew install tesseract tesseract-lang` (el Host también busca
+`/opt/homebrew/bin` si Homebrew no está en `PATH`). En Linux:
+`sudo apt install tesseract-ocr tesseract-ocr-spa`. Si falta OCR, el documento queda
+marcado como `Requiere OCR`. Ningún
 archivo se envía a Firecrawl.
 Ambas dependencias y el fallback OCR se ejecutan localmente; los bindings nativos
 se cargan según la plataforma del Host.

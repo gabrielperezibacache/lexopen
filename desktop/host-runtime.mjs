@@ -296,6 +296,40 @@ function bundledModuleFile(name, file) {
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 }
 
+export function extraHostToolPathDirs(platform = process.platform) {
+  if (platform === "darwin") return ["/opt/homebrew/bin", "/usr/local/bin"];
+  if (platform === "win32") {
+    return [
+      "C:\\Program Files\\Tesseract-OCR",
+      "C:\\Program Files (x86)\\Tesseract-OCR",
+    ];
+  }
+  return [];
+}
+
+/** GUI / launchd PATH often omits Homebrew; pdfdown-ocr looks up `tesseract` on PATH. */
+export function ensureHostToolPath(
+  env = process.env,
+  platform = process.platform
+) {
+  const dirs = extraHostToolPathDirs(platform).filter((dir) => fs.existsSync(dir));
+  const pathKey =
+    platform === "win32" && !env.PATH && env.Path ? "Path" : "PATH";
+  const sep = platform === "win32" ? ";" : ":";
+  const parts = String(env[pathKey] || "")
+    .split(sep)
+    .filter(Boolean);
+  const seen = new Set(parts.map((part) => part.toLowerCase()));
+  for (const dir of [...dirs].reverse()) {
+    if (seen.has(dir.toLowerCase())) continue;
+    parts.unshift(dir);
+    seen.add(dir.toLowerCase());
+  }
+  env[pathKey] = parts.join(sep);
+  if (platform === "win32") env.PATH = env[pathKey];
+  return env[pathKey];
+}
+
 function runtimeEnv(env = {}) {
   return process.versions.electron
     ? { ...env, ELECTRON_RUN_AS_NODE: "1" }
@@ -514,6 +548,7 @@ export async function startHost(options = {}) {
   preferEnvFileKeys(host.envFile, HOST_ENV_FILE_WINS, process.env);
   // Strip CI/shell relaxations that would fail instrumentation in NODE_ENV=production.
   applyHostFailClosedEnv(process.env);
+  ensureHostToolPath(process.env);
   // Reafirmar tras cargar .env (el archivo no debe pisar la versión del binario)
   process.env.LEXOPEN_APP_VERSION = version;
   process.env.LEXOPEN_DATA_DIR = dataDir;

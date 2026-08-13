@@ -8,6 +8,7 @@ type OcrStatus = {
   provider: string;
   version?: string;
   reason?: string;
+  hint?: string;
 };
 
 export function DocumentOcrStatus() {
@@ -37,8 +38,15 @@ export function DocumentOcrStatus() {
   }
   return (
     <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-      OCR local no disponible ({status.reason || "revise la configuración del Host"}).
-      Los PDFs escaneados quedarán marcados para reintento.
+      OCR local no disponible
+      {status.reason ? ` (${status.reason})` : ""}. Los PDFs escaneados
+      quedarán marcados para reintento.
+      {status.hint ? (
+        <>
+          {" "}
+          {status.hint}
+        </>
+      ) : null}
     </p>
   );
 }

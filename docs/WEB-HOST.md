@@ -123,7 +123,7 @@ páginas internamente:
 # Debian/Ubuntu
 sudo apt install tesseract-ocr tesseract-ocr-spa
 
-# macOS con Homebrew
+# macOS con Homebrew (el Host busca /opt/homebrew/bin aunque no esté en PATH)
 brew install tesseract tesseract-lang
 ```
 

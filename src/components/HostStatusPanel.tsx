@@ -53,6 +53,7 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
             {ocr.provider}
             {ocr.version ? ` · ${ocr.version}` : ""}
             {ocr.reason ? ` · ${ocr.reason}` : ""}
+            {ocr.hint ? ` · ${ocr.hint}` : ""}
           </div>
         </div>
         <div className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">

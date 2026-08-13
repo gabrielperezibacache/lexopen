@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs";
+import { existsSync, promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFile as execFileCallback } from "node:child_process";
@@ -14,6 +14,8 @@ export type OcrCapability = {
   provider: "pdfdown-ocr" | "tesseract-cli" | "disabled" | "unavailable";
   version?: string;
   reason?: string;
+  bin?: string;
+  hint?: string;
 };
 
 export type OcrPdfResult = {
@@ -31,6 +33,153 @@ function commandError(error: unknown) {
   return "";
 }
 
+function envPathKey(
+  env: Record<string, string | undefined>,
+  platform = process.platform
+) {
+  return platform === "win32" && !env.PATH && env.Path ? "Path" : "PATH";
+}
+
+export function extraOcrPathDirs(platform = process.platform) {
+  if (platform === "darwin") return ["/opt/homebrew/bin", "/usr/local/bin"];
+  if (platform === "win32") {
+    return [
+      "C:\\Program Files\\Tesseract-OCR",
+      "C:\\Program Files (x86)\\Tesseract-OCR",
+    ];
+  }
+  return [];
+}
+
+/** Homebrew / Program Files often missing from GUI, launchd and Electron PATH. */
+export function prependOcrPath(
+  env: Record<string, string | undefined> = process.env,
+  platform = process.platform,
+  dirs = extraOcrPathDirs(platform).filter((dir) => existsSync(dir))
+) {
+  const pathKey = envPathKey(env, platform);
+  const sep = platform === "win32" ? ";" : ":";
+  const parts = String(env[pathKey] || "")
+    .split(sep)
+    .filter(Boolean);
+  const seen = new Set(parts.map((part) => part.toLowerCase()));
+  for (const dir of [...dirs].reverse()) {
+    if (!dir || seen.has(dir.toLowerCase())) continue;
+    parts.unshift(dir);
+    seen.add(dir.toLowerCase());
+  }
+  env[pathKey] = parts.join(sep);
+  if (platform === "win32") env.PATH = env[pathKey];
+  return env[pathKey] || "";
+}
+
+export function tesseractBinCandidates(
+  env: Record<string, string | undefined> = process.env,
+  platform = process.platform
+) {
+  const configured = env.OCR_TESSERACT_BIN?.trim();
+  const fromDirs = extraOcrPathDirs(platform).map((dir) =>
+    platform === "win32" ? path.join(dir, "tesseract.exe") : path.join(dir, "tesseract")
+  );
+  return [
+    configured,
+    "tesseract",
+    ...fromDirs,
+    platform === "win32" ? null : "/usr/bin/tesseract",
+  ].filter((value, index, all): value is string =>
+    Boolean(value) && all.indexOf(value) === index
+  );
+}
+
+export function pdftoppmBinCandidates(
+  env: Record<string, string | undefined> = process.env,
+  platform = process.platform
+) {
+  const configured = env.OCR_PDFTOPPM_BIN?.trim();
+  const fromDirs = extraOcrPathDirs(platform).map((dir) =>
+    path.join(dir, platform === "win32" ? "pdftoppm.exe" : "pdftoppm")
+  );
+  return [
+    configured,
+    "pdftoppm",
+    ...fromDirs,
+    platform === "win32" ? null : "/usr/bin/pdftoppm",
+  ].filter((value, index, all): value is string =>
+    Boolean(value) && all.indexOf(value) === index
+  );
+}
+
+export function ocrInstallHint(platform = process.platform) {
+  if (platform === "darwin") {
+    return "En macOS: brew install tesseract tesseract-lang y reinicie el Host (npm run web:host).";
+  }
+  if (platform === "win32") {
+    return "En Windows instale Tesseract OCR y Poppler, y fije OCR_TESSERACT_BIN y OCR_PDFTOPPM_BIN en el .env del Host.";
+  }
+  return "En Linux: sudo apt install tesseract-ocr tesseract-ocr-spa y reinicie el Host.";
+}
+
+function guessTessdataDir(tesseractBin: string) {
+  const dir = path.dirname(tesseractBin);
+  return [
+    path.join(path.dirname(dir), "share", "tessdata"),
+    path.join(dir, "tessdata"),
+  ].find((candidate) => existsSync(candidate));
+}
+
+function exposeTesseractOnPath(tesseractBin: string) {
+  if (tesseractBin && tesseractBin !== "tesseract") {
+    prependOcrPath(process.env, process.platform, [path.dirname(tesseractBin)]);
+  }
+  if (!process.env.TESSDATA_PREFIX) {
+    const tessdata = guessTessdataDir(tesseractBin);
+    if (tessdata) process.env.TESSDATA_PREFIX = tessdata;
+  }
+}
+
+async function probeBin(bin: string, args: string[]) {
+  if (path.isAbsolute(bin) && !existsSync(bin)) {
+    return { ok: false as const, stdout: "", stderr: "" };
+  }
+  try {
+    const result = await execFile(bin, args, {
+      timeout: 3_000,
+      maxBuffer: 128 * 1024,
+      windowsHide: true,
+      encoding: "utf8",
+    });
+    return {
+      ok: true as const,
+      stdout: String(result.stdout || ""),
+      stderr: String(result.stderr || ""),
+    };
+  } catch {
+    return { ok: false as const, stdout: "", stderr: "" };
+  }
+}
+
+async function resolveTesseract() {
+  prependOcrPath();
+  for (const bin of tesseractBinCandidates()) {
+    const probed = await probeBin(bin, ["--version"]);
+    if (!probed.ok) continue;
+    exposeTesseractOnPath(bin);
+    const version =
+      (probed.stdout || probed.stderr).split(/\r?\n/, 1)[0] || undefined;
+    return { bin, version };
+  }
+  return null;
+}
+
+async function resolvePdftoppm() {
+  prependOcrPath();
+  for (const bin of pdftoppmBinCandidates()) {
+    const probed = await probeBin(bin, ["-v"]);
+    if (probed.ok) return bin;
+  }
+  return null;
+}
+
 export function getOcrCapability() {
   if (!capabilityPromise) {
     capabilityPromise = detectOcrCapability();
@@ -43,49 +192,46 @@ async function detectOcrCapability(): Promise<OcrCapability> {
     return { enabled: false, available: false, provider: "disabled" };
   }
 
-  const tesseract = process.env.OCR_TESSERACT_BIN || "tesseract";
-  let version: string | undefined;
-  try {
-    const result = await execFile(tesseract, ["--version"], {
-      timeout: 3_000,
-      maxBuffer: 128 * 1024,
-      windowsHide: true,
-      encoding: "utf8",
-    });
-    version = String(result.stdout || "").split(/\r?\n/, 1)[0] || undefined;
-  } catch (error) {
+  const found = await resolveTesseract();
+  if (!found) {
     return {
       enabled: true,
       available: false,
       provider: "unavailable",
-      reason:
-        commandError(error) === "ENOENT"
-          ? "tesseract_missing"
-          : "tesseract_unavailable",
+      reason: "tesseract_missing",
+      hint: ocrInstallHint(),
     };
   }
 
   try {
     await import("@d0paminedriven/pdfdown-ocr");
-    return { enabled: true, available: true, provider: "pdfdown-ocr", version };
+    return {
+      enabled: true,
+      available: true,
+      provider: "pdfdown-ocr",
+      version: found.version,
+      bin: found.bin,
+    };
   } catch {
-    const pdftoppm = process.env.OCR_PDFTOPPM_BIN || "pdftoppm";
-    try {
-      await execFile(pdftoppm, ["-v"], {
-        timeout: 3_000,
-        maxBuffer: 128 * 1024,
-        windowsHide: true,
-      });
-      return { enabled: true, available: true, provider: "tesseract-cli", version };
-    } catch {
+    const pdftoppm = await resolvePdftoppm();
+    if (pdftoppm) {
       return {
         enabled: true,
-        available: false,
-        provider: "unavailable",
-        version,
-        reason: "ocr_binding_and_pdftoppm_missing",
+        available: true,
+        provider: "tesseract-cli",
+        version: found.version,
+        bin: found.bin,
       };
     }
+    return {
+      enabled: true,
+      available: false,
+      provider: "unavailable",
+      version: found.version,
+      bin: found.bin,
+      reason: "ocr_binding_and_pdftoppm_missing",
+      hint: ocrInstallHint(),
+    };
   }
 }
 
@@ -200,14 +346,25 @@ export async function ocrPdfPages(
     };
   }
 
+  const found = await resolveTesseract();
+  if (!found) {
+    return {
+      status: "unavailable",
+      markdown: null,
+      pagesProcessed: [],
+      pagesFailed: selected.pages,
+      reason: "tesseract_missing",
+    };
+  }
+
   const bundledOcr = await tryPdfDownOcr(bytes, selected);
   if (bundledOcr) return bundledOcr;
 
+  const pdftoppm = (await resolvePdftoppm()) || process.env.OCR_PDFTOPPM_BIN || "pdftoppm";
+  const tesseract = found.bin;
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "lexopen-ocr-"));
   const pdfPath = path.join(root, "document.pdf");
   const renderPrefix = path.join(root, "page");
-  const tesseract = process.env.OCR_TESSERACT_BIN || "tesseract";
-  const pdftoppm = process.env.OCR_PDFTOPPM_BIN || "pdftoppm";
   const language = process.env.OCR_LANGUAGE || "spa+eng";
   const timeout = Math.max(
     5_000,
