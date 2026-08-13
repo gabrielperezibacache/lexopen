@@ -19,18 +19,21 @@ export function AppShell({
   showUpdateBanner?: boolean;
   children: React.ReactNode;
 }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  // Open only while still on the route where the menu was opened — closes on
+  // navigation without setState inside an effect (eslint react-hooks/set-state-in-effect).
+  const [menuPath, setMenuPath] = useState<string | null>(null);
+  const mobileOpen = menuPath === pathname;
   const { t } = useI18n();
 
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+  function setMobileOpen(open: boolean) {
+    setMenuPath(open ? pathname : null);
+  }
 
   useEffect(() => {
     if (!mobileOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileOpen(false);
+      if (event.key === "Escape") setMenuPath(null);
     };
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
