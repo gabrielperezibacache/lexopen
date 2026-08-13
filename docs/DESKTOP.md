@@ -1,7 +1,9 @@
 # LexOpen Desktop — PC principal + acceso remoto (Tailscale)
 
-LexOpen Desktop empaqueta el estudio como aplicación instalable en **macOS** y **Windows**.  
-La arquitectura es **un solo servidor local** (PC principal) y el resto de abogados/asistentes se conectan a esa instalación — no hay una base de datos por laptop.
+La instalación soportada es **clonar este repositorio** (como en el
+[README](../README.md#-empezar-guía-sencilla)), no un `.dmg` / `.exe`.
+LexOpen Desktop es el shell Electron opcional sobre el mismo Host local:
+un solo PC guarda los datos y el resto se conecta por Tailscale o el navegador.
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -23,27 +25,40 @@ La arquitectura es **un solo servidor local** (PC principal) y el resto de aboga
 
 | Rol | Qué hace |
 | --- | --- |
-| **Host** | Instala LexOpen Desktop en el PC que siempre queda encendido (o se enciende al abrir el estudio). Ahí se crean usuarios y vive la base de datos. |
-| **Cliente** | En otros equipos: abre LexOpen Desktop en modo «Conectar a servidor» o un navegador con la URL Tailscale del Host. Sesión = login LexOpen (mismo usuario que en el Host). |
+| **Host** | En el PC que queda encendido: `git clone` + `npm ci` + `npm run web:host` o `npm run desktop:dev`. Ahí se crean usuarios y vive la base de datos. |
+| **Cliente** | En otros equipos: navegador con la URL Tailscale/LAN del Host, o `npm run desktop:dev` en modo «Conectar a servidor». Sesión = login LexOpen. |
 
 No se sincronizan copias locales: **siempre** se trabaja contra la instalación del PC principal.
 
 ## Requisitos
 
-- **Host:** macOS 12+ o Windows 10/11, ~2 GB libres, Node no hace falta (va empaquetado).
-- **Cliente:** solo red Tailscale al Host (o LAN si están en la misma oficina).
+- **Host:** macOS 12+, Windows 10/11 o Linux; Node.js 22 (ver [`.nvmrc`](../.nvmrc)); Git; ~2 GB libres.
+- **Cliente:** red Tailscale al Host (o LAN si están en la misma oficina) y un navegador. Electron en los clientes es opcional.
 - **Tailscale:** cuenta del estudio; todos los PCs en el mismo tailnet. [tailscale.com](https://tailscale.com)
 
 ## Flujo de instalación (estudio)
 
-1. En el **PC principal**, instalar LexOpen Desktop y elegir **«Este PC es el servidor del estudio»**.
-2. El Host abre la configuración inicial para crear el primer administrador con una contraseña propia. Cargar datos demo es opcional y solo debe usarse para una evaluación. El `SESSION_SECRET` se genera solo en la carpeta de datos.
+1. En el **PC principal**, clone el repo y arranque el Host:
+
+   ```bash
+   git clone https://github.com/gabrielperezibacache/lexopen.git
+   cd lexopen
+   npm ci
+   npm run desktop:install
+   npm run desktop:dev
+   ```
+
+   O, sin Electron, el camino recomendado del README: `npm run web:host` y abra
+   `http://127.0.0.1:3000` en el navegador.
+2. En Desktop, elija **«Este PC es el servidor del estudio»**. El Host abre `/setup`
+   para crear el primer administrador. Cargar datos demo es opcional. El
+   `SESSION_SECRET` se genera solo en la carpeta de datos.
 3. Iniciar sesión y crear usuarios reales en LexOpen (People / configuración) — roles admin, abogado, asistente, cliente.
    Cada usuario puede cambiar su contraseña desde **Mi cuenta**.
 4. Instalar **Tailscale** en el Host y en cada laptop. Anotar el hostname MagicDNS, p. ej. `pc-estudio.tailXXXX.ts.net`.
-5. En cada otro equipo: instalar LexOpen Desktop → **«Conectar a un servidor»** → URL  
+5. En cada otro equipo: abra en el navegador  
    `http://pc-estudio.tailXXXX.ts.net:3000`  
-   (o abrir esa URL en el navegador).
+   (o, si usa el shell Electron, `npm run desktop:dev` → **«Conectar a un servidor»**).
 6. Cada persona inicia sesión con **su** usuario LexOpen.
 
 ### Tailscale Serve (opcional, HTTPS)
@@ -59,11 +74,12 @@ Use esa URL en los clientes. El CSRF de LexOpen acepta el `Host` de la petición
 
 ## Actualizaciones (repo en constante cambio)
 
-**Garantía:** publicar o instalar una versión nueva **no reescribe** configuración ni datos del usuario. Solo se reemplaza el binario de la app.
+**Garantía:** un `git pull` **no reescribe** configuración ni datos del usuario.
+Solo cambia el código del clon. Los datos viven fuera del repo.
 
-| Se actualiza (instalador) | Se preserva (fuera del .app / Program Files) |
+| Se actualiza (`git pull` + `npm ci`) | Se preserva (`LEXOPEN_DATA_DIR` / Application Support / %APPDATA%) |
 | --- | --- |
-| Código Next/Electron | `desktop-config.json` (modo Host/Cliente, URL Tailscale) |
+| Código Next/Electron del clon | `desktop-config.json` (modo Host/Cliente, URL Tailscale) |
 | Migraciones Prisma (al arrancar) | `.env` (secretos, LLM, S3, Google…) — merge: solo claves *faltantes* |
 | | `pgdata/` (Postgres embebido) |
 | | `storage/` (documentos locales) |
@@ -71,23 +87,16 @@ Use esa URL en los clientes. El CSRF de LexOpen acepta el `Host` de la petición
 
 ### Reconocimiento inmediato
 
-1. Al abrir el Host tras instalar, se escribe `app-state.json` con la nueva versión **antes** de migrar.
+1. Al abrir el Host tras un `git pull`, se escribe `app-state.json` con la nueva versión **antes** de migrar.
 2. `/api/health` expone `version` + `updateRecognized` con `Cache-Control: no-store`.
 3. Clientes Desktop consultan el health cada 15s; si el Host cambió de versión, **recargan al momento** (`?lexopen_v=`).
-4. Quien use solo el navegador ve la UI nueva en el siguiente refresh (sin reinstalar).
+4. Quien use solo el navegador ve la UI nueva en el siguiente refresh.
 
 Flujo operativo:
 
-1. Publicar release GitHub (`.dmg` / `.exe`) con `npm run desktop:dist`.
-2. En el **Host**: instalar encima (NSIS/macOS no tocan `%APPDATA%` / Application Support).
-3. Arrancar → log `Actualización reconocida: x → y` → `prisma migrate deploy` → listo.
-4. Clientes: si usan Desktop, recarga automática; si usan navegador, F5.
-
-En una instalación empaquetada, LexOpen comprueba GitHub Releases, no descarga
-silenciosamente y pide confirmación antes de descargar. Tras la descarga, solicita
-confirmación para cerrar ordenadamente el Host e instalar la actualización. La
-carpeta de datos se conserva; releases sin firma o sin metadata válida deben
-actualizarse manualmente.
+1. En el **Host**: `git pull origin main && npm ci`.
+2. Arrancar de nuevo (`npm run web:host` o `npm run desktop:dev`) → log `Actualización reconocida: x → y` → `prisma migrate deploy` → listo.
+3. Clientes: si usan Desktop, recarga automática; si usan navegador, F5.
 
 Datos del Host:
 
@@ -96,16 +105,17 @@ Datos del Host:
 | macOS | `~/Library/Application Support/LexOpen/` |
 | Windows | `%APPDATA%\LexOpen\` |
 
-> El instalador **nunca** debe apuntar `STORAGE_PATH` ni Postgres al directorio de la aplicación: van bajo esa carpeta de datos.
+> `STORAGE_PATH` y Postgres **nunca** deben apuntar al clon del repo (se mezclarían con `git pull`). Van bajo esa carpeta de datos o `LEXOPEN_DATA_DIR`.
 
 ## Desarrollo (desde el repo)
 
 ```bash
-# Dependencias del shell desktop
+git clone https://github.com/gabrielperezibacache/lexopen.git
+cd lexopen
 npm install
 npm --prefix desktop install
 
-# Host en desarrollo (Postgres embebido + next dev o start)
+# Host (Postgres embebido + next)
 npm run desktop:host
 
 # Shell Electron (tras tener el host arriba, o el propio Electron lo arranca en modo host)
@@ -117,32 +127,9 @@ alertas de plazos contra su propio endpoint cuando el `.env` del directorio de
 datos define `CRON_SECRET` y los intervalos (`PJUD_*_INTERVAL_MINUTES`,
 `PLAZOS_ALERTAS_INTERVAL_MINUTES`). Detalle en [`WEB-HOST.md`](./WEB-HOST.md).
 
-Build de instaladores (en la máquina objetivo o CI):
-
-```bash
-npm run build
-LEXOPEN_STANDALONE=1 npm run build   # genera .next/standalone
-npm run desktop:dist                 # electron-builder → .dmg / .exe
-npm run desktop:dist:linux           # electron-builder → .AppImage
-```
-
-Para releases reproducibles, cree un tag `vX.Y.Z` que coincida con las versiones
-de `package.json` y `desktop/package.json`. El workflow
-`.github/workflows/desktop-release.yml` ejecuta calidad, compila Linux/macOS/Windows
-y publica los artefactos en GitHub Releases.
-
-### Firma de instaladores
-
-Electron Builder firma automáticamente cuando el workflow recibe estos secrets:
-
-- `MAC_CSC_LINK`: certificado macOS Developer ID Application (`.p12`).
-- `MAC_CSC_KEY_PASSWORD`: contraseña del certificado macOS.
-- `WIN_CSC_LINK`: certificado Windows Code Signing (`.pfx`/`.p12`).
-- `WIN_CSC_KEY_PASSWORD`: contraseña del certificado Windows.
-- `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`: notarización macOS.
-
-Sin esos secrets el workflow genera artefactos válidos pero sin firma. La firma y
-notarización son necesarias para evitar advertencias de SmartScreen y Gatekeeper.
+El canal soportado de distribución es el clon Git, no `.dmg` / `.exe`. El
+árbol aún incluye `electron-builder` y `.github/workflows/desktop-release.yml`
+por si se necesita un paquete interno; no es el flujo de instalación del README.
 
 ## Seguridad
 
@@ -160,6 +147,5 @@ notarización son necesarias para evitar advertencias de SmartScreen y Gatekeepe
 ## Limitaciones actuales (v0.1 desktop)
 
 - Un solo Host activo (no multi-maestro).
-- La firma/notarización depende de los certificados del estudio y secrets del workflow.
-- Durante desarrollo (`electron .`) no se consulta el canal de actualizaciones.
-- El instalador empaquetado incluye el runtime; el desarrollo desde repo requiere Node 22.
+- La instalación soportada es el clon Git + Node 22; no se distribuye un instalador.
+- Durante `npm run desktop:dev` no se consulta el canal de actualizaciones empaquetado.

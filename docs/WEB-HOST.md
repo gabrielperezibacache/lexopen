@@ -75,7 +75,7 @@ npm run prod:check -- --health http://127.0.0.1:3000
 Use esta lista antes de cargar información real del estudio:
 
 1. **Datos persistentes:** `LEXOPEN_DATA_DIR` apunta a un disco local con backups
-   posibles (no a una carpeta temporal del instalador).
+   posibles (no a una carpeta temporal ni al clon de git).
 2. **Sin demo ni relajaciones CI:** en el `.env` del data dir,
    `LEXOPEN_DEMO_SWITCHER=0`, `HERMES_ALLOW_DEMO=0`, `LLM_ALLOW_DEMO=0`,
    `PJUD_ALLOW_DEMO=0`, y también `LEXOPEN_RELAX_CSRF=0`,

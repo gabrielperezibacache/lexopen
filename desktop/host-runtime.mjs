@@ -1,7 +1,7 @@
 /**
  * Arranca Postgres embebido + migraciones + servidor Next.
  * Bind: 127.0.0.1 por defecto; 0.0.0.0 solo con URL pública no-local o LEXOPEN_BIND.
- * Datos/config del usuario viven en LEXOPEN_DATA_DIR (fuera del instalador).
+ * Datos/config del usuario viven en LEXOPEN_DATA_DIR (fuera del clon).
  */
 import { createRequire } from "module";
 import { spawn } from "child_process";
@@ -423,7 +423,7 @@ function startNextServer(port, bindHost = "127.0.0.1") {
     "[lexopen-host] Usando `next start` (empaquetado: LEXOPEN_STANDALONE=1 npm run build)."
   );
   if (process.versions.electron) {
-    throw new Error("Falta .next/standalone/server.js en el instalador de LexOpen.");
+    throw new Error("Falta .next/standalone/server.js. Ejecute `npm run desktop:build` o `npm run web:host`.");
   }
   return spawn("npx", ["next", "start", "-H", host, "-p", String(port)], {
     cwd: repoRoot,

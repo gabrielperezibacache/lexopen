@@ -696,34 +696,25 @@ producción local.
 
 ## 🖥️ Aplicación desktop
 
-LexOpen Desktop empaqueta el Host local y un cliente remoto:
-
-```text
-PC principal / Host
-  Electron + Next.js + PostgreSQL embebido
-            │
-            └── Tailscale o LAN privada
-                  ├── LexOpen Desktop / Cliente
-                  └── Navegador
-```
-
-Guía detallada: [`docs/DESKTOP.md`](docs/DESKTOP.md).
-Para usar solo navegador sin instalar Electron en clientes, consulte
+El camino soportado es el mismo clon del README (`git clone` + Node 22). El shell
+Electron es **opcional**: el Host recomendado es `npm run web:host` y el resto
+entra con el navegador. Guía: [`docs/DESKTOP.md`](docs/DESKTOP.md) y
 [`docs/WEB-HOST.md`](docs/WEB-HOST.md).
 
 ```bash
-npm install
+git clone https://github.com/gabrielperezibacache/lexopen.git
+cd lexopen
+npm ci
 npm run desktop:install
-npm run desktop:test
 npm run desktop:dev
 ```
 
-En una instalación Host limpia, LexOpen abre `/setup` para crear el primer
-administrador con una contraseña propia; el seed demo es opcional y no es necesario
-para iniciar su práctica.
+En un Host limpio, LexOpen abre `/setup` para crear el primer administrador con
+una contraseña propia; el seed demo es opcional.
 
-Requiere Node 22 (ver [`.nvmrc`](.nvmrc)). Las actualizaciones del instalador no
-borran `Application Support` / `%APPDATA%\LexOpen` (config, Postgres, documentos).
+Requiere Node 22 (ver [`.nvmrc`](.nvmrc)). Un `git pull` no borra
+`Application Support` / `%APPDATA%\LexOpen` ni `LEXOPEN_DATA_DIR` (config,
+Postgres, documentos).
 
 Variables relevantes y completas: [`.env.example`](.env.example).
 
@@ -733,26 +724,8 @@ documentos, vault y configuración; contiene secretos y debe guardarse cifrado.
 Si se pierde la contraseña del administrador, **Recuperar contraseña admin…** abre
 un flujo local protegido por token y revoca las sesiones anteriores.
 
-Para generar instaladores de macOS y Windows:
-
-```bash
-LEXOPEN_STANDALONE=1 npm run build
-npm run desktop:dist
-npm run desktop:dist:linux  # Linux AppImage
-```
-
-La guía documenta macOS 12+ y Windows 10/11 como plataformas principales. El
-builder contiene un target AppImage para Linux. Los tags `vX.Y.Z` activan
-`.github/workflows/desktop-release.yml`, que compila los tres sistemas y publica
-los artefactos. La firma/notarización requiere certificados configurados como
-secrets; sin ellos los instaladores son unsigned. En builds empaquetados, LexOpen
-consulta releases, pide confirmación para descargar y detiene el Host de forma
-ordenada antes de instalar; durante desarrollo no se consulta el canal.
-
-El Host conserva configuración y datos fuera del directorio de la aplicación; los
-clientes desktop detectan cambios de versión del Host y recargan la interfaz. La
-descarga e instalación automática de nuevas versiones no debe asumirse como una
-capacidad operativa ya disponible.
+No se publica un `.dmg` / `.exe` como canal de instalación. Actualice con
+`git pull origin main && npm ci` y vuelva a arrancar el Host.
 
 ## 🔗 API
 
@@ -812,9 +785,9 @@ sync/digest/plazos también son locales (`npm run pjud:host` + intervalos en el
 
 ## 🔄 Cómo actualizar la aplicación
 
-Cuando GitHub Releases publica una versión más nueva que la del Host, quien usa
-la instalación ve un **aviso en la aplicación** con los pasos de actualización
-(se puede descartar por versión). También puede desactivar la consulta con
+Cuando hay una versión más nueva en GitHub, quien usa la instalación ve un
+**aviso en la aplicación** con los pasos de actualización (`git pull`; se puede
+descartar por versión). También puede desactivar la consulta con
 `LEXOPEN_UPDATE_CHECK=0`.
 
 Actualizar LexOpen reemplaza el **código** (y aplica migraciones de base de datos).
@@ -830,7 +803,7 @@ La carpeta de datos (`LEXOPEN_DATA_DIR`, Application Support / `%APPDATA%\LexOpe
    # Host web
    npm run web:backup -- --output /ruta/externa/lexopen-backup
 
-   # Desktop: menú LexOpen → Crear respaldo…
+   # Host (clon): menú LexOpen → Crear respaldo…
    ```
 
 3. **No ejecute** `npm run db:seed`, `npm run setup`, `npm run db:reset` ni
@@ -881,16 +854,19 @@ npm run build               # si usa next start en producción
 npm run start               # o npm run dev
 ```
 
-### Aplicación desktop
+### Shell desktop (clon del repo)
 
-1. Descargue el instalador nuevo desde [GitHub Releases](https://github.com/gabrielperezibacache/lexopen/releases)
-   (o acepte la actualización que ofrece el Host empaquetado).
-2. Instale **encima** en el PC Host: no se tocan `%APPDATA%\LexOpen` /
-   `~/Library/Application Support/LexOpen/`.
-3. Arranque el Host: aplicará migraciones y registrará la versión nueva.
-4. Clientes Desktop recargan solos al detectar el cambio; el navegador necesita F5.
+En el mismo clon del Host:
 
-Detalle del flujo y límites del auto-update: [`docs/DESKTOP.md`](docs/DESKTOP.md).
+```bash
+git pull origin main
+npm ci
+npm run desktop:install
+npm run desktop:dev
+```
+
+Los datos en Application Support / `%APPDATA%\LexOpen` no se tocan. Detalle:
+[`docs/DESKTOP.md`](docs/DESKTOP.md).
 
 ### Si algo falla
 
@@ -902,7 +878,7 @@ Detalle del flujo y límites del auto-update: [`docs/DESKTOP.md`](docs/DESKTOP.m
    npm run web:host
    ```
 
-   En desktop: **Restaurar respaldo…**.
+   En el clon desktop: **Restaurar respaldo…**.
 3. Abra un issue en GitHub con la versión anterior, la nueva y el error de
    `/api/health` o de la consola del Host.
 
@@ -932,7 +908,7 @@ Controles implementados en el código:
   LLM cifradas en reposo (`enc:v2`, migración de plaintext); tokens Google
   migran `enc:v1`→`enc:v2` y rechazan plaintext; rutas Obsidian/ingest
   confinadas; billing GET y creación de grupos con ACL más estricta; Desktop
-  con `sandbox`, allowlist de navegación y updater sin downgrade;
+  con `sandbox` y allowlist de navegación;
 - SSRF: bloqueo IPv6 ULA/mapped, nip.io/sslip.io; PDF backup solo `*.pjud.cl`;
   listados sin cuerpos/`storageKey`; miembros de site y visibilidad cliente
   admin-only;

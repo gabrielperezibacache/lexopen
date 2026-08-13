@@ -110,7 +110,7 @@ async function checkForUpdates(interactive = false) {
       await dialog.showMessageBox({
         type: "info",
         title: "LexOpen",
-        message: "La búsqueda de actualizaciones solo está disponible en el instalador.",
+        message: "En el clon del repo actualice con git pull origin main && npm ci.",
       });
     }
     return null;

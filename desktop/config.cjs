@@ -1,7 +1,7 @@
 /**
- * Preferencias y datos del usuario viven FUERA del instalador
- * (Application Support / %APPDATA%). Las actualizaciones solo
- * reemplazan el binario; nunca reescriben config ni pgdata/storage.
+ * Preferencias y datos del usuario viven FUERA del clon
+ * (Application Support / %APPDATA% / LEXOPEN_DATA_DIR). Un git pull
+ * nunca reescribe config ni pgdata/storage.
  */
 const fs = require("fs");
 const path = require("path");
@@ -107,7 +107,7 @@ function pgDataDir(dataDir = defaultDataDir()) {
   return path.join(dataDir, "pgdata");
 }
 
-/** true si la ruta de storage quedaría dentro del instalador (se borra al actualizar). */
+/** true si la ruta de storage quedaría dentro del clon (se mezclaría con git pull). */
 function isUnsafeStoragePath(storagePath, dataDir) {
   if (!storagePath) return true;
   const resolved = path.resolve(storagePath);
@@ -425,7 +425,7 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
   let finalMap = merged.map;
   let finalText = merged.text;
 
-  // Si STORAGE_PATH apunta dentro del instalador (se perdería al actualizar), corregir
+  // Si STORAGE_PATH apunta dentro del clon (se mezclaría con git pull), corregir
   if (isUnsafeStoragePath(finalMap.STORAGE_PATH, dataDir)) {
     const forced = parseEnvFile(finalText);
     forced.map.STORAGE_PATH = storageDir(dataDir);

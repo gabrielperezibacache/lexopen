@@ -100,50 +100,32 @@ export function UpdateAvailableBanner({ enabled }: { enabled: boolean }) {
 
       {openSteps && (
         <div className="mt-3 rounded-2xl border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--ink-soft)]/90">
-          {data.desktop ? (
-            <>
-              <p className="font-medium text-[var(--ink)]">Host desktop</p>
-              <ol className="mt-2 list-decimal space-y-1 pl-5">
-                <li>
-                  En el menú use <strong>Buscar actualizaciones…</strong> o instale el
-                  instalador nuevo desde GitHub Releases.
-                </li>
-                <li>
-                  Instale encima en el PC Host; no se borran Application Support /
-                  %APPDATA%\LexOpen.
-                </li>
-                <li>Arranque el Host (aplicará migraciones) y refresque los clientes.</li>
-              </ol>
-            </>
-          ) : (
-            <>
-              <p className="font-medium text-[var(--ink)]">Host web</p>
-              <ol className="mt-2 list-decimal space-y-1 pl-5">
-                <li>
-                  Respalde con el Host detenido:{" "}
-                  <code className="text-xs">npm run web:backup -- --output /ruta/backup</code>
-                </li>
-                <li>
-                  En el servidor del Host:{" "}
-                  <code className="text-xs">
-                    git pull origin main && npm ci
-                  </code>
-                </li>
-                <li>
-                  Arranque de nuevo:{" "}
-                  <code className="text-xs">
-                    LEXOPEN_DATA_DIR=… npm run web:host
-                  </code>{" "}
-                  (o reinicie el servicio systemd/launchd).
-                </li>
-                <li>
-                  Verifique{" "}
-                  <code className="text-xs">curl http://127.0.0.1:3000/api/health</code>{" "}
-                  y refresque el navegador (F5).
-                </li>
-              </ol>
-            </>
-          )}
+          <p className="font-medium text-[var(--ink)]">Host (clon del repositorio)</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5">
+            <li>
+              Respalde con el Host detenido:{" "}
+              <code className="text-xs">npm run web:backup -- --output /ruta/backup</code>
+              {data.desktop ? " (o menú LexOpen → Crear respaldo…)" : ""}
+            </li>
+            <li>
+              En el clon del Host:{" "}
+              <code className="text-xs">git pull origin main && npm ci</code>
+            </li>
+            <li>
+              Arranque de nuevo:{" "}
+              <code className="text-xs">
+                {data.desktop
+                  ? "npm run desktop:dev"
+                  : "LEXOPEN_DATA_DIR=… npm run web:host"}
+              </code>{" "}
+              (o reinicie el servicio systemd/launchd).
+            </li>
+            <li>
+              Verifique{" "}
+              <code className="text-xs">curl http://127.0.0.1:3000/api/health</code>{" "}
+              y refresque el navegador (F5).
+            </li>
+          </ol>
           <p className="mt-3 text-xs">
             Guía completa en el README:{" "}
             <a

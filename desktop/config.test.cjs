@@ -247,7 +247,7 @@ assert.equal(readAppState(tmp).lastAppVersion, "0.2.0");
 const r3 = recognizeAppVersion("0.2.0", tmp);
 assert.equal(r3.changed, false);
 
-// STORAGE_PATH bajo cwd/instalador se corrige a dataDir/storage
+// STORAGE_PATH bajo cwd/clon se corrige a dataDir/storage
 const {
   isUnsafeStoragePath,
   storageDir: storageDirFn,
