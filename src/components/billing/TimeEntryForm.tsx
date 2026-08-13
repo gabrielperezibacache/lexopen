@@ -42,7 +42,7 @@ export function TimeEntryForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid gap-3 rounded-3xl p-5 md:grid-cols-3">
+    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-3">
       <input className="input" type="date" name="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
       <input className="input" type="number" step="0.25" min="0.25" name="hours" required placeholder="Horas" />
       <select className="select" name="activityCode" defaultValue="drafting">

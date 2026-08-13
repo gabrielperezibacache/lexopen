@@ -16,7 +16,7 @@ const SECTIONS = [
 export function ConfigSectionNav() {
   return (
     <nav
-      className="panel sticky top-4 z-10 flex flex-wrap gap-2 rounded-3xl p-3"
+      className="panel z-10 flex flex-wrap gap-2 rounded-3xl p-3 md:sticky md:top-4"
       aria-label="Secciones de configuración"
     >
       {SECTIONS.map((s) => (

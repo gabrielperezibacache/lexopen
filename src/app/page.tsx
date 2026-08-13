@@ -24,19 +24,19 @@ export default function LandingPage() {
       <div className="hero-glow pointer-events-none absolute -right-24 top-0 h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(196,122,58,0.28),transparent_70%)]" />
       <div className="pointer-events-none absolute -left-20 top-40 h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(31,111,120,0.22),transparent_70%)]" />
 
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] text-white shadow-[0_12px_28px_rgba(196,122,58,0.35)]">
+      <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] text-white shadow-[0_12px_28px_rgba(196,122,58,0.35)]">
             <Scale size={20} />
           </span>
-          <div>
+          <div className="min-w-0">
             <div className="display text-2xl leading-none">LexOpen</div>
             <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]/70">
               {t("brand.openPlatform")}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <LanguageSwitcher variant="compact" />
           <Link href="/login" className="btn btn-ghost">
             {t("landing.signIn")}

@@ -25,7 +25,7 @@ export default async function SitePeoplePage({ params }: Params) {
   return (
     <div>
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/personas" />
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
           Miembros, roles del espacio y grupos con acceso (muros éticos / permisos).
         </p>

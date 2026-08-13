@@ -64,7 +64,7 @@ export default async function PlazosPage({ searchParams }: Props) {
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
             Gestión de términos
           </p>
-          <h1 className="display mt-2 text-4xl">Plazos</h1>
+          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Plazos</h1>
           <p className="mt-2 text-[var(--ink-soft)]/80">
             Plazos procesales, audiencias e internos. Envíelos a Google Calendar con un clic.
           </p>

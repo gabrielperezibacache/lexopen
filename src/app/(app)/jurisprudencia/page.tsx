@@ -46,7 +46,7 @@ export default async function JurisprudenciaPage({
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
           Base doctrinal
         </p>
-        <h1 className="display mt-2 text-4xl">Jurisprudencia</h1>
+        <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Jurisprudencia</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
           Consulte roles de Corte Suprema, Cortes de Apelaciones y Tribunal Constitucional.
           Corpus demo incluido; conecte su fuente oficial o scraper en producción.

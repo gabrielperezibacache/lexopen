@@ -61,7 +61,7 @@ export default async function ClientesPage({
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
             {t("crm.eyebrow")}
           </p>
-          <h1 className="display mt-2 text-4xl">{t("crm.title")}</h1>
+          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">{t("crm.title")}</h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
             {t("crm.subtitle")}
           </p>

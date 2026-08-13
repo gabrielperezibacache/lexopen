@@ -589,7 +589,7 @@ function AgenteInner() {
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
           Copiloto legal
         </p>
-        <h1 className="display mt-2 text-4xl">Asistente LexOpen</h1>
+        <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Asistente LexOpen</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
           Entiende lo que pide, recuerda el hilo y ancla la respuesta a la carpeta
           investigativa, documentos indexados (OCR/Markdown), VDR vinculado y plazos
@@ -624,7 +624,7 @@ function AgenteInner() {
           <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
             Cálculo interno de plazo
           </h2>
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="mb-1 block text-sm font-medium">Desde</label>
               <input
@@ -709,7 +709,7 @@ function AgenteInner() {
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <aside className="panel rounded-3xl p-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <h2 className="font-semibold">Conversaciones</h2>
             <button
               className="text-sm text-[var(--sea)]"

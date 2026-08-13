@@ -128,7 +128,7 @@ function NuevaCausaInner() {
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
           Alta de litigio
         </p>
-        <h1 className="display mt-2 text-4xl">Nueva causa</h1>
+        <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Nueva causa</h1>
       </div>
 
       <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">

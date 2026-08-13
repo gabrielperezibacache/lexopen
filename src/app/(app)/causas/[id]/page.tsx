@@ -108,7 +108,7 @@ export default async function CausaDetailPage({ params }: Params) {
           <Link href="/causas" className="text-sm text-[var(--sea)]">
             ← Causas
           </Link>
-          <h1 className="display mt-2 text-4xl">{causa.titulo}</h1>
+          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">{causa.titulo}</h1>
           <p className="mt-2 text-[var(--ink-soft)]/80">
             {causa.caratula || "Sin carátula"} · {causa.rit || "Sin RIT"}
           </p>
@@ -289,9 +289,9 @@ export default async function CausaDetailPage({ params }: Params) {
         />
       </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="panel rounded-3xl p-5 md:col-span-2">
-          <div className="flex items-center justify-between gap-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="panel rounded-3xl p-5 sm:col-span-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Minutas del expediente</h2>
             <Link href="/minutas" className="text-sm text-[var(--sea)]">
               Ver todas

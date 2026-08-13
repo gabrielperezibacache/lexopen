@@ -38,7 +38,7 @@ export function LedgerForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid gap-3 rounded-3xl p-5 md:grid-cols-4">
+    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4">
       <select className="select" name="tipo" defaultValue="provision">
         <option value="provision">Provisión de fondos</option>
         <option value="ajuste">Ajuste</option>

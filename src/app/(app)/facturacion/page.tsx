@@ -104,7 +104,7 @@ export default async function FacturacionPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <h2 className="text-lg font-semibold">Facturas recientes</h2>
             <Link href="/facturacion/facturas" className="text-sm text-[var(--sea)]">
               Ver todas
@@ -151,7 +151,7 @@ export default async function FacturacionPage() {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <h2 className="text-lg font-semibold">Horas recientes</h2>
             <Link href="/facturacion/horas" className="text-sm text-[var(--sea)]">
               Registrar

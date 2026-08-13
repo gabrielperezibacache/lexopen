@@ -35,7 +35,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="display text-4xl">{invoice.number}</h1>
+            <h1 className="display break-words text-2xl sm:text-3xl md:text-4xl">{invoice.number}</h1>
             <p className="mt-2 text-[var(--ink-soft)]/80">
               {docLabel} · {invoice.cliente.razonSocial}
               {invoice.causa ? ` · ${invoice.causa.rit || invoice.causa.titulo}` : ""}
@@ -95,6 +95,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
       </div>
 
       <section className="panel overflow-hidden rounded-3xl">
+        <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--ink)] text-white/90">
             <tr>
@@ -118,6 +119,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
             ))}
           </tbody>
         </table>
+          </div>
         <div className="space-y-1 border-t border-[var(--line)] px-4 py-4 text-sm">
           <div className="flex justify-between">
             <span>Subtotal</span>

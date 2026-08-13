@@ -49,7 +49,7 @@ export default async function DocumentosPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
             Repositorio por causa
           </p>
-          <h1 className="display mt-2 text-4xl">Documentos</h1>
+          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Documentos</h1>
           <p className="mt-2 text-[var(--ink-soft)]/80">
             Incorporación de escritos, carpetas investigativas y memos vinculados a causas —
             con extracción Markdown/OCR para el copiloto IA, Obsidian y Google Drive. El VDR
@@ -73,6 +73,7 @@ export default async function DocumentosPage() {
         />
       ) : (
         <div className="panel overflow-hidden rounded-3xl">
+          <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[var(--ink)] text-white/90">
               <tr>
@@ -170,6 +171,7 @@ export default async function DocumentosPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

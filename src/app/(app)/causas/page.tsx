@@ -50,7 +50,7 @@ export default async function CausasPage({
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
             Litigio Chile
           </p>
-          <h1 className="display mt-2 text-4xl">Causas judiciales</h1>
+          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Causas judiciales</h1>
           <p className="mt-2 text-[var(--ink-soft)]/80">
             RIT, RUC, tribunal, etapa procesal y equipo responsable.
           </p>

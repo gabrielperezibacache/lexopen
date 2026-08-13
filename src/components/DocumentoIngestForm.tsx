@@ -259,7 +259,7 @@ export function DocumentoIngestForm({
         }}
       />
 
-      <div className={`grid gap-3 ${compact ? "md:grid-cols-2" : "md:grid-cols-4"}`}>
+      <div className={`grid gap-3 grid-cols-1 ${compact ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
         <div>
           <label className="mb-1 block text-sm font-medium">Tipo</label>
           <select

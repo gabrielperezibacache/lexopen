@@ -32,7 +32,7 @@ import { cn } from "@/lib/chile";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useI18n } from "@/components/i18n/I18nProvider";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 type NavItem = {
   href: string;
@@ -285,7 +285,33 @@ export function AppSidebar({
   onMobileOpenChange?: (open: boolean) => void;
 }) {
   const { t } = useI18n();
+  const drawerRef = useRef<HTMLElement>(null);
   const close = () => onMobileOpenChange?.(false);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const root = drawerRef.current;
+    if (!root) return;
+    const focusable = root.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    first?.focus();
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || focusable.length === 0) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
 
   return (
     <>
@@ -313,6 +339,7 @@ export function AppSidebar({
           onClick={close}
         />
         <aside
+          ref={drawerRef}
           id="lexopen-mobile-nav"
           className={cn(
             "absolute left-0 top-0 flex h-full w-[min(20rem,88vw)] flex-col bg-[linear-gradient(180deg,#0c1c24_0%,#14313d_55%,#1a3d3f_100%)] text-white shadow-2xl transition-transform duration-200 ease-out",

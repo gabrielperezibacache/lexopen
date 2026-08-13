@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ReactNode } from "react";
 import { cn } from "@/lib/chile";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import { pageTitleClass } from "@/components/ui";
 
 export function SiteNav({
   siteId,
@@ -41,39 +42,47 @@ export function SiteNav({
   return (
     <div className="mb-6 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <Link href={clientView ? "/portal" : "/sites"} className="text-sm text-[var(--sea)]">
             {clientView ? t("siteTabs.backToPortal") : t("siteTabs.backToSites")}
           </Link>
-          <div className="mt-2 flex items-center gap-3">
-            <span className="h-4 w-4 rounded-full" style={{ background: color }} />
-            <h1 className="display text-2xl sm:text-3xl md:text-4xl">{siteName}</h1>
+          <div className="mt-2 flex min-w-0 items-start gap-3">
+            <span
+              className="mt-1.5 h-4 w-4 shrink-0 rounded-full"
+              style={{ background: color }}
+            />
+            <h1 className={cn(pageTitleClass, "mt-0")} title={siteName}>
+              {siteName}
+            </h1>
           </div>
           <p className="mt-1 text-sm uppercase tracking-[0.14em] text-[var(--ink-soft)]/60">
             {tipoLabel} · {t("siteTabs.spaceLabel")}
           </p>
         </div>
       </div>
-      <div className="-mx-1 overflow-x-auto overscroll-x-contain border-b border-[var(--line)] pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max gap-1 px-1">
-          {visibleTabs.map((tab) => {
-            const href = `/sites/${siteId}${tab.href}`;
-            const isActive = active === tab.href;
-            return (
-              <Link
-                key={tab.href || "overview"}
-                href={href}
-                className={cn(
-                  "rounded-t-lg px-3 py-2.5 text-sm font-medium whitespace-nowrap transition touch-manipulation",
-                  isActive
-                    ? "bg-white text-[var(--ink)] shadow-sm"
-                    : "text-[var(--ink-soft)]/70 hover:text-[var(--ink)]"
-                )}
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-8 bg-gradient-to-l from-[var(--paper)] to-transparent md:hidden" />
+        <div className="-mx-1 overflow-x-auto overscroll-x-contain border-b border-[var(--line)] pb-1 [scrollbar-width:thin]">
+          <div className="flex min-w-max gap-1 px-1">
+            {visibleTabs.map((tab) => {
+              const href = `/sites/${siteId}${tab.href}`;
+              const isActive = active === tab.href;
+              return (
+                <Link
+                  key={tab.href || "overview"}
+                  href={href}
+                  className={cn(
+                    "rounded-t-lg px-3 py-2.5 text-sm font-medium whitespace-nowrap transition touch-manipulation",
+                    isActive
+                      ? "bg-white text-[var(--ink)] shadow-sm"
+                      : "text-[var(--ink-soft)]/70 hover:text-[var(--ink)]"
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -97,10 +106,48 @@ export function ModuleHeader({
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
           {eyebrow}
         </p>
-        <h1 className="display mt-2 text-2xl sm:text-3xl md:text-4xl">{title}</h1>
+        <h1 className={pageTitleClass}>{title}</h1>
         {subtitle && (
-          <p className="mt-2 max-w-2xl text-sm text-[var(--ink-soft)]/80 sm:text-base">{subtitle}</p>
+          <p className="mt-2 max-w-2xl text-sm text-[var(--ink-soft)]/80 sm:text-base">
+            {subtitle}
+          </p>
         )}
+      </div>
+      {actions ? (
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+          {actions}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Shared page header for list routes that are not ModuleHeader yet. */
+export function PageHeader({
+  eyebrow,
+  title,
+  subtitle,
+  actions,
+}: {
+  eyebrow?: string;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        {eyebrow ? (
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
+            {eyebrow}
+          </p>
+        ) : null}
+        <h1 className={cn(pageTitleClass, !eyebrow && "mt-0")}>{title}</h1>
+        {subtitle ? (
+          <div className="mt-2 max-w-2xl text-sm text-[var(--ink-soft)]/80 sm:text-base">
+            {subtitle}
+          </div>
+        ) : null}
       </div>
       {actions ? (
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">

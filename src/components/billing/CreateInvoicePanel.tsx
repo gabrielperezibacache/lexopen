@@ -85,7 +85,7 @@ export function CreateInvoicePanel({
 
       {open && (
         <form onSubmit={onSubmit} className="mt-5 space-y-4 border-t border-[var(--line)] pt-5">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <select className="select" value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
               {clientes.map((c) => (
                 <option key={c.id} value={c.id}>

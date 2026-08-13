@@ -160,7 +160,7 @@ export function PjudQuickAddPanel() {
       </div>
 
       {mode === "rol" ? (
-        <form ref={rolFormRef} className="grid gap-3 md:grid-cols-4">
+        <form ref={rolFormRef} className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <input
             className="input"
             name="rit"
@@ -168,7 +168,7 @@ export function PjudQuickAddPanel() {
             placeholder="ROL/RIT (C-100-2024)"
           />
           <select
-            className="input md:col-span-2"
+            className="input sm:col-span-2"
             name="tribunal"
             required
             defaultValue=""
@@ -201,7 +201,7 @@ export function PjudQuickAddPanel() {
             </button>
           </div>
           <input
-            className="input md:col-span-4"
+            className="input sm:col-span-2 lg:col-span-4"
             name="titulo"
             placeholder="Carátula opcional"
           />
@@ -209,7 +209,7 @@ export function PjudQuickAddPanel() {
       ) : (
         <form onSubmit={onBuscarRut} className="flex flex-wrap gap-2">
           <input
-            className="input max-w-xs"
+            className="input w-full max-w-xs"
             name="rut"
             required
             placeholder="RUT litigante (12.345.678-9)"

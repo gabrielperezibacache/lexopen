@@ -323,10 +323,10 @@ export function PeopleManager({
                   key={u.id}
                   className="rounded-2xl border border-[var(--line)] px-4 py-3"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
                       <span
-                        className="grid h-10 w-10 place-items-center rounded-full text-xs font-bold text-white"
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-bold text-white"
                         style={{ background: u.avatarColor }}
                       >
                         {u.name
@@ -335,8 +335,8 @@ export function PeopleManager({
                           .map((p) => p[0])
                           .join("")}
                       </span>
-                      <div>
-                        <div className="font-medium">
+                      <div className="min-w-0">
+                        <div className="font-medium break-words">
                           {u.name}
                           {u.id === currentUserId ? (
                             <span className="ml-2 text-xs text-[var(--sea)]">
@@ -344,14 +344,14 @@ export function PeopleManager({
                             </span>
                           ) : null}
                         </div>
-                        <div className="text-xs text-[var(--ink-soft)]/65">
+                        <div className="break-words text-xs text-[var(--ink-soft)]/65">
                           {u.email} · {u.title || "Sin cargo"}
                         </div>
                       </div>
                     </div>
                     {canManage ? (
                       <select
-                        className="select max-w-[140px]"
+                        className="select w-full max-w-[140px] sm:w-auto"
                         value={u.role}
                         aria-label={`Rol de ${u.name}`}
                         onChange={(e) => updateRole(u.id, e.target.value)}

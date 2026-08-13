@@ -113,6 +113,7 @@ export default async function AuditoriaPage({ searchParams }: Props) {
         />
       ) : (
         <div className="panel overflow-hidden rounded-3xl">
+          <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[var(--ink)] text-white/90">
               <tr>
@@ -149,6 +150,7 @@ export default async function AuditoriaPage({ searchParams }: Props) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

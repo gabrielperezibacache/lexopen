@@ -132,7 +132,7 @@ export default function MisCausasPage() {
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
           ClaveÚnica · OJV
         </p>
-        <h1 className="display mt-2 text-4xl">Mis Causas</h1>
+        <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Mis Causas</h1>
         <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
           LexOpen corre en su host: la ClaveÚnica se cifra aquí (AES-GCM /
           Postgres) y no la custodia CausaMonitor ni otro SaaS. El login OJV y
@@ -179,7 +179,7 @@ export default function MisCausasPage() {
           <p className="text-xs text-[var(--copper)]">{status.lastSyncNote}</p>
         )}
 
-        <form onSubmit={saveCredentials} className="grid gap-3 md:grid-cols-3">
+        <form onSubmit={saveCredentials} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <input
             className="input"
             name="rut"

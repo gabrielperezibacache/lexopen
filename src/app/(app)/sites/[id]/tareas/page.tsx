@@ -24,7 +24,7 @@ export default async function SiteTasksPage({ params }: Params) {
   return (
     <div>
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/tareas" />
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
           Gestión de proyecto — asignación, prioridad y fechas límite.
         </p>

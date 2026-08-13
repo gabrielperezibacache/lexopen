@@ -134,14 +134,14 @@ export default async function DashboardPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
             Inicio del estudio
           </p>
-          <h1 className="display mt-2 text-2xl sm:text-3xl md:text-4xl">
+          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">
             {user ? `Hola, ${user.name.split(" ")[0]}` : "Inicio"}
           </h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
             Clientes, causas, trámites pendientes, minutas y actividad del estudio.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/clientes" className="btn btn-secondary">
             Clientes
           </Link>
@@ -164,8 +164,8 @@ export default async function DashboardPage() {
       </div>
 
       <section className="panel rounded-3xl p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold">Trámites a seguir</h2>
             <p className="text-sm text-[var(--ink-soft)]/70">
               {tramitesPendientesCount} abiertos
@@ -215,7 +215,7 @@ export default async function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <h2 className="text-lg font-semibold">Espacios recientes</h2>
             <Link href="/sites" className="text-sm text-[var(--sea)]">
               Todos
@@ -250,7 +250,7 @@ export default async function DashboardPage() {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <h2 className="text-lg font-semibold">Mis tareas</h2>
             <Link href="/tareas" className="text-sm text-[var(--sea)]">
               Ver todas
@@ -287,7 +287,7 @@ export default async function DashboardPage() {
       </div>
 
       <section className="panel rounded-3xl p-5">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <h2 className="text-lg font-semibold">Minutas recientes</h2>
           <Link href="/minutas" className="text-sm text-[var(--sea)]">
             Ver todas

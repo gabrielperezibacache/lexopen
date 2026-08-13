@@ -411,10 +411,10 @@ export function TramitesPanel({
 
       <form
         onSubmit={(e) => void createTramite(e)}
-        className="grid gap-2 rounded-2xl border border-dashed border-[var(--line)] p-3 md:grid-cols-4"
+        className="grid grid-cols-1 gap-2 rounded-2xl border border-dashed border-[var(--line)] p-3 sm:grid-cols-2 lg:grid-cols-4"
       >
         <input
-          className="input md:col-span-2"
+          className="input sm:col-span-2"
           name="titulo"
           required
           placeholder="Nuevo trámite pendiente"
@@ -423,7 +423,7 @@ export function TramitesPanel({
         <button className="btn btn-primary" disabled={busy} type="submit">
           Agregar
         </button>
-        <select className="select md:col-span-2" name="responsableId" defaultValue="">
+        <select className="select sm:col-span-2" name="responsableId" defaultValue="">
           <option value="">Responsable (yo por defecto)</option>
           {responsables.map((u) => (
             <option key={u.id} value={u.id}>
@@ -432,7 +432,7 @@ export function TramitesPanel({
           ))}
         </select>
         <input
-          className="input md:col-span-2"
+          className="input sm:col-span-2"
           name="detalle"
           placeholder="Detalle opcional"
         />

@@ -25,7 +25,7 @@ export default async function SiteISheetsPage({ params }: Params) {
   return (
     <div>
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/isheets" />
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <p className="mt-1 max-w-2xl text-sm text-[var(--ink-soft)]/75">
           iSheets — tablas estructuradas colaborativas (seguimiento procesal, issues log, reporting).
         </p>

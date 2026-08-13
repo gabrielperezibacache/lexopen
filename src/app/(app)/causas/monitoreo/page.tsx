@@ -190,7 +190,7 @@ export default function MonitoreoCausasPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
             Seguimiento judicial
           </p>
-          <h1 className="display mt-2 text-4xl">Monitoreo de causas</h1>
+          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Monitoreo de causas</h1>
           <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
             Cartera en su host con semáforos, sync y cola — paridad de flujo
             CausaMonitor. Puede llamar OJV/CAPTCHA/partner; los datos y el vault
@@ -363,33 +363,35 @@ export default function MonitoreoCausasPage() {
         </section>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            ["todas", "Todas"],
-            ["monitoreadas", "Monitoreadas"],
-            ["fallidas", "Fallidas"],
-            ["verde", "Al día"],
-            ["amarillo", "Amarillas"],
-            ["rojo", "Rojas"],
-            ["gris", "Sin datos"],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            className={`rounded-full border px-3 py-1 text-sm ${
-              filter === key
-                ? "border-[var(--sea)] bg-[var(--sea)]/10 text-[var(--ink)]"
-                : "border-[var(--line)] text-[var(--ink-soft)]/75"
-            }`}
-            onClick={() => setFilter(key)}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["todas", "Todas"],
+              ["monitoreadas", "Monitoreadas"],
+              ["fallidas", "Fallidas"],
+              ["verde", "Al día"],
+              ["amarillo", "Amarillas"],
+              ["rojo", "Rojas"],
+              ["gris", "Sin datos"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={`rounded-full border px-3 py-1 text-sm ${
+                filter === key
+                  ? "border-[var(--sea)] bg-[var(--sea)]/10 text-[var(--ink)]"
+                  : "border-[var(--line)] text-[var(--ink-soft)]/75"
+              }`}
+              onClick={() => setFilter(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <input
-          className="input ml-auto max-w-xs"
+          className="input w-full max-w-xs sm:ml-auto"
           placeholder="Buscar RIT, título, sala, cliente…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
