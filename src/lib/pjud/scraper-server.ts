@@ -224,7 +224,7 @@ export function createScraperServer() {
       return send(res, 404, { error: "Not found" });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const status = error instanceof PjudScrapeError ? 502 : 500;
+      const status = error instanceof PjudScrapeError ? error.status || 502 : 500;
       return send(res, status, { error: message });
     }
   });

@@ -22,9 +22,11 @@ function secretKey() {
     process.env.PJUD_SECRETS_KEY?.trim() || process.env.SESSION_SECRET?.trim();
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "PJUD_SECRETS_KEY o SESSION_SECRET requerido para cifrar secretos PJUD/ClaveÚnica"
-      );
+      const err = new Error(
+        "Falta SESSION_SECRET (o PJUD_SECRETS_KEY) para cifrar la ClaveÚnica. Revise el .env del directorio de datos del Host y reinicie."
+      ) as Error & { status: number };
+      err.status = 503;
+      throw err;
     }
     return createHash("sha256").update("lexopen-dev-only").digest();
   }

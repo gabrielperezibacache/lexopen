@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
-import { validarRut } from "@/lib/chile";
+import { httpError } from "@/lib/auth/access";
+import { normalizarRut, validarRut } from "@/lib/chile";
 import { decryptSecret, encryptSecret, maskRut, secretsKeySource } from "@/lib/pjud/secret";
 import {
   scrapeMisCausasWithClaveUnica,
@@ -70,21 +71,25 @@ export async function getClaveUnicaStatus() {
   };
 }
 
+/** RUT del titular ClaveÚnica; 400 si el dígito verificador no calza. */
+export function parseClaveUnicaRut(raw: string): string {
+  const normalized = normalizarRut(raw.trim());
+  if (!validarRut(normalized)) {
+    throw httpError(
+      "RUT ClaveÚnica inválido. Revise el dígito verificador (el ejemplo 12.345.678-9 no es un RUT válido).",
+      400
+    );
+  }
+  return normalized;
+}
+
 export async function saveClaveUnicaCredentials(opts: {
   rut: string;
   password: string;
   enabled?: boolean;
 }) {
   const { settings } = await getOrCreateFirmSettings();
-  const raw = opts.rut.trim();
-  const normalized = raw.replace(/\./g, "").replace(/\s/g, "").toUpperCase();
-  const dashed = normalized.includes("-")
-    ? normalized
-    : `${normalized.slice(0, -1)}-${normalized.slice(-1)}`;
-  if (!validarRut(raw) && !validarRut(dashed)) {
-    throw new Error("RUT ClaveÚnica inválido");
-  }
-  const storedRut = validarRut(raw) ? raw : dashed;
+  const storedRut = parseClaveUnicaRut(opts.rut);
   return prisma.firmSettings.update({
     where: { id: settings.id },
     data: {
@@ -121,17 +126,18 @@ export async function setClaveUnicaEnabled(enabled: boolean) {
 async function resolveMisCausasList(): Promise<MisCausasItem[]> {
   const { settings } = await getOrCreateFirmSettings();
   if (!settings.claveUnicaEnabled) {
-    throw new Error("ClaveÚnica deshabilitada en el estudio.");
+    throw httpError("ClaveÚnica deshabilitada en el estudio.", 409);
   }
   if (!settings.claveUnicaRut || !settings.claveUnicaPasswordEnc) {
-    throw new Error("Configure RUT y contraseña ClaveÚnica primero.");
+    throw httpError("Configure RUT y contraseña ClaveÚnica primero.", 400);
   }
   const password = decryptSecret(settings.claveUnicaPasswordEnc, {
     strict: true,
   });
   if (!password) {
-    throw new Error(
-      "No se pudo descifrar la contraseña ClaveÚnica (re-guarde con PJUD_SECRETS_KEY/SESSION_SECRET)."
+    throw httpError(
+      "No se pudo descifrar la contraseña ClaveÚnica (re-guarde con PJUD_SECRETS_KEY/SESSION_SECRET).",
+      400
     );
   }
 

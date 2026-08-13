@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { validarRut } from "@/lib/chile";
 
 type Status = {
   enabled: boolean;
@@ -31,8 +32,11 @@ export default function MisCausasPage() {
 
   async function load() {
     const res = await fetch("/api/pjud/mis-causas");
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMsg(data.error || "No se pudo cargar el estado de ClaveÚnica");
+      return;
+    }
     setStatus(data.status || null);
   }
 
@@ -52,13 +56,22 @@ export default function MisCausasPage() {
     setBusy(true);
     setMsg("");
     const fd = new FormData(e.currentTarget);
+    const rut = String(fd.get("rut") || "");
+    const password = String(fd.get("password") || "");
+    if (!validarRut(rut)) {
+      setBusy(false);
+      setMsg(
+        "RUT ClaveÚnica inválido. Revise el dígito verificador (el ejemplo 12.345.678-9 no es un RUT válido)."
+      );
+      return;
+    }
     const res = await fetch("/api/pjud/claveunica", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "save",
-        rut: fd.get("rut"),
-        password: fd.get("password"),
+        rut,
+        password,
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -170,7 +183,7 @@ export default function MisCausasPage() {
             className="input"
             name="rut"
             required
-            placeholder="RUT ClaveÚnica (12.345.678-9)"
+            placeholder="RUT ClaveÚnica (12.345.678-5)"
             autoComplete="username"
           />
           <input
@@ -239,7 +252,11 @@ export default function MisCausasPage() {
           </Link>
         </div>
         {msg && (
-          <p className="text-sm text-[var(--ink-soft)]/80" role="status">
+          <p
+            className="text-sm text-[var(--copper)]"
+            role="status"
+            data-testid="claveunica-msg"
+          >
             {msg}
           </p>
         )}

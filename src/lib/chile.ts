@@ -102,13 +102,23 @@ export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
-/** Valida RUT chileno (con o sin puntos; con guión). */
+/** Guiones tipográficos (en-dash, em-dash, minus) → hyphen ASCII. */
+function rutCuerpoDv(rut: string): { body: string; dv: string } | null {
+  const clean = rut
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/\./g, "")
+    .replace(/\s/g, "")
+    .toUpperCase();
+  const m = clean.match(/^(\d{7,8})-?([\dK])$/);
+  if (!m) return null;
+  return { body: m[1], dv: m[2] };
+}
+
+/** Valida RUT chileno (con o sin puntos; guión opcional). */
 export function validarRut(rut: string): boolean {
-  const clean = rut.replace(/\./g, "").replace(/\s/g, "").toUpperCase();
-  const m = clean.match(/^(\d{7,8})-([\dK])$/);
-  if (!m) return false;
-  const body = m[1];
-  const dv = m[2];
+  const parts = rutCuerpoDv(rut);
+  if (!parts) return false;
+  const { body, dv } = parts;
   let sum = 0;
   let mul = 2;
   for (let i = body.length - 1; i >= 0; i--) {
@@ -133,8 +143,7 @@ export function validarRuc(ruc: string): boolean {
 }
 
 export function normalizarRut(rut: string): string {
-  const clean = rut.replace(/\./g, "").replace(/\s/g, "").toUpperCase();
-  const m = clean.match(/^(\d{7,8})-?([\dK])$/);
-  if (!m) return rut.trim();
-  return `${m[1]}-${m[2]}`;
+  const parts = rutCuerpoDv(rut);
+  if (!parts) return rut.trim();
+  return `${parts.body}-${parts.dv}`;
 }

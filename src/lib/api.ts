@@ -24,19 +24,33 @@ export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+function isPrismaSchemaMismatch(e: unknown) {
+  if (e && typeof e === "object" && "code" in e) {
+    const code = String((e as { code: unknown }).code);
+    if (code === "P2021" || code === "P2022") return true;
+  }
+  const msg = e instanceof Error ? e.message : "";
+  return /does not exist in the current database|The column .* does not exist/i.test(
+    msg
+  );
+}
+
 export function handleRouteError(e: unknown) {
   if (e && typeof e === "object" && "status" in e) {
     const status = Number((e as { status: number }).status) || 500;
-    const message =
-      status >= 500 && process.env.NODE_ENV === "production"
-        ? "Error interno"
-        : e instanceof Error
-          ? e.message
-          : "Error";
+    // Errores con `.status` son mensajes curados (httpError, CSRF, scrape).
+    const message = e instanceof Error ? e.message : "Error";
     return jsonError(message, status);
   }
   if (e instanceof ZodError) {
     return jsonError(e.errors.map((x) => x.message).join("; "), 400);
+  }
+  if (isPrismaSchemaMismatch(e)) {
+    console.error(e);
+    return jsonError(
+      "La base de datos no tiene el esquema actual. Reinicie el Host para aplicar migraciones.",
+      503
+    );
   }
   console.error(e);
   return jsonError(

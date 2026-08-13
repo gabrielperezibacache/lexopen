@@ -83,9 +83,11 @@ export async function assertPublicScrapeRuntime() {
 }
 
 export class PjudScrapeError extends Error {
-  constructor(message: string) {
+  status: number;
+  constructor(message: string, status = 502) {
     super(message);
     this.name = "PjudScrapeError";
+    this.status = status;
   }
 }
 
@@ -916,16 +918,21 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
 }): Promise<MisCausasItem[]> {
   if (process.env.PJUD_CLAVEUNICA_SCRAPE !== "1") {
     throw new PjudScrapeError(
-      "PJUD_CLAVEUNICA_SCRAPE!=1: automatización ClaveÚnica deshabilitada."
+      "Automatización ClaveÚnica deshabilitada. En el .env del Host ponga PJUD_CLAVEUNICA_SCRAPE=1 y reinicie.",
+      409
     );
   }
   if (!publicScrapeEnabled()) {
-    throw new PjudScrapeError("Active también PJUD_PUBLIC_SCRAPE=1.");
+    throw new PjudScrapeError(
+      "Active también PJUD_PUBLIC_SCRAPE=1 en el .env del Host y reinicie.",
+      409
+    );
   }
   if (!captchaSolverConfigured()) {
     throw new PjudScrapeError(
       captchaConfigErrorMessage() ||
-        "CAPTCHA solver requerido para ClaveÚnica/OJV."
+        "CAPTCHA solver requerido para ClaveÚnica/OJV (CAPTCHA_SOLVER_PROVIDER + CAPTCHA_SOLVER_API_KEY).",
+      409
     );
   }
 
