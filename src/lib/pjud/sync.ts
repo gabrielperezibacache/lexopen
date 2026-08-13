@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { httpError } from "@/lib/auth/access";
 import {
   diasEntre,
   semaforoPorDiasSinMovimiento,
@@ -151,7 +152,7 @@ export async function syncCausaPjud(
         },
       }),
     ]);
-    throw e;
+    throw httpError(note, 502);
   }
 
   if (fetchResult.provider === "none") {

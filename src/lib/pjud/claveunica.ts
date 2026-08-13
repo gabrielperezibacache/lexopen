@@ -79,7 +79,9 @@ export async function getClaveUnicaStatus() {
       "Automatización bloqueada (PJUD_CLAVEUNICA_SCRAPE=0 en el .env del Host)."
     );
   }
-  const canUseSidecar = Boolean(sidecarHealth?.reachable);
+  const canUseSidecar = Boolean(
+    sidecarHealth?.reachable && sidecarHealth.scrapeReady !== false
+  );
   const canUseInProcess = publicScrapeReady();
   if (!canUseSidecar && !canUseInProcess) {
     if (sidecar && !sidecarHealth?.reachable) {
@@ -88,6 +90,10 @@ export async function getClaveUnicaStatus() {
           sidecarHealth?.error ? ` (${sidecarHealth.error})` : ""
         }. Arranque \`npm run pjud:scraper\` o quite PJUD_SCRAPER_URL.`
       );
+    } else if (sidecar && sidecarHealth?.reachable && sidecarHealth.scrapeReady === false) {
+      blockers.push(
+        "Sidecar arriba pero scrape no listo (CAPTCHA/PJUD_PUBLIC_SCRAPE en el worker). Active scrape in-process o configure CAPTCHA en el sidecar."
+      );
     }
     if (!publicScrape) {
       blockers.push("Active PJUD_PUBLIC_SCRAPE=1 para scrape in-process.");
@@ -95,7 +101,7 @@ export async function getClaveUnicaStatus() {
       blockers.push(
         "Configure CAPTCHA_SOLVER_PROVIDER (+ API_KEY si aplica) para scrape OJV."
       );
-    } else {
+    } else if (!(sidecar && sidecarHealth?.reachable)) {
       blockers.push(
         "Scrape in-process no está listo (revisar Playwright/Chromium: npm run pjud:chromium)."
       );
@@ -196,6 +202,10 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
     const health = await probeScraperSidecarHealth();
     if (!health.reachable) {
       sidecarError = new Error(health.error || "sidecar no responde");
+    } else if (health.scrapeReady === false) {
+      sidecarError = new Error(
+        "sidecar arriba pero scrapeReady=false (CAPTCHA / PJUD_PUBLIC_SCRAPE en el worker)"
+      );
     } else {
       try {
         const fromSidecar = await fetchMisCausasFromSidecar({
@@ -354,15 +364,17 @@ export async function syncMisCausas(opts?: {
     }));
   }
 
-  const syncFailed = syncResults.filter((r) => r.status === "failed").length;
-  const syncOk = syncResults.filter((r) => r.status !== "failed").length;
+  const syncFailed = syncResults.filter(
+    (r) => r.status === "failed" || r.status === "error"
+  ).length;
+  const syncOk = syncResults.length - syncFailed;
   const insertedTotal = syncResults.reduce(
     (sum, r) => sum + (r.inserted || 0),
     0
   );
   let lastSyncStatus: string = "ok";
   if (syncResults.length > 0 && syncFailed === syncResults.length) {
-    lastSyncStatus = "partial";
+    lastSyncStatus = "failed";
   } else if (syncFailed > 0) {
     lastSyncStatus = "partial";
   }

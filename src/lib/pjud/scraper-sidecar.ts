@@ -223,7 +223,9 @@ export async function fetchFromScraperSidecar(
     signal: AbortSignal.timeout(90_000),
   });
   if (!res.ok) {
-    throw new Error(`Scraper sidecar HTTP ${res.status}`);
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    const detail = body.error?.trim() || `HTTP ${res.status}`;
+    throw new Error(`Scraper sidecar: ${detail}`);
   }
   const text = await res.text();
   if (text.length > 5 * 1024 * 1024) {
@@ -264,7 +266,9 @@ export async function fetchMisCausasFromSidecar(opts: {
     signal: AbortSignal.timeout(120_000),
   });
   if (!res.ok) {
-    throw new Error(`Scraper Mis Causas HTTP ${res.status}`);
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    const detail = body.error?.trim() || `HTTP ${res.status}`;
+    throw new Error(`Scraper Mis Causas: ${detail}`);
   }
   const data = z
     .object({

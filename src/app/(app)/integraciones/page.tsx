@@ -53,6 +53,16 @@ function IntegracionesInner() {
   const [google, setGoogle] = useState<GoogleStatus | null>(null);
   const [llmInfo, setLlmInfo] = useState("");
   const [captcha, setCaptcha] = useState<CaptchaStatus | null>(null);
+  const [claveUnica, setClaveUnica] = useState<{
+    enabled?: boolean;
+    hasPassword?: boolean;
+    scrapeFlag?: boolean;
+    readyToSync?: boolean;
+    blockers?: string[];
+    lastSyncStatus?: string | null;
+    lastSyncNote?: string | null;
+    sidecarReachable?: boolean;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/integrations/google")
@@ -87,6 +97,10 @@ function IntegracionesInner() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setCaptcha(d))
       .catch(() => setCaptcha(null));
+    fetch("/api/pjud/mis-causas")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setClaveUnica(d?.status || null))
+      .catch(() => setClaveUnica(null));
   }, []);
 
   async function syncObsidian() {
@@ -278,6 +292,33 @@ function IntegracionesInner() {
             )}
             {captcha.honesty && (
               <p className="text-xs text-[var(--ink-soft)]/70">{captcha.honesty}</p>
+            )}
+            {claveUnica && (
+              <div className="rounded-xl border border-[var(--line)] bg-white/60 px-3 py-2 text-xs text-[var(--ink-soft)]/80">
+                <div>
+                  ClaveÚnica:{" "}
+                  <strong className="text-[var(--ink)]">
+                    {claveUnica.readyToSync
+                      ? "lista para sync"
+                      : claveUnica.hasPassword
+                        ? "credenciales OK, sync bloqueado"
+                        : "sin credenciales"}
+                  </strong>
+                  {claveUnica.lastSyncStatus
+                    ? ` · último ${claveUnica.lastSyncStatus}`
+                    : ""}
+                </div>
+                {claveUnica.lastSyncNote && (
+                  <p className="mt-1 text-[var(--copper)]">{claveUnica.lastSyncNote}</p>
+                )}
+                {claveUnica.blockers && claveUnica.blockers.length > 0 && (
+                  <ul className="mt-1 list-disc pl-4 text-rose-800">
+                    {claveUnica.blockers.slice(0, 3).map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
             {captcha.captcha?.providers && (
               <ul className="grid gap-2 sm:grid-cols-2">
