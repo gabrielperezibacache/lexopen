@@ -193,6 +193,8 @@ export function publicLlmConfig(config: LlmConfig) {
   };
 }
 
+export { llmEnvSnippet } from "@/lib/integrations/llm-env-snippet";
+
 export function applyPreset(
   preset: LlmPreset,
   current?: Partial<LlmConfig>

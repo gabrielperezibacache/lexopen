@@ -6,6 +6,7 @@ import {
   LLM_PRESET_CATALOG,
   legalSystemPrompt,
   looksLikeSse,
+  llmEnvSnippet,
   parseChatCompletionBody,
   sanitizeLlmMessages,
 } from "./llm";
@@ -125,5 +126,22 @@ const sseParseError = new SyntaxError(
   `Unexpected token 'd', "data: {"id"... is not valid JSON`
 );
 assert.match(describeLlmProviderError(sseParseError), /stream SSE/);
+
+assert.equal(
+  llmEnvSnippet({
+    apiUrl: "https://openrouter.ai/api/v1/",
+    model: "openai/gpt-4o-mini",
+    allowDemo: false,
+    apiKey: "sk-secret",
+  }),
+  [
+    "LLM_API_URL=https://openrouter.ai/api/v1",
+    "LLM_API_KEY=••••",
+    "LLM_MODEL=openai/gpt-4o-mini",
+    "LLM_ALLOW_DEMO=0",
+    "# Compat: HERMES_API_URL / HERMES_API_KEY / HERMES_ALLOW_DEMO",
+  ].join("\n")
+);
+assert.match(llmEnvSnippet({ apiUrl: "https://api.openai.com/v1" }), /LLM_API_KEY=\n/);
 
 console.log("integrations/llm.test.ts OK");

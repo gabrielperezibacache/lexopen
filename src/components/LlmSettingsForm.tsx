@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { llmEnvSnippet } from "@/lib/integrations/llm-env-snippet";
 
 type PresetKey = "openai" | "azure" | "groq" | "ollama" | "hermes" | "custom";
 
@@ -224,12 +225,17 @@ export function LlmSettingsForm() {
       </div>
 
       <div className="rounded-2xl border border-[var(--line)] bg-white/60 p-4 text-xs text-[var(--ink-soft)]/75">
-        <p className="font-medium text-[var(--ink)]">Variables de entorno (prioridad base)</p>
-        <pre className="mt-2 overflow-x-auto rounded-xl bg-[var(--ink)] p-3 text-[11px] text-white/85">{`LLM_API_URL=https://api.openai.com/v1
-LLM_API_KEY=
-LLM_MODEL=gpt-4o-mini
-LLM_ALLOW_DEMO=0
-# Compat: HERMES_API_URL / HERMES_API_KEY / HERMES_ALLOW_DEMO`}</pre>
+        <p className="font-medium text-[var(--ink)]">
+          Equivalente .env (sigue el formulario)
+        </p>
+        <p className="mt-1 text-[var(--ink-soft)]/70">
+          Al pulsar Guardar IA esto queda en el Host (Postgres). No hace falta
+          editar el <code>.env</code> salvo que quiera fijar el valor al arrancar.
+        </p>
+        <pre
+          className="mt-2 overflow-x-auto rounded-xl bg-[var(--ink)] p-3 text-[11px] text-white/85"
+          data-testid="llm-env-snippet"
+        >{llmEnvSnippet(config)}</pre>
       </div>
 
       <div className="flex flex-wrap gap-2">
