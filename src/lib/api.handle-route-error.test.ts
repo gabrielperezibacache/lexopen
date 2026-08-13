@@ -11,6 +11,8 @@ async function jsonError(res: Response) {
 async function main() {
   const env = process.env as Record<string, string | undefined>;
   const previousNodeEnv = env.NODE_ENV;
+  const previousError = console.error;
+  console.error = () => {};
   env.NODE_ENV = "production";
 
   try {
@@ -51,6 +53,7 @@ async function main() {
     assert.equal(schema.status, 503);
     assert.match(schema.error, /esquema actual/);
   } finally {
+    console.error = previousError;
     if (previousNodeEnv === undefined) delete env.NODE_ENV;
     else env.NODE_ENV = previousNodeEnv;
   }
