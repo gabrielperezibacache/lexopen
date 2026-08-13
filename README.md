@@ -63,6 +63,7 @@
 - [Empezar (guía sencilla)](#-empezar-guía-sencilla)
 - [Inicio rápido](#-inicio-rápido)
 - [Instalación web 100% local](#-instalación-web-100-local)
+- [Reabrir el Host](#reabrir-una-instalación-existente)
 - [Usuarios demo y pasar a producción](#-usuarios-demo-y-pasar-a-producción)
 - [Configuración](#-configuración)
 - [Integraciones](#-integraciones)
@@ -285,6 +286,34 @@ LEXOPEN_DATA_DIR=/ruta/lexopen-data npm run web:host
 # Windows PowerShell
 $env:LEXOPEN_DATA_DIR="$HOME\LexOpenData"; npm run web:host
 ```
+
+### Reabrir una instalación existente
+
+No vuelva a clonar ni ejecute `npm ci`, `db:seed` o `setup` solo para arrancar.
+En el mismo clon:
+
+```bash
+cd lexopen
+npm run web:host
+```
+
+Abra `http://127.0.0.1:3000`. Los datos siguen en la carpeta predeterminada del
+sistema (`~/Library/Application Support/LexOpen/` en macOS,
+`%APPDATA%\LexOpen\` en Windows, `~/.local/share/LexOpen` en Linux) o en
+`LEXOPEN_DATA_DIR` si lo definió al instalar.
+
+Si usó una carpeta de datos propia, repita la misma variable:
+
+```bash
+# macOS / Linux
+LEXOPEN_DATA_DIR=/ruta/lexopen-data npm run web:host
+
+# Windows PowerShell
+$env:LEXOPEN_DATA_DIR="$HOME\LexOpenData"; npm run web:host
+```
+
+Si usa el shell Electron en lugar del navegador: `npm run desktop:dev`.
+Detenga el Host con `Ctrl+C`.
 
 ### Primer acceso
 
