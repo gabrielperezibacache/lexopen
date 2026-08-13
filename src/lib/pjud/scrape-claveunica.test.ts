@@ -10,6 +10,7 @@ import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import {
   PjudScrapeError,
   claveUnicaAutomationAllowed,
+  pjudPlaywrightInstallHint,
   publicScrapeEnabled,
   publicScrapeReady,
   scrapeMisCausasWithClaveUnica,
@@ -94,6 +95,9 @@ async function main() {
   env.PJUD_CLAVEUNICA_SCRAPE = "1";
   assert.equal(claveUnicaAutomationAllowed(false), true);
   delete env.PJUD_CLAVEUNICA_SCRAPE;
+
+  assert.match(pjudPlaywrightInstallHint(), /pjud:chromium/);
+  assert.match(pjudPlaywrightInstallHint(), /web:host/);
 
   await assert.rejects(
     () => scrapeMisCausasWithClaveUnica({ rut: "12345678-5", password: "x" }),

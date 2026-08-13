@@ -7,6 +7,8 @@ import {
   ensureHostToolPath,
   extraHostToolPathDirs,
   ensureStandaloneStaticAssets,
+  ensureStandalonePlaywright,
+  repoNodePath,
   loadEnvFile,
   preferEnvFileKeys,
   setupPendingMessage,
@@ -116,6 +118,32 @@ assert.equal(
   fs.readFileSync(path.join(standaloneDir, "public", "favicon.ico"), "utf8"),
   "ico"
 );
+
+const pwSrc = path.join(cloneRoot, "node_modules", "playwright");
+const pwCoreSrc = path.join(cloneRoot, "node_modules", "playwright-core");
+fs.mkdirSync(path.join(pwSrc, "lib"), { recursive: true });
+fs.mkdirSync(pwCoreSrc, { recursive: true });
+fs.writeFileSync(path.join(pwSrc, "index.js"), "module.exports = { chromium: true };");
+fs.writeFileSync(path.join(pwSrc, "package.json"), '{"name":"playwright","version":"1.0.0"}');
+fs.writeFileSync(path.join(pwCoreSrc, "index.js"), "module.exports = {};");
+fs.writeFileSync(
+  path.join(pwCoreSrc, "package.json"),
+  '{"name":"playwright-core","version":"1.0.0"}'
+);
+assert.equal(ensureStandalonePlaywright(cloneEntry, cloneRoot), 2);
+assert.equal(
+  fs.readFileSync(
+    path.join(standaloneDir, "node_modules", "playwright", "index.js"),
+    "utf8"
+  ),
+  "module.exports = { chromium: true };"
+);
+assert.ok(
+  fs.existsSync(path.join(standaloneDir, "node_modules", "playwright-core", "index.js"))
+);
+const nodePath = repoNodePath(cloneRoot, "");
+assert.equal(nodePath, path.join(cloneRoot, "node_modules"));
+assert.match(repoNodePath(cloneRoot, "/tmp/other"), /node_modules/);
 
 assert.ok(extraHostToolPathDirs("darwin").includes("/opt/homebrew/bin"));
 const slimPath = { PATH: "/usr/bin:/bin" };

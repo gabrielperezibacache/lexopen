@@ -40,6 +40,8 @@ import {
   parseSalaFromHtml,
   parseVerDetalleJuridicaHtml,
 } from "@/lib/pjud/parse-html";
+import { createRequire } from "node:module";
+import path from "node:path";
 import type { MisCausasItem } from "@/lib/pjud/types";
 import { type PjudCausaRef, type PjudFetchedMovimiento } from "@/lib/pjud/types";
 
@@ -50,9 +52,27 @@ export function publicScrapeEnabled() {
   return process.env.PJUD_PUBLIC_SCRAPE === "1";
 }
 
+/** Comando único para Host clone: paquete npm + binario Chromium. */
+export function pjudPlaywrightInstallHint() {
+  const linux =
+    process.platform === "linux"
+      ? " En Debian/Ubuntu también: `npx playwright install-deps chromium`."
+      : "";
+  return `En el clon: npm ci && npm run pjud:chromium.${linux} Reinicie npm run web:host.`;
+}
+
+function playwrightSearchRoots() {
+  const roots = [
+    process.env.LEXOPEN_APP_ROOT,
+    process.cwd(),
+    path.resolve(process.cwd(), "..", ".."),
+  ].filter((value): value is string => Boolean(value));
+  return [...new Set(roots.map((root) => path.resolve(root)))];
+}
+
 export async function playwrightAvailable() {
   try {
-    const pw = await import("playwright");
+    const pw = await loadPlaywright();
     return Boolean(pw.chromium);
   } catch {
     return false;
@@ -90,7 +110,7 @@ export async function assertPublicScrapeRuntime() {
   }
   if (!(await playwrightAvailable())) {
     throw new PjudScrapeError(
-      "Playwright/Chromium no disponible. Instale `playwright` (`npx playwright install chromium`) o use PJUD_SCRAPER_URL."
+      `Playwright/Chromium no disponible. ${pjudPlaywrightInstallHint()}`
     );
   }
 }
@@ -167,10 +187,25 @@ async function loadPlaywright() {
   try {
     return await import("playwright");
   } catch {
-    throw new PjudScrapeError(
-      "Playwright no está disponible. Instale `playwright` y Chromium, o configure PJUD_SCRAPER_URL."
-    );
+    // Next standalone often omits the traced package; resolve from the clone.
   }
+  for (const root of playwrightSearchRoots()) {
+    const candidates = [
+      path.join(root, "package.json"),
+      path.join(root, "node_modules", "playwright", "index.js"),
+      path.join(root, "node_modules", "playwright", "package.json"),
+    ];
+    for (const from of candidates) {
+      try {
+        return createRequire(from)("playwright") as typeof import("playwright");
+      } catch {
+        // try next candidate
+      }
+    }
+  }
+  throw new PjudScrapeError(
+    `Playwright no está disponible. ${pjudPlaywrightInstallHint()}`
+  );
 }
 
 type PlaywrightPage = import("playwright").Page;
@@ -212,7 +247,7 @@ export async function launchPjudBrowser(): Promise<PjudBrowserLaunch> {
       const chrome =
         chromeError instanceof Error ? chromeError.message : String(chromeError);
       throw new PjudScrapeError(
-        `Browser no arranca (Chromium: ${bundled}; Chrome: ${chrome}). Ejecute npm run pjud:chromium o instale Google Chrome.`
+        `Browser no arranca (Chromium: ${bundled}; Chrome: ${chrome}). ${pjudPlaywrightInstallHint()} Opcional: instale Google Chrome.`
       );
     }
   }

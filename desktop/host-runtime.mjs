@@ -452,6 +452,48 @@ export function ensureStandaloneStaticAssets(entry, appRoot = repoRoot) {
   return destStatic;
 }
 
+function sameNpmPackageVersion(src, dest) {
+  try {
+    const a = JSON.parse(fs.readFileSync(path.join(src, "package.json"), "utf8"));
+    const b = JSON.parse(fs.readFileSync(path.join(dest, "package.json"), "utf8"));
+    return Boolean(a.version && a.version === b.version);
+  } catch {
+    return false;
+  }
+}
+
+const STANDALONE_PLAYWRIGHT_PACKAGES = ["playwright", "playwright-core"];
+
+/**
+ * Next standalone traces a subset of node_modules. Dynamic `import("playwright")`
+ * is often omitted, so ClaveÚnica/OJV scrape fails even after `npm ci`.
+ */
+export function ensureStandalonePlaywright(entry, appRoot = repoRoot) {
+  const standaloneDir = path.dirname(entry);
+  const destNm = path.join(standaloneDir, "node_modules");
+  let copied = 0;
+  for (const name of STANDALONE_PLAYWRIGHT_PACKAGES) {
+    const src = path.join(appRoot, "node_modules", name);
+    const dest = path.join(destNm, name);
+    if (!fs.existsSync(src)) continue;
+    if (!sameNpmPackageVersion(src, dest)) {
+      copyDirIfDistinct(src, dest);
+    }
+    copied += 1;
+  }
+  return copied;
+}
+
+export function repoNodePath(appRoot = repoRoot, existing = "") {
+  const extra = path.join(appRoot, "node_modules");
+  const parts = String(existing || "")
+    .split(path.delimiter)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (!parts.includes(extra)) parts.unshift(extra);
+  return parts.join(path.delimiter);
+}
+
 /** @deprecated Use ensureStandaloneStaticAssets */
 export function assertStandaloneStaticAssets(entry, appRoot = repoRoot) {
   return ensureStandaloneStaticAssets(entry, appRoot);
@@ -469,6 +511,14 @@ function startNextServer(port, bindHost = "127.0.0.1") {
 
   if (resolved.type === "standalone") {
     ensureStandaloneStaticAssets(resolved.entry, repoRoot);
+    const pwCopied = ensureStandalonePlaywright(resolved.entry, repoRoot);
+    env.LEXOPEN_APP_ROOT = repoRoot;
+    env.NODE_PATH = repoNodePath(repoRoot, env.NODE_PATH);
+    if (pwCopied === 0) {
+      console.warn(
+        "[lexopen-host] Falta el paquete playwright. En el clon: npm ci && npm run pjud:chromium"
+      );
+    }
     console.log("[lexopen-host] Usando Next standalone:", resolved.entry);
     return spawn(process.execPath, [resolved.entry], {
       cwd: path.dirname(resolved.entry),

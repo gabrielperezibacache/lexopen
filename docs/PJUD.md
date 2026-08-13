@@ -121,9 +121,10 @@ Opción recomendada: **sidecar Playwright + solver CAPTCHA** en el mismo host
 que LexOpen. El web habla con `127.0.0.1:8787`; CAPTCHA/OJV son APIs externas.
 
 ```bash
-# 1) Una vez
-cp .env.example .env   # complete CAPTCHA_SOLVER_* y PJUD_SCRAPER_KEY
+# 1) Una vez (paquete npm + binario Chromium)
+npm ci
 npm run pjud:chromium
+# Debian/Ubuntu: npx playwright install-deps chromium
 
 # 2) Sidecar (valida CAPTCHA y espera /health)
 npm run pjud:host

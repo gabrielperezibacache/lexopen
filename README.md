@@ -265,6 +265,8 @@ la ejecución.
 - Red LAN si habrá clientes en otros equipos.
 - **Tesseract** (opcional) para OCR de PDFs escaneados. Sin él, Documentos muestra
   «OCR local no disponible (tesseract_missing)» y esos PDF quedan para reintento.
+- **Chromium de Playwright** (una vez) para scrape PJUD / ClaveÚnica / Mis Causas.
+  `npm ci` instala el paquete; el navegador se descarga con `npm run pjud:chromium`.
 
 ### Instalación
 
@@ -318,6 +320,41 @@ El Host busca también `/opt/homebrew/bin` (Homebrew en Apple Silicon) aunque no
 esté en `PATH`. Recargue Documentos: debe verse «OCR local disponible». Los PDF
 marcados como «Requiere OCR» se pueden reintentar. Detalle:
 [`docs/WEB-HOST.md`](docs/WEB-HOST.md#ocr-local-para-pdfs-escaneados).
+
+### Chromium para PJUD / ClaveÚnica
+
+El scrape de Oficina Judicial Virtual (Mis Causas y movimientos) usa el
+paquete npm `playwright` (entra con `npm ci`) y un Chromium aparte (~150 MB,
+una vez por máquina). Sin ese binario verá
+«Playwright no está disponible».
+
+```bash
+cd lexopen
+npm ci
+npm run pjud:chromium
+npm run web:host
+```
+
+En Debian / Ubuntu instale también las librerías del sistema de Chromium:
+
+```bash
+npx playwright install-deps chromium
+npm run pjud:chromium
+```
+
+En macOS y Windows basta `npm run pjud:chromium` (no hace falta apt). Si ya
+tiene Google Chrome, LexOpen puede usarlo como respaldo.
+
+Luego, en el mismo clon:
+
+```bash
+git pull origin main
+npm run web:host
+```
+
+No reconstruya un `.dmg`. Detalle:
+[`docs/WEB-HOST.md`](docs/WEB-HOST.md#chromium-para-pjud--claveunica) y
+[`docs/PJUD.md`](docs/PJUD.md).
 
 ### Reabrir una instalación existente
 
@@ -640,7 +677,7 @@ variables más relevantes:
 | `LLM_ALLOW_DEMO` | No | Demo etiquetado si el proveedor IA no responde (`0` = fail-closed). |
 | `PJUD_API_URL`, `PJUD_API_KEY` | No | Conector partner para sincronizar movimientos judiciales. |
 | `PJUD_SCRAPER_URL`, `PJUD_SCRAPER_KEY` | No | Sidecar scrape (lookup + Mis Causas). |
-| `PJUD_PUBLIC_SCRAPE` | No | `1` = scrape OJV in-process (Playwright + CAPTCHA). |
+| `PJUD_PUBLIC_SCRAPE` | No | `1` = scrape OJV in-process (Playwright + CAPTCHA). Requiere `npm run pjud:chromium` una vez. |
 | `CAPTCHA_SOLVER_PROVIDER`, `CAPTCHA_SOLVER_API_KEY` | No | `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster`. Key opcional solo en `nopecha`. |
 | `PJUD_CLAVEUNICA_SCRAPE` | No | Ausente: guardar credenciales en Mis Causas habilita el login. `1` = permite. `0` = bloquea. |
 | `PJUD_SECRETS_KEY` | No | Clave AES para vault ClaveÚnica (fallback SESSION_SECRET). |

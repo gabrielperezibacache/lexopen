@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
     "@firecrawl/anydoc",
     "@firecrawl/pdf-inspector",
     "@d0paminedriven/pdfdown-ocr",
+    "playwright",
+    "playwright-core",
   ],
   async headers() {
     return [
@@ -28,6 +30,12 @@ const nextConfig: NextConfig = {
         output: "standalone" as const,
         outputFileTracingExcludes: {
           "*": ["./desktop/dist/**", "./desktop/node_modules/**"],
+        },
+        outputFileTracingIncludes: {
+          "*": [
+            "./node_modules/playwright/**",
+            "./node_modules/playwright-core/**",
+          ],
         },
       }
     : {}),

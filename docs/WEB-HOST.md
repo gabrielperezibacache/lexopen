@@ -134,6 +134,26 @@ idioma con `OCR_LANGUAGE=spa+eng` y limitar el consumo con `OCR_MAX_PAGES` y
 `OCR_TIMEOUT_MS`. Si faltan los binarios, el original se conserva y el documento
 queda marcado como `Requiere OCR`.
 
+## Chromium para PJUD / ClaveÚnica
+
+`web:host` scrapea OJV in-process (Playwright) si el sidecar no está corriendo.
+`npm ci` instala el paquete `playwright`; el navegador Chromium se descarga
+aparte, una vez:
+
+```bash
+npm run pjud:chromium
+```
+
+En Debian/Ubuntu, antes o después:
+
+```bash
+npx playwright install-deps chromium
+```
+
+macOS y Windows no necesitan `install-deps`. Reinicie `npm run web:host` y
+vuelva a sincronizar Mis Causas. Alternativa: `npm run pjud:host` (sidecar en
+`:8787`) además del web.
+
 ## Acceso desde los clientes
 
 Por defecto el Host solo escucha en `127.0.0.1`. Para LAN o Tailscale, configure
