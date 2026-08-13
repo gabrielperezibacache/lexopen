@@ -98,13 +98,13 @@ export default async function PortalPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           {sites.map((s) => (
             <article key={s.id} className="panel rounded-3xl p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
                   <div className="text-xs uppercase tracking-[0.14em] text-[var(--ink-soft)]/55">
                     {s.cliente?.razonSocial || "Cliente"}
                   </div>
-                  <h2 className="mt-1 text-xl font-semibold">{s.name}</h2>
-                  <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                  <h2 className="mt-1 break-words text-xl font-semibold">{s.name}</h2>
+                  <p className="mt-1 break-words text-sm text-[var(--ink-soft)]/70">
                     {s.causa?.rit || s.tipo} · {s.causa?.tribunal || "Portal"}
                   </p>
                 </div>
@@ -112,7 +112,7 @@ export default async function PortalPage() {
               </div>
 
               <div className="mt-5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Documentos compartidos</h3>
                   <Link href={`/sites/${s.id}/archivos`} className="text-xs text-[var(--sea)]">
                     Ver archivos
@@ -168,7 +168,7 @@ export default async function PortalPage() {
               )}
 
               <div className="mt-5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Q&A abiertas</h3>
                   <Link href={`/sites/${s.id}/qa`} className="text-xs text-[var(--sea)]">
                     Ir a Q&A

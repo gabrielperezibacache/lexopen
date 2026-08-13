@@ -36,7 +36,7 @@ export function ISheetTable({
 
   return (
     <div className="panel overflow-hidden rounded-3xl">
-      <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-3">
         <span className="text-sm text-[var(--ink-soft)]/70">{rows.length} registros</span>
         <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>
           Nueva fila

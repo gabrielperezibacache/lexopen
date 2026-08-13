@@ -115,15 +115,15 @@ export default async function FacturacionPage() {
               <Link
                 key={inv.id}
                 href={`/facturacion/facturas/${inv.id}`}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-4 py-3"
+                className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] px-4 py-3 sm:items-center"
               >
-                <div>
+                <div className="min-w-0">
                   <div className="font-medium">{inv.number}</div>
-                  <div className="text-sm text-[var(--ink-soft)]/70">
+                  <div className="break-words text-sm text-[var(--ink-soft)]/70">
                     {inv.cliente.razonSocial} · {inv.causa?.rit || "Sin causa"}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <div className="font-semibold">{clp(inv.totalClp)}</div>
                   <StatusBadge
                     estado={

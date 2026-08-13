@@ -867,8 +867,8 @@ function AgenteInner() {
               </div>
               {visibleDocs.length > 0 ? (
                 <div>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <label className="text-xs font-medium text-[var(--ink-soft)]/70">
+                  <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
+                    <label className="min-w-0 text-xs font-medium text-[var(--ink-soft)]/70">
                       Documentos ({selectedDocIds.length || "auto"} / {visibleDocs.length})
                     </label>
                     <button

@@ -300,7 +300,7 @@ export function TramitesPanel({
         onResult={(r) => void applyAiTramites(r)}
       />
       <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-dashed border-[var(--line)] p-3">
-        <label className="block min-w-[220px] flex-1 text-sm">
+        <label className="block w-full min-w-0 flex-1 text-sm sm:min-w-[220px]">
           <span className="mb-1 block text-xs font-medium text-[var(--ink-soft)]/70">
             Aplicar plantilla
           </span>

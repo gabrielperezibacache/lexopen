@@ -83,8 +83,8 @@ export function DriveFolderPanel({
 
   return (
     <section className="panel rounded-3xl p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold">Google Drive</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
             Enlace el expediente digital de la causa a una carpeta. Preferimos

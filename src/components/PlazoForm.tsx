@@ -115,9 +115,9 @@ export function PlazoForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="panel grid gap-4 rounded-3xl p-5 lg:grid-cols-4"
+      className="panel grid grid-cols-1 gap-4 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4"
     >
-      <div className="lg:col-span-2">
+      <div className="sm:col-span-2">
         <label className="mb-1 block text-sm font-medium">Título</label>
         <input
           className="input"
@@ -215,7 +215,7 @@ export function PlazoForm({
       <label className="flex items-end gap-2 pb-3 text-sm">
         <input type="checkbox" name="esFatal" /> Fatal
       </label>
-      <div className="lg:col-span-2">
+      <div className="sm:col-span-2">
         <label className="mb-1 block text-sm font-medium">Descripción</label>
         <input
           className="input"
@@ -229,7 +229,7 @@ export function PlazoForm({
         </button>
       </div>
       {estimate && !estimate.error && estimate.vencimiento && (
-        <div className="lg:col-span-4 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
+        <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm sm:col-span-2 lg:col-span-4">
           <p>
             Estimación LexOpen: <strong>{estimate.vencimiento}</strong> ·{" "}
             {estimate.urgencia} · {estimate.diasRestantes}d
@@ -247,12 +247,12 @@ export function PlazoForm({
         </div>
       )}
       {estimate?.error && (
-        <p className="text-sm text-[var(--danger)] lg:col-span-4">
+        <p className="text-sm text-[var(--danger)] sm:col-span-2 lg:col-span-4">
           {estimate.error}
         </p>
       )}
       {error && (
-        <p className="text-sm text-[var(--danger)] lg:col-span-4">{error}</p>
+        <p className="text-sm text-[var(--danger)] sm:col-span-2 lg:col-span-4">{error}</p>
       )}
     </form>
   );

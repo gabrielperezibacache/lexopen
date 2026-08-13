@@ -91,7 +91,7 @@ export default function LandingPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="fade-up-delay-2 grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <div className="fade-up-delay-2 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           {dict.landing.modules.map((mod, i) => {
             const Icon = moduleIcons[i] || Building2;
             return (

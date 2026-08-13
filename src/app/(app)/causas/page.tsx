@@ -5,6 +5,7 @@ import { StatusBadge, formatDate } from "@/components/ui";
 import { Plus } from "lucide-react";
 import { CausasFilters } from "@/components/CausasFilters";
 import { requireStaff } from "@/lib/auth/session";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 export default async function CausasPage({
   searchParams,
@@ -45,25 +46,21 @@ export default async function CausasPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            Litigio Chile
-          </p>
-          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Causas judiciales</h1>
-          <p className="mt-2 text-[var(--ink-soft)]/80">
-            RIT, RUC, tribunal, etapa procesal y equipo responsable.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/causas/monitoreo" className="btn btn-secondary">
-            Monitoreo PJUD
-          </Link>
-          <Link href="/causas/nueva" className="btn btn-primary">
-            <Plus size={16} /> Nueva causa
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Litigio Chile"
+        title="Causas judiciales"
+        subtitle="RIT, RUC, tribunal, etapa procesal y equipo responsable."
+        actions={
+          <>
+            <Link href="/causas/monitoreo" className="btn btn-secondary">
+              Monitoreo PJUD
+            </Link>
+            <Link href="/causas/nueva" className="btn btn-primary">
+              <Plus size={16} /> Nueva causa
+            </Link>
+          </>
+        }
+      />
 
       <CausasFilters />
 

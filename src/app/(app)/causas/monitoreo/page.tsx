@@ -185,19 +185,19 @@ export default function MonitoreoCausasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
             Seguimiento judicial
           </p>
           <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Monitoreo de causas</h1>
-          <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
+          <p className="mt-2 max-w-2xl text-sm text-[var(--ink-soft)]/80 sm:text-base">
             Cartera en su host con semáforos, sync y cola — paridad de flujo
             CausaMonitor. Puede llamar OJV/CAPTCHA/partner; los datos y el vault
             quedan aquí (scrape / sidecar / ClaveÚnica / CSV).
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
           <Link
             className="btn btn-secondary"
             href="/api/causas/monitoreo?format=csv"

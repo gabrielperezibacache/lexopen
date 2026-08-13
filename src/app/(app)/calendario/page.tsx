@@ -106,14 +106,24 @@ export default async function CalendarioPage({ searchParams }: Props) {
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-          <Link href={`/calendario?ym=${prevYm}`} className="btn btn-ghost">
-            ← Anterior
+          <Link
+            href={`/calendario?ym=${prevYm}`}
+            className="btn btn-ghost flex-1 sm:flex-none"
+            aria-label="Mes anterior"
+          >
+            ← <span className="sm:hidden">Ant.</span>
+            <span className="hidden sm:inline">Anterior</span>
           </Link>
-          <Link href="/calendario" className="btn btn-secondary">
+          <Link href="/calendario" className="btn btn-secondary flex-1 sm:flex-none">
             Hoy
           </Link>
-          <Link href={`/calendario?ym=${nextYm}`} className="btn btn-ghost">
-            Siguiente →
+          <Link
+            href={`/calendario?ym=${nextYm}`}
+            className="btn btn-ghost flex-1 sm:flex-none"
+            aria-label="Mes siguiente"
+          >
+            <span className="sm:hidden">Sig.</span>
+            <span className="hidden sm:inline">Siguiente</span> →
           </Link>
         </div>
       </div>

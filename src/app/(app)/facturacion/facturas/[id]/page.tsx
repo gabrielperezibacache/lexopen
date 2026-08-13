@@ -33,10 +33,10 @@ export default async function InvoiceDetailPage({ params }: Params) {
         <Link href="/facturacion/facturas" className="text-sm text-[var(--sea)]">
           ← Facturas
         </Link>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
-          <div>
+        <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h1 className="display break-words text-2xl sm:text-3xl md:text-4xl">{invoice.number}</h1>
-            <p className="mt-2 text-[var(--ink-soft)]/80">
+            <p className="mt-2 break-words text-[var(--ink-soft)]/80">
               {docLabel} · {invoice.cliente.razonSocial}
               {invoice.causa ? ` · ${invoice.causa.rit || invoice.causa.titulo}` : ""}
             </p>
@@ -53,7 +53,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
               <span className="ml-2 text-sm text-[var(--ink-soft)]/65">{invoice.status}</span>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:items-end">
             <InvoiceActions
               invoiceId={invoice.id}
               status={invoice.status}
@@ -64,11 +64,11 @@ export default async function InvoiceDetailPage({ params }: Params) {
               href={`/api/billing/invoices/${invoice.id}/pdf`}
               target="_blank"
               rel="noreferrer"
-              className="btn btn-secondary"
+              className="btn btn-secondary w-full sm:w-auto"
             >
               Ver PDF / imprimir
             </a>
-            <p className="max-w-xs text-right text-xs text-[var(--ink-soft)]/60">
+            <p className="max-w-xs text-left text-xs text-[var(--ink-soft)]/60 sm:text-right">
               Cuenta interna LexOpen — no es DTE SII
             </p>
           </div>
