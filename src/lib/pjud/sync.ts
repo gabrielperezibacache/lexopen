@@ -17,7 +17,8 @@ import {
   probeScraperSidecarHealth,
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
-import { pdfBackupEnabled, backupMovimientoDocuments } from "@/lib/pjud/pdf-backup";
+import { pdfBackupEnabled, backupMovimientoDocuments, ingestPjudDocumentBuffer } from "@/lib/pjud/pdf-backup";
+import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
 import { publicScrapeEnabled, publicScrapeReady, claveUnicaAutomationAllowed } from "@/lib/pjud/public-scrape";
 import { pjudWebhookConfigured } from "@/lib/pjud/webhook";
 
@@ -253,6 +254,11 @@ export async function syncCausaPjud(
         pjudExternalKey: externalKey(causa.rit, causa.tribunal),
         pjudSource: fetchResult.provider,
         ...(fetchResult.sala ? { sala: fetchResult.sala } : {}),
+        ...(fetchResult.resolvedTribunal &&
+        (isPlaceholderTribunal(causa.tribunal) ||
+          fetchResult.resolvedTribunal.length > causa.tribunal.length)
+          ? { tribunal: fetchResult.resolvedTribunal.slice(0, 180) }
+          : {}),
       },
     });
 
@@ -295,10 +301,31 @@ export async function syncCausaPjud(
   });
 
   let pdfBackedUp = 0;
+  // Prefer bytes captured with OJV session cookies during scrape.
+  for (const m of fetchResult.movimientos) {
+    if (!m.documentoBytes?.byteLength) continue;
+    const mov = await prisma.causaMovimiento.findFirst({
+      where: { causaId, externalId: m.externalId },
+      select: { id: true, documentoRef: true },
+    });
+    if (!mov || mov.documentoRef?.startsWith("doc:")) continue;
+    try {
+      const id = await ingestPjudDocumentBuffer({
+        causaId,
+        movimientoId: mov.id,
+        bytes: m.documentoBytes,
+        filename: m.documentoFilename,
+        esReceptor: m.esReceptor,
+      });
+      if (id) pdfBackedUp += 1;
+    } catch {
+      /* best-effort */
+    }
+  }
   if (pdfBackupEnabled()) {
     try {
       const backup = await backupMovimientoDocuments(causaId);
-      pdfBackedUp = backup.saved;
+      pdfBackedUp += backup.saved;
     } catch {
       /* PDF backup is best-effort */
     }

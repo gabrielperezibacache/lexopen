@@ -144,13 +144,23 @@ function NuevaCausaInner() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Tribunal</label>
-          <select className="select" name="tribunal" required defaultValue={TRIBUNALES_CHILE[0]}>
+          <input
+            className="input"
+            name="tribunal"
+            required
+            list="tribunales-chile"
+            placeholder="Escriba o elija el tribunal (como en OJV)"
+            defaultValue=""
+            autoComplete="off"
+          />
+          <datalist id="tribunales-chile">
             {TRIBUNALES_CHILE.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
+              <option key={t} value={t} />
             ))}
-          </select>
+          </datalist>
+          <p className="mt-1 text-xs text-[var(--ink-soft)]/60">
+            Puede escribir cualquier nombre de tribunal (no solo la lista).
+          </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>

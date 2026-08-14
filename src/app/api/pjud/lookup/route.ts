@@ -8,12 +8,31 @@ import {
   previewRolLookup,
 } from "@/lib/pjud/lookup";
 import { TRIBUNALES_CHILE } from "@/lib/chile";
+import { prisma } from "@/lib/db";
 
 export async function GET() {
   try {
     await requireStaff();
+    const fromDb = await prisma.tribunal
+      .findMany({
+        where: { activo: true },
+        select: { nombre: true },
+        orderBy: { nombre: "asc" },
+        take: 2000,
+      })
+      .catch(() => [] as Array<{ nombre: string }>);
+    const seen = new Set<string>();
+    const tribunales: string[] = [];
+    for (const t of [...fromDb.map((r) => r.nombre), ...TRIBUNALES_CHILE]) {
+      const name = t.replace(/\s+/g, " ").trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      tribunales.push(name);
+    }
+    tribunales.sort((a, b) => a.localeCompare(b, "es"));
     return NextResponse.json({
-      tribunales: TRIBUNALES_CHILE,
+      tribunales,
+      count: tribunales.length,
     });
   } catch (e) {
     return handleRouteError(e);

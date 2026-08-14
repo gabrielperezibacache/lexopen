@@ -16,6 +16,12 @@ export type PjudFetchedMovimiento = {
   esReceptor?: boolean;
   pendienteResolucion?: boolean;
   documentoRef?: string | null;
+  /**
+   * Ephemeral PDF/DOC bytes captured during Playwright scrape (session cookies).
+   * Not serialized over HTTP; consumed by sync → Documento LexOpen.
+   */
+  documentoBytes?: Buffer | null;
+  documentoFilename?: string | null;
 };
 
 export type PjudCausaRef = {
@@ -33,6 +39,7 @@ export type PjudFetchResult = {
   note: string;
   demo: boolean;
   sala?: string | null;
+  resolvedTribunal?: string | null;
 };
 
 export type MisCausasItem = {

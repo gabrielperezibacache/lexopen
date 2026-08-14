@@ -7,7 +7,11 @@ import {
   publicScrapeReady,
   scrapeCausaByRol,
 } from "@/lib/pjud/public-scrape";
-import { fetchFromScraperSidecar, scraperSidecarConfigured } from "@/lib/pjud/scraper-sidecar";
+import {
+  fetchFromScraperSidecar,
+  probeScraperSidecarHealth,
+  scraperSidecarConfigured,
+} from "@/lib/pjud/scraper-sidecar";
 import {
   fingerprint,
   type PjudCausaRef,
@@ -358,26 +362,44 @@ export async function fetchPjudMovimientos(
   // CAPTCHA, partner) están permitidas; no se usa un host SaaS ajeno.
   let sidecarError: Error | null = null;
   let scrapeError: Error | null = null;
+  let claveUnicaError: Error | null = null;
 
-  // 1) Sidecar en su despliegue (localhost / red privada)
+  // 1) Sidecar solo si responde (evita ruido "fetch failed" con URL muerta)
   if (scraperSidecarConfigured()) {
-    try {
-      const fromSidecar = await fetchFromScraperSidecar(causa);
-      if (fromSidecar) return fromSidecar;
-    } catch (error) {
-      sidecarError =
-        error instanceof Error ? error : new Error(String(error));
-      if (!publicScrapeReady() && !pjudProviderConfigured()) {
-        if (pjudDemoAllowed() && process.env.NODE_ENV !== "production") {
-          // fall through to demo in non-prod
-        } else {
-          throw sidecarError;
+    const health = await probeScraperSidecarHealth();
+    if (health.reachable) {
+      try {
+        const fromSidecar = await fetchFromScraperSidecar(causa);
+        if (fromSidecar) return fromSidecar;
+      } catch (error) {
+        sidecarError =
+          error instanceof Error ? error : new Error(String(error));
+        if (!publicScrapeReady() && !pjudProviderConfigured()) {
+          if (pjudDemoAllowed() && process.env.NODE_ENV !== "production") {
+            // fall through to demo in non-prod
+          } else {
+            throw sidecarError;
+          }
         }
       }
     }
   }
 
-  // 2) Scrape OJV in-process (Playwright en este host; CAPTCHA = API externa OK)
+  // 2a) Detalle autenticado Mis Causas (cuadernos / historia) si hay vault
+  if (publicScrapeReady()) {
+    try {
+      const { tryScrapeCausaDetailAuthenticated } = await import(
+        "@/lib/pjud/claveunica"
+      );
+      const fromCu = await tryScrapeCausaDetailAuthenticated(causa);
+      if (fromCu && fromCu.movimientos.length > 0) return fromCu;
+    } catch (error) {
+      claveUnicaError =
+        error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  // 2b) Scrape OJV invitado (Playwright + CAPTCHA)
   if (publicScrapeReady()) {
     try {
       const scraped = await scrapeCausaByRol(causa);
@@ -387,14 +409,20 @@ export async function fetchPjudMovimientos(
         note: scraped.note,
         demo: false,
         sala: scraped.sala,
+        resolvedTribunal: scraped.resolvedTribunal || null,
       };
     } catch (error) {
       scrapeError = error instanceof Error ? error : new Error(String(error));
       if (!pjudProviderConfigured()) {
-        if (sidecarError) {
-          throw new Error(
-            `Sidecar falló (${sidecarError.message}); scrape in-process también falló: ${scrapeError.message}`
-          );
+        if (sidecarError || claveUnicaError) {
+          const parts = [
+            sidecarError ? `Sidecar: ${sidecarError.message}` : null,
+            claveUnicaError
+              ? `Mis Causas: ${claveUnicaError.message}`
+              : null,
+            `Consulta pública: ${scrapeError.message}`,
+          ].filter(Boolean);
+          throw new Error(parts.join(" · "));
         }
         if (pjudDemoAllowed() && process.env.NODE_ENV !== "production") {
           // fall through
@@ -420,16 +448,17 @@ export async function fetchPjudMovimientos(
   // 3) Partner API (externa, permitida — no es “host” de LexOpen)
   const fromApi = await fetchFromPartnerApi(causa);
   if (fromApi) {
-    if (sidecarError || scrapeError) {
+    if (sidecarError || scrapeError || claveUnicaError) {
       const reasons = [
         sidecarError ? `sidecar: ${sidecarError.message}` : null,
+        claveUnicaError ? `mis-causas: ${claveUnicaError.message}` : null,
         scrapeError ? `scrape: ${scrapeError.message}` : null,
       ]
         .filter(Boolean)
         .join("; ");
       return {
         ...fromApi,
-        note: `${fromApi.note} · fallback partner tras fallo de sidecar/scrape (${reasons})`,
+        note: `${fromApi.note} · fallback partner tras fallo (${reasons})`,
       };
     }
     return fromApi;
@@ -438,7 +467,7 @@ export async function fetchPjudMovimientos(
   // 4) Demo etiquetado
   if (pjudDemoAllowed()) {
     const demo = fetchDemoMovimientos(causa);
-    const prefix = [sidecarError, scrapeError]
+    const prefix = [sidecarError, claveUnicaError, scrapeError]
       .filter(Boolean)
       .map((e) => (e as Error).message)
       .join("; ");

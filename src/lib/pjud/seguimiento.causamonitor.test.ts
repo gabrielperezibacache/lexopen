@@ -49,7 +49,7 @@ import type { PjudCausaRef, PjudFetchedMovimiento } from "@/lib/pjud/types";
 const tribunal = TRIBUNALES_CHILE[0];
 const rit = "C-4521-2025";
 assert.equal(validarRit(rit), true);
-assert.ok(TRIBUNALES_CHILE.length >= 40, "catálogo tribunales ampliado");
+assert.ok(TRIBUNALES_CHILE.length >= 200, "catálogo tribunales ampliado");
 
 // --- 1) Alta por ROL (validación de forma CausaMonitor) ---
 const alta = {

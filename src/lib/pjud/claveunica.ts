@@ -4,6 +4,7 @@ import { normalizarRut, validarRut } from "@/lib/chile";
 import { decryptSecret, encryptSecret, maskRut, secretsKeySource } from "@/lib/pjud/secret";
 import {
   scrapeMisCausasWithClaveUnica,
+  scrapeCausaDetailWithClaveUnica,
   claveUnicaAutomationAllowed,
   publicScrapeEnabled,
   publicScrapeReady,
@@ -19,6 +20,8 @@ import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import {
   isMisCausasSyncInFlight,
 } from "@/lib/pjud/mis-causas-sync-state";
+import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
+import type { PjudCausaRef, PjudFetchResult } from "@/lib/pjud/types";
 
 export {
   isMisCausasSyncInFlight,
@@ -319,6 +322,39 @@ function humanizeClaveUnicaSyncError(error: unknown, sidecarError: Error): strin
   return `Consulta directa: ${short} ${sidecarTip}`;
 }
 
+/**
+ * Detalle de una causa vía Mis Causas (ClaveÚnica) cuando hay vault configurado.
+ * Devuelve null si no hay credenciales / automatización; lanza si el scrape falla.
+ */
+export async function tryScrapeCausaDetailAuthenticated(
+  causa: PjudCausaRef
+): Promise<PjudFetchResult | null> {
+  const { settings } = await getOrCreateFirmSettings();
+  if (!settings.claveUnicaEnabled) return null;
+  if (!settings.claveUnicaRut || !settings.claveUnicaPasswordEnc) return null;
+  if (!claveUnicaAutomationAllowed(settings.claveUnicaEnabled)) return null;
+  if (!publicScrapeReady()) return null;
+
+  const password = decryptSecret(settings.claveUnicaPasswordEnc, {
+    strict: true,
+  });
+  if (!password) return null;
+
+  const scraped = await scrapeCausaDetailWithClaveUnica({
+    rut: settings.claveUnicaRut,
+    password,
+    causa,
+    optedIn: settings.claveUnicaEnabled,
+  });
+  return {
+    provider: "scrape",
+    movimientos: scraped.movimientos,
+    note: scraped.note,
+    demo: false,
+    sala: scraped.sala,
+  };
+}
+
 async function findExistingCausa(item: MisCausasItem) {
   if (item.ruc) {
     const byRuc = await prisma.causa.findFirst({
@@ -425,7 +461,9 @@ export async function syncMisCausas(opts?: {
           titulo: item.caratula || item.rit,
           rit: item.rit,
           ruc: item.ruc || null,
-          tribunal: item.tribunal,
+          tribunal: isPlaceholderTribunal(item.tribunal)
+            ? "Por identificar"
+            : item.tribunal,
           materia: "Por clasificar",
           caratula: item.caratula || null,
           estado: item.estado?.toLowerCase().includes("termin")
@@ -449,7 +487,9 @@ export async function syncMisCausas(opts?: {
           pjudMonitoreoActivo: true,
           pjudSource: "claveunica",
           pjudNextSyncAt: new Date(),
-          ...(item.tribunal ? { tribunal: item.tribunal } : {}),
+          ...(!isPlaceholderTribunal(item.tribunal)
+            ? { tribunal: item.tribunal }
+            : {}),
           ...(item.ruc ? { ruc: item.ruc } : {}),
         },
       });

@@ -38,9 +38,9 @@ assert.equal(parseSalaFromHtml(html), "3 Civil");
 
 assert.equal(
   extractDocumentoHrefFromRowHtml(
-    `<td><a href="/x/escrito.docx">archivo</a></td>`
+    `<td><a href="#" onclick="window.open('/documentos/xyz.pdf')">PDF</a></td>`
   ),
-  "https://oficinajudicialvirtual.pjud.cl/x/escrito.docx"
+  "https://oficinajudicialvirtual.pjud.cl/documentos/xyz.pdf"
 );
 
 const listHtml = `
@@ -80,5 +80,14 @@ assert.ok(
   merged.some((x) => x.rit === "F-9-2020"),
   "loose rows must survive beside verDetalle"
 );
+
+const movsLongDate = parseMovimientosFromHtml(`
+<table class="table-titulos">
+  <tr><th>Folio</th><th>Fecha</th><th>Trámite</th></tr>
+  <tr><td>2</td><td>13 de agosto de 2025</td><td>Resolución: se tiene por presentada</td></tr>
+</table>
+`);
+assert.equal(movsLongDate.length, 1);
+assert.equal(movsLongDate[0].fecha.toISOString().slice(0, 10), "2025-08-13");
 
 console.log("pjud/parse-html.test.ts OK");

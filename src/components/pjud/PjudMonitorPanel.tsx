@@ -78,8 +78,16 @@ function documentoHref(ref: string | null | undefined) {
   return null;
 }
 
-function MovementCard({ m }: { m: Movimiento }) {
+function MovementCard({
+  m,
+  causaId,
+}: {
+  m: Movimiento;
+  causaId: string;
+}) {
   const docUrl = documentoHref(m.documentoRef);
+  const docId =
+    m.documentoRef?.startsWith("doc:") ? m.documentoRef.slice(4).trim() : null;
   return (
     <article
       className={`rounded-2xl border px-3 py-2 text-sm ${
@@ -110,23 +118,32 @@ function MovementCard({ m }: { m: Movimiento }) {
       {m.detalle && (
         <p className="mt-2 text-[var(--ink-soft)]/80">{m.detalle}</p>
       )}
-      {docUrl && (
-        <p className="mt-1 text-xs">
-          <a
-            className="text-[var(--sea)] underline-offset-2 hover:underline"
-            href={docUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {m.documentoRef?.startsWith("doc:")
-              ? "Ver documento LexOpen"
-              : "Ver documento (OJV)"}
-          </a>
+      {(docUrl || docId) && (
+        <p className="mt-1 flex flex-wrap gap-3 text-xs">
+          {docUrl && (
+            <a
+              className="text-[var(--sea)] underline-offset-2 hover:underline"
+              href={docUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {docId ? "Ver / descargar" : "Abrir en OJV"}
+            </a>
+          )}
+          {docId && (
+            <Link
+              className="text-[var(--sea)] underline-offset-2 hover:underline"
+              href={`/agente?causaId=${causaId}&utility=doc_qa&documentoId=${docId}`}
+            >
+              Revisar con IA
+            </Link>
+          )}
         </p>
       )}
-      {!docUrl && m.documentoRef && (
+      {!docUrl && m.documentoRef && !docId && (
         <p className="mt-1 text-xs text-[var(--ink-soft)]/55">
-          Ref. doc: {m.documentoRef}
+          Ref. doc: {m.documentoRef} (se importará al LexOpen en el próximo sync
+          con scrape activo)
         </p>
       )}
     </article>
@@ -394,7 +411,7 @@ export function PjudMonitorPanel({
                 : "Timeline de movimientos"}
         </h3>
         {visible.map((m) => (
-          <MovementCard key={m.id} m={m} />
+          <MovementCard key={m.id} m={m} causaId={causaId} />
         ))}
         {visible.length === 0 && (
           <p className="text-sm text-[var(--ink-soft)]/65">

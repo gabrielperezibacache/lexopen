@@ -108,7 +108,7 @@ Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 | `PJUD_CAUSAS_DAILY_SOLVE_BUDGET` | Tope diario de CAPTCHA (default 50) |
 | `PJUD_SYNC_CONCURRENCY` | Parallelismo del worker de cola (default **5**, como CM) |
 | `PJUD_SYNC_INTERVAL_MINUTES` | Intervalo `pjudNextSyncAt` tras sync OK (default **240** = 4h) |
-| `PJUD_PDF_BACKUP=1` | Tras sync, descarga `documentoRef` http(s) → `Documento` LexOpen |
+| `PJUD_PDF_BACKUP` | Tras sync: URL `documentoRef` → `Documento`. Default **on** si `PJUD_PUBLIC_SCRAPE=1` (ponga `=0` para apagar). Preferible: PDF capturados en el scrape con cookies OJV. |
 | `CRON_SECRET` | Autoriza crons (`x-cron-secret`) |
 
 Sin `PJUD_PUBLIC_SCRAPE=1` + CAPTCHA (o sidecar), LexOpen **no** scrapea OJV.
@@ -218,7 +218,7 @@ El sidecar se ejecuta en el mismo Host: `npm run pjud:chromium` (una vez) y
 
 ## Backup PDF
 
-Con `PJUD_PDF_BACKUP=1`, tras sync (también backfill) se descargan links `documentoRef` públicos seguros (anti-SSRF), se rechazan HTML/login walls, y se guardan como `Documento`; el movimiento queda con `doc:<id>` y la ficha muestra link LexOpen.
+Con scrape activo, tras sync se importan anexos OJV como `Documento` (preferencia: bytes capturados con la sesión Playwright; fallback `fetch` si `PJUD_PDF_BACKUP` lo permite). El movimiento queda con `doc:<id>`; la ficha muestra **Ver / descargar** y **Revisar con IA**.
 
 ## Programación de salas
 

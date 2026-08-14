@@ -167,21 +167,19 @@ export function PjudQuickAddPanel() {
             required
             placeholder="ROL/RIT (C-100-2024)"
           />
-          <select
+          <input
             className="input sm:col-span-2"
             name="tribunal"
             required
-            defaultValue=""
-          >
-            <option value="" disabled>
-              Tribunal
-            </option>
+            list="pjud-tribunales"
+            placeholder="Tribunal (escriba para buscar…)"
+            autoComplete="off"
+          />
+          <datalist id="pjud-tribunales">
             {tribunales.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
+              <option key={t} value={t} />
             ))}
-          </select>
+          </datalist>
           <div className="flex flex-wrap gap-2">
             <button
               className="btn btn-secondary"
@@ -265,7 +263,8 @@ export function PjudQuickAddPanel() {
       )}
 
       <p className="text-xs text-[var(--ink-soft)]/60">
-        Requiere scrape/sidecar activo. También puede usar{" "}
+        Requiere scrape/sidecar activo. El tribunal se puede escribir libremente
+        (coincida con OJV). También puede usar{" "}
         <Link href="/causas/mis-causas" className="text-[var(--sea)]">
           Mis Causas (ClaveÚnica)
         </Link>

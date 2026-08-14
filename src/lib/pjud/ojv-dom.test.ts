@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import {
   inferCompetenciaFromTribunal,
+  isPlaceholderTribunal,
   parseRitParts,
+  pickBestTribunalOption,
+  pickTribunalFromTexts,
   splitRut,
   tribunalLabelsMatch,
+  tribunalMatchScore,
 } from "@/lib/pjud/ojv-dom";
 import { parseVerDetalleJuridicaHtml } from "@/lib/pjud/parse-html";
 
@@ -27,6 +31,13 @@ assert.equal(inferCompetenciaFromTribunal("Corte de Apelaciones de Santiago"), "
 assert.equal(inferCompetenciaFromTribunal("Juzgado de Cobranza de Santiago"), "6");
 assert.equal(inferCompetenciaFromTribunal("Tribunal de Juicio Oral en lo Penal"), "5");
 
+assert.equal(isPlaceholderTribunal("Tribunal no identificado"), true);
+assert.equal(isPlaceholderTribunal("Por identificar"), true);
+assert.equal(isPlaceholderTribunal("1º Juzgado Civil de Santiago"), false);
+assert.equal(
+  pickTribunalFromTexts(["C-1-2024", "1º Juzgado de Familia de Santiago", "Tramitación"]),
+  "1º Juzgado de Familia de Santiago"
+);
 assert.equal(
   tribunalLabelsMatch(
     "1º Juzgado Civil de Santiago",
@@ -34,6 +45,21 @@ assert.equal(
   ),
   true
 );
+assert.ok(
+  tribunalMatchScore(
+    "15º Juzgado Civil de Santiago",
+    "15 Juzgado Civil de Santiago"
+  ) >= 0.72
+);
+const best = pickBestTribunalOption(
+  [
+    { value: "1", label: "Seleccione Tribunal" },
+    { value: "10", label: "10º Juzgado Civil de Santiago" },
+    { value: "15", label: "15º Juzgado Civil de Santiago" },
+  ],
+  "15º Juzgado Civil de Santiago"
+);
+assert.equal(best?.value, "15");
 
 const listHtml = `
 <table id="verDetalleJuridica">
