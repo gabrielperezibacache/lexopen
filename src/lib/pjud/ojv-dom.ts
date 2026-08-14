@@ -50,6 +50,11 @@ export const OJV = {
   sweetAlert: ".sweet-alert.showSweetAlert.visible",
   sweetConfirm:
     ".sweet-alert.showSweetAlert.visible button.confirm, .sweet-alert.visible button.confirm",
+  // Mis Causas (sesión ClaveÚnica) — menú izquierdo + materias + Buscar
+  misCausasMenu:
+    'a:has-text("Mis Causas"), a:has-text("MIS CAUSAS"), #menuMisCausas, [onclick*="MisCausas" i]',
+  misCausasBuscar:
+    'button:has-text("Buscar"), input[type="submit"][value*="Buscar" i], #btnBuscar',
 } as const;
 
 export type OjvCompetenciaValue = "1" | "2" | "3" | "4" | "5" | "6";
