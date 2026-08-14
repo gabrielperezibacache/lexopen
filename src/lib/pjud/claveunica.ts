@@ -270,14 +270,17 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
 function humanizeClaveUnicaSyncError(error: unknown, sidecarError: Error): string {
   const scrapeNote = error instanceof Error ? error.message : "scrape falló";
   const sidecarNote = sidecarError.message || "no responde";
-  const formIssue = /Timeout|not visible|locator\.fill|rut_hidden|formulario visible/i.test(
-    scrapeNote
-  );
+  const formIssue =
+    /Timeout|not visible|locator\.fill|rut_hidden|formulario visible|campo RUN|campo de contraseña|Página no encontrada|404/i.test(
+      scrapeNote
+    );
   if (formIssue) {
     return [
-      "No se pudo iniciar sesión en ClaveÚnica: el formulario del sitio no respondió (campo oculto o bloqueo).",
-      "Si tiene configurado un servicio auxiliar PJUD, arránquelo; si no, quite PJUD_SCRAPER_URL del entorno del Host y reinicie LexOpen para usar la consulta directa.",
-      `Detalle técnico del auxiliar: ${sidecarNote.slice(0, 120)}.`,
+      "No se pudo completar el login de ClaveÚnica (formulario no disponible o bloqueo del sitio).",
+      "LexOpen intentó la consulta directa porque el servicio auxiliar no responde.",
+      "Si usa sidecar, arranque `npm run pjud:scraper`; si no lo necesita, quite PJUD_SCRAPER_URL del .env y reinicie.",
+      `Auxiliar: ${sidecarNote.slice(0, 80)}.`,
+      scrapeNote.length > 140 ? `Detalle: ${scrapeNote.slice(0, 140)}…` : `Detalle: ${scrapeNote}`,
     ].join(" ");
   }
   const short =
