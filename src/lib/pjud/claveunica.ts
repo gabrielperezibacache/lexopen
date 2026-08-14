@@ -87,10 +87,16 @@ export async function getClaveUnicaStatus() {
     sidecarHealth?.reachable && sidecarHealth.scrapeReady !== false
   );
   const canUseInProcess = publicScrapeReady();
+  const warnings: string[] = [];
+  if (sidecar && !sidecarHealth?.reachable && canUseInProcess) {
+    warnings.push(
+      "El servicio auxiliar (PJUD_SCRAPER_URL) no responde. LexOpen usará la consulta directa. Arranque `npm run pjud:host` o quite PJUD_SCRAPER_URL del .env si no lo necesita."
+    );
+  }
   if (!canUseSidecar && !canUseInProcess) {
     if (sidecar && !sidecarHealth?.reachable) {
       blockers.push(
-        "El servicio auxiliar de consulta judicial no está en marcha. Arránquelo o pida ayuda al administrador del Host; mientras tanto LexOpen no puede entrar a Mis Causas."
+        "El servicio auxiliar de consulta judicial no está en marcha. Arránquelo con `npm run pjud:host`, o quite PJUD_SCRAPER_URL del .env si prefiere solo consulta directa; mientras tanto LexOpen no puede entrar a Mis Causas."
       );
     } else if (
       sidecar &&
@@ -122,6 +128,8 @@ export async function getClaveUnicaStatus() {
   if (blockers.length) {
     readinessLabel = "Aún no se puede sincronizar";
     readinessHint = blockers[0];
+  } else if (warnings.length) {
+    readinessHint = warnings[0];
   }
 
   const channelLabel = canUseSidecar
@@ -146,6 +154,7 @@ export async function getClaveUnicaStatus() {
     captchaConfigured: captcha,
     readyToSync: blockers.length === 0,
     blockers,
+    warnings,
     readinessLabel,
     readinessHint,
     channelLabel,

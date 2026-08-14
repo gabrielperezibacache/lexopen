@@ -20,6 +20,7 @@ type Status = {
   captchaConfigured?: boolean;
   readyToSync?: boolean;
   blockers?: string[];
+  warnings?: string[];
   readinessLabel?: string;
   readinessHint?: string;
   channelLabel?: string;
@@ -346,6 +347,22 @@ export default function MisCausasPage() {
             </p>
           </div>
         )}
+
+        {status?.warnings &&
+          status.warnings.length > 0 &&
+          !(status.blockers && status.blockers.length > 0) && (
+            <div
+              className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950"
+              role="status"
+            >
+              <p className="font-semibold">Aviso del Host</p>
+              <ul className="mt-2 list-disc space-y-1.5 pl-5">
+                {status.warnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
         {adminOnly && (
           <p className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">

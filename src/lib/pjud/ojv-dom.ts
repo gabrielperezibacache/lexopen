@@ -12,8 +12,12 @@
 
 export const OJV_BASE = "https://oficinajudicialvirtual.pjud.cl";
 export const OJV_HOME = `${OJV_BASE}/home/index.php`;
+/** Shell autenticado post ClaveÚnica (aparece referenciado desde el home). */
+export const OJV_INDEX_N = `${OJV_BASE}/indexN.php`;
 export const OJV_CONSULTA_URL =
   "https://www.pjud.cl/consulta-unificada-de-causas";
+
+export const OJV_POST_AUTH_URLS = [OJV_INDEX_N, OJV_HOME] as const;
 
 export const OJV = {
   accesoConsulta: 'button.dropbtn[onclick*="accesoConsultaCausas"], a[onclick*="accesoConsultaCausas"]',

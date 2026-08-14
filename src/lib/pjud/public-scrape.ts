@@ -29,6 +29,8 @@ import {
   OJV,
   OJV_CONSULTA_URL,
   OJV_HOME,
+  OJV_INDEX_N,
+  OJV_POST_AUTH_URLS,
   parseRitParts,
   splitRut,
   tribunalLabelsMatch,
@@ -36,6 +38,7 @@ import {
 } from "@/lib/pjud/ojv-dom";
 import {
   parseCausasListFromHtml,
+  parseMisCausasLooseFromHtml,
   parseMovimientosFromHtml,
   parseSalaFromHtml,
   parseVerDetalleJuridicaHtml,
@@ -1204,27 +1207,61 @@ function parseMisCausasItemsFromHtml(html: string): MisCausasItem[] {
       estado: r.estado,
     }));
   }
-  return parseCausasListFromHtml(html);
+  const fromList = parseCausasListFromHtml(html);
+  if (fromList.length > 0) return fromList;
+  return parseMisCausasLooseFromHtml(html);
+}
+
+async function pagesAndFramesHtml(page: AnyPage): Promise<string> {
+  const chunks: string[] = [];
+  try {
+    chunks.push(await page.content());
+  } catch {
+    /* ignore */
+  }
+  for (const frame of page.frames?.() || []) {
+    try {
+      if (frame === page.mainFrame?.()) continue;
+      const html = await frame.content();
+      if (html && html.length > 200) chunks.push(html);
+    } catch {
+      /* cross-origin */
+    }
+  }
+  return chunks.join("\n");
+}
+
+async function ensureAuthenticatedOjvShell(page: AnyPage): Promise<AnyPage> {
+  await dismissOjvPrompts(page);
+  const onOjv = /oficinajudicialvirtual\.pjud\.cl|ojv\.pjud\.cl/i.test(page.url());
+  const needsShell =
+    !onOjv || /return\.php|\/home\/index\.php|accounts\.claveunica/i.test(page.url());
+  if (!needsShell) return page;
+
+  for (const url of OJV_POST_AUTH_URLS) {
+    const res = await page
+      .goto(url, { waitUntil: "domcontentloaded", timeout: 45_000 })
+      .catch(() => null);
+    await dismissOjvPrompts(page);
+    if (res && (res.ok() || /indexN\.php/i.test(page.url()))) {
+      return page;
+    }
+  }
+  return page;
 }
 
 async function collectMisCausasFromAuthenticatedOjv(
   page: AnyPage
 ): Promise<{ items: MisCausasItem[]; openedMenu: boolean; materiasTried: string[] }> {
-  await dismissOjvPrompts(page);
-  // A veces el callback deja en return.php; ir al home autenticado.
-  if (/return\.php|claveunica/i.test(page.url())) {
-    await page
-      .goto(OJV_HOME, { waitUntil: "domcontentloaded", timeout: 45_000 })
-      .catch(() => undefined);
-    await dismissOjvPrompts(page);
-  }
+  page = await ensureAuthenticatedOjvShell(page);
 
   const openedMenu = await openMisCausasMenu(page);
   const materiasTried: string[] = [];
   const all: MisCausasItem[] = [];
   const seen = new Set<string>();
 
-  const pushParsed = (html: string) => {
+  const pushParsed = async () => {
+    const html = await pagesAndFramesHtml(page);
     for (const item of parseMisCausasItemsFromHtml(html)) {
       const key = `${item.rit}|${item.tribunal}`.toUpperCase();
       if (seen.has(key)) continue;
@@ -1233,8 +1270,7 @@ async function collectMisCausasFromAuthenticatedOjv(
     }
   };
 
-  // Parsear lo que ya esté en pantalla tras abrir el menú.
-  pushParsed(await page.content());
+  await pushParsed();
 
   for (const materia of MIS_CAUSAS_MATERIAS) {
     const tab = page
@@ -1242,17 +1278,20 @@ async function collectMisCausasFromAuthenticatedOjv(
       .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
       .or(
         page.locator(
-          `a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a`
+          `a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a, div.card:has-text("${materia}")`
         )
       )
       .first();
     if ((await tab.count().catch(() => 0)) === 0) continue;
-    if (!(await tab.isVisible().catch(() => false))) continue;
+    if (!(await tab.isVisible().catch(() => false))) {
+      // Algunas materias están en acordeón colapsado.
+      await tab.click({ force: true, timeout: 8_000 }).catch(() => undefined);
+    } else {
+      await tab.click({ timeout: 8_000 }).catch(() => undefined);
+    }
     materiasTried.push(materia);
-    await tab.click({ timeout: 8_000 }).catch(() => undefined);
     await sleep(500);
 
-    // Filtros: intentar “Seleccionar todos” en estados si aparece.
     const filtros = page.getByRole("button", { name: /Filtros/i }).first();
     if (await filtros.isVisible().catch(() => false)) {
       await filtros.click().catch(() => undefined);
@@ -1267,13 +1306,12 @@ async function collectMisCausasFromAuthenticatedOjv(
     }
 
     await clickMisCausasBuscar(page);
-    pushParsed(await page.content());
+    await pushParsed();
   }
 
-  // Si no hubo tabs de materia, al menos un Buscar genérico.
   if (materiasTried.length === 0) {
     await clickMisCausasBuscar(page);
-    pushParsed(await page.content());
+    await pushParsed();
   }
 
   return { items: all, openedMenu, materiasTried };
