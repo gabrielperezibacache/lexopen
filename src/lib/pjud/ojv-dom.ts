@@ -37,8 +37,11 @@ export const OJV = {
   competencia: "#jurCompetencia",
   tribunal: "#jurTribunal",
   corte: "#corteJur",
+  /** Prefer visible active-pane Buscar; juridica id is often hidden on ROL tab. */
   btnBuscar: "#btnConConsultaJur",
-  loader: "#loadPreJuridica",
+  btnBuscarAny:
+    '#btnConConsultaJur, #btnConConsultaCausa, #btnConConsultaRol, #btnBuscar, .tab-pane.active button.btn-primary, button.btn-primary:has-text("Buscar")',
+  loader: "#loadPreJuridica, #loadPreCausa, .loadingConsulta",
   resultsHost: "#resultConsultaJuridica",
   resultsTable: "#verDetalleJuridica",
   noResultsText: "No se han encontrado resultados",

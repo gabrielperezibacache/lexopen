@@ -38,7 +38,7 @@ import {
 } from "@/lib/pjud/ojv-dom";
 import {
   parseCausasListFromHtml,
-  parseMisCausasLooseFromHtml,
+  parseMisCausasFromHtml,
   parseMovimientosFromHtml,
   parseSalaFromHtml,
   parseVerDetalleJuridicaHtml,
@@ -355,8 +355,11 @@ async function waitConsultaLoader(page: PlaywrightPage) {
   await page
     .waitForFunction(
       () => {
-        const l = document.querySelector("#loadPreJuridica");
-        return !l || l.innerHTML.trim() === "";
+        const loaders = document.querySelectorAll(
+          "#loadPreJuridica, #loadPreCausa, .loadingConsulta"
+        );
+        if (!loaders.length) return true;
+        return [...loaders].every((l) => (l as HTMLElement).innerHTML.trim() === "");
       },
       { timeout: 60_000 }
     )
@@ -428,13 +431,80 @@ async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: string) {
   }
 }
 
+/**
+ * Click the active Consulta Unificada "Buscar".
+ * `#btnConConsultaJur` often stays in the DOM on inactive Bootstrap tabs
+ * (not visible) after switching to ROL/RIT — Playwright then times out.
+ */
 async function clickBuscar(page: PlaywrightPage) {
-  const btn = page.locator(OJV.btnBuscar);
-  if ((await btn.count()) === 0) {
-    await page.locator(OJV.submit).first().click().catch(() => undefined);
-  } else {
-    await btn.first().click();
+  await closeSweetAlerts(page);
+  await closeBootstrapModals(page);
+
+  const viaDom = await page
+    .evaluate(() => {
+      const visible = (el: Element) => {
+        const h = el as HTMLElement;
+        const style = window.getComputedStyle(h);
+        if (
+          style.display === "none" ||
+          style.visibility === "hidden" ||
+          Number(style.opacity) === 0
+        ) {
+          return false;
+        }
+        const r = h.getBoundingClientRect();
+        return r.width > 1 && r.height > 1;
+      };
+      const labelOf = (el: Element) =>
+        (
+          (el.textContent || "") +
+          " " +
+          ((el as HTMLInputElement).value || "")
+        ).trim();
+      const active =
+        document.querySelector(".tab-pane.active, .tab-content > .active") ||
+        document.body;
+      const tryClick = (root: ParentNode) => {
+        const nodes = [
+          ...root.querySelectorAll<HTMLElement>(
+            "#btnConConsultaJur, #btnConConsultaCausa, #btnConConsultaRol, #btnBuscar, button.btn-primary, button[type='submit'], input[type='submit']"
+          ),
+        ];
+        for (const el of nodes) {
+          const label = labelOf(el);
+          const id = el.id || "";
+          const isBuscar =
+            /btnConConsulta|btnBuscar/i.test(id) || /^buscar$/i.test(label);
+          if (!isBuscar || !visible(el)) continue;
+          el.click();
+          return id || label || "buscar";
+        }
+        return null;
+      };
+      return tryClick(active) || tryClick(document);
+    })
+    .catch(() => null);
+
+  if (!viaDom) {
+    const roleBtn = page.getByRole("button", { name: /^Buscar$/i }).first();
+    if (await roleBtn.isVisible().catch(() => false)) {
+      await roleBtn.click({ timeout: 10_000 });
+    } else {
+      const any = page.locator(OJV.btnBuscarAny).first();
+      if ((await any.count()) > 0) {
+        await any.scrollIntoViewIfNeeded().catch(() => undefined);
+        // force: last resort when OJV marks the control "not visible" but present
+        await any.click({ force: true, timeout: 10_000 });
+      } else {
+        await page
+          .locator(OJV.submit)
+          .first()
+          .click({ force: true })
+          .catch(() => undefined);
+      }
+    }
   }
+
   await waitConsultaLoader(page);
 }
 
@@ -682,6 +752,7 @@ async function scrapeCausaByRolOnce(
       await rolTab.first().click().catch(() => undefined);
       await delay(400);
       usedRolTab = true;
+      await selectCompetencia(page, competencia);
       // Fill common ROL field variants used across OJV layouts.
       const fills: Array<[string, string]> = [
         ['input[id*="rit" i], input[name*="rit" i], input[id*="rol" i], input[name*="rol" i]', ritParts.numero],
@@ -1196,20 +1267,60 @@ async function clickMisCausasBuscar(page: AnyPage) {
   return true;
 }
 
-function parseMisCausasItemsFromHtml(html: string): MisCausasItem[] {
-  const fromTable = parseVerDetalleJuridicaHtml(html);
-  if (fromTable.length > 0) {
-    return fromTable.map((r) => ({
-      rit: r.rit,
-      tribunal: r.tribunal,
-      caratula: r.caratula,
-      ruc: r.ruc,
-      estado: r.estado,
-    }));
+/** Walk Mis Causas pagination while new RITs appear (cap 25 pages). */
+async function collectMisCausasPages(
+  page: AnyPage,
+  pushParsed: () => Promise<void>,
+  knownCount: () => number
+) {
+  for (let i = 0; i < 25; i++) {
+    await pushParsed();
+    const before = knownCount();
+    const next = page
+      .getByRole("link", { name: /^(Siguiente|Next|›|»)$/i })
+      .or(
+        page.locator(
+          '.pagination a[rel="next"], .pagination li:not(.disabled) a:has-text("›"), .pagination li:not(.disabled) a:has-text("Siguiente"), a.page-link:has-text("›")'
+        )
+      )
+      .first();
+    if (!(await next.isVisible().catch(() => false))) break;
+    await next.click({ timeout: 8_000 }).catch(() => undefined);
+    await sleep(900);
+    await page
+      .waitForLoadState("networkidle", { timeout: 15_000 })
+      .catch(() => undefined);
+    await pushParsed();
+    if (knownCount() <= before) break;
   }
-  const fromList = parseCausasListFromHtml(html);
-  if (fromList.length > 0) return fromList;
-  return parseMisCausasLooseFromHtml(html);
+}
+
+async function applyMisCausasFiltros(page: AnyPage) {
+  const filtros = page.getByRole("button", { name: /Filtros/i }).first();
+  if (await filtros.isVisible().catch(() => false)) {
+    await filtros.click().catch(() => undefined);
+    await sleep(300);
+  }
+  // Manual OJV: Estado → Seleccionar Todos para no omitir concluidas.
+  const estado = page
+    .getByRole("button", { name: /^Estado$/i })
+    .or(page.getByText(/^Estado$/i))
+    .first();
+  if (await estado.isVisible().catch(() => false)) {
+    await estado.click().catch(() => undefined);
+    await sleep(200);
+  }
+  const selectAll = page
+    .getByText(/Seleccionar Todos|Seleccionar todos/i)
+    .first();
+  if (await selectAll.isVisible().catch(() => false)) {
+    await selectAll.click().catch(() => undefined);
+    await sleep(200);
+  }
+}
+
+function parseMisCausasItemsFromHtml(html: string): MisCausasItem[] {
+  return parseMisCausasFromHtml(html);
 }
 
 async function pagesAndFramesHtml(page: AnyPage): Promise<string> {
@@ -1292,26 +1403,15 @@ async function collectMisCausasFromAuthenticatedOjv(
     materiasTried.push(materia);
     await sleep(500);
 
-    const filtros = page.getByRole("button", { name: /Filtros/i }).first();
-    if (await filtros.isVisible().catch(() => false)) {
-      await filtros.click().catch(() => undefined);
-      await sleep(300);
-    }
-    const selectAll = page
-      .getByText(/Seleccionar Todos|Seleccionar todos/i)
-      .first();
-    if (await selectAll.isVisible().catch(() => false)) {
-      await selectAll.click().catch(() => undefined);
-      await sleep(200);
-    }
-
+    await applyMisCausasFiltros(page);
     await clickMisCausasBuscar(page);
-    await pushParsed();
+    await collectMisCausasPages(page, pushParsed, () => all.length);
   }
 
   if (materiasTried.length === 0) {
+    await applyMisCausasFiltros(page);
     await clickMisCausasBuscar(page);
-    await pushParsed();
+    await collectMisCausasPages(page, pushParsed, () => all.length);
   }
 
   return { items: all, openedMenu, materiasTried };

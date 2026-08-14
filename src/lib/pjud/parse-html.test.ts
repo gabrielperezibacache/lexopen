@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   parseCausasListFromHtml,
+  parseMisCausasFromHtml,
   parseMisCausasLooseFromHtml,
   parseMovimientosFromHtml,
   parseSalaFromHtml,
@@ -66,5 +67,18 @@ const looseHtml = `
 const loose = parseMisCausasLooseFromHtml(looseHtml);
 assert.ok(loose.some((x) => x.rit === "C-55-2023"));
 assert.ok(loose.some((x) => /Familia/i.test(x.tribunal)));
+
+const mergedHtml = `
+<table id="verDetalleJuridica">
+  <tr><td><a>ver</a></td><td>C-1-2024</td><td>1º Juzgado Civil de Santiago</td><td></td><td>A / B</td><td>01/01/2024</td><td>Tramitación</td></tr>
+</table>
+<div class="card"><h3>F-9-2020</h3><p>2º Juzgado de Familia de Santiago · Terminada</p></div>
+`;
+const merged = parseMisCausasFromHtml(mergedHtml);
+assert.ok(merged.some((x) => x.rit === "C-1-2024"));
+assert.ok(
+  merged.some((x) => x.rit === "F-9-2020"),
+  "loose rows must survive beside verDetalle"
+);
 
 console.log("pjud/parse-html.test.ts OK");

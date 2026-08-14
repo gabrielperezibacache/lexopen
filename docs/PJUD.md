@@ -65,7 +65,7 @@ Misma familia DOM que scrapers de campo `consulta_causas_pjud`:
 1. `home/index.php` → `accesoConsultaCausas()` (sesión invitado)
 2. Tab `#BusJuridica` (RUT) o tab ROL/RIT
 3. `#jurCompetencia` + `#jurTribunal` / `#corteJur`
-4. `#btnConConsultaJur` → espera `#loadPreJuridica`
+4. Buscar visible (no forzar `#btnConConsultaJur` oculto en otra pestaña) → espera loaders `#loadPreJuridica` / `#loadPreCausa`
 5. Filas `#verDetalleJuridica` → modal `.modal.in` (`table.table-titulos`, historia, e-book)
 
 Sesión CAPTCHA reutilizable + presupuesto diario de solves (operación a escala tipo worker).  
