@@ -4,7 +4,7 @@ export const en: Dictionary = {
   meta: {
     title: "LexOpen — Open-source legal operations",
     description:
-      "Open-source HighQ-inspired platform for Chilean law firms. Matters, case law, Obsidian, Hermes Agent and Google Workspace.",
+      "Open-source HighQ-inspired platform for Chilean law firms. Matters, case law, Obsidian, AI copilot and Google Workspace.",
   },
   brand: {
     tagline: "Firm · Chile",
@@ -46,8 +46,8 @@ export const en: Dictionary = {
     documents: "Documents",
     deadlines: "Deadlines",
     jurisprudence: "Case law",
-    agent: "Hermes agent",
-    assistant: "AI copiloto",
+    agent: "AI Copilot",
+    assistant: "AI Copilot",
     portal: "Client portal",
     integrations: "Integrations",
     audit: "Audit",
@@ -98,7 +98,7 @@ export const en: Dictionary = {
     enterFirm: "Enter the firm",
     eyebrow: "Chile · Legal operations",
     lead:
-      "Open-source platform for law firms: sites, data room, iSheets, tasks, wiki, Q&A and workflows — plus Chilean matters, deadlines, case law, Obsidian, Hermes and Google Workspace.",
+      "Open-source platform for law firms: sites, data room, iSheets, tasks, wiki, Q&A and workflows — plus Chilean matters, deadlines, case law, Obsidian, AI copilot and Google Workspace.",
     openPlatform: "Open platform",
     seeDemo: "View firm demo",
     matterLabel: "Matter workspace",
@@ -115,7 +115,7 @@ export const en: Dictionary = {
       { title: "Files", text: "Data room, versions, metadata" },
       { title: "iSheets", text: "Collaborative structured tables" },
       { title: "Wiki + Q&A", text: "Knowledge and client questions" },
-      { title: "Integrations", text: "Obsidian · Google · Hermes" },
+      { title: "Integrations", text: "Obsidian · Google · Copilot" },
       { title: "Chile", text: "RIT/RUC matters + case law" },
     ],
   },

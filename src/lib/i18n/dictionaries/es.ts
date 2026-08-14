@@ -2,7 +2,7 @@ export const es = {
   meta: {
     title: "LexOpen — Operaciones jurídicas open source",
     description:
-      "Clon open-source de HighQ para estudios jurídicos en Chile. Causas, jurisprudencia, Obsidian, Hermes Agent y Google Workspace.",
+      "Clon open-source de HighQ para estudios jurídicos en Chile. Causas, jurisprudencia, Obsidian, copiloto IA y Google Workspace.",
   },
   brand: {
     tagline: "Estudio · Chile",
@@ -44,7 +44,7 @@ export const es = {
     documents: "Documentos",
     deadlines: "Plazos",
     jurisprudence: "Jurisprudencia",
-    agent: "Agente Hermes",
+    agent: "Copiloto IA",
     assistant: "Copiloto IA",
     portal: "Portal cliente",
     integrations: "Integraciones",
@@ -96,7 +96,7 @@ export const es = {
     enterFirm: "Entrar al estudio",
     eyebrow: "Chile · Operación legal",
     lead:
-      "Plataforma open-source para estudios jurídicos: espacios, data room, iSheets, tareas, wiki, Q&A y flujos — con causas chilenas, plazos, jurisprudencia, Obsidian, Hermes y Google Workspace.",
+      "Plataforma open-source para estudios jurídicos: espacios, data room, iSheets, tareas, wiki, Q&A y flujos — con causas chilenas, plazos, jurisprudencia, Obsidian, copiloto IA y Google Workspace.",
     openPlatform: "Abrir plataforma",
     seeDemo: "Ver demo del estudio",
     matterLabel: "Espacio de causa",
@@ -113,7 +113,7 @@ export const es = {
       { title: "Archivos", text: "Data room, versiones, metadata" },
       { title: "iSheets", text: "Tablas estructuradas colaborativas" },
       { title: "Wiki + Q&A", text: "Conocimiento y preguntas cliente" },
-      { title: "Integraciones", text: "Obsidian · Google · Hermes" },
+      { title: "Integraciones", text: "Obsidian · Google · Copiloto" },
       { title: "Chile", text: "Causas RIT/RUC + jurisprudencia" },
     ],
   },

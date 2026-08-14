@@ -89,40 +89,7 @@ export function SiteNav({
   );
 }
 
-export function ModuleHeader({
-  eyebrow,
-  title,
-  subtitle,
-  actions,
-}: {
-  eyebrow: string;
-  title: string;
-  subtitle?: string;
-  actions?: ReactNode;
-}) {
-  return (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          {eyebrow}
-        </p>
-        <h1 className={pageTitleClass}>{title}</h1>
-        {subtitle && (
-          <p className="mt-2 max-w-2xl text-sm text-[var(--ink-soft)]/80 sm:text-base">
-            {subtitle}
-          </p>
-        )}
-      </div>
-      {actions ? (
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-          {actions}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** Shared page header for list routes that are not ModuleHeader yet. */
+/** Shared page header for app and module routes. */
 export function PageHeader({
   eyebrow,
   title,
@@ -155,5 +122,27 @@ export function PageHeader({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Alias with required eyebrow — delegates to PageHeader. */
+export function ModuleHeader({
+  eyebrow,
+  title,
+  subtitle,
+  actions,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <PageHeader
+      eyebrow={eyebrow}
+      title={title}
+      subtitle={subtitle}
+      actions={actions}
+    />
   );
 }

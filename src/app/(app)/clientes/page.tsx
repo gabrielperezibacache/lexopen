@@ -18,6 +18,7 @@ export default async function ClientesPage({
   const q = sp.q?.trim();
   const estado = sp.estado;
 
+  const LIST_TAKE = 100;
   const [clientes, abogados] = await Promise.all([
     prisma.cliente.findMany({
       where: {
@@ -47,6 +48,7 @@ export default async function ClientesPage({
         },
       },
       orderBy: { updatedAt: "desc" },
+      take: LIST_TAKE,
     }),
     prisma.user.findMany({
       where: { role: { in: ["admin", "abogado", "asistente"] } },
@@ -81,6 +83,11 @@ export default async function ClientesPage({
         </button>
       </form>
 
+      {clientes.length > 0 ? (
+        <p className="text-xs text-[var(--ink-soft)]/65">
+          Mostrando hasta {LIST_TAKE} clientes más recientes.
+        </p>
+      ) : null}
       <div className="panel overflow-hidden rounded-3xl">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">

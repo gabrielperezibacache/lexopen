@@ -72,11 +72,11 @@ export default async function FacturacionPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <ModuleHeader
         eyebrow="Contabilidad del estudio"
         title="Facturación"
-        subtitle="Horas, gastos, boletas/facturas Chile, pagos y cuenta corriente por cliente/causa."
+        subtitle="Horas, gastos, boletas/facturas (piloto sin DTE SII completo), pagos y cuenta corriente por cliente/causa."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/facturacion/horas" className="btn btn-ghost">

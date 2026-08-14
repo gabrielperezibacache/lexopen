@@ -89,9 +89,10 @@ export function SelfUpdatePanel() {
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-semibold">Actualización de LexOpen</h3>
+          <h3 className="text-lg font-semibold">Actualización del Host</h3>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-            Versión actual: v{status.currentVersion}
+            Actualice LexOpen desde esta pantalla cuando el Host lo permita (git +
+            web-host). Versión actual: v{status.currentVersion}
             {status.latestVersion
               ? ` · disponible v${status.latestVersion}`
               : ""}

@@ -11,9 +11,11 @@ import { requireStaff } from "@/lib/auth/session";
 import { confidentialWhere } from "@/lib/api";
 import { documentoListSelect } from "@/lib/sites/file-select";
 import { PageHeader } from "@/components/sites/SiteNav";
+import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 
 export default async function DocumentosPage() {
   const user = await requireStaff();
+  const LIST_TAKE = 100;
   const [rawDocumentos, causas] = await Promise.all([
     prisma.documento.findMany({
       where: confidentialWhere(user.role),
@@ -26,6 +28,7 @@ export default async function DocumentosPage() {
         autor: { select: publicUserSelect },
       },
       orderBy: { updatedAt: "desc" },
+      take: LIST_TAKE,
     }),
     prisma.causa.findMany({
       select: { id: true, rit: true, titulo: true },
@@ -117,7 +120,9 @@ export default async function DocumentosPage() {
                     )}
                     {d.googleDriveId && (
                       <div className="text-xs text-[var(--ink-soft)]/60">
-                        Drive: {d.googleDriveId}
+                        {isRealDriveFolderId(d.googleDriveId)
+                          ? `Drive: ${d.googleDriveId}`
+                          : "Drive: stub / demo (conecte OAuth para IDs reales)"}
                       </div>
                     )}
                   </td>
