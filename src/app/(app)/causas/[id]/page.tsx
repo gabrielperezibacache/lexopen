@@ -6,6 +6,7 @@ import { StatusBadge, formatDate, formatDateTime } from "@/components/ui";
 import { CausaActions } from "@/components/CausaActions";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
+import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
 import { PjudMonitorPanel } from "@/components/pjud/PjudMonitorPanel";
 import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
@@ -450,7 +451,8 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         <section className="panel rounded-3xl p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Documentos del expediente</h2>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <CausaDocumentImportButton causaId={causa.id} />
               <Link
                 href={`/agente?causaId=${causa.id}&utility=doc_qa`}
                 className="text-sm text-[var(--sea)]"
@@ -462,6 +464,11 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
               </Link>
             </div>
           </div>
+          <p className="mt-2 text-xs text-[var(--ink-soft)]/65">
+            «Importar documentos PJUD» descarga anexos/resoluciones en cola (uno
+            a uno) y los guarda de inmediato en LexOpen para verlos, descargarlos
+            y usarlos con IA.
+          </p>
           <div className="mt-4 space-y-3">
             {documentos.map((d) => (
               <div key={d.id} className="rounded-2xl border border-[var(--line)] px-3 py-2 text-sm">

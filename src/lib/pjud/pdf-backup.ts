@@ -14,6 +14,24 @@ export function pdfBackupEnabled() {
   return process.env.PJUD_PUBLIC_SCRAPE === "1";
 }
 
+/** Pause between sequential OJV/PJUD document downloads (ms). Default 2500. */
+export function pjudDocDownloadDelayMs() {
+  const n = Number(process.env.PJUD_DOC_DOWNLOAD_DELAY_MS);
+  if (!Number.isFinite(n) || n < 0) return 2500;
+  return Math.min(Math.floor(n), 30_000);
+}
+
+/** Max documents downloaded in one import/scrape pass. Default 20, cap 50. */
+export function pjudDocDownloadMaxPerRun() {
+  const n = Number(process.env.PJUD_DOC_DOWNLOAD_MAX);
+  if (!Number.isFinite(n) || n <= 0) return 20;
+  return Math.min(Math.floor(n), 50);
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
 /** True when buffer looks like a PDF (%PDF). */
 export function looksLikePdf(buf: Buffer) {
   if (buf.byteLength < 5) return false;
@@ -109,13 +127,30 @@ export async function ingestPjudDocumentBuffer(opts: {
 
 /**
  * Download remote PDF/document URLs referenced on movimientos and store as Documento.
- * Uses absolute http(s) documentoRef values from scrape/sidecar.
+ * Strictly sequential (never parallel) with delay between each outbound request.
  * Note: OJV often requires session cookies — prefer scrape-time documentoBytes.
  */
-export async function backupMovimientoDocuments(causaId: string) {
-  if (!pdfBackupEnabled()) {
-    return { enabled: false, saved: 0, skipped: 0 };
+export async function backupMovimientoDocuments(
+  causaId: string,
+  opts?: {
+    max?: number;
+    delayMs?: number;
+    /** Manual import from ficha/timeline — always persist into LexOpen Documentos. */
+    force?: boolean;
+    onProgress?: (info: {
+      index: number;
+      total: number;
+      label: string;
+      saved: boolean;
+    }) => void;
   }
+) {
+  if (!opts?.force && !pdfBackupEnabled()) {
+    return { enabled: false, saved: 0, skipped: 0, attempted: 0 };
+  }
+
+  const max = opts?.max ?? pjudDocDownloadMaxPerRun();
+  const delayMs = opts?.delayMs ?? pjudDocDownloadDelayMs();
 
   const movimientos = await prisma.causaMovimiento.findMany({
     where: {
@@ -123,18 +158,33 @@ export async function backupMovimientoDocuments(causaId: string) {
       documentoRef: { not: null },
     },
     orderBy: { fecha: "desc" },
-    take: 30,
+    take: Math.max(max * 2, 40),
   });
+
+  const pending = movimientos.filter((mov) =>
+    isBackupableDocumentoRef(mov.documentoRef)
+  ).slice(0, max);
 
   let saved = 0;
   let skipped = 0;
+  let attempted = 0;
 
-  for (const mov of movimientos) {
+  for (let i = 0; i < pending.length; i += 1) {
+    const mov = pending[i];
     const ref = mov.documentoRef?.trim();
     if (!isBackupableDocumentoRef(ref)) {
       skipped += 1;
       continue;
     }
+
+    if (attempted > 0 && delayMs > 0) {
+      await sleep(delayMs);
+    }
+    attempted += 1;
+    const label =
+      mov.folio?.trim()
+        ? `Folio ${mov.folio}`
+        : mov.titulo.slice(0, 80) || mov.id;
 
     try {
       const parsed = new URL(ref!);
@@ -145,6 +195,7 @@ export async function backupMovimientoDocuments(causaId: string) {
       });
       if (!res.ok) {
         skipped += 1;
+        opts?.onProgress?.({ index: i + 1, total: pending.length, label, saved: false });
         continue;
       }
       const contentType =
@@ -162,10 +213,17 @@ export async function backupMovimientoDocuments(causaId: string) {
       });
       if (id) saved += 1;
       else skipped += 1;
+      opts?.onProgress?.({
+        index: i + 1,
+        total: pending.length,
+        label,
+        saved: Boolean(id),
+      });
     } catch {
       skipped += 1;
+      opts?.onProgress?.({ index: i + 1, total: pending.length, label, saved: false });
     }
   }
 
-  return { enabled: true, saved, skipped };
+  return { enabled: true, saved, skipped, attempted };
 }
