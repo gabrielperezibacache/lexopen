@@ -1,4 +1,5 @@
 import type { HostStatus } from "@/lib/host-status";
+import { SelfUpdatePanel } from "@/components/SelfUpdatePanel";
 
 function yesNo(value: boolean) {
   return value ? "Sí" : "No";
@@ -179,6 +180,8 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
           </span>
         )}
       </div>
+
+      <SelfUpdatePanel />
     </section>
   );
 }

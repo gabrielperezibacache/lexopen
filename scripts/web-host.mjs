@@ -132,6 +132,8 @@ function startHostProcess() {
       ...process.env,
       NODE_ENV: "production",
       LEXOPEN_DESKTOP: "1",
+      LEXOPEN_WEB_HOST: "1",
+      LEXOPEN_DATA_DIR: dataDir,
     },
     shell,
     stdio: "inherit",
@@ -182,6 +184,94 @@ backupScheduler = createLocalBackupScheduler({
   startHost: startHostProcess,
   waitForHost,
 });
+
+const {
+  applySelfUpdate,
+  requestPath: selfUpdateRequestPath,
+  lockPath: selfUpdateLockPath,
+  statusPath: selfUpdateStatusPath,
+} = await import("./web-self-update.mjs");
+
+let selfUpdateBusy = false;
+
+async function maybeRunSelfUpdate() {
+  if (selfUpdateBusy || shuttingDown) return;
+  const reqFile = selfUpdateRequestPath(dataDir);
+  if (!fs.existsSync(reqFile)) return;
+  selfUpdateBusy = true;
+  console.log("[web-host] Solicitud de actualización in-app detectada");
+  let hostStopped = false;
+  try {
+    await stopCurrentHost();
+    hostStopped = true;
+    applySelfUpdate({
+      dataDir,
+      branch: "main",
+      onPhase: (phase, extra) => {
+        console.log(
+          `[web-host] self-update ${phase}${extra?.message ? `: ${extra.message}` : ""}`
+        );
+      },
+    });
+  } catch (error) {
+    console.error(
+      "[web-host] Actualización in-app falló:",
+      error instanceof Error ? error.message : error
+    );
+  } finally {
+    try {
+      if (fs.existsSync(reqFile)) fs.unlinkSync(reqFile);
+    } catch {
+      // ignore
+    }
+    try {
+      const lock = selfUpdateLockPath(dataDir);
+      if (fs.existsSync(lock)) fs.unlinkSync(lock);
+    } catch {
+      // ignore
+    }
+    if (hostStopped && !shuttingDown) {
+      startHostProcess();
+      const ok = await waitForHost(initialUrl);
+      if (!ok) {
+        console.error(
+          "[web-host] Health no disponible tras la actualización in-app."
+        );
+      } else {
+        // Mark done with restarting cleared for UI.
+        try {
+          const statusFile = selfUpdateStatusPath(dataDir);
+          if (fs.existsSync(statusFile)) {
+            const prev = JSON.parse(fs.readFileSync(statusFile, "utf8"));
+            fs.writeFileSync(
+              statusFile,
+              JSON.stringify(
+                {
+                  ...prev,
+                  phase: prev.phase === "failed" ? "failed" : "done",
+                  message:
+                    prev.phase === "failed"
+                      ? prev.message
+                      : "Actualización aplicada. Ya puede recargar el navegador.",
+                  updatedAt: new Date().toISOString(),
+                },
+                null,
+                2
+              )
+            );
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+    selfUpdateBusy = false;
+  }
+}
+
+setInterval(() => {
+  void maybeRunSelfUpdate();
+}, 5_000);
 
 // PJUD / digest / alertas de plazos: los arranca desktop/host-runtime.mjs
 // (también usado por Electron), para no duplicar crons con web:host.
