@@ -702,13 +702,20 @@ async function scrapeModalTabs(
 /**
  * Download OJV anexos with the authenticated Playwright session (cookies).
  * Bare `fetch()` after scrape usually hits a login wall HTML page.
+ * Downloads are strictly sequential with a delay between requests.
  */
 async function attachDocumentoBytesFromPage(
   page: PlaywrightPage,
   movimientos: PjudFetchedMovimiento[],
-  limit = 12
+  opts?: { limit?: number; delayMs?: number }
 ): Promise<PjudFetchedMovimiento[]> {
-  const { looksLikePdf } = await import("@/lib/pjud/pdf-backup");
+  const {
+    looksLikePdf,
+    pjudDocDownloadDelayMs,
+    pjudDocDownloadMaxPerRun,
+  } = await import("@/lib/pjud/pdf-backup");
+  const limit = opts?.limit ?? pjudDocDownloadMaxPerRun();
+  const delayMs = opts?.delayMs ?? pjudDocDownloadDelayMs();
   let downloaded = 0;
   const out: PjudFetchedMovimiento[] = [];
 
@@ -765,6 +772,9 @@ async function attachDocumentoBytesFromPage(
     }
 
     try {
+      if (downloaded > 0 && delayMs > 0) {
+        await delay(delayMs);
+      }
       const res = await page.request.get(ref, { timeout: 35_000 });
       if (!res.ok()) {
         out.push({ ...m, documentoRef: ref });

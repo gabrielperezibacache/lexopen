@@ -109,6 +109,8 @@ Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
 | `PJUD_SYNC_CONCURRENCY` | Parallelismo del worker de cola (default **5**, como CM) |
 | `PJUD_SYNC_INTERVAL_MINUTES` | Intervalo `pjudNextSyncAt` tras sync OK (default **240** = 4h) |
 | `PJUD_PDF_BACKUP` | Tras sync: URL `documentoRef` → `Documento`. Default **on** si `PJUD_PUBLIC_SCRAPE=1` (ponga `=0` para apagar). Preferible: PDF capturados en el scrape con cookies OJV. |
+| `PJUD_DOC_DOWNLOAD_DELAY_MS` | Pausa entre descargas secuenciales (botón en ficha + scrape). Default `2500`, máx. `30000`. |
+| `PJUD_DOC_DOWNLOAD_MAX` | Máximo de PDFs por corrida de import/scrape. Default `20`, máx. `50`. |
 | `CRON_SECRET` | Autoriza crons (`x-cron-secret`) |
 
 Sin `PJUD_PUBLIC_SCRAPE=1` + CAPTCHA (o sidecar), LexOpen **no** scrapea OJV.
@@ -219,6 +221,8 @@ El sidecar se ejecuta en el mismo Host: `npm run pjud:chromium` (una vez) y
 ## Backup PDF
 
 Con scrape activo, tras sync se importan anexos OJV como `Documento` (preferencia: bytes capturados con la sesión Playwright; fallback `fetch` si `PJUD_PDF_BACKUP` lo permite). El movimiento queda con `doc:<id>`; la ficha muestra **Ver / descargar** y **Revisar con IA**.
+
+En la ficha de causa (timeline PJUD y expediente), **Importar documentos PJUD** descarga anexos en cola **secuencial** (pausa `PJUD_DOC_DOWNLOAD_DELAY_MS`, tope `PJUD_DOC_DOWNLOAD_MAX`) y los **persiste de inmediato** como `Documento` (`doc:<id>`), listos para Ver/descargar e IA. Solo una importación corre a la vez en el host.
 
 ## Programación de salas
 

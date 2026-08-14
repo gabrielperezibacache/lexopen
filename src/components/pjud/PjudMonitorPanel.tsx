@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { labelMovimientoTipo } from "@/lib/pjud/classify";
+import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
 
 type Movimiento = {
   id: string;
@@ -76,12 +77,12 @@ function documentoContentHref(ref: string | null | undefined) {
 
 function pendingDocumentoHint(ref: string) {
   if (/^https?:\/\//i.test(ref)) {
-    return "Documento aún no importado a LexOpen. El enlace de OJV exige sesión ClaveÚnica y no funciona desde el navegador: sincronice de nuevo con scrape activo para verlo, descargarlo y usarlo con IA.";
+    return "Documento pendiente de importar a LexOpen. Use «Importar documentos PJUD» en este panel: se guarda en el expediente para verlo, descargarlo y usarlo con IA.";
   }
   if (ref.startsWith("lexopen:")) {
     return null;
   }
-  return `Ref. doc: ${ref} (se importará al LexOpen en el próximo sync con scrape activo)`;
+  return `Ref. doc: ${ref} — use «Importar documentos PJUD» para guardarlo en LexOpen.`;
 }
 
 function MovementCard({
@@ -351,6 +352,7 @@ export function PjudMonitorPanel({
           Ver cartera
         </Link>
       </div>
+      <CausaDocumentImportButton causaId={causaId} className="mt-1" />
       {msg && (
         <div
           className={`flex flex-wrap items-start justify-between gap-2 rounded-2xl border px-3 py-2 text-xs ${
