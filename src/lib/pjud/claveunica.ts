@@ -261,14 +261,28 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
     });
   } catch (error) {
     if (sidecarError) {
-      const scrapeNote = error instanceof Error ? error.message : "scrape falló";
-      throw httpError(
-        `Sidecar PJUD no responde (${sidecarError.message}). In-process: ${scrapeNote}. Arranque \`npm run pjud:scraper\` o quite PJUD_SCRAPER_URL del .env del Host si usa scrape local.`,
-        502
-      );
+      throw httpError(humanizeClaveUnicaSyncError(error, sidecarError), 502);
     }
     throw error;
   }
+}
+
+function humanizeClaveUnicaSyncError(error: unknown, sidecarError: Error): string {
+  const scrapeNote = error instanceof Error ? error.message : "scrape falló";
+  const sidecarNote = sidecarError.message || "no responde";
+  const formIssue = /Timeout|not visible|locator\.fill|rut_hidden|formulario visible/i.test(
+    scrapeNote
+  );
+  if (formIssue) {
+    return [
+      "No se pudo iniciar sesión en ClaveÚnica: el formulario del sitio no respondió (campo oculto o bloqueo).",
+      "Si tiene configurado un servicio auxiliar PJUD, arránquelo; si no, quite PJUD_SCRAPER_URL del entorno del Host y reinicie LexOpen para usar la consulta directa.",
+      `Detalle técnico del auxiliar: ${sidecarNote.slice(0, 120)}.`,
+    ].join(" ");
+  }
+  const short =
+    scrapeNote.length > 220 ? `${scrapeNote.slice(0, 220)}…` : scrapeNote;
+  return `El servicio auxiliar PJUD no responde (${sidecarNote.slice(0, 80)}). Consulta directa: ${short}`;
 }
 
 async function findExistingCausa(item: MisCausasItem) {
