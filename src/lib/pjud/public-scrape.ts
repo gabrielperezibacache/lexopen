@@ -29,6 +29,8 @@ import {
   OJV,
   OJV_CONSULTA_URL,
   OJV_HOME,
+  OJV_INDEX_N,
+  OJV_POST_AUTH_URLS,
   parseRitParts,
   splitRut,
   tribunalLabelsMatch,
@@ -36,6 +38,7 @@ import {
 } from "@/lib/pjud/ojv-dom";
 import {
   parseCausasListFromHtml,
+  parseMisCausasLooseFromHtml,
   parseMovimientosFromHtml,
   parseSalaFromHtml,
   parseVerDetalleJuridicaHtml,
@@ -1084,7 +1087,234 @@ async function fillClaveUnicaLoginForm(page: AnyPage, rut: string, password: str
       )
     )
     .first();
+
+  const navAway = page
+    .waitForURL(
+      (url: URL) => !/accounts\.claveunica\.gob\.cl\/accounts\/login/i.test(url.href),
+      { timeout: 90_000 }
+    )
+    .catch(() => undefined);
   await submit.click({ timeout: 15_000 });
+  await navAway;
+  await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+  await sleep(800);
+
+  // Si seguimos en el login, el sitio mostró error / CAPTCHA / credenciales.
+  if (isClaveUnicaAccountsUrl(page.url()) && /\/accounts\/login/i.test(page.url())) {
+    const body = await page
+      .locator("body")
+      .innerText()
+      .catch(() => "");
+    const hint = /incorrect|inv[aá]lid|error|bloquead|captcha|intentos/i.test(body)
+      ? " El portal reportó un error de acceso (credenciales, bloqueo o CAPTCHA)."
+      : " Sigue en la página de login (posible CAPTCHA invisible o rechazo del sitio).";
+    throw new PjudScrapeError(
+      `No se completó el login de ClaveÚnica.${hint}`
+    );
+  }
+}
+
+/** Materias típicas del menú Mis Causas (manual OJV). */
+export const MIS_CAUSAS_MATERIAS = [
+  "Civil",
+  "Familia",
+  "Laboral",
+  "Cobranza",
+  "Penal",
+  "Garantía",
+  "Tribunal Oral",
+  "Apelaciones",
+  "Corte Suprema",
+  "Constitucional",
+] as const;
+
+async function dismissOjvPrompts(page: AnyPage) {
+  await closeSweetAlerts(page);
+  await closeBootstrapModals(page);
+  // Términos / “Acepto” en primer ingreso
+  const accept = page
+    .getByRole("button", {
+      name: /Acepto|Aceptar|Continuar|Entendido|OK|De acuerdo/i,
+    })
+    .or(
+      page.locator(
+        'button:has-text("Acepto"), input[value*="Acepto" i], a:has-text("Acepto")'
+      )
+    )
+    .first();
+  if (await accept.isVisible().catch(() => false)) {
+    await accept.click({ timeout: 5_000 }).catch(() => undefined);
+    await sleep(500);
+    await closeSweetAlerts(page);
+  }
+}
+
+async function openMisCausasMenu(page: AnyPage): Promise<boolean> {
+  const candidates = [
+    page.getByRole("link", { name: /^Mis Causas$/i }).first(),
+    page.getByRole("button", { name: /^Mis Causas$/i }).first(),
+    page.locator(OJV.misCausasMenu).first(),
+    page.locator("#menuMisCausas, #misCausas, a[href*='misCausa' i]").first(),
+  ];
+  for (const loc of candidates) {
+    if ((await loc.count().catch(() => 0)) === 0) continue;
+    if (!(await loc.isVisible().catch(() => false))) {
+      await loc.click({ force: true, timeout: 8_000 }).catch(() => undefined);
+    } else {
+      await loc.click({ timeout: 8_000 }).catch(() => undefined);
+    }
+    await page
+      .waitForLoadState("domcontentloaded")
+      .catch(() => undefined);
+    await sleep(700);
+    await dismissOjvPrompts(page);
+    return true;
+  }
+  // Intento por texto en sidebar / menú
+  const byText = page.locator("text=/^\\s*Mis Causas\\s*$/i").first();
+  if ((await byText.count().catch(() => 0)) > 0) {
+    await byText.click({ force: true, timeout: 8_000 }).catch(() => undefined);
+    await sleep(700);
+    return true;
+  }
+  return false;
+}
+
+async function clickMisCausasBuscar(page: AnyPage) {
+  const buscar = page
+    .getByRole("button", { name: /^Buscar$/i })
+    .or(page.locator(OJV.misCausasBuscar))
+    .first();
+  if ((await buscar.count().catch(() => 0)) === 0) return false;
+  if (!(await buscar.isVisible().catch(() => false))) {
+    await buscar.click({ force: true, timeout: 8_000 }).catch(() => undefined);
+  } else {
+    await buscar.click({ timeout: 8_000 }).catch(() => undefined);
+  }
+  await sleep(1200);
+  await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined);
+  return true;
+}
+
+function parseMisCausasItemsFromHtml(html: string): MisCausasItem[] {
+  const fromTable = parseVerDetalleJuridicaHtml(html);
+  if (fromTable.length > 0) {
+    return fromTable.map((r) => ({
+      rit: r.rit,
+      tribunal: r.tribunal,
+      caratula: r.caratula,
+      ruc: r.ruc,
+      estado: r.estado,
+    }));
+  }
+  const fromList = parseCausasListFromHtml(html);
+  if (fromList.length > 0) return fromList;
+  return parseMisCausasLooseFromHtml(html);
+}
+
+async function pagesAndFramesHtml(page: AnyPage): Promise<string> {
+  const chunks: string[] = [];
+  try {
+    chunks.push(await page.content());
+  } catch {
+    /* ignore */
+  }
+  for (const frame of page.frames?.() || []) {
+    try {
+      if (frame === page.mainFrame?.()) continue;
+      const html = await frame.content();
+      if (html && html.length > 200) chunks.push(html);
+    } catch {
+      /* cross-origin */
+    }
+  }
+  return chunks.join("\n");
+}
+
+async function ensureAuthenticatedOjvShell(page: AnyPage): Promise<AnyPage> {
+  await dismissOjvPrompts(page);
+  const onOjv = /oficinajudicialvirtual\.pjud\.cl|ojv\.pjud\.cl/i.test(page.url());
+  const needsShell =
+    !onOjv || /return\.php|\/home\/index\.php|accounts\.claveunica/i.test(page.url());
+  if (!needsShell) return page;
+
+  for (const url of OJV_POST_AUTH_URLS) {
+    const res = await page
+      .goto(url, { waitUntil: "domcontentloaded", timeout: 45_000 })
+      .catch(() => null);
+    await dismissOjvPrompts(page);
+    if (res && (res.ok() || /indexN\.php/i.test(page.url()))) {
+      return page;
+    }
+  }
+  return page;
+}
+
+async function collectMisCausasFromAuthenticatedOjv(
+  page: AnyPage
+): Promise<{ items: MisCausasItem[]; openedMenu: boolean; materiasTried: string[] }> {
+  page = await ensureAuthenticatedOjvShell(page);
+
+  const openedMenu = await openMisCausasMenu(page);
+  const materiasTried: string[] = [];
+  const all: MisCausasItem[] = [];
+  const seen = new Set<string>();
+
+  const pushParsed = async () => {
+    const html = await pagesAndFramesHtml(page);
+    for (const item of parseMisCausasItemsFromHtml(html)) {
+      const key = `${item.rit}|${item.tribunal}`.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      all.push(item);
+    }
+  };
+
+  await pushParsed();
+
+  for (const materia of MIS_CAUSAS_MATERIAS) {
+    const tab = page
+      .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
+      .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
+      .or(
+        page.locator(
+          `a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a, div.card:has-text("${materia}")`
+        )
+      )
+      .first();
+    if ((await tab.count().catch(() => 0)) === 0) continue;
+    if (!(await tab.isVisible().catch(() => false))) {
+      // Algunas materias están en acordeón colapsado.
+      await tab.click({ force: true, timeout: 8_000 }).catch(() => undefined);
+    } else {
+      await tab.click({ timeout: 8_000 }).catch(() => undefined);
+    }
+    materiasTried.push(materia);
+    await sleep(500);
+
+    const filtros = page.getByRole("button", { name: /Filtros/i }).first();
+    if (await filtros.isVisible().catch(() => false)) {
+      await filtros.click().catch(() => undefined);
+      await sleep(300);
+    }
+    const selectAll = page
+      .getByText(/Seleccionar Todos|Seleccionar todos/i)
+      .first();
+    if (await selectAll.isVisible().catch(() => false)) {
+      await selectAll.click().catch(() => undefined);
+      await sleep(200);
+    }
+
+    await clickMisCausasBuscar(page);
+    await pushParsed();
+  }
+
+  if (materiasTried.length === 0) {
+    await clickMisCausasBuscar(page);
+    await pushParsed();
+  }
+
+  return { items: all, openedMenu, materiasTried };
 }
 
 /** True only for the OIDC login host — not the citizen marketing portal. */
@@ -1242,41 +1472,41 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
       .waitForLoadState("networkidle", { timeout: 15_000 })
       .catch(() => undefined);
     await fillClaveUnicaLoginForm(page, opts.rut, opts.password);
-    await page
-      .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60_000 })
-      .catch(() => undefined);
-    await page
-      .waitForURL(/pjud\.cl|claveunica\.gob\.cl/i, { timeout: 60_000 })
-      .catch(() => undefined);
 
-    const misCausas = page.locator(
-      'a:has-text("Mis Causas"), a:has-text("Mis causas"), a[href*="mis-causas"], a[href*="miscausas"]'
-    );
-    if ((await misCausas.count()) > 0) {
-      await Promise.all([
-        page
-          .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 45_000 })
-          .catch(() => undefined),
-        misCausas.first().click(),
-      ]);
+    // Tras OIDC puede haber popup de return.php; preferir pestaña OJV.
+    const pages = page.context().pages();
+    for (const p of pages) {
+      if (/oficinajudicialvirtual\.pjud\.cl|ojv\.pjud\.cl/i.test(p.url())) {
+        page = p;
+        break;
+      }
     }
+    await page
+      .waitForURL(/pjud\.cl/i, { timeout: 60_000 })
+      .catch(() => undefined);
+    await page
+      .waitForLoadState("domcontentloaded")
+      .catch(() => undefined);
+    await dismissOjvPrompts(page);
 
-    const html = await page.content();
-    const fromTable = parseVerDetalleJuridicaHtml(html);
-    const items =
-      fromTable.length > 0
-        ? fromTable.map((r: { rit: string; tribunal: string; caratula?: string | null; ruc?: string | null; estado?: string | null }) => ({
-            rit: r.rit,
-            tribunal: r.tribunal,
-            caratula: r.caratula,
-            ruc: r.ruc,
-            estado: r.estado,
-          }))
-        : parseCausasListFromHtml(html);
+    const { items, openedMenu, materiasTried } =
+      await collectMisCausasFromAuthenticatedOjv(page);
 
     if (items.length === 0) {
+      const url = String(page.url()).slice(0, 160);
+      const title = await page.title().catch(() => "");
+      const stillLogin = isClaveUnicaAccountsUrl(url);
       throw new PjudScrapeError(
-        "Login ClaveÚnica OK o parcial, pero no se listaron Mis Causas. Revise credenciales o layout OJV."
+        stillLogin
+          ? `El login de ClaveÚnica no llegó a OJV (url=${url}). Revise credenciales o CAPTCHA.`
+          : [
+              "Se autenticó en ClaveÚnica pero no se listaron causas en Mis Causas.",
+              openedMenu
+                ? `Menú Mis Causas abierto; materias probadas: ${materiasTried.join(", ") || "(ninguna visible)"}.`
+                : "No se encontró el menú «Mis Causas» (sesión incompleta o layout distinto).",
+              `url=${url}${title ? ` título=${title.slice(0, 60)}` : ""}.`,
+              "En OJV: Mis Causas → materia (p. ej. Civil/Familia) → Filtros/Buscar.",
+            ].join(" ")
       );
     }
     return items;

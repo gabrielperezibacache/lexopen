@@ -193,8 +193,10 @@ export function parseCausasListFromHtml(html: string): Array<{
         /juzgado|corte de|tribunal oral|tribunal constitucional|^tribunal\b/i.test(
           c
         )
-      ) || null;
-    if (!tribunal || /sin tribunal/i.test(tribunal)) continue;
+      ) ||
+      cells.find((c) => /civil|laboral|cobranza|garant|familia|penal/i.test(c)) ||
+      "Tribunal no identificado";
+    if (/sin tribunal/i.test(tribunal)) continue;
     const key = `${rit}|${tribunal}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -204,6 +206,56 @@ export function parseCausasListFromHtml(html: string): Array<{
       caratula: cells.find((c) => /\bvs\.?\b|\/|con\b/i.test(c)) || cells[0],
       ruc: cells.find((c) => /\d{1,3}-\d{8,}-\d/.test(c)) || null,
       estado: cells.find((c) => /tramitaci|terminad|archiv/i.test(c)) || null,
+    });
+  }
+  return items;
+}
+
+/**
+ * Fallback cuando Mis Causas no usa `<table>` clásica (cards / divs).
+ * Busca RIT + tribunal en ventanas de texto plano del HTML.
+ */
+export function parseMisCausasLooseFromHtml(html: string): Array<{
+  rit: string;
+  tribunal: string;
+  caratula?: string | null;
+  ruc?: string | null;
+  estado?: string | null;
+}> {
+  const text = stripTags(html);
+  const items: Array<{
+    rit: string;
+    tribunal: string;
+    caratula?: string | null;
+    ruc?: string | null;
+    estado?: string | null;
+  }> = [];
+  const seen = new Set<string>();
+  const ritRe = /\b([A-ZÁÉÍÓÚÑ]{1,4}-\d{1,6}-\d{4}|\d{1,6}-\d{4})\b/gi;
+  let match: RegExpExecArray | null;
+  while ((match = ritRe.exec(text)) !== null) {
+    const rit = match[1].toUpperCase();
+    if (/^\d{1,2}-\d{4}$/.test(rit)) continue; // fechas dd-yyyy raras
+    const start = Math.max(0, match.index - 120);
+    const end = Math.min(text.length, match.index + match[0].length + 220);
+    const window = text.slice(start, end);
+    const tribunalMatch = window.match(
+      /\b(\d{0,2}\s*[ºo°.]?\s*(?:Juzgado|Tribunal|Corte)[^.]{0,60})/i
+    );
+    const tribunal = (tribunalMatch?.[1] || "Tribunal no identificado").trim();
+    const key = `${rit}|${tribunal}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const rucMatch = window.match(/\b(\d{1,3}-\d{8,}-\d|\d{7,8}-[\dkK])\b/i);
+    const estadoMatch = window.match(
+      /\b(Tramitaci[oó]n|Terminad[oa]|Archivad[oa]|Vigente|Activa)\b/i
+    );
+    items.push({
+      rit,
+      tribunal,
+      caratula: null,
+      ruc: rucMatch?.[1] || null,
+      estado: estadoMatch?.[1] || null,
     });
   }
   return items;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   parseCausasListFromHtml,
+  parseMisCausasLooseFromHtml,
   parseMovimientosFromHtml,
   parseSalaFromHtml,
   extractDocumentoHrefFromRowHtml,
@@ -50,7 +51,20 @@ const listHtml = `
 </table>
 `;
 const list = parseCausasListFromHtml(listHtml);
-assert.equal(list.length, 1);
+assert.equal(list.length, 2);
 assert.equal(list[0].rit, "C-100-2024");
+assert.equal(list[1].rit, "99-2024");
+assert.equal(list[1].tribunal, "Tribunal no identificado");
+
+const looseHtml = `
+<div class="card">
+  <h3>C-55-2023</h3>
+  <p>1º Juzgado de Familia de Santiago · Tramitación</p>
+  <p>RUC 00-12345678-9</p>
+</div>
+`;
+const loose = parseMisCausasLooseFromHtml(looseHtml);
+assert.ok(loose.some((x) => x.rit === "C-55-2023"));
+assert.ok(loose.some((x) => /Familia/i.test(x.tribunal)));
 
 console.log("pjud/parse-html.test.ts OK");

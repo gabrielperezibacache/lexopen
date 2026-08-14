@@ -87,10 +87,16 @@ export async function getClaveUnicaStatus() {
     sidecarHealth?.reachable && sidecarHealth.scrapeReady !== false
   );
   const canUseInProcess = publicScrapeReady();
+  const warnings: string[] = [];
+  if (sidecar && !sidecarHealth?.reachable && canUseInProcess) {
+    warnings.push(
+      "El servicio auxiliar (PJUD_SCRAPER_URL) no responde. LexOpen usará la consulta directa. Arranque `npm run pjud:host` o quite PJUD_SCRAPER_URL del .env si no lo necesita."
+    );
+  }
   if (!canUseSidecar && !canUseInProcess) {
     if (sidecar && !sidecarHealth?.reachable) {
       blockers.push(
-        "El servicio auxiliar de consulta judicial no está en marcha. Arránquelo o pida ayuda al administrador del Host; mientras tanto LexOpen no puede entrar a Mis Causas."
+        "El servicio auxiliar de consulta judicial no está en marcha. Arránquelo con `npm run pjud:host`, o quite PJUD_SCRAPER_URL del .env si prefiere solo consulta directa; mientras tanto LexOpen no puede entrar a Mis Causas."
       );
     } else if (
       sidecar &&
@@ -122,6 +128,8 @@ export async function getClaveUnicaStatus() {
   if (blockers.length) {
     readinessLabel = "Aún no se puede sincronizar";
     readinessHint = blockers[0];
+  } else if (warnings.length) {
+    readinessHint = warnings[0];
   }
 
   const channelLabel = canUseSidecar
@@ -146,6 +154,7 @@ export async function getClaveUnicaStatus() {
     captchaConfigured: captcha,
     readyToSync: blockers.length === 0,
     blockers,
+    warnings,
     readinessLabel,
     readinessHint,
     channelLabel,
@@ -271,21 +280,35 @@ function humanizeClaveUnicaSyncError(error: unknown, sidecarError: Error): strin
   const scrapeNote = error instanceof Error ? error.message : "scrape falló";
   const sidecarNote = sidecarError.message || "no responde";
   const formIssue =
-    /Timeout|not visible|locator\.fill|rut_hidden|formulario visible|campo RUN|campo de contraseña|Página no encontrada|404/i.test(
+    /Timeout|not visible|locator\.fill|rut_hidden|formulario visible|campo RUN|campo de contraseña|Página no encontrada|404|no se completó el login|no llegó a OJV/i.test(
       scrapeNote
     );
+  const listIssue =
+    /no se listaron|Mis Causas|materias probadas|menú «Mis Causas»/i.test(
+      scrapeNote
+    );
+  const sidecarTip =
+    /fetch failed|ECONNREFUSED|no responde/i.test(sidecarNote)
+      ? "Arranque el auxiliar con `npm run pjud:host` o quite PJUD_SCRAPER_URL del .env del Host si no lo usa."
+      : `Auxiliar: ${sidecarNote.slice(0, 80)}.`;
+
+  if (listIssue) {
+    return [
+      scrapeNote.length > 280 ? `${scrapeNote.slice(0, 280)}…` : scrapeNote,
+      sidecarTip,
+    ].join(" ");
+  }
   if (formIssue) {
     return [
       "No se pudo completar el login de ClaveÚnica (formulario no disponible o bloqueo del sitio).",
       "LexOpen intentó la consulta directa porque el servicio auxiliar no responde.",
-      "Si usa sidecar, arranque `npm run pjud:scraper`; si no lo necesita, quite PJUD_SCRAPER_URL del .env y reinicie.",
-      `Auxiliar: ${sidecarNote.slice(0, 80)}.`,
+      sidecarTip,
       scrapeNote.length > 140 ? `Detalle: ${scrapeNote.slice(0, 140)}…` : `Detalle: ${scrapeNote}`,
     ].join(" ");
   }
   const short =
     scrapeNote.length > 220 ? `${scrapeNote.slice(0, 220)}…` : scrapeNote;
-  return `El servicio auxiliar PJUD no responde (${sidecarNote.slice(0, 80)}). Consulta directa: ${short}`;
+  return `Consulta directa: ${short} ${sidecarTip}`;
 }
 
 async function findExistingCausa(item: MisCausasItem) {

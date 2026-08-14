@@ -13,6 +13,7 @@ import {
   CLAVEUNICA_RUT_SELECTORS,
   formatClaveUnicaRunInput,
   isClaveUnicaAccountsUrl,
+  MIS_CAUSAS_MATERIAS,
   claveUnicaAutomationAllowed,
   pjudPlaywrightInstallHint,
   publicScrapeEnabled,
@@ -28,6 +29,8 @@ assert.doesNotMatch(CLAVEUNICA_RUT_SELECTORS, /rut_hidden/i);
 assert.match(CLAVEUNICA_RUT_SELECTORS, /#uname:visible/);
 assert.match(CLAVEUNICA_RUT_SELECTORS, /placeholder\*=\"RUN\"/i);
 assert.ok(CLAVEUNICA_LOGIN_URLS.every((u) => !u.endsWith("/login/")));
+assert.ok(MIS_CAUSAS_MATERIAS.includes("Civil"));
+assert.ok(MIS_CAUSAS_MATERIAS.includes("Familia"));
 assert.equal(
   isClaveUnicaAccountsUrl(
     "https://accounts.claveunica.gob.cl/accounts/login/?next=/openid/authorize"

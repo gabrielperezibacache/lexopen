@@ -12,8 +12,12 @@
 
 export const OJV_BASE = "https://oficinajudicialvirtual.pjud.cl";
 export const OJV_HOME = `${OJV_BASE}/home/index.php`;
+/** Shell autenticado post ClaveÚnica (aparece referenciado desde el home). */
+export const OJV_INDEX_N = `${OJV_BASE}/indexN.php`;
 export const OJV_CONSULTA_URL =
   "https://www.pjud.cl/consulta-unificada-de-causas";
+
+export const OJV_POST_AUTH_URLS = [OJV_INDEX_N, OJV_HOME] as const;
 
 export const OJV = {
   accesoConsulta: 'button.dropbtn[onclick*="accesoConsultaCausas"], a[onclick*="accesoConsultaCausas"]',
@@ -50,6 +54,11 @@ export const OJV = {
   sweetAlert: ".sweet-alert.showSweetAlert.visible",
   sweetConfirm:
     ".sweet-alert.showSweetAlert.visible button.confirm, .sweet-alert.visible button.confirm",
+  // Mis Causas (sesión ClaveÚnica) — menú izquierdo + materias + Buscar
+  misCausasMenu:
+    'a:has-text("Mis Causas"), a:has-text("MIS CAUSAS"), #menuMisCausas, [onclick*="MisCausas" i]',
+  misCausasBuscar:
+    'button:has-text("Buscar"), input[type="submit"][value*="Buscar" i], #btnBuscar',
 } as const;
 
 export type OjvCompetenciaValue = "1" | "2" | "3" | "4" | "5" | "6";
