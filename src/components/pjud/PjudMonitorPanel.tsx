@@ -67,15 +67,21 @@ function fmtDateTime(d: string | Date | null | undefined) {
   });
 }
 
-function documentoHref(ref: string | null | undefined) {
-  if (!ref) return null;
-  if (ref.startsWith("doc:")) {
-    const id = ref.slice(4).trim();
-    return id ? `/api/documentos/${id}/content` : null;
+/** LexOpen-stored docs only. Raw OJV http(s) links need session cookies and fail in the browser. */
+function documentoContentHref(ref: string | null | undefined) {
+  if (!ref?.startsWith("doc:")) return null;
+  const id = ref.slice(4).trim();
+  return id ? `/api/documentos/${id}/content` : null;
+}
+
+function pendingDocumentoHint(ref: string) {
+  if (/^https?:\/\//i.test(ref)) {
+    return "Documento aún no importado a LexOpen. El enlace de OJV exige sesión ClaveÚnica y no funciona desde el navegador: sincronice de nuevo con scrape activo para verlo, descargarlo y usarlo con IA.";
   }
-  if (ref.startsWith("lexopen:")) return null;
-  if (/^https?:\/\//i.test(ref)) return ref;
-  return null;
+  if (ref.startsWith("lexopen:")) {
+    return null;
+  }
+  return `Ref. doc: ${ref} (se importará al LexOpen en el próximo sync con scrape activo)`;
 }
 
 function MovementCard({
@@ -85,9 +91,11 @@ function MovementCard({
   m: Movimiento;
   causaId: string;
 }) {
-  const docUrl = documentoHref(m.documentoRef);
+  const docUrl = documentoContentHref(m.documentoRef);
   const docId =
     m.documentoRef?.startsWith("doc:") ? m.documentoRef.slice(4).trim() : null;
+  const pendingHint =
+    !docId && m.documentoRef ? pendingDocumentoHint(m.documentoRef) : null;
   return (
     <article
       className={`rounded-2xl border px-3 py-2 text-sm ${
@@ -118,33 +126,26 @@ function MovementCard({
       {m.detalle && (
         <p className="mt-2 text-[var(--ink-soft)]/80">{m.detalle}</p>
       )}
-      {(docUrl || docId) && (
+      {docId && docUrl && (
         <p className="mt-1 flex flex-wrap gap-3 text-xs">
-          {docUrl && (
-            <a
-              className="text-[var(--sea)] underline-offset-2 hover:underline"
-              href={docUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {docId ? "Ver / descargar" : "Abrir en OJV"}
-            </a>
-          )}
-          {docId && (
-            <Link
-              className="text-[var(--sea)] underline-offset-2 hover:underline"
-              href={`/agente?causaId=${causaId}&utility=doc_qa&documentoId=${docId}`}
-            >
-              Revisar con IA
-            </Link>
-          )}
+          <a
+            className="text-[var(--sea)] underline-offset-2 hover:underline"
+            href={docUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ver / descargar
+          </a>
+          <Link
+            className="text-[var(--sea)] underline-offset-2 hover:underline"
+            href={`/agente?causaId=${causaId}&utility=doc_qa&documentoId=${docId}`}
+          >
+            Revisar con IA
+          </Link>
         </p>
       )}
-      {!docUrl && m.documentoRef && !docId && (
-        <p className="mt-1 text-xs text-[var(--ink-soft)]/55">
-          Ref. doc: {m.documentoRef} (se importará al LexOpen en el próximo sync
-          con scrape activo)
-        </p>
+      {pendingHint && (
+        <p className="mt-1 text-xs text-[var(--ink-soft)]/55">{pendingHint}</p>
       )}
     </article>
   );
