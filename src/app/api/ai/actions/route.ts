@@ -16,6 +16,7 @@ import {
   parseActionResult,
 } from "@/lib/ai/actions";
 import { buildActionContext } from "@/lib/ai/context";
+import { rateLimitAsync } from "@/lib/auth/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,18 @@ export async function POST(req: NextRequest) {
     assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, postSchema);
+
+    const limited = await rateLimitAsync(`llm:actions:${user.id}`, 30, 60_000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        {
+          error:
+            "Demasiadas solicitudes al copiloto. Espere un momento e intente de nuevo.",
+          code: "rate_limited",
+        },
+        { status: 429 }
+      );
+    }
 
     if (!isAiActionId(body.action)) {
       return NextResponse.json({ error: "Acción IA desconocida" }, { status: 404 });

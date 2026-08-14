@@ -231,7 +231,23 @@ export const llmConfigSchema = z.object({
   preset: z
     .enum(["openai", "azure", "groq", "ollama", "hermes", "custom"])
     .optional(),
-  apiUrl: z.string().min(1).max(500).optional(),
+  apiUrl: z
+    .string()
+    .min(1)
+    .max(500)
+    .optional()
+    .refine(
+      (value) => {
+        if (value === undefined) return true;
+        try {
+          const url = new URL(value);
+          return url.protocol === "http:" || url.protocol === "https:";
+        } catch {
+          return false;
+        }
+      },
+      { message: "La URL del endpoint de IA debe ser http(s) válida" }
+    ),
   apiKey: z.string().max(500).optional().nullable(),
   model: z.string().min(1).max(200).optional(),
   requireApproval: z.boolean().optional(),

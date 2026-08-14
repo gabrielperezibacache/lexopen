@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   applyPreset,
+  classifyLlmProviderError,
   describeLlmProviderError,
   LLM_PRESETS,
   LLM_PRESET_CATALOG,
@@ -8,6 +9,7 @@ import {
   looksLikeSse,
   llmEnvSnippet,
   parseChatCompletionBody,
+  resolveAllowDemoFlag,
   sanitizeLlmMessages,
 } from "./llm";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
@@ -93,6 +95,27 @@ assert.equal(
 assert.equal(envAllowsDemo({ NODE_ENV: "development" }), true);
 
 assert.equal(
+  resolveAllowDemoFlag(true, { NODE_ENV: "production" }),
+  false
+);
+assert.equal(
+  resolveAllowDemoFlag(false, { NODE_ENV: "production", LLM_ALLOW_DEMO: "1" }),
+  true
+);
+assert.equal(
+  resolveAllowDemoFlag(true, { NODE_ENV: "production", LLM_ALLOW_DEMO: "0" }),
+  false
+);
+assert.equal(
+  resolveAllowDemoFlag(true, { NODE_ENV: "development" }),
+  true
+);
+assert.equal(
+  resolveAllowDemoFlag(false, { NODE_ENV: "development" }),
+  false
+);
+
+assert.equal(
   parseChatCompletionBody(
     JSON.stringify({ choices: [{ message: { content: "  OK  " } }] })
   ),
@@ -125,7 +148,24 @@ assert.equal(
 const sseParseError = new SyntaxError(
   `Unexpected token 'd', "data: {"id"... is not valid JSON`
 );
-assert.match(describeLlmProviderError(sseParseError), /stream SSE/);
+assert.match(describeLlmProviderError(sseParseError), /formato no usable|SSE|OpenAI/i);
+assert.equal(classifyLlmProviderError(sseParseError).code, "llm_bad_response");
+assert.equal(
+  classifyLlmProviderError(new Error("LLM HTTP 401: invalid_api_key")).code,
+  "llm_http_4xx"
+);
+assert.equal(
+  classifyLlmProviderError(new Error("LLM HTTP 502: bad gateway")).code,
+  "llm_http_5xx"
+);
+assert.equal(
+  classifyLlmProviderError(new Error("fetch failed")).code,
+  "llm_unreachable"
+);
+assert.doesNotMatch(
+  classifyLlmProviderError(new Error("LLM HTTP 401: sk-secret-leak")).message,
+  /sk-secret/
+);
 
 assert.equal(
   llmEnvSnippet({

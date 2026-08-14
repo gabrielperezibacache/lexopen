@@ -10,7 +10,7 @@ import {
 import {
   getLlmConfig,
   publicLlmConfig,
-  saveLlmConfig,
+  resolveAllowDemoFlag,
   LLM_PRESET_CATALOG,
 } from "@/lib/integrations/llm";
 import { buildAiContextPack } from "@/lib/ai/context-pack";
@@ -30,7 +30,9 @@ import {
   renderMinutaMarkdown,
 } from "@/lib/minutas";
 import { writeAudit } from "@/lib/audit";
-import { llmConfigSchema } from "@/lib/schemas";
+import { rateLimitAsync } from "@/lib/auth/rate-limit";
+
+const MAX_HERMES_PROMPT = 8000;
 
 export async function GET(req: NextRequest) {
   try {
@@ -103,37 +105,15 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     if (body.action === "save-config") {
-      if (user.role !== "admin") {
-        return NextResponse.json(
-          { error: "Solo admin puede configurar el proveedor IA" },
-          { status: 403 }
-        );
-      }
-      const parsed = llmConfigSchema.parse(body.config || {});
-      try {
-        const saved = await saveLlmConfig({
-          enabled: Boolean(body.enabled ?? true),
-          config: {
-            ...parsed,
-            apiKey:
-              parsed.apiKey === null || parsed.apiKey === undefined
-                ? undefined
-                : parsed.apiKey,
-          },
-        });
-        return NextResponse.json({
-          ok: true,
-          config: publicLlmConfig(saved),
-        });
-      } catch (err) {
-        return NextResponse.json(
-          {
-            error:
-              err instanceof Error ? err.message : "URL de endpoint IA inválida",
-          },
-          { status: 400 }
-        );
-      }
+      return NextResponse.json(
+        {
+          error:
+            "La configuración del endpoint de IA se edita en Configuración → IA.",
+          code: "llm_config_deprecated",
+          href: "/configuracion#llm-settings",
+        },
+        { status: 410 }
+      );
     }
 
     if (body.action === "estimate-plazo") {
@@ -431,9 +411,30 @@ export async function POST(req: Request) {
       });
     }
 
+    const promptRaw = String(body.prompt || "").trim();
+    if (promptRaw.length > MAX_HERMES_PROMPT) {
+      return NextResponse.json(
+        {
+          error: `El mensaje es demasiado largo (máximo ${MAX_HERMES_PROMPT} caracteres).`,
+          code: "prompt_too_long",
+        },
+        { status: 400 }
+      );
+    }
     const prompt =
-      String(body.prompt || "").trim() ||
-      "Resume el estado procesal y sugiere próximos pasos.";
+      promptRaw || "Resume el estado procesal y sugiere próximos pasos.";
+
+    const limited = await rateLimitAsync(`llm:hermes:${user.id}`, 30, 60_000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        {
+          error: "Demasiadas solicitudes al copiloto. Espere un momento e intente de nuevo.",
+          code: "rate_limited",
+        },
+        { status: 429 }
+      );
+    }
+
     const utility = getAiUtility(
       body.utility || inferAiUtility(prompt)
     );
@@ -541,20 +542,13 @@ export async function POST(req: Request) {
       const firm = await prisma.firmSettings.findFirst({
         select: { hermesAllowDemo: true },
       });
-      // Env fail-closed: firm flag alone must not reopen demo in production.
-      const allowDemo =
-        process.env.HERMES_ALLOW_DEMO === "1" ||
-        process.env.LLM_ALLOW_DEMO === "1" ||
-        (process.env.NODE_ENV === "development" &&
-          process.env.HERMES_ALLOW_DEMO !== "0" &&
-          process.env.LLM_ALLOW_DEMO !== "0" &&
-          firm?.hermesAllowDemo === true);
+      const allowDemo = resolveAllowDemoFlag(Boolean(firm?.hermesAllowDemo));
       if (!allowDemo) {
         return NextResponse.json(
           {
             source: "error",
             content:
-              "La integración Hermes está deshabilitada en Integraciones. Habilítela o active el modo demo (HERMES_ALLOW_DEMO).",
+              "La integración de IA está deshabilitada en Configuración. Actívela o permita respuestas de demostración en el Host (LLM_ALLOW_DEMO=1).",
             chat: null,
             utility: { id: utility.id, label: utility.label },
             sources: pack.sources,
@@ -564,7 +558,7 @@ export async function POST(req: Request) {
               causaId: body.causaId,
             }),
             requireApproval: false,
-            note: "La integración Hermes está deshabilitada en Integraciones.",
+            note: "La integración de IA está deshabilitada.",
             error: "hermes_disabled",
           },
           { status: 503 }
@@ -578,11 +572,11 @@ export async function POST(req: Request) {
           `**Modo:** ${utility.label}`,
           `**Consulta:** ${prompt.slice(0, 500)}`,
           "",
-          "> Integración Hermes deshabilitada en Configuración → Integraciones.",
+          "> Integración de IA deshabilitada en Configuración → IA.",
           "> **Aprobación humana requerida.**",
         ].join("\n"),
         requireApproval: true,
-        note: "⚠ Integración Hermes deshabilitada — respuesta demo local.",
+        note: "⚠ Integración de IA deshabilitada — respuesta de demostración local.",
       };
     } else {
       result = await askHermes({

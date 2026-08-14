@@ -31,19 +31,36 @@ export function LlmSettingsForm() {
   const [message, setMessage] = useState("");
   const [ok, setOk] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [clearApiKey, setClearApiKey] = useState(false);
+  const [demoFailClosed, setDemoFailClosed] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     fetch("/api/integrations/llm")
-      .then((r) => (r.ok ? r.json() : null))
+      .then(async (r) => {
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          throw new Error(data.error || "No se pudo cargar la configuración de IA.");
+        }
+        return r.json();
+      })
       .then((data) => {
-        if (!data) return;
         setEnabled(Boolean(data.enabled));
         if (data.config) setConfig({ ...data.config });
         if (data.presets) setPresets(data.presets);
+        setDemoFailClosed(Boolean(data.demoPolicy?.productionFailClosed));
         setLoaded(true);
       })
-      .catch(() => setLoaded(true));
+      .catch((err) => {
+        setLoadError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo cargar la configuración de IA."
+        );
+        setLoaded(true);
+      });
   }, []);
 
   function onPresetChange(preset: PresetKey) {
@@ -56,44 +73,68 @@ export function LlmSettingsForm() {
     }));
   }
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setMessage("");
-    setOk(false);
+  function configPayload() {
+    return {
+      preset: config.preset,
+      apiUrl: config.apiUrl,
+      apiKey: clearApiKey ? null : config.apiKey,
+      model: config.model,
+      requireApproval: config.requireApproval,
+      allowDemo: config.allowDemo,
+    };
+  }
+
+  async function saveConfig() {
     const res = await fetch("/api/integrations/llm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "save-config",
         enabled,
-        config: {
-          preset: config.preset,
-          apiUrl: config.apiUrl,
-          apiKey: config.apiKey,
-          model: config.model,
-          requireApproval: config.requireApproval,
-          allowDemo: config.allowDemo,
-        },
+        config: configPayload(),
       }),
     });
     const data = await res.json().catch(() => ({}));
+    return { res, data };
+  }
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setMessage("");
+    setOk(false);
+    setSaving(true);
+    const { res, data } = await saveConfig();
+    setSaving(false);
     setOk(res.ok);
-    setMessage(res.ok ? "Configuración IA guardada" : data.error || "Error al guardar");
-    if (res.ok && data.config) setConfig({ ...data.config });
+    setMessage(
+      res.ok
+        ? "Configuración de IA guardada."
+        : data.error || "No se pudo guardar la configuración."
+    );
+    if (res.ok && data.config) {
+      setConfig({ ...data.config });
+      setClearApiKey(false);
+    }
   }
 
   async function onTest() {
     setTesting(true);
     setMessage("");
-    await fetch("/api/integrations/llm", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "save-config",
-        enabled,
-        config,
-      }),
-    });
+    setOk(false);
+    const { res: saveRes, data: saveData } = await saveConfig();
+    if (!saveRes.ok) {
+      setTesting(false);
+      setOk(false);
+      setMessage(
+        saveData.error ||
+          "No se pudo guardar antes de probar. Corrija el endpoint y vuelva a intentar."
+      );
+      return;
+    }
+    if (saveData.config) {
+      setConfig({ ...saveData.config });
+      setClearApiKey(false);
+    }
     const res = await fetch("/api/integrations/llm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -104,9 +145,9 @@ export function LlmSettingsForm() {
     setOk(Boolean(data.ok));
     setMessage(
       data.ok
-        ? `Conexión OK · ${data.provider}/${data.model}: ${data.preview}`
+        ? `Conexión correcta · ${data.provider}/${data.model}: ${data.preview}`
         : [data.note, data.error].filter(Boolean).join(" — ") ||
-            "Prueba fallida"
+            "La prueba de conexión falló."
     );
   }
 
@@ -127,10 +168,10 @@ export function LlmSettingsForm() {
       <div>
         <h2 className="text-lg font-semibold">Endpoints de IA</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-          Proveedor OpenAI-compatible para el copiloto: OpenAI, Azure OpenAI, Groq,
-          Ollama, Hermes Agent o un endpoint personalizado. LexOpen llama a{" "}
-          <code className="text-xs">{"{apiUrl}/chat/completions"}</code>{" "}
-          (JSON; si el servidor hace stream SSE, LexOpen lo lee igual).
+          Conecte el copiloto a OpenAI, Azure, Groq, Ollama, Hermes u otro
+          servicio compatible. LexOpen usa la ruta{" "}
+          <code className="text-xs">{"{url}/chat/completions"}</code> del
+          endpoint que indique.
         </p>
       </div>
 
@@ -140,12 +181,12 @@ export function LlmSettingsForm() {
           checked={enabled}
           onChange={(e) => setEnabled(e.target.checked)}
         />
-        Integración IA habilitada
+        Integración de IA activada
       </label>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="block text-sm">
-          <span className="mb-1 block font-medium">Proveedor (preset)</span>
+          <span className="mb-1 block font-medium">Proveedor</span>
           <select
             className="select"
             value={config.preset}
@@ -169,7 +210,7 @@ export function LlmSettingsForm() {
           />
         </label>
         <label className="block text-sm md:col-span-2">
-          <span className="mb-1 block font-medium">Endpoint (base URL)</span>
+          <span className="mb-1 block font-medium">URL base del endpoint</span>
           <input
             className="input"
             value={config.apiUrl}
@@ -180,25 +221,63 @@ export function LlmSettingsForm() {
           <span className="mt-1 block text-xs text-[var(--ink-soft)]/60">
             Ejemplos: <code>https://api.openai.com/v1</code>,{" "}
             <code>http://localhost:11434/v1</code> (Ollama),{" "}
-            <code>http://localhost:8642/v1</code> (Hermes). También puede fijarse con{" "}
-            <code>LLM_API_URL</code> / <code>HERMES_API_URL</code> en el entorno.
+            <code>http://localhost:8642/v1</code> (Hermes).
           </span>
         </label>
-        <label className="block text-sm md:col-span-2">
-          <span className="mb-1 block font-medium">API key</span>
-          <input
-            className="input"
-            type="password"
-            value={config.apiKey}
-            onChange={(e) => setConfig((c) => ({ ...c, apiKey: e.target.value }))}
-            placeholder={config.hasApiKey ? "•••• (dejar para conservar)" : "sk-…"}
-            autoComplete="off"
-          />
-          <span className="mt-1 block text-xs text-[var(--ink-soft)]/60">
-            Opcional en Ollama local. Variables: <code>LLM_API_KEY</code> /{" "}
-            <code>HERMES_API_KEY</code>.
-          </span>
-        </label>
+        <div className="md:col-span-2">
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">API key</span>
+            <input
+              className="input"
+              type="password"
+              value={clearApiKey ? "" : config.apiKey}
+              disabled={clearApiKey}
+              onChange={(e) => {
+                setClearApiKey(false);
+                setConfig((c) => ({ ...c, apiKey: e.target.value }));
+              }}
+              placeholder={
+                clearApiKey
+                  ? "Se eliminará al guardar"
+                  : config.hasApiKey
+                    ? "•••• (dejar en blanco para conservar)"
+                    : "sk-…"
+              }
+              autoComplete="off"
+            />
+          </label>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[var(--ink-soft)]/65">
+            <span>Opcional en Ollama local. Queda cifrada en este Host.</span>
+            {(config.hasApiKey || config.apiKey) && (
+              <button
+                type="button"
+                className="text-[var(--sea)] underline-offset-2 hover:underline"
+                onClick={() => {
+                  setClearApiKey(true);
+                  setConfig((c) => ({ ...c, apiKey: "", hasApiKey: false }));
+                }}
+              >
+                Quitar API key
+              </button>
+            )}
+            {clearApiKey && (
+              <button
+                type="button"
+                className="text-[var(--ink-soft)] underline-offset-2 hover:underline"
+                onClick={() => {
+                  setClearApiKey(false);
+                  setConfig((c) => ({
+                    ...c,
+                    apiKey: "••••",
+                    hasApiKey: true,
+                  }));
+                }}
+              >
+                Deshacer
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-4 text-sm">
@@ -220,32 +299,48 @@ export function LlmSettingsForm() {
               setConfig((c) => ({ ...c, allowDemo: e.target.checked }))
             }
           />
-          Permitir respuestas demo si el proveedor no responde
+          Permitir respuestas de demostración si el proveedor no responde
         </label>
       </div>
+      <p className="text-xs text-[var(--ink-soft)]/60">
+        {demoFailClosed
+          ? "Este Host está en producción: las respuestas de demostración están bloqueadas hasta que el administrador active LLM_ALLOW_DEMO=1 en el entorno y reinicie."
+          : "Si el proveedor no responde, LexOpen puede mostrar una respuesta de demostración marcada como no real."}
+      </p>
+
+      {loadError && (
+        <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900" role="alert">
+          {loadError}
+        </p>
+      )}
 
       <div className="rounded-2xl border border-[var(--line)] bg-white/60 p-4 text-xs text-[var(--ink-soft)]/75">
         <p className="font-medium text-[var(--ink)]">
-          Equivalente .env (sigue el formulario)
+          Equivalente en el archivo de entorno (sigue el formulario)
         </p>
         <p className="mt-1 text-[var(--ink-soft)]/70">
-          Al pulsar Guardar IA esto queda en el Host (Postgres). No hace falta
-          editar el <code>.env</code> salvo que quiera fijar el valor al arrancar.
+          Al guardar, LexOpen guarda esto en su Host. No hace falta editar el
+          entorno salvo que quiera fijar el valor al arrancar.
         </p>
         <pre
           className="mt-2 overflow-x-auto rounded-xl bg-[var(--ink)] p-3 text-[11px] text-white/85"
           data-testid="llm-env-snippet"
-        >{llmEnvSnippet(config)}</pre>
+        >
+          {llmEnvSnippet({
+            ...config,
+            apiKey: clearApiKey ? "" : config.apiKey,
+          })}
+        </pre>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button className="btn btn-primary" type="submit">
-          Guardar IA
+        <button className="btn btn-primary" type="submit" disabled={saving || testing}>
+          {saving ? "Guardando…" : "Guardar IA"}
         </button>
         <button
           className="btn btn-secondary"
           type="button"
-          disabled={testing}
+          disabled={testing || saving}
           onClick={onTest}
         >
           {testing ? "Probando…" : "Probar conexión"}

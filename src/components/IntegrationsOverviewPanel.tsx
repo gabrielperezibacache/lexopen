@@ -39,15 +39,15 @@ export function IntegrationsOverviewPanel() {
           title: "IA / LLM",
           ok: Boolean(llm?.enabled && llm?.config?.apiUrl),
           status: llm
-            ? `${llm.config?.preset || "custom"} · ${
-                llm.enabled ? "habilitado" : "off"
+            ? `${llm.config?.preset || "personalizado"} · ${
+                llm.enabled ? "activo" : "pausado"
               }`
-            : "No disponible",
+            : "Sin configurar",
           detail: llm
-            ? `${llm.config?.apiUrl || "—"} · modelo ${llm.config?.model || "—"} · key ${
-                llm.config?.hasApiKey ? "sí" : "no"
+            ? `${llm.config?.apiUrl || "sin URL"} · modelo ${llm.config?.model || "—"} · clave ${
+                llm.config?.hasApiKey ? "guardada" : "sin clave"
               }`
-            : "Configure el endpoint en el panel de IA.",
+            : "Configure el endpoint en Configuración → IA.",
           href: "#llm-settings",
         },
         {

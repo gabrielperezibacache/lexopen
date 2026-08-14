@@ -9,6 +9,8 @@ import {
 } from "@/lib/api";
 import { buildClienteFolderContext } from "@/lib/integrations/client-folder-context";
 import { askLlm, legalSystemPrompt } from "@/lib/integrations/llm";
+import { safeJsonParse } from "@/lib/safe-json";
+import { rateLimitAsync } from "@/lib/auth/rate-limit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -48,10 +50,22 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await parseBody(
       req,
       z.object({
-        prompt: z.string().min(1),
+        prompt: z.string().min(1).max(8000),
         chatId: z.string().optional().nullable(),
       })
     );
+
+    const limited = await rateLimitAsync(`llm:cliente:${user.id}`, 30, 60_000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        {
+          error:
+            "Demasiadas solicitudes al copiloto. Espere un momento e intente de nuevo.",
+          code: "rate_limited",
+        },
+        { status: 429 }
+      );
+    }
 
     const built = await buildClienteFolderContext(id, user.role);
     if (!built) {
@@ -90,7 +104,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       if (!existing) {
         return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
       }
-      const previous = JSON.parse(existing.messagesJson || "[]");
+      const previous = safeJsonParse<
+        Array<{ role: string; content: string; source?: string }>
+      >(existing.messagesJson || "[]", []);
       chat = await prisma.agentChat.update({
         where: { id: body.chatId },
         data: {

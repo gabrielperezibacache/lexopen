@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { httpError } from "@/lib/auth/access";
 import {
   fetchSafeOutbound,
   isLoopbackHostname,
@@ -155,18 +156,7 @@ export async function getLlmConfig(): Promise<LlmConfig> {
   if (parsed.allowDemo === undefined && firm) {
     merged.allowDemo = Boolean(firm.hermesAllowDemo);
   }
-  // Env fail-closed wins over firm/DB/stored config in production Host.
-  if (
-    process.env.LLM_ALLOW_DEMO === "0" ||
-    process.env.HERMES_ALLOW_DEMO === "0"
-  ) {
-    merged.allowDemo = false;
-  } else if (
-    process.env.LLM_ALLOW_DEMO === "1" ||
-    process.env.HERMES_ALLOW_DEMO === "1"
-  ) {
-    merged.allowDemo = true;
-  }
+  merged.allowDemo = resolveAllowDemoFlag(merged.allowDemo);
   if (!merged.preset) merged.preset = inferPreset(merged.apiUrl);
   // One-shot upgrade: rewrite plaintext API keys as enc:v2.
   if (hadPlaintextKey && merged.apiKey && !migratingPlaintextApiKey) {
@@ -208,6 +198,26 @@ export function applyPreset(
     apiUrl: p.apiUrl,
     model: current?.model || p.model,
   };
+}
+
+/**
+ * Env always wins when set. In production, demo is fail-closed unless
+ * LLM_ALLOW_DEMO=1 or HERMES_ALLOW_DEMO=1 (DB/UI alone cannot reopen it).
+ */
+export function resolveAllowDemoFlag(
+  dbOrFirmAllowDemo: boolean,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (env.LLM_ALLOW_DEMO === "0" || env.HERMES_ALLOW_DEMO === "0") {
+    return false;
+  }
+  if (env.LLM_ALLOW_DEMO === "1" || env.HERMES_ALLOW_DEMO === "1") {
+    return true;
+  }
+  if (env.NODE_ENV === "production") {
+    return false;
+  }
+  return Boolean(dbOrFirmAllowDemo);
 }
 
 function allowLocalLlmUrl() {
@@ -269,7 +279,10 @@ export async function saveLlmConfig(input: {
   }
 
   if (!isAllowedLlmUrl(next.apiUrl)) {
-    throw new Error("URL de endpoint IA no permitida (SSRF / host privado)");
+    throw httpError(
+      "La URL del endpoint de IA no está permitida. Use una dirección https pública, o en el Host active el permiso para endpoints locales (Ollama/Hermes).",
+      400
+    );
   }
 
   const payload = {
@@ -280,41 +293,33 @@ export async function saveLlmConfig(input: {
     requireApproval: next.requireApproval,
     allowDemo: next.allowDemo,
   };
+  const payloadJson = JSON.stringify(payload);
+  const enabled = Boolean(input.enabled ?? true);
 
   await prisma.integrationConfig.upsert({
     where: { provider: "llm" },
     create: {
       provider: "llm",
-      enabled: Boolean(input.enabled ?? true),
-      configJson: JSON.stringify(payload),
+      enabled,
+      configJson: payloadJson,
     },
     update: {
-      enabled: Boolean(input.enabled ?? true),
-      configJson: JSON.stringify(payload),
+      enabled,
+      configJson: payloadJson,
     },
   });
 
-  // Keep hermes row in sync for legacy consumers / copiloto
+  // Keep hermes row in sync for legacy consumers / copiloto (full payload).
   await prisma.integrationConfig.upsert({
     where: { provider: "hermes" },
     create: {
       provider: "hermes",
-      enabled: Boolean(input.enabled ?? true),
-      configJson: JSON.stringify({
-        apiUrl: payload.apiUrl,
-        apiKey: payload.apiKey,
-        model: payload.model,
-        requireApproval: payload.requireApproval,
-      }),
+      enabled,
+      configJson: payloadJson,
     },
     update: {
-      enabled: Boolean(input.enabled ?? true),
-      configJson: JSON.stringify({
-        apiUrl: payload.apiUrl,
-        apiKey: payload.apiKey,
-        model: payload.model,
-        requireApproval: payload.requireApproval,
-      }),
+      enabled,
+      configJson: payloadJson,
     },
   });
 
@@ -420,15 +425,63 @@ export function parseChatCompletionBody(raw: string): string {
   return "";
 }
 
-export function describeLlmProviderError(err: unknown) {
+export type LlmClientError = {
+  code:
+    | "llm_unreachable"
+    | "llm_http_4xx"
+    | "llm_http_5xx"
+    | "llm_bad_response"
+    | "llm_invalid_url";
+  message: string;
+};
+
+/** Stable client-facing error; logs raw upstream detail server-side only. */
+export function classifyLlmProviderError(err: unknown): LlmClientError {
   const msg = err instanceof Error ? err.message : String(err);
+  console.warn("[llm] provider error:", msg.slice(0, 500));
+
   if (
     /Unexpected token ['"]d['"]/.test(msg) ||
-    /"data:\s*\{/.test(msg)
+    /"data:\s*\{/.test(msg) ||
+    /stream SSE/i.test(msg)
   ) {
-    return "El proveedor respondió con un stream SSE (`data: {...}`), no JSON. LexOpen ahora lo interpreta; si persiste, use `{base}/v1` OpenAI-compatible.";
+    return {
+      code: "llm_bad_response",
+      message:
+        "El proveedor respondió en un formato no usable. Use un endpoint compatible con OpenAI (`…/v1`).",
+    };
   }
-  return msg;
+  const httpMatch = msg.match(/LLM HTTP (\d{3})/);
+  if (httpMatch) {
+    const status = Number(httpMatch[1]);
+    if (status >= 400 && status < 500) {
+      return {
+        code: "llm_http_4xx",
+        message:
+          "El proveedor rechazó la solicitud. Revise la API key, el modelo o la cuota.",
+      };
+    }
+    return {
+      code: "llm_http_5xx",
+      message: "El proveedor tuvo un error interno. Intente de nuevo más tarde.",
+    };
+  }
+  if (/URL|inválida|no permitida/i.test(msg)) {
+    return {
+      code: "llm_invalid_url",
+      message: "La URL del proveedor de IA no es válida o no está permitida.",
+    };
+  }
+  return {
+    code: "llm_unreachable",
+    message:
+      "No se pudo conectar con el proveedor de IA. Revise el endpoint y la API key.",
+  };
+}
+
+/** @deprecated Prefer classifyLlmProviderError — returns public message only. */
+export function describeLlmProviderError(err: unknown) {
+  return classifyLlmProviderError(err).message;
 }
 
 export async function askLlm(params: {
@@ -461,7 +514,9 @@ export async function askLlm(params: {
         requireApproval: true,
         provider: config.preset,
         model: config.model,
-        note: "La URL del proveedor IA no está permitida (SSRF / host privado).",
+        note: "La URL del proveedor de IA no está permitida (host privado o inseguro).",
+        error: "llm_invalid_url",
+        code: "llm_invalid_url" as const,
       };
     }
     if (
@@ -478,7 +533,9 @@ export async function askLlm(params: {
       requireApproval: true,
       provider: config.preset,
       model: config.model,
-      note: "La URL del proveedor IA no es válida.",
+      note: "La URL del proveedor de IA no es válida.",
+      error: "llm_invalid_url",
+      code: "llm_invalid_url" as const,
     };
   }
 
@@ -546,6 +603,7 @@ export async function askLlm(params: {
       model: config.model,
     };
   } catch (err) {
+    const classified = classifyLlmProviderError(err);
     if (!config.allowDemo) {
       return {
         source: "error" as const,
@@ -554,8 +612,9 @@ export async function askLlm(params: {
         provider: config.preset,
         model: config.model,
         note:
-          "Proveedor IA no alcanzable. Active allowDemo en Configuración o revise endpoint/API key.",
-        error: describeLlmProviderError(err),
+          "No se pudo contactar al proveedor de IA. Revise el endpoint y la API key en Configuración → IA, o active respuestas de demostración (en producción requiere LLM_ALLOW_DEMO=1 en el Host).",
+        error: classified.message,
+        code: classified.code,
       };
     }
     const lastUser = [...params.messages]
@@ -601,6 +660,7 @@ export async function testLlmConnection() {
     preview: result.content.slice(0, 120),
     note: "note" in result ? result.note : undefined,
     error: "error" in result ? result.error : undefined,
+    code: "code" in result ? result.code : undefined,
   };
 }
 
