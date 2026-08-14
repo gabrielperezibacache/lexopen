@@ -41,6 +41,7 @@
     "pjud:host:check": "node scripts/pjud-host.mjs --check-only",
     "pjud:chromium": "npx playwright install chromium",
     "pjud:online": "node scripts/pjud-online-smoke.mjs",
+    "pjud:claveunica:form": "tsx scripts/pjud-claveunica-form-probe.ts",
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium"
   },

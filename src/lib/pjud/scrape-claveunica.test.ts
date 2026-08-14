@@ -12,6 +12,7 @@ import {
   CLAVEUNICA_LOGIN_URLS,
   CLAVEUNICA_RUT_SELECTORS,
   formatClaveUnicaRunInput,
+  isClaveUnicaAccountsUrl,
   claveUnicaAutomationAllowed,
   pjudPlaywrightInstallHint,
   publicScrapeEnabled,
@@ -27,6 +28,17 @@ assert.doesNotMatch(CLAVEUNICA_RUT_SELECTORS, /rut_hidden/i);
 assert.match(CLAVEUNICA_RUT_SELECTORS, /#uname:visible/);
 assert.match(CLAVEUNICA_RUT_SELECTORS, /placeholder\*=\"RUN\"/i);
 assert.ok(CLAVEUNICA_LOGIN_URLS.every((u) => !u.endsWith("/login/")));
+assert.equal(
+  isClaveUnicaAccountsUrl(
+    "https://accounts.claveunica.gob.cl/accounts/login/?next=/openid/authorize"
+  ),
+  true
+);
+assert.equal(isClaveUnicaAccountsUrl("https://claveunica.gob.cl/"), false);
+assert.equal(
+  isClaveUnicaAccountsUrl("https://oficinajudicialvirtual.pjud.cl/"),
+  false
+);
 
 const env = process.env as Record<string, string | undefined>;
 const prevSecret = env.SESSION_SECRET;
