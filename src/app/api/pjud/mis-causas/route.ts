@@ -4,6 +4,7 @@ import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api
 import { writeAudit } from "@/lib/audit";
 import {
   claimMisCausasSync,
+  clearClaveUnicaSyncMessages,
   getClaveUnicaStatus,
   syncMisCausas,
 } from "@/lib/pjud/claveunica";
@@ -41,12 +42,32 @@ export async function POST(req: NextRequest) {
       req,
       z
         .object({
+          action: z.enum(["sync", "clear_errors"]).optional(),
           syncMovimientos: z.boolean().optional(),
           /** Dev/ops only: wait for full sync in this request (can 524 behind CF). */
           wait: z.boolean().optional(),
         })
         .optional()
-    ).catch(() => ({ syncMovimientos: true as boolean | undefined, wait: false as boolean | undefined }));
+    ).catch(() => ({
+      action: "sync" as const,
+      syncMovimientos: true as boolean | undefined,
+      wait: false as boolean | undefined,
+    }));
+
+    if (body?.action === "clear_errors") {
+      if (cron) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const status = await clearClaveUnicaSyncMessages();
+      if (actorId) {
+        await writeAudit({
+          actorId,
+          action: "pjud.mis-causas.clear_errors",
+          entityType: "FirmSettings",
+        });
+      }
+      return NextResponse.json({ ok: true, status });
+    }
 
     const syncMovimientos = body?.syncMovimientos !== false;
     // Cron / explicit wait: await. UI: 202 + background (Cloudflare ~100s).

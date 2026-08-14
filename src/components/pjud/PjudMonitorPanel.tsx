@@ -204,7 +204,7 @@ export function PjudMonitorPanel({
     return movimientos;
   }, [tab, receptor, escritos, movimientos, cuadernoFilter]);
 
-  async function action(act: "sync" | "enable" | "disable" | "retry") {
+  async function action(act: "sync" | "enable" | "disable" | "retry" | "clear_errors") {
     setBusy(true);
     setMsg("");
     setMsgBad(false);
@@ -218,6 +218,12 @@ export function PjudMonitorPanel({
     if (!res.ok) {
       setMsgBad(true);
       setMsg(data.error || "Error");
+      return;
+    }
+    if (act === "clear_errors") {
+      setMsg("");
+      setMsgBad(false);
+      router.refresh();
       return;
     }
     if (act === "sync" || act === "retry") {
@@ -239,6 +245,7 @@ export function PjudMonitorPanel({
     lastSyncStatus === "failed" ||
     lastSyncStatus === "error" ||
     failCount > 0;
+  const hasNotices = Boolean(lastSyncNote || msg || failed);
 
   return (
     <section className="panel space-y-5 rounded-3xl p-5">
@@ -311,6 +318,16 @@ export function PjudMonitorPanel({
             Reintentar fallido
           </button>
         )}
+        {hasNotices && (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={busy}
+            onClick={() => action("clear_errors")}
+          >
+            Limpiar avisos
+          </button>
+        )}
         {monitoreoActivo ? (
           <button
             type="button"
@@ -335,16 +352,26 @@ export function PjudMonitorPanel({
         </Link>
       </div>
       {msg && (
-        <p
-          className={`rounded-2xl border px-3 py-2 text-xs ${
+        <div
+          className={`flex flex-wrap items-start justify-between gap-2 rounded-2xl border px-3 py-2 text-xs ${
             msgBad
               ? "border-rose-200 bg-rose-50 text-rose-900"
               : "border-[var(--line)] bg-white/80 text-[var(--ink-soft)]/80"
           }`}
           role="status"
         >
-          {msg}
-        </p>
+          <p className="min-w-0 flex-1">{msg}</p>
+          <button
+            type="button"
+            className="shrink-0 text-[var(--ink-soft)]/70 underline-offset-2 hover:underline"
+            onClick={() => {
+              setMsg("");
+              setMsgBad(false);
+            }}
+          >
+            Cerrar
+          </button>
+        </div>
       )}
 
       <div className="flex flex-wrap gap-2">

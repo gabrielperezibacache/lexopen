@@ -389,6 +389,36 @@ export async function setMonitoreoActivo(causaId: string, activo: boolean) {
   });
 }
 
+/** Dismiss sticky sync errors/notes without changing monitoreo on/off. */
+export async function clearCausaPjudSyncMessages(causaId: string) {
+  const causa = await prisma.causa.findUnique({
+    where: { id: causaId },
+    select: {
+      id: true,
+      pjudLastSyncStatus: true,
+      pjudMonitoreoActivo: true,
+    },
+  });
+  if (!causa) throw httpError("Causa no encontrada", 404);
+
+  const failedStatus =
+    causa.pjudLastSyncStatus === "failed" ||
+    causa.pjudLastSyncStatus === "error";
+
+  return prisma.causa.update({
+    where: { id: causaId },
+    data: {
+      pjudLastSyncNote: null,
+      pjudFailCount: 0,
+      ...(failedStatus
+        ? {
+            pjudLastSyncStatus: causa.pjudMonitoreoActivo ? "ok" : "disabled",
+          }
+        : {}),
+    },
+  });
+}
+
 export async function listCarteraMonitoreo() {
   const causas = await prisma.causa.findMany({
     where: { estado: "activa" },
