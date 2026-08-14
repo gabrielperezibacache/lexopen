@@ -261,6 +261,50 @@ export function parseMisCausasLooseFromHtml(html: string): Array<{
   return items;
 }
 
+export type MisCausasParsedItem = {
+  rit: string;
+  tribunal: string;
+  caratula?: string | null;
+  ruc?: string | null;
+  estado?: string | null;
+};
+
+/**
+ * Merge verDetalle + table list + loose card parsers (dedupe by rit|tribunal).
+ * Avoids early-return on a partial `#verDetalleJuridica` missing Mis Causas rows.
+ */
+export function parseMisCausasFromHtml(html: string): MisCausasParsedItem[] {
+  const seen = new Set<string>();
+  const out: MisCausasParsedItem[] = [];
+  const push = (items: MisCausasParsedItem[]) => {
+    for (const item of items) {
+      if (!item.rit) continue;
+      const key = `${item.rit}|${item.tribunal}`.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        rit: item.rit,
+        tribunal: item.tribunal,
+        caratula: item.caratula ?? null,
+        ruc: item.ruc ?? null,
+        estado: item.estado ?? null,
+      });
+    }
+  };
+  push(
+    parseVerDetalleJuridicaHtml(html).map((r) => ({
+      rit: r.rit,
+      tribunal: r.tribunal,
+      caratula: r.caratula,
+      ruc: r.ruc,
+      estado: r.estado,
+    }))
+  );
+  push(parseCausasListFromHtml(html));
+  push(parseMisCausasLooseFromHtml(html));
+  return out;
+}
+
 export type VerDetalleRow = {
   rit: string;
   tribunal: string;
