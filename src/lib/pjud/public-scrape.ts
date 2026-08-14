@@ -959,14 +959,19 @@ export async function scrapeCausasByRut(
 /**
  * Login ClaveÚnica en OJV y lista "Mis Causas" (flujo CausaMonitor).
  *
- * Selectores: no usar id*="rut" — en el login actual coincide con #rut_hidden
- * (input type=hidden) y Playwright queda en timeout al intentar fill.
+ * El portal nuevo es SPA (Nuxt): no hay inputs en el HTML inicial.
+ * `/accounts/login/` sin `?next=` puede devolver 404; hay que llegar vía
+ * el enlace ClaveÚnica de OJV (OIDC) o URLs sin trailing slash.
+ *
+ * No usar id*="rut": coincide con #rut_hidden (input oculto).
  */
 export const CLAVEUNICA_RUT_SELECTORS = [
   'input#uname:visible',
   'input[name="run" i]:visible',
   'input[name="rut" i]:visible',
   'input[autocomplete="username"]:visible',
+  'input[placeholder*="RUN" i]:visible',
+  'input[aria-label*="RUN" i]:visible',
   'form input[type="text"]:visible',
   'form input[type="tel"]:visible',
 ].join(", ");
@@ -976,7 +981,14 @@ export const CLAVEUNICA_PASSWORD_SELECTORS = [
   'input[type="password"]:visible',
   'input[name*="password" i]:visible',
   'input[autocomplete="current-password"]:visible',
+  'input[placeholder*="Clave" i]:visible',
+  'input[aria-label*="Clave" i]:visible',
 ].join(", ");
+
+export const CLAVEUNICA_LOGIN_URLS = [
+  "https://accounts.claveunica.gob.cl/accounts/login",
+  "https://accounts.claveunica.gob.cl/openid/login",
+] as const;
 
 /** RUN con puntos para el campo visible de ClaveÚnica (12.345.678-5). */
 export function formatClaveUnicaRunInput(rut: string): string {
@@ -987,6 +999,117 @@ export function formatClaveUnicaRunInput(rut: string): string {
   const dv = parts[2]!.toUpperCase();
   const withDots = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `${withDots}-${dv}`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyPage = any;
+
+async function fillClaveUnicaLoginForm(page: AnyPage, rut: string, password: string) {
+  const runValue = formatClaveUnicaRunInput(rut);
+  const rutCandidates = [
+    page.getByPlaceholder(/RUN|RUT/i).first(),
+    page.getByLabel(/Ingresa tu RUN|^RUN$|RUT/i).first(),
+    page.locator(CLAVEUNICA_RUT_SELECTORS).first(),
+  ];
+  const passCandidates = [
+    page.getByPlaceholder(/ClaveÚnica|Clave Unica|contrase[nñ]a/i).first(),
+    page.getByLabel(/ClaveÚnica|Clave Unica|contrase[nñ]a/i).first(),
+    page.locator(CLAVEUNICA_PASSWORD_SELECTORS).first(),
+  ];
+
+  let rutField = rutCandidates[2];
+  let found = false;
+  const deadline = Date.now() + 40_000;
+  while (Date.now() < deadline && !found) {
+    for (const candidate of rutCandidates) {
+      if (await candidate.isVisible().catch(() => false)) {
+        rutField = candidate;
+        found = true;
+        break;
+      }
+    }
+    if (!found) await sleep(400);
+  }
+  if (!found) {
+    const url = page.url();
+    const title = await page.title().catch(() => "");
+    throw new PjudScrapeError(
+      `No se encontró el campo RUN visible de ClaveÚnica (url=${String(url).slice(0, 140)}, título=${String(title).slice(0, 80)}). El sitio puede haber cambiado o bloquear automatización.`
+    );
+  }
+
+  let passField = passCandidates[2];
+  found = false;
+  const passDeadline = Date.now() + 15_000;
+  while (Date.now() < passDeadline && !found) {
+    for (const candidate of passCandidates) {
+      if (await candidate.isVisible().catch(() => false)) {
+        passField = candidate;
+        found = true;
+        break;
+      }
+    }
+    if (!found) await sleep(300);
+  }
+  if (!found) {
+    throw new PjudScrapeError(
+      "No se encontró el campo de contraseña visible de ClaveÚnica."
+    );
+  }
+
+  await rutField.click({ timeout: 5_000 }).catch(() => undefined);
+  await rutField.fill("");
+  try {
+    await rutField.pressSequentially(runValue, { delay: 25 });
+  } catch {
+    await rutField.fill(runValue);
+  }
+  await passField.click({ timeout: 5_000 }).catch(() => undefined);
+  await passField.fill("");
+  try {
+    await passField.pressSequentially(password, { delay: 20 });
+  } catch {
+    await passField.fill(password);
+  }
+
+  const submit = page
+    .getByRole("button", { name: /INGRESA|Ingresar|Continuar|Entrar/i })
+    .or(
+      page.locator(
+        `${OJV.submit}, button[type="submit"]:visible, input[type="submit"]:visible`
+      )
+    )
+    .first();
+  await submit.click({ timeout: 15_000 });
+}
+
+async function openClaveUnicaFromOjv(page: AnyPage): Promise<AnyPage | null> {
+  const cuLink = page.locator(
+    'a:has-text("ClaveÚnica"), a:has-text("Clave Unica"), a:has-text("Iniciar sesión"), a[href*="claveunica"], a[href*="accounts.claveunica"], #cuform a, button:has-text("ClaveÚnica"), img[alt*="ClaveÚnica" i], img[alt*="Clave Unica" i]'
+  );
+  if ((await cuLink.count()) === 0) return null;
+
+  const popupPromise = page
+    .context()
+    .waitForEvent("page", { timeout: 8_000 })
+    .catch(() => null);
+  const navPromise = page
+    .waitForURL(/claveunica\.gob\.cl/i, { timeout: 45_000 })
+    .catch(() => undefined);
+
+  await cuLink.first().click({ timeout: 10_000 });
+  const popup = await popupPromise;
+  if (popup) {
+    await popup.waitForLoadState("domcontentloaded").catch(() => undefined);
+    return popup;
+  }
+  await navPromise;
+  if (/claveunica\.gob\.cl/i.test(page.url())) return page;
+  return page;
 }
 
 export async function scrapeMisCausasWithClaveUnica(opts: {
@@ -1031,7 +1154,7 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
     await context.addInitScript(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => undefined });
     });
-    const page = await context.newPage();
+    let page: AnyPage = await context.newPage();
     await page.goto(OJV_HOME, {
       waitUntil: "domcontentloaded",
       timeout: 45_000,
@@ -1039,43 +1162,38 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
     await closeSweetAlerts(page);
     await maybeSolveCaptchaOnPage(page, opts.signal);
 
-    const cuLink = page.locator(
-      'a:has-text("ClaveÚnica"), a:has-text("Clave Unica"), a:has-text("Iniciar sesión"), a[href*="claveunica"], a[href*="accounts.claveunica"], #cuform a, button:has-text("ClaveÚnica")'
-    );
-    if ((await cuLink.count()) > 0) {
-      await Promise.all([
-        page
-          .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 45_000 })
-          .catch(() => undefined),
-        cuLink.first().click(),
-      ]);
+    const cuPage = await openClaveUnicaFromOjv(page);
+    if (cuPage) {
+      page = cuPage;
     } else {
-      await page.goto("https://accounts.claveunica.gob.cl/accounts/login/", {
-        waitUntil: "domcontentloaded",
-        timeout: 45_000,
-      });
+      let opened = false;
+      for (const url of CLAVEUNICA_LOGIN_URLS) {
+        const res = await page.goto(url, {
+          waitUntil: "domcontentloaded",
+          timeout: 45_000,
+        });
+        const status = res?.status?.() ?? 0;
+        if (status && status < 400) {
+          opened = true;
+          break;
+        }
+      }
+      if (!opened) {
+        throw new PjudScrapeError(
+          "No se pudo abrir el login de ClaveÚnica desde OJV ni la URL directa. Revise conectividad del Host."
+        );
+      }
     }
 
-    const rutField = page.locator(CLAVEUNICA_RUT_SELECTORS);
-    const passField = page.locator(CLAVEUNICA_PASSWORD_SELECTORS);
-    try {
-      await rutField.first().waitFor({ state: "visible", timeout: 20_000 });
-      await passField.first().waitFor({ state: "visible", timeout: 10_000 });
-    } catch {
-      throw new PjudScrapeError(
-        "No se encontró el formulario visible de ClaveÚnica (el sitio cambió o hay un bloqueo anti-bot). Intente de nuevo en unos minutos."
-      );
-    }
-    const runValue = formatClaveUnicaRunInput(opts.rut);
-    await rutField.first().click({ timeout: 5_000 }).catch(() => undefined);
-    await rutField.first().fill(runValue);
-    await passField.first().fill(opts.password);
-    const submit = page.locator(
-      `${OJV.submit}, button[type="submit"]:visible, input[type="submit"]:visible, button:has-text("Ingresar"):visible, button:has-text("Continuar"):visible`
-    );
-    await submit.first().click();
+    await page
+      .waitForLoadState("networkidle", { timeout: 15_000 })
+      .catch(() => undefined);
+    await fillClaveUnicaLoginForm(page, opts.rut, opts.password);
     await page
       .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60_000 })
+      .catch(() => undefined);
+    await page
+      .waitForURL(/pjud\.cl|claveunica\.gob\.cl/i, { timeout: 60_000 })
       .catch(() => undefined);
 
     const misCausas = page.locator(
@@ -1094,7 +1212,7 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
     const fromTable = parseVerDetalleJuridicaHtml(html);
     const items =
       fromTable.length > 0
-        ? fromTable.map((r) => ({
+        ? fromTable.map((r: { rit: string; tribunal: string; caratula?: string | null; ruc?: string | null; estado?: string | null }) => ({
             rit: r.rit,
             tribunal: r.tribunal,
             caratula: r.caratula,

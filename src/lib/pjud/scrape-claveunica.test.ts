@@ -9,6 +9,7 @@ import { parseClaveUnicaRut } from "@/lib/pjud/claveunica";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import {
   PjudScrapeError,
+  CLAVEUNICA_LOGIN_URLS,
   CLAVEUNICA_RUT_SELECTORS,
   formatClaveUnicaRunInput,
   claveUnicaAutomationAllowed,
@@ -24,6 +25,8 @@ assert.equal(formatClaveUnicaRunInput("12345678-5"), "12.345.678-5");
 assert.doesNotMatch(CLAVEUNICA_RUT_SELECTORS, /id\*=.*rut/i);
 assert.doesNotMatch(CLAVEUNICA_RUT_SELECTORS, /rut_hidden/i);
 assert.match(CLAVEUNICA_RUT_SELECTORS, /#uname:visible/);
+assert.match(CLAVEUNICA_RUT_SELECTORS, /placeholder\*=\"RUN\"/i);
+assert.ok(CLAVEUNICA_LOGIN_URLS.every((u) => !u.endsWith("/login/")));
 
 const env = process.env as Record<string, string | undefined>;
 const prevSecret = env.SESSION_SECRET;
