@@ -386,6 +386,7 @@ export default async function CausaDetailPage({ params }: Params) {
           etapa: m.etapa,
           tramite: m.tramite,
           esReceptor: m.esReceptor,
+          pendienteResolucion: m.pendienteResolucion,
           documentoRef: m.documentoRef,
         }))}
       />
