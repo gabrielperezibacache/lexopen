@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   applyPreset,
+  classifyLlmProviderError,
   describeLlmProviderError,
   LLM_PRESETS,
   LLM_PRESET_CATALOG,
@@ -8,6 +9,7 @@ import {
   looksLikeSse,
   llmEnvSnippet,
   parseChatCompletionBody,
+  resolveAllowDemoFlag,
   sanitizeLlmMessages,
 } from "./llm";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
@@ -92,6 +94,34 @@ assert.equal(
 );
 assert.equal(envAllowsDemo({ NODE_ENV: "development" }), true);
 
+{
+  const prev = {
+    NODE_ENV: process.env.NODE_ENV,
+    LLM_ALLOW_DEMO: process.env.LLM_ALLOW_DEMO,
+    HERMES_ALLOW_DEMO: process.env.HERMES_ALLOW_DEMO,
+  };
+  try {
+    process.env.NODE_ENV = "production";
+    delete process.env.LLM_ALLOW_DEMO;
+    delete process.env.HERMES_ALLOW_DEMO;
+    assert.equal(resolveAllowDemoFlag(true), false);
+    process.env.LLM_ALLOW_DEMO = "1";
+    assert.equal(resolveAllowDemoFlag(false), true);
+    process.env.LLM_ALLOW_DEMO = "0";
+    assert.equal(resolveAllowDemoFlag(true), false);
+    process.env.NODE_ENV = "development";
+    delete process.env.LLM_ALLOW_DEMO;
+    assert.equal(resolveAllowDemoFlag(true), true);
+    assert.equal(resolveAllowDemoFlag(false), false);
+  } finally {
+    process.env.NODE_ENV = prev.NODE_ENV;
+    if (prev.LLM_ALLOW_DEMO === undefined) delete process.env.LLM_ALLOW_DEMO;
+    else process.env.LLM_ALLOW_DEMO = prev.LLM_ALLOW_DEMO;
+    if (prev.HERMES_ALLOW_DEMO === undefined) delete process.env.HERMES_ALLOW_DEMO;
+    else process.env.HERMES_ALLOW_DEMO = prev.HERMES_ALLOW_DEMO;
+  }
+}
+
 assert.equal(
   parseChatCompletionBody(
     JSON.stringify({ choices: [{ message: { content: "  OK  " } }] })
@@ -125,7 +155,24 @@ assert.equal(
 const sseParseError = new SyntaxError(
   `Unexpected token 'd', "data: {"id"... is not valid JSON`
 );
-assert.match(describeLlmProviderError(sseParseError), /stream SSE/);
+assert.match(describeLlmProviderError(sseParseError), /formato no usable|SSE|OpenAI/i);
+assert.equal(classifyLlmProviderError(sseParseError).code, "llm_bad_response");
+assert.equal(
+  classifyLlmProviderError(new Error("LLM HTTP 401: invalid_api_key")).code,
+  "llm_http_4xx"
+);
+assert.equal(
+  classifyLlmProviderError(new Error("LLM HTTP 502: bad gateway")).code,
+  "llm_http_5xx"
+);
+assert.equal(
+  classifyLlmProviderError(new Error("fetch failed")).code,
+  "llm_unreachable"
+);
+assert.doesNotMatch(
+  classifyLlmProviderError(new Error("LLM HTTP 401: sk-secret-leak")).message,
+  /sk-secret/
+);
 
 assert.equal(
   llmEnvSnippet({
