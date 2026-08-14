@@ -958,7 +958,37 @@ export async function scrapeCausasByRut(
 
 /**
  * Login ClaveÚnica en OJV y lista "Mis Causas" (flujo CausaMonitor).
+ *
+ * Selectores: no usar id*="rut" — en el login actual coincide con #rut_hidden
+ * (input type=hidden) y Playwright queda en timeout al intentar fill.
  */
+export const CLAVEUNICA_RUT_SELECTORS = [
+  'input#uname:visible',
+  'input[name="run" i]:visible',
+  'input[name="rut" i]:visible',
+  'input[autocomplete="username"]:visible',
+  'form input[type="text"]:visible',
+  'form input[type="tel"]:visible',
+].join(", ");
+
+export const CLAVEUNICA_PASSWORD_SELECTORS = [
+  'input#pword:visible',
+  'input[type="password"]:visible',
+  'input[name*="password" i]:visible',
+  'input[autocomplete="current-password"]:visible',
+].join(", ");
+
+/** RUN con puntos para el campo visible de ClaveÚnica (12.345.678-5). */
+export function formatClaveUnicaRunInput(rut: string): string {
+  const compact = rut.trim().replace(/\./g, "").replace(/\s+/g, "");
+  const parts = /^(\d+)-([\dkK])$/i.exec(compact);
+  if (!parts) return rut.trim();
+  const body = parts[1]!;
+  const dv = parts[2]!.toUpperCase();
+  const withDots = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${withDots}-${dv}`;
+}
+
 export async function scrapeMisCausasWithClaveUnica(opts: {
   rut: string;
   password: string;
@@ -1026,20 +1056,24 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
       });
     }
 
-    const rutField = page.locator(
-      'input[name*="run" i], input[name*="rut" i], #uname, input[id*="rut" i]'
-    );
-    const passField = page.locator(
-      'input[type="password"], input[name*="password" i], #pword'
-    );
-    if ((await rutField.count()) === 0 || (await passField.count()) === 0) {
+    const rutField = page.locator(CLAVEUNICA_RUT_SELECTORS);
+    const passField = page.locator(CLAVEUNICA_PASSWORD_SELECTORS);
+    try {
+      await rutField.first().waitFor({ state: "visible", timeout: 20_000 });
+      await passField.first().waitFor({ state: "visible", timeout: 10_000 });
+    } catch {
       throw new PjudScrapeError(
-        "No se encontró el formulario ClaveÚnica (layout cambió o bloqueo anti-bot)."
+        "No se encontró el formulario visible de ClaveÚnica (el sitio cambió o hay un bloqueo anti-bot). Intente de nuevo en unos minutos."
       );
     }
-    await rutField.first().fill(opts.rut);
+    const runValue = formatClaveUnicaRunInput(opts.rut);
+    await rutField.first().click({ timeout: 5_000 }).catch(() => undefined);
+    await rutField.first().fill(runValue);
     await passField.first().fill(opts.password);
-    await page.locator(OJV.submit).first().click();
+    const submit = page.locator(
+      `${OJV.submit}, button[type="submit"]:visible, input[type="submit"]:visible, button:has-text("Ingresar"):visible, button:has-text("Continuar"):visible`
+    );
+    await submit.first().click();
     await page
       .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60_000 })
       .catch(() => undefined);
