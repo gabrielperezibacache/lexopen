@@ -243,8 +243,8 @@ Paridad con CausaMonitor `/api/pjud-credentials` (+ Mis Causas):
 - UI: `/causas/mis-causas` (admin guarda RUT/password)
 - Almacenamiento **local cifrado** en Postgres (`FirmSettings.claveUnicaPasswordEnc`), AES-256-GCM (`enc:v2:…`) con **`PJUD_SECRETS_KEY`** (fallback `SESSION_SECRET`)
 - Status sin plaintext: RUT enmascarado + `hasPassword`
-- Sync: `POST /api/pjud/mis-causas` (también vía `x-cron-secret`)
-- Importa causas, marca `pjudFromMisCausas` / `pjudSource: claveunica` y dispara sync de movimientos
+- Sync: `POST /api/pjud/mis-causas` (también vía `x-cron-secret`). Desde la UI responde **202** y corre en background (evita Cloudflare **524** ~100s); la UI consulta `GET` hasta salir de `running`. Cron espera el resultado. Solo encola movimientos (`processJobsInline` off); el worker de monitoreo los procesa.
+- Importa causas, marca `pjudFromMisCausas` / `pjudSource: claveunica` y encola sync de movimientos
 
 La vía invitada sigue disponible para alta por ROL/RUT sin credenciales.
 

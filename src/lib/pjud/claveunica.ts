@@ -16,6 +16,14 @@ import {
 } from "@/lib/pjud/scraper-sidecar";
 import { enqueueDueSyncJobs, processPendingSyncJobs } from "@/lib/pjud/queue";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
+import {
+  isMisCausasSyncInFlight,
+} from "@/lib/pjud/mis-causas-sync-state";
+
+export {
+  isMisCausasSyncInFlight,
+  MIS_CAUSAS_SYNC_STUCK_MS,
+} from "@/lib/pjud/mis-causas-sync-state";
 
 /**
  * Credenciales ClaveÚnica del estudio — paridad CausaMonitor
@@ -333,11 +341,61 @@ async function findExistingCausa(item: MisCausasItem) {
   });
 }
 
+/**
+ * Claim the firm-wide Mis Causas sync slot (sets status=running).
+ * Returns alreadyRunning when another sync is still in flight.
+ */
+export async function claimMisCausasSync(opts?: {
+  note?: string;
+  now?: Date;
+}): Promise<{ alreadyRunning: boolean; settingsId: string }> {
+  const { settings } = await getOrCreateFirmSettings();
+  const now = opts?.now ?? new Date();
+  if (
+    isMisCausasSyncInFlight({
+      status: settings.claveUnicaLastSyncStatus,
+      lastSyncAt: settings.claveUnicaLastSyncAt,
+      now,
+    })
+  ) {
+    return { alreadyRunning: true, settingsId: settings.id };
+  }
+  await prisma.firmSettings.update({
+    where: { id: settings.id },
+    data: {
+      claveUnicaLastSyncAt: now,
+      claveUnicaLastSyncStatus: "running",
+      claveUnicaLastSyncNote:
+        opts?.note ||
+        "Sincronizando Mis Causas… (puede tardar varios minutos; no cierre esta página).",
+    },
+  });
+  return { alreadyRunning: false, settingsId: settings.id };
+}
+
 export async function syncMisCausas(opts?: {
   actorId?: string | null;
   syncMovimientos?: boolean;
+  /**
+   * When true, also drain enqueued movimiento jobs in this call.
+   * Default false: enqueue only — avoids Cloudflare 524 / proxy ~100s limits.
+   * Movimientos se procesan vía cron de monitoreo (`processPendingSyncJobs`).
+   */
+  processJobsInline?: boolean;
+  /** Skip claim when the HTTP layer already marked running. */
+  alreadyClaimed?: boolean;
 }) {
   const { settings } = await getOrCreateFirmSettings();
+  if (!opts?.alreadyClaimed) {
+    const claim = await claimMisCausasSync();
+    if (claim.alreadyRunning) {
+      throw httpError(
+        "Ya hay una sincronización de Mis Causas en curso. Espere a que termine.",
+        409
+      );
+    }
+  }
+
   let items: MisCausasItem[];
   try {
     items = await resolveMisCausasList();
@@ -409,24 +467,26 @@ export async function syncMisCausas(opts?: {
   let enqueued = 0;
 
   if (opts?.syncMovimientos !== false && causaIdsForSync.length) {
-    // Enqueue durable jobs instead of N serial scrapes (avoids cron timeouts).
+    // Enqueue durable jobs instead of N serial scrapes (avoids proxy timeouts).
     const jobs = await enqueueDueSyncJobs({
       causaIds: causaIdsForSync,
       trigger: "cron",
       limit: Math.min(causaIdsForSync.length, 100),
     });
     enqueued = jobs.length;
-    const processed = await processPendingSyncJobs({
-      actorId: opts?.actorId,
-      limit: Math.min(jobs.length || 20, 40),
-      jobIds: jobs.map((j) => j.id),
-    });
-    syncResults = processed.map((r) => ({
-      causaId: r.causaId,
-      status: r.status,
-      note: r.note,
-      inserted: r.inserted,
-    }));
+    if (opts?.processJobsInline) {
+      const processed = await processPendingSyncJobs({
+        actorId: opts?.actorId,
+        limit: Math.min(jobs.length || 20, 40),
+        jobIds: jobs.map((j) => j.id),
+      });
+      syncResults = processed.map((r) => ({
+        causaId: r.causaId,
+        status: r.status,
+        note: r.note,
+        inserted: r.inserted,
+      }));
+    }
   }
 
   const syncFailed = syncResults.filter(
