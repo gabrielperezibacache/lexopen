@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/sites/SiteNav";
+import { apiMutation } from "@/lib/api-mutation";
 
 type GoogleStatus = {
   enabled: boolean;
@@ -105,18 +106,26 @@ function IntegracionesInner() {
 
   async function syncObsidian() {
     setObsidianMsg("Sincronizando…");
-    const res = await fetch("/api/integrations/obsidian", {
+    const result = await apiMutation<{
+      synced?: number;
+      failed?: number;
+      mode?: { label?: string };
+      results?: Array<{ mode?: string }>;
+      error?: string;
+    }>("/api/integrations/obsidian", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "sync-all" }),
     });
-    const data = await res.json();
+    if (!result.ok) {
+      setObsidianMsg(result.error || "Error");
+      return;
+    }
+    const data = result.data;
     setObsidianMsg(
-      res.ok
-        ? `Exportación: ${data.synced ?? 0} ok` +
-            (data.failed ? `, ${data.failed} con error` : "") +
-            ` · ${data.mode?.label || data.results?.[0]?.mode || "storage"}`
-        : data.error || "Error"
+      `Exportación: ${data.synced ?? 0} ok` +
+        (data.failed ? `, ${data.failed} con error` : "") +
+        ` · ${data.mode?.label || data.results?.[0]?.mode || "storage"}`
     );
   }
 
@@ -148,7 +157,7 @@ function IntegracionesInner() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="panel rounded-3xl p-5">
-          <h2 className="text-xl font-semibold">Obsidian</h2>
+          <h2 className="text-lg font-semibold">Obsidian</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
             Exporta cada causa como Markdown. Si `OBSIDIAN_REST_URL` está configurado,
             escribe vía Local REST; si no, guarda los `.md` en storage. En desarrollo
@@ -164,11 +173,11 @@ function IntegracionesInner() {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <h2 className="text-xl font-semibold">Copiloto IA</h2>
+          <h2 className="text-lg font-semibold">Copiloto IA</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
             API compatible con OpenAI Chat Completions: OpenAI, Azure, Groq, Ollama,
-            Hermes u otro endpoint custom. Utilidades tipo Julia.cl con fuentes del
-            estudio. Configure proveedor y API key en Configuración.
+            Hermes Agent u otro endpoint. Utilidades con fuentes del estudio.
+            Configure proveedor y API key en Configuración.
           </p>
           <p className="mt-4 text-xs text-[var(--ink-soft)]/65">{llmInfo || "Cargando…"}</p>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -182,7 +191,7 @@ function IntegracionesInner() {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <h2 className="text-xl font-semibold">Google Workspace</h2>
+          <h2 className="text-lg font-semibold">Google Workspace</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
             OAuth 2.0 para Drive (carpeta por causa + archivos/minutas), Calendar
             (plazos) y Gmail (digests). En cada causa puede crear la carpeta del
@@ -201,15 +210,23 @@ function IntegracionesInner() {
                 type="button"
                 className="btn btn-primary"
                 onClick={async () => {
-                  const res = await fetch("/api/integrations/google", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "start-oauth" }),
-                  });
-                  const data = await res.json().catch(() => ({}));
-                  if (res.ok && data.authUrl) {
-                    window.location.href = data.authUrl as string;
+                  const result = await apiMutation<{ authUrl?: string }>(
+                    "/api/integrations/google",
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "start-oauth" }),
+                    }
+                  );
+                  if (result.ok && result.data.authUrl) {
+                    window.location.href = result.data.authUrl;
+                    return;
                   }
+                  setObsidianMsg(
+                    result.ok
+                      ? "No se recibió la URL de autorización de Google."
+                      : result.error || "No se pudo iniciar OAuth de Google."
+                  );
                 }}
               >
                 {google?.connected ? "Reconectar Google" : "Conectar Google"}
@@ -224,13 +241,19 @@ function IntegracionesInner() {
                 className="btn btn-ghost"
                 type="button"
                 onClick={async () => {
-                  await fetch("/api/integrations/google", {
+                  const result = await apiMutation("/api/integrations/google", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ action: "disconnect" }),
                   });
+                  if (!result.ok) {
+                    setObsidianMsg(
+                      result.error || "No se pudo desconectar Google."
+                    );
+                    return;
+                  }
                   const r = await fetch("/api/integrations/google");
-                  setGoogle(await r.json());
+                  if (r.ok) setGoogle(await r.json());
                 }}
               >
                 Desconectar
@@ -244,7 +267,7 @@ function IntegracionesInner() {
       </div>
 
       <section className="panel rounded-3xl p-5">
-        <h2 className="text-xl font-semibold">Seguimiento judicial (PJUD)</h2>
+        <h2 className="text-lg font-semibold">Seguimiento judicial (PJUD)</h2>
         <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
           LexOpen puede traer causas y movimientos desde la Oficina Judicial
           Virtual. Para usar su cuenta ClaveÚnica, configure el acceso en{" "}

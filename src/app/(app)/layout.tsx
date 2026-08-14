@@ -9,11 +9,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     where: { userId: user.id, read: false },
   });
   const showUpdateBanner = isStaff(user.role);
+  const canSelfUpdate = user.role === "admin";
   return (
     <AppShell
       role={user.role}
       unreadCount={unreadCount}
       showUpdateBanner={showUpdateBanner}
+      canSelfUpdate={canSelfUpdate}
     >
       {children}
     </AppShell>

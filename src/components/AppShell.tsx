@@ -12,11 +12,13 @@ export function AppShell({
   role,
   unreadCount = 0,
   showUpdateBanner = false,
+  canSelfUpdate = false,
   children,
 }: {
   role?: string | null;
   unreadCount?: number;
   showUpdateBanner?: boolean;
+  canSelfUpdate?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -88,7 +90,10 @@ export function AppShell({
           </Link>
         </header>
 
-        <UpdateAvailableBanner enabled={showUpdateBanner} />
+        <UpdateAvailableBanner
+          enabled={showUpdateBanner}
+          canSelfUpdate={canSelfUpdate}
+        />
 
         <main
           className="min-w-0 w-full flex-1 px-3 py-4 sm:px-5 sm:py-5 md:px-8 md:py-7"

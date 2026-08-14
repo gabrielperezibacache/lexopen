@@ -18,6 +18,7 @@ export default async function CausasPage({
   const materia = sp.materia;
   const estado = sp.estado;
 
+  const LIST_TAKE = 100;
   const causas = await prisma.causa.findMany({
     where: {
       AND: [
@@ -42,6 +43,7 @@ export default async function CausasPage({
       _count: { select: { documentos: true, plazos: true } },
     },
     orderBy: { updatedAt: "desc" },
+    take: LIST_TAKE,
   });
 
   return (
@@ -64,6 +66,11 @@ export default async function CausasPage({
 
       <CausasFilters />
 
+      {causas.length > 0 ? (
+        <p className="text-xs text-[var(--ink-soft)]/65">
+          Mostrando hasta {LIST_TAKE} causas más recientes.
+        </p>
+      ) : null}
       <div className="panel overflow-hidden rounded-3xl">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">

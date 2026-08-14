@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { validarRut } from "@/lib/chile";
 import { PageHeader } from "@/components/sites/SiteNav";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Status = {
   enabled: boolean;
@@ -107,7 +108,12 @@ export default function MisCausasPage() {
       );
       return;
     }
-    const res = await fetch("/api/pjud/claveunica", {
+    const result = await apiMutation<{
+      error?: string;
+      enabled?: boolean;
+      rutMasked?: string | null;
+      hasPassword?: boolean;
+    }>("/api/pjud/claveunica", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -116,22 +122,21 @@ export default function MisCausasPage() {
         password,
       }),
     });
-    const data = await res.json().catch(() => ({}));
     setBusy(false);
-    if (!res.ok) {
+    if (!result.ok) {
       setMsgTone("err");
-      if (res.status === 403) {
+      if (result.status === 403) {
         setAdminOnly(true);
         setMsg(
           "Solo quien administra el estudio puede guardar o borrar la ClaveÚnica. Si ya está guardada, usted sí puede sincronizar."
         );
       } else {
-        setMsg(data.error || "No se pudieron guardar los datos de acceso.");
+        setMsg(result.error || "No se pudieron guardar los datos de acceso.");
       }
       return;
     }
     setAdminOnly(false);
-    setStatus(data);
+    setStatus(result.data as Status);
     setMsgTone("ok");
     setMsg(
       "Listo: su ClaveÚnica quedó guardada de forma segura en este servidor. Ya puede sincronizar."
@@ -142,24 +147,23 @@ export default function MisCausasPage() {
   async function clearCredentials() {
     setBusy(true);
     setMsg("");
-    const res = await fetch("/api/pjud/claveunica", {
+    const result = await apiMutation<Status>("/api/pjud/claveunica", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "clear" }),
     });
-    const data = await res.json().catch(() => ({}));
     setBusy(false);
-    if (!res.ok) {
+    if (!result.ok) {
       setMsgTone("err");
-      if (res.status === 403) {
+      if (result.status === 403) {
         setAdminOnly(true);
         setMsg("Solo quien administra el estudio puede eliminar la ClaveÚnica.");
       } else {
-        setMsg(data.error || "No se pudieron eliminar los datos.");
+        setMsg(result.error || "No se pudieron eliminar los datos.");
       }
       return;
     }
-    setStatus(data);
+    setStatus(result.data);
     setResult(null);
     setMsgTone("ok");
     setMsg("Se eliminaron el RUT y la contraseña de este estudio.");
@@ -169,22 +173,25 @@ export default function MisCausasPage() {
     setBusy(true);
     setMsg("");
     setResult(null);
-    const res = await fetch("/api/pjud/mis-causas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ syncMovimientos: true }),
-    });
-    const data = await res.json().catch(() => ({}));
+    const result = await apiMutation<SyncResult & { status?: Status }>(
+      "/api/pjud/mis-causas",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ syncMovimientos: true }),
+      }
+    );
     setBusy(false);
-    if (!res.ok) {
+    if (!result.ok) {
       setMsgTone("err");
       setMsg(
-        data.error ||
+        result.error ||
           "No se pudo sincronizar. Revise los pasos pendientes más abajo e intente de nuevo."
       );
       await load();
       return;
     }
+    const data = result.data;
     setResult(data);
     setStatus(data.status || null);
     const failed = Number(data.syncFailed || 0);
@@ -415,28 +422,27 @@ export default function MisCausasPage() {
               onClick={async () => {
                 setBusy(true);
                 setMsg("");
-                const res = await fetch("/api/pjud/claveunica", {
+                const result = await apiMutation<Status>("/api/pjud/claveunica", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     action: status.enabled ? "disable" : "enable",
                   }),
                 });
-                const data = await res.json().catch(() => ({}));
                 setBusy(false);
-                if (!res.ok) {
+                if (!result.ok) {
                   setMsgTone("err");
-                  if (res.status === 403) {
+                  if (result.status === 403) {
                     setAdminOnly(true);
                     setMsg(
                       "Solo quien administra el estudio puede pausar o reanudar la conexión."
                     );
                   } else {
-                    setMsg(data.error || "No se pudo cambiar el estado.");
+                    setMsg(result.error || "No se pudo cambiar el estado.");
                   }
                   return;
                 }
-                setStatus(data);
+                setStatus(result.data);
                 setMsgTone("ok");
                 setMsg(
                   status.enabled

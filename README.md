@@ -885,10 +885,13 @@ sync/digest/plazos también son locales (`npm run pjud:host` + intervalos en el
 
 ## 🔄 Cómo actualizar la aplicación
 
-Cuando hay una versión más nueva en GitHub, quien usa la instalación ve un
-**aviso en la aplicación** con los pasos de actualización (`git pull`; se puede
-descartar por versión). También puede desactivar la consulta con
-`LEXOPEN_UPDATE_CHECK=0`.
+Cuando hay una versión más nueva en GitHub, quien administra el Host ve un
+**aviso en la aplicación** con el botón **Actualizar ahora** (también en
+Configuración → Host). Eso aplica `git pull`, dependencias, migraciones y
+recompilación sin salir del entorno; luego recargue el navegador. Se puede
+descartar el aviso por versión, o desactivar la consulta con
+`LEXOPEN_UPDATE_CHECK=0`. Para desactivar solo el botón automático:
+`LEXOPEN_SELF_UPDATE=0`.
 
 Actualizar LexOpen reemplaza el **código** (y aplica migraciones de base de datos).
 La carpeta de datos (`LEXOPEN_DATA_DIR`, Application Support / `%APPDATA%\LexOpen`)

@@ -4,6 +4,10 @@ import { labelMateria, MATERIAS } from "@/lib/chile";
 import { JurisprudenciaSearch } from "@/components/JurisprudenciaSearch";
 import { requireStaff } from "@/lib/auth/session";
 import { PageHeader } from "@/components/sites/SiteNav";
+import { EmptyState } from "@/components/EmptyState";
+import type { Prisma } from "@prisma/client";
+
+const LIST_TAKE = 80;
 
 export default async function JurisprudenciaPage({
   searchParams,
@@ -12,11 +16,32 @@ export default async function JurisprudenciaPage({
 }) {
   await requireStaff();
   const sp = await searchParams;
-  const q = (sp.q || "").trim().toLowerCase();
+  const q = (sp.q || "").trim();
   const materia = sp.materia;
 
-  const all = await prisma.jurisprudencia.findMany({
+  const where: Prisma.JurisprudenciaWhereInput = {
+    AND: [
+      materia ? { materia } : {},
+      q
+        ? {
+            OR: [
+              { rol: { contains: q, mode: "insensitive" } },
+              { tribunal: { contains: q, mode: "insensitive" } },
+              { caratula: { contains: q, mode: "insensitive" } },
+              { descripcion: { contains: q, mode: "insensitive" } },
+              { doctrina: { contains: q, mode: "insensitive" } },
+              { tags: { contains: q, mode: "insensitive" } },
+              { materia: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : {},
+    ],
+  };
+
+  const items = await prisma.jurisprudencia.findMany({
+    where,
     orderBy: { fecha: "desc" },
+    take: LIST_TAKE,
     select: {
       id: true,
       rol: true,
@@ -31,25 +56,23 @@ export default async function JurisprudenciaPage({
       fecha: true,
     },
   });
-  const items = all.filter((j) => {
-    if (materia && j.materia !== materia) return false;
-    if (!q) return true;
-    const hay = [j.rol, j.tribunal, j.caratula, j.descripcion, j.doctrina, j.tags, j.materia]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    return hay.includes(q);
-  });
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Base doctrinal"
         title="Jurisprudencia"
-        subtitle="Consulte roles de Corte Suprema, Cortes de Apelaciones y Tribunal Constitucional. Corpus demo incluido; conecte su fuente oficial o scraper en producción."
+        subtitle="Corpus de demostración para pilotos (no es el repositorio oficial del Poder Judicial). En producción conecte su fuente o scraper."
       />
 
       <JurisprudenciaSearch materias={[...MATERIAS]} />
+
+      {items.length > 0 ? (
+        <p className="text-xs text-[var(--ink-soft)]/65">
+          Mostrando hasta {LIST_TAKE} fallos recientes
+          {q || materia ? " con estos filtros" : ""}.
+        </p>
+      ) : null}
 
       <div className="space-y-4">
         {items.map((j) => (
@@ -59,7 +82,7 @@ export default async function JurisprudenciaPage({
                 <div className="text-xs uppercase tracking-[0.14em] text-[var(--copper)]">
                   {j.fuente} · {j.rol}
                 </div>
-                <h2 className="mt-1 break-words text-xl font-semibold">
+                <h2 className="mt-1 break-words text-lg font-semibold">
                   {j.caratula || "Sin carátula"}
                 </h2>
                 <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
@@ -79,9 +102,16 @@ export default async function JurisprudenciaPage({
           </article>
         ))}
         {items.length === 0 && (
-          <div className="panel rounded-3xl p-8 text-center text-[var(--ink-soft)]/70">
-            Sin resultados para esa búsqueda.
-          </div>
+          <EmptyState
+            title="Sin resultados en el corpus demo"
+            description={
+              q || materia
+                ? "Pruebe otros filtros o limpie la búsqueda. Este listado no cubre toda la jurisprudencia oficial."
+                : "Aún no hay fallos cargados en esta instalación piloto."
+            }
+            actionLabel={q || materia ? "Limpiar filtros" : undefined}
+            actionHref={q || materia ? "/jurisprudencia" : undefined}
+          />
         )}
       </div>
     </div>

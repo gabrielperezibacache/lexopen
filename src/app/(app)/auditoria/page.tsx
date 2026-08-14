@@ -61,9 +61,12 @@ export default async function AuditoriaPage({ searchParams }: Props) {
       <ModuleHeader
         eyebrow="Seguridad"
         title="Auditoría"
-        subtitle="Eventos relevantes de causas, plazos, minutas, personas y configuración."
+        subtitle="Eventos relevantes de causas, plazos, minutas, personas y configuración. Se muestran hasta 300 eventos recientes."
       />
 
+      <p className="text-xs text-[var(--ink-soft)]/65">
+        Mostrando hasta 300 eventos más recientes (luego filtros en pantalla).
+      </p>
       <form className="panel flex flex-wrap items-end gap-3 rounded-3xl p-4" method="get">
         <label className="text-sm">
           <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">Acción</span>

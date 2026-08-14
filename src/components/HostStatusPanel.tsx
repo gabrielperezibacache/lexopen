@@ -1,4 +1,5 @@
 import type { HostStatus } from "@/lib/host-status";
+import { SelfUpdatePanel } from "@/components/SelfUpdatePanel";
 
 function yesNo(value: boolean) {
   return value ? "Sí" : "No";
@@ -17,7 +18,8 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
         <div>
           <h2 className="text-lg font-semibold">Estado del Host</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-            Diagnóstico operativo local, sin exponer secretos ni credenciales.
+            Diagnóstico operativo local (sin secretos) y actualización del Host
+            cuando esté disponible abajo.
           </p>
         </div>
         <span className="badge badge-sea">Actualizado {new Date(status.generatedAt).toLocaleTimeString("es-CL")}</span>
@@ -179,6 +181,8 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
           </span>
         )}
       </div>
+
+      <SelfUpdatePanel />
     </section>
   );
 }

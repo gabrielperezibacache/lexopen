@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { apiMutation } from "@/lib/api-mutation";
 
 type GoogleState = {
   enabled: boolean;
@@ -77,32 +78,32 @@ export function GoogleSettingsForm() {
   async function startOauth() {
     setConnecting(true);
     setMessage("");
-    try {
-      const res = await fetch("/api/integrations/google", {
+    const result = await apiMutation<{ authUrl?: string }>(
+      "/api/integrations/google",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "start-oauth" }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.authUrl) {
-        setOk(false);
-        setMessage(data.error || "No se pudo iniciar OAuth");
-        return;
       }
-      window.location.href = data.authUrl as string;
-    } catch {
+    );
+    setConnecting(false);
+    if (!result.ok || !result.data.authUrl) {
       setOk(false);
-      setMessage("Error de red al iniciar OAuth");
-    } finally {
-      setConnecting(false);
+      setMessage(
+        result.ok
+          ? "No se recibió la URL de autorización"
+          : result.error || "No se pudo iniciar OAuth"
+      );
+      return;
     }
+    window.location.href = result.data.authUrl;
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!state) return;
     setMessage("");
-    const res = await fetch("/api/integrations/google", {
+    const result = await apiMutation("/api/integrations/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -114,10 +115,11 @@ export function GoogleSettingsForm() {
         },
       }),
     });
-    const data = await res.json().catch(() => ({}));
-    setOk(res.ok);
-    setMessage(res.ok ? "Google guardado" : data.error || "Error al guardar");
-    if (res.ok) await reload();
+    setOk(result.ok);
+    setMessage(
+      result.ok ? "Google guardado" : result.error || "Error al guardar"
+    );
+    if (result.ok) await reload();
   }
 
   if (!state) {
@@ -224,11 +226,16 @@ export function GoogleSettingsForm() {
             className="btn btn-ghost"
             type="button"
             onClick={async () => {
-              await fetch("/api/integrations/google", {
+              const result = await apiMutation("/api/integrations/google", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "disconnect" }),
               });
+              if (!result.ok) {
+                setOk(false);
+                setMessage(result.error || "No se pudo desconectar");
+                return;
+              }
               await reload();
               setOk(true);
               setMessage("Google desconectado");
@@ -245,20 +252,22 @@ export function GoogleSettingsForm() {
             onClick={async () => {
               setTestingGmail(true);
               setMessage("");
-              const res = await fetch("/api/integrations/google", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  action: "test-gmail",
-                  to: state.connectedEmail || undefined,
-                }),
-              });
-              const data = await res.json().catch(() => ({}));
-              setOk(res.ok);
+              const result = await apiMutation<{ to?: string }>(
+                "/api/integrations/google",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    action: "test-gmail",
+                    to: state.connectedEmail || undefined,
+                  }),
+                }
+              );
+              setOk(result.ok);
               setMessage(
-                res.ok
-                  ? `Prueba Gmail enviada a ${data.to || state.connectedEmail || "destino"}`
-                  : data.error || "Error al enviar prueba Gmail"
+                result.ok
+                  ? `Prueba Gmail enviada a ${result.data.to || state.connectedEmail || "destino"}`
+                  : result.error || "Error al enviar prueba Gmail"
               );
               setTestingGmail(false);
             }}

@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/EmptyState";
+import { apiMutation } from "@/lib/api-mutation";
 
 type UserRow = {
   id: string;
@@ -70,7 +71,7 @@ export function PeopleManager({
     setOkMsg(null);
     setBusy(true);
     const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/people", {
+    const result = await apiMutation("/api/people", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -83,9 +84,8 @@ export function PeopleManager({
       }),
     });
     setBusy(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "No se pudo crear el usuario");
+    if (!result.ok) {
+      setError(result.error || "No se pudo crear el usuario");
       return;
     }
     setUserOpen(false);
@@ -101,7 +101,7 @@ export function PeopleManager({
     setBusy(true);
     const fd = new FormData(e.currentTarget);
     const password = String(fd.get("password") || "");
-    const res = await fetch("/api/people", {
+    const result = await apiMutation("/api/people", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -115,9 +115,8 @@ export function PeopleManager({
       }),
     });
     setBusy(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "No se pudo actualizar el usuario");
+    if (!result.ok) {
+      setError(result.error || "No se pudo actualizar el usuario");
       return;
     }
     setEditing(null);
@@ -128,14 +127,13 @@ export function PeopleManager({
   async function updateRole(userId: string, role: string) {
     setError(null);
     setOkMsg(null);
-    const res = await fetch("/api/people", {
+    const result = await apiMutation("/api/people", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "update-role", userId, role }),
     });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "No se pudo actualizar el rol");
+    if (!result.ok) {
+      setError(result.error || "No se pudo actualizar el rol");
       await reload();
       return;
     }
@@ -155,15 +153,14 @@ export function PeopleManager({
     setError(null);
     setOkMsg(null);
     setBusy(true);
-    const res = await fetch("/api/people", {
+    const result = await apiMutation("/api/people", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete-user", userId: user.id }),
     });
     setBusy(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "No se pudo eliminar el usuario");
+    if (!result.ok) {
+      setError(result.error || "No se pudo eliminar el usuario");
       return;
     }
     setOkMsg("Usuario eliminado");
@@ -176,7 +173,7 @@ export function PeopleManager({
     setOkMsg(null);
     const fd = new FormData(e.currentTarget);
     const memberIds = fd.getAll("memberIds").map(String).filter(Boolean);
-    const res = await fetch("/api/people", {
+    const result = await apiMutation("/api/people", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -186,9 +183,8 @@ export function PeopleManager({
         memberIds,
       }),
     });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "No se pudo crear el grupo");
+    if (!result.ok) {
+      setError(result.error || "No se pudo crear el grupo");
       return;
     }
     setGroupOpen(false);
@@ -204,7 +200,7 @@ export function PeopleManager({
     setBusy(true);
     const fd = new FormData(e.currentTarget);
     const memberIds = fd.getAll("memberIds").map(String).filter(Boolean);
-    const res = await fetch("/api/people", {
+    const result = await apiMutation("/api/people", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -216,9 +212,8 @@ export function PeopleManager({
       }),
     });
     setBusy(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "No se pudo actualizar el grupo");
+    if (!result.ok) {
+      setError(result.error || "No se pudo actualizar el grupo");
       return;
     }
     setEditingGroup(null);
@@ -232,15 +227,14 @@ export function PeopleManager({
     setError(null);
     setOkMsg(null);
     setBusy(true);
-    const res = await fetch("/api/people", {
+    const result = await apiMutation("/api/people", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete-group", groupId: group.id }),
     });
     setBusy(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "No se pudo eliminar el grupo");
+    if (!result.ok) {
+      setError(result.error || "No se pudo eliminar el grupo");
       return;
     }
     setOkMsg("Grupo eliminado");

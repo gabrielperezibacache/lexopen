@@ -80,7 +80,7 @@ export default async function PortalPage() {
 
       {isCliente(user.role) && (
         <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
-          Acceso restringido: sin facturación interna, Hermes ni carpetas Drive del estudio.
+          Acceso restringido: sin facturación interna, copiloto del estudio ni carpetas Drive internas.
         </div>
       )}
 

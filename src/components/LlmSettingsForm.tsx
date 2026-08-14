@@ -168,8 +168,9 @@ export function LlmSettingsForm() {
       <div>
         <h2 className="text-lg font-semibold">Endpoints de IA</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-          Conecte el copiloto a OpenAI, Azure, Groq, Ollama, Hermes u otro
-          servicio compatible. LexOpen usa la ruta{" "}
+          Conecte el copiloto a OpenAI, Azure, Groq, Ollama, Hermes Agent u otro
+          servicio compatible. Hermes es el preset técnico; en la UI se muestra
+          como Copiloto IA. LexOpen usa la ruta{" "}
           <code className="text-xs">{"{url}/chat/completions"}</code> del
           endpoint que indique.
         </p>

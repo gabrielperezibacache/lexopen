@@ -407,9 +407,9 @@ function AgenteInner() {
         [
           data.utility?.label ? `Modo: ${data.utility.label}` : null,
           data.source === "hermes"
-            ? "Fuente: Hermes"
+            ? "Fuente: copiloto conectado"
             : data.source === "error"
-              ? "Error de Hermes"
+              ? "Error del copiloto"
               : "Fuente: demo local",
           canApprove ? "Requiere aprobación humana" : null,
           data.note || null,
@@ -745,7 +745,7 @@ function AgenteInner() {
               >
                 <div className="font-medium">{chat.title}</div>
                 <div className="text-xs text-[var(--ink-soft)]/60">
-                  {chat.demoMode ? "demo" : "Hermes"} ·{" "}
+                  {chat.demoMode ? "demo" : "conectado"} ·{" "}
                   {new Date(chat.updatedAt).toLocaleDateString("es-CL")}
                 </div>
               </button>
