@@ -6,6 +6,7 @@ import {
   claimMisCausasSync,
   clearClaveUnicaSyncMessages,
   getClaveUnicaStatus,
+  listCausasFromMisCausas,
   syncMisCausas,
 } from "@/lib/pjud/claveunica";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
@@ -16,8 +17,13 @@ export const maxDuration = 300;
 export async function GET() {
   try {
     await requireStaff();
+    const [status, causas] = await Promise.all([
+      getClaveUnicaStatus(),
+      listCausasFromMisCausas(),
+    ]);
     return NextResponse.json({
-      status: await getClaveUnicaStatus(),
+      status,
+      causas,
     });
   } catch (e) {
     return handleRouteError(e);

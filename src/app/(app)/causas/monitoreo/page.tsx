@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { labelSemaforo, type Semaforo } from "@/lib/pjud/classify";
+import {
+  labelCausaOrigen,
+  labelPjudSyncStatus,
+} from "@/lib/pjud/causa-origin";
 import { PjudQuickAddPanel } from "@/components/pjud/PjudQuickAddPanel";
 
 type Item = {
@@ -24,6 +28,8 @@ type Item = {
   lastSyncNote: string | null;
   failCount: number;
   failed: boolean;
+  pjudFromMisCausas?: boolean;
+  pjudSource?: string | null;
   movimientosCount: number;
   lastMovimiento: {
     titulo: string;
@@ -183,6 +189,24 @@ export default function MonitoreoCausasPage() {
     await load();
   }
 
+  async function clearFallidosAvisos() {
+    setBusy(true);
+    setMsg("");
+    const res = await fetch("/api/causas/monitoreo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "clear-errors" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    setMsg(
+      res.ok
+        ? `Avisos limpiados: ${data.clearedCausas || 0} causa(s) · ${data.dismissedJobs || 0} job(s)`
+        : data.error || "Error al limpiar avisos"
+    );
+    await load();
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
@@ -192,12 +216,16 @@ export default function MonitoreoCausasPage() {
           </p>
           <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Monitoreo de causas</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--ink-soft)]/80 sm:text-base">
-            Vea el estado de su cartera, sincronice movimientos y revise fallos.
-            Las causas con ClaveÚnica se importan desde{" "}
+            Sincroniza movimientos de la cartera monitoreada (cola PJUD). Para
+            importar desde ClaveÚnica use{" "}
             <Link href="/causas/mis-causas" className="text-[var(--sea)]">
               Mis Causas
             </Link>
-            ; los datos quedan en su Host.
+            ; para editar o archivar,{" "}
+            <Link href="/causas" className="text-[var(--sea)]">
+              Causas
+            </Link>
+            .
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
@@ -351,9 +379,22 @@ export default function MonitoreoCausasPage() {
 
       {fallidos.length > 0 && (
         <section className="rounded-3xl border border-rose-200 bg-rose-50/60 p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-rose-800">
-            Fallidos ({fallidos.length})
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-rose-800">
+              Fallidos ({fallidos.length})
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn btn-ghost text-xs"
+                disabled={busy}
+                onClick={clearFallidosAvisos}
+                title="Quita avisos y contadores sin volver a sincronizar"
+              >
+                Limpiar avisos
+              </button>
+            </div>
+          </div>
           <ul className="mt-3 space-y-2 text-sm">
             {fallidos.slice(0, 8).map((f) => (
               <li
@@ -362,7 +403,7 @@ export default function MonitoreoCausasPage() {
               >
                 <div>
                   <Link
-                    href={`/causas/${f.causaId}`}
+                    href={`/causas/${f.causaId}?from=monitoreo`}
                     className="font-medium text-[var(--sea)]"
                   >
                     {f.rit || f.titulo}
@@ -378,6 +419,23 @@ export default function MonitoreoCausasPage() {
             ))}
           </ul>
         </section>
+      )}
+
+      {(resumen?.fallidas ?? 0) > 0 && fallidos.length === 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+          <p>
+            Hay {resumen?.fallidas} causa(s) con fallo de sync marcado. Puede
+            limpiar los avisos sin reintentar.
+          </p>
+          <button
+            type="button"
+            className="btn btn-ghost text-xs"
+            disabled={busy}
+            onClick={clearFallidosAvisos}
+          >
+            Limpiar avisos
+          </button>
+        </div>
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -428,7 +486,12 @@ export default function MonitoreoCausasPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((i) => (
+            {filtered.map((i) => {
+              const origen = labelCausaOrigen({
+                pjudFromMisCausas: i.pjudFromMisCausas,
+                pjudSource: i.pjudSource,
+              });
+              return (
               <tr key={i.id} className="border-b border-[var(--line)]/70">
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-2">
@@ -445,7 +508,7 @@ export default function MonitoreoCausasPage() {
                 </td>
                 <td className="px-4 py-3">
                   <Link
-                    href={`/causas/${i.id}`}
+                    href={`/causas/${i.id}?from=monitoreo`}
                     className="font-medium text-[var(--sea)]"
                   >
                     {i.rit || i.titulo}
@@ -454,6 +517,7 @@ export default function MonitoreoCausasPage() {
                     {i.cliente?.razonSocial || "—"} ·{" "}
                     {i.abogado?.name || "Sin abogado"}
                     {i.monitoreoActivo ? " · ON" : ""}
+                    {origen ? ` · ${origen}` : ""}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-[var(--ink-soft)]/80">
@@ -501,12 +565,23 @@ export default function MonitoreoCausasPage() {
                 <td className="px-4 py-3 text-xs text-[var(--ink-soft)]/65">
                   <div>
                     Último: {fmtShort(i.lastSyncAt)}
-                    {i.lastSyncStatus ? ` · ${i.lastSyncStatus}` : ""}
+                    {i.lastSyncStatus
+                      ? ` · ${labelPjudSyncStatus(i.lastSyncStatus)}`
+                      : ""}
                   </div>
                   <div>Próximo: {fmtShort(i.nextSyncAt)}</div>
+                  {i.lastSyncNote && (
+                    <div
+                      className="mt-0.5 max-w-[14rem] truncate text-[var(--copper)]"
+                      title={i.lastSyncNote}
+                    >
+                      {i.lastSyncNote}
+                    </div>
+                  )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {filtered.length === 0 && (
               <tr>
                 <td

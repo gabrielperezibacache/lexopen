@@ -5,6 +5,7 @@ import { verifyCronSecret } from "@/lib/security/cron-secret";
 import { downloadResponseHeaders } from "@/lib/security/download";
 import { writeAudit } from "@/lib/audit";
 import {
+  clearFallidosMonitoreoAvisos,
   listCarteraMonitoreo,
   listFallidosMonitoreo,
   providerStatusPublicAsync,
@@ -93,7 +94,13 @@ export async function POST(req: NextRequest) {
       z
         .object({
           action: z
-            .enum(["sync", "retry-fallidos", "process-queue", "import-cartera"])
+            .enum([
+              "sync",
+              "retry-fallidos",
+              "clear-errors",
+              "process-queue",
+              "import-cartera",
+            ])
             .optional(),
           causaIds: z.array(z.string().min(1).max(100)).max(100).optional(),
           limit: z.number().int().min(1).max(200).optional(),
@@ -169,6 +176,30 @@ export async function POST(req: NextRequest) {
         imported: results.length,
         created: results.filter((r) => r.created).length,
         results,
+        provider: await providerStatusPublicAsync(),
+      });
+    }
+
+    if (body?.action === "clear-errors") {
+      if (cron) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const cleared = await clearFallidosMonitoreoAvisos({
+        causaIds: body.causaIds,
+        limit: body.limit,
+      });
+      if (actorId) {
+        await writeAudit({
+          actorId,
+          action: "pjud.clear-fallidos",
+          entityType: "Causa",
+          after: cleared,
+        });
+      }
+      return NextResponse.json({
+        ok: true,
+        ...cleared,
+        fallidos: await listFallidosMonitoreo(20),
         provider: await providerStatusPublicAsync(),
       });
     }

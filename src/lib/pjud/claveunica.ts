@@ -473,6 +473,7 @@ export async function syncMisCausas(opts?: {
   const created: string[] = [];
   const linked: string[] = [];
   const causaIdsForSync: string[] = [];
+  const itemsWithIds: Array<MisCausasItem & { causaId: string }> = [];
 
   for (const item of items) {
     const existing = await findExistingCausa(item);
@@ -517,6 +518,7 @@ export async function syncMisCausas(opts?: {
       });
       linked.push(causaId);
     }
+    itemsWithIds.push({ ...item, causaId });
     causaIdsForSync.push(causaId);
   }
 
@@ -608,7 +610,26 @@ export async function syncMisCausas(opts?: {
     syncOk,
     syncFailed,
     inserted: insertedTotal,
-    items,
+    items: itemsWithIds,
     syncResults,
   };
+}
+
+/** Causas marcadas como importadas/enlazadas desde Mis Causas (ClaveÚnica). */
+export async function listCausasFromMisCausas(limit = 80) {
+  return prisma.causa.findMany({
+    where: { pjudFromMisCausas: true },
+    select: {
+      id: true,
+      rit: true,
+      tribunal: true,
+      titulo: true,
+      caratula: true,
+      estado: true,
+      pjudLastSyncStatus: true,
+      updatedAt: true,
+    },
+    orderBy: { updatedAt: "desc" },
+    take: Math.min(Math.max(limit, 1), 200),
+  });
 }

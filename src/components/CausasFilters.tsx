@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MATERIAS, ESTADOS_CAUSA } from "@/lib/chile";
 import { FormEvent, Suspense } from "react";
 
-function FiltersInner() {
+function FiltersInner({ defaultEstado }: { defaultEstado: string }) {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -19,15 +19,24 @@ function FiltersInner() {
     router.push(`/causas?${params.toString()}`);
   }
 
+  const estadoValue = sp.get("estado") || defaultEstado || "activa";
+
   return (
-    <form onSubmit={onSubmit} className="panel grid gap-3 rounded-3xl p-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+    <form
+      onSubmit={onSubmit}
+      className="panel grid grid-cols-1 gap-3 rounded-3xl p-4 sm:grid-cols-2 lg:grid-cols-4"
+    >
       <input
         className="input sm:col-span-2"
         name="q"
         placeholder="Buscar RIT, carátula, tribunal…"
         defaultValue={sp.get("q") || ""}
       />
-      <select className="select" name="materia" defaultValue={sp.get("materia") || ""}>
+      <select
+        className="select"
+        name="materia"
+        defaultValue={sp.get("materia") || ""}
+      >
         <option value="">Todas las materias</option>
         {MATERIAS.map((m) => (
           <option key={m.value} value={m.value}>
@@ -36,8 +45,8 @@ function FiltersInner() {
         ))}
       </select>
       <div className="flex gap-2">
-        <select className="select" name="estado" defaultValue={sp.get("estado") || ""}>
-          <option value="">Todos los estados</option>
+        <select className="select" name="estado" defaultValue={estadoValue}>
+          <option value="all">Todos los estados</option>
           {ESTADOS_CAUSA.map((m) => (
             <option key={m.value} value={m.value}>
               {m.label}
@@ -52,10 +61,14 @@ function FiltersInner() {
   );
 }
 
-export function CausasFilters() {
+export function CausasFilters({
+  defaultEstado = "activa",
+}: {
+  defaultEstado?: string;
+}) {
   return (
     <Suspense fallback={<div className="panel h-16 rounded-3xl" />}>
-      <FiltersInner />
+      <FiltersInner defaultEstado={defaultEstado} />
     </Suspense>
   );
 }

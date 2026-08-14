@@ -2,8 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { CausaManageActions } from "@/components/CausaManageActions";
 
-export function CausaActions({ causaId }: { causaId: string }) {
+export function CausaActions({
+  causaId,
+  titulo,
+  estado,
+  isAdmin,
+}: {
+  causaId: string;
+  titulo: string;
+  estado: string;
+  isAdmin: boolean;
+}) {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -36,7 +47,13 @@ export function CausaActions({ causaId }: { causaId: string }) {
   }
 
   return (
-    <div className="flex w-full flex-col items-stretch gap-2 sm:items-end">
+    <div className="flex w-full flex-col items-stretch gap-3 sm:items-end">
+      <CausaManageActions
+        causaId={causaId}
+        titulo={titulo}
+        estado={estado}
+        isAdmin={isAdmin}
+      />
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
         <Link
           href={`/causas/${causaId}/minuta/nueva`}
@@ -70,15 +87,9 @@ export function CausaActions({ causaId }: { causaId: string }) {
         >
           Abrir copiloto
         </Link>
-        <Link
-          href={`/agente?causaId=${causaId}&utility=doc_qa`}
-          className="btn btn-ghost w-full sm:w-auto"
-        >
-          Preguntar a documentos
-        </Link>
       </div>
       {msg && (
-        <p className="max-w-md rounded-2xl border border-[var(--line)] bg-white/80 p-3 text-xs text-[var(--ink-soft)]/80">
+        <p className="text-xs text-[var(--ink-soft)]/75" role="status">
           {msg}
         </p>
       )}

@@ -13,6 +13,7 @@ import {
   diasEntre,
   semaforoPorDiasSinMovimiento,
 } from "@/lib/pjud/classify";
+import { labelCausaOrigen } from "@/lib/pjud/causa-origin";
 import {
   isPlaceholderDriveFolderId,
   isRealDriveFolderId,
@@ -26,11 +27,28 @@ import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 
-type Params = { params: Promise<{ id: string }> };
+type Params = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+};
 
-export default async function CausaDetailPage({ params }: Params) {
+export default async function CausaDetailPage({ params, searchParams }: Params) {
   const user = await requireStaff();
   const { id } = await params;
+  const sp = await searchParams;
+  const from = sp.from?.trim();
+  const backHref =
+    from === "monitoreo"
+      ? "/causas/monitoreo"
+      : from === "mis-causas"
+        ? "/causas/mis-causas"
+        : "/causas";
+  const backLabel =
+    from === "monitoreo"
+      ? "← Monitoreo"
+      : from === "mis-causas"
+        ? "← Mis Causas"
+        : "← Causas";
   const [causa, responsables] = await Promise.all([
     prisma.causa.findUnique({
       where: { id },
@@ -81,6 +99,10 @@ export default async function CausaDetailPage({ params }: Params) {
     }),
   ]);
   if (!causa) notFound();
+  const origen = labelCausaOrigen({
+    pjudFromMisCausas: causa.pjudFromMisCausas,
+    pjudSource: causa.pjudSource,
+  });
 
   const documentos = causa.documentos.map(
     ({ contenido, extractedMarkdown, storageKey, ...rest }) => ({
@@ -105,8 +127,8 @@ export default async function CausaDetailPage({ params }: Params) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Link href="/causas" className="text-sm text-[var(--sea)]">
-            ← Causas
+          <Link href={backHref} className="text-sm text-[var(--sea)]">
+            {backLabel}
           </Link>
           <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">{causa.titulo}</h1>
           <p className="mt-2 break-words text-[var(--ink-soft)]/80">
@@ -116,6 +138,7 @@ export default async function CausaDetailPage({ params }: Params) {
             <StatusBadge estado={causa.estado} />
             <span className="badge badge-sea">{labelMateria(causa.materia)}</span>
             <span className="badge badge-ink">{labelEtapa(causa.etapa)}</span>
+            {origen && <span className="badge badge-ink">Origen: {origen}</span>}
             <span
               className={
                 causa.conflictStatus === "blocked"
@@ -136,7 +159,12 @@ export default async function CausaDetailPage({ params }: Params) {
               )}
           </div>
         </div>
-        <CausaActions causaId={causa.id} />
+        <CausaActions
+          causaId={causa.id}
+          titulo={causa.titulo}
+          estado={causa.estado}
+          isAdmin={user.role === "admin"}
+        />
       </div>
 
       <div className="panel rounded-3xl border border-[var(--sea)]/20 bg-[linear-gradient(135deg,rgba(31,111,120,0.08),rgba(255,255,255,0.85))] px-5 py-5">
