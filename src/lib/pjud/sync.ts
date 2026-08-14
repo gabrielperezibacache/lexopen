@@ -419,6 +419,75 @@ export async function clearCausaPjudSyncMessages(causaId: string) {
   });
 }
 
+/**
+ * Clear sticky failed-sync notices for the whole monitoreo cartera:
+ * reset causa fail counters/notes and dismiss failed queue jobs from the UI list.
+ */
+export async function clearFallidosMonitoreoAvisos(opts?: {
+  causaIds?: string[];
+  limit?: number;
+}) {
+  const limit = Math.min(Math.max(opts?.limit ?? 200, 1), 500);
+  const causaFilter = opts?.causaIds?.length
+    ? { id: { in: opts.causaIds.slice(0, limit) } }
+    : {
+        OR: [
+          { pjudLastSyncStatus: { in: ["failed", "error"] } },
+          { pjudFailCount: { gt: 0 } },
+        ],
+      };
+
+  const causas = await prisma.causa.findMany({
+    where: causaFilter,
+    select: {
+      id: true,
+      pjudLastSyncStatus: true,
+      pjudMonitoreoActivo: true,
+    },
+    take: limit,
+  });
+
+  let clearedCausas = 0;
+  for (const causa of causas) {
+    const failedStatus =
+      causa.pjudLastSyncStatus === "failed" ||
+      causa.pjudLastSyncStatus === "error";
+    await prisma.causa.update({
+      where: { id: causa.id },
+      data: {
+        pjudLastSyncNote: null,
+        pjudFailCount: 0,
+        ...(failedStatus
+          ? {
+              pjudLastSyncStatus: causa.pjudMonitoreoActivo ? "ok" : "disabled",
+            }
+          : {}),
+      },
+    });
+    clearedCausas += 1;
+  }
+
+  const jobWhere = {
+    status: "failed" as const,
+    ...(opts?.causaIds?.length
+      ? { causaId: { in: opts.causaIds.slice(0, limit) } }
+      : {}),
+  };
+  const dismissedJobs = await prisma.pjudSyncJob.updateMany({
+    where: jobWhere,
+    data: {
+      status: "dismissed",
+      note: "Aviso limpiado desde Monitoreo",
+      finishedAt: new Date(),
+    },
+  });
+
+  return {
+    clearedCausas,
+    dismissedJobs: dismissedJobs.count,
+  };
+}
+
 export async function listCarteraMonitoreo() {
   const causas = await prisma.causa.findMany({
     where: { estado: "activa" },
@@ -465,6 +534,8 @@ export async function listCarteraMonitoreo() {
       failCount: c.pjudFailCount,
       failed,
       failedJobs: c._count.pjudSyncJobs,
+      pjudFromMisCausas: c.pjudFromMisCausas,
+      pjudSource: c.pjudSource,
       movimientosCount: c._count.movimientos,
       lastMovimiento: last
         ? {

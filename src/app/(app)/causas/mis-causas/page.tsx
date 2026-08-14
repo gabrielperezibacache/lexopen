@@ -34,7 +34,22 @@ type SyncResult = {
   syncOk?: number;
   syncFailed?: number;
   inserted?: number;
-  items: Array<{ rit: string; tribunal: string; caratula?: string | null }>;
+  items: Array<{
+    rit: string;
+    tribunal: string;
+    caratula?: string | null;
+    causaId?: string | null;
+  }>;
+};
+
+type LinkedCausa = {
+  id: string;
+  rit: string | null;
+  tribunal: string;
+  titulo: string;
+  caratula: string | null;
+  estado: string;
+  pjudLastSyncStatus: string | null;
 };
 
 function formatWhen(value: string | null | undefined) {
@@ -76,6 +91,7 @@ export default function MisCausasPage() {
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"ok" | "warn" | "err">("ok");
   const [result, setResult] = useState<SyncResult | null>(null);
+  const [linkedCausas, setLinkedCausas] = useState<LinkedCausa[]>([]);
   const [adminOnly, setAdminOnly] = useState(false);
 
   async function load() {
@@ -87,6 +103,7 @@ export default function MisCausasPage() {
       return;
     }
     setStatus(data.status || null);
+    setLinkedCausas(Array.isArray(data.causas) ? data.causas : []);
   }
 
   useEffect(() => {
@@ -278,6 +295,7 @@ export default function MisCausasPage() {
             "Sincronización terminada. Los movimientos se actualizan en segundo plano vía la cola de monitoreo."
         );
       }
+      await load();
       return;
     }
 
@@ -324,7 +342,17 @@ export default function MisCausasPage() {
       <PageHeader
         eyebrow="Poder Judicial"
         title="Mis Causas (ClaveÚnica)"
-        subtitle="Traiga a LexOpen las causas de su Oficina Judicial Virtual. El RUT y la contraseña se guardan cifrados solo en su servidor; no se envían a un SaaS externo."
+        subtitle="Importa y enlaza causas de la Oficina Judicial Virtual. Los movimientos se encolan en Monitoreo; puede editar o archivar cada causa en su ficha."
+        actions={
+          <>
+            <Link href="/causas" className="btn btn-ghost">
+              Ver causas
+            </Link>
+            <Link href="/causas/monitoreo" className="btn btn-secondary">
+              Monitoreo
+            </Link>
+          </>
+        }
       />
 
       <section className="panel space-y-4 rounded-3xl p-5">
@@ -634,16 +662,30 @@ export default function MisCausasPage() {
             </p>
           ) : (
             <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-              Estas son las causas que LexOpen leyó desde «Mis Causas».
+              Listado desde «Mis Causas». Los movimientos se procesan en la cola
+              de{" "}
+              <Link href="/causas/monitoreo" className="text-[var(--sea)]">
+                Monitoreo
+              </Link>
+              .
             </p>
           )}
           <ul className="mt-4 space-y-2 text-sm">
             {result.items.map((item) => (
               <li
-                key={`${item.rit}-${item.tribunal}`}
+                key={`${item.causaId || item.rit}-${item.tribunal}`}
                 className="rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3"
               >
-                <div className="font-medium">{item.rit}</div>
+                {item.causaId ? (
+                  <Link
+                    href={`/causas/${item.causaId}?from=mis-causas`}
+                    className="font-medium text-[var(--sea)]"
+                  >
+                    {item.rit}
+                  </Link>
+                ) : (
+                  <div className="font-medium">{item.rit}</div>
+                )}
                 <div className="mt-0.5 break-words text-xs text-[var(--ink-soft)]/65">
                   {item.tribunal}
                   {item.caratula ? ` · ${item.caratula}` : ""}
@@ -655,6 +697,37 @@ export default function MisCausasPage() {
                 No aparecieron causas en esta sincronización.
               </li>
             )}
+          </ul>
+        </section>
+      )}
+
+      {!result && linkedCausas.length > 0 && (
+        <section className="panel rounded-3xl p-5">
+          <h2 className="text-lg font-semibold">
+            Causas desde ClaveÚnica ({linkedCausas.length})
+          </h2>
+          <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+            Ya están en LexOpen. Abra la ficha para editar datos o revise
+            movimientos en Monitoreo.
+          </p>
+          <ul className="mt-4 space-y-2 text-sm">
+            {linkedCausas.map((c) => (
+              <li
+                key={c.id}
+                className="rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3"
+              >
+                <Link
+                  href={`/causas/${c.id}?from=mis-causas`}
+                  className="font-medium text-[var(--sea)]"
+                >
+                  {c.rit || c.titulo}
+                </Link>
+                <div className="mt-0.5 break-words text-xs text-[var(--ink-soft)]/65">
+                  {c.tribunal}
+                  {c.caratula ? ` · ${c.caratula}` : ""}
+                </div>
+              </li>
+            ))}
           </ul>
         </section>
       )}

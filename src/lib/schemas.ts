@@ -41,6 +41,29 @@ export const causaCreateSchema = z.object({
   conflictNotes: z.string().optional().nullable(),
 });
 
+/** Partial update for ficha fields (no Drive — use Google integration routes). */
+export const causaUpdateSchema = z
+  .object({
+    titulo: z.string().min(3).max(500).optional(),
+    rit: z.string().max(80).optional().nullable(),
+    ruc: z.string().max(80).optional().nullable(),
+    tribunal: z.string().min(2).max(300).optional(),
+    materia: z.string().min(2).max(120).optional(),
+    procedimiento: z.string().max(200).optional().nullable(),
+    estado: z.string().min(2).max(40).optional(),
+    etapa: z.string().min(2).max(40).optional(),
+    caratula: z.string().max(500).optional().nullable(),
+    resumen: z.string().max(20_000).optional().nullable(),
+    clienteId: z.string().min(1).max(100).optional().nullable(),
+    abogadoId: z.string().min(1).max(100).optional().nullable(),
+    sala: z.string().max(120).optional().nullable(),
+    cuaderno: z.string().max(120).optional().nullable(),
+    abogadoContraparte: z.string().max(300).optional().nullable(),
+  })
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: "Sin campos para actualizar",
+  });
+
 export const plazoCreateSchema = z.object({
   titulo: z.string().min(2),
   descripcion: z.string().optional().nullable(),
