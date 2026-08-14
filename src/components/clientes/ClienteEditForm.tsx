@@ -45,9 +45,9 @@ export function ClienteEditForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-2">
+    <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <input
-        className="input md:col-span-2"
+        className="input sm:col-span-2"
         name="razonSocial"
         required
         defaultValue={cliente.razonSocial}
@@ -87,13 +87,13 @@ export function ClienteEditForm({
         ))}
       </select>
       <textarea
-        className="input md:col-span-2"
+        className="input sm:col-span-2"
         name="notas"
         rows={2}
         defaultValue={cliente.notas || ""}
         placeholder="Notas"
       />
-      <div className="md:col-span-2 flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
         <button className="btn btn-secondary" type="submit">
           Guardar datos
         </button>

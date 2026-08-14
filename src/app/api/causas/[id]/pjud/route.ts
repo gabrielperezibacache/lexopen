@@ -3,7 +3,7 @@ import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import {
-  providerStatusPublic,
+  providerStatusPublicAsync,
   setMonitoreoActivo,
   syncCausaPjud,
 } from "@/lib/pjud/sync";
@@ -40,7 +40,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({
       causa,
       jobs: recentJobs,
-      provider: providerStatusPublic(),
+      provider: await providerStatusPublicAsync(),
     });
   } catch (e) {
     return handleRouteError(e);

@@ -63,7 +63,7 @@ export function InvoiceActions({
   }
 
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:items-end">
       {error && (
         <p className="max-w-xs rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {error}
@@ -82,7 +82,7 @@ export function InvoiceActions({
         )}
       </div>
       {payOpen && (
-        <form onSubmit={pay} className="panel w-72 space-y-2 rounded-2xl p-4">
+        <form onSubmit={pay} className="panel w-full max-w-xs space-y-2 rounded-2xl p-4 sm:w-72">
           <div className="text-xs text-[var(--ink-soft)]/65">Saldo {clp(balanceClp)}</div>
           <input
             className="input"

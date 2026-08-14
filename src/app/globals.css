@@ -222,6 +222,15 @@ a {
     padding: 0.85rem 1rem;
     font-size: 0.95rem;
   }
+
+  .btn {
+    min-height: 2.75rem;
+  }
+
+  .input,
+  .select {
+    min-height: 2.75rem;
+  }
 }
 
 .nav-link:hover,

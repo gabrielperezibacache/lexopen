@@ -40,7 +40,7 @@ export default async function SiteQaPage({ params }: Params) {
         active="/qa"
         clientView={clientView}
       />
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
           Q&A del espacio — hilos con cliente y equipo, con respuestas oficiales.
         </p>

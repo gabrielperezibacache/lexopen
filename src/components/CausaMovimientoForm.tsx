@@ -99,7 +99,7 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
 
   return (
     <div className="space-y-3">
-      <form onSubmit={onSubmit} className="mt-4 grid gap-3 md:grid-cols-4">
+      <form onSubmit={onSubmit} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <input
           className="input md:col-span-2"
           name="titulo"

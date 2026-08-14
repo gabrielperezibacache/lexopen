@@ -7,7 +7,6 @@ import { writeAudit } from "@/lib/audit";
 import {
   listCarteraMonitoreo,
   listFallidosMonitoreo,
-  providerStatusPublic,
   providerStatusPublicAsync,
   syncCausaPjud,
 } from "@/lib/pjud/sync";
@@ -170,7 +169,7 @@ export async function POST(req: NextRequest) {
         imported: results.length,
         created: results.filter((r) => r.created).length,
         results,
-        provider: providerStatusPublic(),
+        provider: await providerStatusPublicAsync(),
       });
     }
 
@@ -201,7 +200,7 @@ export async function POST(req: NextRequest) {
         requeued: requeued.length,
         synced: results.length,
         results,
-        provider: providerStatusPublic(),
+        provider: await providerStatusPublicAsync(),
       });
     }
 
@@ -214,7 +213,7 @@ export async function POST(req: NextRequest) {
         ok: true,
         synced: results.length,
         results,
-        provider: providerStatusPublic(),
+        provider: await providerStatusPublicAsync(),
       });
     }
 
@@ -262,7 +261,7 @@ export async function POST(req: NextRequest) {
         ok: true,
         synced: results.length,
         results,
-        provider: providerStatusPublic(),
+        provider: await providerStatusPublicAsync(),
       });
     }
 
@@ -289,7 +288,7 @@ export async function POST(req: NextRequest) {
       enqueued: pipeline.enqueued,
       synced: pipeline.synced,
       results: pipeline.results,
-      provider: providerStatusPublic(),
+      provider: await providerStatusPublicAsync(),
     });
   } catch (e) {
     return handleRouteError(e);

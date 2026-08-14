@@ -5,6 +5,7 @@ import { FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react
 import { useSearchParams } from "next/navigation";
 import { safeJsonParse } from "@/lib/safe-json";
 import { MarkdownView } from "@/lib/markdown";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 type CausaOption = { id: string; titulo: string; rit: string | null };
 type SourceRef = {
@@ -585,17 +586,11 @@ function AgenteInner() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          Copiloto legal
-        </p>
-        <h1 className="display mt-2 text-4xl">Asistente LexOpen</h1>
-        <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Entiende lo que pide, recuerda el hilo y ancla la respuesta a la carpeta
-          investigativa, documentos indexados (OCR/Markdown), VDR vinculado y plazos
-          del host. Borradores siempre sujetos a revisión humana.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Copiloto legal"
+        title="Asistente LexOpen"
+        subtitle="Entiende lo que pide, recuerda el hilo y ancla la respuesta a la carpeta investigativa, documentos indexados (OCR/Markdown), VDR vinculado y plazos del host. Borradores siempre sujetos a revisión humana."
+      />
 
       {utilities.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -624,7 +619,7 @@ function AgenteInner() {
           <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
             Cálculo interno de plazo
           </h2>
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="mb-1 block text-sm font-medium">Desde</label>
               <input
@@ -709,7 +704,7 @@ function AgenteInner() {
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <aside className="panel rounded-3xl p-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <h2 className="font-semibold">Conversaciones</h2>
             <button
               className="text-sm text-[var(--sea)]"
@@ -867,8 +862,8 @@ function AgenteInner() {
               </div>
               {visibleDocs.length > 0 ? (
                 <div>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <label className="text-xs font-medium text-[var(--ink-soft)]/70">
+                  <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
+                    <label className="min-w-0 text-xs font-medium text-[var(--ink-soft)]/70">
                       Documentos ({selectedDocIds.length || "auto"} / {visibleDocs.length})
                     </label>
                     <button

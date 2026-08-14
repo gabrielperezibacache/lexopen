@@ -25,7 +25,7 @@ export default async function SiteWikiPage({ params }: Params) {
   return (
     <div>
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/wiki" />
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
           Wiki colaborativa del espacio — playbooks, checklists e inicio del matter.
         </p>
@@ -45,10 +45,10 @@ export default async function SiteWikiPage({ params }: Params) {
               id={p.slug}
               className="panel scroll-mt-24 rounded-3xl p-5"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-semibold">{p.title}</h2>
-                  <p className="mt-1 text-xs text-[var(--ink-soft)]/60">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="break-words text-xl font-semibold">{p.title}</h2>
+                  <p className="mt-1 break-words text-xs text-[var(--ink-soft)]/60">
                     /{p.slug} · {p.author?.name || "—"}
                   </p>
                 </div>

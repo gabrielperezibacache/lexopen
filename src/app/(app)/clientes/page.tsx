@@ -5,6 +5,7 @@ import { NewClienteForm } from "@/components/clientes/NewClienteForm";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
 import { StatusBadge } from "@/components/ui";
 import { getI18n } from "@/lib/i18n/server";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 export default async function ClientesPage({
   searchParams,
@@ -56,27 +57,21 @@ export default async function ClientesPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            {t("crm.eyebrow")}
-          </p>
-          <h1 className="display mt-2 text-4xl">{t("crm.title")}</h1>
-          <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            {t("crm.subtitle")}
-          </p>
-        </div>
-        <NewClienteForm abogados={abogados} />
-      </div>
+      <PageHeader
+        eyebrow={t("crm.eyebrow")}
+        title={t("crm.title")}
+        subtitle={t("crm.subtitle")}
+        actions={<NewClienteForm abogados={abogados} />}
+      />
 
-      <form className="flex flex-wrap gap-2">
+      <form className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <input
-          className="input max-w-xs"
+          className="input w-full max-w-xs"
           name="q"
           defaultValue={q || ""}
           placeholder={t("crm.searchPlaceholder")}
         />
-        <select className="select" name="estado" defaultValue={estado || ""}>
+        <select className="select w-full max-w-xs sm:w-auto" name="estado" defaultValue={estado || ""}>
           <option value="">{t("crm.filterAll")}</option>
           <option value="activo">{t("crm.filterActive")}</option>
           <option value="inactivo">{t("crm.filterInactive")}</option>

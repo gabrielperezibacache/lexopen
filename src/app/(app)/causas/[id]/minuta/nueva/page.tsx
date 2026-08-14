@@ -25,7 +25,7 @@ export default async function NuevaMinutaPage({ params, searchParams }: Params) 
         <Link href={`/causas/${causa.id}`} className="text-sm text-[var(--sea)]">
           ← Volver a la causa
         </Link>
-        <h1 className="display mt-2 text-4xl">Nueva minuta</h1>
+        <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Nueva minuta</h1>
         <p className="mt-2 text-[var(--ink-soft)]/80">
           Tras cada audiencia, reunión o llamada, deje el handoff listo para que
           cualquier abogado continúe la tramitación.

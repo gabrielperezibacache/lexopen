@@ -149,6 +149,7 @@ export function PjudMonitorPanel({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [msgBad, setMsgBad] = useState(false);
   const [tab, setTab] = useState<Tab>("historial");
   const [cuadernoFilter, setCuadernoFilter] = useState<string>("todos");
 
@@ -188,6 +189,7 @@ export function PjudMonitorPanel({
   async function action(act: "sync" | "enable" | "disable" | "retry") {
     setBusy(true);
     setMsg("");
+    setMsgBad(false);
     const res = await fetch(`/api/causas/${causaId}/pjud`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -196,12 +198,18 @@ export function PjudMonitorPanel({
     const data = await res.json().catch(() => ({}));
     setBusy(false);
     if (!res.ok) {
+      setMsgBad(true);
       setMsg(data.error || "Error");
       return;
     }
     if (act === "sync" || act === "retry") {
+      const bad =
+        data.status === "failed" ||
+        data.status === "error" ||
+        data.provider === "none";
+      setMsgBad(bad);
       setMsg(
-        `${data.demo ? "[DEMO] " : ""}+${data.inserted || 0} nuevos · ${data.skipped || 0} ya conocidos · receptor ${data.receptorCount || 0}. ${data.note || ""}`
+        `${bad ? "⚠ " : ""}${data.demo ? "[DEMO] " : ""}+${data.inserted || 0} nuevos · ${data.skipped || 0} ya conocidos · receptor ${data.receptorCount || 0}. ${data.note || ""}`
       );
     } else {
       setMsg(act === "enable" ? "Monitoreo activado." : "Monitoreo desactivado.");
@@ -220,9 +228,9 @@ export function PjudMonitorPanel({
         <div>
           <h2 className="text-lg font-semibold">Seguimiento judicial (PJUD)</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--ink-soft)]/75">
-            Experiencia tipo CausaMonitor: cuadernos, receptor, escritos, sync,
-            fallidos, scrape OJV opt-in y Mis Causas vía ClaveÚnica cifrada.
-            Ver /causas/mis-causas y docs/PJUD.md.
+            Experiencia de seguimiento: cuadernos, receptor, escritos y
+          sincronización con la Oficina Judicial Virtual. Configure ClaveÚnica
+          en Mis Causas si aún no lo ha hecho.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
@@ -309,7 +317,14 @@ export function PjudMonitorPanel({
         </Link>
       </div>
       {msg && (
-        <p className="rounded-2xl border border-[var(--line)] bg-white/80 px-3 py-2 text-xs text-[var(--ink-soft)]/80">
+        <p
+          className={`rounded-2xl border px-3 py-2 text-xs ${
+            msgBad
+              ? "border-rose-200 bg-rose-50 text-rose-900"
+              : "border-[var(--line)] bg-white/80 text-[var(--ink-soft)]/80"
+          }`}
+          role="status"
+        >
           {msg}
         </p>
       )}

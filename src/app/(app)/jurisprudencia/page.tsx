@@ -3,6 +3,7 @@ import { formatDate } from "@/components/ui";
 import { labelMateria, MATERIAS } from "@/lib/chile";
 import { JurisprudenciaSearch } from "@/components/JurisprudenciaSearch";
 import { requireStaff } from "@/lib/auth/session";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 export default async function JurisprudenciaPage({
   searchParams,
@@ -42,28 +43,23 @@ export default async function JurisprudenciaPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          Base doctrinal
-        </p>
-        <h1 className="display mt-2 text-4xl">Jurisprudencia</h1>
-        <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Consulte roles de Corte Suprema, Cortes de Apelaciones y Tribunal Constitucional.
-          Corpus demo incluido; conecte su fuente oficial o scraper en producción.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Base doctrinal"
+        title="Jurisprudencia"
+        subtitle="Consulte roles de Corte Suprema, Cortes de Apelaciones y Tribunal Constitucional. Corpus demo incluido; conecte su fuente oficial o scraper en producción."
+      />
 
       <JurisprudenciaSearch materias={[...MATERIAS]} />
 
       <div className="space-y-4">
         {items.map((j) => (
           <article key={j.id} className="panel rounded-3xl p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+            <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-[0.14em] text-[var(--copper)]">
                   {j.fuente} · {j.rol}
                 </div>
-                <h2 className="mt-1 text-xl font-semibold">
+                <h2 className="mt-1 break-words text-xl font-semibold">
                   {j.caratula || "Sin carátula"}
                 </h2>
                 <p className="mt-1 text-sm text-[var(--ink-soft)]/70">

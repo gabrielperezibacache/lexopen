@@ -5,6 +5,8 @@ import { decryptSecret, encryptSecret, maskRut, secretsKeySource } from "@/lib/p
 import {
   scrapeMisCausasWithClaveUnica,
   claveUnicaAutomationAllowed,
+  publicScrapeEnabled,
+  publicScrapeReady,
   type MisCausasItem,
 } from "@/lib/pjud/public-scrape";
 import {
@@ -13,6 +15,7 @@ import {
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
 import { enqueueDueSyncJobs, processPendingSyncJobs } from "@/lib/pjud/queue";
+import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 
 /**
  * Credenciales ClaveÚnica del estudio — paridad CausaMonitor
@@ -59,6 +62,74 @@ async function getOrCreateFirmSettings() {
 
 export async function getClaveUnicaStatus() {
   const { settings } = await getOrCreateFirmSettings();
+  const scrapeFlag = claveUnicaAutomationAllowed(settings.claveUnicaEnabled);
+  const sidecar = scraperSidecarConfigured();
+  const sidecarHealth = sidecar ? await probeScraperSidecarHealth() : null;
+  const publicScrape = publicScrapeEnabled();
+  const captcha = captchaSolverConfigured();
+  const blockers: string[] = [];
+  if (!settings.claveUnicaEnabled) {
+    blockers.push(
+      "La conexión está pausada. Pulse «Reanudar conexión» para volver a usarla."
+    );
+  }
+  if (!settings.claveUnicaRut || !settings.claveUnicaPasswordEnc) {
+    blockers.push(
+      "Todavía no hay RUT ni contraseña guardados. Complételos abajo (solo un administrador puede hacerlo)."
+    );
+  }
+  if (!scrapeFlag) {
+    blockers.push(
+      "En este servidor la consulta automática a ClaveÚnica está apagada. Pida a quien administra el Host que la active, o revise Configuración → PJUD."
+    );
+  }
+  const canUseSidecar = Boolean(
+    sidecarHealth?.reachable && sidecarHealth.scrapeReady !== false
+  );
+  const canUseInProcess = publicScrapeReady();
+  if (!canUseSidecar && !canUseInProcess) {
+    if (sidecar && !sidecarHealth?.reachable) {
+      blockers.push(
+        "El servicio auxiliar de consulta judicial no está en marcha. Arránquelo o pida ayuda al administrador del Host; mientras tanto LexOpen no puede entrar a Mis Causas."
+      );
+    } else if (
+      sidecar &&
+      sidecarHealth?.reachable &&
+      sidecarHealth.scrapeReady === false
+    ) {
+      blockers.push(
+        "El servicio auxiliar está encendido pero aún no puede consultar el Poder Judicial (falta el resolutor de CAPTCHA). Revise Integraciones → PJUD."
+      );
+    }
+    if (!publicScrape) {
+      blockers.push(
+        "Falta activar la consulta directa al Poder Judicial en el servidor. Revise Integraciones → PJUD o Configuración."
+      );
+    } else if (!captcha) {
+      blockers.push(
+        "Falta configurar el resolutor de CAPTCHA (necesario para entrar a la Oficina Judicial Virtual). Hágalo en Integraciones → PJUD."
+      );
+    } else if (!(sidecar && sidecarHealth?.reachable)) {
+      blockers.push(
+        "Falta el navegador automatizado (Chromium) en este Host. En el servidor ejecute la instalación de Chromium para PJUD y reinicie LexOpen."
+      );
+    }
+  }
+
+  let readinessLabel = "Listo para sincronizar";
+  let readinessHint =
+    "Puede traer sus causas desde la Oficina Judicial Virtual y actualizar el monitoreo.";
+  if (blockers.length) {
+    readinessLabel = "Aún no se puede sincronizar";
+    readinessHint = blockers[0];
+  }
+
+  const channelLabel = canUseSidecar
+    ? "Servicio auxiliar del Host"
+    : canUseInProcess
+      ? "Consulta directa desde LexOpen"
+      : "Sin canal de consulta";
+
   return {
     enabled: settings.claveUnicaEnabled,
     rutMasked: maskRut(settings.claveUnicaRut),
@@ -68,8 +139,16 @@ export async function getClaveUnicaStatus() {
     lastSyncAt: settings.claveUnicaLastSyncAt,
     lastSyncStatus: settings.claveUnicaLastSyncStatus,
     lastSyncNote: settings.claveUnicaLastSyncNote,
-    scrapeFlag: claveUnicaAutomationAllowed(settings.claveUnicaEnabled),
-    sidecar: scraperSidecarConfigured(),
+    scrapeFlag,
+    sidecar,
+    sidecarReachable: sidecarHealth?.reachable ?? false,
+    publicScrape,
+    captchaConfigured: captcha,
+    readyToSync: blockers.length === 0,
+    blockers,
+    readinessLabel,
+    readinessHint,
+    channelLabel,
   };
 }
 
@@ -98,7 +177,7 @@ export async function saveClaveUnicaCredentials(opts: {
       claveUnicaRut: storedRut,
       claveUnicaPasswordEnc: encryptSecret(opts.password),
       claveUnicaEnabled: opts.enabled ?? true,
-      claveUnicaLastSyncNote: "Credenciales actualizadas (AES-GCM).",
+      claveUnicaLastSyncNote: "Datos de acceso guardados de forma segura.",
     },
   });
 }
@@ -111,7 +190,7 @@ export async function clearClaveUnicaCredentials() {
       claveUnicaRut: null,
       claveUnicaPasswordEnc: null,
       claveUnicaEnabled: false,
-      claveUnicaLastSyncNote: "Credenciales ClaveÚnica eliminadas.",
+      claveUnicaLastSyncNote: "Se eliminaron los datos de ClaveÚnica de este estudio.",
       claveUnicaLastSyncStatus: "cleared",
     },
   });
@@ -148,6 +227,10 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
     const health = await probeScraperSidecarHealth();
     if (!health.reachable) {
       sidecarError = new Error(health.error || "sidecar no responde");
+    } else if (health.scrapeReady === false) {
+      sidecarError = new Error(
+        "sidecar arriba pero scrapeReady=false (CAPTCHA / PJUD_PUBLIC_SCRAPE en el worker)"
+      );
     } else {
       try {
         const fromSidecar = await fetchMisCausasFromSidecar({
@@ -196,11 +279,14 @@ async function findExistingCausa(item: MisCausasItem) {
     });
     if (byRuc) return byRuc;
   }
-  const byRitTribunal = await prisma.causa.findFirst({
-    where: { rit: item.rit, tribunal: item.tribunal },
-    select: { id: true },
-  });
-  if (byRitTribunal) return byRitTribunal;
+  // Prefer rit+tribunal. Do not fall back to rit-only when tribunal is known —
+  // the same RIT can exist in another tribunal and would link the wrong causa.
+  if (item.tribunal) {
+    return prisma.causa.findFirst({
+      where: { rit: item.rit, tribunal: item.tribunal },
+      select: { id: true },
+    });
+  }
   return prisma.causa.findFirst({
     where: { rit: item.rit },
     select: { id: true },
@@ -303,12 +389,52 @@ export async function syncMisCausas(opts?: {
     }));
   }
 
+  const syncFailed = syncResults.filter(
+    (r) => r.status === "failed" || r.status === "error"
+  ).length;
+  const syncOk = syncResults.length - syncFailed;
+  const insertedTotal = syncResults.reduce(
+    (sum, r) => sum + (r.inserted || 0),
+    0
+  );
+  let lastSyncStatus: string = "ok";
+  if (syncResults.length > 0 && syncFailed === syncResults.length) {
+    lastSyncStatus = "failed";
+  } else if (syncFailed > 0) {
+    lastSyncStatus = "partial";
+  }
+  const noteParts = [
+    `Se encontraron ${items.length} causa${items.length === 1 ? "" : "s"}`,
+    `${created.length} nueva${created.length === 1 ? "" : "s"}`,
+    `${linked.length} ya estaba${linked.length === 1 ? "" : "n"} en LexOpen`,
+  ];
+  if (enqueued) {
+    noteParts.push(
+      `${enqueued} puesta${enqueued === 1 ? "" : "s"} en cola para actualizar movimientos`
+    );
+  }
+  if (syncResults.length) {
+    if (syncFailed === 0) {
+      noteParts.push(
+        `movimientos al día (+${insertedTotal} nuevo${insertedTotal === 1 ? "" : "s"})`
+      );
+    } else if (syncOk === 0) {
+      noteParts.push(
+        `no se pudieron actualizar los movimientos (${syncFailed} con error)`
+      );
+    } else {
+      noteParts.push(
+        `${syncOk} actualizadas bien, ${syncFailed} con error (+${insertedTotal} movimientos nuevos)`
+      );
+    }
+  }
+
   await prisma.firmSettings.update({
     where: { id: settings.id },
     data: {
       claveUnicaLastSyncAt: new Date(),
-      claveUnicaLastSyncStatus: "ok",
-      claveUnicaLastSyncNote: `Mis Causas: ${items.length} listadas · ${created.length} nuevas · ${linked.length} ya existentes · encoladas ${enqueued}.`,
+      claveUnicaLastSyncStatus: lastSyncStatus,
+      claveUnicaLastSyncNote: `${noteParts.join(". ")}.`,
     },
   });
 
@@ -317,6 +443,9 @@ export async function syncMisCausas(opts?: {
     created: created.length,
     linked: linked.length,
     enqueued,
+    syncOk,
+    syncFailed,
+    inserted: insertedTotal,
     items,
     syncResults,
   };

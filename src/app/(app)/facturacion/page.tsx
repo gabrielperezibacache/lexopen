@@ -104,7 +104,7 @@ export default async function FacturacionPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <h2 className="text-lg font-semibold">Facturas recientes</h2>
             <Link href="/facturacion/facturas" className="text-sm text-[var(--sea)]">
               Ver todas
@@ -115,15 +115,15 @@ export default async function FacturacionPage() {
               <Link
                 key={inv.id}
                 href={`/facturacion/facturas/${inv.id}`}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-4 py-3"
+                className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] px-4 py-3 sm:items-center"
               >
-                <div>
+                <div className="min-w-0">
                   <div className="font-medium">{inv.number}</div>
-                  <div className="text-sm text-[var(--ink-soft)]/70">
+                  <div className="break-words text-sm text-[var(--ink-soft)]/70">
                     {inv.cliente.razonSocial} · {inv.causa?.rit || "Sin causa"}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <div className="font-semibold">{clp(inv.totalClp)}</div>
                   <StatusBadge
                     estado={
@@ -151,7 +151,7 @@ export default async function FacturacionPage() {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <h2 className="text-lg font-semibold">Horas recientes</h2>
             <Link href="/facturacion/horas" className="text-sm text-[var(--sea)]">
               Registrar

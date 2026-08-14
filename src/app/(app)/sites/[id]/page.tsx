@@ -74,7 +74,7 @@ export default async function SiteOverviewPage({ params }: Params) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <h2 className="font-semibold">Tareas</h2>
             <Link href={`/sites/${site.id}/tareas`} className="text-sm text-[var(--sea)]">
               Ver
@@ -111,7 +111,7 @@ export default async function SiteOverviewPage({ params }: Params) {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <h2 className="font-semibold">Archivos recientes</h2>
             <Link href={`/sites/${site.id}/archivos`} className="text-sm text-[var(--sea)]">
               Data room
@@ -138,7 +138,7 @@ export default async function SiteOverviewPage({ params }: Params) {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <h2 className="font-semibold">iSheets</h2>
             <Link href={`/sites/${site.id}/isheets`} className="text-sm text-[var(--sea)]">
               Abrir

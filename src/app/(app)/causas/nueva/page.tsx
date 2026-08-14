@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { PageHeader } from "@/components/sites/SiteNav";
 import {
   MATERIAS,
   ETAPAS,
@@ -124,19 +125,14 @@ function NuevaCausaInner() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          Alta de litigio
-        </p>
-        <h1 className="display mt-2 text-4xl">Nueva causa</h1>
-      </div>
+      <PageHeader eyebrow="Alta de litigio" title="Nueva causa" />
 
       <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
         <div>
           <label className="mb-1 block text-sm font-medium">Título</label>
           <input className="input" name="titulo" required placeholder="Ej. Cobro de pesos — contrato" />
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium">RIT</label>
             <input className="input" name="rit" placeholder="C-1234-2026" />

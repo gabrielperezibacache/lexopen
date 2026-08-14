@@ -6,6 +6,7 @@ import { isCliente, isStaff } from "@/lib/auth/rbac";
 import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
 import { EmptyState } from "@/components/EmptyState";
 import { labelTramiteEstado } from "@/lib/tramites";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 export default async function PortalPage() {
   const user = await requireUser();
@@ -64,18 +65,18 @@ export default async function PortalPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          Experiencia cliente
-        </p>
-        <h1 className="display mt-2 text-4xl">Portal del cliente</h1>
-        <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-          Documentos compartidos, hitos y Q&A.{" "}
-          {isCliente(user.role)
-            ? "Solo ve espacios donde es miembro."
-            : "Vista previa staff (espacios visibles al cliente)."}
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Experiencia cliente"
+        title="Portal del cliente"
+        subtitle={
+          <>
+            Documentos compartidos, hitos y Q&A.{" "}
+            {isCliente(user.role)
+              ? "Solo ve espacios donde es miembro."
+              : "Vista previa staff (espacios visibles al cliente)."}
+          </>
+        }
+      />
 
       {isCliente(user.role) && (
         <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
@@ -98,13 +99,13 @@ export default async function PortalPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           {sites.map((s) => (
             <article key={s.id} className="panel rounded-3xl p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
                   <div className="text-xs uppercase tracking-[0.14em] text-[var(--ink-soft)]/55">
                     {s.cliente?.razonSocial || "Cliente"}
                   </div>
-                  <h2 className="mt-1 text-xl font-semibold">{s.name}</h2>
-                  <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                  <h2 className="mt-1 break-words text-xl font-semibold">{s.name}</h2>
+                  <p className="mt-1 break-words text-sm text-[var(--ink-soft)]/70">
                     {s.causa?.rit || s.tipo} · {s.causa?.tribunal || "Portal"}
                   </p>
                 </div>
@@ -112,7 +113,7 @@ export default async function PortalPage() {
               </div>
 
               <div className="mt-5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Documentos compartidos</h3>
                   <Link href={`/sites/${s.id}/archivos`} className="text-xs text-[var(--sea)]">
                     Ver archivos
@@ -168,7 +169,7 @@ export default async function PortalPage() {
               )}
 
               <div className="mt-5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Q&A abiertas</h3>
                   <Link href={`/sites/${s.id}/qa`} className="text-xs text-[var(--sea)]">
                     Ir a Q&A

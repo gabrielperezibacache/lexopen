@@ -10,6 +10,7 @@ import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { requireStaff } from "@/lib/auth/session";
 import { confidentialWhere } from "@/lib/api";
 import { documentoListSelect } from "@/lib/sites/file-select";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 export default async function DocumentosPage() {
   const user = await requireStaff();
@@ -44,22 +45,16 @@ export default async function DocumentosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            Repositorio por causa
-          </p>
-          <h1 className="display mt-2 text-4xl">Documentos</h1>
-          <p className="mt-2 text-[var(--ink-soft)]/80">
-            Incorporación de escritos, carpetas investigativas y memos vinculados a causas —
-            con extracción Markdown/OCR para el copiloto IA, Obsidian y Google Drive. El VDR
-            por espacio está en Espacios → Archivos.
-          </p>
-        </div>
-        <Link className="btn btn-secondary" href="/agente?utility=doc_qa">
-          Preguntar con IA
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Repositorio por causa"
+        title="Documentos"
+        subtitle="Incorporación de escritos, carpetas investigativas y memos vinculados a causas — con extracción Markdown/OCR para el copiloto IA, Obsidian y Google Drive. El VDR por espacio está en Espacios → Archivos."
+        actions={
+          <Link className="btn btn-secondary" href="/agente?utility=doc_qa">
+            Preguntar con IA
+          </Link>
+        }
+      />
 
       <DocumentOcrStatus />
       <DocumentoIngestForm causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))} />
@@ -73,6 +68,7 @@ export default async function DocumentosPage() {
         />
       ) : (
         <div className="panel overflow-hidden rounded-3xl">
+          <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[var(--ink)] text-white/90">
               <tr>
@@ -170,6 +166,7 @@ export default async function DocumentosPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

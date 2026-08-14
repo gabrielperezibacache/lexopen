@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { httpError } from "@/lib/auth/access";
 import {
   diasEntre,
   semaforoPorDiasSinMovimiento,
@@ -151,7 +152,7 @@ export async function syncCausaPjud(
         },
       }),
     ]);
-    throw e;
+    throw httpError(note, 502);
   }
 
   if (fetchResult.provider === "none") {
@@ -482,6 +483,11 @@ export async function retryFallidos(opts?: {
 
 export function providerStatusPublic() {
   const captcha = captchaSolverStatusPublic();
+  const cuFlag = process.env.PJUD_CLAVEUNICA_SCRAPE?.trim();
+  // Sync helper cannot see UI opt-in; async version overlays FirmSettings.
+  // Kill-switch (0) is always OFF; flag=1 is ON; absent is "opt-in pending".
+  const claveUnicaScrapeEnabled =
+    cuFlag === "0" ? false : cuFlag === "1" ? true : false;
   return {
     apiConfigured: pjudProviderConfigured(),
     scraperSidecarConfigured: scraperSidecarConfigured(),
@@ -489,7 +495,8 @@ export function providerStatusPublic() {
     publicScrapeReady: publicScrapeReady(),
     captchaConfigured: captchaSolverConfigured(),
     captcha,
-    claveUnicaScrapeEnabled: process.env.PJUD_CLAVEUNICA_SCRAPE === "1",
+    claveUnicaScrapeEnabled,
+    claveUnicaEnv: cuFlag ?? null,
     liveIngestConfigured: pjudLiveIngestConfigured(),
     webhookConfigured: pjudWebhookConfigured(),
     pdfBackupEnabled: pdfBackupEnabled(),
@@ -501,15 +508,15 @@ export function providerStatusPublic() {
     syncIntervalMinutes: Math.round(pjudSyncIntervalMs() / 60000),
     honesty: pjudLiveIngestConfigured()
       ? scraperSidecarConfigured()
-        ? "Sidecar configurado (PJUD_SCRAPER_URL). Vault ClaveÚnica en Postgres local; OJV/CAPTCHA son APIs externas OK."
+        ? "La consulta en vivo está disponible mediante el servicio auxiliar del Host. Su ClaveÚnica se guarda cifrada aquí; la Oficina Judicial Virtual y el CAPTCHA se consultan por internet."
         : publicScrapeReady()
-          ? `Scrape OJV in-process (${captcha.provider || "CAPTCHA"} BYOK). Vault ClaveÚnica local.`
+          ? `La consulta en vivo está disponible desde LexOpen (${captcha.provider || "CAPTCHA"} configurado). Su ClaveÚnica permanece cifrada en este servidor.`
           : pjudProviderConfigured()
-            ? "Partner API externa activa (PJUD_API_URL). Datos y vault siguen en su host."
-            : "Ingest live listo."
+            ? "La consulta en vivo usa una API de socio externo. Sus datos y ClaveÚnica siguen en su Host."
+            : "La consulta en vivo está lista."
       : captcha.configError
-        ? `Sin ingest live: ${captcha.configError} Alternativa: CSV/demo/partner. LexOpen corre en su host.`
-        : "Sin ingest live: configure sidecar, scrape+CAPTCHA (nopecha free u otro BYOK), partner API o CSV. LexOpen corre en su host (no SaaS CausaMonitor); APIs externas sí están permitidas.",
+        ? `Aún no hay consulta en vivo: ${captcha.configError} Mientras tanto puede importar por CSV o modo demo. LexOpen sigue corriendo en su Host.`
+        : "Aún no hay consulta en vivo. Configure el servicio auxiliar, la consulta directa con CAPTCHA, una API de socio o importe por CSV. LexOpen corre en su Host; solo las consultas al Poder Judicial o CAPTCHA salen a internet.",
   };
 }
 
@@ -529,11 +536,11 @@ export async function providerStatusPublicAsync() {
   let honesty = base.honesty;
   if (sidecar.configured && !sidecar.reachable) {
     honesty = publicScrapeReady()
-      ? "Sidecar (PJUD_SCRAPER_URL) no responde; se usará scrape OJV in-process. Arranque `npm run pjud:scraper` o quite esa URL del .env del Host."
-      : "Sidecar configurado pero no responde. Arranque `npm run pjud:scraper`, o active PJUD_PUBLIC_SCRAPE=1 + CAPTCHA.";
+      ? "El servicio auxiliar no responde; LexOpen usará la consulta directa. Pida al administrador del Host que lo arranque, o revise Integraciones → PJUD."
+      : "El servicio auxiliar está configurado pero apagado. Arránquelo en el Host, o active la consulta directa con CAPTCHA (Integraciones → PJUD).";
   } else if (sidecar.configured && sidecar.reachable) {
     honesty =
-      "Sidecar en su host activo (PJUD_SCRAPER_URL). Vault ClaveÚnica en Postgres local; OJV/CAPTCHA son APIs externas OK.";
+      "El servicio auxiliar del Host está activo. Su ClaveÚnica se guarda cifrada aquí; la Oficina Judicial Virtual y el CAPTCHA se consultan por internet.";
   }
   return {
     ...base,

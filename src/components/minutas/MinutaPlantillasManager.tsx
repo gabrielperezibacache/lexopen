@@ -69,7 +69,7 @@ export function MinutaPlantillasManager({
           Cree plantillas reutilizables para audiencias, reuniones y llamadas.
         </p>
       </div>
-      <form onSubmit={create} className="grid gap-3 md:grid-cols-4">
+      <form onSubmit={create} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <input className="input" name="tipo" required placeholder="Tipo" />
         <input className="input" name="nombre" required placeholder="Nombre" />
         <input className="input" name="materia" placeholder="Materia" />

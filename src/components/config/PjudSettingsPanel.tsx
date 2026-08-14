@@ -56,16 +56,16 @@ export function PjudSettingsPanel() {
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">PJUD / monitoreo judicial</h2>
+          <h2 className="text-lg font-semibold">Seguimiento judicial (PJUD)</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-            Valores efectivos del entorno (solo lectura). Cámbielos en{" "}
-            <code>.env</code> del Host y reinicie. Credenciales y sync
-            ClaveÚnica se gestionan en Mis Causas.
+            Vista técnica del servidor (solo lectura). Para guardar ClaveÚnica y
+            sincronizar causas use Mis Causas. Los cambios de configuración del
+            Host se hacen en el archivo de entorno y requieren reinicio.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/causas/mis-causas" className="btn btn-secondary text-sm">
-            Mis Causas CU
+            Mis Causas
           </Link>
           <Link href="/causas/monitoreo" className="btn btn-ghost text-sm">
             Monitoreo
@@ -81,48 +81,71 @@ export function PjudSettingsPanel() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-[var(--line)] p-4">
-          <h3 className="font-semibold">Ingest / conectores</h3>
-          <Row label="Partner API" value={yn(pjud.apiConfigured)} hint="PJUD_API_URL" />
+          <h3 className="font-semibold">Cómo se consulta el PJUD</h3>
           <Row
-            label="Sidecar scrape"
+            label="API de socio"
+            value={yn(pjud.apiConfigured)}
+            hint="Variable PJUD_API_URL en el Host"
+          />
+          <Row
+            label="Servicio auxiliar"
             value={
               !pjud.sidecar?.configured
-                ? "no config"
+                ? "no usado"
                 : pjud.sidecar.reachable
                   ? pjud.sidecar.scrapeReady
-                    ? "ready"
-                    : "up"
-                  : "down"
+                    ? "listo"
+                    : "encendido"
+                  : "apagado"
             }
-            hint="PJUD_SCRAPER_URL"
+            hint="Variable PJUD_SCRAPER_URL en el Host"
           />
-          <Row label="Scrape OJV" value={yn(Boolean(pjud.publicScrapeReady))} hint="PJUD_PUBLIC_SCRAPE" />
-          <Row label="Ingest live" value={yn(Boolean(pjud.liveIngestConfigured))} />
-          <Row label="Webhook" value={yn(Boolean(pjud.webhookConfigured))} hint="PJUD_WEBHOOK_SECRET" />
-          <Row label="Demo PJUD" value={yn(Boolean(pjud.demoAllowed))} hint="PJUD_ALLOW_DEMO" />
-          <Row label="Backup PDF" value={yn(Boolean(pjud.pdfBackupEnabled))} hint="PJUD_PDF_BACKUP" />
+          <Row
+            label="Consulta directa OJV"
+            value={yn(Boolean(pjud.publicScrapeReady))}
+            hint="Variable PJUD_PUBLIC_SCRAPE"
+          />
+          <Row
+            label="Consulta en vivo"
+            value={yn(Boolean(pjud.liveIngestConfigured))}
+          />
+          <Row
+            label="Webhook"
+            value={yn(Boolean(pjud.webhookConfigured))}
+            hint="Variable PJUD_WEBHOOK_SECRET"
+          />
+          <Row
+            label="Modo demo"
+            value={yn(Boolean(pjud.demoAllowed))}
+            hint="Variable PJUD_ALLOW_DEMO"
+          />
+          <Row
+            label="Respaldo PDF"
+            value={yn(Boolean(pjud.pdfBackupEnabled))}
+            hint="Variable PJUD_PDF_BACKUP"
+          />
         </div>
 
         <div className="rounded-2xl border border-[var(--line)] p-4">
-          <h3 className="font-semibold">CAPTCHA (BYOK)</h3>
+          <h3 className="font-semibold">Resolutor de CAPTCHA</h3>
           <Row
             label="Proveedor"
-            value={pjud.captcha?.provider || (pjud.captchaConfigured ? "on" : "off")}
-            hint="CAPTCHA_SOLVER_PROVIDER"
+            value={pjud.captcha?.provider || (pjud.captchaConfigured ? "activo" : "no")}
+            hint="Variable CAPTCHA_SOLVER_PROVIDER"
           />
           <Row
-            label="API key"
-            value={pjud.captcha?.keyPresent ? "configurada" : "no"}
-            hint="CAPTCHA_SOLVER_API_KEY (valor oculto)"
+            label="Clave API"
+            value={pjud.captcha?.keyPresent ? "configurada" : "falta"}
+            hint="Variable CAPTCHA_SOLVER_API_KEY (oculta)"
           />
           <Row
-            label="Free tier"
+            label="Plan gratuito"
             value={yn(Boolean(pjud.captcha?.freeTier))}
           />
           <Row
-            label="Fallback"
+            label="Respaldo"
             value={pjud.captcha?.fallbacks?.join(" → ") || "—"}
-            hint="CAPTCHA_SOLVER_FALLBACK"
+            hint="Variable CAPTCHA_SOLVER_FALLBACK"
           />
           {pjud.captcha?.configError && (
             <p className="mt-2 text-xs text-rose-700">{pjud.captcha.configError}</p>
@@ -154,19 +177,30 @@ export function PjudSettingsPanel() {
 
         <div className="rounded-2xl border border-[var(--line)] p-4">
           <h3 className="font-semibold">ClaveÚnica del estudio</h3>
-          <Row label="Habilitada" value={yn(claveUnica.enabled)} />
-          <Row label="RUT" value={claveUnica.rutMasked || "—"} />
-          <Row label="Password vault" value={claveUnica.passwordSet ? "cifrada" : "no"} />
+          <Row label="Conexión activa" value={yn(claveUnica.enabled)} />
+          <Row label="RUT guardado" value={claveUnica.rutMasked || "—"} />
           <Row
-            label="Automatización CU"
-            value={yn(claveUnica.scrapeAllowed ?? claveUnica.scrapeEnvEnabled)}
-            hint="Credenciales en Mis Causas; PJUD_CLAVEUNICA_SCRAPE=0 la bloquea"
+            label="Contraseña"
+            value={claveUnica.passwordSet ? "guardada (cifrada)" : "no"}
           />
           <Row
-            label="Último sync"
+            label="Consulta automática"
+            value={yn(claveUnica.scrapeAllowed ?? claveUnica.scrapeEnvEnabled)}
+            hint="Se gestiona en Mis Causas; el administrador del Host puede bloquearla"
+          />
+          <Row
+            label="Última sincronización"
             value={
               claveUnica.lastSyncAt
-                ? `${claveUnica.lastSyncStatus || "—"} · ${new Date(claveUnica.lastSyncAt).toLocaleString("es-CL")}`
+                ? `${
+                    claveUnica.lastSyncStatus === "ok"
+                      ? "correcta"
+                      : claveUnica.lastSyncStatus === "partial"
+                        ? "parcial"
+                        : claveUnica.lastSyncStatus === "failed"
+                          ? "con errores"
+                          : claveUnica.lastSyncStatus || "—"
+                  } · ${new Date(claveUnica.lastSyncAt).toLocaleString("es-CL")}`
                 : "—"
             }
           />
@@ -174,7 +208,7 @@ export function PjudSettingsPanel() {
             <p className="mt-2 text-xs text-[var(--ink-soft)]/70">{claveUnica.lastSyncNote}</p>
           )}
           <Link href={claveUnica.manageHref} className="btn btn-secondary mt-4 inline-flex text-sm">
-            Editar ClaveÚnica
+            Abrir Mis Causas
           </Link>
         </div>
       </div>

@@ -33,7 +33,7 @@ export function UfRateForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid gap-3 rounded-3xl p-5 md:grid-cols-4">
+    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4">
       <input className="input" type="date" name="date" required />
       <input className="input" type="number" name="valueClp" min="1" required placeholder="UF en CLP" />
       <input className="input" name="source" placeholder="Fuente" defaultValue="manual" />

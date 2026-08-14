@@ -76,21 +76,23 @@ export function IntegrationsOverviewPanel() {
         },
         {
           id: "pjud",
-          title: "PJUD / APIs judiciales",
+          title: "Seguimiento judicial",
           ok: Boolean(
             captcha?.liveIngestConfigured ||
               captcha?.sidecar?.configured ||
               captcha?.captcha?.configured
           ),
           status: captcha?.liveIngestConfigured
-            ? "Ingest live"
+            ? "Consulta en vivo lista"
             : captcha?.sidecar?.configured
-              ? `Sidecar ${captcha.sidecar.reachable ? "up" : "down"}`
+              ? captcha.sidecar.reachable
+                ? "Servicio auxiliar activo"
+                : "Servicio auxiliar apagado"
               : captcha?.captcha?.configured
-                ? `CAPTCHA ${captcha.captcha.provider || "on"}`
-                : "Sin ingest live",
+                ? `CAPTCHA ${captcha.captcha.provider || "activo"}`
+                : "Sin consulta en vivo",
           detail:
-            "Partner API (PJUD_API_URL), scraper sidecar (PJUD_SCRAPER_URL) o scrape OJV + CAPTCHA BYOK.",
+            "Oficina Judicial Virtual, ClaveÚnica y CAPTCHA. Configure en Mis Causas e Integraciones.",
           href: "/integraciones",
         },
       ];
@@ -125,7 +127,7 @@ export function IntegrationsOverviewPanel() {
       {!cards ? (
         <p className="text-sm text-[var(--ink-soft)]/65">Cargando estado…</p>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {cards.map((card) => (
             <a
               key={card.id}

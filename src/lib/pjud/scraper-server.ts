@@ -167,9 +167,18 @@ export function createScraperServer() {
         if (!rut || !password) {
           return send(res, 400, { error: "rut y password requeridos" });
         }
-        process.env.PJUD_CLAVEUNICA_SCRAPE =
-          process.env.PJUD_CLAVEUNICA_SCRAPE || "1";
-        const causas = await scrapeMisCausasWithClaveUnica({ rut, password });
+        // Respect explicit kill-switch; otherwise allow when absent (sidecar is opted-in by call).
+        if (process.env.PJUD_CLAVEUNICA_SCRAPE?.trim() === "0") {
+          return send(res, 409, {
+            error:
+              "Automatización ClaveÚnica deshabilitada (PJUD_CLAVEUNICA_SCRAPE=0).",
+          });
+        }
+        const causas = await scrapeMisCausasWithClaveUnica({
+          rut,
+          password,
+          optedIn: true,
+        });
         return send(res, 200, { causas });
       }
 

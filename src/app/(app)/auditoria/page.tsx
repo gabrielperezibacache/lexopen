@@ -87,7 +87,7 @@ export default async function AuditoriaPage({ searchParams }: Props) {
             ))}
           </select>
         </label>
-        <label className="min-w-[200px] flex-1 text-sm">
+        <label className="w-full min-w-0 flex-1 text-sm sm:min-w-[200px]">
           <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">Buscar</span>
           <input
             className="input"
@@ -113,6 +113,7 @@ export default async function AuditoriaPage({ searchParams }: Props) {
         />
       ) : (
         <div className="panel overflow-hidden rounded-3xl">
+          <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[var(--ink)] text-white/90">
               <tr>
@@ -149,6 +150,7 @@ export default async function AuditoriaPage({ searchParams }: Props) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

@@ -88,8 +88,8 @@ export default async function ClienteDetailPage({
         <Link href="/clientes" className="text-sm text-[var(--sea)]">
           ← Clientes
         </Link>
-        <h1 className="display mt-2 text-4xl">{cliente.razonSocial}</h1>
-        <p className="mt-2 text-[var(--ink-soft)]/80">
+        <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">{cliente.razonSocial}</h1>
+        <p className="mt-2 break-words text-[var(--ink-soft)]/80">
           {cliente.rut || "Sin RUT"} · {cliente.tipo} ·{" "}
           {cliente.abogado?.name || "Sin abogado asignado"}
         </p>

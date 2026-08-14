@@ -11,6 +11,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
+import { PageHeader } from "@/components/sites/SiteNav";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -129,27 +130,21 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            Inicio del estudio
-          </p>
-          <h1 className="display mt-2 text-2xl sm:text-3xl md:text-4xl">
-            {user ? `Hola, ${user.name.split(" ")[0]}` : "Inicio"}
-          </h1>
-          <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Clientes, causas, trámites pendientes, minutas y actividad del estudio.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/clientes" className="btn btn-secondary">
-            Clientes
-          </Link>
-          <Link href="/causas/nueva" className="btn btn-primary">
-            Nueva causa <ArrowRight size={16} />
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Inicio del estudio"
+        title={user ? `Hola, ${user.name.split(" ")[0]}` : "Inicio"}
+        subtitle="Clientes, causas, trámites pendientes, minutas y actividad del estudio."
+        actions={
+          <>
+            <Link href="/clientes" className="btn btn-secondary">
+              Clientes
+            </Link>
+            <Link href="/causas/nueva" className="btn btn-primary">
+              Nueva causa <ArrowRight size={16} />
+            </Link>
+          </>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(({ label, value, icon: Icon, href }) => (
@@ -158,14 +153,14 @@ export default async function DashboardPage() {
               <span className="text-sm text-[var(--ink-soft)]/70">{label}</span>
               <Icon size={18} className="text-[var(--copper)]" />
             </div>
-            <div className="display mt-3 text-4xl">{value}</div>
+            <div className="display mt-3 text-3xl sm:text-4xl">{value}</div>
           </Link>
         ))}
       </div>
 
       <section className="panel rounded-3xl p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold">Trámites a seguir</h2>
             <p className="text-sm text-[var(--ink-soft)]/70">
               {tramitesPendientesCount} abiertos
@@ -185,11 +180,11 @@ export default async function DashboardPage() {
               <Link
                 key={t.id}
                 href={tramiteHref(t)}
-                className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+                className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
-                <div>
-                  <div className="font-medium">{t.titulo}</div>
-                  <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                <div className="min-w-0">
+                  <div className="break-words font-medium">{t.titulo}</div>
+                  <div className="mt-1 break-words text-sm text-[var(--ink-soft)]/70">
                     {t.causa.cliente?.razonSocial || "Sin cliente"} ·{" "}
                     {t.causa.rit || t.causa.titulo}
                     {t.fechaLimite ? ` · ${formatDate(t.fechaLimite)}` : ""}
@@ -215,7 +210,7 @@ export default async function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <h2 className="text-lg font-semibold">Espacios recientes</h2>
             <Link href="/sites" className="text-sm text-[var(--sea)]">
               Todos
@@ -250,7 +245,7 @@ export default async function DashboardPage() {
         </section>
 
         <section className="panel rounded-3xl p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <h2 className="text-lg font-semibold">Mis tareas</h2>
             <Link href="/tareas" className="text-sm text-[var(--sea)]">
               Ver todas
@@ -261,11 +256,11 @@ export default async function DashboardPage() {
               <Link
                 key={t.id}
                 href={t.siteId ? `/sites/${t.siteId}/tareas` : "/tareas"}
-                className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+                className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
-                <div>
-                  <div className="font-medium">{t.title}</div>
-                  <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                <div className="min-w-0">
+                  <div className="break-words font-medium">{t.title}</div>
+                  <div className="mt-1 break-words text-sm text-[var(--ink-soft)]/70">
                     {t.site?.name || "—"} · {formatDate(t.dueDate)}
                   </div>
                 </div>
@@ -287,7 +282,7 @@ export default async function DashboardPage() {
       </div>
 
       <section className="panel rounded-3xl p-5">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <h2 className="text-lg font-semibold">Minutas recientes</h2>
           <Link href="/minutas" className="text-sm text-[var(--sea)]">
             Ver todas

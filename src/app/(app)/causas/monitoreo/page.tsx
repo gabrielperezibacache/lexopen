@@ -185,19 +185,22 @@ export default function MonitoreoCausasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
             Seguimiento judicial
           </p>
-          <h1 className="display mt-2 text-4xl">Monitoreo de causas</h1>
-          <p className="mt-2 max-w-2xl text-[var(--ink-soft)]/80">
-            Cartera en su host con semáforos, sync y cola — paridad de flujo
-            CausaMonitor. Puede llamar OJV/CAPTCHA/partner; los datos y el vault
-            quedan aquí (scrape / sidecar / ClaveÚnica / CSV).
+          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Monitoreo de causas</h1>
+          <p className="mt-2 max-w-2xl text-sm text-[var(--ink-soft)]/80 sm:text-base">
+            Vea el estado de su cartera, sincronice movimientos y revise fallos.
+            Las causas con ClaveÚnica se importan desde{" "}
+            <Link href="/causas/mis-causas" className="text-[var(--sea)]">
+              Mis Causas
+            </Link>
+            ; los datos quedan en su Host.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
           <Link
             className="btn btn-secondary"
             href="/api/causas/monitoreo?format=csv"
@@ -261,46 +264,49 @@ export default function MonitoreoCausasPage() {
       </div>
 
       {provider?.honesty && (
-        <p
+        <div
           className={`rounded-2xl border px-4 py-3 text-sm ${
             provider.liveIngestConfigured
-              ? "border-[var(--line)] bg-white/70 text-[var(--copper)]"
+              ? "border-[var(--line)] bg-white/70 text-[var(--ink-soft)]/85"
               : "border-rose-300/60 bg-rose-50 text-rose-900"
           }`}
         >
           {!provider.liveIngestConfigured && (
-            <strong className="mr-1">Ingest live no listo (fail-closed).</strong>
+            <p className="mb-1 font-semibold">
+              Aún no se pueden traer movimientos en vivo desde el Poder Judicial.
+            </p>
           )}
-          {provider.honesty}
-          {provider.syncIntervalMinutes
-            ? ` Intervalo: cada ${provider.syncIntervalMinutes} min.`
-            : ""}
-          {" · "}
-          API {provider.apiConfigured ? "ON" : "OFF"} · Sidecar{" "}
-          {provider.sidecar?.configured
-            ? provider.sidecar.reachable
-              ? `ON (${provider.sidecar.urlHost || "local"}${
-                  provider.sidecar.scrapeReady ? ", ready" : ""
-                })`
-              : `DOWN${provider.sidecar.error ? `: ${provider.sidecar.error}` : ""}`
-            : provider.scraperSidecarConfigured
-              ? "ON"
-              : "OFF"}{" "}
-          · Scrape {provider.publicScrapeReady ? "ON" : "OFF"} · CAPTCHA{" "}
-          {provider.captchaConfigured
-            ? `${provider.captcha?.provider || "on"}${
-                provider.captcha?.freeTier ? " free" : ""
-              }${provider.captcha?.keyPresent ? "+key" : ""}${
-                provider.captcha?.fallbacks?.length
-                  ? ` → ${provider.captcha.fallbacks.join(",")}`
-                  : ""
-              }`
-            : provider.captcha?.configError
-              ? "misconfig"
-              : "OFF"}{" "}
-          · ClaveÚnica {provider.claveUnicaScrapeEnabled ? "ON" : "OFF"}
-          {provider.pdfBackupEnabled ? " · PDF backup ON" : ""}
-        </p>
+          <p>{provider.honesty}</p>
+          <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-90">
+            <span>
+              Consulta en vivo:{" "}
+              {provider.liveIngestConfigured ? "disponible" : "no disponible"}
+            </span>
+            <span>
+              Servicio auxiliar:{" "}
+              {!provider.sidecar?.configured
+                ? "no usado"
+                : provider.sidecar.reachable
+                  ? provider.sidecar.scrapeReady
+                    ? "listo"
+                    : "encendido"
+                  : "apagado"}
+            </span>
+            <span>
+              CAPTCHA:{" "}
+              {provider.captchaConfigured
+                ? provider.captcha?.provider || "activo"
+                : "pendiente"}
+            </span>
+            <span>
+              ClaveÚnica:{" "}
+              {provider.claveUnicaScrapeEnabled ? "permitida" : "no activa"}
+            </span>
+            {provider.syncIntervalMinutes ? (
+              <span>Revisión cada {provider.syncIntervalMinutes} min</span>
+            ) : null}
+          </p>
+        </div>
       )}
       {provider?.captcha?.configError && (
         <p className="rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -363,33 +369,35 @@ export default function MonitoreoCausasPage() {
         </section>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            ["todas", "Todas"],
-            ["monitoreadas", "Monitoreadas"],
-            ["fallidas", "Fallidas"],
-            ["verde", "Al día"],
-            ["amarillo", "Amarillas"],
-            ["rojo", "Rojas"],
-            ["gris", "Sin datos"],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            className={`rounded-full border px-3 py-1 text-sm ${
-              filter === key
-                ? "border-[var(--sea)] bg-[var(--sea)]/10 text-[var(--ink)]"
-                : "border-[var(--line)] text-[var(--ink-soft)]/75"
-            }`}
-            onClick={() => setFilter(key)}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["todas", "Todas"],
+              ["monitoreadas", "Monitoreadas"],
+              ["fallidas", "Fallidas"],
+              ["verde", "Al día"],
+              ["amarillo", "Amarillas"],
+              ["rojo", "Rojas"],
+              ["gris", "Sin datos"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={`rounded-full border px-3 py-1 text-sm ${
+                filter === key
+                  ? "border-[var(--sea)] bg-[var(--sea)]/10 text-[var(--ink)]"
+                  : "border-[var(--line)] text-[var(--ink-soft)]/75"
+              }`}
+              onClick={() => setFilter(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <input
-          className="input ml-auto max-w-xs"
+          className="input w-full max-w-xs sm:ml-auto"
           placeholder="Buscar RIT, título, sala, cliente…"
           value={q}
           onChange={(e) => setQ(e.target.value)}

@@ -61,7 +61,7 @@ export default async function SitesPage() {
                 <span className="mt-1 h-3 w-3 rounded-full" style={{ background: s.color }} />
                 <span className="badge badge-ink">{tipoLabel[s.tipo] || s.tipo}</span>
               </div>
-              <h2 className="mt-3 text-xl font-semibold group-hover:text-[var(--sea)]">{s.name}</h2>
+              <h2 className="mt-3 break-words text-xl font-semibold group-hover:text-[var(--sea)]">{s.name}</h2>
               <p className="mt-2 line-clamp-2 text-sm text-[var(--ink-soft)]/75">
                 {s.description || "Sin descripción"}
               </p>

@@ -42,7 +42,7 @@ export function FeeForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid gap-3 rounded-3xl p-5 md:grid-cols-3">
+    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-3">
       <input className="input md:col-span-2" name="name" required placeholder="Nombre de la condición" />
       <select className="select" value={tipo} onChange={(e) => setTipo(e.target.value)} name="tipo">
         {FEE_TIPOS.map((f) => (

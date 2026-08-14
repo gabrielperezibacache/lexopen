@@ -103,13 +103,13 @@ export default async function CausaDetailPage({ params }: Params) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <Link href="/causas" className="text-sm text-[var(--sea)]">
             ← Causas
           </Link>
-          <h1 className="display mt-2 text-4xl">{causa.titulo}</h1>
-          <p className="mt-2 text-[var(--ink-soft)]/80">
+          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">{causa.titulo}</h1>
+          <p className="mt-2 break-words text-[var(--ink-soft)]/80">
             {causa.caratula || "Sin carátula"} · {causa.rit || "Sin RIT"}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -289,9 +289,9 @@ export default async function CausaDetailPage({ params }: Params) {
         />
       </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="panel rounded-3xl p-5 md:col-span-2">
-          <div className="flex items-center justify-between gap-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="panel rounded-3xl p-5 sm:col-span-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Minutas del expediente</h2>
             <Link href="/minutas" className="text-sm text-[var(--sea)]">
               Ver todas
@@ -404,9 +404,9 @@ export default async function CausaDetailPage({ params }: Params) {
           <h2 className="text-lg font-semibold">Plazos</h2>
           <div className="mt-4 space-y-3">
             {causa.plazos.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-3 py-2">
-                <div>
-                  <div className="text-sm font-medium">{p.titulo}</div>
+              <div key={p.id} className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] px-3 py-2 sm:items-center">
+                <div className="min-w-0">
+                  <div className="break-words text-sm font-medium">{p.titulo}</div>
                   <div className="text-xs text-[var(--ink-soft)]/65">{formatDate(p.fechaLimite)}</div>
                 </div>
                 <StatusBadge estado={p.estado} />

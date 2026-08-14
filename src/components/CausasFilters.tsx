@@ -20,9 +20,9 @@ function FiltersInner() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid gap-3 rounded-3xl p-4 md:grid-cols-4">
+    <form onSubmit={onSubmit} className="panel grid gap-3 rounded-3xl p-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
       <input
-        className="input md:col-span-2"
+        className="input sm:col-span-2"
         name="q"
         placeholder="Buscar RIT, carátula, tribunal…"
         defaultValue={sp.get("q") || ""}

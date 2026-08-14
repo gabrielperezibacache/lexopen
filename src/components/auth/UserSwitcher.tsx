@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -15,6 +15,7 @@ type User = {
 
 export function UserSwitcher() {
   const router = useRouter();
+  const rootRef = useRef<HTMLDivElement>(null);
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [demoSwitcher, setDemoSwitcher] = useState(false);
@@ -57,6 +58,27 @@ export function UserSwitcher() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (target && rootRef.current && !rootRef.current.contains(target)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("touchstart", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("touchstart", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   async function loginAs(userId: string) {
     if (!demoSwitcher) return;
     await fetch("/api/auth/impersonate", {
@@ -84,11 +106,12 @@ export function UserSwitcher() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       <button
         type="button"
         className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-left"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
       >
         <span
           className="grid h-8 w-8 place-items-center rounded-full text-xs font-bold text-white"
