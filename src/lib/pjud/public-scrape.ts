@@ -1087,29 +1087,95 @@ async function fillClaveUnicaLoginForm(page: AnyPage, rut: string, password: str
   await submit.click({ timeout: 15_000 });
 }
 
+/** True only for the OIDC login host — not the citizen marketing portal. */
+export function isClaveUnicaAccountsUrl(url: string): boolean {
+  return /accounts\.claveunica\.gob\.cl/i.test(url);
+}
+
+/**
+ * Abre el login OIDC real desde OJV.
+ *
+ * OJV tiene varios "Clave Única": el marketing (`https://claveunica.gob.cl/`)
+ * y el OIDC (`AutenticaCUnica()` → submit `#cuform`). El selector genérico
+ * `a[href*="claveunica"]` caía en el portal ciudadano y el login fallaba.
+ */
 async function openClaveUnicaFromOjv(page: AnyPage): Promise<AnyPage | null> {
-  const cuLink = page.locator(
-    'a:has-text("ClaveÚnica"), a:has-text("Clave Unica"), a:has-text("Iniciar sesión"), a[href*="claveunica"], a[href*="accounts.claveunica"], #cuform a, button:has-text("ClaveÚnica"), img[alt*="ClaveÚnica" i], img[alt*="Clave Unica" i]'
-  );
-  if ((await cuLink.count()) === 0) return null;
+  const waitForAccounts = async (): Promise<AnyPage | null> => {
+    const popupPromise = page
+      .context()
+      .waitForEvent("page", { timeout: 8_000 })
+      .catch(() => null);
+    const navPromise = page
+      .waitForURL(/accounts\.claveunica\.gob\.cl/i, { timeout: 45_000 })
+      .catch(() => undefined);
+    const popup = await popupPromise;
+    if (popup) {
+      await popup.waitForLoadState("domcontentloaded").catch(() => undefined);
+      if (isClaveUnicaAccountsUrl(popup.url())) return popup;
+    }
+    await navPromise;
+    if (isClaveUnicaAccountsUrl(page.url())) return page;
+    return null;
+  };
 
-  const popupPromise = page
-    .context()
-    .waitForEvent("page", { timeout: 8_000 })
+  const oidcStarted = await page
+    .evaluate(() => {
+      const w = window as unknown as { AutenticaCUnica?: () => void };
+      if (typeof w.AutenticaCUnica === "function") {
+        w.AutenticaCUnica();
+        return "AutenticaCUnica";
+      }
+      const form = document.querySelector("#cuform") as HTMLFormElement | null;
+      if (form) {
+        form.submit();
+        return "cuform";
+      }
+      return null;
+    })
     .catch(() => null);
-  const navPromise = page
-    .waitForURL(/claveunica\.gob\.cl/i, { timeout: 45_000 })
-    .catch(() => undefined);
 
-  await cuLink.first().click({ timeout: 10_000 });
-  const popup = await popupPromise;
-  if (popup) {
-    await popup.waitForLoadState("domcontentloaded").catch(() => undefined);
-    return popup;
+  if (oidcStarted) {
+    const viaOidc = await waitForAccounts();
+    if (viaOidc) return viaOidc;
   }
-  await navPromise;
-  if (/claveunica\.gob\.cl/i.test(page.url())) return page;
-  return page;
+
+  const authLink = page
+    .locator(
+      'a[onclick*="AutenticaCUnica"], button[onclick*="AutenticaCUnica"], #cuform a, a:has-text("Clave Única")[href="#"], a:has-text("ClaveÚnica")[href="#"]'
+    )
+    .first();
+  if ((await authLink.count()) > 0) {
+    const popupPromise = page
+      .context()
+      .waitForEvent("page", { timeout: 8_000 })
+      .catch(() => null);
+    const navPromise = page
+      .waitForURL(/accounts\.claveunica\.gob\.cl/i, { timeout: 45_000 })
+      .catch(() => undefined);
+    // El enlace OIDC suele estar oculto en el DOM; force evita el marketing visible.
+    await authLink.click({ timeout: 10_000, force: true });
+    const popup = await popupPromise;
+    if (popup) {
+      await popup.waitForLoadState("domcontentloaded").catch(() => undefined);
+      if (isClaveUnicaAccountsUrl(popup.url())) return popup;
+    }
+    await navPromise;
+    if (isClaveUnicaAccountsUrl(page.url())) return page;
+  }
+
+  // Último recurso: solo accounts.* (nunca claveunica.gob.cl marketing).
+  const accountsLink = page
+    .locator('a[href*="accounts.claveunica.gob.cl"]')
+    .first();
+  if ((await accountsLink.count()) > 0) {
+    await accountsLink.click({ timeout: 10_000, force: true });
+    await page
+      .waitForURL(/accounts\.claveunica\.gob\.cl/i, { timeout: 45_000 })
+      .catch(() => undefined);
+    if (isClaveUnicaAccountsUrl(page.url())) return page;
+  }
+
+  return null;
 }
 
 export async function scrapeMisCausasWithClaveUnica(opts: {
@@ -1163,26 +1229,13 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
     await maybeSolveCaptchaOnPage(page, opts.signal);
 
     const cuPage = await openClaveUnicaFromOjv(page);
-    if (cuPage) {
+    if (cuPage && isClaveUnicaAccountsUrl(cuPage.url())) {
       page = cuPage;
     } else {
-      let opened = false;
-      for (const url of CLAVEUNICA_LOGIN_URLS) {
-        const res = await page.goto(url, {
-          waitUntil: "domcontentloaded",
-          timeout: 45_000,
-        });
-        const status = res?.status?.() ?? 0;
-        if (status && status < 400) {
-          opened = true;
-          break;
-        }
-      }
-      if (!opened) {
-        throw new PjudScrapeError(
-          "No se pudo abrir el login de ClaveÚnica desde OJV ni la URL directa. Revise conectividad del Host."
-        );
-      }
+      // Sin token OIDC (`?next=`), accounts.* suele responder 404/"Página no encontrada".
+      throw new PjudScrapeError(
+        "No se pudo abrir el login OIDC de ClaveÚnica desde OJV (AutenticaCUnica / #cuform). No use el enlace al portal ciudadano claveunica.gob.cl."
+      );
     }
 
     await page

@@ -6,9 +6,11 @@
  *   npm run pjud:online
  *   npm run pjud:online -- --sidecar http://127.0.0.1:8787
  *   npm run pjud:online -- --skip-ojv
+ *   npm run pjud:online -- --skip-claveunica
  *
  * Sin CAPTCHA_SOLVER_* el scrape de causas no corre; este smoke valida
- * conectividad y arranque de browser (Chromium o Chrome del sistema).
+ * conectividad, arranque de browser y (salvo --skip-claveunica) que OJV
+ * abre el formulario OIDC real de ClaveÚnica (no el portal marketing).
  */
 
 import assert from "node:assert/strict";
@@ -136,6 +138,40 @@ async function main() {
   if (probe.code !== 0 && probe.code !== 2) {
     failures.push(`probe exit ${probe.code}`);
     if (probe.err) console.error(probe.err.slice(0, 2000));
+  }
+
+  // 2b) ClaveÚnica OIDC form (no credentials) — catches marketing-link regressions
+  if (!parseFlag("--skip-claveunica")) {
+    console.log("[pjud-online] probe ClaveÚnica OIDC form…");
+    const cu = await new Promise((resolve, reject) => {
+      const child = spawn(
+        process.platform === "win32" ? "npx.cmd" : "npx",
+        ["tsx", path.join(root, "scripts/pjud-claveunica-form-probe.ts")],
+        {
+          cwd: root,
+          env: { ...process.env },
+          shell: process.platform === "win32",
+        }
+      );
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (d) => {
+        out += d.toString();
+      });
+      child.stderr.on("data", (d) => {
+        err += d.toString();
+      });
+      child.on("exit", (code) => {
+        resolve({ code: code ?? 1, out, err });
+      });
+      child.on("error", reject);
+    });
+    if (cu.code === 0) {
+      console.log("[pjud-online] claveunica form ok");
+    } else {
+      failures.push("claveunica OIDC form probe failed");
+      console.error((cu.err || cu.out).slice(0, 2500));
+    }
   }
 
   // 3) Sidecar /online/probe if auth allows (dev without key)
