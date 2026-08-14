@@ -27,6 +27,14 @@ export async function GET() {
         LLM_API_URL: Boolean(process.env.LLM_API_URL || process.env.HERMES_API_URL),
         LLM_API_KEY: Boolean(process.env.LLM_API_KEY || process.env.HERMES_API_KEY),
         LLM_MODEL: Boolean(process.env.LLM_MODEL || process.env.HERMES_MODEL),
+        LLM_ALLOW_DEMO: process.env.LLM_ALLOW_DEMO || process.env.HERMES_ALLOW_DEMO || null,
+      },
+      demoPolicy: {
+        effectiveAllowDemo: config.allowDemo,
+        productionFailClosed:
+          process.env.NODE_ENV === "production" &&
+          process.env.LLM_ALLOW_DEMO !== "1" &&
+          process.env.HERMES_ALLOW_DEMO !== "1",
       },
     });
   } catch (e) {

@@ -34,18 +34,33 @@ export function LlmSettingsForm() {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [clearApiKey, setClearApiKey] = useState(false);
+  const [demoFailClosed, setDemoFailClosed] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     fetch("/api/integrations/llm")
-      .then((r) => (r.ok ? r.json() : null))
+      .then(async (r) => {
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          throw new Error(data.error || "No se pudo cargar la configuración de IA.");
+        }
+        return r.json();
+      })
       .then((data) => {
-        if (!data) return;
         setEnabled(Boolean(data.enabled));
         if (data.config) setConfig({ ...data.config });
         if (data.presets) setPresets(data.presets);
+        setDemoFailClosed(Boolean(data.demoPolicy?.productionFailClosed));
         setLoaded(true);
       })
-      .catch(() => setLoaded(true));
+      .catch((err) => {
+        setLoadError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo cargar la configuración de IA."
+        );
+        setLoaded(true);
+      });
   }, []);
 
   function onPresetChange(preset: PresetKey) {
@@ -288,10 +303,16 @@ export function LlmSettingsForm() {
         </label>
       </div>
       <p className="text-xs text-[var(--ink-soft)]/60">
-        En producción el Host solo admite demostración si{" "}
-        <code>LLM_ALLOW_DEMO=1</code> está en el entorno (el checkbox solo no
-        basta).
+        {demoFailClosed
+          ? "Este Host está en producción: las respuestas de demostración están bloqueadas hasta que el administrador active LLM_ALLOW_DEMO=1 en el entorno y reinicie."
+          : "Si el proveedor no responde, LexOpen puede mostrar una respuesta de demostración marcada como no real."}
       </p>
+
+      {loadError && (
+        <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900" role="alert">
+          {loadError}
+        </p>
+      )}
 
       <div className="rounded-2xl border border-[var(--line)] bg-white/60 p-4 text-xs text-[var(--ink-soft)]/75">
         <p className="font-medium text-[var(--ink)]">

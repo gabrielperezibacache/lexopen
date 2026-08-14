@@ -204,20 +204,17 @@ export function applyPreset(
  * Env always wins when set. In production, demo is fail-closed unless
  * LLM_ALLOW_DEMO=1 or HERMES_ALLOW_DEMO=1 (DB/UI alone cannot reopen it).
  */
-export function resolveAllowDemoFlag(dbOrFirmAllowDemo: boolean): boolean {
-  if (
-    process.env.LLM_ALLOW_DEMO === "0" ||
-    process.env.HERMES_ALLOW_DEMO === "0"
-  ) {
+export function resolveAllowDemoFlag(
+  dbOrFirmAllowDemo: boolean,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (env.LLM_ALLOW_DEMO === "0" || env.HERMES_ALLOW_DEMO === "0") {
     return false;
   }
-  if (
-    process.env.LLM_ALLOW_DEMO === "1" ||
-    process.env.HERMES_ALLOW_DEMO === "1"
-  ) {
+  if (env.LLM_ALLOW_DEMO === "1" || env.HERMES_ALLOW_DEMO === "1") {
     return true;
   }
-  if (process.env.NODE_ENV === "production") {
+  if (env.NODE_ENV === "production") {
     return false;
   }
   return Boolean(dbOrFirmAllowDemo);
@@ -283,7 +280,7 @@ export async function saveLlmConfig(input: {
 
   if (!isAllowedLlmUrl(next.apiUrl)) {
     throw httpError(
-      "La URL del endpoint de IA no está permitida (host privado o formato inválido). En producción use HTTPS público, o active LLM_ALLOW_PRIVATE_URL=1 para Ollama/Hermes local.",
+      "La URL del endpoint de IA no está permitida. Use una dirección https pública, o en el Host active el permiso para endpoints locales (Ollama/Hermes).",
       400
     );
   }

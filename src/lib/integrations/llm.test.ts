@@ -94,33 +94,26 @@ assert.equal(
 );
 assert.equal(envAllowsDemo({ NODE_ENV: "development" }), true);
 
-{
-  const prev = {
-    NODE_ENV: process.env.NODE_ENV,
-    LLM_ALLOW_DEMO: process.env.LLM_ALLOW_DEMO,
-    HERMES_ALLOW_DEMO: process.env.HERMES_ALLOW_DEMO,
-  };
-  try {
-    process.env.NODE_ENV = "production";
-    delete process.env.LLM_ALLOW_DEMO;
-    delete process.env.HERMES_ALLOW_DEMO;
-    assert.equal(resolveAllowDemoFlag(true), false);
-    process.env.LLM_ALLOW_DEMO = "1";
-    assert.equal(resolveAllowDemoFlag(false), true);
-    process.env.LLM_ALLOW_DEMO = "0";
-    assert.equal(resolveAllowDemoFlag(true), false);
-    process.env.NODE_ENV = "development";
-    delete process.env.LLM_ALLOW_DEMO;
-    assert.equal(resolveAllowDemoFlag(true), true);
-    assert.equal(resolveAllowDemoFlag(false), false);
-  } finally {
-    process.env.NODE_ENV = prev.NODE_ENV;
-    if (prev.LLM_ALLOW_DEMO === undefined) delete process.env.LLM_ALLOW_DEMO;
-    else process.env.LLM_ALLOW_DEMO = prev.LLM_ALLOW_DEMO;
-    if (prev.HERMES_ALLOW_DEMO === undefined) delete process.env.HERMES_ALLOW_DEMO;
-    else process.env.HERMES_ALLOW_DEMO = prev.HERMES_ALLOW_DEMO;
-  }
-}
+assert.equal(
+  resolveAllowDemoFlag(true, { NODE_ENV: "production" }),
+  false
+);
+assert.equal(
+  resolveAllowDemoFlag(false, { NODE_ENV: "production", LLM_ALLOW_DEMO: "1" }),
+  true
+);
+assert.equal(
+  resolveAllowDemoFlag(true, { NODE_ENV: "production", LLM_ALLOW_DEMO: "0" }),
+  false
+);
+assert.equal(
+  resolveAllowDemoFlag(true, { NODE_ENV: "development" }),
+  true
+);
+assert.equal(
+  resolveAllowDemoFlag(false, { NODE_ENV: "development" }),
+  false
+);
 
 assert.equal(
   parseChatCompletionBody(

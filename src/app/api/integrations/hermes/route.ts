@@ -10,6 +10,7 @@ import {
 import {
   getLlmConfig,
   publicLlmConfig,
+  resolveAllowDemoFlag,
   LLM_PRESET_CATALOG,
 } from "@/lib/integrations/llm";
 import { buildAiContextPack } from "@/lib/ai/context-pack";
@@ -541,14 +542,7 @@ export async function POST(req: Request) {
       const firm = await prisma.firmSettings.findFirst({
         select: { hermesAllowDemo: true },
       });
-      // Env fail-closed: firm flag alone must not reopen demo in production.
-      const allowDemo =
-        process.env.HERMES_ALLOW_DEMO === "1" ||
-        process.env.LLM_ALLOW_DEMO === "1" ||
-        (process.env.NODE_ENV === "development" &&
-          process.env.HERMES_ALLOW_DEMO !== "0" &&
-          process.env.LLM_ALLOW_DEMO !== "0" &&
-          firm?.hermesAllowDemo === true);
+      const allowDemo = resolveAllowDemoFlag(Boolean(firm?.hermesAllowDemo));
       if (!allowDemo) {
         return NextResponse.json(
           {
