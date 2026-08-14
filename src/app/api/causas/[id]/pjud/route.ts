@@ -3,6 +3,7 @@ import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import {
+  clearCausaPjudSyncMessages,
   providerStatusPublicAsync,
   setMonitoreoActivo,
   syncCausaPjud,
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await parseBody(
       req,
       z.object({
-        action: z.enum(["sync", "enable", "disable", "retry"]),
+        action: z.enum(["sync", "enable", "disable", "retry", "clear_errors"]),
       })
     );
 
@@ -67,6 +68,22 @@ export async function POST(req: NextRequest, { params }: Params) {
         entityType: "Causa",
         entityId: id,
         after: { pjudMonitoreoActivo: causa.pjudMonitoreoActivo },
+      });
+      return NextResponse.json({ ok: true, causa });
+    }
+
+    if (body.action === "clear_errors") {
+      const causa = await clearCausaPjudSyncMessages(id);
+      await writeAudit({
+        actorId: user.id,
+        action: "pjud.clear_errors",
+        entityType: "Causa",
+        entityId: id,
+        after: {
+          pjudLastSyncNote: causa.pjudLastSyncNote,
+          pjudFailCount: causa.pjudFailCount,
+          pjudLastSyncStatus: causa.pjudLastSyncStatus,
+        },
       });
       return NextResponse.json({ ok: true, causa });
     }

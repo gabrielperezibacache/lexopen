@@ -176,6 +176,29 @@ export default function MisCausasPage() {
     setMsg("Se eliminaron el RUT y la contraseña de este estudio.");
   }
 
+  async function clearErrors() {
+    setBusy(true);
+    setMsg("");
+    setResult(null);
+    const result = await apiMutation<{ ok?: boolean; status?: Status }>(
+      "/api/pjud/mis-causas",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear_errors" }),
+      }
+    );
+    setBusy(false);
+    if (!result.ok) {
+      setMsgTone("err");
+      setMsg(result.error || "No se pudieron limpiar los avisos.");
+      return;
+    }
+    if (result.data.status) setStatus(result.data.status);
+    else await load();
+    setMsg("");
+  }
+
   async function syncMisCausas() {
     setBusy(true);
     setMsg("");
@@ -388,15 +411,33 @@ export default function MisCausasPage() {
 
         {(syncTitle || status?.lastSyncNote) && (
           <div className="rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 text-sm">
-            {syncTitle && (
-              <p className="font-medium">
-                {syncTitle}
-                {when ? ` · ${when}` : ""}
-              </p>
-            )}
-            {status?.lastSyncNote && (
-              <p className="mt-1 text-[var(--ink-soft)]/80">{status.lastSyncNote}</p>
-            )}
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                {syncTitle && (
+                  <p className="font-medium">
+                    {syncTitle}
+                    {when ? ` · ${when}` : ""}
+                  </p>
+                )}
+                {status?.lastSyncNote && (
+                  <p className="mt-1 text-[var(--ink-soft)]/80">
+                    {status.lastSyncNote}
+                  </p>
+                )}
+              </div>
+              {(status?.lastSyncNote ||
+                status?.lastSyncStatus === "failed" ||
+                status?.lastSyncStatus === "partial") && (
+                <button
+                  type="button"
+                  className="btn btn-ghost shrink-0 text-xs"
+                  disabled={busy || status?.lastSyncStatus === "running"}
+                  onClick={clearErrors}
+                >
+                  Limpiar avisos
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -558,8 +599,8 @@ export default function MisCausasPage() {
         </div>
 
         {msg && (
-          <p
-            className={`rounded-2xl border px-4 py-3 text-sm ${
+          <div
+            className={`flex flex-wrap items-start justify-between gap-2 rounded-2xl border px-4 py-3 text-sm ${
               msgTone === "err"
                 ? "border-rose-200 bg-rose-50 text-rose-900"
                 : msgTone === "warn"
@@ -569,8 +610,15 @@ export default function MisCausasPage() {
             role="status"
             data-testid="claveunica-msg"
           >
-            {msg}
-          </p>
+            <p className="min-w-0 flex-1">{msg}</p>
+            <button
+              type="button"
+              className="shrink-0 text-xs underline-offset-2 hover:underline"
+              onClick={() => setMsg("")}
+            >
+              Cerrar
+            </button>
+          </div>
         )}
       </section>
 

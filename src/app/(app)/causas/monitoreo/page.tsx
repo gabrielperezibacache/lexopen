@@ -314,7 +314,18 @@ export default function MonitoreoCausasPage() {
           {provider.captcha.configError}
         </p>
       )}
-      {msg && <p className="text-sm text-[var(--ink-soft)]/80">{msg}</p>}
+      {msg && (
+        <div className="flex flex-wrap items-start justify-between gap-2 text-sm text-[var(--ink-soft)]/80">
+          <p className="min-w-0 flex-1">{msg}</p>
+          <button
+            type="button"
+            className="shrink-0 text-xs underline-offset-2 hover:underline"
+            onClick={() => setMsg("")}
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
 
       <PjudQuickAddPanel />
 

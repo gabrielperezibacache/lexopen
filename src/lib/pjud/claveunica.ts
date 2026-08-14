@@ -224,6 +224,28 @@ export async function setClaveUnicaEnabled(enabled: boolean) {
   });
 }
 
+/** Dismiss sticky Mis Causas sync notes/errors without removing credentials. */
+export async function clearClaveUnicaSyncMessages() {
+  const { settings } = await getOrCreateFirmSettings();
+  if (settings.claveUnicaLastSyncStatus === "running") {
+    throw httpError(
+      "Hay una sincronización en curso; espere a que termine antes de limpiar avisos.",
+      409
+    );
+  }
+  const failed =
+    settings.claveUnicaLastSyncStatus === "failed" ||
+    settings.claveUnicaLastSyncStatus === "partial";
+  await prisma.firmSettings.update({
+    where: { id: settings.id },
+    data: {
+      claveUnicaLastSyncNote: null,
+      ...(failed ? { claveUnicaLastSyncStatus: null } : {}),
+    },
+  });
+  return getClaveUnicaStatus();
+}
+
 async function resolveMisCausasList(): Promise<MisCausasItem[]> {
   const { settings } = await getOrCreateFirmSettings();
   if (!settings.claveUnicaEnabled) {
