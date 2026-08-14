@@ -59,9 +59,15 @@ function lastSyncLabel(status: string | null | undefined) {
       return "Última sincronización con errores";
     case "cleared":
       return "Credenciales eliminadas";
+    case "running":
+      return "Sincronización en curso";
     default:
       return status ? `Estado: ${status}` : null;
   }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export default function MisCausasPage() {
@@ -174,16 +180,23 @@ export default function MisCausasPage() {
     setBusy(true);
     setMsg("");
     setResult(null);
-    const result = await apiMutation<SyncResult & { status?: Status }>(
-      "/api/pjud/mis-causas",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ syncMovimientos: true }),
-      }
+    setMsgTone("ok");
+    setMsg(
+      "Sincronización iniciada. Puede tardar varios minutos (login ClaveÚnica + listado); no cierre esta página."
     );
-    setBusy(false);
+    const result = await apiMutation<
+      SyncResult & {
+        status?: Status;
+        async?: boolean;
+        started?: boolean;
+      }
+    >("/api/pjud/mis-causas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ syncMovimientos: true }),
+    });
     if (!result.ok) {
+      setBusy(false);
       setMsgTone("err");
       setMsg(
         result.error ||
@@ -193,18 +206,75 @@ export default function MisCausasPage() {
       return;
     }
     const data = result.data;
+    if (data.status) setStatus(data.status);
+
+    // 202 async: poll until status leaves "running" (avoids Cloudflare 524).
+    if (data.async) {
+      if (data.started === false) {
+        setMsg(
+          "Ya hay una sincronización en curso. Esperando el resultado…"
+        );
+      }
+      let finalStatus: Status | null = data.status || null;
+      for (let i = 0; i < 120; i++) {
+        await sleep(3000);
+        try {
+          const res = await fetch("/api/pjud/mis-causas");
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) continue;
+          const st = (body as { status?: Status }).status || null;
+          if (st) {
+            setStatus(st);
+            finalStatus = st;
+          }
+          if (st?.lastSyncStatus && st.lastSyncStatus !== "running") {
+            break;
+          }
+        } catch {
+          /* keep polling */
+        }
+      }
+      setBusy(false);
+      const note = finalStatus?.lastSyncNote || "";
+      const st = finalStatus?.lastSyncStatus;
+      if (st === "failed") {
+        setMsgTone("err");
+        setMsg(note || "La sincronización falló.");
+      } else if (st === "partial") {
+        setMsgTone("warn");
+        setMsg(note || "Sincronización parcial.");
+      } else if (st === "running") {
+        setMsgTone("warn");
+        setMsg(
+          "La sincronización sigue en curso en el servidor. Recargue en unos minutos o revise el monitoreo."
+        );
+      } else {
+        setMsgTone("ok");
+        setMsg(
+          note ||
+            "Sincronización terminada. Los movimientos se actualizan en segundo plano vía la cola de monitoreo."
+        );
+      }
+      return;
+    }
+
+    setBusy(false);
     setResult(data);
     setStatus(data.status || null);
     const failed = Number(data.syncFailed || 0);
     const listed = Number(data.listed || 0);
     const created = Number(data.created || 0);
     const linked = Number(data.linked || 0);
+    const enqueued = Number(data.enqueued || 0);
     const inserted = Number(data.inserted || 0);
     let summary = `Se encontraron ${listed} causa${listed === 1 ? "" : "s"}`;
     if (created || linked) {
       summary += ` (${created} nueva${created === 1 ? "" : "s"}, ${linked} ya estaban en LexOpen)`;
     }
-    if (failed > 0) {
+    if (enqueued > 0 && failed === 0 && inserted === 0) {
+      summary += `. ${enqueued} puesta${enqueued === 1 ? "" : "s"} en cola para movimientos.`;
+      setMsgTone("ok");
+    } else if (failed > 0) {
       summary += `. Algunas no pudieron actualizar sus movimientos (${failed}). Revise el monitoreo.`;
       setMsgTone("warn");
     } else if (inserted > 0) {
@@ -218,7 +288,10 @@ export default function MisCausasPage() {
   }
 
   const syncDisabled =
-    busy || !status?.hasPassword || status?.readyToSync === false;
+    busy ||
+    !status?.hasPassword ||
+    status?.readyToSync === false ||
+    status?.lastSyncStatus === "running";
   const ready = Boolean(status?.readyToSync);
   const when = formatWhen(status?.lastSyncAt);
   const syncTitle = lastSyncLabel(status?.lastSyncStatus);
