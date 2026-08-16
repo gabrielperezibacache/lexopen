@@ -60,6 +60,7 @@ export const en: Dictionary = {
     files: "Files",
     tasks: "Tasks",
     wiki: "Wiki",
+    blog: "Blog",
     isheets: "iSheets",
     qa: "Q&A",
     people: "People",

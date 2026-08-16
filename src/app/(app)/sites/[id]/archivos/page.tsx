@@ -11,6 +11,7 @@ import {
   fileVersionListSelect,
   siteFileListSelect,
 } from "@/lib/sites/file-select";
+import { FileCommentForm } from "@/components/sites/FileCommentForm";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -144,6 +145,11 @@ export default async function SiteFilesPage({ params }: Params) {
                       Descargar
                     </a>{" "}
                     · {f.versions.length} versiones
+                    {!clientView && (
+                      <div className="mt-2">
+                        <FileCommentForm siteId={site.id} fileId={f.id} />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { triggerSiteWorkflows } from "@/lib/sites/workflow-triggers";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -99,6 +100,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           mensaje: `Tarea completada: ${task.title}`,
           siteId: id,
         },
+      });
+      await triggerSiteWorkflows({
+        siteId: id,
+        triggerType: "task_done",
+        actorId: user.id,
+        payload: { taskId: task.id, title: task.title },
       });
     }
     return NextResponse.json(task);

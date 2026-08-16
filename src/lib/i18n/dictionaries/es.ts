@@ -58,6 +58,7 @@ export const es = {
     files: "Archivos",
     tasks: "Tareas",
     wiki: "Wiki",
+    blog: "Blog",
     isheets: "iSheets",
     qa: "Q&A",
     people: "Personas",

@@ -4,12 +4,14 @@ import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/
 import { clientVisibleFileWhere } from "@/lib/auth/access";
 import { isClientSharedTag } from "@/lib/auth/client-tags";
 import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
+import { publicUserSelect } from "@/lib/auth/public-user";
 import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storage";
 import { sanitizeUploadMimeType } from "@/lib/security/download";
 import {
   fileVersionListSelect,
   siteFileListSelect,
 } from "@/lib/sites/file-select";
+import { triggerSiteWorkflows } from "@/lib/sites/workflow-triggers";
 
 type Params = { params: Promise<{ id: string }> };
 const LARGE_CONTENT_BYTES = 64 * 1024;
@@ -215,6 +217,12 @@ export async function POST(req: NextRequest, { params }: Params) {
           userId: user.id,
         },
       });
+      await triggerSiteWorkflows({
+        siteId: id,
+        triggerType: "file_upload",
+        actorId: user.id,
+        payload: { fileId: file.id, name: file.name },
+      });
       return NextResponse.json(file, { status: 201 });
     }
 
@@ -266,6 +274,35 @@ export async function POST(req: NextRequest, { params }: Params) {
         },
       });
       return NextResponse.json(file);
+    }
+
+    if (body.action === "add-comment" && body.fileId) {
+      const existing = await prisma.siteFile.findFirst({
+        where: { id: body.fileId, siteId: id },
+        select: { id: true, confidencial: true, privilegio: true },
+      });
+      if (!existing) {
+        return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
+      }
+      if (
+        (existing.confidencial || existing.privilegio) &&
+        !canSeeConfidential(user.role)
+      ) {
+        return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
+      }
+      const text = typeof body.body === "string" ? body.body.trim() : "";
+      if (!text || text.length > 5000) {
+        return NextResponse.json({ error: "Comentario inválido" }, { status: 400 });
+      }
+      const comment = await prisma.comment.create({
+        data: {
+          body: text,
+          fileId: existing.id,
+          authorId: user.id,
+        },
+        include: { author: { select: publicUserSelect } },
+      });
+      return NextResponse.json(comment, { status: 201 });
     }
 
     return NextResponse.json({ error: "Acción no válida" }, { status: 400 });
