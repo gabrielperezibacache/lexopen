@@ -178,7 +178,7 @@ test("un cliente queda limitado al portal y a sus espacios", async ({ page }) =>
 
   const searchPage = await page.goto("/buscar");
   expect(searchPage?.ok()).toBeTruthy();
-  await expect(page.getByRole("heading", { name: "Buscar" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Buscar" })).toBeVisible();
 
   const searchRes = await page.request.get("/api/search?q=andes");
   expect(searchRes.ok()).toBeTruthy();
