@@ -1107,8 +1107,9 @@ de producción:
   versión en BD; descargas fuerzan `attachment` salvo MIME seguros; listados/
   búsqueda no devuelven cuerpos de archivo; setup/recovery usan cookie httpOnly
   (Desktop no pone el token en la URL); `openExternal` del Desktop tiene allowlist;
-- el portal cliente no debe presentarse como estrictamente de solo lectura sin una
-  revisión adicional de permisos;
+- el portal cliente ofrece documentos compartidos y Q&A limitado (no es un
+  expediente completo ni un portal de solo lectura estricto); revise permisos
+  antes de compartir matters;
 - los campos de confidencialidad no equivalen a una implementación completa de
   privilegio abogado-cliente;
 - la auditoría es de mejor esfuerzo: un fallo al persistirla no necesariamente

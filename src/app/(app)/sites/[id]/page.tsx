@@ -1,7 +1,12 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { assertSitePageAccess, confidentialFileWhere } from "@/lib/auth/access";
+import {
+  assertSitePageAccess,
+  clientVisibleFileWhere,
+  confidentialFileWhere,
+} from "@/lib/auth/access";
+import { isCliente } from "@/lib/auth/rbac";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
 
@@ -10,6 +15,10 @@ type Params = { params: Promise<{ id: string }> };
 export default async function SiteOverviewPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
+  // Defense in depth: overview is staff-only (portal allowlist already excludes it).
+  if (isCliente(user.role)) {
+    redirect(`/sites/${id}/archivos`);
+  }
   const fileWhere = confidentialFileWhere(user.role);
   const site = await prisma.site.findUnique({
     where: { id },
@@ -28,7 +37,7 @@ export default async function SiteOverviewPage({ params }: Params) {
   });
   if (!site) notFound();
   const visibleFilesCount = await prisma.siteFile.count({
-    where: { siteId: id, ...fileWhere },
+    where: { siteId: id, ...clientVisibleFileWhere(user.role) },
   });
 
   return (

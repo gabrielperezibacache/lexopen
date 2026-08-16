@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/setup-cookies";
 import { isAuthorizedCronRequest } from "@/lib/security/cron-paths";
 import { isStrongSessionSecret } from "@/lib/security/production-env";
+import { isClientAllowedPath } from "@/lib/auth/client-paths";
 
 const SESSION_COOKIE = "lexopen_session";
 const CSRF_COOKIE = "lexopen_csrf";
@@ -117,25 +118,6 @@ async function verifyToken(
   if (!matched.ok) return null;
   // Prefer DB role so ACL tracks role changes after session minting.
   return { userId, role: matched.role };
-}
-
-function isClientAllowedPath(pathname: string) {
-  return (
-    pathname === "/portal" ||
-    pathname.startsWith("/portal/") ||
-    pathname === "/cuenta" ||
-    pathname.startsWith("/cuenta/") ||
-    pathname === "/notificaciones" ||
-    pathname.startsWith("/notificaciones/") ||
-    pathname === "/sites" ||
-    /^\/sites\/[^/]+\/(archivos|qa)(?:\/.*)?$/.test(pathname) ||
-    pathname === "/api/sites" ||
-    /^\/api\/sites\/[^/]+\/(files|qa)(?:\/.*)?$/.test(pathname) ||
-    pathname.startsWith("/api/notifications") ||
-    pathname.startsWith("/api/auth/") ||
-    pathname === "/api/health" ||
-    pathname.startsWith("/api/search")
-  );
 }
 
 function cookieSecureFlag() {

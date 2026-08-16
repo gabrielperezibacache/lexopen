@@ -128,6 +128,46 @@ test("un cliente queda limitado al portal y a sus espacios", async ({ page }) =>
     page.getByRole("checkbox", { name: "Marcar como respuesta oficial" })
   ).toHaveCount(0);
 
+  const siteId = filesHref!.split("/")[2];
+  expect(siteId).toBeTruthy();
+
+  expect(
+    (await page.request.post(`/api/sites/${siteId}/files`, {
+      data: { action: "create-folder", name: "hack" },
+    })).status()
+  ).toBe(403);
+  expect(
+    (await page.request.post("/api/messages", {
+      data: { receiverId: "x", body: "hola" },
+    })).status()
+  ).toBe(403);
+  expect(
+    (await page.request.post(`/api/sites/${siteId}/members`, {
+      data: { userId: "x", role: "viewer" },
+    })).status()
+  ).toBe(403);
+  expect(
+    (await page.request.post("/api/sites", {
+      data: { name: "hack", tipo: "matter" },
+    })).status()
+  ).toBe(403);
+  expect(
+    (await page.request.post("/api/auth/impersonate", {
+      data: { userId: "x" },
+    })).status()
+  ).toBe(403);
+  expect((await page.request.get(`/api/sites/${siteId}`)).status()).toBe(403);
+  expect((await page.request.get("/api/billing/invoices")).status()).toBe(403);
+
+  const searchRes = await page.request.get("/api/search?q=andes");
+  expect(searchRes.ok()).toBeTruthy();
+  const searchBody = (await searchRes.json()) as { scope?: string; causas?: unknown[] };
+  expect(searchBody.scope).toBe("portal");
+  expect(searchBody.causas || []).toEqual([]);
+
+  await page.goto(`/sites/${siteId}`);
+  await expect(page).toHaveURL(/\/portal$/);
+
   await page.goto("/causas");
   await expect(page).toHaveURL(/\/portal$/);
   await expect(

@@ -70,9 +70,9 @@ export default async function PortalPage() {
         title="Portal del cliente"
         subtitle={
           <>
-            Documentos compartidos, hitos y Q&A.{" "}
+            Documentos compartidos (etiqueta «cliente»), hitos y Q&A limitado.{" "}
             {isCliente(user.role)
-              ? "Solo ve espacios donde es miembro."
+              ? "Solo ve espacios donde es miembro; puede abrir preguntas mientras el hilo esté abierto."
               : "Vista previa staff (espacios visibles al cliente)."}
           </>
         }
@@ -80,7 +80,8 @@ export default async function PortalPage() {
 
       {isCliente(user.role) && (
         <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
-          Acceso restringido: sin facturación interna, copiloto del estudio ni carpetas Drive internas.
+          Acceso restringido: documentos compartidos y Q&A limitado. Sin facturación
+          interna, copiloto del estudio, wiki, iSheets ni carpetas Drive internas.
         </div>
       )}
 

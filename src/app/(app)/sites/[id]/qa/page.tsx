@@ -20,7 +20,10 @@ export default async function SiteQaPage({ params }: Params) {
   });
   if (!site) notFound();
   const threads = await prisma.qaThread.findMany({
-    where: { siteId: id },
+    where: {
+      siteId: id,
+      ...(clientView ? { status: "open" } : {}),
+    },
     include: {
       posts: {
         include: { author: { select: publicUserSelect } },
@@ -42,14 +45,20 @@ export default async function SiteQaPage({ params }: Params) {
       />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
-          Q&A del espacio — hilos con cliente y equipo, con respuestas oficiales.
+          {clientView
+            ? "Preguntas abiertas del espacio — puede abrir hilos y responder mientras estén abiertos."
+            : "Q&A del espacio — hilos con cliente y equipo, con respuestas oficiales."}
         </p>
         <QaActions siteId={site.id} canMarkAnswer={!clientView} />
       </div>
       {threads.length === 0 && (
         <EmptyState
           title="Sin hilos de Q&A"
-          description="Abra una pregunta para el cliente o el equipo. Las respuestas oficiales quedan marcadas."
+          description={
+            clientView
+              ? "Abra una pregunta para el estudio. Solo verá hilos abiertos."
+              : "Abra una pregunta para el cliente o el equipo. Las respuestas oficiales quedan marcadas."
+          }
           action={<QaActions siteId={site.id} canMarkAnswer={!clientView} />}
         />
       )}
@@ -59,7 +68,13 @@ export default async function SiteQaPage({ params }: Params) {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold">{t.subject}</h2>
               <StatusBadge
-                estado={t.status === "answered" ? "cumplido" : t.status === "open" ? "pendiente" : "activa"}
+                estado={
+                  t.status === "answered"
+                    ? "cumplido"
+                    : t.status === "open"
+                      ? "pendiente"
+                      : "activa"
+                }
               />
               {t.category && <span className="badge badge-ink">{t.category}</span>}
             </div>
@@ -81,12 +96,14 @@ export default async function SiteQaPage({ params }: Params) {
                 </div>
               ))}
             </div>
-            <QaActions
-              siteId={site.id}
-              threadId={t.id}
-              reply
-              canMarkAnswer={!clientView}
-            />
+            {(!clientView || t.status === "open") && (
+              <QaActions
+                siteId={site.id}
+                threadId={t.id}
+                reply
+                canMarkAnswer={!clientView}
+              />
+            )}
           </article>
         ))}
       </div>

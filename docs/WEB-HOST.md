@@ -112,6 +112,13 @@ Use esta lista antes de cargar información real del estudio:
     `PJUD_SCRAPER_ALLOW_PRIVATE=1` son normales en loopback del Host. Si publica
     el servicio fuera de la máquina, revise que el sidecar Obsidian/PJUD no
     quede expuesto sin autenticación.
+13. **Portal cliente:** revise members + `isClientVisible` + etiqueta `cliente`
+    en archivos. El portal ofrece documentos compartidos y Q&A limitado (abrir
+    hilos / responder abiertos); no es expediente completo ni “solo lectura”
+    absoluto. Active 2FA en cuentas admin cuando esté disponible.
+14. **Auditoría:** mutaciones sensibles (auth, personas, purge, ClaveÚnica,
+    billing, override de conflicto) deben persistir evento de auditoría;
+    compruebe `/auditoria` tras un cambio de prueba.
 
 ## OCR local para PDFs escaneados
 
