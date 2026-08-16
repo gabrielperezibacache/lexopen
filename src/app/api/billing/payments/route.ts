@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { paymentCreateSchema } from "@/lib/schemas";
 import { invoiceStatusAfterPayment } from "@/lib/billing";
+import { writeAuditStrict } from "@/lib/audit";
 
 export async function GET() {
   try {
@@ -27,7 +28,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
-    await requireBillingManager();
+    const user = await requireBillingManager();
     const body = await parseBody(req, paymentCreateSchema);
     const amountClp = body.amountClp;
 
@@ -118,6 +119,18 @@ export async function POST(req: NextRequest) {
 
       return created;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    await writeAuditStrict({
+      actorId: user.id,
+      action: "billing.payment.create",
+      entityType: "Payment",
+      entityId: payment.id,
+      after: {
+        amountClp: payment.amountClp,
+        clienteId: payment.clienteId,
+        invoiceId: payment.invoiceId,
+      },
+    });
 
     return NextResponse.json(payment, { status: 201 });
   } catch (e) {

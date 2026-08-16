@@ -11,6 +11,7 @@ import {
 import { computeInvoiceTotals, nextInvoiceNumber } from "@/lib/billing";
 import { invoiceCreateSchema } from "@/lib/schemas";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { writeAuditStrict } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -239,6 +240,19 @@ export async function POST(req: NextRequest) {
 
       return created;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    await writeAuditStrict({
+      actorId: user.id,
+      action: "billing.invoice.create",
+      entityType: "Invoice",
+      entityId: invoice.id,
+      after: {
+        number: invoice.number,
+        totalClp: invoice.totalClp,
+        status: invoice.status,
+        clienteId: invoice.clienteId,
+      },
+    });
 
     return NextResponse.json(invoice, { status: 201 });
   } catch (e) {

@@ -32,7 +32,14 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (pageId) {
       const page = await prisma.wikiPage.findFirst({
         where: { id: pageId, siteId: id },
-        include: { author: { select: publicUserSelect } },
+        include: {
+          author: { select: publicUserSelect },
+          revisions: {
+            orderBy: { createdAt: "desc" },
+            take: 20,
+            include: { author: { select: publicUserSelect } },
+          },
+        },
       });
       if (!page) {
         return NextResponse.json({ error: "Página no encontrada" }, { status: 404 });
@@ -114,11 +121,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
     const current = await prisma.wikiPage.findFirst({
       where: { id: body.id, siteId: id },
-      select: { id: true, title: true },
+      select: { id: true, title: true, content: true },
     });
     if (!current) {
       return NextResponse.json({ error: "Página no encontrada" }, { status: 404 });
     }
+    await prisma.wikiPageRevision.create({
+      data: {
+        pageId: current.id,
+        title: current.title,
+        content: current.content,
+        authorId: user.id,
+      },
+    });
     const page = await prisma.wikiPage.update({
       where: { id: current.id },
       data: {
@@ -131,6 +146,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         content: true,
       },
     });
+    if (body.action === "restore" && body.revisionId) {
+      const rev = await prisma.wikiPageRevision.findFirst({
+        where: { id: body.revisionId, pageId: current.id },
+      });
+      if (rev) {
+        await prisma.wikiPage.update({
+          where: { id: current.id },
+          data: { title: rev.title, content: rev.content },
+        });
+      }
+    }
     await prisma.activity.create({
       data: {
         tipo: "comentario",

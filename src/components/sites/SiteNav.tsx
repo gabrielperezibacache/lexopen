@@ -27,13 +27,17 @@ export function SiteNav({
     { href: "/archivos", label: t("siteTabs.files") },
     { href: "/tareas", label: t("siteTabs.tasks") },
     { href: "/wiki", label: t("siteTabs.wiki") },
+    { href: "/blog", label: t("siteTabs.blog") },
     { href: "/isheets", label: t("siteTabs.isheets") },
     { href: "/qa", label: t("siteTabs.qa") },
     { href: "/personas", label: t("siteTabs.people") },
     { href: "/flujos", label: t("siteTabs.workflows") },
   ];
   const visibleTabs = clientView
-    ? tabs.filter((tab) => tab.href === "/archivos" || tab.href === "/qa")
+    ? tabs.filter(
+        (tab) =>
+          tab.href === "/archivos" || tab.href === "/qa" || tab.href === "/blog"
+      )
     : tabs;
   const tipoLabel =
     dict.siteTabs.types[tipo as keyof typeof dict.siteTabs.types] ||

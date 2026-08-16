@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireRole } from "@/lib/api";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import {
   clearClaveUnicaCredentials,
   getClaveUnicaStatus,
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
         password: body.password,
         enabled: true,
       });
-      await writeAudit({
+      await writeAuditStrict({
         actorId: user.id,
         action: "pjud.claveunica.save",
         entityType: "FirmSettings",
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "clear") {
       await clearClaveUnicaCredentials();
-      await writeAudit({
+      await writeAuditStrict({
         actorId: user.id,
         action: "pjud.claveunica.clear",
         entityType: "FirmSettings",
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     await setClaveUnicaEnabled(body.action === "enable");
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: `pjud.claveunica.${body.action}`,
       entityType: "FirmSettings",

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, parseBody, requireUser } from "@/lib/api";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { passwordChangeSchema } from "@/lib/schemas";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import {
   ROLE_COOKIE,
   SESSION_COOKIE,
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         sessionVersion: nextSessionVersion,
       },
     });
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "user.password_change",
       entityType: "User",

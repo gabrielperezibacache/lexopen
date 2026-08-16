@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError } from "@/lib/api";
 import { hashPassword } from "@/lib/auth/password";
 import { isValidBootstrapToken } from "@/lib/auth/bootstrap";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
 import { rotateDesktopEnvSecret } from "@/lib/auth/env-secrets";
 import {
@@ -66,14 +66,17 @@ export async function POST(req: NextRequest) {
         data: {
           password: await hashPassword(body.newPassword),
           sessionVersion: { increment: 1 },
+          totpEnabled: false,
+          totpSecretEnc: null,
+          totpBackupCodes: null,
         },
       });
-      await writeAudit({
+      await writeAuditStrict({
         actorId: null,
         action: "user.password_recovery",
         entityType: "User",
         entityId: admin.id,
-        after: { source: "local recovery token" },
+        after: { source: "local recovery token", totpCleared: true },
       });
       // One-time use: rotate recovery token after a successful reset.
       await rotateDesktopEnvSecret("LEXOPEN_RECOVERY_TOKEN");

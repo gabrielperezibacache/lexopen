@@ -58,6 +58,7 @@ export const es = {
     files: "Archivos",
     tasks: "Tareas",
     wiki: "Wiki",
+    blog: "Blog",
     isheets: "iSheets",
     qa: "Q&A",
     people: "Personas",
@@ -126,6 +127,33 @@ export const es = {
     languageTitle: "Idioma de la interfaz",
     languageHelp:
       "Afecta navegación, login y textos de la plataforma. El contenido jurídico chileno (RIT, plazos, minutas) permanece en español cuando corresponde.",
+  },
+  dashboard: {
+    eyebrow: "Inicio del estudio",
+    titleFallback: "Inicio",
+    hello: "Hola, {name}",
+    subtitle:
+      "Clientes, causas, trámites pendientes, minutas y actividad del estudio.",
+    clients: "Clientes",
+    newCase: "Nueva causa",
+  },
+  causas: {
+    eyebrow: "Litigio Chile",
+    title: "Causas judiciales",
+    subtitle:
+      "Alta manual, importación ClaveÚnica (Mis Causas) o ROL en Monitoreo. Edite, archive o elimine desde aquí o la ficha.",
+    newCase: "Nueva causa",
+    empty: "No hay causas con esos filtros.",
+  },
+  portal: {
+    eyebrow: "Experiencia cliente",
+    title: "Portal del cliente",
+    subtitleClient:
+      "Documentos compartidos (etiqueta «cliente»), hitos y Q&A limitado. Solo ve espacios donde es miembro; puede abrir preguntas mientras el hilo esté abierto.",
+    subtitleStaff:
+      "Documentos compartidos (etiqueta «cliente»), hitos y Q&A limitado. Vista previa staff (espacios visibles al cliente).",
+    notice:
+      "Acceso restringido: documentos compartidos y Q&A limitado. Sin facturación interna, copiloto del estudio, wiki, iSheets ni carpetas Drive internas.",
   },
   crm: {
     eyebrow: "CRM",

@@ -4,6 +4,9 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
 import { canSeeConfidential, isCliente, isStaff } from "@/lib/auth/rbac";
 import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
+import { isClientAllowedPagePath } from "@/lib/auth/client-paths";
+
+export { isClientAllowedPath, isClientAllowedPagePath } from "@/lib/auth/client-paths";
 
 export function httpError(message: string, status: number) {
   const err = new Error(message) as Error & { status: number };
@@ -64,16 +67,6 @@ export function clientVisibleFileWhere(role: string) {
   };
 }
 
-export function isClientAllowedPath(pathname: string) {
-  if (!pathname) return false;
-  if (pathname === "/portal" || pathname.startsWith("/portal/")) return true;
-  if (pathname === "/cuenta" || pathname.startsWith("/cuenta/")) return true;
-  if (pathname === "/notificaciones" || pathname.startsWith("/notificaciones/"))
-    return true;
-  if (pathname === "/sites") return true;
-  return /^\/sites\/[^/]+\/(archivos|qa)(?:\/.*)?$/.test(pathname);
-}
-
 /** Server layout gate for (app) routes. */
 export async function enforceAppAccess() {
   const user = await getCurrentUser();
@@ -83,7 +76,7 @@ export async function enforceAppAccess() {
   const path = h.get("x-lexopen-pathname") || "";
 
   // Fail closed: missing pathname header must not skip the client path gate.
-  if (isCliente(user.role) && !isClientAllowedPath(path)) {
+  if (isCliente(user.role) && !isClientAllowedPagePath(path)) {
     redirect("/portal");
   }
 

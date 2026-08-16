@@ -10,7 +10,7 @@ import {
 import { causaCreateSchema } from "@/lib/schemas";
 import { validarRit, validarRuc, validarRut, normalizarRut } from "@/lib/chile";
 import { checkConflicts } from "@/lib/conflict";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { canSeeConfidential, isStaff } from "@/lib/auth/rbac";
@@ -162,12 +162,20 @@ export async function POST(req: NextRequest) {
         userId: user.id,
       },
     });
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
-      action: "causa.create",
+      action: body.conflictOverride && blocked.length
+        ? "causa.create.conflict_override"
+        : "causa.create",
       entityType: "Causa",
       entityId: causa.id,
-      after: { titulo: causa.titulo, rit: causa.rit, conflicts },
+      after: {
+        titulo: causa.titulo,
+        rit: causa.rit,
+        conflicts,
+        conflictOverride: Boolean(body.conflictOverride && blocked.length),
+        conflictNotes: body.conflictNotes || null,
+      },
     });
 
     return NextResponse.json({ ...causa, conflicts }, { status: 201 });

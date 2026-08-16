@@ -60,6 +60,7 @@ export const en: Dictionary = {
     files: "Files",
     tasks: "Tasks",
     wiki: "Wiki",
+    blog: "Blog",
     isheets: "iSheets",
     qa: "Q&A",
     people: "People",
@@ -128,6 +129,31 @@ export const en: Dictionary = {
     languageTitle: "Interface language",
     languageHelp:
       "Affects navigation, login and platform chrome. Chilean legal content (RIT, deadlines, minutes) stays in Spanish where appropriate.",
+  },
+  dashboard: {
+    eyebrow: "Firm home",
+    titleFallback: "Home",
+    hello: "Hello, {name}",
+    subtitle: "Clients, matters, open filings, minutes and firm activity.",
+    clients: "Clients",
+    newCase: "New matter",
+  },
+  causas: {
+    eyebrow: "Litigation",
+    title: "Matters",
+    subtitle: "Firm dockets with RIT/RUC, stage and deadlines.",
+    newCase: "New matter",
+    empty: "No matters match those filters.",
+  },
+  portal: {
+    eyebrow: "Client experience",
+    title: "Client portal",
+    subtitleClient:
+      "Shared documents (tag «cliente»), milestones and limited Q&A. You only see spaces where you are a member; you can open questions while a thread is open.",
+    subtitleStaff:
+      "Shared documents (tag «cliente»), milestones and limited Q&A. Staff preview (client-visible spaces).",
+    notice:
+      "Restricted access: shared documents and limited Q&A. No internal billing, firm copilot, wiki, iSheets or internal Drive folders.",
   },
   crm: {
     eyebrow: "CRM",

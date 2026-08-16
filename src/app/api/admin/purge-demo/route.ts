@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireRole } from "@/lib/api";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import {
   PURGE_CONFIRM_PHRASE,
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     // Auditoría best-effort: puede fallar si auditEvent ya se borró.
     try {
-      await writeAudit({
+      await writeAuditStrict({
         action: "purge_demo",
         entityType: "Organization",
         entityId: "all",

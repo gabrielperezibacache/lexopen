@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { isAdmin } from "@/lib/auth/rbac";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import {
   createStudioUser,
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
           members: { include: { user: { select: publicUserSelect } } },
         },
       });
-      await writeAudit({
+      await writeAuditStrict({
         actorId: actor.id,
         action: "group.create",
         entityType: "Group",
@@ -207,7 +207,7 @@ export async function POST(req: NextRequest) {
           members: { include: { user: { select: publicUserSelect } } },
         },
       });
-      await writeAudit({
+      await writeAuditStrict({
         actorId: actor.id,
         action: "group.update",
         entityType: "Group",
@@ -236,7 +236,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
       }
       await prisma.group.delete({ where: { id: data.groupId } });
-      await writeAudit({
+      await writeAuditStrict({
         actorId: actor.id,
         action: "group.delete",
         entityType: "Group",

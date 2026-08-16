@@ -12,6 +12,10 @@ import { rateLimitAsync, rateLimitAuthFailure } from "@/lib/auth/rate-limit";
 import { assertCsrf, handleRouteError } from "@/lib/api";
 import { baseCookieOptions } from "@/lib/auth/cookie-options";
 import { appendCsrfCookie } from "@/lib/auth/csrf-token";
+import {
+  mintTotpPendingToken,
+  TOTP_PENDING_COOKIE,
+} from "@/lib/auth/totp-pending";
 
 const schema = z.object({
   email: z.string().email(),
@@ -99,6 +103,19 @@ export async function POST(req: NextRequest) {
         where: { id: user.id },
         data: { password: await hashPassword(body.password) },
       });
+    }
+
+    if (user.totpEnabled && user.totpSecretEnc) {
+      const pending = mintTotpPendingToken(user.id);
+      const res = NextResponse.json({
+        ok: true,
+        needsTotp: true,
+        message: "Ingrese el código de autenticación en dos pasos",
+      });
+      const cookieBase = baseCookieOptions({ maxAge: 5 * 60 });
+      res.cookies.set(TOTP_PENDING_COOKIE, pending, cookieBase);
+      appendCsrfCookie(res);
+      return res;
     }
 
     const session = buildSessionCookieValue(

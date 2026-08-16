@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { isAdmin, isCliente } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { writeAuditStrict } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -80,6 +81,13 @@ export async function POST(req: NextRequest, { params }: Params) {
         siteId: id,
         userId: actor.id,
       },
+    });
+    await writeAuditStrict({
+      actorId: actor.id,
+      action: "site.member.upsert",
+      entityType: "SiteMember",
+      entityId: member.id,
+      after: { siteId: id, userId: body.userId, role: member.role },
     });
     return NextResponse.json(member, { status: 201 });
   } catch (e) {

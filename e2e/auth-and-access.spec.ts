@@ -44,7 +44,8 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   await expect(page.getByText("C-4521-2025")).toBeVisible();
   const causeRow = page.locator("tr").filter({ hasText: "C-4521-2025" }).first();
   const causeHref = await causeRow
-    .locator('a[href^="/causas/"]')
+    .locator('a[href^="/causas/"]:not([href*="/editar"])')
+    .first()
     .getAttribute("href");
   expect(causeHref).toBeTruthy();
   await page.goto(causeHref!);
@@ -70,6 +71,15 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   }>;
   const openInvoice = invoices.find((invoice) => invoice.totalClp > invoice.paidClp);
   expect(openInvoice).toBeTruthy();
+
+  const exportCsv = await page.request.get(
+    `/api/billing/invoices/export?format=csv&id=${openInvoice!.id}`
+  );
+  expect(exportCsv.ok()).toBeTruthy();
+  const csvText = await exportCsv.text();
+  expect(csvText).toContain("folioInterno");
+  expect(csvText).toContain("rutEmisor");
+
   const overpayment = await page.request.post("/api/billing/payments", {
     data: {
       invoiceId: openInvoice!.id,
@@ -127,6 +137,85 @@ test("un cliente queda limitado al portal y a sus espacios", async ({ page }) =>
   await expect(
     page.getByRole("checkbox", { name: "Marcar como respuesta oficial" })
   ).toHaveCount(0);
+
+  const siteId = filesHref!.split("/")[2];
+  expect(siteId).toBeTruthy();
+
+  expect(
+    (await page.request.post(`/api/sites/${siteId}/files`, {
+      data: { action: "create-folder", name: "hack" },
+    })).status()
+  ).toBe(403);
+  expect(
+    (await page.request.post(`/api/sites/${siteId}/files`, {
+      data: { action: "add-comment", fileId: "x", body: "nota interna" },
+    })).status()
+  ).toBe(403);
+  expect((await page.request.get(`/api/sites/${siteId}/isheets`)).status()).toBe(403);
+  expect(
+    (await page.request.post(`/api/sites/${siteId}/isheets`, {
+      data: { action: "update-row", rowId: "x", data: {} },
+    })).status()
+  ).toBe(403);
+  expect((await page.request.get(`/api/sites/${siteId}/wiki`)).status()).toBe(403);
+  expect(
+    (await page.request.post(`/api/sites/${siteId}/wiki`, {
+      data: { title: "hack", content: "no" },
+    })).status()
+  ).toBe(403);
+
+  await page.goto(`/sites/${siteId}/isheets`);
+  await expect(page).toHaveURL(/\/portal$/);
+  await page.goto(`/sites/${siteId}/wiki`);
+  await expect(page).toHaveURL(/\/portal$/);
+
+  expect(
+    (await page.request.post("/api/messages", {
+      data: { receiverId: "x", body: "hola" },
+    })).status()
+  ).toBe(403);
+  expect(
+    (await page.request.post(`/api/sites/${siteId}/members`, {
+      data: { userId: "x", role: "viewer" },
+    })).status()
+  ).toBe(403);
+  expect(
+    (await page.request.post("/api/sites", {
+      data: { name: "hack", tipo: "matter" },
+    })).status()
+  ).toBe(403);
+  expect(
+    (await page.request.post("/api/auth/impersonate", {
+      data: { userId: "x" },
+    })).status()
+  ).toBe(403);
+  expect((await page.request.get(`/api/sites/${siteId}`)).status()).toBe(403);
+  expect((await page.request.get("/api/billing/invoices")).status()).toBe(403);
+  expect(
+    (await page.request.get("/api/billing/invoices/export?format=csv")).status()
+  ).toBe(403);
+
+  const messagesPage = await page.goto("/mensajes");
+  expect(messagesPage?.ok()).toBeTruthy();
+  await expect(page.getByRole("heading", { name: "Mensajes" })).toBeVisible();
+
+  const searchPage = await page.goto("/buscar");
+  expect(searchPage?.ok()).toBeTruthy();
+  await expect(page.getByRole("heading", { level: 1, name: "Buscar" })).toBeVisible();
+
+  const searchRes = await page.request.get("/api/search?q=andes");
+  expect(searchRes.ok()).toBeTruthy();
+  const searchBody = (await searchRes.json()) as {
+    scope?: string;
+    causas?: unknown[];
+    files?: unknown[];
+  };
+  expect(searchBody.scope).toBe("portal");
+  expect(searchBody.causas || []).toEqual([]);
+  expect(Array.isArray(searchBody.files)).toBe(true);
+
+  await page.goto(`/sites/${siteId}`);
+  await expect(page).toHaveURL(/\/portal$/);
 
   await page.goto("/causas");
   await expect(page).toHaveURL(/\/portal$/);

@@ -44,7 +44,10 @@
 
 > [!IMPORTANT]
 > **Estado del proyecto:** LexOpen está en la versión `0.1.4` y debe considerarse un
-> prototipo funcional / base para pilotos e iteraciones. Antes de cargar información
+> prototipo funcional / base para pilotos e iteraciones. El checklist de Host local
+> (`docs/WEB-HOST.md`) cubre ACL del portal, auditoría estricta en mutaciones
+> sensibles, 2FA TOTP y export CSV/XML de facturación hacia un facturador externo
+> (sin DTE/SII in-app). Antes de cargar información
 > real de clientes o causas, revise seguridad, permisos, respaldos, cumplimiento y
 > fuentes jurídicas según las necesidades de su práctica (solo o en equipo).
 
@@ -1107,18 +1110,21 @@ de producción:
   versión en BD; descargas fuerzan `attachment` salvo MIME seguros; listados/
   búsqueda no devuelven cuerpos de archivo; setup/recovery usan cookie httpOnly
   (Desktop no pone el token en la URL); `openExternal` del Desktop tiene allowlist;
-- el portal cliente no debe presentarse como estrictamente de solo lectura sin una
-  revisión adicional de permisos;
+- el portal cliente ofrece documentos compartidos y Q&A limitado (no es un
+  expediente completo ni un portal de solo lectura estricto); revise permisos
+  antes de compartir matters;
 - los campos de confidencialidad no equivalen a una implementación completa de
   privilegio abogado-cliente;
-- la auditoría es de mejor esfuerzo: un fallo al persistirla no necesariamente
-  bloquea la operación;
+- la auditoría es best-effort salvo mutaciones sensibles (auth, personas, purge,
+  ClaveÚnica, billing, override de conflicto), que fallan si no se puede persistir
+  el evento;
 - no hay topología multi-Host ni alta disponibilidad; los backups automáticos
   locales son opcionales, requieren almacenamiento separado y no sustituyen una
   copia externa cifrada;
 - la jurisprudencia y los plazos son datos/ayudas de demo, no fuentes oficiales;
 - los documentos de facturación son control interno y no constituyen DTE electrónico
-  ni integración con el SII;
+  ni integración con el SII; exporte CSV/XML desde Facturación → Facturas para un
+  facturador externo certificado;
 - la integración live con PJUD es opt-in (partner API, sidecar scrape o
   Playwright+CAPTCHA / ClaveÚnica) y no es una API oficial del Poder Judicial;
   quien active el scrape asume el costo y el riesgo de ese mecanismo (véase el

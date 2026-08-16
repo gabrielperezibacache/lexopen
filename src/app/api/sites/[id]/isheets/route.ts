@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 import { isCliente } from "@/lib/auth/rbac";
+import { triggerSiteWorkflows } from "@/lib/sites/workflow-triggers";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -106,6 +107,12 @@ export async function POST(req: NextRequest, { params }: Params) {
           dataJson: JSON.stringify(body.data || {}),
         },
       });
+      await triggerSiteWorkflows({
+        siteId: id,
+        triggerType: "isheet_row",
+        actorId: user.id,
+        payload: { sheetId: body.sheetId, rowId: row.id },
+      });
       return NextResponse.json(row, { status: 201 });
     }
 
@@ -120,6 +127,16 @@ export async function POST(req: NextRequest, { params }: Params) {
         data: { dataJson: JSON.stringify(body.data || {}) },
       });
       return NextResponse.json(row);
+    }
+
+    if (body.action === "delete-row" && body.rowId) {
+      const existing = await prisma.iSheetRow.findFirst({
+        where: { id: body.rowId, sheet: { siteId: id } },
+        select: { id: true },
+      });
+      if (!existing) return NextResponse.json({ error: "Fila no encontrada" }, { status: 404 });
+      await prisma.iSheetRow.delete({ where: { id: existing.id } });
+      return NextResponse.json({ ok: true });
     }
 
     return NextResponse.json({ error: "Acción no válida" }, { status: 400 });

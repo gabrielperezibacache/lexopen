@@ -8,11 +8,12 @@ import {
 } from "@/lib/api";
 import { clientSiteWhere, confidentialFileWhere } from "@/lib/auth/access";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
-import { ftsCausaIds } from "@/lib/search";
+import { ftsCausaIds, ftsDocumentoIds, ftsWikiIds } from "@/lib/search";
 import {
   documentoListSelect,
   siteFileListSelect,
 } from "@/lib/sites/file-select";
+import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
 
 const textMatch = (q: string) => ({ contains: q, mode: "insensitive" as const });
 
@@ -62,35 +63,76 @@ export async function GET(req: NextRequest) {
     const minutaFilter = minutaConfidentialWhere(user.role);
 
     if (isCliente(user.role)) {
-      const sites = await prisma.site.findMany({
-        where: {
-          AND: [
-            clientSiteWhere(user.id),
-            {
-              OR: [
-                { name: textMatch(q) },
-                { description: textMatch(q) },
-              ],
-            },
-          ],
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          tipo: true,
-          description: true,
-        },
-        take: 10,
-      });
+      const [sites, files, tasks] = await Promise.all([
+        prisma.site.findMany({
+          where: {
+            AND: [
+              clientSiteWhere(user.id),
+              {
+                OR: [
+                  { name: textMatch(q) },
+                  { description: textMatch(q) },
+                ],
+              },
+            ],
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            tipo: true,
+            description: true,
+          },
+          take: 10,
+        }),
+        prisma.siteFile.findMany({
+          where: {
+            AND: [
+              { site: clientSiteWhere(user.id) },
+              { confidencial: false, privilegio: false },
+              clientSharedTagPrismaWhere(),
+              {
+                OR: [
+                  { name: textMatch(q) },
+                  { tags: textMatch(q) },
+                  { contenido: textMatch(q) },
+                ],
+              },
+            ],
+          },
+          select: {
+            ...siteFileListSelect,
+            site: { select: { id: true, name: true, slug: true } },
+          },
+          take: 10,
+        }),
+        prisma.task.findMany({
+          where: {
+            AND: [
+              { site: clientSiteWhere(user.id) },
+              {
+                OR: [{ title: textMatch(q) }, { description: textMatch(q) }],
+              },
+            ],
+          },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            siteId: true,
+            site: { select: { id: true, name: true } },
+          },
+          take: 10,
+        }),
+      ]);
       return NextResponse.json({
         sites,
         causas: [],
         clientes: [],
         tramites: [],
-        files: [],
+        files,
         documentos: [],
-        tasks: [],
+        tasks,
         jurisprudencia: [],
         wiki: [],
         minutas: [],
@@ -103,7 +145,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Prohibido" }, { status: 403 });
     }
 
-    const ftsIds = await ftsCausaIds(prisma, q, 10);
+    const [ftsIds, docFtsIds, wikiFtsIds] = await Promise.all([
+      ftsCausaIds(prisma, q, 10),
+      ftsDocumentoIds(prisma, q, 10),
+      ftsWikiIds(prisma, q, 10),
+    ]);
 
     const [
       sites,
@@ -205,15 +251,17 @@ export async function GET(req: NextRequest) {
           where: {
             AND: [
               docFilter,
-              {
-                OR: [
-                  { nombre: textMatch(q) },
-                  { ruta: textMatch(q) },
-                  { tipo: textMatch(q) },
-                  { extractedMarkdown: textMatch(q) },
-                  { contenido: textMatch(q) },
-                ],
-              },
+              docFtsIds
+                ? { id: { in: docFtsIds } }
+                : {
+                    OR: [
+                      { nombre: textMatch(q) },
+                      { ruta: textMatch(q) },
+                      { tipo: textMatch(q) },
+                      { extractedMarkdown: textMatch(q) },
+                      { contenido: textMatch(q) },
+                    ],
+                  },
             ],
           },
           select: {
@@ -257,9 +305,11 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.wikiPage.findMany({
-          where: {
-            OR: [{ title: textMatch(q) }, { content: textMatch(q) }],
-          },
+          where: wikiFtsIds
+            ? { id: { in: wikiFtsIds } }
+            : {
+                OR: [{ title: textMatch(q) }, { content: textMatch(q) }],
+              },
           select: {
             id: true,
             title: true,

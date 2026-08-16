@@ -1,0 +1,35 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "totpSecretEnc" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "totpEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "totpBackupCodes" TEXT;
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "WikiPageRevision" (
+    "id" TEXT NOT NULL,
+    "pageId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "authorId" TEXT,
+
+    CONSTRAINT "WikiPageRevision_pkey" PRIMARY KEY ("id")
+);
+
+-- AlterTable BlogPost
+ALTER TABLE "BlogPost" ADD COLUMN IF NOT EXISTS "slug" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "BlogPost" ADD COLUMN IF NOT EXISTS "published" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "BlogPost" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "BlogPost" ADD COLUMN IF NOT EXISTS "authorId" TEXT;
+
+-- AddForeignKey
+DO $$ BEGIN
+  ALTER TABLE "WikiPageRevision" ADD CONSTRAINT "WikiPageRevision_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "WikiPage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "WikiPageRevision" ADD CONSTRAINT "WikiPageRevision_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "BlogPost" ADD CONSTRAINT "BlogPost_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
