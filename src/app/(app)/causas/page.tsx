@@ -8,6 +8,7 @@ import { CausaManageActions } from "@/components/CausaManageActions";
 import { requireStaff } from "@/lib/auth/session";
 import { PageHeader } from "@/components/sites/SiteNav";
 import { labelCausaOrigen } from "@/lib/pjud/causa-origin";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function CausasPage({
   searchParams,
@@ -15,6 +16,7 @@ export default async function CausasPage({
   searchParams: Promise<{ q?: string; materia?: string; estado?: string }>;
 }) {
   const user = await requireStaff();
+  const { t } = await getI18n();
   const sp = await searchParams;
   const q = sp.q?.trim();
   const materia = sp.materia;
@@ -58,9 +60,9 @@ export default async function CausasPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Litigio Chile"
-        title="Causas judiciales"
-        subtitle="Alta manual, importación ClaveÚnica (Mis Causas) o ROL en Monitoreo. Edite, archive o elimine desde aquí o la ficha."
+        eyebrow={t("causas.eyebrow")}
+        title={t("causas.title")}
+        subtitle={t("causas.subtitle")}
         actions={
           <>
             <Link href="/causas/mis-causas" className="btn btn-ghost">
@@ -70,7 +72,7 @@ export default async function CausasPage({
               Monitoreo PJUD
             </Link>
             <Link href="/causas/nueva" className="btn btn-primary">
-              <Plus size={16} /> Nueva causa
+              <Plus size={16} /> {t("causas.newCase")}
             </Link>
           </>
         }

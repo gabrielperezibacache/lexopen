@@ -23,71 +23,30 @@ export default function MessagesPage() {
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const [mRes, peopleRes, meRes] = await Promise.all([
+    const [mRes, dirRes, meRes] = await Promise.all([
       fetch("/api/messages"),
-      fetch("/api/people"),
+      fetch("/api/messages?directory=1"),
       fetch("/api/auth/me"),
     ]);
     const m = await mRes.json().catch(() => []);
-    const people = await peopleRes.json().catch(() => ({}));
+    const dir = await dirRes.json().catch(() => ({}));
     const me = await meRes.json().catch(() => ({}));
     setMessages(Array.isArray(m) ? m : []);
-    const directory = Array.isArray(people.users)
-      ? people.users
-      : Array.isArray(me.users)
-        ? me.users
-        : [];
+    const directory = Array.isArray(dir.users) ? dir.users : [];
     const myId = me.user?.id || me.id;
-    setUsers(
-      directory.filter(
-        (u: User) =>
-          u.id !== myId &&
-          (!u.role || u.role === "admin" || u.role === "abogado" || u.role === "asistente")
-      )
-    );
+    setUsers(directory.filter((u: User) => u.id !== myId));
     setLoaded(true);
   }
 
   useEffect(() => {
     let active = true;
-    Promise.all([
-      fetch("/api/messages"),
-      fetch("/api/people"),
-      fetch("/api/auth/me"),
-    ])
-      .then(async ([mRes, peopleRes, meRes]) => {
-        const m = await mRes.json().catch(() => []);
-        const people = await peopleRes.json().catch(() => ({}));
-        const me = await meRes.json().catch(() => ({}));
-        if (!active) return;
-        setMessages(Array.isArray(m) ? m : []);
-        const directory = Array.isArray(people.users)
-          ? people.users
-          : Array.isArray(me.users)
-            ? me.users
-            : [];
-        const myId = me.user?.id || me.id;
-        setUsers(
-          directory.filter(
-            (u: User) =>
-              u.id !== myId &&
-              (!u.role ||
-                u.role === "admin" ||
-                u.role === "abogado" ||
-                u.role === "asistente")
-          )
-        );
-        setLoaded(true);
-      })
-      .catch(() => {
-        if (!active) return;
-        setMessages([]);
-        setUsers([]);
-        setLoaded(true);
-      });
+    load().then(() => {
+      if (!active) return;
+    });
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function send(e: FormEvent<HTMLFormElement>) {
@@ -123,9 +82,9 @@ export default function MessagesPage() {
   return (
     <div>
       <ModuleHeader
-        eyebrow="Mensajería interna"
+        eyebrow="Mensajería"
         title="Mensajes"
-        subtitle="Bandeja segura del estudio. Las alertas del sistema están en Notificaciones."
+        subtitle="Bandeja del estudio y canal staff↔cliente acotado a miembros del portal (sin chat libre global)."
         actions={
           <Link href="/notificaciones" className="btn btn-ghost">
             Ir a notificaciones
@@ -144,7 +103,7 @@ export default function MessagesPage() {
             {loaded && messages.length === 0 && (
               <EmptyState
                 title="Bandeja vacía"
-                description="Envíe el primer mensaje a un colega del estudio."
+                description="Envíe el primer mensaje a un colega o al canal del portal."
               />
             )}
             {messages.map((m) => (

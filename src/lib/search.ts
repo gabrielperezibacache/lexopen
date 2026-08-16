@@ -45,3 +45,47 @@ export async function ftsCausaIds(
     return null;
   }
 }
+
+export async function ftsDocumentoIds(
+  prismaClient: { $queryRawUnsafe: (sql: string, ...values: unknown[]) => Promise<unknown> },
+  q: string,
+  limit = 20
+): Promise<string[] | null> {
+  const needle = q.trim();
+  if (!needle) return [];
+  try {
+    const rows = (await prismaClient.$queryRawUnsafe(
+      `SELECT id FROM "Documento"
+       WHERE to_tsvector('spanish', unaccent(coalesce(nombre,'') || ' ' || coalesce("extractedMarkdown",'') || ' ' || coalesce(contenido,'')))
+             @@ plainto_tsquery('spanish', unaccent($1))
+       LIMIT $2`,
+      needle,
+      limit
+    )) as Array<{ id: string }>;
+    return rows.map((r) => r.id);
+  } catch {
+    return null;
+  }
+}
+
+export async function ftsWikiIds(
+  prismaClient: { $queryRawUnsafe: (sql: string, ...values: unknown[]) => Promise<unknown> },
+  q: string,
+  limit = 20
+): Promise<string[] | null> {
+  const needle = q.trim();
+  if (!needle) return [];
+  try {
+    const rows = (await prismaClient.$queryRawUnsafe(
+      `SELECT id FROM "WikiPage"
+       WHERE to_tsvector('spanish', unaccent(coalesce(title,'') || ' ' || coalesce(content,'')))
+             @@ plainto_tsquery('spanish', unaccent($1))
+       LIMIT $2`,
+      needle,
+      limit
+    )) as Array<{ id: string }>;
+    return rows.map((r) => r.id);
+  } catch {
+    return null;
+  }
+}

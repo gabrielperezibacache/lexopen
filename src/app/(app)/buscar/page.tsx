@@ -117,7 +117,7 @@ export default function SearchPage() {
       <ModuleHeader
         eyebrow="Búsqueda unificada"
         title="Buscar"
-        subtitle="Espacios, causas, documentos, minutas, archivos VDR, tareas, wiki y jurisprudencia en un solo índice."
+        subtitle="Espacios, causas, documentos (FTS), minutas, archivos VDR, tareas, wiki y jurisprudencia. En el portal: spaces y archivos etiquetados «cliente»."
       />
       <form onSubmit={onSubmit} className="panel mb-6 flex gap-2 rounded-3xl p-4">
         <input

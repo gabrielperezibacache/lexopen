@@ -7,9 +7,11 @@ import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
 import { EmptyState } from "@/components/EmptyState";
 import { labelTramiteEstado } from "@/lib/tramites";
 import { PageHeader } from "@/components/sites/SiteNav";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function PortalPage() {
   const user = await requireUser();
+  const { t } = await getI18n();
 
   const sites = await prisma.site.findMany({
     where: {
@@ -28,6 +30,8 @@ export default async function PortalPage() {
           id: true,
           rit: true,
           tribunal: true,
+          etapa: true,
+          estado: true,
           updatedAt: true,
           tramites: {
             where: { estado: { in: ["pendiente", "en_curso", "hecho"] } },
@@ -38,6 +42,27 @@ export default async function PortalPage() {
               titulo: true,
               estado: true,
               fechaLimite: true,
+            },
+          },
+          plazos: {
+            where: { estado: { in: ["pendiente", "vencido"] } },
+            orderBy: { fechaLimite: "asc" },
+            take: 5,
+            select: {
+              id: true,
+              titulo: true,
+              fechaLimite: true,
+              esFatal: true,
+            },
+          },
+          movimientos: {
+            orderBy: { fecha: "desc" },
+            take: 5,
+            select: {
+              id: true,
+              titulo: true,
+              fecha: true,
+              tipo: true,
             },
           },
         },
@@ -66,22 +91,16 @@ export default async function PortalPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Experiencia cliente"
-        title="Portal del cliente"
+        eyebrow={t("portal.eyebrow")}
+        title={t("portal.title")}
         subtitle={
-          <>
-            Documentos compartidos (etiqueta «cliente»), hitos y Q&A limitado.{" "}
-            {isCliente(user.role)
-              ? "Solo ve espacios donde es miembro; puede abrir preguntas mientras el hilo esté abierto."
-              : "Vista previa staff (espacios visibles al cliente)."}
-          </>
+          isCliente(user.role) ? t("portal.subtitleClient") : t("portal.subtitleStaff")
         }
       />
 
       {isCliente(user.role) && (
         <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
-          Acceso restringido: documentos compartidos y Q&A limitado. Sin facturación
-          interna, copiloto del estudio, wiki, iSheets ni carpetas Drive internas.
+          {t("portal.notice")}
         </div>
       )}
 
@@ -108,10 +127,49 @@ export default async function PortalPage() {
                   <h2 className="mt-1 break-words text-xl font-semibold">{s.name}</h2>
                   <p className="mt-1 break-words text-sm text-[var(--ink-soft)]/70">
                     {s.causa?.rit || s.tipo} · {s.causa?.tribunal || "Portal"}
+                    {s.causa?.etapa ? ` · etapa ${s.causa.etapa}` : ""}
                   </p>
                 </div>
-                <StatusBadge estado="activa" />
+                <StatusBadge estado={s.causa?.estado === "terminada" ? "cumplido" : "activa"} />
               </div>
+
+              {s.causa && (s.causa.movimientos.length > 0 || s.causa.plazos.length > 0) && (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">Últimos movimientos</h3>
+                    <ul className="mt-2 space-y-1.5">
+                      {s.causa.movimientos.map((m) => (
+                        <li key={m.id} className="text-sm text-[var(--ink-soft)]/85">
+                          {m.titulo}
+                          <span className="block text-xs text-[var(--ink-soft)]/55">
+                            {formatDate(m.fecha)} · {m.tipo}
+                          </span>
+                        </li>
+                      ))}
+                      {s.causa.movimientos.length === 0 && (
+                        <li className="text-sm text-[var(--ink-soft)]/60">Sin movimientos.</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Plazos publicados</h3>
+                    <ul className="mt-2 space-y-1.5">
+                      {s.causa.plazos.map((p) => (
+                        <li key={p.id} className="text-sm text-[var(--ink-soft)]/85">
+                          {p.esFatal ? "Fatal · " : ""}
+                          {p.titulo}
+                          <span className="block text-xs text-[var(--ink-soft)]/55">
+                            {formatDate(p.fechaLimite)}
+                          </span>
+                        </li>
+                      ))}
+                      {s.causa.plazos.length === 0 && (
+                        <li className="text-sm text-[var(--ink-soft)]/60">Sin plazos listados.</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-5">
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
@@ -199,6 +257,12 @@ export default async function PortalPage() {
                 </Link>
                 <Link href={`/sites/${s.id}/archivos`} className="btn btn-secondary">
                   Documentos
+                </Link>
+                <Link href={`/sites/${s.id}/blog`} className="btn btn-ghost">
+                  Blog
+                </Link>
+                <Link href="/mensajes" className="btn btn-ghost">
+                  Mensajes
                 </Link>
                 {isStaff(user.role) && (
                   <Link href={`/sites/${s.id}`} className="btn btn-ghost">

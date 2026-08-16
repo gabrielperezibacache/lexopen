@@ -174,6 +174,8 @@ function SidebarChrome({
     () => [
       { href: "/portal", label: t("nav.portal"), icon: DoorOpen },
       { href: "/sites", label: t("nav.sites"), icon: Building2 },
+      { href: "/buscar", label: t("nav.search"), icon: Search },
+      { href: "/mensajes", label: t("nav.messages"), icon: MessageSquare },
       { href: "/notificaciones", label: t("nav.notifications"), icon: Bell },
       { href: "/cuenta", label: t("nav.account"), icon: Settings },
     ],

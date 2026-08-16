@@ -1,12 +1,76 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { isStaff } from "@/lib/auth/rbac";
+import { assertCsrf, handleRouteError, requireUser } from "@/lib/api";
+import { isCliente, isStaff } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
 
-export async function GET() {
+async function clientHasPortalSite(userId: string) {
+  return (
+    (await prisma.site.count({
+      where: {
+        isClientVisible: true,
+        members: { some: { userId } },
+      },
+    })) > 0
+  );
+}
+
+async function canMessage(
+  sender: { id: string; role: string },
+  receiverId: string
+): Promise<boolean> {
+  const receiver = await prisma.user.findUnique({
+    where: { id: receiverId },
+    select: { id: true, role: true },
+  });
+  if (!receiver || receiver.id === sender.id) return false;
+  if (isStaff(sender.role) && isStaff(receiver.role)) return true;
+  if (isStaff(sender.role) && isCliente(receiver.role)) {
+    return clientHasPortalSite(receiver.id);
+  }
+  if (isCliente(sender.role) && isStaff(receiver.role)) {
+    return clientHasPortalSite(sender.id);
+  }
+  return false;
+}
+
+export async function GET(req: NextRequest) {
   try {
-    const user = await requireStaff();
+    const user = await requireUser();
+    const directory = req.nextUrl.searchParams.get("directory") === "1";
+    if (directory) {
+      if (isCliente(user.role)) {
+        if (!(await clientHasPortalSite(user.id))) {
+          return NextResponse.json({ users: [] });
+        }
+        const staff = await prisma.user.findMany({
+          where: { role: { in: ["admin", "abogado", "asistente"] } },
+          select: publicUserSelect,
+          orderBy: { name: "asc" },
+        });
+        return NextResponse.json({ users: staff });
+      }
+      const clients = await prisma.user.findMany({
+        where: {
+          role: "cliente",
+          siteMemberships: {
+            some: { site: { isClientVisible: true } },
+          },
+        },
+        select: publicUserSelect,
+        orderBy: { name: "asc" },
+      });
+      const staff = await prisma.user.findMany({
+        where: {
+          role: { in: ["admin", "abogado", "asistente"] },
+          id: { not: user.id },
+        },
+        select: publicUserSelect,
+        orderBy: { name: "asc" },
+      });
+      return NextResponse.json({ users: [...staff, ...clients] });
+    }
+
     const messages = await prisma.message.findMany({
       where: { OR: [{ receiverId: user.id }, { senderId: user.id }] },
       include: {
@@ -25,7 +89,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
-    const user = await requireStaff();
+    const user = await requireUser();
     const body = await req.json();
     if (
       typeof body.receiverId !== "string" ||
@@ -34,14 +98,16 @@ export async function POST(req: NextRequest) {
       !body.body.trim() ||
       body.body.length > 10000
     ) {
-      return NextResponse.json({ error: "Destinatario y mensaje son obligatorios" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Destinatario y mensaje son obligatorios" },
+        { status: 400 }
+      );
     }
-    const receiver = await prisma.user.findUnique({
-      where: { id: body.receiverId },
-      select: { id: true, role: true },
-    });
-    if (!receiver || !isStaff(receiver.role)) {
-      return NextResponse.json({ error: "Destinatario no encontrado" }, { status: 404 });
+    if (!(await canMessage(user, body.receiverId))) {
+      return NextResponse.json(
+        { error: "No puede mensajear a este destinatario" },
+        { status: 403 }
+      );
     }
     const msg = await prisma.message.create({
       data: {

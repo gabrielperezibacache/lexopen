@@ -11,6 +11,7 @@ export function isClientAllowedPagePath(pathname: string): boolean {
   if (pathname === "/notificaciones" || pathname.startsWith("/notificaciones/"))
     return true;
   if (pathname === "/mensajes" || pathname.startsWith("/mensajes/")) return true;
+  if (pathname === "/buscar" || pathname.startsWith("/buscar/")) return true;
   if (pathname === "/sites") return true;
   return /^\/sites\/[^/]+\/(archivos|qa|blog)(?:\/.*)?$/.test(pathname);
 }

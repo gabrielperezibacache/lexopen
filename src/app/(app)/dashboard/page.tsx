@@ -12,9 +12,11 @@ import {
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { PageHeader } from "@/components/sites/SiteNav";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+  const { t } = await getI18n();
   const now = new Date();
 
   const [
@@ -131,16 +133,20 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Inicio del estudio"
-        title={user ? `Hola, ${user.name.split(" ")[0]}` : "Inicio"}
-        subtitle="Clientes, causas, trámites pendientes, minutas y actividad del estudio."
+        eyebrow={t("dashboard.eyebrow")}
+        title={
+          user
+            ? t("dashboard.hello").replace("{name}", user.name.split(" ")[0])
+            : t("dashboard.titleFallback")
+        }
+        subtitle={t("dashboard.subtitle")}
         actions={
           <>
             <Link href="/clientes" className="btn btn-secondary">
-              Clientes
+              {t("dashboard.clients")}
             </Link>
             <Link href="/causas/nueva" className="btn btn-primary">
-              Nueva causa <ArrowRight size={16} />
+              {t("dashboard.newCase")} <ArrowRight size={16} />
             </Link>
           </>
         }

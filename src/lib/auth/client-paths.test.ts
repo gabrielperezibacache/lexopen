@@ -13,6 +13,7 @@ assert.equal(isClientAllowedPagePath("/sites/abc"), false);
 assert.equal(isClientAllowedPagePath("/sites/abc/archivos"), true);
 assert.equal(isClientAllowedPagePath("/sites/abc/blog"), true);
 assert.equal(isClientAllowedPagePath("/mensajes"), true);
+assert.equal(isClientAllowedPagePath("/buscar"), true);
 assert.equal(isClientAllowedPath("/api/sites/abc/blog"), true);
 assert.equal(isClientAllowedPath("/api/messages"), true);
 assert.equal(isClientAllowedPagePath("/causas"), false);
