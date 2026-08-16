@@ -43,7 +43,7 @@ export default async function CuentaCorrientePage({
       <ModuleHeader
         eyebrow="Provisión de fondos"
         title="Cuenta corriente"
-        subtitle="Provisiones de fondos, cargos por honorarios/gastos, pagos y saldo a favor del cliente."
+        subtitle="Provisiones, cargos y pagos por cliente. Saldos de control interno; exporte documentos a facturador externo desde Facturas (CSV/XML, no DTE SII)."
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

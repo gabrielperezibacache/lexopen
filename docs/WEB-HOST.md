@@ -119,6 +119,9 @@ Use esta lista antes de cargar información real del estudio:
 14. **Auditoría:** mutaciones sensibles (auth, personas, purge, ClaveÚnica,
     billing, override de conflicto) deben persistir evento de auditoría;
     compruebe `/auditoria` tras un cambio de prueba.
+15. **Facturación / DTE:** los documentos internos no son DTE SII. Exporte
+    CSV/XML desde Facturación → Facturas (`/api/billing/invoices/export`) hacia
+    un facturador externo certificado.
 
 ## OCR local para PDFs escaneados
 

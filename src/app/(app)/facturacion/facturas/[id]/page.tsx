@@ -68,8 +68,20 @@ export default async function InvoiceDetailPage({ params }: Params) {
             >
               Ver PDF / imprimir
             </a>
+            <a
+              href={`/api/billing/invoices/export?format=csv&id=${invoice.id}`}
+              className="btn btn-ghost w-full sm:w-auto"
+            >
+              Exportar para facturador (CSV)
+            </a>
+            <a
+              href={`/api/billing/invoices/export?format=xml&id=${invoice.id}`}
+              className="btn btn-ghost w-full sm:w-auto"
+            >
+              Exportar XML
+            </a>
             <p className="max-w-xs text-left text-xs text-[var(--ink-soft)]/60 sm:text-right">
-              Cuenta interna LexOpen — no es DTE SII
+              Cuenta interna LexOpen — no es DTE SII. Use CSV/XML con un facturador externo certificado.
             </p>
           </div>
         </div>

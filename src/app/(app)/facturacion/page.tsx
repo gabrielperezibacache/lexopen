@@ -76,12 +76,15 @@ export default async function FacturacionPage() {
       <ModuleHeader
         eyebrow="Contabilidad del estudio"
         title="Facturación"
-        subtitle="Horas, gastos, boletas/facturas (piloto sin DTE SII completo), pagos y cuenta corriente por cliente/causa."
+        subtitle="Horas, gastos, boletas/facturas internas (no DTE SII), pagos y cuenta corriente. Exporte CSV/XML a un facturador externo desde Facturas."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/facturacion/horas" className="btn btn-ghost">
               + Horas
             </Link>
+            <a href="/api/billing/invoices/export?format=csv" className="btn btn-ghost">
+              Exportar CSV
+            </a>
             <Link href="/facturacion/facturas" className="btn btn-primary">
               Facturas
             </Link>

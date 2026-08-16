@@ -1112,14 +1112,16 @@ de producción:
   antes de compartir matters;
 - los campos de confidencialidad no equivalen a una implementación completa de
   privilegio abogado-cliente;
-- la auditoría es de mejor esfuerzo: un fallo al persistirla no necesariamente
-  bloquea la operación;
+- la auditoría es best-effort salvo mutaciones sensibles (auth, personas, purge,
+  ClaveÚnica, billing, override de conflicto), que fallan si no se puede persistir
+  el evento;
 - no hay topología multi-Host ni alta disponibilidad; los backups automáticos
   locales son opcionales, requieren almacenamiento separado y no sustituyen una
   copia externa cifrada;
 - la jurisprudencia y los plazos son datos/ayudas de demo, no fuentes oficiales;
 - los documentos de facturación son control interno y no constituyen DTE electrónico
-  ni integración con el SII;
+  ni integración con el SII; exporte CSV/XML desde Facturación → Facturas para un
+  facturador externo certificado;
 - la integración live con PJUD es opt-in (partner API, sidecar scrape o
   Playwright+CAPTCHA / ClaveÚnica) y no es una API oficial del Poder Judicial;
   quien active el scrape asume el costo y el riesgo de ese mecanismo (véase el
