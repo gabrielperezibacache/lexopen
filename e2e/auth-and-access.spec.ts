@@ -147,6 +147,29 @@ test("un cliente queda limitado al portal y a sus espacios", async ({ page }) =>
     })).status()
   ).toBe(403);
   expect(
+    (await page.request.post(`/api/sites/${siteId}/files`, {
+      data: { action: "add-comment", fileId: "x", body: "nota interna" },
+    })).status()
+  ).toBe(403);
+  expect((await page.request.get(`/api/sites/${siteId}/isheets`)).status()).toBe(403);
+  expect(
+    (await page.request.post(`/api/sites/${siteId}/isheets`, {
+      data: { action: "update-row", rowId: "x", data: {} },
+    })).status()
+  ).toBe(403);
+  expect((await page.request.get(`/api/sites/${siteId}/wiki`)).status()).toBe(403);
+  expect(
+    (await page.request.post(`/api/sites/${siteId}/wiki`, {
+      data: { title: "hack", content: "no" },
+    })).status()
+  ).toBe(403);
+
+  await page.goto(`/sites/${siteId}/isheets`);
+  await expect(page).toHaveURL(/\/portal$/);
+  await page.goto(`/sites/${siteId}/wiki`);
+  await expect(page).toHaveURL(/\/portal$/);
+
+  expect(
     (await page.request.post("/api/messages", {
       data: { receiverId: "x", body: "hola" },
     })).status()
