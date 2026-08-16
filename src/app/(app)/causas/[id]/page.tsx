@@ -20,6 +20,7 @@ import {
   isRealDriveFolderId,
 } from "@/lib/integrations/drive-folder";
 import { labelConflictStatus } from "@/lib/conflict";
+import { ConflictReviewPanel } from "@/components/ConflictReviewPanel";
 import { requireStaff } from "@/lib/auth/session";
 import { confidentialWhere, minutaConfidentialWhere } from "@/lib/api";
 import { documentoListSelect } from "@/lib/sites/file-select";
@@ -303,6 +304,12 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           folderUrl={causa.googleDriveFolderUrl}
         />
       </div>
+
+      <ConflictReviewPanel
+        causaId={causa.id}
+        status={causa.conflictStatus}
+        notes={causa.conflictNotes}
+      />
 
       <section id="tramites" className="panel scroll-mt-24 rounded-3xl p-5">
         <h2 className="mb-3 text-lg font-semibold">Trámites</h2>

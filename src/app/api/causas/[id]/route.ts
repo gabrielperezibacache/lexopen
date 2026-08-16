@@ -14,6 +14,10 @@ import { publicUserSelect } from "@/lib/auth/public-user";
 import { isStaff } from "@/lib/auth/rbac";
 import { documentoListSelect } from "@/lib/sites/file-select";
 import { causaUpdateSchema } from "@/lib/schemas";
+import {
+  checkConflicts,
+  summarizeConflictStatus,
+} from "@/lib/conflict";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -87,13 +91,30 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (data.clienteId === "") data.clienteId = null;
     if (data.abogadoId === "") data.abogadoId = null;
 
-    const prev = await prisma.causa.findUnique({ where: { id } });
+    const prev = await prisma.causa.findUnique({
+      where: { id },
+      include: { partes: true },
+    });
     if (!prev) {
       return NextResponse.json({ error: "No encontrada" }, { status: 404 });
     }
     const causa = await prisma.causa.update({
       where: { id },
       data,
+    });
+
+    // Re-check conflicts against current parties after any update.
+    const conflicts = await checkConflicts({
+      partes: prev.partes.map((p) => ({ nombre: p.nombre, rut: p.rut })),
+      excludeCausaId: id,
+    });
+    const conflictStatus = summarizeConflictStatus(conflicts);
+    await prisma.causa.update({
+      where: { id },
+      data: {
+        conflictCheckedAt: new Date(),
+        conflictStatus,
+      },
     });
 
     if (body.estado || body.etapa) {
@@ -117,10 +138,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       entityType: "Causa",
       entityId: id,
       before: prev,
-      after: data,
+      after: { ...data, conflictStatus, conflictHits: conflicts.length },
     });
 
-    return NextResponse.json(causa);
+    return NextResponse.json({ ...causa, conflictStatus, conflicts });
   } catch (e) {
     return handleRouteError(e);
   }
