@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { toPublicUser } from "@/lib/auth/public-user";
 
 const ROLES = ["admin", "abogado", "asistente", "cliente"] as const;
@@ -59,7 +59,7 @@ export async function createStudioUser(opts: {
       avatarColor: pickAvatarColor(opts.name),
     },
   });
-  await writeAudit({
+  await writeAuditStrict({
     actorId: opts.actorId,
     action: "user.create",
     entityType: "User",
@@ -122,7 +122,7 @@ export async function updateStudioUser(opts: {
     data,
   });
 
-  await writeAudit({
+  await writeAuditStrict({
     actorId: opts.actorId,
     action: "user.update",
     entityType: "User",
@@ -269,7 +269,7 @@ export async function deleteStudioUser(opts: {
     throw e;
   }
 
-  await writeAudit({
+  await writeAuditStrict({
     actorId: opts.actorId,
     action: "user.delete",
     entityType: "User",

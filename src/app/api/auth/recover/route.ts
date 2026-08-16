@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError } from "@/lib/api";
 import { hashPassword } from "@/lib/auth/password";
 import { isValidBootstrapToken } from "@/lib/auth/bootstrap";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
 import { rotateDesktopEnvSecret } from "@/lib/auth/env-secrets";
 import {
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
           sessionVersion: { increment: 1 },
         },
       });
-      await writeAudit({
+      await writeAuditStrict({
         actorId: null,
         action: "user.password_recovery",
         entityType: "User",

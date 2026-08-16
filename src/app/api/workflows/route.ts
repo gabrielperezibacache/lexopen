@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { writeAuditStrict } from "@/lib/audit";
 
 export async function GET() {
   try {
@@ -95,6 +96,18 @@ export async function POST(req: NextRequest) {
                 ? "approved"
                 : "running",
           actorId: user.id,
+        },
+      });
+      await writeAuditStrict({
+        actorId: user.id,
+        action: "workflow.advance",
+        entityType: "WorkflowInstance",
+        entityId: updated.id,
+        after: {
+          workflowId: inst.workflowId,
+          status: updated.status,
+          currentStep: updated.currentStep,
+          decision: body.decision,
         },
       });
       return NextResponse.json(updated);
