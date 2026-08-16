@@ -18,6 +18,7 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState(SHOW_DEMO_LOGIN ? "socio@estudio.cl" : "");
+  const [needsTotp, setNeedsTotp] = useState(false);
   const { t } = useI18n();
 
   const demoUsers = useMemo(
@@ -36,6 +37,24 @@ function LoginForm() {
     setError("");
     try {
       const fd = new FormData(e.currentTarget);
+      if (needsTotp) {
+        const res = await fetch("/api/auth/totp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "verify-login",
+            code: fd.get("totp"),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || t("login.error"));
+          return;
+        }
+        router.push(safeAppPath(next));
+        router.refresh();
+        return;
+      }
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -47,6 +66,10 @@ function LoginForm() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || t("login.error"));
+        return;
+      }
+      if (data.needsTotp) {
+        setNeedsTotp(true);
         return;
       }
       router.push(safeAppPath(next));
@@ -92,31 +115,64 @@ function LoginForm() {
               className="input"
               name="email"
               type="email"
-              required
+              required={!needsTotp}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="username"
+              disabled={needsTotp}
             />
           </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">{t("login.password")}</span>
-            <input
-              className="input"
-              name="password"
-              type="password"
-              required
-              defaultValue={SHOW_DEMO_LOGIN ? "lexopen" : ""}
-              autoComplete="current-password"
-            />
-          </label>
+          {!needsTotp ? (
+            <label className="block text-sm">
+              <span className="mb-1 block text-[var(--ink-soft)]/70">{t("login.password")}</span>
+              <input
+                className="input"
+                name="password"
+                type="password"
+                required
+                defaultValue={SHOW_DEMO_LOGIN ? "lexopen" : ""}
+                autoComplete="current-password"
+              />
+            </label>
+          ) : (
+            <label className="block text-sm">
+              <span className="mb-1 block text-[var(--ink-soft)]/70">
+                Código 2FA o respaldo
+              </span>
+              <input
+                className="input"
+                name="totp"
+                required
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                autoFocus
+              />
+            </label>
+          )}
           {error && (
             <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
               {error}
             </p>
           )}
           <button className="btn btn-primary w-full" disabled={busy} type="submit">
-            {busy ? t("login.submitting") : t("login.submit")}
+            {busy
+              ? t("login.submitting")
+              : needsTotp
+                ? "Verificar 2FA"
+                : t("login.submit")}
           </button>
+          {needsTotp && (
+            <button
+              type="button"
+              className="btn btn-ghost w-full"
+              onClick={() => {
+                setNeedsTotp(false);
+                setError("");
+              }}
+            >
+              Volver
+            </button>
+          )}
         </form>
 
         {SHOW_DEMO_LOGIN && (

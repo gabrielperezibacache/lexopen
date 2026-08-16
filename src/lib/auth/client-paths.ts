@@ -16,7 +16,7 @@ export function isClientAllowedPagePath(pathname: string): boolean {
 
 /** Auth API paths cliente may call (subset of /api/auth/*). */
 const CLIENT_AUTH_API =
-  /^\/api\/auth\/(me|logout|password)(?:\/|$)/;
+  /^\/api\/auth\/(me|logout|password|totp)(?:\/|$)/;
 
 /** Full path allowlist for role=cliente (pages + APIs). */
 export function isClientAllowedPath(pathname: string): boolean {

@@ -25,6 +25,7 @@ assert.equal(isClientAllowedPath("/api/notifications"), true);
 assert.equal(isClientAllowedPath("/api/auth/me"), true);
 assert.equal(isClientAllowedPath("/api/auth/password"), true);
 assert.equal(isClientAllowedPath("/api/auth/logout"), true);
+assert.equal(isClientAllowedPath("/api/auth/totp"), true);
 assert.equal(isClientAllowedPath("/api/auth/impersonate"), false);
 assert.equal(isClientAllowedPath("/api/auth/login"), false);
 assert.equal(isClientAllowedPath("/api/messages"), false);

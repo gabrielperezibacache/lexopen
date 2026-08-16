@@ -20,6 +20,7 @@ const PUBLIC_PATHS = [
   "/recovery",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/totp",
   "/api/setup",
   "/api/auth/recover",
   "/api/integrations/pjud/webhook",

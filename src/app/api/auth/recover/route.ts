@@ -66,6 +66,9 @@ export async function POST(req: NextRequest) {
         data: {
           password: await hashPassword(body.newPassword),
           sessionVersion: { increment: 1 },
+          totpEnabled: false,
+          totpSecretEnc: null,
+          totpBackupCodes: null,
         },
       });
       await writeAuditStrict({
@@ -73,7 +76,7 @@ export async function POST(req: NextRequest) {
         action: "user.password_recovery",
         entityType: "User",
         entityId: admin.id,
-        after: { source: "local recovery token" },
+        after: { source: "local recovery token", totpCleared: true },
       });
       // One-time use: rotate recovery token after a successful reset.
       await rotateDesktopEnvSecret("LEXOPEN_RECOVERY_TOKEN");

@@ -51,6 +51,11 @@ model User {
   sessionVersion Int @default(0)
   avatarColor String @default("#1f6f78")
   title     String?
+  /// TOTP secret AES-GCM (enc:v2:…) when 2FA enrolled
+  totpSecretEnc   String?
+  totpEnabled     Boolean  @default(false)
+  /// JSON array of bcrypt-hashed one-time backup codes
+  totpBackupCodes String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -69,6 +74,7 @@ model User {
   notifications   Notification[]
   qaPosts         QaPost[]
   wikiPages       WikiPage[]
+  wikiRevisions   WikiPageRevision[] @relation("WikiRevisionAuthor")
   workflowActions WorkflowInstance[] @relation("WorkflowActor")
   groupMembers    GroupMember[]
   fileVersions    FileVersion[]
@@ -81,6 +87,7 @@ model User {
   auditEvents     AuditEvent[]
   timeApprovals   TimeEntry[]      @relation("TimeApprover")
   agentChats      AgentChat[]
+  blogPosts       BlogPost[]       @relation("BlogAuthor")
 }
 
 model AuditEvent {
@@ -632,17 +639,34 @@ model WikiPage {
   site     Site  @relation(fields: [siteId], references: [id], onDelete: Cascade)
   authorId String?
   author   User? @relation(fields: [authorId], references: [id])
+  revisions WikiPageRevision[]
 
   @@unique([siteId, slug])
+}
+
+model WikiPageRevision {
+  id        String   @id @default(cuid())
+  pageId    String
+  page      WikiPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  authorId  String?
+  author    User?    @relation("WikiRevisionAuthor", fields: [authorId], references: [id])
 }
 
 model BlogPost {
   id        String   @id @default(cuid())
   title     String
+  slug      String   @default("")
   body      String
+  published Boolean  @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
   siteId    String
   site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?    @relation("BlogAuthor", fields: [authorId], references: [id])
 }
 
 /// HighQ iSheets — structured collaborative tables

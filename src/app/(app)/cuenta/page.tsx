@@ -1,5 +1,6 @@
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { PasswordChangeForm } from "@/components/PasswordChangeForm";
+import { TotpSettingsPanel } from "@/components/TotpSettingsPanel";
 import { requireUser } from "@/lib/auth/session";
 
 export default async function CuentaPage() {
@@ -13,6 +14,7 @@ export default async function CuentaPage() {
         subtitle={`${user.name} · ${user.email}`}
       />
       <PasswordChangeForm />
+      <TotpSettingsPanel />
     </div>
   );
 }
