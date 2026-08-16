@@ -2,10 +2,12 @@ import { prisma } from "@/lib/db";
 import { formatDate } from "@/components/ui";
 import { labelMateria, MATERIAS } from "@/lib/chile";
 import { JurisprudenciaSearch } from "@/components/JurisprudenciaSearch";
+import { JurisprudenciaIngestForm } from "@/components/JurisprudenciaIngestForm";
 import { requireStaff } from "@/lib/auth/session";
 import { PageHeader } from "@/components/sites/SiteNav";
 import { EmptyState } from "@/components/EmptyState";
 import type { Prisma } from "@prisma/client";
+import { isAdmin } from "@/lib/auth/rbac";
 
 const LIST_TAKE = 80;
 
@@ -14,7 +16,7 @@ export default async function JurisprudenciaPage({
 }: {
   searchParams: Promise<{ q?: string; materia?: string }>;
 }) {
-  await requireStaff();
+  const user = await requireStaff();
   const sp = await searchParams;
   const q = (sp.q || "").trim();
   const materia = sp.materia;
@@ -62,10 +64,11 @@ export default async function JurisprudenciaPage({
       <PageHeader
         eyebrow="Base doctrinal"
         title="Jurisprudencia"
-        subtitle="Corpus de demostración para pilotos (no es el repositorio oficial del Poder Judicial). En producción conecte su fuente o scraper."
+        subtitle="Corpus local (seed demo o importado). No es el repositorio oficial del Poder Judicial."
       />
 
       <JurisprudenciaSearch materias={[...MATERIAS]} />
+      {isAdmin(user.role) && <JurisprudenciaIngestForm />}
 
       {items.length > 0 ? (
         <p className="text-xs text-[var(--ink-soft)]/65">

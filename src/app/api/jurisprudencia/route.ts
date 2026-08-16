@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { handleRouteError, requireStaff } from "@/lib/api";
+import {
+  assertCsrf,
+  handleRouteError,
+  parseBody,
+  requireRole,
+  requireStaff,
+} from "@/lib/api";
+import { parseLocalDateInput } from "@/lib/minutas";
+import { writeAuditStrict } from "@/lib/audit";
 
 const listSelect = {
   id: true,
@@ -16,6 +25,21 @@ const listSelect = {
   fuente: true,
   fecha: true,
 } satisfies Prisma.JurisprudenciaSelect;
+
+const itemSchema = z.object({
+  rol: z.string().trim().min(1).max(120),
+  tribunal: z.string().trim().min(1).max(200),
+  sala: z.string().trim().max(80).optional().nullable(),
+  fecha: z.string().optional().nullable(),
+  materia: z.string().trim().max(120).optional().nullable(),
+  caratula: z.string().trim().max(500).optional().nullable(),
+  descripcion: z.string().trim().max(5000).optional().nullable(),
+  doctrina: z.string().trim().max(20000).optional().nullable(),
+  texto: z.string().trim().max(200000).optional().nullable(),
+  url: z.string().trim().max(2000).optional().nullable(),
+  fuente: z.string().trim().max(120).optional().nullable(),
+  tags: z.string().trim().max(500).optional().nullable(),
+});
 
 export async function GET(req: NextRequest) {
   try {
@@ -53,9 +77,7 @@ export async function GET(req: NextRequest) {
       where,
       orderBy: { fecha: "desc" },
       take: includeTexto ? 50 : 200,
-      select: includeTexto
-        ? { ...listSelect, texto: true }
-        : listSelect,
+      select: includeTexto ? { ...listSelect, texto: true } : listSelect,
     });
 
     if (!includeTexto) {
@@ -71,6 +93,42 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json(filtered);
+  } catch (e) {
+    return handleRouteError(e);
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    assertCsrf(req);
+    const user = await requireRole("admin");
+    const body = await req.json();
+    const itemsRaw = Array.isArray(body.items) ? body.items : [body];
+    const items = z.array(itemSchema).min(1).max(200).parse(itemsRaw);
+
+    const data = items.map((item) => ({
+      rol: item.rol,
+      tribunal: item.tribunal,
+      sala: item.sala || null,
+      fecha: item.fecha ? parseLocalDateInput(item.fecha) : null,
+      materia: item.materia || null,
+      caratula: item.caratula || null,
+      descripcion: item.descripcion || null,
+      doctrina: item.doctrina || null,
+      texto: item.texto || null,
+      url: item.url || null,
+      fuente: item.fuente || "manual",
+      tags: item.tags || "",
+    }));
+
+    const created = await prisma.jurisprudencia.createMany({ data });
+    await writeAuditStrict({
+      actorId: user.id,
+      action: "jurisprudencia.import",
+      entityType: "Jurisprudencia",
+      after: { count: created.count },
+    });
+    return NextResponse.json({ ok: true, created: created.count }, { status: 201 });
   } catch (e) {
     return handleRouteError(e);
   }

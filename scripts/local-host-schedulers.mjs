@@ -204,6 +204,30 @@ export async function startLocalHostSchedulers(opts) {
         }
       },
     }),
+    startIntervalJob({
+      env,
+      baseUrl,
+      alreadyHealthy,
+      intervalKey: "UF_SYNC_INTERVAL_MINUTES",
+      label: "sync UF",
+      log,
+      timeoutMs: 60_000,
+      run: async ({ baseUrl: url, secret, log: l, timeoutMs }) => {
+        const body = await postCron({
+          url: `${url}/api/uf/sync`,
+          secret,
+          body: "{}",
+          timeoutMs,
+          log: l,
+          failLabel: "Sync UF falló",
+        });
+        if (body) {
+          l.info(
+            `UF sync: ${body.upserted || 0} valores · último ${body.latest?.valueClp ?? "—"}`
+          );
+        }
+      },
+    }),
   ]);
 
   return {

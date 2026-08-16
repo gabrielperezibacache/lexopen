@@ -36,17 +36,18 @@ function shiftMonth(d: Date, delta: number) {
   return new Date(d.getFullYear(), d.getMonth() + delta, 1, 12);
 }
 
-type Props = { searchParams: Promise<{ ym?: string }> };
+type Props = { searchParams: Promise<{ ym?: string; tipo?: string }> };
 
 export default async function CalendarioPage({ searchParams }: Props) {
   await requireStaff();
   const sp = await searchParams;
   const monthDate = parseYm(sp.ym);
+  const filterTipo = (sp.tipo || "todos").toLowerCase();
   const now = new Date();
   const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59);
 
-  const [plazos, tasks] = await Promise.all([
+  const [plazos, tasks, causasTabla, movAudiencias] = await Promise.all([
     prisma.plazo.findMany({
       where: {
         estado: { in: ["pendiente", "vencido"] },
@@ -62,6 +63,33 @@ export default async function CalendarioPage({ searchParams }: Props) {
       },
       include: { site: true },
       orderBy: { dueDate: "asc" },
+    }),
+    prisma.causa.findMany({
+      where: {
+        proximaTabla: { gte: monthStart, lte: monthEnd },
+      },
+      select: {
+        id: true,
+        rit: true,
+        titulo: true,
+        proximaTabla: true,
+        proximaTablaNota: true,
+        sala: true,
+      },
+    }),
+    prisma.causaMovimiento.findMany({
+      where: {
+        tipo: "audiencia",
+        fecha: { gte: monthStart, lte: monthEnd },
+      },
+      select: {
+        id: true,
+        titulo: true,
+        fecha: true,
+        causaId: true,
+        causa: { select: { rit: true, titulo: true } },
+      },
+      take: 200,
     }),
   ]);
 
@@ -82,16 +110,49 @@ export default async function CalendarioPage({ searchParams }: Props) {
 
   function eventsOn(day: Date) {
     const key = day.toISOString().slice(0, 10);
-    const p = plazos.filter((x) => x.fechaLimite.toISOString().slice(0, 10) === key);
-    const t = tasks.filter((x) => x.dueDate && x.dueDate.toISOString().slice(0, 10) === key);
-    return { p, t };
+    const p =
+      filterTipo === "tarea" || filterTipo === "audiencia"
+        ? []
+        : plazos.filter((x) => x.fechaLimite.toISOString().slice(0, 10) === key);
+    const t =
+      filterTipo === "plazo" || filterTipo === "audiencia"
+        ? []
+        : tasks.filter(
+            (x) => x.dueDate && x.dueDate.toISOString().slice(0, 10) === key
+          );
+    const a =
+      filterTipo === "plazo" || filterTipo === "tarea"
+        ? []
+        : [
+            ...causasTabla
+              .filter(
+                (c) =>
+                  c.proximaTabla &&
+                  c.proximaTabla.toISOString().slice(0, 10) === key
+              )
+              .map((c) => ({
+                id: `tabla-${c.id}`,
+                titulo: c.proximaTablaNota || `Tabla · ${c.rit || c.titulo}`,
+                causaId: c.id,
+                sala: c.sala,
+              })),
+            ...movAudiencias
+              .filter((m) => m.fecha.toISOString().slice(0, 10) === key)
+              .map((m) => ({
+                id: m.id,
+                titulo: m.titulo,
+                causaId: m.causaId,
+                sala: null as string | null,
+              })),
+          ];
+    return { p, t, a };
   }
 
   const agendaDays = cells
     .map((c) => c.date)
     .filter((d): d is Date => Boolean(d))
     .map((day) => ({ day, ...eventsOn(day) }))
-    .filter(({ p, t }) => p.length > 0 || t.length > 0);
+    .filter(({ p, t, a }) => p.length > 0 || t.length > 0 || a.length > 0);
 
   return (
     <div className="space-y-6">
@@ -102,8 +163,28 @@ export default async function CalendarioPage({ searchParams }: Props) {
           </p>
           <h1 className={pageTitleClass}>Calendario</h1>
           <p className="mt-2 text-sm text-[var(--ink-soft)]/80 sm:text-base">
-            Plazos procesales (hábiles/fatales) y vencimientos de tareas.
+            Plazos procesales, tareas y audiencias (próxima tabla / movimientos).
           </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            {[
+              ["todos", "Todos"],
+              ["plazo", "Plazos"],
+              ["tarea", "Tareas"],
+              ["audiencia", "Audiencias"],
+            ].map(([value, label]) => (
+              <Link
+                key={value}
+                href={`/calendario?ym=${ymKey(monthDate)}&tipo=${value}`}
+                className={`rounded-full px-3 py-1 ${
+                  filterTipo === value
+                    ? "bg-[var(--sea)] text-white"
+                    : "bg-white/70 text-[var(--ink-soft)]"
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
           <Link
@@ -133,7 +214,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
 
         {/* Mobile: agenda list */}
         <div className="space-y-3 md:hidden">
-          {agendaDays.map(({ day, p, t }) => (
+          {agendaDays.map(({ day, p, t, a }) => (
             <div
               key={day.toISOString()}
               className="rounded-2xl border border-[var(--line)] bg-white/60 px-3 py-3"
@@ -169,12 +250,21 @@ export default async function CalendarioPage({ searchParams }: Props) {
                     Tarea · {x.title}
                   </Link>
                 ))}
+                {a.map((x) => (
+                  <Link
+                    key={x.id}
+                    href={`/causas/${x.causaId}`}
+                    className="block rounded-lg bg-amber-100 px-2 py-1.5 text-sm text-amber-950"
+                  >
+                    Audiencia · {x.titulo}
+                  </Link>
+                ))}
               </div>
             </div>
           ))}
           {agendaDays.length === 0 && (
             <p className="text-sm text-[var(--ink-soft)]/65">
-              Sin plazos ni tareas este mes.
+              Sin eventos este mes para el filtro seleccionado.
             </p>
           )}
         </div>
@@ -191,7 +281,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
               if (!c.date) {
                 return <div key={`e-${i}`} className="min-h-24 rounded-xl bg-white/30" />;
               }
-              const { p, t } = eventsOn(c.date);
+              const { p, t, a } = eventsOn(c.date);
               const isToday = c.date.toDateString() === now.toDateString();
               return (
                 <div
@@ -227,6 +317,16 @@ export default async function CalendarioPage({ searchParams }: Props) {
                         title={x.title}
                       >
                         {x.title}
+                      </Link>
+                    ))}
+                    {a.slice(0, 2).map((x) => (
+                      <Link
+                        key={x.id}
+                        href={`/causas/${x.causaId}`}
+                        className="block truncate rounded bg-amber-100 px-1 text-[10px] text-amber-950"
+                        title={x.titulo}
+                      >
+                        {x.titulo}
                       </Link>
                     ))}
                   </div>
