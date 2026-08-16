@@ -8,6 +8,7 @@ import {
   shouldSkipIngestFile,
   sortIngestFiles,
 } from "@/lib/document-ingest";
+import { apiMutation } from "@/lib/api-mutation";
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
   let binary = "";
@@ -38,16 +39,16 @@ export function SiteFileActions({
   const [importProgress, setImportProgress] = useState("");
 
   async function api(body: Record<string, unknown>) {
-    const res = await fetch(`/api/sites/${siteId}/files`, {
+    const result = await apiMutation<{ id: string } & Record<string, unknown>>(
+      `/api/sites/${siteId}/files`,
+      {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || "No se pudo completar la acción");
-    }
-    return data;
+      }
+    );
+    if (!result.ok) throw new Error(result.error || "No se pudo completar la acción");
+    return result.data;
   }
 
   async function ensureFolderPath(

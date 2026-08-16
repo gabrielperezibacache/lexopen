@@ -54,8 +54,22 @@ function idleStatus(causaId: string): CausaDocImportStatus {
 }
 
 function publicStatus(job: JobRecord): CausaDocImportStatus {
-  const { promise: _promise, ...rest } = job;
-  return rest;
+  return {
+    causaId: job.causaId,
+    status: job.status,
+    phase: job.phase,
+    total: job.total,
+    completed: job.completed,
+    saved: job.saved,
+    skipped: job.skipped,
+    failed: job.failed,
+    currentLabel: job.currentLabel,
+    note: job.note,
+    delayMs: job.delayMs,
+    maxPerRun: job.maxPerRun,
+    startedAt: job.startedAt,
+    finishedAt: job.finishedAt,
+  };
 }
 
 export function getCausaDocImportStatus(causaId: string): CausaDocImportStatus {

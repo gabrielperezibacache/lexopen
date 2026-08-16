@@ -28,12 +28,12 @@ export default async function WorkflowsGlobalPage() {
       <ModuleHeader
         eyebrow="Automatización"
         title="Flujos"
-        subtitle="Aprobaciones multi-paso por espacio (piloto). Configure y dispare flujos desde cada matter o VDR; este listado es una vista global."
+        subtitle="Aprobaciones multi-paso por espacio (funcionalidad en maduración). Configure y dispare flujos desde cada matter o VDR; este listado es una vista global."
       />
       {workflows.length === 0 ? (
         <EmptyState
           title="Sin flujos configurados"
-          description="En esta fase piloto los flujos viven en cada espacio. Abra un matter o VDR para iniciar una aprobación."
+          description="Los flujos viven en cada espacio. Abra un matter o VDR para iniciar una aprobación."
           actionLabel="Ver espacios"
           actionHref="/sites"
         />

@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 const STATUS_LABEL: Record<string, string> = {
   todo: "Por hacer",
@@ -19,11 +20,15 @@ export function NewTaskButton({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setBusy(true);
+    setError("");
     const fd = new FormData(e.currentTarget);
-    await fetch(`/api/sites/${siteId}/tasks`, {
+    const result = await apiMutation(`/api/sites/${siteId}/tasks`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -34,6 +39,11 @@ export function NewTaskButton({
         assigneeId: fd.get("assigneeId") || null,
       }),
     });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error || "No se pudo crear la tarea");
+      return;
+    }
     setOpen(false);
     router.refresh();
   }
@@ -64,12 +74,18 @@ export function NewTaskButton({
               ))}
             </select>
             <input className="input" type="date" name="dueDate" />
+            {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
-              <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
+              <button
+                className="btn btn-ghost"
+                type="button"
+                disabled={busy}
+                onClick={() => setOpen(false)}
+              >
                 Cancelar
               </button>
-              <button className="btn btn-primary" type="submit">
-                Crear
+              <button className="btn btn-primary" type="submit" disabled={busy}>
+                {busy ? "Creando…" : "Crear"}
               </button>
             </div>
           </form>
@@ -89,27 +105,50 @@ export function TaskStatusButton({
   status: string;
 }) {
   const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
   async function setStatus(next: string) {
-    await fetch(`/api/sites/${siteId}/tasks`, {
+    setBusy(true);
+    setError("");
+    const result = await apiMutation(`/api/sites/${siteId}/tasks`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: taskId, status: next }),
     });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error || "No se pudo actualizar la tarea");
+      return;
+    }
     router.refresh();
   }
   if (status === "done") {
     return <span className="text-sm text-[var(--ok)]">{STATUS_LABEL.done}</span>;
   }
   return (
-    <div className="flex flex-wrap gap-2">
-      {status !== "in_progress" && (
-        <button className="btn btn-ghost" type="button" onClick={() => setStatus("in_progress")}>
-          En curso
+    <div>
+      <div className="flex flex-wrap gap-2">
+        {status !== "in_progress" && (
+          <button
+            className="btn btn-ghost"
+            type="button"
+            disabled={busy}
+            onClick={() => setStatus("in_progress")}
+          >
+            En curso
+          </button>
+        )}
+        <button
+          className="btn btn-ghost"
+          type="button"
+          disabled={busy}
+          onClick={() => setStatus("done")}
+        >
+          Marcar hecha
         </button>
-      )}
-      <button className="btn btn-ghost" type="button" onClick={() => setStatus("done")}>
-        Marcar hecha
-      </button>
+      </div>
+      {error && <p className="mt-1 text-sm text-[var(--danger)]">{error}</p>}
     </div>
   );
 }

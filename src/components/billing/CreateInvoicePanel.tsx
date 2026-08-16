@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DOC_TIPOS, clp } from "@/lib/billing";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Item = {
   id: string;
@@ -31,6 +32,7 @@ export function CreateInvoicePanel({
   const [causaId, setCausaId] = useState("");
   const [tipo, setTipo] = useState("boleta_honorarios");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   const preview = useMemo(() => {
     const t = timeEntries.filter((x) => selectedTime.includes(x.id));
@@ -41,9 +43,10 @@ export function CreateInvoicePanel({
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
+    setError("");
     const due = new Date();
     due.setDate(due.getDate() + 30);
-    const res = await fetch("/api/billing/invoices", {
+    const result = await apiMutation<{ id: string }>("/api/billing/invoices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -58,11 +61,12 @@ export function CreateInvoicePanel({
       }),
     });
     setBusy(false);
-    if (res.ok) {
-      const inv = await res.json();
-      router.push(`/facturacion/facturas/${inv.id}`);
-      router.refresh();
+    if (!result.ok) {
+      setError(result.error || "No se pudo emitir el documento");
+      return;
     }
+    router.push(`/facturacion/facturas/${result.data.id}`);
+    router.refresh();
   }
 
   function toggle(list: string[], id: string, setter: (v: string[]) => void) {
@@ -167,6 +171,7 @@ export function CreateInvoicePanel({
               {busy ? "Emitiendo…" : "Emitir documento"}
             </button>
           </div>
+          {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
         </form>
       )}
     </div>

@@ -1,9 +1,9 @@
 {
   "name": "lexopen-desktop",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "author": "LexOpen contributors",
-  "description": "LexOpen Desktop — host local del estudio + cliente remoto (Tailscale)",
+  "description": "LexOpen Desktop \u2014 host local del estudio + cliente remoto (Tailscale)",
   "main": "main.cjs",
   "scripts": {
     "dev": "electron .",

@@ -2,17 +2,20 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function NewSiteButton() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
+    setError("");
     const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/sites", {
+    const result = await apiMutation<{ id: string }>("/api/sites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -22,11 +25,12 @@ export function NewSiteButton() {
       }),
     });
     setBusy(false);
-    if (res.ok) {
-      const site = await res.json();
-      router.push(`/sites/${site.id}`);
-      router.refresh();
+    if (!result.ok) {
+      setError(result.error || "No se pudo crear el espacio");
+      return;
     }
+    router.push(`/sites/${result.data.id}`);
+    router.refresh();
   }
 
   return (
@@ -47,8 +51,14 @@ export function NewSiteButton() {
               <option value="project">Proyecto</option>
               <option value="knowledge">Knowledge / playbooks</option>
             </select>
+            {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
-              <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
+              <button
+                className="btn btn-ghost"
+                type="button"
+                disabled={busy}
+                onClick={() => setOpen(false)}
+              >
                 Cancelar
               </button>
               <button className="btn btn-primary" disabled={busy} type="submit">

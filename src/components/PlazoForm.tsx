@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Option = { id: string; label: string };
 
@@ -45,12 +46,18 @@ export function PlazoForm({
 
   useEffect(() => {
     let cancelled = false;
-    const t = window.setTimeout(() => {
+    const t = window.setTimeout(async () => {
       if (!fechaNotificacion || !diasPlazo || Number(diasPlazo) < 1) {
         if (!cancelled) setEstimate(null);
         return;
       }
-      fetch("/api/integrations/hermes", {
+      const result = await apiMutation<{
+        vencimiento?: string;
+        urgencia?: string;
+        diasRestantes?: number;
+        disclaimer?: string;
+        error?: string;
+      }>("/api/integrations/hermes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -59,14 +66,9 @@ export function PlazoForm({
           dias: Number(diasPlazo),
           tipoComputo,
         }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (!cancelled) setEstimate(data);
-        })
-        .catch(() => {
-          if (!cancelled) setEstimate({ error: "No se pudo estimar" });
-        });
+      });
+      if (cancelled) return;
+      setEstimate(result.ok ? result.data : { error: result.error || "No se pudo estimar" });
     }, 250);
     return () => {
       cancelled = true;
@@ -78,7 +80,8 @@ export function PlazoForm({
     e.preventDefault();
     setError("");
     setBusy(true);
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     const payload = {
       titulo: String(fd.get("titulo") || ""),
       descripcion: String(fd.get("descripcion") || ""),
@@ -91,18 +94,17 @@ export function PlazoForm({
       causaId: causaId || null,
       responsableId: String(fd.get("responsableId") || "") || null,
     };
-    const res = await fetch("/api/plazos", {
+    const result = await apiMutation("/api/plazos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     setBusy(false);
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setError(body.error || "No se pudo crear el plazo");
+    if (!result.ok) {
+      setError(result.error || "No se pudo crear el plazo");
       return;
     }
-    e.currentTarget.reset();
+    form.reset();
     setCausaId("");
     setFechaNotificacion("");
     setDiasPlazo("");
