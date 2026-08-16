@@ -44,7 +44,8 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   await expect(page.getByText("C-4521-2025")).toBeVisible();
   const causeRow = page.locator("tr").filter({ hasText: "C-4521-2025" }).first();
   const causeHref = await causeRow
-    .locator('a[href^="/causas/"]')
+    .locator('a[href^="/causas/"]:not([href*="/editar"])')
+    .first()
     .getAttribute("href");
   expect(causeHref).toBeTruthy();
   await page.goto(causeHref!);
