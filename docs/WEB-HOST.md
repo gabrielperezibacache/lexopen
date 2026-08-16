@@ -115,7 +115,8 @@ Use esta lista antes de cargar información real del estudio:
 13. **Portal cliente:** revise members + `isClientVisible` + etiqueta `cliente`
     en archivos. El portal ofrece documentos compartidos y Q&A limitado (abrir
     hilos / responder abiertos); no es expediente completo ni “solo lectura”
-    absoluto. Active 2FA en cuentas admin cuando esté disponible.
+    absoluto. Active 2FA TOTP en cuentas admin/staff desde `/cuenta`
+    (enrolamiento + códigos de recuperación).
 14. **Auditoría:** mutaciones sensibles (auth, personas, purge, ClaveÚnica,
     billing, override de conflicto) deben persistir evento de auditoría;
     compruebe `/auditoria` tras un cambio de prueba.

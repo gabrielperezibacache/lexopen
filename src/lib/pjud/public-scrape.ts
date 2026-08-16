@@ -35,7 +35,6 @@ import {
   parseRitParts,
   pickBestTribunalOption,
   splitRut,
-  tribunalLabelsMatch,
   type OjvCompetenciaValue,
 } from "@/lib/pjud/ojv-dom";
 import {

@@ -110,8 +110,8 @@ export default async function JurisprudenciaPage({
             description={
               q || materia
                 ? "Pruebe otros filtros o limpie la búsqueda. Este listado no cubre toda la jurisprudencia oficial."
-                : "Aún no hay fallos cargados en esta instalación piloto."
-            }
+                : "Aún no hay fallos cargados. Use Incorporar (admin) o el seed de demostración."
+              }
             actionLabel={q || materia ? "Limpiar filtros" : undefined}
             actionHref={q || materia ? "/jurisprudencia" : undefined}
           />
