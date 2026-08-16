@@ -7,6 +7,7 @@ import { MarkdownView } from "@/lib/markdown";
 import { formatDate } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
 import { NewBlogPostButton } from "@/components/sites/NewBlogPostButton";
+import { EditBlogPostButton } from "@/components/sites/EditBlogPostButton";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -55,11 +56,26 @@ export default async function SiteBlogPage({ params }: Params) {
         <div className="space-y-4">
           {posts.map((p) => (
             <article key={p.id} className="panel rounded-3xl p-5">
-              <h2 className="text-xl font-semibold">{p.title}</h2>
-              <p className="mt-1 text-xs text-[var(--ink-soft)]/60">
-                {p.author?.name || "—"} · {formatDate(p.createdAt)}
-                {!p.published ? " · borrador" : ""}
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h2 className="text-xl font-semibold">{p.title}</h2>
+                  <p className="mt-1 text-xs text-[var(--ink-soft)]/60">
+                    {p.author?.name || "—"} · {formatDate(p.createdAt)}
+                    {!p.published ? " · borrador" : ""}
+                  </p>
+                </div>
+                {!clientView && (
+                  <EditBlogPostButton
+                    siteId={site.id}
+                    post={{
+                      id: p.id,
+                      title: p.title,
+                      body: p.body,
+                      published: p.published,
+                    }}
+                  />
+                )}
+              </div>
               <div className="mt-4 border-t border-[var(--line)] pt-3">
                 <MarkdownView content={p.body} />
               </div>

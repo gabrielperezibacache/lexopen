@@ -4,6 +4,7 @@ import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { NewWikiButton } from "@/components/sites/NewWikiButton";
 import { EditWikiButton } from "@/components/sites/EditWikiButton";
+import { WikiHistoryPanel } from "@/components/sites/WikiHistoryPanel";
 import { MarkdownView } from "@/lib/markdown";
 import { EmptyState } from "@/components/EmptyState";
 import { isCliente } from "@/lib/auth/rbac";
@@ -53,10 +54,13 @@ export default async function SiteWikiPage({ params }: Params) {
                   </p>
                 </div>
                 {canEdit && (
-                  <EditWikiButton
-                    siteId={site.id}
-                    page={{ id: p.id, title: p.title, content: p.content }}
-                  />
+                  <div className="flex shrink-0 flex-wrap gap-1">
+                    <EditWikiButton
+                      siteId={site.id}
+                      page={{ id: p.id, title: p.title, content: p.content }}
+                    />
+                    <WikiHistoryPanel siteId={site.id} pageId={p.id} />
+                  </div>
                 )}
               </div>
               <div className="mt-4 max-h-72 overflow-auto border-t border-[var(--line)] pt-3">

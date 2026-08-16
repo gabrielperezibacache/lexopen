@@ -653,6 +653,8 @@ model WikiPageRevision {
   createdAt DateTime @default(now())
   authorId  String?
   author    User?    @relation("WikiRevisionAuthor", fields: [authorId], references: [id])
+
+  @@index([pageId])
 }
 
 model BlogPost {
@@ -667,6 +669,8 @@ model BlogPost {
   site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   authorId  String?
   author    User?    @relation("BlogAuthor", fields: [authorId], references: [id])
+
+  @@unique([siteId, slug])
 }
 
 /// HighQ iSheets — structured collaborative tables
