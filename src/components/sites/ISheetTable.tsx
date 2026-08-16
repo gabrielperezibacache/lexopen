@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Column = { key: string; name: string; type: string; options: string };
 type Row = { id: string; data: Record<string, string> };
@@ -21,19 +22,25 @@ export function ISheetTable({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function addRow(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
+    setError("");
     const fd = new FormData(e.currentTarget);
     const data: Record<string, string> = {};
     for (const c of columns) data[c.key] = String(fd.get(c.key) || "");
-    await fetch(`/api/sites/${siteId}/isheets`, {
+    const result = await apiMutation(`/api/sites/${siteId}/isheets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "add-row", sheetId, data }),
     });
     setBusy(false);
+    if (!result.ok) {
+      setError(result.error || "No se pudo agregar la fila");
+      return;
+    }
     setOpen(false);
     router.refresh();
   }
@@ -42,15 +49,20 @@ export function ISheetTable({
     e.preventDefault();
     if (!editing) return;
     setBusy(true);
+    setError("");
     const fd = new FormData(e.currentTarget);
     const data: Record<string, string> = {};
     for (const c of columns) data[c.key] = String(fd.get(c.key) || "");
-    await fetch(`/api/sites/${siteId}/isheets`, {
+    const result = await apiMutation(`/api/sites/${siteId}/isheets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "update-row", rowId: editing.id, data }),
     });
     setBusy(false);
+    if (!result.ok) {
+      setError(result.error || "No se pudo actualizar la fila");
+      return;
+    }
     setEditing(null);
     router.refresh();
   }
@@ -58,12 +70,17 @@ export function ISheetTable({
   async function deleteRow(rowId: string) {
     if (!confirm("¿Eliminar esta fila?")) return;
     setBusy(true);
-    await fetch(`/api/sites/${siteId}/isheets`, {
+    setError("");
+    const result = await apiMutation(`/api/sites/${siteId}/isheets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete-row", rowId }),
     });
     setBusy(false);
+    if (!result.ok) {
+      setError(result.error || "No se pudo eliminar la fila");
+      return;
+    }
     router.refresh();
   }
 
@@ -104,6 +121,11 @@ export function ISheetTable({
           Nueva fila
         </button>
       </div>
+      {error && (
+        <p className="border-b border-[var(--line)] px-4 py-2 text-sm text-[var(--danger)]">
+          {error}
+        </p>
+      )}
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--ink)] text-white/90">
@@ -155,6 +177,7 @@ export function ISheetTable({
           <form onSubmit={addRow} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
             <h3 className="text-lg font-semibold">Nueva fila</h3>
             {fieldInputs()}
+            {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
               <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
                 Cancelar
@@ -172,6 +195,7 @@ export function ISheetTable({
           <form onSubmit={saveEdit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
             <h3 className="text-lg font-semibold">Editar fila</h3>
             {fieldInputs(editing.data)}
+            {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
               <button className="btn btn-ghost" type="button" onClick={() => setEditing(null)}>
                 Cancelar

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ACTIVITY_CODES } from "@/lib/billing";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function TimeEntryForm({
   causas,
@@ -15,14 +16,17 @@ export function TimeEntryForm({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    const fd = new FormData(e.currentTarget);
+    setError("");
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     const causaId = String(fd.get("causaId") || "");
     const causa = causas.find((c) => c.id === causaId);
-    await fetch("/api/billing/time-entries", {
+    const result = await apiMutation("/api/billing/time-entries", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -37,12 +41,19 @@ export function TimeEntryForm({
       }),
     });
     setBusy(false);
-    e.currentTarget.reset();
+    if (!result.ok) {
+      setError(result.error || "No se pudieron registrar las horas");
+      return;
+    }
+    form.reset();
     router.refresh();
   }
 
   return (
     <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-3">
+      {error && (
+        <p className="sm:col-span-2 lg:col-span-3 text-sm text-[var(--danger)]">{error}</p>
+      )}
       <input className="input" type="date" name="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
       <input className="input" type="number" step="0.25" min="0.25" name="hours" required placeholder="Horas" />
       <select className="select" name="activityCode" defaultValue="drafting">

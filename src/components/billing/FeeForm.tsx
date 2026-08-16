@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FEE_TIPOS } from "@/lib/billing";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function FeeForm({
   clientes,
@@ -14,12 +15,15 @@ export function FeeForm({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [tipo, setTipo] = useState("hourly");
+  const [error, setError] = useState("");
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    const fd = new FormData(e.currentTarget);
-    await fetch("/api/billing/fee-arrangements", {
+    setError("");
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const result = await apiMutation("/api/billing/fee-arrangements", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -36,13 +40,20 @@ export function FeeForm({
       }),
     });
     setBusy(false);
-    e.currentTarget.reset();
+    if (!result.ok) {
+      setError(result.error || "No se pudo guardar la tarifa");
+      return;
+    }
+    form.reset();
     setTipo("hourly");
     router.refresh();
   }
 
   return (
     <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-3">
+      {error && (
+        <p className="sm:col-span-2 lg:col-span-3 text-sm text-[var(--danger)]">{error}</p>
+      )}
       <input className="input md:col-span-2" name="name" required placeholder="Nombre de la condición" />
       <select className="select" value={tipo} onChange={(e) => setTipo(e.target.value)} name="tipo">
         {FEE_TIPOS.map((f) => (

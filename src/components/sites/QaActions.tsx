@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function QaActions({
   siteId,
@@ -16,12 +17,17 @@ export function QaActions({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setBusy(true);
+    setError("");
     const fd = new FormData(e.currentTarget);
+    let result;
     if (reply && threadId) {
-      await fetch(`/api/sites/${siteId}/qa`, {
+      result = await apiMutation(`/api/sites/${siteId}/qa`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -32,7 +38,7 @@ export function QaActions({
         }),
       });
     } else {
-      await fetch(`/api/sites/${siteId}/qa`, {
+      result = await apiMutation(`/api/sites/${siteId}/qa`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -42,6 +48,11 @@ export function QaActions({
           body: fd.get("body"),
         }),
       });
+    }
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error || "No se pudo publicar");
+      return;
     }
     setOpen(false);
     router.refresh();
@@ -62,11 +73,17 @@ export function QaActions({
                 <input type="checkbox" name="isAnswer" /> Marcar como respuesta oficial
               </label>
             )}
+            {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex gap-2">
-              <button className="btn btn-primary" type="submit">
-                Enviar
+              <button className="btn btn-primary" type="submit" disabled={busy}>
+                {busy ? "Enviando…" : "Enviar"}
               </button>
-              <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
+              <button
+                className="btn btn-ghost"
+                type="button"
+                disabled={busy}
+                onClick={() => setOpen(false)}
+              >
                 Cancelar
               </button>
             </div>
@@ -88,12 +105,18 @@ export function QaActions({
             <input className="input" name="subject" required placeholder="Asunto" />
             <input className="input" name="category" placeholder="Categoría" />
             <textarea className="textarea" name="body" required placeholder="Detalle" />
+            {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
-              <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
+              <button
+                className="btn btn-ghost"
+                type="button"
+                disabled={busy}
+                onClick={() => setOpen(false)}
+              >
                 Cancelar
               </button>
-              <button className="btn btn-primary" type="submit">
-                Publicar
+              <button className="btn btn-primary" type="submit" disabled={busy}>
+                {busy ? "Publicando…" : "Publicar"}
               </button>
             </div>
           </form>

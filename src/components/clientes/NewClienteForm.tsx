@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function NewClienteForm({
   abogados,
@@ -18,7 +19,7 @@ export function NewClienteForm({
     setBusy(true);
     setError("");
     const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/clientes", {
+    const result = await apiMutation<{ id: string }>("/api/clientes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -33,13 +34,11 @@ export function NewClienteForm({
       }),
     });
     setBusy(false);
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setError(body.error || "No se pudo crear");
+    if (!result.ok) {
+      setError(result.error || "No se pudo crear");
       return;
     }
-    const cliente = await res.json();
-    router.push(`/clientes/${cliente.id}`);
+    router.push(`/clientes/${result.data.id}`);
   }
 
   if (!open) {
