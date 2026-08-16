@@ -82,9 +82,12 @@ export default async function FacturacionPage() {
             <Link href="/facturacion/horas" className="btn btn-ghost">
               + Horas
             </Link>
-            <a href="/api/billing/invoices/export?format=csv" className="btn btn-ghost">
+            <Link
+              href="/api/billing/invoices/export?format=csv"
+              className="btn btn-ghost"
+            >
               Exportar CSV
-            </a>
+            </Link>
             <Link href="/facturacion/facturas" className="btn btn-primary">
               Facturas
             </Link>

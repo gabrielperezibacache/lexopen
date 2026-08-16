@@ -138,9 +138,10 @@ export const es = {
     newCase: "Nueva causa",
   },
   causas: {
-    eyebrow: "Litigios",
-    title: "Causas",
-    subtitle: "Expedientes del estudio con RIT/RUC, etapa y plazos.",
+    eyebrow: "Litigio Chile",
+    title: "Causas judiciales",
+    subtitle:
+      "Alta manual, importación ClaveÚnica (Mis Causas) o ROL en Monitoreo. Edite, archive o elimine desde aquí o la ficha.",
     newCase: "Nueva causa",
     empty: "No hay causas con esos filtros.",
   },

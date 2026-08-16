@@ -44,7 +44,10 @@
 
 > [!IMPORTANT]
 > **Estado del proyecto:** LexOpen está en la versión `0.1.4` y debe considerarse un
-> prototipo funcional / base para pilotos e iteraciones. Antes de cargar información
+> prototipo funcional / base para pilotos e iteraciones. El checklist de Host local
+> (`docs/WEB-HOST.md`) cubre ACL del portal, auditoría estricta en mutaciones
+> sensibles, 2FA TOTP y export CSV/XML de facturación hacia un facturador externo
+> (sin DTE/SII in-app). Antes de cargar información
 > real de clientes o causas, revise seguridad, permisos, respaldos, cumplimiento y
 > fuentes jurídicas según las necesidades de su práctica (solo o en equipo).
 

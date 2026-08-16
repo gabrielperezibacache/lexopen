@@ -70,6 +70,15 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   }>;
   const openInvoice = invoices.find((invoice) => invoice.totalClp > invoice.paidClp);
   expect(openInvoice).toBeTruthy();
+
+  const exportCsv = await page.request.get(
+    `/api/billing/invoices/export?format=csv&id=${openInvoice!.id}`
+  );
+  expect(exportCsv.ok()).toBeTruthy();
+  const csvText = await exportCsv.text();
+  expect(csvText).toContain("folioInterno");
+  expect(csvText).toContain("rutEmisor");
+
   const overpayment = await page.request.post("/api/billing/payments", {
     data: {
       invoiceId: openInvoice!.id,
@@ -158,12 +167,28 @@ test("un cliente queda limitado al portal y a sus espacios", async ({ page }) =>
   ).toBe(403);
   expect((await page.request.get(`/api/sites/${siteId}`)).status()).toBe(403);
   expect((await page.request.get("/api/billing/invoices")).status()).toBe(403);
+  expect(
+    (await page.request.get("/api/billing/invoices/export?format=csv")).status()
+  ).toBe(403);
+
+  const messagesPage = await page.goto("/mensajes");
+  expect(messagesPage?.ok()).toBeTruthy();
+  await expect(page.getByRole("heading", { name: "Mensajes" })).toBeVisible();
+
+  const searchPage = await page.goto("/buscar");
+  expect(searchPage?.ok()).toBeTruthy();
+  await expect(page.getByRole("heading", { name: "Buscar" })).toBeVisible();
 
   const searchRes = await page.request.get("/api/search?q=andes");
   expect(searchRes.ok()).toBeTruthy();
-  const searchBody = (await searchRes.json()) as { scope?: string; causas?: unknown[] };
+  const searchBody = (await searchRes.json()) as {
+    scope?: string;
+    causas?: unknown[];
+    files?: unknown[];
+  };
   expect(searchBody.scope).toBe("portal");
   expect(searchBody.causas || []).toEqual([]);
+  expect(Array.isArray(searchBody.files)).toBe(true);
 
   await page.goto(`/sites/${siteId}`);
   await expect(page).toHaveURL(/\/portal$/);

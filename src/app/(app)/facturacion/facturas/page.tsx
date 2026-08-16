@@ -39,18 +39,18 @@ export default async function FacturasPage() {
         subtitle="Boleta de honorarios, factura afecta/exenta y nota de crédito — con IVA y retención Chile. Export CSV/XML para facturadores externos (no es DTE SII)."
         actions={
           <div className="flex flex-wrap gap-2">
-            <a
+            <Link
               href="/api/billing/invoices/export?format=csv"
               className="btn btn-secondary"
             >
               Exportar CSV
-            </a>
-            <a
+            </Link>
+            <Link
               href="/api/billing/invoices/export?format=xml"
               className="btn btn-ghost"
             >
               Exportar XML
-            </a>
+            </Link>
           </div>
         }
       />
