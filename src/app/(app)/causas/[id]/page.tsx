@@ -28,6 +28,8 @@ import { publicUserSelect } from "@/lib/auth/public-user";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
+import { CausaResumenAi } from "@/components/ai/CausaResumenAi";
+import { PlazoSugerirAi } from "@/components/ai/PlazoSugerirAi";
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -297,6 +299,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           <p className="mt-4 text-sm leading-relaxed text-[var(--ink-soft)]/85">
             {causa.resumen || "Sin resumen."}
           </p>
+          <CausaResumenAi causaId={causa.id} titulo={causa.titulo} />
         </div>
 
         <DriveFolderPanel
@@ -455,6 +458,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
               <p className="text-sm text-[var(--ink-soft)]/65">Sin plazos.</p>
             )}
           </div>
+          <PlazoSugerirAi causaId={causa.id} />
         </section>
 
         <section className="panel rounded-3xl p-5">

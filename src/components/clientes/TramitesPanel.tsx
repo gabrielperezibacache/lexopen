@@ -10,6 +10,7 @@ import {
 } from "@/lib/tramite-templates";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 import { apiMutation } from "@/lib/api-mutation";
+import { calcularVencimiento } from "@/lib/plazos";
 
 type Tramite = {
   id: string;
@@ -150,7 +151,11 @@ export function TramitesPanel({
     for (const item of items) {
       const fechaLimite =
         typeof item.diasLimite === "number" && item.diasLimite > 0
-          ? new Date(Date.now() + item.diasLimite * 86400000)
+          ? calcularVencimiento({
+              desde: new Date(),
+              dias: item.diasLimite,
+              tipoComputo: "habiles",
+            })
               .toISOString()
               .slice(0, 10)
           : null;

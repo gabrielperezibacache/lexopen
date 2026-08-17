@@ -24,6 +24,7 @@ import {
   formatPlazoEstimate,
 } from "@/lib/ai/local-assist";
 import { buildAiSuggestedActions } from "@/lib/ai/suggested-actions";
+import { buildChatHistoryForLlm } from "@/lib/ai/chat-history";
 import { safeJsonParse } from "@/lib/safe-json";
 import {
   formatLocalDate,
@@ -475,23 +476,8 @@ export async function POST(req: Request) {
             source?: string;
           }>
         >(existing.messagesJson, []);
-        for (const m of prev.slice(-16)) {
-          if (
-            (m.role === "user" || m.role === "assistant") &&
-            typeof m.content === "string" &&
-            m.content.trim() &&
-            !m.discarded &&
-            m.source !== "error"
-          ) {
-            history.push({
-              role: m.role,
-              content: m.content.slice(0, 12_000),
-            });
-          }
-        }
-        // Mantener como máximo 12 mensajes útiles
-        if (history.length > 12) {
-          history.splice(0, history.length - 12);
+        for (const m of buildChatHistoryForLlm(prev)) {
+          history.push(m);
         }
       }
     }

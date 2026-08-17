@@ -20,6 +20,37 @@ export function isAiActionId(v: string): v is AiActionId {
   return (AI_ACTIONS as readonly string[]).includes(v);
 }
 
+type DemoHint = {
+  text: string;
+  titulo?: string;
+  materia?: string;
+  query?: string;
+};
+
+function parseDemoHint(hint = ""): DemoHint {
+  const text = hint.trim();
+  if (!text) return { text: "" };
+  if (text.startsWith("{")) {
+    try {
+      const j = JSON.parse(text) as Record<string, unknown>;
+      return {
+        text,
+        titulo:
+          typeof j.titulo === "string"
+            ? j.titulo
+            : typeof j.causaTitulo === "string"
+              ? j.causaTitulo
+              : undefined,
+        materia: typeof j.materia === "string" ? j.materia : undefined,
+        query: typeof j.query === "string" ? j.query : undefined,
+      };
+    } catch {
+      return { text };
+    }
+  }
+  return { text };
+}
+
 export type AiActionMeta = {
   id: AiActionId;
   label: string;
@@ -155,6 +186,10 @@ Checklist accionable para el estudio.`;
 }
 
 export function demoForAction(action: AiActionId, hint = ""): string {
+  const ctx = parseDemoHint(hint);
+  const label = ctx.titulo || ctx.query || ctx.text.slice(0, 120) || "la consulta";
+  const materiaNote = ctx.materia ? ` (${ctx.materia})` : "";
+
   switch (action) {
     case "causa.sugerir_tramites":
       return JSON.stringify(
@@ -183,13 +218,13 @@ export function demoForAction(action: AiActionId, hint = ""): string {
     case "causa.extraer":
       return JSON.stringify(
         {
-          titulo: "Cobro de pesos — borrador IA",
+          titulo: ctx.titulo || "Cobro de pesos — borrador IA",
           rit: "C-0000-2026",
           ruc: null,
           tribunal: "1º Juzgado Civil de Santiago",
-          materia: "civil",
+          materia: ctx.materia || "civil",
           caratula: "Demandante con Demandado",
-          resumen: hint.slice(0, 240) || "Resumen demo generado por LexOpen.",
+          resumen: ctx.text.slice(0, 240) || "Resumen demo generado por LexOpen.",
           partes: [
             { nombre: "Demandante SpA", rut: null, rol: "demandante" },
             { nombre: "Demandado Ltda.", rut: null, rol: "demandado" },
@@ -297,12 +332,12 @@ export function demoForAction(action: AiActionId, hint = ""): string {
         2
       );
     case "documento.resumir":
-      return `## Resumen (demo)\nDocumento revisado en modo demo.\n\n## Puntos clave\n- Verificar autenticidad y fechas\n- Cruzar con trámites de la causa\n\n## Acciones sugeridas\n- Etiquetar y vincular a la causa\n\n> ${hint.slice(0, 120)}`;
+      return `## Resumen (demo)\nDocumento revisado en modo demo${materiaNote}.\n\n## Puntos clave\n- Verificar autenticidad y fechas\n- Cruzar con trámites de la causa\n\n## Acciones sugeridas\n- Etiquetar y vincular a la causa\n\n> ${label.slice(0, 120)}`;
     case "jurisprudencia.brief":
-      return `## Hallazgos (demo)\nSíntesis preliminar sobre: ${hint.slice(0, 120) || "la consulta"}\n\n## Doctrina útil\n- Contraste hechos / norma aplicable\n\n## Aplicación\nUse solo fallos del corpus LexOpen.\n\n## Riesgos\nDistinga ratio decidendi de obiter.`;
+      return `## Hallazgos (demo)\nSíntesis preliminar sobre: ${label}\n\n## Doctrina útil\n- Contraste hechos / norma aplicable\n\n## Aplicación\nUse solo fallos del corpus LexOpen.\n\n## Riesgos\nDistinga ratio decidendi de obiter.`;
     case "causa.resumen":
     default:
-      return `## Estado actual (demo)\nResumen IA de demostración.\n\n## Hechos clave\n- ${hint.slice(0, 160) || "Sin contexto adicional"}\n\n## Riesgos\nVerificar plazos fatales.\n\n## Próximos 3 pasos\n1. Actualizar trámites\n2. Revisar documentos\n3. Informar al cliente`;
+      return `## Estado actual (demo)\nResumen IA de demostración${ctx.titulo ? ` — **${ctx.titulo}**` : ""}.\n\n## Hechos clave\n- ${label.slice(0, 160) || "Sin contexto adicional"}\n\n## Riesgos\nVerificar plazos fatales.\n\n## Próximos 3 pasos\n1. Actualizar trámites\n2. Revisar documentos\n3. Informar al cliente`;
   }
 }
 

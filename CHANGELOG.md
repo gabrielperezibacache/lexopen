@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.8 — 2026-08-17
+
+Corte IA definitivo: multi-turno cliente, acciones conectadas en UI, auditoría y correcciones copiloto.
+
+### Nuevo
+- Brief IA en `/jurisprudencia` (`JurisprudenciaBrief`)
+- Resumen procesal y sugerencia de plazos con IA en ficha de causa
+- Helper `buildChatHistoryForLlm` compartido Hermes / chat cliente
+
+### Mejoras
+- Chat carpeta cliente: replay de historial multi-turno al LLM
+- Demo IA contextual (título causa, materia, consulta)
+- Auditoría best-effort en `/api/ai/actions` y chat cliente
+- Trámites sugeridos: fechas límite con días hábiles (`calcularVencimiento`)
+
+### Correcciones
+- Agente: eliminado `!res.ok` huérfano tras migración a `apiMutation`
+
 ## 0.1.7 — 2026-08-17
 
 Corte de repaso: ops schedulers, docs migrate, auditoría estricta, i18n dashboard y buzón PJUD `/correo`.

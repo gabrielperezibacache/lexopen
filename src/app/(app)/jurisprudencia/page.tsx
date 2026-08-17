@@ -6,6 +6,7 @@ import { JurisprudenciaIngestForm } from "@/components/JurisprudenciaIngestForm"
 import { requireStaff } from "@/lib/auth/session";
 import { PageHeader } from "@/components/sites/SiteNav";
 import { EmptyState } from "@/components/EmptyState";
+import { JurisprudenciaBrief } from "@/components/ai/JurisprudenciaBrief";
 import type { Prisma } from "@prisma/client";
 import { isAdmin } from "@/lib/auth/rbac";
 
@@ -68,6 +69,7 @@ export default async function JurisprudenciaPage({
       />
 
       <JurisprudenciaSearch materias={[...MATERIAS]} />
+      <JurisprudenciaBrief />
       {isAdmin(user.role) && <JurisprudenciaIngestForm />}
 
       {items.length > 0 ? (

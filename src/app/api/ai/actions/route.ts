@@ -17,6 +17,7 @@ import {
 } from "@/lib/ai/actions";
 import { buildActionContext } from "@/lib/ai/context";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
+import { writeAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +130,20 @@ export async function POST(req: NextRequest) {
     }
 
     const parsed = parseActionResult(action, content);
+
+    await writeAudit({
+      action: "ai.action",
+      entityType: "ai_action",
+      entityId: action,
+      actorId: user.id,
+      after: {
+        source: result.source,
+        ok: true,
+        causaId: body.causaId || null,
+        clienteId: body.clienteId || null,
+        documentoId: body.documentoId || null,
+      },
+    });
 
     return NextResponse.json({
       ok: true,

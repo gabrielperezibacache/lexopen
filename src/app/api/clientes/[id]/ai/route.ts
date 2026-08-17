@@ -11,6 +11,8 @@ import { buildClienteFolderContext } from "@/lib/integrations/client-folder-cont
 import { askLlm, legalSystemPrompt } from "@/lib/integrations/llm";
 import { safeJsonParse } from "@/lib/safe-json";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
+import { buildChatHistoryForLlm } from "@/lib/ai/chat-history";
+import { writeAudit } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -73,6 +75,27 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const prompt = body.prompt.trim();
+
+    let historyMessages: ReturnType<typeof buildChatHistoryForLlm> = [];
+    let existingChat: Awaited<ReturnType<typeof prisma.agentChat.findFirst>> = null;
+
+    if (body.chatId) {
+      existingChat = await prisma.agentChat.findFirst({
+        where: {
+          id: body.chatId,
+          clienteId: id,
+          ...(user.role === "admin" ? {} : { userId: user.id }),
+        },
+      });
+      if (!existingChat) {
+        return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
+      }
+      const previous = safeJsonParse<
+        Array<{ role: string; content: string; source?: string; discarded?: boolean }>
+      >(existingChat.messagesJson || "[]", []);
+      historyMessages = buildChatHistoryForLlm(previous);
+    }
+
     const result = await askLlm({
       userId: user.id,
       utilityLabel: "Chat carpeta cliente",
@@ -83,6 +106,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             `Trabajas sobre la carpeta del cliente. Usa solo el contexto siguiente (causas, trámites, documentos).\n${built.context}`
           ),
         },
+        ...historyMessages,
         { role: "user", content: prompt },
       ],
     });
@@ -93,25 +117,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     ];
 
     let chat;
-    if (body.chatId) {
-      const existing = await prisma.agentChat.findFirst({
-        where: {
-          id: body.chatId,
-          clienteId: id,
-          ...(user.role === "admin" ? {} : { userId: user.id }),
-        },
-      });
-      if (!existing) {
-        return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
-      }
+    if (existingChat) {
       const previous = safeJsonParse<
         Array<{ role: string; content: string; source?: string }>
-      >(existing.messagesJson || "[]", []);
+      >(existingChat.messagesJson || "[]", []);
       chat = await prisma.agentChat.update({
-        where: { id: body.chatId },
+        where: { id: existingChat.id },
         data: {
           messagesJson: JSON.stringify([...previous, ...nextMessages]),
-          demoMode: existing.demoMode || result.source === "demo",
+          demoMode: existingChat.demoMode || result.source === "demo",
           userId: user.id,
         },
       });
@@ -126,6 +140,19 @@ export async function POST(req: NextRequest, { params }: Params) {
         },
       });
     }
+
+    await writeAudit({
+      action: "ai.cliente_chat",
+      entityType: "cliente",
+      entityId: id,
+      actorId: user.id,
+      after: {
+        chatId: chat?.id,
+        source: result.source,
+        promptLength: prompt.length,
+        historyTurns: historyMessages.length,
+      },
+    });
 
     return NextResponse.json({
       ...result,

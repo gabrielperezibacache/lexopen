@@ -386,7 +386,7 @@ function AgenteInner() {
         const parsed = safeJsonParse<ChatMessage[]>(data.chat.messagesJson, []);
         setMessages(Array.isArray(parsed) ? parsed : []);
         await loadChats(causaId || undefined);
-      } else if (data.source === "error" || !res.ok) {
+      } else if (data.source === "error") {
         // Mostrar el error en el hilo aunque no se persista
         setMessages((prev) => {
           const next: ChatMessage[] = [
