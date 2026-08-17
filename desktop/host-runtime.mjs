@@ -381,6 +381,9 @@ function stopChild(child) {
 }
 
 async function migrate() {
+  console.log(
+    "[lexopen-host] Aplicando migraciones Prisma (migrate deploy; dev local usa db push solo en npm run setup)."
+  );
   const schema = path.join(prismaRoot, "schema.prisma");
   const bundled = runBundledTool(
     "prisma",

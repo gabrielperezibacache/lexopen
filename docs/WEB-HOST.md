@@ -86,6 +86,13 @@ Use esta lista antes de cargar información real del estudio:
    (p. ej. CI). El `.env` del data dir también gana sobre un `DATABASE_URL`
    / secretos del shell (evita migrar contra otra base de CI). No use
    `npm run db:seed` / `setup` / `db:reset` con datos reales.
+
+   **Schema: `db push` (dev) vs `migrate deploy` (Host).** El onboarding rápido
+   (`npm run setup`) usa `prisma db push` y no escribe en `_prisma_migrations`.
+   El Host (`web:host`, self-update, Desktop) y `npm run setup:production` usan
+   **`prisma migrate deploy` exclusivamente**. No mezcle: un estudio en producción
+   nunca debe ejecutar `setup` ni `db:reset` sobre su data dir.
+
 3. **Primer admin:** abra `/setup?token=…` una sola vez; elimine o rote
    `LEXOPEN_BOOTSTRAP_TOKEN` después.
 4. **Health:** `curl http://127.0.0.1:3000/api/health` → `db: "up"` y, en

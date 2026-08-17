@@ -578,14 +578,22 @@ Abra `http://localhost:3000/login`. Para una experiencia de demostración, el se
 crea usuarios y contenido ficticio; consulte [Usuarios y datos demo](#-usuarios-y-datos-demo).
 
 ### Comandos de base de datos
+
+| Contexto | Comando | Mecanismo | Cuándo |
+| --- | --- | --- | --- |
+| **Dev local / demo** | `npm run setup` | `db push` + seed | Primer clone o reset de demo; **no** en Host con datos reales. |
+| **Dev local / demo** | `npm run db:reset` | `db push --force-reset` + seed | Solo desarrollo; **destructivo**. |
+| **Host producción / upgrade** | `npm run setup:production` / `db:migrate` | `migrate deploy` | Siempre en el estudio; registra historial en `_prisma_migrations`. |
+| **Host producción / upgrade** | `web:host`, `web:self-update`, Desktop | `migrate deploy` (automático) | Nunca use `db push` en el data dir del estudio. |
+
 | Comando | Uso |
 | --- | --- |
 | `npm run db:migrate` / `setup:production` | Aplica migraciones; **sin** cargar demo. Use esto en producción. |
-| `npm run db:push` | Sincroniza el schema directamente; útil para prototipos locales. |
+| `npm run db:push` | Sincroniza el schema directamente; útil para prototipos locales. No sustituye `migrate deploy` en Host. |
 | `npm run db:seed` | **Borra el contenido y carga datos demo.** Solo desarrollo. |
 | `npm run db:purge-demo -- --yes` | **Borra datos operativos/demo** y deja la BD lista para `/setup`. |
-| `npm run db:reset` | `db push --force-reset` + seed; **destructivo**. |
-| `npm run setup` | `db:push` + seed; **destructivo** si ya hay datos. |
+| `npm run db:reset` | `db push --force-reset` + seed; **destructivo**. Ver tabla de contexto arriba. |
+| `npm run setup` | `db:push` + seed; **destructivo** si ya hay datos. Solo dev/demo. |
 
 > [!WARNING]
 > No ejecute `db:seed`, `db:reset`, `setup` ni `db:purge-demo` sobre una base con
