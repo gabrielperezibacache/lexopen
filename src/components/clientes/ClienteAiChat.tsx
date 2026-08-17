@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 type Msg = { role: string; content: string; source?: string };
 
@@ -12,6 +13,7 @@ export function ClienteAiChat({
   clienteId: string;
   clienteNombre: string;
 }) {
+  const { t } = useI18n();
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
@@ -38,7 +40,7 @@ export function ClienteAiChat({
     });
     setBusy(false);
     if (!result.ok) {
-      setNote(result.error || "Error al consultar IA");
+      setNote(result.error || t("ai.assist.errorQuery"));
       return;
     }
     const data = result.data;
@@ -47,7 +49,7 @@ export function ClienteAiChat({
       ...m,
       {
         role: "assistant",
-        content: data.content || "(sin respuesta)",
+        content: data.content || t("ai.clienteChat.noReply"),
         source: data.source,
       },
     ]);
@@ -57,19 +59,15 @@ export function ClienteAiChat({
   return (
     <section className="panel space-y-4 rounded-3xl p-5">
       <div>
-        <h2 className="text-lg font-semibold">Trabajar con IA</h2>
+        <h2 className="text-lg font-semibold">{t("ai.clienteChat.title")}</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-          El asistente usa la carpeta de {clienteNombre}: causas, trámites y
-          documentos de texto. Configure el proveedor en Configuración.
+          {t("ai.clienteChat.subtitle").replace("{name}", clienteNombre)}
         </p>
       </div>
 
       <div className="max-h-80 space-y-3 overflow-y-auto rounded-2xl border border-[var(--line)] bg-white/50 p-3">
         {messages.length === 0 && (
-          <p className="text-sm text-[var(--ink-soft)]/65">
-            Ejemplos: «Resume los trámites pendientes de este cliente», «Redacta
-            un correo de avance con base en la carpeta».
-          </p>
+          <p className="text-sm text-[var(--ink-soft)]/65">{t("ai.clienteChat.empty")}</p>
         )}
         {messages.map((m, i) => (
           <div
@@ -81,7 +79,9 @@ export function ClienteAiChat({
             }`}
           >
             <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/50">
-              {m.role === "user" ? "Usted" : `IA${m.source ? ` · ${m.source}` : ""}`}
+              {m.role === "user"
+                ? t("ai.clienteChat.you")
+                : `IA${m.source ? ` · ${m.source}` : ""}`}
             </div>
             <div className="whitespace-pre-wrap">{m.content}</div>
           </div>
@@ -93,11 +93,11 @@ export function ClienteAiChat({
           className="input flex-1"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Pregunte sobre la carpeta del cliente…"
+          placeholder={t("ai.clienteChat.placeholder")}
           disabled={busy}
         />
         <button className="btn btn-primary" disabled={busy || !prompt.trim()} type="submit">
-          {busy ? "Pensando…" : "Preguntar"}
+          {busy ? t("ai.clienteChat.thinking") : t("ai.clienteChat.ask")}
         </button>
       </form>
       {note && (

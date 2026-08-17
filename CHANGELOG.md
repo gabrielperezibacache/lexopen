@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.9 — 2026-08-17
+
+Iteración IA definitiva: i18n, acciones conectadas y refactor del copiloto.
+
+### Nuevo
+- Acciones IA en UI: `causa.extraer`, `minuta.borrador`, `factura.glosa`, `mensaje.borrador`, `wiki.borrador`
+- Refactor copiloto: `useAgenteCopilot`, `AgenteCopilotView`, `types` y `SourceChip`
+
+### Mejoras
+- i18n ES/EN en paneles IA (`AiAssist`, chat cliente, documentos, trámites, agente)
+- Glosa factura: copiar o guardar como nota interna
+
 ## 0.1.8 — 2026-08-17
 
 Corte IA definitivo: multi-turno cliente, acciones conectadas en UI, auditoría y correcciones copiloto.

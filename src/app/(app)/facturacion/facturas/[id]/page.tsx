@@ -5,6 +5,7 @@ import { clp, DOC_TIPOS } from "@/lib/billing";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { InvoiceActions } from "@/components/billing/InvoiceActions";
+import { InvoiceAiPanel } from "@/components/billing/InvoiceAiPanel";
 import { requireStaff } from "@/lib/auth/session";
 
 type Params = { params: Promise<{ id: string }> };
@@ -105,6 +106,20 @@ export default async function InvoiceDetailPage({ params }: Params) {
           <div className="mt-1 font-medium">{invoice.author?.name || "—"}</div>
         </div>
       </div>
+
+      <section className="panel rounded-3xl p-5">
+        <h2 className="text-lg font-semibold">Asistente IA</h2>
+        <InvoiceAiPanel
+          invoiceId={invoice.id}
+          clienteId={invoice.clienteId}
+          causaId={invoice.causaId}
+          summary={[
+            invoice.number,
+            invoice.cliente.razonSocial,
+            invoice.lines.map((l) => l.description).join("; "),
+          ].join(" · ")}
+        />
+      </section>
 
       <section className="panel overflow-hidden rounded-3xl">
         <div className="overflow-x-auto">

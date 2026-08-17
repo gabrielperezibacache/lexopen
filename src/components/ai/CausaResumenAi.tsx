@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AiAssist } from "@/components/ai/AiAssist";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 export function CausaResumenAi({
   causaId,
@@ -10,6 +11,7 @@ export function CausaResumenAi({
   causaId: string;
   titulo: string;
 }) {
+  const { t } = useI18n();
   const [preview, setPreview] = useState("");
 
   return (
@@ -17,7 +19,7 @@ export function CausaResumenAi({
       <AiAssist
         action="causa.resumen"
         causaId={causaId}
-        label="Resumen procesal con IA"
+        label={t("ai.causaResumen.label")}
         showNotes={false}
         extra={{ titulo }}
         onResult={(r) => setPreview(r.content || "")}

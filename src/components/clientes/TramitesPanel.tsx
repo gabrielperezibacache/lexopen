@@ -11,6 +11,7 @@ import {
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 import { apiMutation } from "@/lib/api-mutation";
 import { calcularVencimiento } from "@/lib/plazos";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 type Tramite = {
   id: string;
@@ -50,6 +51,7 @@ export function TramitesPanel({
   compact?: boolean;
   responsables?: Responsable[];
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [templateId, setTemplateId] = useState("");
@@ -306,7 +308,7 @@ export function TramitesPanel({
       <AiAssist
         action="causa.sugerir_tramites"
         causaId={causaId}
-        label="Sugerir trámites con IA"
+        label={t("ai.tramites.suggest")}
         showPreview={false}
         onResult={(r) => void applyAiTramites(r)}
       />

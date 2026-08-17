@@ -12,6 +12,7 @@ import {
   validarRut,
 } from "@/lib/chile";
 import { apiMutation } from "@/lib/api-mutation";
+import { CausaExtraerAi } from "@/components/ai/CausaExtraerAi";
 
 type ConflictHit = {
   causaId: string;
@@ -130,7 +131,8 @@ function NuevaCausaInner() {
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader eyebrow="Alta de litigio" title="Nueva causa" />
 
-      <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
+      <form id="nueva-causa-form" onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
+        <CausaExtraerAi formId="nueva-causa-form" />
         <div>
           <label className="mb-1 block text-sm font-medium">Título</label>
           <input className="input" name="titulo" required placeholder="Ej. Cobro de pesos — contrato" />

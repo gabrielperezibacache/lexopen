@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 import { apiMutation } from "@/lib/api-mutation";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 export function DocumentoAiActions({
   documentoId,
@@ -12,6 +13,7 @@ export function DocumentoAiActions({
   documentoId: string;
   causaId?: string | null;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,7 +26,7 @@ export function DocumentoAiActions({
       motivo?: string;
     } | null;
     if (!data) {
-      setNote("Sin clasificación estructurada.");
+      setNote(t("ai.documento.noClassify"));
       return;
     }
     setBusy(true);
@@ -43,12 +45,12 @@ export function DocumentoAiActions({
     });
     setBusy(false);
     if (!result.ok) {
-      setNote(result.error || "No se pudo guardar la clasificación.");
+      setNote(result.error || t("ai.assist.errorQuery"));
       return;
     }
     setNote(
       [
-        "Clasificación guardada",
+        t("ai.documento.saved"),
         data.tipo ? `Tipo: ${data.tipo}` : null,
         data.confidencial ? "confidencial" : null,
         data.privilegio ? "privilegio" : null,
@@ -66,14 +68,14 @@ export function DocumentoAiActions({
         action="documento.resumir"
         documentoId={documentoId}
         causaId={causaId || undefined}
-        label="Resumir"
+        label={t("ai.documento.resumir")}
         showNotes={false}
       />
       <AiAssist
         action="documento.clasificar"
         documentoId={documentoId}
         causaId={causaId || undefined}
-        label={busy ? "Guardando…" : "Clasificar"}
+        label={busy ? t("ai.documento.saving") : t("ai.documento.clasificar")}
         showPreview={false}
         showNotes={false}
         onResult={(r) => void onClassify(r)}

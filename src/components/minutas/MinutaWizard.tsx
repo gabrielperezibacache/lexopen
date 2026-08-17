@@ -9,6 +9,7 @@ import {
   TIPOS_MINUTA,
 } from "@/lib/minutas";
 import { apiMutation } from "@/lib/api-mutation";
+import { MinutaBorradorAi } from "@/components/ai/MinutaBorradorAi";
 
 type AccionDraft = {
   key: string;
@@ -233,6 +234,41 @@ export function MinutaWizard({
     });
   }
 
+  function applyMinutaDraft(draft: {
+    titulo?: string;
+    resumenEjecutivo?: string;
+    hechosRelevantes?: string;
+    acuerdos?: string;
+    estadoCausaNota?: string;
+    riesgosAlertas?: string;
+    acciones?: Array<{
+      descripcion?: string;
+      prioridad?: string;
+      diasPlazo?: number;
+      crearPlazo?: boolean;
+      crearTask?: boolean;
+    }>;
+  }) {
+    if (draft.titulo) setTitulo(draft.titulo);
+    if (draft.resumenEjecutivo) setResumenEjecutivo(draft.resumenEjecutivo);
+    if (draft.hechosRelevantes) setHechosRelevantes(draft.hechosRelevantes);
+    if (draft.acuerdos) setAcuerdos(draft.acuerdos);
+    if (draft.estadoCausaNota) setEstadoCausaNota(draft.estadoCausaNota);
+    if (draft.riesgosAlertas) setRiesgosAlertas(draft.riesgosAlertas);
+    if (Array.isArray(draft.acciones) && draft.acciones.length > 0) {
+      setAcciones(
+        draft.acciones.map((a) => ({
+          ...emptyAccion(),
+          descripcion: a.descripcion || "",
+          prioridad: a.prioridad || "media",
+          diasPlazo: a.diasPlazo ? String(a.diasPlazo) : "",
+          crearPlazo: Boolean(a.crearPlazo),
+          crearTask: a.crearTask !== false,
+        }))
+      );
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="panel rounded-3xl px-5 py-4">
@@ -262,6 +298,8 @@ export function MinutaWizard({
           ))}
         </ol>
       </div>
+
+      <MinutaBorradorAi causaId={causaId} onApply={applyMinutaDraft} />
 
       {step === 0 && (
         <section className="panel space-y-5 rounded-3xl p-5">

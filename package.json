@@ -1,6 +1,6 @@
 {
   "name": "lexopen",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": false,
   "license": "AGPL-3.0-or-later",
   "description": "LexOpen — operaciones jurídicas open source para Chile: abogados independientes y estudios gestionan causas, plazos, CRM y facturación en un Host local (Obsidian, Google Workspace, IA OpenAI-compatible).",

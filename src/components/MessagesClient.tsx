@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { EmptyState } from "@/components/EmptyState";
 import { apiMutation } from "@/lib/api-mutation";
+import { MensajeBorradorAi } from "@/components/ai/MensajeBorradorAi";
 
 type Msg = {
   id: string;
@@ -28,6 +29,8 @@ export function MessagesClient({
   const [messages, setMessages] = useState(initialMessages);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
 
   async function refresh() {
     const res = await fetch("/api/messages");
@@ -48,8 +51,8 @@ export function MessagesClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           receiverId: fd.get("receiverId"),
-          subject: fd.get("subject"),
-          body: fd.get("body"),
+          subject: subject || fd.get("subject"),
+          body: body || fd.get("body"),
         }),
       });
       if (!result.ok) {
@@ -57,6 +60,8 @@ export function MessagesClient({
         return;
       }
       form.reset();
+      setSubject("");
+      setBody("");
       await refresh();
     } catch {
       setError("No se pudo enviar el mensaje");
@@ -111,6 +116,12 @@ export function MessagesClient({
         </section>
         <section className="panel rounded-3xl p-5">
           <h2 className="font-semibold">Nuevo mensaje</h2>
+          <MensajeBorradorAi
+            onApply={(draft) => {
+              setSubject(draft.subject);
+              setBody(draft.body);
+            }}
+          />
           <form onSubmit={send} className="mt-4 space-y-2">
             <select className="select" name="receiverId" required defaultValue="">
               <option value="" disabled>
@@ -123,12 +134,20 @@ export function MessagesClient({
                 </option>
               ))}
             </select>
-            <input className="input" name="subject" placeholder="Asunto" />
+            <input
+              className="input"
+              name="subject"
+              placeholder="Asunto"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+            />
             <textarea
               className="textarea"
               name="body"
               required
               placeholder="Mensaje"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
             />
             <button
               className="btn btn-primary"

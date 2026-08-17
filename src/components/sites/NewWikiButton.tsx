@@ -3,25 +3,24 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
+import { WikiBorradorAi } from "@/components/ai/WikiBorradorAi";
 
 export function NewWikiButton({ siteId }: { siteId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const fd = new FormData(e.currentTarget);
     const result = await apiMutation(`/api/sites/${siteId}/wiki`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: fd.get("title"),
-        content: fd.get("content"),
-      }),
+      body: JSON.stringify({ title, content }),
     });
     setBusy(false);
     if (!result.ok) {
@@ -29,6 +28,8 @@ export function NewWikiButton({ siteId }: { siteId: string }) {
       return;
     }
     setOpen(false);
+    setTitle("");
+    setContent("");
     router.refresh();
   }
 
@@ -41,10 +42,26 @@ export function NewWikiButton({ siteId }: { siteId: string }) {
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <form onSubmit={onSubmit} className="panel w-full max-w-lg space-y-3 rounded-3xl p-6">
             <h3 className="text-lg font-semibold">Nueva página wiki</h3>
-            <input className="input" name="title" required placeholder="Título" />
+            <WikiBorradorAi
+              siteId={siteId}
+              onApply={(draft) => {
+                if (draft.title) setTitle(draft.title);
+                if (draft.content) setContent(draft.content);
+              }}
+            />
+            <input
+              className="input"
+              name="title"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Título"
+            />
             <textarea
               className="textarea min-h-[180px]"
               name="content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
               placeholder="Escriba en Markdown: títulos (#), listas (-), negrita (**texto**)"
             />
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}

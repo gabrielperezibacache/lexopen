@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import type { AiActionId } from "@/lib/ai/actions";
 import { AI_ACTION_META } from "@/lib/ai/actions";
 import { apiMutation } from "@/lib/api-mutation";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 export type AiActionResponse = {
   ok: boolean;
@@ -49,6 +50,7 @@ export function AiAssist({
   className = "",
   children,
 }: Props) {
+  const { t } = useI18n();
   const meta = AI_ACTION_META[action];
   const buttonLabel = label || meta.label;
   const [busy, setBusy] = useState(false);
@@ -79,23 +81,23 @@ export function AiAssist({
     );
     setBusy(false);
     if (!result.ok) {
-      setStatus(result.error || "Error al consultar IA");
+      setStatus(result.error || t("ai.assist.errorQuery"));
       return;
     }
     const data = result.data;
     if (data.ok === false) {
-      setStatus(data.error || data.note || "Error al consultar IA");
+      setStatus(data.error || data.note || t("ai.assist.errorQuery"));
       return;
     }
     setPreview(data.content || "");
     setStatus(
       [
         data.source === "demo"
-          ? "Modo demo"
+          ? t("ai.assist.demoMode")
           : data.source === "llm"
-            ? "Modelo real"
+            ? t("ai.assist.realModel")
             : data.source,
-        data.requireApproval ? "revisión humana requerida" : null,
+        data.requireApproval ? t("ai.assist.humanReview") : null,
         data.note || null,
       ]
         .filter(Boolean)
@@ -103,6 +105,9 @@ export function AiAssist({
     );
     onResult?.(data);
   }
+
+  const generating = t("ai.assist.generating");
+  const executeLabel = t("ai.assist.execute").replace("{label}", buttonLabel);
 
   return (
     <div className={`space-y-2 ${className}`}>
@@ -117,7 +122,7 @@ export function AiAssist({
           }}
           title={meta.description}
         >
-          {busy ? "Generando…" : open ? `Ejecutar: ${buttonLabel}` : buttonLabel}
+          {busy ? generating : open ? executeLabel : buttonLabel}
         </button>
         {open && (
           <button
@@ -125,7 +130,7 @@ export function AiAssist({
             className="btn btn-ghost text-xs"
             onClick={() => setOpen(false)}
           >
-            Cerrar
+            {t("ai.assist.close")}
           </button>
         )}
         {children}
@@ -134,13 +139,13 @@ export function AiAssist({
         <div className="rounded-2xl border border-[var(--line)] bg-white/70 p-3">
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium text-[var(--ink-soft)]/70">
-              Notas opcionales para la IA
+              {t("ai.assist.notesLabel")}
             </span>
             <textarea
               className="textarea min-h-[72px]"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Contexto adicional, tono, énfasis…"
+              placeholder={t("ai.assist.notesPlaceholder")}
             />
           </label>
           <button
@@ -149,7 +154,7 @@ export function AiAssist({
             disabled={busy}
             onClick={() => void run()}
           >
-            {busy ? "Generando…" : "Generar"}
+            {busy ? generating : t("ai.assist.generate")}
           </button>
         </div>
       )}
