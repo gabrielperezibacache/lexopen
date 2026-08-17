@@ -26,7 +26,7 @@ export function PlazoGoogleButton({ plazoId }: { plazoId: string }) {
     }
     const data = result.data;
     if (data.status === "created") setMsg("Creado en Calendar");
-    else if (data.status === "stub") setMsg(data.message);
+    else if (data.status === "stub") setMsg(data.message || "Google no conectado");
     else setMsg(data.error || "Error");
   }
 

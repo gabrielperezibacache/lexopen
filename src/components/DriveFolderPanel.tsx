@@ -60,7 +60,7 @@ export function DriveFolderPanel({
     });
     if (!result.ok) {
       setError(result.error || "Error");
-      return result;
+      return;
     }
     const data = result.data;
     setMsg(
@@ -84,7 +84,6 @@ export function DriveFolderPanel({
       setFiles(null);
       router.refresh();
     }
-    return data;
   }
 
   return (
