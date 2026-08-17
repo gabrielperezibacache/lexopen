@@ -18,7 +18,7 @@
       <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg" alt="Licencia AGPL-3.0-or-later">
     </a>
     <a href="package.json">
-      <img src="https://img.shields.io/badge/version-0.1.5-orange.svg" alt="Versión 0.1.5">
+      <img src="https://img.shields.io/badge/version-0.1.6-orange.svg" alt="Versión 0.1.6">
     </a>
     <a href="https://nodejs.org/">
       <img src="https://img.shields.io/badge/Node.js-22.x-339933.svg?logo=nodedotjs&logoColor=white" alt="Node.js 22">
@@ -43,10 +43,10 @@
 </div>
 
 > [!IMPORTANT]
-> **Estado del proyecto:** LexOpen está en la versión `0.1.5` y debe considerarse un
-> piloto endurecido (`0.1.5`). El checklist de Host local (`docs/WEB-HOST.md`)
+> **Estado del proyecto:** LexOpen está en la versión `0.1.6` y debe considerarse un
+> piloto endurecido (`0.1.6`). El checklist de Host local (`docs/WEB-HOST.md`)
 > cubre ACL del portal, CSRF en mutaciones cliente, auditoría estricta en
-> mutaciones sensibles, 2FA TOTP en `/cuenta` y export CSV/XML de facturación
+> mutaciones sensibles (incluido CRM/expediente), 2FA TOTP en `/cuenta` y export CSV/XML de facturación
 > hacia un facturador externo (sin DTE/SII in-app). Antes de cargar información
 > real de clientes o causas, revise seguridad, permisos, respaldos, cumplimiento y
 > fuentes jurídicas según las necesidades de su práctica (solo o en equipo).
@@ -1138,7 +1138,7 @@ de producción:
   `HERMES_ALLOW_DEMO`, `LLM_ALLOW_DEMO`, `PJUD_ALLOW_DEMO` y URLs privadas de
   LLM/Hermes generan advertencia al boot y deben quedar en `0` en un Host real.
 
-Estas limitaciones son parte del estado `0.1.5`, no un sustituto de un análisis de
+Estas limitaciones son parte del estado `0.1.6`, no un sustituto de un análisis de
 seguridad, privacidad o cumplimiento para una organización concreta.
 
 ## 🧪 Desarrollo y pruebas

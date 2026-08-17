@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.6 — 2026-08-17
+
+Corte de endurecimiento Host sobre `0.1.5`: CSRF restante, auditoría de expediente y Drive stub fail-closed.
+
+### Correcciones
+- CSRF: mutaciones restantes de Host (password, minutas, trámites, documentos, PJUD writes, config) usan `apiMutation`; login/setup/recovery siguen en la ruta especial
+- Drive: acciones stub (`push-documento` / Calendar / crear carpeta) responden 4xx en producción; el badge de causa ya no parece una carpeta real
+- UI: errores de mutación consistentes vía `apiMutation` (sin depender solo de `CsrfFetchPatch`)
+
+### Mejoras
+- `writeAuditStrict` en clientes, documentos, plazos, minutas, trámites, movimientos, sync PJUD Mis Causas/monitoreo
+- Tests: contrato `apiMutation`/CSRF, audit strict vs swallow, e2e conflictos y mensajes portal
+
+### Distribución
+- Solo git clone + `npm run web:host` (sin instaladores desktop). Tras actualizar: `prisma migrate deploy` si hay migraciones pendientes.
+
 ## 0.1.5 — 2026-08-16
 
 Corte de calidad y endurecimiento Host sobre la mejora progresiva de `0.1.4`.
