@@ -1,6 +1,6 @@
 {
   "name": "lexopen-desktop",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "author": "LexOpen contributors",
   "description": "LexOpen Desktop \u2014 host local del estudio + cliente remoto (Tailscale)",
