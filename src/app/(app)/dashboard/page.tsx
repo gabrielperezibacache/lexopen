@@ -249,14 +249,15 @@ export default async function DashboardPage() {
           </div>
           <div className="space-y-3">
             {sitesList.map((s) => (
-              <Link
+              <div
                 key={s.id}
-                href={`/sites/${s.id}`}
-                className="block rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+                className="rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
-                  <div className="font-medium">{s.name}</div>
+                  <Link href={`/sites/${s.id}`} className="font-medium text-[var(--ink)] hover:text-[var(--sea)]">
+                    {s.name}
+                  </Link>
                 </div>
                 <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
                   {t("dashboard.sites.meta")
@@ -273,7 +274,7 @@ export default async function DashboardPage() {
                     </>
                   ) : null}
                 </div>
-              </Link>
+              </div>
             ))}
             {sitesList.length === 0 && (
               <p className="text-sm text-[var(--ink-soft)]/65">
