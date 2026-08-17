@@ -8,12 +8,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const unreadCount = await prisma.notification.count({
     where: { userId: user.id, read: false },
   });
+  const mailPendingCount = isStaff(user.role)
+    ? await prisma.mailboxMessage.count({
+        where: {
+          userId: user.id,
+          status: { in: ["nuevo", "vinculado"] },
+        },
+      })
+    : 0;
   const showUpdateBanner = isStaff(user.role);
   const canSelfUpdate = user.role === "admin";
   return (
     <AppShell
       role={user.role}
       unreadCount={unreadCount}
+      mailPendingCount={mailPendingCount}
       showUpdateBanner={showUpdateBanner}
       canSelfUpdate={canSelfUpdate}
     >

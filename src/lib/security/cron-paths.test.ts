@@ -7,6 +7,7 @@ import {
 } from "@/lib/security/cron-paths";
 
 assert.ok(CRON_API_PATHS.includes("/api/plazos/alertas"));
+assert.ok(CRON_API_PATHS.includes("/api/mail/sync"));
 assert.equal(isCronApiPath("/api/causas/monitoreo"), true);
 assert.equal(isCronApiPath("/api/pjud/digest"), true);
 assert.equal(isCronApiPath("/api/health"), false);

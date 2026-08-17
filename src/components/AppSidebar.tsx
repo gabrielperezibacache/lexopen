@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Scale,
+  Inbox,
   LayoutDashboard,
   Briefcase,
   BookOpen,
@@ -39,6 +40,7 @@ type NavItem = {
   label: string;
   icon: typeof LayoutDashboard;
   roles?: Array<"admin" | "abogado" | "asistente">;
+  badge?: number;
 };
 
 function filterNav(links: NavItem[], role?: string | null) {
@@ -71,7 +73,7 @@ function NavGroup({
           const best =
             [...matches].sort((a, b) => b.href.length - a.href.length)[0]
               ?.href || null;
-          return links.map(({ href, label, icon: Icon }) => (
+          return links.map(({ href, label, icon: Icon, badge }) => (
             <Link
               key={href}
               href={href}
@@ -80,6 +82,11 @@ function NavGroup({
             >
               <Icon size={16} className="shrink-0" />
               <span className="truncate">{label}</span>
+              {badge != null && badge > 0 && (
+                <span className="ml-auto min-w-[1.15rem] rounded-full bg-[var(--copper)] px-1 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
             </Link>
           ));
         })()}
@@ -91,12 +98,14 @@ function NavGroup({
 function SidebarChrome({
   role,
   unreadCount,
+  mailPendingCount = 0,
   onNavigate,
   onClose,
   showClose,
 }: {
   role?: string | null;
   unreadCount: number;
+  mailPendingCount?: number;
   onNavigate?: () => void;
   onClose?: () => void;
   showClose?: boolean;
@@ -123,6 +132,13 @@ function SidebarChrome({
         icon: Shield,
         roles: ["admin", "abogado"],
       },
+      {
+        href: "/correo",
+        label: t("nav.mailbox"),
+        icon: Inbox,
+        roles: ["admin", "abogado", "asistente"],
+        badge: mailPendingCount,
+      },
       { href: "/minutas", label: t("nav.minutes"), icon: ClipboardPen },
       {
         href: "/facturacion",
@@ -134,7 +150,7 @@ function SidebarChrome({
       { href: "/calendario", label: t("nav.calendar"), icon: CalendarDays },
       { href: "/buscar", label: t("nav.search"), icon: Search },
     ],
-    [t]
+    [t, mailPendingCount]
   );
 
   const collab = useMemo<NavItem[]>(
@@ -278,11 +294,13 @@ function SidebarChrome({
 export function AppSidebar({
   role,
   unreadCount = 0,
+  mailPendingCount = 0,
   mobileOpen = false,
   onMobileOpenChange,
 }: {
   role?: string | null;
   unreadCount?: number;
+  mailPendingCount?: number;
   mobileOpen?: boolean;
   onMobileOpenChange?: (open: boolean) => void;
 }) {
@@ -319,7 +337,11 @@ export function AppSidebar({
     <>
       <div className="sticky top-0 hidden h-screen shrink-0 md:block">
         <aside className="flex h-full w-[240px] shrink-0 flex-col bg-[linear-gradient(180deg,#0c1c24_0%,#14313d_55%,#1a3d3f_100%)] text-white">
-          <SidebarChrome role={role} unreadCount={unreadCount} />
+          <SidebarChrome
+            role={role}
+            unreadCount={unreadCount}
+            mailPendingCount={mailPendingCount}
+          />
         </aside>
       </div>
 
@@ -354,6 +376,7 @@ export function AppSidebar({
           <SidebarChrome
             role={role}
             unreadCount={unreadCount}
+            mailPendingCount={mailPendingCount}
             onNavigate={close}
             onClose={close}
             showClose

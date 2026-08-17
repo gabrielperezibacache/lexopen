@@ -228,6 +228,30 @@ export async function startLocalHostSchedulers(opts) {
         }
       },
     }),
+    startIntervalJob({
+      env,
+      baseUrl,
+      alreadyHealthy,
+      intervalKey: "MAIL_SYNC_INTERVAL_MINUTES",
+      label: "sync correo PJUD",
+      log,
+      timeoutMs: 120_000,
+      run: async ({ baseUrl: url, secret, log: l, timeoutMs }) => {
+        const body = await postCron({
+          url: `${url}/api/mail/sync`,
+          secret,
+          body: "{}",
+          timeoutMs,
+          log: l,
+          failLabel: "Sync correo falló",
+        });
+        if (body) {
+          l.info(
+            `Correo: ${body.inserted ?? 0} nuevos · ${body.users ?? 0} usuarios`
+          );
+        }
+      },
+    }),
   ]);
 
   return {

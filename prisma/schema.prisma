@@ -88,6 +88,8 @@ model User {
   timeApprovals   TimeEntry[]      @relation("TimeApprover")
   agentChats      AgentChat[]
   blogPosts       BlogPost[]       @relation("BlogAuthor")
+  mailboxAccount  MailboxAccount?
+  mailboxMessages MailboxMessage[]
 }
 
 model AuditEvent {
@@ -288,6 +290,7 @@ model Causa {
   agentChats      AgentChat[]
   movimientos     CausaMovimiento[]
   pjudSyncJobs    PjudSyncJob[]
+  mailboxMessages MailboxMessage[]
 
   @@index([rit])
   @@index([ruc])
@@ -979,4 +982,47 @@ model LedgerEntry {
   invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   paymentId String?
   payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+}
+
+/// Buzón PJUD por usuario (demo o IMAP)
+model MailboxAccount {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  protocol     String   @default("demo") // demo | imap
+  email        String?
+  imapHost     String?
+  imapPort     Int      @default(993)
+  imapTls      Boolean  @default(true)
+  passwordEnc  String?
+  lastSyncAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  messages     MailboxMessage[]
+}
+
+model MailboxMessage {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     MailboxAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  externalId  String?
+  kind        String   @default("otro") // resolucion | causa_general | tablas | otro
+  status      String   @default("nuevo") // nuevo | vinculado | aplicado | descartado
+  subject     String
+  fromAddress String?
+  receivedAt  DateTime
+  bodyText    String   @db.Text
+  parsedJson  String?  @db.Text
+  rit         String?
+  tribunal    String?
+  causaId     String?
+  causa       Causa?   @relation(fields: [causaId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, externalId])
+  @@index([userId, status])
+  @@index([causaId])
 }

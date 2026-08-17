@@ -8,6 +8,7 @@ export const CRON_API_PATHS = [
   "/api/pjud/digest",
   "/api/plazos/alertas",
   "/api/uf/sync",
+  "/api/mail/sync",
 ] as const;
 
 export function isCronApiPath(pathname: string): boolean {

@@ -34,6 +34,7 @@ assert.equal(ufNoCron.ok, false);
 assert.ok(ufNoCron.errors.some((e) => /CRON_SECRET/.test(e)));
 
 assert.ok(SCHEDULER_INTERVAL_KEYS.includes("UF_SYNC_INTERVAL_MINUTES"));
+assert.ok(SCHEDULER_INTERVAL_KEYS.includes("MAIL_SYNC_INTERVAL_MINUTES"));
 
 const good = evaluateHostEnv({
   SESSION_SECRET: "production-grade-session-secret-32",

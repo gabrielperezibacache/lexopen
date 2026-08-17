@@ -11,12 +11,14 @@ import { useI18n } from "@/components/i18n/I18nProvider";
 export function AppShell({
   role,
   unreadCount = 0,
+  mailPendingCount = 0,
   showUpdateBanner = false,
   canSelfUpdate = false,
   children,
 }: {
   role?: string | null;
   unreadCount?: number;
+  mailPendingCount?: number;
   showUpdateBanner?: boolean;
   canSelfUpdate?: boolean;
   children: React.ReactNode;
@@ -51,6 +53,7 @@ export function AppShell({
       <AppSidebar
         role={role}
         unreadCount={unreadCount}
+        mailPendingCount={mailPendingCount}
         mobileOpen={mobileOpen}
         onMobileOpenChange={setMobileOpen}
       />

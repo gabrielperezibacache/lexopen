@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.7 — 2026-08-17
+
+Corte de repaso: ops schedulers, docs migrate, auditoría estricta, i18n dashboard y buzón PJUD `/correo`.
+
+### Nuevo
+- Buzón PJUD por usuario: demo/IMAP, pegado manual, parser RIT/resolución/tablas, apply/link con ACL de causa
+- Cron `MAIL_SYNC_INTERVAL_MINUTES` + entrada en `prod:check`
+
+### Mejoras
+- `UF_SYNC_INTERVAL_MINUTES` en `prod:check` y `.env.example`
+- Documentación `db push` vs `migrate deploy`
+- `writeAuditStrict` en wiki, blog, isheets, webhook PJUD, self-update, Hermes minuta
+- i18n dashboard, loading, error e integraciones
+- Agente: POST Hermes vía `apiMutation`
+
 ## 0.1.6 — 2026-08-17
 
 Corte de endurecimiento Host sobre `0.1.5`: CSRF restante, auditoría de expediente y Drive stub fail-closed.
