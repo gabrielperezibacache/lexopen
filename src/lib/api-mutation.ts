@@ -7,7 +7,10 @@ import { withCsrfHeaders } from "@/lib/client-csrf";
 export async function apiMutation<T = unknown>(
   input: RequestInfo | URL,
   init?: RequestInit
-): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
+): Promise<
+  | { ok: true; data: T }
+  | { ok: false; error: string; status: number; data?: T & { error?: string } }
+> {
   try {
     const headers = withCsrfHeaders(init?.headers);
     const res = await fetch(input, { ...init, headers });
@@ -19,6 +22,7 @@ export async function apiMutation<T = unknown>(
           (data && typeof data === "object" && "error" in data && data.error) ||
           `Error ${res.status}`,
         status: res.status,
+        data,
       };
     }
     return { ok: true, data };

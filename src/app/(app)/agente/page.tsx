@@ -327,7 +327,17 @@ function AgenteInner() {
     setApproveMsg("");
     setApproveHref("");
     try {
-      const res = await fetch("/api/integrations/hermes", {
+      const result = await apiMutation<{
+        content?: string;
+        note?: string;
+        error?: string;
+        code?: string;
+        source?: string;
+        sources?: SourceRef[];
+        suggestedActions?: { label: string; href: string }[];
+        requireApproval?: boolean;
+        chat?: { id: string; messagesJson: string; demoMode?: boolean };
+      }>("/api/integrations/hermes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -340,18 +350,24 @@ function AgenteInner() {
           documentoIds: selectedDocIds.length ? selectedDocIds : undefined,
         }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 409 && data.code === "causa_mismatch") {
-        setChatId("");
-        if (!opts?.retrying) {
-          await sendPrompt(nextPrompt, u, {
-            chatIdOverride: null,
-            retrying: true,
-          });
+      const data = result.ok ? result.data : result.data || {};
+      if (!result.ok) {
+        if (result.status === 409 && data.code === "causa_mismatch") {
+          setChatId("");
+          if (!opts?.retrying) {
+            await sendPrompt(nextPrompt, u, {
+              chatIdOverride: null,
+              retrying: true,
+            });
+            return;
+          }
+          setReply(data.error || "Inicie un chat nuevo para esta causa");
+          setMeta("Causa distinta al chat");
+          setRequireApproval(false);
           return;
         }
-        setReply(data.error || "Inicie un chat nuevo para esta causa");
-        setMeta("Causa distinta al chat");
+        setReply(data.error || result.error || "Sin respuesta");
+        setMeta("");
         setRequireApproval(false);
         return;
       }
@@ -565,7 +581,13 @@ function AgenteInner() {
   async function estimatePlazo() {
     setPlazoPreview("");
     setPlazoVencimiento("");
-    const res = await fetch("/api/integrations/hermes", {
+    const result = await apiMutation<{
+      error?: string;
+      vencimiento?: string;
+      urgencia?: string;
+      diasRestantes?: number;
+      disclaimer?: string;
+    }>("/api/integrations/hermes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -575,9 +597,10 @@ function AgenteInner() {
         tipoComputo: plazoComputo,
       }),
     });
-    const data = await res.json().catch(() => ({}));
-    if (data.error) {
-      setPlazoPreview(data.error);
+    const data = result.ok ? result.data : result.data || {};
+    const errMsg = data.error || (!result.ok ? result.error : undefined);
+    if (!result.ok || errMsg) {
+      setPlazoPreview(errMsg || "Error");
       return;
     }
     setPlazoVencimiento(data.vencimiento || "");

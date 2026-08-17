@@ -32,6 +32,8 @@ function shouldAttachCsrf(input: RequestInfo | URL, init?: RequestInit) {
 
 /**
  * Ensures same-origin mutating fetch() calls send the double-submit CSRF header.
+ * Legacy safety net: prefer explicit `apiMutation` for new mutating calls so errors
+ * surface consistently. Remove this patch only after auditing all POST/PATCH/DELETE.
  */
 export function CsrfFetchPatch() {
   useEffect(() => {

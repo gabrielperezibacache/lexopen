@@ -41,6 +41,7 @@ async function main() {
     if (!denied.ok) {
       assert.equal(denied.error, "No autorizado");
       assert.equal(denied.status, 403);
+      assert.deepEqual(denied.data, { error: "No autorizado" });
     }
 
     globalThis.fetch = (async (_input, init) => {
