@@ -54,6 +54,16 @@ function intervalOn(env, key) {
   return Number.isFinite(n) && n > 0;
 }
 
+/** Interval env keys that require CRON_SECRET when > 0 (keep in sync with local-host-schedulers). */
+export const SCHEDULER_INTERVAL_KEYS = [
+  "PJUD_SYNC_INTERVAL_MINUTES",
+  "PJUD_DIGEST_INTERVAL_MINUTES",
+  "PJUD_MIS_CAUSAS_INTERVAL_MINUTES",
+  "PLAZOS_ALERTAS_INTERVAL_MINUTES",
+  "UF_SYNC_INTERVAL_MINUTES",
+  // MAIL_SYNC_INTERVAL_MINUTES — add when /correo mailbox cron ships
+];
+
 /**
  * @returns {{ ok: boolean, errors: string[], warnings: string[] }}
  */
@@ -81,11 +91,7 @@ export function evaluateHostEnv(env = {}) {
     }
   }
 
-  const schedulers =
-    intervalOn(env, "PJUD_SYNC_INTERVAL_MINUTES") ||
-    intervalOn(env, "PJUD_DIGEST_INTERVAL_MINUTES") ||
-    intervalOn(env, "PJUD_MIS_CAUSAS_INTERVAL_MINUTES") ||
-    intervalOn(env, "PLAZOS_ALERTAS_INTERVAL_MINUTES");
+  const schedulers = SCHEDULER_INTERVAL_KEYS.some((key) => intervalOn(env, key));
   if (schedulers && !String(env.CRON_SECRET || "").trim()) {
     errors.push(
       "Hay intervalos de scheduler > 0 pero falta CRON_SECRET (requerido por proxy/cron)."

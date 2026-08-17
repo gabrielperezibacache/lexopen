@@ -94,7 +94,9 @@ Use esta lista antes de cargar información real del estudio:
    `PJUD_SECRETS_KEY` + `CRON_SECRET` aleatorios (≥16 caracteres).
 6. **Schedulers (opcionales, recomendados en operación diaria):**
    `PJUD_SYNC_INTERVAL_MINUTES=240`, `PLAZOS_ALERTAS_INTERVAL_MINUTES=60`,
+   `UF_SYNC_INTERVAL_MINUTES=1440` (UF diaria para facturación; `0` = off),
    `LEXOPEN_BACKUP_INTERVAL_MINUTES` + `LEXOPEN_BACKUP_DIR` **fuera** del data dir.
+   Cualquier intervalo `*_INTERVAL_MINUTES` > 0 exige `CRON_SECRET` (`prod:check` lo valida).
 7. **OCR (opcional):** Tesseract instalado si procesará PDFs escaneados.
 8. **PJUD scrape:** solo con consentimiento del estudio (ToS); preferir sidecar
    `npm run pjud:host` + CAPTCHA BYOK. Ver `docs/PJUD.md` y el aviso en LICENSE.
@@ -289,9 +291,11 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
   PLAZOS_ALERTAS_INTERVAL_MINUTES=60
   PLAZOS_ALERTAS_DAYS=3
   # PLAZOS_ALERTAS_EMAIL=1
+  # Opcional: sync UF diaria (mindicador.cl → tarifas en facturación)
+  UF_SYNC_INTERVAL_MINUTES=1440
   ```
 
-  Los schedulers PJUD / digest / plazos los arranca el runtime del Host
+  Los schedulers PJUD / digest / plazos / UF los arranca el runtime del Host
   (`desktop/host-runtime.mjs`), también usado por Electron. `web:host` solo
   orquesta el proceso y los backups. LexOpen corre en **su host**; puede usar
   APIs externas (OJV, CAPTCHA, `PJUD_API_URL`).
