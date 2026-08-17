@@ -8,6 +8,7 @@ import {
   PRIORIDADES_ACCION,
   TIPOS_MINUTA,
 } from "@/lib/minutas";
+import { apiMutation } from "@/lib/api-mutation";
 
 type AccionDraft = {
   key: string;
@@ -173,59 +174,62 @@ export function MinutaWizard({
     }
 
     startTransition(async () => {
-      try {
-        const res = await fetch("/api/minutas", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            causaId,
-            tipo,
-            titulo: titulo.trim(),
-            fecha,
-            modalidad,
-            lugar: lugar.trim() || null,
-            participantes: participantes.trim(),
-            resumenEjecutivo: resumenEjecutivo.trim(),
-            hechosRelevantes: hechosRelevantes.trim() || null,
-            acuerdos: acuerdos.trim() || null,
-            estadoCausaNota: estadoCausaNota.trim() || null,
-            riesgosAlertas: riesgosAlertas.trim() || null,
-            etapaSugerida: etapaSugerida || null,
-            actualizarEtapa,
-            confidencial,
-            subirADrive: subirADrive && hasRealDriveFolder,
-            acciones: accionesValidas().map((a) => ({
-              descripcion: a.descripcion.trim(),
-              responsable: a.responsable.trim() || undefined,
-              fechaLimite: a.fechaLimite || null,
-              diasPlazo: a.diasPlazo ? Number(a.diasPlazo) : null,
-              tipoComputo: a.tipoComputo,
-              esFatal: a.esFatal,
-              prioridad: a.prioridad,
-              crearPlazo: a.crearPlazo && Boolean(a.fechaLimite || a.diasPlazo),
-              crearTask: a.crearTask,
-            })),
-            proximosPasos: accionesValidas()
-              .map((a) => `- ${a.descripcion}`)
-              .join("\n"),
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setError(data.error || "No se pudo guardar la minuta");
-          return;
-        }
-        const driveWarn =
-          Array.isArray(data.warnings) && data.warnings.length > 0
-            ? `?aviso=${encodeURIComponent(data.warnings[0])}`
-            : "";
-        router.push(
-          `/causas/${causaId}/minutas/${data.minuta.id}${driveWarn}`
-        );
-        router.refresh();
-      } catch {
-        setError("Error de red al guardar la minuta. Intente de nuevo.");
+      const result = await apiMutation<{
+        minuta?: { id: string };
+        warnings?: string[];
+      }>("/api/minutas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          causaId,
+          tipo,
+          titulo: titulo.trim(),
+          fecha,
+          modalidad,
+          lugar: lugar.trim() || null,
+          participantes: participantes.trim(),
+          resumenEjecutivo: resumenEjecutivo.trim(),
+          hechosRelevantes: hechosRelevantes.trim() || null,
+          acuerdos: acuerdos.trim() || null,
+          estadoCausaNota: estadoCausaNota.trim() || null,
+          riesgosAlertas: riesgosAlertas.trim() || null,
+          etapaSugerida: etapaSugerida || null,
+          actualizarEtapa,
+          confidencial,
+          subirADrive: subirADrive && hasRealDriveFolder,
+          acciones: accionesValidas().map((a) => ({
+            descripcion: a.descripcion.trim(),
+            responsable: a.responsable.trim() || undefined,
+            fechaLimite: a.fechaLimite || null,
+            diasPlazo: a.diasPlazo ? Number(a.diasPlazo) : null,
+            tipoComputo: a.tipoComputo,
+            esFatal: a.esFatal,
+            prioridad: a.prioridad,
+            crearPlazo: a.crearPlazo && Boolean(a.fechaLimite || a.diasPlazo),
+            crearTask: a.crearTask,
+          })),
+          proximosPasos: accionesValidas()
+            .map((a) => `- ${a.descripcion}`)
+            .join("\n"),
+        }),
+      });
+      if (!result.ok) {
+        setError(result.error || "No se pudo guardar la minuta");
+        return;
       }
+      const data = result.data;
+      if (!data.minuta?.id) {
+        setError("No se pudo guardar la minuta");
+        return;
+      }
+      const driveWarn =
+        Array.isArray(data.warnings) && data.warnings.length > 0
+          ? `?aviso=${encodeURIComponent(data.warnings[0])}`
+          : "";
+      router.push(
+        `/causas/${causaId}/minutas/${data.minuta.id}${driveWarn}`
+      );
+      router.refresh();
     });
   }
 

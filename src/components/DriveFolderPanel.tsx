@@ -8,6 +8,7 @@ import {
   isPlaceholderDriveFolderId,
   isRealDriveFolderId,
 } from "@/lib/integrations/drive-folder";
+import { apiMutation } from "@/lib/api-mutation";
 
 type DriveFile = {
   id: string;
@@ -47,16 +48,21 @@ export function DriveFolderPanel({
   async function run(action: string, extra: Record<string, unknown> = {}) {
     setMsg("");
     setError("");
-    const res = await fetch("/api/integrations/google", {
+    const result = await apiMutation<{
+      error?: string;
+      message?: string;
+      status?: string;
+      files?: DriveFile[];
+    }>("/api/integrations/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, causaId, ...extra }),
     });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || "Error");
-      return data;
+    if (!result.ok) {
+      setError(result.error || "Error");
+      return result;
     }
+    const data = result.data;
     setMsg(
       data.message ||
         (data.status === "created"

@@ -1118,8 +1118,10 @@ de producción:
 - la auditoría es best-effort salvo mutaciones sensibles vía `writeAuditStrict`
   (auth/TOTP/password/recover, personas, purge-demo, ClaveÚnica, billing
   invoices/payments, override de conflicto, site members, workflows,
-  jurisprudencia ingest, alta de causa), que fallan si no se puede persistir el
-  evento; wiki/blog/iSheet usan auditoría best-effort;
+  jurisprudencia ingest, alta/edición de causa, clientes, documentos, plazos,
+  minutas, trámites, movimientos, sync PJUD Mis Causas/monitoreo), que fallan
+  si no se puede persistir el evento; wiki/blog/iSheet, Hermes y webhook PJUD
+  usan auditoría best-effort;
 - no hay topología multi-Host ni alta disponibilidad; los backups automáticos
   locales son opcionales, requieren almacenamiento separado y no sustituyen una
   copia externa cifrada;

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import type { AiActionId } from "@/lib/ai/actions";
 import { AI_ACTION_META } from "@/lib/ai/actions";
+import { apiMutation } from "@/lib/api-mutation";
 
 export type AiActionResponse = {
   ok: boolean;
@@ -60,24 +61,29 @@ export function AiAssist({
     setBusy(true);
     setStatus("");
     setPreview("");
-    const res = await fetch("/api/ai/actions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action,
-        prompt: notes || prompt || undefined,
-        causaId,
-        clienteId,
-        documentoId,
-        siteId,
-        extra,
-      }),
-    });
-    const data = (await res.json().catch(() => ({}))) as AiActionResponse & {
-      error?: string;
-    };
+    const result = await apiMutation<AiActionResponse & { error?: string }>(
+      "/api/ai/actions",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          prompt: notes || prompt || undefined,
+          causaId,
+          clienteId,
+          documentoId,
+          siteId,
+          extra,
+        }),
+      }
+    );
     setBusy(false);
-    if (!res.ok || data.ok === false) {
+    if (!result.ok) {
+      setStatus(result.error || "Error al consultar IA");
+      return;
+    }
+    const data = result.data;
+    if (data.ok === false) {
       setStatus(data.error || data.note || "Error al consultar IA");
       return;
     }

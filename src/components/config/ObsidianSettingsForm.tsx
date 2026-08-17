@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { apiMutation } from "@/lib/api-mutation";
 
 type ObsidianConfig = {
   vaultPath: string;
@@ -45,7 +46,7 @@ export function ObsidianSettingsForm() {
     e.preventDefault();
     setMessage("");
     setOk(false);
-    const res = await fetch("/api/integrations/obsidian", {
+    const result = await apiMutation("/api/integrations/obsidian", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -54,26 +55,27 @@ export function ObsidianSettingsForm() {
         config,
       }),
     });
-    const data = await res.json().catch(() => ({}));
-    setOk(res.ok);
-    setMessage(res.ok ? "Obsidian guardado" : data.error || "Error al guardar");
+    setOk(result.ok);
+    setMessage(result.ok ? "Obsidian guardado" : result.error || "Error al guardar");
   }
 
   async function onSync() {
     setSyncing(true);
     setMessage("");
-    const res = await fetch("/api/integrations/obsidian", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "sync-all" }),
-    });
-    const data = await res.json().catch(() => ({}));
+    const result = await apiMutation<{ synced?: number }>(
+      "/api/integrations/obsidian",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sync-all" }),
+      }
+    );
     setSyncing(false);
-    setOk(res.ok);
+    setOk(result.ok);
     setMessage(
-      res.ok
-        ? `Exportación: ${data.synced ?? 0} causas`
-        : data.error || "Error al sincronizar"
+      result.ok
+        ? `Exportación: ${result.data.synced ?? 0} causas`
+        : result.error || "Error al sincronizar"
     );
   }
 

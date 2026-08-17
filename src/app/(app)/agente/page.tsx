@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { safeJsonParse } from "@/lib/safe-json";
 import { MarkdownView } from "@/lib/markdown";
 import { PageHeader } from "@/components/sites/SiteNav";
+import { apiMutation } from "@/lib/api-mutation";
 
 type CausaOption = { id: string; titulo: string; rit: string | null };
 type SourceRef = {
@@ -472,7 +473,11 @@ function AgenteInner() {
     setApproveBusy(true);
     setApproveMsg("");
     try {
-      const res = await fetch("/api/integrations/hermes", {
+      const result = await apiMutation<{
+        href?: string;
+        error?: string;
+        chat?: { messagesJson?: string };
+      }>("/api/integrations/hermes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -484,24 +489,24 @@ function AgenteInner() {
             utilities.find((u) => u.id === utility)?.label || utility,
         }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 409 && data.href) {
-        setRequireApproval(false);
-        setApproveMsg(data.error || "Este borrador ya fue aprobado.");
-        setApproveHref(data.href);
-        return;
-      }
-      if (!res.ok) {
-        setApproveMsg(data.error || "No se pudo guardar la minuta");
+      if (!result.ok) {
+        if (result.status === 409) {
+          setRequireApproval(false);
+          setApproveMsg(result.error || "Este borrador ya fue aprobado.");
+          setApproveHref("");
+          return;
+        }
+        setApproveMsg(result.error || "No se pudo guardar la minuta");
         setApproveHref("");
         return;
       }
+      const data = result.data;
       setRequireApproval(false);
       setApproveMsg("Minuta guardada a partir del borrador aprobado.");
       setApproveHref(data.href || "");
       if (data.href) {
         setActions((prev) => [
-          { label: "Ver minuta aprobada", href: data.href },
+          { label: "Ver minuta aprobada", href: data.href! },
           ...prev.filter((a) => a.href !== data.href),
         ]);
       }
@@ -533,20 +538,24 @@ function AgenteInner() {
       return;
     }
     try {
-      const res = await fetch("/api/integrations/hermes", {
+      const result = await apiMutation<{
+        chat?: { id: string; messagesJson?: string; demoMode?: boolean };
+      }>("/api/integrations/hermes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "discard-draft", chatId }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.chat) {
-        setChatId(data.chat.id);
-        const parsed = safeJsonParse<ChatMessage[]>(data.chat.messagesJson, []);
+      if (result.ok && result.data.chat) {
+        setChatId(result.data.chat.id);
+        const parsed = safeJsonParse<ChatMessage[]>(
+          result.data.chat.messagesJson,
+          []
+        );
         setMessages(Array.isArray(parsed) ? parsed : []);
         const lastAssistant = [...(Array.isArray(parsed) ? parsed : [])]
           .reverse()
           .find((m) => m.role === "assistant");
-        applyAssistantMeta(lastAssistant, data.chat.demoMode);
+        applyAssistantMeta(lastAssistant, result.data.chat.demoMode);
       }
     } catch {
       /* local discard already applied */

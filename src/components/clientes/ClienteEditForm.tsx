@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function ClienteEditForm({
   cliente,
@@ -26,7 +27,7 @@ export function ClienteEditForm({
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const res = await fetch(`/api/clientes/${cliente.id}`, {
+    const result = await apiMutation(`/api/clientes/${cliente.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -40,8 +41,8 @@ export function ClienteEditForm({
         abogadoId: fd.get("abogadoId") || null,
       }),
     });
-    setMsg(res.ok ? "Guardado" : "Error al guardar");
-    if (res.ok) router.refresh();
+    setMsg(result.ok ? "Guardado" : "Error al guardar");
+    if (result.ok) router.refresh();
   }
 
   return (

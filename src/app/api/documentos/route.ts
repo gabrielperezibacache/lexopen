@@ -9,7 +9,7 @@ import {
 } from "@/lib/api";
 import { documentoCreateSchema } from "@/lib/schemas";
 import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storage";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { MAX_PROCESSING_BYTES } from "@/lib/document-processing";
@@ -218,7 +218,7 @@ export async function POST(req: NextRequest) {
         },
       });
     }
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "documento.create",
       entityType: "Documento",

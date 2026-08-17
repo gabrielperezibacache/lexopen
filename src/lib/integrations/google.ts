@@ -382,6 +382,29 @@ async function requireDriveSession() {
   return config;
 }
 
+/** HTTP status for Drive/Calendar action payloads. Stub is 200 in dev, 4xx in production. */
+export function googleActionHttpStatus(status: string): number {
+  if (status === "needs_real_folder") return 400;
+  if (status === "stub" && process.env.NODE_ENV === "production") return 400;
+  return 200;
+}
+
+function softGoogleFailure(e: GoogleIntegrationError): {
+  status: "needs_reconnect" | "blocked" | "stub";
+  message: string;
+} {
+  if (e.code === "needs_reconnect") {
+    return { status: "needs_reconnect", message: e.message };
+  }
+  if (e.code === "sync_off" || e.code === "disabled") {
+    return { status: "blocked", message: e.message };
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw e;
+  }
+  return { status: "stub", message: e.message };
+}
+
 async function requireCalendarSession() {
   const enabled = await isGoogleIntegrationEnabled();
   const config = await ensureGoogleAccessToken();
@@ -552,14 +575,9 @@ export async function pushPlazoToGoogleCalendar(plazoId: string) {
         e.code === "sync_off" ||
         e.code === "needs_reconnect")
     ) {
+      const soft = softGoogleFailure(e);
       return {
-        status:
-          e.code === "needs_reconnect"
-            ? ("needs_reconnect" as const)
-            : e.code === "sync_off" || e.code === "disabled"
-              ? ("blocked" as const)
-              : ("stub" as const),
-        message: e.message,
+        ...soft,
         draftEvent: {
           summary: `[LexOpen] ${plazo.titulo}`,
           description: `${plazo.descripcion ?? ""}\nCausa: ${plazo.causa?.titulo ?? "—"} (${plazo.causa?.rit ?? ""})`,
@@ -641,14 +659,9 @@ export async function pushDocumentoToDrive(
         e.code === "sync_off" ||
         e.code === "needs_reconnect")
     ) {
+      const soft = softGoogleFailure(e);
       return {
-        status:
-          e.code === "needs_reconnect"
-            ? ("needs_reconnect" as const)
-            : e.code === "needs_oauth"
-              ? ("stub" as const)
-              : ("blocked" as const),
-        message: e.message,
+        ...soft,
         draft: {
           name: doc.nombre,
           mimeType: doc.mimeType || "application/octet-stream",
@@ -1132,14 +1145,9 @@ export async function pushMinutaToDrive(
         e.code === "sync_off" ||
         e.code === "needs_reconnect")
     ) {
+      const soft = softGoogleFailure(e);
       return {
-        status:
-          e.code === "needs_reconnect"
-            ? ("needs_reconnect" as const)
-            : e.code === "needs_oauth"
-              ? ("stub" as const)
-              : ("blocked" as const),
-        message: e.message,
+        ...soft,
         draft: {
           name,
           parents: [folderId],

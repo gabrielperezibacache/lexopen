@@ -15,6 +15,19 @@ export type WriteAuditOpts = {
   strict?: boolean;
 };
 
+/** Best-effort logs; strict throws 500 so the mutation cannot succeed silently. */
+export function handleAuditWriteError(e: unknown, strict?: boolean) {
+  console.error("audit write failed", e);
+  if (strict) {
+    const err = new Error(
+      "No se pudo registrar la auditoría; la operación se abortó"
+    ) as Error & { status: number; cause?: unknown };
+    err.status = 500;
+    err.cause = e;
+    throw err;
+  }
+}
+
 export async function writeAudit(opts: WriteAuditOpts) {
   try {
     await prisma.auditEvent.create({
@@ -29,15 +42,7 @@ export async function writeAudit(opts: WriteAuditOpts) {
       },
     });
   } catch (e) {
-    console.error("audit write failed", e);
-    if (opts.strict) {
-      const err = new Error(
-        "No se pudo registrar la auditoría; la operación se abortó"
-      ) as Error & { status: number; cause?: unknown };
-      err.status = 500;
-      err.cause = e;
-      throw err;
-    }
+    handleAuditWriteError(e, opts.strict);
   }
 }
 

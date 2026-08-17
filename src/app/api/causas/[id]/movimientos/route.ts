@@ -8,7 +8,7 @@ import {
   parseBody,
   requireStaff,
 } from "@/lib/api";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { classifyMovimiento } from "@/lib/pjud/classify";
 import { fingerprint } from "@/lib/pjud/provider";
 import {
@@ -233,7 +233,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         }
         return { created: createdRows.count, skipped };
       });
-      await writeAudit({
+      await writeAuditStrict({
         actorId: user.id,
         action: "causa.movimientos.import",
         entityType: "Causa",
@@ -296,7 +296,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
       return { row: created, abogadoId: causa?.abogadoId || null };
     });
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "causa.movimiento",
       entityType: "CausaMovimiento",

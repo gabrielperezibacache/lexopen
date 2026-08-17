@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { driveFileUrl, isRealDriveFolderId } from "@/lib/integrations/drive-folder";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function DocumentDriveAction({
   documentId,
@@ -33,41 +34,41 @@ export function DocumentDriveAction({
     setMsg("");
     setError("");
     startTransition(async () => {
-      try {
-        const res = await fetch("/api/integrations/google", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "push-documento", documentoId: documentId }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setError(data.error || data.message || "No se pudo subir a Drive");
-          return;
-        }
-        setMsg(
-          data.message ||
-            (data.status === "uploaded"
-              ? data.kind === "binary"
-                ? "Archivo subido a Drive"
-                : "Subido a Drive como Google Doc"
-              : data.status === "stub"
-                ? "Modo stub: conecte Google OAuth"
-                : data.status === "needs_reconnect"
-                  ? "Reconecte Google OAuth"
-                  : data.status === "blocked"
-                    ? "Drive deshabilitado en Configuración"
-                    : data.status === "needs_real_folder"
-                      ? "Vincule una carpeta real en la causa"
-                      : data.status === "needs_ocr"
-                        ? "Requiere OCR/extracción primero"
-                        : data.status === "unsupported"
-                          ? "Sin contenido para subir"
-                          : String(data.status))
-        );
-        if (data.status === "uploaded") router.refresh();
-      } catch {
-        setError("Error de red");
+      const result = await apiMutation<{
+        message?: string;
+        status?: string;
+        kind?: string;
+      }>("/api/integrations/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "push-documento", documentoId: documentId }),
+      });
+      if (!result.ok) {
+        setError(result.error || "No se pudo subir a Drive");
+        return;
       }
+      const data = result.data;
+      setMsg(
+        data.message ||
+          (data.status === "uploaded"
+            ? data.kind === "binary"
+              ? "Archivo subido a Drive"
+              : "Subido a Drive como Google Doc"
+            : data.status === "stub"
+              ? "Modo stub: conecte Google OAuth"
+              : data.status === "needs_reconnect"
+                ? "Reconecte Google OAuth"
+                : data.status === "blocked"
+                  ? "Drive deshabilitado en Configuración"
+                  : data.status === "needs_real_folder"
+                    ? "Vincule una carpeta real en la causa"
+                    : data.status === "needs_ocr"
+                      ? "Requiere OCR/extracción primero"
+                      : data.status === "unsupported"
+                        ? "Sin contenido para subir"
+                        : String(data.status))
+      );
+      if (data.status === "uploaded") router.refresh();
     });
   }
 

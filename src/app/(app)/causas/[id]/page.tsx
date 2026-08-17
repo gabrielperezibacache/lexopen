@@ -157,7 +157,9 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
             )}
             {isPlaceholderDriveFolderId(causa.googleDriveFolderId) &&
               causa.googleDriveFolderId && (
-                <span className="badge badge-pendiente">Drive stub</span>
+                <span className="badge badge-pendiente">
+                  Marcador Drive (no es carpeta real)
+                </span>
               )}
           </div>
         </div>

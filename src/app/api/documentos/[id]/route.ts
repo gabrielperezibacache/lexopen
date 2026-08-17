@@ -8,7 +8,7 @@ import {
 } from "@/lib/api";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { documentoUpdateSchema } from "@/lib/schemas";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { documentoListSelect } from "@/lib/sites/file-select";
 
 type Params = { params: Promise<{ id: string }> };
@@ -58,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       },
       select: documentoListSelect,
     });
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "documento.update",
       entityType: "Documento",

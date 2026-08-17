@@ -9,6 +9,7 @@ import {
   type TramiteTemplate,
 } from "@/lib/tramite-templates";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Tramite = {
   id: string;
@@ -67,7 +68,8 @@ export function TramitesPanel({
     e.preventDefault();
     setBusy(true);
     const fd = new FormData(e.currentTarget);
-    await fetch(`/api/causas/${causaId}/tramites`, {
+    const form = e.currentTarget;
+    const result = await apiMutation(`/api/causas/${causaId}/tramites`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -79,7 +81,8 @@ export function TramitesPanel({
       }),
     });
     setBusy(false);
-    e.currentTarget.reset();
+    if (!result.ok) return;
+    form.reset();
     router.refresh();
   }
 
@@ -88,12 +91,13 @@ export function TramitesPanel({
     body: Record<string, unknown>
   ) {
     setBusy(true);
-    await fetch(`/api/tramites/${id}`, {
+    const result = await apiMutation(`/api/tramites/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     setBusy(false);
+    if (!result.ok) return;
     setEditingId(null);
     router.refresh();
   }
@@ -105,8 +109,9 @@ export function TramitesPanel({
   async function deleteTramite(id: string) {
     if (!window.confirm("¿Eliminar este trámite?")) return;
     setBusy(true);
-    await fetch(`/api/tramites/${id}`, { method: "DELETE" });
+    const result = await apiMutation(`/api/tramites/${id}`, { method: "DELETE" });
     setBusy(false);
+    if (!result.ok) return;
     router.refresh();
   }
 
@@ -124,12 +129,13 @@ export function TramitesPanel({
   async function applyTemplate() {
     if (!templateId) return;
     setBusy(true);
-    await fetch(`/api/causas/${causaId}/tramites`, {
+    const result = await apiMutation(`/api/causas/${causaId}/tramites`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "apply-template", templateId }),
     });
     setBusy(false);
+    if (!result.ok) return;
     setTemplateId("");
     router.refresh();
   }
@@ -148,7 +154,7 @@ export function TramitesPanel({
               .toISOString()
               .slice(0, 10)
           : null;
-      await fetch(`/api/causas/${causaId}/tramites`, {
+      await apiMutation(`/api/causas/${causaId}/tramites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

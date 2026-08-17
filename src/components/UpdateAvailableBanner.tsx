@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { apiMutation } from "@/lib/api-mutation";
 
 type UpdatePayload = {
   updateAvailable: boolean;
@@ -152,20 +153,22 @@ export function UpdateAvailableBanner({
   async function startUpdate() {
     setBusy(true);
     setMsg("");
-    const res = await fetch("/api/admin/self-update", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "start" }),
-    });
-    const payload = await res.json().catch(() => ({}));
+    const result = await apiMutation<{ status?: SelfUpdateStatus }>(
+      "/api/admin/self-update",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start" }),
+      }
+    );
     setBusy(false);
-    if (!res.ok) {
-      setMsg(payload.error || "No se pudo iniciar la actualización.");
+    if (!result.ok) {
+      setMsg(result.error || "No se pudo iniciar la actualización.");
       return;
     }
-    setSelfUpdate(payload.status || null);
+    setSelfUpdate(result.data.status || null);
     setMsg(
-      payload.status?.message ||
+      result.data.status?.message ||
         "Actualización iniciada. La app estará unos minutos fuera de línea."
     );
   }

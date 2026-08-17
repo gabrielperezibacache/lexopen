@@ -2,6 +2,7 @@
 
 import { FormEvent, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Settings = {
   name: string;
@@ -50,7 +51,7 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
     setMessage("");
     setOk(false);
     const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/configuracion", {
+    const result = await apiMutation("/api/configuracion", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -68,9 +69,9 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
         hermesAllowDemo: fd.get("hermesAllowDemo") === "on",
       }),
     });
-    setOk(res.ok);
-    setMessage(res.ok ? "Configuración guardada" : "No se pudo guardar");
-    if (res.ok) router.refresh();
+    setOk(result.ok);
+    setMessage(result.ok ? "Configuración guardada" : "No se pudo guardar");
+    if (result.ok) router.refresh();
   }
 
   const s = organization.settings;

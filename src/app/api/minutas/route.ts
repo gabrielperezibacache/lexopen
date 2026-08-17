@@ -9,7 +9,7 @@ import {
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { pushMinutaToDrive } from "@/lib/integrations/google";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { documentoListSelect } from "@/lib/sites/file-select";
 import { calcularVencimiento } from "@/lib/plazos";
@@ -347,7 +347,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  await writeAudit({
+  await writeAuditStrict({
     actorId: user.id,
     action: "minuta.create",
     entityType: "Minuta",

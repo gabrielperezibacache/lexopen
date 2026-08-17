@@ -9,6 +9,7 @@ import {
   createCausaDriveFolder,
   getGoogleAuthUrl,
   getGoogleConfig,
+  googleActionHttpStatus,
   googleCredentialsConfigured,
   linkCausaDriveFolder,
   listCausaDriveFolder,
@@ -40,6 +41,20 @@ function googleErrorResponse(e: unknown) {
     );
   }
   return null;
+}
+
+function jsonGoogleAction(result: { status?: string; message?: string }) {
+  const status = googleActionHttpStatus(result.status || "ok");
+  if (status >= 400) {
+    return NextResponse.json(
+      {
+        error: result.message || "Google OAuth requerido",
+        ...result,
+      },
+      { status }
+    );
+  }
+  return NextResponse.json(result);
 }
 
 export async function GET() {
@@ -104,14 +119,14 @@ export async function POST(req: Request) {
 
     if (body.action === "push-plazo" && body.plazoId) {
       const result = await pushPlazoToGoogleCalendar(body.plazoId);
-      return NextResponse.json(result);
+      return jsonGoogleAction(result);
     }
     if (body.action === "push-documento" && body.documentoId) {
       try {
         const result = await pushDocumentoToDrive(body.documentoId, {
           role: user.role,
         });
-        return NextResponse.json(result);
+        return jsonGoogleAction(result);
       } catch (e) {
         return (
           googleErrorResponse(e) ||
@@ -127,7 +142,7 @@ export async function POST(req: Request) {
         const result = await pushMinutaToDrive(body.minutaId, {
           role: user.role,
         });
-        return NextResponse.json(result);
+        return jsonGoogleAction(result);
       } catch (e) {
         return (
           googleErrorResponse(e) ||
@@ -172,7 +187,7 @@ export async function POST(req: Request) {
           parentFolderId: body.parentFolderId,
           name: body.name,
         });
-        return NextResponse.json(result);
+        return jsonGoogleAction(result);
       } catch (e) {
         return (
           googleErrorResponse(e) ||

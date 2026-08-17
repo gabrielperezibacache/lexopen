@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Msg = { role: string; content: string; source?: string };
 
@@ -25,17 +26,22 @@ export function ClienteAiChat({
     const userMsg = prompt.trim();
     setMessages((m) => [...m, { role: "user", content: userMsg }]);
     setPrompt("");
-    const res = await fetch(`/api/clientes/${clienteId}/ai`, {
+    const result = await apiMutation<{
+      chat?: { id?: string };
+      content?: string;
+      source?: string;
+      note?: string;
+    }>(`/api/clientes/${clienteId}/ai`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: userMsg, chatId }),
     });
-    const data = await res.json().catch(() => ({}));
     setBusy(false);
-    if (!res.ok) {
-      setNote(data.error || "Error al consultar IA");
+    if (!result.ok) {
+      setNote(result.error || "Error al consultar IA");
       return;
     }
+    const data = result.data;
     if (data.chat?.id) setChatId(data.chat.id);
     setMessages((m) => [
       ...m,

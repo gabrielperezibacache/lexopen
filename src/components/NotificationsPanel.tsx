@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { formatDateTime } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Notif = {
   id: string;
@@ -21,23 +22,23 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
   const unread = items.filter((n) => !n.read).length;
 
   async function markOne(id: string) {
-    const res = await fetch("/api/notifications", {
+    const result = await apiMutation("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
-    if (!res.ok) return;
+    if (!result.ok) return;
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     router.refresh();
   }
 
   async function markAll() {
-    const res = await fetch("/api/notifications", {
+    const result = await apiMutation("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "read-all" }),
     });
-    if (!res.ok) return;
+    if (!result.ok) return;
     setItems((prev) => prev.map((n) => ({ ...n, read: true })));
     router.refresh();
   }

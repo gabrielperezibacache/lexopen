@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function PasswordChangeForm() {
   const [error, setError] = useState("");
@@ -25,18 +26,18 @@ export function PasswordChangeForm() {
     }
 
     setBusy(true);
-    const response = await fetch("/api/auth/password", {
+    const formEl = event.currentTarget;
+    const result = await apiMutation("/api/auth/password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentPassword, newPassword }),
     });
-    const data = await response.json().catch(() => ({}));
     setBusy(false);
-    if (!response.ok) {
-      setError(data.error || "No se pudo cambiar la contraseña.");
+    if (!result.ok) {
+      setError(result.error || "No se pudo cambiar la contraseña.");
       return;
     }
-    event.currentTarget.reset();
+    formEl.reset();
     setSuccess("Contraseña actualizada correctamente.");
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Status = {
   phase: string;
@@ -54,20 +55,19 @@ export function SelfUpdatePanel() {
   async function start() {
     setBusy(true);
     setMsg("");
-    const res = await fetch("/api/admin/self-update", {
+    const result = await apiMutation<{ status?: Status }>("/api/admin/self-update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "start" }),
     });
-    const data = await res.json().catch(() => ({}));
     setBusy(false);
-    if (!res.ok) {
-      setMsg(data.error || "No se pudo iniciar la actualización.");
+    if (!result.ok) {
+      setMsg(result.error || "No se pudo iniciar la actualización.");
       return;
     }
-    setStatus(data.status || null);
+    setStatus(result.data.status || null);
     setMsg(
-      data.status?.message ||
+      result.data.status?.message ||
         "Actualización iniciada. Espere a que el Host vuelva y recargue."
     );
   }

@@ -11,6 +11,7 @@ import {
   validarRuc,
   validarRut,
 } from "@/lib/chile";
+import { apiMutation } from "@/lib/api-mutation";
 
 type ConflictHit = {
   causaId: string;
@@ -101,26 +102,28 @@ function NuevaCausaInner() {
       partes,
     };
 
-    const res = await fetch("/api/causas", {
+    const result = await apiMutation<{
+      id?: string;
+      conflicts?: ConflictHit[];
+      error?: string;
+    }>("/api/causas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     setLoading(false);
-    if (!res.ok) {
-      if (res.status === 409) {
-        const body = (await res.json()) as { conflicts?: ConflictHit[]; error?: string };
-        setConflicts(body.conflicts || []);
+    if (!result.ok) {
+      if (result.status === 409) {
         setConflictStatus("blocked");
         setOverrideRequired(true);
-        setError(body.error || "Conflicto de interés detectado");
+        setError(result.error || "Conflicto de interés detectado");
         return;
       }
       setError("No se pudo crear la causa");
       return;
     }
-    const causa = await res.json();
-    router.push(`/causas/${causa.id}`);
+    const causa = result.data;
+    if (causa.id) router.push(`/causas/${causa.id}`);
   }
 
   return (

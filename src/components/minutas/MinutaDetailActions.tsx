@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatLocalDate } from "@/lib/minutas";
 import { driveFileUrl, isRealDriveFolderId } from "@/lib/integrations/drive-folder";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Accion = {
   id: string;
@@ -36,25 +37,20 @@ export function MinutaDetailActions({
   function setEstado(accionId: string, estado: string) {
     setError("");
     startTransition(async () => {
-      try {
-        const res = await fetch(`/api/minutas/${minutaId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "accion-estado",
-            accionId,
-            estado,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setError(data.error || "No se pudo actualizar la acción");
-          return;
-        }
-        router.refresh();
-      } catch {
-        setError("Error de red al actualizar la acción");
+      const result = await apiMutation(`/api/minutas/${minutaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "accion-estado",
+          accionId,
+          estado,
+        }),
+      });
+      if (!result.ok) {
+        setError(result.error || "No se pudo actualizar la acción");
+        return;
       }
+      router.refresh();
     });
   }
 
@@ -62,29 +58,28 @@ export function MinutaDetailActions({
     setMsg("");
     setError("");
     startTransition(async () => {
-      try {
-        const res = await fetch(`/api/minutas/${minutaId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "push-drive" }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setError(data.error || data.message || "Error al subir a Drive");
-          return;
-        }
-        setMsg(
-          data.message ||
-            (data.status === "uploaded"
-              ? "Minuta subida a la carpeta Drive de la causa"
-              : data.status === "stub"
-                ? "Modo stub: conecte Google OAuth para subir"
-                : String(data.status))
-        );
-        router.refresh();
-      } catch {
-        setError("Error de red al subir a Drive");
+      const result = await apiMutation<{
+        message?: string;
+        status?: string;
+      }>(`/api/minutas/${minutaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "push-drive" }),
+      });
+      if (!result.ok) {
+        setError(result.error || "Error al subir a Drive");
+        return;
       }
+      const data = result.data;
+      setMsg(
+        data.message ||
+          (data.status === "uploaded"
+            ? "Minuta subida a la carpeta Drive de la causa"
+            : data.status === "stub"
+              ? "Modo stub: conecte Google OAuth para subir"
+              : String(data.status))
+      );
+      router.refresh();
     });
   }
 
