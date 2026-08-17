@@ -16,8 +16,8 @@ export function DocumentoAiActions({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function onClassify(result: AiActionResponse) {
-    const data = result.data as {
+  async function onClassify(aiResult: AiActionResponse) {
+    const data = aiResult.data as {
       tipo?: string;
       confidencial?: boolean;
       privilegio?: boolean;
