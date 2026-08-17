@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 type ApiCard = {
   id: string;
@@ -12,6 +13,7 @@ type ApiCard = {
 };
 
 export function IntegrationsOverviewPanel() {
+  const { t } = useI18n();
   const [cards, setCards] = useState<ApiCard[] | null>(null);
 
   useEffect(() => {
@@ -125,7 +127,7 @@ export function IntegrationsOverviewPanel() {
       </div>
 
       {!cards ? (
-        <p className="text-sm text-[var(--ink-soft)]/65">Cargando estado…</p>
+        <p className="text-sm text-[var(--ink-soft)]/65">{t("integrations.loadingStatus")}</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {cards.map((card) => (

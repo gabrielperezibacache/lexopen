@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import type { ConfigSnapshot } from "@/lib/config-snapshot";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 function Row({
   label,
@@ -34,6 +35,7 @@ function yn(v: boolean) {
 }
 
 export function RuntimeSettingsPanel() {
+  const { t } = useI18n();
   const [snap, setSnap] = useState<ConfigSnapshot | null>(null);
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export function RuntimeSettingsPanel() {
   if (!snap) {
     return (
       <div className="panel rounded-3xl p-5 text-sm text-[var(--ink-soft)]/70">
-        Cargando entorno…
+        {t("integrations.loadingEnv")}
       </div>
     );
   }

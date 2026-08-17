@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/components/i18n/I18nProvider";
+
 export default function AppError({
   error,
   reset,
@@ -7,21 +9,25 @@ export default function AppError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useI18n();
+  const forbidden =
+    error.message === "Prohibido" || error.message === "Forbidden";
+
   return (
     <div className="panel rounded-3xl p-6">
       <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--danger)]">
-        Error
+        {t("errors.eyebrow")}
       </p>
-      <h1 className="display mt-2 text-3xl">No se pudo cargar esta vista</h1>
+      <h1 className="display mt-2 text-3xl">{t("errors.title")}</h1>
       <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
-        {error.message === "Prohibido" || error.message === "Forbidden"
-          ? "No tiene permiso para ver esta sección."
+        {forbidden
+          ? t("errors.forbidden")
           : process.env.NODE_ENV === "production"
-            ? "Ocurrió un error inesperado. Intente de nuevo o vuelva al inicio."
+            ? t("errors.genericProd")
             : error.message}
       </p>
       <button className="btn btn-primary mt-4" type="button" onClick={reset}>
-        Reintentar
+        {t("common.retry")}
       </button>
     </div>
   );

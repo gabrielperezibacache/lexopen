@@ -107,15 +107,30 @@ export default async function DashboardPage() {
   ]);
 
   const stats = [
-    { label: "Clientes activos", value: clientesActivos, icon: ContactRound, href: "/clientes" },
-    { label: "Causas activas", value: causas, icon: Briefcase, href: "/causas" },
     {
-      label: "Trámites vencidos",
+      label: t("dashboard.stats.activeClients"),
+      value: clientesActivos,
+      icon: ContactRound,
+      href: "/clientes",
+    },
+    {
+      label: t("dashboard.stats.activeCases"),
+      value: causas,
+      icon: Briefcase,
+      href: "/causas",
+    },
+    {
+      label: t("dashboard.stats.overdueFilings"),
       value: tramitesVencidos.length,
       icon: AlertTriangle,
       href: "/clientes",
     },
-    { label: "Tareas abiertas", value: tasksOpen, icon: ListTodo, href: "/tareas" },
+    {
+      label: t("dashboard.stats.openTasks"),
+      value: tasksOpen,
+      icon: ListTodo,
+      href: "/tareas",
+    },
   ];
 
   function tramiteHref(t: {
@@ -167,38 +182,43 @@ export default async function DashboardPage() {
       <section className="panel rounded-3xl p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold">Trámites a seguir</h2>
+            <h2 className="text-lg font-semibold">{t("dashboard.tramites.title")}</h2>
             <p className="text-sm text-[var(--ink-soft)]/70">
-              {tramitesPendientesCount} abiertos
+              {t("dashboard.tramites.openCount").replace(
+                "{count}",
+                String(tramitesPendientesCount)
+              )}
               {tramitesVencidos.length > 0
-                ? ` · ${tramitesVencidos.length} vencidos`
+                ? ` · ${t("dashboard.tramites.overdueCount").replace("{count}", String(tramitesVencidos.length))}`
                 : ""}
-              {unread > 0 ? ` · ${unread} notificaciones` : ""}
+              {unread > 0
+                ? ` · ${t("dashboard.tramites.notificationsCount").replace("{count}", String(unread))}`
+                : ""}
             </p>
           </div>
           <Link href="/clientes" className="text-sm text-[var(--sea)]">
-            Ver clientes
+            {t("dashboard.viewClients")}
           </Link>
         </div>
         <div className="space-y-3">
           {(tramitesVencidos.length ? tramitesVencidos : tramitesPendientes).map(
-            (t) => (
+            (tramite) => (
               <Link
-                key={t.id}
-                href={tramiteHref(t)}
+                key={tramite.id}
+                href={tramiteHref(tramite)}
                 className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
                 <div className="min-w-0">
-                  <div className="break-words font-medium">{t.titulo}</div>
+                  <div className="break-words font-medium">{tramite.titulo}</div>
                   <div className="mt-1 break-words text-sm text-[var(--ink-soft)]/70">
-                    {t.causa.cliente?.razonSocial || "Sin cliente"} ·{" "}
-                    {t.causa.rit || t.causa.titulo}
-                    {t.fechaLimite ? ` · ${formatDate(t.fechaLimite)}` : ""}
+                    {tramite.causa.cliente?.razonSocial || t("dashboard.tramites.noClient")} ·{" "}
+                    {tramite.causa.rit || tramite.causa.titulo}
+                    {tramite.fechaLimite ? ` · ${formatDate(tramite.fechaLimite)}` : ""}
                   </div>
                 </div>
                 <StatusBadge
                   estado={
-                    isTramiteVencido(t.estado, t.fechaLimite, now)
+                    isTramiteVencido(tramite.estado, tramite.fechaLimite, now)
                       ? "vencido"
                       : "pendiente"
                   }
@@ -208,7 +228,7 @@ export default async function DashboardPage() {
           )}
           {tramitesPendientes.length === 0 && (
             <p className="text-sm text-[var(--ink-soft)]/65">
-              Sin trámites abiertos. Revise las fichas de cliente o causa.
+              {t("dashboard.tramites.empty")}
             </p>
           )}
         </div>
@@ -217,9 +237,9 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-            <h2 className="text-lg font-semibold">Espacios recientes</h2>
+            <h2 className="text-lg font-semibold">{t("dashboard.sites.recent")}</h2>
             <Link href="/sites" className="text-sm text-[var(--sea)]">
-              Todos
+              {t("dashboard.sites.all")}
             </Link>
           </div>
           <div className="space-y-3">
@@ -234,16 +254,19 @@ export default async function DashboardPage() {
                   <div className="font-medium">{s.name}</div>
                 </div>
                 <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
-                  {s.tipo} · {s._count.files} archivos · {s._count.tasks} tareas
+                  {t("dashboard.sites.meta")
+                    .replace("{tipo}", s.tipo)
+                    .replace("{files}", String(s._count.files))
+                    .replace("{tasks}", String(s._count.tasks))}
                   {s.causa?.rit ? ` · ${s.causa.rit}` : ""}
                 </div>
               </Link>
             ))}
             {sitesList.length === 0 && (
               <p className="text-sm text-[var(--ink-soft)]/65">
-                Aún no hay espacios.{" "}
+                {t("dashboard.sites.empty")}{" "}
                 <Link href="/sites" className="text-[var(--sea)]">
-                  Crear un espacio
+                  {t("dashboard.sites.create")}
                 </Link>
               </p>
             )}
@@ -252,34 +275,34 @@ export default async function DashboardPage() {
 
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-            <h2 className="text-lg font-semibold">Mis tareas</h2>
+            <h2 className="text-lg font-semibold">{t("dashboard.tasks.my")}</h2>
             <Link href="/tareas" className="text-sm text-[var(--sea)]">
-              Ver todas
+              {t("dashboard.viewAll")}
             </Link>
           </div>
           <div className="space-y-3">
-            {tasks.map((t) => (
+            {tasks.map((task) => (
               <Link
-                key={t.id}
-                href={t.siteId ? `/sites/${t.siteId}/tareas` : "/tareas"}
+                key={task.id}
+                href={task.siteId ? `/sites/${task.siteId}/tareas` : "/tareas"}
                 className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
                 <div className="min-w-0">
-                  <div className="break-words font-medium">{t.title}</div>
+                  <div className="break-words font-medium">{task.title}</div>
                   <div className="mt-1 break-words text-sm text-[var(--ink-soft)]/70">
-                    {t.site?.name || "—"} · {formatDate(t.dueDate)}
+                    {task.site?.name || "—"} · {formatDate(task.dueDate)}
                   </div>
                 </div>
                 <StatusBadge
-                  estado={t.priority === "urgent" ? "vencido" : "pendiente"}
+                  estado={task.priority === "urgent" ? "vencido" : "pendiente"}
                 />
               </Link>
             ))}
             {tasks.length === 0 && (
               <p className="text-sm text-[var(--ink-soft)]/65">
-                No tiene tareas asignadas.{" "}
+                {t("dashboard.tasks.empty")}{" "}
                 <Link href="/tareas" className="text-[var(--sea)]">
-                  Ver bandeja global
+                  {t("dashboard.tasks.globalInbox")}
                 </Link>
               </p>
             )}
@@ -289,9 +312,9 @@ export default async function DashboardPage() {
 
       <section className="panel rounded-3xl p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-          <h2 className="text-lg font-semibold">Minutas recientes</h2>
+          <h2 className="text-lg font-semibold">{t("dashboard.minutes.recent")}</h2>
           <Link href="/minutas" className="text-sm text-[var(--sea)]">
-            Ver todas
+            {t("dashboard.viewAll")}
           </Link>
         </div>
         <div className="space-y-3">
@@ -304,20 +327,23 @@ export default async function DashboardPage() {
               <div className="font-medium">{m.titulo}</div>
               <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
                 {m.causa.rit || m.causa.titulo} · {m.tipo} ·{" "}
-                {m.acciones.length} pendientes
+                {t("dashboard.minutes.pendingCount").replace(
+                  "{count}",
+                  String(m.acciones.length)
+                )}
               </div>
             </Link>
           ))}
           {minutasRecientes.length === 0 && (
             <p className="text-sm text-[var(--ink-soft)]/65">
-              Sin minutas aún. Tras cada audiencia o reunión, genere el handoff.
+              {t("dashboard.minutes.empty")}
             </p>
           )}
         </div>
       </section>
 
       <section className="panel rounded-3xl p-5">
-        <h2 className="mb-4 text-lg font-semibold">Actividad reciente</h2>
+        <h2 className="mb-4 text-lg font-semibold">{t("dashboard.activity.recent")}</h2>
         <div className="space-y-3">
           {actividades.map((a) => (
             <div key={a.id} className="flex gap-3 border-b border-[var(--line)] pb-3 last:border-0">
@@ -325,14 +351,18 @@ export default async function DashboardPage() {
               <div>
                 <div className="text-sm">{a.mensaje}</div>
                 <div className="mt-1 text-xs text-[var(--ink-soft)]/60">
-                  {a.user?.name || "Sistema"} · {a.site?.name || a.causa?.rit || labelMateria(a.causa?.materia || "") || "General"} ·{" "}
-                  {formatDate(a.createdAt)}
+                  {a.user?.name || t("dashboard.activity.system")} ·{" "}
+                  {a.site?.name ||
+                    a.causa?.rit ||
+                    labelMateria(a.causa?.materia || "") ||
+                    t("dashboard.activity.general")}{" "}
+                  · {formatDate(a.createdAt)}
                 </div>
               </div>
             </div>
           ))}
           {actividades.length === 0 && (
-            <p className="text-sm text-[var(--ink-soft)]/65">Sin actividad reciente.</p>
+            <p className="text-sm text-[var(--ink-soft)]/65">{t("dashboard.activity.empty")}</p>
           )}
         </div>
       </section>
