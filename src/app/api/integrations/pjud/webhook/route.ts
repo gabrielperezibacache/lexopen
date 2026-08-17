@@ -4,7 +4,7 @@ import { classifyMovimiento } from "@/lib/pjud/classify";
 import { fingerprint } from "@/lib/pjud/provider";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { prisma } from "@/lib/db";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import {
   parsePjudWebhookPayload,
   pjudWebhookConfigured,
@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
       return created.count;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
-    await writeAudit({
+    await writeAuditStrict({
       action: "pjud.webhook",
       entityType: "Causa",
       entityId: causa.id,

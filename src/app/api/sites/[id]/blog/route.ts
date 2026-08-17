@@ -11,7 +11,7 @@ import {
 } from "@/lib/api";
 import { isCliente } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           userId: user.id,
         },
       });
-      await writeAudit({
+      await writeAuditStrict({
         action: "blog.create",
         entityType: "BlogPost",
         entityId: post.id,
@@ -141,7 +141,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           ...(body.published !== undefined ? { published: body.published } : {}),
         },
       });
-      await writeAudit({
+      await writeAuditStrict({
         action: "blog.update",
         entityType: "BlogPost",
         entityId: post.id,

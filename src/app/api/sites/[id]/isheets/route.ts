@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 import { isCliente } from "@/lib/auth/rbac";
 import { triggerSiteWorkflows } from "@/lib/sites/workflow-triggers";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           dataJson: JSON.stringify(body.data || {}),
         },
       });
-      await writeAudit({
+      await writeAuditStrict({
         action: "isheet.row.create",
         entityType: "ISheetRow",
         entityId: row.id,
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         where: { id: existing.id },
         data: { dataJson: JSON.stringify(body.data || {}) },
       });
-      await writeAudit({
+      await writeAuditStrict({
         action: "isheet.row.update",
         entityType: "ISheetRow",
         entityId: row.id,
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       });
       if (!existing) return NextResponse.json({ error: "Fila no encontrada" }, { status: 404 });
       await prisma.iSheetRow.delete({ where: { id: existing.id } });
-      await writeAudit({
+      await writeAuditStrict({
         action: "isheet.row.delete",
         entityType: "ISheetRow",
         entityId: existing.id,

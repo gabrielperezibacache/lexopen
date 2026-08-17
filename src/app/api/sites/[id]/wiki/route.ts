@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
 import { isCliente } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       return created;
     });
 
-    await writeAudit({
+    await writeAuditStrict({
       action: "wiki.create",
       entityType: "WikiPage",
       entityId: page.id,
@@ -174,7 +174,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           },
         });
       });
-      await writeAudit({
+      await writeAuditStrict({
         action: "wiki.restore",
         entityType: "WikiPage",
         entityId: page.id,
@@ -215,7 +215,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       });
     });
 
-    await writeAudit({
+    await writeAuditStrict({
       action: "wiki.update",
       entityType: "WikiPage",
       entityId: page.id,

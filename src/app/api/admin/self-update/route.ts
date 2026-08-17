@@ -4,7 +4,7 @@ import {
   handleRouteError,
   requireRole,
 } from "@/lib/api";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
 import {
   getSelfUpdateCapability,
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       targetVersion: update?.latestVersion || body.targetVersion || null,
     });
 
-    await writeAudit({
+    await writeAuditStrict({
       action: "host.self_update",
       entityType: "host",
       entityId: "self-update",

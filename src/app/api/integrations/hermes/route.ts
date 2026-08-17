@@ -29,7 +29,7 @@ import {
   formatLocalDate,
   renderMinutaMarkdown,
 } from "@/lib/minutas";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
 
 const MAX_HERMES_PROMPT = 8000;
@@ -394,13 +394,13 @@ export async function POST(req: Request) {
         });
       }
 
-      await writeAudit({
+      await writeAuditStrict({
         action: "minuta.create",
         entityType: "minuta",
         entityId: minuta.id,
         actorId: user.id,
         after: { from: "copiloto", utility: utilityLabel, causaId },
-      }).catch(() => undefined);
+      });
 
       const href = `/causas/${causa.id}/minutas/${minuta.id}`;
       return NextResponse.json({
