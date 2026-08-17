@@ -8,13 +8,18 @@ import { WikiHistoryPanel } from "@/components/sites/WikiHistoryPanel";
 import { MarkdownView } from "@/lib/markdown";
 import { EmptyState } from "@/components/EmptyState";
 import { isCliente } from "@/lib/auth/rbac";
+import { getI18n } from "@/lib/i18n/server";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteWikiPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
-  const site = await prisma.site.findUnique({ where: { id } });
+  const { t } = await getI18n();
+  const site = await prisma.site.findUnique({
+    where: { id },
+    include: { cliente: true, causa: true },
+  });
   if (!site) notFound();
   const pages = await prisma.wikiPage.findMany({
     where: { siteId: id },
@@ -25,11 +30,19 @@ export default async function SiteWikiPage({ params }: Params) {
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/wiki" />
+      <SiteNav
+        siteId={site.id}
+        siteName={site.name}
+        tipo={site.tipo}
+        color={site.color}
+        active="/wiki"
+        clienteName={site.cliente?.razonSocial}
+        causaRit={site.causa?.rit || site.causa?.titulo}
+        isClientVisible={site.isClientVisible}
+        status={site.status}
+      />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <p className="text-sm text-[var(--ink-soft)]/75">
-          Wiki colaborativa del espacio — playbooks, checklists e inicio del matter.
-        </p>
+        <p className="text-sm text-[var(--ink-soft)]/75">{t("sites.wikiHint")}</p>
         {canEdit && <NewWikiButton siteId={site.id} />}
       </div>
       {pages.length === 0 ? (

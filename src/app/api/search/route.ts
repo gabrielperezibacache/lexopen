@@ -28,6 +28,7 @@ const causaSearchSelect = {
   etapa: true,
   caratula: true,
   updatedAt: true,
+  site: { select: { id: true, name: true } },
 };
 
 const clienteSearchSelect = {
@@ -37,6 +38,7 @@ const clienteSearchSelect = {
   email: true,
   tipo: true,
   estado: true,
+  _count: { select: { sites: true } },
 };
 
 export async function GET(req: NextRequest) {

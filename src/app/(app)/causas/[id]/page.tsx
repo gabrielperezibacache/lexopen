@@ -30,6 +30,9 @@ import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 import { CausaResumenAi } from "@/components/ai/CausaResumenAi";
 import { PlazoSugerirAi } from "@/components/ai/PlazoSugerirAi";
+import { CreateSiteFromCausaButton } from "@/components/sites/NewSiteButton";
+import { getI18n } from "@/lib/i18n/server";
+import { siteTipoLabel } from "@/lib/sites/labels";
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -38,6 +41,7 @@ type Params = {
 
 export default async function CausaDetailPage({ params, searchParams }: Params) {
   const user = await requireStaff();
+  const { t, dict } = await getI18n();
   const { id } = await params;
   const sp = await searchParams;
   const from = sp.from?.trim();
@@ -94,6 +98,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           orderBy: { createdAt: "desc" },
           take: 30,
         },
+        site: { select: { id: true, name: true, tipo: true, isClientVisible: true } },
       },
     }),
     prisma.user.findMany({
@@ -242,6 +247,37 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           >
             Cuenta corriente
           </Link>
+        </div>
+      </div>
+
+      <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-3xl px-5 py-4">
+        <div>
+          <div className="text-sm font-semibold">{t("sites.causaPanel.title")}</div>
+          <p className="text-sm text-[var(--ink-soft)]/75">
+            {causa.site ? t("sites.causaPanel.hasSite") : t("sites.causaPanel.noSite")}
+          </p>
+          {causa.site && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span className="badge badge-ink">{siteTipoLabel(dict, causa.site.tipo)}</span>
+              {causa.site.isClientVisible && (
+                <span className="badge badge-sea">{t("siteTabs.portalVisible")}</span>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {causa.site ? (
+            <Link href={`/sites/${causa.site.id}`} className="btn btn-primary">
+              {t("sites.causaPanel.openSite")}
+            </Link>
+          ) : (
+            <CreateSiteFromCausaButton
+              causaId={causa.id}
+              clienteId={causa.clienteId}
+              suggestedName={causa.rit ? `${causa.rit} · ${causa.titulo}` : causa.titulo}
+              isAdmin={user.role === "admin"}
+            />
+          )}
         </div>
       </div>
 

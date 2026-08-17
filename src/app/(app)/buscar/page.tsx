@@ -7,12 +7,13 @@ import { ModuleHeader } from "@/components/sites/SiteNav";
 type Results = {
   q: string;
   sites: Array<{ id: string; name: string; tipo: string }>;
-  causas: Array<{ id: string; titulo: string; rit: string | null }>;
+  causas: Array<{ id: string; titulo: string; rit: string | null; site?: { id: string; name: string } | null }>;
   clientes?: Array<{
     id: string;
     razonSocial: string;
     rut: string | null;
     estado: string;
+    _count?: { sites: number };
   }>;
   tramites?: Array<{
     id: string;
@@ -174,7 +175,7 @@ export default function SearchPage() {
             items={results.causas.map((c) => ({
               href: `/causas/${c.id}`,
               label: c.titulo,
-              meta: c.rit || "",
+              meta: [c.rit, c.site ? `Espacio: ${c.site.name}` : null].filter(Boolean).join(" · "),
             }))}
           />
           <ResultBlock
@@ -182,7 +183,13 @@ export default function SearchPage() {
             items={(results.clientes || []).map((c) => ({
               href: `/clientes/${c.id}`,
               label: c.razonSocial,
-              meta: [c.rut, c.estado].filter(Boolean).join(" · "),
+              meta: [
+                c.rut,
+                c.estado,
+                c._count?.sites ? `${c._count.sites} espacio(s)` : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
             }))}
           />
           <ResultBlock

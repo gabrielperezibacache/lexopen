@@ -77,6 +77,18 @@ export async function POST(req: NextRequest) {
     assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, siteCreateSchema);
+    if (body.causaId) {
+      const existing = await prisma.site.findFirst({
+        where: { causaId: body.causaId },
+        select: { id: true },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { error: "Esta causa ya tiene un espacio vinculado" },
+          { status: 409 }
+        );
+      }
+    }
     const slug =
       body.slug ||
       String(body.name || "site")

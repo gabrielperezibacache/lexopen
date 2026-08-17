@@ -8,16 +8,27 @@ import { formatDate } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
 import { NewBlogPostButton } from "@/components/sites/NewBlogPostButton";
 import { EditBlogPostButton } from "@/components/sites/EditBlogPostButton";
+import { getI18n } from "@/lib/i18n/server";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteBlogPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
+  const { t } = await getI18n();
   const clientView = isCliente(user.role);
   const site = await prisma.site.findUnique({
     where: { id },
-    select: { id: true, name: true, tipo: true, color: true },
+    select: {
+      id: true,
+      name: true,
+      tipo: true,
+      color: true,
+      status: true,
+      isClientVisible: true,
+      cliente: { select: { razonSocial: true } },
+      causa: { select: { rit: true, titulo: true } },
+    },
   });
   if (!site) notFound();
 
@@ -39,11 +50,13 @@ export default async function SiteBlogPage({ params }: Params) {
         color={site.color}
         active="/blog"
         clientView={clientView}
+        clienteName={site.cliente?.razonSocial}
+        causaRit={site.causa?.rit || site.causa?.titulo}
+        isClientVisible={site.isClientVisible}
+        status={site.status}
       />
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-[var(--ink-soft)]/75">
-          Publicaciones del espacio (Markdown).
-        </p>
+        <p className="text-sm text-[var(--ink-soft)]/75">{t("sites.blogHint")}</p>
         {!clientView && <NewBlogPostButton siteId={site.id} />}
       </div>
       {posts.length === 0 ? (

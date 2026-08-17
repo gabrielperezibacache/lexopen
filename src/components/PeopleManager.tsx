@@ -364,7 +364,16 @@ export function PeopleManager({
                   </div>
                   <div className="mt-2 text-xs text-[var(--ink-soft)]/70">
                     Espacios:{" "}
-                    {u.siteMemberships.map((m) => m.site.name).join(", ") || "—"}
+                    {u.siteMemberships.length > 0
+                      ? u.siteMemberships.map((m, i) => (
+                          <span key={m.site.id}>
+                            {i > 0 ? ", " : ""}
+                            <Link href={`/sites/${m.site.id}/personas`} className="text-[var(--sea)]">
+                              {m.site.name}
+                            </Link>
+                          </span>
+                        ))
+                      : "—"}
                     {" · "}
                     Grupos:{" "}
                     {u.groupMembers.map((m) => m.group.name).join(", ") || "—"}

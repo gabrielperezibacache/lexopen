@@ -6,6 +6,8 @@ import { cn } from "@/lib/chile";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { pageTitleClass } from "@/components/ui";
 
+type Tab = { href: string; label: string; group: "content" | "collab" };
+
 export function SiteNav({
   siteId,
   siteName,
@@ -13,6 +15,10 @@ export function SiteNav({
   color,
   active,
   clientView = false,
+  clienteName,
+  causaRit,
+  isClientVisible = false,
+  status,
 }: {
   siteId: string;
   siteName: string;
@@ -20,28 +26,47 @@ export function SiteNav({
   color: string;
   active: string;
   clientView?: boolean;
+  clienteName?: string | null;
+  causaRit?: string | null;
+  isClientVisible?: boolean;
+  status?: string;
 }) {
   const { t, dict } = useI18n();
-  const tabs = [
-    { href: "", label: t("siteTabs.overview") },
-    { href: "/archivos", label: t("siteTabs.files") },
-    { href: "/tareas", label: t("siteTabs.tasks") },
-    { href: "/wiki", label: t("siteTabs.wiki") },
-    { href: "/blog", label: t("siteTabs.blog") },
-    { href: "/isheets", label: t("siteTabs.isheets") },
-    { href: "/qa", label: t("siteTabs.qa") },
-    { href: "/personas", label: t("siteTabs.people") },
-    { href: "/flujos", label: t("siteTabs.workflows") },
+  const allTabs: Tab[] = [
+    { href: "", label: t("siteTabs.overview"), group: "content" },
+    { href: "/archivos", label: t("siteTabs.files"), group: "content" },
+    { href: "/wiki", label: t("siteTabs.wiki"), group: "content" },
+    { href: "/blog", label: t("siteTabs.blog"), group: "content" },
+    { href: "/isheets", label: t("siteTabs.isheets"), group: "content" },
+    { href: "/tareas", label: t("siteTabs.tasks"), group: "collab" },
+    { href: "/qa", label: t("siteTabs.qa"), group: "collab" },
+    { href: "/personas", label: t("siteTabs.people"), group: "collab" },
+    { href: "/flujos", label: t("siteTabs.workflows"), group: "collab" },
   ];
   const visibleTabs = clientView
-    ? tabs.filter(
+    ? allTabs.filter(
         (tab) =>
           tab.href === "/archivos" || tab.href === "/qa" || tab.href === "/blog"
       )
-    : tabs;
+    : allTabs;
   const tipoLabel =
     dict.siteTabs.types[tipo as keyof typeof dict.siteTabs.types] ||
     tipo.replace("_", " ");
+
+  const groups: Array<{ key: Tab["group"]; tabs: Tab[] }> = clientView
+    ? [{ key: "content", tabs: visibleTabs }]
+    : [
+        {
+          key: "content",
+          tabs: visibleTabs.filter((tab) => tab.group === "content"),
+        },
+        {
+          key: "collab",
+          tabs: visibleTabs.filter((tab) => tab.group === "collab"),
+        },
+      ];
+
+  const breadcrumb = [clienteName, causaRit, siteName].filter(Boolean).join(" · ");
 
   return (
     <div className="mb-6 space-y-4">
@@ -59,35 +84,55 @@ export function SiteNav({
               {siteName}
             </h1>
           </div>
-          <p className="mt-1 text-sm uppercase tracking-[0.14em] text-[var(--ink-soft)]/60">
-            {tipoLabel} · {t("siteTabs.spaceLabel")}
+          <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+            {tipoLabel}
+            {isClientVisible && (
+              <span className="ml-2 badge badge-sea">{t("siteTabs.portalVisible")}</span>
+            )}
+            {status === "archived" && (
+              <span className="ml-2 badge badge-ink">{t("siteTabs.archived")}</span>
+            )}
           </p>
+          {breadcrumb && !clientView && (
+            <p className="mt-1 text-xs text-[var(--ink-soft)]/60">{breadcrumb}</p>
+          )}
         </div>
       </div>
-      <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-8 bg-gradient-to-l from-[var(--paper)] to-transparent md:hidden" />
-        <div className="-mx-1 overflow-x-auto overscroll-x-contain border-b border-[var(--line)] pb-1 [scrollbar-width:thin]">
-          <div className="flex min-w-max gap-1 px-1">
-            {visibleTabs.map((tab) => {
-              const href = `/sites/${siteId}${tab.href}`;
-              const isActive = active === tab.href;
-              return (
-                <Link
-                  key={tab.href || "overview"}
-                  href={href}
-                  className={cn(
-                    "rounded-t-lg px-3 py-2.5 text-sm font-medium whitespace-nowrap transition touch-manipulation",
-                    isActive
-                      ? "bg-white text-[var(--ink)] shadow-sm"
-                      : "text-[var(--ink-soft)]/70 hover:text-[var(--ink)]"
-                  )}
-                >
-                  {tab.label}
-                </Link>
-              );
-            })}
+      <div className="relative space-y-2">
+        {groups.map((group) => (
+          <div key={group.key}>
+            {!clientView && (
+              <p className="mb-1 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
+                {t(`siteTabs.tabGroups.${group.key}`)}
+              </p>
+            )}
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-8 bg-gradient-to-l from-[var(--paper)] to-transparent md:hidden" />
+              <div className="-mx-1 overflow-x-auto overscroll-x-contain border-b border-[var(--line)] pb-1 [scrollbar-width:thin]">
+                <div className="flex min-w-max gap-1 px-1">
+                  {group.tabs.map((tab) => {
+                    const href = `/sites/${siteId}${tab.href}`;
+                    const isActive = active === tab.href;
+                    return (
+                      <Link
+                        key={tab.href || "overview"}
+                        href={href}
+                        className={cn(
+                          "rounded-t-lg px-3 py-2.5 text-sm font-medium whitespace-nowrap transition touch-manipulation",
+                          isActive
+                            ? "bg-white text-[var(--ink)] shadow-sm"
+                            : "text-[var(--ink-soft)]/70 hover:text-[var(--ink)]"
+                        )}
+                      >
+                        {tab.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );

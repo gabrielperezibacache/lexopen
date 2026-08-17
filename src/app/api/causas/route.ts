@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
       include: {
         cliente: true,
         abogado: { select: publicUserSelect },
+        site: { select: { id: true } },
         plazos: {
           where: { estado: "pendiente" },
           orderBy: { fechaLimite: "asc" },

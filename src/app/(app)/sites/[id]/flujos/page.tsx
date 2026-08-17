@@ -4,14 +4,20 @@ import { assertSitePageAccess } from "@/lib/auth/access";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { WorkflowActions } from "@/components/sites/WorkflowActions";
+import { EmptyState } from "@/components/EmptyState";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { getI18n } from "@/lib/i18n/server";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteWorkflowsPage({ params }: Params) {
   const { id } = await params;
   await assertSitePageAccess(id);
-  const site = await prisma.site.findUnique({ where: { id } });
+  const { t } = await getI18n();
+  const site = await prisma.site.findUnique({
+    where: { id },
+    include: { cliente: true, causa: true },
+  });
   if (!site) notFound();
   const workflows = await prisma.workflow.findMany({
     where: { siteId: id },
@@ -26,16 +32,29 @@ export default async function SiteWorkflowsPage({ params }: Params) {
 
   return (
     <div>
-      <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/flujos" />
+      <SiteNav
+        siteId={site.id}
+        siteName={site.name}
+        tipo={site.tipo}
+        color={site.color}
+        active="/flujos"
+        clienteName={site.cliente?.razonSocial}
+        causaRit={site.causa?.rit || site.causa?.titulo}
+        isClientVisible={site.isClientVisible}
+        status={site.status}
+      />
       <p className="mb-4 text-sm text-[var(--ink-soft)]/75">
         Flujos de aprobación — escritos, publicación a portal y disparadores.
       </p>
+      {workflows.length === 0 ? (
+        <EmptyState
+          title={t("sites.flowsEmpty")}
+          description=""
+          actionLabel={t("sites.flowsGlobal")}
+          actionHref="/flujos"
+        />
+      ) : null}
       <div className="space-y-4">
-        {workflows.length === 0 && (
-          <div className="panel rounded-3xl px-6 py-10 text-center text-sm text-[var(--ink-soft)]/70">
-            Este espacio aún no tiene flujos. Use la API o el seed demo para crear uno.
-          </div>
-        )}
         {workflows.map((w) => {
           const steps = (() => {
             try {
@@ -55,7 +74,7 @@ export default async function SiteWorkflowsPage({ params }: Params) {
                   <h2 className="text-lg font-semibold">{w.name}</h2>
                   <p className="mt-1 text-sm text-[var(--ink-soft)]/75">{w.description}</p>
                   <div className="mt-2 text-xs text-[var(--ink-soft)]/60">
-                    trigger: {w.triggerType} · {steps.map((s) => s.name).join(" → ")}
+                    {steps.map((s) => s.name).join(" → ")}
                   </div>
                 </div>
                 <WorkflowActions workflowId={w.id} />
@@ -66,10 +85,9 @@ export default async function SiteWorkflowsPage({ params }: Params) {
                     key={i.id}
                     className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
                   >
-                    <div>
-                      Instancia · paso {i.currentStep + 1}/{steps.length} ·{" "}
-                      {i.actor?.name || "—"} · {formatDate(i.createdAt)}
-                    </div>
+                    <span>
+                      {i.actor?.name || "—"} · paso {i.currentStep + 1} · {formatDate(i.createdAt)}
+                    </span>
                     <div className="flex items-center gap-2">
                       <StatusBadge
                         estado={

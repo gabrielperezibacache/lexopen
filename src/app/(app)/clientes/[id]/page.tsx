@@ -12,6 +12,8 @@ import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 import { confidentialWhere } from "@/lib/api";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
+import { getI18n } from "@/lib/i18n/server";
+import { siteTipoLabel } from "@/lib/sites/labels";
 
 type Params = { params: Promise<{ id: string }> };
 type Search = { searchParams: Promise<{ causa?: string }> };
@@ -21,6 +23,7 @@ export default async function ClienteDetailPage({
   searchParams,
 }: Params & Search) {
   const user = await requireStaffPage();
+  const { t, dict } = await getI18n();
   const { id } = await params;
   const sp = await searchParams;
   const focusCausaId = sp.causa || null;
@@ -56,6 +59,17 @@ export default async function ClienteDetailPage({
               },
             },
             _count: { select: { documentos: true, plazos: true } },
+          },
+        },
+        sites: {
+          orderBy: { updatedAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            tipo: true,
+            isClientVisible: true,
+            status: true,
+            causa: { select: { id: true, rit: true, titulo: true } },
           },
         },
       },
@@ -111,6 +125,40 @@ export default async function ClienteDetailPage({
       <section className="panel rounded-3xl p-5">
         <h2 className="mb-4 text-lg font-semibold">Datos del cliente</h2>
         <ClienteEditForm cliente={cliente} abogados={abogados} />
+      </section>
+
+      <section className="panel rounded-3xl p-5">
+        <h2 className="mb-4 text-lg font-semibold">{t("sites.clientSection.title")}</h2>
+        {cliente.sites.length === 0 ? (
+          <p className="text-sm text-[var(--ink-soft)]/70">{t("sites.clientSection.empty")}</p>
+        ) : (
+          <div className="space-y-3">
+            {cliente.sites.map((site) => (
+              <div
+                key={site.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-4 py-3"
+              >
+                <div>
+                  <div className="font-medium">{site.name}</div>
+                  <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                    <span className="badge badge-ink">{siteTipoLabel(dict, site.tipo)}</span>
+                    {site.isClientVisible && (
+                      <span className="badge badge-sea">{t("siteTabs.portalVisible")}</span>
+                    )}
+                    {site.causa && (
+                      <Link href={`/causas/${site.causa.id}`} className="text-[var(--sea)]">
+                        {site.causa.rit || site.causa.titulo}
+                      </Link>
+                    )}
+                  </div>
+                </div>
+                <Link href={`/sites/${site.id}`} className="btn btn-secondary text-sm">
+                  {t("sites.clientSection.open")}
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="space-y-4">

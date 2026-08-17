@@ -191,6 +191,17 @@ export const siteCreateSchema = z.object({
   causaId: z.string().optional().nullable(),
 });
 
+export const siteUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional().nullable(),
+  tipo: z.string().optional(),
+  status: z.enum(["active", "archived"]).optional(),
+  color: z.string().optional(),
+  isClientVisible: z.boolean().optional(),
+  clienteId: z.string().optional().nullable(),
+  causaId: z.string().optional().nullable(),
+});
+
 export const ledgerCreateSchema = z.object({
   clienteId: z.string().min(1),
   causaId: z.string().optional().nullable(),

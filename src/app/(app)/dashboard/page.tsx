@@ -13,10 +13,11 @@ import {
 import { getCurrentUser } from "@/lib/auth/session";
 import { PageHeader } from "@/components/sites/SiteNav";
 import { getI18n } from "@/lib/i18n/server";
+import { siteTipoLabel } from "@/lib/sites/labels";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  const { t } = await getI18n();
+  const { t, dict } = await getI18n();
   const now = new Date();
 
   const [
@@ -42,7 +43,11 @@ export default async function DashboardPage() {
       where: { estado: { in: [...TRAMITES_ABIERTOS] } },
     }),
     prisma.site.findMany({
-      include: { _count: { select: { files: true, tasks: true } }, causa: true },
+      include: {
+        _count: { select: { files: true, tasks: true } },
+        causa: true,
+        cliente: { select: { id: true, razonSocial: true } },
+      },
       orderBy: { updatedAt: "desc" },
       take: 6,
     }),
@@ -255,10 +260,18 @@ export default async function DashboardPage() {
                 </div>
                 <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
                   {t("dashboard.sites.meta")
-                    .replace("{tipo}", s.tipo)
+                    .replace("{tipo}", siteTipoLabel(dict, s.tipo))
                     .replace("{files}", String(s._count.files))
                     .replace("{tasks}", String(s._count.tasks))}
                   {s.causa?.rit ? ` · ${s.causa.rit}` : ""}
+                  {s.cliente?.razonSocial ? (
+                    <>
+                      {" · "}
+                      <Link href={`/clientes/${s.cliente.id}`} className="text-[var(--sea)]">
+                        {s.cliente.razonSocial}
+                      </Link>
+                    </>
+                  ) : null}
                 </div>
               </Link>
             ))}

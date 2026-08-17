@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, parseBody, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
 import { clientVisibleFileWhere } from "@/lib/auth/access";
 import { isAdmin, isCliente } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { siteFileListSelect } from "@/lib/sites/file-select";
+import { siteUpdateSchema } from "@/lib/schemas";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -142,26 +143,72 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const actor = await requireStaff();
     const { id } = await params;
     await requireSiteAccess(id, actor);
-    const body = await req.json();
+    const body = await parseBody(req, siteUpdateSchema);
     if (body.isClientVisible !== undefined && !isAdmin(actor.role)) {
       return NextResponse.json(
         { error: "Solo admin puede cambiar la visibilidad del portal cliente" },
         { status: 403 }
       );
     }
+
+    let clienteId = body.clienteId;
+
+    if (body.causaId) {
+      const existing = await prisma.site.findFirst({
+        where: { causaId: body.causaId, NOT: { id } },
+        select: { id: true, name: true },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { error: "Esta causa ya tiene un espacio vinculado" },
+          { status: 409 }
+        );
+      }
+      const causa = await prisma.causa.findUnique({
+        where: { id: body.causaId },
+        select: { clienteId: true },
+      });
+      if (!causa) {
+        return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
+      }
+      if (clienteId && causa.clienteId && clienteId !== causa.clienteId) {
+        return NextResponse.json(
+          { error: "La causa no pertenece al cliente seleccionado" },
+          { status: 400 }
+        );
+      }
+      if (clienteId === undefined && causa.clienteId) {
+        clienteId = causa.clienteId;
+      }
+    }
+
     const site = await prisma.site.update({
       where: { id },
       data: {
-        name: body.name,
-        description: body.description,
-        tipo: body.tipo,
-        status: body.status,
-        color: body.color,
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.description !== undefined ? { description: body.description } : {}),
+        ...(body.tipo !== undefined ? { tipo: body.tipo } : {}),
+        ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.color !== undefined ? { color: body.color } : {}),
         ...(body.isClientVisible !== undefined
           ? { isClientVisible: Boolean(body.isClientVisible) }
           : {}),
+        ...(body.clienteId !== undefined || clienteId !== undefined
+          ? { clienteId: (clienteId ?? body.clienteId) || null }
+          : {}),
+        ...(body.causaId !== undefined ? { causaId: body.causaId || null } : {}),
       },
     });
+
+    await prisma.activity.create({
+      data: {
+        tipo: "sistema",
+        mensaje: `Espacio actualizado: ${site.name}`,
+        siteId: site.id,
+        userId: actor.id,
+      },
+    });
+
     return NextResponse.json(site);
   } catch (e) {
     return handleRouteError(e);
