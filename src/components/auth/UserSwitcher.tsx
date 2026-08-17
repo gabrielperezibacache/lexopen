@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { apiMutation } from "@/lib/api-mutation";
 
 type User = {
   id: string;
@@ -81,7 +82,7 @@ export function UserSwitcher() {
 
   async function loginAs(userId: string) {
     if (!demoSwitcher) return;
-    await fetch("/api/auth/impersonate", {
+    await apiMutation("/api/auth/impersonate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
@@ -92,7 +93,7 @@ export function UserSwitcher() {
   }
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiMutation("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
   }

@@ -8,6 +8,7 @@ import {
   shouldSkipIngestFile,
   sortIngestFiles,
 } from "@/lib/document-ingest";
+import { apiMutation } from "@/lib/api-mutation";
 
 type CausaOption = { id: string; label: string };
 
@@ -118,22 +119,29 @@ export function DocumentoIngestForm({
     if (confidencial) fd.set("confidencial", "on");
     if (privilegio) fd.set("privilegio", "on");
 
-    const res = await fetch("/api/documentos", { method: "POST", body: fd });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(body.error || "No se pudo subir el documento");
+    const result = await apiMutation<{ id?: string }>("/api/documentos", {
+      method: "POST",
+      body: fd,
+    });
+    if (!result.ok) {
+      throw new Error(result.error || "No se pudo subir el documento");
     }
+    const body = result.data;
 
     if (pushDrive && body.id && resolvedCausaId) {
-      const driveRes = await fetch("/api/integrations/google", {
+      const driveResult = await apiMutation<{
+        error?: string;
+        status?: string;
+        message?: string;
+      }>("/api/integrations/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "push-documento", documentoId: body.id }),
       });
-      const driveBody = await driveRes.json().catch(() => ({}));
-      if (!driveRes.ok && driveBody.error) {
-        return { warning: `Subido localmente; Drive: ${driveBody.error}` };
+      if (!driveResult.ok && driveResult.error) {
+        return { warning: `Subido localmente; Drive: ${driveResult.error}` };
       }
+      const driveBody = driveResult.ok ? driveResult.data : {};
       if (driveBody.status && driveBody.status !== "uploaded") {
         return {
           warning:

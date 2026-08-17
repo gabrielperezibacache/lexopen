@@ -9,7 +9,7 @@ import {
   requireRole,
   requireStaff,
 } from "@/lib/api";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { isStaff } from "@/lib/auth/rbac";
 import { documentoListSelect } from "@/lib/sites/file-select";
@@ -132,7 +132,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         data: { causaId: id, etapa: body.etapa, nota: "Cambio de etapa" },
       });
     }
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "causa.update",
       entityType: "Causa",
@@ -160,7 +160,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "No encontrada" }, { status: 404 });
     }
     await prisma.causa.delete({ where: { id } });
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "causa.delete",
       entityType: "Causa",

@@ -8,6 +8,7 @@ import {
   labelPjudSyncStatus,
 } from "@/lib/pjud/causa-origin";
 import { PjudQuickAddPanel } from "@/components/pjud/PjudQuickAddPanel";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Item = {
   id: string;
@@ -156,17 +157,19 @@ export default function MonitoreoCausasPage() {
   async function syncAll() {
     setBusy(true);
     setMsg("");
-    const res = await fetch("/api/causas/monitoreo", {
+    const result = await apiMutation<{
+      synced?: number;
+      results?: Array<{ inserted?: number }>;
+    }>("/api/causas/monitoreo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "sync" }),
     });
-    const data = await res.json().catch(() => ({}));
     setBusy(false);
     setMsg(
-      res.ok
-        ? `Sync cartera: ${data.synced} causas · +${(data.results || []).reduce((s: number, r: { inserted?: number }) => s + (r.inserted || 0), 0)} movimientos`
-        : data.error || "Error"
+      result.ok
+        ? `Sync cartera: ${result.data.synced} causas · +${(result.data.results || []).reduce((s, r) => s + (r.inserted || 0), 0)} movimientos`
+        : result.error || "Error"
     );
     await load();
   }
@@ -174,17 +177,16 @@ export default function MonitoreoCausasPage() {
   async function retryFallidos() {
     setBusy(true);
     setMsg("");
-    const res = await fetch("/api/causas/monitoreo", {
+    const result = await apiMutation<{ synced?: number }>("/api/causas/monitoreo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "retry-fallidos" }),
     });
-    const data = await res.json().catch(() => ({}));
     setBusy(false);
     setMsg(
-      res.ok
-        ? `Reintento fallidos: ${data.synced} causas`
-        : data.error || "Error"
+      result.ok
+        ? `Reintento fallidos: ${result.data.synced} causas`
+        : result.error || "Error"
     );
     await load();
   }
@@ -192,17 +194,19 @@ export default function MonitoreoCausasPage() {
   async function clearFallidosAvisos() {
     setBusy(true);
     setMsg("");
-    const res = await fetch("/api/causas/monitoreo", {
+    const result = await apiMutation<{
+      clearedCausas?: number;
+      dismissedJobs?: number;
+    }>("/api/causas/monitoreo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "clear-errors" }),
     });
-    const data = await res.json().catch(() => ({}));
     setBusy(false);
     setMsg(
-      res.ok
-        ? `Avisos limpiados: ${data.clearedCausas || 0} causa(s) · ${data.dismissedJobs || 0} job(s)`
-        : data.error || "Error al limpiar avisos"
+      result.ok
+        ? `Avisos limpiados: ${result.data.clearedCausas || 0} causa(s) · ${result.data.dismissedJobs || 0} job(s)`
+        : result.error || "Error al limpiar avisos"
     );
     await load();
   }
@@ -250,7 +254,10 @@ export default function MonitoreoCausasPage() {
                 setBusy(true);
                 setMsg("");
                 const csv = await file.text();
-                const res = await fetch("/api/causas/monitoreo", {
+                const result = await apiMutation<{
+                  imported?: number;
+                  created?: number;
+                }>("/api/causas/monitoreo", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -259,12 +266,11 @@ export default function MonitoreoCausasPage() {
                     syncNow: false,
                   }),
                 });
-                const data = await res.json().catch(() => ({}));
                 setBusy(false);
                 setMsg(
-                  res.ok
-                    ? `CSV cartera: ${data.imported} filas · ${data.created} nuevas (sync diferido)`
-                    : data.error || "Error al importar CSV"
+                  result.ok
+                    ? `CSV cartera: ${result.data.imported} filas · ${result.data.created} nuevas (sync diferido)`
+                    : result.error || "Error al importar CSV"
                 );
                 await load();
               }}

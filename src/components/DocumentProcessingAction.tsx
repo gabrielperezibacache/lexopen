@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function DocumentProcessingAction({ documentId }: { documentId: string }) {
   const router = useRouter();
@@ -9,7 +10,7 @@ export function DocumentProcessingAction({ documentId }: { documentId: string })
 
   async function retry() {
     setBusy(true);
-    await fetch(`/api/documentos/${documentId}/process`, {
+    await apiMutation(`/api/documentos/${documentId}/process`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{}",

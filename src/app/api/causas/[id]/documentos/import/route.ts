@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import {
   getCausaDocImportStatus,
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: result.started
         ? "pjud.docs.import.start"

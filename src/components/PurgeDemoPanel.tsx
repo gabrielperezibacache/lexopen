@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Detection = {
   looksLikeDemo: boolean;
@@ -33,25 +34,19 @@ export function PurgeDemoPanel() {
     e.preventDefault();
     setBusy(true);
     setMessage("");
-    try {
-      const res = await fetch("/api/admin/purge-demo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm, keepCatalogs }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setMessage(data.error || "No se pudo purgar");
-        return;
-      }
-      setDone(true);
-      setMessage(data.next || "Datos eliminados.");
-      router.refresh();
-    } catch {
-      setMessage("Error de red al purgar.");
-    } finally {
-      setBusy(false);
+    const result = await apiMutation<{ next?: string }>("/api/admin/purge-demo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm, keepCatalogs }),
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setMessage(result.error || "No se pudo purgar");
+      return;
     }
+    setDone(true);
+    setMessage(result.data.next || "Datos eliminados.");
+    router.refresh();
   }
 
   if (!info) {

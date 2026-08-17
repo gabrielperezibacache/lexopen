@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 type CsvPreviewRow = {
   titulo: string;
@@ -26,8 +27,9 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    const fd = new FormData(e.currentTarget);
-    await fetch(`/api/causas/${causaId}/movimientos`, {
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const result = await apiMutation(`/api/causas/${causaId}/movimientos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -38,7 +40,8 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
       }),
     });
     setBusy(false);
-    e.currentTarget.reset();
+    if (!result.ok) return;
+    form.reset();
     router.refresh();
   }
 
@@ -46,24 +49,27 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
     e.preventDefault();
     setImporting(true);
     setImportMessage("");
-    const fd = new FormData(e.currentTarget);
-    const response = await fetch(`/api/causas/${causaId}/movimientos`, {
-      method: "POST",
-      body: fd,
-    });
-    const data = await response.json().catch(() => ({}));
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const result = await apiMutation<{ rows?: number; skipped?: number }>(
+      `/api/causas/${causaId}/movimientos`,
+      {
+        method: "POST",
+        body: fd,
+      }
+    );
     setImporting(false);
-    e.currentTarget.reset();
+    form.reset();
     setSelectedFile(null);
     setPreviewRows([]);
     setPreviewTotal(0);
     setPreviewTruncated(false);
     setImportMessage(
-      response.ok
-        ? `Importados: ${data.rows || 0} nuevos · omitidos: ${data.skipped || 0} repetidos.`
-        : data.error || "No se pudo importar el CSV."
+      result.ok
+        ? `Importados: ${result.data.rows || 0} nuevos · omitidos: ${result.data.skipped || 0} repetidos.`
+        : result.error || "No se pudo importar el CSV."
     );
-    router.refresh();
+    if (result.ok) router.refresh();
   }
 
   async function onPreview() {

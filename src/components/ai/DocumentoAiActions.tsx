@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function DocumentoAiActions({
   documentoId,
@@ -15,8 +16,8 @@ export function DocumentoAiActions({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function onClassify(result: AiActionResponse) {
-    const data = result.data as {
+  async function onClassify(aiResult: AiActionResponse) {
+    const data = aiResult.data as {
       tipo?: string;
       confidencial?: boolean;
       privilegio?: boolean;
@@ -27,7 +28,7 @@ export function DocumentoAiActions({
       return;
     }
     setBusy(true);
-    const res = await fetch(`/api/documentos/${documentoId}`, {
+    const result = await apiMutation(`/api/documentos/${documentoId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -41,9 +42,8 @@ export function DocumentoAiActions({
       }),
     });
     setBusy(false);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setNote(err.error || "No se pudo guardar la clasificación.");
+    if (!result.ok) {
+      setNote(result.error || "No se pudo guardar la clasificación.");
       return;
     }
     setNote(

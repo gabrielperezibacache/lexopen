@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { labelMovimientoTipo } from "@/lib/pjud/classify";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Movimiento = {
   id: string;
@@ -209,18 +210,26 @@ export function PjudMonitorPanel({
     setBusy(true);
     setMsg("");
     setMsgBad(false);
-    const res = await fetch(`/api/causas/${causaId}/pjud`, {
+    const result = await apiMutation<{
+      status?: string;
+      provider?: string;
+      demo?: boolean;
+      inserted?: number;
+      skipped?: number;
+      receptorCount?: number;
+      note?: string;
+    }>(`/api/causas/${causaId}/pjud`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: act }),
     });
-    const data = await res.json().catch(() => ({}));
     setBusy(false);
-    if (!res.ok) {
+    if (!result.ok) {
       setMsgBad(true);
-      setMsg(data.error || "Error");
+      setMsg(result.error || "Error");
       return;
     }
+    const data = result.data;
     if (act === "clear_errors") {
       setMsg("");
       setMsgBad(false);

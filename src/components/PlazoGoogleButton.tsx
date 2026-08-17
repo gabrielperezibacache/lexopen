@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function PlazoGoogleButton({ plazoId }: { plazoId: string }) {
   const [msg, setMsg] = useState("");
@@ -9,15 +10,23 @@ export function PlazoGoogleButton({ plazoId }: { plazoId: string }) {
   async function push() {
     setBusy(true);
     setMsg("");
-    const res = await fetch("/api/integrations/google", {
+    const result = await apiMutation<{
+      status?: string;
+      message?: string;
+      error?: string;
+    }>("/api/integrations/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "push-plazo", plazoId }),
     });
-    const data = await res.json();
     setBusy(false);
+    if (!result.ok) {
+      setMsg(result.error || "Error");
+      return;
+    }
+    const data = result.data;
     if (data.status === "created") setMsg("Creado en Calendar");
-    else if (data.status === "stub") setMsg(data.message);
+    else if (data.status === "stub") setMsg(data.message || "Google no conectado");
     else setMsg(data.error || "Error");
   }
 

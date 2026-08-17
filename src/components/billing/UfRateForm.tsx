@@ -16,8 +16,9 @@ export function UfRateForm() {
     setBusy(true);
     setError("");
     setMsg("");
-    const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/uf", {
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const result = await apiMutation("/api/uf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -27,12 +28,11 @@ export function UfRateForm() {
       }),
     });
     setBusy(false);
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setError(body.error || "No se pudo guardar la UF");
+    if (!result.ok) {
+      setError(result.error || "No se pudo guardar la UF");
       return;
     }
-    e.currentTarget.reset();
+    form.reset();
     router.refresh();
   }
 

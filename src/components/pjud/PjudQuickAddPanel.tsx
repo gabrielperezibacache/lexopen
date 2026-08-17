@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Mode = "rol" | "rut";
 
@@ -38,29 +39,25 @@ export function PjudQuickAddPanel() {
     setMsg("");
     if (action === "preview-rol") setPreview(null);
     const fd = new FormData(form);
-    const res = await fetch("/api/pjud/lookup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action,
-        rit: fd.get("rit"),
-        tribunal: fd.get("tribunal"),
-        titulo: fd.get("titulo") || undefined,
-        syncNow: true,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) {
-      setMsg(
-        data.error ||
-          (action === "preview-rol"
-            ? "No se pudo previsualizar"
-            : "No se pudo agregar la causa")
-      );
-      return;
-    }
+    const payload = {
+      action,
+      rit: fd.get("rit"),
+      tribunal: fd.get("tribunal"),
+      titulo: fd.get("titulo") || undefined,
+      syncNow: true,
+    };
     if (action === "preview-rol") {
+      const res = await fetch("/api/pjud/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      setBusy(false);
+      if (!res.ok) {
+        setMsg(data.error || "No se pudo previsualizar");
+        return;
+      }
       setPreview(data);
       setMsg(
         `Preview ${data.provider || ""}: ${data.count ?? 0} movimientos${
@@ -69,6 +66,21 @@ export function PjudQuickAddPanel() {
       );
       return;
     }
+    const result = await apiMutation<{
+      note?: string;
+      sync?: { inserted?: number; status?: string };
+      causaId?: string;
+    }>("/api/pjud/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setMsg(result.error || "No se pudo agregar la causa");
+      return;
+    }
+    const data = result.data;
     setMsg(
       `${data.note} Sync: +${data.sync?.inserted ?? 0} movimientos (${data.sync?.status || "—"})`
     );
@@ -103,7 +115,7 @@ export function PjudQuickAddPanel() {
   }) {
     setBusy(true);
     setMsg("");
-    const res = await fetch("/api/pjud/lookup", {
+    const result = await apiMutation<{ causaId?: string }>("/api/pjud/lookup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -114,13 +126,12 @@ export function PjudQuickAddPanel() {
         syncNow: true,
       }),
     });
-    const data = await res.json().catch(() => ({}));
     setBusy(false);
-    if (!res.ok) {
-      setMsg(data.error || "No se pudo agregar");
+    if (!result.ok) {
+      setMsg(result.error || "No se pudo agregar");
       return;
     }
-    if (data.causaId) router.push(`/causas/${data.causaId}`);
+    if (result.data.causaId) router.push(`/causas/${result.data.causaId}`);
   }
 
   return (

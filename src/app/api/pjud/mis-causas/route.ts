@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import {
   claimMisCausasSync,
   clearClaveUnicaSyncMessages,
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       }
       const status = await clearClaveUnicaSyncMessages();
       if (actorId) {
-        await writeAudit({
+        await writeAuditStrict({
           actorId,
           action: "pjud.mis-causas.clear_errors",
           entityType: "FirmSettings",
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
             alreadyClaimed: true,
           });
           if (actor) {
-            await writeAudit({
+            await writeAuditStrict({
               actorId: actor,
               action: "pjud.mis-causas.sync",
               entityType: "FirmSettings",
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (actorId) {
-      await writeAudit({
+      await writeAuditStrict({
         actorId,
         action: "pjud.mis-causas.sync",
         entityType: "FirmSettings",

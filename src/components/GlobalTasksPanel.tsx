@@ -5,6 +5,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Task = {
   id: string;
@@ -71,8 +72,9 @@ export function GlobalTasksPanel({
   async function createTask(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/tasks", {
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const result = await apiMutation("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -85,20 +87,20 @@ export function GlobalTasksPanel({
       }),
     });
     setBusy(false);
-    if (!res.ok) return;
+    if (!result.ok) return;
     setOpen(false);
-    e.currentTarget.reset();
+    form.reset();
     await reload();
   }
 
   async function setTaskStatus(id: string, next: string) {
-    const res = await fetch("/api/tasks", {
+    const result = await apiMutation<Task>("/api/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status: next }),
     });
-    if (!res.ok) return;
-    const updated = await res.json();
+    if (!result.ok) return;
+    const updated = result.data;
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
   }
 

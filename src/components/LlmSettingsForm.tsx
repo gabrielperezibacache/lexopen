@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { llmEnvSnippet } from "@/lib/integrations/llm-env-snippet";
+import { apiMutation } from "@/lib/api-mutation";
 
 type PresetKey = "openai" | "azure" | "groq" | "ollama" | "hermes" | "custom";
 
@@ -85,7 +86,7 @@ export function LlmSettingsForm() {
   }
 
   async function saveConfig() {
-    const res = await fetch("/api/integrations/llm", {
+    return apiMutation<{ config?: LlmConfig }>("/api/integrations/llm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -94,8 +95,6 @@ export function LlmSettingsForm() {
         config: configPayload(),
       }),
     });
-    const data = await res.json().catch(() => ({}));
-    return { res, data };
   }
 
   async function onSubmit(e: FormEvent) {
@@ -103,16 +102,16 @@ export function LlmSettingsForm() {
     setMessage("");
     setOk(false);
     setSaving(true);
-    const { res, data } = await saveConfig();
+    const result = await saveConfig();
     setSaving(false);
-    setOk(res.ok);
+    setOk(result.ok);
     setMessage(
-      res.ok
+      result.ok
         ? "Configuración de IA guardada."
-        : data.error || "No se pudo guardar la configuración."
+        : result.error || "No se pudo guardar la configuración."
     );
-    if (res.ok && data.config) {
-      setConfig({ ...data.config });
+    if (result.ok && result.data.config) {
+      setConfig({ ...result.data.config });
       setClearApiKey(false);
     }
   }
@@ -121,27 +120,39 @@ export function LlmSettingsForm() {
     setTesting(true);
     setMessage("");
     setOk(false);
-    const { res: saveRes, data: saveData } = await saveConfig();
-    if (!saveRes.ok) {
+    const saveResult = await saveConfig();
+    if (!saveResult.ok) {
       setTesting(false);
       setOk(false);
       setMessage(
-        saveData.error ||
+        saveResult.error ||
           "No se pudo guardar antes de probar. Corrija el endpoint y vuelva a intentar."
       );
       return;
     }
-    if (saveData.config) {
-      setConfig({ ...saveData.config });
+    if (saveResult.data.config) {
+      setConfig({ ...saveResult.data.config });
       setClearApiKey(false);
     }
-    const res = await fetch("/api/integrations/llm", {
+    const result = await apiMutation<{
+      ok?: boolean;
+      provider?: string;
+      model?: string;
+      preview?: string;
+      note?: string;
+      error?: string;
+    }>("/api/integrations/llm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "test" }),
     });
-    const data = await res.json().catch(() => ({}));
     setTesting(false);
+    if (!result.ok) {
+      setOk(false);
+      setMessage(result.error || "La prueba de conexión falló.");
+      return;
+    }
+    const data = result.data;
     setOk(Boolean(data.ok));
     setMessage(
       data.ok

@@ -10,7 +10,7 @@ import {
 import { plazoCreateSchema } from "@/lib/schemas";
 import { calcularVencimiento } from "@/lib/plazos";
 import { parseLocalDateInput } from "@/lib/minutas";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { z } from "zod";
 
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         },
       });
     }
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "plazo.create",
       entityType: "Plazo",
@@ -113,7 +113,7 @@ export async function PATCH(req: NextRequest) {
       where: { id: body.id },
       data: { estado: body.estado },
     });
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "plazo.update",
       entityType: "Plazo",

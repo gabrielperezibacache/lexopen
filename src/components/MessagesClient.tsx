@@ -5,6 +5,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { EmptyState } from "@/components/EmptyState";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Msg = {
   id: string;
@@ -42,7 +43,7 @@ export function MessagesClient({
     const form = e.currentTarget;
     const fd = new FormData(form);
     try {
-      const res = await fetch("/api/messages", {
+      const result = await apiMutation("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -51,9 +52,8 @@ export function MessagesClient({
           body: fd.get("body"),
         }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || "No se pudo enviar el mensaje");
+      if (!result.ok) {
+        setError(result.error || "No se pudo enviar el mensaje");
         return;
       }
       form.reset();

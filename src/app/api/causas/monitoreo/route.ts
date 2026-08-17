@@ -3,7 +3,7 @@ import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
 import { downloadResponseHeaders } from "@/lib/security/download";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import {
   clearFallidosMonitoreoAvisos,
   listCarteraMonitoreo,
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
         }
       }
       if (actorId) {
-        await writeAudit({
+        await writeAuditStrict({
           actorId,
           action: "pjud.import-cartera",
           entityType: "Causa",
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
         limit: body.limit,
       });
       if (actorId) {
-        await writeAudit({
+        await writeAuditStrict({
           actorId,
           action: "pjud.clear-fallidos",
           entityType: "Causa",
@@ -215,7 +215,7 @@ export async function POST(req: NextRequest) {
         jobIds: requeued.map((j) => j.id),
       });
       if (actorId) {
-        await writeAudit({
+        await writeAuditStrict({
           actorId,
           action: "pjud.retry-fallidos",
           entityType: "Causa",
@@ -278,7 +278,7 @@ export async function POST(req: NextRequest) {
         }
       }
       if (actorId) {
-        await writeAudit({
+        await writeAuditStrict({
           actorId,
           action: "pjud.sync-all",
           entityType: "Causa",
@@ -302,7 +302,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (actorId) {
-      await writeAudit({
+      await writeAuditStrict({
         actorId,
         action: "pjud.sync-all",
         entityType: "Causa",

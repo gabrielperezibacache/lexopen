@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CausaManageActions } from "@/components/CausaManageActions";
+import { apiMutation } from "@/lib/api-mutation";
 
 export function CausaActions({
   causaId,
@@ -21,26 +22,33 @@ export function CausaActions({
   async function syncObsidian() {
     setBusy(true);
     setMsg("");
-    const res = await fetch("/api/integrations/obsidian", {
+    const result = await apiMutation<{
+      result?: {
+        skippedConfidential?: { minutas?: number; documentos?: number };
+        warnings?: unknown[];
+        mode?: string;
+        files?: number;
+      };
+      error?: string;
+    }>("/api/integrations/obsidian", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "sync-causa", causaId }),
     });
-    const data = await res.json();
     setBusy(false);
-    if (!res.ok) {
-      setMsg(data.error || "Error");
+    if (!result.ok) {
+      setMsg(result.error || "Error");
       return;
     }
-    const result = data.result || {};
+    const syncResult = result.data.result || {};
     const skipped =
-      (result.skippedConfidential?.minutas || 0) +
-      (result.skippedConfidential?.documentos || 0);
-    const warnCount = Array.isArray(result.warnings)
-      ? result.warnings.length
+      (syncResult.skippedConfidential?.minutas || 0) +
+      (syncResult.skippedConfidential?.documentos || 0);
+    const warnCount = Array.isArray(syncResult.warnings)
+      ? syncResult.warnings.length
       : 0;
     setMsg(
-      `Obsidian (${result.mode || "storage"}): ${result.files ?? 0} archivo(s)` +
+      `Obsidian (${syncResult.mode || "storage"}): ${syncResult.files ?? 0} archivo(s)` +
         (skipped ? ` · ${skipped} confidencial(es) omitido(s)` : "") +
         (warnCount ? ` · ${warnCount} aviso(s)` : "")
     );

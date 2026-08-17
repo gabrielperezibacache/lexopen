@@ -16,6 +16,7 @@ import {
   type Dictionary,
   type Locale,
 } from "@/lib/i18n";
+import { apiMutation } from "@/lib/api-mutation";
 
 type I18nContextValue = {
   locale: Locale;
@@ -44,7 +45,7 @@ export function I18nProvider({
     async (next: Locale) => {
       if (next === locale) return;
       setOverride(next);
-      await fetch("/api/locale", {
+      await apiMutation("/api/locale", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ locale: next }),

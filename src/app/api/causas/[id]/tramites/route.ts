@@ -7,7 +7,7 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { tramiteCreateSchema } from "@/lib/schemas";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import {
   fechaLimiteFromDias,
   findTemplate,
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           userId: user.id,
         },
       });
-      await writeAudit({
+      await writeAuditStrict({
         actorId: user.id,
         action: "tramite.apply-template",
         entityType: "Causa",
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         userId: user.id,
       },
     });
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "tramite.create",
       entityType: "Tramite",

@@ -7,7 +7,7 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { tramiteUpdateSchema } from "@/lib/schemas";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -96,7 +96,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       });
     }
 
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "tramite.update",
       entityType: "Tramite",
@@ -121,7 +121,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
     await prisma.tramite.delete({ where: { id } });
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "tramite.delete",
       entityType: "Tramite",

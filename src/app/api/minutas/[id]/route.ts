@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { pushMinutaToDrive } from "@/lib/integrations/google";
+import { googleActionHttpStatus, pushMinutaToDrive } from "@/lib/integrations/google";
 import {
   isValidEstadoAccion,
   renderMinutaMarkdown,
 } from "@/lib/minutas";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { canSeeConfidential } from "@/lib/auth/rbac";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { documentoListSelect } from "@/lib/sites/file-select";
 
@@ -88,16 +88,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (body.action === "push-drive") {
     try {
       const result = await pushMinutaToDrive(id, { role: user.role });
-      if (
-        result.status === "needs_real_folder" ||
-        result.status === "stub"
-      ) {
-        // stub = OAuth ausente; needs_real_folder = carpeta demo/stub
-        return NextResponse.json(result, {
-          status: result.status === "stub" ? 200 : 400,
-        });
-      }
-      return NextResponse.json(result);
+      return NextResponse.json(result, {
+        status: googleActionHttpStatus(result.status),
+      });
     } catch (e) {
       return NextResponse.json(
         { error: e instanceof Error ? e.message : "Error Drive" },
@@ -238,7 +231,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   if (Object.keys(data).length > 0) {
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "minuta.update",
       entityType: "Minuta",

@@ -7,7 +7,7 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { clienteCreateSchema } from "@/lib/schemas";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
 
 export async function GET(req: NextRequest) {
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "cliente.create",
       entityType: "Cliente",

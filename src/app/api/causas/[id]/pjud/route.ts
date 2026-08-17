@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import {
   clearCausaPjudSyncMessages,
   providerStatusPublicAsync,
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (body.action === "enable" || body.action === "disable") {
       const causa = await setMonitoreoActivo(id, body.action === "enable");
-      await writeAudit({
+      await writeAuditStrict({
         actorId: user.id,
         action: `pjud.monitor.${body.action}`,
         entityType: "Causa",
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (body.action === "clear_errors") {
       const causa = await clearCausaPjudSyncMessages(id);
-      await writeAudit({
+      await writeAuditStrict({
         actorId: user.id,
         action: "pjud.clear_errors",
         entityType: "Causa",
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       force: true,
       trigger: body.action === "retry" ? "retry" : "manual",
     });
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: body.action === "retry" ? "pjud.retry" : "pjud.sync",
       entityType: "Causa",

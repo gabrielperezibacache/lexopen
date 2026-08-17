@@ -8,7 +8,7 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { clienteUpdateSchema } from "@/lib/schemas";
-import { writeAudit } from "@/lib/audit";
+import { writeAuditStrict } from "@/lib/audit";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
 import { documentoListSelect } from "@/lib/sites/file-select";
 
@@ -117,7 +117,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       },
     });
 
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "cliente.update",
       entityType: "Cliente",
@@ -154,7 +154,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       );
     }
     await prisma.cliente.delete({ where: { id } });
-    await writeAudit({
+    await writeAuditStrict({
       actorId: user.id,
       action: "cliente.delete",
       entityType: "Cliente",

@@ -3,6 +3,7 @@ import {
   GoogleIntegrationError,
   assertGoogleFeatureEnabled,
   getGoogleAuthUrl,
+  googleActionHttpStatus,
   googleCredentialsConfigured,
   googleRedirectUri,
 } from "@/lib/integrations/google";
@@ -115,5 +116,20 @@ assert.equal(
 assert.ok(
   driveFileUrl("1aBcDeFgHiJkLmNoPq").includes("/file/d/1aBcDeFgHiJkLmNoPq/")
 );
+
+{
+  const prev = process.env.NODE_ENV;
+  (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+  assert.equal(googleActionHttpStatus("stub"), 400);
+  assert.equal(googleActionHttpStatus("needs_real_folder"), 400);
+  assert.equal(googleActionHttpStatus("uploaded"), 200);
+  (process.env as Record<string, string | undefined>).NODE_ENV = "development";
+  assert.equal(googleActionHttpStatus("stub"), 200);
+  if (prev === undefined) {
+    delete (process.env as Record<string, string | undefined>).NODE_ENV;
+  } else {
+    (process.env as Record<string, string | undefined>).NODE_ENV = prev;
+  }
+}
 
 console.log("google integration tests ok");

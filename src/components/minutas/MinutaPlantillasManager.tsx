@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiMutation } from "@/lib/api-mutation";
 
 type Plantilla = {
   id: string;
@@ -25,7 +26,8 @@ export function MinutaPlantillasManager({
     setBusy(true);
     setError("");
     const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/minutas/plantillas", {
+    const form = e.currentTarget;
+    const result = await apiMutation("/api/minutas/plantillas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -36,26 +38,24 @@ export function MinutaPlantillasManager({
       }),
     });
     setBusy(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "No se pudo crear la plantilla");
+    if (!result.ok) {
+      setError(result.error || "No se pudo crear la plantilla");
       return;
     }
-    e.currentTarget.reset();
+    form.reset();
     router.refresh();
   }
 
   async function remove(id: string) {
     setBusy(true);
     setError("");
-    const res = await fetch(
+    const result = await apiMutation(
       `/api/minutas/plantillas?id=${encodeURIComponent(id)}`,
       { method: "DELETE" }
     );
     setBusy(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "No se pudo eliminar");
+    if (!result.ok) {
+      setError(result.error || "No se pudo eliminar");
       return;
     }
     router.refresh();
