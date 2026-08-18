@@ -74,33 +74,6 @@ export default function MonitoreoCausasPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [fallidos, setFallidos] = useState<Fallido[]>([]);
   const [resumen, setResumen] = useState<Record<string, number> | null>(null);
-  const [provider, setProvider] = useState<{
-    honesty?: string;
-    apiConfigured?: boolean;
-    scraperSidecarConfigured?: boolean;
-    publicScrapeReady?: boolean;
-    claveUnicaScrapeEnabled?: boolean;
-    liveIngestConfigured?: boolean;
-    pdfBackupEnabled?: boolean;
-    syncIntervalMinutes?: number;
-    captchaConfigured?: boolean;
-    captcha?: {
-      provider?: string | null;
-      freeTier?: boolean;
-      keyPresent?: boolean;
-      fallbacks?: string[];
-      configError?: string | null;
-      providers?: { id: string; label: string; freeTier: boolean; selected?: boolean }[];
-    };
-    sidecar?: {
-      configured?: boolean;
-      reachable?: boolean;
-      scrapeReady?: boolean | null;
-      captcha?: boolean | null;
-      urlHost?: string | null;
-      error?: string | null;
-    };
-  } | null>(null);
   const [filter, setFilter] = useState<
     "todas" | Semaforo | "monitoreadas" | "fallidas"
   >("monitoreadas");
@@ -115,7 +88,6 @@ export default function MonitoreoCausasPage() {
     setItems(data.items || []);
     setFallidos(data.fallidos || []);
     setResumen(data.resumen || null);
-    setProvider(data.provider || null);
   }
 
   useEffect(() => {
@@ -130,7 +102,6 @@ export default function MonitoreoCausasPage() {
         setItems(data.items || []);
         setFallidos(data.fallidos || []);
         setResumen(data.resumen || null);
-        setProvider(data.provider || null);
       })
       .catch(() => undefined);
     return () => {
@@ -296,57 +267,6 @@ export default function MonitoreoCausasPage() {
         </div>
       </div>
 
-      {provider?.honesty && (
-        <div
-          className={`rounded-2xl border px-4 py-3 text-sm ${
-            provider.liveIngestConfigured
-              ? "border-[var(--line)] bg-white/70 text-[var(--ink-soft)]/85"
-              : "border-rose-300/60 bg-rose-50 text-rose-900"
-          }`}
-        >
-          {!provider.liveIngestConfigured && (
-            <p className="mb-1 font-semibold">
-              Aún no se pueden traer movimientos en vivo desde el Poder Judicial.
-            </p>
-          )}
-          <p>{provider.honesty}</p>
-          <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-90">
-            <span>
-              Consulta en vivo:{" "}
-              {provider.liveIngestConfigured ? "disponible" : "no disponible"}
-            </span>
-            <span>
-              Servicio auxiliar:{" "}
-              {!provider.sidecar?.configured
-                ? "no usado"
-                : provider.sidecar.reachable
-                  ? provider.sidecar.scrapeReady
-                    ? "listo"
-                    : "encendido"
-                  : "apagado"}
-            </span>
-            <span>
-              CAPTCHA:{" "}
-              {provider.captchaConfigured
-                ? provider.captcha?.provider || "activo"
-                : "pendiente"}
-            </span>
-            <span>
-              ClaveÚnica:{" "}
-              {provider.claveUnicaScrapeEnabled ? "permitida" : "no activa"}
-            </span>
-            {provider.syncIntervalMinutes ? (
-              <span>Revisión cada {provider.syncIntervalMinutes} min</span>
-            ) : null}
-          </p>
-        </div>
-      )}
-      {provider?.captcha?.configError && (
-        <p className="rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <strong className="mr-1">CAPTCHA:</strong>
-          {provider.captcha.configError}
-        </p>
-      )}
       {msg && (
         <div className="flex flex-wrap items-start justify-between gap-2 text-sm text-[var(--ink-soft)]/80">
           <p className="min-w-0 flex-1">{msg}</p>

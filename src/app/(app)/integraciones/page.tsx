@@ -274,8 +274,11 @@ function IntegracionesInner() {
           <Link href="/causas/mis-causas" className="text-[var(--sea)]">
             Causas → ClaveÚnica
           </Link>
-          . Abajo ve el estado técnico del servidor (CAPTCHA, servicio auxiliar,
-          etc.).
+          . El estado del canal (servicio auxiliar, CAPTCHA) está en{" "}
+          <Link href="/configuracion#pjud-log" className="text-[var(--sea)]">
+            Configuración → PJUD
+          </Link>
+          .
         </p>
         {captcha && (
           <div className="mt-4 space-y-3 rounded-2xl border border-[var(--line)] bg-white/70 p-4 text-sm">
@@ -310,12 +313,6 @@ function IntegracionesInner() {
                 </strong>
               </span>
             </div>
-            {captcha.captcha?.configError && (
-              <p className="text-amber-900">{captcha.captcha.configError}</p>
-            )}
-            {captcha.honesty && (
-              <p className="text-xs text-[var(--ink-soft)]/70">{captcha.honesty}</p>
-            )}
             {claveUnica && (
               <div className="rounded-xl border border-[var(--line)] bg-white/60 px-3 py-2 text-sm text-[var(--ink-soft)]/85">
                 <div>

@@ -665,8 +665,8 @@ export async function providerStatusPublicAsync() {
   let honesty = base.honesty;
   if (sidecar.configured && !sidecar.reachable) {
     honesty = publicScrapeReady()
-      ? "El servicio auxiliar no responde; LexOpen usará la consulta directa. Pida al administrador del Host que lo arranque, o revise Integraciones → PJUD."
-      : "El servicio auxiliar está configurado pero apagado. Arránquelo en el Host, o active la consulta directa con CAPTCHA (Integraciones → PJUD).";
+      ? "El servicio auxiliar no responde; LexOpen usará la consulta directa. Arranque el auxiliar en el Host o revise Configuración → PJUD."
+      : "El servicio auxiliar está configurado pero apagado. Arránquelo en el Host, o active la consulta directa con CAPTCHA (Configuración → PJUD).";
   } else if (sidecar.configured && sidecar.reachable) {
     honesty =
       "El servicio auxiliar del Host está activo. Su ClaveÚnica se guarda cifrada aquí; la Oficina Judicial Virtual y el CAPTCHA se consultan por internet.";

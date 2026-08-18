@@ -5,6 +5,7 @@ import { getObsidianConfig } from "@/lib/integrations/obsidian";
 import { getGoogleConfig } from "@/lib/integrations/google";
 import { captchaEnvSnippet } from "@/lib/pjud/captcha-solver";
 import { claveUnicaAutomationAllowed } from "@/lib/pjud/public-scrape";
+import { buildPjudOpsLog } from "@/lib/pjud/ops-log";
 
 type EnvMap = Record<string, string | undefined>;
 
@@ -186,6 +187,28 @@ export async function getConfigSnapshot() {
         scraperPort: envNumber(env, "PJUD_SCRAPER_PORT", 8787),
       },
       captchaSnippet: captchaEnvSnippet(),
+      opsLog: buildPjudOpsLog({
+        generatedAt: host.generatedAt,
+        honesty: host.pjud.honesty,
+        liveIngestConfigured: host.pjud.liveIngestConfigured,
+        sidecar: host.pjud.sidecar,
+        captcha: host.pjud.captcha,
+        claveUnica: {
+          lastSyncAt: firm?.claveUnicaLastSyncAt?.toISOString() || null,
+          lastSyncStatus: firm?.claveUnicaLastSyncStatus || null,
+          lastSyncNote: firm?.claveUnicaLastSyncNote || null,
+        },
+        digest: {
+          lastAt:
+            firm?.pjudDigestLastAt?.toISOString() ||
+            host.pjud.digest?.lastAt ||
+            null,
+          lastStatus:
+            firm?.pjudDigestLastStatus || host.pjud.digest?.lastStatus || null,
+          lastNote: firm?.pjudDigestLastNote || host.pjud.digest?.lastNote || null,
+        },
+        failedJobs: host.pjud.failedJobs,
+      }),
     },
     storage: {
       ...host.storage,

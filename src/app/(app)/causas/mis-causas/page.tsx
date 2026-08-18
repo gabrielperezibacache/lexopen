@@ -487,30 +487,14 @@ export default function MisCausasPage() {
               ))}
             </ul>
             <p className="mt-3 text-xs text-rose-900/80">
-              Si necesita ayuda técnica del servidor, revise también{" "}
-              <Link href="/integraciones" className="underline">
-                Integraciones
-              </Link>{" "}
-              o Configuración → PJUD.
+              Si el servidor no puede consultar el PJUD, el detalle está en{" "}
+              <Link href="/configuracion#pjud-log" className="underline">
+                Configuración → PJUD
+              </Link>
+              .
             </p>
           </div>
         )}
-
-        {status?.warnings &&
-          status.warnings.length > 0 &&
-          !(status.blockers && status.blockers.length > 0) && (
-            <div
-              className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950"
-              role="status"
-            >
-              <p className="font-semibold">Aviso del Host</p>
-              <ul className="mt-2 list-disc space-y-1.5 pl-5">
-                {status.warnings.map((w) => (
-                  <li key={w}>{w}</li>
-                ))}
-              </ul>
-            </div>
-          )}
 
         {adminOnly && (
           <p className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">

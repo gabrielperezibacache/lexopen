@@ -79,6 +79,7 @@ export async function getClaveUnicaStatus() {
   const publicScrape = publicScrapeEnabled();
   const captcha = captchaSolverConfigured();
   const blockers: string[] = [];
+  const hostNotices: string[] = [];
   if (!settings.claveUnicaEnabled) {
     blockers.push(
       "La conexión está pausada. Pulse «Reanudar conexión» para volver a usarla."
@@ -90,7 +91,7 @@ export async function getClaveUnicaStatus() {
     );
   }
   if (!scrapeFlag) {
-    blockers.push(
+    hostNotices.push(
       "En este servidor la consulta automática a ClaveÚnica está apagada. Pida a quien administra el Host que la active, o revise Configuración → PJUD."
     );
   }
@@ -98,15 +99,14 @@ export async function getClaveUnicaStatus() {
     sidecarHealth?.reachable && sidecarHealth.scrapeReady !== false
   );
   const canUseInProcess = publicScrapeReady();
-  const warnings: string[] = [];
   if (sidecar && !sidecarHealth?.reachable && canUseInProcess) {
-    warnings.push(
+    hostNotices.push(
       "El servicio auxiliar (PJUD_SCRAPER_URL) no responde. LexOpen usará la consulta directa. Arranque `npm run pjud:host` o quite PJUD_SCRAPER_URL del .env si no lo necesita."
     );
   }
   if (!canUseSidecar && !canUseInProcess) {
     if (sidecar && !sidecarHealth?.reachable) {
-      blockers.push(
+      hostNotices.push(
         "El servicio auxiliar de consulta judicial no está en marcha. Arránquelo con `npm run pjud:host`, o quite PJUD_SCRAPER_URL del .env si prefiere solo consulta directa; mientras tanto LexOpen no puede entrar a Mis Causas."
       );
     } else if (
@@ -114,33 +114,37 @@ export async function getClaveUnicaStatus() {
       sidecarHealth?.reachable &&
       sidecarHealth.scrapeReady === false
     ) {
-      blockers.push(
+      hostNotices.push(
         "El servicio auxiliar está encendido pero aún no puede consultar el Poder Judicial (falta el resolutor de CAPTCHA). Revise Integraciones → PJUD."
       );
     }
     if (!publicScrape) {
-      blockers.push(
+      hostNotices.push(
         "Falta activar la consulta directa al Poder Judicial en el servidor. Revise Integraciones → PJUD o Configuración."
       );
     } else if (!captcha) {
-      blockers.push(
+      hostNotices.push(
         "Falta configurar el resolutor de CAPTCHA (necesario para entrar a la Oficina Judicial Virtual). Hágalo en Integraciones → PJUD."
       );
     } else if (!(sidecar && sidecarHealth?.reachable)) {
-      blockers.push(
+      hostNotices.push(
         "Falta el navegador automatizado (Chromium) en este Host. En el servidor ejecute la instalación de Chromium para PJUD y reinicie LexOpen."
       );
     }
   }
 
+  const hostBlocked =
+    !scrapeFlag || (!canUseSidecar && !canUseInProcess);
   let readinessLabel = "Listo para sincronizar";
   let readinessHint =
     "Puede traer sus causas desde la Oficina Judicial Virtual y actualizar el monitoreo.";
   if (blockers.length) {
     readinessLabel = "Aún no se puede sincronizar";
     readinessHint = blockers[0];
-  } else if (warnings.length) {
-    readinessHint = warnings[0];
+  } else if (hostBlocked) {
+    readinessLabel = "Aún no se puede sincronizar";
+    readinessHint =
+      "El canal de consulta PJUD no está listo. El detalle está en Configuración → PJUD.";
   }
 
   const channelLabel = canUseSidecar
@@ -163,9 +167,10 @@ export async function getClaveUnicaStatus() {
     sidecarReachable: sidecarHealth?.reachable ?? false,
     publicScrape,
     captchaConfigured: captcha,
-    readyToSync: blockers.length === 0,
+    readyToSync: blockers.length === 0 && !hostBlocked,
     blockers,
-    warnings,
+    hostNotices,
+    warnings: [],
     readinessLabel,
     readinessHint,
     channelLabel,
