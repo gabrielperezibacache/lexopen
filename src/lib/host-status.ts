@@ -26,6 +26,7 @@ export async function getHostStatus() {
     digest,
     pjudQueue,
     pjudProvider,
+    connectedMailboxes,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.site.count(),
@@ -64,6 +65,7 @@ export async function getHostStatus() {
       workerConcurrency: 5,
     })),
     providerStatusPublicAsync(),
+    prisma.mailboxAccount.count({ where: { status: "connected" } }),
   ]);
 
   return {
@@ -108,6 +110,7 @@ export async function getHostStatus() {
       invoices,
       openInvoices,
       failedPjudJobs,
+      connectedMailboxes,
     },
   };
 }

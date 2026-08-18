@@ -165,6 +165,7 @@ export async function getConfigSnapshot() {
         PJUD_WEBHOOK_SECRET: envPresence(env, "PJUD_WEBHOOK_SECRET"),
         PJUD_SECRETS_KEY: envPresence(env, "PJUD_SECRETS_KEY"),
         CRON_SECRET: envPresence(env, "CRON_SECRET"),
+        MAIL_SYNC_INTERVAL_MINUTES: envPresence(env, "MAIL_SYNC_INTERVAL_MINUTES"),
         CAPTCHA_SOLVER_PROVIDER: env.CAPTCHA_SOLVER_PROVIDER || null,
         CAPTCHA_SOLVER_API_KEY: envPresence(env, "CAPTCHA_SOLVER_API_KEY"),
         CAPTCHA_SOLVER_FALLBACK: env.CAPTCHA_SOLVER_FALLBACK || null,
@@ -180,6 +181,7 @@ export async function getConfigSnapshot() {
         ),
         plazosAlertasDays: envNumber(env, "PLAZOS_ALERTAS_DAYS", 3),
         plazosAlertasEmail: envFlag(env, "PLAZOS_ALERTAS_EMAIL"),
+        mailSyncMinutes: envNumber(env, "MAIL_SYNC_INTERVAL_MINUTES", 0),
         concurrency: envNumber(env, "PJUD_SYNC_CONCURRENCY", 5),
         dailySolveBudget: envNumber(env, "PJUD_CAUSAS_DAILY_SOLVE_BUDGET", 50),
         sessionTtlMs: envNumber(env, "PJUD_SESSION_TTL_MS", 1_500_000),
@@ -209,6 +211,21 @@ export async function getConfigSnapshot() {
         },
         failedJobs: host.pjud.failedJobs,
       }),
+    },
+    mail: {
+      syncMinutes: envNumber(env, "MAIL_SYNC_INTERVAL_MINUTES", 0),
+      connectedAccounts: host.counts.connectedMailboxes ?? 0,
+      googleMailboxConfigured:
+        envPresence(env, "GOOGLE_CLIENT_ID") && envPresence(env, "GOOGLE_CLIENT_SECRET"),
+      microsoftMailboxConfigured:
+        envPresence(env, "MICROSOFT_CLIENT_ID") &&
+        envPresence(env, "MICROSOFT_CLIENT_SECRET"),
+      googleMailRedirect:
+        env.GOOGLE_MAIL_REDIRECT_URI ||
+        `${env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/mail/google/callback`,
+      microsoftRedirect:
+        env.MICROSOFT_REDIRECT_URI ||
+        `${env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/mail/microsoft/callback`,
     },
     storage: {
       ...host.storage,

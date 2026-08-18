@@ -268,6 +268,7 @@ export function useAgenteCopilot() {
         sources?: SourceRef[];
         suggestedActions?: { label: string; href: string }[];
         requireApproval?: boolean;
+        utility?: { id?: string; label?: string };
         chat?: { id: string; messagesJson: string; demoMode?: boolean };
       }>("/api/integrations/hermes", {
         method: "POST",

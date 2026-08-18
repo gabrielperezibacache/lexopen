@@ -986,21 +986,32 @@ model LedgerEntry {
   payment   Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 }
 
-/// Buzón PJUD por usuario (demo o IMAP)
+/// Buzón profesional por usuario (Gmail / Microsoft / IMAP). Solo ingest pjud.cl.
 model MailboxAccount {
-  id           String   @id @default(cuid())
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  protocol     String   @default("demo") // demo | imap
-  email        String?
-  imapHost     String?
-  imapPort     Int      @default(993)
-  imapTls      Boolean  @default(true)
-  passwordEnc  String?
-  lastSyncAt   DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  messages     MailboxMessage[]
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// gmail | microsoft | imap
+  protocol        String    @default("imap")
+  /// disconnected | connected | error
+  status          String    @default("disconnected")
+  email           String?
+  imapHost        String?
+  imapPort        Int       @default(993)
+  imapTls         Boolean   @default(true)
+  passwordEnc     String?
+  oauthRefreshEnc String?
+  oauthAccessEnc  String?
+  oauthExpiresAt  DateTime?
+  lastError       String?
+  lastSyncAt      DateTime?
+  imapUidValidity Int?
+  imapLastUid     Int?
+  gmailHistoryId  String?
+  graphDeltaLink  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  messages        MailboxMessage[]
 }
 
 model MailboxMessage {
@@ -1023,8 +1034,26 @@ model MailboxMessage {
   causa       Causa?   @relation(fields: [causaId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  attachments MailboxAttachment[]
 
   @@unique([userId, externalId])
   @@index([userId, status])
   @@index([causaId])
+}
+
+model MailboxAttachment {
+  id          String   @id @default(cuid())
+  messageId   String
+  message     MailboxMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  filename    String
+  mimeType    String?
+  sha256      String
+  sizeBytes   Int      @default(0)
+  storageKey  String?
+  documentoId String?
+  siteFileId  String?
+  createdAt   DateTime @default(now())
+
+  @@unique([messageId, sha256])
+  @@index([documentoId])
 }
