@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { handleRouteError, requireStaff } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { listCausasForMail } from "@/lib/mail/ingest";
+import { publicMailboxAccount, publicMailboxMessage } from "@/lib/mail/types";
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,6 +15,14 @@ export async function GET(req: NextRequest) {
       },
       include: {
         causa: { select: { id: true, titulo: true, rit: true } },
+        attachments: {
+          select: {
+            filename: true,
+            mimeType: true,
+            sizeBytes: true,
+            documentoId: true,
+          },
+        },
       },
       orderBy: { receivedAt: "desc" },
       take: 80,
@@ -29,29 +38,12 @@ export async function GET(req: NextRequest) {
       },
     });
     return NextResponse.json({
-      messages,
+      messages: messages.map(publicMailboxMessage),
       tablas: tablas.filter((c) => c.proximaTabla),
       causas: tablas,
-      account,
+      account: publicMailboxAccount(account),
       pending,
     });
-  } catch (e) {
-    return handleRouteError(e);
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    assertCsrf(req);
-    const user = await requireStaff();
-    const body = await req.json().catch(() => ({}));
-    if (body.action === "discard-all-demo") {
-      await prisma.mailboxMessage.deleteMany({
-        where: { userId: user.id, externalId: { startsWith: "demo-" } },
-      });
-      return NextResponse.json({ ok: true });
-    }
-    return NextResponse.json({ error: "Acción no soportada" }, { status: 400 });
   } catch (e) {
     return handleRouteError(e);
   }

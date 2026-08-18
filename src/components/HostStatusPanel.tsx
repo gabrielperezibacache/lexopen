@@ -145,6 +145,8 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
             <dd className="text-right font-medium">
               {counts.failedPjudJobs ?? pjud.failedJobs ?? 0}
             </dd>
+            <dt className="text-[var(--ink-soft)]/65">Buzones PJUD conectados</dt>
+            <dd className="text-right font-medium">{counts.connectedMailboxes ?? 0}</dd>
             <dt className="text-[var(--ink-soft)]/65">Facturas abiertas</dt>
             <dd className="text-right font-medium">{counts.openInvoices}</dd>
           </dl>

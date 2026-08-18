@@ -210,6 +210,27 @@ El sidecar se ejecuta en el mismo Host: `npm run pjud:chromium` (una vez) y
   `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` y `PJUD_DIGEST_INTERVAL_MINUTES` (p. ej. digest
   cercano a las 08:00 del Host) más `CRON_SECRET`.
 
+## Correo PJUD (solo `pjud.cl` → carpetas)
+
+Bandeja en `/correo`. Cada profesional conecta **su** Gmail, Outlook/Hotmail o IMAP.
+LexOpen **no** reutiliza el token Google del estudio (`gmail.send` / Drive / Calendar).
+
+| Proveedor | Cómo |
+|-----------|------|
+| Gmail | OAuth `gmail.readonly` (`GOOGLE_CLIENT_ID/SECRET` + `GOOGLE_MAIL_REDIRECT_URI`) o IMAP `imap.gmail.com` con contraseña de aplicación |
+| Outlook / Hotmail | Microsoft Graph `Mail.Read` (`MICROSOFT_CLIENT_ID/SECRET` + `MICROSOFT_REDIRECT_URI`). IMAP básico de Outlook está muerto |
+| IMAP genérico | Gmail / Yahoo / iCloud / host propio (`assertImapHostAllowed`; sin localhost ni Outlook) |
+
+Pipeline: sync incremental → filtro From/Reply-To/Return-Path `@pjud.cl` / `*.pjud.cl` → MIME (`mailparser`) → RIT → auto-archivo:
+
+- `Documento` con `ruta: "correo/pjud"`
+- carpeta **Correo PJUD** del Espacio de la causa (`SiteFile`)
+- `pushDocumentoToDrive` si la causa tiene carpeta Drive real
+
+Sin RIT o causa no visible: queda en bandeja (`nuevo`) para vincular a mano. Pegar texto es vía excepcional (no exige remitente pjud.cl).
+
+Cron Host: `MAIL_SYNC_INTERVAL_MINUTES=15` + `CRON_SECRET` → `POST /api/mail/sync`. Solo cuentas `connected`; no inventa correo.
+
 ## Digest email (~08:00 Santiago)
 
 - `POST /api/pjud/digest` (cron secret o staff)

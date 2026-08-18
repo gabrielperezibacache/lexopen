@@ -162,6 +162,11 @@ export function PjudSettingsPanel() {
           <Row label="Sync causas (min)" value={pjud.intervals.syncMinutes} hint="PJUD_SYNC_INTERVAL_MINUTES" />
           <Row label="Mis Causas (min)" value={pjud.intervals.misCausasMinutes || "off"} hint="PJUD_MIS_CAUSAS_INTERVAL_MINUTES" />
           <Row label="Digest (min)" value={pjud.intervals.digestMinutes || "off"} hint="PJUD_DIGEST_INTERVAL_MINUTES" />
+          <Row
+            label="Correo PJUD (min)"
+            value={pjud.intervals.mailSyncMinutes || "off"}
+            hint="MAIL_SYNC_INTERVAL_MINUTES"
+          />
           <Row label="Concurrencia" value={pjud.intervals.concurrency} hint="PJUD_SYNC_CONCURRENCY" />
           <Row label="Budget solves/día" value={pjud.intervals.dailySolveBudget} hint="PJUD_CAUSAS_DAILY_SOLVE_BUDGET" />
           <Row
