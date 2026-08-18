@@ -24,12 +24,12 @@ test("un abogado ve un menú Causas con tres pestañas y sin ítems duplicados",
   await expect(page).toHaveURL(/\/causas\/monitoreo/);
   await expect(page.getByRole("heading", { name: "Cartera PJUD" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Monitoreadas" })
+    page.getByRole("button", { name: "Monitoreadas", exact: true })
   ).toBeVisible();
 
   await page.getByTestId("causas-section-tabs").getByRole("link", { name: "ClaveÚnica" }).click();
   await expect(page).toHaveURL(/\/causas\/mis-causas/);
-  await expect(page.getByRole("heading", { name: "ClaveÚnica" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ClaveÚnica", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Ver en Expediente" }).first()).toBeVisible();
 
   await page.goto("/causas/nueva");
@@ -40,7 +40,7 @@ test("un abogado ve un menú Causas con tres pestañas y sin ítems duplicados",
 test("un asistente no opera ClaveÚnica", async ({ page }) => {
   await loginAs(page, "asistente@estudio.cl");
   await page.goto("/causas/mis-causas");
-  await expect(page.getByRole("heading", { name: "ClaveÚnica" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ClaveÚnica", exact: true })).toBeVisible();
   await expect(
     page.getByText("no guardar credenciales ni sincronizar")
   ).toBeVisible();
