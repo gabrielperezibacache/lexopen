@@ -5,6 +5,7 @@ test("correo PJUD muestra conector y no inventa mensajes demo", async ({
   page,
 }) => {
   await loginAs(page, "socio@estudio.cl");
+  await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/correo");
 
   await expect(page.getByRole("heading", { name: "Correo PJUD" })).toBeVisible();
