@@ -100,15 +100,20 @@ export function MailboxPanel() {
     void load();
   }, [load]);
 
-  useEffect(() => {
+  const oauthFlash = useMemo(() => {
     const gmail = searchParams.get("gmail");
     const microsoft = searchParams.get("microsoft");
     if (gmail === "connected" || microsoft === "connected") {
-      setNotice(t("mailbox.oauthConnected"));
-    } else if (gmail || microsoft) {
-      setError(t("mailbox.oauthError"));
+      return { notice: t("mailbox.oauthConnected"), error: "" };
     }
+    if (gmail || microsoft) {
+      return { notice: "", error: t("mailbox.oauthError") };
+    }
+    return { notice: "", error: "" };
   }, [searchParams, t]);
+
+  const flashNotice = notice || oauthFlash.notice;
+  const flashError = error || oauthFlash.error;
 
   const selected = useMemo(
     () => messages.find((m) => m.id === selectedId) || null,
@@ -365,14 +370,14 @@ export function MailboxPanel() {
               {busy ? t("common.loading") : t("mailbox.sync")}
             </button>
           </div>
-          {notice && (
+          {flashNotice && (
             <p className="text-sm text-[var(--sea)]" role="status">
-              {notice}
+              {flashNotice}
             </p>
           )}
-          {error && (
+          {flashError && (
             <p className="text-sm text-[var(--danger)]" role="alert" data-testid="mailbox-error">
-              {error}
+              {flashError}
             </p>
           )}
           {loading ? (
