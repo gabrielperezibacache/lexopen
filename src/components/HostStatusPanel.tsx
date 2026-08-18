@@ -103,9 +103,6 @@ export function HostStatusPanel({ status }: { status: HostStatus }) {
               ? ` · Digest ${pjud.digest.lastStatus}`
               : " · Digest —"}
           </div>
-          {pjud.captcha?.configError && (
-            <p className="mt-2 text-xs text-rose-700/90">{pjud.captcha.configError}</p>
-          )}
           {pjud.captcha?.fallbacks?.length ? (
             <p className="mt-1 text-xs text-[var(--ink-soft)]/60">
               Fallback CAPTCHA: {pjud.captcha.fallbacks.join(" → ")}

@@ -7,6 +7,7 @@ const SECTIONS = [
   { id: "obsidian-settings", label: "Obsidian" },
   { id: "google-settings", label: "Google" },
   { id: "pjud-settings", label: "PJUD" },
+  { id: "pjud-log", label: "Log PJUD" },
   { id: "runtime-settings", label: "Entorno" },
   { id: "integraciones-overview", label: "APIs" },
   { id: "host-status", label: "Host" },

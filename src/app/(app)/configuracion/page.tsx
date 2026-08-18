@@ -7,6 +7,7 @@ import { LlmSettingsForm } from "@/components/LlmSettingsForm";
 import { ObsidianSettingsForm } from "@/components/config/ObsidianSettingsForm";
 import { GoogleSettingsForm } from "@/components/config/GoogleSettingsForm";
 import { PjudSettingsPanel } from "@/components/config/PjudSettingsPanel";
+import { PjudOpsLogPanel } from "@/components/config/PjudOpsLogPanel";
 import { RuntimeSettingsPanel } from "@/components/config/RuntimeSettingsPanel";
 import { ConfigSectionNav } from "@/components/config/ConfigSectionNav";
 import { UsersAdminPanel } from "@/components/config/UsersAdminPanel";
@@ -14,6 +15,7 @@ import { IntegrationsOverviewPanel } from "@/components/IntegrationsOverviewPane
 import { HostStatusPanel } from "@/components/HostStatusPanel";
 import { PurgeDemoPanel } from "@/components/PurgeDemoPanel";
 import { getHostStatus } from "@/lib/host-status";
+import { buildPjudOpsLog } from "@/lib/pjud/ops-log";
 
 export default async function ConfiguracionPage() {
   const me = await requireRole("admin");
@@ -35,6 +37,33 @@ export default async function ConfiguracionPage() {
   const settingsOrganization =
     organization ||
     (await prisma.organization.create({ data: {}, include: { settings: true } }));
+
+  const settings = settingsOrganization.settings;
+  const pjudOpsLog = buildPjudOpsLog({
+    generatedAt: hostStatus.generatedAt,
+    honesty: hostStatus.pjud.honesty,
+    liveIngestConfigured: hostStatus.pjud.liveIngestConfigured,
+    sidecar: hostStatus.pjud.sidecar,
+    captcha: hostStatus.pjud.captcha,
+    claveUnica: {
+      lastSyncAt: settings?.claveUnicaLastSyncAt?.toISOString() || null,
+      lastSyncStatus: settings?.claveUnicaLastSyncStatus || null,
+      lastSyncNote: settings?.claveUnicaLastSyncNote || null,
+    },
+    digest: {
+      lastAt:
+        settings?.pjudDigestLastAt?.toISOString() ||
+        hostStatus.pjud.digest?.lastAt ||
+        null,
+      lastStatus:
+        settings?.pjudDigestLastStatus ||
+        hostStatus.pjud.digest?.lastStatus ||
+        null,
+      lastNote:
+        settings?.pjudDigestLastNote || hostStatus.pjud.digest?.lastNote || null,
+    },
+    failedJobs: hostStatus.pjud.failedJobs,
+  });
 
   return (
     <div className="space-y-6">
@@ -77,6 +106,10 @@ export default async function ConfiguracionPage() {
       <ObsidianSettingsForm />
       <GoogleSettingsForm />
       <PjudSettingsPanel />
+      <PjudOpsLogPanel
+        generatedAt={hostStatus.generatedAt}
+        entries={pjudOpsLog}
+      />
       <RuntimeSettingsPanel />
       <IntegrationsOverviewPanel />
       <HostStatusPanel status={hostStatus} />

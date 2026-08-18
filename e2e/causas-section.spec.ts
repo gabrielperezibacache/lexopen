@@ -57,6 +57,26 @@ test("un asistente no opera ClaveÚnica", async ({ page }) => {
   expect(sync.status()).toBe(403);
 });
 
+test("avisos del canal PJUD van al log de Configuración, no a Cartera", async ({
+  page,
+}) => {
+  await loginAs(page, "socio@estudio.cl");
+
+  await page.goto("/causas/monitoreo");
+  await expect(page.getByRole("heading", { name: "Cartera PJUD" })).toBeVisible();
+  await expect(page.getByText("El servicio auxiliar no responde")).toHaveCount(0);
+
+  await page.goto("/causas/mis-causas");
+  await expect(
+    page.getByRole("heading", { name: "ClaveÚnica", exact: true })
+  ).toBeVisible();
+  await expect(page.getByText("Aviso del Host")).toHaveCount(0);
+
+  await page.goto("/configuracion#pjud-log");
+  await expect(page.getByTestId("pjud-ops-log")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Log PJUD" })).toBeVisible();
+});
+
 test("un cliente sigue sin Causas", async ({ page }) => {
   await loginAs(page, "cliente@andes.cl");
   await expect(page.getByRole("link", { name: "Causas" })).toHaveCount(0);

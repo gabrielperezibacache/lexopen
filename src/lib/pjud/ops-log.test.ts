@@ -17,6 +17,33 @@ assert.ok(
     /servicio auxiliar no responde/i.test(e.message)
   )
 );
+assert.equal(
+  down.filter((e) => /servicio auxiliar no responde/i.test(e.message)).length,
+  1
+);
+
+const sidecarRaw = buildPjudOpsLog({
+  generatedAt: "2026-08-18T01:00:00.000Z",
+  honesty:
+    "El servicio auxiliar no responde; LexOpen usará la consulta directa. Arranque el auxiliar en el Host o revise Configuración → PJUD.",
+  liveIngestConfigured: true,
+  sidecar: {
+    configured: true,
+    reachable: false,
+    scrapeReady: null,
+    error: "fetch failed",
+  },
+  hostNotices: [
+    "El servicio auxiliar (PJUD_SCRAPER_URL) no responde. LexOpen usará la consulta directa.",
+  ],
+});
+assert.equal(sidecarRaw.filter((e) => e.source === "auxiliar").length, 0);
+assert.equal(sidecarRaw.filter((e) => e.source === "claveunica").length, 0);
+assert.equal(
+  sidecarRaw.filter((e) => /servicio auxiliar no responde/i.test(e.message))
+    .length,
+  1
+);
 
 const captcha = buildPjudOpsLog({
   generatedAt: "2026-08-18T01:00:00.000Z",

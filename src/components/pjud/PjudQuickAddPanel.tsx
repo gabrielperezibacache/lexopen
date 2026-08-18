@@ -282,8 +282,7 @@ export function PjudQuickAddPanel() {
       )}
 
       <p className="text-xs text-[var(--ink-soft)]/60">
-        Requiere scrape/sidecar activo. El tribunal se puede escribir libremente
-        (coincida con OJV). También puede usar{" "}
+        El tribunal se puede escribir libremente (coincida con OJV). También puede usar{" "}
         <Link href="/causas/mis-causas" className="text-[var(--sea)]">
           ClaveÚnica
         </Link>

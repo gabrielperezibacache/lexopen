@@ -67,12 +67,20 @@ export function buildPjudOpsLog(input: PjudOpsLogInput): PjudOpsLogEntry[] {
     });
   }
 
-  if (input.sidecar?.configured && input.sidecar.error) {
+  if (
+    input.sidecar?.configured &&
+    input.sidecar.error &&
+    !/servicio auxiliar/i.test(input.honesty || "")
+  ) {
+    const raw = input.sidecar.error;
+    const message = /fetch failed|ECONNREFUSED|no responde/i.test(raw)
+      ? "El servicio auxiliar no responde."
+      : raw;
     pushUnique(entries, {
       at,
       level: input.sidecar.reachable ? "warn" : "error",
       source: "auxiliar",
-      message: input.sidecar.error,
+      message,
     });
   } else if (
     input.sidecar?.configured &&
@@ -98,6 +106,12 @@ export function buildPjudOpsLog(input: PjudOpsLogInput): PjudOpsLogEntry[] {
   }
 
   for (const notice of input.hostNotices || []) {
+    if (
+      /servicio auxiliar/i.test(notice) &&
+      /servicio auxiliar/i.test(input.honesty || "")
+    ) {
+      continue;
+    }
     pushUnique(entries, {
       at,
       level: "warn",
