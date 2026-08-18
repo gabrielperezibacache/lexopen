@@ -30,6 +30,7 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
     meta,
     sources,
     actions,
+    setActions,
     requireApproval,
     chatId,
     setChatId,
