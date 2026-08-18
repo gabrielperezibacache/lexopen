@@ -8,6 +8,7 @@ import {
 import { fetchFromScraperSidecar, buscarCausasByRutFromSidecar, scraperSidecarConfigured } from "@/lib/pjud/scraper-sidecar";
 import { syncCausaPjud } from "@/lib/pjud/sync";
 import type { MisCausasItem } from "@/lib/pjud/types";
+import type { CausaOrigin } from "@/lib/pjud/causa-origin";
 
 export type LookupCreateResult = {
   causaId: string;
@@ -27,12 +28,14 @@ export async function addCausaByRol(opts: {
   materia?: string;
   actorId?: string | null;
   syncNow?: boolean;
+  origin?: CausaOrigin;
 }): Promise<LookupCreateResult> {
   const rit = opts.rit.trim().toUpperCase();
   if (!validarRit(rit)) throw new Error("RIT/ROL inválido");
   const tribunal = opts.tribunal.trim();
   if (!tribunal) throw new Error("Tribunal requerido");
 
+  const origin: CausaOrigin = opts.origin || "rol";
   const existing = await prisma.causa.findFirst({
     where: {
       OR: [
@@ -40,7 +43,7 @@ export async function addCausaByRol(opts: {
         ...(opts.ruc ? [{ ruc: opts.ruc, tribunal }] : []),
       ],
     },
-    select: { id: true },
+    select: { id: true, pjudOrigin: true },
   });
 
   let causaId = existing?.id;
@@ -54,6 +57,8 @@ export async function addCausaByRol(opts: {
         tribunal,
         materia: opts.materia || "Por clasificar",
         pjudMonitoreoActivo: true,
+        pjudOrigin: origin,
+        pjudSource: origin,
         pjudLastSyncStatus: "never",
         pjudLastSyncNote: "Alta rápida por ROL (flujo CausaMonitor).",
       },
@@ -63,7 +68,10 @@ export async function addCausaByRol(opts: {
   } else {
     await prisma.causa.update({
       where: { id: causaId },
-      data: { pjudMonitoreoActivo: true },
+      data: {
+        pjudMonitoreoActivo: true,
+        ...(existing?.pjudOrigin ? {} : { pjudOrigin: origin }),
+      },
     });
   }
 

@@ -43,7 +43,7 @@ export function buildAiSuggestedActions(opts: {
   }
 
   if (opts.utility === "copilot" || opts.utility === "briefing") {
-    actions.push({ label: "Monitoreo PJUD", href: "/causas/monitoreo" });
+    actions.push({ label: "Cartera PJUD", href: "/causas/monitoreo" });
   }
 
   if (

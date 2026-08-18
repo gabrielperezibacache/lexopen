@@ -14,6 +14,7 @@ import { writeAuditStrict } from "@/lib/audit";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { canSeeConfidential, isStaff } from "@/lib/auth/rbac";
+import { duplicateCausaWhere } from "@/lib/pjud/causa-origin";
 
 export async function GET(req: NextRequest) {
   try {
@@ -89,6 +90,32 @@ export async function POST(req: NextRequest) {
     if (body.ruc && !validarRuc(body.ruc)) {
       return jsonError("RUC inválido", 400);
     }
+
+    const duplicateWhere = duplicateCausaWhere({
+      rit: body.rit,
+      ruc: body.ruc,
+      tribunal: body.tribunal,
+    });
+    if (duplicateWhere) {
+      const existing = await prisma.causa.findFirst({
+        where: duplicateWhere,
+        select: { id: true, titulo: true, rit: true },
+      });
+      if (existing) {
+        return NextResponse.json(
+          {
+            error:
+              "Ya existe una causa con el mismo RIT o RUC en ese tribunal",
+            code: "causa_duplicate",
+            existingId: existing.id,
+            id: existing.id,
+            titulo: existing.titulo,
+            rit: existing.rit,
+          },
+          { status: 409 }
+        );
+      }
+    }
     for (const p of body.partes || []) {
       if (p.rut && !validarRut(p.rut)) {
         return jsonError(`RUT inválido: ${p.rut}`, 400);
@@ -129,6 +156,7 @@ export async function POST(req: NextRequest) {
         abogadoContraparte: body.abogadoContraparte || null,
         fechaNotificacion: parseLocalDateInput(body.fechaNotificacion || undefined),
         fechaIngreso: new Date(),
+        pjudOrigin: "manual",
         clienteId: body.clienteId || null,
         abogadoId,
         conflictCheckedAt: new Date(),

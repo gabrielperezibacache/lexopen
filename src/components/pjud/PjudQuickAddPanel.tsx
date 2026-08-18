@@ -31,6 +31,14 @@ export function PjudQuickAddPanel() {
       .catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("alta") === "1") {
+      document.getElementById("alta-rol")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+
   async function submitRol(action: "add-rol" | "preview-rol") {
     const form = rolFormRef.current;
     if (!form) return;
@@ -135,7 +143,7 @@ export function PjudQuickAddPanel() {
   }
 
   return (
-    <section className="panel space-y-4 rounded-3xl p-5">
+    <section id="alta-rol" className="panel space-y-4 rounded-3xl p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Alta rápida PJUD</h2>
@@ -277,7 +285,7 @@ export function PjudQuickAddPanel() {
         Requiere scrape/sidecar activo. El tribunal se puede escribir libremente
         (coincida con OJV). También puede usar{" "}
         <Link href="/causas/mis-causas" className="text-[var(--sea)]">
-          Mis Causas (ClaveÚnica)
+          ClaveÚnica
         </Link>
         .
       </p>

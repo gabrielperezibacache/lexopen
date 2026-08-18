@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/sites/SiteNav";
 import {
@@ -31,11 +32,13 @@ function NuevaCausaInner() {
   const [conflicts, setConflicts] = useState<ConflictHit[]>([]);
   const [conflictStatus, setConflictStatus] = useState<"idle" | "clear" | "warning" | "blocked">("idle");
   const [overrideRequired, setOverrideRequired] = useState(false);
+  const [duplicateId, setDuplicateId] = useState<string | null>(null);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setDuplicateId(null);
     const fd = new FormData(e.currentTarget);
     const rit = String(fd.get("rit") || "");
     const ruc = String(fd.get("ruc") || "");
@@ -105,6 +108,8 @@ function NuevaCausaInner() {
 
     const result = await apiMutation<{
       id?: string;
+      existingId?: string;
+      code?: string;
       conflicts?: ConflictHit[];
       error?: string;
     }>("/api/causas", {
@@ -114,6 +119,18 @@ function NuevaCausaInner() {
     });
     setLoading(false);
     if (!result.ok) {
+      if (result.status === 409 && result.data?.code === "causa_duplicate") {
+        const existingId = result.data.existingId || result.data.id;
+        setError(
+          existingId
+            ? `${result.error || "Ya existe una causa con ese RIT o RUC en el tribunal"}.`
+            : result.error || "Ya existe una causa duplicada"
+        );
+        if (existingId) {
+          setDuplicateId(existingId);
+        }
+        return;
+      }
       if (result.status === 409) {
         setConflictStatus("blocked");
         setOverrideRequired(true);
@@ -247,7 +264,19 @@ function NuevaCausaInner() {
           <label className="mb-1 block text-sm font-medium">Resumen</label>
           <textarea className="textarea" name="resumen" />
         </div>
-        {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+        {error && (
+          <p className="text-sm text-[var(--danger)]">
+            {error}
+            {duplicateId ? (
+              <>
+                {" "}
+                <Link href={`/causas/${duplicateId}`} className="underline">
+                  Abrir ficha existente
+                </Link>
+              </>
+            ) : null}
+          </p>
+        )}
         <button className="btn btn-primary" disabled={loading} type="submit">
           {loading ? "Guardando…" : "Crear causa"}
         </button>

@@ -25,7 +25,6 @@ import {
   ClipboardPen,
   Shield,
   Settings,
-  Radar,
   ContactRound,
   X,
 } from "lucide-react";
@@ -125,13 +124,6 @@ function SidebarChrome({
         roles: ["admin", "abogado", "asistente"],
       },
       { href: "/causas", label: t("nav.cases"), icon: Briefcase },
-      { href: "/causas/monitoreo", label: t("nav.pjudMonitor"), icon: Radar },
-      {
-        href: "/causas/mis-causas",
-        label: t("nav.misCausas"),
-        icon: Shield,
-        roles: ["admin", "abogado"],
-      },
       {
         href: "/correo",
         label: t("nav.mailbox"),

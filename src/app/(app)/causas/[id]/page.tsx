@@ -53,10 +53,10 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         : "/causas";
   const backLabel =
     from === "monitoreo"
-      ? "← Monitoreo"
+      ? "← Cartera PJUD"
       : from === "mis-causas"
-        ? "← Mis Causas"
-        : "← Causas";
+        ? "← ClaveÚnica"
+        : "← Expediente";
   const [causa, responsables] = await Promise.all([
     prisma.causa.findUnique({
       where: { id },
@@ -109,6 +109,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
   ]);
   if (!causa) notFound();
   const origen = labelCausaOrigen({
+    pjudOrigin: causa.pjudOrigin,
     pjudFromMisCausas: causa.pjudFromMisCausas,
     pjudSource: causa.pjudSource,
   });

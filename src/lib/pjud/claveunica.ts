@@ -378,10 +378,11 @@ export async function tryScrapeCausaDetailAuthenticated(
 }
 
 async function findExistingCausa(item: MisCausasItem) {
+  const select = { id: true, pjudOrigin: true } as const;
   if (item.ruc) {
     const byRuc = await prisma.causa.findFirst({
       where: { ruc: item.ruc },
-      select: { id: true },
+      select,
     });
     if (byRuc) return byRuc;
   }
@@ -390,12 +391,12 @@ async function findExistingCausa(item: MisCausasItem) {
   if (item.tribunal) {
     return prisma.causa.findFirst({
       where: { rit: item.rit, tribunal: item.tribunal },
-      select: { id: true },
+      select,
     });
   }
   return prisma.causa.findFirst({
     where: { rit: item.rit },
-    select: { id: true },
+    select,
   });
 }
 
@@ -494,6 +495,7 @@ export async function syncMisCausas(opts?: {
             : "activa",
           pjudMonitoreoActivo: true,
           pjudFromMisCausas: true,
+          pjudOrigin: "claveunica",
           pjudSource: "claveunica",
           pjudLastSyncStatus: "never",
           pjudNextSyncAt: new Date(),
@@ -508,6 +510,7 @@ export async function syncMisCausas(opts?: {
         data: {
           pjudFromMisCausas: true,
           pjudMonitoreoActivo: true,
+          ...(existing?.pjudOrigin ? {} : { pjudOrigin: "claveunica" }),
           pjudSource: "claveunica",
           pjudNextSyncAt: new Date(),
           ...(!isPlaceholderTribunal(item.tribunal)

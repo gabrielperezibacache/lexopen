@@ -270,9 +270,9 @@ function IntegracionesInner() {
         <h2 className="text-lg font-semibold">Seguimiento judicial (PJUD)</h2>
         <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
           LexOpen puede traer causas y movimientos desde la Oficina Judicial
-          Virtual. Para usar su cuenta ClaveÚnica, configure el acceso en{" "}
+          Virtual. Configure ClaveÚnica en la pestaña{" "}
           <Link href="/causas/mis-causas" className="text-[var(--sea)]">
-            Mis Causas
+            Causas → ClaveÚnica
           </Link>
           . Abajo ve el estado técnico del servidor (CAPTCHA, servicio auxiliar,
           etc.).
@@ -349,7 +349,7 @@ function IntegracionesInner() {
                   href="/causas/mis-causas"
                   className="mt-2 inline-flex text-[var(--sea)]"
                 >
-                  Abrir Mis Causas →
+                  Abrir ClaveÚnica →
                 </Link>
               </div>
             )}
@@ -398,10 +398,10 @@ function IntegracionesInner() {
         )}
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/causas/monitoreo" className="btn btn-secondary">
-            Monitoreo
+            Cartera PJUD
           </Link>
           <Link href="/causas/mis-causas" className="btn btn-ghost">
-            Mis Causas CU
+            ClaveÚnica
           </Link>
         </div>
       </section>

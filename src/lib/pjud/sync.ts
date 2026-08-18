@@ -536,6 +536,7 @@ export async function listCarteraMonitoreo() {
       failedJobs: c._count.pjudSyncJobs,
       pjudFromMisCausas: c.pjudFromMisCausas,
       pjudSource: c.pjudSource,
+      pjudOrigin: c.pjudOrigin,
       movimientosCount: c._count.movimientos,
       lastMovimiento: last
         ? {

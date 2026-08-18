@@ -31,6 +31,7 @@ type Item = {
   failed: boolean;
   pjudFromMisCausas?: boolean;
   pjudSource?: string | null;
+  pjudOrigin?: string | null;
   movimientosCount: number;
   lastMovimiento: {
     titulo: string;
@@ -102,7 +103,7 @@ export default function MonitoreoCausasPage() {
   } | null>(null);
   const [filter, setFilter] = useState<
     "todas" | Semaforo | "monitoreadas" | "fallidas"
-  >("todas");
+  >("monitoreadas");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -216,20 +217,18 @@ export default function MonitoreoCausasPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            Seguimiento judicial
+            Pulso judicial
           </p>
-          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Monitoreo de causas</h1>
+          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">
+            Cartera PJUD
+          </h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--ink-soft)]/80 sm:text-base">
-            Sincroniza movimientos de la cartera monitoreada (cola PJUD). Para
-            importar desde ClaveÚnica use{" "}
-            <Link href="/causas/mis-causas" className="text-[var(--sea)]">
-              Mis Causas
-            </Link>
-            ; para editar o archivar,{" "}
+            Esta vista es el pulso judicial (semáforo, sync, CSV). El expediente
+            se edita en{" "}
             <Link href="/causas" className="text-[var(--sea)]">
-              Causas
+              Expediente
             </Link>
-            .
+            . ClaveÚnica se configura en su pestaña, no aquí.
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
@@ -483,7 +482,7 @@ export default function MonitoreoCausasPage() {
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-[var(--line)] text-xs uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
             <tr>
-              <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3">Actividad PJUD</th>
               <th className="px-4 py-3">Causa</th>
               <th className="px-4 py-3">Tribunal / Sala</th>
               <th className="px-4 py-3">Último movimiento</th>
@@ -494,6 +493,7 @@ export default function MonitoreoCausasPage() {
           <tbody>
             {filtered.map((i) => {
               const origen = labelCausaOrigen({
+                pjudOrigin: i.pjudOrigin,
                 pjudFromMisCausas: i.pjudFromMisCausas,
                 pjudSource: i.pjudSource,
               });
@@ -594,7 +594,28 @@ export default function MonitoreoCausasPage() {
                   colSpan={6}
                   className="px-4 py-8 text-center text-[var(--ink-soft)]/65"
                 >
-                  No hay causas con este filtro.
+                  No hay causas con este filtro.{" "}
+                  {filter === "monitoreadas" ? (
+                    <>
+                      Active el monitoreo en{" "}
+                      <Link href="/causas" className="text-[var(--sea)]">
+                        Expediente
+                      </Link>{" "}
+                      o use alta por ROL. También puede conectar{" "}
+                      <Link href="/causas/mis-causas" className="text-[var(--sea)]">
+                        ClaveÚnica
+                      </Link>
+                      .
+                    </>
+                  ) : (
+                    <>
+                      Pruebe «Monitoreadas» o abra{" "}
+                      <Link href="/causas" className="text-[var(--sea)]">
+                        Expediente
+                      </Link>
+                      .
+                    </>
+                  )}
                 </td>
               </tr>
             )}

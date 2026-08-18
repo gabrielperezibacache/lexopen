@@ -42,16 +42,6 @@ type SyncResult = {
   }>;
 };
 
-type LinkedCausa = {
-  id: string;
-  rit: string | null;
-  tribunal: string;
-  titulo: string;
-  caratula: string | null;
-  estado: string;
-  pjudLastSyncStatus: string | null;
-};
-
 function formatWhen(value: string | null | undefined) {
   if (!value) return null;
   try {
@@ -91,19 +81,31 @@ export default function MisCausasPage() {
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"ok" | "warn" | "err">("ok");
   const [result, setResult] = useState<SyncResult | null>(null);
-  const [linkedCausas, setLinkedCausas] = useState<LinkedCausa[]>([]);
+  const [linkedCount, setLinkedCount] = useState(0);
   const [adminOnly, setAdminOnly] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch("/api/pjud/mis-causas");
+    const [res, meRes] = await Promise.all([
+      fetch("/api/pjud/mis-causas"),
+      fetch("/api/auth/me"),
+    ]);
     const data = await res.json().catch(() => ({}));
+    const me = await meRes.json().catch(() => ({}));
+    if (me?.user?.role) setRole(me.user.role);
     if (!res.ok) {
       setMsgTone("err");
       setMsg(data.error || "No se pudo cargar el estado de ClaveÚnica.");
       return;
     }
     setStatus(data.status || null);
-    setLinkedCausas(Array.isArray(data.causas) ? data.causas : []);
+    setLinkedCount(
+      typeof data.causasCount === "number"
+        ? data.causasCount
+        : Array.isArray(data.causas)
+          ? data.causas.length
+          : 0
+    );
   }
 
   useEffect(() => {
@@ -326,10 +328,13 @@ export default function MisCausasPage() {
       setMsgTone("ok");
     }
     setMsg(summary);
+    await load();
   }
 
+  const canOperate = role === "admin" || role === "abogado";
   const syncDisabled =
     busy ||
+    !canOperate ||
     !status?.hasPassword ||
     status?.readyToSync === false ||
     status?.lastSyncStatus === "running";
@@ -341,18 +346,8 @@ export default function MisCausasPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Poder Judicial"
-        title="Mis Causas (ClaveÚnica)"
-        subtitle="Importa y enlaza causas de la Oficina Judicial Virtual. Los movimientos se encolan en Monitoreo; puede editar o archivar cada causa en su ficha."
-        actions={
-          <>
-            <Link href="/causas" className="btn btn-ghost">
-              Ver causas
-            </Link>
-            <Link href="/causas/monitoreo" className="btn btn-secondary">
-              Monitoreo
-            </Link>
-          </>
-        }
+        title="ClaveÚnica"
+        subtitle="Credenciales y sync de cartera OJV. Las causas quedan en Expediente; los movimientos, en Cartera PJUD."
       />
 
       <section className="panel space-y-4 rounded-3xl p-5">
@@ -400,18 +395,29 @@ export default function MisCausasPage() {
           </li>
           <li className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--sea)]">
-              3. Seguir en monitoreo
+              3. Seguir en el apartado
             </div>
             <p className="mt-2 text-[var(--ink-soft)]/80">
-              Después puede ver movimientos y semáforos en{" "}
+              Revise el expediente en{" "}
+              <Link href="/causas?origen=claveunica" className="text-[var(--sea)]">
+                Expediente
+              </Link>{" "}
+              y el pulso (semáforo / sync) en{" "}
               <Link href="/causas/monitoreo" className="text-[var(--sea)]">
-                Monitoreo
+                Cartera PJUD
               </Link>
               .
             </p>
           </li>
         </ol>
       </section>
+
+      {!canOperate && role === "asistente" && (
+        <p className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+          Su perfil de asistente puede ver el estado, pero no guardar
+          credenciales ni sincronizar. Pida a un abogado o administrador.
+        </p>
+      )}
 
       <section className="panel space-y-5 rounded-3xl p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
@@ -459,7 +465,7 @@ export default function MisCausasPage() {
                 <button
                   type="button"
                   className="btn btn-ghost shrink-0 text-xs"
-                  disabled={busy || status?.lastSyncStatus === "running"}
+                  disabled={busy || !canOperate || status?.lastSyncStatus === "running"}
                   onClick={clearErrors}
                 >
                   Limpiar avisos
@@ -548,7 +554,7 @@ export default function MisCausasPage() {
               />
             </label>
             <div className="flex items-end">
-              <button className="btn btn-primary w-full" disabled={busy} type="submit">
+              <button className="btn btn-primary w-full" disabled={busy || !canOperate} type="submit">
                 Guardar de forma segura
               </button>
             </div>
@@ -577,7 +583,7 @@ export default function MisCausasPage() {
             <button
               type="button"
               className="btn btn-ghost"
-              disabled={busy}
+              disabled={busy || !canOperate}
               onClick={async () => {
                 setBusy(true);
                 setMsg("");
@@ -616,13 +622,16 @@ export default function MisCausasPage() {
           <button
             type="button"
             className="btn btn-ghost"
-            disabled={busy || !status?.hasPassword}
+            disabled={busy || !status?.hasPassword || !canOperate}
             onClick={clearCredentials}
           >
             Eliminar acceso guardado
           </button>
+          <Link href="/causas?origen=claveunica" className="btn btn-ghost">
+            Ver en Expediente
+          </Link>
           <Link href="/causas/monitoreo" className="btn btn-ghost">
-            Ir a monitoreo
+            Ir a Cartera PJUD
           </Link>
         </div>
 
@@ -653,23 +662,28 @@ export default function MisCausasPage() {
       {result && (
         <section className="panel rounded-3xl p-5">
           <h2 className="text-lg font-semibold">
-            Causas encontradas ({result.listed})
+            Resultado de la sincronización ({result.listed})
           </h2>
           {result.syncFailed ? (
             <p className="mt-1 text-sm text-amber-800">
               {result.syncFailed} no pudieron actualizar sus movimientos. Puede
-              reintentar desde Monitoreo.
+              reintentar desde Cartera PJUD.
             </p>
           ) : (
             <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-              Listado desde «Mis Causas». Los movimientos se procesan en la cola
-              de{" "}
+              Listado desde OJV. Abra las causas en Expediente; los movimientos
+              se procesan en{" "}
               <Link href="/causas/monitoreo" className="text-[var(--sea)]">
-                Monitoreo
+                Cartera PJUD
               </Link>
               .
             </p>
           )}
+          <p className="mt-2">
+            <Link href="/causas?origen=claveunica" className="btn btn-secondary">
+              Ver en Expediente
+            </Link>
+          </p>
           <ul className="mt-4 space-y-2 text-sm">
             {result.items.map((item) => (
               <li
@@ -701,36 +715,18 @@ export default function MisCausasPage() {
         </section>
       )}
 
-      {!result && linkedCausas.length > 0 && (
-        <section className="panel rounded-3xl p-5">
-          <h2 className="text-lg font-semibold">
-            Causas desde ClaveÚnica ({linkedCausas.length})
-          </h2>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-            Ya están en LexOpen. Abra la ficha para editar datos o revise
-            movimientos en Monitoreo.
-          </p>
-          <ul className="mt-4 space-y-2 text-sm">
-            {linkedCausas.map((c) => (
-              <li
-                key={c.id}
-                className="rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3"
-              >
-                <Link
-                  href={`/causas/${c.id}?from=mis-causas`}
-                  className="font-medium text-[var(--sea)]"
-                >
-                  {c.rit || c.titulo}
-                </Link>
-                <div className="mt-0.5 break-words text-xs text-[var(--ink-soft)]/65">
-                  {c.tribunal}
-                  {c.caratula ? ` · ${c.caratula}` : ""}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <section className="panel rounded-3xl p-5">
+        <h2 className="text-lg font-semibold">
+          {linkedCount} causa{linkedCount === 1 ? "" : "s"} vinculada
+          {linkedCount === 1 ? "" : "s"} desde ClaveÚnica
+        </h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+          No es un segundo expediente: abra el filtro de origen en Expediente.
+        </p>
+        <Link href="/causas?origen=claveunica" className="btn btn-secondary mt-4">
+          Ver en Expediente
+        </Link>
+      </section>
     </div>
   );
 }

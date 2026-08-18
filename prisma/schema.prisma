@@ -263,6 +263,8 @@ model Causa {
   pjudFailCount         Int       @default(0)
   /// api | scrape | scrape-sidecar | claveunica | demo | import | webhook | none
   pjudSource            String?
+  /// Stable intake origin: manual | claveunica | rol | csv | webhook
+  pjudOrigin            String?
   pjudFromMisCausas     Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

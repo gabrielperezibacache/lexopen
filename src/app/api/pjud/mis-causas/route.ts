@@ -6,9 +6,9 @@ import {
   claimMisCausasSync,
   clearClaveUnicaSyncMessages,
   getClaveUnicaStatus,
-  listCausasFromMisCausas,
   syncMisCausas,
 } from "@/lib/pjud/claveunica";
+import { prisma } from "@/lib/db";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
 
 /** Hosts that honor this (not Cloudflare 524) get more headroom for cron. */
@@ -17,13 +17,14 @@ export const maxDuration = 300;
 export async function GET() {
   try {
     await requireStaff();
-    const [status, causas] = await Promise.all([
+    const [status, causasCount] = await Promise.all([
       getClaveUnicaStatus(),
-      listCausasFromMisCausas(),
+      prisma.causa.count({ where: { pjudFromMisCausas: true } }),
     ]);
     return NextResponse.json({
       status,
-      causas,
+      causasCount,
+      causas: [],
     });
   } catch (e) {
     return handleRouteError(e);
@@ -41,6 +42,15 @@ export async function POST(req: NextRequest) {
     } else {
       assertCsrf(req);
       const user = await requireStaff();
+      if (user.role === "asistente") {
+        return NextResponse.json(
+          {
+            error:
+              "Solo abogados o admin pueden sincronizar o limpiar avisos de ClaveÚnica",
+          },
+          { status: 403 }
+        );
+      }
       actorId = user.id;
     }
 

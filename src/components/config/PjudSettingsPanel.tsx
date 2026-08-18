@@ -59,16 +59,16 @@ export function PjudSettingsPanel() {
           <h2 className="text-lg font-semibold">Seguimiento judicial (PJUD)</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
             Vista técnica del servidor (solo lectura). Para guardar ClaveÚnica y
-            sincronizar causas use Mis Causas. Los cambios de configuración del
+            sincronizar causas use Causas → ClaveÚnica. Los cambios de configuración del
             Host se hacen en el archivo de entorno y requieren reinicio.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/causas/mis-causas" className="btn btn-secondary text-sm">
-            Mis Causas
+            ClaveÚnica
           </Link>
           <Link href="/causas/monitoreo" className="btn btn-ghost text-sm">
-            Monitoreo
+            Cartera PJUD
           </Link>
         </div>
       </div>
@@ -208,7 +208,7 @@ export function PjudSettingsPanel() {
             <p className="mt-2 text-xs text-[var(--ink-soft)]/70">{claveUnica.lastSyncNote}</p>
           )}
           <Link href={claveUnica.manageHref} className="btn btn-secondary mt-4 inline-flex text-sm">
-            Abrir Mis Causas
+            Abrir ClaveÚnica
           </Link>
         </div>
       </div>

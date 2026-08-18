@@ -147,6 +147,7 @@ export async function POST(req: NextRequest) {
               materia: row.materia || undefined,
               actorId,
               syncNow: body.syncNow === true,
+              origin: "csv",
             })
           );
         } catch (e) {

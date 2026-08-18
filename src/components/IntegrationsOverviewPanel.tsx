@@ -94,7 +94,7 @@ export function IntegrationsOverviewPanel() {
                 ? `CAPTCHA ${captcha.captcha.provider || "activo"}`
                 : "Sin consulta en vivo",
           detail:
-            "Oficina Judicial Virtual, ClaveÚnica y CAPTCHA. Configure en Mis Causas e Integraciones.",
+            "Oficina Judicial Virtual, ClaveÚnica y CAPTCHA. Configure en Causas → ClaveÚnica e Integraciones.",
           href: "/integraciones",
         },
       ];
