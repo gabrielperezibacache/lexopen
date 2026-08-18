@@ -12,6 +12,9 @@ Iteración IA definitiva: i18n, acciones conectadas y refactor del copiloto.
 - i18n ES/EN en paneles IA (`AiAssist`, chat cliente, documentos, trámites, agente)
 - Glosa factura: copiar o guardar como nota interna
 
+### Correcciones
+- Actualización in-app: `db:migrate` usa `DATABASE_URL` del data dir; P1001 no aborta el update (Postgres embebido se detiene con el Host)
+
 ## 0.1.8 — 2026-08-17
 
 Corte IA definitivo: multi-turno cliente, acciones conectadas en UI, auditoría y correcciones copiloto.

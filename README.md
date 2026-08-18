@@ -898,9 +898,11 @@ sync/digest/plazos también son locales (`npm run pjud:host` + intervalos en el
 
 Cuando hay una versión más nueva en GitHub, quien administra el Host ve un
 **aviso en la aplicación** con el botón **Actualizar ahora** (también en
-Configuración → Host). Eso aplica `git pull`, dependencias, migraciones y
-recompilación sin salir del entorno; luego recargue el navegador. Se puede
-descartar el aviso por versión, o desactivar la consulta con
+Configuración → Host). Eso aplica `git pull`, dependencias y recompilación
+sin salir del entorno. Las migraciones Prisma usan el `.env` del **data dir**
+(Postgres embebido); si el Host se detiene durante el update, `web:host`
+vuelve a aplicar `migrate deploy` al reiniciar. Luego recargue el navegador.
+Se puede descartar el aviso por versión, o desactivar la consulta con
 `LEXOPEN_UPDATE_CHECK=0`. Para desactivar solo el botón automático:
 `LEXOPEN_SELF_UPDATE=0`.
 

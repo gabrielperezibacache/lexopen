@@ -41,6 +41,42 @@ export function lockPath(dataDir) {
   return path.join(dataDir, "self-update.lock");
 }
 
+export function readEnvFile(file) {
+  if (!fs.existsSync(file)) return {};
+  return Object.fromEntries(
+    fs
+      .readFileSync(file, "utf8")
+      .split(/\r?\n/)
+      .filter((line) => line.trim() && !line.trim().startsWith("#"))
+      .map((line) => {
+        const index = line.indexOf("=");
+        return index > 0
+          ? [line.slice(0, index).trim(), line.slice(index + 1).trim()]
+          : null;
+      })
+      .filter((entry) => entry !== null)
+  );
+}
+
+/**
+ * Prisma CLI loads the repo `.env` (often `.env.example` → localhost:5432).
+ * The Host stores the real URL in `$LEXOPEN_DATA_DIR/.env` (embedded PG ~54329).
+ * Existing process.env values do not override that file for DATABASE_URL.
+ */
+export function hostCommandEnv(dataDir, env = process.env) {
+  const merged = { ...env };
+  const fromFile = readEnvFile(path.join(dataDir, ".env"));
+  if (fromFile.DATABASE_URL) {
+    merged.DATABASE_URL = fromFile.DATABASE_URL;
+  }
+  return merged;
+}
+
+export function isUnreachableDatabaseError(message) {
+  const text = String(message || "");
+  return /P1001/.test(text) || /Can't reach database server/i.test(text);
+}
+
 function writeJson(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
@@ -57,11 +93,11 @@ function readJson(file, fallback = null) {
   }
 }
 
-function run(cmd, args, label, onPhase) {
+function run(cmd, args, label, { onPhase, env } = {}) {
   onPhase?.(label);
   const result = spawnSync(cmd, args, {
     cwd: root,
-    env: process.env,
+    env: env || process.env,
     shell,
     encoding: "utf8",
     maxBuffer: 20 * 1024 * 1024,
@@ -74,6 +110,33 @@ function run(cmd, args, label, onPhase) {
     );
   }
   return result;
+}
+
+/**
+ * Apply Prisma migrations against the Host data-dir DATABASE_URL.
+ * When the in-app updater stops `desktop:host`, embedded Postgres is down;
+ * skip P1001 so the restarted Host can migrate after it starts Postgres.
+ */
+export function migrateDuringSelfUpdate({
+  dataDir,
+  runCommand = run,
+  env = hostCommandEnv(dataDir),
+} = {}) {
+  if (!env.DATABASE_URL) {
+    throw new Error(
+      "No hay DATABASE_URL en el .env del data dir (LEXOPEN_DATA_DIR). " +
+        "La actualización in-app no debe usar el .env del clon git (localhost:5432)."
+    );
+  }
+  try {
+    runCommand(npm, ["run", "db:migrate"], "db:migrate", { env });
+    return { skipped: false };
+  } catch (error) {
+    if (isUnreachableDatabaseError(error instanceof Error ? error.message : error)) {
+      return { skipped: true, reason: "unreachable" };
+    }
+    throw error;
+  }
 }
 
 function isGitRepo() {
@@ -126,27 +189,34 @@ export function applySelfUpdate({
 
   try {
     setStatus("pulling", { message: "Descargando código nuevo…" });
-    run("git", ["fetch", "origin", branch], "git fetch", () =>
-      setStatus("pulling", { message: "Descargando código nuevo…" })
-    );
-    run(
-      "git",
-      ["checkout", branch],
-      "git checkout",
-      () => setStatus("pulling", { message: "Cambiando a la rama principal…" })
-    );
-    run(
-      "git",
-      ["pull", "--ff-only", "origin", branch],
-      "git pull",
-      () => setStatus("pulling", { message: "Aplicando cambios…" })
-    );
+    run("git", ["fetch", "origin", branch], "git fetch", {
+      onPhase: () => setStatus("pulling", { message: "Descargando código nuevo…" }),
+    });
+    run("git", ["checkout", branch], "git checkout", {
+      onPhase: () =>
+        setStatus("pulling", { message: "Cambiando a la rama principal…" }),
+    });
+    run("git", ["pull", "--ff-only", "origin", branch], "git pull", {
+      onPhase: () => setStatus("pulling", { message: "Aplicando cambios…" }),
+    });
+
+    const hostEnv = hostCommandEnv(dataDir);
 
     setStatus("installing", { message: "Instalando dependencias…" });
-    run(npm, ["ci"], "npm ci");
+    run(npm, ["ci"], "npm ci", { env: hostEnv });
 
     setStatus("migrating", { message: "Aplicando migraciones de base de datos…" });
-    run(npm, ["run", "db:migrate"], "db:migrate");
+    const migrated = migrateDuringSelfUpdate({
+      dataDir,
+      runCommand: run,
+      env: hostEnv,
+    });
+    if (migrated.skipped) {
+      setStatus("migrating", {
+        message:
+          "Postgres del Host está detenido durante la actualización; las migraciones se aplicarán al reiniciar.",
+      });
+    }
 
     setStatus("building", { message: "Compilando LexOpen…" });
     // Prefer standalone Host build when that entry exists or LEXOPEN_DESKTOP=1.
@@ -154,9 +224,9 @@ export function applySelfUpdate({
       process.env.LEXOPEN_DESKTOP === "1" ||
       fs.existsSync(path.join(root, ".next", "standalone", "server.js"));
     if (useDesktopBuild) {
-      run(npm, ["run", "desktop:build"], "desktop:build");
+      run(npm, ["run", "desktop:build"], "desktop:build", { env: hostEnv });
     } else {
-      run(npm, ["run", "build"], "build");
+      run(npm, ["run", "build"], "build", { env: hostEnv });
     }
 
     setStatus("done", {

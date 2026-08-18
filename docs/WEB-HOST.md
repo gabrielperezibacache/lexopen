@@ -90,8 +90,11 @@ Use esta lista antes de cargar información real del estudio:
    **Schema: `db push` (dev) vs `migrate deploy` (Host).** El onboarding rápido
    (`npm run setup`) usa `prisma db push` y no escribe en `_prisma_migrations`.
    El Host (`web:host`, self-update, Desktop) y `npm run setup:production` usan
-   **`prisma migrate deploy` exclusivamente**. No mezcle: un estudio en producción
-   nunca debe ejecutar `setup` ni `db:reset` sobre su data dir.
+   **`prisma migrate deploy` exclusivamente**. El botón **Actualizar ahora** no
+   debe usar el `.env` del clon git (`localhost:5432`); toma `DATABASE_URL` de
+   `$LEXOPEN_DATA_DIR/.env`. Si Postgres embebido está detenido durante el
+   update, las migraciones se aplican al reiniciar el Host. No mezcle: un estudio
+   en producción nunca debe ejecutar `setup` ni `db:reset` sobre su data dir.
 
 3. **Primer admin:** abra `/setup?token=…` una sola vez; elimine o rote
    `LEXOPEN_BOOTSTRAP_TOKEN` después.
