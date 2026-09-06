@@ -33,10 +33,7 @@ const VALID_ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
 function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
   if (isStrongSessionSecret(secret)) return secret!.trim();
-  if (process.env.NODE_ENV === "production") {
-    return "";
-  }
-  return secret || "lexopen-dev-session-secret-change-me";
+  return "";
 }
 
 function toHex(buf: ArrayBuffer) {
