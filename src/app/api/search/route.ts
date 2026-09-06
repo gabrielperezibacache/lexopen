@@ -45,6 +45,9 @@ export async function GET(req: NextRequest) {
   try {
     const user = await requireUser();
     const q = req.nextUrl.searchParams.get("q")?.trim() || "";
+    if (q.length > 200) {
+      return NextResponse.json({ error: "La búsqueda no puede superar 200 caracteres" }, { status: 400 });
+    }
     if (!q) {
       return NextResponse.json({
         sites: [],
@@ -183,7 +186,7 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.causa.findMany({
-          where: ftsIds
+          where: ftsIds?.length
             ? { id: { in: ftsIds } }
             : {
                 OR: [
@@ -253,7 +256,7 @@ export async function GET(req: NextRequest) {
           where: {
             AND: [
               docFilter,
-              docFtsIds
+              docFtsIds?.length
                 ? { id: { in: docFtsIds } }
                 : {
                     OR: [
@@ -307,7 +310,7 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.wikiPage.findMany({
-          where: wikiFtsIds
+          where: wikiFtsIds?.length
             ? { id: { in: wikiFtsIds } }
             : {
                 OR: [{ title: textMatch(q) }, { content: textMatch(q) }],

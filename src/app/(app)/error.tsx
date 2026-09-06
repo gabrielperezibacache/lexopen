@@ -4,17 +4,17 @@ import { useI18n } from "@/components/i18n/I18nProvider";
 
 export default function AppError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   const { t } = useI18n();
   const forbidden =
     error.message === "Prohibido" || error.message === "Forbidden";
 
   return (
-    <div className="panel rounded-3xl p-6">
+    <div className="panel rounded-3xl p-6" role="alert">
       <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--danger)]">
         {t("errors.eyebrow")}
       </p>
@@ -26,7 +26,7 @@ export default function AppError({
             ? t("errors.genericProd")
             : error.message}
       </p>
-      <button className="btn btn-primary mt-4" type="button" onClick={reset}>
+      <button className="btn btn-primary mt-4" type="button" onClick={retry}>
         {t("common.retry")}
       </button>
     </div>

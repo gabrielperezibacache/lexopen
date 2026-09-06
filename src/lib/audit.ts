@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 
 export type WriteAuditOpts = {
   actorId?: string | null;
@@ -28,9 +29,12 @@ export function handleAuditWriteError(e: unknown, strict?: boolean) {
   }
 }
 
-export async function writeAudit(opts: WriteAuditOpts) {
+export async function writeAudit(
+  opts: WriteAuditOpts,
+  client: Pick<Prisma.TransactionClient, "auditEvent"> = prisma
+) {
   try {
-    await prisma.auditEvent.create({
+    await client.auditEvent.create({
       data: {
         actorId: opts.actorId || undefined,
         action: opts.action,
@@ -47,6 +51,9 @@ export async function writeAudit(opts: WriteAuditOpts) {
 }
 
 /** Persist audit or fail the mutation (auth, purge, billing, ClaveÚnica, conflicts). */
-export async function writeAuditStrict(opts: Omit<WriteAuditOpts, "strict">) {
-  return writeAudit({ ...opts, strict: true });
+export async function writeAuditStrict(
+  opts: Omit<WriteAuditOpts, "strict">,
+  client: Pick<Prisma.TransactionClient, "auditEvent"> = prisma
+) {
+  return writeAudit({ ...opts, strict: true }, client);
 }

@@ -13,12 +13,9 @@ const ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
 export function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
   if (isStrongSessionSecret(secret)) return secret!.trim();
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "SESSION_SECRET es obligatorio en producción (mín. 16 chars, no placeholder)"
-    );
-  }
-  return secret || "lexopen-dev-session-secret-change-me";
+  throw new Error(
+    "SESSION_SECRET es obligatorio (mín. 16 chars, no placeholder)"
+  );
 }
 
 export function signSessionToken(
@@ -72,13 +69,8 @@ export async function getCurrentUser() {
   const raw = jar.get(SESSION_COOKIE)?.value;
   if (!raw) return null;
 
-  // Legacy unsigned cookie removed outside development
-  if (!raw.includes(".")) {
-    if (process.env.NODE_ENV === "development") {
-      return prisma.user.findUnique({ where: { id: raw } });
-    }
-    return null;
-  }
+  // User IDs alone are not authentication, including on a development Host.
+  if (!raw.includes(".")) return null;
 
   const parsed = verifySessionToken(raw);
   if (!parsed) return null;

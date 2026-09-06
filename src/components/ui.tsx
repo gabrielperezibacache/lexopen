@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es, enUS } from "date-fns/locale";
 import type { Locale } from "@/lib/i18n";
 
@@ -11,7 +11,7 @@ export function formatDate(
   locale?: Locale | string | null
 ) {
   if (!value) return "—";
-  const d = typeof value === "string" ? new Date(value) : value;
+  const d = typeof value === "string" ? parseISO(value) : value;
   if (Number.isNaN(d.getTime())) return "—";
   return format(d, "dd MMM yyyy", { locale: dateFnsLocale(locale) });
 }
@@ -21,7 +21,7 @@ export function formatDateTime(
   locale?: Locale | string | null
 ) {
   if (!value) return "—";
-  const d = typeof value === "string" ? new Date(value) : value;
+  const d = typeof value === "string" ? parseISO(value) : value;
   if (Number.isNaN(d.getTime())) return "—";
   return format(d, "dd MMM yyyy · HH:mm", { locale: dateFnsLocale(locale) });
 }
@@ -34,6 +34,7 @@ export function StatusBadge({
   const map: Record<string, string> = {
     activa: "badge-activa",
     pendiente: "badge-pendiente",
+    urgente: "badge-pendiente",
     vencido: "badge-vencido",
     cumplido: "badge-activa",
     terminada: "badge-ink",
@@ -49,4 +50,3 @@ export const pageTitleClass =
 
 export const pageToolbarClass =
   "mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between";
-

@@ -35,6 +35,15 @@ export function AppShell({
   }
 
   useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 768px)");
+    const onChange = () => {
+      if (desktop.matches) setMenuPath(null);
+    };
+    desktop.addEventListener("change", onChange);
+    return () => desktop.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
     if (!mobileOpen) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMenuPath(null);
@@ -50,6 +59,9 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen w-full">
+      <a href="#main-content" className="skip-link" inert={mobileOpen}>
+        {t("common.skipToContent")}
+      </a>
       <AppSidebar
         role={role}
         unreadCount={unreadCount}
@@ -58,14 +70,14 @@ export function AppShell({
         onMobileOpenChange={setMobileOpen}
       />
 
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col" inert={mobileOpen}>
         <header
           className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--line)] bg-[rgba(247,250,248,0.92)] px-3 py-2.5 backdrop-blur md:hidden"
           style={{ paddingTop: "max(0.625rem, env(safe-area-inset-top))" }}
         >
           <button
             type="button"
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-white/80 text-[var(--ink)]"
+            className="grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-white/80 text-[var(--ink)]"
             onClick={() => setMobileOpen(true)}
             aria-label={t("common.openMenu")}
             aria-expanded={mobileOpen}
@@ -81,7 +93,7 @@ export function AppShell({
           </div>
           <Link
             href="/notificaciones"
-            className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-white/80 text-[var(--ink)]"
+            className="relative grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-white/80 text-[var(--ink)]"
             aria-label={t("nav.notifications")}
           >
             <Bell size={18} />
@@ -99,6 +111,8 @@ export function AppShell({
         />
 
         <main
+          id="main-content"
+          tabIndex={-1}
           className="min-w-0 w-full flex-1 px-3 py-4 sm:px-5 sm:py-5 md:px-8 md:py-7"
           style={{
             paddingBottom: "max(1rem, env(safe-area-inset-bottom))",

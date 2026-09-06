@@ -33,10 +33,7 @@ const VALID_ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
 function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
   if (isStrongSessionSecret(secret)) return secret!.trim();
-  if (process.env.NODE_ENV === "production") {
-    return "";
-  }
-  return secret || "lexopen-dev-session-secret-change-me";
+  return "";
 }
 
 function toHex(buf: ArrayBuffer) {
@@ -86,13 +83,7 @@ async function verifyToken(
 ): Promise<{ userId: string; role: string } | null> {
   const secret = sessionSecret();
   if (!secret) return null;
-  if (!token.includes(".")) {
-    // Legacy unsigned cookie: development only, and only if the user still exists.
-    if (process.env.NODE_ENV !== "development") return null;
-    const row = await lookupSessionVersion(token);
-    if (!row || !VALID_ROLES.has(row.role)) return null;
-    return { userId: token, role: row.role };
-  }
+  if (!token.includes(".")) return null;
   const parts = token.split(".");
   if (parts.length !== 5) return null;
   const [userId, expStr, versionStr, role, sig] = parts;

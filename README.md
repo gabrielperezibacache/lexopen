@@ -18,7 +18,7 @@
       <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg" alt="Licencia AGPL-3.0-or-later">
     </a>
     <a href="package.json">
-      <img src="https://img.shields.io/badge/version-0.1.6-orange.svg" alt="Versión 0.1.6">
+      <img src="https://img.shields.io/badge/version-0.1.9-orange.svg" alt="Versión 0.1.9">
     </a>
     <a href="https://nodejs.org/">
       <img src="https://img.shields.io/badge/Node.js-22.x-339933.svg?logo=nodedotjs&logoColor=white" alt="Node.js 22">
@@ -43,8 +43,8 @@
 </div>
 
 > [!IMPORTANT]
-> **Estado del proyecto:** LexOpen está en la versión `0.1.6` y debe considerarse un
-> piloto endurecido (`0.1.6`). El checklist de Host local (`docs/WEB-HOST.md`)
+> **Estado del proyecto:** LexOpen está en la versión `0.1.9` y debe considerarse un
+> piloto endurecido. El checklist de Host local (`docs/WEB-HOST.md`)
 > cubre ACL del portal, CSRF en mutaciones cliente, auditoría estricta en
 > mutaciones sensibles (incluido CRM/expediente), 2FA TOTP en `/cuenta` y export CSV/XML de facturación
 > hacia un facturador externo (sin DTE/SII in-app). Antes de cargar información
@@ -1159,6 +1159,7 @@ Scripts principales:
 npm run dev            # Next.js con Turbopack
 npm run lint           # ESLint
 npm test               # pruebas de utilidades, contratos, smoke y desktop
+npm run test:integration # transacciones; requiere E2E_DATABASE_URL local desechable
 npm run build          # Prisma generate + next build
 npm run start          # servidor Next en modo producción
 npm run desktop:test   # configuración del cliente Electron
@@ -1175,6 +1176,13 @@ PostgreSQL 16, migraciones, tests, lint, build y E2E en cada push a `main` o
 ramas `cursor/**`, y en pull requests.
 
 Para cambios que afecten datos, permisos o integraciones:
+
+La auditoría de ramas, PR y mejoras transversales está en
+[`docs/AUDITORIA-2026-09-06.md`](docs/AUDITORIA-2026-09-06.md).
+`SESSION_SECRET` debe ser fuerte también en desarrollo: no se aceptan secretos
+predeterminados ni cookies antiguas sin firma. `web:host` genera la configuración;
+con `npm run dev`, configure el secreto en `.env` antes de iniciar sesión.
+
 
 1. agregue o actualice una prueba de contrato o integración;
 2. ejecute `npm test`, `npm run lint` y `npm run build`;

@@ -46,6 +46,18 @@ const corridos = formatPlazoEstimate({
 assert.ok(!("error" in corridos));
 assert.equal(corridos.vencimiento, "2026-08-04");
 
+const originalTimezone = process.env.TZ;
+try {
+  for (const timezone of ["America/Santiago", "UTC", "Pacific/Auckland"]) {
+    process.env.TZ = timezone;
+    assert.equal(formatPlazoEstimate({ desde: "2026-08-01", dias: 3, tipoComputo: "corridos" }).vencimiento, "2026-08-04");
+    assert.ok("error" in formatPlazoEstimate({ desde: "2026-02-30", dias: 3 }));
+  }
+} finally {
+  if (originalTimezone === undefined) delete process.env.TZ;
+  else process.env.TZ = originalTimezone;
+}
+
 const briefing = buildLocalBriefingMarkdown({
   causaLabel: "C-1-2026",
   alerts: ["Plazo fatal próximo"],

@@ -14,6 +14,7 @@ export const en: Dictionary = {
     menu: "Menu",
     openMenu: "Open menu",
     closeMenu: "Close menu",
+    skipToContent: "Skip to content",
     language: "Language",
     save: "Save",
     cancel: "Cancel",

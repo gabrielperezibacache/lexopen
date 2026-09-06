@@ -42,7 +42,7 @@ export default async function RootLayout({
   const locale = await getLocale();
 
   return (
-    <html lang={locale}>
+    <html lang={locale} data-scroll-behavior="smooth">
       <body className={`${sora.variable} ${fraunces.variable} antialiased`}>
         <CsrfFetchPatch />
         <I18nProvider locale={locale}>{children}</I18nProvider>
