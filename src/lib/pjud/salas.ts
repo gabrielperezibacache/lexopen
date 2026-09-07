@@ -174,17 +174,19 @@ export async function applySalaMatchesToCartera(
     select: { id: true, rit: true, tribunal: true, titulo: true },
   });
   const matches = matchMonitoredCausasToSalas(causas, agenda);
-  for (const match of matches) {
-    const fecha = new Date(`${match.entry.fecha}T12:00:00`);
-    await prisma.causa.update({
-      where: { id: match.causaId },
-      data: {
-        proximaTabla: Number.isNaN(fecha.getTime()) ? null : fecha,
-        proximaTablaNota: formatSalaMatchNote(match),
-        ...(match.entry.sala ? { sala: match.entry.sala } : {}),
-      },
-    });
-  }
+  await prisma.$transaction(
+    matches.map((match) => {
+      const fecha = new Date(`${match.entry.fecha}T12:00:00`);
+      return prisma.causa.update({
+        where: { id: match.causaId },
+        data: {
+          proximaTabla: Number.isNaN(fecha.getTime()) ? null : fecha,
+          proximaTablaNota: formatSalaMatchNote(match),
+          ...(match.entry.sala ? { sala: match.entry.sala } : {}),
+        },
+      });
+    })
+  );
   return { scanned: causas.length, matched: matches.length, matches };
 }
 
