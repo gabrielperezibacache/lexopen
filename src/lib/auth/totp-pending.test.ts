@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import {
   mintTotpPendingToken,
   verifyTotpPendingToken,
@@ -32,5 +33,30 @@ const loginNeedsTotpResponse = {
 };
 assert.equal(loginNeedsTotpResponse.needsTotp, true);
 assert.equal(typeof loginNeedsTotpResponse.message, "string");
+
+const originalSessionSecret = process.env.SESSION_SECRET;
+try {
+  delete process.env.SESSION_SECRET;
+  const legacyPayload = `user-no-secret.${Date.now() + 300_000}`;
+  const legacySignature = createHmac(
+    "sha256",
+    "lexopen-dev-session-secret-change-me"
+  )
+    .update(legacyPayload)
+    .digest("hex");
+  assert.equal(
+    verifyTotpPendingToken(`${legacyPayload}.${legacySignature}`),
+    null,
+    "known development fallback must not authenticate a pending TOTP token"
+  );
+  assert.throws(
+    () => mintTotpPendingToken("user-no-secret"),
+    /SESSION_SECRET/,
+    "minting must fail closed when SESSION_SECRET is missing"
+  );
+} finally {
+  if (originalSessionSecret === undefined) delete process.env.SESSION_SECRET;
+  else process.env.SESSION_SECRET = originalSessionSecret;
+}
 
 console.log("totp-pending.test.ts: ok");

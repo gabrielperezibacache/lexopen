@@ -9,25 +9,28 @@ const TTL_MS = 5 * 60 * 1000;
 
 function secret() {
   const s = process.env.SESSION_SECRET;
-  if (isStrongSessionSecret(s)) return s!.trim();
-  if (process.env.NODE_ENV === "production") return "";
-  return s || "lexopen-dev-session-secret-change-me";
+  return isStrongSessionSecret(s) ? s!.trim() : "";
 }
 
-function hmac(payload: string) {
-  return createHmac("sha256", secret()).update(payload).digest("hex");
+function hmac(payload: string, key: string) {
+  return createHmac("sha256", key).update(payload).digest("hex");
 }
 
 export function mintTotpPendingToken(userId: string) {
+  const key = secret();
+  if (!key) {
+    throw new Error("SESSION_SECRET es obligatorio para TOTP");
+  }
   const exp = Date.now() + TTL_MS;
   const payload = `${userId}.${exp}`;
-  return `${payload}.${hmac(payload)}`;
+  return `${payload}.${hmac(payload, key)}`;
 }
 
 export function verifyTotpPendingToken(
   token: string | undefined | null
 ): { userId: string } | null {
-  if (!token || !secret()) return null;
+  const key = secret();
+  if (!token || !key) return null;
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const [userId, expStr, sig] = parts;
@@ -35,7 +38,7 @@ export function verifyTotpPendingToken(
   const exp = Number(expStr);
   if (!Number.isFinite(exp) || exp < Date.now()) return null;
   const payload = `${userId}.${expStr}`;
-  const expected = hmac(payload);
+  const expected = hmac(payload, key);
   try {
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
