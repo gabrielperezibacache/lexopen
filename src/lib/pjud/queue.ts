@@ -209,22 +209,22 @@ export async function requeueFailedJobs(opts?: {
   });
 
   const busy = await causaIdsWithActiveJobs(failed.map((j) => j.causaId));
-  const created = [];
+  const toCreate = [];
   for (const job of failed) {
     if (busy.has(job.causaId)) continue;
-    created.push(
-      await prisma.pjudSyncJob.create({
-        data: {
-          causaId: job.causaId,
-          status: "pending",
-          trigger: "retry",
-          attempts: 0,
-        },
-      })
-    );
+    toCreate.push({
+      causaId: job.causaId,
+      status: "pending",
+      trigger: "retry",
+      attempts: 0,
+    });
     busy.add(job.causaId);
   }
-  return created;
+
+  if (toCreate.length === 0) return [];
+  return await prisma.pjudSyncJob.createManyAndReturn({
+    data: toCreate,
+  });
 }
 
 /**
