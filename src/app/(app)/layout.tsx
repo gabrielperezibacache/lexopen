@@ -5,17 +5,20 @@ import { prisma } from "@/lib/db";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await enforceAppAccess();
-  const unreadCount = await prisma.notification.count({
-    where: { userId: user.id, read: false },
-  });
-  const mailPendingCount = isStaff(user.role)
-    ? await prisma.mailboxMessage.count({
-        where: {
-          userId: user.id,
-          status: { in: ["nuevo", "vinculado"] },
-        },
-      })
-    : 0;
+  // ⚡ Bolt: Fetch global unread and mail counts concurrently to save one database round trip per page load
+  const [unreadCount, mailPendingCount] = await Promise.all([
+    prisma.notification.count({
+      where: { userId: user.id, read: false },
+    }),
+    isStaff(user.role)
+      ? prisma.mailboxMessage.count({
+          where: {
+            userId: user.id,
+            status: { in: ["nuevo", "vinculado"] },
+          },
+        })
+      : Promise.resolve(0),
+  ]);
   const showUpdateBanner = isStaff(user.role);
   const canSelfUpdate = user.role === "admin";
   return (

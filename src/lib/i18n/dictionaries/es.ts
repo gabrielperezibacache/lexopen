@@ -12,6 +12,7 @@ export const es = {
     menu: "Menú",
     openMenu: "Abrir menú",
     closeMenu: "Cerrar menú",
+    skipToContent: "Saltar al contenido",
     language: "Idioma",
     save: "Guardar",
     cancel: "Cancelar",

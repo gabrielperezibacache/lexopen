@@ -3,13 +3,14 @@
  */
 
 import { calcularVencimiento, clasificarUrgencia, diasRestantes } from "@/lib/plazos";
+import { format, parseISO } from "date-fns";
 
 export function formatPlazoEstimate(opts: {
   desde: string;
   dias: number;
   tipoComputo?: "habiles" | "corridos";
 }) {
-  const desde = new Date(opts.desde);
+  const desde = parseISO(opts.desde);
   if (Number.isNaN(desde.getTime())) {
     return { error: "Fecha 'desde' inválida" as const };
   }
@@ -26,7 +27,7 @@ export function formatPlazoEstimate(opts: {
     tipoComputo: opts.tipoComputo || "habiles",
   });
   return {
-    vencimiento: vencimiento.toISOString().slice(0, 10),
+    vencimiento: format(vencimiento, "yyyy-MM-dd"),
     urgencia: clasificarUrgencia(vencimiento),
     diasRestantes: diasRestantes(vencimiento),
     disclaimer:

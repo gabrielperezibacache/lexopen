@@ -427,6 +427,9 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
   causaIds?: string[];
   limit?: number;
 }) {
+  if (opts?.causaIds !== undefined && opts.causaIds.length === 0) {
+    return { clearedCausas: 0, dismissedJobs: 0 };
+  }
   const limit = Math.min(Math.max(opts?.limit ?? 200, 1), 500);
   const causaFilter = opts?.causaIds?.length
     ? { id: { in: opts.causaIds.slice(0, limit) } }
@@ -447,44 +450,90 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
     take: limit,
   });
 
-  let clearedCausas = 0;
+  const idsToOk = [];
+  const idsToDisabled = [];
+  const idsToClearOnly = [];
+
   for (const causa of causas) {
     const failedStatus =
       causa.pjudLastSyncStatus === "failed" ||
       causa.pjudLastSyncStatus === "error";
-    await prisma.causa.update({
-      where: { id: causa.id },
-      data: {
-        pjudLastSyncNote: null,
-        pjudFailCount: 0,
-        ...(failedStatus
-          ? {
-              pjudLastSyncStatus: causa.pjudMonitoreoActivo ? "ok" : "disabled",
-            }
-          : {}),
-      },
-    });
-    clearedCausas += 1;
+
+    if (failedStatus) {
+      if (causa.pjudMonitoreoActivo) {
+        idsToOk.push(causa.id);
+      } else {
+        idsToDisabled.push(causa.id);
+      }
+    } else {
+      idsToClearOnly.push(causa.id);
+    }
+  }
+
+  const transactions = [];
+
+  if (idsToOk.length > 0) {
+    transactions.push(
+      prisma.causa.updateMany({
+        where: { id: { in: idsToOk } },
+        data: {
+          pjudLastSyncNote: null,
+          pjudFailCount: 0,
+          pjudLastSyncStatus: "ok",
+        },
+      })
+    );
+  }
+
+  if (idsToDisabled.length > 0) {
+    transactions.push(
+      prisma.causa.updateMany({
+        where: { id: { in: idsToDisabled } },
+        data: {
+          pjudLastSyncNote: null,
+          pjudFailCount: 0,
+          pjudLastSyncStatus: "disabled",
+        },
+      })
+    );
+  }
+
+  if (idsToClearOnly.length > 0) {
+    transactions.push(
+      prisma.causa.updateMany({
+        where: { id: { in: idsToClearOnly } },
+        data: {
+          pjudLastSyncNote: null,
+          pjudFailCount: 0,
+        },
+      })
+    );
   }
 
   const jobWhere = {
     status: "failed" as const,
-    ...(opts?.causaIds?.length
-      ? { causaId: { in: opts.causaIds.slice(0, limit) } }
-      : {}),
+    causaId: { in: causas.map(causa => causa.id) },
   };
-  const dismissedJobs = await prisma.pjudSyncJob.updateMany({
-    where: jobWhere,
-    data: {
-      status: "dismissed",
-      note: "Aviso limpiado desde Monitoreo",
-      finishedAt: new Date(),
-    },
-  });
+
+  transactions.push(
+    prisma.pjudSyncJob.updateMany({
+      where: jobWhere,
+      data: {
+        status: "dismissed",
+        note: "Aviso limpiado desde Monitoreo",
+        finishedAt: new Date(),
+      },
+    })
+  );
+
+  const results = await prisma.$transaction(transactions);
+  const dismissedJobsCount = results.pop();
+
+  const clearedCausas = results.reduce((count, result) => count + result.count, 0);
 
   return {
     clearedCausas,
-    dismissedJobs: dismissedJobs.count,
+    dismissedJobs: dismissedJobsCount?.count ?? 0,
   };
 }
 

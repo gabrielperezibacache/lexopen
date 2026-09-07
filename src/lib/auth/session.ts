@@ -69,13 +69,8 @@ export async function getCurrentUser() {
   const raw = jar.get(SESSION_COOKIE)?.value;
   if (!raw) return null;
 
-  // Legacy unsigned cookie removed outside development
-  if (!raw.includes(".")) {
-    if (process.env.NODE_ENV === "development") {
-      return prisma.user.findUnique({ where: { id: raw } });
-    }
-    return null;
-  }
+  // User IDs alone are not authentication, including on a development Host.
+  if (!raw.includes(".")) return null;
 
   const parsed = verifySessionToken(raw);
   if (!parsed) return null;

@@ -77,6 +77,7 @@ function NavGroup({
               key={href}
               href={href}
               className={cn("nav-link", best === href && "active")}
+              aria-current={best === href ? "page" : undefined}
               onClick={onNavigate}
             >
               <Icon size={16} className="shrink-0" />
@@ -219,7 +220,7 @@ function SidebarChrome({
           {showClose && (
             <button
               type="button"
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-white"
+              className="grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl bg-white/10 text-white"
               onClick={onClose}
               aria-label={t("common.closeMenu")}
             >
@@ -304,6 +305,7 @@ export function AppSidebar({
     if (!mobileOpen) return;
     const root = drawerRef.current;
     if (!root) return;
+    const previousFocus = document.activeElement;
     const focusable = root.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
     );
@@ -322,7 +324,12 @@ export function AppSidebar({
       }
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+        previousFocus.focus();
+      }
+    };
   }, [mobileOpen]);
 
   return (
@@ -343,6 +350,7 @@ export function AppSidebar({
           mobileOpen ? "pointer-events-auto" : "pointer-events-none"
         )}
         aria-hidden={!mobileOpen}
+        inert={!mobileOpen}
       >
         <button
           type="button"

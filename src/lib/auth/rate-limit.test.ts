@@ -22,6 +22,12 @@ async function main() {
   delete process.env.UPSTASH_REDIS_REST_URL;
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
+  fs.writeFileSync(process.env.LEXOPEN_RATE_LIMIT_PATH!, JSON.stringify({
+    "persisted-block": { count: 2, resetAt: Date.now() + 60_000 },
+  }));
+  assert.equal((await rateLimitAsync("persisted-block", 2, 60_000)).ok, false,
+    "The first request after restart must respect persisted limits");
+
   const key = `test-${Date.now()}`;
   assert.equal(rateLimit(key, 2, 60_000).ok, true);
   assert.equal(rateLimit(key, 2, 60_000).ok, true);

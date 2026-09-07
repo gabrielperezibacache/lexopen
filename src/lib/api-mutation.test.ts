@@ -55,6 +55,19 @@ async function main() {
     assert.equal(ok.ok, true);
     if (ok.ok) assert.equal(ok.data.id, "1");
 
+    globalThis.fetch = (async () => new Response("<html>Login</html>", { status: 200 })) as typeof fetch;
+    const invalid = await apiMutation("/api/x", { method: "POST" });
+    assert.equal(invalid.ok, false);
+    if (!invalid.ok) assert.equal(invalid.status, 502);
+
+    globalThis.fetch = (async () => new Response(null, { status: 204 })) as typeof fetch;
+    assert.equal((await apiMutation("/api/x", { method: "DELETE" })).ok, true);
+
+    globalThis.fetch = (async () => new Response(JSON.stringify({ error: { secret: "hidden" } }), { status: 500 })) as typeof fetch;
+    const malformedError = await apiMutation("/api/x");
+    assert.equal(malformedError.ok, false);
+    if (!malformedError.ok) assert.equal(malformedError.error, "Error 500");
+
     globalThis.fetch = origFetch;
   } finally {
     if (prevDocument === undefined) {
