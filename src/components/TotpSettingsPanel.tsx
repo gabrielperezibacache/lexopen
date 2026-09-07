@@ -121,7 +121,7 @@ export function TotpSettingsPanel() {
           disabled={busy}
           onClick={setup}
         >
-          Configurar 2FA
+          {busy ? "Configurando…" : "Configurar 2FA"}
         </button>
       )}
       {secret && (
@@ -139,7 +139,7 @@ export function TotpSettingsPanel() {
             <input className="input" name="code" required inputMode="numeric" />
           </label>
           <button className="btn btn-primary" disabled={busy} type="submit">
-            Confirmar y activar
+            {busy ? "Confirmando…" : "Confirmar y activar"}
           </button>
         </form>
       )}
@@ -150,7 +150,7 @@ export function TotpSettingsPanel() {
             <input className="input" name="code" required />
           </label>
           <button className="btn btn-ghost" disabled={busy} type="submit">
-            Desactivar 2FA
+            {busy ? "Desactivando…" : "Desactivar 2FA"}
           </button>
         </form>
       )}
