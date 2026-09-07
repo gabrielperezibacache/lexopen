@@ -86,21 +86,24 @@ export async function enqueueDueSyncJobs(opts?: {
   });
 
   const busy = await causaIdsWithActiveJobs(causas.map((c) => c.id));
-  const jobs = [];
+  const jobsData = [];
   for (const c of causas) {
-    if (jobs.length >= limit) break;
+    if (jobsData.length >= limit) break;
     if (busy.has(c.id)) continue;
-    const job = await prisma.pjudSyncJob.create({
-      data: {
-        causaId: c.id,
-        status: "pending",
-        trigger,
-        attempts: 0,
-      },
+    jobsData.push({
+      causaId: c.id,
+      status: "pending",
+      trigger,
+      attempts: 0,
     });
     busy.add(c.id);
-    jobs.push(job);
   }
+
+  if (jobsData.length === 0) return [];
+
+  const jobs = await prisma.pjudSyncJob.createManyAndReturn({
+    data: jobsData,
+  });
   return jobs;
 }
 
