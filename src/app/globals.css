@@ -91,7 +91,7 @@ a {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--copper), var(--copper-deep));
+  background: var(--copper-deep);
   color: white;
   box-shadow: 0 10px 24px rgba(154, 90, 40, 0.28);
 }
@@ -218,18 +218,20 @@ a {
 
 @media (max-width: 767px) {
   .nav-link {
-    min-height: 2.75rem;
+    min-height: 44px;
     padding: 0.85rem 1rem;
     font-size: 0.95rem;
   }
 
   .btn {
-    min-height: 2.75rem;
+    min-height: 44px;
   }
 
   .input,
-  .select {
-    min-height: 2.75rem;
+  .select,
+  .textarea {
+    min-height: 44px;
+    font-size: 16px;
   }
 }
 
@@ -246,4 +248,42 @@ a {
 
 .table-row:hover {
   background: rgba(31, 111, 120, 0.04);
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--sea-bright);
+  outline-offset: 3px;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 60;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--ink);
+  color: white;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .fade-up, .fade-up-delay, .fade-up-delay-2, .hero-glow {
+    animation: none;
+  }
+  .btn { transition: background 180ms ease; }
+  .btn:hover { transform: none; }
+  #lexopen-mobile-nav { transition: none; }
 }

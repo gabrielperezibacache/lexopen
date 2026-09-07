@@ -17,17 +17,21 @@ function storePath() {
 let fileCache: Record<string, Bucket> | null = null;
 let fileDirty = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let loadingFileStore: Promise<void> | null = null;
 
 async function loadFileStore() {
   const file = storePath();
   if (!file) return;
   if (fileCache) return;
-  try {
-    const raw = await fs.readFile(file, "utf8");
-    fileCache = JSON.parse(raw) as Record<string, Bucket>;
-  } catch {
-    fileCache = {};
-  }
+  loadingFileStore ??= (async () => {
+    try {
+      const raw = await fs.readFile(file, "utf8");
+      fileCache = JSON.parse(raw) as Record<string, Bucket>;
+    } catch {
+      fileCache = {};
+    }
+  })();
+  await loadingFileStore;
 }
 
 function scheduleFlush() {
@@ -129,6 +133,7 @@ export async function rateLimitAsync(
     }
     return { ok: true, remaining: Math.max(0, limit - remote.count) };
   }
+  await loadFileStore();
   return rateLimit(key, limit, windowMs);
 }
 

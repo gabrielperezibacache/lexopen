@@ -308,7 +308,9 @@ export default async function DashboardPage() {
                   </div>
                 </div>
                 <StatusBadge
-                  estado={task.priority === "urgent" ? "vencido" : "pendiente"}
+                  estado={task.dueDate && task.dueDate < now
+                    ? "vencido"
+                    : task.priority === "urgent" ? "urgente" : "pendiente"}
                 />
               </Link>
             ))}

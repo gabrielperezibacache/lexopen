@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { dueSyncWhere, pjudSyncConcurrency } from "@/lib/pjud/queue";
+import { dueSyncWhere, pjudSyncConcurrency, processPendingSyncJobs, requeueFailedJobs, enqueueDueSyncJobs } from "@/lib/pjud/queue";
+import { clearFallidosMonitoreoAvisos } from "@/lib/pjud/sync";
 import {
   isBackupableDocumentoRef,
   looksLikePdf,
@@ -16,6 +17,15 @@ assert.deepEqual(due.OR?.[1], { pjudNextSyncAt: { lte: now } });
 const explicit = dueSyncWhere({ causaIds: ["a", "b"], now });
 assert.deepEqual(explicit.id, { in: ["a", "b"] });
 assert.equal("OR" in explicit, false);
+assert.deepEqual(dueSyncWhere({ causaIds: [] }).id, { in: [] });
+
+async function emptySelectionDoesNotTouchDatabase() {
+  assert.deepEqual(await enqueueDueSyncJobs({ causaIds: [] }), []);
+  assert.deepEqual(await processPendingSyncJobs({ jobIds: [] }), []);
+  assert.deepEqual(await requeueFailedJobs({ causaIds: [] }), []);
+  assert.deepEqual(await clearFallidosMonitoreoAvisos({ causaIds: [] }), { clearedCausas: 0, dismissedJobs: 0 });
+}
+emptySelectionDoesNotTouchDatabase().catch((error) => { console.error(error); process.exitCode = 1; });
 
 assert.equal(looksLikePdf(Buffer.from("%PDF-1.4")), true);
 assert.equal(looksLikePdf(Buffer.from("<html>")), false);

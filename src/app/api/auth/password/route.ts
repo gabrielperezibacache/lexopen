@@ -56,18 +56,18 @@ export async function POST(req: NextRequest) {
     }
 
     const nextSessionVersion = user.sessionVersion + 1;
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: await hashPassword(body.newPassword),
-        sessionVersion: nextSessionVersion,
-      },
-    });
-    await writeAuditStrict({
-      actorId: user.id,
-      action: "user.password_change",
-      entityType: "User",
-      entityId: user.id,
+    const password = await hashPassword(body.newPassword);
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id, sessionVersion: user.sessionVersion },
+        data: { password, sessionVersion: { increment: 1 } },
+      });
+      await writeAuditStrict({
+        actorId: user.id,
+        action: "user.password_change",
+        entityType: "User",
+        entityId: user.id,
+      }, tx);
     });
     const session = buildSessionCookieValue(
       user.id,

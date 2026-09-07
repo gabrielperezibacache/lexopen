@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
 import { startOfDay } from "@/lib/plazos";
+import { createPlazoAlerts, escapeAlertHtml } from "@/lib/plazo-alerts";
 import { getGoogleConfig } from "@/lib/integrations/google";
 import { sendGmailMessage } from "@/lib/integrations/gmail";
 
@@ -34,84 +35,9 @@ export async function POST(req: NextRequest) {
       new Date(from.getTime() + days * 24 * 60 * 60 * 1000)
     );
 
-    const plazos = await prisma.plazo.findMany({
-      where: {
-        estado: "pendiente",
-        alertaEnviada: false,
-        fechaLimite: { gte: from, lte: until },
-      },
-      include: {
-        responsable: { select: { id: true, email: true, name: true } },
-        causa: {
-          select: {
-            id: true,
-            titulo: true,
-            rit: true,
-            abogadoId: true,
-            abogado: { select: { id: true, email: true, name: true } },
-          },
-        },
-      },
-      orderBy: { fechaLimite: "asc" },
-      take: 100,
+    const { plazos, notifications, emailBuckets } = await createPlazoAlerts(prisma, {
+      from, until, emailEnabled: emailAlertasEnabled(),
     });
-
-    let notifications = 0;
-    const emailBuckets = new Map<
-      string,
-      { email: string; name: string; lines: string[] }
-    >();
-    const updatedPlazoIds: string[] = [];
-
-    for (const plazo of plazos) {
-      const recipients = new Map<
-        string,
-        { id: string; email: string | null; name: string | null }
-      >();
-      if (plazo.responsable?.id) {
-        recipients.set(plazo.responsable.id, plazo.responsable);
-      }
-      if (plazo.causa?.abogadoId && plazo.causa.abogado) {
-        recipients.set(plazo.causa.abogadoId, plazo.causa.abogado);
-      }
-      if (recipients.size === 0) continue;
-
-      const title = `Plazo próximo · ${plazo.causa?.rit || plazo.causa?.titulo || "sin causa"}`;
-      const body = `${plazo.titulo} vence el ${plazo.fechaLimite.toISOString().slice(0, 10)}.`;
-      const href = plazo.causaId ? `/causas/${plazo.causaId}` : "/plazos";
-
-      await prisma.notification.createMany({
-        data: [...recipients.keys()].map((userId) => ({
-          userId,
-          title,
-          body,
-          href,
-        })),
-      });
-      notifications += recipients.size;
-
-      if (emailAlertasEnabled()) {
-        for (const user of recipients.values()) {
-          if (!user.email) continue;
-          const bucket = emailBuckets.get(user.email) || {
-            email: user.email,
-            name: user.name || user.email,
-            lines: [],
-          };
-          bucket.lines.push(`• ${title}: ${body}`);
-          emailBuckets.set(user.email, bucket);
-        }
-      }
-
-      updatedPlazoIds.push(plazo.id);
-    }
-
-    if (updatedPlazoIds.length > 0) {
-      await prisma.plazo.updateMany({
-        where: { id: { in: updatedPlazoIds } },
-        data: { alertaEnviada: true },
-      });
-    }
 
     let emailed = 0;
     let emailFailed = 0;
@@ -137,11 +63,11 @@ export async function POST(req: NextRequest) {
               to: bucket.email,
               subject: `LexOpen · ${bucket.lines.length} plazo(s) próximo(s)`,
               text,
-              html: `<p>Hola ${bucket.name},</p><p>Plazos próximos en LexOpen:</p><ul>${bucket.lines
-                .map((l) => `<li>${l.replace(/^•\s*/, "")}</li>`)
+              html: `<p>Hola ${escapeAlertHtml(bucket.name)},</p><p>Plazos próximos en LexOpen:</p><ul>${bucket.lines
+                .map((l) => `<li>${escapeAlertHtml(l.replace(/^•\s*/, ""))}</li>`)
                 .join("")}</ul>${
                 appUrl
-                  ? `<p><a href="${appUrl}/plazos">Abrir plazos</a></p>`
+                  ? `<p><a href="${escapeAlertHtml(appUrl)}/plazos">Abrir plazos</a></p>`
                   : ""
               }`,
             });
@@ -156,7 +82,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       days,
-      plazos: plazos.length,
+      plazos,
       notifications,
       emailed,
       emailFailed,

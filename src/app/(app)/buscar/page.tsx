@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 
 type Results = {
@@ -71,16 +71,24 @@ export default function SearchPage() {
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
+  const activeRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => activeRequest.current?.abort(), []);
 
   async function runSearch(q: string) {
     const trimmed = q.trim();
     if (!trimmed) return;
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
     setBusy(true);
     setQuery(trimmed);
     setError("");
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
-      const data = await res.json().catch(() => ({}));
+      const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`, {
+        signal: controller.signal,
+      });
+      const data = await res.json();
+      if (controller.signal.aborted) return;
       if (!res.ok) {
         setResults(EMPTY_RESULTS(trimmed));
         setError(data.error || "No se pudo completar la búsqueda");
@@ -100,10 +108,11 @@ export default function SearchPage() {
         minutas: Array.isArray(data.minutas) ? data.minutas : [],
       });
     } catch {
+      if (controller.signal.aborted) return;
       setResults(EMPTY_RESULTS(trimmed));
       setError("No se pudo completar la búsqueda");
     } finally {
-      setBusy(false);
+      if (activeRequest.current === controller) setBusy(false);
     }
   }
 
@@ -120,11 +129,16 @@ export default function SearchPage() {
         title="Buscar"
         subtitle="Espacios, causas, documentos (FTS), minutas, archivos VDR, tareas, wiki y jurisprudencia. En el portal: spaces y archivos etiquetados «cliente»."
       />
-      <form onSubmit={onSubmit} className="panel mb-6 flex gap-2 rounded-3xl p-4">
+      <form role="search" onSubmit={onSubmit} className="panel mb-6 flex flex-col gap-2 rounded-3xl p-4 sm:flex-row">
+        <label htmlFor="unified-search" className="sr-only">Buscar en LexOpen</label>
         <input
+          id="unified-search"
+          type="search"
           className="input"
           name="q"
-          defaultValue={query}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          maxLength={200}
           placeholder="Ej. tutela, Andes, audiencia, C-4521…"
           required
         />
@@ -132,6 +146,10 @@ export default function SearchPage() {
           {busy ? "…" : "Buscar"}
         </button>
       </form>
+
+      <p role="status" aria-live="polite" className="mb-4 text-sm text-[var(--ink-soft)]">
+        {busy ? "Buscando…" : results && !error ? `Resultados para «${results.q}»` : ""}
+      </p>
 
       {error && (
         <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">

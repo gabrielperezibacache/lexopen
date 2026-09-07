@@ -427,6 +427,9 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
   causaIds?: string[];
   limit?: number;
 }) {
+  if (opts?.causaIds !== undefined && opts.causaIds.length === 0) {
+    return { clearedCausas: 0, dismissedJobs: 0 };
+  }
   const limit = Math.min(Math.max(opts?.limit ?? 200, 1), 500);
   const causaFilter = opts?.causaIds?.length
     ? { id: { in: opts.causaIds.slice(0, limit) } }
@@ -509,9 +512,7 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
 
   const jobWhere = {
     status: "failed" as const,
-    ...(opts?.causaIds?.length
-      ? { causaId: { in: opts.causaIds.slice(0, limit) } }
-      : {}),
+    causaId: { in: causas.map(causa => causa.id) },
   };
 
   transactions.push(
@@ -528,7 +529,7 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
   const results = await prisma.$transaction(transactions);
   const dismissedJobsCount = results.pop();
 
-  const clearedCausas = idsToOk.length + idsToDisabled.length + idsToClearOnly.length;
+  const clearedCausas = results.reduce((count, result) => count + result.count, 0);
 
   return {
     clearedCausas,

@@ -22,7 +22,7 @@ export function dueSyncWhere(opts?: {
   now?: Date;
 }) {
   const now = opts?.now || new Date();
-  if (opts?.causaIds?.length) {
+  if (opts?.causaIds !== undefined) {
     return {
       id: { in: opts.causaIds },
       pjudMonitoreoActivo: true,
@@ -73,6 +73,7 @@ export async function enqueueDueSyncJobs(opts?: {
   trigger?: "cron" | "manual" | "retry";
   limit?: number;
 }) {
+  if (opts?.causaIds !== undefined && opts.causaIds.length === 0) return [];
   const trigger = opts?.trigger || "cron";
   const limit = Math.min(Math.max(opts?.limit || DEFAULT_BATCH, 1), 200);
 
@@ -113,6 +114,8 @@ export async function processPendingSyncJobs(opts?: {
   limit?: number;
   jobIds?: string[];
 }) {
+  // An explicitly empty selection must never expand to the entire queue.
+  if (opts?.jobIds !== undefined && opts.jobIds.length === 0) return [];
   const limit = Math.min(Math.max(opts?.limit || DEFAULT_BATCH, 1), 100);
   await reclaimStuckRunningJobs();
 
@@ -190,7 +193,8 @@ export async function runDueSyncPipeline(opts?: {
   const results = await processPendingSyncJobs({
     actorId: opts?.actorId,
     limit: opts?.limit,
-    jobIds: enqueued.map((j) => j.id),
+    // Cron drains the oldest pending jobs; manual runs stay within their selection.
+    jobIds: opts?.causaIds !== undefined ? enqueued.map((j) => j.id) : undefined,
   });
   return { enqueued: enqueued.length, synced: results.length, results };
 }
@@ -199,6 +203,7 @@ export async function requeueFailedJobs(opts?: {
   causaIds?: string[];
   limit?: number;
 }) {
+  if (opts?.causaIds !== undefined && opts.causaIds.length === 0) return [];
   await reclaimStuckRunningJobs();
 
   const failed = await prisma.pjudSyncJob.findMany({
