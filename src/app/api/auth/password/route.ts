@@ -11,11 +11,26 @@ import {
 } from "@/lib/auth/session";
 import { baseCookieOptions } from "@/lib/auth/cookie-options";
 import { appendCsrfCookie } from "@/lib/auth/csrf-token";
+import { rateLimitAsync, rateLimitAuthFailure } from "@/lib/auth/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
     const user = await requireUser();
+
+    const limited = await rateLimitAsync(`password-change:${user.id}`, 10, 15 * 60 * 1000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: "Demasiados intentos. Espere e intente de nuevo." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil((limited.retryAfterMs || 60000) / 1000)),
+          },
+        }
+      );
+    }
+
     const body = await parseBody(req, passwordChangeSchema);
     if (body.currentPassword === body.newPassword) {
       return NextResponse.json(
@@ -23,7 +38,20 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
     if (!(await verifyPassword(body.currentPassword, user.password))) {
+      const failed = await rateLimitAuthFailure(`password-change-fail:${user.id}`);
+      if (!failed.ok) {
+        return NextResponse.json(
+          { error: "Demasiados intentos. Espere e intente de nuevo." },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(Math.ceil((failed.retryAfterMs || 60000) / 1000)),
+            },
+          }
+        );
+      }
       return NextResponse.json({ error: "Contraseña actual inválida" }, { status: 401 });
     }
 
