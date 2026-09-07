@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
       string,
       { email: string; name: string; lines: string[] }
     >();
+    const updatedPlazoIds: string[] = [];
 
     for (const plazo of plazos) {
       const recipients = new Map<
@@ -102,8 +103,12 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      await prisma.plazo.update({
-        where: { id: plazo.id },
+      updatedPlazoIds.push(plazo.id);
+    }
+
+    if (updatedPlazoIds.length > 0) {
+      await prisma.plazo.updateMany({
+        where: { id: { in: updatedPlazoIds } },
         data: { alertaEnviada: true },
       });
     }
