@@ -13,12 +13,9 @@ const ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
 export function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
   if (isStrongSessionSecret(secret)) return secret!.trim();
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "SESSION_SECRET es obligatorio en producción (mín. 16 chars, no placeholder)"
-    );
-  }
-  return secret || "lexopen-dev-session-secret-change-me";
+  throw new Error(
+    "SESSION_SECRET es obligatorio (mín. 16 chars, no placeholder)"
+  );
 }
 
 export function signSessionToken(
