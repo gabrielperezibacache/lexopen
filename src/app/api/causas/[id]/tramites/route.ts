@@ -79,25 +79,27 @@ export async function POST(req: NextRequest, { params }: Params) {
         _max: { orden: true },
       });
       let orden = (maxOrden._max.orden ?? 0) + 1;
-      const created = await prisma.$transaction(
-        template.items.map((item) => {
-          const current = orden;
-          orden += 1;
-          return prisma.tramite.create({
-            data: {
-              causaId: id,
-              titulo: item.titulo,
-              detalle: item.detalle || null,
-              estado: "pendiente",
-              fechaLimite: item.diasLimite
-                ? fechaLimiteFromDias(item.diasLimite)
-                : null,
-              responsableId: user.id,
-              orden: current,
-            },
-          });
-        })
-      );
+
+      const tramiteData = template.items.map((item) => {
+        const current = orden;
+        orden += 1;
+        return {
+          causaId: id,
+          titulo: item.titulo,
+          detalle: item.detalle || null,
+          estado: "pendiente",
+          fechaLimite: item.diasLimite
+            ? fechaLimiteFromDias(item.diasLimite)
+            : null,
+          responsableId: user.id,
+          orden: current,
+        };
+      });
+
+      const created = await prisma.tramite.createManyAndReturn({
+        data: tramiteData,
+      });
+
       await prisma.activity.create({
         data: {
           tipo: "tramite",
