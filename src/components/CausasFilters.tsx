@@ -33,11 +33,13 @@ function FiltersInner({ defaultEstado }: { defaultEstado: string }) {
         name="q"
         placeholder={t("causas.filterSearch")}
         defaultValue={sp.get("q") || ""}
+        aria-label={t("causas.filterSearch")}
       />
       <select
         className="select"
         name="materia"
         defaultValue={sp.get("materia") || ""}
+        aria-label={t("causas.filterAllMatters")}
       >
         <option value="">{t("causas.filterAllMatters")}</option>
         {MATERIAS.map((m) => (
@@ -46,7 +48,7 @@ function FiltersInner({ defaultEstado }: { defaultEstado: string }) {
           </option>
         ))}
       </select>
-      <select className="select" name="estado" defaultValue={estadoValue}>
+      <select className="select" name="estado" defaultValue={estadoValue} aria-label={t("causas.filterAllProcedural")}>
         <option value="all">{t("causas.filterAllProcedural")}</option>
         {ESTADOS_CAUSA.map((m) => (
           <option key={m.value} value={m.value}>
