@@ -100,13 +100,19 @@ export function SiteSettingsPanel({
           <Link href="/portal" className="btn btn-ghost text-sm">
             {t("sites.settings.portalPreview")}
           </Link>
-          <button type="button" className="btn btn-secondary text-sm" onClick={() => setOpen(!open)}>
+          <button
+            type="button"
+            className="btn btn-secondary text-sm"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            aria-controls="site-settings-panel-content"
+          >
             {open ? t("sites.guide.collapse") : t("sites.guide.expand")}
           </button>
         </div>
       </div>
       {open && (
-        <form onSubmit={onSubmit} className="mt-4 grid gap-4 lg:grid-cols-2">
+        <form id="site-settings-panel-content" onSubmit={onSubmit} className="mt-4 grid gap-4 lg:grid-cols-2">
           <label className="block text-sm">
             <span className="mb-1 block font-medium">{t("sites.settings.name")}</span>
             <input className="input w-full" name="name" required defaultValue={site.name} />
