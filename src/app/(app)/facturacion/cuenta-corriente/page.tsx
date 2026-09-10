@@ -21,8 +21,10 @@ export default async function CuentaCorrientePage({
       include: { cliente: true, causa: true, invoice: true },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
+    // ⚡ Bolt: Push "latest row extraction" down to Postgres using distinct + desc sort to prevent O(N) memory/bandwidth bottleneck.
     prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     }),
     prisma.causa.findMany({

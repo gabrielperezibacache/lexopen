@@ -36,8 +36,10 @@ export default async function FacturacionPage() {
         date: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
       },
     }),
+    // ⚡ Bolt: Push "latest row extraction" down to Postgres using distinct + desc sort to prevent O(N) memory/bandwidth bottleneck.
     prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     }),
     prisma.invoice.findMany({
