@@ -51,12 +51,18 @@ export function SitesGuidePanel() {
     <section className="panel mb-6 rounded-3xl border border-[var(--sea)]/15 bg-[linear-gradient(135deg,rgba(31,111,120,0.06),rgba(255,255,255,0.9))] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-lg font-semibold">{t("sites.guide.title")}</h2>
-        <button type="button" className="btn btn-ghost text-sm" onClick={toggle}>
+        <button
+          type="button"
+          className="btn btn-ghost text-sm"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          aria-controls="sites-guide-panel-content"
+        >
           {collapsed ? t("sites.guide.expand") : t("sites.guide.collapse")}
         </button>
       </div>
       {!collapsed && (
-        <>
+        <div id="sites-guide-panel-content">
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead>
@@ -86,7 +92,7 @@ export function SitesGuidePanel() {
             </table>
           </div>
           <p className="mt-4 text-sm text-[var(--ink-soft)]/75">{t("sites.guide.hint")}</p>
-        </>
+        </div>
       )}
     </section>
   );
