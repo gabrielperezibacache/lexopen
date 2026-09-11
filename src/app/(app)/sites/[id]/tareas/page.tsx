@@ -14,20 +14,23 @@ export default async function SiteTasksPage({ params }: Params) {
   const { id } = await params;
   await assertSitePageAccess(id);
   const { t, dict } = await getI18n();
-  const site = await prisma.site.findUnique({
-    where: { id },
-    include: {
-      members: { include: { user: true } },
-      cliente: true,
-      causa: true,
-    },
-  });
+  const [site, tasks] = await Promise.all([
+    prisma.site.findUnique({
+      where: { id },
+      include: {
+        members: { include: { user: true } },
+        cliente: true,
+        causa: true,
+      },
+    }),
+    prisma.task.findMany({
+      where: { siteId: id },
+      include: { assignee: true, creator: true },
+      orderBy: [{ status: "asc" }, { dueDate: "asc" }],
+    }),
+  ]);
+
   if (!site) notFound();
-  const tasks = await prisma.task.findMany({
-    where: { siteId: id },
-    include: { assignee: true, creator: true },
-    orderBy: [{ status: "asc" }, { dueDate: "asc" }],
-  });
 
   return (
     <div>
