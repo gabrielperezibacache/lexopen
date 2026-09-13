@@ -21,8 +21,11 @@ export default async function CuentaCorrientePage({
       include: { cliente: true, causa: true, invoice: true },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
+    // ⚡ Bolt: Fetches only the latest ledger entry per client instead of the entire history.
+    // Impact: Eliminates O(N) memory/data transfer per client history where N is all past entries.
     prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     }),
     prisma.causa.findMany({
