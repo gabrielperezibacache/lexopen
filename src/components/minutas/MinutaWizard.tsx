@@ -43,7 +43,8 @@ type Props = {
 
 function emptyAccion(): AccionDraft {
   return {
-    key: Math.random().toString(36).slice(2),
+    // 🛡️ Sentinel: Replace weak random key generation with crypto.randomUUID()
+    key: crypto.randomUUID(),
     descripcion: "",
     responsable: "",
     fechaLimite: "",
