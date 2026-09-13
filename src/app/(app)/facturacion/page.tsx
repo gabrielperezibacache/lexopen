@@ -37,7 +37,10 @@ export default async function FacturacionPage() {
       },
     }),
     prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+      // ⚡ Bolt: Fetches only the latest ledger entry per client instead of the entire history.
+      // Impact: Eliminates O(N) memory/data transfer per client history where N is all past entries.
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     }),
     prisma.invoice.findMany({
