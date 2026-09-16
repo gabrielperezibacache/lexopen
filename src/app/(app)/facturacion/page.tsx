@@ -37,7 +37,10 @@ export default async function FacturacionPage() {
       },
     }),
     prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+      // ⚡ Bolt: Fetches only the latest ledger entry per client instead of the entire history.
+      // Impact: Eliminates O(N) memory/data transfer per client history where N is all past entries.
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     }),
     prisma.invoice.findMany({
@@ -57,9 +60,7 @@ export default async function FacturacionPage() {
   const unbilledGastos = unbilledExpenses.reduce((s, e) => s + e.amountClp, 0);
   const porCobrar = openInvoices.reduce((s, i) => s + Math.max(0, i.totalClp - i.paidClp), 0);
   const cobradoMes = paidThisMonth.reduce((s, p) => s + p.amountClp, 0);
-  const balMap = new Map<string, number>();
-  for (const e of allLedger) balMap.set(e.clienteId, e.balanceClp);
-  const provisionTotal = [...balMap.values()].reduce((s, v) => s + v, 0);
+  const provisionTotal = allLedger.reduce((s, e) => s + e.balanceClp, 0);
 
   const stats = [
     { label: "Horas por facturar", value: `${unbilledHours.toFixed(1)} h`, sub: clp(unbilledHonorarios), icon: Clock, href: "/facturacion/horas" },
