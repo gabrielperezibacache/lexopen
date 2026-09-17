@@ -22,7 +22,9 @@ export default async function CuentaCorrientePage({
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
     prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+      // ⚡ Bolt: Push latest balance extraction to the database to prevent O(N) memory/bandwidth bottlenecks
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     }),
     prisma.causa.findMany({
