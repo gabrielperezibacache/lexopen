@@ -1,0 +1,3 @@
+## 2025-02-17 - Added ARIA attributes to SitesGuidePanel collapsible section
+**Learning:** Collapsible sections (`<section className="panel ...">`) containing expand/collapse functionality often rely purely on conditional rendering without proper accessibility traits binding the toggle button to the expanding content.
+**Action:** When implementing or fixing disclosure widgets or collapsible panels in this codebase, always include `aria-expanded` on the toggle button and `aria-controls` linked to the `id` of the content container to ensure screen reader accessibility. Ensure the container has an actual DOM wrapper (like `div`) to hold the `id`, rather than just using a React Fragment (`<>`).
