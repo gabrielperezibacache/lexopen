@@ -22,7 +22,12 @@ export default async function CuentaCorrientePage({
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
     prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+      // ⚡ Bolt: Fetch only the latest ledger entry per client instead of the entire history.
+      // Note: This variable (allForBalance) is ONLY used to map the latest running balance for the summary cards.
+      // The full history (entries) is queried separately above and remains unmodified.
+      // Impact: Eliminates O(N) memory/data transfer per client history where N is all past entries.
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     }),
     prisma.causa.findMany({
