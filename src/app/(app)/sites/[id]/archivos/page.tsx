@@ -43,21 +43,24 @@ export default async function SiteFilesPage({ params }: Params) {
           },
         }),
   };
-  const folders = await prisma.folder.findMany({
-    where: { siteId: id },
-    include: {
-      files: {
-        where: fileWhere,
-        select: fileSelect,
-        orderBy: { name: "asc" },
+  // ⚡ Bolt: Fetch folders and root files concurrently to save one database round trip per page load
+  const [folders, rootFiles] = await Promise.all([
+    prisma.folder.findMany({
+      where: { siteId: id },
+      include: {
+        files: {
+          where: fileWhere,
+          select: fileSelect,
+          orderBy: { name: "asc" },
+        },
       },
-    },
-    orderBy: { name: "asc" },
-  });
-  const rootFiles = await prisma.siteFile.findMany({
-    where: { siteId: id, folderId: null, ...fileWhere },
-    select: fileSelect,
-  });
+      orderBy: { name: "asc" },
+    }),
+    prisma.siteFile.findMany({
+      where: { siteId: id, folderId: null, ...fileWhere },
+      select: fileSelect,
+    }),
+  ]);
 
   return (
     <div>
