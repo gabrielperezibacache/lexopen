@@ -15,19 +15,20 @@ export async function GET() {
       recentInvoices,
       recentTime,
     ] = await Promise.all([
-      prisma.timeEntry.findMany({ where: { billable: true, billed: false } }),
-      prisma.expense.findMany({ where: { billable: true, billed: false } }),
+      prisma.timeEntry.aggregate({ where: { billable: true, billed: false }, _sum: { hours: true, amountClp: true } }),
+      prisma.expense.aggregate({ where: { billable: true, billed: false }, _sum: { amountClp: true } }),
       prisma.invoice.findMany({
         where: { status: { in: ["emitida", "parcialmente_pagada", "vencida"] } },
         include: { cliente: true, causa: true },
         orderBy: { issueDate: "desc" },
       }),
-      prisma.payment.findMany({
+      prisma.payment.aggregate({
         where: {
           date: {
             gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
           },
         },
+        _sum: { amountClp: true },
       }),
       prisma.ledgerEntry.findMany({
         // ⚡ Bolt: Fetches only the latest ledger entry per client instead of the entire history.
@@ -47,14 +48,14 @@ export async function GET() {
       }),
     ]);
 
-    const unbilledHours = unbilledTime.reduce((s, t) => s + t.hours, 0);
-    const unbilledHonorarios = unbilledTime.reduce((s, t) => s + t.amountClp, 0);
-    const unbilledGastos = unbilledExpenses.reduce((s, e) => s + e.amountClp, 0);
+    const unbilledHours = unbilledTime._sum.hours || 0;
+    const unbilledHonorarios = unbilledTime._sum.amountClp || 0;
+    const unbilledGastos = unbilledExpenses._sum.amountClp || 0;
     const porCobrar = openInvoices.reduce(
       (s, i) => s + Math.max(0, i.totalClp - i.paidClp),
       0
     );
-    const cobradoMes = paidThisMonth.reduce((s, p) => s + p.amountClp, 0);
+    const cobradoMes = paidThisMonth._sum.amountClp || 0;
 
     // Saldo provisión por cliente (último balance)
     const balanceByClient = new Map<string, number>();
