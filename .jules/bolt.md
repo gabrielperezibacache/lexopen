@@ -15,3 +15,7 @@
 ## 2025-02-12 - Concurrent Prisma Fetching Optimization
 **Learning:** Sequential Prisma calls in Next.js Server Components, where the second query is independent but placed after a `null` check of the first, are a common source of performance bottlenecks.
 **Action:** Use `Promise.all` to fetch multiple independent datasets concurrently, moving `notFound()` checks to after the grouped response is resolved. This trades slightly more database work on 404 paths for a consistently faster "happy path" page load.
+
+## 2024-05-18 - [Page Sequential DB Queries]
+**Learning:** `src/app/(app)/sites/[id]/archivos/page.tsx` was doing multiple sequential Prisma database calls (`site.findUnique`, `folder.findMany`, `siteFile.findMany`) causing unnecessary round-trips to the DB.
+**Action:** When a Next.js Server Component needs multiple independent pieces of data, wrap the Prisma queries in `Promise.all` to fetch them concurrently. To optimize the happy path, group queries even if a secondary query logically follows a `null` check on the first, moving `notFound()` checks to after the `Promise.all` resolution.

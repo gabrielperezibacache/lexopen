@@ -20,12 +20,6 @@ export default async function SiteFilesPage({ params }: Params) {
   const user = await assertSitePageAccess(id);
   const clientView = isCliente(user.role);
   const fileWhere = clientVisibleFileWhere(user.role);
-  const site = await prisma.site.findUnique({
-    where: { id },
-    select: { id: true, name: true, tipo: true, color: true },
-  });
-  if (!site) notFound();
-
   const fileSelect = {
     ...siteFileListSelect,
     versions: {
@@ -43,21 +37,31 @@ export default async function SiteFilesPage({ params }: Params) {
           },
         }),
   };
-  const folders = await prisma.folder.findMany({
-    where: { siteId: id },
-    include: {
-      files: {
-        where: fileWhere,
-        select: fileSelect,
-        orderBy: { name: "asc" },
+
+  // ⚡ Bolt: Fetch site, folders, and root files concurrently to save database round trips
+  const [site, folders, rootFiles] = await Promise.all([
+    prisma.site.findUnique({
+      where: { id },
+      select: { id: true, name: true, tipo: true, color: true },
+    }),
+    prisma.folder.findMany({
+      where: { siteId: id },
+      include: {
+        files: {
+          where: fileWhere,
+          select: fileSelect,
+          orderBy: { name: "asc" },
+        },
       },
-    },
-    orderBy: { name: "asc" },
-  });
-  const rootFiles = await prisma.siteFile.findMany({
-    where: { siteId: id, folderId: null, ...fileWhere },
-    select: fileSelect,
-  });
+      orderBy: { name: "asc" },
+    }),
+    prisma.siteFile.findMany({
+      where: { siteId: id, folderId: null, ...fileWhere },
+      select: fileSelect,
+    }),
+  ]);
+
+  if (!site) notFound();
 
   return (
     <div>
