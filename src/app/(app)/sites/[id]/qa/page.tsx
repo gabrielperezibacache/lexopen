@@ -14,24 +14,26 @@ export default async function SiteQaPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
   const clientView = isCliente(user.role);
-  const site = await prisma.site.findUnique({
-    where: { id },
-    select: { id: true, name: true, tipo: true, color: true },
-  });
-  if (!site) notFound();
-  const threads = await prisma.qaThread.findMany({
-    where: {
-      siteId: id,
-      ...(clientView ? { status: "open" } : {}),
-    },
-    include: {
-      posts: {
-        include: { author: { select: publicUserSelect } },
-        orderBy: { createdAt: "asc" },
+  const [site, threads] = await Promise.all([
+    prisma.site.findUnique({
+      where: { id },
+      select: { id: true, name: true, tipo: true, color: true },
+    }),
+    prisma.qaThread.findMany({
+      where: {
+        siteId: id,
+        ...(clientView ? { status: "open" } : {}),
       },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+      include: {
+        posts: {
+          include: { author: { select: publicUserSelect } },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    }),
+  ]);
+  if (!site) notFound();
 
   return (
     <div>

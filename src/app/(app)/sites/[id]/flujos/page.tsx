@@ -14,21 +14,23 @@ export default async function SiteWorkflowsPage({ params }: Params) {
   const { id } = await params;
   await assertSitePageAccess(id);
   const { t } = await getI18n();
-  const site = await prisma.site.findUnique({
-    where: { id },
-    include: { cliente: true, causa: true },
-  });
-  if (!site) notFound();
-  const workflows = await prisma.workflow.findMany({
-    where: { siteId: id },
-    include: {
-      instances: {
-        include: { actor: { select: publicUserSelect } },
-        orderBy: { createdAt: "desc" },
-        take: 8,
+  const [site, workflows] = await Promise.all([
+    prisma.site.findUnique({
+      where: { id },
+      include: { cliente: true, causa: true },
+    }),
+    prisma.workflow.findMany({
+      where: { siteId: id },
+      include: {
+        instances: {
+          include: { actor: { select: publicUserSelect } },
+          orderBy: { createdAt: "desc" },
+          take: 8,
+        },
       },
-    },
-  });
+    }),
+  ]);
+  if (!site) notFound();
 
   return (
     <div>

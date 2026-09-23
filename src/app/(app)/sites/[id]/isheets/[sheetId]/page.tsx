@@ -10,15 +10,17 @@ type Params = { params: Promise<{ id: string; sheetId: string }> };
 export default async function ISheetDetailPage({ params }: Params) {
   const { id, sheetId } = await params;
   await assertSitePageAccess(id);
-  const site = await prisma.site.findUnique({ where: { id } });
+  const [site, sheet] = await Promise.all([
+    prisma.site.findUnique({ where: { id } }),
+    prisma.iSheet.findUnique({
+      where: { id: sheetId },
+      include: {
+        columns: { orderBy: { position: "asc" } },
+        rows: { orderBy: { createdAt: "asc" } },
+      },
+    }),
+  ]);
   if (!site) notFound();
-  const sheet = await prisma.iSheet.findUnique({
-    where: { id: sheetId },
-    include: {
-      columns: { orderBy: { position: "asc" } },
-      rows: { orderBy: { createdAt: "asc" } },
-    },
-  });
   if (!sheet || sheet.siteId !== id) notFound();
 
   return (

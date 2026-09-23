@@ -11,16 +11,18 @@ type Params = { params: Promise<{ id: string }> };
 export default async function SiteISheetsPage({ params }: Params) {
   const { id } = await params;
   await assertSitePageAccess(id);
-  const site = await prisma.site.findUnique({ where: { id } });
+  const [site, sheets] = await Promise.all([
+    prisma.site.findUnique({ where: { id } }),
+    prisma.iSheet.findMany({
+      where: { siteId: id },
+      include: {
+        columns: true,
+        _count: { select: { rows: true } },
+      },
+      orderBy: { name: "asc" },
+    }),
+  ]);
   if (!site) notFound();
-  const sheets = await prisma.iSheet.findMany({
-    where: { siteId: id },
-    include: {
-      columns: true,
-      _count: { select: { rows: true } },
-    },
-    orderBy: { name: "asc" },
-  });
 
   return (
     <div>

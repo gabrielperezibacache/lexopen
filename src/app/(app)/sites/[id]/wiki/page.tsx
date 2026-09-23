@@ -16,16 +16,18 @@ export default async function SiteWikiPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
   const { t } = await getI18n();
-  const site = await prisma.site.findUnique({
-    where: { id },
-    include: { cliente: true, causa: true },
-  });
+  const [site, pages] = await Promise.all([
+    prisma.site.findUnique({
+      where: { id },
+      include: { cliente: true, causa: true },
+    }),
+    prisma.wikiPage.findMany({
+      where: { siteId: id },
+      include: { author: true },
+      orderBy: { title: "asc" },
+    }),
+  ]);
   if (!site) notFound();
-  const pages = await prisma.wikiPage.findMany({
-    where: { siteId: id },
-    include: { author: true },
-    orderBy: { title: "asc" },
-  });
   const canEdit = !isCliente(user.role);
 
   return (

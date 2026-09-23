@@ -19,3 +19,7 @@
 ## 2024-05-18 - [Page Sequential DB Queries]
 **Learning:** `src/app/(app)/sites/[id]/archivos/page.tsx` was doing multiple sequential Prisma database calls (`site.findUnique`, `folder.findMany`, `siteFile.findMany`) causing unnecessary round-trips to the DB.
 **Action:** When a Next.js Server Component needs multiple independent pieces of data, wrap the Prisma queries in `Promise.all` to fetch them concurrently. To optimize the happy path, group queries even if a secondary query logically follows a `null` check on the first, moving `notFound()` checks to after the `Promise.all` resolution.
+
+## 2024-05-18 - [Parallelize Independent DB Queries]
+**Learning:** Sequential, independent database queries in Next.js Server Components create unnecessary bottlenecks. For instance, fetching layout parameters (like `site` info) and then fetching the specific page data sequentially doubles the round-trip latency.
+**Action:** Always combine independent Prisma fetches (e.g., `findUnique` and `findMany`) inside `Promise.all` to execute them concurrently, optimizing the "happy path" page load times.
