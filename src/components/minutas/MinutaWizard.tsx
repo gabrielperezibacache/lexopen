@@ -43,7 +43,7 @@ type Props = {
 
 function emptyAccion(): AccionDraft {
   return {
-    key: Math.random().toString(36).slice(2),
+    key: crypto.randomUUID(),
     descripcion: "",
     responsable: "",
     fechaLimite: "",
