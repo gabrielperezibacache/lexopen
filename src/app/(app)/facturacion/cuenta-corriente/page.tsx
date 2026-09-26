@@ -21,8 +21,11 @@ export default async function CuentaCorrientePage({
       include: { cliente: true, causa: true, invoice: true },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
+    // ⚡ Bolt: Fetch only the latest entry per client to avoid O(N) memory bottlenecks.
+    // Downstream code only requires the latest balanceClp, which is pre-calculated on the row.
     prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     }),
     prisma.causa.findMany({
