@@ -21,12 +21,15 @@ export async function GET(req: NextRequest) {
     });
 
     // Saldos por cliente
-    const all = await prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+    // Optimization: use distinct and descending sort to push "latest row extraction"
+    // down to PostgreSQL instead of loading all historical entries into memory (O(N) memory/bandwidth fix).
+    const latestEntries = await prisma.ledgerEntry.findMany({
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     });
     const balances = new Map<string, { clienteId: string; nombre: string; balanceClp: number }>();
-    for (const e of all) {
+    for (const e of latestEntries) {
       balances.set(e.clienteId, {
         clienteId: e.clienteId,
         nombre: e.cliente.razonSocial,
