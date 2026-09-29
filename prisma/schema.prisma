@@ -301,6 +301,8 @@ model Causa {
   @@index([pjudLastSyncAt])
   @@index([pjudNextSyncAt])
   @@index([pjudLastSyncStatus])
+  // Bolt: Add database index on 'materia' to speed up list filtering in /causas
+  @@index([materia])
 }
 
 model Tramite {
