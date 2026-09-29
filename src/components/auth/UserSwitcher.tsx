@@ -113,6 +113,7 @@ export function UserSwitcher() {
         className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-left"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        aria-controls="user-switcher-menu"
       >
         <span
           className="grid h-8 w-8 place-items-center rounded-full text-xs font-bold text-white"
@@ -130,7 +131,10 @@ export function UserSwitcher() {
         </span>
       </button>
       {open && (
-        <div className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 z-20 max-h-72 overflow-auto rounded-xl border border-white/10 bg-[#0c1c24] p-2 shadow-xl">
+        <div
+          id="user-switcher-menu"
+          className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 z-20 max-h-72 overflow-auto rounded-xl border border-white/10 bg-[#0c1c24] p-2 shadow-xl"
+        >
           {demoSwitcher && (
             <>
               <div className="px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-white/40">
