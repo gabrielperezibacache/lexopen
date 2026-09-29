@@ -108,7 +108,7 @@ export function WikiHistoryPanel({
                     disabled={busy}
                     onClick={() => restore(r.id)}
                   >
-                    Restaurar
+                    {busy ? "Restaurando…" : "Restaurar"}
                   </button>
                 </li>
               ))}
