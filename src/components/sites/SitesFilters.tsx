@@ -40,8 +40,14 @@ function FiltersInner({ defaultStatus }: { defaultStatus: string }) {
         name="q"
         placeholder={t("sites.filters.search")}
         defaultValue={sp.get("q") || ""}
+        aria-label={t("sites.filters.search")}
       />
-      <select className="select" name="tipo" defaultValue={sp.get("tipo") || ""}>
+      <select
+        className="select"
+        name="tipo"
+        defaultValue={sp.get("tipo") || ""}
+        aria-label={t("sites.filters.allTypes")}
+      >
         <option value="">{t("sites.filters.allTypes")}</option>
         {SITE_TYPES.map((tipo) => (
           <option key={tipo} value={tipo}>
@@ -49,7 +55,12 @@ function FiltersInner({ defaultStatus }: { defaultStatus: string }) {
           </option>
         ))}
       </select>
-      <select className="select" name="estado" defaultValue={estadoValue}>
+      <select
+        className="select"
+        name="estado"
+        defaultValue={estadoValue}
+        aria-label={t("sites.filters.allStatuses")}
+      >
         <option value="all">{t("sites.filters.allStatuses")}</option>
         <option value="active">{t("sites.filters.active")}</option>
         <option value="archived">{t("sites.filters.archived")}</option>
