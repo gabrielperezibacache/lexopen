@@ -110,6 +110,7 @@ export default function MonitoreoCausasPage() {
   }, []);
 
   const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase(); // ⚡ Bolt: compute toLowerCase() outside the loop to optimize list filtering
     return items.filter((i) => {
       if (filter === "monitoreadas" && !i.monitoreoActivo) return false;
       if (filter === "fallidas" && !i.failed) return false;
@@ -120,9 +121,9 @@ export default function MonitoreoCausasPage() {
         i.semaforo !== filter
       )
         return false;
-      if (!q.trim()) return true;
+      if (!query) return true;
       const hay = `${i.rit} ${i.titulo} ${i.tribunal} ${i.sala || ""} ${i.cliente?.razonSocial || ""}`.toLowerCase();
-      return hay.includes(q.trim().toLowerCase());
+      return hay.includes(query);
     });
   }, [items, filter, q]);
 
