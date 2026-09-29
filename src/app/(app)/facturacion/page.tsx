@@ -36,8 +36,11 @@ export default async function FacturacionPage() {
         date: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
       },
     }),
+    // ⚡ Bolt: Fetches only the latest balance row per client (distinct: ["clienteId"])
+    // to avoid O(N) memory/bandwidth constraints when calculating current balances.
     prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     }),
     prisma.invoice.findMany({
