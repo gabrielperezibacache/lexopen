@@ -75,7 +75,13 @@ export function UfRateForm() {
         onSubmit={onSubmit}
         className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4"
       >
-        <input className="input" type="date" name="date" required />
+        <input
+          className="input"
+          type="date"
+          name="date"
+          required
+          aria-label="Fecha de la UF"
+        />
         <input
           className="input"
           type="number"
@@ -83,12 +89,14 @@ export function UfRateForm() {
           min="1"
           required
           placeholder="UF en CLP"
+          aria-label="Valor de la UF en CLP"
         />
         <input
           className="input"
           name="source"
           placeholder="Fuente"
           defaultValue="manual"
+          aria-label="Fuente de la UF"
         />
         <button className="btn btn-primary" disabled={busy} type="submit">
           {busy ? "Guardando..." : "Guardar UF"}

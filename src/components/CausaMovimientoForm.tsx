@@ -111,15 +111,17 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
           name="titulo"
           required
           placeholder="Nuevo movimiento"
+          aria-label="Título del nuevo movimiento"
         />
-        <input className="input" type="date" name="fecha" />
+        <input className="input" type="date" name="fecha" aria-label="Fecha del movimiento" />
         <button className="btn btn-primary" disabled={busy} type="submit">
-          Agregar
+          {busy ? "Agregando…" : "Agregar"}
         </button>
         <input
           className="input md:col-span-4"
           name="detalle"
           placeholder="Detalle opcional"
+          aria-label="Detalle opcional del movimiento"
         />
       </form>
       <form
@@ -149,6 +151,7 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
           name="file"
           accept=".csv,text/csv"
           required
+          aria-label="Archivo CSV de movimientos"
           onChange={(event) => {
             setSelectedFile(event.target.files?.[0] || null);
             setPreviewRows([]);
