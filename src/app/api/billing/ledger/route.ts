@@ -21,12 +21,14 @@ export async function GET(req: NextRequest) {
     });
 
     // Saldos por cliente
-    const all = await prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+    const latestBalances = await prisma.ledgerEntry.findMany({
+      // ⚡ Bolt: Fetches only the latest ledger entry per client instead of the entire history.
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     });
     const balances = new Map<string, { clienteId: string; nombre: string; balanceClp: number }>();
-    for (const e of all) {
+    for (const e of latestBalances) {
       balances.set(e.clienteId, {
         clienteId: e.clienteId,
         nombre: e.cliente.razonSocial,

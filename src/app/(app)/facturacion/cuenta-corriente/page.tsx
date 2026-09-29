@@ -15,14 +15,16 @@ export default async function CuentaCorrientePage({
   const clientes = await prisma.cliente.findMany({ orderBy: { razonSocial: "asc" } });
   const clienteId = sp.clienteId || clientes[0]?.id;
 
-  const [entries, allForBalance, causas] = await Promise.all([
+  const [entries, latestBalances, causas] = await Promise.all([
     prisma.ledgerEntry.findMany({
       where: clienteId ? { clienteId } : undefined,
       include: { cliente: true, causa: true, invoice: true },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
     prisma.ledgerEntry.findMany({
-      orderBy: [{ clienteId: "asc" }, { date: "asc" }, { createdAt: "asc" }],
+      // ⚡ Bolt: Fetches only the latest ledger entry per client instead of the entire history.
+      distinct: ["clienteId"],
+      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
     }),
     prisma.causa.findMany({
@@ -32,7 +34,7 @@ export default async function CuentaCorrientePage({
   ]);
 
   const balances = new Map<string, { nombre: string; balanceClp: number }>();
-  for (const e of allForBalance) {
+  for (const e of latestBalances) {
     balances.set(e.clienteId, { nombre: e.cliente.razonSocial, balanceClp: e.balanceClp });
   }
 
