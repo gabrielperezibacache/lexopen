@@ -17,29 +17,31 @@ export default async function SiteBlogPage({ params }: Params) {
   const user = await assertSitePageAccess(id);
   const { t } = await getI18n();
   const clientView = isCliente(user.role);
-  const site = await prisma.site.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      name: true,
-      tipo: true,
-      color: true,
-      status: true,
-      isClientVisible: true,
-      cliente: { select: { razonSocial: true } },
-      causa: { select: { rit: true, titulo: true } },
-    },
-  });
-  if (!site) notFound();
+  const [site, posts] = await Promise.all([
+    prisma.site.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        tipo: true,
+        color: true,
+        status: true,
+        isClientVisible: true,
+        cliente: { select: { razonSocial: true } },
+        causa: { select: { rit: true, titulo: true } },
+      },
+    }),
+    prisma.blogPost.findMany({
+      where: {
+        siteId: id,
+        ...(clientView ? { published: true } : {}),
+      },
+      include: { author: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
-  const posts = await prisma.blogPost.findMany({
-    where: {
-      siteId: id,
-      ...(clientView ? { published: true } : {}),
-    },
-    include: { author: true },
-    orderBy: { createdAt: "desc" },
-  });
+  if (!site) notFound();
 
   return (
     <div>
