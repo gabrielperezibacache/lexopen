@@ -23,3 +23,7 @@
 ## 2024-05-18 - [Parallelize Independent DB Queries]
 **Learning:** Sequential, independent database queries in Next.js Server Components create unnecessary bottlenecks. For instance, fetching layout parameters (like `site` info) and then fetching the specific page data sequentially doubles the round-trip latency.
 **Action:** Always combine independent Prisma fetches (e.g., `findUnique` and `findMany`) inside `Promise.all` to execute them concurrently, optimizing the "happy path" page load times.
+
+## 2024-10-24 - Database Level Aggregation
+**Learning:** Fetching all rows of a database into Node.js application memory just to calculate a sum using `reduce` wastes memory bandwidth and leads to O(N) memory complexity based on the record count. This is a common performance anti-pattern.
+**Action:** Use Prisma's `.aggregate({ _sum: { ... } })` feature to execute these reductions at the database level where they are highly optimized, and returning only the required calculation result to the application.
