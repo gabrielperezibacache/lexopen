@@ -4,6 +4,10 @@ import { civilDateKey, civilMonthQueryRange, formatCivilDate } from "@/lib/chile
 import { clasificarUrgencia, labelTipoComputo } from "@/lib/plazos";
 import { UrgenciaBadge, pageTitleClass } from "@/components/ui";
 import { requireStaff } from "@/lib/auth/session";
+import {
+  CalendarioClient,
+  type EventoListItem,
+} from "@/components/calendario/CalendarioClient";
 
 function monthMatrix(year: number, monthIndex: number) {
   const firstDow = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay();
@@ -50,7 +54,7 @@ function dayLabel(ymd: string) {
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
-type Props = { searchParams: Promise<{ ym?: string; tipo?: string }> };
+type Props = { searchParams: Promise<{ ym?: string; tipo?: string; nuevo?: string }> };
 
 export default async function CalendarioPage({ searchParams }: Props) {
   await requireStaff();
@@ -60,7 +64,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
   const todayKey = civilDateKey(new Date());
   const { start: monthStart, end: monthEnd } = civilMonthQueryRange(year, monthIndex);
 
-  const [plazos, tasks, causasTabla, movAudiencias] = await Promise.all([
+  const [plazos, tasks, causasTabla, movAudiencias, eventosRaw, causasOptions] = await Promise.all([
     prisma.plazo.findMany({
       where: {
         estado: { in: ["pendiente", "vencido"] },
@@ -104,7 +108,38 @@ export default async function CalendarioPage({ searchParams }: Props) {
       },
       take: 200,
     }),
+    prisma.evento.findMany({
+      where: {
+        estado: { not: "cancelado" },
+        inicio: { gte: monthStart, lte: monthEnd },
+      },
+      include: { causa: { select: { id: true, rit: true, titulo: true } } },
+      orderBy: { inicio: "asc" },
+      take: 300,
+    }),
+    prisma.causa.findMany({
+      where: { estado: { in: ["activa", "suspensa"] } },
+      select: { id: true, rit: true, titulo: true },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+    }),
   ]);
+
+  const eventos: EventoListItem[] = eventosRaw.map((e) => ({
+    id: e.id,
+    titulo: e.titulo,
+    tipo: e.tipo,
+    inicio: e.inicio.toISOString(),
+    fin: e.fin ? e.fin.toISOString() : null,
+    todoElDia: e.todoElDia,
+    lugar: e.lugar,
+    modalidad: e.modalidad,
+    notas: e.notas,
+    causaId: e.causaId,
+    causaLabel: e.causa ? e.causa.rit || e.causa.titulo : null,
+    tipoAudiencia: e.tipoAudiencia,
+    tribunal: e.tribunal,
+  }));
 
   const upcomingPlazos = await prisma.plazo.findMany({
     where: { estado: { in: ["pendiente", "vencido"] } },
@@ -123,12 +158,13 @@ export default async function CalendarioPage({ searchParams }: Props) {
   const prevYm = shiftYm(year, monthIndex, -1);
   const nextYm = shiftYm(year, monthIndex, 1);
 
-  // ⚡ Bolt: Replace O(N^2) filtering loops with O(N) hash map lookups.
+  // Bolt O(N) maps + Evento (Fase 1) en el mismo índice por día.
   const pByDate = new Map<string, typeof plazos>();
   const tByDate = new Map<string, typeof tasks>();
   const aByDate = new Map<string, Array<{ id: string; titulo: string; causaId: string; sala: string | null }>>();
+  const evByDate = new Map<string, typeof eventos>();
 
-  if (filterTipo !== "tarea" && filterTipo !== "audiencia") {
+  if (filterTipo === "todos" || filterTipo === "plazo") {
     for (const x of plazos) {
       const key = civilDateKey(x.fechaLimite);
       if (!pByDate.has(key)) pByDate.set(key, []);
@@ -136,7 +172,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
     }
   }
 
-  if (filterTipo !== "plazo" && filterTipo !== "audiencia") {
+  if (filterTipo === "todos" || filterTipo === "tarea") {
     for (const x of tasks) {
       if (!x.dueDate) continue;
       const key = civilDateKey(x.dueDate);
@@ -145,7 +181,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
     }
   }
 
-  if (filterTipo !== "plazo" && filterTipo !== "tarea") {
+  if (filterTipo === "todos" || filterTipo === "audiencia") {
     for (const c of causasTabla) {
       if (!c.proximaTabla) continue;
       const key = civilDateKey(c.proximaTabla);
@@ -169,24 +205,32 @@ export default async function CalendarioPage({ searchParams }: Props) {
     }
   }
 
+  if (filterTipo === "todos" || filterTipo === "evento") {
+    for (const x of eventos) {
+      const key = civilDateKey(new Date(x.inicio));
+      if (!evByDate.has(key)) evByDate.set(key, []);
+      evByDate.get(key)!.push(x);
+    }
+  }
+
   function eventsOn(key: string) {
     return {
       p: pByDate.get(key) || [],
       t: tByDate.get(key) || [],
       a: aByDate.get(key) || [],
+      ev: evByDate.get(key) || [],
     };
   }
 
-  // ⚡ Bolt: Use a single O(N) reduce pass to construct agendaDays instead of multiple map/filter array allocations.
   const agendaDays = cells.reduce((acc, c) => {
     if (c.ymd) {
       const events = eventsOn(c.ymd);
-      if (events.p.length > 0 || events.t.length > 0 || events.a.length > 0) {
+      if (events.p.length > 0 || events.t.length > 0 || events.a.length > 0 || events.ev.length > 0) {
         acc.push({ ymd: c.ymd, ...events });
       }
     }
     return acc;
-  }, [] as Array<{ ymd: string; p: ReturnType<typeof eventsOn>["p"]; t: ReturnType<typeof eventsOn>["t"]; a: ReturnType<typeof eventsOn>["a"] }>);
+  }, [] as Array<{ ymd: string; p: ReturnType<typeof eventsOn>["p"]; t: ReturnType<typeof eventsOn>["t"]; a: ReturnType<typeof eventsOn>["a"]; ev: ReturnType<typeof eventsOn>["ev"] }>);
 
   return (
     <div className="space-y-6">
@@ -205,6 +249,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
               ["plazo", "Plazos"],
               ["tarea", "Tareas"],
               ["audiencia", "Audiencias"],
+              ["evento", "Eventos"],
             ].map(([value, label]) => (
               <Link
                 key={value}
@@ -221,6 +266,9 @@ export default async function CalendarioPage({ searchParams }: Props) {
           </div>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+          <Link href={`/calendario?ym=${currentYm}&nuevo=1`} className="btn btn-primary flex-1 sm:flex-none">
+            Nuevo evento
+          </Link>
           <Link
             href={`/calendario?ym=${prevYm}`}
             className="btn btn-ghost flex-1 sm:flex-none"
@@ -248,7 +296,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
 
         {/* Mobile: agenda list */}
         <div className="space-y-3 md:hidden">
-          {agendaDays.map(({ ymd, p, t, a }) => (
+          {agendaDays.map(({ ymd, p, t, a, ev }) => (
             <div
               key={ymd}
               className="rounded-2xl border border-[var(--line)] bg-white/60 px-3 py-3"
@@ -289,6 +337,16 @@ export default async function CalendarioPage({ searchParams }: Props) {
                     Audiencia · {x.titulo}
                   </Link>
                 ))}
+                {ev.map((x) => (
+                  <Link
+                    key={x.id}
+                    href={x.causaId ? `/causas/${x.causaId}` : "/calendario"}
+                    className="block rounded-lg bg-emerald-100 px-2 py-1.5 text-sm text-emerald-950"
+                  >
+                    {x.tipo === "audiencia" ? "Audiencia · " : "Evento · "}
+                    {x.titulo}
+                  </Link>
+                ))}
               </div>
             </div>
           ))}
@@ -311,7 +369,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
               if (!c.ymd) {
                 return <div key={`e-${i}`} className="min-h-24 rounded-xl bg-white/30" />;
               }
-              const { p, t, a } = eventsOn(c.ymd);
+              const { p, t, a, ev } = eventsOn(c.ymd);
               const isToday = c.ymd === todayKey;
               return (
                 <div
@@ -361,6 +419,16 @@ export default async function CalendarioPage({ searchParams }: Props) {
                         {x.titulo}
                       </Link>
                     ))}
+                    {ev.slice(0, 2).map((x) => (
+                      <Link
+                        key={x.id}
+                        href={x.causaId ? `/causas/${x.causaId}` : "/calendario"}
+                        className="block truncate rounded bg-emerald-100 px-1 text-[10px] text-emerald-950"
+                        title={x.titulo}
+                      >
+                        {x.titulo}
+                      </Link>
+                    ))}
                   </div>
                 </div>
               );
@@ -368,6 +436,13 @@ export default async function CalendarioPage({ searchParams }: Props) {
           </div>
         </div>
       </section>
+
+      <CalendarioClient
+        eventos={eventos}
+        causas={causasOptions.map((c) => ({ id: c.id, label: c.rit || c.titulo }))}
+        autoOpenNuevo={sp.nuevo === "1"}
+        currentYm={currentYm}
+      />
 
       <section className="panel rounded-3xl p-5">
         <h2 className="text-lg font-semibold">Próximos plazos</h2>
