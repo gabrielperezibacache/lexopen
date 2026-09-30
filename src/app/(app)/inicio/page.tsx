@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { prisma } from "@/lib/db";
 import { requireStaff } from "@/lib/auth/session";
 import { chileGreeting } from "@/lib/assistant/greeting";
@@ -10,6 +11,7 @@ import {
 } from "@/lib/chile-time";
 import { getI18n } from "@/lib/i18n/server";
 import { pageTitleClass } from "@/components/ui";
+import { LoadingState } from "@/components/ui/LoadingState";
 import { InicioWorkbench } from "@/components/inicio/InicioWorkbench";
 import type {
   InicioActivityCard,
@@ -23,7 +25,12 @@ import type {
 /** Línea de estado server-side (sin LLM): reemplaza `{token}` por conteos. */
 function buildStatusLine(
   template: string,
-  status: { plazosFatalesProximos: number; plazosProximos7d: number; eventosHoy: number; movimientosRecientes: number }
+  status: {
+    plazosFatalesProximos: number;
+    plazosProximos7d: number;
+    eventosHoy: number;
+    movimientosRecientes: number;
+  }
 ) {
   return template
     .replace("{fatales}", String(status.plazosFatalesProximos))
@@ -34,7 +41,13 @@ function buildStatusLine(
 
 function buildSuggestions(
   status: { plazosFatalesProximos: number; eventosHoy: number },
-  chips: { plazosFatales: string; agendarManana: string; buscarCausa: string; resumirDocumento: string; plazoProximo: string }
+  chips: {
+    plazosFatales: string;
+    agendarManana: string;
+    buscarCausa: string;
+    resumirDocumento: string;
+    plazoProximo: string;
+  }
 ): InicioSuggestion[] {
   const suggestions: InicioSuggestion[] = [];
   if (status.plazosFatalesProximos > 0) {
@@ -60,65 +73,79 @@ function buildSuggestions(
   return suggestions;
 }
 
-export default async function InicioPage() {
-  const user = await requireStaff();
+async function InicioStream({
+  userId,
+  role,
+}: {
+  userId: string;
+  role: string;
+}) {
   const { t } = await getI18n();
   const now = new Date();
-
-  const greeting = chileGreeting(user.name, now);
-  const status = await buildInicioStatus(user.id, now);
+  const status = await buildInicioStatus(userId, now);
 
   const todayYmd = santiagoDateKey(now);
   const in7dYmd = addCivilDays(todayYmd, 7);
   const hoyRange = civilDayQueryRange(todayYmd);
   const proxima7dRange = civilSpanQueryRange(todayYmd, in7dYmd);
 
-  const [eventosHoyRaw, plazosHoyRaw, plazosProximosRaw, actividadRaw, causasRecientesRaw] =
-    await Promise.all([
-      prisma.evento.findMany({
-        where: {
-          estado: { not: "cancelado" },
-          inicio: { gte: hoyRange.start, lte: hoyRange.end },
-          responsableId: user.id,
-        },
-        orderBy: { inicio: "asc" },
-        take: 5,
-      }),
-      prisma.plazo.findMany({
-        where: {
-          estado: "pendiente",
-          fechaLimite: { gte: hoyRange.start, lte: hoyRange.end },
-          responsableId: user.id,
-        },
-        include: { causa: { select: { id: true, rit: true, titulo: true } } },
-        orderBy: { fechaLimite: "asc" },
-        take: 5,
-      }),
-      prisma.plazo.findMany({
-        where: {
-          estado: "pendiente",
-          fechaLimite: { gte: proxima7dRange.start, lte: proxima7dRange.end },
-          responsableId: user.id,
-        },
-        include: { causa: { select: { id: true, rit: true, titulo: true } } },
-        orderBy: { fechaLimite: "asc" },
-        take: 5,
-      }),
-      prisma.activity.findMany({
-        include: {
-          user: { select: { name: true } },
-          causa: { select: { id: true, rit: true, titulo: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      }),
-      prisma.causa.findMany({
-        where: user.role === "admin" ? {} : { abogadoId: user.id },
-        select: { id: true, titulo: true, rit: true, estado: true, updatedAt: true },
-        orderBy: { updatedAt: "desc" },
-        take: 5,
-      }),
-    ]);
+  const [
+    eventosHoyRaw,
+    plazosHoyRaw,
+    plazosProximosRaw,
+    actividadRaw,
+    causasRecientesRaw,
+  ] = await Promise.all([
+    prisma.evento.findMany({
+      where: {
+        estado: { not: "cancelado" },
+        inicio: { gte: hoyRange.start, lte: hoyRange.end },
+        responsableId: userId,
+      },
+      orderBy: { inicio: "asc" },
+      take: 5,
+    }),
+    prisma.plazo.findMany({
+      where: {
+        estado: "pendiente",
+        fechaLimite: { gte: hoyRange.start, lte: hoyRange.end },
+        responsableId: userId,
+      },
+      include: { causa: { select: { id: true, rit: true, titulo: true } } },
+      orderBy: { fechaLimite: "asc" },
+      take: 5,
+    }),
+    prisma.plazo.findMany({
+      where: {
+        estado: "pendiente",
+        fechaLimite: { gte: proxima7dRange.start, lte: proxima7dRange.end },
+        responsableId: userId,
+      },
+      include: { causa: { select: { id: true, rit: true, titulo: true } } },
+      orderBy: { fechaLimite: "asc" },
+      take: 5,
+    }),
+    prisma.activity.findMany({
+      include: {
+        user: { select: { name: true } },
+        causa: { select: { id: true, rit: true, titulo: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+    prisma.causa.findMany({
+      where: role === "admin" ? {} : { abogadoId: userId },
+      select: {
+        id: true,
+        titulo: true,
+        rit: true,
+        estado: true,
+        updatedAt: true,
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+    }),
+  ]);
 
   const eventosHoy: InicioEventoCard[] = eventosHoyRaw.map((e) => ({
     id: e.id,
@@ -184,21 +211,37 @@ export default async function InicioPage() {
   };
 
   return (
+    <>
+      <p
+        className="mt-2 max-w-3xl text-sm text-[var(--ink-soft)]/80 sm:text-base"
+        data-testid="inicio-status-line"
+      >
+        {statusLine}
+      </p>
+      <div className="mt-6">
+        <InicioWorkbench initialData={initialData} />
+      </div>
+    </>
+  );
+}
+
+export default async function InicioPage() {
+  const user = await requireStaff();
+  const { t } = await getI18n();
+  const greeting = chileGreeting(user.name);
+
+  return (
     <div className="space-y-6">
       <header>
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
           {t("inicio.eyebrow")}
         </p>
         <h1 className={pageTitleClass}>{greeting}</h1>
-        <p
-          className="mt-2 max-w-3xl text-sm text-[var(--ink-soft)]/80 sm:text-base"
-          data-testid="inicio-status-line"
-        >
-          {statusLine}
-        </p>
       </header>
 
-      <InicioWorkbench initialData={initialData} />
+      <Suspense fallback={<LoadingState label={t("common.loading")} />}>
+        <InicioStream userId={user.id} role={user.role} />
+      </Suspense>
     </div>
   );
 }
