@@ -4,7 +4,7 @@
 | --- | --- |
 | Versión base | `0.1.9` («piloto endurecido») |
 | Fecha diagnóstico | 2026-09-30 |
-| Alcance de este documento | **Solo** diagnóstico + plan priorizado. **No** implementa Fases 1–4. |
+| Alcance de este documento | Diagnóstico (Fase 0) + plan priorizado; Fase 1 = brief completo aprobado. |
 | Rama | `cursor/lexopen-1.0` |
 | Fuentes | `README.md`, `docs/WEB-HOST.md`, `docs/AUDITORIA-2026-09-06.md`, `docs/PJUD.md`, `docs/DESKTOP.md`, `prisma/schema.prisma`, `src/**`, `.jules/` vs `.Jules/` |
 
@@ -172,10 +172,29 @@ Acción recomendada (Fase 2 o 4): fusionar en **una** carpeta (preferir
 | Dominio anclado | `plazos.ts`, `minutas.ts`, `search.ts`, `causas/*`, `pjud/*` | Cómputos y handoffs |
 | Seguridad | RBAC, CSRF (`apiMutation`), audit, confidentialWhere | Misma superficie que el resto del Host |
 
-**Dirección Fase 1 (Inicio):** evolucionar `/dashboard` (nav «Inicio») hacia un
-asistente de turno que **componga** `useAgenteCopilot` / Hermes + widgets de
-urgencias ya presentes (plazos, tareas, minutas, trámites), sin duplicar
-`context-pack` ni el contrato Hermes.
+**Dirección Fase 1 (Inicio):** brief completo (opción A, aprobado 2026-09-30):
+ruta `/inicio` como default staff post-login; motor de intención
+`src/lib/assistant/` con tools tipados + confirmación humana en escrituras;
+reutilizar dominio §5 (`llm.ts`, `plazos.ts`, `search.ts`, `chat-history`,
+RBAC/CSRF/audit). `/agente` sigue como consola completa. `/dashboard` queda
+como «Panel» de KPIs (no se eliminan features).
+
+---
+
+## 5bis. Decisiones aprobadas (Gabriel · 2026-09-30)
+
+| Tema | Decisión |
+| --- | --- |
+| Alcance Fase 1 | **Brief original completo** (Inicio + intent engine + tools + Evento). No el sketch ligero «embeber Hermes en dashboard» de la §6 borrador. |
+| Portal | Mantener modelo actual (members + `isClientVisible` + tag cliente). |
+| Auditoría | Documentar gaps best-effort; **no** forzar `writeAuditStrict` en todo antes de 1.0. Mutaciones del asistente sí usan `writeAuditStrict`. |
+| Redis | Store archivo OK para un solo proceso Host. |
+| Facturación | Solo export; copy claro «no DTE». |
+| PJUD | 100 % opt-in. |
+| Desktop | Best-effort; Host web = camino soportado. |
+| i18n | ES + EN parcial; strings nuevos vía i18n. |
+| `.jules` merge | Fase 2. |
+| Tag | `1.0.0` tras Fases 1–4 (sin `0.2.0` intermedio). |
 
 ---
 
@@ -184,31 +203,60 @@ urgencias ya presentes (plazos, tareas, minutas, trámites), sin duplicar
 Esfuerzo relativo (no calendario): **S** (acotado, pocos archivos) · **M**
 (varios módulos, contratos) · **L** (transversal UI/seguridad/docs).
 
-### Fase 1 — Inicio como asistente · esfuerzo **M** · riesgo medio
+### Fase 1 — Inicio + asistente operativo · esfuerzo **L** · riesgo medio-alto
 
-**Objetivo:** el primer viewport de trabajo diario responde «qué priorizar hoy»
-con fuentes del Host y handoffs (crear plazo/tarea/minuta), no solo KPIs.
+**Objetivo:** primer viewport de trabajo diario = asistente de turno con
+confirmación humana en escrituras, status del Host (sin LLM) y agenda unificada
+(plazos + eventos + audiencias).
 
 **Hacer**
 
-- Embebido deliberado del pipeline Hermes/copiloto en `/dashboard` (o rediseño
-  Inicio que reexporte `AgenteCopilotView` con defaults `utility=copilot`).
-- Reutilizar `buildAiSuggestedActions` + chips de fuentes; ACL confidencial
-  idéntica a `/agente`.
-- Mantener `/agente` como consola completa (alcance documental, utilidades).
+1. **Nav:** `src/app/(app)/inicio/page.tsx` default post-login staff;
+   `safeAppPath` + redirects `/dashboard` → `/inicio`; AppSidebar «Inicio»
+   primero; dashboard como «Panel»; cliente → `/portal`.
+2. **Inicio UI:** saludo Chile-time + línea de status (plazos fatales,
+   audiencias, movimientos PJUD); composer autoexpandible (placeholders,
+   adjuntos ingest/OCR, Enter/Shift+Enter, ⌘K/Ctrl+K, Web Speech es-CL
+   opcional, chips); cards Hoy/Plazos/Actividad/Causas; historial con result
+   cards (Ver/Editar/Deshacer).
+3. **Intent engine** `src/lib/assistant/`: normalize (es-CL / Santiago,
+   RIT/ROL/RUC) → classify (Zod JSON multi-intent + rule fallback sin LLM) →
+   resolve (`search.ts` + ACL) → plan ordenado → confirm humano en writes →
+   tool registry → `writeAuditStrict` + card + undo. APIs SSE
+   `POST /api/assistant` + `POST /api/assistant/confirm` (planId server-side);
+   CSRF, rate-limit, Zod, `handleRouteError`; persistir `AgentChat`.
+4. **Tools** mínimos: `nota.*`, `tarea.*`, `causa.*`, `minuta.borrador|crear`,
+   `documento.*`, `plazo.crear|estimar`, `evento.*`, `buscar`,
+   `jurisprudencia.*`, `respuesta.libre`.
+5. **Evento:** migrate Prisma `Evento`; `/calendario` mes/semana/agenda con
+   CRUD + drag; Google Calendar CRUD + ICS; conflictos en confirm.
+6. **Tests:** unit (fechas, RIT/RUC, Zod tools, RBAC, rule classifier);
+   contract `/api/assistant` con fixtures; e2e login→Inicio→audiencia→confirm
+   →calendario; cliente sin staff assistant. `npm test` / lint / build / e2e
+   verdes.
 
-**No hacer**
+**No hacer (Fase 1)**
 
-- Nuevo proveedor LLM, nuevo schema de chat, ni bypass de aprobación humana.
+- Fases 2–4 de producto (UI global, hardening Redis obligatorio, tag 1.0).
+- Bypass de confirmación humana en escrituras.
+- Nuevo proveedor LLM; reescribir `context-pack` / Hermes.
 
 **Riesgos**
 
-- Duplicar estado cliente si se copia `useAgenteCopilot` en vez de extraer props.
-- Regresión e2e `agente-document-scope` / smoke dashboard.
-- Prometer «asesoría» en copy — mantener disclaimer operativo.
+- Scope L: migration + calendario + SSE + muchos tools.
+- Regresión e2e que asumen post-login `/dashboard`.
+- Copy que suene a «asesoría» — disclaimer operativo.
 
-**Criterio de salida:** Inicio usa el mismo backend Hermes; tests unitarios AI
-verdes; e2e smoke + scope documental verdes.
+**Definición de terminado (Fase 1)**
+
+- [ ] Staff aterriza en `/inicio`; cliente en `/portal`; Panel conserva KPIs.
+- [ ] Composer + status + cards + historial con rich cards / undo.
+- [ ] Pipeline intent → confirm → execute auditado; reads sin confirm.
+- [ ] Tools mínimos del brief registrados y testeados (Zod + RBAC).
+- [ ] `Evento` migrado; calendario muestra plazos+eventos+audiencias.
+- [ ] Unit + contract + e2e del flujo audiencia; suite `test` incluye nuevos.
+- [ ] `npm test`, `npm run lint`, `npm run build`, `npm run e2e` verdes.
+- [ ] CHANGELOG actualizado; sin trabajo de Fase 2–4 de producto.
 
 ### Fase 2 — Refresco UI coherente · esfuerzo **M–L** · riesgo medio-bajo
 
@@ -300,31 +348,23 @@ Fase 4 docs/release
 
 ---
 
-## 8. Preguntas abiertas (requieren aprobación de Gabriel)
+## 8. Preguntas abiertas
 
-1. **Inicio:** ¿el asistente reemplaza el dashboard de KPIs, convive arriba del
-   hub actual, o `/dashboard` redirige a un modo «briefing del día»?
-2. **Alcance portal 1.0:** ¿se endurece a solo lectura + Q&A, o se mantiene el
-   modelo actual documentado?
-3. **Auditoría strict:** ¿hay que subir wiki/blog/iSheet/Hermes/webhook a
-   `writeAuditStrict` antes del tag 1.0, o basta documentar best-effort?
-4. **Redis:** ¿1.0 asume siempre un solo proceso Host (archivo OK), o se exige
-   Redis cuando `LEXOPEN_BIND=0.0.0.0`?
-5. **Facturación 1.0:** ¿solo export CSV/XML + copy claro «no DTE», o se apunta
-   a un conector de facturador chileno concreto?
-6. **PJUD en 1.0:** ¿el scrape sigue 100 % opt-in con warning LICENSE, o se
-   limita el marketing a CSV/partner?
-7. **Desktop:** ¿1.0 declara Electron «best effort / opcional» y Host web como
-   único camino soportado (ya casi es así)?
-8. **i18n:** ¿EN completo es gate de 1.0 o solo ES jurídico chileno + EN parcial?
-9. **Paleta `.Jules` vs `.jules`:** ¿se fusiona en Fase 2 o en un chore previo?
-10. **Versionado:** ¿`1.0.0` tras Fases 1–4, o un `0.2.0` intermedio post-Inicio?
+**Resueltas** → ver §5bis (Decisiones aprobadas).
+
+**Pendientes (no bloquean Fase 1):**
+
+1. ¿Calendario 1.0 exige sync bidireccional Google (pull) o basta push + ICS?
+2. ¿El setting «solo LLM local» se modela en `FirmSettings` o basta
+   `IntegrationConfig` + flags de URL privada ya existentes?
+3. ¿Prompts completos en auditoría solo con flag admin (default off) — confirmar
+   nombre de flag (`LEXOPEN_AUDIT_LLM_PROMPTS=1`)?
 
 ---
 
-## 9. Fuera de alcance de este diagnóstico
+## 9. Fuera de alcance de Fase 0 / de este doc como diagnóstico
 
-- Implementación de producto Fases 1–4.
+- Implementación de producto Fases 2–4 (Fase 1 se implementa en la misma rama).
 - Merge de las ~90 ramas históricas inventariadas en AUDITORIA (mayoría behind;
   no reabrir en bloque).
 - Certificación WCAG completa, pentest externo, ni carga de producción.
