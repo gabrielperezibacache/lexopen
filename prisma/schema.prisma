@@ -318,6 +318,7 @@ model Causa {
   @@index([updatedAt])
   @@index([abogadoId])
   @@index([clienteId])
+  @@index([pjudFromMisCausas])
 }
 
 model Tramite {
@@ -329,7 +330,7 @@ model Tramite {
   fechaHecho   DateTime?
   orden        Int       @default(0)
   createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  updatedAt    DateTime  @default(now()) @updatedAt
 
   causaId String
   causa   Causa @relation(fields: [causaId], references: [id], onDelete: Cascade)

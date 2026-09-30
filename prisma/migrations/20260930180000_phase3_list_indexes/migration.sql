@@ -2,6 +2,7 @@
 CREATE INDEX IF NOT EXISTS "Causa_updatedAt_idx" ON "Causa"("updatedAt");
 CREATE INDEX IF NOT EXISTS "Causa_abogadoId_idx" ON "Causa"("abogadoId");
 CREATE INDEX IF NOT EXISTS "Causa_clienteId_idx" ON "Causa"("clienteId");
+CREATE INDEX IF NOT EXISTS "Causa_materia_idx" ON "Causa"("materia");
 
 CREATE INDEX IF NOT EXISTS "Documento_updatedAt_idx" ON "Documento"("updatedAt");
 
