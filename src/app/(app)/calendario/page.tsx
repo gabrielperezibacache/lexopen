@@ -8,6 +8,17 @@ import {
   CalendarioClient,
   type EventoListItem,
 } from "@/components/calendario/CalendarioClient";
+import {
+  CalendarioBoard,
+  type BoardDay,
+} from "@/components/calendario/CalendarioBoard";
+import {
+  mondayOfWeek,
+  shiftWeek,
+  weekDays,
+  weekQueryRange,
+} from "@/lib/calendario/week";
+import { GoogleCalendarPullButton } from "@/components/calendario/GoogleCalendarPullButton";
 
 function monthMatrix(year: number, monthIndex: number) {
   const firstDow = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay();
@@ -54,76 +65,107 @@ function dayLabel(ymd: string) {
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
-type Props = { searchParams: Promise<{ ym?: string; tipo?: string; nuevo?: string }> };
+type Vista = "mes" | "semana" | "agenda";
+
+function parseVista(raw?: string): Vista {
+  if (raw === "semana" || raw === "agenda") return raw;
+  return "mes";
+}
+
+type Props = {
+  searchParams: Promise<{
+    ym?: string;
+    tipo?: string;
+    nuevo?: string;
+    vista?: string;
+    semana?: string;
+  }>;
+};
 
 export default async function CalendarioPage({ searchParams }: Props) {
   await requireStaff();
   const sp = await searchParams;
+  const vista = parseVista(sp.vista);
   const { year, monthIndex } = parseYm(sp.ym);
   const filterTipo = (sp.tipo || "todos").toLowerCase();
   const todayKey = civilDateKey(new Date());
-  const { start: monthStart, end: monthEnd } = civilMonthQueryRange(year, monthIndex);
+  const currentYm = ymKey(year, monthIndex);
 
-  const [plazos, tasks, causasTabla, movAudiencias, eventosRaw, causasOptions] = await Promise.all([
-    prisma.plazo.findMany({
-      where: {
-        estado: { in: ["pendiente", "vencido"] },
-        fechaLimite: { gte: monthStart, lte: monthEnd },
-      },
-      include: { causa: true },
-      orderBy: { fechaLimite: "asc" },
-    }),
-    prisma.task.findMany({
-      where: {
-        status: { not: "done" },
-        dueDate: { gte: monthStart, lte: monthEnd },
-      },
-      include: { site: true },
-      orderBy: { dueDate: "asc" },
-    }),
-    prisma.causa.findMany({
-      where: {
-        proximaTabla: { gte: monthStart, lte: monthEnd },
-      },
-      select: {
-        id: true,
-        rit: true,
-        titulo: true,
-        proximaTabla: true,
-        proximaTablaNota: true,
-        sala: true,
-      },
-    }),
-    prisma.causaMovimiento.findMany({
-      where: {
-        tipo: "audiencia",
-        fecha: { gte: monthStart, lte: monthEnd },
-      },
-      select: {
-        id: true,
-        titulo: true,
-        fecha: true,
-        causaId: true,
-        causa: { select: { rit: true, titulo: true } },
-      },
-      take: 200,
-    }),
-    prisma.evento.findMany({
-      where: {
-        estado: { not: "cancelado" },
-        inicio: { gte: monthStart, lte: monthEnd },
-      },
-      include: { causa: { select: { id: true, rit: true, titulo: true } } },
-      orderBy: { inicio: "asc" },
-      take: 300,
-    }),
-    prisma.causa.findMany({
-      where: { estado: { in: ["activa", "suspensa"] } },
-      select: { id: true, rit: true, titulo: true },
-      orderBy: { updatedAt: "desc" },
-      take: 100,
-    }),
-  ]);
+  const weekMonday =
+    vista === "semana"
+      ? mondayOfWeek(
+          sp.semana && /^\d{4}-\d{2}-\d{2}$/.test(sp.semana)
+            ? sp.semana
+            : todayKey
+        )
+      : mondayOfWeek(todayKey);
+
+  const range =
+    vista === "semana"
+      ? weekQueryRange(weekMonday)
+      : civilMonthQueryRange(year, monthIndex);
+
+  const [plazos, tasks, causasTabla, movAudiencias, eventosRaw, causasOptions] =
+    await Promise.all([
+      prisma.plazo.findMany({
+        where: {
+          estado: { in: ["pendiente", "vencido"] },
+          fechaLimite: { gte: range.start, lte: range.end },
+        },
+        include: { causa: true },
+        orderBy: { fechaLimite: "asc" },
+      }),
+      prisma.task.findMany({
+        where: {
+          status: { not: "done" },
+          dueDate: { gte: range.start, lte: range.end },
+        },
+        include: { site: true },
+        orderBy: { dueDate: "asc" },
+      }),
+      prisma.causa.findMany({
+        where: {
+          proximaTabla: { gte: range.start, lte: range.end },
+        },
+        select: {
+          id: true,
+          rit: true,
+          titulo: true,
+          proximaTabla: true,
+          proximaTablaNota: true,
+          sala: true,
+        },
+      }),
+      prisma.causaMovimiento.findMany({
+        where: {
+          tipo: "audiencia",
+          fecha: { gte: range.start, lte: range.end },
+        },
+        select: {
+          id: true,
+          titulo: true,
+          fecha: true,
+          causaId: true,
+          causa: { select: { rit: true, titulo: true } },
+        },
+        take: 200,
+      }),
+      prisma.evento.findMany({
+        where: {
+          estado: { not: "cancelado" },
+          inicio: { gte: range.start, lte: range.end },
+        },
+        include: { causa: { select: { id: true, rit: true, titulo: true } } },
+        orderBy: { inicio: "asc" },
+        take: 300,
+      }),
+      prisma.causa.findMany({
+        where: { estado: { in: ["activa", "suspensa"] } },
+        select: { id: true, rit: true, titulo: true },
+        orderBy: { updatedAt: "desc" },
+        take: 100,
+      }),
+    ]);
 
   const eventos: EventoListItem[] = eventosRaw.map((e) => ({
     id: e.id,
@@ -148,22 +190,48 @@ export default async function CalendarioPage({ searchParams }: Props) {
     take: 12,
   });
 
-  const cells = monthMatrix(year, monthIndex);
+  const cells =
+    vista === "semana"
+      ? weekDays(weekMonday).map((ymd) => ({ ymd: ymd as string | null }))
+      : monthMatrix(year, monthIndex);
+
   const monthLabel = new Intl.DateTimeFormat("es-CL", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(Date.UTC(year, monthIndex, 1, 12)));
-  const currentYm = ymKey(year, monthIndex);
+
+  const weekLabel = `${dayLabel(weekMonday)} – ${dayLabel(
+    weekDays(weekMonday)[6]
+  )}`;
+
   const prevYm = shiftYm(year, monthIndex, -1);
   const nextYm = shiftYm(year, monthIndex, 1);
+  const prevSemana = shiftWeek(weekMonday, -1);
+  const nextSemana = shiftWeek(weekMonday, 1);
+
+  function qs(extra: Record<string, string | undefined>) {
+    const p = new URLSearchParams();
+    p.set("vista", extra.vista || vista);
+    if ((extra.vista || vista) === "semana") {
+      p.set("semana", extra.semana || weekMonday);
+    } else {
+      p.set("ym", extra.ym || currentYm);
+    }
+    if (filterTipo !== "todos") p.set("tipo", filterTipo);
+    if (extra.nuevo) p.set("nuevo", extra.nuevo);
+    if (extra.tipo) p.set("tipo", extra.tipo);
+    return `/calendario?${p.toString()}`;
+  }
 
   function show(tipo: string) {
     return filterTipo === "todos" || filterTipo === tipo;
   }
 
   function eventsOn(key: string) {
-    const p = show("plazo") ? plazos.filter((x) => civilDateKey(x.fechaLimite) === key) : [];
+    const p = show("plazo")
+      ? plazos.filter((x) => civilDateKey(x.fechaLimite) === key)
+      : [];
     const t = show("tarea")
       ? tasks.filter((x) => x.dueDate && civilDateKey(x.dueDate) === key)
       : [];
@@ -193,11 +261,46 @@ export default async function CalendarioPage({ searchParams }: Props) {
     return { p, t, a, ev };
   }
 
+  const boardDays: BoardDay[] = cells.map((c) => {
+    if (!c.ymd) return { ymd: null, p: [], t: [], a: [], ev: [] };
+    const { p, t, a, ev } = eventsOn(c.ymd);
+    return {
+      ymd: c.ymd,
+      p: p.map((x) => ({
+        id: x.id,
+        titulo: x.titulo,
+        causaId: x.causaId,
+        esFatal: x.esFatal,
+        fechaLimite: x.fechaLimite.toISOString(),
+      })),
+      t: t.map((x) => ({
+        id: x.id,
+        title: x.title,
+        siteId: x.siteId,
+      })),
+      a: a.map((x) => ({
+        id: x.id,
+        titulo: x.titulo,
+        causaId: x.causaId,
+      })),
+      ev: ev.map((x) => ({
+        id: x.id,
+        titulo: x.titulo,
+        tipo: x.tipo,
+        inicio: x.inicio,
+        causaId: x.causaId,
+      })),
+    };
+  });
+
   const agendaDays = cells
     .map((c) => c.ymd)
     .filter((ymd): ymd is string => Boolean(ymd))
     .map((ymd) => ({ ymd, ...eventsOn(ymd) }))
     .filter(({ p, t, a, ev }) => p.length > 0 || t.length > 0 || a.length > 0 || ev.length > 0);
+
+  const weekLabels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+  const heading = vista === "semana" ? weekLabel : monthLabel;
 
   return (
     <div className="space-y-6">
@@ -208,9 +311,32 @@ export default async function CalendarioPage({ searchParams }: Props) {
           </p>
           <h1 className={pageTitleClass}>Calendario</h1>
           <p className="mt-2 text-sm text-[var(--ink-soft)]/80 sm:text-base">
-            Plazos procesales, tareas y audiencias (próxima tabla / movimientos).
+            Plazos procesales, tareas, eventos y audiencias. Arrastre eventos
+            (verde) entre días en mes o semana.
           </p>
           <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            {(
+              [
+                ["mes", "Mes"],
+                ["semana", "Semana"],
+                ["agenda", "Agenda"],
+              ] as const
+            ).map(([value, label]) => (
+              <Link
+                key={value}
+                href={qs({ vista: value })}
+                className={`rounded-full px-3 py-1 ${
+                  vista === value
+                    ? "bg-[var(--ink)] text-white"
+                    : "bg-white/70 text-[var(--ink-soft)]"
+                }`}
+                data-testid={`cal-vista-${value}`}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-sm">
             {[
               ["todos", "Todos"],
               ["plazo", "Plazos"],
@@ -220,7 +346,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
             ].map(([value, label]) => (
               <Link
                 key={value}
-                href={`/calendario?ym=${currentYm}&tipo=${value}`}
+                href={qs({ tipo: value })}
                 className={`rounded-full px-3 py-1 ${
                   filterTipo === value
                     ? "bg-[var(--sea)] text-white"
@@ -233,13 +359,18 @@ export default async function CalendarioPage({ searchParams }: Props) {
           </div>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-          <Link href={`/calendario?ym=${currentYm}&nuevo=1`} className="btn btn-primary flex-1 sm:flex-none">
+          <GoogleCalendarPullButton />
+          <Link href={qs({ nuevo: "1" })} className="btn btn-primary flex-1 sm:flex-none">
             Nuevo evento
           </Link>
           <Link
-            href={`/calendario?ym=${prevYm}`}
+            href={
+              vista === "semana"
+                ? qs({ semana: prevSemana })
+                : qs({ ym: prevYm })
+            }
             className="btn btn-ghost flex-1 sm:flex-none"
-            aria-label="Mes anterior"
+            aria-label={vista === "semana" ? "Semana anterior" : "Mes anterior"}
           >
             ← <span className="sm:hidden">Ant.</span>
             <span className="hidden sm:inline">Anterior</span>
@@ -248,9 +379,13 @@ export default async function CalendarioPage({ searchParams }: Props) {
             Hoy
           </Link>
           <Link
-            href={`/calendario?ym=${nextYm}`}
+            href={
+              vista === "semana"
+                ? qs({ semana: nextSemana })
+                : qs({ ym: nextYm })
+            }
             className="btn btn-ghost flex-1 sm:flex-none"
-            aria-label="Mes siguiente"
+            aria-label={vista === "semana" ? "Semana siguiente" : "Mes siguiente"}
           >
             <span className="sm:hidden">Sig.</span>
             <span className="hidden sm:inline">Siguiente</span> →
@@ -259,9 +394,11 @@ export default async function CalendarioPage({ searchParams }: Props) {
       </div>
 
       <section className="panel rounded-3xl p-4">
-        <h2 className="mb-3 text-center text-lg font-semibold capitalize">{monthLabel}</h2>
+        <h2 className="mb-3 text-center text-lg font-semibold capitalize">
+          {heading}
+        </h2>
 
-        {/* Mobile: agenda list */}
+        {/* Mobile: always agenda list */}
         <div className="space-y-3 md:hidden">
           {agendaDays.map(({ ymd, p, t, a, ev }) => (
             <div
@@ -319,88 +456,73 @@ export default async function CalendarioPage({ searchParams }: Props) {
           ))}
           {agendaDays.length === 0 && (
             <p className="text-sm text-[var(--ink-soft)]/65">
-              Sin eventos este mes para el filtro seleccionado.
+              Sin eventos en este periodo para el filtro seleccionado.
             </p>
           )}
         </div>
 
-        {/* Desktop+: month grid */}
+        {/* Desktop+: mes/semana board con DnD; agenda = lista */}
         <div className="hidden md:block">
-          <div className="mb-3 grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wider text-[var(--ink-soft)]/55">
-            {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
-              <div key={d}>{d}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-2">
-            {cells.map((c, i) => {
-              if (!c.ymd) {
-                return <div key={`e-${i}`} className="min-h-24 rounded-xl bg-white/30" />;
-              }
-              const { p, t, a, ev } = eventsOn(c.ymd);
-              const isToday = c.ymd === todayKey;
-              return (
+          {vista === "agenda" ? (
+            <div className="space-y-3">
+              {agendaDays.map(({ ymd, p, t, a, ev }) => (
                 <div
-                  key={c.ymd}
-                  className={`min-h-24 rounded-xl border px-2 py-2 ${
-                    isToday
-                      ? "border-[var(--sea)] bg-[var(--sea)]/8"
-                      : "border-[var(--line)] bg-white/60"
-                  }`}
+                  key={ymd}
+                  className="rounded-2xl border border-[var(--line)] bg-white/60 px-3 py-3"
                 >
-                  <div className="text-xs font-semibold">{Number(c.ymd.slice(8))}</div>
-                  <div className="mt-1 space-y-1">
-                    {p.slice(0, 2).map((x) => (
+                  <div className="text-sm font-semibold">{dayLabel(ymd)}</div>
+                  <div className="mt-2 space-y-1.5 text-sm">
+                    {p.map((x) => (
                       <Link
                         key={x.id}
                         href={x.causaId ? `/causas/${x.causaId}` : "/plazos"}
-                        className={`block truncate rounded px-1 text-[10px] ${
-                          x.esFatal ||
-                          clasificarUrgencia(x.fechaLimite) === "critico" ||
-                          clasificarUrgencia(x.fechaLimite) === "vencido"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-[var(--copper)]/15 text-[var(--ink)]"
-                        }`}
-                        title={x.titulo}
+                        className="block text-[var(--ink)]"
                       >
-                        {x.esFatal ? "F · " : ""}
+                        {x.esFatal ? "Fatal · " : "Plazo · "}
                         {x.titulo}
                       </Link>
                     ))}
-                    {t.slice(0, 2).map((x) => (
+                    {t.map((x) => (
                       <Link
                         key={x.id}
                         href={x.siteId ? `/sites/${x.siteId}/tareas` : "/tareas"}
-                        className="block truncate rounded bg-[var(--sea)]/10 px-1 text-[10px] text-[var(--ink)]"
-                        title={x.title}
+                        className="block"
                       >
-                        {x.title}
+                        Tarea · {x.title}
                       </Link>
                     ))}
-                    {a.slice(0, 2).map((x) => (
-                      <Link
-                        key={x.id}
-                        href={`/causas/${x.causaId}`}
-                        className="block truncate rounded bg-amber-100 px-1 text-[10px] text-amber-950"
-                        title={x.titulo}
-                      >
-                        {x.titulo}
+                    {a.map((x) => (
+                      <Link key={x.id} href={`/causas/${x.causaId}`} className="block">
+                        Audiencia · {x.titulo}
                       </Link>
                     ))}
-                    {ev.slice(0, 2).map((x) => (
+                    {ev.map((x) => (
                       <Link
                         key={x.id}
                         href={x.causaId ? `/causas/${x.causaId}` : "/calendario"}
-                        className="block truncate rounded bg-emerald-100 px-1 text-[10px] text-emerald-950"
-                        title={x.titulo}
+                        className="block"
                       >
+                        {x.tipo === "audiencia" ? "Audiencia · " : "Evento · "}
                         {x.titulo}
                       </Link>
                     ))}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+              {agendaDays.length === 0 && (
+                <p className="text-sm text-[var(--ink-soft)]/65">
+                  Sin eventos en este periodo.
+                </p>
+              )}
+            </div>
+          ) : (
+            <CalendarioBoard
+              mode={vista === "semana" ? "semana" : "mes"}
+              days={boardDays}
+              todayKey={todayKey}
+              weekLabels={weekLabels}
+            />
+          )}
         </div>
       </section>
 
@@ -425,7 +547,8 @@ export default async function CalendarioPage({ searchParams }: Props) {
                   {p.titulo}
                 </div>
                 <div className="text-xs text-[var(--ink-soft)]/65">
-                  {p.causa?.rit || "Sin causa"} · {labelTipoComputo(p.tipoComputo)} · {formatCivilDate(p.fechaLimite)}
+                  {p.causa?.rit || "Sin causa"} · {labelTipoComputo(p.tipoComputo)} ·{" "}
+                  {formatCivilDate(p.fechaLimite)}
                 </div>
               </div>
               <UrgenciaBadge fecha={p.fechaLimite} />
