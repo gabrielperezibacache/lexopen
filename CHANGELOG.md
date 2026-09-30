@@ -11,6 +11,8 @@
 - Asistente operativo: `src/lib/assistant/` + `POST /api/assistant` (+ confirm).
 - Modelo `Evento` + calendario unificado.
 - `FirmSettings.assistantLlmMode` (local_only | remote_allowed) + `auditLlmPrompts`: el estudio puede forzar clasificación local (sin LLM remoto) y controlar si la auditoría del asistente guarda prompts completos (`src/lib/assistant/firm-policy.ts`, `POST /api/assistant`, "Configuración" → "Asistente / IA").
+- Calendario: vistas mes / semana / agenda; drag-and-drop de eventos entre días (`CalendarioBoard`).
+- Google Calendar: pull → Eventos LexOpen (`pull-calendar`) además de push e ICS; soft-fail con `GoogleIntegrationError`.
 
 ## 0.1.9 — 2026-08-17
 
