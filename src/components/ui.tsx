@@ -1,78 +1,32 @@
-import { format, parseISO } from "date-fns";
-import { es, enUS } from "date-fns/locale";
-import type { Locale } from "@/lib/i18n";
-import {
-  clasificarUrgencia,
-  diasRestantes,
-  labelDiasRestantes,
-  labelUrgencia,
-  urgenciaBadgeClass,
-} from "@/lib/plazos";
-
-function dateFnsLocale(locale?: Locale | string | null) {
-  return locale === "en" ? enUS : es;
-}
-
-export function formatDate(
-  value?: string | Date | null,
-  locale?: Locale | string | null
-) {
-  if (!value) return "—";
-  const d = typeof value === "string" ? parseISO(value) : value;
-  if (Number.isNaN(d.getTime())) return "—";
-  return format(d, "dd MMM yyyy", { locale: dateFnsLocale(locale) });
-}
-
-export function formatDateTime(
-  value?: string | Date | null,
-  locale?: Locale | string | null
-) {
-  if (!value) return "—";
-  const d = typeof value === "string" ? parseISO(value) : value;
-  if (Number.isNaN(d.getTime())) return "—";
-  return format(d, "dd MMM yyyy · HH:mm", { locale: dateFnsLocale(locale) });
-}
-
-export function UrgenciaBadge({
-  fecha,
-  estado,
-}: {
-  fecha: string | Date;
-  estado?: string;
-}) {
-  if (estado === "cumplido" || estado === "suspendido") return null;
-  const date = typeof fecha === "string" ? new Date(fecha) : fecha;
-  if (Number.isNaN(date.getTime())) return null;
-  const dias = diasRestantes(date);
-  const code = clasificarUrgencia(date);
-  return (
-    <span className={`badge ${urgenciaBadgeClass(code)}`} title={labelDiasRestantes(dias)}>
-      {labelUrgencia(code, dias)}
-    </span>
-  );
-}
-
-export function StatusBadge({
-  estado,
-}: {
-  estado: string;
-}) {
-  const map: Record<string, string> = {
-    activa: "badge-activa",
-    pendiente: "badge-pendiente",
-    urgente: "badge-pendiente",
-    vencido: "badge-vencido",
-    cumplido: "badge-activa",
-    terminada: "badge-ink",
-    archivada: "badge-ink",
-    suspensa: "badge-pendiente",
-  };
-  return <span className={`badge ${map[estado] || "badge-ink"}`}>{estado}</span>;
-}
-
-/** Shared responsive display title scale for app pages. */
-export const pageTitleClass =
-  "display mt-2 break-words text-2xl sm:text-3xl md:text-4xl";
-
-export const pageToolbarClass =
-  "mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between";
+/**
+ * Compatibility barrel — prefer `@/components/ui` package exports.
+ * Kept so existing `from "@/components/ui"` imports keep working.
+ */
+export {
+  formatDate,
+  formatDateTime,
+  UrgenciaBadge,
+  StatusBadge,
+  pageTitleClass,
+  pageToolbarClass,
+  Button,
+  Input,
+  Textarea,
+  Select,
+  Combobox,
+  DatePicker,
+  Dialog,
+  Sheet,
+  Tabs,
+  Table,
+  Badge,
+  ToastProvider,
+  useToast,
+  Skeleton,
+  EmptyState,
+  Tooltip,
+  DropdownMenu,
+  CommandPalette,
+  PageHeader,
+  ModuleHeader,
+} from "@/components/ui/index";
