@@ -1144,9 +1144,11 @@ de producción:
   quien active el scrape asume el costo y el riesgo de ese mecanismo (véase el
   aviso en Licencia y el WARNING de la [Capa Chile](#capa-chile));
 - `LEXOPEN_OPEN_ACCESS`, `LEXOPEN_RELAX_CSRF`, `LEXOPEN_DEMO_SWITCHER`,
-  `LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS` hacen fallar el arranque en producción;
-  `HERMES_ALLOW_DEMO`, `LLM_ALLOW_DEMO`, `PJUD_ALLOW_DEMO` y URLs privadas de
-  LLM/Hermes generan advertencia al boot y deben quedar en `0` en un Host real.
+  `LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS` y los demos
+  `HERMES_ALLOW_DEMO` / `LLM_ALLOW_DEMO` / `PJUD_ALLOW_DEMO` (salvo
+  `LEXOPEN_KEEP_*_DEMO=1` intencional) hacen fallar el arranque y
+  `prod:check` en producción; URLs privadas de LLM/Hermes siguen como
+  advertencia.
 
 Estas limitaciones son parte del estado `0.1.6`, no un sustituto de un análisis de
 seguridad, privacidad o cumplimiento para una organización concreta.
