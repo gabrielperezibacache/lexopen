@@ -61,6 +61,7 @@ export const PURGE_DATA_MODELS = [
   "mailboxAccount",
   "pjudSyncJob",
   "agentChat",
+  "evento",
   "causa",
   "cliente",
   "jurisprudencia",

@@ -9,7 +9,7 @@ test("un abogado agenda una audiencia desde Inicio y aparece en el calendario", 
   await expect(page.getByTestId("inicio-status-line")).toBeVisible();
 
   const composer = page.getByTestId("inicio-composer");
-  await composer.fill("agenda una audiencia mañana a las 10 sobre prueba e2e");
+  await composer.fill("agenda una audiencia hoy a las 15 sobre prueba e2e");
   await page.getByTestId("inicio-send").click();
 
   const confirmButton = page.getByTestId("plan-confirm");
@@ -22,7 +22,11 @@ test("un abogado agenda una audiencia desde Inicio y aparece en el calendario", 
   await expect(page.getByText(/agendad/i).first()).toBeVisible();
 
   await page.goto("/calendario?tipo=evento");
-  await expect(page.getByText(/prueba e2e/i).first()).toBeVisible({
+  const eventosPanel = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Eventos y audiencias" }) });
+  await expect(eventosPanel).toBeVisible();
+  await expect(eventosPanel.getByText(/prueba e2e/i)).toBeVisible({
     timeout: 10_000,
   });
 });
