@@ -27,3 +27,7 @@
 ## 2024-10-24 - Database Level Aggregation
 **Learning:** Fetching all rows of a database into Node.js application memory just to calculate a sum using `reduce` wastes memory bandwidth and leads to O(N) memory complexity based on the record count. This is a common performance anti-pattern.
 **Action:** Use Prisma's `.aggregate({ _sum: { ... } })` feature to execute these reductions at the database level where they are highly optimized, and returning only the required calculation result to the application.
+
+## 2024-10-24 - Database Level Aggregation
+**Learning:** Fetching all rows of a database into Node.js application memory just to calculate a sum using `reduce` wastes memory bandwidth and leads to O(N) memory complexity based on the record count. This is a common performance anti-pattern.
+**Action:** Use Prisma's `.aggregate({ _sum: { ... } })` feature to execute these reductions at the database level where they are highly optimized, and returning only the required calculation result to the application.
