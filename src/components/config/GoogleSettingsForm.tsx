@@ -20,6 +20,7 @@ export function GoogleSettingsForm() {
   const [ok, setOk] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [testingGmail, setTestingGmail] = useState(false);
+  const [pullingCalendar, setPullingCalendar] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,8 +142,9 @@ export function GoogleSettingsForm() {
         <h2 className="text-lg font-semibold">Google Workspace</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
           OAuth para Drive (carpetas por causa + archivos/minutas), Calendar
-          (plazos) y Gmail (digests PJUD). Credenciales:{" "}
-          <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>.
+          (push de plazos/eventos + pull a Eventos LexOpen + ICS) y Gmail
+          (digests PJUD). Credenciales: <code>GOOGLE_CLIENT_ID</code> /{" "}
+          <code>GOOGLE_CLIENT_SECRET</code>.
         </p>
       </div>
 
@@ -273,6 +275,45 @@ export function GoogleSettingsForm() {
             }}
           >
             {testingGmail ? "Enviando…" : "Probar Gmail"}
+          </button>
+        )}
+        {state.connected && state.syncCalendar && (
+          <button
+            className="btn btn-secondary"
+            type="button"
+            disabled={pullingCalendar}
+            data-testid="google-settings-pull-calendar"
+            onClick={async () => {
+              setPullingCalendar(true);
+              setMessage("");
+              const result = await apiMutation<{
+                created?: number;
+                updated?: number;
+                skipped?: number;
+                message?: string;
+                status?: string;
+              }>("/api/integrations/google", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "pull-calendar" }),
+              });
+              setOk(result.ok);
+              if (!result.ok) {
+                setMessage(result.error || "Error al importar Calendar");
+              } else if (
+                result.data.status &&
+                result.data.status !== "ok"
+              ) {
+                setMessage(result.data.message || result.data.status);
+              } else {
+                setMessage(
+                  `Calendar importado: ${result.data.created ?? 0} nuevos, ${result.data.updated ?? 0} actualizados`
+                );
+              }
+              setPullingCalendar(false);
+            }}
+          >
+            {pullingCalendar ? "Importando…" : "Importar Calendar → LexOpen"}
           </button>
         )}
       </div>
