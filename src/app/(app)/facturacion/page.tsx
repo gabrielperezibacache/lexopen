@@ -25,16 +25,27 @@ export default async function FacturacionPage() {
     recentInvoices,
     recentTime,
   ] = await Promise.all([
-    prisma.timeEntry.findMany({ where: { billable: true, billed: false } }),
-    prisma.expense.findMany({ where: { billable: true, billed: false } }),
+    // Sum unbilled hours in Postgres. hours is Float and amountClp is Int, so
+    // _sum is number | null (not Decimal); null means no matching rows.
+    prisma.timeEntry.aggregate({
+      where: { billable: true, billed: false },
+      _sum: { hours: true, amountClp: true },
+    }),
+    prisma.expense.aggregate({
+      where: { billable: true, billed: false },
+      _sum: { amountClp: true },
+      _count: { id: true },
+    }),
     prisma.invoice.findMany({
       where: { status: { in: ["emitida", "parcialmente_pagada", "vencida"] } },
-      include: { cliente: true },
+      // Por cobrar only needs totals; the client relation is unused here.
+      select: { totalClp: true, paidClp: true },
     }),
-    prisma.payment.findMany({
+    prisma.payment.aggregate({
       where: {
         date: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
       },
+      _sum: { amountClp: true },
     }),
     prisma.ledgerEntry.findMany({
       // ⚡ Bolt: Fetches only the latest ledger entry per client instead of the entire history.
@@ -54,18 +65,18 @@ export default async function FacturacionPage() {
     }),
   ]);
 
-  const unbilledHours = unbilledTime.reduce((s, t) => s + t.hours, 0);
-  const unbilledHonorarios = unbilledTime.reduce((s, t) => s + t.amountClp, 0);
-  const unbilledGastos = unbilledExpenses.reduce((s, e) => s + e.amountClp, 0);
+  const unbilledHours = unbilledTime._sum.hours ?? 0;
+  const unbilledHonorarios = unbilledTime._sum.amountClp ?? 0;
+  const unbilledGastos = unbilledExpenses._sum.amountClp ?? 0;
   const porCobrar = openInvoices.reduce((s, i) => s + Math.max(0, i.totalClp - i.paidClp), 0);
-  const cobradoMes = paidThisMonth.reduce((s, p) => s + p.amountClp, 0);
+  const cobradoMes = paidThisMonth._sum.amountClp ?? 0;
   const balMap = new Map<string, number>();
   for (const e of latestLedgerBalances) balMap.set(e.clienteId, e.balanceClp);
   const provisionTotal = [...balMap.values()].reduce((s, v) => s + v, 0);
 
   const stats = [
     { label: "Horas por facturar", value: `${unbilledHours.toFixed(1)} h`, sub: clp(unbilledHonorarios), icon: Clock, href: "/facturacion/horas" },
-    { label: "Gastos por facturar", value: clp(unbilledGastos), sub: `${unbilledExpenses.length} ítems`, icon: Wallet, href: "/facturacion/gastos" },
+    { label: "Gastos por facturar", value: clp(unbilledGastos), sub: `${unbilledExpenses._count.id} ítems`, icon: Wallet, href: "/facturacion/gastos" },
     { label: "Por cobrar", value: clp(porCobrar), sub: `${openInvoices.length} docs`, icon: CircleDollarSign, href: "/facturacion/facturas" },
     { label: "Cobrado este mes", value: clp(cobradoMes), sub: "Pagos recibidos", icon: Receipt, href: "/facturacion/facturas" },
     { label: "Provisión / CC", value: clp(provisionTotal), sub: "Saldo a favor clientes", icon: PiggyBank, href: "/facturacion/cuenta-corriente" },
