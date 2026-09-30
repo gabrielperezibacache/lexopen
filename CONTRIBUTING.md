@@ -18,3 +18,13 @@ El runner reinicia esa base antes de cada ejecución y rechaza URLs remotas o
 nombres que no indiquen `e2e`/`test`.
 
 Licencia del proyecto: AGPL-3.0-or-later.
+
+## Design system / agentes
+
+- No cree `.jules/` ni `.Jules/` (scratch de agentes; eliminado en main y
+  ignorado en `.gitignore` por colisión en FS case-insensitive).
+- Tokens UI: `src/app/globals.css` (Tailwind 4 `@theme`, light/`html.dark`).
+- Primitivos: `src/components/ui/` — importe desde `@/components/ui`.
+- Strings nuevas de UI vía diccionarios `src/lib/i18n/dictionaries/{es,en}.ts`.
+- Next.js 16: lea `node_modules/next/dist/docs/` antes de layouts/rutas (AGENTS.md).
+

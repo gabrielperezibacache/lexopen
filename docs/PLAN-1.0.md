@@ -268,27 +268,33 @@ confirmación humana en escrituras, status del Host (sin LLM) y agenda unificada
 | `auditLlmPrompts` (admin) | **Cerrado** — default `false`; prompts completos en auditoría solo si está activo (sin env obligatorio; setting DB). |
 | E2E suite completa en VM | **Parcial** — 2026-09-30: `npm test` + lint + build OK; `e2e/inicio-assistant` **2/2** verdes. Suite Playwright legacy completa no re-corrida (disco VM ~93%). |
 
-### Fase 2 — Refresco UI coherente · esfuerzo **M–L** · riesgo medio-bajo
+### Fase 2 — UI renovada y coherente · esfuerzo **M–L** · riesgo medio-bajo
 
-**Objetivo:** una sola lectura visual staff (tokens + headers + i18n) sin
-rediseñar marca.
+**Objetivo:** una sola lectura visual staff (tokens + shell + primitivos + i18n)
+sin reinventar la marca (copper/sea).
 
-**Hacer**
+**Estado (2026-09-30 · en curso en PR #151)**
 
-- Pasar hubs residuales (facturación, posiblemente personas/flujos) a
-  `PageHeader` + diccionarios i18n.
-- Extender `ui.tsx` solo con primitivos repetidos (p. ej. toolbar/empty).
-- Unificar `.jules` / `.Jules` palette.
-- Revisar pantallas densas (ficha causa, monitoreo PJUD) con tokens existentes;
-  sin cards decorativas ni tema púrpura/cream genérico.
+| Ítem | Estado |
+| --- | --- |
+| Tokens `globals.css` + `@theme` + light/`html.dark` + motion/a11y | **Hecho** |
+| Theme toggle persistido (`lexopen_theme` + `prefers-color-scheme`) | **Hecho** |
+| Librería `src/components/ui/*` (Button…CommandPalette) sin Radix | **Hecho** (nativo dialog/listbox; sin deps nuevas) |
+| AppShell/Sidebar colapsable + grupos Trabajo/Clientes/Documentos/Admin | **Hecho** |
+| Breadcrumbs + búsqueda global + ⌘K + panel notificaciones | **Hecho** |
+| Hub Facturación → i18n + `ModuleHeader` | **Hecho** |
+| Unificar `.jules/palette.md` (eliminar `.Jules/`) + CONTRIBUTING | **Hecho** |
+| Screen pass resto de hubs (plazos, personas, flujos, ficha causa…) | **Parcial** — deuda residual |
+| Empty/loading/error + confirm destructivo en todas las rutas | **Parcial** |
+| Spot-check Electron `desktop/` | **Pendiente** |
 
 **Riesgos**
 
 - Scope creep «rediseño total»; Next 16 breaking changes en layouts.
 - Regresiones a11y móvil ya arregladas en AppShell.
 
-**Criterio de salida:** lint/tsc/build verdes; spot-check rutas AUDITORIA;
-paleta agentes unificada.
+**Criterio de salida:** lint/tsc/build verdes; `inicio-assistant` e2e verde;
+paleta agentes unificada; hubs principales con tokens/i18n.
 
 ### Fase 3 — Endurecimiento producción · esfuerzo **M** · riesgo alto si se toca mal
 

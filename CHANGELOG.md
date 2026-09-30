@@ -6,6 +6,12 @@
 - Fase 0: diagnóstico y plan hacia 1.0 en `docs/PLAN-1.0.md` (mapa de módulos, bloqueadores de producción, design system, Fases 1–4).
 - Decisiones aprobadas (2026-09-30): Fase 1 = brief completo (Inicio + intent engine + Evento); portal/Redis/billing/PJUD/Desktop/i18n/`.jules`/tag según §5bis del plan.
 
+### Fase 2 (en curso)
+- Design system: tokens en `globals.css` (color, tipografía, spacing, radius, shadow, motion) + tema claro/oscuro persistido.
+- Librería `src/components/ui/` (Button, Input, Dialog, Sheet, Table, CommandPalette, etc.) sin dependencias Radix; barrel compatible `@/components/ui`.
+- Shell: sidebar colapsable y agrupada (Trabajo / Clientes / Documentos / Admin), breadcrumbs, búsqueda global, ⌘K, panel de notificaciones, theme toggle.
+- Facturación hub con diccionarios i18n; `.jules/palette.md` canónico (se elimina `.Jules/`).
+
 ### Fase 1 (en curso)
 - Nav: `/inicio` como home staff; Panel = `/dashboard`; redirects y e2e alineados.
 - Asistente operativo: `src/lib/assistant/` + `POST /api/assistant` (+ confirm).
