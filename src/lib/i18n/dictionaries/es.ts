@@ -40,6 +40,10 @@ export const es = {
     errorGeneric: "Algo salió mal. Intente de nuevo.",
     noNotifications: "No hay notificaciones nuevas.",
     viewAll: "Ver todas",
+    delete: "Eliminar",
+    confirm: "Confirmar",
+    previousMonth: "Mes anterior",
+    nextMonth: "Mes siguiente",
   },
   nav: {
     groups: {
@@ -781,6 +785,117 @@ export const es = {
     recentTime: "Horas recientes",
     emptyInvoices: "Sin facturas aún.",
     emptyTime: "Sin horas registradas.",
+  },
+  hubs: {
+    plazos: {
+      eyebrow: "Gestión de términos",
+      title: "Plazos",
+      subtitle:
+        "Plazos procesales, audiencias e internos. Envíelos a Google Calendar con un clic.",
+      analyze: "Analizar con copiloto",
+      calendarHeading: "Calendario {month}",
+      empty:
+        "No hay plazos en este mes. Cree uno arriba o revise el calendario.",
+      openCalendar: "calendario",
+      noCause: "Sin causa",
+      noOwner: "Sin responsable",
+      fatal: "fatal",
+    },
+    personas: {
+      eyebrow: "Directorio del estudio",
+      title: "Personas",
+      subtitle:
+        "Crear, editar y administrar usuarios, roles y grupos con acceso a espacios.",
+    },
+    flujos: {
+      eyebrow: "Automatización",
+      title: "Flujos",
+      subtitle:
+        "Aprobaciones multi-paso por espacio (funcionalidad en maduración). Configure y dispare flujos desde cada matter o VDR; este listado es una vista global.",
+      emptyTitle: "Sin flujos configurados",
+      emptyDescription:
+        "Los flujos viven en cada espacio. Abra un matter o VDR para iniciar una aprobación.",
+      emptyAction: "Ver espacios",
+    },
+    tareas: {
+      eyebrow: "Gestión de proyecto",
+      title: "Tareas",
+      subtitle: "Vista global de tareas del estudio y por espacio.",
+    },
+    documentos: {
+      eyebrow: "Repositorio por causa",
+      title: "Documentos",
+      subtitle: "Ingesta, OCR local e índice por causa.",
+    },
+    notificaciones: {
+      eyebrow: "Centro de avisos",
+      title: "Notificaciones",
+      subtitle: "Alertas de plazos, PJUD y actividad del estudio.",
+    },
+    buscar: {
+      eyebrow: "Búsqueda unificada",
+      title: "Buscar",
+      subtitle: "Causas, clientes, documentos y más en un solo lugar.",
+      searching: "Buscando…",
+      resultsFor: "Resultados para «{q}»",
+      empty: "Sin resultados para esta búsqueda.",
+    },
+    integraciones: {
+      eyebrow: "Conectores",
+      title: "Integraciones",
+      subtitle: "Google Workspace, Obsidian, LLM y PJUD.",
+    },
+    auditoria: {
+      eyebrow: "Seguridad",
+      title: "Auditoría",
+      subtitle: "Registro de acciones sensibles del Host.",
+    },
+    configuracion: {
+      eyebrow: "Administración",
+      title: "Configuración",
+      subtitle: "Estudio, Host, seguridad e integraciones.",
+    },
+    cuenta: {
+      eyebrow: "Seguridad personal",
+      title: "Mi cuenta",
+      subtitle: "Contraseña, 2FA e idioma.",
+    },
+    jurisprudencia: {
+      eyebrow: "Base doctrinal",
+      title: "Jurisprudencia",
+      subtitle: "Corpus del estudio y brief con IA.",
+    },
+    minutas: {
+      eyebrow: "Continuidad del estudio",
+      title: "Minutas",
+      subtitle: "Actas y seguimiento de acuerdos por causa.",
+    },
+    causaDetail: {
+      backExpediente: "← Expediente",
+      backMonitoreo: "← Cartera PJUD",
+      backMisCausas: "← ClaveÚnica",
+      noCaratula: "Sin carátula",
+      noRit: "Sin RIT",
+      origin: "Origen: {label}",
+      conflicts: "Conflictos: {status}",
+      driveLinked: "Drive vinculado",
+      driveStub: "Marcador Drive (no es carpeta real)",
+    },
+  },
+  confirm: {
+    deleteEvent: '¿Eliminar «{title}»?',
+    deleteEventDesc: "Esta acción no se puede deshacer desde aquí.",
+    deleteGroup: '¿Eliminar el grupo «{name}»?',
+    deleteGroupDesc: "Los miembros perderán la membresía del grupo.",
+    deleteUser: "¿Eliminar a «{name}»?",
+    deleteUserDesc: "Se revocará el acceso de esta persona al Host.",
+    deleteRow: "¿Eliminar esta fila?",
+    deleteRowDesc: "La fila se eliminará de la hoja.",
+    deleteTramite: "¿Eliminar este trámite?",
+    deleteTramiteDesc: "El trámite se quitará del expediente.",
+    deleteCausa: "¿Eliminar permanentemente «{title}»?",
+    deleteCausaDesc:
+      "Se borrarán movimientos, documentos vinculados y el historial. Esta acción no se puede deshacer.",
   },
 };
 

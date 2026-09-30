@@ -42,6 +42,10 @@ export const en: Dictionary = {
     errorGeneric: "Something went wrong. Please try again.",
     noNotifications: "No new notifications.",
     viewAll: "View all",
+    delete: "Delete",
+    confirm: "Confirm",
+    previousMonth: "Previous month",
+    nextMonth: "Next month",
   },
   nav: {
     groups: {
@@ -781,5 +785,114 @@ export const en: Dictionary = {
     recentTime: "Recent hours",
     emptyInvoices: "No invoices yet.",
     emptyTime: "No hours logged.",
+  },
+  hubs: {
+    plazos: {
+      eyebrow: "Deadline management",
+      title: "Deadlines",
+      subtitle:
+        "Procedural, hearing and internal deadlines. Push them to Google Calendar in one click.",
+      analyze: "Analyze with copilot",
+      calendarHeading: "Calendar {month}",
+      empty: "No deadlines this month. Create one above or open the calendar.",
+      openCalendar: "calendar",
+      noCause: "No matter",
+      noOwner: "Unassigned",
+      fatal: "fatal",
+    },
+    personas: {
+      eyebrow: "Firm directory",
+      title: "People",
+      subtitle: "Create and manage users, roles and groups with site access.",
+    },
+    flujos: {
+      eyebrow: "Automation",
+      title: "Workflows",
+      subtitle:
+        "Multi-step approvals per site (maturing feature). Configure and run workflows from each matter or VDR; this list is a global view.",
+      emptyTitle: "No workflows configured",
+      emptyDescription:
+        "Workflows live on each site. Open a matter or VDR to start an approval.",
+      emptyAction: "View sites",
+    },
+    tareas: {
+      eyebrow: "Project management",
+      title: "Tasks",
+      subtitle: "Global firm tasks and per-site boards.",
+    },
+    documentos: {
+      eyebrow: "Matter repository",
+      title: "Documents",
+      subtitle: "Ingest, local OCR and index by matter.",
+    },
+    notificaciones: {
+      eyebrow: "Alert center",
+      title: "Notifications",
+      subtitle: "Deadline, PJUD and firm activity alerts.",
+    },
+    buscar: {
+      eyebrow: "Unified search",
+      title: "Search",
+      subtitle: "Matters, clients, documents and more in one place.",
+      searching: "Searching…",
+      resultsFor: "Results for “{q}”",
+      empty: "No results for this search.",
+    },
+    integraciones: {
+      eyebrow: "Connectors",
+      title: "Integrations",
+      subtitle: "Google Workspace, Obsidian, LLM and PJUD.",
+    },
+    auditoria: {
+      eyebrow: "Security",
+      title: "Audit",
+      subtitle: "Sensitive Host action log.",
+    },
+    configuracion: {
+      eyebrow: "Administration",
+      title: "Settings",
+      subtitle: "Firm, Host, security and integrations.",
+    },
+    cuenta: {
+      eyebrow: "Personal security",
+      title: "My account",
+      subtitle: "Password, 2FA and language.",
+    },
+    jurisprudencia: {
+      eyebrow: "Doctrine base",
+      title: "Case law",
+      subtitle: "Firm corpus and AI brief.",
+    },
+    minutas: {
+      eyebrow: "Firm continuity",
+      title: "Minutes",
+      subtitle: "Minutes and action tracking per matter.",
+    },
+    causaDetail: {
+      backExpediente: "← Matters",
+      backMonitoreo: "← PJUD portfolio",
+      backMisCausas: "← ClaveÚnica",
+      noCaratula: "No caption",
+      noRit: "No RIT",
+      origin: "Origin: {label}",
+      conflicts: "Conflicts: {status}",
+      driveLinked: "Drive linked",
+      driveStub: "Drive stub (not a real folder)",
+    },
+  },
+  confirm: {
+    deleteEvent: 'Delete “{title}”?',
+    deleteEventDesc: "This cannot be undone from here.",
+    deleteGroup: 'Delete group “{name}”?',
+    deleteGroupDesc: "Members will lose this group membership.",
+    deleteUser: 'Delete “{name}”?',
+    deleteUserDesc: "This person will lose Host access.",
+    deleteRow: "Delete this row?",
+    deleteRowDesc: "The row will be removed from the sheet.",
+    deleteTramite: "Delete this filing?",
+    deleteTramiteDesc: "The filing will be removed from the matter.",
+    deleteCausa: 'Permanently delete “{title}”?',
+    deleteCausaDesc:
+      "Movements, linked documents and history will be removed. This cannot be undone.",
   },
 };

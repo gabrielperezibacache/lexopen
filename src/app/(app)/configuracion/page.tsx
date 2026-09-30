@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth/session";
-import { ModuleHeader } from "@/components/sites/SiteNav";
+import { ModuleHeader } from "@/components/ui/PageHeader";
+import { getI18n } from "@/lib/i18n/server";
 import { LanguageSettingsPanel } from "@/components/i18n/LanguageSettingsPanel";
 import { FirmSettingsForm } from "@/components/FirmSettingsForm";
 import { LlmSettingsForm } from "@/components/LlmSettingsForm";
@@ -19,6 +20,8 @@ import { buildPjudOpsLog } from "@/lib/pjud/ops-log";
 
 export default async function ConfiguracionPage() {
   const me = await requireRole("admin");
+  const { dict } = await getI18n();
+  const h = dict.hubs.configuracion;
   const [organization, hostStatus, users, groups] = await Promise.all([
     prisma.organization.findFirst({ include: { settings: true } }),
     getHostStatus(),
@@ -67,11 +70,7 @@ export default async function ConfiguracionPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleHeader
-        eyebrow="Administración"
-        title="Configuración del estudio"
-        subtitle="Identidad, usuarios, tributario, IA, Obsidian, Google, PJUD, entorno del host e integraciones."
-      />
+      <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
       <ConfigSectionNav />
       <LanguageSettingsPanel />
       <FirmSettingsForm organization={settingsOrganization} />
