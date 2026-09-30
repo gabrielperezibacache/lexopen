@@ -40,6 +40,10 @@ model FirmSettings {
   pjudDigestLastAt         DateTime?
   pjudDigestLastStatus     String?
   pjudDigestLastNote       String?
+  /// local_only | remote_allowed — asistente Inicio / classify
+  assistantLlmMode  String  @default("remote_allowed")
+  /// Si true, auditoría puede guardar prompts LLM completos (solo admin)
+  auditLlmPrompts   Boolean @default(false)
 }
 
 model User {

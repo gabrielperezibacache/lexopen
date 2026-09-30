@@ -10,6 +10,7 @@
 - Nav: `/inicio` como home staff; Panel = `/dashboard`; redirects y e2e alineados.
 - Asistente operativo: `src/lib/assistant/` + `POST /api/assistant` (+ confirm).
 - Modelo `Evento` + calendario unificado.
+- `FirmSettings.assistantLlmMode` (local_only | remote_allowed) + `auditLlmPrompts`: el estudio puede forzar clasificación local (sin LLM remoto) y controlar si la auditoría del asistente guarda prompts completos (`src/lib/assistant/firm-policy.ts`, `POST /api/assistant`, "Configuración" → "Asistente / IA").
 
 ## 0.1.9 — 2026-08-17
 

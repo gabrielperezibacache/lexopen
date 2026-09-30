@@ -11,6 +11,7 @@ import { ASSISTANT_TOOL_IDS, isAssistantToolId } from "./types";
 import type { AssistantIntent } from "./types";
 import { ruleClassify } from "./classify-rules";
 import type { NormalizedAssistantInput } from "./normalize";
+import type { AssistantLlmMode } from "./firm-policy";
 
 const llmIntentSchema = z.object({
   intents: z
@@ -29,6 +30,8 @@ export type ClassifyResult = {
   intents: AssistantIntent[];
   clarify?: string;
   source: "llm" | "rule";
+  /** Prompt de clasificación (enviado al LLM, o el que se habría enviado). Solo para auditoría opt-in. */
+  prompt: string;
 };
 
 const ATTACHMENT_START = "<<<ADJUNTO_NO_CONFIABLE_INICIO>>>";
@@ -39,7 +42,7 @@ export function delimitUntrustedAttachment(text: string): string {
   return `${ATTACHMENT_START}\n${text.slice(0, 20_000)}\n${ATTACHMENT_END}`;
 }
 
-function classifyPrompt(
+export function classifyPrompt(
   normalized: NormalizedAssistantInput,
   attachments?: string[]
 ) {
@@ -79,8 +82,17 @@ export async function classifyIntents(
     askLlm?: typeof defaultAskLlm;
     attachments?: string[];
     userId?: string;
+    /** Política del estudio (`FirmSettings.assistantLlmMode`). Override para tests. */
+    assistantLlmMode?: AssistantLlmMode;
+    /** Fuerza clasificación por reglas sin tocar el LLM, sin importar el modo. */
+    forceLocal?: boolean;
   }
 ): Promise<ClassifyResult> {
+  const prompt = classifyPrompt(input, opts?.attachments);
+  if (opts?.assistantLlmMode === "local_only" || opts?.forceLocal) {
+    const rules = ruleClassify(input);
+    return { ...rules, source: "rule", prompt };
+  }
   const askLlmFn = opts?.askLlm ?? defaultAskLlm;
   try {
     const result = await askLlmFn({
@@ -90,7 +102,7 @@ export async function classifyIntents(
           content:
             "Responde únicamente con JSON válido, sin markdown ni texto adicional.",
         },
-        { role: "user", content: classifyPrompt(input, opts?.attachments) },
+        { role: "user", content: prompt },
       ],
       userId: opts?.userId,
       utilityLabel: "assistant.classify",
@@ -108,12 +120,12 @@ export async function classifyIntents(
           slots: i.slots,
         }));
       if (intents.length > 0) {
-        return { intents, clarify: parsed.clarify, source: "llm" };
+        return { intents, clarify: parsed.clarify, source: "llm", prompt };
       }
     }
   } catch {
     // LLM no disponible / respuesta no usable → fallback a reglas.
   }
   const rules = ruleClassify(input);
-  return { ...rules, source: "rule" };
+  return { ...rules, source: "rule", prompt };
 }

@@ -18,6 +18,8 @@ type Settings = {
     defaultRetencionPct: number;
     ivaPct: number;
     hermesAllowDemo: boolean;
+    assistantLlmMode: string;
+    auditLlmPrompts: boolean;
   } | null;
 };
 
@@ -67,6 +69,8 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
         defaultRetencionPct: Number(fd.get("defaultRetencionPct")),
         ivaPct: Number(fd.get("ivaPct")),
         hermesAllowDemo: fd.get("hermesAllowDemo") === "on",
+        assistantLlmMode: fd.get("assistantLlmMode") || "remote_allowed",
+        auditLlmPrompts: fd.get("auditLlmPrompts") === "on",
       }),
     });
     setOk(result.ok);
@@ -172,6 +176,47 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
               Fallback del estudio si el proveedor (OpenAI, Hermes, Ollama, etc.) no
               responde. También puede configurarse por proveedor en el panel de
               endpoints de IA más abajo.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold">Asistente / IA</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+          Controla si el asistente de Inicio puede usar un LLM remoto para clasificar
+          la intención del usuario, y qué queda registrado en la auditoría.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            label="Modo del asistente"
+            hint="Solo LLM local: nunca sale texto del usuario a un proveedor remoto (clasificación por reglas). Permitir LLM remoto: usa el proveedor de IA configurado cuando está disponible."
+            className="sm:col-span-2"
+          >
+            <select
+              className="input"
+              name="assistantLlmMode"
+              defaultValue={s?.assistantLlmMode ?? "remote_allowed"}
+            >
+              <option value="local_only">Solo LLM local</option>
+              <option value="remote_allowed">Permitir LLM remoto</option>
+            </select>
+          </Field>
+        </div>
+        <label className="mt-3 flex items-start gap-3 text-sm">
+          <input
+            className="mt-1"
+            type="checkbox"
+            name="auditLlmPrompts"
+            defaultChecked={s?.auditLlmPrompts ?? false}
+          />
+          <span>
+            <span className="font-medium">Guardar prompts LLM completos en auditoría</span>
+            <span className="mt-0.5 block text-[var(--ink-soft)]/65">
+              Por defecto la auditoría del asistente solo registra el plan e
+              identificadores de herramientas. Si activa esta opción, el texto completo
+              del prompt de clasificación también se guarda (truncado), visible solo
+              para administradores.
             </span>
           </span>
         </label>

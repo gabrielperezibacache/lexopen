@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import type { Role } from "@/lib/auth/rbac";
 import { normalizeAssistantInput } from "./normalize";
 import { classifyIntents } from "./classify";
+import { getAssistantFirmPolicy } from "./firm-policy";
 import { getTool } from "./tools/registry";
 import { storePlan } from "./plan-store";
 import type {
@@ -42,6 +43,13 @@ export type AssistantTurnResult = {
   streamEvents: AssistantStreamEvent[];
   /** Resultados de los pasos de lectura ya ejecutados (needsConfirm=false). */
   autoResults?: Array<{ toolId: AssistantIntentId; result: ToolResult }>;
+  /** Metadatos de clasificación, para auditoría (`assistant.turn`). */
+  classification: {
+    source: "llm" | "rule";
+    toolIds: string[];
+    /** Prompt de clasificación; solo se persiste en auditoría si `auditLlmPrompts=true`. */
+    prompt: string;
+  };
 };
 
 async function resolveCausaId(normalized: {
@@ -209,10 +217,17 @@ export async function runAssistantTurn(
   streamEvents.push({ type: "status", message: "Analizando su solicitud…" });
 
   const normalized = normalizeAssistantInput(input.text, input.now);
+  const policy = await getAssistantFirmPolicy();
   const classification = await classifyIntents(normalized, {
     userId: input.user.id,
     attachments: input.attachments,
+    assistantLlmMode: policy.assistantLlmMode,
   });
+  const classificationMeta = {
+    source: classification.source,
+    toolIds: classification.intents.map((i) => i.toolId),
+    prompt: classification.prompt,
+  };
 
   if (classification.clarify) {
     streamEvents.push({ type: "clarify", message: classification.clarify });
@@ -221,6 +236,7 @@ export async function runAssistantTurn(
       clarify: classification.clarify,
       previewSteps: [],
       streamEvents,
+      classification: classificationMeta,
     };
   }
 
@@ -258,7 +274,7 @@ export async function runAssistantTurn(
     const message =
       "No pude preparar ninguna acción ejecutable con los datos disponibles. ¿Puede dar más detalle?";
     streamEvents.push({ type: "error", message });
-    return { planId: null, previewSteps: [], streamEvents };
+    return { planId: null, previewSteps: [], streamEvents, classification: classificationMeta };
   }
 
   const needsConfirm = steps.some((s) => getTool(s.toolId).kind === "write");
@@ -280,5 +296,11 @@ export async function runAssistantTurn(
   }
 
   streamEvents.push({ type: "done" });
-  return { planId: plan.id, previewSteps: steps, streamEvents, autoResults };
+  return {
+    planId: plan.id,
+    previewSteps: steps,
+    streamEvents,
+    autoResults,
+    classification: classificationMeta,
+  };
 }

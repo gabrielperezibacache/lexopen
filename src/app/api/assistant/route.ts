@@ -5,7 +5,11 @@ import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
 import type { Role } from "@/lib/auth/rbac";
 import { runAssistantTurn } from "@/lib/assistant/pipeline";
+import { getAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
+import { writeAudit } from "@/lib/audit";
 import { safeJsonParse } from "@/lib/safe-json";
+
+const AUDIT_PROMPT_MAX_CHARS = 8_000;
 
 const MAX_TEXT = 8000;
 
@@ -53,6 +57,30 @@ export async function POST(req: NextRequest) {
             attachments: body.attachments,
             user: { id: user.id, role: user.role as Role },
             chatId: body.chatId,
+          });
+
+          const auditPolicy = await getAssistantFirmPolicy().catch(
+            () => ({ assistantLlmMode: "remote_allowed" as const, auditLlmPrompts: false })
+          );
+          await writeAudit({
+            actorId: user.id,
+            action: "assistant.turn",
+            entityType: "AgentChat",
+            entityId: body.chatId || null,
+            after: {
+              planId: result.planId,
+              toolIds: result.classification.toolIds,
+              source: result.classification.source,
+              clarify: result.clarify || null,
+              ...(auditPolicy.auditLlmPrompts
+                ? {
+                    classifyPrompt: result.classification.prompt.slice(
+                      0,
+                      AUDIT_PROMPT_MAX_CHARS
+                    ),
+                  }
+                : {}),
+            },
           });
 
           for (const evt of result.streamEvents) {
