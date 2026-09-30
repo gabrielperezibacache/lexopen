@@ -8,6 +8,8 @@ import {
 
 assert.ok(DEMO_USER_EMAILS.includes("socio@estudio.cl"));
 assert.ok(PURGE_DATA_MODELS.includes("mailboxAccount"));
+assert.ok(PURGE_DATA_MODELS.includes("evento"));
+assert.ok(PURGE_DATA_MODELS.indexOf("evento") < PURGE_DATA_MODELS.indexOf("user"));
 assert.ok(PURGE_DATA_MODELS.indexOf("mailboxAttachment") < PURGE_DATA_MODELS.indexOf("mailboxMessage"));
 assert.ok(PURGE_DATA_MODELS.indexOf("mailboxMessage") < PURGE_DATA_MODELS.indexOf("mailboxAccount"));
 assert.ok(PURGE_DATA_MODELS.indexOf("mailboxAccount") < PURGE_DATA_MODELS.indexOf("user"));
