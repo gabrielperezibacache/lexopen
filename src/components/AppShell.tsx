@@ -3,10 +3,17 @@
 import Link from "next/link";
 import { Bell, Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import { Breadcrumbs } from "@/components/shell/Breadcrumbs";
+import { GlobalSearch } from "@/components/shell/GlobalSearch";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { CommandPalette, type CommandItem } from "@/components/ui/CommandPalette";
+import { Sheet } from "@/components/ui/Sheet";
+
+const SIDEBAR_KEY = "lexopen_sidebar_collapsed";
 
 export function AppShell({
   role,
@@ -24,14 +31,31 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  // Open only while still on the route where the menu was opened — closes on
-  // navigation without setState inside an effect (eslint react-hooks/set-state-in-effect).
   const [menuPath, setMenuPath] = useState<string | null>(null);
   const mobileOpen = menuPath === pathname;
   const { t } = useI18n();
+  const [collapsed, setCollapsed] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   function setMobileOpen(open: boolean) {
     setMenuPath(open ? pathname : null);
+  }
+
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(SIDEBAR_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  function onCollapsedChange(next: boolean) {
+    setCollapsed(next);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
   }
 
   useEffect(() => {
@@ -57,6 +81,33 @@ export function AppShell({
     };
   }, [mobileOpen]);
 
+  const commandItems = useMemo<CommandItem[]>(() => {
+    const groups: Array<[string, string, string]> = [
+      ["/inicio", t("nav.home"), t("nav.groups.work")],
+      ["/causas", t("nav.cases"), t("nav.groups.work")],
+      ["/plazos", t("nav.deadlines"), t("nav.groups.work")],
+      ["/calendario", t("nav.calendar"), t("nav.groups.work")],
+      ["/tareas", t("nav.tasks"), t("nav.groups.work")],
+      ["/clientes", t("nav.clients"), t("nav.groups.clients")],
+      ["/portal", t("nav.portal"), t("nav.groups.clients")],
+      ["/documentos", t("nav.documents"), t("nav.groups.documents")],
+      ["/minutas", t("nav.minutes"), t("nav.groups.documents")],
+      ["/jurisprudencia", t("nav.jurisprudence"), t("nav.groups.documents")],
+      ["/facturacion", t("nav.billing"), t("nav.groups.admin")],
+      ["/configuracion", t("nav.settings"), t("nav.groups.admin")],
+      ["/integraciones", t("nav.integrations"), t("nav.groups.admin")],
+      ["/auditoria", t("nav.audit"), t("nav.groups.admin")],
+      ["/buscar", t("nav.search"), t("nav.groups.documents")],
+      ["/notificaciones", t("nav.notifications"), t("nav.groups.admin")],
+    ];
+    return groups.map(([href, label, group]) => ({
+      id: href,
+      href,
+      label,
+      group,
+    }));
+  }, [t]);
+
   return (
     <div className="flex min-h-screen w-full">
       <a href="#main-content" className="skip-link" inert={mobileOpen}>
@@ -68,16 +119,18 @@ export function AppShell({
         mailPendingCount={mailPendingCount}
         mobileOpen={mobileOpen}
         onMobileOpenChange={setMobileOpen}
+        collapsed={collapsed}
+        onCollapsedChange={onCollapsedChange}
       />
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col" inert={mobileOpen}>
         <header
-          className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--line)] bg-[rgba(247,250,248,0.92)] px-3 py-2.5 backdrop-blur md:hidden"
+          className="shell-header sticky top-0 z-20 flex items-center gap-3 px-3 py-2.5 md:px-5"
           style={{ paddingTop: "max(0.625rem, env(safe-area-inset-top))" }}
         >
           <button
             type="button"
-            className="grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-white/80 text-[var(--ink)]"
+            className="grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] text-[var(--ink)] md:hidden"
             onClick={() => setMobileOpen(true)}
             aria-label={t("common.openMenu")}
             aria-expanded={mobileOpen}
@@ -85,24 +138,37 @@ export function AppShell({
           >
             <Menu size={20} />
           </button>
-          <div className="min-w-0 flex-1">
+
+          <div className="hidden min-w-0 flex-1 flex-col gap-1 md:flex">
+            <Breadcrumbs />
+            <GlobalSearch />
+          </div>
+
+          <div className="min-w-0 flex-1 md:hidden">
             <div className="display truncate text-lg leading-none">LexOpen</div>
-            <div className="mt-0.5 truncate text-[10px] uppercase tracking-[0.14em] text-[var(--ink-soft)]/55">
+            <div className="mt-0.5 truncate text-[10px] uppercase tracking-[0.14em] text-[var(--muted)]">
               {t("brand.tagline")}
             </div>
           </div>
-          <Link
-            href="/notificaciones"
-            className="relative grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-white/80 text-[var(--ink)]"
-            aria-label={t("nav.notifications")}
-          >
-            <Bell size={18} />
-            {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 min-w-[1.15rem] rounded-full bg-[var(--copper)] px-1 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            )}
-          </Link>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden md:block">
+              <ThemeToggle />
+            </div>
+            <button
+              type="button"
+              className="relative grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] text-[var(--ink)]"
+              aria-label={t("nav.notifications")}
+              onClick={() => setNotifOpen(true)}
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 min-w-[1.15rem] rounded-full bg-[var(--copper)] px-1 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
         </header>
 
         <UpdateAvailableBanner
@@ -121,6 +187,28 @@ export function AppShell({
           {children}
         </main>
       </div>
+
+      <CommandPalette items={commandItems} />
+
+      <Sheet
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        title={t("nav.notifications")}
+        side="right"
+      >
+        <p className="text-sm text-[var(--muted)]">
+          {unreadCount > 0
+            ? String(unreadCount)
+            : t("common.noNotifications")}
+        </p>
+        <Link
+          href="/notificaciones"
+          className="btn btn-primary mt-4 w-full"
+          onClick={() => setNotifOpen(false)}
+        >
+          {t("common.viewAll")}
+        </Link>
+      </Sheet>
     </div>
   );
 }
