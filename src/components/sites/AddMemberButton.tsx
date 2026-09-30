@@ -44,9 +44,14 @@ export function AddMemberButton({
         Agregar persona
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-member-title"
+        >
           <form onSubmit={onSubmit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 className="text-lg font-semibold">Agregar al espacio</h3>
+            <h3 id="add-member-title" className="text-lg font-semibold">Agregar al espacio</h3>
             <select className="select" name="userId" required defaultValue="">
               <option value="" disabled>
                 Seleccione usuario

@@ -39,9 +39,14 @@ export function NewWikiButton({ siteId }: { siteId: string }) {
         Nueva página
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-wiki-title"
+        >
           <form onSubmit={onSubmit} className="panel w-full max-w-lg space-y-3 rounded-3xl p-6">
-            <h3 className="text-lg font-semibold">Nueva página wiki</h3>
+            <h3 id="new-wiki-title" className="text-lg font-semibold">Nueva página wiki</h3>
             <WikiBorradorAi
               siteId={siteId}
               onApply={(draft) => {
