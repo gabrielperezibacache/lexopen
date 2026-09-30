@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Planificación
+- Fase 0: diagnóstico y plan hacia 1.0 en `docs/PLAN-1.0.md` (mapa de módulos, bloqueadores de producción, design system, Fases 1–4). Sin cambios de producto.
+
 ## 0.1.9 — 2026-08-17
 
 Iteración IA definitiva: i18n, acciones conectadas y refactor del copiloto.
