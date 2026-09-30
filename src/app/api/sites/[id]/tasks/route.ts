@@ -3,14 +3,19 @@ import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { triggerSiteWorkflows } from "@/lib/sites/workflow-triggers";
+import { parseListLimit } from "@/lib/api/list-limit";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, { params }: Params) {
   try {
     const user = await requireStaff();
     const { id } = await params;
     await requireSiteAccess(id, user);
+    const limit = parseListLimit(req.nextUrl.searchParams.get("limit"), {
+      default: 200,
+      max: 500,
+    });
     const tasks = await prisma.task.findMany({
       where: { siteId: id },
       include: {
@@ -19,6 +24,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         comments: true,
       },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
+      take: limit,
     });
     return NextResponse.json(tasks);
   } catch (e) {

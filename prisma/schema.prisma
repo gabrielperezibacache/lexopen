@@ -108,6 +108,11 @@ model AuditEvent {
   createdAt  DateTime @default(now())
   actorId    String?
   actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entityType, createdAt])
+  @@index([action])
 }
 
 model Tribunal {
@@ -310,6 +315,10 @@ model Causa {
   @@index([pjudLastSyncStatus])
   // Bolt: Add database index on 'materia' to speed up list filtering in /causas
   @@index([materia])
+  @@index([updatedAt])
+  @@index([abogadoId])
+  @@index([clienteId])
+  @@index([pjudFromMisCausas])
 }
 
 model Tramite {
@@ -321,7 +330,7 @@ model Tramite {
   fechaHecho   DateTime?
   orden        Int       @default(0)
   createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  updatedAt    DateTime  @default(now()) @updatedAt
 
   causaId String
   causa   Causa @relation(fields: [causaId], references: [id], onDelete: Cascade)
@@ -567,6 +576,7 @@ model Documento {
 
   @@index([causaId])
   @@index([clienteId])
+  @@index([updatedAt])
 }
 
 model Plazo {
@@ -592,6 +602,8 @@ model Plazo {
 
   @@index([fechaLimite])
   @@index([estado])
+  @@index([estado, fechaLimite])
+  @@index([responsableId, fechaLimite])
 }
 
 model Nota {
@@ -617,6 +629,9 @@ model Activity {
   site    Site?  @relation(fields: [siteId], references: [id], onDelete: Cascade)
   userId  String?
   user    User?  @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }
 
 model Task {
@@ -638,6 +653,11 @@ model Task {
 
   comments Comment[]
   minutaAcciones MinutaAccion[]
+
+  @@index([assigneeId])
+  @@index([siteId])
+  @@index([status])
+  @@index([dueDate])
 }
 
 model WikiPage {
@@ -782,6 +802,9 @@ model Notification {
   createdAt DateTime @default(now())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, read])
 }
 
 model Workflow {
@@ -1101,4 +1124,5 @@ model Evento {
   @@index([tipo, estado])
   @@index([causaId])
   @@index([responsableId])
+  @@index([responsableId, inicio])
 }

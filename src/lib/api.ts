@@ -19,6 +19,7 @@ import {
   normalizeOrigin,
 } from "@/lib/csrf";
 import { assertCsrfDoubleSubmit } from "@/lib/auth/csrf-token";
+import { getRequestId, log } from "@/lib/log";
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -46,13 +47,19 @@ export function handleRouteError(e: unknown) {
     return jsonError(e.errors.map((x) => x.message).join("; "), 400);
   }
   if (isPrismaSchemaMismatch(e)) {
-    console.error(e);
+    log.error("prisma_schema_mismatch", {
+      err: e instanceof Error ? e.message : String(e),
+      requestId: getRequestId(),
+    });
     return jsonError(
       "La base de datos no tiene el esquema actual. Reinicie el Host para aplicar migraciones.",
       503
     );
   }
-  console.error(e);
+  log.error("route_error", {
+    err: e instanceof Error ? e.message : String(e),
+    requestId: getRequestId(),
+  });
   return jsonError(
     process.env.NODE_ENV === "production"
       ? "Error interno"

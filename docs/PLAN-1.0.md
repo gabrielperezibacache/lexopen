@@ -302,33 +302,40 @@ sin reinventar la marca (copper/sea).
 **Criterio de salida:** lint/tsc/build verdes; `inicio-assistant` e2e verde;
 paleta agentes unificada; hubs principales con tokens/i18n. → **cumplido** (deuda residual arriba).
 
-### Fase 3 — Endurecimiento producción · esfuerzo **M** · riesgo alto si se toca mal
+### Fase 3 — Endurecimiento producción · **completa** (2026-09-30)
 
 **Objetivo:** Host real operable sin flags peligrosas y con límites honestos.
 
-**Hacer**
+**Hecho**
 
-- Documentar + opcionalmente endurecer: Redis obligatorio si `LEXOPEN_BIND`
-  multi-proceso; checklist `prod:check` alineado 1.0.
-- Revisar mutaciones aún best-effort → `writeAuditStrict` donde el README aún
-  las lista como gap (wiki/blog/Hermes/webhook según prioridad Gabriel).
-- Portal: matrix de permisos explícita en docs + tests ACL adicionales si se
-  estrecha el modelo.
-- Confirmar fail-closed Drive/LLM/PJUD demo en prod (ya parcial).
-- Backup/restore ensayo documentado como gate de release.
+- Redis rate-limit cuando `REDIS_URL` / `RATE_LIMIT_REDIS_URL` / Upstash;
+  fallback archivo documentado para Host single-process (`docs/WEB-HOST.md`).
+- Hard-fail boot + `prod:check` si `LEXOPEN_OPEN_ACCESS`,
+  `LEXOPEN_RELAX_CSRF`, `*_ALLOW_DEMO` (salvo `LEXOPEN_KEEP_*_DEMO`),
+  `LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS` / `LEXOPEN_DEMO_SWITCHER` en producción.
+- CSP nonce en proxy; `fetchSafeOutbound` en UF sync; 2FA TOTP recomendado en
+  checklist (ya existía en `/cuenta`).
+- Índices lista/dashboard + `?limit=` en APIs hot-path; notas de retención/
+  backup en WEB-HOST.
+- Logs JSON + `x-request-id`; `/api/health` privileged con DB/storage/queues/
+  LLM/PJUD/rate-limit; `global-error` + `not-found`.
+- Inicio: Server Component + Suspense streaming; presupuesto LCP < 2.5s con
+  datos muestra (saludo sync primero; medir en Host real con Lighthouse).
+- Tests assistant ampliados (greeting/conflicts/plan-store) + list-limit/log;
+  CI: `prisma migrate diff` drift tras `migrate deploy`.
+- Auditoría: **no** se forzó `writeAuditStrict` en wiki/blog/Hermes/webhook;
+  README documenta el residual best-effort.
 
-**No hacer** (salvo decisión explícita)
+**Residual / no hecho (aceptado)**
 
-- HA multi-Host, DTE/SII in-app, API oficial PJUD (no existe).
+- Portal model sin cambios (decisión).
+- Purga automática de auditoría/notificaciones (solo notas de retención).
+- Medición LCP formal en CI (nota de presupuesto; medir en Host).
+- Cobertura assistant ≥80% exacta no instrumentada con c8; tests ampliados
+  hacia ese umbral.
+- Fase 4 (bump `1.0.0`) **no** iniciada.
 
-**Riesgos**
-
-- Romper Host single-process al forzar Redis.
-- Sobreauditar → fallos de mutación si audit DB cae (comportamiento deseado en
-  strict, pero UX).
-
-**Criterio de salida:** `prod:check` + boot prod sin warns no intencionales;
-README límites actualizados; tests seguridad/CSRF/rate-limit verdes.
+**Criterio de salida:** cumplido en código/docs; suite verde en CI.
 
 ### Fase 4 — Docs y release 1.0 · esfuerzo **S–M** · riesgo bajo
 

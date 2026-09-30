@@ -93,13 +93,29 @@ assert.doesNotThrow(() => assertSafeProductionEnv());
 
 env.LLM_ALLOW_DEMO = "1";
 env.HERMES_ALLOW_DEMO = "1";
-assert.deepEqual(warnProductionFlags().sort(), [
+assert.deepEqual(forbiddenProductionFlags().sort(), [
   "HERMES_ALLOW_DEMO",
   "LLM_ALLOW_DEMO",
 ]);
+assert.throws(() => assertSafeProductionEnv(), /HERMES_ALLOW_DEMO|LLM_ALLOW_DEMO/);
+env.LEXOPEN_KEEP_HERMES_DEMO = "1";
+env.LEXOPEN_KEEP_LLM_DEMO = "1";
+assert.deepEqual(forbiddenProductionFlags(), []);
 assert.doesNotThrow(() => assertSafeProductionEnv());
+delete env.LEXOPEN_KEEP_HERMES_DEMO;
+delete env.LEXOPEN_KEEP_LLM_DEMO;
 delete env.LLM_ALLOW_DEMO;
 delete env.HERMES_ALLOW_DEMO;
+
+env.HERMES_ALLOW_PRIVATE_URL = "1";
+env.LLM_ALLOW_PRIVATE_URL = "1";
+assert.deepEqual(warnProductionFlags().sort(), [
+  "HERMES_ALLOW_PRIVATE_URL",
+  "LLM_ALLOW_PRIVATE_URL",
+]);
+assert.doesNotThrow(() => assertSafeProductionEnv());
+delete env.HERMES_ALLOW_PRIVATE_URL;
+delete env.LLM_ALLOW_PRIVATE_URL;
 
 if (prevCron === undefined) delete env.CRON_SECRET;
 else env.CRON_SECRET = prevCron;

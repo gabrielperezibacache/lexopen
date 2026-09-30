@@ -470,6 +470,13 @@ export const es = {
     title: "No se pudo cargar esta vista",
     forbidden: "No tiene permiso para ver esta sección.",
     genericProd: "Ocurrió un error inesperado. Intente de nuevo o vuelva al inicio.",
+    notFoundTitle: "Página no encontrada",
+    notFoundDescription:
+      "La ruta no existe o ya no está disponible. Vuelva al inicio o use la búsqueda.",
+    globalTitle: "Algo salió mal",
+    globalDescription:
+      "Ocurrió un error inesperado en LexOpen. Recargue la página o vuelva al inicio.",
+    goHome: "Ir al inicio",
   },
   integrations: {
     loadingStatus: "Cargando estado…",

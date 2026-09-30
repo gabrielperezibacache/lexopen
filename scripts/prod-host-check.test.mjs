@@ -24,7 +24,16 @@ assert.equal(bad.ok, false);
 assert.ok(bad.errors.some((e) => /SESSION_SECRET/.test(e)));
 assert.ok(bad.errors.some((e) => /LEXOPEN_DEMO_SWITCHER/.test(e)));
 assert.ok(bad.errors.some((e) => /CRON_SECRET/.test(e)));
-assert.ok(bad.warnings.some((w) => /HERMES_ALLOW_DEMO/.test(w)));
+assert.ok(bad.errors.some((e) => /HERMES_ALLOW_DEMO/.test(e)));
+
+const demoKept = evaluateHostEnv({
+  SESSION_SECRET: "production-grade-session-secret-32",
+  HERMES_ALLOW_DEMO: "1",
+  LEXOPEN_KEEP_HERMES_DEMO: "1",
+});
+assert.equal(demoKept.ok, true);
+assert.ok(demoKept.warnings.some((w) => /HERMES_ALLOW_DEMO/.test(w)));
+assert.ok(demoKept.warnings.some((w) => /LEXOPEN_KEEP_HERMES_DEMO/.test(w)));
 
 const ufNoCron = evaluateHostEnv({
   SESSION_SECRET: "production-grade-session-secret-32",

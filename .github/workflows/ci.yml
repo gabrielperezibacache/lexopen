@@ -37,6 +37,13 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      # Fail if schema.prisma drifts from the DB after migrate deploy.
+      - name: Prisma schema drift check
+        run: |
+          npx prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code
       - run: npm test
       - run: npm run test:integration
       - run: npm run lint
