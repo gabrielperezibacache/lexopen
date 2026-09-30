@@ -12,23 +12,19 @@ test("un abogado agenda una audiencia desde Inicio y aparece en el calendario", 
   await composer.fill("agenda una audiencia mañana a las 10 sobre prueba e2e");
   await page.getByTestId("inicio-send").click();
 
-  // Si la tool requiere confirmación humana (escritura), confirme el plan.
   const confirmButton = page.getByTestId("plan-confirm");
-  const confirmVisible = await confirmButton
-    .isVisible({ timeout: 15_000 })
-    .catch(() => false);
-  if (confirmVisible) {
-    await confirmButton.click();
-  }
+  await expect(confirmButton).toBeVisible({ timeout: 20_000 });
+  await confirmButton.click();
 
-  await expect(
-    page.getByText(/agendad[oa]|prueba e2e/i).first()
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("assistant-result-card").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByText(/agendad/i).first()).toBeVisible();
 
   await page.goto("/calendario?tipo=evento");
-  await expect(
-    page.getByText(/prueba e2e/i).first()
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/prueba e2e/i).first()).toBeVisible({
+    timeout: 10_000,
+  });
 });
 
 test("un cliente no puede acceder a Inicio ni al asistente", async ({ page }) => {

@@ -125,6 +125,7 @@ export function ResultCard({ item, onUndone }: { item: AssistantResultItem; onUn
 
   return (
     <div
+      data-testid="assistant-result-card"
       className={`rounded-2xl border px-3 py-2 text-sm ${
         item.ok
           ? "border-[var(--line)] bg-white/70"

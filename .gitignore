@@ -55,3 +55,4 @@ yarn-error.log*
 /playwright-report/
 /test-results/
 /.tmp/
+.lexopen-e2e-pg/

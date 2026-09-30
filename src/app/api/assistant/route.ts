@@ -114,10 +114,22 @@ export async function POST(req: NextRequest) {
             });
           }
 
+          const needsConfirm =
+            Boolean(result.planId) && result.autoResults === undefined;
           send("done", {
             planId: result.planId,
             chatId: chat.id,
-            needsConfirm: Boolean(result.planId) && result.autoResults === undefined,
+            needsConfirm,
+            plan: result.planId
+              ? {
+                  id: result.planId,
+                  needsConfirm,
+                  steps: result.previewSteps.map((s) => ({
+                    toolId: s.toolId,
+                    preview: s.preview,
+                  })),
+                }
+              : null,
             results: result.autoResults || [],
           });
         } catch (e) {
