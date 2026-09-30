@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
-import { formatDateTime } from "@/components/ui";
+import { ConfirmDialog, formatDateTime } from "@/components/ui";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { EventoForm, type EventoFormDefaults } from "@/components/calendario/EventoForm";
 
 type Option = { id: string; label: string };
@@ -65,11 +66,13 @@ export function CalendarioClient({
   currentYm: string;
 }) {
   const router = useRouter();
+  const { dict, t } = useI18n();
   const [formOpen, setFormOpen] = useState(autoOpenNuevo);
   const [editing, setEditing] = useState<EventoListItem | null>(null);
   const [moving, setMoving] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<EventoListItem | null>(null);
 
   function openCreate() {
     setEditing(null);
@@ -116,12 +119,14 @@ export function CalendarioClient({
     router.refresh();
   }
 
-  async function removeEvento(evento: EventoListItem) {
-    if (!window.confirm(`¿Eliminar "${evento.titulo}"?`)) return;
+  async function confirmRemoveEvento() {
+    if (!pendingDelete) return;
+    const evento = pendingDelete;
     setBusyId(evento.id);
     setError("");
     const result = await apiMutation(`/api/eventos/${evento.id}`, { method: "DELETE" });
     setBusyId(null);
+    setPendingDelete(null);
     if (!result.ok) {
       setError(result.error || "No se pudo eliminar el evento");
       return;
@@ -207,9 +212,9 @@ export function CalendarioClient({
                 type="button"
                 className="btn btn-ghost"
                 disabled={busyId === e.id}
-                onClick={() => void removeEvento(e)}
+                onClick={() => setPendingDelete(e)}
               >
-                Eliminar
+                {t("common.delete")}
               </button>
             </div>
           </div>
@@ -224,6 +229,19 @@ export function CalendarioClient({
           </p>
         )}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => void confirmRemoveEvento()}
+        title={
+          pendingDelete
+            ? dict.confirm.deleteEvent.replace("{title}", pendingDelete.titulo)
+            : dict.confirm.deleteEvent
+        }
+        description={dict.confirm.deleteEventDesc}
+        busy={Boolean(pendingDelete && busyId === pendingDelete.id)}
+      />
     </section>
   );
 }

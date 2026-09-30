@@ -3,7 +3,9 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { apiMutation } from "@/lib/api-mutation";
 
 type UserRow = {
@@ -46,8 +48,11 @@ export function PeopleManager({
   compact?: boolean;
 }) {
   const router = useRouter();
+  const { dict, t } = useI18n();
   const [users, setUsers] = useState(initialUsers);
   const [groups, setGroups] = useState(initialGroups);
+  const [pendingUserDelete, setPendingUserDelete] = useState<UserRow | null>(null);
+  const [pendingGroupDelete, setPendingGroupDelete] = useState<GroupRow | null>(null);
   const [userOpen, setUserOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [groupOpen, setGroupOpen] = useState(false);
@@ -141,15 +146,17 @@ export function PeopleManager({
     await reload();
   }
 
-  async function deleteUser(user: UserRow) {
+  function requestDeleteUser(user: UserRow) {
     if (user.id === currentUserId) {
       setError("No puede eliminar su propio usuario");
       return;
     }
-    const ok = window.confirm(
-      `¿Eliminar a ${user.name} (${user.email})?\nEsta acción no se puede deshacer.`
-    );
-    if (!ok) return;
+    setPendingUserDelete(user);
+  }
+
+  async function confirmDeleteUser() {
+    if (!pendingUserDelete) return;
+    const user = pendingUserDelete;
     setError(null);
     setOkMsg(null);
     setBusy(true);
@@ -159,6 +166,7 @@ export function PeopleManager({
       body: JSON.stringify({ action: "delete-user", userId: user.id }),
     });
     setBusy(false);
+    setPendingUserDelete(null);
     if (!result.ok) {
       setError(result.error || "No se pudo eliminar el usuario");
       return;
@@ -221,9 +229,9 @@ export function PeopleManager({
     await reload();
   }
 
-  async function deleteGroup(group: GroupRow) {
-    const ok = window.confirm(`¿Eliminar el grupo «${group.name}»?`);
-    if (!ok) return;
+  async function confirmDeleteGroup() {
+    if (!pendingGroupDelete) return;
+    const group = pendingGroupDelete;
     setError(null);
     setOkMsg(null);
     setBusy(true);
@@ -233,6 +241,7 @@ export function PeopleManager({
       body: JSON.stringify({ action: "delete-group", groupId: group.id }),
     });
     setBusy(false);
+    setPendingGroupDelete(null);
     if (!result.ok) {
       setError(result.error || "No se pudo eliminar el grupo");
       return;
@@ -394,9 +403,9 @@ export function PeopleManager({
                         className="btn btn-ghost text-xs text-rose-800"
                         type="button"
                         disabled={busy || u.id === currentUserId}
-                        onClick={() => deleteUser(u)}
+                        onClick={() => requestDeleteUser(u)}
                       >
-                        Eliminar
+                        {t("common.delete")}
                       </button>
                     </div>
                   )}
@@ -460,9 +469,9 @@ export function PeopleManager({
                         className="btn btn-ghost text-xs text-rose-800"
                         type="button"
                         disabled={busy}
-                        onClick={() => deleteGroup(g)}
+                        onClick={() => setPendingGroupDelete(g)}
                       >
-                        Eliminar
+                        {t("common.delete")}
                       </button>
                     </div>
                   )}
@@ -687,6 +696,31 @@ export function PeopleManager({
           </form>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingUserDelete)}
+        onClose={() => setPendingUserDelete(null)}
+        onConfirm={() => void confirmDeleteUser()}
+        title={
+          pendingUserDelete
+            ? dict.confirm.deleteUser.replace("{name}", pendingUserDelete.name)
+            : dict.confirm.deleteUser
+        }
+        description={dict.confirm.deleteUserDesc}
+        busy={busy}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingGroupDelete)}
+        onClose={() => setPendingGroupDelete(null)}
+        onConfirm={() => void confirmDeleteGroup()}
+        title={
+          pendingGroupDelete
+            ? dict.confirm.deleteGroup.replace("{name}", pendingGroupDelete.name)
+            : dict.confirm.deleteGroup
+        }
+        description={dict.confirm.deleteGroupDesc}
+        busy={busy}
+      />
     </div>
   );
 }

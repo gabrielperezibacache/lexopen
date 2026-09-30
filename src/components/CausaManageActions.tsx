@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { apiMutation } from "@/lib/api-mutation";
 
 type Props = {
@@ -21,8 +23,10 @@ export function CausaManageActions({
   compact = false,
 }: Props) {
   const router = useRouter();
+  const { dict, t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const archived = estado === "archivada";
 
   async function archiveOrRestore() {
@@ -47,20 +51,14 @@ export function CausaManageActions({
     }
   }
 
-  async function removeCausa() {
-    if (
-      !window.confirm(
-        `¿Eliminar permanentemente «${titulo}»?\nSe borrarán movimientos, documentos vinculados y el historial. Esta acción no se puede deshacer.`
-      )
-    ) {
-      return;
-    }
+  async function confirmRemoveCausa() {
     setBusy(true);
     setMsg("");
     const result = await apiMutation(`/api/causas/${causaId}`, {
       method: "DELETE",
     });
     setBusy(false);
+    setConfirmOpen(false);
     if (!result.ok) {
       setMsg(result.error || "No se pudo eliminar");
       return;
@@ -96,9 +94,9 @@ export function CausaManageActions({
             type="button"
             className={btnDanger}
             disabled={busy}
-            onClick={() => void removeCausa()}
+            onClick={() => setConfirmOpen(true)}
           >
-            Eliminar
+            {t("common.delete")}
           </button>
         )}
       </div>
@@ -107,6 +105,14 @@ export function CausaManageActions({
           {msg}
         </p>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => void confirmRemoveCausa()}
+        title={dict.confirm.deleteCausa.replace("{title}", titulo)}
+        description={dict.confirm.deleteCausaDesc}
+        busy={busy}
+      />
     </div>
   );
 }

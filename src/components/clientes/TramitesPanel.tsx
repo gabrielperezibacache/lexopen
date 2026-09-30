@@ -9,6 +9,7 @@ import {
   type TramiteTemplate,
 } from "@/lib/tramite-templates";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { apiMutation } from "@/lib/api-mutation";
 import { civilDateKey } from "@/lib/chile-time";
 import { calcularVencimiento } from "@/lib/plazos";
@@ -53,11 +54,12 @@ export function TramitesPanel({
   compact?: boolean;
   responsables?: Responsable[];
 }) {
-  const { t } = useI18n();
+  const { t, dict } = useI18n();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [templateId, setTemplateId] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const templates: TramiteTemplate[] = useMemo(() => {
     const list = templatesForMateria(materia);
     return list.length ? list : TRAMITE_TEMPLATES;
@@ -111,11 +113,14 @@ export function TramitesPanel({
     await patchTramite(id, { estado });
   }
 
-  async function deleteTramite(id: string) {
-    if (!window.confirm("¿Eliminar este trámite?")) return;
+  async function confirmDeleteTramite() {
+    if (!pendingDeleteId) return;
     setBusy(true);
-    const result = await apiMutation(`/api/tramites/${id}`, { method: "DELETE" });
+    const result = await apiMutation(`/api/tramites/${pendingDeleteId}`, {
+      method: "DELETE",
+    });
     setBusy(false);
+    setPendingDeleteId(null);
     if (!result.ok) return;
     router.refresh();
   }
@@ -243,9 +248,9 @@ export function TramitesPanel({
           type="button"
           className="btn btn-ghost text-xs text-[var(--danger)]"
           disabled={busy}
-          onClick={() => void deleteTramite(t.id)}
+          onClick={() => setPendingDeleteId(t.id)}
         >
-          Eliminar
+          {dict.common.delete}
         </button>
       </div>
     );
@@ -452,6 +457,15 @@ export function TramitesPanel({
           placeholder="Detalle opcional"
         />
       </form>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteId)}
+        onClose={() => setPendingDeleteId(null)}
+        onConfirm={() => void confirmDeleteTramite()}
+        title={dict.confirm.deleteTramite}
+        description={dict.confirm.deleteTramiteDesc}
+        busy={busy}
+      />
     </div>
   );
 }
