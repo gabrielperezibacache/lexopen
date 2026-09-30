@@ -3,9 +3,16 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isStaff } from "@/lib/auth/rbac";
 import { persistentStorageReady, storageMode } from "@/lib/storage";
-import { recoverPendingDocumentProcessing } from "@/lib/document-processing-queue";
+import {
+  getDocumentProcessingQueueStatus,
+  recoverPendingDocumentProcessing,
+} from "@/lib/document-processing-queue";
 import { getOcrCapability } from "@/lib/local-ocr";
 import { isLoopbackHttpRequest } from "@/lib/net/loopback-request";
+import { redisRateLimitConfigured } from "@/lib/auth/redis-rate-limit";
+import { getPjudQueueStatus } from "@/lib/pjud/queue";
+import { getLlmConfig } from "@/lib/integrations/llm";
+import { log, newRequestId, setRequestId } from "@/lib/log";
 
 function desktopDetails() {
   return {
@@ -27,7 +34,68 @@ function noStoreJson(body: Record<string, unknown>, status = 200) {
   });
 }
 
+async function privilegedIntegrations() {
+  const [docQueue, pjudQueue, llm] = await Promise.all([
+    Promise.resolve(getDocumentProcessingQueueStatus()),
+    getPjudQueueStatus().catch(() => null),
+    getLlmConfig().catch(() => null),
+  ]);
+
+  let apiUrlHost: string | null = null;
+  if (llm?.apiUrl) {
+    try {
+      apiUrlHost = new URL(llm.apiUrl).host;
+    } catch {
+      apiUrlHost = null;
+    }
+  }
+  const llmStatus = llm
+    ? {
+        preset: llm.preset || null,
+        demo: Boolean(llm.allowDemo),
+        hasApiKey: Boolean(llm.apiKey),
+        configured: Boolean(llm.apiKey) || Boolean(llm.allowDemo),
+        apiUrlHost,
+      }
+    : {
+        preset: null,
+        demo: false,
+        hasApiKey: false,
+        configured: false,
+        apiUrlHost: null,
+      };
+
+  const pjudDemo =
+    process.env.PJUD_ALLOW_DEMO === "1" &&
+    process.env.LEXOPEN_KEEP_PJUD_DEMO !== "1"
+      ? "unsafe"
+      : process.env.PJUD_ALLOW_DEMO === "1"
+        ? "kept"
+        : "off";
+
+  return {
+    queues: {
+      documents: docQueue,
+      pjud: pjudQueue,
+    },
+    llm: llmStatus,
+    pjud: {
+      demo: pjudDemo,
+      scrape: process.env.PJUD_CLAVEUNICA_SCRAPE === "1",
+      queue: pjudQueue,
+    },
+    rateLimit: {
+      redis: redisRateLimitConfigured(),
+      backend: redisRateLimitConfigured() ? "redis" : "file-or-memory",
+    },
+  };
+}
+
 export async function GET(req: NextRequest) {
+  const incomingId = req.headers.get("x-request-id")?.trim();
+  const requestId = incomingId || newRequestId();
+  setRequestId(requestId);
+
   const time = new Date().toISOString();
   const storage = storageMode();
   const storageReady = persistentStorageReady();
@@ -50,6 +118,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       db: "up",
       time,
+      requestId,
     };
 
     if (privileged) {
@@ -57,6 +126,7 @@ export async function GET(req: NextRequest) {
       publicBody.storageReady = storageReady;
       publicBody.storageRequired = storageRequired;
       publicBody.needsSetup = needsSetup;
+      Object.assign(publicBody, await privilegedIntegrations());
     }
 
     // Detailed recon (OCR, desktop URL/version) only for staff or local desktop.
@@ -72,7 +142,9 @@ export async function GET(req: NextRequest) {
     }
 
     void recoverPendingDocumentProcessing().catch((error) => {
-      console.error("document processing recovery failed", error);
+      log.error("document_processing_recovery_failed", {
+        err: error instanceof Error ? error.message : String(error),
+      });
     });
 
     if (!storageReady && storageRequired) {
@@ -93,11 +165,15 @@ export async function GET(req: NextRequest) {
     }
 
     return noStoreJson(publicBody);
-  } catch {
+  } catch (error) {
+    log.error("health_check_failed", {
+      err: error instanceof Error ? error.message : String(error),
+    });
     const body: Record<string, unknown> = {
       ok: false,
       db: "down",
       time,
+      requestId,
     };
     if (privileged) {
       body.storage = storage;

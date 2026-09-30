@@ -142,10 +142,18 @@ function httpsEnabled() {
   return Boolean(process.env.NEXT_PUBLIC_APP_URL?.startsWith("https://"));
 }
 
+function newRequestId() {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  const rand = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${Date.now().toString(36)}-${rand}`;
+}
+
 function withSecurityHeaders(
   req: NextRequest,
   res: NextResponse,
-  nonce: string
+  nonce: string,
+  requestId: string
 ) {
   const csp = buildContentSecurityPolicy({
     https: httpsEnabled(),
@@ -153,6 +161,7 @@ function withSecurityHeaders(
     isDev: process.env.NODE_ENV === "development",
   });
   res.headers.set("Content-Security-Policy", csp);
+  res.headers.set("x-request-id", requestId);
   if (!req.cookies.get(CSRF_COOKIE)?.value) {
     res.cookies.set(CSRF_COOKIE, newEdgeCsrfToken(), {
       httpOnly: false,
@@ -165,10 +174,11 @@ function withSecurityHeaders(
   return res;
 }
 
-function attachRequestNonce(req: NextRequest, nonce: string) {
+function attachRequestNonce(req: NextRequest, nonce: string, requestId: string) {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-lexopen-pathname", req.nextUrl.pathname);
   requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("x-request-id", requestId);
   requestHeaders.set(
     "Content-Security-Policy",
     buildContentSecurityPolicy({
@@ -181,7 +191,7 @@ function attachRequestNonce(req: NextRequest, nonce: string) {
 }
 
 /** Move ?token= into an httpOnly cookie and redirect to a clean URL. */
-function migrateQueryToken(req: NextRequest, nonce: string) {
+function migrateQueryToken(req: NextRequest, nonce: string, requestId: string) {
   const { pathname } = req.nextUrl;
   if (pathname !== "/setup" && pathname !== "/recovery") return null;
   if (!req.nextUrl.searchParams.has("token")) return null;
@@ -189,7 +199,12 @@ function migrateQueryToken(req: NextRequest, nonce: string) {
   const token = String(req.nextUrl.searchParams.get("token") || "").slice(0, 256);
   const clean = req.nextUrl.clone();
   clean.searchParams.delete("token");
-  const res = withSecurityHeaders(req, NextResponse.redirect(clean), nonce);
+  const res = withSecurityHeaders(
+    req,
+    NextResponse.redirect(clean),
+    nonce,
+    requestId
+  );
   if (token) {
     const name =
       pathname === "/setup" ? SETUP_TOKEN_COOKIE : RECOVERY_TOKEN_COOKIE;
@@ -201,9 +216,11 @@ function migrateQueryToken(req: NextRequest, nonce: string) {
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const nonce = newCspNonce();
-  const requestHeaders = attachRequestNonce(req, nonce);
+  const requestId =
+    req.headers.get("x-request-id")?.trim() || newRequestId();
+  const requestHeaders = attachRequestNonce(req, nonce, requestId);
 
-  const migrated = migrateQueryToken(req, nonce);
+  const migrated = migrateQueryToken(req, nonce, requestId);
   if (migrated) return migrated;
 
   const pass = () =>
@@ -212,7 +229,8 @@ export async function proxy(req: NextRequest) {
       NextResponse.next({
         request: { headers: requestHeaders },
       }),
-      nonce
+      nonce,
+      requestId
     );
 
   if (
@@ -251,12 +269,18 @@ export async function proxy(req: NextRequest) {
       return withSecurityHeaders(
         req,
         NextResponse.json({ error: "No autenticado" }, { status: 401 }),
-        nonce
+        nonce,
+        requestId
       );
     }
     const login = new URL("/login", req.url);
     login.searchParams.set("next", pathname);
-    return withSecurityHeaders(req, NextResponse.redirect(login), nonce);
+    return withSecurityHeaders(
+      req,
+      NextResponse.redirect(login),
+      nonce,
+      requestId
+    );
   }
 
   // Role ACL comes from the DB-backed session — never from a forgeable cookie.
@@ -268,13 +292,15 @@ export async function proxy(req: NextRequest) {
           { error: "Acceso restringido al portal cliente" },
           { status: 403 }
         ),
-        nonce
+        nonce,
+        requestId
       );
     }
     return withSecurityHeaders(
       req,
       NextResponse.redirect(new URL("/portal", req.url)),
-      nonce
+      nonce,
+      requestId
     );
   }
 
