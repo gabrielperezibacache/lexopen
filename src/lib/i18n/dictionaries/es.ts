@@ -21,6 +21,7 @@ export const es = {
     loadingApp: "Cargando LexOpen...",
     retry: "Reintentar",
     search: "Buscar",
+    searchInApp: "Buscar en LexOpen",
     searchPlaceholder: "Buscar en LexOpen…",
     back: "Volver",
     demoPassword: "Contraseña demo: lexopen",
@@ -852,7 +853,7 @@ export const es = {
     },
     configuracion: {
       eyebrow: "Administración",
-      title: "Configuración",
+      title: "Configuración del estudio",
       subtitle: "Estudio, Host, seguridad e integraciones.",
     },
     cuenta: {
