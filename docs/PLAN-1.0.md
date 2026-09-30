@@ -266,7 +266,7 @@ confirmación humana en escrituras, status del Host (sin LLM) y agenda unificada
 | Google Calendar pull (+ push/ICS) | **Cerrado** — `pullGoogleCalendarEvents` + `POST action=pull-calendar`; UI en Calendario e Integraciones; soft-fail `GoogleIntegrationError`. Conflictos en API directa siguen informativos (no bloqueantes). |
 | `FirmSettings.assistantLlmMode` | **Cerrado** — `local_only` \| `remote_allowed`; classify usa reglas si local-only o sin LLM. |
 | `auditLlmPrompts` (admin) | **Cerrado** — default `false`; prompts completos en auditoría solo si está activo (sin env obligatorio; setting DB). |
-| E2E suite completa en VM | **Parcial** — `inicio-assistant` + smoke Fase 1 verdes; suite legacy completa puede no caber por disco/Postgres embebido (documentar qué corrió en el PR). |
+| E2E suite completa en VM | **Parcial** — 2026-09-30: `npm test` + lint + build OK; `e2e/inicio-assistant` **2/2** verdes. Suite Playwright legacy completa no re-corrida (disco VM ~93%). |
 
 ### Fase 2 — Refresco UI coherente · esfuerzo **M–L** · riesgo medio-bajo
 
