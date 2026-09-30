@@ -6,5 +6,5 @@ export async function loginAs(page: Page, email: string) {
   await page.locator('input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill("lexopen");
   await page.locator('button[type="submit"]').click();
-  await page.waitForURL(/\/(dashboard|portal)(?:\?|$|\/)/, { timeout: 15_000 });
+  await page.waitForURL(/\/(inicio|dashboard|portal)(?:\?|$|\/)/, { timeout: 15_000 });
 }

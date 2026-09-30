@@ -5,7 +5,7 @@ test("copiloto muestra alcance documental y restaura chat con fuentes", async ({
   page,
 }) => {
   await loginAs(page, "abogado@estudio.cl");
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/(inicio|dashboard)$/);
 
   const causasRes = await page.request.get("/api/causas");
   expect(causasRes.ok()).toBeTruthy();

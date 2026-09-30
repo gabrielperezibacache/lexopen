@@ -31,6 +31,7 @@ export const es = {
       portal: "Portal",
     },
     home: "Inicio",
+    panel: "Panel",
     sites: "Espacios",
     clients: "Clientes",
     cases: "Causas",
@@ -320,8 +321,76 @@ export const es = {
     languageHelp:
       "Afecta navegación, login y textos de la plataforma. El contenido jurídico chileno (RIT, plazos, minutas) permanece en español cuando corresponde.",
   },
+  inicio: {
+    eyebrow: "Turno de hoy",
+    subtitle:
+      "Escriba lo que necesita: agendar una audiencia, crear un plazo, buscar una causa o resumir un documento.",
+    status: {
+      line: "{fatales} plazos fatales · {proximos} plazos próximos (7 días) · {eventosHoy} eventos hoy · {movimientos} movimientos PJUD (48h)",
+      empty:
+        "Sin plazos fatales ni eventos pendientes por ahora. Buen momento para revisar causas.",
+    },
+    composer: {
+      placeholders: [
+        "Agenda una audiencia para el lunes a las 10…",
+        "Crea un plazo para contestar la demanda en 10 días…",
+        "Busca la causa RIT C-1234-2025…",
+        "Resume el último documento de la causa…",
+        "Estima el vencimiento de un plazo de 5 días hábiles…",
+      ],
+      send: "Enviar",
+      sending: "Enviando…",
+      attach: "Adjuntar archivo",
+      mic: "Dictar por voz",
+      micListening: "Escuchando…",
+      hint: "Enter para enviar · Shift+Enter para nueva línea · ⌘K/Ctrl+K para enfocar",
+      dropHint: "Suelte el archivo para adjuntarlo",
+    },
+    chips: {
+      plazosFatales: "Ver plazos fatales",
+      agendarManana: "Agendar audiencia mañana",
+      buscarCausa: "Buscar una causa",
+      resumirDocumento: "Resumir un documento",
+      plazoProximo: "Revisar plazos próximos",
+    },
+    plan: {
+      title: "Plan propuesto",
+      confirm: "Confirmar",
+      cancel: "Cancelar",
+      confirming: "Ejecutando…",
+      cancelled: "Plan descartado.",
+      needsConfirm: "Requiere su confirmación antes de escribir en la base de datos.",
+    },
+    result: {
+      view: "Ver",
+      edit: "Editar",
+      undo: "Deshacer",
+      undoing: "Deshaciendo…",
+      undone: "Acción revertida.",
+      undoError: "No se pudo deshacer la acción.",
+    },
+    cards: {
+      hoy: { title: "Hoy", empty: "Sin eventos ni plazos para hoy." },
+      plazos: { title: "Plazos próximos", empty: "Sin plazos próximos en 7 días." },
+      actividad: { title: "Actividad reciente", empty: "Sin actividad reciente." },
+      causas: { title: "Causas recientes", empty: "Sin causas recientes." },
+    },
+    attachments: {
+      added: "Adjuntado: {name}",
+      max: "Máximo 5 adjuntos por mensaje",
+      unsupportedNote: "[Adjunto no legible como texto: {name}]",
+    },
+    speech: {
+      unsupported: "Dictado por voz no disponible en este navegador",
+    },
+    you: "Usted",
+    assistant: "Asistente",
+    clarify: "El asistente necesita más detalle",
+    error: "No se pudo contactar al asistente",
+    empty: "Escriba una instrucción arriba para comenzar.",
+  },
   dashboard: {
-    eyebrow: "Inicio del estudio",
+    eyebrow: "Panel",
     titleFallback: "Inicio",
     hello: "Hola, {name}",
     subtitle:
