@@ -10,6 +10,7 @@ import {
 } from "@/lib/tramite-templates";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 import { apiMutation } from "@/lib/api-mutation";
+import { civilDateKey } from "@/lib/chile-time";
 import { calcularVencimiento } from "@/lib/plazos";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
@@ -33,9 +34,10 @@ function fmt(d: string | Date | null) {
 
 function toDateInput(d: string | Date | null) {
   if (!d) return "";
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
   const date = typeof d === "string" ? new Date(d) : d;
   if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 10);
+  return civilDateKey(date);
 }
 
 export function TramitesPanel({

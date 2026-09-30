@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
-import { StatusBadge, formatDate } from "@/components/ui";
+import { StatusBadge, UrgenciaBadge } from "@/components/ui";
+import { civilDateKey, civilMonthQueryRange, formatCivilDate } from "@/lib/chile-time";
+import { diasRestantes, labelDiasRestantes, labelTipoComputo } from "@/lib/plazos";
 import Link from "next/link";
 import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
 import { PlazoForm } from "@/components/PlazoForm";
@@ -19,27 +21,36 @@ type Props = {
   }>;
 };
 
-function monthBounds(value?: string) {
-  const now = new Date();
+function monthView(value?: string) {
+  const today = civilDateKey(new Date());
+  const [todayYear, todayMonth] = today.split("-").map(Number);
   const match = value?.match(/^(\d{4})-(\d{2})$/);
-  const year = match ? Number(match[1]) : now.getFullYear();
-  const month = match ? Number(match[2]) - 1 : now.getMonth();
-  const start = new Date(year, month, 1, 0, 0, 0, 0);
-  const end = new Date(year, month + 1, 1, 0, 0, 0, 0);
-  return { start, end };
+  const year = match ? Number(match[1]) : todayYear;
+  const month = match ? Number(match[2]) : todayMonth;
+  const safeMonth = month >= 1 && month <= 12 ? month : todayMonth;
+  const anchor = new Date(Date.UTC(year, safeMonth - 1, 1));
+  const y = anchor.getUTCFullYear();
+  const m = anchor.getUTCMonth();
+  return {
+    year: y,
+    monthIndex: m,
+    ...civilMonthQueryRange(y, m),
+  };
 }
 
-function monthParam(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+function shiftMonthParam(year: number, monthIndex: number, delta: number) {
+  const next = new Date(Date.UTC(year, monthIndex + delta, 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 export default async function PlazosPage({ searchParams }: Props) {
   await requireStaff();
   const sp = await searchParams;
-  const { start, end } = monthBounds(sp.mes);
-  const [plazos, causas, responsables] = await Promise.all([
+  const { start, end, year, monthIndex } = monthView(sp.mes);
+  const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+  const [plazosRaw, causas, responsables] = await Promise.all([
     prisma.plazo.findMany({
-      where: { fechaLimite: { gte: start, lt: end } },
+      where: { fechaLimite: { gte: start, lte: end } },
       include: { causa: true, responsable: { select: publicUserSelect } },
       orderBy: { fechaLimite: "asc" },
     }),
@@ -55,8 +66,16 @@ export default async function PlazosPage({ searchParams }: Props) {
       orderBy: { name: "asc" },
     }),
   ]);
-  const prev = new Date(start.getFullYear(), start.getMonth() - 1, 1);
-  const next = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+  const plazos = plazosRaw.filter((plazo) =>
+    civilDateKey(plazo.fechaLimite).startsWith(monthKey)
+  );
+  const prev = shiftMonthParam(year, monthIndex, -1);
+  const next = shiftMonthParam(year, monthIndex, 1);
+  const monthLabel = new Intl.DateTimeFormat("es-CL", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, monthIndex, 1, 12)));
 
   return (
     <div className="space-y-6">
@@ -87,18 +106,18 @@ export default async function PlazosPage({ searchParams }: Props) {
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <Link
           className="btn btn-ghost order-2 flex-1 sm:order-1 sm:flex-none"
-          href={`/plazos?mes=${monthParam(prev)}`}
+          href={`/plazos?mes=${prev}`}
           aria-label="Mes anterior"
         >
           ← <span className="sm:hidden">Ant.</span>
           <span className="hidden sm:inline">Mes anterior</span>
         </Link>
         <h2 className="order-1 text-center text-lg font-semibold capitalize sm:order-2">
-          Calendario {start.toLocaleDateString("es-CL", { month: "long", year: "numeric" })}
+          Calendario {monthLabel}
         </h2>
         <Link
           className="btn btn-ghost order-3 flex-1 sm:flex-none"
-          href={`/plazos?mes=${monthParam(next)}`}
+          href={`/plazos?mes=${next}`}
           aria-label="Mes siguiente"
         >
           <span className="sm:hidden">Sig.</span>
@@ -125,11 +144,17 @@ export default async function PlazosPage({ searchParams }: Props) {
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-semibold">{p.titulo}</h2>
                 <StatusBadge estado={p.estado} />
+                <UrgenciaBadge fecha={p.fechaLimite} estado={p.estado} />
                 <span className="badge badge-ink">{p.tipo}</span>
+                <span className="badge badge-ink">{labelTipoComputo(p.tipoComputo)}</span>
                 {p.esFatal && <span className="badge badge-vencido">fatal</span>}
               </div>
               <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-                {formatDate(p.fechaLimite)} ·{" "}
+                {formatCivilDate(p.fechaLimite)}
+                {p.estado === "pendiente"
+                  ? ` · ${labelDiasRestantes(diasRestantes(p.fechaLimite))}`
+                  : ""}{" "}
+                ·{" "}
                 {p.causa ? (
                   <Link href={`/causas/${p.causa.id}`} className="text-[var(--sea)]">
                     {p.causa.rit || p.causa.titulo}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 import { apiMutation } from "@/lib/api-mutation";
+import { civilDateKey } from "@/lib/chile-time";
 import { calcularVencimiento } from "@/lib/plazos";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
@@ -38,9 +39,9 @@ export function PlazoSugerirAi({ causaId }: { causaId: string }) {
     for (const item of items) {
       const dias = typeof item.dias === "number" && item.dias > 0 ? item.dias : 5;
       const tipoComputo = item.tipoComputo === "corridos" ? "corridos" : "habiles";
-      const fechaLimite = calcularVencimiento({ desde: hoy, dias, tipoComputo })
-        .toISOString()
-        .slice(0, 10);
+      const fechaLimite = civilDateKey(
+        calcularVencimiento({ desde: hoy, dias, tipoComputo })
+      );
       const res = await apiMutation("/api/plazos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -52,7 +53,7 @@ export function PlazoSugerirAi({ causaId }: { causaId: string }) {
           esFatal: Boolean(item.esFatal),
           tipoComputo,
           diasPlazo: dias,
-          fechaNotificacion: hoy.toISOString().slice(0, 10),
+          fechaNotificacion: civilDateKey(hoy),
           fechaLimite,
         }),
       });

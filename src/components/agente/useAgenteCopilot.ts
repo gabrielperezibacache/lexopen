@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { civilDateKey } from "@/lib/chile-time";
 import { safeJsonParse } from "@/lib/safe-json";
 import { apiMutation } from "@/lib/api-mutation";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -41,7 +42,7 @@ export function useAgenteCopilot() {
   const [approveMsg, setApproveMsg] = useState("");
   const [approveHref, setApproveHref] = useState("");
   const [plazoDesde, setPlazoDesde] = useState(() =>
-    new Date().toISOString().slice(0, 10)
+    civilDateKey(new Date())
   );
   const [plazoDias, setPlazoDias] = useState("5");
   const [plazoComputo, setPlazoComputo] = useState<"habiles" | "corridos">(

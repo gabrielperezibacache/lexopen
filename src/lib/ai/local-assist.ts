@@ -2,16 +2,22 @@
  * Ayudas determinísticas (sin LLM) — briefing / plazos.
  */
 
-import { calcularVencimiento, clasificarUrgencia, diasRestantes } from "@/lib/plazos";
-import { format, parseISO } from "date-fns";
+import { isValidYmd, ymdToLocalNoon } from "@/lib/chile-time";
+import {
+  calcularVencimientoYmd,
+  clasificarUrgencia,
+  diasRestantes,
+  labelUrgencia,
+  type TipoComputo,
+} from "@/lib/plazos";
 
 export function formatPlazoEstimate(opts: {
   desde: string;
   dias: number;
-  tipoComputo?: "habiles" | "corridos";
+  tipoComputo?: TipoComputo;
 }) {
-  const desde = parseISO(opts.desde);
-  if (Number.isNaN(desde.getTime())) {
+  const desde = opts.desde.trim();
+  if (!isValidYmd(desde)) {
     return { error: "Fecha 'desde' inválida" as const };
   }
   const dias = Number(opts.dias);
@@ -21,17 +27,18 @@ export function formatPlazoEstimate(opts: {
   if (dias > 3650) {
     return { error: "El plazo no puede superar 3650 días" as const };
   }
-  const vencimiento = calcularVencimiento({
-    desde,
-    dias,
-    tipoComputo: opts.tipoComputo || "habiles",
-  });
+  const tipoComputo = opts.tipoComputo || "habiles";
+  const vencimiento = calcularVencimientoYmd({ desde, dias, tipoComputo });
+  const vencimientoDate = ymdToLocalNoon(vencimiento);
+  const restantes = diasRestantes(vencimientoDate);
+  const urgencia = clasificarUrgencia(vencimientoDate);
   return {
-    vencimiento: format(vencimiento, "yyyy-MM-dd"),
-    urgencia: clasificarUrgencia(vencimiento),
-    diasRestantes: diasRestantes(vencimiento),
+    vencimiento,
+    urgencia,
+    urgenciaLabel: labelUrgencia(urgencia, restantes),
+    diasRestantes: restantes,
     disclaimer:
-      "Estimación interna LexOpen (días hábiles/corridos simplificados). No reemplaza el cómputo oficial del tribunal ni la revisión de un abogado.",
+      "Estimación interna LexOpen (días hábiles lun–vie o corridos, con feriados nacionales). Si el corrido cae en sábado, domingo o feriado, se corre al día hábil siguiente. No reemplaza el cómputo oficial del tribunal ni la revisión de un abogado.",
   };
 }
 
