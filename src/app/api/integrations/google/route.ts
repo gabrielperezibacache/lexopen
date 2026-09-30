@@ -13,6 +13,7 @@ import {
   googleCredentialsConfigured,
   linkCausaDriveFolder,
   listCausaDriveFolder,
+  pullGoogleCalendarEvents,
   pushDocumentoToDrive,
   pushMinutaToDrive,
   pushPlazoToGoogleCalendar,
@@ -120,6 +121,30 @@ export async function POST(req: Request) {
     if (body.action === "push-plazo" && body.plazoId) {
       const result = await pushPlazoToGoogleCalendar(body.plazoId);
       return jsonGoogleAction(result);
+    }
+    if (body.action === "pull-calendar") {
+      try {
+        const timeMin =
+          typeof body.timeMin === "string" ? new Date(body.timeMin) : undefined;
+        const timeMax =
+          typeof body.timeMax === "string" ? new Date(body.timeMax) : undefined;
+        const result = await pullGoogleCalendarEvents({
+          responsableId: user.id,
+          timeMin:
+            timeMin && !Number.isNaN(timeMin.getTime()) ? timeMin : undefined,
+          timeMax:
+            timeMax && !Number.isNaN(timeMax.getTime()) ? timeMax : undefined,
+        });
+        return jsonGoogleAction(result);
+      } catch (e) {
+        return (
+          googleErrorResponse(e) ||
+          NextResponse.json(
+            { error: e instanceof Error ? e.message : "Error Calendar pull" },
+            { status: 400 }
+          )
+        );
+      }
     }
     if (body.action === "push-documento" && body.documentoId) {
       try {
