@@ -24,6 +24,7 @@ export const en: Dictionary = {
     retry: "Retry",
     search: "Search",
     searchInApp: "Search LexOpen",
+    searchGlobal: "Global search",
     searchPlaceholder: "Search LexOpen…",
     back: "Back",
     demoPassword: "Demo password: lexopen",

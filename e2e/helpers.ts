@@ -12,36 +12,38 @@ async function waitLoginResponse(page: Page, timeout = 15_000): Promise<Response
 /**
  * Login estable: selectores por name/type (no dependen del idioma).
  * Staff → /inicio (o /dashboard legado); portal → /portal.
- * Reintenta una vez ante 429 (cascada de reintentos e2e en CI).
+ * En e2e (`LEXOPEN_E2E=1` / NODE_ENV=test) los buckets de login son altos;
+ * aún así reintenta una vez ante 429 residual.
  */
 export async function loginAs(page: Page, email: string) {
   await page.goto("/login");
   await page.locator('input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill("lexopen");
 
-  const first = waitLoginResponse(page);
-  await page.locator('button[type="submit"]').click();
-  let response = await first;
-
-  if (response.status() === 429) {
-    const retryAfterSec = Math.min(
-      Number(response.headers()["retry-after"] || 8),
-      20
-    );
-    await page.waitForTimeout(retryAfterSec * 1000);
-    const retry = waitLoginResponse(page);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const pending = waitLoginResponse(page);
     await page.locator('button[type="submit"]').click();
-    response = await retry;
-  }
+    const response = await pending;
 
-  if (!response.ok()) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `loginAs(${email}) falló HTTP ${response.status()}: ${body.slice(0, 200)}`
-    );
-  }
+    if (response.status() === 429 && attempt === 0) {
+      const retryAfterSec = Math.min(
+        Number(response.headers()["retry-after"] || 5),
+        15
+      );
+      await page.waitForTimeout(retryAfterSec * 1000);
+      continue;
+    }
 
-  await page.waitForURL(/\/(inicio|dashboard|portal)(?:\?|$|\/)/, {
-    timeout: 20_000,
-  });
+    if (!response.ok()) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `loginAs(${email}) falló HTTP ${response.status()}: ${body.slice(0, 200)}`
+      );
+    }
+
+    await page.waitForURL(/\/(inicio|dashboard|portal)(?:\?|$|\/)/, {
+      timeout: 20_000,
+    });
+    return;
+  }
 }

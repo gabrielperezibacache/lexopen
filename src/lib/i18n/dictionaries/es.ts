@@ -22,6 +22,7 @@ export const es = {
     retry: "Reintentar",
     search: "Buscar",
     searchInApp: "Buscar en LexOpen",
+    searchGlobal: "Búsqueda global",
     searchPlaceholder: "Buscar en LexOpen…",
     back: "Volver",
     demoPassword: "Contraseña demo: lexopen",

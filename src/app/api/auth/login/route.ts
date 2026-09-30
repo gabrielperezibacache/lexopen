@@ -9,6 +9,7 @@ import {
 import { hashPassword, looksHashed, verifyPassword } from "@/lib/auth/password";
 import { canImpersonate } from "@/lib/auth/rbac";
 import { rateLimitAsync, rateLimitAuthFailure } from "@/lib/auth/rate-limit";
+import { loginEmailLimit, loginIpLimit } from "@/lib/auth/e2e-limits";
 import { assertCsrf, handleRouteError } from "@/lib/api";
 import { baseCookieOptions } from "@/lib/auth/cookie-options";
 import { appendCsrfCookie } from "@/lib/auth/csrf-token";
@@ -36,7 +37,11 @@ export async function POST(req: NextRequest) {
           req.headers.get("x-real-ip") ||
           "unknown"
         : "direct";
-    const limited = await rateLimitAsync(`login:${ip}`, 40, 15 * 60 * 1000);
+    const limited = await rateLimitAsync(
+      `login:${ip}`,
+      loginIpLimit(),
+      15 * 60 * 1000
+    );
     if (!limited.ok) {
       return NextResponse.json(
         { error: "Demasiados intentos. Espere e intente de nuevo." },
@@ -53,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     const emailLimited = await rateLimitAsync(
       `login-email:${email}`,
-      10,
+      loginEmailLimit(),
       15 * 60 * 1000
     );
     if (!emailLimited.ok) {
