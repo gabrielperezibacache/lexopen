@@ -201,10 +201,39 @@ antes del siguiente uso.
 
 ### Rate limit en Host
 
-El login usa un store local (`$LEXOPEN_DATA_DIR/rate-limit.json`). Un único
-proceso Host es el caso normal. Si ejecuta varias instancias contra el mismo
-data dir, configure `REDIS_URL`, `RATE_LIMIT_REDIS_URL` o Upstash REST para
-compartir el contador.
+El login usa `rateLimitAsync` (`src/lib/auth/rate-limit.ts`):
+
+1. **Redis / Upstash** cuando exista `REDIS_URL`, `RATE_LIMIT_REDIS_URL` o el
+   par `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`. Obligatorio si
+   corre **varias instancias** del Host (o varios workers) contra el mismo
+   estudio: el archivo local no comparte contadores entre procesos.
+2. **Fallback archivo** (`$LEXOPEN_DATA_DIR/rate-limit.json`, o
+   `LEXOPEN_RATE_LIMIT_PATH`) + memoria: adecuado y documentado para Host
+   **single-process** (caso normal de `web:host`).
+
+`/api/health` (staff o loopback) reporta `rateLimit.redis` /
+`rateLimit.backend` para verificar qué backend está activo.
+
+### Flags demo en producción
+
+En `NODE_ENV=production` el boot (`assertSafeProductionEnv`) y
+`npm run prod:check` **fallan** si están activos:
+
+- `LEXOPEN_OPEN_ACCESS`, `LEXOPEN_RELAX_CSRF`,
+  `LEXOPEN_ALLOW_PLAINTEXT_PASSWORDS`, `LEXOPEN_DEMO_SWITCHER`
+- `HERMES_ALLOW_DEMO` / `LLM_ALLOW_DEMO` / `PJUD_ALLOW_DEMO` **salvo** el
+  keep intencional `LEXOPEN_KEEP_HERMES_DEMO=1` /
+  `LEXOPEN_KEEP_LLM_DEMO=1` / `LEXOPEN_KEEP_PJUD_DEMO=1` (queda como
+  warning en `prod:check`).
+
+### Retención y listados
+
+- Backups automáticos: `LEXOPEN_BACKUP_KEEP` (1–365). Ver sección de backups.
+- Listas API principales (`/api/causas`, `/api/clientes`, `/api/documentos`,
+  `/api/plazos`, tareas de site, tribunales) aceptan `?limit=` con techo 500
+  (default 200) para evitar respuestas no acotadas.
+- Auditoría y notificaciones: sin purga automática en 1.0; si necesita
+  retención legal corta, exporte `/auditoria` y archive fuera del data dir.
 
 Tailscale sigue siendo opcional para acceso remoto; no es necesario para una red
 local sin Internet.
