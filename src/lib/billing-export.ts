@@ -1,7 +1,31 @@
 /**
- * Export helpers for external DTE / billing providers.
+ * Export helpers for external billing providers.
  * LexOpen invoices remain internal control docs — not SII electronic DTEs.
  */
+
+import { civilDateKey } from "@/lib/chile-time";
+
+export const CSV_UTF8_BOM = "\uFEFF";
+
+/** Celda CSV segura para Excel (comillas y fórmulas). */
+export function csvCell(value: string | number | boolean | null | undefined) {
+  const raw = value == null ? "" : String(value);
+  const guarded =
+    typeof value === "string" && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  if (/[",\n\r]/.test(guarded)) return `"${guarded.replace(/"/g, '""')}"`;
+  return guarded;
+}
+
+export function csvDocument(
+  headers: readonly string[],
+  rows: Array<Array<string | number | boolean | null | undefined>>
+) {
+  const lines = [
+    headers.map((header) => csvCell(header)).join(","),
+    ...rows.map((row) => row.map((cell) => csvCell(cell)).join(",")),
+  ];
+  return `${CSV_UTF8_BOM}${lines.join("\n")}\n`;
+}
 
 export type BillingExportRow = {
   folioInterno: string;
@@ -29,12 +53,6 @@ export type BillingExportEmisor = {
   razonSocial: string | null | undefined;
 };
 
-function csvEscape(value: string | number) {
-  const s = String(value ?? "");
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
 function xmlEscape(value: string | number) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -44,11 +62,12 @@ function xmlEscape(value: string | number) {
     .replace(/'/g, "&apos;");
 }
 
-function isoDate(d: Date | string | null | undefined) {
+/** Día civil en Chile (fecha-solo UTC se conserva; un timestamp usa America/Santiago). */
+function exportDate(d: Date | string | null | undefined) {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
   if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 10);
+  return civilDateKey(date);
 }
 
 export function buildBillingExportRows(
@@ -75,8 +94,8 @@ export function buildBillingExportRows(
     folioInterno: inv.number,
     tipoDocumento: inv.tipoDocumento,
     estado: inv.status,
-    fechaEmision: isoDate(inv.issueDate),
-    fechaVencimiento: isoDate(inv.dueDate),
+    fechaEmision: exportDate(inv.issueDate),
+    fechaVencimiento: exportDate(inv.dueDate),
     rutEmisor: emisor.rut || "",
     razonSocialEmisor: emisor.razonSocial || "Estudio LexOpen",
     rutReceptor: inv.cliente.rut || "",
@@ -115,11 +134,10 @@ const CSV_HEADERS: Array<keyof BillingExportRow> = [
 ];
 
 export function billingExportToCsv(rows: BillingExportRow[]) {
-  const lines = [
-    CSV_HEADERS.join(","),
-    ...rows.map((row) => CSV_HEADERS.map((h) => csvEscape(row[h])).join(",")),
-  ];
-  return `${lines.join("\n")}\n`;
+  return csvDocument(
+    CSV_HEADERS,
+    rows.map((row) => CSV_HEADERS.map((header) => row[header]))
+  );
 }
 
 export function billingExportToXml(rows: BillingExportRow[]) {
@@ -153,7 +171,7 @@ export function billingExportToXml(rows: BillingExportRow[]) {
     )
     .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
-<lexopenExport version="1" nota="Control interno LexOpen — no es DTE SII; use un facturador externo certificado.">
+<lexopenExport version="1" zonaHoraria="America/Santiago" nota="Control interno LexOpen — no es DTE SII; use un facturador externo certificado.">
 ${body}
 </lexopenExport>
 `;

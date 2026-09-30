@@ -1,12 +1,8 @@
 import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
-import { clp, FEE_TIPOS } from "@/lib/billing";
+import { clp, formatUf, labelFeeTipo } from "@/lib/billing";
 import { FeeForm } from "@/components/billing/FeeForm";
 import { requireStaff } from "@/lib/auth/session";
-
-function labelFee(tipo: string) {
-  return FEE_TIPOS.find((f) => f.value === tipo)?.label || tipo;
-}
 
 export default async function TarifasPage() {
   await requireStaff();
@@ -32,7 +28,12 @@ export default async function TarifasPage() {
           <article key={f.id} className="panel rounded-3xl p-5">
             <div className="flex items-start justify-between gap-2">
               <h2 className="text-lg font-semibold">{f.name}</h2>
-              <span className="badge badge-sea">{labelFee(f.tipo)}</span>
+              <span className="flex flex-col items-end gap-1">
+                <span className="badge badge-sea">{labelFeeTipo(f.tipo)}</span>
+                <span className={`badge ${f.active ? "badge-activa" : "badge-ink"}`}>
+                  {f.active ? "Vigente" : "Inactiva"}
+                </span>
+              </span>
             </div>
             <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
               {f.cliente?.razonSocial || "Sin cliente"} · {f.causa?.rit || f.causa?.titulo || "General"}
@@ -47,7 +48,7 @@ export default async function TarifasPage() {
               {f.rateHourlyUf != null && (
                 <>
                   <dt className="text-[var(--ink-soft)]/60">Tarifa hora UF</dt>
-                  <dd className="font-medium">{f.rateHourlyUf} UF</dd>
+                  <dd className="font-medium">{formatUf(f.rateHourlyUf)}</dd>
                 </>
               )}
               {f.flatFeeClp != null && (
@@ -78,6 +79,11 @@ export default async function TarifasPage() {
             {f.notes && <p className="mt-3 text-sm text-[var(--ink-soft)]/80">{f.notes}</p>}
           </article>
         ))}
+        {fees.length === 0 && (
+          <p className="panel rounded-3xl p-5 text-sm text-[var(--ink-soft)]/70 md:col-span-2">
+            Sin tarifas. Defina una condición por hora, suma alzada, retainer o cuota litis.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
-import { clp } from "@/lib/billing";
-import { publicUserSelect } from "@/lib/auth/public-user";
-import { StatusBadge, formatDate } from "@/components/ui";
+import { clp, formatHours, labelTimeBillingState } from "@/lib/billing";
+import { loadBillingOverview } from "@/lib/billing-overview";
+import { formatCivilDate } from "@/lib/chile-time";
 import { requireStaff } from "@/lib/auth/session";
+import { InvoiceStatusPill } from "@/components/billing/InvoiceStatusPill";
 import {
   Clock,
   Receipt,
@@ -16,72 +16,67 @@ import {
 
 export default async function FacturacionPage() {
   await requireStaff();
-  const [
-    unbilledTime,
-    unbilledExpenses,
-    openInvoices,
-    paidThisMonth,
-    latestLedgerBalances,
-    recentInvoices,
-    recentTime,
-  ] = await Promise.all([
-    // Sum unbilled hours in Postgres. hours is Float and amountClp is Int, so
-    // _sum is number | null (not Decimal); null means no matching rows.
-    prisma.timeEntry.aggregate({
-      where: { billable: true, billed: false },
-      _sum: { hours: true, amountClp: true },
-    }),
-    prisma.expense.aggregate({
-      where: { billable: true, billed: false },
-      _sum: { amountClp: true },
-      _count: { id: true },
-    }),
-    prisma.invoice.findMany({
-      where: { status: { in: ["emitida", "parcialmente_pagada", "vencida"] } },
-      // Por cobrar only needs totals; the client relation is unused here.
-      select: { totalClp: true, paidClp: true },
-    }),
-    prisma.payment.aggregate({
-      where: {
-        date: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
-      },
-      _sum: { amountClp: true },
-    }),
-    prisma.ledgerEntry.findMany({
-      // ⚡ Bolt: Fetches only the latest ledger entry per client instead of the entire history.
-      distinct: ["clienteId"],
-      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
-      include: { cliente: true },
-    }),
-    prisma.invoice.findMany({
-      include: { cliente: true, causa: true },
-      orderBy: { updatedAt: "desc" },
-      take: 6,
-    }),
-    prisma.timeEntry.findMany({
-      include: { user: { select: publicUserSelect }, causa: true },
-      orderBy: { date: "desc" },
-      take: 6,
-    }),
-  ]);
+  const { month, kpis, recentInvoices, recentTime } = await loadBillingOverview();
 
-  const unbilledHours = unbilledTime._sum.hours ?? 0;
-  const unbilledHonorarios = unbilledTime._sum.amountClp ?? 0;
-  const unbilledGastos = unbilledExpenses._sum.amountClp ?? 0;
-  const porCobrar = openInvoices.reduce((s, i) => s + Math.max(0, i.totalClp - i.paidClp), 0);
-  const cobradoMes = paidThisMonth._sum.amountClp ?? 0;
-  const balMap = new Map<string, number>();
-  for (const e of latestLedgerBalances) balMap.set(e.clienteId, e.balanceClp);
-  const provisionTotal = [...balMap.values()].reduce((s, v) => s + v, 0);
+  const provisionSub =
+    kpis.adeudoClp > 0
+      ? `${kpis.clientsInCredit} con provisión · adeudo ${clp(kpis.adeudoClp)}`
+      : kpis.clientsInCredit > 0
+        ? `${kpis.clientsInCredit} cliente${kpis.clientsInCredit === 1 ? "" : "s"} con saldo a favor`
+        : "Sin saldo en cuenta corriente";
 
   const stats = [
-    { label: "Horas por facturar", value: `${unbilledHours.toFixed(1)} h`, sub: clp(unbilledHonorarios), icon: Clock, href: "/facturacion/horas" },
-    { label: "Gastos por facturar", value: clp(unbilledGastos), sub: `${unbilledExpenses._count.id} ítems`, icon: Wallet, href: "/facturacion/gastos" },
-    { label: "Por cobrar", value: clp(porCobrar), sub: `${openInvoices.length} docs`, icon: CircleDollarSign, href: "/facturacion/facturas" },
-    { label: "Cobrado este mes", value: clp(cobradoMes), sub: "Pagos recibidos", icon: Receipt, href: "/facturacion/facturas" },
-    { label: "Provisión / CC", value: clp(provisionTotal), sub: "Saldo a favor clientes", icon: PiggyBank, href: "/facturacion/cuenta-corriente" },
-    { label: "Tarifas", value: "Honorarios", sub: "Condiciones por causa", icon: FileSpreadsheet, href: "/facturacion/tarifas" },
-    { label: "UF", value: "Valores", sub: "Conversión honorarios", icon: CircleDollarSign, href: "/facturacion/uf" },
+    {
+      label: "Horas por facturar",
+      value: formatHours(kpis.unbilledHours),
+      sub: clp(kpis.unbilledHonorarios),
+      icon: Clock,
+      href: "/facturacion/horas?estado=por_facturar",
+    },
+    {
+      label: "Gastos por facturar",
+      value: clp(kpis.unbilledGastos),
+      sub: `${kpis.unbilledExpenseCount} ítems`,
+      icon: Wallet,
+      href: "/facturacion/gastos?estado=por_facturar",
+    },
+    {
+      label: "Por cobrar",
+      value: clp(kpis.porCobrar),
+      sub: `${kpis.openInvoiceCount} documentos`,
+      icon: CircleDollarSign,
+      href: "/facturacion/facturas",
+    },
+    {
+      label: "Cobrado este mes",
+      value: clp(kpis.cobradoMes),
+      sub: kpis.cobradoMesCount
+        ? `${kpis.cobradoMesCount} pagos · ${month.label}`
+        : `Sin pagos en ${month.label}`,
+      icon: Receipt,
+      href: "/facturacion/facturas",
+    },
+    {
+      label: "Provisión / CC",
+      value: clp(kpis.provisionClp),
+      sub: provisionSub,
+      icon: PiggyBank,
+      href: "/facturacion/cuenta-corriente",
+    },
+    {
+      label: "Tarifas",
+      value: "Honorarios",
+      sub: "Condiciones por causa",
+      icon: FileSpreadsheet,
+      href: "/facturacion/tarifas",
+    },
+    {
+      label: "UF",
+      value: "Valores",
+      sub: "Conversión honorarios",
+      icon: CircleDollarSign,
+      href: "/facturacion/uf",
+    },
   ];
 
   return (
@@ -89,16 +84,13 @@ export default async function FacturacionPage() {
       <ModuleHeader
         eyebrow="Contabilidad del estudio"
         title="Facturación"
-        subtitle="Horas, gastos, boletas/facturas internas (no DTE SII), pagos y cuenta corriente. Exporte CSV/XML a un facturador externo desde Facturas."
+        subtitle="Horas, gastos, boletas y facturas internas (no DTE SII), pagos y cuenta corriente. El mes de cobro es el calendario de Chile. Exporte CSV/XML a un facturador externo desde Facturas."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/facturacion/horas" className="btn btn-ghost">
               + Horas
             </Link>
-            <Link
-              href="/api/billing/invoices/export?format=csv"
-              className="btn btn-ghost"
-            >
+            <Link href="/api/billing/invoices/export?format=csv" className="btn btn-ghost">
               Exportar CSV
             </Link>
             <Link href="/facturacion/facturas" className="btn btn-primary">
@@ -144,17 +136,7 @@ export default async function FacturacionPage() {
                 </div>
                 <div className="shrink-0 text-right">
                   <div className="font-semibold">{clp(inv.totalClp)}</div>
-                  <StatusBadge
-                    estado={
-                      inv.status === "pagada"
-                        ? "cumplido"
-                        : inv.status === "vencida"
-                          ? "vencido"
-                          : inv.status === "emitida" || inv.status === "parcialmente_pagada"
-                            ? "pendiente"
-                            : "activa"
-                    }
-                  />
+                  <InvoiceStatusPill status={inv.status} />
                 </div>
               </Link>
             ))}
@@ -184,8 +166,9 @@ export default async function FacturacionPage() {
                   <div className="text-sm font-semibold">{clp(t.amountClp)}</div>
                 </div>
                 <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
-                  {t.hours}h · {t.user.name} · {t.causa?.rit || "—"} · {formatDate(t.date)}
-                  {t.billed ? " · facturado" : t.billable ? " · por facturar" : " · no facturable"}
+                  {formatHours(t.hours)} · {t.user.name} · {t.causa?.rit || "—"} · {formatCivilDate(t.date)}
+                  {" · "}
+                  {labelTimeBillingState(t)}
                 </div>
               </div>
             ))}
