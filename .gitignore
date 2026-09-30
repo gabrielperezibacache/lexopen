@@ -55,11 +55,7 @@ yarn-error.log*
 /playwright-report/
 /test-results/
 /.tmp/
-<<<<<<< HEAD
-
 # agent scratch (both spellings: case collision on macOS/Windows)
 /.jules/
 /.Jules/
-=======
 .lexopen-e2e-pg/
->>>>>>> 68b2a1b (fix(inicio): plan en evento done y e2e de audiencia)
