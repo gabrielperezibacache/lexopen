@@ -3,7 +3,13 @@
 ## Unreleased
 
 ### Planificación
-- Fase 0: diagnóstico y plan hacia 1.0 en `docs/PLAN-1.0.md` (mapa de módulos, bloqueadores de producción, design system, Fases 1–4). Sin cambios de producto.
+- Fase 0: diagnóstico y plan hacia 1.0 en `docs/PLAN-1.0.md` (mapa de módulos, bloqueadores de producción, design system, Fases 1–4).
+- Decisiones aprobadas (2026-09-30): Fase 1 = brief completo (Inicio + intent engine + Evento); portal/Redis/billing/PJUD/Desktop/i18n/`.jules`/tag según §5bis del plan.
+
+### Fase 1 (en curso)
+- Nav: `/inicio` como home staff; Panel = `/dashboard`; redirects y e2e alineados.
+- Asistente operativo: `src/lib/assistant/` + `POST /api/assistant` (+ confirm).
+- Modelo `Evento` + calendario unificado.
 
 ## 0.1.9 — 2026-08-17
 
