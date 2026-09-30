@@ -13,17 +13,23 @@ import { calcularVencimiento } from "@/lib/plazos";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { writeAuditStrict } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { parseListLimit } from "@/lib/api/list-limit";
 import { z } from "zod";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await requireStaff();
+    const limit = parseListLimit(req.nextUrl.searchParams.get("limit"), {
+      default: 200,
+      max: 500,
+    });
     const plazos = await prisma.plazo.findMany({
       include: {
         causa: true,
         responsable: { select: publicUserSelect },
       },
       orderBy: { fechaLimite: "asc" },
+      take: limit,
     });
     return NextResponse.json(plazos);
   } catch (e) {

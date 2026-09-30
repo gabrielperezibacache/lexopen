@@ -9,6 +9,7 @@ import {
 import { clienteCreateSchema } from "@/lib/schemas";
 import { writeAuditStrict } from "@/lib/audit";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
+import { parseListLimit } from "@/lib/api/list-limit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,6 +17,7 @@ export async function GET(req: NextRequest) {
     const sp = new URL(req.url).searchParams;
     const q = sp.get("q")?.trim();
     const estado = sp.get("estado")?.trim();
+    const limit = parseListLimit(sp.get("limit"), { default: 200, max: 500 });
 
     const clientes = await prisma.cliente.findMany({
       where: {
@@ -54,6 +56,7 @@ export async function GET(req: NextRequest) {
         },
       },
       orderBy: { updatedAt: "desc" },
+      take: limit,
     });
 
     const items = clientes.map((c) => ({
