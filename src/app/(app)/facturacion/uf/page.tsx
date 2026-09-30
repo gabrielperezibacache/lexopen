@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
-import { formatDate } from "@/components/ui";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp } from "@/lib/billing";
+import { formatCivilDate } from "@/lib/chile-time";
 import { UfRateForm } from "@/components/billing/UfRateForm";
 import { requireStaff } from "@/lib/auth/session";
 
@@ -30,9 +30,16 @@ export default async function UfPage() {
             </tr>
           </thead>
           <tbody>
+            {rates.length === 0 && (
+              <tr>
+                <td className="px-4 py-8 text-[var(--ink-soft)]/65" colSpan={3}>
+                  Sin valores de UF. Ingrese el valor del día para convertir tarifas pactadas en UF a pesos.
+                </td>
+              </tr>
+            )}
             {rates.map((r) => (
               <tr key={r.id} className="table-row">
-                <td className="px-4 py-3">{formatDate(r.date)}</td>
+                <td className="px-4 py-3">{formatCivilDate(r.date)}</td>
                 <td className="px-4 py-3">{clp(r.valueClp)}</td>
                 <td className="px-4 py-3">{r.source}</td>
               </tr>

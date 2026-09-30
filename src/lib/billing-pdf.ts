@@ -1,5 +1,4 @@
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatCivilDate } from "@/lib/chile-time";
 
 /** Genera HTML imprimible / descargable como “PDF” interno (cuenta del estudio). */
 export function renderInvoiceHtml(input: {
@@ -57,7 +56,7 @@ export function renderInvoiceHtml(input: {
   <div class="box">
     <div class="badge">Cuenta interna LexOpen — no es DTE SII</div>
     <h1 style="margin-top:12px">${escapeHtml(tipoLabel)}</h1>
-    <p class="muted">Nº ${escapeHtml(input.number)} · Emitida ${format(input.issueDate, "dd MMM yyyy", { locale: es })}${input.dueDate ? ` · Vence ${format(input.dueDate, "dd MMM yyyy", { locale: es })}` : ""}</p>
+    <p class="muted">Nº ${escapeHtml(input.number)} · Emitida ${escapeHtml(formatCivilDate(input.issueDate))}${input.dueDate ? ` · Vence ${escapeHtml(formatCivilDate(input.dueDate))}` : ""}</p>
     <div style="display:flex;gap:32px;margin-top:20px">
       <div>
         <strong>Emisor</strong><br/>

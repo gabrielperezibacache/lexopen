@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { handleRouteError, requireBillingManager } from "@/lib/api";
+import { invoiceListWhere } from "@/lib/billing";
 import {
   billingExportToCsv,
   billingExportToXml,
@@ -23,12 +24,13 @@ export async function GET(req: NextRequest) {
       );
     }
     const status = req.nextUrl.searchParams.get("status");
+    const tipo = req.nextUrl.searchParams.get("tipo");
     const id = req.nextUrl.searchParams.get("id");
 
     const invoices = await prisma.invoice.findMany({
       where: {
         ...(id ? { id } : {}),
-        ...(status ? { status } : {}),
+        ...invoiceListWhere(status, tipo),
       },
       include: {
         cliente: { select: { rut: true, razonSocial: true } },
@@ -54,7 +56,8 @@ export async function GET(req: NextRequest) {
       return new NextResponse(xml, {
         headers: downloadResponseHeaders(
           `lexopen-facturacion-${stamp}.xml`,
-          "application/xml"
+          "application/xml",
+          { charset: "utf-8" }
         ),
       });
     }

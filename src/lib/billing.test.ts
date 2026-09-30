@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import {
+  canRegisterInvoicePayment,
   computeInvoiceTotals,
+  expenseListWhere,
+  formatHours,
+  formatPercentRate,
+  formatUf,
+  invoiceListWhere,
   invoiceStatusAfterPayment,
+  labelExpenseCategory,
+  labelInvoiceStatus,
+  labelLedgerTipo,
+  timeEntryListWhere,
 } from "@/lib/billing";
 import {
   invoiceCreateSchema,
@@ -109,5 +119,28 @@ assert.equal(
   }).success,
   false
 );
+
+assert.equal(formatHours(0.25), "0,25 h");
+assert.equal(formatHours(1), "1 h");
+assert.equal(formatUf(1.5), "1,5 UF");
+assert.equal(formatPercentRate(0.19), "19%");
+assert.equal(formatPercentRate(0.1375), "13,75%");
+assert.equal(labelInvoiceStatus("parcialmente_pagada"), "Parcialmente pagada");
+assert.equal(labelInvoiceStatus("anulada"), "Anulada");
+assert.equal(labelExpenseCategory("notario"), "Notaría");
+assert.equal(labelLedgerTipo("provision"), "Provisión");
+assert.equal(canRegisterInvoicePayment("borrador", 1000), false);
+assert.equal(canRegisterInvoicePayment("anulada", 1000), false);
+assert.equal(canRegisterInvoicePayment("emitida", 1000), true);
+assert.equal(canRegisterInvoicePayment("vencida", 0), false);
+assert.deepEqual(timeEntryListWhere("por_facturar"), { billable: true, billed: false });
+assert.deepEqual(timeEntryListWhere("por_aprobar"), { approved: false, billed: false });
+assert.deepEqual(timeEntryListWhere("no-existe"), {});
+assert.deepEqual(expenseListWhere("interno"), { billable: false });
+assert.deepEqual(invoiceListWhere("emitida", "factura_afecta"), {
+  status: "emitida",
+  tipoDocumento: "factura_afecta",
+});
+assert.deepEqual(invoiceListWhere("bitcoin", "dte"), {});
 
 console.log("billing.test.ts OK");

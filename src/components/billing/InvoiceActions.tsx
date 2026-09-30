@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { clp } from "@/lib/billing";
+import { PAYMENT_METHODS, canRegisterInvoicePayment, clp } from "@/lib/billing";
 import { apiMutation } from "@/lib/api-mutation";
 
 export function InvoiceActions({
@@ -20,6 +20,23 @@ export function InvoiceActions({
   const [payOpen, setPayOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  async function anular() {
+    if (!window.confirm("¿Anular este borrador? El documento quedará anulado.")) return;
+    setBusy(true);
+    setError("");
+    const result = await apiMutation(`/api/billing/invoices/${invoiceId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "anulada" }),
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
+  }
 
   async function emit() {
     setBusy(true);
@@ -75,7 +92,12 @@ export function InvoiceActions({
             Emitir
           </button>
         )}
-        {balanceClp > 0 && status !== "anulada" && (
+        {status === "borrador" && (
+          <button className="btn btn-ghost" type="button" disabled={busy} onClick={anular}>
+            Anular borrador
+          </button>
+        )}
+        {canRegisterInvoicePayment(status, balanceClp) && (
           <button className="btn btn-primary" type="button" onClick={() => setPayOpen(true)}>
             Registrar pago
           </button>
@@ -92,11 +114,12 @@ export function InvoiceActions({
             defaultValue={balanceClp}
             max={balanceClp}
           />
-          <select className="select" name="method" defaultValue="transferencia">
-            <option value="transferencia">Transferencia</option>
-            <option value="cheque">Cheque</option>
-            <option value="efectivo">Efectivo</option>
-            <option value="tarjeta">Tarjeta</option>
+          <select className="select" name="method" defaultValue="transferencia" aria-label="Medio de pago">
+            {PAYMENT_METHODS.map((method) => (
+              <option key={method.value} value={method.value}>
+                {method.label}
+              </option>
+            ))}
           </select>
           <input className="input" name="reference" placeholder="Nº transferencia / ref." />
           <div className="flex gap-2">

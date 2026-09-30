@@ -9,7 +9,9 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { canManageBilling } from "@/lib/auth/rbac";
-import { DEFAULT_HOURLY_CLP } from "@/lib/billing";
+import { DEFAULT_HOURLY_CLP, timeEntryListWhere } from "@/lib/billing";
+import { csvDocument } from "@/lib/billing-export";
+import { civilDateKey } from "@/lib/chile-time";
 import { ufToClp } from "@/lib/uf";
 import { timeEntrySchema } from "@/lib/schemas";
 import { publicUserSelect } from "@/lib/auth/public-user";
@@ -24,10 +26,12 @@ export async function GET(req: NextRequest) {
     const user = await requireStaff();
     const unbilled = req.nextUrl.searchParams.get("unbilled");
     const causaId = req.nextUrl.searchParams.get("causaId");
+    const estado = req.nextUrl.searchParams.get("estado");
     const entries = await prisma.timeEntry.findMany({
       where: {
         AND: [
           unbilled === "1" ? { billable: true, billed: false } : {},
+          timeEntryListWhere(estado),
           causaId ? { causaId } : {},
           canManageBilling(user.role) ? {} : { userId: user.id },
         ],
@@ -36,26 +40,21 @@ export async function GET(req: NextRequest) {
       orderBy: { date: "desc" },
     });
     if (req.nextUrl.searchParams.get("format") === "csv") {
-      const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-      const csv = [
-        ["fecha", "descripcion", "causa", "cliente", "usuario", "horas", "monto_clp", "facturable", "facturado", "aprobado"].join(","),
-        ...entries.map((e) =>
-          [
-            e.date.toISOString().slice(0, 10),
-            e.description,
-            e.causa?.rit || e.causa?.titulo || "",
-            e.cliente?.razonSocial || "",
-            e.user.name,
-            e.hours,
-            e.amountClp,
-            e.billable,
-            e.billed,
-            e.approved,
-          ]
-            .map(escape)
-            .join(",")
-        ),
-      ].join("\n");
+      const csv = csvDocument(
+        ["fecha", "descripcion", "causa", "cliente", "usuario", "horas", "monto_clp", "facturable", "facturado", "aprobado"],
+        entries.map((e) => [
+          civilDateKey(e.date),
+          e.description,
+          e.causa?.rit || e.causa?.titulo || "",
+          e.cliente?.razonSocial || "",
+          e.user.name,
+          e.hours,
+          e.amountClp,
+          e.billable,
+          e.billed,
+          e.approved,
+        ])
+      );
       return new NextResponse(csv, {
         headers: downloadResponseHeaders("time-entries.csv", "text/csv"),
       });

@@ -1,9 +1,15 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { clp, DOC_TIPOS } from "@/lib/billing";
+import {
+  clp,
+  labelDocTipo,
+  labelLineTipo,
+  labelPaymentMethod,
+} from "@/lib/billing";
+import { formatCivilDate } from "@/lib/chile-time";
 import { publicUserSelect } from "@/lib/auth/public-user";
-import { StatusBadge, formatDate } from "@/components/ui";
+import { InvoiceStatusPill } from "@/components/billing/InvoiceStatusPill";
 import { InvoiceActions } from "@/components/billing/InvoiceActions";
 import { InvoiceAiPanel } from "@/components/billing/InvoiceAiPanel";
 import { requireStaff } from "@/lib/auth/session";
@@ -26,7 +32,8 @@ export default async function InvoiceDetailPage({ params }: Params) {
     },
   });
   if (!invoice) notFound();
-  const docLabel = DOC_TIPOS.find((d) => d.value === invoice.tipoDocumento)?.label;
+  const docLabel = labelDocTipo(invoice.tipoDocumento);
+  const saldoClp = Math.max(0, invoice.totalClp - invoice.paidClp);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -42,16 +49,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
               {invoice.causa ? ` · ${invoice.causa.rit || invoice.causa.titulo}` : ""}
             </p>
             <div className="mt-3">
-              <StatusBadge
-                estado={
-                  invoice.status === "pagada"
-                    ? "cumplido"
-                    : invoice.status === "vencida"
-                      ? "vencido"
-                      : "pendiente"
-                }
-              />
-              <span className="ml-2 text-sm text-[var(--ink-soft)]/65">{invoice.status}</span>
+              <InvoiceStatusPill status={invoice.status} />
             </div>
           </div>
           <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:items-end">
@@ -59,7 +57,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
               invoiceId={invoice.id}
               status={invoice.status}
               clienteId={invoice.clienteId}
-              balanceClp={invoice.totalClp - invoice.paidClp}
+              balanceClp={saldoClp}
             />
             <Link
               href={`/api/billing/invoices/${invoice.id}/pdf`}
@@ -91,11 +89,13 @@ export default async function InvoiceDetailPage({ params }: Params) {
       <div className="panel grid gap-4 rounded-3xl p-5 sm:grid-cols-2">
         <div>
           <div className="text-xs uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">Emisión</div>
-          <div className="mt-1 font-medium">{formatDate(invoice.issueDate)}</div>
+          <div className="mt-1 font-medium">{formatCivilDate(invoice.issueDate)}</div>
         </div>
         <div>
           <div className="text-xs uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">Vencimiento</div>
-          <div className="mt-1 font-medium">{formatDate(invoice.dueDate)}</div>
+          <div className="mt-1 font-medium">
+            {invoice.dueDate ? formatCivilDate(invoice.dueDate) : "—"}
+          </div>
         </div>
         <div>
           <div className="text-xs uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">RUT cliente</div>
@@ -137,7 +137,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
               <tr key={l.id} className="table-row">
                 <td className="px-4 py-3">
                   <div className="font-medium">{l.description}</div>
-                  <div className="text-xs text-[var(--ink-soft)]/60">{l.tipo}</div>
+                  <div className="text-xs text-[var(--ink-soft)]/60">{labelLineTipo(l.tipo)}</div>
                 </td>
                 <td className="px-4 py-3">{l.quantity}</td>
                 <td className="px-4 py-3">{clp(l.unitAmountClp)}</td>
@@ -154,7 +154,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
           </div>
           {invoice.ivaClp > 0 && (
             <div className="flex justify-between">
-              <span>IVA 19%</span>
+              <span>IVA</span>
               <span>{clp(invoice.ivaClp)}</span>
             </div>
           )}
@@ -174,7 +174,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
           </div>
           <div className="flex justify-between font-medium text-[var(--copper)]">
             <span>Saldo</span>
-            <span>{clp(invoice.totalClp - invoice.paidClp)}</span>
+            <span>{clp(saldoClp)}</span>
           </div>
         </div>
       </section>
@@ -191,7 +191,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
           {invoice.payments.map((p) => (
             <div key={p.id} className="flex justify-between rounded-xl border border-[var(--line)] px-3 py-2 text-sm">
               <span>
-                {formatDate(p.date)} · {p.method}
+                {formatCivilDate(p.date)} · {labelPaymentMethod(p.method)}
                 {p.reference ? ` · ${p.reference}` : ""}
               </span>
               <span className="font-medium">{clp(p.amountClp)}</span>
