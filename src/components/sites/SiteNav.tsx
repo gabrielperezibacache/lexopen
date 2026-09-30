@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode } from "react";
 import { cn } from "@/lib/chile";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { pageTitleClass } from "@/components/ui";

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { cn } from "@/lib/chile";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
 export type TableColumn<T> = {
@@ -89,19 +88,23 @@ export function Table<T extends { id: string }>({
           <thead className="bg-[color-mix(in_srgb,var(--mist)_70%,transparent)] text-[var(--muted)]">
             <tr>
               {columns.map((c) => (
-                <th key={c.id} scope="col" className="px-3 py-2 font-semibold">
+                <th
+                  key={c.id}
+                  scope="col"
+                  className="px-3 py-2 font-semibold"
+                  aria-sort={
+                    c.sortable && sortId === c.id
+                      ? sortDir === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : undefined
+                  }
+                >
                   {c.sortable ? (
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-[var(--ink)]"
                       onClick={() => toggleSort(c.id)}
-                      aria-sort={
-                        sortId === c.id
-                          ? sortDir === "asc"
-                            ? "ascending"
-                            : "descending"
-                          : "none"
-                      }
                     >
                       {c.header}
                       {sortId === c.id ? (sortDir === "asc" ? " ↑" : " ↓") : ""}

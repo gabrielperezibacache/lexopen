@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Bell, Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -14,6 +14,25 @@ import { CommandPalette, type CommandItem } from "@/components/ui/CommandPalette
 import { Sheet } from "@/components/ui/Sheet";
 
 const SIDEBAR_KEY = "lexopen_sidebar_collapsed";
+const SIDEBAR_EVENT = "lexopen-sidebar";
+
+function subscribeSidebar(onStoreChange: () => void) {
+  const handler = () => onStoreChange();
+  window.addEventListener("storage", handler);
+  window.addEventListener(SIDEBAR_EVENT, handler);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener(SIDEBAR_EVENT, handler);
+  };
+}
+
+function getSidebarCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function AppShell({
   role,
@@ -34,28 +53,24 @@ export function AppShell({
   const [menuPath, setMenuPath] = useState<string | null>(null);
   const mobileOpen = menuPath === pathname;
   const { t } = useI18n();
-  const [collapsed, setCollapsed] = useState(false);
+  const collapsed = useSyncExternalStore(
+    subscribeSidebar,
+    getSidebarCollapsed,
+    () => false
+  );
   const [notifOpen, setNotifOpen] = useState(false);
 
   function setMobileOpen(open: boolean) {
     setMenuPath(open ? pathname : null);
   }
 
-  useEffect(() => {
-    try {
-      setCollapsed(localStorage.getItem(SIDEBAR_KEY) === "1");
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
   function onCollapsedChange(next: boolean) {
-    setCollapsed(next);
     try {
       localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
     } catch {
       /* ignore */
     }
+    window.dispatchEvent(new Event(SIDEBAR_EVENT));
   }
 
   useEffect(() => {
