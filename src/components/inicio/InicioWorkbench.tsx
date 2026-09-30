@@ -71,6 +71,7 @@ async function streamAssistant(
       planId: string | null;
       chatId: string;
       needsConfirm: boolean;
+      plan?: AssistantPlanLite | null;
       results: Array<{ toolId: string; result: ToolResultLite }>;
     }) => void;
     onError?: (message: string) => void;
@@ -301,13 +302,14 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
           },
           onDone: (data) => {
             if (data.chatId) setChatId(data.chatId);
-            if (data.needsConfirm && data.planId && latestPlan) {
+            const plan = data.plan || latestPlan;
+            if (data.needsConfirm && data.planId && plan) {
               setEntries((prev) => [
                 ...prev,
                 {
                   kind: "plan",
                   id: nextId(),
-                  plan: latestPlan!,
+                  plan: { ...plan, id: data.planId || plan.id },
                   resolved: false,
                   cancelled: false,
                 },
