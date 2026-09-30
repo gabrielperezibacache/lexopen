@@ -72,12 +72,24 @@ function emitThemeChange() {
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
+function getServerModeSnapshot(): ThemeMode {
+  return "system";
+}
+
+function getServerResolvedSnapshot(): "light" | "dark" {
+  return "light";
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const mode = useSyncExternalStore(subscribe, getModeSnapshot, () => "system");
-  const resolved = useSyncExternalStore(
+  const mode = useSyncExternalStore<ThemeMode>(
+    subscribe,
+    getModeSnapshot,
+    getServerModeSnapshot
+  );
+  const resolved = useSyncExternalStore<"light" | "dark">(
     subscribe,
     getResolvedSnapshot,
-    () => "light"
+    getServerResolvedSnapshot
   );
 
   useEffect(() => {
