@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { format } from "date-fns";
+import { civilDateKey } from "@/lib/chile-time";
 
 export function escapeAlertHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({
@@ -32,17 +32,23 @@ export async function createPlazoAlerts(
           orderBy: [{ fechaLimite: "asc" }, { id: "asc" }],
           take: 100,
         });
+        const fromKey = civilDateKey(opts.from);
+        const untilKey = civilDateKey(opts.until);
+        let considered = 0;
         const data: Prisma.NotificationCreateManyInput[] = [];
         const ids: string[] = [];
         const emailBuckets = new Map<string, { email: string; name: string; lines: string[] }>();
         for (const plazo of plazos) {
+          const dueKey = civilDateKey(plazo.fechaLimite);
+          if (dueKey < fromKey || dueKey > untilKey) continue;
+          considered += 1;
           const recipients = new Map<string, { id: string; email: string | null; name: string | null }>();
           for (const user of [plazo.responsable, plazo.causa?.abogado]) {
             if (user) recipients.set(user.id, user);
           }
           if (!recipients.size) continue;
           const title = `Plazo próximo · ${plazo.causa?.rit || plazo.causa?.titulo || "sin causa"}`;
-          const body = `${plazo.titulo} vence el ${format(plazo.fechaLimite, "yyyy-MM-dd")}.`;
+          const body = `${plazo.titulo} vence el ${civilDateKey(plazo.fechaLimite)}.`;
           const href = plazo.causaId ? `/causas/${plazo.causaId}` : "/plazos";
           for (const user of recipients.values()) {
             data.push({ userId: user.id, title, body, href });
@@ -60,7 +66,7 @@ export async function createPlazoAlerts(
           await tx.notification.createMany({ data });
           await tx.plazo.updateMany({ where: { id: { in: ids } }, data: { alertaEnviada: true } });
         }
-        return { plazos: plazos.length, notifications: data.length, emailBuckets };
+        return { plazos: considered, notifications: data.length, emailBuckets };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2034" || attempt >= 2) {

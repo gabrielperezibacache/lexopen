@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { allDayEventDates } from "@/lib/chile-time";
 import { prisma } from "@/lib/db";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { getObject } from "@/lib/storage";
@@ -556,7 +557,7 @@ async function uploadMarkdownToDrive(opts: {
   });
 }
 
-/** Crea un evento de Calendar o un stub local si no hay token. */
+/** Crea un evento de día completo en Calendar, o un stub local si no hay token. */
 export async function pushPlazoToGoogleCalendar(plazoId: string) {
   const plazo = await prisma.plazo.findUnique({
     where: { id: plazoId },
@@ -576,19 +577,21 @@ export async function pushPlazoToGoogleCalendar(plazoId: string) {
         e.code === "needs_reconnect")
     ) {
       const soft = softGoogleFailure(e);
+      const dates = allDayEventDates(plazo.fechaLimite);
       return {
         ...soft,
         draftEvent: {
           summary: `[LexOpen] ${plazo.titulo}`,
           description: `${plazo.descripcion ?? ""}\nCausa: ${plazo.causa?.titulo ?? "—"} (${plazo.causa?.rit ?? ""})`,
-          start: plazo.fechaLimite.toISOString(),
+          start: { date: dates.start },
+          end: { date: dates.end },
         },
       };
     }
     throw e;
   }
 
-  const end = new Date(plazo.fechaLimite.getTime() + 60 * 60 * 1000);
+  const dates = allDayEventDates(plazo.fechaLimite);
   const res = await googleFetch(
     "https://www.googleapis.com/calendar/v3/calendars/primary/events",
     {
@@ -600,8 +603,8 @@ export async function pushPlazoToGoogleCalendar(plazoId: string) {
       body: JSON.stringify({
         summary: `[LexOpen] ${plazo.titulo}`,
         description: `${plazo.descripcion ?? ""}\nCausa: ${plazo.causa?.titulo ?? ""}`,
-        start: { dateTime: plazo.fechaLimite.toISOString() },
-        end: { dateTime: end.toISOString() },
+        start: { date: dates.start },
+        end: { date: dates.end },
       }),
     }
   );

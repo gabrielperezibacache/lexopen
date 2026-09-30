@@ -8,6 +8,7 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { plazoCreateSchema } from "@/lib/schemas";
+import { civilDateKey } from "@/lib/chile-time";
 import { calcularVencimiento } from "@/lib/plazos";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { writeAuditStrict } from "@/lib/audit";
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
       await prisma.activity.create({
         data: {
           tipo: "plazo",
-          mensaje: `Plazo${plazo.esFatal ? " fatal" : ""}: ${plazo.titulo} (${plazo.fechaLimite.toISOString().slice(0, 10)})`,
+          mensaje: `Plazo${plazo.esFatal ? " fatal" : ""}: ${plazo.titulo} (${civilDateKey(plazo.fechaLimite)})`,
           causaId: plazo.causaId,
           userId: user.id,
         },

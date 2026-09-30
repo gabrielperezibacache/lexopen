@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { labelEtapa, labelMateria } from "@/lib/chile";
-import { StatusBadge, formatDate, formatDateTime } from "@/components/ui";
+import { TRIBUNALES_CHILE, labelEtapa, labelMateria } from "@/lib/chile";
+import { formatCivilDate } from "@/lib/chile-time";
+import { labelDiasRestantes, labelTipoComputo, diasRestantes } from "@/lib/plazos";
+import { StatusBadge, UrgenciaBadge, formatDate, formatDateTime } from "@/components/ui";
 import { CausaActions } from "@/components/CausaActions";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
@@ -132,6 +134,12 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
     (n, m) => n + m.acciones.length,
     0
   );
+  const proximosPlazos = causa.plazos.filter(
+    (p) => p.estado === "pendiente" || p.estado === "vencido"
+  );
+  const tribunalEnCatalogo = TRIBUNALES_CHILE.includes(
+    causa.tribunal as (typeof TRIBUNALES_CHILE)[number]
+  );
 
   return (
     <div className="space-y-6">
@@ -178,6 +186,37 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           isAdmin={user.role === "admin"}
         />
       </div>
+
+      {proximosPlazos.length > 0 && (
+        <section className="panel rounded-3xl px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Próximos plazos</h2>
+            <Link href={`/plazos?causaId=${causa.id}`} className="text-sm text-[var(--sea)]">
+              Registrar plazo
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-2">
+            {proximosPlazos.slice(0, 4).map((p) => (
+              <div
+                key={p.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium break-words">
+                    {p.esFatal ? "Fatal · " : ""}
+                    {p.titulo}
+                  </div>
+                  <div className="text-xs text-[var(--ink-soft)]/65">
+                    {formatCivilDate(p.fechaLimite)} · {labelTipoComputo(p.tipoComputo)} ·{" "}
+                    {labelDiasRestantes(diasRestantes(p.fechaLimite))}
+                  </div>
+                </div>
+                <UrgenciaBadge fecha={p.fechaLimite} estado={p.estado} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="panel rounded-3xl border border-[var(--sea)]/20 bg-[linear-gradient(135deg,rgba(31,111,120,0.08),rgba(255,255,255,0.85))] px-5 py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -287,8 +326,19 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           <h2 className="text-lg font-semibold">Ficha procesal</h2>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
+              <dt className="text-[var(--ink-soft)]/60">RIT</dt>
+              <dd className="font-medium">{causa.rit || "—"}</dd>
+            </div>
+            <div>
               <dt className="text-[var(--ink-soft)]/60">Tribunal</dt>
-              <dd className="font-medium">{causa.tribunal}</dd>
+              <dd className="font-medium">
+                {causa.tribunal}
+                {!tribunalEnCatalogo && causa.tribunal ? (
+                  <span className="mt-1 block text-xs font-normal text-[var(--ink-soft)]/60">
+                    No está en el catálogo de tribunales. Puede corregirlo al editar.
+                  </span>
+                ) : null}
+              </dd>
             </div>
             <div>
               <dt className="text-[var(--ink-soft)]/60">Procedimiento</dt>
@@ -485,14 +535,31 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
             {causa.plazos.map((p) => (
               <div key={p.id} className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] px-3 py-2 sm:items-center">
                 <div className="min-w-0">
-                  <div className="break-words text-sm font-medium">{p.titulo}</div>
-                  <div className="text-xs text-[var(--ink-soft)]/65">{formatDate(p.fechaLimite)}</div>
+                  <div className="break-words text-sm font-medium">
+                    {p.esFatal ? "Fatal · " : ""}
+                    {p.titulo}
+                  </div>
+                  <div className="text-xs text-[var(--ink-soft)]/65">
+                    {formatCivilDate(p.fechaLimite)} · {labelTipoComputo(p.tipoComputo)}
+                    {p.estado === "pendiente"
+                      ? ` · ${labelDiasRestantes(diasRestantes(p.fechaLimite))}`
+                      : ""}
+                  </div>
                 </div>
-                <StatusBadge estado={p.estado} />
+                <div className="flex flex-wrap justify-end gap-1">
+                  <UrgenciaBadge fecha={p.fechaLimite} estado={p.estado} />
+                  <StatusBadge estado={p.estado} />
+                </div>
               </div>
             ))}
             {causa.plazos.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">Sin plazos.</p>
+              <p className="text-sm text-[var(--ink-soft)]/65">
+                Sin plazos.{" "}
+                <Link href={`/plazos?causaId=${causa.id}`} className="text-[var(--sea)]">
+                  Registrar uno
+                </Link>
+                .
+              </p>
             )}
           </div>
           <PlazoSugerirAi causaId={causa.id} />

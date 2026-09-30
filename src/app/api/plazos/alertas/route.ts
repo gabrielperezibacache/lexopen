@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
-import { startOfDay } from "@/lib/plazos";
+import { addCivilDays, civilDateKey, civilSpanQueryRange } from "@/lib/chile-time";
 import { createPlazoAlerts, escapeAlertHtml } from "@/lib/plazo-alerts";
 import { getGoogleConfig } from "@/lib/integrations/google";
 import { sendGmailMessage } from "@/lib/integrations/gmail";
@@ -30,9 +30,10 @@ export async function POST(req: NextRequest) {
     const days = Number.isFinite(daysParam)
       ? Math.max(0, Math.min(30, Math.trunc(daysParam)))
       : 3;
-    const from = startOfDay(new Date());
-    const until = startOfDay(
-      new Date(from.getTime() + days * 24 * 60 * 60 * 1000)
+    const today = civilDateKey(new Date());
+    const { start: from, end: until } = civilSpanQueryRange(
+      today,
+      addCivilDays(today, days)
     );
 
     const { plazos, notifications, emailBuckets } = await createPlazoAlerts(prisma, {

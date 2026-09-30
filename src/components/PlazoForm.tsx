@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
+import { labelDiasRestantes, labelUrgencia } from "@/lib/plazos";
 
 type Option = { id: string; label: string };
 
@@ -39,6 +40,7 @@ export function PlazoForm({
   const [estimate, setEstimate] = useState<{
     vencimiento?: string;
     urgencia?: string;
+    urgenciaLabel?: string;
     diasRestantes?: number;
     disclaimer?: string;
     error?: string;
@@ -54,6 +56,7 @@ export function PlazoForm({
       const result = await apiMutation<{
         vencimiento?: string;
         urgencia?: string;
+        urgenciaLabel?: string;
         diasRestantes?: number;
         disclaimer?: string;
         error?: string;
@@ -190,7 +193,7 @@ export function PlazoForm({
             )
           }
         >
-          <option value="habiles">Hábiles</option>
+          <option value="habiles">Hábiles (lun–vie)</option>
           <option value="corridos">Corridos</option>
         </select>
       </div>
@@ -230,11 +233,32 @@ export function PlazoForm({
           {busy ? "Guardando..." : "Crear plazo"}
         </button>
       </div>
+      <p className="text-xs leading-relaxed text-[var(--ink-soft)]/70 sm:col-span-2 lg:col-span-4">
+        Hábiles: lunes a viernes, sin feriados nacionales (el sábado no se
+        cuenta). Corridos: todos los días; si el último cae en sábado, domingo
+        o feriado, el vencimiento pasa al día hábil siguiente. No descuenta la
+        feria judicial de febrero.
+      </p>
       {estimate && !estimate.error && estimate.vencimiento && (
         <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm sm:col-span-2 lg:col-span-4">
           <p>
-            Estimación LexOpen: <strong>{estimate.vencimiento}</strong> ·{" "}
-            {estimate.urgencia} · {estimate.diasRestantes}d
+            Estimación LexOpen: <strong>{estimate.vencimiento}</strong>
+            {estimate.urgencia ? (
+              <>
+                {" "}
+                ·{" "}
+                <span className="font-medium">
+                  {estimate.urgenciaLabel ||
+                    labelUrgencia(
+                      estimate.urgencia,
+                      estimate.diasRestantes
+                    )}
+                </span>
+              </>
+            ) : null}
+            {typeof estimate.diasRestantes === "number"
+              ? ` · ${labelDiasRestantes(estimate.diasRestantes)}`
+              : ""}
           </p>
           <p className="mt-1 text-xs text-[var(--ink-soft)]/70">
             {estimate.disclaimer}
