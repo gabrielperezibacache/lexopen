@@ -249,14 +249,21 @@ confirmación humana en escrituras, status del Host (sin LLM) y agenda unificada
 
 **Definición de terminado (Fase 1)**
 
-- [ ] Staff aterriza en `/inicio`; cliente en `/portal`; Panel conserva KPIs.
-- [ ] Composer + status + cards + historial con rich cards / undo.
-- [ ] Pipeline intent → confirm → execute auditado; reads sin confirm.
-- [ ] Tools mínimos del brief registrados y testeados (Zod + RBAC).
-- [ ] `Evento` migrado; calendario muestra plazos+eventos+audiencias.
-- [ ] Unit + contract + e2e del flujo audiencia; suite `test` incluye nuevos.
-- [ ] `npm test`, `npm run lint`, `npm run build`, `npm run e2e` verdes.
-- [ ] CHANGELOG actualizado; sin trabajo de Fase 2–4 de producto.
+- [x] Staff aterriza en `/inicio`; cliente en `/portal`; Panel conserva KPIs.
+- [x] Composer + status + cards + historial con rich cards / undo.
+- [x] Pipeline intent → confirm → execute auditado; reads sin confirm.
+- [x] Tools mínimos del brief registrados y testeados (Zod + RBAC).
+- [x] `Evento` migrado; calendario muestra plazos+eventos+audiencias.
+- [x] Unit + contract + e2e del flujo audiencia; suite `test` incluye nuevos.
+- [x] `npm test`, `npm run lint`, `npm run build` verdes; e2e inicio+cliente OK.
+- [x] CHANGELOG actualizado; sin trabajo de Fase 2–4 de producto.
+
+**Gaps residuales vs brief (no bloquean merge de Fase 1)**
+
+- Vista semana del calendario: mes + agenda + lista CRUD (drag completo limitado a date input «Mover»).
+- Sync Google Calendar pull / conflictos bloqueantes en API directa (conflict warning informativo).
+- Setting org «solo LLM local» explícito: se usa fallback rule classifier si remoto falla.
+- Cobertura e2e de toda la suite existente no re-corrida completa en este entorno (disco/Postgres embebido); smoke de Fase 1 sí.
 
 ### Fase 2 — Refresco UI coherente · esfuerzo **M–L** · riesgo medio-bajo
 
