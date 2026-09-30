@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { ModuleHeader } from "@/components/sites/SiteNav";
+import { ModuleHeader } from "@/components/ui/PageHeader";
 import { clp } from "@/lib/billing";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { requireStaff } from "@/lib/auth/session";
+import { getDictionary } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n/server";
 import {
   Clock,
   Receipt,
@@ -16,6 +18,10 @@ import {
 
 export default async function FacturacionPage() {
   await requireStaff();
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  const b = dict.billingHub;
+
   const [
     unbilledTime,
     unbilledExpenses,
@@ -25,8 +31,6 @@ export default async function FacturacionPage() {
     recentInvoices,
     recentTime,
   ] = await Promise.all([
-    // Sum unbilled hours in Postgres. hours is Float and amountClp is Int, so
-    // _sum is number | null (not Decimal); null means no matching rows.
     prisma.timeEntry.aggregate({
       where: { billable: true, billed: false },
       _sum: { hours: true, amountClp: true },
@@ -38,17 +42,17 @@ export default async function FacturacionPage() {
     }),
     prisma.invoice.findMany({
       where: { status: { in: ["emitida", "parcialmente_pagada", "vencida"] } },
-      // Por cobrar only needs totals; the client relation is unused here.
       select: { totalClp: true, paidClp: true },
     }),
     prisma.payment.aggregate({
       where: {
-        date: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+        date: {
+          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        },
       },
       _sum: { amountClp: true },
     }),
     prisma.ledgerEntry.findMany({
-      // ⚡ Bolt: Fetches only the latest ledger entry per client instead of the entire history.
       distinct: ["clienteId"],
       orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
       include: { cliente: true },
@@ -68,41 +72,86 @@ export default async function FacturacionPage() {
   const unbilledHours = unbilledTime._sum.hours ?? 0;
   const unbilledHonorarios = unbilledTime._sum.amountClp ?? 0;
   const unbilledGastos = unbilledExpenses._sum.amountClp ?? 0;
-  const porCobrar = openInvoices.reduce((s, i) => s + Math.max(0, i.totalClp - i.paidClp), 0);
+  const porCobrar = openInvoices.reduce(
+    (s, i) => s + Math.max(0, i.totalClp - i.paidClp),
+    0
+  );
   const cobradoMes = paidThisMonth._sum.amountClp ?? 0;
   const balMap = new Map<string, number>();
   for (const e of latestLedgerBalances) balMap.set(e.clienteId, e.balanceClp);
   const provisionTotal = [...balMap.values()].reduce((s, v) => s + v, 0);
 
   const stats = [
-    { label: "Horas por facturar", value: `${unbilledHours.toFixed(1)} h`, sub: clp(unbilledHonorarios), icon: Clock, href: "/facturacion/horas" },
-    { label: "Gastos por facturar", value: clp(unbilledGastos), sub: `${unbilledExpenses._count.id} ítems`, icon: Wallet, href: "/facturacion/gastos" },
-    { label: "Por cobrar", value: clp(porCobrar), sub: `${openInvoices.length} docs`, icon: CircleDollarSign, href: "/facturacion/facturas" },
-    { label: "Cobrado este mes", value: clp(cobradoMes), sub: "Pagos recibidos", icon: Receipt, href: "/facturacion/facturas" },
-    { label: "Provisión / CC", value: clp(provisionTotal), sub: "Saldo a favor clientes", icon: PiggyBank, href: "/facturacion/cuenta-corriente" },
-    { label: "Tarifas", value: "Honorarios", sub: "Condiciones por causa", icon: FileSpreadsheet, href: "/facturacion/tarifas" },
-    { label: "UF", value: "Valores", sub: "Conversión honorarios", icon: CircleDollarSign, href: "/facturacion/uf" },
+    {
+      label: b.stats.unbilledHours,
+      value: `${unbilledHours.toFixed(1)} h`,
+      sub: clp(unbilledHonorarios),
+      icon: Clock,
+      href: "/facturacion/horas",
+    },
+    {
+      label: b.stats.unbilledExpenses,
+      value: clp(unbilledGastos),
+      sub: b.stats.items.replace("{count}", String(unbilledExpenses._count.id)),
+      icon: Wallet,
+      href: "/facturacion/gastos",
+    },
+    {
+      label: b.stats.receivables,
+      value: clp(porCobrar),
+      sub: b.stats.docs.replace("{count}", String(openInvoices.length)),
+      icon: CircleDollarSign,
+      href: "/facturacion/facturas",
+    },
+    {
+      label: b.stats.paidMonth,
+      value: clp(cobradoMes),
+      sub: b.stats.paymentsReceived,
+      icon: Receipt,
+      href: "/facturacion/facturas",
+    },
+    {
+      label: b.stats.provision,
+      value: clp(provisionTotal),
+      sub: b.stats.clientCredit,
+      icon: PiggyBank,
+      href: "/facturacion/cuenta-corriente",
+    },
+    {
+      label: b.stats.rates,
+      value: b.stats.honorarios,
+      sub: b.stats.feeTerms,
+      icon: FileSpreadsheet,
+      href: "/facturacion/tarifas",
+    },
+    {
+      label: b.stats.uf,
+      value: b.stats.ufValues,
+      sub: b.stats.ufHint,
+      icon: CircleDollarSign,
+      href: "/facturacion/uf",
+    },
   ];
 
   return (
     <div className="space-y-6">
       <ModuleHeader
-        eyebrow="Contabilidad del estudio"
-        title="Facturación"
-        subtitle="Horas, gastos, boletas/facturas internas (no DTE SII), pagos y cuenta corriente. Exporte CSV/XML a un facturador externo desde Facturas."
+        eyebrow={b.eyebrow}
+        title={b.title}
+        subtitle={b.subtitle}
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/facturacion/horas" className="btn btn-ghost">
-              + Horas
+              {b.addHours}
             </Link>
             <Link
               href="/api/billing/invoices/export?format=csv"
               className="btn btn-ghost"
             >
-              Exportar CSV
+              {b.exportCsv}
             </Link>
             <Link href="/facturacion/facturas" className="btn btn-primary">
-              Facturas
+              {b.title}
             </Link>
           </div>
         }
@@ -110,23 +159,27 @@ export default async function FacturacionPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {stats.map(({ label, value, sub, icon: Icon, href }) => (
-          <Link key={label} href={href} className="panel rounded-3xl p-5 transition hover:shadow-[var(--shadow)]">
+          <Link
+            key={label}
+            href={href}
+            className="panel rounded-[var(--radius-xl)] p-5 transition hover:shadow-[var(--shadow)]"
+          >
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[var(--ink-soft)]/70">{label}</span>
-              <Icon size={18} className="text-[var(--copper)]" />
+              <span className="text-sm text-[var(--muted)]">{label}</span>
+              <Icon size={18} className="text-[var(--copper)]" aria-hidden />
             </div>
             <div className="display mt-3 text-3xl">{value}</div>
-            <div className="mt-1 text-sm text-[var(--ink-soft)]/65">{sub}</div>
+            <div className="mt-1 text-sm text-[var(--muted)]">{sub}</div>
           </Link>
         ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="panel rounded-3xl p-5">
+        <section className="panel rounded-[var(--radius-xl)] p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-            <h2 className="text-lg font-semibold">Facturas recientes</h2>
+            <h2 className="text-lg font-semibold">{b.recentInvoices}</h2>
             <Link href="/facturacion/facturas" className="text-sm text-[var(--sea)]">
-              Ver todas
+              {dict.common.next}
             </Link>
           </div>
           <div className="space-y-3">
@@ -138,8 +191,8 @@ export default async function FacturacionPage() {
               >
                 <div className="min-w-0">
                   <div className="font-medium">{inv.number}</div>
-                  <div className="break-words text-sm text-[var(--ink-soft)]/70">
-                    {inv.cliente.razonSocial} · {inv.causa?.rit || "Sin causa"}
+                  <div className="break-words text-sm text-[var(--muted)]">
+                    {inv.cliente.razonSocial} · {inv.causa?.rit || "—"}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
@@ -150,7 +203,8 @@ export default async function FacturacionPage() {
                         ? "cumplido"
                         : inv.status === "vencida"
                           ? "vencido"
-                          : inv.status === "emitida" || inv.status === "parcialmente_pagada"
+                          : inv.status === "emitida" ||
+                              inv.status === "parcialmente_pagada"
                             ? "pendiente"
                             : "activa"
                     }
@@ -159,43 +213,36 @@ export default async function FacturacionPage() {
               </Link>
             ))}
             {recentInvoices.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">
-                Sin facturas aún.{" "}
-                <Link href="/facturacion/facturas" className="text-[var(--sea)]">
-                  Emitir documento
-                </Link>
-              </p>
+              <p className="text-sm text-[var(--muted)]">{b.emptyInvoices}</p>
             )}
           </div>
         </section>
 
-        <section className="panel rounded-3xl p-5">
+        <section className="panel rounded-[var(--radius-xl)] p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-            <h2 className="text-lg font-semibold">Horas recientes</h2>
+            <h2 className="text-lg font-semibold">{b.recentTime}</h2>
             <Link href="/facturacion/horas" className="text-sm text-[var(--sea)]">
-              Registrar
+              {b.addHours}
             </Link>
           </div>
           <div className="space-y-3">
-            {recentTime.map((t) => (
-              <div key={t.id} className="rounded-2xl border border-[var(--line)] px-4 py-3">
+            {recentTime.map((entry) => (
+              <div
+                key={entry.id}
+                className="rounded-2xl border border-[var(--line)] px-4 py-3"
+              >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="font-medium">{t.description}</div>
-                  <div className="text-sm font-semibold">{clp(t.amountClp)}</div>
+                  <div className="font-medium">{entry.description}</div>
+                  <div className="text-sm font-semibold">{clp(entry.amountClp)}</div>
                 </div>
-                <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
-                  {t.hours}h · {t.user.name} · {t.causa?.rit || "—"} · {formatDate(t.date)}
-                  {t.billed ? " · facturado" : t.billable ? " · por facturar" : " · no facturable"}
+                <div className="mt-1 text-sm text-[var(--muted)]">
+                  {entry.hours}h · {entry.user.name} · {entry.causa?.rit || "—"} ·{" "}
+                  {formatDate(entry.date, locale)}
                 </div>
               </div>
             ))}
             {recentTime.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">
-                Sin horas registradas.{" "}
-                <Link href="/facturacion/horas" className="text-[var(--sea)]">
-                  Cargar tiempo
-                </Link>
-              </p>
+              <p className="text-sm text-[var(--muted)]">{b.emptyTime}</p>
             )}
           </div>
         </section>
