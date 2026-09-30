@@ -10,11 +10,14 @@ import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { requireStaff } from "@/lib/auth/session";
 import { confidentialWhere } from "@/lib/api";
 import { documentoListSelect } from "@/lib/sites/file-select";
-import { PageHeader } from "@/components/sites/SiteNav";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function DocumentosPage() {
   const user = await requireStaff();
+  const { dict } = await getI18n();
+  const h = dict.hubs.documentos;
   const LIST_TAKE = 100;
   const [rawDocumentos, causas] = await Promise.all([
     prisma.documento.findMany({
@@ -49,12 +52,12 @@ export default async function DocumentosPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Repositorio por causa"
-        title="Documentos"
-        subtitle="Incorporación de escritos, carpetas investigativas y memos vinculados a causas — con extracción Markdown/OCR para el copiloto IA, Obsidian y Google Drive. El VDR por espacio está en Espacios → Archivos."
+        eyebrow={h.eyebrow}
+        title={h.title}
+        subtitle={h.subtitle}
         actions={
           <Link className="btn btn-secondary" href="/agente?utility=doc_qa">
-            Preguntar con IA
+            IA
           </Link>
         }
       />

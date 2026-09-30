@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/db";
-import { ModuleHeader } from "@/components/sites/SiteNav";
+import { ModuleHeader } from "@/components/ui/PageHeader";
 import { requireStaff } from "@/lib/auth/session";
 import { isAdmin } from "@/lib/auth/rbac";
 import { PeopleManager } from "@/components/PeopleManager";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function PeoplePage() {
   const me = await requireStaff();
+  const { dict } = await getI18n();
+  const h = dict.hubs.personas;
   const [users, groups] = await Promise.all([
     prisma.user.findMany({
       include: {
@@ -22,11 +25,7 @@ export default async function PeoplePage() {
 
   return (
     <div>
-      <ModuleHeader
-        eyebrow="Directorio del estudio"
-        title="Personas"
-        subtitle="Crear, editar y administrar usuarios, roles y grupos con acceso a espacios."
-      />
+      <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
       <PeopleManager
         canManage={isAdmin(me.role)}
         currentUserId={me.id}

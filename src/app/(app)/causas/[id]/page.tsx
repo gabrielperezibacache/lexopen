@@ -44,6 +44,7 @@ type Params = {
 export default async function CausaDetailPage({ params, searchParams }: Params) {
   const user = await requireStaff();
   const { t, dict } = await getI18n();
+  const h = dict.hubs.causaDetail;
   const { id } = await params;
   const sp = await searchParams;
   const from = sp.from?.trim();
@@ -55,10 +56,10 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         : "/causas";
   const backLabel =
     from === "monitoreo"
-      ? "← Cartera PJUD"
+      ? h.backMonitoreo
       : from === "mis-causas"
-        ? "← ClaveÚnica"
-        : "← Expediente";
+        ? h.backMisCausas
+        : h.backExpediente;
   const [causa, responsables] = await Promise.all([
     prisma.causa.findUnique({
       where: { id },
@@ -150,13 +151,17 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           </Link>
           <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">{causa.titulo}</h1>
           <p className="mt-2 break-words text-[var(--ink-soft)]/80">
-            {causa.caratula || "Sin carátula"} · {causa.rit || "Sin RIT"}
+            {causa.caratula || h.noCaratula} · {causa.rit || h.noRit}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <StatusBadge estado={causa.estado} />
             <span className="badge badge-sea">{labelMateria(causa.materia)}</span>
             <span className="badge badge-ink">{labelEtapa(causa.etapa)}</span>
-            {origen && <span className="badge badge-ink">Origen: {origen}</span>}
+            {origen && (
+              <span className="badge badge-ink">
+                {h.origin.replace("{label}", origen)}
+              </span>
+            )}
             <span
               className={
                 causa.conflictStatus === "blocked"
@@ -166,16 +171,14 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
                     : "badge badge-activa"
               }
             >
-              Conflictos: {causa.conflictStatus}
+              {h.conflicts.replace("{status}", causa.conflictStatus)}
             </span>
             {isRealDriveFolderId(causa.googleDriveFolderId) && (
-              <span className="badge badge-activa">Drive vinculado</span>
+              <span className="badge badge-activa">{h.driveLinked}</span>
             )}
             {isPlaceholderDriveFolderId(causa.googleDriveFolderId) &&
               causa.googleDriveFolderId && (
-                <span className="badge badge-pendiente">
-                  Marcador Drive (no es carpeta real)
-                </span>
+                <span className="badge badge-pendiente">{h.driveStub}</span>
               )}
           </div>
         </div>

@@ -6,10 +6,13 @@ import { ClipboardPen } from "lucide-react";
 import { requireStaff } from "@/lib/auth/session";
 import { minutaConfidentialWhere } from "@/lib/api";
 import { MinutaPlantillasManager } from "@/components/minutas/MinutaPlantillasManager";
-import { PageHeader } from "@/components/sites/SiteNav";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function MinutasPage() {
   const user = await requireStaff();
+  const { dict } = await getI18n();
+  const h = dict.hubs.minutas;
   const [minutas, causas, accionesAbiertasTotal, plantillas] = await Promise.all([
     prisma.minuta.findMany({
       where: minutaConfidentialWhere(user.role),
@@ -46,9 +49,9 @@ export default async function MinutasPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Continuidad del estudio"
-        title="Minutas"
-        subtitle="Traspaso tras audiencias, reuniones y llamadas. Cualquier abogado puede retomar la tramitación con el resumen y los próximos pasos."
+        eyebrow={h.eyebrow}
+        title={h.title}
+        subtitle={h.subtitle}
         actions={
           <>
             <Link className="btn btn-secondary" href="/agente?utility=draft">

@@ -1,10 +1,13 @@
 import { prisma } from "@/lib/db";
-import { ModuleHeader } from "@/components/sites/SiteNav";
+import { ModuleHeader } from "@/components/ui/PageHeader";
 import { requireStaff } from "@/lib/auth/session";
 import { GlobalTasksPanel } from "@/components/GlobalTasksPanel";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function GlobalTasksPage() {
   const user = await requireStaff();
+  const { dict } = await getI18n();
+  const h = dict.hubs.tareas;
   const [tasks, sites, users] = await Promise.all([
     prisma.task.findMany({
       include: { site: true, assignee: true },
@@ -25,13 +28,9 @@ export default async function GlobalTasksPage() {
   return (
     <div>
       <ModuleHeader
-        eyebrow="Gestión de proyecto"
-        title="Tareas"
-        subtitle={
-          user
-            ? `Vista global del estudio. Sesión: ${user.name}.`
-            : "Vista global de tareas del estudio."
-        }
+        eyebrow={h.eyebrow}
+        title={h.title}
+        subtitle={`${h.subtitle} ${user.name}.`}
       />
       <GlobalTasksPanel
         initialTasks={tasks.map((t) => ({

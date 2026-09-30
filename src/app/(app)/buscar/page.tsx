@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { ModuleHeader } from "@/components/sites/SiteNav";
+import { ModuleHeader } from "@/components/ui/PageHeader";
+import { useI18n } from "@/components/i18n/I18nProvider";
 
 type Results = {
   q: string;
@@ -67,6 +68,8 @@ const EMPTY_RESULTS = (q: string): Results => ({
 });
 
 export default function SearchPage() {
+  const { dict, t } = useI18n();
+  const h = dict.hubs.buscar;
   const [results, setResults] = useState<Results | null>(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
@@ -125,12 +128,12 @@ export default function SearchPage() {
   return (
     <div>
       <ModuleHeader
-        eyebrow="Búsqueda unificada"
-        title="Buscar"
-        subtitle="Espacios, causas, documentos (FTS), minutas, archivos VDR, tareas, wiki y jurisprudencia. En el portal: spaces y archivos etiquetados «cliente»."
+        eyebrow={h.eyebrow}
+        title={h.title}
+        subtitle={h.subtitle}
       />
       <form role="search" onSubmit={onSubmit} className="panel mb-6 flex flex-col gap-2 rounded-3xl p-4 sm:flex-row">
-        <label htmlFor="unified-search" className="sr-only">Buscar en LexOpen</label>
+        <label htmlFor="unified-search" className="sr-only">{t("common.search")}</label>
         <input
           id="unified-search"
           type="search"
@@ -139,16 +142,20 @@ export default function SearchPage() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           maxLength={200}
-          placeholder="Ej. tutela, Andes, audiencia, C-4521…"
+          placeholder={t("common.searchPlaceholder")}
           required
         />
         <button className="btn btn-primary" disabled={busy} type="submit">
-          {busy ? "…" : "Buscar"}
+          {busy ? "…" : h.title}
         </button>
       </form>
 
       <p role="status" aria-live="polite" className="mb-4 text-sm text-[var(--ink-soft)]">
-        {busy ? "Buscando…" : results && !error ? `Resultados para «${results.q}»` : ""}
+        {busy
+          ? h.searching
+          : results && !error
+            ? h.resultsFor.replace("{q}", results.q)
+            : ""}
       </p>
 
       {error && (

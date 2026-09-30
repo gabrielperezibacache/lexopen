@@ -2,13 +2,14 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth/session";
 import { formatDateTime } from "@/components/ui";
-import { ModuleHeader } from "@/components/sites/SiteNav";
+import { ModuleHeader } from "@/components/ui/PageHeader";
 import {
   labelAuditAction,
   labelAuditEntity,
   summarizeAuditJson,
 } from "@/lib/audit-labels";
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { getI18n } from "@/lib/i18n/server";
 
 type Props = {
   searchParams: Promise<{ action?: string; actor?: string; q?: string }>;
@@ -16,6 +17,8 @@ type Props = {
 
 export default async function AuditoriaPage({ searchParams }: Props) {
   await requireRole("admin");
+  const { dict } = await getI18n();
+  const h = dict.hubs.auditoria;
   const sp = await searchParams;
   const actionFilter = (sp.action || "").trim();
   const actorFilter = (sp.actor || "").trim();
@@ -58,11 +61,7 @@ export default async function AuditoriaPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <ModuleHeader
-        eyebrow="Seguridad"
-        title="Auditoría"
-        subtitle="Eventos relevantes de causas, plazos, minutas, personas y configuración. Se muestran hasta 300 eventos recientes."
-      />
+      <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
 
       <p className="text-xs text-[var(--ink-soft)]/65">
         Mostrando hasta 300 eventos más recientes (luego filtros en pantalla).
