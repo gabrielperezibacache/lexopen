@@ -5,7 +5,7 @@ test("staff puede re-ejecutar el chequeo de conflictos de una causa", async ({
   page,
 }) => {
   await loginAs(page, "socio@estudio.cl");
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/(inicio|dashboard)$/);
 
   const causasRes = await page.request.get("/api/causas");
   expect(causasRes.ok()).toBeTruthy();
@@ -25,7 +25,7 @@ test("staff puede re-ejecutar el chequeo de conflictos de una causa", async ({
 
 test("el staff puede enviar un mensaje interno", async ({ page }) => {
   await loginAs(page, "socio@estudio.cl");
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/(inicio|dashboard)$/);
 
   const peopleRes = await page.request.get("/api/people");
   expect(peopleRes.ok()).toBeTruthy();

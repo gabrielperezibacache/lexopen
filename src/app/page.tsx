@@ -62,7 +62,7 @@ export default function LandingPage() {
             <Link href="/login" className="btn btn-primary">
               {t("landing.openPlatform")}
             </Link>
-            <Link href="/login?next=/dashboard" className="btn btn-secondary">
+            <Link href="/login?next=/inicio" className="btn btn-secondary">
               {t("landing.seeDemo")}
             </Link>
           </div>

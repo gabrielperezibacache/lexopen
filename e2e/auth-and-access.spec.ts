@@ -6,11 +6,12 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
 }) => {
   await loginAs(page, "socio@estudio.cl");
 
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/(inicio|dashboard)$/);
+  await expect(page.getByTestId("inicio-status-line")).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Hola, María" })
+    page.getByRole("heading", { name: /María/i })
   ).toBeVisible();
-  await expect(page.getByText("Inicio del estudio")).toBeVisible();
+  await expect(page.getByText("Turno de hoy")).toBeVisible();
 
   const hostStatusResponse = await page.request.get("/api/admin/host-status");
   expect(hostStatusResponse.ok()).toBeTruthy();

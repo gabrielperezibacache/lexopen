@@ -6,6 +6,7 @@ import {
   Scale,
   Inbox,
   LayoutDashboard,
+  Home,
   Briefcase,
   BookOpen,
   Files,
@@ -116,7 +117,8 @@ function SidebarChrome({
 
   const primary = useMemo<NavItem[]>(
     () => [
-      { href: "/dashboard", label: t("nav.home"), icon: LayoutDashboard },
+      { href: "/inicio", label: t("nav.home"), icon: Home },
+      { href: "/dashboard", label: t("nav.panel"), icon: LayoutDashboard },
       { href: "/sites", label: t("nav.sites"), icon: Building2 },
       {
         href: "/clientes",

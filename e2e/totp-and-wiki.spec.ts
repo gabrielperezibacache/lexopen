@@ -4,7 +4,7 @@ import { generateTotpCode } from "../src/lib/auth/totp";
 
 test("TOTP enroll, challenge on login, then disable", async ({ page }) => {
   await loginAs(page, "asistente@estudio.cl");
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/(inicio|dashboard)$/);
 
   const setup = await page.request.post("/api/auth/totp", {
     data: { action: "setup" },
@@ -33,7 +33,7 @@ test("TOTP enroll, challenge on login, then disable", async ({ page }) => {
   const codeInput = page.locator('input[name="totp"], input[name="code"]').first();
   await codeInput.fill(generateTotpCode(secret));
   await page.locator('button[type="submit"]').click();
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
+  await expect(page).toHaveURL(/\/(inicio|dashboard)$/, { timeout: 15_000 });
 
   const disable = await page.request.post("/api/auth/totp", {
     data: { action: "disable", code: generateTotpCode(secret) },
@@ -43,7 +43,7 @@ test("TOTP enroll, challenge on login, then disable", async ({ page }) => {
 
 test("staff puede crear página wiki y ver historial", async ({ page }) => {
   await loginAs(page, "socio@estudio.cl");
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/(inicio|dashboard)$/);
 
   const sitesRes = await page.request.get("/api/sites");
   expect(sitesRes.ok()).toBeTruthy();
