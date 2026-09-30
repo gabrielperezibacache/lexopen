@@ -8,6 +8,7 @@ import {
   requireRole,
   requireStaff,
 } from "@/lib/api";
+import { parseListLimit } from "@/lib/api/list-limit";
 
 const tribunalCreateSchema = z.object({
   nombre: z.string().min(3),
@@ -19,6 +20,10 @@ export async function GET(req: NextRequest) {
   try {
     await requireStaff();
     const q = req.nextUrl.searchParams.get("q")?.trim();
+    const limit = parseListLimit(req.nextUrl.searchParams.get("limit"), {
+      default: 200,
+      max: 500,
+    });
     const tribunales = await prisma.tribunal.findMany({
       where: {
         activo: true,
@@ -33,6 +38,7 @@ export async function GET(req: NextRequest) {
           : {}),
       },
       orderBy: [{ region: "asc" }, { nombre: "asc" }],
+      take: limit,
     });
     return NextResponse.json({ tribunales });
   } catch (e) {

@@ -10,6 +10,7 @@ import {
   deleteStudioUser,
   updateStudioUser,
 } from "@/lib/users-admin";
+import { parseListLimit } from "@/lib/api/list-limit";
 
 const roleEnum = z.enum(["admin", "abogado", "asistente", "cliente"]);
 
@@ -63,9 +64,13 @@ const deleteGroupSchema = z.object({
   groupId: z.string().min(1),
 });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await requireStaff();
+    const limit = parseListLimit(req.nextUrl.searchParams.get("limit"), {
+      default: 200,
+      max: 500,
+    });
     const [users, groups] = await Promise.all([
       prisma.user.findMany({
         select: {
@@ -84,12 +89,14 @@ export async function GET() {
           },
         },
         orderBy: { name: "asc" },
+        take: limit,
       }),
       prisma.group.findMany({
         include: {
           members: { include: { user: { select: { id: true, name: true } } } },
         },
         orderBy: { name: "asc" },
+        take: limit,
       }),
     ]);
     return NextResponse.json({ users, groups });

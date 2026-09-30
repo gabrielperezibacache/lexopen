@@ -17,6 +17,7 @@ import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 import { inferDocumentoTipo, normalizeIngestPath } from "@/lib/document-ingest";
 import { sanitizeUploadMimeType } from "@/lib/security/download";
 import { documentoListSelect } from "@/lib/sites/file-select";
+import { parseListLimit } from "@/lib/api/list-limit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
     const sp = new URL(req.url).searchParams;
     const causaId = sp.get("causaId");
     const clienteId = sp.get("clienteId");
+    const limit = parseListLimit(sp.get("limit"), { default: 200, max: 500 });
     const documentos = await prisma.documento.findMany({
       where: {
         ...(causaId ? { causaId } : {}),
@@ -37,6 +39,7 @@ export async function GET(req: NextRequest) {
         autor: { select: publicUserSelect },
       },
       orderBy: { updatedAt: "desc" },
+      take: limit,
     });
     return NextResponse.json(documentos);
   } catch (e) {

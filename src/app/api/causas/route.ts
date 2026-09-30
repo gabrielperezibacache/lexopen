@@ -15,6 +15,7 @@ import { parseLocalDateInput } from "@/lib/minutas";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { canSeeConfidential, isStaff } from "@/lib/auth/rbac";
 import { duplicateCausaWhere } from "@/lib/pjud/causa-origin";
+import { parseListLimit } from "@/lib/api/list-limit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,6 +24,10 @@ export async function GET(req: NextRequest) {
     const q = searchParams.get("q")?.trim();
     const materia = searchParams.get("materia");
     const estado = searchParams.get("estado");
+    const limit = parseListLimit(searchParams.get("limit"), {
+      default: 200,
+      max: 500,
+    });
 
     const causas = await prisma.causa.findMany({
       where: {
@@ -54,6 +59,7 @@ export async function GET(req: NextRequest) {
         _count: { select: { documentos: true, partes: true } },
       },
       orderBy: { updatedAt: "desc" },
+      take: limit,
     });
 
     return NextResponse.json(causas);
