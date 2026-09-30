@@ -6,13 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
 export type ThemeMode = "light" | "dark" | "system";
 
 const STORAGE_KEY = "lexopen_theme";
+const CHANGE_EVENT = "lexopen-theme";
 
 type ThemeContextValue = {
   mode: ThemeMode;
@@ -36,7 +37,6 @@ function applyResolved(resolved: "light" | "dark") {
   document.documentElement.style.colorScheme = resolved;
 }
 
-/** Apply theme before paint — inline in root layout as well. */
 export function readStoredThemeMode(): ThemeMode {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -47,40 +47,51 @@ export function readStoredThemeMode(): ThemeMode {
   return "system";
 }
 
+function subscribe(onStoreChange: () => void) {
+  const onChange = () => onStoreChange();
+  window.addEventListener("storage", onChange);
+  window.addEventListener(CHANGE_EVENT, onChange);
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(CHANGE_EVENT, onChange);
+    mq.removeEventListener("change", onChange);
+  };
+}
+
+function getModeSnapshot(): ThemeMode {
+  return readStoredThemeMode();
+}
+
+function getResolvedSnapshot(): "light" | "dark" {
+  return resolveMode(readStoredThemeMode());
+}
+
+function emitThemeChange() {
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>("system");
-  const [resolved, setResolved] = useState<"light" | "dark">("light");
+  const mode = useSyncExternalStore(subscribe, getModeSnapshot, () => "system");
+  const resolved = useSyncExternalStore(
+    subscribe,
+    getResolvedSnapshot,
+    () => "light"
+  );
 
   useEffect(() => {
-    const initial = readStoredThemeMode();
-    setModeState(initial);
-    const next = resolveMode(initial);
-    setResolved(next);
-    applyResolved(next);
-  }, []);
-
-  useEffect(() => {
-    if (mode !== "system") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      const next = resolveMode("system");
-      setResolved(next);
-      applyResolved(next);
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, [mode]);
+    applyResolved(resolved);
+  }, [resolved]);
 
   const setMode = useCallback((next: ThemeMode) => {
-    setModeState(next);
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
       /* ignore */
     }
-    const resolvedNext = resolveMode(next);
-    setResolved(resolvedNext);
-    applyResolved(resolvedNext);
+    applyResolved(resolveMode(next));
+    emitThemeChange();
   }, []);
 
   const toggle = useCallback(() => {
