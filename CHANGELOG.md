@@ -6,11 +6,15 @@
 - Fase 0: diagnóstico y plan hacia 1.0 en `docs/PLAN-1.0.md` (mapa de módulos, bloqueadores de producción, design system, Fases 1–4).
 - Decisiones aprobadas (2026-09-30): Fase 1 = brief completo (Inicio + intent engine + Evento); portal/Redis/billing/PJUD/Desktop/i18n/`.jules`/tag según §5bis del plan.
 
-### Fase 2 (en curso)
+### Fase 2 (completa · deuda residual en PLAN)
 - Design system: tokens en `globals.css` (color, tipografía, spacing, radius, shadow, motion) + tema claro/oscuro persistido.
-- Librería `src/components/ui/` (Button, Input, Dialog, Sheet, Table, CommandPalette, etc.) sin dependencias Radix; barrel compatible `@/components/ui`.
+- Librería `src/components/ui/` (Button, Input, Dialog, Sheet, Table, CommandPalette, LoadingState, ErrorState, ConfirmDialog, etc.) sin dependencias Radix; barrel `@/components/ui`.
 - Shell: sidebar colapsable y agrupada (Trabajo / Clientes / Documentos / Admin), breadcrumbs, búsqueda global, ⌘K, panel de notificaciones, theme toggle.
-- Facturación hub con diccionarios i18n; `.jules/palette.md` canónico (se elimina `.Jules/`).
+- Hubs i18n + `PageHeader`/`ModuleHeader`: plazos, personas, flujos, tareas, documentos, notificaciones, buscar, integraciones, auditoría, configuración, cuenta, jurisprudencia, minutas, ficha causa, facturación.
+- Confirm destructivo accesible (calendario, personas, trámites, iSheet, eliminar causa); `(app)/loading` y `error` usan LoadingState/ErrorState.
+- ThemeProvider: genéricos `ThemeMode` / `"light" | "dark"` en `useSyncExternalStore` (fix typecheck CI).
+- Electron `desktop/`: spot-check `npm test` OK; tokens setup cercanos a web (alineación fina residual).
+- `.jules/palette.md` canónico (se elimina `.Jules/`).
 
 ### Fase 1 (en curso)
 - Nav: `/inicio` como home staff; Panel = `/dashboard`; redirects y e2e alineados.

@@ -273,20 +273,26 @@ confirmación humana en escrituras, status del Host (sin LLM) y agenda unificada
 **Objetivo:** una sola lectura visual staff (tokens + shell + primitivos + i18n)
 sin reinventar la marca (copper/sea).
 
-**Estado (2026-09-30 · en curso en PR #151)**
+**Estado (2026-09-30 · completa en PR #151; deuda residual abajo)**
 
 | Ítem | Estado |
 | --- | --- |
 | Tokens `globals.css` + `@theme` + light/`html.dark` + motion/a11y | **Hecho** |
 | Theme toggle persistido (`lexopen_theme` + `prefers-color-scheme`) | **Hecho** |
-| Librería `src/components/ui/*` (Button…CommandPalette) sin Radix | **Hecho** (nativo dialog/listbox; sin deps nuevas) |
+| Librería `src/components/ui/*` (Button…CommandPalette, Loading/Error/Confirm) | **Hecho** (nativo dialog/listbox; sin deps nuevas) |
 | AppShell/Sidebar colapsable + grupos Trabajo/Clientes/Documentos/Admin | **Hecho** |
 | Breadcrumbs + búsqueda global + ⌘K + panel notificaciones | **Hecho** |
 | Hub Facturación → i18n + `ModuleHeader` | **Hecho** |
 | Unificar `.jules/palette.md` (eliminar `.Jules/`) + CONTRIBUTING | **Hecho** |
-| Screen pass resto de hubs (plazos, personas, flujos, ficha causa…) | **Parcial** — deuda residual |
-| Empty/loading/error + confirm destructivo en todas las rutas | **Parcial** |
-| Spot-check Electron `desktop/` | **Pendiente** |
+| Screen pass hubs (plazos, personas, flujos, ficha causa, buscar, integraciones, …) | **Hecho** |
+| Empty/loading/error + confirm destructivo (calendario, personas, trámites, isheet, causa) | **Hecho** |
+| Spot-check Electron `desktop/` (`npm test` + tokens setup) | **Hecho** |
+
+**Deuda residual (no bloquea cierre Fase 2)**
+
+- Sub-hubs facturación (`/facturacion/*`) y altas PJUD (`causas/nueva`, `mis-causas`) aún con copy ES hardcodeado en headers (re-exportan `PageHeader` de UI).
+- `WikiHistoryPanel` sigue con `confirm()` nativo (restaurar revisión).
+- Shell Electron `desktop/renderer/setup.css`: tokens cercanos pero no idénticos a `globals.css` (sand/paper legacy); sin rotura funcional.
 
 **Riesgos**
 
@@ -294,7 +300,7 @@ sin reinventar la marca (copper/sea).
 - Regresiones a11y móvil ya arregladas en AppShell.
 
 **Criterio de salida:** lint/tsc/build verdes; `inicio-assistant` e2e verde;
-paleta agentes unificada; hubs principales con tokens/i18n.
+paleta agentes unificada; hubs principales con tokens/i18n. → **cumplido** (deuda residual arriba).
 
 ### Fase 3 — Endurecimiento producción · esfuerzo **M** · riesgo alto si se toca mal
 
