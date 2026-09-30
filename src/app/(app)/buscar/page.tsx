@@ -133,7 +133,9 @@ export default function SearchPage() {
         subtitle={h.subtitle}
       />
       <form role="search" onSubmit={onSubmit} className="panel mb-6 flex flex-col gap-2 rounded-3xl p-4 sm:flex-row">
-        <label htmlFor="unified-search" className="sr-only">{t("common.search")}</label>
+        <label htmlFor="unified-search" className="sr-only">
+          {t("common.searchInApp")}
+        </label>
         <input
           id="unified-search"
           type="search"
@@ -143,6 +145,7 @@ export default function SearchPage() {
           onChange={(event) => setQuery(event.target.value)}
           maxLength={200}
           placeholder={t("common.searchPlaceholder")}
+          aria-label={t("common.searchInApp")}
           required
         />
         <button className="btn btn-primary" disabled={busy} type="submit">

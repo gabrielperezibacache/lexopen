@@ -23,7 +23,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
       role="search"
     >
       <label className="sr-only" htmlFor="lexopen-global-search">
-        {t("common.search")}
+        {t("common.searchInApp")}
       </label>
       <div className="relative">
         <Search
@@ -33,10 +33,12 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
         />
         <input
           id="lexopen-global-search"
+          type="search"
           className="input !py-2 pl-9 pr-3"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={t("common.searchPlaceholder")}
+          aria-label={t("common.searchInApp")}
         />
       </div>
     </form>

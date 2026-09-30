@@ -23,6 +23,7 @@ export const en: Dictionary = {
     loadingApp: "Loading LexOpen...",
     retry: "Retry",
     search: "Search",
+    searchInApp: "Search LexOpen",
     searchPlaceholder: "Search LexOpen…",
     back: "Back",
     demoPassword: "Demo password: lexopen",
@@ -850,7 +851,7 @@ export const en: Dictionary = {
     },
     configuracion: {
       eyebrow: "Administration",
-      title: "Settings",
+      title: "Firm settings",
       subtitle: "Firm, Host, security and integrations.",
     },
     cuenta: {
