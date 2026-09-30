@@ -57,7 +57,7 @@ Leyenda de estado: **completo** (usable en piloto con tests/contratos útiles) �
 | **Causas** | parcial → completo en núcleo | `/causas`, ficha, nueva/editar, tabs (`lib/causas/section-tabs`), Mis Causas, monitoreo | Ficha densa; sync PJUD acoplado a UI | Menú Causas ya unificado (e2e); legado de ramas divergentes CRM/PJUD | Unit tabs; e2e sección; smoke rutas |
 | **Clientes / CRM** | parcial | `/clientes`, ficha, trámites, chat IA carpeta | Lista `take: 100`; chat acotado a carpeta | i18n mejor que facturación; sin e2e dedicado de CRUD | Contratos trámites; e2e ACL portal toca clientes de paso |
 | **Plazos** | completo (ayuda operativa) | `/plazos`, `lib/plazos.ts`, cron alertas | No es cómputo oficial de tribunal (documentado) | Fechas locales corregidas en auditoría | Unit + integración alertas |
-| **Calendario** | parcial | `/calendario` unifica plazos/tareas; Google Calendar vía OAuth | Sync Calendar stub sin OAuth | Vista rica; sin e2e de interacción | Indirecto vía plazos/Google unit |
+| **Calendario** | parcial → completo en núcleo Fase 1 | `/calendario` mes/semana/agenda + Evento DnD; Google push/pull/ICS | Conflictos API informativos | Pull requiere OAuth real | Unit week + calendar-pull map; e2e indirecto |
 | **Documentos** | parcial → completo en ingest | `/documentos`, cola OCR, ingest carpeta, Drive push | OCR depende de binarios Host; cola local | Badge Drive stub en prod fail-closed | Unit ingest/processing/OCR |
 | **Minutas** | completo (núcleo) | Wizard, plantillas, approve-to-minuta desde Hermes | Drive upload exige carpeta real | Copy stub claro en UI | Contract API + render |
 | **Tareas** | parcial | `/tareas` + tareas por site | Página global delgada vs panel site | UX desigual entre hub y site | Smoke; sin e2e flujo crear |
@@ -258,12 +258,15 @@ confirmación humana en escrituras, status del Host (sin LLM) y agenda unificada
 - [x] `npm test`, `npm run lint`, `npm run build` verdes; e2e inicio+cliente OK.
 - [x] CHANGELOG actualizado; sin trabajo de Fase 2–4 de producto.
 
-**Gaps residuales vs brief (no bloquean merge de Fase 1)**
+**Gaps residuales vs brief (cierre 2026-09-30)**
 
-- Vista semana del calendario: mes + agenda + lista CRUD (drag completo limitado a date input «Mover»).
-- Sync Google Calendar pull / conflictos bloqueantes en API directa (conflict warning informativo).
-- Setting org «solo LLM local» explícito: se usa fallback rule classifier si remoto falla.
-- Cobertura e2e de toda la suite existente no re-corrida completa en este entorno (disco/Postgres embebido); smoke de Fase 1 sí.
+| Gap | Estado |
+| --- | --- |
+| Vista semana + drag-to-move de eventos | **Cerrado** — `vista=mes\|semana\|agenda`, `CalendarioBoard` DnD → `PATCH /api/eventos/:id` (conserva hora); agenda móvil intacta. |
+| Google Calendar pull (+ push/ICS) | **Cerrado** — `pullGoogleCalendarEvents` + `POST action=pull-calendar`; UI en Calendario e Integraciones; soft-fail `GoogleIntegrationError`. Conflictos en API directa siguen informativos (no bloqueantes). |
+| `FirmSettings.assistantLlmMode` | **Cerrado** — `local_only` \| `remote_allowed`; classify usa reglas si local-only o sin LLM. |
+| `auditLlmPrompts` (admin) | **Cerrado** — default `false`; prompts completos en auditoría solo si está activo (sin env obligatorio; setting DB). |
+| E2E suite completa en VM | **Parcial** — `inicio-assistant` + smoke Fase 1 verdes; suite legacy completa puede no caber por disco/Postgres embebido (documentar qué corrió en el PR). |
 
 ### Fase 2 — Refresco UI coherente · esfuerzo **M–L** · riesgo medio-bajo
 
@@ -359,13 +362,14 @@ Fase 4 docs/release
 
 **Resueltas** → ver §5bis (Decisiones aprobadas).
 
-**Pendientes (no bloquean Fase 1):**
+**Resueltas en cierre de gaps Fase 1 (Gabriel · 2026-09-30):**
 
-1. ¿Calendario 1.0 exige sync bidireccional Google (pull) o basta push + ICS?
-2. ¿El setting «solo LLM local» se modela en `FirmSettings` o basta
-   `IntegrationConfig` + flags de URL privada ya existentes?
-3. ¿Prompts completos en auditoría solo con flag admin (default off) — confirmar
-   nombre de flag (`LEXOPEN_AUDIT_LLM_PROMPTS=1`)?
+1. Google Calendar: **pull + push + ICS** (no solo push).
+2. Modo LLM del estudio: **`FirmSettings.assistantLlmMode`** (`local_only` |
+   `remote_allowed`).
+3. Auditoría de prompts: **`FirmSettings.auditLlmPrompts`** (admin, default
+   off). No se exige env `LEXOPEN_AUDIT_LLM_PROMPTS`; el setting DB es la fuente
+   de verdad.
 
 ---
 
