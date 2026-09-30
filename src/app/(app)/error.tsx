@@ -1,6 +1,7 @@
 "use client";
 
 import { useI18n } from "@/components/i18n/I18nProvider";
+import { ErrorState } from "@/components/ui/ErrorState";
 
 export default function AppError({
   error,
@@ -14,21 +15,18 @@ export default function AppError({
     error.message === "Prohibido" || error.message === "Forbidden";
 
   return (
-    <div className="panel rounded-3xl p-6" role="alert">
-      <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--danger)]">
-        {t("errors.eyebrow")}
-      </p>
-      <h1 className="display mt-2 text-3xl">{t("errors.title")}</h1>
-      <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
-        {forbidden
+    <ErrorState
+      eyebrow={t("errors.eyebrow")}
+      title={t("errors.title")}
+      description={
+        forbidden
           ? t("errors.forbidden")
           : process.env.NODE_ENV === "production"
             ? t("errors.genericProd")
-            : error.message}
-      </p>
-      <button className="btn btn-primary mt-4" type="button" onClick={retry}>
-        {t("common.retry")}
-      </button>
-    </div>
+            : error.message
+      }
+      retryLabel={t("common.retry")}
+      onRetry={retry}
+    />
   );
 }
