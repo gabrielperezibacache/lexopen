@@ -40,9 +40,14 @@ export default async function ClientesPage({
         _count: { select: { causas: true, documentos: true } },
         causas: {
           select: {
-            tramites: {
-              where: { estado: { in: [...TRAMITES_ABIERTOS] } },
-              select: { id: true },
+            // ⚡ Bolt: Use Prisma's `_count` aggregate to avoid an O(N) memory/bandwidth
+            // bottleneck that gets worse as a client accumulates cases and tasks.
+            _count: {
+              select: {
+                tramites: {
+                  where: { estado: { in: [...TRAMITES_ABIERTOS] } },
+                },
+              },
             },
           },
         },
@@ -105,7 +110,7 @@ export default async function ClientesPage({
             <tbody>
               {clientes.map((c) => {
                 const pend = c.causas.reduce(
-                  (n, causa) => n + causa.tramites.length,
+                  (n, causa) => n + causa._count.tramites,
                   0
                 );
                 return (
