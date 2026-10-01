@@ -75,7 +75,7 @@ export function CausaActions({
           onClick={syncObsidian}
           type="button"
         >
-          Sync Obsidian
+          {busy ? "Sincronizando…" : "Sync Obsidian"}
         </button>
         <Link
           href={`/agente?causaId=${causaId}&utility=briefing&run=1`}

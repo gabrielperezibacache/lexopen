@@ -89,7 +89,7 @@ export function CausaManageActions({
           disabled={busy}
           onClick={() => void archiveOrRestore()}
         >
-          {archived ? "Reactivar" : "Archivar"}
+          {busy ? "Procesando…" : archived ? "Reactivar" : "Archivar"}
         </button>
         {isAdmin && (
           <button
@@ -98,7 +98,7 @@ export function CausaManageActions({
             disabled={busy}
             onClick={() => void removeCausa()}
           >
-            Eliminar
+            {busy ? "Eliminando…" : "Eliminar"}
           </button>
         )}
       </div>
