@@ -55,3 +55,7 @@ yarn-error.log*
 /playwright-report/
 /test-results/
 /.tmp/
+
+# agent scratch (both spellings: case collision on macOS/Windows)
+/.jules/
+/.Jules/
