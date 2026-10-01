@@ -36,33 +36,33 @@ function sessionSecret() {
   return "";
 }
 
-function toHex(buf: ArrayBuffer) {
-  return [...new Uint8Array(buf)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+function fromHex(hex: string) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
 }
 
-function timingSafeEqualHex(a: string, b: string) {
-  if (a.length !== b.length) return false;
-  let out = 0;
-  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return out === 0;
-}
-
-async function hmacSha256Hex(payload: string, secret: string) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(payload)
-  );
-  return toHex(sig);
+async function verifyHmacSha256Hex(payload: string, signatureHex: string, secret: string) {
+  if (signatureHex.length !== 64) return false;
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    return await crypto.subtle.verify(
+      "HMAC",
+      key,
+      fromHex(signatureHex),
+      new TextEncoder().encode(payload)
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function lookupSessionVersion(userId: string) {
@@ -99,11 +99,12 @@ async function verifyToken(
   ) {
     return null;
   }
-  const expected = await hmacSha256Hex(
+  const ok = await verifyHmacSha256Hex(
     `${userId}.${expiresAt}.${sessionVersion}.${role}`,
+    sig,
     secret
   );
-  if (!timingSafeEqualHex(sig, expected)) return null;
+  if (!ok) return null;
 
   const row = await lookupSessionVersion(userId);
   const matched = sessionVersionMatches(row, sessionVersion, VALID_ROLES);
