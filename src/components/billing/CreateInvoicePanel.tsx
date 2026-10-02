@@ -115,20 +115,21 @@ export function CreateInvoicePanel({
           className="btn btn-primary"
           type="button"
           aria-expanded={open}
+          aria-controls="create-invoice-content"
           onClick={() => setOpen((v) => !v)}
         >
           {open ? "Cerrar" : "Nueva emisión"}
         </button>
       </div>
 
-      {open && clientes.length === 0 && (
-        <p className="mt-4 text-sm text-[var(--ink-soft)]/70">
-          Registre un cliente antes de emitir una boleta o factura.
-        </p>
-      )}
-
-      {open && clientes.length > 0 && (
-        <form onSubmit={onSubmit} className="mt-5 space-y-4 border-t border-[var(--line)] pt-5">
+      {open && (
+        <div id="create-invoice-content">
+          {clientes.length === 0 ? (
+            <p className="mt-4 text-sm text-[var(--ink-soft)]/70">
+              Registre un cliente antes de emitir una boleta o factura.
+            </p>
+          ) : (
+            <form onSubmit={onSubmit} className="mt-5 space-y-4 border-t border-[var(--line)] pt-5">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]/60">
               Cliente
@@ -236,6 +237,8 @@ export function CreateInvoicePanel({
           </div>
           {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
         </form>
+          )}
+        </div>
       )}
     </div>
   );
