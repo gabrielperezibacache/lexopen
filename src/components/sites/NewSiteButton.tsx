@@ -109,9 +109,14 @@ export function NewSiteButton({
         {label || t("sites.newSite")}
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-site-title"
+        >
           <form onSubmit={onSubmit} className="panel max-h-[90vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-3xl p-6">
-            <h2 className="text-xl font-semibold">{t("sites.createTitle")}</h2>
+            <h2 id="new-site-title" className="text-xl font-semibold">{t("sites.createTitle")}</h2>
             <input
               className="input"
               name="name"

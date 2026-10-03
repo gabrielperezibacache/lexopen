@@ -99,9 +99,14 @@ export function QaActions({
         Nueva pregunta
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-qa-title"
+        >
           <form onSubmit={onSubmit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 className="text-lg font-semibold">Nueva pregunta Q&A</h3>
+            <h3 id="new-qa-title" className="text-lg font-semibold">Nueva pregunta Q&A</h3>
             <input className="input" name="subject" required placeholder="Asunto" />
             <input className="input" name="category" placeholder="Categoría" />
             <textarea className="textarea" name="body" required placeholder="Detalle" />
