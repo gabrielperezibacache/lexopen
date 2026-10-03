@@ -225,9 +225,14 @@ export function GlobalTasksPanel({
       )}
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-task-title"
+        >
           <form onSubmit={createTask} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 className="text-lg font-semibold">Nueva tarea</h3>
+            <h3 id="new-task-title" className="text-lg font-semibold">Nueva tarea</h3>
             <input className="input" name="title" required placeholder="Título" />
             <textarea className="textarea" name="description" placeholder="Descripción" />
             <select className="select" name="siteId" defaultValue="">
