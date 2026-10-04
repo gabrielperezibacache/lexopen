@@ -474,12 +474,17 @@ export function PeopleManager({
       </div>
 
       {userOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-user-title"
+        >
           <form
             onSubmit={createUser}
             className="panel w-full max-w-md space-y-3 rounded-3xl p-6"
           >
-            <h3 className="text-lg font-semibold">Crear usuario</h3>
+            <h3 id="create-user-title" className="text-lg font-semibold">Crear usuario</h3>
             <p className="text-xs text-[var(--ink-soft)]/65">
               Roles: admin (configuración), abogado, asistente o cliente (portal).
             </p>
@@ -530,12 +535,17 @@ export function PeopleManager({
       )}
 
       {editing && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-user-title"
+        >
           <form
             onSubmit={saveUser}
             className="panel w-full max-w-md space-y-3 rounded-3xl p-6"
           >
-            <h3 className="text-lg font-semibold">Editar usuario</h3>
+            <h3 id="edit-user-title" className="text-lg font-semibold">Editar usuario</h3>
             <input
               className="input"
               name="name"
@@ -591,12 +601,17 @@ export function PeopleManager({
       )}
 
       {groupOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-group-title"
+        >
           <form
             onSubmit={createGroup}
             className="panel w-full max-w-md space-y-3 rounded-3xl p-6"
           >
-            <h3 className="text-lg font-semibold">Nuevo grupo</h3>
+            <h3 id="create-group-title" className="text-lg font-semibold">Nuevo grupo</h3>
             <input
               className="input"
               name="name"
@@ -637,12 +652,17 @@ export function PeopleManager({
       )}
 
       {editingGroup && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-group-title"
+        >
           <form
             onSubmit={saveGroup}
             className="panel w-full max-w-md space-y-3 rounded-3xl p-6"
           >
-            <h3 className="text-lg font-semibold">Editar grupo</h3>
+            <h3 id="edit-group-title" className="text-lg font-semibold">Editar grupo</h3>
             <input
               className="input"
               name="name"
