@@ -79,9 +79,14 @@ export function WikiHistoryPanel({
         Historial
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="wiki-history-title"
+        >
           <div className="panel w-full max-w-lg space-y-3 rounded-3xl p-6">
-            <h3 className="text-lg font-semibold">Historial de revisiones</h3>
+            <h3 id="wiki-history-title" className="text-lg font-semibold">Historial de revisiones</h3>
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             {busy && !revisions && (
               <p className="text-sm text-[var(--ink-soft)]/70">Cargando…</p>

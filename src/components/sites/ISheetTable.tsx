@@ -173,9 +173,14 @@ export function ISheetTable({
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="isheet-add-row-title"
+        >
           <form onSubmit={addRow} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 className="text-lg font-semibold">Nueva fila</h3>
+            <h3 id="isheet-add-row-title" className="text-lg font-semibold">Nueva fila</h3>
             {fieldInputs()}
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
@@ -191,9 +196,14 @@ export function ISheetTable({
       )}
 
       {editing && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="isheet-edit-row-title"
+        >
           <form onSubmit={saveEdit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 className="text-lg font-semibold">Editar fila</h3>
+            <h3 id="isheet-edit-row-title" className="text-lg font-semibold">Editar fila</h3>
             {fieldInputs(editing.data)}
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
