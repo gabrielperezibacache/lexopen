@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "crypto";
+
 /**
  * API routes invoked by local Host schedulers with `x-cron-secret`.
  * Must stay in sync with scripts/local-host-schedulers.mjs.
@@ -25,9 +27,17 @@ export function cronSecretMatches(
   const a = provided;
   const b = exp;
   if (a.length !== b.length) return false;
-  let out = 0;
-  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return out === 0;
+  try {
+    const aBuf = Buffer.from(a);
+    const bBuf = Buffer.from(b);
+    if (aBuf.length !== bBuf.length) {
+      timingSafeEqual(bBuf, bBuf);
+      return false;
+    }
+    return timingSafeEqual(aBuf, bBuf);
+  } catch {
+    return false;
+  }
 }
 
 /** Same gate used by `src/proxy.ts` before allowing session-less cron POSTs. */
