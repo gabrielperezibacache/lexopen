@@ -6,18 +6,18 @@ import { apiMutation } from "@/lib/api-mutation";
 
 export function TimeEntryActions({ id, approved }: { id: string; approved: boolean }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState("");
 
   async function setApproval(action: "approve" | "reject") {
-    setBusy(true);
+    setLoadingAction(action);
     setError("");
     const result = await apiMutation("/api/billing/time-entries", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, action }),
     });
-    setBusy(false);
+    setLoadingAction(null);
     if (!result.ok) {
       setError(result.error || "No se pudo actualizar la aprobación");
       return;
@@ -30,18 +30,18 @@ export function TimeEntryActions({ id, approved }: { id: string; approved: boole
       <button
         className="btn btn-ghost"
         type="button"
-        disabled={busy || approved}
+        disabled={loadingAction !== null || approved}
         onClick={() => setApproval("approve")}
       >
-        Aprobar
+        {loadingAction === "approve" ? "Procesando…" : "Aprobar"}
       </button>
       <button
         className="btn btn-ghost"
         type="button"
-        disabled={busy || !approved}
+        disabled={loadingAction !== null || !approved}
         onClick={() => setApproval("reject")}
       >
-        Rechazar
+        {loadingAction === "reject" ? "Procesando…" : "Rechazar"}
       </button>
       {error && <p className="w-full text-sm text-[var(--danger)]">{error}</p>}
     </div>
