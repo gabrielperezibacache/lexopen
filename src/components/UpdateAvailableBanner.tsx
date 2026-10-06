@@ -238,6 +238,8 @@ export function UpdateAvailableBanner({
             type="button"
             className="btn btn-secondary"
             onClick={() => setOpenSteps((v) => !v)}
+            aria-expanded={openSteps}
+            aria-controls="manual-update-steps"
           >
             {openSteps ? "Ocultar pasos" : "Pasos manuales"}
           </button>
@@ -264,7 +266,7 @@ export function UpdateAvailableBanner({
       )}
 
       {openSteps && (
-        <div className="mt-3 rounded-2xl border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--ink-soft)]/90">
+        <div id="manual-update-steps" className="mt-3 rounded-2xl border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--ink-soft)]/90">
           <p className="font-medium text-[var(--ink)]">
             Actualización manual (si el botón no está disponible)
           </p>
