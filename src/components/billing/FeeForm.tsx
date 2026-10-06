@@ -95,7 +95,7 @@ export function FeeForm({
       </select>
       <input className="input md:col-span-2" name="notes" placeholder="Notas / condiciones" />
       <button className="btn btn-primary" disabled={busy} type="submit">
-        Guardar tarifa
+        {busy ? 'Guardando…' : 'Guardar tarifa'}
       </button>
     </form>
   );
