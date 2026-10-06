@@ -83,7 +83,7 @@ export function ExpenseForm({
         ))}
       </select>
       <button className="btn btn-primary" disabled={busy} type="submit">
-        Registrar gasto
+        {busy ? 'Registrando…' : 'Registrar gasto'}
       </button>
     </form>
   );

@@ -66,7 +66,7 @@ export function LedgerForm({
         ))}
       </select>
       <button className="btn btn-primary" disabled={busy} type="submit">
-        Registrar
+        {busy ? 'Registrando…' : 'Registrar'}
       </button>
       <input className="input md:col-span-4" name="description" required placeholder="Descripción del movimiento" />
     </form>
