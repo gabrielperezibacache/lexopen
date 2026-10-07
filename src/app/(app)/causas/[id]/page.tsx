@@ -88,8 +88,12 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           where: minutaConfidentialWhere(user.role),
           include: {
             autor: { select: { name: true } },
-            acciones: {
-              where: { estado: { in: [...ACCIONES_ABIERTAS] } },
+            _count: {
+              select: {
+                acciones: {
+                  where: { estado: { in: [...ACCIONES_ABIERTAS] } },
+                },
+              },
             },
           },
           orderBy: { fecha: "desc" },
@@ -131,7 +135,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
 
   const ultimaMinuta = causa.minutas[0];
   const accionesAbiertas = causa.minutas.reduce(
-    (n, m) => n + m.acciones.length,
+    (n, m) => n + m._count.acciones,
     0
   );
   const proximosPlazos = causa.plazos.filter(
@@ -440,7 +444,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
                 </div>
                 <div className="mt-1 text-xs text-[var(--ink-soft)]/65">
                   {formatDateTime(m.fecha)} · {m.autor?.name || "Sin autor"} ·{" "}
-                  {m.acciones.length} abiertas
+                  {m._count.acciones} abiertas
                 </div>
                 <p className="mt-2 line-clamp-2 text-sm text-[var(--ink-soft)]/80">
                   {m.resumenEjecutivo}
