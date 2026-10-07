@@ -7,6 +7,7 @@ import {
   setupCookieOptions,
 } from "@/lib/auth/setup-cookies";
 import { isAuthorizedCronRequest } from "@/lib/security/cron-paths";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { isStrongSessionSecret } from "@/lib/security/production-env";
 import { isClientAllowedPath } from "@/lib/auth/client-paths";
 
@@ -36,30 +37,17 @@ function sessionSecret() {
   return "";
 }
 
-function fromHex(hex: string) {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-  }
-  return bytes;
-}
-
-async function verifyHmacSha256Hex(payload: string, signatureHex: string, secret: string) {
+function verifyHmacSha256Hex(payload: string, signatureHex: string, secret: string) {
   if (signatureHex.length !== 64) return false;
   try {
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["verify"]
-    );
-    return await crypto.subtle.verify(
-      "HMAC",
-      key,
-      fromHex(signatureHex),
-      new TextEncoder().encode(payload)
-    );
+    const expected = createHmac("sha256", secret).update(payload).digest("hex");
+    const expectedBuf = Buffer.from(expected);
+    const signatureBuf = Buffer.from(signatureHex);
+    if (expectedBuf.length !== signatureBuf.length) {
+      timingSafeEqual(expectedBuf, expectedBuf);
+      return false;
+    }
+    return timingSafeEqual(expectedBuf, signatureBuf);
   } catch {
     return false;
   }
@@ -99,7 +87,7 @@ async function verifyToken(
   ) {
     return null;
   }
-  const ok = await verifyHmacSha256Hex(
+  const ok = verifyHmacSha256Hex(
     `${userId}.${expiresAt}.${sessionVersion}.${role}`,
     sig,
     secret
