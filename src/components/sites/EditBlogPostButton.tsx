@@ -50,14 +50,27 @@ export function EditBlogPostButton({
 
   return (
     <form onSubmit={onSubmit} className="mt-3 space-y-3 rounded-2xl border border-[var(--line)] p-4">
-      <input className="input" name="title" required defaultValue={post.title} />
-      <textarea
-        className="textarea"
-        name="body"
-        required
-        rows={6}
-        defaultValue={post.body}
-      />
+      <label className="block text-sm">
+        <span className="mb-1 block font-medium">Título</span>
+        <input
+          className="input w-full"
+          name="title"
+          required
+          defaultValue={post.title}
+          placeholder="Ej: Actualización del caso..."
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="mb-1 block font-medium">Contenido</span>
+        <textarea
+          className="textarea w-full"
+          name="body"
+          required
+          rows={6}
+          defaultValue={post.body}
+          placeholder="Escriba el contenido en Markdown..."
+        />
+      </label>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="published" defaultChecked={post.published} />
         Publicado
