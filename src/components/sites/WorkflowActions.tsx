@@ -14,18 +14,18 @@ export function WorkflowActions({
   advance?: boolean;
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<"approve" | "reject" | "start" | null>(null);
   const [error, setError] = useState("");
 
   async function start() {
-    setBusy(true);
+    setLoadingAction("start");
     setError("");
     const result = await apiMutation("/api/workflows", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "start", workflowId }),
     });
-    setBusy(false);
+    setLoadingAction(null);
     if (!result.ok) {
       setError(result.error || "No se pudo iniciar el flujo");
       return;
@@ -34,14 +34,14 @@ export function WorkflowActions({
   }
 
   async function decide(decision: "approve" | "reject") {
-    setBusy(true);
+    setLoadingAction(decision);
     setError("");
     const result = await apiMutation("/api/workflows", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "advance", instanceId, decision }),
     });
-    setBusy(false);
+    setLoadingAction(null);
     if (!result.ok) {
       setError(result.error || "No se pudo actualizar el flujo");
       return;
@@ -56,18 +56,18 @@ export function WorkflowActions({
           <button
             className="btn btn-ghost"
             type="button"
-            disabled={busy}
+            disabled={loadingAction !== null}
             onClick={() => decide("approve")}
           >
-            Aprobar
+            {loadingAction === "approve" ? "Aprobando…" : "Aprobar"}
           </button>
           <button
             className="btn btn-ghost"
             type="button"
-            disabled={busy}
+            disabled={loadingAction !== null}
             onClick={() => decide("reject")}
           >
-            Rechazar
+            {loadingAction === "reject" ? "Rechazando…" : "Rechazar"}
           </button>
         </div>
         {error && <p className="mt-1 text-sm text-[var(--danger)]">{error}</p>}
@@ -77,8 +77,8 @@ export function WorkflowActions({
 
   return (
     <div>
-      <button className="btn btn-secondary" type="button" disabled={busy} onClick={start}>
-        {busy ? "Iniciando…" : "Iniciar"}
+      <button className="btn btn-secondary" type="button" disabled={loadingAction !== null} onClick={start}>
+        {loadingAction === "start" ? "Iniciando…" : "Iniciar"}
       </button>
       {error && <p className="mt-1 text-sm text-[var(--danger)]">{error}</p>}
     </div>
