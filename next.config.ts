@@ -5,6 +5,7 @@ import { buildSecurityHeaders } from "./src/lib/security/headers";
 const securityHeaders = buildSecurityHeaders({ includeCsp: false });
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   /* Hide the floating "N" Next.js Dev Tools badge in development.
      Compile/runtime errors still surface via the error overlay. */
   devIndicators: false,
