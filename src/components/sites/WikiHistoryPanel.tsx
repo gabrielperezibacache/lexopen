@@ -21,6 +21,7 @@ export function WikiHistoryPanel({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [revisions, setRevisions] = useState<Revision[] | null>(null);
 
@@ -54,6 +55,7 @@ export function WikiHistoryPanel({
       return;
     }
     setBusy(true);
+    setRestoringId(revisionId);
     setError("");
     const result = await apiMutation(`/api/sites/${siteId}/wiki`, {
       method: "PATCH",
@@ -65,6 +67,7 @@ export function WikiHistoryPanel({
       }),
     });
     setBusy(false);
+    setRestoringId(null);
     if (!result.ok) {
       setError(result.error || "No se pudo restaurar");
       return;
@@ -113,7 +116,7 @@ export function WikiHistoryPanel({
                     disabled={busy}
                     onClick={() => restore(r.id)}
                   >
-                    {busy ? "Restaurando…" : "Restaurar"}
+                    {restoringId === r.id ? "Restaurando…" : "Restaurar"}
                   </button>
                 </li>
               ))}
