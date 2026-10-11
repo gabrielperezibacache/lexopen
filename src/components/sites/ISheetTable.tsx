@@ -22,6 +22,7 @@ export function ISheetTable({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   async function addRow(e: FormEvent<HTMLFormElement>) {
@@ -70,6 +71,7 @@ export function ISheetTable({
   async function deleteRow(rowId: string) {
     if (!confirm("¿Eliminar esta fila?")) return;
     setBusy(true);
+    setDeletingId(rowId);
     setError("");
     const result = await apiMutation(`/api/sites/${siteId}/isheets`, {
       method: "POST",
@@ -77,6 +79,7 @@ export function ISheetTable({
       body: JSON.stringify({ action: "delete-row", rowId }),
     });
     setBusy(false);
+    setDeletingId(null);
     if (!result.ok) {
       setError(result.error || "No se pudo eliminar la fila");
       return;
@@ -162,7 +165,7 @@ export function ISheetTable({
                       disabled={busy}
                       onClick={() => deleteRow(r.id)}
                     >
-                      Eliminar
+                      {deletingId === r.id ? "Eliminando…" : "Eliminar"}
                     </button>
                   </div>
                 </td>
