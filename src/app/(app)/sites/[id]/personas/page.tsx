@@ -10,17 +10,20 @@ type Params = { params: Promise<{ id: string }> };
 export default async function SitePeoplePage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
-  const site = await prisma.site.findUnique({
-    where: { id },
-    include: {
-      members: { include: { user: true } },
-      groups: { include: { group: { include: { members: { include: { user: true } } } } } },
-    },
-  });
+  // ⚡ Bolt: Fetch site and available users concurrently to save one database round trip per page load
+  const [site, allUsers] = await Promise.all([
+    prisma.site.findUnique({
+      where: { id },
+      include: {
+        members: { include: { user: true } },
+        groups: { include: { group: { include: { members: { include: { user: true } } } } } },
+      },
+    }),
+    isStaff(user.role)
+      ? prisma.user.findMany({ orderBy: { name: "asc" } })
+      : Promise.resolve([]),
+  ]);
   if (!site) notFound();
-  const allUsers = isStaff(user.role)
-    ? await prisma.user.findMany({ orderBy: { name: "asc" } })
-    : [];
 
   return (
     <div>
