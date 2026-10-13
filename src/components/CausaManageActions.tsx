@@ -21,12 +21,12 @@ export function CausaManageActions({
   compact = false,
 }: Props) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<"archive" | "delete" | null>(null);
   const [msg, setMsg] = useState("");
   const archived = estado === "archivada";
 
   async function archiveOrRestore() {
-    setBusy(true);
+    setLoadingAction("archive");
     setMsg("");
     const next = archived ? "activa" : "archivada";
     const result = await apiMutation(`/api/causas/${causaId}`, {
@@ -34,7 +34,7 @@ export function CausaManageActions({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ estado: next }),
     });
-    setBusy(false);
+    setLoadingAction(null);
     if (!result.ok) {
       setMsg(result.error || "No se pudo actualizar el estado");
       return;
@@ -55,12 +55,12 @@ export function CausaManageActions({
     ) {
       return;
     }
-    setBusy(true);
+    setLoadingAction("delete");
     setMsg("");
     const result = await apiMutation(`/api/causas/${causaId}`, {
       method: "DELETE",
     });
-    setBusy(false);
+    setLoadingAction(null);
     if (!result.ok) {
       setMsg(result.error || "No se pudo eliminar");
       return;
@@ -86,19 +86,19 @@ export function CausaManageActions({
         <button
           type="button"
           className={btn}
-          disabled={busy}
+          disabled={loadingAction !== null}
           onClick={() => void archiveOrRestore()}
         >
-          {busy ? "Procesando…" : archived ? "Reactivar" : "Archivar"}
+          {loadingAction === "archive" ? "Procesando…" : archived ? "Reactivar" : "Archivar"}
         </button>
         {isAdmin && (
           <button
             type="button"
             className={btnDanger}
-            disabled={busy}
+            disabled={loadingAction !== null}
             onClick={() => void removeCausa()}
           >
-            {busy ? "Eliminando…" : "Eliminar"}
+            {loadingAction === "delete" ? "Eliminando…" : "Eliminar"}
           </button>
         )}
       </div>
