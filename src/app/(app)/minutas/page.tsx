@@ -16,8 +16,13 @@ export default async function MinutasPage() {
       include: {
         causa: { select: { id: true, titulo: true, rit: true } },
         autor: { select: { name: true } },
-        acciones: {
-          where: { estado: { in: [...ACCIONES_ABIERTAS] } },
+        // ⚡ Bolt: Fetches the count from the database rather than loading the whole array into memory.
+        _count: {
+          select: {
+            acciones: {
+              where: { estado: { in: [...ACCIONES_ABIERTAS] } },
+            },
+          },
         },
       },
       orderBy: { fecha: "desc" },
@@ -130,13 +135,13 @@ export default async function MinutasPage() {
                 </div>
               </div>
               <div className="text-right text-sm">
-                {m.acciones.length > 0 ? (
+                {m._count.acciones > 0 ? (
                   <StatusBadge estado="pendiente" />
                 ) : (
                   <StatusBadge estado="cumplido" />
                 )}
                 <div className="mt-1 text-xs text-[var(--ink-soft)]/60">
-                  {m.acciones.length} acción(es) abierta(s)
+                  {m._count.acciones} acción(es) abierta(s)
                 </div>
               </div>
             </Link>
