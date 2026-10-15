@@ -117,6 +117,7 @@ export function SiteNav({
                       <Link
                         key={tab.href || "overview"}
                         href={href}
+                        aria-current={isActive ? "page" : undefined}
                         className={cn(
                           "rounded-t-lg px-3 py-2.5 text-sm font-medium whitespace-nowrap transition touch-manipulation",
                           isActive

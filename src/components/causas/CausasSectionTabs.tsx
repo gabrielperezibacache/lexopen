@@ -41,6 +41,7 @@ export function CausasSectionTabs({
             key={tab.href}
             href={tab.href}
             title={"hint" in tab ? tab.hint : undefined}
+            aria-current={active ? "page" : undefined}
             className={cn(
               "rounded-xl px-3 py-2 text-sm font-medium transition-colors",
               active
