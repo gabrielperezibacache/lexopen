@@ -53,15 +53,21 @@ export async function GET(req: NextRequest) {
     }
     const fallidos = await listFallidosMonitoreo(20);
     const queue = await getPjudQueueStatus().catch(() => null);
-    const resumen = {
-      total: items.length,
-      monitoreadas: items.filter((i) => i.monitoreoActivo).length,
-      verdes: items.filter((i) => i.semaforo === "verde").length,
-      amarillas: items.filter((i) => i.semaforo === "amarillo").length,
-      rojas: items.filter((i) => i.semaforo === "rojo").length,
-      sinDatos: items.filter((i) => i.semaforo === "gris").length,
-      fallidas: items.filter((i) => i.failed).length,
-    };
+    // ⚡ Bolt: Use a single O(N) reduce loop to aggregate counts instead of
+    // iterating over the items array 6 separate times with filter().length.
+    // This improves performance as the number of monitored causes grows.
+    const resumen = items.reduce(
+      (acc, i) => {
+        if (i.monitoreoActivo) acc.monitoreadas++;
+        if (i.semaforo === "verde") acc.verdes++;
+        if (i.semaforo === "amarillo") acc.amarillas++;
+        if (i.semaforo === "rojo") acc.rojas++;
+        if (i.semaforo === "gris") acc.sinDatos++;
+        if (i.failed) acc.fallidas++;
+        return acc;
+      },
+      { total: items.length, monitoreadas: 0, verdes: 0, amarillas: 0, rojas: 0, sinDatos: 0, fallidas: 0 }
+    );
     return NextResponse.json({
       items,
       fallidos,
