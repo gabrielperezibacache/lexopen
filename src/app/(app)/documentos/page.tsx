@@ -21,8 +21,6 @@ export default async function DocumentosPage() {
       where: confidentialWhere(user.role),
       select: {
         ...documentoListSelect,
-        contenido: true,
-        extractedMarkdown: true,
         storageKey: true,
         causa: { select: { id: true, rit: true, titulo: true } },
         autor: { select: publicUserSelect },
@@ -37,11 +35,21 @@ export default async function DocumentosPage() {
     }),
   ]);
 
+  const docIds = rawDocumentos.map(d => d.id);
+  const textStatus = docIds.length > 0 ? await prisma.$queryRaw<{id: string, has_text: boolean, has_markdown: boolean}[]>`
+    SELECT id,
+           (length(trim(coalesce("extractedMarkdown", ''))) + length(trim(coalesce("contenido", '')))) > 0 as has_text,
+           length(trim(coalesce("extractedMarkdown", ''))) > 0 as has_markdown
+    FROM "Documento"
+    WHERE id = ANY(${docIds})
+  ` : [];
+  const statusMap = new Map(textStatus.map(s => [s.id, s]));
+
   const documentos = rawDocumentos.map(
-    ({ contenido, extractedMarkdown, storageKey, ...rest }) => ({
+    ({ storageKey, ...rest }) => ({
       ...rest,
-      hasText: Boolean((extractedMarkdown || contenido || "").trim()),
-      hasMarkdown: Boolean(extractedMarkdown?.trim()),
+      hasText: statusMap.get(rest.id)?.has_text ?? false,
+      hasMarkdown: statusMap.get(rest.id)?.has_markdown ?? false,
       hasBinary: Boolean(storageKey),
     })
   );
