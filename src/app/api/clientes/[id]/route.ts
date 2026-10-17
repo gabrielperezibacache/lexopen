@@ -55,15 +55,18 @@ export async function GET(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
-    const tramitesPendientes = cliente.causas.reduce(
-      (n, c) =>
-        n + c.tramites.filter((t) => TRAMITES_ABIERTOS.includes(t.estado as "pendiente" | "en_curso")).length,
-      0
-    );
-    const tramitesHechos = cliente.causas.reduce(
-      (n, c) => n + c.tramites.filter((t) => t.estado === "hecho").length,
-      0
-    );
+    // ⚡ Bolt: Calculate multiple counts in a single O(N) pass to avoid redundant iteration and memory overhead.
+    let tramitesPendientes = 0;
+    let tramitesHechos = 0;
+    for (const c of cliente.causas) {
+      for (const t of c.tramites) {
+        if (t.estado === "hecho") {
+          tramitesHechos++;
+        } else if (TRAMITES_ABIERTOS.includes(t.estado as "pendiente" | "en_curso")) {
+          tramitesPendientes++;
+        }
+      }
+    }
 
     return NextResponse.json({
       ...cliente,
