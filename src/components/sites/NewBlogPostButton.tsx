@@ -43,14 +43,25 @@ export function NewBlogPostButton({ siteId }: { siteId: string }) {
 
   return (
     <form onSubmit={onSubmit} className="panel w-full max-w-xl space-y-3 rounded-3xl p-5">
-      <input className="input" name="title" required placeholder="Título" />
-      <textarea
-        className="textarea"
-        name="body"
-        required
-        rows={8}
-        placeholder="Contenido Markdown"
-      />
+      <label className="block text-sm">
+        <span className="mb-1 block font-medium">Título</span>
+        <input
+          className="input w-full"
+          name="title"
+          required
+          placeholder="Ej: Actualización del caso..."
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="mb-1 block font-medium">Contenido</span>
+        <textarea
+          className="textarea w-full"
+          name="body"
+          required
+          rows={8}
+          placeholder="Escriba el contenido en Markdown..."
+        />
+      </label>
       {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
       <div className="flex gap-2">
         <button className="btn btn-primary" disabled={busy} type="submit">
