@@ -45,11 +45,13 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [ok, setOk] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMessage("");
     setOk(false);
+    setBusy(true);
     const fd = new FormData(e.currentTarget);
     const result = await apiMutation("/api/configuracion", {
       method: "PATCH",
@@ -69,6 +71,7 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
         hermesAllowDemo: fd.get("hermesAllowDemo") === "on",
       }),
     });
+    setBusy(false);
     setOk(result.ok);
     setMessage(result.ok ? "Configuración guardada" : "No se pudo guardar");
     if (result.ok) router.refresh();
@@ -186,8 +189,8 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
             {message}
           </span>
         )}
-        <button className="btn btn-primary" type="submit">
-          Guardar configuración
+        <button className="btn btn-primary" type="submit" disabled={busy}>
+          {busy ? "Guardando..." : "Guardar configuración"}
         </button>
       </div>
     </form>
