@@ -10,6 +10,7 @@
  * Env: PORT, PJUD_SCRAPER_KEY, CAPTCHA_*, PJUD_PUBLIC_SCRAPE=1 (auto si no set)
  */
 
+import { timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import { URL } from "node:url";
 import {
@@ -49,7 +50,14 @@ function authOk(req: http.IncomingMessage) {
     return process.env.NODE_ENV !== "production";
   }
   const header = req.headers.authorization || "";
-  return header === `Bearer ${key}`;
+  const expected = `Bearer ${key}`;
+  const headerBuf = Buffer.from(header);
+  const expectedBuf = Buffer.from(expected);
+  if (headerBuf.length !== expectedBuf.length) {
+    timingSafeEqual(expectedBuf, expectedBuf);
+    return false;
+  }
+  return timingSafeEqual(headerBuf, expectedBuf);
 }
 
 async function readJson(req: http.IncomingMessage) {
