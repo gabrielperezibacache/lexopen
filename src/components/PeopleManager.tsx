@@ -171,6 +171,7 @@ export function PeopleManager({
     e.preventDefault();
     setError(null);
     setOkMsg(null);
+    setBusy(true);
     const fd = new FormData(e.currentTarget);
     const memberIds = fd.getAll("memberIds").map(String).filter(Boolean);
     const result = await apiMutation("/api/people", {
@@ -183,6 +184,7 @@ export function PeopleManager({
         memberIds,
       }),
     });
+    setBusy(false);
     if (!result.ok) {
       setError(result.error || "No se pudo crear el grupo");
       return;
@@ -643,8 +645,8 @@ export function PeopleManager({
               >
                 Cancelar
               </button>
-              <button className="btn btn-primary" type="submit">
-                Crear
+              <button className="btn btn-primary" type="submit" disabled={busy}>
+                {busy ? "Creando…" : "Crear"}
               </button>
             </div>
           </form>
