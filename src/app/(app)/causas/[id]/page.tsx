@@ -59,7 +59,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       : from === "mis-causas"
         ? "← ClaveÚnica"
         : "← Expediente";
-  const [causa, responsables] = await Promise.all([
+  const [causa, responsables, totalAccionesAbiertas] = await Promise.all([
     prisma.causa.findUnique({
       where: { id },
       include: {
@@ -110,6 +110,12 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    prisma.minutaAccion.count({
+      where: {
+        minuta: { causaId: id },
+        estado: { in: [...ACCIONES_ABIERTAS] },
+      },
+    }),
   ]);
   if (!causa) notFound();
 
@@ -143,10 +149,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
   const semaforo = semaforoPorDiasSinMovimiento(diasSinMovimiento);
 
   const ultimaMinuta = causa.minutas[0];
-  const accionesAbiertas = causa.minutas.reduce(
-    (n, m) => n + m._count.acciones,
-    0
-  );
+  const accionesAbiertas = totalAccionesAbiertas;
   const proximosPlazos = causa.plazos.filter(
     (p) => p.estado === "pendiente" || p.estado === "vencido"
   );
