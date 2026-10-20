@@ -68,8 +68,13 @@ export default async function DashboardPage() {
     prisma.minuta.findMany({
       include: {
         causa: { select: { id: true, rit: true, titulo: true } },
-        acciones: {
-          where: { estado: { in: ["pendiente", "en_curso"] } },
+        // ⚡ Bolt: Fetches the count from the database rather than loading the whole array into memory.
+        _count: {
+          select: {
+            acciones: {
+              where: { estado: { in: ["pendiente", "en_curso"] } },
+            },
+          },
         },
       },
       orderBy: { fecha: "desc" },
@@ -345,7 +350,7 @@ export default async function DashboardPage() {
                 {m.causa.rit || m.causa.titulo} · {m.tipo} ·{" "}
                 {t("dashboard.minutes.pendingCount").replace(
                   "{count}",
-                  String(m.acciones.length)
+                  String(m._count.acciones)
                 )}
               </div>
             </Link>
