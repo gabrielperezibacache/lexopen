@@ -95,12 +95,28 @@ export function DocumentoIngestForm({
   const [privilegio, setPrivilegio] = useState(false);
   const [pushDrive, setPushDrive] = useState(false);
 
+  // ⚡ Bolt: Avoid allocating new arrays with filter().length by using reduce() for counts
   const pendingCount = useMemo(
-    () => rows.filter((r) => r.status === "pending" || r.status === "uploading").length,
+    () => rows.reduce((c, r) => (r.status === "pending" || r.status === "uploading" ? c + 1 : c), 0),
     [rows]
   );
-  const okCount = useMemo(() => rows.filter((r) => r.status === "ok").length, [rows]);
-  const errCount = useMemo(() => rows.filter((r) => r.status === "error").length, [rows]);
+  const okCount = useMemo(
+    () => rows.reduce((c, r) => (r.status === "ok" ? c + 1 : c), 0),
+    [rows]
+  );
+  const errCount = useMemo(
+    () => rows.reduce((c, r) => (r.status === "error" ? c + 1 : c), 0),
+    [rows]
+  );
+  // ⚡ Bolt: Cache array counts to avoid O(N) operations inside render during large folder uploads
+  const validCount = useMemo(
+    () => rows.reduce((c, r) => (r.status !== "skipped" ? c + 1 : c), 0),
+    [rows]
+  );
+  const pendingOrErrCount = useMemo(
+    () => rows.reduce((c, r) => (r.status === "pending" || r.status === "error" ? c + 1 : c), 0),
+    [rows]
+  );
 
   function onPick(list: FileList | null) {
     setError("");
@@ -396,9 +412,9 @@ export function DocumentoIngestForm({
         )}
         <button className="btn btn-primary" disabled={busy || rows.length === 0} type="submit">
           {busy
-            ? `Incorporando… (${okCount}/${rows.filter((r) => r.status !== "skipped").length})`
+            ? `Incorporando… (${okCount}/${validCount})`
             : rows.length
-              ? `Incorporar ${rows.filter((r) => r.status === "pending" || r.status === "error").length || rows.filter((r) => r.status !== "skipped").length}`
+              ? `Incorporar ${pendingOrErrCount || validCount}`
               : "Incorporar"}
         </button>
       </div>
