@@ -19,28 +19,39 @@ type Notif = {
 export function NotificationsPanel({ initial }: { initial: Notif[] }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const unread = items.filter((n) => !n.read).length;
 
   async function markOne(id: string) {
-    const result = await apiMutation("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    if (!result.ok) return;
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    router.refresh();
+    setLoadingAction(id);
+    try {
+      const result = await apiMutation("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!result.ok) return;
+      setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+      router.refresh();
+    } finally {
+      setLoadingAction(null);
+    }
   }
 
   async function markAll() {
-    const result = await apiMutation("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "read-all" }),
-    });
-    if (!result.ok) return;
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
-    router.refresh();
+    setLoadingAction("all");
+    try {
+      const result = await apiMutation("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "read-all" }),
+      });
+      if (!result.ok) return;
+      setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+      router.refresh();
+    } finally {
+      setLoadingAction(null);
+    }
   }
 
   if (items.length === 0) {
@@ -61,8 +72,13 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
           {unread > 0 ? `${unread} sin leer` : "Todas leídas"}
         </p>
         {unread > 0 && (
-          <button className="btn btn-secondary" type="button" onClick={markAll}>
-            Marcar todas como leídas
+          <button
+            className="btn btn-secondary"
+            type="button"
+            disabled={loadingAction !== null}
+            onClick={markAll}
+          >
+            {loadingAction === "all" ? "Marcando..." : "Marcar todas como leídas"}
           </button>
         )}
       </div>
@@ -84,8 +100,13 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
               </div>
               <div className="flex flex-wrap gap-2">
                 {!n.read && (
-                  <button className="btn btn-ghost" type="button" onClick={() => markOne(n.id)}>
-                    Marcar leída
+                  <button
+                    className="btn btn-ghost"
+                    type="button"
+                    disabled={loadingAction !== null}
+                    onClick={() => markOne(n.id)}
+                  >
+                    {loadingAction === n.id ? "Marcando..." : "Marcar leída"}
                   </button>
                 )}
                 {n.href && (
