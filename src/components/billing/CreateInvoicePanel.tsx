@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   BOLETA_RETENCION_RATE,
@@ -47,15 +47,29 @@ export function CreateInvoicePanel({
 
   const iva = typeof ivaRate === "number" ? ivaRate : IVA_RATE;
   const retencion = typeof retencionRate === "number" ? retencionRate : BOLETA_RETENCION_RATE;
-  const causasCliente = causas.filter((causa) => causa.clienteId === clienteId);
-  const visibleTime = timeEntries.filter((item) => matchesScope(item, clienteId, causaId));
-  const visibleExpenses = expenses.filter((item) => matchesScope(item, clienteId, causaId));
-  const chosenTime = visibleTime.filter((item) => selectedTime.includes(item.id));
-  const chosenExpenses = visibleExpenses.filter((item) => selectedExp.includes(item.id));
-  const horasSinCliente = timeEntries.filter((item) => !item.clienteId).length;
-  const gastosSinCliente = expenses.filter((item) => !item.clienteId).length;
 
-  const preview = previewTotals(chosenTime, chosenExpenses, tipo, iva, retencion);
+  // ⚡ Bolt: Wrapped filtering and counting logic in useMemo to prevent multiple
+  // O(N) array iterations and intermediate allocations on every render.
+  // Also replaced .filter().length with a single-pass .reduce() for counts.
+  const causasCliente = useMemo(() => causas.filter((causa) => causa.clienteId === clienteId), [causas, clienteId]);
+  const visibleTime = useMemo(() => timeEntries.filter((item) => matchesScope(item, clienteId, causaId)), [timeEntries, clienteId, causaId]);
+  const visibleExpenses = useMemo(() => expenses.filter((item) => matchesScope(item, clienteId, causaId)), [expenses, clienteId, causaId]);
+  const chosenTime = useMemo(() => visibleTime.filter((item) => selectedTime.includes(item.id)), [visibleTime, selectedTime]);
+  const chosenExpenses = useMemo(() => visibleExpenses.filter((item) => selectedExp.includes(item.id)), [visibleExpenses, selectedExp]);
+
+  const horasSinCliente = useMemo(
+    () => timeEntries.reduce((count, item) => (!item.clienteId ? count + 1 : count), 0),
+    [timeEntries]
+  );
+  const gastosSinCliente = useMemo(
+    () => expenses.reduce((count, item) => (!item.clienteId ? count + 1 : count), 0),
+    [expenses]
+  );
+
+  const preview = useMemo(
+    () => previewTotals(chosenTime, chosenExpenses, tipo, iva, retencion),
+    [chosenTime, chosenExpenses, tipo, iva, retencion]
+  );
 
   function selectCliente(nextId: string) {
     setClienteId(nextId);
