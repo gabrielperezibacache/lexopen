@@ -18,65 +18,74 @@ export function InvoiceActions({
 }) {
   const router = useRouter();
   const [payOpen, setPayOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<"anular" | "emitir" | "pagar" | null>(null);
   const [error, setError] = useState("");
 
   async function anular() {
     if (!window.confirm("¿Anular este borrador? El documento quedará anulado.")) return;
-    setBusy(true);
+    setLoadingAction("anular");
     setError("");
-    const result = await apiMutation(`/api/billing/invoices/${invoiceId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "anulada" }),
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await apiMutation(`/api/billing/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "anulada" }),
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    } finally {
+      setLoadingAction(null);
     }
-    router.refresh();
   }
 
   async function emit() {
-    setBusy(true);
+    setLoadingAction("emitir");
     setError("");
-    const result = await apiMutation(`/api/billing/invoices/${invoiceId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "emitida" }),
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await apiMutation(`/api/billing/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "emitida" }),
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    } finally {
+      setLoadingAction(null);
     }
-    router.refresh();
   }
 
   async function pay(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setBusy(true);
+    setLoadingAction("pagar");
     setError("");
-    const fd = new FormData(e.currentTarget);
-    const result = await apiMutation("/api/billing/payments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        invoiceId,
-        clienteId,
-        amountClp: Number(fd.get("amountClp")),
-        method: fd.get("method"),
-        reference: fd.get("reference"),
-      }),
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const fd = new FormData(e.currentTarget);
+      const result = await apiMutation("/api/billing/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceId,
+          clienteId,
+          amountClp: Number(fd.get("amountClp")),
+          method: fd.get("method"),
+          reference: fd.get("reference"),
+        }),
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setPayOpen(false);
+      router.refresh();
+    } finally {
+      setLoadingAction(null);
     }
-    setPayOpen(false);
-    router.refresh();
   }
 
   return (
@@ -88,13 +97,13 @@ export function InvoiceActions({
       )}
       <div className="flex flex-wrap gap-2">
         {status === "borrador" && (
-          <button className="btn btn-secondary" type="button" disabled={busy} onClick={emit}>
-            Emitir
+          <button className="btn btn-secondary" type="button" disabled={loadingAction !== null} onClick={emit}>
+            {loadingAction === "emitir" ? "Emitiendo…" : "Emitir"}
           </button>
         )}
         {status === "borrador" && (
-          <button className="btn btn-ghost" type="button" disabled={busy} onClick={anular}>
-            Anular borrador
+          <button className="btn btn-ghost" type="button" disabled={loadingAction !== null} onClick={anular}>
+            {loadingAction === "anular" ? "Anulando…" : "Anular borrador"}
           </button>
         )}
         {canRegisterInvoicePayment(status, balanceClp) && (
@@ -126,8 +135,8 @@ export function InvoiceActions({
             <button className="btn btn-ghost" type="button" onClick={() => setPayOpen(false)}>
               Cancelar
             </button>
-            <button className="btn btn-primary" disabled={busy} type="submit">
-              Guardar
+            <button className="btn btn-primary" disabled={loadingAction !== null} type="submit">
+              {loadingAction === "pagar" ? "Guardando…" : "Guardar"}
             </button>
           </div>
         </form>
