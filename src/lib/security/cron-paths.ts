@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
 /**
  * API routes invoked by local Host schedulers with `x-cron-secret`.
@@ -26,15 +26,10 @@ export function cronSecretMatches(
   if (!exp || provided == null || provided === "") return false;
   const a = provided;
   const b = exp;
-  if (a.length !== b.length) return false;
   try {
-    const aBuf = Buffer.from(a);
-    const bBuf = Buffer.from(b);
-    if (aBuf.length !== bBuf.length) {
-      timingSafeEqual(bBuf, bBuf);
-      return false;
-    }
-    return timingSafeEqual(aBuf, bBuf);
+    const aHash = createHmac("sha256", exp).update(a).digest();
+    const bHash = createHmac("sha256", exp).update(b).digest();
+    return timingSafeEqual(aHash, bHash);
   } catch {
     return false;
   }

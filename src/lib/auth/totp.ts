@@ -58,9 +58,9 @@ export function verifyTotpCode(
   if (!/^\d{6}$/.test(normalized)) return false;
   for (let w = -window; w <= window; w++) {
     const expected = generateTotpCode(secret, at + w * 30_000);
-    const a = Buffer.from(expected);
-    const b = Buffer.from(normalized);
-    if (a.length === b.length && timingSafeEqual(a, b)) return true;
+    const a = createHmac("sha256", secret).update(expected).digest();
+    const b = createHmac("sha256", secret).update(normalized).digest();
+    if (timingSafeEqual(a, b)) return true;
   }
   return false;
 }

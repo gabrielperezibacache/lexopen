@@ -55,9 +55,9 @@ export function verifySessionToken(token: string): {
     .update(`${userId}.${expiresAt}.${sessionVersion}.${role}`)
     .digest("hex");
   try {
-    const a = Buffer.from(sig);
-    const b = Buffer.from(expected);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    const a = createHmac("sha256", sessionSecret()).update(sig).digest();
+    const b = createHmac("sha256", sessionSecret()).update(expected).digest();
+    if (!timingSafeEqual(a, b)) return null;
   } catch {
     return null;
   }

@@ -40,9 +40,9 @@ export function verifyTotpPendingToken(
   const payload = `${userId}.${expStr}`;
   const expected = hmac(payload, key);
   try {
-    const a = Buffer.from(sig);
-    const b = Buffer.from(expected);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    const a = createHmac("sha256", key).update(sig).digest();
+    const b = createHmac("sha256", key).update(expected).digest();
+    if (!timingSafeEqual(a, b)) return null;
   } catch {
     return null;
   }
