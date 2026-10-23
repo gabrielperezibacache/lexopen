@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import type { NextResponse } from "next/server";
 import { newCsrfToken } from "@/lib/auth/session";
 import { baseCookieOptions } from "@/lib/auth/cookie-options";
@@ -8,13 +8,9 @@ import { CSRF_COOKIE, CSRF_HEADER } from "@/lib/auth/csrf-constants";
 export { CSRF_COOKIE, CSRF_HEADER };
 
 function timingSafeEqualString(a: string, b: string) {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  if (left.length !== right.length) {
-    timingSafeEqual(left, left);
-    return false;
-  }
-  return timingSafeEqual(left, right);
+  const aHash = createHash("sha256").update(a).digest();
+  const bHash = createHash("sha256").update(b).digest();
+  return timingSafeEqual(aHash, bHash);
 }
 
 export function readCookie(req: Request, name: string) {
