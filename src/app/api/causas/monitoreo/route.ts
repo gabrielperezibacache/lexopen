@@ -167,6 +167,9 @@ export async function POST(req: NextRequest) {
           });
         }
       }
+      // ⚡ Bolt: Use a single O(N) reduce pass instead of .filter().length
+      const createdCount = results.reduce((count, r) => (r.created ? count + 1 : count), 0);
+
       if (actorId) {
         await writeAuditStrict({
           actorId,
@@ -174,14 +177,14 @@ export async function POST(req: NextRequest) {
           entityType: "Causa",
           after: {
             rows: rows.length,
-            created: results.filter((r) => r.created).length,
+            created: createdCount,
           },
         });
       }
       return NextResponse.json({
         ok: true,
         imported: results.length,
-        created: results.filter((r) => r.created).length,
+        created: createdCount,
         results,
         provider: await providerStatusPublicAsync(),
       });
