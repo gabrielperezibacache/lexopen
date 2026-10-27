@@ -8,6 +8,7 @@
  * - capsolver   → pay-per-solve (a veces créditos de prueba)
  * - anticaptcha → pay-per-solve
  * - capmonster  → CapMonster Cloud pay-per-solve
+ * - solvecha    → Solvecha pay-per-solve (solo imagen/texto)
  */
 
 export type CaptchaSolverProvider =
@@ -15,7 +16,8 @@ export type CaptchaSolverProvider =
   | "2captcha"
   | "capsolver"
   | "anticaptcha"
-  | "capmonster";
+  | "capmonster"
+  | "solvecha";
 
 export type CaptchaSolverProviderInfo = {
   id: CaptchaSolverProvider;
@@ -68,6 +70,14 @@ export const CAPTCHA_SOLVER_PROVIDERS: CaptchaSolverProviderInfo[] = [
     keyRequired: true,
     note: "Pay-per-solve (API compatible ImageToText).",
     url: "https://capmonster.cloud/",
+  },
+  {
+    id: "solvecha",
+    label: "Solvecha",
+    freeTier: false,
+    keyRequired: true,
+    note: "Pay-per-solve (API compatible ImageToText). Solo imagen/texto, sin tokens.",
+    url: "https://solvecha.com/docs",
   },
 ];
 
@@ -295,7 +305,8 @@ async function solveWithCapSolverStyle(
   endpointBase: string,
   imageBase64: string,
   apiKey: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  acceptInlineResult = false
 ) {
   const create = await captchaFetch(`${endpointBase}/createTask`, {
     method: "POST",
@@ -314,7 +325,18 @@ async function solveWithCapSolverStyle(
     errorDescription?: string;
     errorCode?: string;
     taskId?: number | string;
+    status?: string;
+    solution?: { text?: string };
   };
+  // Algunos proveedores (Solvecha) pueden devolver la solución ya en createTask.
+  if (
+    acceptInlineResult &&
+    createJson.errorId === 0 &&
+    createJson.status === "ready" &&
+    createJson.solution?.text
+  ) {
+    return createJson.solution.text;
+  }
   if (createJson.errorId !== 0 || createJson.taskId == null) {
     throw new CaptchaSolveError(
       `${label} createTask falló: ${
@@ -380,6 +402,21 @@ async function solveWithCapMonster(
     imageBase64,
     apiKey,
     signal
+  );
+}
+
+async function solveWithSolvecha(
+  imageBase64: string,
+  apiKey: string,
+  signal?: AbortSignal
+) {
+  return solveWithCapSolverStyle(
+    "Solvecha",
+    "https://api.solvecha.com",
+    imageBase64,
+    apiKey,
+    signal,
+    true
   );
 }
 
@@ -507,6 +544,8 @@ async function dispatchSolve(
       return solveWithAntiCaptcha(imageBase64, apiKey!, signal);
     case "capmonster":
       return solveWithCapMonster(imageBase64, apiKey!, signal);
+    case "solvecha":
+      return solveWithSolvecha(imageBase64, apiKey!, signal);
     default: {
       const _exhaustive: never = provider;
       throw new CaptchaSolverConfigError(`Provider desconocido: ${_exhaustive}`);
