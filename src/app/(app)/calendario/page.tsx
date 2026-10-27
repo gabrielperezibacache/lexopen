@@ -123,37 +123,58 @@ export default async function CalendarioPage({ searchParams }: Props) {
   const prevYm = shiftYm(year, monthIndex, -1);
   const nextYm = shiftYm(year, monthIndex, 1);
 
+  // ⚡ Bolt: Replace O(N^2) filtering loops with O(N) hash map lookups.
+  const pByDate = new Map<string, typeof plazos>();
+  const tByDate = new Map<string, typeof tasks>();
+  const aByDate = new Map<string, Array<{ id: string; titulo: string; causaId: string; sala: string | null }>>();
+
+  if (filterTipo !== "tarea" && filterTipo !== "audiencia") {
+    for (const x of plazos) {
+      const key = civilDateKey(x.fechaLimite);
+      if (!pByDate.has(key)) pByDate.set(key, []);
+      pByDate.get(key)!.push(x);
+    }
+  }
+
+  if (filterTipo !== "plazo" && filterTipo !== "audiencia") {
+    for (const x of tasks) {
+      if (!x.dueDate) continue;
+      const key = civilDateKey(x.dueDate);
+      if (!tByDate.has(key)) tByDate.set(key, []);
+      tByDate.get(key)!.push(x);
+    }
+  }
+
+  if (filterTipo !== "plazo" && filterTipo !== "tarea") {
+    for (const c of causasTabla) {
+      if (!c.proximaTabla) continue;
+      const key = civilDateKey(c.proximaTabla);
+      if (!aByDate.has(key)) aByDate.set(key, []);
+      aByDate.get(key)!.push({
+        id: `tabla-${c.id}`,
+        titulo: c.proximaTablaNota || `Tabla · ${c.rit || c.titulo}`,
+        causaId: c.id,
+        sala: c.sala,
+      });
+    }
+    for (const m of movAudiencias) {
+      const key = civilDateKey(m.fecha);
+      if (!aByDate.has(key)) aByDate.set(key, []);
+      aByDate.get(key)!.push({
+        id: m.id,
+        titulo: m.titulo,
+        causaId: m.causaId,
+        sala: null,
+      });
+    }
+  }
+
   function eventsOn(key: string) {
-    const p =
-      filterTipo === "tarea" || filterTipo === "audiencia"
-        ? []
-        : plazos.filter((x) => civilDateKey(x.fechaLimite) === key);
-    const t =
-      filterTipo === "plazo" || filterTipo === "audiencia"
-        ? []
-        : tasks.filter((x) => x.dueDate && civilDateKey(x.dueDate) === key);
-    const a =
-      filterTipo === "plazo" || filterTipo === "tarea"
-        ? []
-        : [
-            ...causasTabla
-              .filter((c) => c.proximaTabla && civilDateKey(c.proximaTabla) === key)
-              .map((c) => ({
-                id: `tabla-${c.id}`,
-                titulo: c.proximaTablaNota || `Tabla · ${c.rit || c.titulo}`,
-                causaId: c.id,
-                sala: c.sala,
-              })),
-            ...movAudiencias
-              .filter((m) => civilDateKey(m.fecha) === key)
-              .map((m) => ({
-                id: m.id,
-                titulo: m.titulo,
-                causaId: m.causaId,
-                sala: null as string | null,
-              })),
-          ];
-    return { p, t, a };
+    return {
+      p: pByDate.get(key) || [],
+      t: tByDate.get(key) || [],
+      a: aByDate.get(key) || [],
+    };
   }
 
   const agendaDays = cells
