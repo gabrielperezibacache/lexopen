@@ -718,7 +718,7 @@ export function MinutaWizard({
               <li>· Resumen: {resumenEjecutivo.slice(0, 140) || "—"}…</li>
               <li>
                 · Acciones:{" "}
-                {acciones.filter((a) => a.descripcion.trim()).length || 0}
+                {acciones.reduce((count, a) => (a.descripcion.trim() ? count + 1 : count), 0)}
               </li>
             </ul>
           </div>

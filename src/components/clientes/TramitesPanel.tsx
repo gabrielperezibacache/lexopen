@@ -63,11 +63,22 @@ export function TramitesPanel({
     return list.length ? list : TRAMITE_TEMPLATES;
   }, [materia]);
 
-  const pendientes = tramites.filter(
-    (t) => t.estado === "pendiente" || t.estado === "en_curso"
-  );
-  const hechos = tramites.filter((t) => t.estado === "hecho");
-  const cancelados = tramites.filter((t) => t.estado === "cancelado");
+  // ⚡ Bolt: Group tramites in a single O(N) pass and memoize to avoid redundant iterations and array allocations on every render.
+  const { pendientes, hechos, cancelados } = useMemo(() => {
+    return tramites.reduce(
+      (acc, t) => {
+        if (t.estado === "pendiente" || t.estado === "en_curso") {
+          acc.pendientes.push(t);
+        } else if (t.estado === "hecho") {
+          acc.hechos.push(t);
+        } else if (t.estado === "cancelado") {
+          acc.cancelados.push(t);
+        }
+        return acc;
+      },
+      { pendientes: [] as Tramite[], hechos: [] as Tramite[], cancelados: [] as Tramite[] }
+    );
+  }, [tramites]);
 
   async function createTramite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

@@ -173,26 +173,24 @@ export function PjudMonitorPanel({
   const [tab, setTab] = useState<Tab>("historial");
   const [cuadernoFilter, setCuadernoFilter] = useState<string>("todos");
 
-  const cuadernos = useMemo(() => {
-    const set = new Set(
-      movimientos.map((m) => m.cuaderno || "Principal").filter(Boolean)
-    );
-    return [...set].sort();
+  // ⚡ Bolt: Compute cuadernos, receptor, and escritos in a single O(N) pass to prevent redundant iterations.
+  const { cuadernos, receptor, escritos } = useMemo(() => {
+    const set = new Set<string>();
+    const rec: typeof movimientos = [];
+    const esc: typeof movimientos = [];
+    for (const m of movimientos) {
+      const c = m.cuaderno || "Principal";
+      if (c) set.add(c);
+      if (m.esReceptor) rec.push(m);
+      if (
+        m.pendienteResolucion ||
+        (m.tipo === "escrito" && (m.relevante || m.pendienteResolucion))
+      ) {
+        esc.push(m);
+      }
+    }
+    return { cuadernos: [...set].sort(), receptor: rec, escritos: esc };
   }, [movimientos]);
-
-  const receptor = useMemo(
-    () => movimientos.filter((m) => m.esReceptor),
-    [movimientos]
-  );
-  const escritos = useMemo(
-    () =>
-      movimientos.filter(
-        (m) =>
-          m.pendienteResolucion ||
-          (m.tipo === "escrito" && (m.relevante || m.pendienteResolucion))
-      ),
-    [movimientos]
-  );
 
   const visible = useMemo(() => {
     if (tab === "receptor") return receptor;

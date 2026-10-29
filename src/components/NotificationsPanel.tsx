@@ -20,7 +20,8 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
-  const unread = items.filter((n) => !n.read).length;
+  // ⚡ Bolt: Avoid allocating a new array with filter().length by using reduce() for counts
+  const unread = items.reduce((count, n) => (!n.read ? count + 1 : count), 0);
 
   async function markOne(id: string) {
     setLoadingAction(id);
