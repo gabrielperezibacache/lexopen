@@ -177,11 +177,16 @@ export default async function CalendarioPage({ searchParams }: Props) {
     };
   }
 
-  const agendaDays = cells
-    .map((c) => c.ymd)
-    .filter((ymd): ymd is string => Boolean(ymd))
-    .map((ymd) => ({ ymd, ...eventsOn(ymd) }))
-    .filter(({ p, t, a }) => p.length > 0 || t.length > 0 || a.length > 0);
+  // ⚡ Bolt: Use a single O(N) reduce pass to construct agendaDays instead of multiple map/filter array allocations.
+  const agendaDays = cells.reduce((acc, c) => {
+    if (c.ymd) {
+      const events = eventsOn(c.ymd);
+      if (events.p.length > 0 || events.t.length > 0 || events.a.length > 0) {
+        acc.push({ ymd: c.ymd, ...events });
+      }
+    }
+    return acc;
+  }, [] as Array<{ ymd: string; p: ReturnType<typeof eventsOn>["p"]; t: ReturnType<typeof eventsOn>["t"]; a: ReturnType<typeof eventsOn>["a"] }>);
 
   return (
     <div className="space-y-6">
