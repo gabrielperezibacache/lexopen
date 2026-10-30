@@ -59,7 +59,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       : from === "mis-causas"
         ? "← ClaveÚnica"
         : "← Expediente";
-  const [causa, responsables, totalAccionesAbiertas] = await Promise.all([
+  const [causa, responsables, totalAccionesAbiertas, textStatus] = await Promise.all([
     prisma.causa.findUnique({
       where: { id },
       include: {
@@ -116,17 +116,17 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         estado: { in: [...ACCIONES_ABIERTAS] },
       },
     }),
+    // ⚡ Bolt: Move textStatus query into Promise.all to fetch concurrently with the causa, saving a round-trip
+    prisma.$queryRaw<{id: string, has_text: boolean, has_markdown: boolean}[]>`
+      SELECT id,
+             (length(trim(coalesce("extractedMarkdown", ''))) + length(trim(coalesce("contenido", '')))) > 0 as has_text,
+             length(trim(coalesce("extractedMarkdown", ''))) > 0 as has_markdown
+      FROM "Documento"
+      WHERE "causaId" = ${id}
+    `,
   ]);
   if (!causa) notFound();
 
-  const docIds = causa.documentos.map((d) => d.id);
-  const textStatus = docIds.length > 0 ? await prisma.$queryRaw<{id: string, has_text: boolean, has_markdown: boolean}[]>`
-    SELECT id,
-           (length(trim(coalesce("extractedMarkdown", ''))) + length(trim(coalesce("contenido", '')))) > 0 as has_text,
-           length(trim(coalesce("extractedMarkdown", ''))) > 0 as has_markdown
-    FROM "Documento"
-    WHERE id = ANY(${docIds})
-  ` : [];
   const statusMap = new Map(textStatus.map((s) => [s.id, s]));
 
   const documentos = causa.documentos.map(
