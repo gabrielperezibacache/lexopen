@@ -189,8 +189,8 @@ fuente oficial, exhaustiva ni necesariamente actualizada.
 Después de ejecutar el seed, una primera exploración útil es:
 
 1. Entrar a `/login` como `socio@estudio.cl`.
-2. Abrir el dashboard y revisar las causas, tareas, notificaciones y minutas
-   pendientes.
+2. Aterrizar en **`/inicio`** (asistente operativo): saludo, status del Host,
+   composer y cards de Hoy/Plazos. El **Panel** de KPIs sigue en `/dashboard`.
 3. Entrar al site **Andes · Cobro de pesos C-4521-2025** para ver archivos
    versionados, wiki, iSheet de hitos, Q&A y workflow de aprobación.
 4. Cambiar al usuario `cliente@andes.cl` para observar la navegación del portal y
@@ -198,8 +198,8 @@ Después de ejecutar el seed, una primera exploración útil es:
 5. Revisar **Facturación** para ver horas, gastos, facturas, pagos y provisiones en
    pesos chilenos.
 6. Probar **Documentos** (Incorporar → Carpeta), la ficha de causa C-4521 y el
-   **copiloto** en `/agente`: acote la carpeta investigativa `Escritos/` o reanude
-   el chat demo «Montos reclamados en Escritos».
+   **copiloto** en `/agente` (consola completa Hermes/LLM), además del asistente
+   de `/inicio`.
 7. Probar **Jurisprudencia** e **Integraciones** para distinguir los datos demo
    de las conexiones externas reales (Google Drive, Obsidian, Hermes).
 

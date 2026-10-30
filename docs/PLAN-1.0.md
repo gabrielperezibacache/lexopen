@@ -6,7 +6,8 @@
 | Fecha diagnóstico | 2026-09-30 |
 | Alcance de este documento | Diagnóstico (Fase 0) + plan priorizado; Fase 1 = brief completo aprobado. |
 | Rama | `cursor/lexopen-1.0` |
-| Fuentes | `README.md`, `docs/WEB-HOST.md`, `docs/AUDITORIA-2026-09-06.md`, `docs/PJUD.md`, `docs/DESKTOP.md`, `prisma/schema.prisma`, `src/**`, `.jules/` vs `.Jules/` |
+| Fuentes | `README.md`, `docs/WEB-HOST.md`, `docs/AUDITORIA-2026-09-06.md`, `docs/PJUD.md`, `docs/DESKTOP.md`, `prisma/schema.prisma`, `src/**` |
+| Estado rama | `cursor/lexopen-1.0` rebased onto `main` (2026-10-30); ver `docs/PLAN-CORRECCION-MEJORA.md` |
 
 > LexOpen es Next.js **16** (convenciones distintas al Next «clásico»). Antes de
 > implementar UI/rutas en Fase 1–2, revisar `node_modules/next/dist/docs/` en el
@@ -39,10 +40,9 @@ Los mayores gaps hacia un **1.0** no son «inventar módulos desde cero», sino:
 4. **Docs / release** — alinear README, WEB-HOST, CHANGELOG y checklist
    `prod:check` con lo que realmente se promete en 1.0.
 
-**Colisión de carpetas:** coexisten `.jules/palette.md` y `.Jules/palette.md`
-(inodos distintos en Linux; en macOS/Windows case-insensitive chocan). Contenido
-divergente (ARIA vs loading states). Debe unificarse antes de que un clone en
-FS case-insensitive pierda uno de los dos.
+**Scratch `.jules` / `.Jules`:** cerrado — main eliminó ambas carpetas (#156);
+`.gitignore` las ignora; CONTRIBUTING prohíbe recrearlas. No hay paleta de
+agentes versionada en el repo.
 
 ---
 
@@ -144,15 +144,9 @@ traiga en `1` (salvo `LEXOPEN_KEEP_*_DEMO=1` para demos).
 `ui.tsx` solo donde reduzca inconsistencia (no introducir otro design system).
 AUDITORIA: tema 2/4, integridad visual 3/4 — deuda heredada, no greenfield.
 
-**Paleta agentes (colisión):**
-
-| Path | Contenido |
-| --- | --- |
-| `.jules/palette.md` | Aprendizaje ARIA (`aria-expanded` / `aria-controls`) |
-| `.Jules/palette.md` | Aprendizajes loading text en botones TOTP/async |
-
-Acción recomendada (Fase 2 o 4): fusionar en **una** carpeta (preferir
-`.jules/` lowercase) y documentar en CONTRIBUTING.
+**Paleta agentes:** eliminada del árbol (main #156 + rebase 1.0). No versionar
+scratch de agentes; aprendizajes UX van en PRs Palette/Sentinel o docs de
+producto.
 
 ---
 
@@ -193,7 +187,7 @@ como «Panel» de KPIs (no se eliminan features).
 | PJUD | 100 % opt-in. |
 | Desktop | Best-effort; Host web = camino soportado. |
 | i18n | ES + EN parcial; strings nuevos vía i18n. |
-| `.jules` merge | Fase 2. |
+| `.jules` | Eliminar (no merge); hecho en main #156 + rebase 1.0. |
 | Tag | `1.0.0` tras Fases 1–4 (sin `0.2.0` intermedio). |
 
 ---
@@ -283,7 +277,7 @@ sin reinventar la marca (copper/sea).
 | AppShell/Sidebar colapsable + grupos Trabajo/Clientes/Documentos/Admin | **Hecho** |
 | Breadcrumbs + búsqueda global + ⌘K + panel notificaciones | **Hecho** |
 | Hub Facturación → i18n + `ModuleHeader` | **Hecho** |
-| Unificar `.jules/palette.md` (eliminar `.Jules/`) + CONTRIBUTING | **Hecho** |
+| Eliminar scratch `.jules`/`.Jules` + CONTRIBUTING (no recrear) | **Hecho** (main #156 + rebase) |
 | Screen pass hubs (plazos, personas, flujos, ficha causa, buscar, integraciones, …) | **Hecho** |
 | Empty/loading/error + confirm destructivo (calendario, personas, trámites, isheet, causa) | **Hecho** |
 | Spot-check Electron `desktop/` (`npm test` + tokens setup) | **Hecho** |
@@ -340,7 +334,7 @@ lo entregado en 1–3.
 - Bump versión, sección CHANGELOG 1.0.0, badge README.
 - Actualizar recorrido demo + checklist producción.
 - Nota de upgrade desde 0.1.9 (`migrate deploy`, no seed).
-- CONTRIBUTING: Next 16 docs path + carpeta `.jules` canónica.
+- CONTRIBUTING: Next 16 docs path + prohibición de recrear `.jules`/`.Jules`.
 
 **Riesgos**
 
@@ -405,4 +399,4 @@ Fase 4 docs/release
 - [x] globals.css, ui.tsx, AppShell, AppSidebar, tokens `--ink-soft`
 - [x] Módulos de dominio listados + `lib/ai/*`, hermes, plazos, google, document-*,
       minutas, causas, pjud, search, security/RBAC/CSRF/audit, i18n, copiloto
-- [x] Colisión `.jules` / `.Jules` documentada
+- [x] Scratch `.jules` / `.Jules` eliminado y documentado como prohibido
