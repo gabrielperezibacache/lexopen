@@ -41,13 +41,9 @@ function verifyHmacSha256Hex(payload: string, signatureHex: string, secret: stri
   if (signatureHex.length !== 64) return false;
   try {
     const expected = createHmac("sha256", secret).update(payload).digest("hex");
-    const expectedBuf = Buffer.from(expected);
-    const signatureBuf = Buffer.from(signatureHex);
-    if (expectedBuf.length !== signatureBuf.length) {
-      timingSafeEqual(expectedBuf, expectedBuf);
-      return false;
-    }
-    return timingSafeEqual(expectedBuf, signatureBuf);
+    const a = createHmac("sha256", secret).update(signatureHex).digest();
+    const b = createHmac("sha256", secret).update(expected).digest();
+    return timingSafeEqual(a, b);
   } catch {
     return false;
   }

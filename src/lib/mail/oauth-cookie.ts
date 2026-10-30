@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "crypto";
+import { timingSafeEqual, createHmac } from "crypto";
 import { NextResponse } from "next/server";
 import { baseCookieOptions } from "@/lib/auth/cookie-options";
 
@@ -8,13 +8,13 @@ export const MICROSOFT_OAUTH_COOKIE = "lexopen_mail_microsoft_oauth";
 export const MICROSOFT_OAUTH_PATH = "/api/mail/microsoft/callback";
 
 export function oauthStateMatches(provided: string, expected: string) {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) {
-    timingSafeEqual(b, b);
+  try {
+    const a = createHmac("sha256", expected).update(provided).digest();
+    const b = createHmac("sha256", expected).update(expected).digest();
+    return timingSafeEqual(a, b);
+  } catch {
     return false;
   }
-  return timingSafeEqual(a, b);
 }
 
 export function bindOauthState(userId: string, nonce: string) {
