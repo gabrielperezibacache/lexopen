@@ -331,21 +331,24 @@ paleta agentes unificada; hubs principales con tokens/i18n. → **cumplido** (de
 
 **Criterio de salida:** cumplido en código/docs; suite verde en CI.
 
-### Fase 4 — Docs y release 1.0 · esfuerzo **S–M** · riesgo bajo
+### Fase 4 — Docs y release 1.0 · **en PR** (2026-10-30)
 
 **Objetivo:** versión `1.0.0`, changelog, README/WEB-HOST/DESKTOP coherentes con
 lo entregado en 1–3.
 
-**Hacer**
+**Hecho / en curso**
 
-- Bump versión, sección CHANGELOG 1.0.0, badge README.
-- Actualizar recorrido demo + checklist producción.
-- Nota de upgrade desde 0.1.9 (`migrate deploy`, no seed).
-- CONTRIBUTING: Next 16 docs path + prohibición de recrear `.jules`/`.Jules`.
+- [x] Bump `package.json` + `desktop/package.json` → `1.0.0`
+- [x] CHANGELOG sección 1.0.0; badge README; estado del proyecto
+- [x] `docs/ASISTENTE.md` + links README
+- [x] `docs/UPGRADE-1.0.md` (0.1.9 → 1.0.0, `migrate deploy`)
+- [x] CONTRIBUTING: Next 16 + no `.jules` + release notes
+- [x] Decisiones Gabriel (2026-10-30): merge #151→#154; Panel sin redirect; #195 después de 1.0.0
+- [ ] Tag `v1.0.0` tras merge de PR Fase 4 + CI verde
 
 **Riesgos**
 
-- Prometer paridad CausaMonitor/SII/HighQ completa — acotar copy.
+- Prometer paridad CausaMonitor/SII/HighQ completa — acotar copy (hecho en README/CHANGELOG).
 
 **Criterio de salida:** tag/release notes; CI verde; `prod:check` documentado
 como paso de aceptación.

@@ -2,35 +2,30 @@
 
 ## Unreleased
 
-### Planificación
-- Fase 0: diagnóstico y plan hacia 1.0 en `docs/PLAN-1.0.md` (mapa de módulos, bloqueadores de producción, design system, Fases 1–4).
-- Decisiones aprobadas (2026-09-30): Fase 1 = brief completo (Inicio + intent engine + Evento); portal/Redis/billing/PJUD/Desktop/i18n/tag según §5bis del plan.
-- Plan de corrección/mejora post-rebase: `docs/PLAN-CORRECCION-MEJORA.md` (2026-10-30).
+## 1.0.0 — 2026-10-30
 
-### Fase 3 (completa · endurecimiento producción)
-- Seguridad: demos `*_ALLOW_DEMO` hard-fail en prod salvo `LEXOPEN_KEEP_*_DEMO`; `prod:check` alineado; Redis rate-limit documentado + fallback archivo; UF sync vía `fetchSafeOutbound`; CSP/`x-request-id` en proxy.
-- Datos: migración índices lista/dashboard; `?limit=` en APIs causas/clientes/documentos/plazos/tareas/tribunales; retención/backup en WEB-HOST.
-- Observabilidad: `src/lib/log.ts` JSON + AsyncLocalStorage; health privileged (queues/LLM/PJUD/rate-limit); `global-error` + `not-found`.
-- Performance: Inicio con Suspense streaming; presupuesto LCP documentado en PLAN.
-- Calidad/CI: tests assistant/list-limit/log; `prisma migrate diff` drift en CI.
+Primera versión estable del Host local LexOpen para práctica chilena.
 
-### Fase 2 (completa · deuda residual en PLAN)
-- Design system: tokens en `globals.css` (color, tipografía, spacing, radius, shadow, motion) + tema claro/oscuro persistido.
-- Librería `src/components/ui/` (Button, Input, Dialog, Sheet, Table, CommandPalette, LoadingState, ErrorState, ConfirmDialog, etc.) sin dependencias Radix; barrel `@/components/ui`.
-- Shell: sidebar colapsable y agrupada (Trabajo / Clientes / Documentos / Admin), breadcrumbs, búsqueda global, ⌘K, panel de notificaciones, theme toggle.
-- Hubs i18n + `PageHeader`/`ModuleHeader`: plazos, personas, flujos, tareas, documentos, notificaciones, buscar, integraciones, auditoría, configuración, cuenta, jurisprudencia, minutas, ficha causa, facturación.
-- Confirm destructivo accesible (calendario, personas, trámites, iSheet, eliminar causa); `(app)/loading` y `error` usan LoadingState/ErrorState.
-- ThemeProvider: genéricos `ThemeMode` / `"light" | "dark"` en `useSyncExternalStore` (fix typecheck CI).
-- Electron `desktop/`: spot-check `npm test` OK; tokens setup cercanos a web (alineación fina residual).
-- Scratch de agentes `.jules/` / `.Jules/`: **eliminado** (alineado con main #156); ignorado en `.gitignore`; no recrear (CONTRIBUTING).
+### Nuevo
+- **Inicio** (`/inicio`): asistente operativo con intent engine, tools tipados, confirmación humana y undo (`docs/ASISTENTE.md`).
+- **Panel** (`/dashboard`): KPIs del estudio (sin redirect HTTP a Inicio).
+- Modelo **Evento** + calendario mes/semana/agenda con drag-and-drop; Google Calendar push/pull/ICS.
+- Design system 1.0: tokens, tema claro/oscuro, `src/components/ui/*`, shell agrupado, ⌘K, ConfirmDialog.
+- Endurecimiento producción: demos `*_ALLOW_DEMO` hard-fail (salvo `LEXOPEN_KEEP_*_DEMO`), Redis rate-limit opcional, CSP/`x-request-id`, logs JSON, health privilegiado, `?limit=` en listas, índices hot-path.
+- `FirmSettings.assistantLlmMode` y `auditLlmPrompts`.
+- Guías: `docs/UPGRADE-1.0.md`, `docs/ASISTENTE.md`, `docs/PLAN-1.0.md`, `docs/PLAN-CORRECCION-MEJORA.md`.
 
-### Fase 1 (completa en PR #151 · rebased onto main 2026-10-30)
-- Nav: `/inicio` como home staff; Panel = `/dashboard`; redirects y e2e alineados.
-- Asistente operativo: `src/lib/assistant/` + `POST /api/assistant` (+ confirm).
-- Modelo `Evento` + calendario unificado.
-- `FirmSettings.assistantLlmMode` (local_only | remote_allowed) + `auditLlmPrompts`: el estudio puede forzar clasificación local (sin LLM remoto) y controlar si la auditoría del asistente guarda prompts completos (`src/lib/assistant/firm-policy.ts`, `POST /api/assistant`, "Configuración" → "Asistente / IA").
-- Calendario: vistas mes / semana / agenda; drag-and-drop de eventos entre días (`CalendarioBoard`).
-- Google Calendar: pull → Eventos LexOpen (`pull-calendar`) además de push e ICS; soft-fail con `GoogleIntegrationError`.
+### Mejoras
+- i18n ES/EN en hubs principales (facturación hub + screen pass Fase 2).
+- CI: `prisma migrate diff` tras `migrate deploy`.
+- Desktop opcional alineado a versión `1.0.0` (camino soportado = Host web).
+
+### Límites (sin sorpresas)
+- Facturación interna ≠ DTE/SII; portal ≠ expediente RO completo; PJUD opt-in; sin multi-Host/HA.
+- Auditoría best-effort residual en wiki/blog/Hermes/webhook (mutaciones del asistente usan `writeAuditStrict`).
+
+### Upgrade
+Desde `0.1.9`: respaldo → `npm ci` → `prisma migrate deploy` → `prod:check`. Ver `docs/UPGRADE-1.0.md`.
 
 ## 0.1.9 — 2026-08-17
 

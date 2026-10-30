@@ -4,11 +4,11 @@
 | --- | --- |
 | Fecha | 2026-10-30 |
 | Repo | `gabrielperezibacache/lexopen` |
-| Versión en árbol | `0.1.9` (tag `1.0.0` = Fase 4, pendiente OK Gabriel) |
-| Base auditada | `main` @ `b565ea9` (+ merges #156–#198) |
-| Stack 1.0 | PR [#151](https://github.com/gabrielperezibacache/lexopen/pull/151) ← PR [#154](https://github.com/gabrielperezibacache/lexopen/pull/154) |
+| Versión en árbol | `1.0.0` (Fase 4 en PR; tag tras merge+CI) |
+| Base auditada | `main` post-#151/#154 |
+| Stack 1.0 | [#151](https://github.com/gabrielperezibacache/lexopen/pull/151) **MERGED** `be287bd` → [#154](https://github.com/gabrielperezibacache/lexopen/pull/154) **MERGED** `a572304` |
+| Decisiones Gabriel | 2026-10-30: sí a todo (orden merge, ready, Fase 4, #195 después, Panel sin redirect) |
 | Plan origen | [`PLAN-1.0.md`](./PLAN-1.0.md) |
-| Preferencias | store `preferences.md` (no merge/ready sin OK) |
 
 ---
 
@@ -24,12 +24,10 @@ quedó **CONFLICTING**. Esta auditoría:
 3. **Corrigió** contradicciones seguras: scratch `.jules`, docs `/inicio` vs
    dashboard, CONTRIBUTING, CHANGELOG/PLAN, merges de calendario (Bolt O(N) +
    Evento), facturación (KPIs Chile + i18n), ConfirmDialog + loading states.
-4. **No** marca PRs ready ni mergea — hold Oct 1 sigue vigente.
+4. Hold levantado 2026-10-30: #151 y #154 **merged** a `main`; Fase 4 bump
+   `1.0.0` en curso. **#195 Solvecha después de 1.0.0** (no en el stack).
 
-**Historia coherente a 1.0:** mergear #151 → main, luego #154 (o squash-stack),
-después Fase 4 (bump `1.0.0`) con OK explícito. PR #195 (Solvecha captcha) es
-paralelo a `main` y no bloquea el stack 1.0, pero conviene mergearlo **antes**
-o **después** del stack (no en medio sin re-test PJUD).
+**Hecho:** merge secuencial #151 → #154. Panel `/dashboard` sin redirect HTTP.
 
 ---
 
@@ -37,9 +35,10 @@ o **después** del stack (no en medio sin re-test PJUD).
 
 | PR | Rama | Base | Estado | Mergeable | CI (último conocido) | Rol |
 | --- | --- | --- | --- | --- | --- | --- |
-| [#151](https://github.com/gabrielperezibacache/lexopen/pull/151) | `cursor/lexopen-1.0` | `main` | **DRAFT** | era CONFLICTING → **rebased** | build OK en head previo `fc78a68` | Fase 1 + 2 |
-| [#154](https://github.com/gabrielperezibacache/lexopen/pull/154) | `cursor/phase3-prod-hardening-ba41` | `cursor/lexopen-1.0` | **DRAFT** | era CLEAN → **restacked** | build OK | Fase 3 |
-| [#195](https://github.com/gabrielperezibacache/lexopen/pull/195) | `add-solvecha-provider` | `main` | OPEN | ? | — | Captcha PJUD (fuera del stack 1.0) |
+| [#151](https://github.com/gabrielperezibacache/lexopen/pull/151) | `cursor/lexopen-1.0` | `main` | **MERGED** | merge `be287bd` | green | Fase 1 + 2 |
+| [#154](https://github.com/gabrielperezibacache/lexopen/pull/154) | `cursor/phase3-prod-hardening-ba41` | `main` | **MERGED** | merge `a572304` | green | Fase 3 |
+| Fase 4 | `cursor/phase4-release-1-0-0-eb19` | `main` | OPEN (PR) | — | — | bump 1.0.0 + docs |
+| [#195](https://github.com/gabrielperezibacache/lexopen/pull/195) | `add-solvecha-provider` | `main` | OPEN | — | — | **después** de 1.0.0 |
 
 **Main desde hold (muestra):** #156 higiene `.jules`, #157–#198 Palette a11y/
 loading, Sentinel timing-safe (`proxy`, cron, scraper), Bolt perf (calendario
@@ -226,14 +225,14 @@ Leyenda esfuerzo: **S** / **M** / **L**. Prioridad: **P0** (bloquea 1.0) ·
 
 ---
 
-## 6. Preguntas abiertas para Gabriel
+## 6. Decisiones Gabriel (2026-10-30) — sí a todo
 
-1. **¿Merge order?** ¿Aprobar stack #151→#154 tal cual, o squash a un solo PR hacia main?
-2. **¿Ready-for-review** ahora que el rebase está hecho, o esperar CI + smoke manual Host?
-3. **¿Fase 4** inmediata tras merge Phase 3, o pausa piloto en `0.1.9` + features 1.0 sin tag?
-4. **¿PR #195 Solvecha** entra en 1.0.0 o en 1.0.1?
-5. **¿R1** confirmar: Panel `/dashboard` permanente (sin redirect HTTP) vs redirect a `/inicio`?
-6. **¿Hold** sigue hasta revisión humana explícita de este plan?
+1. Merge order: **#151 then #154** (no squash-stack).
+2. Ready when CI green, then merge (hold lifted).
+3. **Fase 4** inmediata tras Phase 3 en main.
+4. **#195 AFTER 1.0.0**.
+5. Keep `/dashboard` as Panel (**no** HTTP redirect) — R1 cerrado.
+6. Hold levantado.
 
 ---
 
