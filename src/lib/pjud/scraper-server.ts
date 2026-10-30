@@ -10,7 +10,7 @@
  * Env: PORT, PJUD_SCRAPER_KEY, CAPTCHA_*, PJUD_PUBLIC_SCRAPE=1 (auto si no set)
  */
 
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, createHmac } from "node:crypto";
 import http from "node:http";
 import { URL } from "node:url";
 import {
@@ -51,13 +51,13 @@ function authOk(req: http.IncomingMessage) {
   }
   const header = req.headers.authorization || "";
   const expected = `Bearer ${key}`;
-  const headerBuf = Buffer.from(header);
-  const expectedBuf = Buffer.from(expected);
-  if (headerBuf.length !== expectedBuf.length) {
-    timingSafeEqual(expectedBuf, expectedBuf);
+  try {
+    const a = createHmac("sha256", key).update(header).digest();
+    const b = createHmac("sha256", key).update(expected).digest();
+    return timingSafeEqual(a, b);
+  } catch {
     return false;
   }
-  return timingSafeEqual(headerBuf, expectedBuf);
 }
 
 async function readJson(req: http.IncomingMessage) {
