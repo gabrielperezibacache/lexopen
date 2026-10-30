@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { PageHeader } from "@/components/sites/SiteNav";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { apiMutation } from "@/lib/api-mutation";
 
 type GoogleStatus = {
@@ -49,6 +50,8 @@ type CaptchaStatus = {
 
 function IntegracionesInner() {
   const sp = useSearchParams();
+  const { dict } = useI18n();
+  const h = dict.hubs.integraciones;
   const [obsidianMsg, setObsidianMsg] = useState("");
   const [obsidianMode, setObsidianMode] = useState("");
   const [google, setGoogle] = useState<GoogleStatus | null>(null);
@@ -134,9 +137,9 @@ function IntegracionesInner() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Conectores"
-        title="Integraciones"
-        subtitle="Conecte Obsidian, el copiloto IA, Google Workspace y el seguimiento judicial (Oficina Judicial Virtual / ClaveÚnica)."
+        eyebrow={h.eyebrow}
+        title={h.title}
+        subtitle={h.subtitle}
       />
 
       {googleFlash && (

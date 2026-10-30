@@ -40,6 +40,10 @@ model FirmSettings {
   pjudDigestLastAt         DateTime?
   pjudDigestLastStatus     String?
   pjudDigestLastNote       String?
+  /// local_only | remote_allowed — asistente Inicio / classify
+  assistantLlmMode  String  @default("remote_allowed")
+  /// Si true, auditoría puede guardar prompts LLM completos (solo admin)
+  auditLlmPrompts   Boolean @default(false)
 }
 
 model User {
@@ -90,6 +94,7 @@ model User {
   blogPosts       BlogPost[]       @relation("BlogAuthor")
   mailboxAccount  MailboxAccount?
   mailboxMessages MailboxMessage[]
+  eventosResponsable Evento[]      @relation("EventoResponsable")
 }
 
 model AuditEvent {
@@ -220,6 +225,7 @@ model Cliente {
   invoices        Invoice[]
   payments        Payment[]
   ledgerEntries   LedgerEntry[]
+  eventos         Evento[]
 
   @@index([razonSocial])
   @@index([rut])
@@ -293,6 +299,7 @@ model Causa {
   movimientos     CausaMovimiento[]
   pjudSyncJobs    PjudSyncJob[]
   mailboxMessages MailboxMessage[]
+  eventos         Evento[]
 
   @@index([rit])
   @@index([ruc])
@@ -1058,4 +1065,40 @@ model MailboxAttachment {
 
   @@unique([messageId, sha256])
   @@index([documentoId])
+}
+
+/// Agenda del estudio: audiencias, reuniones, recordatorios, vencimientos
+model Evento {
+  id            String   @id @default(cuid())
+  titulo        String
+  /// audiencia | reunion | recordatorio | vencimiento | otro
+  tipo          String   @default("reunion")
+  inicio        DateTime
+  fin           DateTime?
+  todoElDia     Boolean  @default(false)
+  lugar         String?
+  /// presencial | videollamada | telefonica | hibrida | tribunal
+  modalidad     String?
+  enlace        String?
+  notas         String?
+  /// programado | cancelado | realizado
+  estado        String   @default("programado")
+  /// Solo si tipo=audiencia
+  tipoAudiencia String?
+  tribunal      String?
+  googleEventId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  causaId       String?
+  causa         Causa?   @relation(fields: [causaId], references: [id], onDelete: SetNull)
+  clienteId     String?
+  cliente       Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  responsableId String
+  responsable   User     @relation("EventoResponsable", fields: [responsableId], references: [id])
+
+  @@index([inicio])
+  @@index([tipo, estado])
+  @@index([causaId])
+  @@index([responsableId])
 }

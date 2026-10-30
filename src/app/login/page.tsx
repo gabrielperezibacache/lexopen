@@ -5,6 +5,7 @@ import { FormEvent, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Scale } from "lucide-react";
 import { safeAppPath } from "@/lib/auth/safe-next";
+import { resolvePostLoginPath } from "@/lib/auth/home-path";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
@@ -14,12 +15,17 @@ const SHOW_DEMO_LOGIN = process.env.NODE_ENV !== "production";
 function LoginForm() {
   const router = useRouter();
   const sp = useSearchParams();
-  const next = sp.get("next") || "/dashboard";
+  const next = sp.get("next") || "/inicio";
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState(SHOW_DEMO_LOGIN ? "socio@estudio.cl" : "");
   const [needsTotp, setNeedsTotp] = useState(false);
   const { t } = useI18n();
+
+  function goHome(role?: string | null) {
+    router.push(safeAppPath(resolvePostLoginPath(role, next)));
+    router.refresh();
+  }
 
   const demoUsers = useMemo(
     () => [
@@ -51,8 +57,7 @@ function LoginForm() {
           setError(data.error || t("login.error"));
           return;
         }
-        router.push(safeAppPath(next));
-        router.refresh();
+        goHome(data.user?.role);
         return;
       }
       const res = await fetch("/api/auth/login", {
@@ -72,8 +77,7 @@ function LoginForm() {
         setNeedsTotp(true);
         return;
       }
-      router.push(safeAppPath(next));
-      router.refresh();
+      goHome(data.user?.role);
     } catch {
       setError(t("login.error"));
     } finally {

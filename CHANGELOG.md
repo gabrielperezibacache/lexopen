@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Planificación
+- Fase 0: diagnóstico y plan hacia 1.0 en `docs/PLAN-1.0.md` (mapa de módulos, bloqueadores de producción, design system, Fases 1–4).
+- Decisiones aprobadas (2026-09-30): Fase 1 = brief completo (Inicio + intent engine + Evento); portal/Redis/billing/PJUD/Desktop/i18n/tag según §5bis del plan.
+- Plan de corrección/mejora post-rebase: `docs/PLAN-CORRECCION-MEJORA.md` (2026-10-30).
+
+### Fase 2 (completa · deuda residual en PLAN)
+- Design system: tokens en `globals.css` (color, tipografía, spacing, radius, shadow, motion) + tema claro/oscuro persistido.
+- Librería `src/components/ui/` (Button, Input, Dialog, Sheet, Table, CommandPalette, LoadingState, ErrorState, ConfirmDialog, etc.) sin dependencias Radix; barrel `@/components/ui`.
+- Shell: sidebar colapsable y agrupada (Trabajo / Clientes / Documentos / Admin), breadcrumbs, búsqueda global, ⌘K, panel de notificaciones, theme toggle.
+- Hubs i18n + `PageHeader`/`ModuleHeader`: plazos, personas, flujos, tareas, documentos, notificaciones, buscar, integraciones, auditoría, configuración, cuenta, jurisprudencia, minutas, ficha causa, facturación.
+- Confirm destructivo accesible (calendario, personas, trámites, iSheet, eliminar causa); `(app)/loading` y `error` usan LoadingState/ErrorState.
+- ThemeProvider: genéricos `ThemeMode` / `"light" | "dark"` en `useSyncExternalStore` (fix typecheck CI).
+- Electron `desktop/`: spot-check `npm test` OK; tokens setup cercanos a web (alineación fina residual).
+- Scratch de agentes `.jules/` / `.Jules/`: **eliminado** (alineado con main #156); ignorado en `.gitignore`; no recrear (CONTRIBUTING).
+
+### Fase 1 (completa en PR #151 · rebased onto main 2026-10-30)
+- Nav: `/inicio` como home staff; Panel = `/dashboard`; redirects y e2e alineados.
+- Asistente operativo: `src/lib/assistant/` + `POST /api/assistant` (+ confirm).
+- Modelo `Evento` + calendario unificado.
+- `FirmSettings.assistantLlmMode` (local_only | remote_allowed) + `auditLlmPrompts`: el estudio puede forzar clasificación local (sin LLM remoto) y controlar si la auditoría del asistente guarda prompts completos (`src/lib/assistant/firm-policy.ts`, `POST /api/assistant`, "Configuración" → "Asistente / IA").
+- Calendario: vistas mes / semana / agenda; drag-and-drop de eventos entre días (`CalendarioBoard`).
+- Google Calendar: pull → Eventos LexOpen (`pull-calendar`) además de push e ICS; soft-fail con `GoogleIntegrationError`.
+
 ## 0.1.9 — 2026-08-17
 
 Iteración IA definitiva: i18n, acciones conectadas y refactor del copiloto.

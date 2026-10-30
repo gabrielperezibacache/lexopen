@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { apiMutation } from "@/lib/api-mutation";
 
 type Column = { key: string; name: string; type: string; options: string };
@@ -19,11 +21,13 @@ export function ISheetTable({
   rows: Row[];
 }) {
   const router = useRouter();
+  const { dict, t } = useI18n();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   async function addRow(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -68,18 +72,19 @@ export function ISheetTable({
     router.refresh();
   }
 
-  async function deleteRow(rowId: string) {
-    if (!confirm("¿Eliminar esta fila?")) return;
+  async function confirmDeleteRow() {
+    if (!pendingDeleteId) return;
     setBusy(true);
-    setDeletingId(rowId);
+    setDeletingId(pendingDeleteId);
     setError("");
     const result = await apiMutation(`/api/sites/${siteId}/isheets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "delete-row", rowId }),
+      body: JSON.stringify({ action: "delete-row", rowId: pendingDeleteId }),
     });
     setBusy(false);
     setDeletingId(null);
+    setPendingDeleteId(null);
     if (!result.ok) {
       setError(result.error || "No se pudo eliminar la fila");
       return;
@@ -163,9 +168,9 @@ export function ISheetTable({
                       type="button"
                       className="btn btn-ghost"
                       disabled={busy}
-                      onClick={() => deleteRow(r.id)}
+                      onClick={() => setPendingDeleteId(r.id)}
                     >
-                      {deletingId === r.id ? "Eliminando…" : "Eliminar"}
+                      {deletingId === r.id ? "Eliminando…" : t("common.delete")}
                     </button>
                   </div>
                 </td>
@@ -174,6 +179,15 @@ export function ISheetTable({
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteId)}
+        onClose={() => setPendingDeleteId(null)}
+        onConfirm={() => void confirmDeleteRow()}
+        title={dict.confirm.deleteRow}
+        description={dict.confirm.deleteRowDesc}
+        busy={busy}
+      />
 
       {open && (
         <div

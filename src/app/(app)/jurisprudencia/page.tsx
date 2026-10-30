@@ -4,11 +4,12 @@ import { labelMateria, MATERIAS } from "@/lib/chile";
 import { JurisprudenciaSearch } from "@/components/JurisprudenciaSearch";
 import { JurisprudenciaIngestForm } from "@/components/JurisprudenciaIngestForm";
 import { requireStaff } from "@/lib/auth/session";
-import { PageHeader } from "@/components/sites/SiteNav";
-import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { JurisprudenciaBrief } from "@/components/ai/JurisprudenciaBrief";
 import type { Prisma } from "@prisma/client";
 import { isAdmin } from "@/lib/auth/rbac";
+import { getI18n } from "@/lib/i18n/server";
 
 const LIST_TAKE = 80;
 
@@ -18,6 +19,8 @@ export default async function JurisprudenciaPage({
   searchParams: Promise<{ q?: string; materia?: string }>;
 }) {
   const user = await requireStaff();
+  const { dict } = await getI18n();
+  const h = dict.hubs.jurisprudencia;
   const sp = await searchParams;
   const q = (sp.q || "").trim();
   const materia = sp.materia;
@@ -62,11 +65,7 @@ export default async function JurisprudenciaPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Base doctrinal"
-        title="Jurisprudencia"
-        subtitle="Corpus local (seed demo o importado). No es el repositorio oficial del Poder Judicial."
-      />
+      <PageHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
 
       <JurisprudenciaSearch materias={[...MATERIAS]} />
       <JurisprudenciaBrief />

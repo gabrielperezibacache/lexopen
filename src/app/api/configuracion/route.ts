@@ -16,6 +16,8 @@ const schema = z.object({
   defaultRetencionPct: z.coerce.number().min(0).max(1),
   ivaPct: z.coerce.number().min(0).max(1),
   hermesAllowDemo: z.boolean().optional(),
+  assistantLlmMode: z.enum(["local_only", "remote_allowed"]).optional(),
+  auditLlmPrompts: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -44,6 +46,8 @@ export async function PATCH(req: NextRequest) {
               defaultRetencionPct: body.defaultRetencionPct,
               ivaPct: body.ivaPct,
               hermesAllowDemo: Boolean(body.hermesAllowDemo),
+              assistantLlmMode: body.assistantLlmMode ?? "remote_allowed",
+              auditLlmPrompts: Boolean(body.auditLlmPrompts),
             },
             update: {
               emisorRazonSocial: body.emisorRazonSocial || null,
@@ -53,6 +57,12 @@ export async function PATCH(req: NextRequest) {
               defaultRetencionPct: body.defaultRetencionPct,
               ivaPct: body.ivaPct,
               hermesAllowDemo: Boolean(body.hermesAllowDemo),
+              ...(body.assistantLlmMode !== undefined
+                ? { assistantLlmMode: body.assistantLlmMode }
+                : {}),
+              ...(body.auditLlmPrompts !== undefined
+                ? { auditLlmPrompts: body.auditLlmPrompts }
+                : {}),
             },
           },
         },

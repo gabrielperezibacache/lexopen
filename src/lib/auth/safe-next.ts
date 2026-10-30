@@ -2,7 +2,7 @@
  * Restrict post-login redirects to same-origin relative paths.
  * Blocks protocol-relative URLs, backslashes, control chars, and odd schemes.
  */
-export function safeAppPath(next: string | null | undefined, fallback = "/dashboard") {
+export function safeAppPath(next: string | null | undefined, fallback = "/inicio") {
   if (!next) return fallback;
   let value = String(next).trim();
   if (!value.startsWith("/")) return fallback;

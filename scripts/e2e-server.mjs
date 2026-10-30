@@ -72,6 +72,7 @@ const env = {
   DATABASE_URL: databaseUrl,
   E2E_DATABASE_URL: databaseUrl,
   NODE_ENV: "test",
+  LEXOPEN_E2E: "1",
   SESSION_SECRET: process.env.SESSION_SECRET || "e2e-session-secret-32-chars",
   HERMES_ALLOW_DEMO: "1",
   LEXOPEN_DEMO_SWITCHER: "0",

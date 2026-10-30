@@ -5,6 +5,8 @@ import { loadBillingOverview } from "@/lib/billing-overview";
 import { formatCivilDate } from "@/lib/chile-time";
 import { requireStaff } from "@/lib/auth/session";
 import { InvoiceStatusPill } from "@/components/billing/InvoiceStatusPill";
+import { getDictionary } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n/server";
 import {
   Clock,
   Receipt,
@@ -16,6 +18,9 @@ import {
 
 export default async function FacturacionPage() {
   await requireStaff();
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  const b = dict.billingHub;
   const { month, kpis, recentInvoices, recentTime } = await loadBillingOverview();
 
   const provisionSub =
@@ -27,28 +32,28 @@ export default async function FacturacionPage() {
 
   const stats = [
     {
-      label: "Horas por facturar",
+      label: b.stats.unbilledHours,
       value: formatHours(kpis.unbilledHours),
       sub: clp(kpis.unbilledHonorarios),
       icon: Clock,
       href: "/facturacion/horas?estado=por_facturar",
     },
     {
-      label: "Gastos por facturar",
+      label: b.stats.unbilledExpenses,
       value: clp(kpis.unbilledGastos),
-      sub: `${kpis.unbilledExpenseCount} ítems`,
+      sub: b.stats.items.replace("{count}", String(kpis.unbilledExpenseCount)),
       icon: Wallet,
       href: "/facturacion/gastos?estado=por_facturar",
     },
     {
-      label: "Por cobrar",
+      label: b.stats.receivables,
       value: clp(kpis.porCobrar),
-      sub: `${kpis.openInvoiceCount} documentos`,
+      sub: b.stats.docs.replace("{count}", String(kpis.openInvoiceCount)),
       icon: CircleDollarSign,
       href: "/facturacion/facturas",
     },
     {
-      label: "Cobrado este mes",
+      label: b.stats.paidMonth,
       value: clp(kpis.cobradoMes),
       sub: kpis.cobradoMesCount
         ? `${kpis.cobradoMesCount} pagos · ${month.label}`
@@ -57,23 +62,23 @@ export default async function FacturacionPage() {
       href: "/facturacion/facturas",
     },
     {
-      label: "Provisión / CC",
+      label: b.stats.provision,
       value: clp(kpis.provisionClp),
       sub: provisionSub,
       icon: PiggyBank,
       href: "/facturacion/cuenta-corriente",
     },
     {
-      label: "Tarifas",
-      value: "Honorarios",
-      sub: "Condiciones por causa",
+      label: b.stats.rates,
+      value: b.stats.honorarios,
+      sub: b.stats.feeTerms,
       icon: FileSpreadsheet,
       href: "/facturacion/tarifas",
     },
     {
-      label: "UF",
-      value: "Valores",
-      sub: "Conversión honorarios",
+      label: b.stats.uf,
+      value: b.stats.ufValues,
+      sub: b.stats.ufHint,
       icon: CircleDollarSign,
       href: "/facturacion/uf",
     },
@@ -82,19 +87,19 @@ export default async function FacturacionPage() {
   return (
     <div className="space-y-6">
       <ModuleHeader
-        eyebrow="Contabilidad del estudio"
-        title="Facturación"
-        subtitle="Horas, gastos, boletas y facturas internas (no DTE SII), pagos y cuenta corriente. El mes de cobro es el calendario de Chile. Exporte CSV/XML a un facturador externo desde Facturas."
+        eyebrow={b.eyebrow}
+        title={b.title}
+        subtitle={b.subtitle}
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/facturacion/horas" className="btn btn-ghost">
-              + Horas
+              {b.addHours}
             </Link>
             <Link href="/api/billing/invoices/export?format=csv" className="btn btn-ghost">
-              Exportar CSV
+              {b.exportCsv}
             </Link>
             <Link href="/facturacion/facturas" className="btn btn-primary">
-              Facturas
+              {b.title}
             </Link>
           </div>
         }
@@ -116,7 +121,7 @@ export default async function FacturacionPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-            <h2 className="text-lg font-semibold">Facturas recientes</h2>
+            <h2 className="text-lg font-semibold">{b.recentInvoices}</h2>
             <Link href="/facturacion/facturas" className="text-sm text-[var(--sea)]">
               Ver todas
             </Link>
@@ -142,7 +147,7 @@ export default async function FacturacionPage() {
             ))}
             {recentInvoices.length === 0 && (
               <p className="text-sm text-[var(--ink-soft)]/65">
-                Sin facturas aún.{" "}
+                {b.emptyInvoices}{" "}
                 <Link href="/facturacion/facturas" className="text-[var(--sea)]">
                   Emitir documento
                 </Link>
@@ -153,7 +158,7 @@ export default async function FacturacionPage() {
 
         <section className="panel rounded-3xl p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-            <h2 className="text-lg font-semibold">Horas recientes</h2>
+            <h2 className="text-lg font-semibold">{b.recentTime}</h2>
             <Link href="/facturacion/horas" className="text-sm text-[var(--sea)]">
               Registrar
             </Link>
@@ -174,7 +179,7 @@ export default async function FacturacionPage() {
             ))}
             {recentTime.length === 0 && (
               <p className="text-sm text-[var(--ink-soft)]/65">
-                Sin horas registradas.{" "}
+                {b.emptyTime}{" "}
                 <Link href="/facturacion/horas" className="text-[var(--sea)]">
                   Cargar tiempo
                 </Link>

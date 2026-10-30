@@ -59,7 +59,9 @@ test("menú móvil accesible, foco restaurado y preferencia de movimiento", asyn
   await expect(page.getByRole("link", { name: "Saltar al contenido" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#main-content")).toBeFocused();
-  await expect(page.getByRole("searchbox", { name: "Buscar en LexOpen" })).toBeVisible();
+  await expect(
+    page.locator("#main-content").getByRole("searchbox", { name: "Buscar en LexOpen" })
+  ).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("search-desktop.png"), fullPage: true });
 });
 
@@ -69,7 +71,7 @@ test("búsqueda rechaza consultas excesivas y mantiene sincronizado el campo", a
   expect(response.status()).toBe(400);
   await page.goto("/buscar");
   await page.getByRole("button", { name: "Andes", exact: true }).click();
-  await expect(page.getByRole("searchbox")).toHaveValue("Andes");
+  await expect(page.locator("#unified-search")).toHaveValue("Andes");
   await expect(page.getByRole("status")).toHaveText("Resultados para «Andes»");
 });
 

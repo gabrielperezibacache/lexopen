@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { StatusBadge, UrgenciaBadge } from "@/components/ui";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { civilDateKey, civilMonthQueryRange, formatCivilDate } from "@/lib/chile-time";
 import { diasRestantes, labelDiasRestantes, labelTipoComputo } from "@/lib/plazos";
 import Link from "next/link";
@@ -7,7 +9,7 @@ import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
 import { PlazoForm } from "@/components/PlazoForm";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { requireStaff } from "@/lib/auth/session";
-import { PageHeader } from "@/components/sites/SiteNav";
+import { getI18n } from "@/lib/i18n/server";
 
 type Props = {
   searchParams: Promise<{
@@ -45,6 +47,8 @@ function shiftMonthParam(year: number, monthIndex: number, delta: number) {
 
 export default async function PlazosPage({ searchParams }: Props) {
   await requireStaff();
+  const { t, dict, locale } = await getI18n();
+  const h = dict.hubs.plazos;
   const sp = await searchParams;
   const { start, end, year, monthIndex } = monthView(sp.mes);
   const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
@@ -71,7 +75,7 @@ export default async function PlazosPage({ searchParams }: Props) {
   );
   const prev = shiftMonthParam(year, monthIndex, -1);
   const next = shiftMonthParam(year, monthIndex, 1);
-  const monthLabel = new Intl.DateTimeFormat("es-CL", {
+  const monthLabel = new Intl.DateTimeFormat(locale === "en" ? "en-US" : "es-CL", {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -80,12 +84,12 @@ export default async function PlazosPage({ searchParams }: Props) {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Gestión de términos"
-        title="Plazos"
-        subtitle="Plazos procesales, audiencias e internos. Envíelos a Google Calendar con un clic."
+        eyebrow={h.eyebrow}
+        title={h.title}
+        subtitle={h.subtitle}
         actions={
           <Link className="btn btn-secondary" href="/agente?utility=plazos">
-            Analizar con copiloto
+            {h.analyze}
           </Link>
         }
       />
@@ -107,38 +111,37 @@ export default async function PlazosPage({ searchParams }: Props) {
         <Link
           className="btn btn-ghost order-2 flex-1 sm:order-1 sm:flex-none"
           href={`/plazos?mes=${prev}`}
-          aria-label="Mes anterior"
+          aria-label={t("common.previousMonth")}
         >
           ← <span className="sm:hidden">Ant.</span>
-          <span className="hidden sm:inline">Mes anterior</span>
+          <span className="hidden sm:inline">{t("common.previousMonth")}</span>
         </Link>
         <h2 className="order-1 text-center text-lg font-semibold capitalize sm:order-2">
-          Calendario {monthLabel}
+          {h.calendarHeading.replace("{month}", monthLabel)}
         </h2>
         <Link
           className="btn btn-ghost order-3 flex-1 sm:flex-none"
           href={`/plazos?mes=${next}`}
-          aria-label="Mes siguiente"
+          aria-label={t("common.nextMonth")}
         >
           <span className="sm:hidden">Sig.</span>
-          <span className="hidden sm:inline">Mes siguiente</span> →
+          <span className="hidden sm:inline">{t("common.nextMonth")}</span> →
         </Link>
       </div>
 
       <div className="space-y-3">
         {plazos.length === 0 && (
-          <div className="panel rounded-3xl px-6 py-10 text-center text-sm text-[var(--ink-soft)]/70">
-            No hay plazos en este mes. Cree uno arriba o revise el{" "}
-            <Link href="/calendario" className="text-[var(--sea)]">
-              calendario
-            </Link>
-            .
-          </div>
+          <EmptyState
+            title={h.title}
+            description={h.empty}
+            actionLabel={h.openCalendar}
+            actionHref="/calendario"
+          />
         )}
         {plazos.map((p) => (
           <div
             key={p.id}
-            className="panel flex flex-wrap items-center justify-between gap-4 rounded-3xl px-5 py-4"
+            className="panel flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-xl)] px-5 py-4"
           >
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -147,9 +150,9 @@ export default async function PlazosPage({ searchParams }: Props) {
                 <UrgenciaBadge fecha={p.fechaLimite} estado={p.estado} />
                 <span className="badge badge-ink">{p.tipo}</span>
                 <span className="badge badge-ink">{labelTipoComputo(p.tipoComputo)}</span>
-                {p.esFatal && <span className="badge badge-vencido">fatal</span>}
+                {p.esFatal && <span className="badge badge-vencido">{h.fatal}</span>}
               </div>
-              <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+              <p className="mt-1 text-sm text-[var(--muted)]">
                 {formatCivilDate(p.fechaLimite)}
                 {p.estado === "pendiente"
                   ? ` · ${labelDiasRestantes(diasRestantes(p.fechaLimite))}`
@@ -160,12 +163,12 @@ export default async function PlazosPage({ searchParams }: Props) {
                     {p.causa.rit || p.causa.titulo}
                   </Link>
                 ) : (
-                  "Sin causa"
+                  h.noCause
                 )}{" "}
-                · {p.responsable?.name || "Sin responsable"}
+                · {p.responsable?.name || h.noOwner}
               </p>
               {p.descripcion && (
-                <p className="mt-2 text-sm text-[var(--ink-soft)]/80">{p.descripcion}</p>
+                <p className="mt-2 text-sm text-[var(--muted)]">{p.descripcion}</p>
               )}
             </div>
             <PlazoGoogleButton plazoId={p.id} />
