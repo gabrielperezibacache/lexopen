@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "crypto";
+import { timingSafeEqual, createHmac } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeGoogleCode } from "@/lib/integrations/google";
 import { requireStaff } from "@/lib/api";
@@ -9,13 +9,13 @@ const OAUTH_STATE_COOKIE = "google_oauth_state";
 const OAUTH_STATE_PATH = "/api/integrations/google/callback";
 
 function stateMatches(provided: string, expected: string) {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) {
-    timingSafeEqual(b, b);
+  try {
+    const a = createHmac("sha256", expected).update(provided).digest();
+    const b = createHmac("sha256", expected).update(expected).digest();
+    return timingSafeEqual(a, b);
+  } catch {
     return false;
   }
-  return timingSafeEqual(a, b);
 }
 
 function clearOauthState(res: NextResponse) {
