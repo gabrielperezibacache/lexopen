@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { parseLocalDateInput } from "@/lib/minutas";
+import { fetchSafeOutbound } from "@/lib/net/safe-url";
 
 type MindicadorSerie = {
   serie?: Array<{ fecha?: string; valor?: number }>;
@@ -11,8 +12,7 @@ type MindicadorSerie = {
  */
 export async function syncUfFromMindicador(opts?: { days?: number }) {
   const days = Math.min(Math.max(opts?.days ?? 30, 1), 90);
-  const res = await fetch("https://mindicador.cl/api/uf", {
-    redirect: "error",
+  const res = await fetchSafeOutbound("https://mindicador.cl/api/uf", {
     signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) {

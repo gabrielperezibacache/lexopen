@@ -25,6 +25,13 @@ const FORBIDDEN_ON = [
 
 const DEMO_OFF = ["HERMES_ALLOW_DEMO", "LLM_ALLOW_DEMO", "PJUD_ALLOW_DEMO"];
 
+/** Intentional Host demos require matching KEEP flag (aligned with production-env.ts). */
+const DEMO_KEEP = {
+  HERMES_ALLOW_DEMO: "LEXOPEN_KEEP_HERMES_DEMO",
+  LLM_ALLOW_DEMO: "LEXOPEN_KEEP_LLM_DEMO",
+  PJUD_ALLOW_DEMO: "LEXOPEN_KEEP_PJUD_DEMO",
+};
+
 export function readEnvFile(file) {
   if (!fs.existsSync(file)) return {};
   return Object.fromEntries(
@@ -84,9 +91,15 @@ export function evaluateHostEnv(env = {}) {
   }
 
   for (const key of DEMO_OFF) {
-    if (env[key] === "1") {
+    if (env[key] !== "1") continue;
+    const keep = DEMO_KEEP[key];
+    if (env[keep] === "1") {
       warnings.push(
-        `${key}=1 debilita controles; use 0 salvo LEXOPEN_KEEP_* intencional.`
+        `${key}=1 con ${keep}=1: demo intencional en producción; documente el riesgo.`
+      );
+    } else {
+      errors.push(
+        `${key}=1 está prohibido en producción sin ${keep}=1 (arranque fallará).`
       );
     }
   }

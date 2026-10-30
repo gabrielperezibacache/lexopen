@@ -471,6 +471,13 @@ export const en: Dictionary = {
     title: "Could not load this view",
     forbidden: "You do not have permission to view this section.",
     genericProd: "An unexpected error occurred. Try again or return home.",
+    notFoundTitle: "Page not found",
+    notFoundDescription:
+      "This route does not exist or is no longer available. Go home or use search.",
+    globalTitle: "Something went wrong",
+    globalDescription:
+      "An unexpected error occurred in LexOpen. Reload the page or go home.",
+    goHome: "Go home",
   },
   integrations: {
     loadingStatus: "Loading status…",

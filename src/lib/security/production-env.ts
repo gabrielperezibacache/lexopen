@@ -9,24 +9,47 @@ export const FORBIDDEN_PRODUCTION_FLAGS = [
   "LEXOPEN_DEMO_SWITCHER",
 ] as const;
 
-/** Soft-warn flags: demote integrations to demo; not a hard boot failure. */
-export const WARN_PRODUCTION_FLAGS = [
+/**
+ * Demo integration flags: hard-fail in production unless matching KEEP is set
+ * (intentional Host demos via LEXOPEN_KEEP_*_DEMO=1).
+ */
+export const DEMO_PRODUCTION_FLAGS = [
   "HERMES_ALLOW_DEMO",
   "LLM_ALLOW_DEMO",
   "PJUD_ALLOW_DEMO",
+] as const;
+
+const DEMO_KEEP_FLAGS: Record<(typeof DEMO_PRODUCTION_FLAGS)[number], string> = {
+  HERMES_ALLOW_DEMO: "LEXOPEN_KEEP_HERMES_DEMO",
+  LLM_ALLOW_DEMO: "LEXOPEN_KEEP_LLM_DEMO",
+  PJUD_ALLOW_DEMO: "LEXOPEN_KEEP_PJUD_DEMO",
+};
+
+/** Soft-warn flags: private URL allowances; not a hard boot failure. */
+export const WARN_PRODUCTION_FLAGS = [
   "HERMES_ALLOW_PRIVATE_URL",
   "LLM_ALLOW_PRIVATE_URL",
 ] as const;
 
-export function listedProductionFlags(
-  keys: readonly string[]
-): string[] {
+export function listedProductionFlags(keys: readonly string[]): string[] {
   if (process.env.NODE_ENV !== "production") return [];
   return keys.filter((key) => process.env[key] === "1");
 }
 
+export function forbiddenDemoProductionFlags(): string[] {
+  if (process.env.NODE_ENV !== "production") return [];
+  return DEMO_PRODUCTION_FLAGS.filter((key) => {
+    if (process.env[key] !== "1") return false;
+    const keep = DEMO_KEEP_FLAGS[key];
+    return process.env[keep] !== "1";
+  });
+}
+
 export function forbiddenProductionFlags(): string[] {
-  return listedProductionFlags(FORBIDDEN_PRODUCTION_FLAGS);
+  return [
+    ...listedProductionFlags(FORBIDDEN_PRODUCTION_FLAGS),
+    ...forbiddenDemoProductionFlags(),
+  ];
 }
 
 export function warnProductionFlags(): string[] {

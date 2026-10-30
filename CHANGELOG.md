@@ -7,6 +7,13 @@
 - Decisiones aprobadas (2026-09-30): Fase 1 = brief completo (Inicio + intent engine + Evento); portal/Redis/billing/PJUD/Desktop/i18n/tag según §5bis del plan.
 - Plan de corrección/mejora post-rebase: `docs/PLAN-CORRECCION-MEJORA.md` (2026-10-30).
 
+### Fase 3 (completa · endurecimiento producción)
+- Seguridad: demos `*_ALLOW_DEMO` hard-fail en prod salvo `LEXOPEN_KEEP_*_DEMO`; `prod:check` alineado; Redis rate-limit documentado + fallback archivo; UF sync vía `fetchSafeOutbound`; CSP/`x-request-id` en proxy.
+- Datos: migración índices lista/dashboard; `?limit=` en APIs causas/clientes/documentos/plazos/tareas/tribunales; retención/backup en WEB-HOST.
+- Observabilidad: `src/lib/log.ts` JSON + AsyncLocalStorage; health privileged (queues/LLM/PJUD/rate-limit); `global-error` + `not-found`.
+- Performance: Inicio con Suspense streaming; presupuesto LCP documentado en PLAN.
+- Calidad/CI: tests assistant/list-limit/log; `prisma migrate diff` drift en CI.
+
 ### Fase 2 (completa · deuda residual en PLAN)
 - Design system: tokens en `globals.css` (color, tipografía, spacing, radius, shadow, motion) + tema claro/oscuro persistido.
 - Librería `src/components/ui/` (Button, Input, Dialog, Sheet, Table, CommandPalette, LoadingState, ErrorState, ConfirmDialog, etc.) sin dependencias Radix; barrel `@/components/ui`.
