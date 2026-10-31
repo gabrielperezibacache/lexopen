@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 
 type Member = {
@@ -10,7 +10,7 @@ type Member = {
   user: { id: string; name: string; email: string; role: string };
 };
 
-type StaffOpt = { id: string; name: string; role: string };
+type StaffOpt = { id: string; name: string; role?: string };
 
 const ROL_LABEL: Record<string, string> = {
   responsable: "Responsable",
@@ -24,15 +24,18 @@ const ROL_LABEL: Record<string, string> = {
 export function CausaEquipoPanel({
   causaId,
   initialAcceso,
+  initialMiembros,
+  staffOptions,
   canManage,
 }: {
   causaId: string;
   initialAcceso: string;
+  initialMiembros: Member[];
+  staffOptions: StaffOpt[];
   canManage: boolean;
 }) {
   const [acceso, setAcceso] = useState(initialAcceso || "estudio");
-  const [miembros, setMiembros] = useState<Member[]>([]);
-  const [staff, setStaff] = useState<StaffOpt[]>([]);
+  const [miembros, setMiembros] = useState(initialMiembros);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -44,24 +47,6 @@ export function CausaEquipoPanel({
     setMiembros(data.miembros || []);
     if (data.causa?.acceso) setAcceso(data.causa.acceso);
   }
-
-  useEffect(() => {
-    void reload();
-    void (async () => {
-      const res = await fetch("/api/people?limit=200");
-      if (!res.ok) return;
-      const data = await res.json();
-      setStaff(
-        (data.users || [])
-          .filter((u: { role: string }) => u.role !== "cliente")
-          .map((u: { id: string; name: string; role: string }) => ({
-            id: u.id,
-            name: u.name,
-            role: u.role,
-          }))
-      );
-    })();
-  }, [causaId]);
 
   async function setAccesoMode(next: "estudio" | "equipo") {
     setBusy(true);
@@ -201,7 +186,7 @@ export function CausaEquipoPanel({
             </span>
             <select className="select" name="userId" required>
               <option value="">Elegir…</option>
-              {staff.map((u) => (
+              {staffOptions.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>

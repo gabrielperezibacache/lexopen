@@ -110,11 +110,20 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           take: 30,
         },
         site: { select: { id: true, name: true, tipo: true, isClientVisible: true } },
+        miembros: {
+          include: { user: { select: publicUserSelect } },
+          orderBy: [{ rol: "asc" }, { createdAt: "asc" }],
+        },
       },
     }),
     prisma.user.findMany({
-      where: { role: { in: [...STAFF_ROLES] } },
-      select: { id: true, name: true },
+      where: {
+        OR: [
+          { role: { in: [...STAFF_ROLES] } },
+          { role: "externo" },
+        ],
+      },
+      select: { id: true, name: true, role: true },
       orderBy: { name: "asc" },
     }),
     prisma.minutaAccion.count({
@@ -425,6 +434,18 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       <CausaEquipoPanel
         causaId={causa.id}
         initialAcceso={causa.acceso}
+        initialMiembros={causa.miembros.map((m) => ({
+          id: m.id,
+          userId: m.userId,
+          rol: m.rol,
+          user: {
+            id: m.user.id,
+            name: m.user.name,
+            email: m.user.email,
+            role: m.user.role,
+          },
+        }))}
+        staffOptions={responsables}
         canManage={can(user, "causa.team.manage", {
           causaRol: access.causaRol,
         })}
