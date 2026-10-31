@@ -38,7 +38,7 @@ export function isHitoReady(opts: {
   tz?: string;
 }): boolean {
   const tz = opts.tz || DEFAULT_TZ;
-  const targetYmd = hitoDueYmd(opts.fechaLimite, opts.hito, tz);
+  const targetYmd = hitoDueYmd(opts.fechaLimite, opts.hito);
   const slot = zonedTime(targetYmd, "09:00", tz);
   return opts.now.getTime() >= slot.getTime();
 }
