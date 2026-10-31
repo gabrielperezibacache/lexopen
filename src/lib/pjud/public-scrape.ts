@@ -441,14 +441,15 @@ async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: string) {
       return;
     }
     // Fallback: label exact / contains via Playwright
-    await trib.selectOption({ label: tribunal }).catch(() => undefined);
-    // Último recurso: opción "Todos" / vacía amplia si existe
-    const todos = options.find((o) =>
-      /todos|todas|sin especificar|cualquiera/i.test(o.label)
+    const byLabel = await trib
+      .selectOption({ label: tribunal })
+      .then(() => true)
+      .catch(() => false);
+    if (byLabel) return;
+    // No usar "Todos": puede abrir otra causa y persistir movimientos ajenos.
+    throw new Error(
+      `No se encontró el tribunal «${tribunal}» en la Oficina Judicial Virtual. Revise el nombre o sincronice con ClaveÚnica.`
     );
-    if (todos) {
-      await trib.selectOption(todos.value).catch(() => undefined);
-    }
   }
 }
 
@@ -567,18 +568,17 @@ async function openFirstCauseModal(page: PlaywrightPage, rit?: string | null) {
         return true;
       }
     }
-    // Fallback: first detail link in results table
-    for (const tr of rows) {
-      if (tr.querySelector("nav") || tr.querySelector(".pagination")) continue;
-      const link = tr.querySelector<HTMLElement>("td a[onclick], td a");
-      if (link) {
-        link.click();
-        return true;
-      }
-    }
+    // Sin match de RIT: no abrir la primera fila (riesgo de causa equivocada).
     return false;
   }, rit || null);
-  if (!opened) return false;
+  if (!opened) {
+    if (rit?.trim()) {
+      throw new Error(
+        `No se encontró la causa «${rit}» en los resultados de la Oficina Judicial Virtual. No se abrirá otra fila para evitar mezclar expedientes.`
+      );
+    }
+    return false;
+  }
 
   await page
     .waitForFunction(() => {

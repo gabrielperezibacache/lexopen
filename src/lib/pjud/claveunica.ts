@@ -542,7 +542,7 @@ export async function syncMisCausas(opts?: {
     // Enqueue durable jobs instead of N serial scrapes (avoids proxy timeouts).
     const jobs = await enqueueDueSyncJobs({
       causaIds: causaIdsForSync,
-      trigger: "cron",
+      trigger: "manual",
       limit: Math.min(causaIdsForSync.length, 100),
     });
     enqueued = jobs.length;
