@@ -23,10 +23,11 @@ export function dueSyncWhere(opts?: {
 }) {
   const now = opts?.now || new Date();
   if (opts?.causaIds !== undefined) {
+    // Selección explícita (Mis Causas / UI): incluir terminadas para el sync
+    // inicial de movimientos; el cron automático sigue limitado a activas.
     return {
       id: { in: opts.causaIds },
       pjudMonitoreoActivo: true,
-      estado: "activa" as const,
     };
   }
   return {
@@ -218,6 +219,7 @@ export async function requeueFailedJobs(opts?: {
 
   const busy = await causaIdsWithActiveJobs(failed.map((j) => j.causaId));
   const toCreate = [];
+  const dismissIds: string[] = [];
   for (const job of failed) {
     if (busy.has(job.causaId)) continue;
     toCreate.push({
@@ -226,10 +228,21 @@ export async function requeueFailedJobs(opts?: {
       trigger: "retry",
       attempts: 0,
     });
+    dismissIds.push(job.id);
     busy.add(job.causaId);
   }
 
   if (toCreate.length === 0) return [];
+  // Descartar el failed histórico para que la lista de fallidos no quede zombie
+  // tras un reintento (el nuevo job pending/ok es la fuente de verdad).
+  await prisma.pjudSyncJob.updateMany({
+    where: { id: { in: dismissIds }, status: "failed" },
+    data: {
+      status: "dismissed",
+      note: "Reencolado: fallido anterior descartado",
+      finishedAt: new Date(),
+    },
+  });
   return await prisma.pjudSyncJob.createManyAndReturn({
     data: toCreate,
   });

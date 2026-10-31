@@ -16,6 +16,8 @@ assert.deepEqual(due.OR?.[1], { pjudNextSyncAt: { lte: now } });
 
 const explicit = dueSyncWhere({ causaIds: ["a", "b"], now });
 assert.deepEqual(explicit.id, { in: ["a", "b"] });
+assert.equal(explicit.pjudMonitoreoActivo, true);
+assert.equal("estado" in explicit, false); // selección explícita incluye terminadas
 assert.equal("OR" in explicit, false);
 assert.deepEqual(dueSyncWhere({ causaIds: [] }).id, { in: [] });
 
