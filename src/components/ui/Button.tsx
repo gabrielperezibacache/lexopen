@@ -1,5 +1,6 @@
 import { cn } from "@/lib/chile";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -24,11 +25,12 @@ export function Button({
   return (
     <button
       type={props.type || "button"}
-      className={cn("btn", variantClass[variant], className)}
+      className={cn("btn", variantClass[variant], "inline-flex items-center justify-center", className)}
       disabled={props.disabled || loading}
       aria-busy={loading || undefined}
       {...props}
     >
+      {loading && <Loader2 size={16} className="animate-spin -ml-1 mr-2 inline-block shrink-0" aria-hidden="true" />}
       {children}
     </button>
   );
