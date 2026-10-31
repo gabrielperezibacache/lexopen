@@ -8,6 +8,8 @@ import {
 } from "@/lib/api";
 import { tramiteCreateSchema } from "@/lib/schemas";
 import { writeAuditStrict } from "@/lib/audit";
+import { assertCausaAccess } from "@/lib/auth/causa-access";
+import { syncTaskFromTramite } from "@/lib/tasks/sync-mirrors";
 import {
   fechaLimiteFromDias,
   findTemplate,
@@ -18,8 +20,9 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const { id } = await params;
+    await assertCausaAccess(id, user);
     const causa = await prisma.causa.findUnique({
       where: { id },
       select: { id: true, materia: true },
@@ -48,6 +51,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
+    await assertCausaAccess(id, user);
     const causa = await prisma.causa.findUnique({
       where: { id },
       select: {
@@ -115,6 +119,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         entityId: id,
         after: { templateId, count: created.length },
       });
+      for (const row of created) {
+        await syncTaskFromTramite(row.id);
+      }
       return NextResponse.json({ rows: created.length, tramites: created }, { status: 201 });
     }
 
@@ -167,6 +174,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       entityId: tramite.id,
       after: tramite,
     });
+
+    await syncTaskFromTramite(tramite.id);
 
     return NextResponse.json(tramite, { status: 201 });
   } catch (e) {
