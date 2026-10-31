@@ -242,10 +242,11 @@ export async function syncCausaPjud(
     }
 
     const status = fetchResult.demo ? "demo" : "ok";
+    // No reactivar monitoreo si el estudio lo pausó mientras el job estaba en cola
+    // (force=true en worker no debe encender pjudMonitoreoActivo de nuevo).
     await tx.causa.update({
       where: { id: causaId },
       data: {
-        pjudMonitoreoActivo: true,
         pjudLastSyncAt: new Date(),
         pjudNextSyncAt: next,
         pjudLastSyncStatus: status,
@@ -412,7 +413,8 @@ export async function clearCausaPjudSyncMessages(causaId: string) {
       pjudFailCount: 0,
       ...(failedStatus
         ? {
-            pjudLastSyncStatus: causa.pjudMonitoreoActivo ? "ok" : "disabled",
+            // "cleared" = avisos descartados sin sync exitoso reciente (no pintar "ok").
+            pjudLastSyncStatus: causa.pjudMonitoreoActivo ? "cleared" : "disabled",
           }
         : {}),
     },
@@ -450,7 +452,7 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
     take: limit,
   });
 
-  const idsToOk = [];
+  const idsToCleared = [];
   const idsToDisabled = [];
   const idsToClearOnly = [];
 
@@ -461,7 +463,7 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
 
     if (failedStatus) {
       if (causa.pjudMonitoreoActivo) {
-        idsToOk.push(causa.id);
+        idsToCleared.push(causa.id);
       } else {
         idsToDisabled.push(causa.id);
       }
@@ -472,14 +474,14 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
 
   const transactions = [];
 
-  if (idsToOk.length > 0) {
+  if (idsToCleared.length > 0) {
     transactions.push(
       prisma.causa.updateMany({
-        where: { id: { in: idsToOk } },
+        where: { id: { in: idsToCleared } },
         data: {
           pjudLastSyncNote: null,
           pjudFailCount: 0,
-          pjudLastSyncStatus: "ok",
+          pjudLastSyncStatus: "cleared",
         },
       })
     );
@@ -662,10 +664,10 @@ export async function retryFallidos(opts?: {
 export function providerStatusPublic() {
   const captcha = captchaSolverStatusPublic();
   const cuFlag = process.env.PJUD_CLAVEUNICA_SCRAPE?.trim();
-  // Sync helper cannot see UI opt-in; async version overlays FirmSettings.
-  // Kill-switch (0) is always OFF; flag=1 is ON; absent is "opt-in pending".
-  const claveUnicaScrapeEnabled =
-    cuFlag === "0" ? false : cuFlag === "1" ? true : false;
+  // Sync helper cannot ver opt-in UI; async overlays FirmSettings.
+  // Kill-switch (0) = OFF; flag=1 = ON; ausente = desconocido (null) hasta async.
+  const claveUnicaScrapeEnabled: boolean | null =
+    cuFlag === "0" ? false : cuFlag === "1" ? true : null;
   return {
     apiConfigured: pjudProviderConfigured(),
     scraperSidecarConfigured: scraperSidecarConfigured(),

@@ -88,12 +88,14 @@ corriendo: el sync cae a scrape in-process.
 ## Orden de ingest al sincronizar
 
 1. `PJUD_SCRAPER_URL` (sidecar en su host / red privada)
-2. Scrape in-process (`PJUD_PUBLIC_SCRAPE=1` + CAPTCHA solver + Playwright/Chromium)
-3. `PJUD_API_URL` (partner API externa — permitida)
-4. Demo (`PJUD_ALLOW_DEMO`)
-5. CSV / webhook
+2. **Detalle autenticado Mis Causas / ClaveÚnica** (si hay opt-in y sesión OJV)
+3. Scrape invitado in-process (`PJUD_PUBLIC_SCRAPE=1` + CAPTCHA + Playwright/Chromium)
+4. `PJUD_API_URL` (partner API externa — permitida)
+5. Demo (`PJUD_ALLOW_DEMO`)
+6. CSV / webhook
 
 Sin ingest live en producción el sync es **fail-closed** (no inventa datos).
+El scrape invitado **falla** si el tribunal o el RIT no coinciden (no abre otra causa).
 
 ## Kill switches (obligatorios para scrape)
 

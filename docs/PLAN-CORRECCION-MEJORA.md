@@ -4,11 +4,12 @@
 | --- | --- |
 | Fecha | 2026-10-30 |
 | Repo | `gabrielperezibacache/lexopen` |
-| Versión en árbol | `1.0.0` (Fase 4 en PR; tag tras merge+CI) |
+| Versión en árbol | **`1.0.0`** tag `v1.0.0` (merge #199 `24e9e49`) |
 | Base auditada | `main` post-#151/#154 |
 | Stack 1.0 | [#151](https://github.com/gabrielperezibacache/lexopen/pull/151) **MERGED** `be287bd` → [#154](https://github.com/gabrielperezibacache/lexopen/pull/154) **MERGED** `a572304` |
 | Decisiones Gabriel | 2026-10-30: sí a todo (orden merge, ready, Fase 4, #195 después, Panel sin redirect) |
 | Plan origen | [`PLAN-1.0.md`](./PLAN-1.0.md) |
+| QA OJV | [`QA-FUNCIONAL-OJV.md`](./QA-FUNCIONAL-OJV.md) |
 
 ---
 
