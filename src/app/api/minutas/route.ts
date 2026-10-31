@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { emitNotification } from "@/lib/notify/emit";
 import {
   assertCsrf,
   handleRouteError,
@@ -302,14 +303,18 @@ export async function POST(req: NextRequest) {
     take: 20,
   });
   if (peers.length > 0) {
-    await prisma.notification.createMany({
-      data: peers.map((p) => ({
+    for (const p of peers) {
+      await emitNotification({
+        tipo: "minuta.nueva",
+        userId: p.id,
         title: `Nueva minuta · ${causa.rit || causa.titulo}`,
         body: `${labelTipoMinuta(tipo)}: ${body.titulo.trim()}. Revise próximos pasos para continuar la tramitación.`,
         href: `/causas/${causa.id}/minutas/${minuta.id}`,
-        userId: p.id,
-      })),
-    });
+        entityType: "minuta",
+        entityId: minuta.id,
+        dedupeKey: `minuta:${minuta.id}:${p.id}`,
+      });
+    }
   }
 
   let driveResult: Record<string, unknown> | null = null;

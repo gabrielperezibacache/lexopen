@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Nuevo
+- **Notificaciones 1.1**: outbox Postgres (`MensajeSaliente`), cola `Job`, preferencias/quiet hours, canales SMTP + Gmail + Telegram (long-poll) + Web Push; WhatsApp solo interfaz (`docs/NOTIFICACIONES.md`).
+- Hitos de plazo fatal (T-7…T-0) con acuse e escalamiento sin ack; UI `/cuenta/notificaciones` y panel admin.
+- PWA básica: `manifest.ts`, service worker y suscripción push (VAPID).
+
 ## 1.0.0 — 2026-10-30
 
 Primera versión estable del Host local LexOpen para práctica chilena.

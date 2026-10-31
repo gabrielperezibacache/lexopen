@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { emitNotification } from "@/lib/notify/emit";
 import {
   assertCsrf,
   handleRouteError,
@@ -75,13 +76,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       const href = existing.causa.clienteId
         ? `/clientes/${existing.causa.clienteId}`
         : `/causas/${existing.causaId}#tramites`;
-      await prisma.notification.create({
-        data: {
-          userId: newResponsableId,
-          title: `Trámite asignado · ${existing.causa.rit || existing.causa.titulo}`,
-          body: tramite.titulo,
-          href,
-        },
+      await emitNotification({
+        tipo: "tramite.asignado",
+        userId: newResponsableId,
+        title: `Trámite asignado · ${existing.causa.rit || existing.causa.titulo}`,
+        body: tramite.titulo,
+        href,
+        entityType: "tramite",
+        entityId: tramite.id,
       });
     }
 

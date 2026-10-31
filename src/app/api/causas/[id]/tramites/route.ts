@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { emitNotification } from "@/lib/notify/emit";
 import {
   assertCsrf,
   handleRouteError,
@@ -142,13 +143,14 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
 
     if (responsableId && responsableId !== user.id) {
-      await prisma.notification.create({
-        data: {
-          userId: responsableId,
-          title: `Trámite asignado · ${causa.rit || causa.titulo}`,
-          body: tramite.titulo,
-          href: tramiteHref,
-        },
+      await emitNotification({
+        tipo: "tramite.asignado",
+        userId: responsableId,
+        title: `Trámite asignado · ${causa.rit || causa.titulo}`,
+        body: tramite.titulo,
+        href: tramiteHref,
+        entityType: "tramite",
+        entityId: tramite.id,
       });
     }
 

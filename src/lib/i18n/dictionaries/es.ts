@@ -867,7 +867,7 @@ export const es = {
     cuenta: {
       eyebrow: "Seguridad personal",
       title: "Mi cuenta",
-      subtitle: "Contraseña, 2FA e idioma.",
+      subtitle: "Contraseña, 2FA, notificaciones e idioma.",
     },
     jurisprudencia: {
       eyebrow: "Base doctrinal",

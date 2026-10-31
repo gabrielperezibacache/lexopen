@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import Script from "next/script";
 import { Fraunces, Sora } from "next/font/google";
 import { CsrfFetchPatch } from "@/components/CsrfFetchPatch";
+import { PwaRegister } from "@/components/PwaRegister";
 import { I18nProvider } from "@/components/i18n/I18nProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -53,6 +54,7 @@ export default async function RootLayout({
           {themeBootScript}
         </Script>
         <CsrfFetchPatch />
+        <PwaRegister />
         <ThemeProvider>
           <I18nProvider locale={locale}>
             <ToastProvider>{children}</ToastProvider>
