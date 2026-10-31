@@ -6,6 +6,7 @@ import {
 } from "@/lib/pjud/classify";
 import { getGoogleConfig } from "@/lib/integrations/google";
 import { sendGmailMessage } from "@/lib/integrations/gmail";
+import { emitNotification } from "@/lib/notify/emit";
 
 export type DigestItem = {
   causaId: string;
@@ -327,16 +328,16 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
           emailFailed.push(bucket.email);
         }
       }
-      await prisma.notification.create({
-        data: {
-          title: subject,
-          body: bucket.items
-            .slice(0, 3)
-            .map((i) => i.rit || i.titulo)
-            .join(" · "),
-          href: "/causas/monitoreo",
-          userId,
-        },
+      await emitNotification({
+        tipo: "pjud.digest",
+        userId,
+        title: subject,
+        body: bucket.items
+          .slice(0, 3)
+          .map((i) => i.rit || i.titulo)
+          .join(" · "),
+        href: "/causas/monitoreo",
+        dedupeKey: `pjud.digest:${userId}:${new Date().toISOString().slice(0, 10)}`,
       });
       notified.push(userId);
     }

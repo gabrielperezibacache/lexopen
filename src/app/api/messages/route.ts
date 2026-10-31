@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { emitNotification } from "@/lib/notify/emit";
 import { assertCsrf, handleRouteError, requireUser } from "@/lib/api";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
@@ -117,13 +118,14 @@ export async function POST(req: NextRequest) {
         receiverId: body.receiverId,
       },
     });
-    await prisma.notification.create({
-      data: {
-        userId: body.receiverId,
-        title: "Nuevo mensaje",
-        body: body.subject || body.body.slice(0, 80),
-        href: "/mensajes",
-      },
+    await emitNotification({
+      tipo: "mensaje.interno",
+      userId: body.receiverId,
+      title: "Nuevo mensaje",
+      body: body.subject || body.body.slice(0, 80),
+      href: "/mensajes",
+      entityType: "message",
+      entityId: msg.id,
     });
     return NextResponse.json(msg, { status: 201 });
   } catch (e) {

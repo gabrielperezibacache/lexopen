@@ -9,6 +9,9 @@ export const CRON_API_PATHS = [
   "/api/pjud/mis-causas",
   "/api/pjud/digest",
   "/api/plazos/alertas",
+  "/api/notify/worker",
+  "/api/notify/digest",
+  "/api/notify/escalamiento",
   "/api/uf/sync",
   "/api/mail/sync",
 ] as const;

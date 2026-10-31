@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { emitNotification } from "@/lib/notify/emit";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { triggerSiteWorkflows } from "@/lib/sites/workflow-triggers";
@@ -52,13 +53,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
     });
     if (body.assigneeId) {
-      await prisma.notification.create({
-        data: {
-          userId: body.assigneeId,
-          title: "Nueva tarea asignada",
-          body: task.title,
-          href: `/sites/${id}/tareas`,
-        },
+      await emitNotification({
+        tipo: "tarea.asignada",
+        userId: body.assigneeId,
+        title: "Nueva tarea asignada",
+        body: task.title,
+        href: `/sites/${id}/tareas`,
+        entityType: "task",
+        entityId: task.id,
       });
     }
     await prisma.activity.create({
