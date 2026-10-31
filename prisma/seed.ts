@@ -24,6 +24,8 @@ async function main() {
           emisorRut: "76.123.456-0",
           emisorGiro: "Servicios jurídicos",
           emisorDireccion: "Av. Apoquindo 3000, Las Condes",
+          // Demo/e2e: no forzar enrolamiento 2FA (producción sigue default true).
+          require2faPrivileged: false,
         },
       },
     },

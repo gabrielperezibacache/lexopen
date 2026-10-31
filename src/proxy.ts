@@ -73,6 +73,8 @@ const TWO_FACTOR_POLICY_TTL_MS = 30_000;
 
 /** `FirmSettings.require2faPrivileged` (default true). Fail-closed ante error. */
 async function lookupTwoFactorPolicy() {
+  // Suite Playwright: no bloquear en /cuenta?requiere2fa=1 (seed sin TOTP).
+  if (process.env.LEXOPEN_E2E === "1") return false;
   const now = Date.now();
   if (twoFactorPolicyCache && now - twoFactorPolicyCache.at < TWO_FACTOR_POLICY_TTL_MS) {
     return twoFactorPolicyCache.value;
