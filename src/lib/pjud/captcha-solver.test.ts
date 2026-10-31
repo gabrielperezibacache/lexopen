@@ -92,10 +92,13 @@ async function solvechaMockTests() {
       });
     }) as typeof fetch;
     assert.equal(await solveImageCaptcha("data:image/png;base64,AAAA"), "AB12");
-    assert.equal(calls[0].url, "https://api.solvecha.com/createTask");
-    assert.equal(calls[0].body.clientKey, "dummy-key");
-    assert.equal(calls[0].body.task.type, "ImageToTextTask");
-    assert.equal(calls[0].body.task.body, "AAAA");
+    const first = calls[0];
+    assert.ok(first);
+    assert.equal(first.url, "https://api.solvecha.com/createTask");
+    assert.equal(first.body.clientKey, "dummy-key");
+    assert.ok(first.body.task);
+    assert.equal(first.body.task.type, "ImageToTextTask");
+    assert.equal(first.body.task.body, "AAAA");
 
     // error 4xx con cuerpo JSON: se conserva el mensaje de la API
     globalThis.fetch = (async () =>
