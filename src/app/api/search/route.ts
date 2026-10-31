@@ -8,6 +8,7 @@ import {
 } from "@/lib/api";
 import { clientSiteWhere, confidentialFileWhere } from "@/lib/auth/access";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
+import { causaAccessWhere } from "@/lib/auth/causa-access";
 import { ftsCausaIds, ftsDocumentoIds, ftsWikiIds } from "@/lib/search";
 import {
   documentoListSelect,
@@ -63,9 +64,9 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const confFilter = confidentialFileWhere(user.role);
-    const docFilter = confidentialWhere(user.role);
-    const minutaFilter = minutaConfidentialWhere(user.role);
+    const confFilter = confidentialFileWhere(user);
+    const docFilter = confidentialWhere(user);
+    const minutaFilter = minutaConfidentialWhere(user);
 
     if (isCliente(user.role)) {
       const [sites, files, tasks] = await Promise.all([
@@ -186,16 +187,21 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.causa.findMany({
-          where: ftsIds?.length
-            ? { id: { in: ftsIds } }
-            : {
-                OR: [
-                  { titulo: textMatch(q) },
-                  { rit: textMatch(q) },
-                  { caratula: textMatch(q) },
-                  { tribunal: textMatch(q) },
-                ],
-              },
+          where: {
+            AND: [
+              causaAccessWhere(user),
+              ftsIds?.length
+                ? { id: { in: ftsIds } }
+                : {
+                    OR: [
+                      { titulo: textMatch(q) },
+                      { rit: textMatch(q) },
+                      { caratula: textMatch(q) },
+                      { tribunal: textMatch(q) },
+                    ],
+                  },
+            ],
+          },
           select: causaSearchSelect,
           take: 10,
         }),

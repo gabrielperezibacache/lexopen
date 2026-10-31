@@ -14,12 +14,14 @@ import { writeAuditStrict } from "@/lib/audit";
 import { parseLocalDateInput } from "@/lib/minutas";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { canSeeConfidential, isStaff } from "@/lib/auth/rbac";
+import { causaAccessWhere, ensureResponsableMiembro } from "@/lib/auth/causa-access";
+import { canSome } from "@/lib/auth/permissions";
 import { duplicateCausaWhere } from "@/lib/pjud/causa-origin";
 import { parseListLimit } from "@/lib/api/list-limit";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.trim();
     const materia = searchParams.get("materia");
@@ -32,6 +34,7 @@ export async function GET(req: NextRequest) {
     const causas = await prisma.causa.findMany({
       where: {
         AND: [
+          causaAccessWhere(user),
           q
             ? {
                 OR: [
@@ -72,9 +75,12 @@ export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
     const user = await requireStaff();
+    if (!canSome(user, "causa.create")) {
+      return jsonError("Prohibido: su rol no puede crear causas", 403);
+    }
     const body = await parseBody(req, causaCreateSchema);
 
-    if (body.conflictOverride && !canSeeConfidential(user.role)) {
+    if (body.conflictOverride && !canSeeConfidential(user)) {
       return jsonError("Solo abogados o admin pueden omitir un conflicto bloqueante", 403);
     }
 
@@ -197,6 +203,8 @@ export async function POST(req: NextRequest) {
         userId: user.id,
       },
     });
+    await ensureResponsableMiembro(causa.id, abogadoId, user.id);
+
     await writeAuditStrict({
       actorId: user.id,
       action: body.conflictOverride && blocked.length
