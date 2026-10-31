@@ -95,6 +95,10 @@ model User {
   mailboxAccount  MailboxAccount?
   mailboxMessages MailboxMessage[]
   eventosResponsable Evento[]      @relation("EventoResponsable")
+  // Notificaciones 1.1 (lib/notify)
+  canalesNotificacion      CanalUsuario[]
+  preferenciasNotificacion PreferenciaNotificacion[]
+  perfilNotificacion       PerfilNotificacion?
 }
 
 model AuditEvent {
@@ -601,6 +605,7 @@ model Plazo {
   responsableId String?
   responsable   User?  @relation(fields: [responsableId], references: [id])
   minutaAcciones MinutaAccion[]
+  alertas        PlazoAlerta[]
 
   @@index([fechaLimite])
   @@index([estado])
@@ -804,9 +809,20 @@ model Notification {
   createdAt DateTime @default(now())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Catálogo lib/notify/catalog.ts (plazo.fatal, tarea.asignada, …)
+  tipo       String    @default("general")
+  /// critica | alta | media | baja
+  severidad  String    @default("media")
+  entityType String?
+  entityId   String?
+  dedupeKey  String?   @unique
+  ackAt      DateTime?
+  /// inapp | telegram | push | email
+  ackVia     String?
 
   @@index([userId, createdAt])
   @@index([userId, read])
+  @@index([entityType, entityId])
 }
 
 model Workflow {
@@ -1127,4 +1143,141 @@ model Evento {
   @@index([causaId])
   @@index([responsableId])
   @@index([responsableId, inicio])
+}
+
+// ─── Notificaciones 1.1: canales, preferencias, outbox y cola (lib/notify, lib/jobs) ───
+
+/// Canal externo vinculado por un usuario (Telegram, Web Push; WhatsApp en 1.2).
+model CanalUsuario {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// telegram | push | whatsapp
+  canal          String
+  /// chat_id / PushSubscription JSON cifrado (AES-GCM, lib/notify/secrets)
+  destinoEnc     String    @default("")
+  /// HMAC del destino para dedupe sin descifrar; "pendiente:<rand>" antes de vincular
+  destinoHash    String
+  /// pendiente | activo | bloqueado | revocado | error
+  estado         String    @default("pendiente")
+  /// minimo | estandar | detallado
+  nivelDetalle   String    @default("minimo")
+  etiqueta       String?
+  /// SHA-256 del código de vinculación de un uso (Telegram /start)
+  codigoHash     String?
+  codigoExpiraAt DateTime?
+  verificadoAt   DateTime?
+  ultimoUsoAt    DateTime?
+  ultimoErrorAt  DateTime?
+  ultimoError    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([canal, destinoHash])
+  @@index([userId, canal])
+  @@index([codigoHash])
+}
+
+/// Modo por (tipo, canal); tipo "*" aplica a todo el catálogo.
+model PreferenciaNotificacion {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tipo   String
+  /// inapp | email | telegram | push
+  canal  String
+  /// realtime | digest_diario | digest_semanal | off
+  modo   String @default("realtime")
+
+  @@unique([userId, tipo, canal])
+}
+
+/// Horas de silencio y nivel de detalle del email por usuario.
+model PerfilNotificacion {
+  userId           String    @id
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quietDesde       String    @default("21:00")
+  quietHasta       String    @default("08:00")
+  quietFinesSemana Boolean   @default(true)
+  zonaHoraria      String    @default("America/Santiago")
+  nivelEmail       String    @default("estandar")
+  silenciadoHasta  DateTime?
+  updatedAt        DateTime  @updatedAt
+}
+
+/// Outbox: una fila por destinatario y canal; el payload ya va minimizado.
+model MensajeSaliente {
+  id                 String          @id @default(cuid())
+  notificationId     String?
+  userId             String
+  /// email | telegram | push
+  canal              String
+  canalUsuarioId     String?
+  plantilla          String
+  payloadJson        String          @default("{}")
+  nivelDetalle       String          @default("minimo")
+  dedupeKey          String          @unique
+  /// 0 crítico … 9 digest
+  prioridad          Int             @default(5)
+  /// encolado | digest | enviando | enviado | fallido | muerto | suprimido
+  estado             String          @default("encolado")
+  intentos           Int             @default(0)
+  proximoIntentoAt   DateTime        @default(now())
+  lockedAt           DateTime?
+  proveedor          String?
+  proveedorMessageId String?
+  error              String?
+  createdAt          DateTime        @default(now())
+  enviadoAt          DateTime?
+  eventos            EventoEntrega[]
+
+  @@index([estado, proximoIntentoAt, prioridad])
+  @@index([userId, createdAt])
+  @@index([notificationId])
+}
+
+model EventoEntrega {
+  id        String          @id @default(cuid())
+  mensajeId String
+  mensaje   MensajeSaliente @relation(fields: [mensajeId], references: [id], onDelete: Cascade)
+  estado    String
+  detalle   String?
+  at        DateTime        @default(now())
+
+  @@index([mensajeId, at])
+}
+
+/// Cola genérica Postgres (SELECT … FOR UPDATE SKIP LOCKED).
+model Job {
+  id          String    @id @default(cuid())
+  tipo        String
+  payloadJson String    @default("{}")
+  /// pendiente | corriendo | ok | fallido | muerto
+  estado      String    @default("pendiente")
+  runAt       DateTime  @default(now())
+  intentos    Int       @default(0)
+  maxIntentos Int       @default(5)
+  lockedAt    DateTime?
+  lockedBy    String?
+  dedupeKey   String?   @unique
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  finishedAt  DateTime?
+
+  @@index([estado, runAt])
+}
+
+/// Hitos de alerta por plazo (T-7, T-3, T-1, T-0, escalamiento) con acuse.
+model PlazoAlerta {
+  id         String    @id @default(cuid())
+  plazoId    String
+  plazo      Plazo     @relation(fields: [plazoId], references: [id], onDelete: Cascade)
+  hito       String
+  generadaAt DateTime  @default(now())
+  ackAt      DateTime?
+  ackById    String?
+  ackVia     String?
+
+  @@unique([plazoId, hito])
+  @@index([hito, ackAt])
 }
