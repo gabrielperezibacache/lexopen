@@ -14,6 +14,11 @@ type Notif = {
   read: boolean;
   href: string | null;
   createdAt: string | Date;
+  tipo?: string | null;
+  severidad?: string | null;
+  ackAt?: string | Date | null;
+  entityType?: string | null;
+  entityId?: string | null;
 };
 
 export function NotificationsPanel({ initial }: { initial: Notif[] }) {
@@ -49,6 +54,32 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
       });
       if (!result.ok) return;
       setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+      router.refresh();
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
+  async function ackOne(n: Notif) {
+    setLoadingAction(`ack-${n.id}`);
+    try {
+      const result = await apiMutation("/api/notify/ack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notificationId: n.id,
+          plazoId: n.entityType === "plazo" ? n.entityId : undefined,
+          via: "inapp",
+        }),
+      });
+      if (!result.ok) return;
+      setItems((prev) =>
+        prev.map((x) =>
+          x.id === n.id
+            ? { ...x, ackAt: new Date().toISOString(), read: true }
+            : x
+        )
+      );
       router.refresh();
     } finally {
       setLoadingAction(null);
@@ -100,6 +131,26 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                {(n.tipo === "plazo.fatal" ||
+                  n.tipo === "plazo.fatal.escalamiento" ||
+                  n.severidad === "critica") &&
+                  !n.ackAt && (
+                    <button
+                      className="btn btn-primary"
+                      type="button"
+                      disabled={loadingAction !== null}
+                      onClick={() => ackOne(n)}
+                    >
+                      {loadingAction === `ack-${n.id}`
+                        ? "Acusando..."
+                        : "Acusar recibo"}
+                    </button>
+                  )}
+                {n.ackAt && (
+                  <span className="self-center text-xs text-[var(--sea)]">
+                    Acusado
+                  </span>
+                )}
                 {!n.read && (
                   <button
                     className="btn btn-ghost"

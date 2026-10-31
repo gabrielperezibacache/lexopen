@@ -865,7 +865,7 @@ export const en: Dictionary = {
     cuenta: {
       eyebrow: "Personal security",
       title: "My account",
-      subtitle: "Password, 2FA and language.",
+      subtitle: "Password, 2FA, notifications and language.",
     },
     jurisprudencia: {
       eyebrow: "Doctrine base",
