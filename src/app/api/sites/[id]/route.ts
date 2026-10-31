@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
-    const fileWhere = clientVisibleFileWhere(user.role);
+    const fileWhere = clientVisibleFileWhere(user);
     const clientView = isCliente(user.role);
     const site = await prisma.site.findUnique({
       where: { id },

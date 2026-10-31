@@ -75,6 +75,9 @@ async function main() {
       role: "admin",
       title: "Socia · Litigio Civil",
       avatarColor: "#c47a3a",
+      // Admin técnico 1.1 conserva capacidades de negocio 1.0 vía grants (D9).
+      capabilityGrants:
+        "causa.override_walls,doc.privileged.read,escrito.draft,escrito.approve,time.log,time.approve,billing.rates,ledger.provision,client.message,voice.use",
       password,
     },
   });

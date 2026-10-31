@@ -28,7 +28,7 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
     },
   });
   if (!minuta || minuta.causaId !== id) notFound();
-  if (minuta.confidencial && !canSeeConfidential(user.role)) {
+  if (minuta.confidencial && !canSeeConfidential(user)) {
     notFound();
   }
 

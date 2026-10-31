@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
           unbilled === "1" ? { billable: true, billed: false } : {},
           timeEntryListWhere(estado),
           causaId ? { causaId } : {},
-          canManageBilling(user.role) ? {} : { userId: user.id },
+          canManageBilling(user) ? {} : { userId: user.id },
         ],
       },
       include: { user: { select: publicUserSelect }, causa: true, cliente: true },
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     const amountClp = Math.round(hours * rateClp);
     const targetUserId =
       body.userId && body.userId !== user.id
-        ? canManageBilling(user.role)
+        ? canManageBilling(user)
           ? body.userId
           : null
         : user.id;
@@ -152,7 +152,7 @@ export async function PATCH(req: NextRequest) {
       if (!current?.startedAt) {
         return NextResponse.json({ error: "Timer no iniciado" }, { status: 400 });
       }
-      if (current.userId !== user.id && !canManageBilling(user.role)) {
+      if (current.userId !== user.id && !canManageBilling(user)) {
         return NextResponse.json(
           { error: "Solo puede detener sus propios timers" },
           { status: 403 }
@@ -184,7 +184,7 @@ export async function PATCH(req: NextRequest) {
       if (!current) {
         return NextResponse.json({ error: "Entrada no encontrada" }, { status: 404 });
       }
-      if (current.userId !== user.id && !canManageBilling(user.role)) {
+      if (current.userId !== user.id && !canManageBilling(user)) {
         return NextResponse.json({ error: "Prohibido" }, { status: 403 });
       }
     } else {

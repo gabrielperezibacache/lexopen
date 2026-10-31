@@ -44,12 +44,12 @@ export const buscarTool: AssistantTool<BuscarInput> = {
           }),
       documentoIds !== null
         ? prisma.documento.findMany({
-            where: { id: { in: documentoIds }, ...confidentialWhere(ctx.role) },
+            where: { id: { in: documentoIds }, ...confidentialWhere(ctx) },
             select: { id: true, nombre: true, causaId: true },
           })
         : prisma.documento.findMany({
             where: {
-              ...confidentialWhere(ctx.role),
+              ...confidentialWhere(ctx),
               nombre: { contains: input.q, mode: "insensitive" },
             },
             select: { id: true, nombre: true, causaId: true },

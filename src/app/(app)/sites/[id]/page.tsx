@@ -26,7 +26,7 @@ export default async function SiteOverviewPage({ params, searchParams }: Params)
   if (isCliente(user.role)) {
     redirect(`/sites/${id}/archivos`);
   }
-  const fileWhere = confidentialFileWhere(user.role);
+  const fileWhere = confidentialFileWhere(user);
   const [site, visibleFilesCount, documentoCount, clientes, causas] = await Promise.all([
     prisma.site.findUnique({
       where: { id },
@@ -44,7 +44,7 @@ export default async function SiteOverviewPage({ params, searchParams }: Params)
       },
     }),
     prisma.siteFile.count({
-      where: { siteId: id, ...clientVisibleFileWhere(user.role) },
+      where: { siteId: id, ...clientVisibleFileWhere(user) },
     }),
     prisma.site
       .findUnique({ where: { id }, select: { causaId: true } })

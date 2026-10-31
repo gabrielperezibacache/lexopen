@@ -11,8 +11,9 @@ import {
   updateStudioUser,
 } from "@/lib/users-admin";
 import { parseListLimit } from "@/lib/api/list-limit";
+import { ROLES } from "@/lib/auth/roles";
 
-const roleEnum = z.enum(["admin", "abogado", "asistente", "cliente"]);
+const roleEnum = z.enum(ROLES);
 
 const createUserSchema = z.object({
   action: z.literal("create-user"),
@@ -31,6 +32,8 @@ const updateUserSchema = z.object({
   role: roleEnum.optional(),
   title: z.string().max(200).optional().nullable(),
   password: z.string().min(12).max(256).optional(),
+  capabilityGrants: z.string().max(2000).optional().nullable(),
+  capabilityRevokes: z.string().max(2000).optional().nullable(),
 });
 
 const updateRoleSchema = z.object({
@@ -80,6 +83,8 @@ export async function GET(req: NextRequest) {
           role: true,
           title: true,
           avatarColor: true,
+          capabilityGrants: true,
+          capabilityRevokes: true,
           createdAt: true,
           siteMemberships: {
             include: { site: { select: { id: true, name: true } } },
@@ -112,7 +117,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (body.action === "create-user") {
-      if (!isAdmin(actor.role)) {
+      if (!isAdmin(actor)) {
         return NextResponse.json(
           { error: "Solo admin puede crear usuarios" },
           { status: 403 }
@@ -131,7 +136,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "delete-user") {
-      if (!isAdmin(actor.role)) {
+      if (!isAdmin(actor)) {
         return NextResponse.json(
           { error: "Solo admin puede eliminar usuarios" },
           { status: 403 }
@@ -146,7 +151,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "create-group") {
-      if (!isAdmin(actor.role)) {
+      if (!isAdmin(actor)) {
         return NextResponse.json(
           { error: "Solo admin puede crear grupos" },
           { status: 403 }
@@ -176,7 +181,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "update-group") {
-      if (!isAdmin(actor.role)) {
+      if (!isAdmin(actor)) {
         return NextResponse.json(
           { error: "Solo admin puede editar grupos" },
           { status: 403 }
@@ -229,7 +234,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "delete-group") {
-      if (!isAdmin(actor.role)) {
+      if (!isAdmin(actor)) {
         return NextResponse.json(
           { error: "Solo admin puede eliminar grupos" },
           { status: 403 }
@@ -263,7 +268,7 @@ export async function PATCH(req: NextRequest) {
   try {
     assertCsrf(req);
     const actor = await requireStaff();
-    if (!isAdmin(actor.role)) {
+    if (!isAdmin(actor)) {
       return NextResponse.json(
         { error: "Solo admin puede administrar usuarios" },
         { status: 403 }
@@ -281,6 +286,8 @@ export async function PATCH(req: NextRequest) {
         title: data.title,
         role: data.role,
         password: data.password,
+        capabilityGrants: data.capabilityGrants,
+        capabilityRevokes: data.capabilityRevokes,
       });
       return NextResponse.json(user);
     }

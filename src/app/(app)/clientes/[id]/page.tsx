@@ -34,7 +34,7 @@ export default async function ClienteDetailPage({
       include: {
         abogado: { select: { id: true, name: true } },
         documentos: {
-          where: confidentialWhere(user.role),
+          where: confidentialWhere(user),
           orderBy: { updatedAt: "desc" },
           select: {
             id: true,

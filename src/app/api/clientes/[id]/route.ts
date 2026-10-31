@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       include: {
         abogado: { select: { id: true, name: true, email: true } },
         documentos: {
-          where: confidentialWhere(user.role),
+          where: confidentialWhere(user),
           orderBy: { updatedAt: "desc" },
           select: {
             ...documentoListSelect,
