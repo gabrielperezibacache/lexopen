@@ -331,7 +331,7 @@ paleta agentes unificada; hubs principales con tokens/i18n. → **cumplido** (de
 
 **Criterio de salida:** cumplido en código/docs; suite verde en CI.
 
-### Fase 4 — Docs y release 1.0 · **en PR** (2026-10-30)
+### Fase 4 — Docs y release 1.0 · **completa** (2026-10-31)
 
 **Objetivo:** versión `1.0.0`, changelog, README/WEB-HOST/DESKTOP coherentes con
 lo entregado en 1–3.
@@ -344,7 +344,7 @@ lo entregado en 1–3.
 - [x] `docs/UPGRADE-1.0.md` (0.1.9 → 1.0.0, `migrate deploy`)
 - [x] CONTRIBUTING: Next 16 + no `.jules` + release notes
 - [x] Decisiones Gabriel (2026-10-30): merge #151→#154; Panel sin redirect; #195 después de 1.0.0
-- [ ] Tag `v1.0.0` tras merge de PR Fase 4 + CI verde
+- [x] Tag `v1.0.0` (main `24e9e49`, PR #199)
 
 **Riesgos**
 
