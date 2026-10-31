@@ -1,6 +1,15 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { mapWithConcurrency } from "@/lib/pjud/concurrency";
 import { syncCausaPjud, type SyncCausaResult } from "@/lib/pjud/sync";
+
+/** True when insert hit the partial unique (already pending/running for causa). */
+export function isActiveJobUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
 
 const DEFAULT_BATCH = 40;
 /**
@@ -103,9 +112,18 @@ export async function enqueueDueSyncJobs(opts?: {
 
   if (jobsData.length === 0) return [];
 
-  const jobs = await prisma.pjudSyncJob.createManyAndReturn({
-    data: jobsData,
-  });
+  // Crear uno a uno: el índice parcial UNIQUE (causaId) WHERE pending|running
+  // hace atómica la carrera entre crons concurrentes (P2002 = ya en cola).
+  const jobs = [];
+  for (const data of jobsData) {
+    try {
+      const job = await prisma.pjudSyncJob.create({ data });
+      jobs.push(job);
+    } catch (error) {
+      if (isActiveJobUniqueViolation(error)) continue;
+      throw error;
+    }
+  }
   return jobs;
 }
 
@@ -243,9 +261,16 @@ export async function requeueFailedJobs(opts?: {
       finishedAt: new Date(),
     },
   });
-  return await prisma.pjudSyncJob.createManyAndReturn({
-    data: toCreate,
-  });
+  const created = [];
+  for (const data of toCreate) {
+    try {
+      created.push(await prisma.pjudSyncJob.create({ data }));
+    } catch (error) {
+      if (isActiveJobUniqueViolation(error)) continue;
+      throw error;
+    }
+  }
+  return created;
 }
 
 /**
