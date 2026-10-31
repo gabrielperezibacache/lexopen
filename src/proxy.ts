@@ -10,6 +10,12 @@ import { isAuthorizedCronRequest } from "@/lib/security/cron-paths";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { isStrongSessionSecret } from "@/lib/security/production-env";
 import { isClientAllowedPath } from "@/lib/auth/client-paths";
+import { PORTAL_ROLES, VALID_ROLE_SET } from "@/lib/auth/roles";
+import {
+  isTwoFactorExemptPath,
+  mustEnrollTwoFactor,
+  TWO_FACTOR_REQUIRED_CODE,
+} from "@/lib/auth/two-factor-policy";
 
 const SESSION_COOKIE = "lexopen_session";
 const CSRF_COOKIE = "lexopen_csrf";
@@ -29,7 +35,7 @@ const PUBLIC_PATHS = [
   "/api/locale",
 ];
 
-const VALID_ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
+const VALID_ROLES = VALID_ROLE_SET as Set<string>;
 
 function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -54,7 +60,7 @@ async function lookupSessionVersion(userId: string) {
     const { prisma } = await import("@/lib/db");
     return await prisma.user.findUnique({
       where: { id: userId },
-      select: { sessionVersion: true, role: true },
+      select: { sessionVersion: true, role: true, totpEnabled: true },
     });
   } catch (error) {
     console.warn("[proxy] session lookup failed", error);
@@ -62,9 +68,34 @@ async function lookupSessionVersion(userId: string) {
   }
 }
 
+let twoFactorPolicyCache: { value: boolean; at: number } | null = null;
+const TWO_FACTOR_POLICY_TTL_MS = 30_000;
+
+/** `FirmSettings.require2faPrivileged` (default true). Fail-closed ante error. */
+async function lookupTwoFactorPolicy() {
+  // Suite Playwright: no bloquear en /cuenta?requiere2fa=1 (seed sin TOTP).
+  if (process.env.LEXOPEN_E2E === "1") return false;
+  const now = Date.now();
+  if (twoFactorPolicyCache && now - twoFactorPolicyCache.at < TWO_FACTOR_POLICY_TTL_MS) {
+    return twoFactorPolicyCache.value;
+  }
+  try {
+    const { prisma } = await import("@/lib/db");
+    const settings = await prisma.firmSettings.findFirst({
+      select: { require2faPrivileged: true },
+    });
+    const value = settings ? settings.require2faPrivileged : true;
+    twoFactorPolicyCache = { value, at: now };
+    return value;
+  } catch (error) {
+    console.warn("[proxy] 2FA policy lookup failed", error);
+    return true;
+  }
+}
+
 async function verifyToken(
   token: string
-): Promise<{ userId: string; role: string } | null> {
+): Promise<{ userId: string; role: string; totpEnabled: boolean } | null> {
   const secret = sessionSecret();
   if (!secret) return null;
   if (!token.includes(".")) return null;
@@ -94,7 +125,7 @@ async function verifyToken(
   const matched = sessionVersionMatches(row, sessionVersion, VALID_ROLES);
   if (!matched.ok) return null;
   // Prefer DB role so ACL tracks role changes after session minting.
-  return { userId, role: matched.role };
+  return { userId, role: matched.role, totpEnabled: Boolean(row?.totpEnabled) };
 }
 
 function cookieSecureFlag() {
@@ -269,7 +300,38 @@ export async function proxy(req: NextRequest) {
   }
 
   // Role ACL comes from the DB-backed session — never from a forgeable cookie.
-  if (session.role === "cliente" && !isClientAllowedPath(pathname)) {
+  if (
+    !isTwoFactorExemptPath(pathname) &&
+    mustEnrollTwoFactor({
+      role: session.role,
+      totpEnabled: session.totpEnabled,
+      policyEnabled: await lookupTwoFactorPolicy(),
+    })
+  ) {
+    if (pathname.startsWith("/api/")) {
+      return withSecurityHeaders(
+        req,
+        NextResponse.json(
+          {
+            error:
+              "Su rol requiere verificación en dos pasos. Actívela en Mi cuenta para continuar.",
+            code: TWO_FACTOR_REQUIRED_CODE,
+          },
+          { status: 403 }
+        ),
+        nonce,
+        requestId
+      );
+    }
+    const setup = new URL("/cuenta", req.url);
+    setup.searchParams.set("requiere2fa", "1");
+    return withSecurityHeaders(req, NextResponse.redirect(setup), nonce, requestId);
+  }
+
+  if (
+    (PORTAL_ROLES as readonly string[]).includes(session.role) &&
+    !isClientAllowedPath(pathname)
+  ) {
     if (pathname.startsWith("/api/")) {
       return withSecurityHeaders(
         req,

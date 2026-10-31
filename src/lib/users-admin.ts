@@ -2,9 +2,13 @@ import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { writeAuditStrict } from "@/lib/audit";
 import { toPublicUser } from "@/lib/auth/public-user";
+import {
+  FOUNDER_ADMIN_GRANTS,
+  serializeCapabilityCsv,
+} from "@/lib/auth/permissions";
+import { ROLES, type Role } from "@/lib/auth/roles";
 
-const ROLES = ["admin", "abogado", "asistente", "cliente"] as const;
-export type UserRole = (typeof ROLES)[number];
+export type UserRole = Role;
 
 export function isUserRole(value: string): value is UserRole {
   return (ROLES as readonly string[]).includes(value);
@@ -43,12 +47,24 @@ export async function createStudioUser(opts: {
   role: UserRole;
   title?: string | null;
   password: string;
+  capabilityGrants?: string | null;
+  capabilityRevokes?: string | null;
 }) {
   const email = opts.email.trim().toLowerCase();
   const exists = await prisma.user.findUnique({ where: { email } });
   if (exists) throw httpError("Ya existe un usuario con ese email", 409);
 
   const password = await hashPassword(opts.password);
+  const grants =
+    opts.capabilityGrants !== undefined && opts.capabilityGrants !== null
+      ? serializeCapabilityCsv(opts.capabilityGrants.split(","))
+      : opts.role === "admin"
+        ? FOUNDER_ADMIN_GRANTS.join(",")
+        : "";
+  const revokes = opts.capabilityRevokes
+    ? serializeCapabilityCsv(opts.capabilityRevokes.split(","))
+    : "";
+
   const user = await prisma.user.create({
     data: {
       name: opts.name.trim(),
@@ -57,6 +73,8 @@ export async function createStudioUser(opts: {
       title: opts.title || null,
       password,
       avatarColor: pickAvatarColor(opts.name),
+      capabilityGrants: grants,
+      capabilityRevokes: revokes,
     },
   });
   await writeAuditStrict({
@@ -64,7 +82,12 @@ export async function createStudioUser(opts: {
     action: "user.create",
     entityType: "User",
     entityId: user.id,
-    after: { email: user.email, role: user.role, name: user.name },
+    after: {
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      capabilityGrants: user.capabilityGrants,
+    },
   });
   return toPublicUser(user);
 }
@@ -77,6 +100,8 @@ export async function updateStudioUser(opts: {
   title?: string | null;
   role?: UserRole;
   password?: string;
+  capabilityGrants?: string | null;
+  capabilityRevokes?: string | null;
 }) {
   const before = await prisma.user.findUnique({ where: { id: opts.userId } });
   if (!before) throw httpError("Usuario no encontrado", 404);
@@ -89,6 +114,8 @@ export async function updateStudioUser(opts: {
     password?: string;
     sessionVersion?: { increment: number };
     avatarColor?: string;
+    capabilityGrants?: string;
+    capabilityRevokes?: string;
   } = {};
 
   if (opts.name !== undefined) {
@@ -100,8 +127,8 @@ export async function updateStudioUser(opts: {
     if (email !== before.email) {
       const clash = await prisma.user.findUnique({ where: { email } });
       if (clash) throw httpError("Ya existe un usuario con ese email", 409);
+      data.email = email;
     }
-    data.email = email;
   }
   if (opts.title !== undefined) data.title = opts.title || null;
   if (opts.role !== undefined && opts.role !== before.role) {
@@ -114,6 +141,18 @@ export async function updateStudioUser(opts: {
   }
   if (opts.password) {
     data.password = await hashPassword(opts.password);
+    data.sessionVersion = data.sessionVersion || { increment: 1 };
+  }
+  if (opts.capabilityGrants !== undefined) {
+    data.capabilityGrants = serializeCapabilityCsv(
+      (opts.capabilityGrants || "").split(",")
+    );
+    data.sessionVersion = data.sessionVersion || { increment: 1 };
+  }
+  if (opts.capabilityRevokes !== undefined) {
+    data.capabilityRevokes = serializeCapabilityCsv(
+      (opts.capabilityRevokes || "").split(",")
+    );
     data.sessionVersion = data.sessionVersion || { increment: 1 };
   }
 
@@ -132,6 +171,8 @@ export async function updateStudioUser(opts: {
       role: before.role,
       name: before.name,
       title: before.title,
+      capabilityGrants: before.capabilityGrants,
+      capabilityRevokes: before.capabilityRevokes,
     },
     after: {
       email: user.email,
@@ -139,6 +180,8 @@ export async function updateStudioUser(opts: {
       name: user.name,
       title: user.title,
       passwordReset: Boolean(opts.password),
+      capabilityGrants: user.capabilityGrants,
+      capabilityRevokes: user.capabilityRevokes,
     },
   });
 

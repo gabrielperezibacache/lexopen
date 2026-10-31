@@ -44,13 +44,18 @@ model FirmSettings {
   assistantLlmMode  String  @default("remote_allowed")
   /// Si true, auditoría puede guardar prompts LLM completos (solo admin)
   auditLlmPrompts   Boolean @default(false)
+  /// 2FA obligatorio para roles financieros/aprobadores (admin, socio, contabilidad)
+  require2faPrivileged Boolean @default(true)
 }
 
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String
-  role      String   @default("abogado") // admin | abogado | asistente | cliente
+  role      String   @default("abogado") // admin | socio | abogado | procurador | asistente | contabilidad | externo | cliente
+  /// CSV de capacidades extra / quitadas sobre el preset del rol (lib/auth/permissions)
+  capabilityGrants  String @default("")
+  capabilityRevokes String @default("")
   password  String
   sessionVersion Int @default(0)
   avatarColor String @default("#1f6f78")
@@ -95,6 +100,14 @@ model User {
   mailboxAccount  MailboxAccount?
   mailboxMessages MailboxMessage[]
   eventosResponsable Evento[]      @relation("EventoResponsable")
+  causaMembresias CausaMiembro[]   @relation("CausaMiembroUser")
+  causaMiembrosAgregados CausaMiembro[] @relation("CausaMiembroAgregadoPor")
+  delegacionesOtorgadas Delegacion[] @relation("DelegacionDelegador")
+  delegacionesRecibidas Delegacion[] @relation("DelegacionDelegado")
+  aprobacionesSolicitadas Aprobacion[] @relation("AprobacionSolicitante")
+  aprobacionesAsignadas   Aprobacion[] @relation("AprobacionAprobador")
+  tasksCompleted  Task[]           @relation("TaskCompletedBy")
+  taskHistorial   TaskHistorial[]
 }
 
 model AuditEvent {
@@ -231,6 +244,7 @@ model Cliente {
   payments        Payment[]
   ledgerEntries   LedgerEntry[]
   eventos         Evento[]
+  tasks           Task[]
 
   @@index([razonSocial])
   @@index([rut])
@@ -277,6 +291,8 @@ model Causa {
   /// Stable intake origin: manual | claveunica | rol | csv | webhook
   pjudOrigin            String?
   pjudFromMisCausas     Boolean   @default(false)
+  /// estudio (todo el staff ve, 1.0) | equipo (muro ético: solo miembros)
+  acceso        String    @default("estudio")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -305,6 +321,8 @@ model Causa {
   pjudSyncJobs    PjudSyncJob[]
   mailboxMessages MailboxMessage[]
   eventos         Evento[]
+  miembros        CausaMiembro[]
+  tasks           Task[]
 
   @@index([rit])
   @@index([ruc])
@@ -337,6 +355,7 @@ model Tramite {
 
   responsableId String?
   responsable   User? @relation("TramiteResponsable", fields: [responsableId], references: [id])
+  task          Task?
 
   @@index([causaId, estado])
   @@index([fechaLimite])
@@ -601,6 +620,7 @@ model Plazo {
   responsableId String?
   responsable   User?  @relation(fields: [responsableId], references: [id])
   minutaAcciones MinutaAccion[]
+  tasks         Task[]
 
   @@index([fechaLimite])
   @@index([estado])
@@ -640,11 +660,38 @@ model Task {
   id          String    @id @default(cuid())
   title       String
   description String?
-  status      String    @default("todo") // todo | in_progress | blocked | done
+  status      String    @default("todo") // todo | in_progress | blocked | waiting_client | done | cancelled
   priority    String    @default("medium") // low | medium | high | urgent
   dueDate     DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  /// manual | minuta | pjud | checklist | tramite | asistente | voz | intake | aprobacion
+  origen      String    @default("manual")
+  /// RRULE simple (FREQ=DAILY|WEEKLY|MONTHLY;INTERVAL=n) — al completar se crea la siguiente
+  rrule       String?
+  /// Snooze / «recuérdame»
+  remindAt    DateTime?
+  completedAt DateTime?
+  /// cliente | tribunal | contraparte | interno
+  waitingOn   String?
+
+  causaId     String?
+  causa       Causa?    @relation(fields: [causaId], references: [id], onDelete: SetNull)
+  clienteId   String?
+  cliente     Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  plazoId     String?
+  plazo       Plazo?    @relation(fields: [plazoId], references: [id], onDelete: SetNull)
+  eventoId    String?
+  evento      Evento?   @relation(fields: [eventoId], references: [id], onDelete: SetNull)
+  /// Espejo 1:1 de un Tramite (checklist de causa)
+  tramiteId   String?   @unique
+  tramite     Tramite?  @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Task?     @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks    Task[]    @relation("TaskSubtasks")
+  completedById String?
+  completedBy User?     @relation("TaskCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  historial   TaskHistorial[]
 
   siteId     String?
   site       Site? @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -660,6 +707,27 @@ model Task {
   @@index([siteId])
   @@index([status])
   @@index([dueDate])
+  @@index([causaId])
+  @@index([assigneeId, status, dueDate])
+  @@index([origen])
+  @@index([parentId])
+}
+
+/// Historial auditable de cambios de asignado/estado de un pendiente
+model TaskHistorial {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  /// creada | estado | asignado | posponer | delegada
+  campo     String
+  antes     String?
+  despues   String?
+  nota      String?
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([taskId, createdAt])
 }
 
 model WikiPage {
@@ -1121,10 +1189,76 @@ model Evento {
   cliente       Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   responsableId String
   responsable   User     @relation("EventoResponsable", fields: [responsableId], references: [id])
+  tasks         Task[]
 
   @@index([inicio])
   @@index([tipo, estado])
   @@index([causaId])
   @@index([responsableId])
   @@index([responsableId, inicio])
+}
+
+/// Equipo de la causa. Con `Causa.acceso = "equipo"` solo estos miembros (y quien
+/// tenga `causa.override_walls`) ven la causa.
+model CausaMiembro {
+  id            String    @id @default(cuid())
+  causaId       String
+  causa         Causa     @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation("CausaMiembroUser", fields: [userId], references: [id], onDelete: Cascade)
+  /// responsable | colaborador | procurador | supervisor | externo | lectura
+  rol           String    @default("colaborador")
+  desde         DateTime  @default(now())
+  hasta         DateTime?
+  agregadoPorId String?
+  agregadoPor   User?     @relation("CausaMiembroAgregadoPor", fields: [agregadoPorId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+
+  @@unique([causaId, userId])
+  @@index([userId])
+}
+
+/// «X gestiona la agenda/tareas de Y» o cobertura por vacaciones, con vigencia.
+model Delegacion {
+  id          String    @id @default(cuid())
+  delegadorId String
+  delegador   User      @relation("DelegacionDelegador", fields: [delegadorId], references: [id], onDelete: Cascade)
+  delegadoId  String
+  delegado    User      @relation("DelegacionDelegado", fields: [delegadoId], references: [id], onDelete: Cascade)
+  /// CSV de capacidades delegadas (evento.manage, task.assign, notify.receive_copy)
+  alcance     String    @default("task.assign")
+  desde       DateTime  @default(now())
+  hasta       DateTime?
+  activa      Boolean   @default(true)
+  motivo      String?
+  createdAt   DateTime  @default(now())
+
+  @@index([delegadoId, activa])
+  @@index([delegadorId, activa])
+}
+
+/// Aprobación genérica ligada a cualquier entidad (escrito, horas, factura, muro…)
+model Aprobacion {
+  id            String    @id @default(cuid())
+  /// escrito | time_batch | invoice | gasto | descuento | override_walls | envio_cliente
+  tipo          String
+  titulo        String
+  detalle       String?
+  entityType    String
+  entityId      String
+  solicitanteId String?
+  solicitante   User?     @relation("AprobacionSolicitante", fields: [solicitanteId], references: [id], onDelete: SetNull)
+  aprobadorId   String?
+  aprobador     User?     @relation("AprobacionAprobador", fields: [aprobadorId], references: [id], onDelete: SetNull)
+  /// pendiente | aprobada | rechazada | expirada | cancelada
+  estado        String    @default("pendiente")
+  comentario    String?
+  venceAt       DateTime?
+  createdAt     DateTime  @default(now())
+  resueltaAt    DateTime?
+  resueltaPorId String?
+
+  @@index([aprobadorId, estado])
+  @@index([entityType, entityId])
+  @@index([estado, createdAt])
 }

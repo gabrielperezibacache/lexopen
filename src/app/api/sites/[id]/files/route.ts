@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireSiteAccess, requireUser, canReadFlagged } from "@/lib/api";
 import { clientVisibleFileWhere } from "@/lib/auth/access";
 import { isClientSharedTag } from "@/lib/auth/client-tags";
 import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
@@ -67,7 +67,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
-    const fileWhere = clientVisibleFileWhere(user.role);
+    const fileWhere = clientVisibleFileWhere(user);
     const clientView = isCliente(user.role);
     const folders = await prisma.folder.findMany({
       where: { siteId: id },
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
     if (
-      !canSeeConfidential(user.role) &&
+      !canSeeConfidential(user) &&
       (Boolean(body.confidencial) || Boolean(body.privilegio))
     ) {
       return NextResponse.json(
@@ -229,10 +229,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (body.action === "new-version" && body.fileId) {
       const existing = await prisma.siteFile.findFirst({ where: { id: body.fileId, siteId: id } });
       if (!existing) return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
-      if (existing.confidencial || existing.privilegio) {
-        if (!canSeeConfidential(user.role)) {
-          return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
-        }
+      if (!canReadFlagged(user, existing)) {
+        return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
       }
       if (body.contenido === undefined && body.contenidoBase64 === undefined) {
         return NextResponse.json(
@@ -285,8 +283,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
       }
       if (
-        (existing.confidencial || existing.privilegio) &&
-        !canSeeConfidential(user.role)
+        !canReadFlagged(user, existing)
       ) {
         return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
       }

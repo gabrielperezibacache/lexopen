@@ -2,7 +2,13 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
-import { canSeeConfidential, isCliente, isStaff } from "@/lib/auth/rbac";
+import {
+  canSeeConfidential,
+  canSeePrivileged,
+  isCliente,
+  isStaff,
+} from "@/lib/auth/rbac";
+import type { PermissionSubject } from "@/lib/auth/permissions";
 import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
 import { isClientAllowedPagePath } from "@/lib/auth/client-paths";
 
@@ -53,14 +59,18 @@ export function clientSiteWhere(userId: string) {
   };
 }
 
-export function confidentialFileWhere(role: string) {
-  if (canSeeConfidential(role)) return {};
-  return { confidencial: false, privilegio: false };
+export function confidentialFileWhere(
+  subject: string | PermissionSubject
+): { confidencial?: false; privilegio?: false } {
+  if (!canSeeConfidential(subject)) return { confidencial: false, privilegio: false };
+  if (!canSeePrivileged(subject)) return { privilegio: false };
+  return {};
 }
 
 /** Files shared with clients must be tagged exact token `cliente` and non-confidential. */
-export function clientVisibleFileWhere(role: string) {
-  const base = confidentialFileWhere(role);
+export function clientVisibleFileWhere(subject: string | PermissionSubject) {
+  const base = confidentialFileWhere(subject);
+  const role = typeof subject === "string" ? subject : subject.role;
   if (!isCliente(role)) return base;
   return {
     AND: [base, clientSharedTagPrismaWhere()],

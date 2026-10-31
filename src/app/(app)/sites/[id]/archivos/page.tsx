@@ -19,7 +19,7 @@ export default async function SiteFilesPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
   const clientView = isCliente(user.role);
-  const fileWhere = clientVisibleFileWhere(user.role);
+  const fileWhere = clientVisibleFileWhere(user);
   const fileSelect = {
     ...siteFileListSelect,
     versions: {

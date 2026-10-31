@@ -24,6 +24,8 @@ async function main() {
           emisorRut: "76.123.456-0",
           emisorGiro: "Servicios jurídicos",
           emisorDireccion: "Av. Apoquindo 3000, Las Condes",
+          // Demo/e2e: no forzar enrolamiento 2FA (producción sigue default true).
+          require2faPrivileged: false,
         },
       },
     },
@@ -75,6 +77,9 @@ async function main() {
       role: "admin",
       title: "Socia · Litigio Civil",
       avatarColor: "#c47a3a",
+      // Admin técnico 1.1 conserva capacidades de negocio 1.0 vía grants (D9).
+      capabilityGrants:
+        "causa.override_walls,doc.privileged.read,escrito.draft,escrito.approve,time.log,time.approve,billing.rates,ledger.provision,client.message,voice.use",
       password,
     },
   });

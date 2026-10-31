@@ -12,6 +12,7 @@ import {
 import { writeAuditStrict } from "@/lib/audit";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { isStaff } from "@/lib/auth/rbac";
+import { assertCausaAccess, ensureResponsableMiembro } from "@/lib/auth/causa-access";
 import { documentoListSelect } from "@/lib/sites/file-select";
 import { causaUpdateSchema } from "@/lib/schemas";
 import {
@@ -25,6 +26,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const user = await requireStaff();
     const { id } = await params;
+    await assertCausaAccess(id, user);
     const causa = await prisma.causa.findUnique({
       where: { id },
       include: {
@@ -32,14 +34,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
         abogado: { select: publicUserSelect },
         partes: true,
         documentos: {
-          where: confidentialWhere(user.role),
+          where: confidentialWhere(user),
           orderBy: { updatedAt: "desc" },
           select: documentoListSelect,
         },
         plazos: { orderBy: { fechaLimite: "asc" } },
         notas: { orderBy: { updatedAt: "desc" } },
         minutas: {
-          where: minutaConfidentialWhere(user.role),
+          where: minutaConfidentialWhere(user),
           include: {
             autor: { select: publicUserSelect },
             acciones: true,
@@ -68,6 +70,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
+    await assertCausaAccess(id, user);
     const body = await parseBody(req, causaUpdateSchema);
 
     const data: Record<string, unknown> = {};
@@ -102,6 +105,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       where: { id },
       data,
     });
+
+    if (typeof data.abogadoId === "string" && data.abogadoId) {
+      await ensureResponsableMiembro(id, data.abogadoId, user.id);
+    }
 
     // Re-check conflicts against current parties after any update.
     const conflicts = await checkConflicts({

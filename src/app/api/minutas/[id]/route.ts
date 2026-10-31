@@ -8,6 +8,7 @@ import {
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { writeAuditStrict } from "@/lib/audit";
+import { syncTaskFromMinutaAccion } from "@/lib/tasks/sync-mirrors";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { documentoListSelect } from "@/lib/sites/file-select";
 
@@ -35,7 +36,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (!minuta) {
     return NextResponse.json({ error: "Minuta no encontrada" }, { status: 404 });
   }
-  if (minuta.confidencial && !canSeeConfidential(user.role)) {
+  if (minuta.confidencial && !canSeeConfidential(user)) {
     return NextResponse.json({ error: "Minuta confidencial" }, { status: 403 });
   }
 
@@ -75,10 +76,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!existingMinuta) {
     return NextResponse.json({ error: "Minuta no encontrada" }, { status: 404 });
   }
-  if (existingMinuta.confidencial && !canSeeConfidential(user.role)) {
+  if (existingMinuta.confidencial && !canSeeConfidential(user)) {
     return NextResponse.json({ error: "Minuta confidencial" }, { status: 403 });
   }
-  if (body.confidencial === true && !canSeeConfidential(user.role)) {
+  if (body.confidencial === true && !canSeeConfidential(user)) {
     return NextResponse.json(
       { error: "Su rol no puede marcar minutas como confidenciales" },
       { status: 403 }
@@ -122,24 +123,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       data: { estado: body.estado },
     });
 
-    if (accion.taskId) {
-      if (body.estado === "hecha") {
-        await prisma.task.update({
-          where: { id: accion.taskId },
-          data: { status: "done" },
-        });
-      } else if (body.estado === "pendiente" || body.estado === "en_curso") {
-        await prisma.task.update({
-          where: { id: accion.taskId },
-          data: { status: body.estado === "en_curso" ? "in_progress" : "todo" },
-        });
-      } else if (body.estado === "cancelada") {
-        await prisma.task.update({
-          where: { id: accion.taskId },
-          data: { status: "blocked" },
-        });
-      }
-    }
+    await syncTaskFromMinutaAccion(accion.id);
 
     if (accion.plazoId) {
       if (body.estado === "hecha") {

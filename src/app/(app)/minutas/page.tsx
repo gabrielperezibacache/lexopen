@@ -15,7 +15,7 @@ export default async function MinutasPage() {
   const h = dict.hubs.minutas;
   const [minutas, causas, accionesAbiertasTotal, plantillas] = await Promise.all([
     prisma.minuta.findMany({
-      where: minutaConfidentialWhere(user.role),
+      where: minutaConfidentialWhere(user),
       include: {
         causa: { select: { id: true, titulo: true, rit: true } },
         autor: { select: { name: true } },
@@ -40,7 +40,7 @@ export default async function MinutasPage() {
     prisma.minutaAccion.count({
       where: {
         estado: { in: [...ACCIONES_ABIERTAS] },
-        minuta: minutaConfidentialWhere(user.role),
+        minuta: minutaConfidentialWhere(user),
       },
     }),
     prisma.minutaPlantilla.findMany({

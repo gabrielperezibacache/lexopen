@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
+import { isCliente } from "@/lib/auth/rbac";
 import { isClientSharedTag } from "@/lib/auth/client-tags";
-import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { handleRouteError, requireSiteAccess, requireUser, canReadFlagged } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { getObject } from "@/lib/storage";
 import { downloadResponseHeaders } from "@/lib/security/download";
@@ -20,8 +20,7 @@ export async function GET(_req: Request, { params }: Params) {
       return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
     }
     if (
-      (file.confidencial || file.privilegio) &&
-      !canSeeConfidential(user.role)
+      !canReadFlagged(user, file)
     ) {
       return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
     }

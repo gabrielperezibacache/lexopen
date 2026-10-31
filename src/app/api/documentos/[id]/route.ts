@@ -5,6 +5,7 @@ import {
   handleRouteError,
   parseBody,
   requireStaff,
+  canReadFlagged,
 } from "@/lib/api";
 import { canSeeConfidential } from "@/lib/auth/rbac";
 import { documentoUpdateSchema } from "@/lib/schemas";
@@ -23,8 +24,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
     if (
-      (existing.confidencial || existing.privilegio) &&
-      !canSeeConfidential(user.role)
+      !canReadFlagged(user, existing)
     ) {
       return NextResponse.json(
         { error: "Documento confidencial" },
@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body = await parseBody(req, documentoUpdateSchema);
     if (
       (body.confidencial === true || body.privilegio === true) &&
-      !canSeeConfidential(user.role)
+      !canSeeConfidential(user)
     ) {
       return NextResponse.json(
         {

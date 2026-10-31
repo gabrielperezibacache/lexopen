@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       where: {
         ...(causaId ? { causaId } : {}),
         ...(clienteId ? { clienteId } : {}),
-        ...confidentialWhere(user.role),
+        ...confidentialWhere(user),
       },
       select: {
         ...documentoListSelect,
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     let processingBytes: Buffer | null = null;
     let tipoAuto = false;
 
-    if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
+    if (!canSeeConfidential(user) && (confidencial || privilegio)) {
       return NextResponse.json(
         { error: "Su rol no puede crear contenido confidencial o privilegiado" },
         { status: 403 }
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
           nombre = nombre || normalized.nombre;
         }
       }
-      if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
+      if (!canSeeConfidential(user) && (confidencial || privilegio)) {
         return NextResponse.json(
           { error: "Su rol no puede crear contenido confidencial o privilegiado" },
           { status: 403 }

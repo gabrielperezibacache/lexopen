@@ -21,7 +21,7 @@ export default async function DocumentosPage() {
   const LIST_TAKE = 100;
   const [rawDocumentos, causas] = await Promise.all([
     prisma.documento.findMany({
-      where: confidentialWhere(user.role),
+      where: confidentialWhere(user),
       select: {
         ...documentoListSelect,
         storageKey: true,

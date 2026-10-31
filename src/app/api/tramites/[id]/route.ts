@@ -8,6 +8,7 @@ import {
 } from "@/lib/api";
 import { tramiteUpdateSchema } from "@/lib/schemas";
 import { writeAuditStrict } from "@/lib/audit";
+import { syncTaskFromTramite } from "@/lib/tasks/sync-mirrors";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -104,6 +105,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       before: existing,
       after: tramite,
     });
+
+    await syncTaskFromTramite(tramite.id);
 
     return NextResponse.json(tramite);
   } catch (e) {

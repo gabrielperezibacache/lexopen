@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { assertCsrf, handleRouteError, requireStaff, canReadFlagged } from "@/lib/api";
 import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 import { getObject } from "@/lib/storage";
 
@@ -25,8 +24,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
     if (!document) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
     if (
-      (document.confidencial || document.privilegio) &&
-      !canSeeConfidential(user.role)
+      !canReadFlagged(user, document)
     ) {
       return NextResponse.json({ error: "Documento confidencial" }, { status: 403 });
     }

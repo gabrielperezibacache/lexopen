@@ -27,6 +27,10 @@ import { requireStaff } from "@/lib/auth/session";
 import { confidentialWhere, minutaConfidentialWhere } from "@/lib/api";
 import { documentoListSelect } from "@/lib/sites/file-select";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { assertCausaAccess } from "@/lib/auth/causa-access";
+import { can } from "@/lib/auth/permissions";
+import { CausaEquipoPanel } from "@/components/causas/CausaEquipoPanel";
+import { STAFF_ROLES } from "@/lib/auth/roles";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
@@ -46,6 +50,8 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
   const { t, dict } = await getI18n();
   const h = dict.hubs.causaDetail;
   const { id } = await params;
+  const access = await assertCausaAccess(id, user).catch(() => null);
+  if (!access) notFound();
   const sp = await searchParams;
   const from = sp.from?.trim();
   const backHref =
@@ -68,7 +74,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         abogado: { select: publicUserSelect },
         partes: true,
         documentos: {
-          where: confidentialWhere(user.role),
+          where: confidentialWhere(user),
           orderBy: { updatedAt: "desc" },
           select: {
             ...documentoListSelect,
@@ -84,7 +90,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         etapaHistorial: { orderBy: { createdAt: "desc" } },
         movimientos: { orderBy: { fecha: "desc" }, take: 200 },
         minutas: {
-          where: minutaConfidentialWhere(user.role),
+          where: minutaConfidentialWhere(user),
           include: {
             autor: { select: { name: true } },
             _count: {
@@ -104,11 +110,20 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           take: 30,
         },
         site: { select: { id: true, name: true, tipo: true, isClientVisible: true } },
+        miembros: {
+          include: { user: { select: publicUserSelect } },
+          orderBy: [{ rol: "asc" }, { createdAt: "asc" }],
+        },
       },
     }),
     prisma.user.findMany({
-      where: { role: { in: ["admin", "abogado", "asistente"] } },
-      select: { id: true, name: true },
+      where: {
+        OR: [
+          { role: { in: [...STAFF_ROLES] } },
+          { role: "externo" },
+        ],
+      },
+      select: { id: true, name: true, role: true },
       orderBy: { name: "asc" },
     }),
     prisma.minutaAccion.count({
@@ -415,6 +430,26 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           folderUrl={causa.googleDriveFolderUrl}
         />
       </div>
+
+      <CausaEquipoPanel
+        causaId={causa.id}
+        initialAcceso={causa.acceso}
+        initialMiembros={causa.miembros.map((m) => ({
+          id: m.id,
+          userId: m.userId,
+          rol: m.rol,
+          user: {
+            id: m.user.id,
+            name: m.user.name,
+            email: m.user.email,
+            role: m.user.role,
+          },
+        }))}
+        staffOptions={responsables}
+        canManage={can(user, "causa.team.manage", {
+          causaRol: access.causaRol,
+        })}
+      />
 
       <ConflictReviewPanel
         causaId={causa.id}

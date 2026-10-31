@@ -30,7 +30,7 @@ export const documentoBuscarTool: AssistantTool<DocumentoBuscarInput> = {
     const documentos = await prisma.documento.findMany({
       where: {
         ...(input.causaId ? { causaId: input.causaId } : {}),
-        ...confidentialWhere(ctx.role),
+        ...confidentialWhere(ctx),
         OR: [
           { nombre: { contains: input.q, mode: "insensitive" } },
           { extractedMarkdown: { contains: input.q, mode: "insensitive" } },
@@ -68,7 +68,7 @@ export const documentoDescargarTool: AssistantTool<DocumentoDescargarInput> = {
   },
   async execute(input, ctx) {
     const doc = await prisma.documento.findFirst({
-      where: { id: input.documentoId, ...confidentialWhere(ctx.role) },
+      where: { id: input.documentoId, ...confidentialWhere(ctx) },
       select: { id: true, nombre: true, mimeType: true },
     });
     if (!doc) return { ok: false, message: "Documento no encontrado o sin acceso." };
@@ -101,7 +101,7 @@ export const documentoResumirTool: AssistantTool<DocumentoResumirInput> = {
   },
   async execute(input, ctx) {
     const doc = await prisma.documento.findFirst({
-      where: { id: input.documentoId, ...confidentialWhere(ctx.role) },
+      where: { id: input.documentoId, ...confidentialWhere(ctx) },
     });
     if (!doc) return { ok: false, message: "Documento no encontrado o sin acceso." };
     const texto = (doc.extractedMarkdown || doc.contenido || "").trim();
@@ -147,7 +147,7 @@ export const documentoClasificarTool: AssistantTool<DocumentoClasificarInput> = 
   inputSchema: documentoClasificarSchema,
   async preview(input, ctx) {
     const doc = await prisma.documento.findFirst({
-      where: { id: input.documentoId, ...confidentialWhere(ctx.role) },
+      where: { id: input.documentoId, ...confidentialWhere(ctx) },
       select: { nombre: true, ruta: true, tipo: true },
     });
     if (!doc) return `Clasificar documento ${input.documentoId} (no encontrado o sin acceso).`;
@@ -156,7 +156,7 @@ export const documentoClasificarTool: AssistantTool<DocumentoClasificarInput> = 
   },
   async execute(input, ctx) {
     const before = await prisma.documento.findFirst({
-      where: { id: input.documentoId, ...confidentialWhere(ctx.role) },
+      where: { id: input.documentoId, ...confidentialWhere(ctx) },
     });
     if (!before) return { ok: false, message: "Documento no encontrado o sin acceso." };
     const tipo = inferDocumentoTipo(before.ruta ? `${before.ruta}/${before.nombre}` : before.nombre);

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### 1.1 (en curso) — Equipo y permisos
+- **Roles de estudio**: presets `socio`, `procurador`, `contabilidad`, `externo` además de `admin` / `abogado` / `asistente` / `cliente`. `admin` (Host) ≠ `socio` (negocio); grants/revokes CSV por usuario.
+- **`can(user, capacidad, scope?)`** en `lib/auth/permissions.ts`; `rbac.ts` pasa a wrappers.
+- **Equipo por causa** (`CausaMiembro`) + `Causa.acceso` (`estudio` | `equipo`) con muro ético; `causaAccessWhere` en listados/búsqueda/ficha.
+- **Delegaciones** y **aprobaciones** genéricas (`/api/delegaciones`, `/api/aprobaciones`).
+- **Pendientes unificados**: `Task` espeja `Tramite` / `MinutaAccion`; bandeja `/tareas` con filtros por origen y vencimiento.
+- **2FA obligatorio** para `admin` / `socio` / `contabilidad` cuando `FirmSettings.require2faPrivileged` (default true).
+
 ## 1.0.0 — 2026-10-30
 
 Primera versión estable del Host local LexOpen para práctica chilena.
