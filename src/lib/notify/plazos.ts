@@ -24,7 +24,7 @@ const HITO_OFFSET: Record<string, number> = {
 /**
  * Día civil del hito. Usa `civilDateKey` (fecha-solo UTC) alineado al resto de plazos.
  */
-export function hitoDueYmd(fechaLimite: Date, hito: string, _tz = DEFAULT_TZ): string {
+export function hitoDueYmd(fechaLimite: Date, hito: string): string {
   const due = civilDateKey(fechaLimite);
   const offset = HITO_OFFSET[hito];
   if (offset === undefined) return due;

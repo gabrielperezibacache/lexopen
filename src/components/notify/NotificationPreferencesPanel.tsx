@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 
 type MatrizRow = {
@@ -44,18 +44,25 @@ export function NotificationPreferencesPanel() {
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     const res = await fetch("/api/notify/preferences");
     if (!res.ok) {
       setState(null);
       return;
     }
     setState(await res.json());
-  }
+  }, []);
 
   useEffect(() => {
-    void load();
-  }, []);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      void load();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
 
   async function onSave(e: FormEvent) {
     e.preventDefault();

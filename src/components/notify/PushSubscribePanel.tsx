@@ -20,22 +20,30 @@ export function PushSubscribePanel() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setSupported(
-      typeof window !== "undefined" &&
-        "serviceWorker" in navigator &&
-        "PushManager" in window
-    );
-    void (async () => {
-      const res = await fetch("/api/notify/vapid-public");
-      if (!res.ok) return;
-      const data = await res.json();
-      setEnabled(Boolean(data.enabled && data.publicKey));
-      if (data.enabled && "serviceWorker" in navigator) {
-        const reg = await navigator.serviceWorker.getRegistration();
-        const sub = await reg?.pushManager.getSubscription();
-        setSubscribed(Boolean(sub));
-      }
-    })();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setSupported(
+        typeof window !== "undefined" &&
+          "serviceWorker" in navigator &&
+          "PushManager" in window
+      );
+      void (async () => {
+        const res = await fetch("/api/notify/vapid-public");
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setEnabled(Boolean(data.enabled && data.publicKey));
+        if (data.enabled && "serviceWorker" in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          const sub = await reg?.pushManager.getSubscription();
+          if (!cancelled) setSubscribed(Boolean(sub));
+        }
+      })();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function subscribe() {

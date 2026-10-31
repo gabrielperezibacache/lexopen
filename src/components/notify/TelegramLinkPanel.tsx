@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 
 type Canal = { id: string; canal: string; estado: string };
@@ -13,18 +13,25 @@ export function TelegramLinkPanel() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const res = await fetch("/api/notify/preferences");
     if (!res.ok) return;
     const data = await res.json();
     setCanales(
       (data.canales || []).filter((c: Canal) => c.canal === "telegram")
     );
-  }
+  }, []);
 
   useEffect(() => {
-    void refresh();
-  }, []);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      void refresh();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refresh]);
 
   const activo = canales.find((c) => c.estado === "activo");
 

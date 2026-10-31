@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 
 type Snapshot = {
@@ -48,7 +48,7 @@ export function NotifyAdminPanel() {
     enabled: false,
   });
 
-  async function load() {
+  const load = useCallback(async () => {
     const res = await fetch("/api/integrations/notify");
     if (!res.ok) return;
     const data = await res.json();
@@ -77,11 +77,18 @@ export function NotifyAdminPanel() {
         enabled: Boolean(data.snapshot.webpush.enabled),
       }));
     }
-  }
+  }, []);
 
   useEffect(() => {
-    void load();
-  }, []);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      void load();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
 
   async function saveSmtp(e: FormEvent) {
     e.preventDefault();
