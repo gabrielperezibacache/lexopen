@@ -62,9 +62,14 @@ assert.match(captchaEnvSnippet("nopecha"), /CAPTCHA_SOLVER_PROVIDER=nopecha/);
 assert.ok(CAPTCHA_SOLVER_PROVIDER_IDS.includes("solvecha"));
 assert.equal(isCaptchaSolverProvider("solvecha"), true);
 
+type SolvechaCreateTaskBody = {
+  clientKey?: string;
+  task?: { type?: string; body?: string };
+};
+
 async function solvechaMockTests() {
   const realFetch = globalThis.fetch;
-  const calls: { url: string; body: any }[] = [];
+  const calls: { url: string; body: SolvechaCreateTaskBody }[] = [];
   const reply = (json: unknown, status = 200) =>
     new Response(JSON.stringify(json), { status });
   try {
@@ -73,8 +78,12 @@ async function solvechaMockTests() {
     delete env.CAPTCHA_SOLVER_FALLBACK;
 
     // createTask ya devuelve la solución
-    globalThis.fetch = (async (url: any, init: any) => {
-      calls.push({ url: String(url), body: JSON.parse(init.body) });
+    globalThis.fetch = (async (url, init) => {
+      const raw = typeof init?.body === "string" ? init.body : "{}";
+      calls.push({
+        url: String(url),
+        body: JSON.parse(raw) as SolvechaCreateTaskBody,
+      });
       return reply({
         errorId: 0,
         taskId: "t1",
