@@ -12,6 +12,8 @@ DELETE FROM "CausaMovimiento"
 WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
 
 -- Sustituir índice parcial previo por unique completo (NULL externo sigue permitido N veces en PG).
+-- Quitar índice legado solo-externalId (20260725180000); el unique compuesto lo cubre.
+DROP INDEX IF EXISTS "CausaMovimiento_externalId_idx";
 DROP INDEX IF EXISTS "CausaMovimiento_causaId_externalId_key";
 CREATE UNIQUE INDEX "CausaMovimiento_causaId_externalId_key"
   ON "CausaMovimiento"("causaId", "externalId");
