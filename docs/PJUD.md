@@ -102,7 +102,7 @@ El scrape invitado **falla** si el tribunal o el RIT no coinciden (no abre otra 
 | Variable | Efecto |
 |----------|--------|
 | `PJUD_PUBLIC_SCRAPE=1` | Habilita scrape OJV in-process |
-| `CAPTCHA_SOLVER_PROVIDER` + `CAPTCHA_SOLVER_API_KEY` | Elegible: `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster`. Key opcional solo en `nopecha`. |
+| `CAPTCHA_SOLVER_PROVIDER` + `CAPTCHA_SOLVER_API_KEY` | Elegible: `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster` \| `solvecha`. Key opcional solo en `nopecha`. |
 | `PJUD_SCRAPER_URL` | Microservicio local (`POST /causas/lookup`, `/mis-causas`, `/causas/buscar`). Típico: `http://127.0.0.1:8787` |
 | `PJUD_SCRAPER_ALLOW_PRIVATE=1` | Permite sidecar en localhost / red privada del Host |
 | `PJUD_CLAVEUNICA_SCRAPE` | Ausente: opt-in al guardar credenciales en Mis Causas. `=1` permite. `=0` bloquea. |
@@ -155,7 +155,7 @@ PJUD_SCRAPER_URL=http://127.0.0.1:8787
 PJUD_SCRAPER_ALLOW_PRIVATE=1
 PJUD_SCRAPER_KEY=<misma que el sidecar>
 PJUD_PUBLIC_SCRAPE=1
-CAPTCHA_SOLVER_PROVIDER=nopecha   # free tier; o 2captcha|capsolver|anticaptcha|capmonster
+CAPTCHA_SOLVER_PROVIDER=nopecha   # free tier; o 2captcha|capsolver|anticaptcha|capmonster|solvecha
 CAPTCHA_SOLVER_API_KEY=           # opcional en nopecha; requerida en los demás
 PJUD_ALLOW_DEMO=0
 ```
@@ -172,6 +172,7 @@ LexOpen no vende solves: el estudio elige proveedor. Catálogo en
 | `capsolver` | A veces créditos de prueba | Sí |
 | `anticaptcha` | No | Sí |
 | `capmonster` | No | Sí |
+| `solvecha` | No (solo imagen/texto) | Sí |
 
 Fallback (recomendado en VPS/cloud donde NopeCHA free falla):
 

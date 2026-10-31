@@ -10,6 +10,7 @@ import {
   fallbackProvidersFromEnv,
   isCaptchaSolverProvider,
   providerFromEnv,
+  solveImageCaptcha,
 } from "@/lib/pjud/captcha-solver";
 
 const env = process.env as Record<string, string | undefined>;
@@ -58,13 +59,75 @@ assert.deepEqual(status.fallbacks, ["2captcha", "capsolver"]);
 assert.ok(status.providers.some((p) => p.id === "nopecha" && p.selected));
 assert.match(captchaEnvSnippet("nopecha"), /CAPTCHA_SOLVER_PROVIDER=nopecha/);
 
-if (prevProv === undefined) delete env.CAPTCHA_SOLVER_PROVIDER;
-else env.CAPTCHA_SOLVER_PROVIDER = prevProv;
-if (prevKey === undefined) delete env.CAPTCHA_SOLVER_API_KEY;
-else env.CAPTCHA_SOLVER_API_KEY = prevKey;
-if (prevFb === undefined) delete env.CAPTCHA_SOLVER_FALLBACK;
-else env.CAPTCHA_SOLVER_FALLBACK = prevFb;
-if (prevFbKey === undefined) delete env.CAPTCHA_SOLVER_FALLBACK_API_KEY;
-else env.CAPTCHA_SOLVER_FALLBACK_API_KEY = prevFbKey;
+assert.ok(CAPTCHA_SOLVER_PROVIDER_IDS.includes("solvecha"));
+assert.equal(isCaptchaSolverProvider("solvecha"), true);
 
-console.log("pjud/captcha-solver.test.ts OK");
+type SolvechaCreateTaskBody = {
+  clientKey?: string;
+  task?: { type?: string; body?: string };
+};
+
+async function solvechaMockTests() {
+  const realFetch = globalThis.fetch;
+  const calls: { url: string; body: SolvechaCreateTaskBody }[] = [];
+  const reply = (json: unknown, status = 200) =>
+    new Response(JSON.stringify(json), { status });
+  try {
+    env.CAPTCHA_SOLVER_PROVIDER = "solvecha";
+    env.CAPTCHA_SOLVER_API_KEY = "dummy-key";
+    delete env.CAPTCHA_SOLVER_FALLBACK;
+
+    // createTask ya devuelve la solución
+    globalThis.fetch = (async (url, init) => {
+      const raw = typeof init?.body === "string" ? init.body : "{}";
+      calls.push({
+        url: String(url),
+        body: JSON.parse(raw) as SolvechaCreateTaskBody,
+      });
+      return reply({
+        errorId: 0,
+        taskId: "t1",
+        status: "ready",
+        solution: { text: "AB12" },
+      });
+    }) as typeof fetch;
+    assert.equal(await solveImageCaptcha("data:image/png;base64,AAAA"), "AB12");
+    const first = calls[0];
+    assert.ok(first);
+    assert.equal(first.url, "https://api.solvecha.com/createTask");
+    assert.equal(first.body.clientKey, "dummy-key");
+    assert.ok(first.body.task);
+    assert.equal(first.body.task.type, "ImageToTextTask");
+    assert.equal(first.body.task.body, "AAAA");
+
+    // error 4xx con cuerpo JSON: se conserva el mensaje de la API
+    globalThis.fetch = (async () =>
+      reply(
+        {
+          errorId: 1,
+          errorCode: "ERROR_KEY_DOES_NOT_EXIST",
+          errorDescription: "Invalid API key",
+        },
+        401
+      )) as typeof fetch;
+    await assert.rejects(
+      solveImageCaptcha("AAAA"),
+      /Solvecha createTask falló: Invalid API key/
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+solvechaMockTests().then(() => {
+  if (prevProv === undefined) delete env.CAPTCHA_SOLVER_PROVIDER;
+  else env.CAPTCHA_SOLVER_PROVIDER = prevProv;
+  if (prevKey === undefined) delete env.CAPTCHA_SOLVER_API_KEY;
+  else env.CAPTCHA_SOLVER_API_KEY = prevKey;
+  if (prevFb === undefined) delete env.CAPTCHA_SOLVER_FALLBACK;
+  else env.CAPTCHA_SOLVER_FALLBACK = prevFb;
+  if (prevFbKey === undefined) delete env.CAPTCHA_SOLVER_FALLBACK_API_KEY;
+  else env.CAPTCHA_SOLVER_FALLBACK_API_KEY = prevFbKey;
+
+  console.log("pjud/captcha-solver.test.ts OK");
+});

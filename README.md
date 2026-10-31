@@ -694,7 +694,7 @@ variables más relevantes:
 | `PJUD_API_URL`, `PJUD_API_KEY` | No | Conector partner para sincronizar movimientos judiciales. |
 | `PJUD_SCRAPER_URL`, `PJUD_SCRAPER_KEY` | No | Sidecar scrape (lookup + Mis Causas). |
 | `PJUD_PUBLIC_SCRAPE` | No | `1` = scrape OJV in-process (Playwright + CAPTCHA). Requiere `npm run pjud:chromium` una vez. |
-| `CAPTCHA_SOLVER_PROVIDER`, `CAPTCHA_SOLVER_API_KEY` | No | `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster`. Key opcional solo en `nopecha`. |
+| `CAPTCHA_SOLVER_PROVIDER`, `CAPTCHA_SOLVER_API_KEY` | No | `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster` \| `solvecha`. Key opcional solo en `nopecha`. |
 | `PJUD_CLAVEUNICA_SCRAPE` | No | Ausente: guardar credenciales en Mis Causas habilita el login. `1` = permite. `0` = bloquea. |
 | `PJUD_SECRETS_KEY` | No | Clave AES para vault ClaveÚnica (fallback SESSION_SECRET). |
 | `PJUD_SCRAPER_ALLOW_PRIVATE` | No | `1` = permite sidecar en localhost / red privada del Host. |

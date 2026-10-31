@@ -8,7 +8,7 @@
  *   # otra terminal: npm run web:host  (o npm run dev)
  *
  * Env mínimas (en .env o entorno):
- *   CAPTCHA_SOLVER_PROVIDER=nopecha|2captcha|capsolver|anticaptcha|capmonster
+ *   CAPTCHA_SOLVER_PROVIDER=nopecha|2captcha|capsolver|anticaptcha|capmonster|solvecha
  *   CAPTCHA_SOLVER_API_KEY=...   (opcional para nopecha free tier)
  *   PJUD_SCRAPER_KEY=...   (recomendado)
  *
@@ -127,6 +127,7 @@ function validateEnv(env) {
     "capsolver",
     "anticaptcha",
     "capmonster",
+    "solvecha",
   ];
   const provider = env.CAPTCHA_SOLVER_PROVIDER?.trim().toLowerCase();
   const key = env.CAPTCHA_SOLVER_API_KEY?.trim();
@@ -134,7 +135,7 @@ function validateEnv(env) {
     !key || key.toLowerCase() === "free" || key.toLowerCase() === "none";
   if (!provider || !providers.includes(provider)) {
     missing.push(
-      "CAPTCHA_SOLVER_PROVIDER=nopecha|2captcha|capsolver|anticaptcha|capmonster"
+      "CAPTCHA_SOLVER_PROVIDER=nopecha|2captcha|capsolver|anticaptcha|capmonster|solvecha"
     );
   } else if (provider !== "nopecha" && keyOptional) {
     missing.push(`CAPTCHA_SOLVER_API_KEY (requerido para ${provider})`);
