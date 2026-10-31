@@ -55,17 +55,23 @@ export function PjudQuickAddPanel() {
       syncNow: true,
     };
     if (action === "preview-rol") {
-      const res = await fetch("/api/pjud/lookup", {
+      const result = await apiMutation<{
+        provider?: string;
+        count?: number;
+        sala?: string | null;
+        note?: string;
+        sample?: Array<{ titulo: string; fecha: string; esReceptor?: boolean }>;
+      }>("/api/pjud/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json().catch(() => ({}));
       setBusy(false);
-      if (!res.ok) {
-        setMsg(data.error || "No se pudo previsualizar");
+      if (!result.ok) {
+        setMsg(result.error || "No se pudo previsualizar");
         return;
       }
+      const data = result.data;
       setPreview(data);
       setMsg(
         `Preview ${data.provider || ""}: ${data.count ?? 0} movimientos${
@@ -101,19 +107,21 @@ export function PjudQuickAddPanel() {
     setMsg("");
     setRutHits([]);
     const fd = new FormData(e.currentTarget);
-    const res = await fetch("/api/pjud/lookup", {
+    const result = await apiMutation<{
+      causas?: Array<{ rit: string; tribunal: string; caratula?: string | null }>;
+      count?: number;
+    }>("/api/pjud/lookup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "buscar-rut", rut: fd.get("rut") }),
     });
-    const data = await res.json().catch(() => ({}));
     setBusy(false);
-    if (!res.ok) {
-      setMsg(data.error || "Búsqueda por RUT falló");
+    if (!result.ok) {
+      setMsg(result.error || "Búsqueda por RUT falló");
       return;
     }
-    setRutHits(data.causas || []);
-    setMsg(`${data.count || 0} causa(s) encontradas.`);
+    setRutHits(result.data.causas || []);
+    setMsg(`${result.data.count || 0} causa(s) encontradas.`);
   }
 
   async function addFromHit(hit: {

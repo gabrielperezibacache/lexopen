@@ -81,18 +81,22 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
     setImportMessage("");
     const form = new FormData();
     form.append("file", selectedFile);
-    const response = await fetch(
-      `/api/causas/${causaId}/movimientos?preview=1`,
-      { method: "POST", body: form }
-    );
-    const data = await response.json().catch(() => ({}));
+    const result = await apiMutation<{
+      rows?: CsvPreviewRow[];
+      total?: number;
+      truncated?: boolean;
+    }>(`/api/causas/${causaId}/movimientos?preview=1`, {
+      method: "POST",
+      body: form,
+    });
     setPreviewing(false);
-    if (!response.ok) {
+    if (!result.ok) {
       setPreviewRows([]);
       setPreviewTotal(0);
-      setImportMessage(data.error || "No se pudo validar el CSV.");
+      setImportMessage(result.error || "No se pudo validar el CSV.");
       return;
     }
+    const data = result.data;
     setPreviewRows(data.rows || []);
     setPreviewTotal(data.total || 0);
     setPreviewTruncated(Boolean(data.truncated));

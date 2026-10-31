@@ -72,16 +72,19 @@ function NuevaCausaInner() {
       }
     }
 
-    const preflight = await fetch("/api/conflict-check", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ partes }),
-    });
+    const preflight = await apiMutation<{ conflicts: ConflictHit[] }>(
+      "/api/conflict-check",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partes }),
+      }
+    );
     if (preflight.ok) {
-      const result = (await preflight.json()) as { conflicts: ConflictHit[] };
-      setConflicts(result.conflicts);
-      const hasBlocked = result.conflicts.some((c) => c.severity === "blocked");
-      setConflictStatus(hasBlocked ? "blocked" : result.conflicts.length ? "warning" : "clear");
+      const result = preflight.data;
+      setConflicts(result.conflicts || []);
+      const hasBlocked = (result.conflicts || []).some((c) => c.severity === "blocked");
+      setConflictStatus(hasBlocked ? "blocked" : result.conflicts?.length ? "warning" : "clear");
       if (hasBlocked && !fd.get("conflictOverride")) {
         setOverrideRequired(true);
         setError("Se detectó un conflicto bloqueante. Revise y confirme override con notas.");

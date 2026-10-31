@@ -130,13 +130,18 @@ export default function MonitoreoCausasPage() {
   async function syncAll() {
     setBusy(true);
     setMsg("");
+    // Pasar IDs monitoreados para no limitar a pjudNextSyncAt vencido (botón = todas las monitoreadas).
+    const monitoredIds = items.filter((i) => i.monitoreoActivo).map((i) => i.id);
     const result = await apiMutation<{
       synced?: number;
       results?: Array<{ inserted?: number }>;
     }>("/api/causas/monitoreo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "sync" }),
+      body: JSON.stringify({
+        action: "sync",
+        ...(monitoredIds.length ? { causaIds: monitoredIds } : {}),
+      }),
     });
     setBusy(false);
     setMsg(
