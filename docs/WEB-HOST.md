@@ -3,6 +3,10 @@
 Esta modalidad no requiere instalar Electron en los equipos cliente. Un único PC
 ejecuta LexOpen y PostgreSQL; el resto accede desde Safari, Chrome o Firefox.
 
+**1.0.0:** home staff = [`/inicio`](./ASISTENTE.md) (asistente); Panel =
+`/dashboard` (sin redirect). Upgrade desde 0.1.9:
+[`UPGRADE-1.0.md`](./UPGRADE-1.0.md). Tras arrancar: `npm run prod:check`.
+
 ## Requisitos del Host
 
 - Node.js 22.x.

@@ -28,3 +28,9 @@ Licencia del proyecto: AGPL-3.0-or-later.
 - Strings nuevas de UI vía diccionarios `src/lib/i18n/dictionaries/{es,en}.ts`.
 - Next.js 16: lea `node_modules/next/dist/docs/` antes de layouts/rutas (AGENTS.md).
 
+## Release / Host
+
+- Versión canónica: `package.json` (Desktop: `desktop/package.json`).
+- Upgrade Host: `docs/UPGRADE-1.0.md` — siempre `prisma migrate deploy` sobre datos reales.
+- Asistente vs Agente: `docs/ASISTENTE.md`. Checklist prod: `npm run prod:check`.
+

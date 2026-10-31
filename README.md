@@ -18,7 +18,7 @@
       <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg" alt="Licencia AGPL-3.0-or-later">
     </a>
     <a href="package.json">
-      <img src="https://img.shields.io/badge/version-0.1.9-orange.svg" alt="Versión 0.1.9">
+      <img src="https://img.shields.io/badge/version-1.0.0-orange.svg" alt="Versión 1.0.0">
     </a>
     <a href="https://nodejs.org/">
       <img src="https://img.shields.io/badge/Node.js-22.x-339933.svg?logo=nodedotjs&logoColor=white" alt="Node.js 22">
@@ -35,6 +35,8 @@
     <a href="#-empezar-gu%C3%ADa-sencilla">Empezar</a> ·
     <a href="#-qu%C3%A9-resuelve">Qué resuelve</a> ·
     <a href="docs/WEB-HOST.md">Host local</a> ·
+    <a href="docs/ASISTENTE.md">Asistente</a> ·
+    <a href="docs/UPGRADE-1.0.md">Upgrade 1.0</a> ·
     <a href="CONTRIBUTING.md">Contribuir</a>
   </p>
   <p>
@@ -43,13 +45,15 @@
 </div>
 
 > [!IMPORTANT]
-> **Estado del proyecto:** LexOpen está en la versión `0.1.9` y debe considerarse un
-> piloto endurecido. El checklist de Host local (`docs/WEB-HOST.md`)
-> cubre ACL del portal, CSRF en mutaciones cliente, auditoría estricta en
-> mutaciones sensibles (incluido CRM/expediente), 2FA TOTP en `/cuenta` y export CSV/XML de facturación
-> hacia un facturador externo (sin DTE/SII in-app). Antes de cargar información
-> real de clientes o causas, revise seguridad, permisos, respaldos, cumplimiento y
-> fuentes jurídicas según las necesidades de su práctica (solo o en equipo).
+> **Estado del proyecto:** LexOpen `1.0.0` — Host local para práctica chilena con
+> **Inicio** asistente operativo (`/inicio`), Panel de KPIs (`/dashboard`),
+> calendario con Eventos, UI coherente y endurecimiento de producción (demos
+> hard-fail, rate-limit Redis opcional, observabilidad). Sigue siendo un producto
+> **self-hosted**: sin DTE/SII in-app, PJUD opt-in, portal con modelo members +
+> visibilidad (no RO absoluto). Checklist: [`docs/WEB-HOST.md`](docs/WEB-HOST.md).
+> Upgrade desde 0.1.9: [`docs/UPGRADE-1.0.md`](docs/UPGRADE-1.0.md). Asistente:
+> [`docs/ASISTENTE.md`](docs/ASISTENTE.md). Antes de cargar datos reales, revise
+> seguridad, permisos, respaldos y cumplimiento según su práctica.
 
 > [!NOTE]
 > LexOpen está inspirado en el modelo de workspaces de
