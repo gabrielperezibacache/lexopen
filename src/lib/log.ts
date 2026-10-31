@@ -22,7 +22,7 @@ export function getRequestId(): string | null {
 }
 
 export function newRequestId(): string {
-  const rand = Math.random().toString(36).slice(2, 10);
+  const rand = crypto.randomUUID().slice(0, 8);
   return `${Date.now().toString(36)}-${rand}`;
 }
 
