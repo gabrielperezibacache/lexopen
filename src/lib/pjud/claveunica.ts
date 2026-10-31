@@ -17,15 +17,14 @@ import {
 } from "@/lib/pjud/scraper-sidecar";
 import { enqueueDueSyncJobs, processPendingSyncJobs } from "@/lib/pjud/queue";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
-import {
-  isMisCausasSyncInFlight,
-} from "@/lib/pjud/mis-causas-sync-state";
+import { misCausasClaimableWhere } from "@/lib/pjud/mis-causas-sync-state";
 import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
 import type { PjudCausaRef, PjudFetchResult } from "@/lib/pjud/types";
 
 export {
   isMisCausasSyncInFlight,
   MIS_CAUSAS_SYNC_STUCK_MS,
+  misCausasClaimableWhere,
 } from "@/lib/pjud/mis-causas-sync-state";
 
 /**
@@ -415,17 +414,9 @@ export async function claimMisCausasSync(opts?: {
 }): Promise<{ alreadyRunning: boolean; settingsId: string }> {
   const { settings } = await getOrCreateFirmSettings();
   const now = opts?.now ?? new Date();
-  if (
-    isMisCausasSyncInFlight({
-      status: settings.claveUnicaLastSyncStatus,
-      lastSyncAt: settings.claveUnicaLastSyncAt,
-      now,
-    })
-  ) {
-    return { alreadyRunning: true, settingsId: settings.id };
-  }
-  await prisma.firmSettings.update({
-    where: { id: settings.id },
+  // Compare-and-swap: solo un caller gana el slot (evita TOCTOU).
+  const claimed = await prisma.firmSettings.updateMany({
+    where: misCausasClaimableWhere({ settingsId: settings.id, now }),
     data: {
       claveUnicaLastSyncAt: now,
       claveUnicaLastSyncStatus: "running",
@@ -434,6 +425,9 @@ export async function claimMisCausasSync(opts?: {
         "Sincronizando Mis Causas… (puede tardar varios minutos; no cierre esta página).",
     },
   });
+  if (claimed.count === 0) {
+    return { alreadyRunning: true, settingsId: settings.id };
+  }
   return { alreadyRunning: false, settingsId: settings.id };
 }
 
