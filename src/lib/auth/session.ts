@@ -2,13 +2,20 @@ import { cookies } from "next/headers";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
 import { canImpersonate, isStaff } from "@/lib/auth/rbac";
+import { VALID_ROLE_SET } from "@/lib/auth/roles";
+import {
+  can,
+  canSome,
+  type Capability,
+  type PermissionScope,
+} from "@/lib/auth/permissions";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { isStrongSessionSecret } from "@/lib/security/production-env";
 
 export const SESSION_COOKIE = "lexopen_session";
 export const ROLE_COOKIE = "lexopen_role";
 const SESSION_DAYS = 14;
-const ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
+const ROLES = VALID_ROLE_SET;
 
 export function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -103,6 +110,23 @@ export async function requireRole(...roles: string[]) {
   const user = await requireUser();
   if (!roles.includes(user.role)) {
     const err = new Error("Prohibido") as Error & { status: number };
+    err.status = 403;
+    throw err;
+  }
+  return user;
+}
+
+/**
+ * Exige una capacidad. Sin `scope`, `scoped` (◐) basta para pasar la puerta;
+ * el handler debe acotar el recurso (p. ej. `assertCausaAccess`).
+ */
+export async function requireCapability(cap: Capability, scope?: PermissionScope) {
+  const user = await requireUser();
+  const ok = scope ? can(user, cap, scope) : canSome(user, cap);
+  if (!ok) {
+    const err = new Error("Prohibido: su rol no tiene este permiso") as Error & {
+      status: number;
+    };
     err.status = 403;
     throw err;
   }
