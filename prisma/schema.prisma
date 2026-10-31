@@ -379,7 +379,8 @@ model CausaMovimiento {
   causa       Causa    @relation(fields: [causaId], references: [id], onDelete: Cascade)
 
   @@index([causaId, fecha])
-  @@index([externalId])
+  /// Dedup sync PJUD: skipDuplicates + unique (NULL externalId permitido N veces en PG)
+  @@unique([causaId, externalId])
   @@index([tipo])
   @@index([causaId, cuaderno])
   @@index([causaId, esReceptor])
@@ -391,7 +392,7 @@ model PjudSyncJob {
   id         String    @id @default(cuid())
   causaId    String
   causa      Causa     @relation(fields: [causaId], references: [id], onDelete: Cascade)
-  /// pending | running | ok | failed
+  /// pending | running | ok | failed | dismissed
   status     String    @default("pending")
   /// manual | cron | retry | webhook | import
   trigger    String    @default("manual")
@@ -406,6 +407,7 @@ model PjudSyncJob {
 
   @@index([status, createdAt])
   @@index([causaId, createdAt])
+  /// Índice parcial en migración: UNIQUE (causaId) WHERE status IN (pending, running)
 }
 
 model AgentChat {
