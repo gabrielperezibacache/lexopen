@@ -108,6 +108,7 @@ model User {
   aprobacionesAsignadas   Aprobacion[] @relation("AprobacionAprobador")
   tasksCompleted  Task[]           @relation("TaskCompletedBy")
   taskHistorial   TaskHistorial[]
+  researchRuns    ResearchRun[]
 
   // Notificaciones 1.1 (lib/notify)
   canalesNotificacion      CanalUsuario[]
@@ -328,6 +329,7 @@ model Causa {
   eventos         Evento[]
   miembros        CausaMiembro[]
   tasks           Task[]
+  researchRuns    ResearchRun[]
 
   @@index([rit])
   @@index([ruc])
@@ -1496,6 +1498,9 @@ model DocumentEvidenceVersion {
   metadataJson     String @default("{}") @db.Text
   createdAt        DateTime @default(now())
   fragments        DocumentEvidenceFragment[]
+  pages            DocumentEvidencePage[]
+  pageCount        Int?
+  locatorKind      String @default("text-offset")
 
   @@unique([resourceId, sourceSha256, textSha256, extractorVersion], map: "EvidenceVersion_content_key")
   @@index([resourceId, createdAt])
@@ -1510,8 +1515,95 @@ model DocumentEvidenceFragment {
   textSha256  String
   startOffset Int
   endOffset   Int
+  pageId      String?
+  page        DocumentEvidencePage? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  pageStartOffset Int?
+  pageEndOffset   Int?
 
   @@unique([versionId, ordinal])
+}
+
+model DocumentEvidencePage {
+  id          String @id @default(cuid())
+  versionId   String
+  version     DocumentEvidenceVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  pageNumber  Int
+  text        String @db.Text
+  textSha256  String
+  method      String
+  status      String
+  reason      String?
+  fragments   DocumentEvidenceFragment[]
+
+  @@unique([versionId, pageNumber])
+}
+
+model LegalSource {
+  id           String @id @default(cuid())
+  canonicalUrl String @unique
+  title        String
+  organism     String
+  kind         String
+  externalId   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  versions     LegalSourceVersion[]
+}
+
+model LegalSourceVersion {
+  id               String @id @default(cuid())
+  sourceId         String
+  source           LegalSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  sourceSha256     String
+  textSha256       String
+  text             String @db.Text
+  sourceStorageKey String?
+  title            String
+  organism         String
+  kind             String
+  externalId       String?
+  mimeType         String?
+  publishedAt      DateTime?
+  effectiveFrom    DateTime?
+  effectiveTo      DateTime?
+  retrievedAt      DateTime
+  acquisitionMethod String @default("retrieved")
+  metadataJson     String @default("{}") @db.Text
+  createdAt        DateTime @default(now())
+  fragments        LegalSourceFragment[]
+
+  @@unique([sourceId, sourceSha256, textSha256])
+  @@index([sourceId, createdAt])
+  @@index([kind, publishedAt])
+}
+
+model LegalSourceFragment {
+  id          String @id @default(cuid())
+  versionId   String
+  version     LegalSourceVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  ordinal     Int
+  text        String @db.Text
+  textSha256  String
+  startOffset Int
+  endOffset   Int
+
+  @@unique([versionId, ordinal])
+}
+
+model ResearchRun {
+  id         String @id @default(cuid())
+  ownerId    String
+  owner      User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  causaId    String?
+  causa      Causa? @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  query      String @db.Text
+  scopeJson  String @db.Text
+  resultJson String @db.Text
+  status     String
+  createdAt  DateTime @default(now())
+
+  @@index([ownerId, createdAt])
+  @@index([causaId])
 }
 
 /// Preserves every divergent row before the historical PJUD dedupe runs.

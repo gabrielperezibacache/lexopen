@@ -40,9 +40,9 @@ export function Breadcrumbs() {
   const crumbs = parts.map((part, index) => {
     const href = "/" + parts.slice(0, index + 1).join("/");
     const key = LABEL_KEYS[part];
-    const label = key ? t(key) : part === "fuentes" ? "Fuentes" : decodeURIComponent(part);
+    const label = parts[0] === "jurisprudencia" && parts[1] === "fuentes" && index === 2 ? "Fuente jurídica" : key ? t(key) : part === "fuentes" ? "Fuentes" : decodeURIComponent(part);
     return { href, label, last: index === parts.length - 1 };
-  }).filter((_, index) => !(parts[0] === "documentos" && parts[2] === "fuentes" && index === 1));
+  }).filter((_, index) => !(parts[0] === "documentos" && parts[2] === "fuentes" && index === 1) && !(parts[0] === "jurisprudencia" && parts[1] === "fuentes" && index === 1));
 
   return (
     <nav aria-label={t("common.breadcrumbs")} className="min-w-0">

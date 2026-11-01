@@ -10,13 +10,15 @@ import { JurisprudenciaBrief } from "@/components/ai/JurisprudenciaBrief";
 import type { Prisma } from "@prisma/client";
 import { isAdmin } from "@/lib/auth/rbac";
 import { getI18n } from "@/lib/i18n/server";
+import { causaAccessWhere } from "@/lib/auth/causa-access";
+import { LegalResearchWorkbench } from "@/components/LegalResearchWorkbench";
 
 const LIST_TAKE = 80;
 
 export default async function JurisprudenciaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; materia?: string }>;
+  searchParams: Promise<{ q?: string; materia?: string; investigacion?: string }>;
 }) {
   const user = await requireStaff();
   const { dict } = await getI18n();
@@ -24,6 +26,7 @@ export default async function JurisprudenciaPage({
   const sp = await searchParams;
   const q = (sp.q || "").trim();
   const materia = sp.materia;
+  const cases = await prisma.causa.findMany({ where: causaAccessWhere(user), orderBy: { updatedAt: "desc" }, take: 100, select: { id: true, titulo: true, rit: true } });
 
   const where: Prisma.JurisprudenciaWhereInput = {
     AND: [
@@ -66,6 +69,8 @@ export default async function JurisprudenciaPage({
   return (
     <div className="space-y-6">
       <PageHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
+
+      <LegalResearchWorkbench initialCases={cases} initialRunId={sp.investigacion} />
 
       <JurisprudenciaSearch materias={[...MATERIAS]} />
       <JurisprudenciaBrief />

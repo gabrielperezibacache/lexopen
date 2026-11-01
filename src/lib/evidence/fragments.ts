@@ -33,3 +33,13 @@ export function splitEvidenceText(text: string, targetSize = 1600) {
 export function verifyEvidenceQuote(fragment: { text: string; textSha256: string }, quote: string) {
   return Boolean(quote.trim()) && sha256(fragment.text) === fragment.textSha256 && fragment.text.includes(quote);
 }
+
+export function verifyEvidencePageBinding(fragment: {
+  versionId: string; text: string; pageId?: string | null;
+  pageStartOffset: number | null; pageEndOffset: number | null;
+  page: { versionId: string; text: string; textSha256: string } | null;
+}) {
+  if (!fragment.page) return !fragment.pageId && fragment.pageStartOffset === null && fragment.pageEndOffset === null;
+  const start = fragment.pageStartOffset, end = fragment.pageEndOffset;
+  return fragment.page.versionId === fragment.versionId && start !== null && end !== null && Number.isSafeInteger(start) && Number.isSafeInteger(end) && start >= 0 && end > start && end <= fragment.page.text.length && sha256(fragment.page.text) === fragment.page.textSha256 && fragment.page.text.slice(start, end) === fragment.text;
+}

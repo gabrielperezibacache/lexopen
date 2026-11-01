@@ -28,6 +28,7 @@ jobs:
       SESSION_SECRET: ci-session-secret-16plus
       HERMES_ALLOW_DEMO: "1"
       LEXOPEN_RELAX_CSRF: "1"
+      LEXOPEN_PDF_REQUIRE_TOOLS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,6 +37,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
+      - name: Local PDF rendering and OCR
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa
       - run: npx prisma migrate deploy
       # Fail if schema.prisma drifts from the DB after migrate deploy.
       - name: Prisma schema drift check

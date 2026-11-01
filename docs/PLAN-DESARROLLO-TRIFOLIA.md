@@ -6,6 +6,8 @@ LexOpen debe conservar su operación de estudio jurídico y sumar un motor propi
 
 La referencia funcional comprende 58 capacidades públicas, trazadas en [la matriz de capacidades](auditoria-2026-11-01/MATRIZ-TRIFOLIA.md). No se promete equivalencia con funciones privadas que no se pudieron observar. La implementación comenzó en `codex/lexopen-own-core`: correcciones del núcleo y de los PR 202/203, más el primer lector de fuentes versionadas. El [registro del incremento](IMPLEMENTACION-2026-11-01.md) distingue lo implementado y probado de las fases que siguen pendientes.
 
+Segunda entrega en `codex/pdf-legal-research`: [páginas PDF verificadas e investigación local](PDF-INVESTIGACION-2026-11-01.md), con imagen del original, OCR local, fuentes jurídicas versionadas, extractos literales e historial autorizado. Completa ese flujo de `Documento` y abre F2; no cierra F1 ni F2 completos. La cobertura oficial comprobada y los límites se documentan por separado.
+
 ## 1 Decisiones de producto
 
 1. **Cero dependencia operativa de TRIFOLIA.** Sin cuenta, API, MCP, índices, tokens ni suscripción de ese proveedor. La prueba de independencia bloqueará sus dominios y repetirá los flujos de aceptación.

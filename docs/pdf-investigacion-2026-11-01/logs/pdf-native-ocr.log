@@ -1,0 +1,1 @@
+PDF pages OK: physical ordinals, Unicode/native, scanned OCR, empty page, hashes, bounded parsing/render, cancellation, concurrency and cleanup. Render=true, OCR=true
