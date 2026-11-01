@@ -1,0 +1,66 @@
+{
+  "phase": "final current-core restored service verification",
+  "pid": 29910,
+  "startedAt": "2026-11-01T22:15:52.113Z",
+  "node": "v22.23.1",
+  "moduleFingerprints": {
+    "src/lib/knowledge/cases.ts": {
+      "resolved": "<workspace>/src/lib/knowledge/cases.ts",
+      "sha256": "b3ffc455f1751f24f08bb4f77c50da002b9a48529ffa954f90ef9dcadb736498",
+      "imported": true
+    },
+    "src/lib/knowledge/citations.ts": {
+      "resolved": "<workspace>/src/lib/knowledge/citations.ts",
+      "sha256": "cc2621342f8821d147f16abd8acca1f71f861ee0f0020660016243780fa0039a",
+      "imported": true
+    },
+    "src/lib/knowledge/library.ts": {
+      "resolved": "<workspace>/src/lib/knowledge/library.ts",
+      "sha256": "3da447895123cb86a5e33d7b99a303f13efb2a0f344da086afa386722b3f4e52",
+      "imported": true
+    },
+    "src/lib/research/service.ts": {
+      "resolved": "<workspace>/src/lib/research/service.ts",
+      "sha256": "827ddb016baaab39b4d08a9063764d784934dced29fd49b2c69b73cb83ab001c",
+      "imported": true
+    }
+  },
+  "facts": 4,
+  "humanReviewHistory": "all stored fields exact",
+  "conflict": "apparent/stale/exact",
+  "library": "3 pins/instructions/scope/revision exact; old version remains pinned",
+  "savedResearch": "libraryOnly/history/citations/PDF page2 exact; current replacement excluded",
+  "coverage": {
+    "factsLimited": false,
+    "conflictsLimited": false,
+    "factsShown": 4,
+    "factsLimit": 200,
+    "nextAfter": null,
+    "verificationLimited": false,
+    "verificationFactsLimit": 400,
+    "verificationReferencesLimit": 2000,
+    "chronologyScope": "Hechos autorizados de esta página dentro de una ventana acotada de verificación; fecha del acontecimiento, nunca fecha de carga",
+    "networkRequests": 0,
+    "modelUsed": false
+  },
+  "coverageNote": "Only current derived bounded-verification coverage additions/text differ from old descriptor; all persisted fields and returned facts/chronology/conflicts are exact.",
+  "physicalPage2Sha256": "45b2d4cecaf91a71744b3643ab320682d61e8b356a11fa54c170598e23f9fed9",
+  "thirdParty": {
+    "case": 404,
+    "fact": 404,
+    "conflict": 404,
+    "library": 404,
+    "researchHistory": 404,
+    "citation": 404,
+    "original": 404,
+    "page": 404
+  },
+  "staleRevision": {
+    "fact": 409,
+    "conflict": 409,
+    "collection": 409,
+    "removeItem": 409
+  },
+  "forbiddenFetches": 0,
+  "writes": "none expected; full database/storage snapshot comparison follows"
+}

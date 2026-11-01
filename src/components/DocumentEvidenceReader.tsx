@@ -1,12 +1,14 @@
 "use client";
 
+import { BookmarkCitationButton } from "@/components/knowledge/BookmarkCitationButton";
+
 import { useEffect, useRef, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 import { Copy, Download, Search } from "lucide-react";
 import { PdfEvidencePagePreview } from "./PdfEvidencePagePreview";
 
 type Evidence = {
-  document: { id: string; name: string; status: string | null };
+  document: { id: string; name: string; status: string | null; causaId: string | null };
   versions: { id: string; sourceName: string; sourceSha256: string; createdAt: string; partial: boolean; pageCount: number | null; locatorKind: string; _count: { fragments: number } }[];
   selectedVersionId: string | null;
   fragments: { id: string; ordinal: number; text: string; href: string; pageNumber?: number | null }[];
@@ -122,6 +124,7 @@ export function DocumentEvidenceReader({ documentId, siteId, initialVersion = ""
         {data.fragments.map(fragment => <section id={`fragment-${fragment.ordinal}`} key={fragment.id} className="scroll-mt-24 py-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Fragmento {fragment.ordinal}{fragment.pageNumber ? ` · Página ${fragment.pageNumber}` : ""}</h2><button type="button" className="btn btn-ghost text-sm" onClick={() => copy(fragment)} aria-label={`Copiar referencia del fragmento ${fragment.ordinal}`}><Copy size={16} aria-hidden="true" />Copiar referencia</button></div>
           <p className="max-w-[75ch] whitespace-pre-wrap break-words text-[var(--ink)] leading-relaxed">{fragment.text}</p>
+          <BookmarkCitationButton citation={{ kind: "document", fragmentId: fragment.id, quote: fragment.text }} causaId={data.document.causaId} siteId={siteId} />
         </section>)}
       </div>
       <div className="flex flex-wrap gap-2">{after > 0 && <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => setAfter(0)}>Primeros fragmentos</button>}{data.nextAfter !== null && <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => setAfter(data.nextAfter!)}>Siguientes fragmentos</button>}</div>

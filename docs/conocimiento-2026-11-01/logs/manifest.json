@@ -1,0 +1,215 @@
+{
+  "date": "2026-11-01",
+  "normalization": "ANSI removed, workspace and temporary prefixes replaced, CRLF/trailing whitespace normalized; original files unchanged. SHA256 recorded before and after.",
+  "files": [
+    {
+      "file": "case-postgresql.log",
+      "source": "lexopen-case-knowledge-paging-final.log",
+      "sourceModifiedAt": "2026-11-01T22:16:07.740501+00:00",
+      "sourceBytes": 1493,
+      "sourceSha256": "95517099036e5cc450d87053d06ed52ae0b00022df171b93fe2e4ea4aab6e05f",
+      "normalizedBytes": 1169,
+      "normalizedSha256": "e8ed75f844d823cc99b44938a91753c4aa7c2d4f5ca682a2233abdb51a7a346c"
+    },
+    {
+      "file": "library-postgresql.log",
+      "source": "lexopen-library-integration-final.log",
+      "sourceModifiedAt": "2026-11-01T21:57:14.418815+00:00",
+      "sourceBytes": 2761,
+      "sourceSha256": "1d138e6ec654c7cbd787203217aa4a6d73e925c54cb6c16d8bfaf513d61814e2",
+      "normalizedBytes": 2113,
+      "normalizedSha256": "4458e202e064ba56ca5bdd3a92d2d1517096b6595d507b50f6b4a3d3562b1b24"
+    },
+    {
+      "file": "citations-postgresql.log",
+      "source": "lexopen-knowledge-citations-integration.log",
+      "sourceModifiedAt": "2026-11-01T21:58:20.025189+00:00",
+      "sourceBytes": 298,
+      "sourceSha256": "055c6aad18cb87d7318b54bf93f322d8901a0633489762018ae84729323250b6",
+      "normalizedBytes": 298,
+      "normalizedSha256": "055c6aad18cb87d7318b54bf93f322d8901a0633489762018ae84729323250b6"
+    },
+    {
+      "file": "extraction-unit.log",
+      "source": "lexopen-knowledge-extraction-tests.log",
+      "sourceModifiedAt": "2026-11-01T21:49:21.432171+00:00",
+      "sourceBytes": 227,
+      "sourceSha256": "084ae8a73f21b12d08ac7da62ae75b80f17b6ba5d1adac753853241a9d235716",
+      "normalizedBytes": 227,
+      "normalizedSha256": "084ae8a73f21b12d08ac7da62ae75b80f17b6ba5d1adac753853241a9d235716"
+    },
+    {
+      "file": "case-browser.log",
+      "source": "lexopen-case-browser-review.log",
+      "sourceModifiedAt": "2026-11-01T22:21:28.749245+00:00",
+      "sourceBytes": 360,
+      "sourceSha256": "4e834bf8176c88011fd86a15959edf248eed1ce36cf9f61f57e3431f761b536f",
+      "normalizedBytes": 360,
+      "normalizedSha256": "4e834bf8176c88011fd86a15959edf248eed1ce36cf9f61f57e3431f761b536f"
+    },
+    {
+      "file": "library-browser.log",
+      "source": "lexopen-library-browser-final.log",
+      "sourceModifiedAt": "2026-11-01T21:54:42.305109+00:00",
+      "sourceBytes": 386,
+      "sourceSha256": "88f9de3ee0fe069ae8ac67b079bcbe56629a2d552ac8b2cfbfb514b2bc050d69",
+      "normalizedBytes": 386,
+      "normalizedSha256": "88f9de3ee0fe069ae8ac67b079bcbe56629a2d552ac8b2cfbfb514b2bc050d69"
+    },
+    {
+      "file": "upgrade-restore.log",
+      "source": "lexopen-knowledge-upgrade-restore-proof.log",
+      "sourceModifiedAt": "2026-11-01T22:16:12.615296+00:00",
+      "sourceBytes": 4928,
+      "sourceSha256": "c413431af181932935d007ec8023de21098acb65800ef170bd3340ddeedd0c78",
+      "normalizedBytes": 4923,
+      "normalizedSha256": "4cebcc2e881ccc421a6fcf7b6c59bbd78bde1ecab38a6918eacb46a44ecb6563"
+    },
+    {
+      "file": "restored-current-core.log",
+      "source": "proof.log",
+      "sourceModifiedAt": "2026-11-01T22:15:54.160528+00:00",
+      "sourceBytes": 2856,
+      "sourceSha256": "6914c8f458bd76afce6b6570d6cb4399eaa79b52ae5c9e679ace971e057545ce",
+      "normalizedBytes": 2711,
+      "normalizedSha256": "d191891930fb1268acc10c649080b3484907d80d70d67586540e364bddfe5970"
+    },
+    {
+      "file": "restored-current-core.json",
+      "source": "service-result.json",
+      "sourceModifiedAt": "2026-11-01T22:15:52.642529+00:00",
+      "sourceBytes": 2600,
+      "sourceSha256": "cba2b71e451907184049afbc6d5d85efe493b02a75854f7fb637678979d47fe0",
+      "normalizedBytes": 2456,
+      "normalizedSha256": "2f5528f9ca499ce852b488e0f9ba8ee9ee803c87037d9f3255e723c872005901"
+    },
+    {
+      "file": "units.log",
+      "source": "lexopen-knowledge-units-final.log",
+      "sourceModifiedAt": "2026-11-01T22:30:34.267360+00:00",
+      "sourceBytes": 11729,
+      "sourceSha256": "f0644a40ea5bbd6eb122afeb489089030f7a2a417c9f145d74b8efff65498a42",
+      "normalizedBytes": 11729,
+      "normalizedSha256": "f0644a40ea5bbd6eb122afeb489089030f7a2a417c9f145d74b8efff65498a42",
+      "exitCode": 0,
+      "exitEvidence": "Confirmed by primary agent from executor return/session; not inferred from log contents"
+    },
+    {
+      "file": "integration.log",
+      "source": "lexopen-knowledge-integration-final.log",
+      "sourceModifiedAt": "2026-11-01T22:30:34.095438+00:00",
+      "sourceBytes": 27561,
+      "sourceSha256": "6da348f8d826156ceb1d3fe0d541931ab40be394baac9f0226ba010cc18fbec1",
+      "normalizedBytes": 22615,
+      "normalizedSha256": "9bdd268337461151da773e711316a08064c57f69378c877f67c72fd7b5b006c7",
+      "exitCode": 0,
+      "exitEvidence": "Confirmed by primary agent from executor return/session; not inferred from log contents"
+    },
+    {
+      "file": "build.log",
+      "source": "lexopen-knowledge-build-final.log",
+      "sourceModifiedAt": "2026-11-01T22:30:28.396868+00:00",
+      "sourceBytes": 12743,
+      "sourceSha256": "1c88f8b4646e3cdcf7c34a4567a0370208fc87174b3ed92143d5a72305f66693",
+      "normalizedBytes": 12038,
+      "normalizedSha256": "774142dbd96061611b1a04fe4319d71b58b89f84cedc5e0755487355438d1b2a",
+      "exitCode": 0,
+      "exitEvidence": "Confirmed by primary agent from executor return/session; not inferred from log contents"
+    },
+    {
+      "file": "production-migrations.log",
+      "source": "lexopen-knowledge-prod-migrate.log",
+      "sourceModifiedAt": "2026-11-01T22:30:12.249229+00:00",
+      "sourceBytes": 4707,
+      "sourceSha256": "f373de93c442c1e2abf2f1023b8e1b8031ce4a64602e40155f2400aff4052779",
+      "normalizedBytes": 4701,
+      "normalizedSha256": "10eafdf061dede599e174dc850fcb852c4176320433979cfa2cfe49d458231bc",
+      "exitCode": 0,
+      "exitEvidence": "Confirmed by primary agent from executor return/session; not inferred from log contents"
+    },
+    {
+      "file": "design-scan.json",
+      "source": "lexopen-knowledge-design-scan.json",
+      "sourceModifiedAt": "2026-11-01T22:26:52.784485+00:00",
+      "sourceBytes": 3,
+      "sourceSha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "normalizedBytes": 3,
+      "normalizedSha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "file": "production.log",
+      "source": "lexopen-knowledge-production-final.log",
+      "sourceModifiedAt": "2026-11-01T22:32:00.905184+00:00",
+      "sourceBytes": 596,
+      "sourceSha256": "e1aeba3f2cdf954b56d45fe82464f61cd27ad620282186795d1602d1ba4de433",
+      "normalizedBytes": 596,
+      "normalizedSha256": "e1aeba3f2cdf954b56d45fe82464f61cd27ad620282186795d1602d1ba4de433",
+      "exitCode": 0,
+      "exitEvidence": "Confirmed by primary agent from executor return/session59744; not inferred from log contents"
+    },
+    {
+      "file": "production-attempt1.log",
+      "source": "lexopen-knowledge-production-attempt1.log",
+      "sourceModifiedAt": "2026-11-01T22:31:21.917159+00:00",
+      "sourceBytes": 413,
+      "sourceSha256": "effb227d24bd06847028667b194c22e58b11f08444129f06cdba5a2514d81016",
+      "normalizedBytes": 377,
+      "normalizedSha256": "51c185ed6627b5fd4987be8d4660e49d669219b375efcdf0134c2fec4ee95bd5",
+      "result": "Failed assertion preserved; no exit status inferred from text"
+    },
+    {
+      "file": "production-attempt2.log",
+      "source": "lexopen-knowledge-production-attempt2.log",
+      "sourceModifiedAt": "2026-11-01T22:31:56.895843+00:00",
+      "sourceBytes": 500,
+      "sourceSha256": "0c12f217a537a13c5b886e69dc47d877211ac084acb04b5066bf7584bc502da7",
+      "normalizedBytes": 464,
+      "normalizedSha256": "f72f7c517c70126400235bdd85b73bd05fd543eedcfe77a8095b6c67dd6ab615",
+      "result": "Failed assertion preserved; no exit status inferred from text"
+    },
+    {
+      "file": "browser-full.log",
+      "source": "lexopen-knowledge-browser-full-final.log",
+      "sourceModifiedAt": "2026-11-01T22:33:39.758288+00:00",
+      "sourceBytes": 25897,
+      "sourceSha256": "d0d4e1fc12b94169c0010162d164f98c1802d7e8562e3b778416e2723afde5a3",
+      "normalizedBytes": 25897,
+      "normalizedSha256": "d0d4e1fc12b94169c0010162d164f98c1802d7e8562e3b778416e2723afde5a3",
+      "exitCode": 0,
+      "exitEvidence": "Confirmed by primary agent from executor return/session15102; not inferred from log contents"
+    },
+    {
+      "file": "types.log",
+      "source": "lexopen-knowledge-types-final.log",
+      "sourceModifiedAt": "2026-11-01T22:33:56.440904+00:00",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedBytes": 0,
+      "normalizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "exitEvidence": "Confirmed by primary agent from final executor return; types/lint session56343, schema drift final exit0; not inferred from log contents"
+    },
+    {
+      "file": "lint.log",
+      "source": "lexopen-knowledge-lint-final.log",
+      "sourceModifiedAt": "2026-11-01T22:34:05.461432+00:00",
+      "sourceBytes": 34,
+      "sourceSha256": "db58e698a71f6923f5d66425538f7b1ea17c7e16f3ce1c85858f0ab5911afc98",
+      "normalizedBytes": 33,
+      "normalizedSha256": "dbd928d643fd9a62d3f7b403093eb025bf1d22a9f30e9b3793a4087d2ebc7b10",
+      "exitCode": 0,
+      "exitEvidence": "Confirmed by primary agent from final executor return; types/lint session56343, schema drift final exit0; not inferred from log contents"
+    },
+    {
+      "file": "schema-drift.log",
+      "source": "lexopen-knowledge-schema-drift-final.log",
+      "sourceModifiedAt": "2026-11-01T22:34:19.872872+00:00",
+      "sourceBytes": 25,
+      "sourceSha256": "198913094e3f41610eb893459ab65a3c79991b65d4ef5fcb8c325ebe52ebf1ed",
+      "normalizedBytes": 24,
+      "normalizedSha256": "728442980e143e18c2aa9bd7d747a8ea8d85f510529e7540f90f35ea9dd1b268",
+      "exitCode": 0,
+      "exitEvidence": "Confirmed by primary agent from final executor return; types/lint session56343, schema drift final exit0; not inferred from log contents"
+    }
+  ]
+}

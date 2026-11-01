@@ -1,0 +1,23 @@
+audit write failed Error: library audit fixture failure
+    at <anonymous> (<workspace>/src/lib/knowledge/library.integration.test.ts:23:167)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+audit write failed Error: library audit fixture failure
+    at <anonymous> (<workspace>/src/lib/knowledge/library.integration.test.ts:23:167)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+Library integration PASS: owned/scoped collections, create replay and concurrent dedupe, pinned historic versions, exact quote and original integrity, PDF page citations, no network/model, explicit library-only/combined research, CAS edits, removals/notes invalidate history, current role/matter/document ACL, unavailable redaction, quota and audit rollback.

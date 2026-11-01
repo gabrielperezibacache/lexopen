@@ -11,6 +11,7 @@ import type { Prisma } from "@prisma/client";
 import { isAdmin } from "@/lib/auth/rbac";
 import { getI18n } from "@/lib/i18n/server";
 import { causaAccessWhere } from "@/lib/auth/causa-access";
+import { LibraryPanel } from "@/components/LibraryPanel";
 import { LegalResearchWorkbench } from "@/components/LegalResearchWorkbench";
 
 const LIST_TAKE = 80;
@@ -71,6 +72,7 @@ export default async function JurisprudenciaPage({
       <PageHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
 
       <LegalResearchWorkbench initialCases={cases} initialRunId={sp.investigacion} />
+      <LibraryPanel initialCases={cases} />
 
       <JurisprudenciaSearch materias={[...MATERIAS]} />
       <JurisprudenciaBrief />

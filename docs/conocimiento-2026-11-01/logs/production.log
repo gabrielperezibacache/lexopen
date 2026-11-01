@@ -1,0 +1,5 @@
+
+> lexopen@1.0.0 test:production:knowledge
+> node --import tsx scripts/production-knowledge-smoke.ts
+
+{"mode":"production","checks":["CSRF real","local source analysis and ambiguous dates","human review and stale CAS","two verified conflict sides and review","PDF page2 OCR and private image","case library and exact pinned version","libraryOnly with no model/network","A-B-A retains human statement/status/revision","six chunked JSON limits reject413","withdrawn pin invalidates history","portal denied","case revocation denies all derivatives"],"googleOrLegalNetwork":false,"deployment":false}

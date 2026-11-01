@@ -1,0 +1,95 @@
+{
+  "date": "2026-11-01",
+  "captures": [
+    {
+      "file": "knowledge-chronology-desktop.png",
+      "bytes": 381745,
+      "sha256": "3270cf2b2c6eed6df3288c5a60a89c1c54aed718a2967bc6c8b8f248586a409b",
+      "sourceRun": "Confirmación dirigida final de hechos/cronología/contradicciones/historial, Chromium"
+    },
+    {
+      "file": "knowledge-chronology-mobile.png",
+      "bytes": 317431,
+      "sha256": "e6f2acfcab570da893d9f8a894dbc54ea4a687762f2384a69ce44d1688e51792",
+      "sourceRun": "Confirmación dirigida final de hechos/cronología/contradicciones/historial, Chromium"
+    },
+    {
+      "file": "knowledge-conflicts-desktop.png",
+      "bytes": 216877,
+      "sha256": "cbaf4ed5c42aab6218db26d3a61da640851182b5bb19029d5f5ec484e7cf5d2b",
+      "sourceRun": "Confirmación dirigida final de hechos/cronología/contradicciones/historial, Chromium"
+    },
+    {
+      "file": "knowledge-conflicts-mobile.png",
+      "bytes": 202228,
+      "sha256": "c24d7a32ad4faba10d7e440f8773de60d6787cacdc1cce7bc665234377572c73",
+      "sourceRun": "Confirmación dirigida final de hechos/cronología/contradicciones/historial, Chromium"
+    },
+    {
+      "file": "knowledge-facts-desktop.png",
+      "bytes": 431264,
+      "sha256": "2c0dce0d689e7428f31b2f35a7ac0ac70b29866463900eb0a6cb4a0d9d590f89",
+      "sourceRun": "Confirmación dirigida final de hechos/cronología/contradicciones/historial, Chromium"
+    },
+    {
+      "file": "knowledge-facts-mobile.png",
+      "bytes": 360246,
+      "sha256": "2a07e463e32ee3e27f24eab7e22ce46d9d35a7be9271ae26a1a1b8699da3ca6d",
+      "sourceRun": "Confirmación dirigida final de hechos/cronología/contradicciones/historial, Chromium"
+    },
+    {
+      "file": "knowledge-history-desktop.png",
+      "bytes": 112315,
+      "sha256": "8b0e3da4b50fa65e870b4c4db80b6e50296bba234f923cc3b914aa7505e55762",
+      "sourceRun": "Confirmación dirigida final de hechos/cronología/contradicciones/historial, Chromium"
+    },
+    {
+      "file": "knowledge-history-mobile.png",
+      "bytes": 96670,
+      "sha256": "92d63381aa1aafa84adbf5bfe7e37c805e002a815109b87684230e719ef22b24",
+      "sourceRun": "Confirmación dirigida final de hechos/cronología/contradicciones/historial, Chromium"
+    },
+    {
+      "file": "library-pinned-version-desktop.png",
+      "bytes": 733993,
+      "sha256": "2e991e906d18fb457f007af9c212308c6548450144f18a818035bf4d5fadb0b9",
+      "sourceRun": "Biblioteca, fijación de versión e investigación, Chromium; anterior a refuerzos finales del servidor"
+    },
+    {
+      "file": "library-pinned-version-mobile.png",
+      "bytes": 521418,
+      "sha256": "3451b3f1b29f94fbb6e6e9dc486fa88b4c5766cfff76c1e9a12b31311ec57c13",
+      "sourceRun": "Biblioteca, fijación de versión e investigación, Chromium; anterior a refuerzos finales del servidor"
+    },
+    {
+      "file": "library-research-desktop.png",
+      "bytes": 314089,
+      "sha256": "23511ef4d2c08331cc7922a05586d738ac99ddd98637abe853238973718b5429",
+      "sourceRun": "Biblioteca, fijación de versión e investigación, Chromium; anterior a refuerzos finales del servidor"
+    },
+    {
+      "file": "library-research-mobile.png",
+      "bytes": 137120,
+      "sha256": "b87482b10edfbca1a0cb5a2c1e743375a8b7a59f18cc388c731cebfd975d3b6e",
+      "sourceRun": "Biblioteca, fijación de versión e investigación, Chromium; anterior a refuerzos finales del servidor"
+    },
+    {
+      "file": "library-source-pin-desktop.png",
+      "bytes": 369931,
+      "sha256": "033b279701f24af96ea7ae2596b2d46921ff16203c3dea941871d0d4c42f7fc0",
+      "sourceRun": "Biblioteca, fijación de versión e investigación, Chromium; anterior a refuerzos finales del servidor"
+    },
+    {
+      "file": "library-source-pin-mobile.png",
+      "bytes": 249041,
+      "sha256": "346a6af0322506bfb8f42210e9fe9804a8668cc4c96827a5f25dd8f5d842bf0c",
+      "sourceRun": "Biblioteca, fijación de versión e investigación, Chromium; anterior a refuerzos finales del servidor"
+    },
+    {
+      "file": "restored-physical-page2.png",
+      "bytes": 89217,
+      "sha256": "45b2d4cecaf91a71744b3643ab320682d61e8b356a11fa54c170598e23f9fed9",
+      "sourceRun": "Página física 2 leída desde restauración lógica; PNG exacto antes/después"
+    }
+  ]
+}

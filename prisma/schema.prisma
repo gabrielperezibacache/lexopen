@@ -114,6 +114,12 @@ model User {
   canalesNotificacion      CanalUsuario[]
   preferenciasNotificacion PreferenciaNotificacion[]
   perfilNotificacion       PerfilNotificacion?
+  createdCaseFacts CaseFact[] @relation("FactCreator")
+  caseFactReviews CaseFactReview[]
+  createdCaseConflicts CaseConflict[] @relation("ConflictCreator")
+  caseConflictReviews CaseConflictReview[]
+  knowledgeCollections KnowledgeCollection[]
+
 }
 
 model AuditEvent {
@@ -199,6 +205,8 @@ model Site {
   workflows   Workflow[]
   activities  Activity[]
   blogPosts   BlogPost[]
+  knowledgeCollections KnowledgeCollection[]
+
 }
 
 model SiteMember {
@@ -345,6 +353,11 @@ model Causa {
   @@index([abogadoId])
   @@index([clienteId])
   @@index([pjudFromMisCausas])
+  caseFacts CaseFact[]
+  caseConflicts CaseConflict[]
+  caseAnalysisSources CaseAnalysisSource[]
+  knowledgeCollections KnowledgeCollection[]
+
 }
 
 model Tramite {
@@ -1639,4 +1652,127 @@ model DriveDocumentImport {
 
   @@unique([causaId, driveFileId, driveVersion, exportMimeType])
   @@index([causaId, importedAt])
+}
+
+/// Reviewed factual propositions; source excerpts remain separately identified.
+model CaseFact {
+  id String @id @default(cuid())
+  causaId String
+  statement String @db.Text
+  dateLiteral String?
+  dateStart DateTime?
+  dateEnd DateTime?
+  datePrecision String @default("unknown")
+  dateInferred Boolean @default(false)
+  status String @default("proposed")
+  highlighted Boolean @default(false)
+  revision Int @default(1)
+  fingerprint String
+  comparisonKey String?
+  origin String @default("manual")
+  metadataJson String @default("{}") @db.Text
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  causa Causa @relation(fields:[causaId],references:[id],onDelete:Cascade)
+  createdBy User @relation("FactCreator",fields:[createdById],references:[id])
+  citations CaseFactCitation[]
+  reviews CaseFactReview[]
+  leftConflicts CaseConflict[] @relation("ConflictLeft")
+  rightConflicts CaseConflict[] @relation("ConflictRight")
+  @@unique([causaId,fingerprint])
+  @@index([causaId,dateStart])
+}
+model CaseFactCitation {
+  id String @id @default(cuid())
+  factId String
+  citationJson String @db.Text
+  sourceKey String
+  fact CaseFact @relation(fields:[factId],references:[id],onDelete:Cascade)
+  @@unique([factId,sourceKey])
+}
+model CaseFactReview {
+  id String @id @default(cuid())
+  factId String
+  actorId String
+  fromRevision Int
+  toRevision Int
+  beforeJson String @db.Text
+  afterJson String @db.Text
+  createdAt DateTime @default(now())
+  fact CaseFact @relation(fields:[factId],references:[id],onDelete:Cascade)
+  actor User @relation(fields:[actorId],references:[id])
+  @@index([factId,createdAt])
+}
+model CaseConflict {
+  id String @id @default(cuid())
+  causaId String
+  leftFactId String
+  rightFactId String
+  kind String
+  reason String @db.Text
+  metadataJson String @default("{}") @db.Text
+  status String @default("proposed")
+  revision Int @default(1)
+  fingerprint String
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  causa Causa @relation(fields:[causaId],references:[id],onDelete:Cascade)
+  leftFact CaseFact @relation("ConflictLeft",fields:[leftFactId],references:[id],onDelete:Cascade)
+  rightFact CaseFact @relation("ConflictRight",fields:[rightFactId],references:[id],onDelete:Cascade)
+  createdBy User @relation("ConflictCreator",fields:[createdById],references:[id])
+  reviews CaseConflictReview[]
+  @@unique([causaId,fingerprint])
+  @@index([causaId,createdAt])
+}
+model CaseConflictReview {
+  id String @id @default(cuid())
+  conflictId String
+  actorId String
+  fromRevision Int
+  toRevision Int
+  beforeJson String @db.Text
+  afterJson String @db.Text
+  createdAt DateTime @default(now())
+  conflict CaseConflict @relation(fields:[conflictId],references:[id],onDelete:Cascade)
+  actor User @relation(fields:[actorId],references:[id])
+  @@index([conflictId,createdAt])
+}
+model CaseAnalysisSource {
+  id String @id @default(cuid())
+  causaId String
+  versionId String
+  extractorVersion String
+  afterOrdinal Int @default(0)
+  completed Boolean @default(false)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  causa Causa @relation(fields:[causaId],references:[id],onDelete:Cascade)
+  @@unique([causaId,versionId,extractorVersion])
+}
+model KnowledgeCollection {
+  id String @id @default(cuid())
+  ownerId String
+  causaId String?
+  siteId String?
+  name String
+  instructions String @default("") @db.Text
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  causa Causa? @relation(fields:[causaId],references:[id],onDelete:Cascade)
+  site Site? @relation(fields:[siteId],references:[id],onDelete:Cascade)
+  items KnowledgeCollectionItem[]
+  @@index([ownerId,updatedAt])
+}
+model KnowledgeCollectionItem {
+  id String @id @default(cuid())
+  collectionId String
+  versionKey String
+  citationJson String @db.Text
+  createdAt DateTime @default(now())
+  collection KnowledgeCollection @relation(fields:[collectionId],references:[id],onDelete:Cascade)
+  @@unique([collectionId,versionKey])
 }
