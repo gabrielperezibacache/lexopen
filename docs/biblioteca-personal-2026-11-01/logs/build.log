@@ -1,0 +1,384 @@
+
+> lexopen@1.0.0 build
+> prisma generate && next build
+
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 324ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Help us improve the Prisma ORM for everyone. Share your feedback in a short 2-min survey: https://pris.ly/orm/survey/release-5-22
+
+▲ Next.js 16.3.0 (Turbopack)
+✓ Running next.config.ts took 11ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.6s
+  Running TypeScript ...
+  Finished TypeScript in 9.2s ...
+  Collecting page data using 13 workers ...
+  Generating static pages using 13 workers (0/139) ...
+  Generating static pages using 13 workers (34/139)
+  Generating static pages using 13 workers (69/139)
+  Generating static pages using 13 workers (104/139)
+✓ Generating static pages using 13 workers (139/139) in 148ms
+Turbopack build encountered 4 warnings:
+./src/lib/auth/rate-limit.ts:28:25
+Warning: Dynamic filesystem access causes tracing of the whole project
+  26 |   loadingFileStore ??= (async () => {
+  27 |     try {
+> 28 |       const raw = await fs.readFile(file, "utf8");
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  29 |       fileCache = JSON.parse(raw) as Record<string, Bucket>;
+  30 |     } catch {
+  31 |       fileCache = {};
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: fs.readFile(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./src/lib/auth/rate-limit.ts
+    ./src/app/api/setup/route.ts
+
+  #2 [App Route]:
+    ./src/lib/auth/rate-limit.ts
+    ./src/lib/storage.ts
+    ./src/app/api/documentos/route.ts
+
+
+./src/lib/storage.ts:190:20
+Warning: Dynamic filesystem access causes tracing of the whole project
+  188 |   let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  189 |   try {
+> 190 |     handle = await fs.open(localPathForKey(key), "r");
+      |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  191 |     if ((await handle.stat()).size > maxBytes) throw tooLarge();
+  192 |     const chunks: Buffer[] = []; let total = 0;
+  193 |     for (;;) {
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: fs.open(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./src/lib/storage.ts
+    ./src/app/api/sites/[id]/files/[fileId]/content/route.ts
+
+  #2 [App Route]:
+    ./src/lib/storage.ts
+    ./src/lib/storage.ts
+    ./src/app/api/documentos/route.ts
+
+  #3 [Server Component]:
+    ./src/lib/storage.ts
+    ./src/lib/evidence/service.ts
+    ./src/app/(app)/documentos/[id]/fuentes/page.tsx
+
+
+./src/lib/storage.ts:163:18
+Warning: Dynamic filesystem access causes tracing of the whole project
+  161 |   }
+  162 |   try {
+> 163 |     return await fs.readFile(localPathForKey(key));
+      |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  164 |   } catch {
+  165 |     return null;
+  166 |   }
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: fs.readFile(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./src/lib/storage.ts
+    ./src/app/api/sites/[id]/files/[fileId]/content/route.ts
+
+  #2 [App Route]:
+    ./src/lib/storage.ts
+    ./src/lib/storage.ts
+    ./src/app/api/documentos/route.ts
+
+  #3 [Server Component]:
+    ./src/lib/storage.ts
+    ./src/lib/evidence/service.ts
+    ./src/app/(app)/documentos/[id]/fuentes/page.tsx
+
+
+./src/lib/storage.ts:15:10
+Warning: Dynamic filesystem access causes tracing of the whole project
+  13 |
+  14 | function localRoot() {
+> 15 |   return path.resolve(process.env.STORAGE_PATH || path.join(process.cwd(), "storage"));
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  16 | }
+  17 |
+  18 | export function storageConfigured() {
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: path.resolve(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./src/lib/storage.ts
+    ./src/app/api/sites/[id]/files/[fileId]/content/route.ts
+
+  #2 [App Route]:
+    ./src/lib/storage.ts
+    ./src/lib/storage.ts
+    ./src/app/api/documentos/route.ts
+
+  #3 [Server Component]:
+    ./src/lib/storage.ts
+    ./src/lib/evidence/service.ts
+    ./src/app/(app)/documentos/[id]/fuentes/page.tsx
+
+
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /agente
+├ ƒ /api/activity
+├ ƒ /api/admin/config-snapshot
+├ ƒ /api/admin/host-status
+├ ƒ /api/admin/purge-demo
+├ ƒ /api/admin/self-update
+├ ƒ /api/admin/update-check
+├ ƒ /api/ai/actions
+├ ƒ /api/aprobaciones
+├ ƒ /api/aprobaciones/[id]/resolver
+├ ƒ /api/assistant
+├ ƒ /api/assistant/confirm
+├ ƒ /api/assistant/undo
+├ ƒ /api/auth/impersonate
+├ ƒ /api/auth/login
+├ ƒ /api/auth/logout
+├ ƒ /api/auth/me
+├ ƒ /api/auth/password
+├ ƒ /api/auth/recover
+├ ƒ /api/auth/totp
+├ ƒ /api/billing/expenses
+├ ƒ /api/billing/fee-arrangements
+├ ƒ /api/billing/invoices
+├ ƒ /api/billing/invoices/[id]
+├ ƒ /api/billing/invoices/[id]/pdf
+├ ƒ /api/billing/invoices/export
+├ ƒ /api/billing/ledger
+├ ƒ /api/billing/payments
+├ ƒ /api/billing/summary
+├ ƒ /api/billing/time-entries
+├ ƒ /api/books
+├ ƒ /api/books/[id]
+├ ƒ /api/books/[id]/original
+├ ƒ /api/books/[id]/pages/[page]
+├ ƒ /api/books/citations/verify
+├ ƒ /api/books/collections
+├ ƒ /api/books/collections/[id]
+├ ƒ /api/books/drafts
+├ ƒ /api/books/drafts/[id]
+├ ƒ /api/books/drafts/[id]/export
+├ ƒ /api/books/people
+├ ƒ /api/books/preferences
+├ ƒ /api/books/search
+├ ƒ /api/calendario/ics
+├ ƒ /api/causas
+├ ƒ /api/causas/[id]
+├ ƒ /api/causas/[id]/conflict-check
+├ ƒ /api/causas/[id]/documentos/import
+├ ƒ /api/causas/[id]/equipo
+├ ƒ /api/causas/[id]/knowledge
+├ ƒ /api/causas/[id]/knowledge/analyze
+├ ƒ /api/causas/[id]/knowledge/conflicts
+├ ƒ /api/causas/[id]/knowledge/conflicts/[conflictId]
+├ ƒ /api/causas/[id]/knowledge/facts
+├ ƒ /api/causas/[id]/knowledge/facts/[factId]
+├ ƒ /api/causas/[id]/knowledge/sources
+├ ƒ /api/causas/[id]/movimientos
+├ ƒ /api/causas/[id]/pjud
+├ ƒ /api/causas/[id]/tramites
+├ ƒ /api/causas/monitoreo
+├ ƒ /api/clientes
+├ ƒ /api/clientes/[id]
+├ ƒ /api/clientes/[id]/ai
+├ ƒ /api/configuracion
+├ ƒ /api/conflict-check
+├ ƒ /api/delegaciones
+├ ƒ /api/documentos
+├ ƒ /api/documentos/[id]
+├ ƒ /api/documentos/[id]/content
+├ ƒ /api/documentos/[id]/evidence
+├ ƒ /api/documentos/[id]/markdown
+├ ƒ /api/documentos/[id]/process
+├ ƒ /api/eventos
+├ ƒ /api/eventos/[id]
+├ ƒ /api/evidence/fragments/[id]/verify
+├ ƒ /api/evidence/versions/[id]/original
+├ ƒ /api/evidence/versions/[id]/pages/[page]
+├ ƒ /api/health
+├ ƒ /api/integrations/google
+├ ƒ /api/integrations/google/callback
+├ ƒ /api/integrations/google/drive/[causaId]
+├ ƒ /api/integrations/hermes
+├ ƒ /api/integrations/llm
+├ ƒ /api/integrations/notify
+├ ƒ /api/integrations/notify/test
+├ ƒ /api/integrations/obsidian
+├ ƒ /api/integrations/pjud/webhook
+├ ƒ /api/jurisprudencia
+├ ƒ /api/knowledge/citations/verify
+├ ƒ /api/knowledge/collections
+├ ƒ /api/knowledge/collections/[id]
+├ ƒ /api/knowledge/collections/[id]/items
+├ ƒ /api/knowledge/collections/[id]/items/[itemId]
+├ ƒ /api/locale
+├ ƒ /api/mail
+├ ƒ /api/mail/account
+├ ƒ /api/mail/google/callback
+├ ƒ /api/mail/google/start
+├ ƒ /api/mail/messages/[id]
+├ ƒ /api/mail/microsoft/callback
+├ ƒ /api/mail/microsoft/start
+├ ƒ /api/mail/paste
+├ ƒ /api/mail/sync
+├ ƒ /api/messages
+├ ƒ /api/minutas
+├ ƒ /api/minutas/[id]
+├ ƒ /api/minutas/plantillas
+├ ƒ /api/notifications
+├ ƒ /api/notify/ack
+├ ƒ /api/notify/digest
+├ ƒ /api/notify/escalamiento
+├ ƒ /api/notify/outbox/reconcile
+├ ƒ /api/notify/preferences
+├ ƒ /api/notify/push/subscribe
+├ ƒ /api/notify/telegram/link
+├ ƒ /api/notify/vapid-public
+├ ƒ /api/notify/worker
+├ ƒ /api/people
+├ ƒ /api/pjud/captcha
+├ ƒ /api/pjud/claveunica
+├ ƒ /api/pjud/digest
+├ ƒ /api/pjud/lookup
+├ ƒ /api/pjud/mis-causas
+├ ƒ /api/pjud/queue
+├ ƒ /api/pjud/salas
+├ ƒ /api/plazos
+├ ƒ /api/plazos/alertas
+├ ƒ /api/research
+├ ƒ /api/research/[id]
+├ ƒ /api/research/citations/verify
+├ ƒ /api/research/scope
+├ ƒ /api/research/sources
+├ ƒ /api/research/sources/[id]
+├ ƒ /api/research/sources/[id]/original
+├ ƒ /api/search
+├ ƒ /api/setup
+├ ƒ /api/sites
+├ ƒ /api/sites/[id]
+├ ƒ /api/sites/[id]/blog
+├ ƒ /api/sites/[id]/files
+├ ƒ /api/sites/[id]/files/[fileId]/content
+├ ƒ /api/sites/[id]/files/[fileId]/evidence
+├ ƒ /api/sites/[id]/isheets
+├ ƒ /api/sites/[id]/members
+├ ƒ /api/sites/[id]/qa
+├ ƒ /api/sites/[id]/tasks
+├ ƒ /api/sites/[id]/wiki
+├ ƒ /api/tasks
+├ ƒ /api/tasks/[id]/reasignar
+├ ƒ /api/tramites/[id]
+├ ƒ /api/tribunales
+├ ƒ /api/uf
+├ ƒ /api/uf/sync
+├ ƒ /api/workflows
+├ ƒ /auditoria
+├ ƒ /biblioteca
+├ ƒ /biblioteca/[id]
+├ ƒ /buscar
+├ ƒ /calendario
+├ ƒ /causas
+├ ƒ /causas/[id]
+├ ƒ /causas/[id]/editar
+├ ƒ /causas/[id]/minuta/nueva
+├ ƒ /causas/[id]/minutas/[minutaId]
+├ ƒ /causas/mis-causas
+├ ƒ /causas/monitoreo
+├ ƒ /causas/nueva
+├ ƒ /clientes
+├ ƒ /clientes/[id]
+├ ƒ /configuracion
+├ ƒ /correo
+├ ƒ /cuenta
+├ ƒ /cuenta/notificaciones
+├ ƒ /dashboard
+├ ƒ /documentos
+├ ƒ /documentos/[id]/fuentes
+├ ƒ /facturacion
+├ ƒ /facturacion/cuenta-corriente
+├ ƒ /facturacion/facturas
+├ ƒ /facturacion/facturas/[id]
+├ ƒ /facturacion/gastos
+├ ƒ /facturacion/horas
+├ ƒ /facturacion/tarifas
+├ ƒ /facturacion/uf
+├ ƒ /flujos
+├ ƒ /inicio
+├ ƒ /integraciones
+├ ƒ /jurisprudencia
+├ ƒ /jurisprudencia/fuentes/[id]
+├ ƒ /login
+├ ○ /manifest.webmanifest
+├ ƒ /mensajes
+├ ƒ /minutas
+├ ƒ /notificaciones
+├ ƒ /personas
+├ ƒ /plazos
+├ ƒ /portal
+├ ƒ /recovery
+├ ƒ /setup
+├ ƒ /sites
+├ ƒ /sites/[id]
+├ ƒ /sites/[id]/archivos
+├ ƒ /sites/[id]/archivos/[fileId]/fuentes
+├ ƒ /sites/[id]/blog
+├ ƒ /sites/[id]/flujos
+├ ƒ /sites/[id]/isheets
+├ ƒ /sites/[id]/isheets/[sheetId]
+├ ƒ /sites/[id]/personas
+├ ƒ /sites/[id]/qa
+├ ƒ /sites/[id]/tareas
+├ ƒ /sites/[id]/wiki
+└ ƒ /tareas
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

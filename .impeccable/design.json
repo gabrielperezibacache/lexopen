@@ -1,0 +1,794 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-01T23:38:46.400Z",
+  "title": "Design System: LexOpen",
+  "extensions": {
+    "colorMeta": {
+      "copper": {
+        "role": "primary",
+        "displayName": "Cobre",
+        "canonical": "#c47a3a",
+        "tonalRamp": [
+          "oklch(15% 0.1214 58.79)",
+          "oklch(25% 0.1214 58.79)",
+          "oklch(35% 0.1214 58.79)",
+          "oklch(45% 0.1214 58.79)",
+          "oklch(55% 0.1214 58.79)",
+          "oklch(65% 0.1214 58.79)",
+          "oklch(80% 0.1214 58.79)",
+          "oklch(95% 0.1214 58.79)"
+        ]
+      },
+      "copper-deep": {
+        "role": "primary",
+        "displayName": "Cobre profundo",
+        "canonical": "#9a5a28",
+        "tonalRamp": [
+          "oklch(15% 0.1057 55.66)",
+          "oklch(25% 0.1057 55.66)",
+          "oklch(35% 0.1057 55.66)",
+          "oklch(45% 0.1057 55.66)",
+          "oklch(55% 0.1057 55.66)",
+          "oklch(65% 0.1057 55.66)",
+          "oklch(80% 0.1057 55.66)",
+          "oklch(95% 0.1057 55.66)"
+        ]
+      },
+      "copper-soft": {
+        "role": "primary",
+        "displayName": "Cobre suave",
+        "canonical": "rgba(196, 122, 58, 0.14)",
+        "tonalRamp": [
+          "oklch(15% 0.1214 58.79 / 0.14)",
+          "oklch(25% 0.1214 58.79 / 0.14)",
+          "oklch(35% 0.1214 58.79 / 0.14)",
+          "oklch(45% 0.1214 58.79 / 0.14)",
+          "oklch(55% 0.1214 58.79 / 0.14)",
+          "oklch(65% 0.1214 58.79 / 0.14)",
+          "oklch(80% 0.1214 58.79 / 0.14)",
+          "oklch(95% 0.1214 58.79 / 0.14)"
+        ]
+      },
+      "sea": {
+        "role": "secondary",
+        "displayName": "Verde mar",
+        "canonical": "#1f6f78",
+        "tonalRamp": [
+          "oklch(15% 0.0753 206.03)",
+          "oklch(25% 0.0753 206.03)",
+          "oklch(35% 0.0753 206.03)",
+          "oklch(45% 0.0753 206.03)",
+          "oklch(55% 0.0753 206.03)",
+          "oklch(65% 0.0753 206.03)",
+          "oklch(80% 0.0753 206.03)",
+          "oklch(95% 0.0753 206.03)"
+        ]
+      },
+      "sea-bright": {
+        "role": "secondary",
+        "displayName": "Mar luminoso",
+        "canonical": "#2a8f99",
+        "tonalRamp": [
+          "oklch(15% 0.0903 204.75)",
+          "oklch(25% 0.0903 204.75)",
+          "oklch(35% 0.0903 204.75)",
+          "oklch(45% 0.0903 204.75)",
+          "oklch(55% 0.0903 204.75)",
+          "oklch(65% 0.0903 204.75)",
+          "oklch(80% 0.0903 204.75)",
+          "oklch(95% 0.0903 204.75)"
+        ]
+      },
+      "sea-soft": {
+        "role": "secondary",
+        "displayName": "Mar suave",
+        "canonical": "rgba(31, 111, 120, 0.12)",
+        "tonalRamp": [
+          "oklch(15% 0.0753 206.03 / 0.12)",
+          "oklch(25% 0.0753 206.03 / 0.12)",
+          "oklch(35% 0.0753 206.03 / 0.12)",
+          "oklch(45% 0.0753 206.03 / 0.12)",
+          "oklch(55% 0.0753 206.03 / 0.12)",
+          "oklch(65% 0.0753 206.03 / 0.12)",
+          "oklch(80% 0.0753 206.03 / 0.12)",
+          "oklch(95% 0.0753 206.03 / 0.12)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "canonical": "#0c1c24",
+        "tonalRamp": [
+          "oklch(15% 0.0268 231.56)",
+          "oklch(25% 0.0268 231.56)",
+          "oklch(35% 0.0268 231.56)",
+          "oklch(45% 0.0268 231.56)",
+          "oklch(55% 0.0268 231.56)",
+          "oklch(65% 0.0268 231.56)",
+          "oklch(80% 0.0268 231.56)",
+          "oklch(95% 0.0268 231.56)"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Tinta suave",
+        "canonical": "#1a3340",
+        "tonalRamp": [
+          "oklch(15% 0.0389 232.66)",
+          "oklch(25% 0.0389 232.66)",
+          "oklch(35% 0.0389 232.66)",
+          "oklch(45% 0.0389 232.66)",
+          "oklch(55% 0.0389 232.66)",
+          "oklch(65% 0.0389 232.66)",
+          "oklch(80% 0.0389 232.66)",
+          "oklch(95% 0.0389 232.66)"
+        ]
+      },
+      "mist": {
+        "role": "neutral",
+        "displayName": "Niebla",
+        "canonical": "#e7eef1",
+        "tonalRamp": [
+          "oklch(15% 0.0085 225.08)",
+          "oklch(25% 0.0085 225.08)",
+          "oklch(35% 0.0085 225.08)",
+          "oklch(45% 0.0085 225.08)",
+          "oklch(55% 0.0085 225.08)",
+          "oklch(65% 0.0085 225.08)",
+          "oklch(80% 0.0085 225.08)",
+          "oklch(95% 0.0085 225.08)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel",
+        "canonical": "#f3f6f4",
+        "tonalRamp": [
+          "oklch(15% 0.0041 157.18)",
+          "oklch(25% 0.0041 157.18)",
+          "oklch(35% 0.0041 157.18)",
+          "oklch(45% 0.0041 157.18)",
+          "oklch(55% 0.0041 157.18)",
+          "oklch(65% 0.0041 157.18)",
+          "oklch(80% 0.0041 157.18)",
+          "oklch(95% 0.0041 157.18)"
+        ]
+      },
+      "sand": {
+        "role": "neutral",
+        "displayName": "Arena",
+        "canonical": "#d6c4a8",
+        "tonalRamp": [
+          "oklch(15% 0.0429 78.91)",
+          "oklch(25% 0.0429 78.91)",
+          "oklch(35% 0.0429 78.91)",
+          "oklch(45% 0.0429 78.91)",
+          "oklch(55% 0.0429 78.91)",
+          "oklch(65% 0.0429 78.91)",
+          "oklch(80% 0.0429 78.91)",
+          "oklch(95% 0.0429 78.91)"
+        ]
+      },
+      "surface-solid": {
+        "role": "neutral",
+        "displayName": "Superficie sólida",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.88)",
+          "oklch(25% 0.0000 89.88)",
+          "oklch(35% 0.0000 89.88)",
+          "oklch(45% 0.0000 89.88)",
+          "oklch(55% 0.0000 89.88)",
+          "oklch(65% 0.0000 89.88)",
+          "oklch(80% 0.0000 89.88)",
+          "oklch(95% 0.0000 89.88)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Línea",
+        "canonical": "rgba(12, 28, 36, 0.12)",
+        "tonalRamp": [
+          "oklch(15% 0.0268 231.56 / 0.12)",
+          "oklch(25% 0.0268 231.56 / 0.12)",
+          "oklch(35% 0.0268 231.56 / 0.12)",
+          "oklch(45% 0.0268 231.56 / 0.12)",
+          "oklch(55% 0.0268 231.56 / 0.12)",
+          "oklch(65% 0.0268 231.56 / 0.12)",
+          "oklch(80% 0.0268 231.56 / 0.12)",
+          "oklch(95% 0.0268 231.56 / 0.12)"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Línea fuerte",
+        "canonical": "rgba(12, 28, 36, 0.22)",
+        "tonalRamp": [
+          "oklch(15% 0.0268 231.56 / 0.22)",
+          "oklch(25% 0.0268 231.56 / 0.22)",
+          "oklch(35% 0.0268 231.56 / 0.22)",
+          "oklch(45% 0.0268 231.56 / 0.22)",
+          "oklch(55% 0.0268 231.56 / 0.22)",
+          "oklch(65% 0.0268 231.56 / 0.22)",
+          "oklch(80% 0.0268 231.56 / 0.22)",
+          "oklch(95% 0.0268 231.56 / 0.22)"
+        ]
+      },
+      "danger": {
+        "role": "neutral",
+        "displayName": "Error",
+        "canonical": "#b42318",
+        "tonalRamp": [
+          "oklch(15% 0.1821 29.51)",
+          "oklch(25% 0.1821 29.51)",
+          "oklch(35% 0.1821 29.51)",
+          "oklch(45% 0.1821 29.51)",
+          "oklch(55% 0.1821 29.51)",
+          "oklch(65% 0.1821 29.51)",
+          "oklch(80% 0.1821 29.51)",
+          "oklch(95% 0.1821 29.51)"
+        ]
+      },
+      "ok": {
+        "role": "neutral",
+        "displayName": "Correcto",
+        "canonical": "#1f7a4c",
+        "tonalRamp": [
+          "oklch(15% 0.1112 156.28)",
+          "oklch(25% 0.1112 156.28)",
+          "oklch(35% 0.1112 156.28)",
+          "oklch(45% 0.1112 156.28)",
+          "oklch(55% 0.1112 156.28)",
+          "oklch(65% 0.1112 156.28)",
+          "oklch(80% 0.1112 156.28)",
+          "oklch(95% 0.1112 156.28)"
+        ]
+      },
+      "warn": {
+        "role": "neutral",
+        "displayName": "Aviso",
+        "canonical": "#b86e1a",
+        "tonalRamp": [
+          "oklch(15% 0.1299 62.56)",
+          "oklch(25% 0.1299 62.56)",
+          "oklch(35% 0.1299 62.56)",
+          "oklch(45% 0.1299 62.56)",
+          "oklch(55% 0.1299 62.56)",
+          "oklch(65% 0.1299 62.56)",
+          "oklch(80% 0.1299 62.56)",
+          "oklch(95% 0.1299 62.56)"
+        ]
+      },
+      "dark-ink": {
+        "role": "neutral",
+        "displayName": "Tinta · modo oscuro",
+        "canonical": "#e8f0f2",
+        "tonalRamp": [
+          "oklch(15% 0.0090 214.34)",
+          "oklch(25% 0.0090 214.34)",
+          "oklch(35% 0.0090 214.34)",
+          "oklch(45% 0.0090 214.34)",
+          "oklch(55% 0.0090 214.34)",
+          "oklch(65% 0.0090 214.34)",
+          "oklch(80% 0.0090 214.34)",
+          "oklch(95% 0.0090 214.34)"
+        ]
+      },
+      "dark-ink-soft": {
+        "role": "neutral",
+        "displayName": "Tinta suave · modo oscuro",
+        "canonical": "#c5d4da",
+        "tonalRamp": [
+          "oklch(15% 0.0183 223.63)",
+          "oklch(25% 0.0183 223.63)",
+          "oklch(35% 0.0183 223.63)",
+          "oklch(45% 0.0183 223.63)",
+          "oklch(55% 0.0183 223.63)",
+          "oklch(65% 0.0183 223.63)",
+          "oklch(80% 0.0183 223.63)",
+          "oklch(95% 0.0183 223.63)"
+        ]
+      },
+      "dark-paper": {
+        "role": "neutral",
+        "displayName": "Papel · modo oscuro",
+        "canonical": "#0e1a20",
+        "tonalRamp": [
+          "oklch(15% 0.0208 230.71)",
+          "oklch(25% 0.0208 230.71)",
+          "oklch(35% 0.0208 230.71)",
+          "oklch(45% 0.0208 230.71)",
+          "oklch(55% 0.0208 230.71)",
+          "oklch(65% 0.0208 230.71)",
+          "oklch(80% 0.0208 230.71)",
+          "oklch(95% 0.0208 230.71)"
+        ]
+      },
+      "dark-mist": {
+        "role": "neutral",
+        "displayName": "Niebla · modo oscuro",
+        "canonical": "#1a2c34",
+        "tonalRamp": [
+          "oklch(15% 0.0278 227.75)",
+          "oklch(25% 0.0278 227.75)",
+          "oklch(35% 0.0278 227.75)",
+          "oklch(45% 0.0278 227.75)",
+          "oklch(55% 0.0278 227.75)",
+          "oklch(65% 0.0278 227.75)",
+          "oklch(80% 0.0278 227.75)",
+          "oklch(95% 0.0278 227.75)"
+        ]
+      },
+      "dark-surface-solid": {
+        "role": "neutral",
+        "displayName": "Superficie sólida · modo oscuro",
+        "canonical": "#14242c",
+        "tonalRamp": [
+          "oklch(15% 0.0264 230.90)",
+          "oklch(25% 0.0264 230.90)",
+          "oklch(35% 0.0264 230.90)",
+          "oklch(45% 0.0264 230.90)",
+          "oklch(55% 0.0264 230.90)",
+          "oklch(65% 0.0264 230.90)",
+          "oklch(80% 0.0264 230.90)",
+          "oklch(95% 0.0264 230.90)"
+        ]
+      },
+      "dark-line": {
+        "role": "neutral",
+        "displayName": "Línea · modo oscuro",
+        "canonical": "rgba(232, 240, 242, 0.12)",
+        "tonalRamp": [
+          "oklch(15% 0.0090 214.34 / 0.12)",
+          "oklch(25% 0.0090 214.34 / 0.12)",
+          "oklch(35% 0.0090 214.34 / 0.12)",
+          "oklch(45% 0.0090 214.34 / 0.12)",
+          "oklch(55% 0.0090 214.34 / 0.12)",
+          "oklch(65% 0.0090 214.34 / 0.12)",
+          "oklch(80% 0.0090 214.34 / 0.12)",
+          "oklch(95% 0.0090 214.34 / 0.12)"
+        ]
+      },
+      "dark-line-strong": {
+        "role": "neutral",
+        "displayName": "Línea fuerte · modo oscuro",
+        "canonical": "rgba(232, 240, 242, 0.22)",
+        "tonalRamp": [
+          "oklch(15% 0.0090 214.34 / 0.22)",
+          "oklch(25% 0.0090 214.34 / 0.22)",
+          "oklch(35% 0.0090 214.34 / 0.22)",
+          "oklch(45% 0.0090 214.34 / 0.22)",
+          "oklch(55% 0.0090 214.34 / 0.22)",
+          "oklch(65% 0.0090 214.34 / 0.22)",
+          "oklch(80% 0.0090 214.34 / 0.22)",
+          "oklch(95% 0.0090 214.34 / 0.22)"
+        ]
+      },
+      "binding-oxblood": {
+        "role": "tertiary",
+        "displayName": "Burdeos",
+        "canonical": "#64292e",
+        "tonalRamp": [
+          "oklch(15% 0.0854 17.13)",
+          "oklch(25% 0.0854 17.13)",
+          "oklch(35% 0.0854 17.13)",
+          "oklch(45% 0.0854 17.13)",
+          "oklch(55% 0.0854 17.13)",
+          "oklch(65% 0.0854 17.13)",
+          "oklch(80% 0.0854 17.13)",
+          "oklch(95% 0.0854 17.13)"
+        ]
+      },
+      "binding-forest": {
+        "role": "tertiary",
+        "displayName": "Verde bosque",
+        "canonical": "#244d3c",
+        "tonalRamp": [
+          "oklch(15% 0.0552 164.60)",
+          "oklch(25% 0.0552 164.60)",
+          "oklch(35% 0.0552 164.60)",
+          "oklch(45% 0.0552 164.60)",
+          "oklch(55% 0.0552 164.60)",
+          "oklch(65% 0.0552 164.60)",
+          "oklch(80% 0.0552 164.60)",
+          "oklch(95% 0.0552 164.60)"
+        ]
+      },
+      "binding-navy": {
+        "role": "tertiary",
+        "displayName": "Azul noche",
+        "canonical": "#263d55",
+        "tonalRamp": [
+          "oklch(15% 0.0511 250.45)",
+          "oklch(25% 0.0511 250.45)",
+          "oklch(35% 0.0511 250.45)",
+          "oklch(45% 0.0511 250.45)",
+          "oklch(55% 0.0511 250.45)",
+          "oklch(65% 0.0511 250.45)",
+          "oklch(80% 0.0511 250.45)",
+          "oklch(95% 0.0511 250.45)"
+        ]
+      },
+      "binding-cognac": {
+        "role": "tertiary",
+        "displayName": "Coñac",
+        "canonical": "#805034",
+        "tonalRamp": [
+          "oklch(15% 0.0768 50.37)",
+          "oklch(25% 0.0768 50.37)",
+          "oklch(35% 0.0768 50.37)",
+          "oklch(45% 0.0768 50.37)",
+          "oklch(55% 0.0768 50.37)",
+          "oklch(65% 0.0768 50.37)",
+          "oklch(80% 0.0768 50.37)",
+          "oklch(95% 0.0768 50.37)"
+        ]
+      },
+      "binding-ivory": {
+        "role": "tertiary",
+        "displayName": "Marfil",
+        "canonical": "#e2d1ad",
+        "tonalRamp": [
+          "oklch(15% 0.0514 85.69)",
+          "oklch(25% 0.0514 85.69)",
+          "oklch(35% 0.0514 85.69)",
+          "oklch(45% 0.0514 85.69)",
+          "oklch(55% 0.0514 85.69)",
+          "oklch(65% 0.0514 85.69)",
+          "oklch(80% 0.0514 85.69)",
+          "oklch(95% 0.0514 85.69)"
+        ]
+      },
+      "binding-charcoal": {
+        "role": "tertiary",
+        "displayName": "Grafito",
+        "canonical": "#343a3c",
+        "tonalRamp": [
+          "oklch(15% 0.0089 219.73)",
+          "oklch(25% 0.0089 219.73)",
+          "oklch(35% 0.0089 219.73)",
+          "oklch(45% 0.0089 219.73)",
+          "oklch(55% 0.0089 219.73)",
+          "oklch(65% 0.0089 219.73)",
+          "oklch(80% 0.0089 219.73)",
+          "oklch(95% 0.0089 219.73)"
+        ]
+      },
+      "binding-ink": {
+        "role": "tertiary",
+        "displayName": "Tinta dorada de encuadernación",
+        "canonical": "#f0d59a",
+        "tonalRamp": [
+          "oklch(15% 0.0814 86.11)",
+          "oklch(25% 0.0814 86.11)",
+          "oklch(35% 0.0814 86.11)",
+          "oklch(45% 0.0814 86.11)",
+          "oklch(55% 0.0814 86.11)",
+          "oklch(65% 0.0814 86.11)",
+          "oklch(80% 0.0814 86.11)",
+          "oklch(95% 0.0814 86.11)"
+        ]
+      },
+      "binding-ink-ivory": {
+        "role": "tertiary",
+        "displayName": "Tinta de encuadernación marfil",
+        "canonical": "#4e3924",
+        "tonalRamp": [
+          "oklch(15% 0.0445 65.64)",
+          "oklch(25% 0.0445 65.64)",
+          "oklch(35% 0.0445 65.64)",
+          "oklch(45% 0.0445 65.64)",
+          "oklch(55% 0.0445 65.64)",
+          "oklch(65% 0.0445 65.64)",
+          "oklch(80% 0.0445 65.64)",
+          "oklch(95% 0.0445 65.64)"
+        ]
+      },
+      "wood-walnut": {
+        "role": "tertiary",
+        "displayName": "Nogal clásico",
+        "canonical": "#4e3022",
+        "tonalRamp": [
+          "oklch(15% 0.0499 45.64)",
+          "oklch(25% 0.0499 45.64)",
+          "oklch(35% 0.0499 45.64)",
+          "oklch(45% 0.0499 45.64)",
+          "oklch(55% 0.0499 45.64)",
+          "oklch(65% 0.0499 45.64)",
+          "oklch(80% 0.0499 45.64)",
+          "oklch(95% 0.0499 45.64)"
+        ]
+      },
+      "wood-oak": {
+        "role": "tertiary",
+        "displayName": "Roble claro",
+        "canonical": "#9c7348",
+        "tonalRamp": [
+          "oklch(15% 0.0784 66.61)",
+          "oklch(25% 0.0784 66.61)",
+          "oklch(35% 0.0784 66.61)",
+          "oklch(45% 0.0784 66.61)",
+          "oklch(55% 0.0784 66.61)",
+          "oklch(65% 0.0784 66.61)",
+          "oklch(80% 0.0784 66.61)",
+          "oklch(95% 0.0784 66.61)"
+        ]
+      },
+      "wood-night": {
+        "role": "tertiary",
+        "displayName": "Madera oscura",
+        "canonical": "#202c2e",
+        "tonalRamp": [
+          "oklch(15% 0.0168 208.80)",
+          "oklch(25% 0.0168 208.80)",
+          "oklch(35% 0.0168 208.80)",
+          "oklch(45% 0.0168 208.80)",
+          "oklch(55% 0.0168 208.80)",
+          "oklch(65% 0.0168 208.80)",
+          "oklch(80% 0.0168 208.80)",
+          "oklch(95% 0.0168 208.80)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Título principal",
+        "purpose": "Cabecera de biblioteca y lector."
+      },
+      "headline": {
+        "displayName": "Título de sección",
+        "purpose": "Paneles, mesa y pasajes."
+      },
+      "title": {
+        "displayName": "Rótulo de estante",
+        "purpose": "Títulos de estantes con peso 500."
+      },
+      "body": {
+        "displayName": "Interfaz",
+        "purpose": "Sora con escala fluida en el elemento raíz."
+      },
+      "label": {
+        "displayName": "Etiqueta",
+        "purpose": "Etiquetas de campos de biblioteca."
+      },
+      "reading": {
+        "displayName": "Lectura de pasajes",
+        "purpose": "Citas literales con interlineado 1.9 y medida máxima 72ch."
+      },
+      "chrome-micro": {
+        "displayName": "Microtexto del marco",
+        "purpose": "Paso existente de 10px en grupos, contadores y marca; no se aplica a lectura de libros."
+      },
+      "chrome-label": {
+        "displayName": "Leyenda del marco",
+        "purpose": "Paso existente de 11px en la leyenda de marca de AppSidebar."
+      }
+    },
+    "shadows": [
+      {
+        "name": "ambient",
+        "value": "0 12px 36px rgba(12, 28, 36, 0.1)",
+        "purpose": "Sombra raíz de superficies, toast y diálogos."
+      },
+      {
+        "name": "ambient-small",
+        "value": "0 2px 8px rgba(12, 28, 36, 0.06)",
+        "purpose": "Paneles existentes."
+      },
+      {
+        "name": "ambient-dark",
+        "value": "0 12px 36px rgba(0, 0, 0, 0.35)",
+        "purpose": "Sustitución de la sombra raíz en html.dark."
+      },
+      {
+        "name": "ambient-small-dark",
+        "value": "0 2px 8px rgba(0, 0, 0, 0.25)",
+        "purpose": "Sustitución de sombra pequeña en html.dark."
+      },
+      {
+        "name": "primary-action",
+        "value": "0 8px 20px rgba(154, 90, 40, 0.28)",
+        "purpose": "Botón primario de cobre profundo."
+      },
+      {
+        "name": "library-paper",
+        "value": "0 14px 35px rgba(28,35,30,.07)",
+        "purpose": "Papel de la mesa de escritura."
+      },
+      {
+        "name": "library-shelf",
+        "value": "inset 4px 0 12px rgba(0,0,0,.35), 0 14px 36px rgba(26,15,8,.14)",
+        "purpose": "Profundidad del panel de madera."
+      },
+      {
+        "name": "library-edge",
+        "value": "0 9px 12px rgba(0,0,0,.38), inset 0 -5px 7px rgba(0,0,0,.25)",
+        "purpose": "Canto horizontal del estante."
+      },
+      {
+        "name": "book-front",
+        "value": "inset 5px 0 6px rgba(0,0,0,.35), inset -2px 0 3px rgba(255,225,175,.14), 12px 12px 15px rgba(0,0,0,.28)",
+        "purpose": "Contacto, relieve y separación de la cubierta."
+      }
+    ],
+    "motion": [
+      {
+        "name": "motion-fast",
+        "value": "150ms",
+        "purpose": "Cambios de estado en controles existentes."
+      },
+      {
+        "name": "motion-base",
+        "value": "180ms",
+        "purpose": "Tema y marco de aplicación."
+      },
+      {
+        "name": "motion-ease",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Curva existente del sistema."
+      },
+      {
+        "name": "book-duration",
+        "value": "420ms",
+        "purpose": "Una respuesta de elevación y giro al puntero o foco."
+      },
+      {
+        "name": "book-ease",
+        "value": "cubic-bezier(.16,1,.3,1)",
+        "purpose": "Curva de transformación del volumen."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "none",
+        "purpose": "Sin transición ni transformación dinámica; permanece la pose estática del libro."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "shell-mobile",
+        "value": "767px"
+      },
+      {
+        "name": "shell-desktop",
+        "value": "768px"
+      },
+      {
+        "name": "library-compact",
+        "value": "1120px"
+      },
+      {
+        "name": "library-stack",
+        "value": "800px"
+      },
+      {
+        "name": "library-mobile",
+        "value": "480px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acción primario de LexOpen; el foco y el movimiento siguen la biblioteca.",
+      "html": "<button type=\"button\" class=\"ds-btn-primary\">Añadir libros</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:var(--radius-pill,999px);padding:.65rem 1.1rem;font-size:.92rem;font-weight:600;border:1px solid transparent;font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;transition:transform var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),background var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),box-shadow var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),border-color var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1));background:var(--copper-deep,#9a5a28);color:white;box-shadow:0 8px 20px rgba(154,90,40,.28);}.ds-btn-primary:hover{transform:translateY(-1px)}.ds-btn-primary:focus-visible{outline:2px solid var(--sea,#1f6f78);outline-offset:4px;}.ds-btn-primary:disabled{cursor:wait;opacity:.55}@media(max-width:767px){.ds-btn-primary{min-height:44px}}@media(prefers-reduced-motion:reduce){.ds-btn-primary{transition:none}.ds-btn-primary:hover{transform:none}}"
+    },
+    {
+      "name": "Secundario",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Acción secundario de LexOpen; el foco y el movimiento siguen la biblioteca.",
+      "html": "<button type=\"button\" class=\"ds-btn-secondary\">Descargar original</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:var(--radius-pill,999px);padding:.65rem 1.1rem;font-size:.92rem;font-weight:600;border:1px solid transparent;font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;transition:transform var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),background var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),box-shadow var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),border-color var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1));background:var(--ink,#0c1c24);color:var(--paper,#f3f6f4);}.ds-btn-secondary:hover{transform:translateY(-1px)}.ds-btn-secondary:focus-visible{outline:2px solid var(--sea,#1f6f78);outline-offset:4px;}.ds-btn-secondary:disabled{cursor:wait;opacity:.55}@media(max-width:767px){.ds-btn-secondary{min-height:44px}}@media(prefers-reduced-motion:reduce){.ds-btn-secondary{transition:none}.ds-btn-secondary:hover{transform:none}}:host-context(html.dark) .ds-btn-secondary{background:var(--sea,#1f6f78);color:white}"
+    },
+    {
+      "name": "Contorno",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Acción contorno de LexOpen; el foco y el movimiento siguen la biblioteca.",
+      "html": "<button type=\"button\" class=\"ds-btn-ghost\">Personalizar biblioteca</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:var(--radius-pill,999px);padding:.65rem 1.1rem;font-size:.92rem;font-weight:600;border:1px solid transparent;font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;transition:transform var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),background var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),box-shadow var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),border-color var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1));background:transparent;border-color:var(--line,rgba(12,28,36,.12));color:var(--ink,#0c1c24);}.ds-btn-ghost:hover{transform:translateY(-1px)}.ds-btn-ghost:focus-visible{outline:2px solid var(--sea,#1f6f78);outline-offset:4px;}.ds-btn-ghost:disabled{cursor:wait;opacity:.55}@media(max-width:767px){.ds-btn-ghost{min-height:44px}}@media(prefers-reduced-motion:reduce){.ds-btn-ghost{transition:none}.ds-btn-ghost:hover{transform:none}}"
+    },
+    {
+      "name": "Campo de texto",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo existente de la ficha, con foco y estado inválido.",
+      "html": "<label class=\"ds-field\">Nombre de mi biblioteca<input class=\"ds-input\" type=\"text\" value=\"Mi biblioteca jurídica\" /></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:.55rem;color:var(--ink,#0c1c24);font-size:.82rem;font-weight:600;font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;}.ds-input{width:100%;border:1px solid var(--line,rgba(12,28,36,.12));background:var(--surface-solid,#fff);border-radius:var(--radius-md,.85rem);padding:.75rem .9rem;color:var(--ink,#0c1c24);font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;transition:border-color var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),box-shadow var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1))}.ds-input:focus{border-color:color-mix(in srgb,var(--sea,#1f6f78) 55%,transparent);box-shadow:0 0 0 3px var(--sea-soft,rgba(31,111,120,.12))}.ds-input:focus-visible{outline:3px solid var(--sea-bright,#2a8f99);outline-offset:3px}.ds-input[aria-invalid=\"true\"]{border-color:var(--danger,#b42318);box-shadow:0 0 0 3px color-mix(in srgb,var(--danger,#b42318) 18%,transparent)}@media(max-width:767px){.ds-input{min-height:44px;font-size:16px}}@media(prefers-reduced-motion:reduce){.ds-input{transition:none}}"
+    },
+    {
+      "name": "Navegación lateral",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Enlace del marco de aplicación; fondo e identidad existentes.",
+      "html": "<nav class=\"ds-sidebar\" aria-label=\"Navegación de ejemplo\"><a class=\"ds-nav-link\" href=\"#biblioteca\" aria-current=\"page\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/></svg>Biblioteca</a></nav>",
+      "css": ".ds-sidebar{background:var(--sidebar-bg,linear-gradient(180deg,#0c1c24 0%,#14313d 55%,#1a3d3f 100%));padding:.75rem;font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;}.ds-nav-link{display:flex;align-items:center;gap:.7rem;padding:.65rem .85rem;border-radius:var(--radius-md,.85rem);color:rgba(243,246,244,.72);text-decoration:none;transition:background var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),color var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1));touch-action:manipulation}.ds-nav-link:hover,.ds-nav-link[aria-current=\"page\"]{background:rgba(255,255,255,.08);color:#fff}.ds-nav-link:focus-visible{outline:3px solid var(--sea-bright,#2a8f99);outline-offset:3px}@media(max-width:767px){.ds-nav-link{min-height:44px;padding:.85rem 1rem;font-size:.95rem}}@media(prefers-reduced-motion:reduce){.ds-nav-link{transition:none}}"
+    },
+    {
+      "name": "Etiqueta de verde mar",
+      "kind": "chip",
+      "refersTo": "chip-sea",
+      "description": "Etiqueta estática existente para categoría o estado; no funciona como botón.",
+      "html": "<span class=\"ds-chip-sea\">Compartido</span>",
+      "css": ".ds-chip-sea{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .55rem;border-radius:var(--radius-pill,999px);font-size:var(--text-xs,.72rem);font-weight:600;letter-spacing:.02em;text-transform:uppercase;background:var(--sea-soft,rgba(31,111,120,.12));color:var(--sea,#1f6f78);font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;}:host-context(html.dark) .ds-chip-sea{color:var(--sea-bright,#2a8f99)}"
+    },
+    {
+      "name": "Papel de escritura",
+      "kind": "card",
+      "refersTo": "library-paper",
+      "description": "Superficie real de trabajo de la biblioteca, sin pasajes ficticios.",
+      "html": "<section class=\"ds-writing-paper\"><h2 class=\"ds-paper-heading\">Mesa de escritura</h2><p class=\"ds-paper-copy\">Elige los libros de tu biblioteca para fundamentar.</p></section>",
+      "css": ".ds-writing-paper{background:var(--surface-solid,#fff);padding:clamp(1.2rem,3vw,2.5rem);border-radius:12px;box-shadow:0 14px 35px rgba(28,35,30,.07);min-width:0;color:var(--ink,#0c1c24);font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;}.ds-paper-heading{font-family:var(--font-fraunces,Fraunces),Georgia,serif;font-size:clamp(1.6rem,2.4vw,2.3rem);line-height:1.2;margin:0 0 .6rem;letter-spacing:-.025em}.ds-paper-copy{color:var(--ink-soft,#1a3340);font-size:.85rem;line-height:1.8;max-width:75ch;margin:0}@media(max-width:480px){.ds-writing-paper{padding:1.1rem}}"
+    },
+    {
+      "name": "Seis distribuciones de biblioteca",
+      "kind": "custom",
+      "refersTo": "library-layout-choice",
+      "description": "Selector real de seis variantes de interfaz; las miniaturas geométricas son decorativas, sin datos de libros.",
+      "html": "<fieldset class=\"ds-library-layouts\"><legend>Distribución de la biblioteca</legend><label class=\"ds-library-layout-choice\"><input type=\"radio\" name=\"ds-library-layout\" value=\"mesa\" checked /><span class=\"ds-library-layout-miniature\" data-layout=\"mesa\" aria-hidden=\"true\"><span></span><span></span><span></span><span></span><span></span><span></span></span><strong>La mesa de estudio</strong><span>Un libro abierto al trabajo, con tus estantes cerca.</span></label><label class=\"ds-library-layout-choice\"><input type=\"radio\" name=\"ds-library-layout\" value=\"estantes\" /><span class=\"ds-library-layout-miniature\" data-layout=\"estantes\" aria-hidden=\"true\"><span></span><span></span><span></span><span></span><span></span><span></span></span><strong>La gran biblioteca</strong><span>Una pared de libros, ordenada por tus estantes.</span></label><label class=\"ds-library-layout-choice\"><input type=\"radio\" name=\"ds-library-layout\" value=\"gabinete\" /><span class=\"ds-library-layout-miniature\" data-layout=\"gabinete\" aria-hidden=\"true\"><span></span><span></span><span></span><span></span><span></span><span></span></span><strong>El gabinete</strong><span>Lomos y colecciones en una biblioteca recogida.</span></label><label class=\"ds-library-layout-choice\"><input type=\"radio\" name=\"ds-library-layout\" value=\"galeria\" /><span class=\"ds-library-layout-miniature\" data-layout=\"galeria\" aria-hidden=\"true\"><span></span><span></span><span></span><span></span><span></span><span></span></span><strong>La galería</strong><span>Encuadernaciones amplias, para mirar y elegir.</span></label><label class=\"ds-library-layout-choice\"><input type=\"radio\" name=\"ds-library-layout\" value=\"archivo\" /><span class=\"ds-library-layout-miniature\" data-layout=\"archivo\" aria-hidden=\"true\"><span></span><span></span><span></span><span></span><span></span><span></span></span><strong>El archivo</strong><span>Estantes densos de lomos y encuadernaciones.</span></label><label class=\"ds-library-layout-choice\"><input type=\"radio\" name=\"ds-library-layout\" value=\"salon\" /><span class=\"ds-library-layout-miniature\" data-layout=\"salon\" aria-hidden=\"true\"><span></span><span></span><span></span><span></span><span></span><span></span></span><strong>El salón de lectura</strong><span>Estantes abiertos y una composición luminosa.</span></label></fieldset>",
+      "css": ".ds-library-layouts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1rem; }\n.ds-library-layouts > legend { font-size: .9rem; font-weight: 600; padding-bottom: 1rem; }\n.ds-library-layout-choice { position: relative; display: flex; flex-direction: column; gap: .65rem; padding: 1rem; border: 1px solid var(--line-strong,rgba(12,28,36,.22)); border-radius: 10px; cursor: pointer; min-width: 0; }\n.ds-library-layout-choice:has(input:checked) { border-color: var(--sea,#1f6f78); background: var(--sea-soft,rgba(31,111,120,.12)); }\n.ds-library-layout-choice > input { position: absolute; top: 1rem; right: 1rem; accent-color: var(--sea,#1f6f78); width: 17px; height: 17px; }\n.ds-library-layout-choice > strong { font-family: var(--font-fraunces,Fraunces), Georgia, serif; font-size: 1.1rem; font-weight: 500; }\n.ds-library-layout-choice > span:last-child { font-size: .72rem; color: var(--ink-soft,#1a3340); line-height: 1.6; }\n.ds-library-layout-miniature { display: grid; grid-template-columns: repeat(6,1fr); align-items: end; gap: 4px; background: #34251e; padding: 13px 15px 9px; border-bottom: 6px solid #8c6041; width: 110px; height: 75px; border-radius: 3px; }\n.ds-library-layout-miniature > span { background: #764044; height: 42px; border: 1px solid #b99d69; border-radius: 1px; }\n.ds-library-layout-miniature > span:nth-child(2n) { background: #355548; height: 37px; }\n.ds-library-layout-miniature > span:nth-child(3n) { background: #314d63; }\n.ds-library-layout-miniature[data-layout=\"mesa\"] { width: 110px; padding-left: 35px; border-left: 21px solid #c9b99f; }\n.ds-library-layout-miniature[data-layout=\"gabinete\"] { padding-inline: 24px; gap: 3px; }\n.ds-library-layout-miniature[data-layout=\"galeria\"] { grid-template-columns: repeat(3,1fr); padding-inline: 16px; background: #eee8dc; border-bottom-color: #d8cbb8; }\n.ds-library-layout-miniature[data-layout=\"galeria\"] > span:nth-child(n+4) { display: none; }\n.ds-library-layout-miniature[data-layout=\"archivo\"] { grid-template-columns: repeat(7,1fr); gap: 3px; padding: 13px 8px 9px; background: #172022; border-bottom-color: #6d4b34; }\n.ds-library-layout-miniature[data-layout=\"archivo\"] > span:first-child { grid-column: span 2; }\n.ds-library-layout-miniature[data-layout=\"salon\"] { gap: 7px; padding-inline: 8px; background: #e9dfce; border-bottom-color: #c6aa7f; }\n.ds-library-layouts{border:0;color:var(--ink,#0c1c24);font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;}.ds-library-layout-choice input:focus-visible{outline:2px solid var(--sea,#1f6f78);outline-offset:4px;}@media(max-width:800px){.ds-library-layouts{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:480px){.ds-library-layouts{gap:.65rem}.ds-library-layout-choice{padding:.75rem;gap:.7rem}.ds-library-layout-choice>input{right:.7rem;top:.75rem;width:15px;height:15px}.ds-library-layout-miniature{width:82px;height:65px;padding-inline:10px;gap:3px;margin-top:1.2rem}.ds-library-layout-choice>strong{font-size:.98rem}.ds-library-layout-choice>span:last-child{font-size:.66rem}.ds-library-layout-miniature[data-layout=\"mesa\"]{width:82px;padding-left:12px;border-left-width:14px}}"
+    },
+    {
+      "name": "Vista previa de una encuadernación",
+      "kind": "custom",
+      "description": "Geometría CSS del estado vacío, identificada como vista previa. El grano usa la variable de textura de la app cuando está disponible; no crea un libro en la colección.",
+      "html": "<div class=\"ds-volume-preview\"><a class=\"ds-book-open-link\" href=\"#ds-volume-caption\" aria-label=\"Vista previa de una encuadernación\"><span class=\"ds-law-book-scene\" aria-hidden=\"true\" data-preview=\"true\"><span class=\"ds-law-book-volume\" data-color=\"oxblood\" data-material=\"leather\"><span class=\"ds-law-book-pages\"></span><span class=\"ds-law-book-spine\"><span>Tu biblioteca</span></span><span class=\"ds-law-book-front\"><span class=\"ds-law-book-frame\"></span><span class=\"ds-law-book-author\">Tu biblioteca personal</span><span class=\"ds-law-book-title\"><span class=\"ds-law-book-title-word\">Tu</span><span class=\"ds-law-book-title-word\">próximo</span><span class=\"ds-law-book-title-word\">libro</span></span><span class=\"ds-law-book-ornament\"><span></span><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.2\" aria-hidden=\"true\"><path d=\"M12 5a3 3 0 1 1 3 3m-3-3a3 3 0 1 0-3 3m3-3v1M9 8a3 3 0 1 0 3 3M9 8h1m5 0a3 3 0 1 1-3 3m3-3h-1m-2 3v-1\"/><circle cx=\"12\" cy=\"8\" r=\"2\"/><path d=\"M12 10v12\"/><path d=\"M12 22c4.2 0 7-1.667 7-5-4.2 0-7 1.667-7 5Z\"/><path d=\"M12 22c-4.2 0-7-1.667-7-5 4.2 0 7 1.667 7 5Z\"/></svg><span></span></span><span class=\"ds-law-book-imprint\">Ex libris</span><svg class=\"ds-law-book-press\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.2\" aria-hidden=\"true\"><path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/></svg></span></span></span><span class=\"ds-volume-caption\" id=\"ds-volume-caption\">Vista previa de una encuadernación</span></a></div>",
+      "css": ".ds-law-book-scene { display: block; perspective: 900px; width: 155px; height: 225px; position: relative; margin: 0 auto; flex-shrink: 0; }\n.ds-law-book-volume { --binding: #64292e; --binding-deep: #37181c; --binding-ink: #f0d59a; display: block; width: 143px; height: 218px; transform-style: preserve-3d; transform: rotateY(-18deg) rotateX(3deg); position: relative; transition: transform 420ms cubic-bezier(.16,1,.3,1); }\n.ds-law-book-volume[data-color=\"forest\"], .ds-book-color-option[data-color=\"forest\"] { --binding: #244d3c; --binding-deep: #10271f; }\n.ds-law-book-volume[data-color=\"navy\"], .ds-book-color-option[data-color=\"navy\"] { --binding: #263d55; --binding-deep: #132333; }\n.ds-law-book-volume[data-color=\"cognac\"], .ds-book-color-option[data-color=\"cognac\"] { --binding: #805034; --binding-deep: #482f22; }\n.ds-law-book-volume[data-color=\"ivory\"], .ds-book-color-option[data-color=\"ivory\"] { --binding: #e2d1ad; --binding-deep: #b3a07e; --binding-ink: #4e3924; }\n.ds-law-book-volume[data-color=\"charcoal\"], .ds-book-color-option[data-color=\"charcoal\"] { --binding: #343a3c; --binding-deep: #1a2021; }\n.ds-law-book-front { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 24px 16px 18px 21px; background-color: var(--binding); background-image: var(--leather-asset); background-size: 280px; background-blend-mode: soft-light; border-radius: 2px 5px 5px 2px; transform: translateZ(12px); box-shadow: inset 5px 0 6px rgba(0,0,0,.35), inset -2px 0 3px rgba(255,225,175,.14), 12px 12px 15px rgba(0,0,0,.28); color: var(--binding-ink); }\n.ds-law-book-front::after { content: \"\"; position: absolute; inset: 12px 10px 12px 14px; border: 1px solid currentColor; opacity: .44; border-radius: 1px; pointer-events: none; }\n.ds-law-book-frame { position: absolute; inset: 8px 6px 8px 10px; border: 1px solid currentColor; opacity: .45; border-radius: 2px; pointer-events: none; }\n.ds-law-book-spine { width: 24px; position: absolute; top: 0; bottom: 0; left: 0; background: var(--binding-deep); transform: rotateY(-90deg) translateX(-12px); transform-origin: left; display: flex; align-items: center; justify-content: center; border-radius: 3px 0 0 3px; color: var(--binding-ink); border-block: 1px solid rgba(237,200,131,.2); }\n.ds-law-book-spine > span { writing-mode: vertical-rl; max-height: 175px; overflow: hidden; font-family: var(--font-fraunces,Fraunces), Georgia, serif; font-size: .66rem; letter-spacing: .02em; white-space: nowrap; text-overflow: ellipsis; }\n.ds-law-book-pages { position: absolute; width: 22px; top: 4px; bottom: 4px; right: 0; background: repeating-linear-gradient(90deg, #cfc0a1 0px, #f2e8d0 1px, #f2e8d0 3px); transform-origin: right; transform: rotateY(90deg) translateX(12px); border-radius: 0 2px 2px 0; }\n.ds-law-book-author { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: .52rem; line-height: 1.5; text-align: center; max-width: 100%; margin-bottom: auto; opacity: .95; }\n.ds-law-book-title { display: flex; flex-wrap: wrap; align-content: center; justify-content: center; column-gap: .22em; font-family: var(--font-fraunces,Fraunces), Georgia, serif; font-size: min(var(--cover-title-size, 1.17rem), 1.17rem); line-height: 1.14; text-align: center; overflow-wrap: normal; word-break: normal; hyphens: none; font-weight: 400; width: 100%; text-shadow: 0 1px 1px rgba(0,0,0,.45); }\n.ds-law-book-title-word { display: inline-block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.ds-law-book-volume[data-title-density=\"compact\"] .ds-law-book-title { font-size: min(calc(var(--cover-title-size) * .85), 1rem); }\n.ds-law-book-volume[data-title-density=\"compact\"] .ds-law-book-ornament { margin-block: 7px; }\n.ds-law-book-volume[data-title-density=\"compact\"] .ds-law-book-press { display: none; }\n.ds-law-book-spine-title { display: none; }\n.ds-law-book-ornament { display: flex; align-items: center; justify-content: center; gap: 5px; width: 75%; margin: 12px 0; }\n.ds-law-book-ornament > span { height: 1px; flex: 1; background: currentColor; opacity: .65; }\n.ds-law-book-imprint { text-align: center; font-size: .55rem; line-height: 1.3; margin-top: auto; }\n.ds-law-book-press { margin-top: 9px; opacity: .8; }\n.ds-law-book-volume[data-material=\"linen\"] .ds-law-book-front { background-image: none; box-shadow: inset 3px 0 4px rgba(0,0,0,.2), 12px 12px 15px rgba(0,0,0,.25); }\n.ds-law-book-volume[data-material=\"minimal\"] .ds-law-book-front { background-image: none; }\n.ds-law-book-volume[data-material=\"minimal\"] .ds-law-book-frame, .ds-law-book-volume[data-material=\"minimal\"] .ds-law-book-front::after, .ds-law-book-volume[data-material=\"minimal\"] .ds-law-book-ornament { display: none; }\n.ds-book-open-link:hover .ds-law-book-volume, .ds-book-open-link:focus-visible .ds-law-book-volume { transform: translateY(-7px) rotateY(-7deg) rotateX(0); }\n.ds-volume-preview{color:var(--ink,#0c1c24);font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;}.ds-book-open-link{display:flex;align-items:center;flex-direction:column;gap:1rem;color:inherit;text-decoration:none}.ds-book-open-link:focus-visible{outline:2px solid #f2d799;outline-offset:4px;border-radius:4px}.ds-volume-caption{font-size:.77rem;color:var(--ink-soft,#1a3340)}@media(prefers-reduced-motion:reduce){.ds-law-book-volume{transition:none}.ds-book-open-link:hover .ds-law-book-volume,.ds-book-open-link:focus-visible .ds-law-book-volume{transform:rotateY(-18deg) rotateX(3deg)}}"
+    },
+    {
+      "name": "Aviso de texto conservado",
+      "kind": "custom",
+      "refersTo": "library-conversion-notice",
+      "description": "Aviso del lector sin original; comunica la base real de cotejo.",
+      "html": "<p class=\"ds-conversion-notice\"><strong>Original no conservado.</strong> Este libro conserva el texto preparado. No hay cotejo de sus páginas ni de su formato original en LexOpen; las citas se comprueban contra el texto conservado.</p>",
+      "css": ".ds-conversion-notice{padding:1rem 1.1rem;background:var(--sea-soft,rgba(31,111,120,.12));border-radius:8px;font-size:.8rem;line-height:1.8;color:var(--ink,#0c1c24);max-width:75ch;font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Continuidad LexOpen; biblioteca clásica personal",
+    "overview": "LexOpen conserva su identidad de cobre, verde mar, papel claro y tinta oscura, con Sora para la interfaz y Fraunces para los títulos. La autoridad del sistema sigue en `src/app/globals.css`, `AppShell` y `AppSidebar`; esta ampliación no reemplaza el cromo ni la identidad de otras pantallas.\n\nLa biblioteca añade la dirección aprobada de encuadernaciones clásicas de cuero en tres dimensiones. El grano y la madera pertenecen a los libros y estantes; la lectura, la escritura y los formularios mantienen superficies de papel y texto HTML. Las seis distribuciones son variantes de interfaz sobre la misma colección privada, no seis colecciones de muestra. La composición específica y su evidencia se conservan en `.impeccable/surfaces/biblioteca.md`.",
+    "keyCharacteristics": [
+      "Continuidad con Sora, Fraunces, cobre y verde mar.",
+      "Materialidad acotada a volúmenes y estantes; controles y pasajes legibles.",
+      "Nombre personal, propiedad y compartición explícitos junto al contenido.",
+      "Localizadores y estados que distinguen original conservado de texto conservado.",
+      "Reorganización adaptable, foco visible y movimiento reducido."
+    ],
+    "rules": [
+      {
+        "name": "The Material Scope Rule",
+        "body": "Las preferencias de madera y encuadernación modifican la biblioteca y sus libros; no cambian los colores semánticos de LexOpen.",
+        "section": "colors"
+      },
+      {
+        "name": "The Complete Title Rule",
+        "body": "La cubierta puede abreviar un título largo para respetar palabras y proporción; el título completo permanece en la ficha, el pie de catálogo y el nombre accesible del enlace.",
+        "section": "typography"
+      },
+      {
+        "name": "The Responsive Depth Rule",
+        "body": "Al pasar el puntero o enfocar el enlace, el libro se eleva y gira una sola vez mediante una transición corta; con movimiento reducido se conserva la pose estática y se elimina la transición. La legibilidad y la apertura del libro no dependen del giro.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** conservar Sora, Fraunces, cobre, verde mar y el marco de aplicación existente.",
+      "**Do** tratar las seis distribuciones como variantes de la misma biblioteca autorizada.",
+      "**Do** mantener títulos completos, propiedad, estados y localizadores en texto HTML legible.",
+      "**Do** usar las texturas propias para el grano y CSS para volumen, iluminación y respuesta al foco.",
+      "**Do** distinguir visualmente original conservado, texto conservado y extracción parcial u OCR.",
+      "**Do** preservar la reorganización móvil y la respuesta estática con movimiento reducido."
+    ],
+    "donts": [
+      "**Don't** aplicar madera, cuero o las preferencias de biblioteca al cromo de las otras pantallas.",
+      "**Don't** usar mocks, libros de ejemplo o miniaturas como contenido real de la colección.",
+      "**Don't** atribuir páginas físicas a EPUB, TXT o un original que no está conservado.",
+      "**Don't** presentar una comprobación de literalidad como verdad jurídica o autoría certificada.",
+      "**Don't** rasterizar títulos, controles, pasajes o avisos de la interfaz.",
+      "**Don't** añadir lámparas, plantas u objetos del mock a la superficie operativa de biblioteca."
+    ]
+  }
+}

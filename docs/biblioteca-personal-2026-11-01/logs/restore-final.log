@@ -1,0 +1,13 @@
+LexOpen personal library final restore read 2026-11-01T23:10:02.354599+00:00
+Continuation: both new databases were created by the retained original run; no reset, deletion, recreation or domain changes.
+Source remains read-only; membership arrays bookIds/memberIds compare as sorted sets; every database row and column still compares byte-exact SQL JSON hashes.
+Artifacts: <tmp>/lexopen-books-upgrade-restore-rtieuybd
+Storage: <tmp>/lexopen-books-restored-storage-0egh_sqc
+{"phase":"restored current domain fresh-process read","nodePid":55321,"books":"title/author/edition/leather/spine/shelf/ownership/source hashes exact","prefs":"salon/night/spines and archivo/oak/covers exact","collection":"members/items/ownership/revision exact","draft":"prose/citations/current bibliography/revision/export exact","revokedHistory":"404 + redacted ID only","pdf":"physical page2 quote/SHA/PNG exact","epub":"section2 without invented page","outsider":"all books/originals/collection/draft denied404","staleCas":"book/collection/draft rejected409","writes":"none","networkRequests":0,"modelCalls":0,"moduleHashes":{"src/lib/books/access.ts":"5d83ff16177ef7eb6de3a057d2cef61aea3f65f1781c124b83672c7c76f6fa55","src/lib/books/service.ts":"9e1800fecad6e4181abd68cd12a798bc54277b8a2fda9e0ffc33217d34020bcd","src/lib/books/formats.ts":"b2217dcfc5bafbb6ed5b399a68467b5727207997a90c67a8ce5f28fc5a439d69","src/lib/books/rag.ts":"6b5bf92a18fdef85a7bc1553c1aaf7fdaec46a95ff0a179b5408bbc2b90bd473","src/lib/books/drafts.ts":"6e859f3eed8778824b7732bff31026e707ba9e2b2d0e2dd3450063507b7bbb2e"}}
+PASS exact restored contents: 97 tables; 761 rows; 30 objects. No writes from successful reads or rejected stale CAS.
+PASS source35 unchanged: 89 tables; 723 rows; 27 objects. Source operated with read-only PGOPTIONS throughout.
+PASS all 37 repository migration checksums matched in original upgrade; drift check exited0.
+PASS fresh Node process: library ownership, leather metadata, shared reading, preferences/layouts, EPUB section, PDF physical page2/PNG, original hashes, draft text, verified citations, bibliography, literal export and revoked history exact. Model/network0.
+INCIDENTS retained: first setup adapter renamed source storage incorrectly and aborted before database creation; second strict service comparison treated collection membership as ordered despite equal timestamps. Only temporary proof adapter changed; app/database/files unchanged.
+LIMITS: logical PostgreSQL dump/restore and local files; not physical Host/vault/configuration, S3, live model, production installation, HTTP compiled restart on restored database or real user materials.
+RESULT PASS. Proof databases, dumps, descriptors, source and restored storage retained. Final executor and Node process exit0.

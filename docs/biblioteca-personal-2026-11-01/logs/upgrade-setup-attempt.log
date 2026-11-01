@@ -1,0 +1,7 @@
+LexOpen personal legal library upgrade and restore rehearsal 2026-11-01T23:08:32.274703+00:00
+Scope: existing fictitious schema35 source is read-only; new disposable destinations only; no production installation.
+Artifacts: <tmp>/lexopen-books-upgrade-restore-75x5agtt
+Source storage: <tmp>/lexopen-books-restored-storage-6ub90xq8
+Fixture storage: <tmp>/lexopen-books-upgrade-storage-n9gnxoxb
+Restored storage: <tmp>/lexopen-books-restored-storage-_u62i0gj
+RESULT FAIL: Previous synthetic storage missing

@@ -1,0 +1,157 @@
+{
+  "date": "2026-11-01",
+  "schema": 38,
+  "status": "24 final library UI captures selected by known filenames from whole36-test Chromium run, plus1physical PDF page from current-code recovery read. Independent review passed; no additional visual inspection.",
+  "files": [
+    {
+      "file": "conversion-options-desktop.png",
+      "source": "library-conversion-convers-5dcda--citas-sin-afirmar-original-chromium/conversion-options-desktop.png",
+      "bytes": 719289,
+      "sha256": "3c9477547e2cd96c398a00f84d67a45f78b32585a4a81a2026cff97aad014d6b"
+    },
+    {
+      "file": "conversion-options-mobile.png",
+      "source": "library-conversion-convers-5dcda--citas-sin-afirmar-original-chromium/conversion-options-mobile.png",
+      "bytes": 405298,
+      "sha256": "b0042ecd9b6bcae185698e937986cd2281b7464f636e31e605ffdc0d210fc49d"
+    },
+    {
+      "file": "conversion-preferences-desktop.png",
+      "source": "library-conversion-convers-5dcda--citas-sin-afirmar-original-chromium/conversion-preferences-desktop.png",
+      "bytes": 746272,
+      "sha256": "fb67c63d16794e4515a368533c04f40f93cb7319743b146047fff8a8a3b8c9ad"
+    },
+    {
+      "file": "conversion-preferences-mobile.png",
+      "source": "library-conversion-convers-5dcda--citas-sin-afirmar-original-chromium/conversion-preferences-mobile.png",
+      "bytes": 405922,
+      "sha256": "ff48562c2c41bd1944779b45ef94fa24032acad4d5625299af834249b61d836b"
+    },
+    {
+      "file": "conversion-reader-desktop.png",
+      "source": "library-conversion-convers-5dcda--citas-sin-afirmar-original-chromium/conversion-reader-desktop.png",
+      "bytes": 370562,
+      "sha256": "b655dd2ea45a2ff2fdfc217c0625756065b5878a8847ca718cfd81238e722b8d"
+    },
+    {
+      "file": "conversion-reader-mobile.png",
+      "source": "library-conversion-convers-5dcda--citas-sin-afirmar-original-chromium/conversion-reader-mobile.png",
+      "bytes": 223646,
+      "sha256": "2bc1bdacc5e12ca2287df5e74405127363ae3300d7d540176cd56091137f8d76"
+    },
+    {
+      "file": "books-archivo-desktop.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-archivo-desktop.png",
+      "bytes": 972936,
+      "sha256": "c1b5274639fd1888b26b6d9700147d13029c260157e631bcd79370775c0e5f9d"
+    },
+    {
+      "file": "books-archivo-mobile.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-archivo-mobile.png",
+      "bytes": 456587,
+      "sha256": "6e1021fd0a92be9eb961dc0b976888d4a939751a08327db22d325e4c40fb82c3"
+    },
+    {
+      "file": "books-empty-desktop.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-empty-desktop.png",
+      "bytes": 591076,
+      "sha256": "32ab29ad4904172b06499fe794b1d2e7819b8fba150be99e80eed20f9e08b859"
+    },
+    {
+      "file": "books-empty-mobile.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-empty-mobile.png",
+      "bytes": 331932,
+      "sha256": "347cbe4011e1a0d59baafe83aaf26a99f292daa1706866e5b6706f9fc3ed5c5c"
+    },
+    {
+      "file": "books-estantes-desktop.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-estantes-desktop.png",
+      "bytes": 1144177,
+      "sha256": "094afc3b584061a2dc26e497014e0fb40939e1cbf3d459a50a1917e1c477eb6f"
+    },
+    {
+      "file": "books-estantes-mobile.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-estantes-mobile.png",
+      "bytes": 559634,
+      "sha256": "010e9c46882f89ce6131218e8d6585a51067fa30be274e6475baf78e1dfd1b19"
+    },
+    {
+      "file": "books-gabinete-desktop.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-gabinete-desktop.png",
+      "bytes": 1106457,
+      "sha256": "760b6edf3f4b03cae729caba524908bf2871caba80b60daab3333d1907a04dcb"
+    },
+    {
+      "file": "books-gabinete-mobile.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-gabinete-mobile.png",
+      "bytes": 483093,
+      "sha256": "a388b83bc5a2073409cf5285dd06590bab8cc36b8a62e069da02ecf927bd4c22"
+    },
+    {
+      "file": "books-galeria-desktop.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-galeria-desktop.png",
+      "bytes": 563399,
+      "sha256": "071b2efe083911ab964b629a212f2d30cac59e6d0e80f69faa97d9f508b8baca"
+    },
+    {
+      "file": "books-galeria-mobile.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-galeria-mobile.png",
+      "bytes": 452638,
+      "sha256": "ded7bf0cc2381dbf430501c375390f1e72c4bb0905601c96fd40206dc07b60ac"
+    },
+    {
+      "file": "books-mesa-desktop.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-mesa-desktop.png",
+      "bytes": 1132459,
+      "sha256": "bef28dc52ef0d3f45e3b1818a4357f62180a746ed8b7306fc93a7292cb0788fa"
+    },
+    {
+      "file": "books-mesa-mobile.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-mesa-mobile.png",
+      "bytes": 572442,
+      "sha256": "b1589663b80c0fd370649646c0590c1eace0170519e4fe13a7708e9c878a6eff"
+    },
+    {
+      "file": "books-reader-desktop.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-reader-desktop.png",
+      "bytes": 386859,
+      "sha256": "c061f925622b7c1931f0a709c5f9f27bd8b9e79a44b6345dcddc87add853c963"
+    },
+    {
+      "file": "books-reader-mobile.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-reader-mobile.png",
+      "bytes": 196452,
+      "sha256": "c9ac91f65387ec30156d8da9d7a1ea778ebb438e1eedceca8686701d6c156445"
+    },
+    {
+      "file": "books-salon-desktop.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-salon-desktop.png",
+      "bytes": 496904,
+      "sha256": "e05e7311a56883112141167b800ec499e7e799a0b6500ef8d2006919f2eb939e"
+    },
+    {
+      "file": "books-salon-mobile.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-salon-mobile.png",
+      "bytes": 329291,
+      "sha256": "d4e419b75657705c6cef9754c6d316687ed375f7e65c72297fbe87f367b3dee5"
+    },
+    {
+      "file": "books-writing-desktop.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-writing-desktop.png",
+      "bytes": 605934,
+      "sha256": "0f8d55a11e91d59e4b982655ddeb0ce8ec2979d7b13bc9f9d03a3cd5ccdcaf2a"
+    },
+    {
+      "file": "books-writing-mobile.png",
+      "source": "personal-library-bibliotec-b0fbe-ito-y-revocación-compartida-chromium/books-writing-mobile.png",
+      "bytes": 335905,
+      "sha256": "a080b7eb6c797b76491423b0b3063db6a9d12799bbb9617b9c57145e9c134619"
+    },
+    {
+      "file": "restored-physical-page2.png",
+      "source": "legacy-book-page2-verify.png",
+      "bytes": 89217,
+      "sha256": "45b2d4cecaf91a71744b3643ab320682d61e8b356a11fa54c170598e23f9fed9"
+    }
+  ]
+}

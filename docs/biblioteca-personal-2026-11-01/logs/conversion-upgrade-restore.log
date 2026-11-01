@@ -1,0 +1,19 @@
+LexOpen optional text conversion upgrade/restore 2026-11-01T23:24:20.854400+00:00
+Scope: existing fictitious schema37 with active books is read-only; two absent disposable destinations; no reset/deletion or production data.
+Artifacts: <tmp>/lexopen-books-conversion-upgrade-restore-aoolh1nk
+Source storage: <tmp>/lexopen-books-restored-storage-0egh_sqc
+Fixture storage: <tmp>/lexopen-books-conversion-upgrade-storage-xn4c1pcf
+Restored storage: <tmp>/lexopen-books-conversion-restored-storage-3eiu9o9h
+Source snapshot: 97 tables; 761 rows; 30 objects.
+Created NEW lexopen_books_conversion_upgrade_test
+PASS migrate37→38 exit0
+PASS schema drift exit0
+PASS historical values: every old column/row hash/count across97tables unchanged except +1migration. Six new book and three preference fields have explicit safe defaults.
+{"phase":"conversion fixtures created","legacyOriginalsPreserved":3,"legacyPDFPage":2,"legacyDraftKeysUnchanged":true,"newBooks":2,"retainedTextOnlyPDF":true,"original410":true,"noPDFPageForRetainedText":true,"retainedTextShaExact":true,"explicitlyKeptEPUBOriginal":true,"sharedReading":true,"prefsThresholdMb":1,"moduleHashes":{"src/lib/books/access.ts":"5d83ff16177ef7eb6de3a057d2cef61aea3f65f1781c124b83672c7c76f6fa55","src/lib/books/service.ts":"46c58249b38f0eacd05241fbeac107e9faf38d0232d1bf80e7d92d0860123b44","src/lib/books/formats.ts":"b2217dcfc5bafbb6ed5b399a68467b5727207997a90c67a8ce5f28fc5a439d69","src/lib/books/rag.ts":"1b03df2c95eee5fd53de3587039b4d3184aff6f32cdd984d5930e42d2fc765a0","src/lib/books/drafts.ts":"dbe5c8894ff900377ecd04b1f5f6eb91c941c8b14dec892526cf604e4dd690bd"},"networkRequests":0,"modelCalls":0}
+Fixture snapshot: 97 tables; 783 rows; 32 objects. All38migration checksums match.
+Created NEW lexopen_books_conversion_restore_test
+PASS restore exact alltable row/column hashes/counts and all storage object hashes/sizes
+{"phase":"conversion restore fresh-process reads","nodePid":63498,"legacyOriginalsAndDrafts":"all37sources/sourceKeys/prose/layouts preserved; defaultoriginaltrue and historical PDFp2PNGexact","retainedOnlyPDF":"UTF8TXT/SHA/extractedText exact;original410;image404;nullpage","keptEPUB":"originalSHA and retained/prepared text exact","citations":"basis original versus retained_text and distinct hashes/notes/export exact","sharing":"current readers authorized, outsider404","preferences":"conversiontrue/originalfalse/threshold1 +layoutestantes/oak exact","staleCAS409":true,"writes":"none","moduleHashes":{"src/lib/books/access.ts":"5d83ff16177ef7eb6de3a057d2cef61aea3f65f1781c124b83672c7c76f6fa55","src/lib/books/service.ts":"46c58249b38f0eacd05241fbeac107e9faf38d0232d1bf80e7d92d0860123b44","src/lib/books/formats.ts":"b2217dcfc5bafbb6ed5b399a68467b5727207997a90c67a8ce5f28fc5a439d69","src/lib/books/rag.ts":"1b03df2c95eee5fd53de3587039b4d3184aff6f32cdd984d5930e42d2fc765a0","src/lib/books/drafts.ts":"dbe5c8894ff900377ecd04b1f5f6eb91c941c8b14dec892526cf604e4dd690bd"},"networkRequests":0,"modelCalls":0}
+PASS both source37 and restored38 hashes remain exact after fresh domain reads and denied CAS; no data/file writes or model/network calls.
+LIMITS: logical PostgreSQL/local files/domain reads; not physical Host/vault/config/S3/live model or compiled HTTP restart on restored database.
+RESULT PASS. Both destinations were absent before creation; no database reset or deletion; dumps/storage/proof descriptors retained. Python and fresh Node exit0.

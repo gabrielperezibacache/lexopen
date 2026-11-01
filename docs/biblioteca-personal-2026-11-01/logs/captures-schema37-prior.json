@@ -1,0 +1,121 @@
+{
+  "date": "2026-11-01",
+  "schema": 37,
+  "status": "Baseline approved before optional conversion extension; 18 final directed browser screenshots plus one restored physical PDF image.",
+  "files": [
+    {
+      "file": "books-archivo-desktop.png",
+      "source": "books-archivo-desktop.png",
+      "bytes": 967903,
+      "sha256": "16f85693fc8c4ba202a37e1928345884c489aa290ae4f451142dc692915eca65"
+    },
+    {
+      "file": "books-archivo-mobile.png",
+      "source": "books-archivo-mobile.png",
+      "bytes": 453172,
+      "sha256": "3e6c0da2b413aa1f46080be82bb755a421283ba642975675b46456620a834218"
+    },
+    {
+      "file": "books-empty-desktop.png",
+      "source": "books-empty-desktop.png",
+      "bytes": 590275,
+      "sha256": "0193ab3286a877c587356d62d6c12ed8e3be25d6724a6abb2f633d78850d884d"
+    },
+    {
+      "file": "books-empty-mobile.png",
+      "source": "books-empty-mobile.png",
+      "bytes": 331599,
+      "sha256": "32b9d95d7da4933be6170f0802516195301c14b86e1e554db0460edf9e3f197d"
+    },
+    {
+      "file": "books-estantes-desktop.png",
+      "source": "books-estantes-desktop.png",
+      "bytes": 1139684,
+      "sha256": "572552f7d7543f3c9d35aa76fe55ab2c81e6f860a127c6f48082981194ad67a3"
+    },
+    {
+      "file": "books-estantes-mobile.png",
+      "source": "books-estantes-mobile.png",
+      "bytes": 557207,
+      "sha256": "00cc3c31216a89357a9e337cfcd6a5e0f4fe544bf4138bcfab97b89d04f3c367"
+    },
+    {
+      "file": "books-gabinete-desktop.png",
+      "source": "books-gabinete-desktop.png",
+      "bytes": 1102464,
+      "sha256": "93b60598c8af2c206c009a42d5fdb9abd3016f1d85a9caaf332b10aca65b1b95"
+    },
+    {
+      "file": "books-gabinete-mobile.png",
+      "source": "books-gabinete-mobile.png",
+      "bytes": 480570,
+      "sha256": "75df8918783c9cef26e910d8f1b78c4965b9603e5f570b4f6e7437bbf25c79be"
+    },
+    {
+      "file": "books-galeria-desktop.png",
+      "source": "books-galeria-desktop.png",
+      "bytes": 558313,
+      "sha256": "8574aa24650692580b1b59e12478fceb5f258b41517286c213959c514a271edb"
+    },
+    {
+      "file": "books-galeria-mobile.png",
+      "source": "books-galeria-mobile.png",
+      "bytes": 449626,
+      "sha256": "a4c13896358e65e21729a68a3ae13e6c6b514d2772ebdf91135447a659652857"
+    },
+    {
+      "file": "books-mesa-desktop.png",
+      "source": "books-mesa-desktop.png",
+      "bytes": 1128289,
+      "sha256": "597328e0b89c5b7214b16efc1f093ea67f179b0761add579bf09d7ceba05220d"
+    },
+    {
+      "file": "books-mesa-mobile.png",
+      "source": "books-mesa-mobile.png",
+      "bytes": 569559,
+      "sha256": "34590d212213847a56f4668a4ca2141d7f1ee6be7fc549d1fa55c59aecea95fe"
+    },
+    {
+      "file": "books-reader-desktop.png",
+      "source": "books-reader-desktop.png",
+      "bytes": 387784,
+      "sha256": "e46b625c69bb95020ebb301b7df4aec025a34c286ff711dfdf777832235a44bd"
+    },
+    {
+      "file": "books-reader-mobile.png",
+      "source": "books-reader-mobile.png",
+      "bytes": 196452,
+      "sha256": "c9ac91f65387ec30156d8da9d7a1ea778ebb438e1eedceca8686701d6c156445"
+    },
+    {
+      "file": "books-salon-desktop.png",
+      "source": "books-salon-desktop.png",
+      "bytes": 491951,
+      "sha256": "04c80d3957fbf4ece98950fea415c0e7d3e1b44fe89558958f237a0b94f79486"
+    },
+    {
+      "file": "books-salon-mobile.png",
+      "source": "books-salon-mobile.png",
+      "bytes": 326625,
+      "sha256": "01e244b4aca586db505f3c5301096e3ac19eaeb554a16e35f06c04e79b33ba89"
+    },
+    {
+      "file": "books-writing-desktop.png",
+      "source": "books-writing-desktop.png",
+      "bytes": 604942,
+      "sha256": "4ce8136cc28b7f999443d9a381df40f2556e0c006150fe1a40f230d660d0276b"
+    },
+    {
+      "file": "books-writing-mobile.png",
+      "source": "books-writing-mobile.png",
+      "bytes": 334775,
+      "sha256": "fcef56931bc69fdf812b373b5a01c9e6db9385764ac3c8452e74a51915da3cf1"
+    },
+    {
+      "file": "restored-physical-page2.png",
+      "source": "book-page2-after.png",
+      "bytes": 89217,
+      "sha256": "45b2d4cecaf91a71744b3643ab320682d61e8b356a11fa54c170598e23f9fed9"
+    }
+  ]
+}

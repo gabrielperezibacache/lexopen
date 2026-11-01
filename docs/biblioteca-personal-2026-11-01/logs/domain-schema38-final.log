@@ -1,0 +1,42 @@
+
+> lexopen@1.0.0 test:books:integration
+> node --import tsx src/lib/books/books.integration.test.ts && node --import tsx src/lib/books/rag.integration.test.ts && node --import tsx src/lib/books/conversion.integration.test.ts
+
+audit write failed Error: Synthetic book audit failure
+    at Array.create (<workspace>/src/lib/books/books.integration.test.ts:86:134)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+audit write failed Error: Synthetic book audit failure
+    at Array.create (<workspace>/src/lib/books/books.integration.test.ts:86:134)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+Personal book library PostgreSQL PASS: private ownership incl admin denial, concurrent import replay/CAS, personalization, explicit read-only collections and revocation, current actor/owner role/capability, exact original/text/Unicode/fragment hashes, EPUB sections, physical PDF/OCR page2/image, whole-PDF page/text coordinate binding and coherent-page/global/local-range tamper rejection and canonical PDF label through export after label-only corruption, preferences isolation, audit rollback and soft-removal derivative denial; network/model calls 0.
+audit write failed Error: Book RAG synthetic audit failure
+    at <anonymous> (<workspace>/src/lib/books/rag.integration.test.ts:21:173)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+Book RAG PostgreSQL PASS: explicit owned/shared scope, BM25 literal citations and retained original, zero-result abstention/no model, real-model-only structured generation, existing author text preserved, source markers as data, invented references/quotes rejected, CAS and audit rollback, authoritative bibliography refresh, per-request and history sharing revocation, text/original tampering, local_only egress and actor revocation.
+audit write failed Error: Synthetic import attempt audit failure
+    at Array.create (<workspace>/src/lib/books/conversion.integration.test.ts:72:142)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+audit write failed Error: Synthetic import attempt audit failure
+    at Array.create (<workspace>/src/lib/books/conversion.integration.test.ts:72:142)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+library.book.import.cleanup_failed {
+  key: 'library-books/book_5ca26016438ac943b24df74f7c090a62389c04b2/attempts/f2643149-a996-4b8b-939e-f5c79e30fdeb/original/d7effbc57ab954ed5ce2e6b545f10fa0b7a6b92bc0b4e07170bd9be7a7c3b42d',
+  code: 'book_import_attempt_cleanup'
+}
+Book text retention PostgreSQL PASS: explicit conversion/original choices and replay conflicts, physical PDF/OCR retained when chosen, TXT-only storage with original hash provenance, original410 and no fake PDF page, text/citation/export tamper409, retained-text RAG footnotes, migrated37 original/citation compatibility, per-user defaults and partial PATCH preservation, heavy text threshold and strict multipart options, per-attempt object cleanup for opposing-option races/audit rollback/same-option replay while retaining only the committed winner, partial writes compensated and cleanup failure returns503 with both causes; model/network calls 0.

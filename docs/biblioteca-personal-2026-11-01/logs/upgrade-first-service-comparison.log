@@ -1,0 +1,121 @@
+LexOpen personal legal library upgrade and restore rehearsal 2026-11-01T23:08:48.113435+00:00
+Scope: existing fictitious schema35 source is read-only; new disposable destinations only; no production installation.
+Artifacts: <tmp>/lexopen-books-upgrade-restore-rtieuybd
+Source storage: <tmp>/lexopen-knowledge-restored-storage-6ub90xq8
+Fixture storage: <tmp>/lexopen-books-upgrade-storage-_ykuorcm
+Restored storage: <tmp>/lexopen-books-restored-storage-0egh_sqc
+Source snapshot: 89 tables; 723 rows; 27 objects. Hashes use sorted SQL JSON text, preserving numeric precision and timestamps.
+Created NEW lexopen_books_upgrade_test
+PASS migrate deploy: schema35 -> schema37, exit 0
+PASS Prisma schema drift check: exit 0
+PASS upgrade preservation: every row/column hash/count across all 89 old tables unchanged; migration rows +2 only. Eight personal-library tables initially empty.
+{"phase":"book fixtures created","users":3,"books":3,"formats":["txt","epub","pdf"],"pdfPhysicalPage":2,"collectionShared":true,"revokedHistoryRedacted":true,"ownerLayout":"salon","memberLayout":"archivo","draftRevision":2,"networkRequests":0,"modelCalls":0,"moduleHashes":{"src/lib/books/access.ts":"5d83ff16177ef7eb6de3a057d2cef61aea3f65f1781c124b83672c7c76f6fa55","src/lib/books/service.ts":"9e1800fecad6e4181abd68cd12a798bc54277b8a2fda9e0ffc33217d34020bcd","src/lib/books/formats.ts":"b2217dcfc5bafbb6ed5b399a68467b5727207997a90c67a8ce5f28fc5a439d69","src/lib/books/rag.ts":"6b5bf92a18fdef85a7bc1553c1aaf7fdaec46a95ff0a179b5408bbc2b90bd473","src/lib/books/drafts.ts":"6e859f3eed8778824b7732bff31026e707ba9e2b2d0e2dd3450063507b7bbb2e"}}
+Fixture snapshot: 97 tables; 761 rows; 30 storage objects. All previous rows remain exact subsets; all 37 migration checksums match repository files.
+Created NEW lexopen_books_restore_test
+PASS restore: every table count/row hash and every storage path/byte count/hash exactly match the upgraded fixture database.
+RESULT FAIL: node exit 1: Ids: [ 'cmvyfyu720001s2z8nw1nvi4y' ],
+        memberCount: 1
+      }
+    },
+    ownerPreferences: {
+      libraryName: 'Biblioteca privada de restauración',
+      shelfTheme: 'night',
+      view: 'spines',
+      layout: 'salon'
+    },
+    memberPreferences: {
+      libraryName: 'Librería del lector ficticio',
+      shelfTheme: 'oak',
+      view: 'covers',
+      layout: 'archivo'
+    },
+    search: {
+      status: 'completed',
+      query: 'pago contrato',
+      results: [
+        {
+          bookId: 'book_5ec685511fb84f5d33eea39a2589e4419966a24c',
+          fragmentId: 'cmvyfyuhk000es2z8gkxfg193',
+          quote: 'PAGINA DOS - DOCUMENTO ESCANEADO\n' +
+            '\n' +
+            'HECHO FICTICIO: PAGO EL 12 DE MAYO DE 2025.\n' +
+            '\n' +
+            'IMPORTE CONFIRMADO: 25000 PESOS.',
+          sourceKind: 'library_book',
+          ordinal: 2,
+          quoteSha256: '7c219b2bfbad34c1d1b7e135e74dd5cf851af874499c99df76d64cbc727d9dfb',
+          textSha256: '7c219b2bfbad34c1d1b7e135e74dd5cf851af874499c99df76d64cbc727d9dfb',
+          sourceSha256: 'acd6070eac020e156b7434ea350d64f02ed3ea5304739a02e14f71e1fe56ade3',
+          sourceKey: '1f1e566563d8bd81e62d5b70bd509ae0abb9c2ba6423436ad9f5e1b82ca1b3b6',
+          pageNumber: 2,
+          locatorLabel: 'Página 2',
+          href: '/biblioteca/book_5ec685511fb84f5d33eea39a2589e4419966a24c?fragment=2#fragment-2',
+          title: 'Prueba documental del ensayo',
+          author: 'Autora ficticia del ensayo',
+          year: '2025',
+          edition: 'Segunda edición ficticia',
+          publisher: 'Editorial de prueba',
+          extractionMethod: 'ocr',
+          partial: false,
+          score: 1.5698
+        },
+        {
+          bookId: 'book_462c78348a645aa42b43b8d3cc55597b92c62f55',
+          fragmentId: 'cmvyfyu7i0009s2z8f5iyidj5',
+          quote: 'Prueba del contrato\n' +
+            '\n' +
+            'Este manual ficticio afirma que la prueba documental del contrato debe contrastarse con sus antecedentes. Es material de prueba, sin autoridad jurídica.',
+          sourceKind: 'library_book',
+          ordinal: 2,
+          quoteSha256: 'a02ba3fc1de9ddfbf15cb30f0de6496880acfd1545f6f6c2d5870240a481d85f',
+          textSha256: 'a02ba3fc1de9ddfbf15cb30f0de6496880acfd1545f6f6c2d5870240a481d85f',
+          sourceSha256: '3bdd3abcb67f919bef947132974e8b4f04e6997304cf22692ccc05408270a8e4',
+          sourceKey: 'b5034113d34742a246648d9f2333e9abd6c2812b708c84cb47155e5793b17d26',
+          pageNumber: null,
+          locatorLabel: 'Sección 2 · second.xhtml',
+          href: '/biblioteca/book_462c78348a645aa42b43b8d3cc55597b92c62f55?fragment=2#fragment-2',
+          title: 'Tratado digital del ensayo',
+          author: 'Autora ficticia del ensayo',
+          year: '2025',
+          edition: 'Segunda edición ficticia',
+          publisher: 'Editorial de prueba',
+          extractionMethod: 'text',
+          partial: false,
+          score: 0.7308
+        },
+        {
+          bookId: 'book_462c78348a645aa42b43b8d3cc55597b92c62f55',
+          fragmentId: 'cmvyfyu7i0008s2z8g6vuwdww',
+          quote: 'Obligaciones y buena fe\n' +
+            '\n' +
+            'Material ficticio: la buena fe exige examinar la conducta de las partes del contrato. Este pasaje sólo sirve para verificar importación y citas.',
+          sourceKind: 'library_book',
+          ordinal: 1,
+          quoteSha256: '7cdae6ede89875c3cdbdd4abcedd58523b880f52f1c036a90ae26b3ede38556e',
+          textSha256: '7cdae6ede89875c3cdbdd4abcedd58523b880f52f1c036a90ae26b3ede38556e',
+          sourceSha256: '3bdd3abcb67f919bef947132974e8b4f04e6997304cf22692ccc05408270a8e4',
+          sourceKey: '1e1f12fe75c8941ac052d76ab666fc3a9a60c75627a56471983fe88f5c4258fd',
+          pageNumber: null,
+          locatorLabel: 'Sección 1 · first.xhtml',
+          href: '/biblioteca/book_462c78348a645aa42b43b8d3cc55597b92c62f55?fragment=1#fragment-1',
+          title: 'Tratado digital del ensayo',
+          author: 'Autora ficticia del ensayo',
+          year: '2025',
+          edition: 'Segunda edición ficticia',
+          publisher: 'Editorial de prueba',
+          extractionMethod: 'text',
+          partial: false,
+          score: 0.5109
+        },
+        {
+          bookId: 'book_82054ba0d9824ba23d6237b80a92c76a4607681b',
+          fragmentId: 'cmvyfyu790004s2z8o3lgoxnx',
+          quote: 'Apuntes ficticios de la biblioteca personal.\n' +
+            '\n' +
+            'La buena fe y la prueba del contrato se examinan con apoyo en fuentes identificadas. Este pasaje es material ficticio para verificar recuperación y citas; no representa doctrina real.',
+          sourceKind: 'library_book',
+          ordinal: 1,
+          quoteSha256: '4caff40024753e677ccc618756d27de871143275f2ebf400b7b92ba7039679b9',
+          textSha256: '4caff40024753e677ccc618756d27de871143275f2ebf400b7b92ba7039679b9',
+          sourceSha256: '91bc3a2631bc7f45e4ee0f871b479095708dc00749e679a6135b5b1b79406942',
+          sourceKey: 'da416

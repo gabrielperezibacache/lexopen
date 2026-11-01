@@ -1,0 +1,390 @@
+{
+  "date": "2026-11-01",
+  "normalization": "ANSI removed; workspace, temporary and user prefixes replaced; line endings/trailing whitespace normalized; original files unchanged.",
+  "files": [
+    {
+      "file": "units.log",
+      "source": "lexopen-books-units-final.log",
+      "sourceBytes": 12231,
+      "sourceSha256": "b039c87b3b4fe4107f32bdbce3a753ae409ffb0ce67e0efdeb8f0d97c7c4ec04",
+      "normalizedBytes": 12231,
+      "normalizedSha256": "b039c87b3b4fe4107f32bdbce3a753ae409ffb0ce67e0efdeb8f0d97c7c4ec04"
+    },
+    {
+      "file": "types.log",
+      "source": "lexopen-books-types-final.log",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedBytes": 0,
+      "normalizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "lint.log",
+      "source": "lexopen-books-lint-final.log",
+      "sourceBytes": 34,
+      "sourceSha256": "db58e698a71f6923f5d66425538f7b1ea17c7e16f3ce1c85858f0ab5911afc98",
+      "normalizedBytes": 33,
+      "normalizedSha256": "dbd928d643fd9a62d3f7b403093eb025bf1d22a9f30e9b3793a4087d2ebc7b10"
+    },
+    {
+      "file": "integration.log",
+      "source": "lexopen-books-integration-final.log",
+      "sourceBytes": 30999,
+      "sourceSha256": "a53e377c0ca53445c4504c62645dae2ae3841f5f256eff4f26556cea0057f984",
+      "normalizedBytes": 25441,
+      "normalizedSha256": "e7d36ffa4bf47cdd99bdd04a295dd2caad42170169b95be2bab410584c8ebae4"
+    },
+    {
+      "file": "pdf-page-binding.log",
+      "source": "lexopen-books-page-binding-regression.log",
+      "sourceBytes": 1546,
+      "sourceSha256": "599a39b89fb6f42361b70c61da25a5d670fc03589b56066ca931098303f86fef",
+      "normalizedBytes": 1258,
+      "normalizedSha256": "234eff14a9216fc6ce81efec55623517832859c9acac6cccf644d32c702a5eb3"
+    },
+    {
+      "file": "pdf-page-label.log",
+      "source": "lexopen-books-canonical-page-label-regression.log",
+      "sourceBytes": 1613,
+      "sourceSha256": "86b8cf6883d531af9ad3102d80aa00e5b405ecf89975afedefc57214321b5617",
+      "normalizedBytes": 1325,
+      "normalizedSha256": "8ecb871e5e77f100a01360f594973d6e328f4623ccf8f057c4f9b2117684218d"
+    },
+    {
+      "file": "browser-first.log",
+      "source": "lexopen-books-browser-first.log",
+      "sourceBytes": 3958,
+      "sourceSha256": "420cc5378a989beee38ac9544d6a0de98f060b81b368673029aee3cbfde20683",
+      "normalizedBytes": 3958,
+      "normalizedSha256": "420cc5378a989beee38ac9544d6a0de98f060b81b368673029aee3cbfde20683"
+    },
+    {
+      "file": "upgrade-setup-attempt.log",
+      "source": "lexopen-books-upgrade-restore-proof.log",
+      "sourceBytes": 533,
+      "sourceSha256": "0326bf507e8446d7e745a6725a0fbe2c450475f1d0a8b47d7bb0c1ab2c131c17",
+      "normalizedBytes": 505,
+      "normalizedSha256": "1eaa16f7ecbeb446e29b0e6640bb57a3169580ca44530ab3905c8b568625eaea"
+    },
+    {
+      "file": "upgrade-first-service-comparison.log",
+      "source": "lexopen-books-upgrade-restore-proof-final.log",
+      "sourceBytes": 7002,
+      "sourceSha256": "a008eab13547791f1030fe9d0ea311b7d2220e6e7591bc21fcf2e6bfdd230637",
+      "normalizedBytes": 6974,
+      "normalizedSha256": "7898e525cec0c5aac0a025d3ae3c127501f7e5d15e123cbec4bf83584d9d7dfd"
+    },
+    {
+      "file": "restore-final.log",
+      "source": "lexopen-books-upgrade-restore-read-final.log",
+      "sourceBytes": 2776,
+      "sourceSha256": "77c978e0c2f0e3ccd409cf980e51454111d7f7a32fe35c10d97b86aef280d6de",
+      "normalizedBytes": 2762,
+      "normalizedSha256": "8bd50a1e6ed7f2d74956099fc3f80c9f3425e33c0eb3df13a8e7bc4e2d69fc83"
+    },
+    {
+      "file": "design-scan.json",
+      "source": "lexopen-books-design-scan.json",
+      "sourceBytes": 1577,
+      "sourceSha256": "01ab284f811e762d7bbc3a8800ed737a81222b4f684436c867893a8b6b35a37b",
+      "normalizedBytes": 1469,
+      "normalizedSha256": "62a992527e4e57d2d7d0b94791da3c58b6fcc1df81cb3366bb1dbe72b0d8fb70"
+    },
+    {
+      "file": "table-object-hashes.json",
+      "source": "proof-table-and-object-hashes.json",
+      "sourceBytes": 78247,
+      "sourceSha256": "cdb1121c0352fa6c877e17b6dc060025a21424aa1677fde38c9c25fdf8fc7ea8",
+      "normalizedBytes": 78247,
+      "normalizedSha256": "cdb1121c0352fa6c877e17b6dc060025a21424aa1677fde38c9c25fdf8fc7ea8"
+    },
+    {
+      "file": "restored-domain-read.json",
+      "source": "proof-current-service-read.json",
+      "sourceBytes": 1191,
+      "sourceSha256": "0c08a8abd764f716d56495c064dce8a1a818b3b6c6fc9e89ca8a06d1f910dfd4",
+      "normalizedBytes": 1191,
+      "normalizedSha256": "0c08a8abd764f716d56495c064dce8a1a818b3b6c6fc9e89ca8a06d1f910dfd4"
+    },
+    {
+      "file": "build.log",
+      "source": "lexopen-books-build-final.log",
+      "sourceBytes": 13218,
+      "sourceSha256": "1df5c4ae0992782cd62dc03d68f00a36f1429b64b9175a7c2c3e20239e28e73f",
+      "normalizedBytes": 12513,
+      "normalizedSha256": "c665f5a3250a14704dd7d3f569abb2490b16a0a2b863b99d6a5153806e31eb06"
+    },
+    {
+      "file": "production.log",
+      "source": "lexopen-books-production-final.log",
+      "sourceBytes": 439,
+      "sourceSha256": "1f2ac7d3b7594952ef0fee00c2edd6c68c015ff47dae80618b03aaf9cbdf5c73",
+      "normalizedBytes": 439,
+      "normalizedSha256": "1f2ac7d3b7594952ef0fee00c2edd6c68c015ff47dae80618b03aaf9cbdf5c73"
+    },
+    {
+      "file": "production-migrations.log",
+      "source": "lexopen-books-prod-migrate.log",
+      "sourceBytes": 4959,
+      "sourceSha256": "93b1963e812752056c123bfc5d6cf7d0c84501642f855d29b3ba97a14f63910d",
+      "normalizedBytes": 4953,
+      "normalizedSha256": "8c967cf1879a59dac5b0f534296e4731a34f15ff5e1ea1d2d4200ef0de3af56a"
+    },
+    {
+      "file": "schema-drift.log",
+      "source": "lexopen-books-schema-drift.log",
+      "sourceBytes": 25,
+      "sourceSha256": "198913094e3f41610eb893459ab65a3c79991b65d4ef5fcb8c325ebe52ebf1ed",
+      "normalizedBytes": 24,
+      "normalizedSha256": "728442980e143e18c2aa9bd7d747a8ea8d85f510529e7540f90f35ea9dd1b268"
+    },
+    {
+      "file": "browser-schema37.log",
+      "source": "lexopen-books-browser-full-final.log",
+      "sourceBytes": 28645,
+      "sourceSha256": "3356846a0a5a01583a40eeb80a32af5239b871b10f59a7b071599fbeb68c0855",
+      "normalizedBytes": 28645,
+      "normalizedSha256": "3356846a0a5a01583a40eeb80a32af5239b871b10f59a7b071599fbeb68c0855"
+    },
+    {
+      "file": "conversion-upgrade-restore.log",
+      "source": "lexopen-books-conversion-restore-proof.log",
+      "sourceBytes": 3456,
+      "sourceSha256": "166cfe57dd48b523787d44bb93370256ecbabce913530b5dfbf16917039f1161",
+      "normalizedBytes": 3428,
+      "normalizedSha256": "a9149ffb729dd152d2ccd2f5480a2b375e56e5d067ba169931dc93221fa0d43e"
+    },
+    {
+      "file": "conversion-defaults.json",
+      "source": "new-column-defaults.json",
+      "sourceBytes": 869,
+      "sourceSha256": "061ab80fbaf70c3f1b45e384755fa223a43a66c7b1ad9e9a5d1bac4a492d96c2",
+      "normalizedBytes": 869,
+      "normalizedSha256": "061ab80fbaf70c3f1b45e384755fa223a43a66c7b1ad9e9a5d1bac4a492d96c2"
+    },
+    {
+      "file": "conversion-table-object-hashes.json",
+      "source": "conversion-table-and-object-hashes.json",
+      "sourceBytes": 95289,
+      "sourceSha256": "67fb815538fffe0ff7ca2b2534fc079a41a346fe4a16b7c5abfdf95d0df27503",
+      "normalizedBytes": 95289,
+      "normalizedSha256": "67fb815538fffe0ff7ca2b2534fc079a41a346fe4a16b7c5abfdf95d0df27503"
+    },
+    {
+      "file": "conversion-restored-domain-read.json",
+      "source": "conversion-restored-domain-read.json",
+      "sourceBytes": 1194,
+      "sourceSha256": "08fe213ace80f8265edeb4e24569cac36d870e620c2a1ad2bf59cf9f19013cca",
+      "normalizedBytes": 1194,
+      "normalizedSha256": "08fe213ace80f8265edeb4e24569cac36d870e620c2a1ad2bf59cf9f19013cca"
+    },
+    {
+      "file": "conversion-domain-integration.log",
+      "source": "lexopen-books-conversion-integration-final.log",
+      "sourceBytes": 446,
+      "sourceSha256": "0a6ca1677412aaba05c4b330292f632e08f3d93306657028c9812e269a10f28c",
+      "normalizedBytes": 446,
+      "normalizedSha256": "0a6ca1677412aaba05c4b330292f632e08f3d93306657028c9812e269a10f28c"
+    },
+    {
+      "file": "conversion-existing-books.log",
+      "source": "lexopen-books-conversion-existing-books.log",
+      "sourceBytes": 1613,
+      "sourceSha256": "86b8cf6883d531af9ad3102d80aa00e5b405ecf89975afedefc57214321b5617",
+      "normalizedBytes": 1325,
+      "normalizedSha256": "8ecb871e5e77f100a01360f594973d6e328f4623ccf8f057c4f9b2117684218d"
+    },
+    {
+      "file": "conversion-existing-rag.log",
+      "source": "lexopen-books-conversion-existing-rag.log",
+      "sourceBytes": 1631,
+      "sourceSha256": "85436a89e976defc62b646fc13e25c587ff7ae1c8671af4c96d7c2a3fd3d5965",
+      "normalizedBytes": 1307,
+      "normalizedSha256": "42bfec30a125d45ba2a8e1aa58f3dfc3bd6cd65ee3fa88b087ee5f28ebd2fe19"
+    },
+    {
+      "file": "conversion-rag-unit.log",
+      "source": "lexopen-books-conversion-rag-unit.log",
+      "sourceBytes": 167,
+      "sourceSha256": "d88dc0d4e62f1e64129859f16f2e3ec2f1a6b0884095bffcbca6ac54fa10ba35",
+      "normalizedBytes": 167,
+      "normalizedSha256": "d88dc0d4e62f1e64129859f16f2e3ec2f1a6b0884095bffcbca6ac54fa10ba35"
+    },
+    {
+      "file": "conversion-lint.log",
+      "source": "lexopen-books-conversion-lint.log",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedBytes": 0,
+      "normalizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "conversion-types.log",
+      "source": "lexopen-books-conversion-types-final.log",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedBytes": 0,
+      "normalizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "conversion-current-code-read.log",
+      "source": "lexopen-books-conversion-current-read-final.log",
+      "sourceBytes": 2397,
+      "sourceSha256": "7bd53eee05e3e6705d1bf3ffccb890d7f905f4e35f808a1a1726de767e811125",
+      "normalizedBytes": 2383,
+      "normalizedSha256": "f2b0805b1e4f601a7a78b391db585b9041e396a504c8150822cdfa73552d9b27"
+    },
+    {
+      "file": "conversion-current-domain.json",
+      "source": "current-final-node.json",
+      "sourceBytes": 1307,
+      "sourceSha256": "624e5a45fdebc36a6f9816b9318a28294d9c2d9cc3a70d368ffae551479127d9",
+      "normalizedBytes": 1307,
+      "normalizedSha256": "624e5a45fdebc36a6f9816b9318a28294d9c2d9cc3a70d368ffae551479127d9"
+    },
+    {
+      "file": "conversion-current-table-hashes.json",
+      "source": "current-final-table-hashes.json",
+      "sourceBytes": 40471,
+      "sourceSha256": "cfd40dbcc10a991b7d8a00c2b212e46006b8bb56fb94ac9a8f8d790fca07bd8d",
+      "normalizedBytes": 40471,
+      "normalizedSha256": "cfd40dbcc10a991b7d8a00c2b212e46006b8bb56fb94ac9a8f8d790fca07bd8d"
+    },
+    {
+      "file": "conversion-attempt-cleanup.log",
+      "source": "lexopen-books38-attempt-cleanup-integration-final.log",
+      "sourceBytes": 2007,
+      "sourceSha256": "8cc0e447eb785fe99f9d8c1cd563999d49ae511d7a2c55cc76c5a80310f7334e",
+      "normalizedBytes": 1719,
+      "normalizedSha256": "86a3b7fc95086747241c1b6a118a94c4ce95d2914330ed74957d63741306dedb"
+    },
+    {
+      "file": "conversion-attempt-storage.log",
+      "source": "lexopen-books38-import-attempt.log",
+      "sourceBytes": 210,
+      "sourceSha256": "8d50ba7e707e757765ef3fdf10e73a22e3838342f5f4a7ce81a83933c7d8fb72",
+      "normalizedBytes": 210,
+      "normalizedSha256": "8d50ba7e707e757765ef3fdf10e73a22e3838342f5f4a7ce81a83933c7d8fb72"
+    },
+    {
+      "file": "conversion-attempt-lint.log",
+      "source": "lexopen-books38-attempt-cleanup-lint.log",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedBytes": 0,
+      "normalizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "conversion-attempt-types.log",
+      "source": "lexopen-books38-attempt-cleanup-types.log",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedBytes": 0,
+      "normalizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "conversion-browser.log",
+      "source": "lexopen-books38-conversion-browser.log",
+      "sourceBytes": 2629,
+      "sourceSha256": "f75e3cb2b52ced42c46f770f814f40c05c73ff12c208e5c13194474d75392d58",
+      "normalizedBytes": 2629,
+      "normalizedSha256": "f75e3cb2b52ced42c46f770f814f40c05c73ff12c208e5c13194474d75392d58"
+    },
+    {
+      "file": "units-schema38-precleanup.log",
+      "source": "lexopen-books38-units-final.log",
+      "sourceBytes": 12231,
+      "sourceSha256": "b039c87b3b4fe4107f32bdbce3a753ae409ffb0ce67e0efdeb8f0d97c7c4ec04",
+      "normalizedBytes": 12231,
+      "normalizedSha256": "b039c87b3b4fe4107f32bdbce3a753ae409ffb0ce67e0efdeb8f0d97c7c4ec04"
+    },
+    {
+      "file": "types-schema38-precleanup.log",
+      "source": "lexopen-books38-types-final.log",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedBytes": 0,
+      "normalizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "lint-schema38-precleanup.log",
+      "source": "lexopen-books38-lint-final.log",
+      "sourceBytes": 34,
+      "sourceSha256": "db58e698a71f6923f5d66425538f7b1ea17c7e16f3ce1c85858f0ab5911afc98",
+      "normalizedBytes": 33,
+      "normalizedSha256": "dbd928d643fd9a62d3f7b403093eb025bf1d22a9f30e9b3793a4087d2ebc7b10"
+    },
+    {
+      "file": "integration-schema38-precleanup.log",
+      "source": "lexopen-books38-integration-final.log",
+      "sourceBytes": 31511,
+      "sourceSha256": "1285c5bcaadf04c5994f54b954016c20a2084a6be6931fe4d8801d934921c876",
+      "normalizedBytes": 25953,
+      "normalizedSha256": "b46fc2dba36218f680081e363917d388429568a89015a7fa91c84614d1f6607d"
+    },
+    {
+      "file": "build-schema38-final.log",
+      "source": "lexopen-books38-build-final.log",
+      "sourceBytes": 13248,
+      "sourceSha256": "4a4ba8ac04ccfa1a5d27e0939a1fd0268017797b0c8b3f5789d2511d178196f1",
+      "normalizedBytes": 12543,
+      "normalizedSha256": "a51243f92d13b48c10110dc875f9f210f34f8b45b816641c1155dcde09ec9aa0"
+    },
+    {
+      "file": "types-schema38-final.log",
+      "source": "lexopen-books38-types-final.log",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedBytes": 0,
+      "normalizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "lint-schema38-final.log",
+      "source": "lexopen-books38-lint-final.log",
+      "sourceBytes": 34,
+      "sourceSha256": "db58e698a71f6923f5d66425538f7b1ea17c7e16f3ce1c85858f0ab5911afc98",
+      "normalizedBytes": 33,
+      "normalizedSha256": "dbd928d643fd9a62d3f7b403093eb025bf1d22a9f30e9b3793a4087d2ebc7b10"
+    },
+    {
+      "file": "domain-schema38-final.log",
+      "source": "lexopen-books38-domain-final.log",
+      "sourceBytes": 5477,
+      "sourceSha256": "254bbd58242efc2aa599510d81ed315ffc989e379fd83da84a5b2d04a34e8830",
+      "normalizedBytes": 4577,
+      "normalizedSha256": "acb18c64678c4930755402787357c16ba7e09af777968dcc1dd61f121d4c8797"
+    },
+    {
+      "file": "production-schema38-final.log",
+      "source": "lexopen-books38-production-final.log",
+      "sourceBytes": 623,
+      "sourceSha256": "9ec6a57b00dbeda35364038ea3395660ab9451c35b7f627cee00e2eed45a25aa",
+      "normalizedBytes": 623,
+      "normalizedSha256": "9ec6a57b00dbeda35364038ea3395660ab9451c35b7f627cee00e2eed45a25aa"
+    },
+    {
+      "file": "captures-schema37-prior.json",
+      "source": "curated-schema37-capture-manifest.json",
+      "sourceBytes": 4097,
+      "sourceSha256": "4a701879f49b0b3817e5a6fa006fe75cb19544313ce97990d51817e766dedb1d",
+      "normalizedBytes": 4097,
+      "normalizedSha256": "4a701879f49b0b3817e5a6fa006fe75cb19544313ce97990d51817e766dedb1d"
+    },
+    {
+      "file": "captures-schema38-prior.json",
+      "source": "curated-schema38-capture-manifest.json",
+      "sourceBytes": 1519,
+      "sourceSha256": "a0096fc62c93e4e8d76b6aa6ef732b556956bd1026e4db2ef0b0ed0c966fb731",
+      "normalizedBytes": 1519,
+      "normalizedSha256": "a0096fc62c93e4e8d76b6aa6ef732b556956bd1026e4db2ef0b0ed0c966fb731"
+    },
+    {
+      "file": "browser-schema38-final.log",
+      "source": "lexopen-books38-browser-full-final.log",
+      "sourceBytes": 29555,
+      "sourceSha256": "f7926d21fb271a0e9edb7718754bcbbaf2f803f33f9977226ac4a871773d917e",
+      "normalizedBytes": 29555,
+      "normalizedSha256": "f7926d21fb271a0e9edb7718754bcbbaf2f803f33f9977226ac4a871773d917e"
+    }
+  ]
+}

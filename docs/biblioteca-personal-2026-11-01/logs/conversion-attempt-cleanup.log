@@ -1,0 +1,15 @@
+audit write failed Error: Synthetic import attempt audit failure
+    at Array.create (<workspace>/src/lib/books/conversion.integration.test.ts:72:142)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+audit write failed Error: Synthetic import attempt audit failure
+    at Array.create (<workspace>/src/lib/books/conversion.integration.test.ts:72:142)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+library.book.import.cleanup_failed {
+  key: 'library-books/book_72d9a96dfe6cc38f1cb893bd8395349d4218f674/attempts/62468d54-2c59-41e4-a014-b9f8b25239b6/original/d7effbc57ab954ed5ce2e6b545f10fa0b7a6b92bc0b4e07170bd9be7a7c3b42d',
+  code: 'book_import_attempt_cleanup'
+}
+Book text retention PostgreSQL PASS: explicit conversion/original choices and replay conflicts, physical PDF/OCR retained when chosen, TXT-only storage with original hash provenance, original410 and no fake PDF page, text/citation/export tamper409, retained-text RAG footnotes, migrated37 original/citation compatibility, per-user defaults and partial PATCH preservation, heavy text threshold and strict multipart options, per-attempt object cleanup for opposing-option races/audit rollback/same-option replay while retaining only the committed winner, partial writes compensated and cleanup failure returns503 with both causes; model/network calls 0.

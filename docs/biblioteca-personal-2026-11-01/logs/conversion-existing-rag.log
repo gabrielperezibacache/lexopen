@@ -1,0 +1,12 @@
+audit write failed Error: Book RAG synthetic audit failure
+    at <anonymous> (<workspace>/src/lib/books/rag.integration.test.ts:21:173)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+Book RAG PostgreSQL PASS: explicit owned/shared scope, BM25 literal citations and retained original, zero-result abstention/no model, real-model-only structured generation, existing author text preserved, source markers as data, invented references/quotes rejected, CAS and audit rollback, authoritative bibliography refresh, per-request and history sharing revocation, text/original tampering, local_only egress and actor revocation.

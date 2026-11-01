@@ -1,0 +1,420 @@
+.personal-law-library {
+  --book-gold: #e7cf99;
+  --wood: #4e3022;
+  --wood-deep: #261b17;
+  --wood-edge: #855538;
+  --shelf-text: #f6e9d4;
+  --shelf-soft: #dfcbb2;
+  --leather-asset: url('/library/textures/leather.webp');
+  --wood-asset: url('/library/textures/walnut.webp');
+  width: 100%; min-width: 0; color: var(--ink);
+}
+.personal-law-library[data-theme="oak"] { --wood: #9c7348; --wood-deep: #62452e; --wood-edge: #be945e; --shelf-text: #fff9ef; --shelf-soft: #fff0d8; }
+.personal-law-library[data-theme="night"] { --wood: #202c2e; --wood-deep: #101b1d; --wood-edge: #38484b; --shelf-text: #f2e9d7; --shelf-soft: #d9d4c7; }
+.book-library-header { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; margin-bottom: 1.8rem; }
+.book-library-header h1, .book-reader h1 { font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(2rem, 3vw, 3.35rem); line-height: 1.08; letter-spacing: -.035em; overflow-wrap: anywhere; text-wrap: balance; margin: 0 0 .65rem; }
+.book-library-header p { margin: 0; font-family: var(--font-fraunces), Georgia, serif; font-size: 1.2rem; font-style: italic; color: var(--ink-soft); }
+.book-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.book-actions .btn { min-height: 44px; }
+.book-library-tabs { display: flex; gap: 1.8rem; border-bottom: 1px solid var(--line-strong); margin-bottom: 1.6rem; }
+.book-library-tabs > button { display: flex; align-items: center; gap: .5rem; padding: 1rem .15rem; border-bottom: 2px solid transparent; font-size: .9rem; font-weight: 600; color: var(--ink-soft); min-height: 48px; }
+.book-library-tabs > button.is-active { color: var(--copper-deep); border-bottom-color: var(--copper-deep); }
+.book-selection-count { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; min-height: 22px; border-radius: 50%; background: var(--copper-soft); font-size: .75rem; }
+.personal-law-library button, .personal-law-library a, .personal-law-library input, .personal-law-library select, .personal-law-library summary, .personal-law-library textarea { outline-offset: 4px; }
+.personal-law-library button:focus-visible, .personal-law-library a:focus-visible, .personal-law-library summary:focus-visible { outline: 2px solid var(--sea); }
+.personal-law-library button:disabled { cursor: wait; opacity: .55; }
+.book-library-tools { display: flex; flex-wrap: wrap; gap: .8rem; margin: 0 0 1.4rem; }
+.book-search-field { display: flex; align-items: center; gap: .7rem; border: 1px solid var(--line-strong); border-radius: 10px; padding: .65rem .9rem; flex: 1 1 240px; background: var(--surface-solid); min-width: 0; }
+.book-search-field input { width: 100%; min-width: 0; background: transparent; border: 0; color: var(--ink); font-size: .9rem; outline: 0; }
+.book-search-field:focus-within { outline: 2px solid var(--sea); outline-offset: 2px; }
+.book-inline-filter .select { width: 100%; min-height: 44px; }
+.book-library-composition { display: grid; grid-template-columns: minmax(200px, .7fr) minmax(0, 2.5fr); gap: 1.2rem; align-items: start; }
+.book-ex-libris { background: var(--surface-solid); padding: clamp(1.3rem, 2.2vw, 2.4rem); min-width: 0; border-radius: 12px; box-shadow: 0 8px 30px rgba(32, 23, 14, .07); }
+.book-ex-libris-seal { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 1.6rem .5rem 2rem; color: var(--copper-deep); font-family: var(--font-fraunces), Georgia, serif; font-style: italic; font-size: 1.3rem; }
+.book-ex-libris h2 { font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(1.6rem, 2vw, 2.3rem); line-height: 1.15; letter-spacing: -.025em; text-wrap: balance; margin: 0 0 1.1rem; }
+.book-ex-libris > p { color: var(--ink-soft); line-height: 1.8; font-size: .88rem; max-width: 38ch; }
+.book-ex-libris-owner { padding: 1.8rem 0; margin: 1.3rem 0; border-block: 1px solid var(--line); display: flex; flex-direction: column; gap: .5rem; }
+.book-ex-libris-owner > span { font-size: .74rem; color: var(--ink-soft); }
+.book-ex-libris-owner > strong { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.3rem; overflow-wrap: anywhere; }
+.book-desk-invitation { display: inline-flex; align-items: center; gap: 1rem; color: var(--sea); font-size: .9rem; font-weight: 600; padding-block: .5rem; margin-bottom: 1rem; }
+.book-ex-libris .book-small { display: flex; align-items: flex-start; gap: .4rem; font-size: .72rem; line-height: 1.65; }
+.book-ex-libris .book-small svg { flex-shrink: 0; margin-top: .2rem; }
+.book-shelves-area { background-color: var(--wood); background-image: var(--wood-asset); background-blend-mode: soft-light; background-size: 720px; min-width: 0; border-radius: 10px; padding: 1rem; box-shadow: inset 4px 0 12px rgba(0,0,0,.35), 0 14px 36px rgba(26,15,8,.14); }
+.book-shelf { position: relative; min-width: 0; padding-top: .75rem; }
+.book-shelf-plaque { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .65rem .75rem 1.2rem; color: var(--shelf-text); }
+.book-shelf-plaque h2 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.25rem; margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+.book-shelf-plaque > span { color: var(--shelf-soft); font-size: .7rem; white-space: nowrap; }
+.book-shelf-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(144px, 1fr)); align-items: start; gap: 1.5rem 1.15rem; padding: .75rem 1rem 1.1rem; }
+.book-on-shelf { min-width: 0; text-align: center; color: var(--shelf-text); position: relative; }
+.book-open-link { display: flex; align-items: center; flex-direction: column; color: inherit; text-decoration: none; min-width: 0; }
+.book-open-link:focus-visible { outline-color: #f2d799 !important; border-radius: 4px; }
+.book-catalog-title { font-family: var(--font-fraunces), Georgia, serif; font-size: .99rem; line-height: 1.4; margin-top: 1rem; max-width: 22ch; overflow-wrap: anywhere; }
+.book-catalog-meta { color: var(--shelf-soft); font-size: .7rem; line-height: 1.6; margin-top: .35rem; display: flex; flex-direction: column; gap: .3rem; overflow-wrap: anywhere; }
+.book-catalog-meta > span { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .3rem; }
+.book-use-check { display: flex; align-items: flex-start; justify-content: center; gap: .45rem; padding-top: .65rem; font-size: .67rem; color: var(--shelf-text); cursor: pointer; text-align: left; }
+.book-use-check input { width: 16px; height: 16px; flex-shrink: 0; accent-color: #b78244; margin-top: .08rem; }
+.book-extraction-state { display: block; margin-top: .5rem; color: #fff0d5; font-size: .7rem; }
+.book-shelf-edge { height: 18px; margin: 0 -.25rem 1rem; border-top: 1px solid rgba(238,193,131,.35); background-color: var(--wood-edge); background-image: var(--wood-asset); background-blend-mode: soft-light; background-size: 800px; box-shadow: 0 9px 12px rgba(0,0,0,.38), inset 0 -5px 7px rgba(0,0,0,.25); border-radius: 2px; }
+.book-shelf:last-child .book-shelf-edge { margin-bottom: .4rem; }
+
+/* The cover, spine and paper edge are separate planes, rather than a tilted tile. */
+.law-book-scene { display: block; perspective: 900px; width: 155px; height: 225px; position: relative; margin: 0 auto; flex-shrink: 0; }
+.law-book-volume { --binding: #64292e; --binding-deep: #37181c; --binding-ink: #f0d59a; display: block; width: 143px; height: 218px; transform-style: preserve-3d; transform: rotateY(-18deg) rotateX(3deg); position: relative; transition: transform 420ms cubic-bezier(.16,1,.3,1); }
+.law-book-volume[data-color="forest"], .book-color-option[data-color="forest"] { --binding: #244d3c; --binding-deep: #10271f; }
+.law-book-volume[data-color="navy"], .book-color-option[data-color="navy"] { --binding: #263d55; --binding-deep: #132333; }
+.law-book-volume[data-color="cognac"], .book-color-option[data-color="cognac"] { --binding: #805034; --binding-deep: #482f22; }
+.law-book-volume[data-color="ivory"], .book-color-option[data-color="ivory"] { --binding: #e2d1ad; --binding-deep: #b3a07e; --binding-ink: #4e3924; }
+.law-book-volume[data-color="charcoal"], .book-color-option[data-color="charcoal"] { --binding: #343a3c; --binding-deep: #1a2021; }
+.law-book-front { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 24px 16px 18px 21px; background-color: var(--binding); background-image: var(--leather-asset); background-size: 280px; background-blend-mode: soft-light; border-radius: 2px 5px 5px 2px; transform: translateZ(12px); box-shadow: inset 5px 0 6px rgba(0,0,0,.35), inset -2px 0 3px rgba(255,225,175,.14), 12px 12px 15px rgba(0,0,0,.28); color: var(--binding-ink); }
+.law-book-front::after { content: ""; position: absolute; inset: 12px 10px 12px 14px; border: 1px solid currentColor; opacity: .44; border-radius: 1px; pointer-events: none; }
+.law-book-frame { position: absolute; inset: 8px 6px 8px 10px; border: 1px solid currentColor; opacity: .45; border-radius: 2px; pointer-events: none; }
+.law-book-spine { width: 24px; position: absolute; top: 0; bottom: 0; left: 0; background: var(--binding-deep); transform: rotateY(-90deg) translateX(-12px); transform-origin: left; display: flex; align-items: center; justify-content: center; border-radius: 3px 0 0 3px; color: var(--binding-ink); border-block: 1px solid rgba(237,200,131,.2); }
+.law-book-spine > span { writing-mode: vertical-rl; max-height: 175px; overflow: hidden; font-family: var(--font-fraunces), Georgia, serif; font-size: .66rem; letter-spacing: .02em; white-space: nowrap; text-overflow: ellipsis; }
+.law-book-pages { position: absolute; width: 22px; top: 4px; bottom: 4px; right: 0; background: repeating-linear-gradient(90deg, #cfc0a1 0px, #f2e8d0 1px, #f2e8d0 3px); transform-origin: right; transform: rotateY(90deg) translateX(12px); border-radius: 0 2px 2px 0; }
+.law-book-author { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: .52rem; line-height: 1.5; text-align: center; max-width: 100%; margin-bottom: auto; opacity: .95; }
+.law-book-title { display: flex; flex-wrap: wrap; align-content: center; justify-content: center; column-gap: .22em; font-family: var(--font-fraunces), Georgia, serif; font-size: min(var(--cover-title-size, 1.17rem), 1.17rem); line-height: 1.14; text-align: center; overflow-wrap: normal; word-break: normal; hyphens: none; font-weight: 400; width: 100%; text-shadow: 0 1px 1px rgba(0,0,0,.45); }
+.law-book-title-word { display: inline-block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.law-book-volume[data-title-density="compact"] .law-book-title { font-size: min(calc(var(--cover-title-size) * .85), 1rem); }
+.law-book-volume[data-title-density="compact"] .law-book-ornament { margin-block: 7px; }
+.law-book-volume[data-title-density="compact"] .law-book-press { display: none; }
+.law-book-spine-title { display: none; }
+.law-book-ornament { display: flex; align-items: center; justify-content: center; gap: 5px; width: 75%; margin: 12px 0; }
+.law-book-ornament > span { height: 1px; flex: 1; background: currentColor; opacity: .65; }
+.law-book-imprint { text-align: center; font-size: .55rem; line-height: 1.3; margin-top: auto; }
+.law-book-press { margin-top: 9px; opacity: .8; }
+.law-book-volume[data-material="linen"] .law-book-front { background-image: none; box-shadow: inset 3px 0 4px rgba(0,0,0,.2), 12px 12px 15px rgba(0,0,0,.25); }
+.law-book-volume[data-material="minimal"] .law-book-front { background-image: none; }
+.law-book-volume[data-material="minimal"] .law-book-frame, .law-book-volume[data-material="minimal"] .law-book-front::after, .law-book-volume[data-material="minimal"] .law-book-ornament { display: none; }
+.book-open-link:hover .law-book-volume, .book-open-link:focus-visible .law-book-volume { transform: translateY(-7px) rotateY(-7deg) rotateX(0); }
+.book-empty-shelf { display: grid; grid-template-columns: minmax(160px, .8fr) minmax(0, 1fr); gap: 2rem; padding: clamp(1.5rem, 4vw, 4rem) 1.5rem; align-items: center; color: var(--shelf-text); min-height: 385px; }
+.book-empty-preview { display: flex; align-items: center; flex-direction: column; gap: 1.7rem; }
+.book-empty-preview > span { max-width: 20ch; text-align: center; color: var(--shelf-soft); font-size: .7rem; }
+.book-empty-copy h2 { font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(1.7rem, 2.6vw, 2.7rem); letter-spacing: -.025em; line-height: 1.12; text-wrap: balance; margin-bottom: 1.2rem; }
+.book-empty-copy p { color: var(--shelf-soft); font-size: .88rem; line-height: 1.9; max-width: 42ch; margin-bottom: 1.5rem; }
+.book-empty-copy p:last-child { font-size: .7rem; margin: 1.2rem 0 0; }
+.book-no-results { color: var(--shelf-text); padding: 4rem 1.5rem; text-align: center; }
+.book-no-results h2 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.6rem; margin: 1rem 0; }
+.book-no-results > svg { margin-inline: auto; }
+.book-no-results .btn { background: var(--surface-solid); }
+.book-selection-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; justify-content: space-between; margin-top: 1.8rem; padding: 1.2rem; background: var(--sea-soft); border-radius: 12px; }
+.book-selection-bar > span { display: flex; align-items: center; gap: .5rem; font-size: .9rem; font-weight: 600; }
+.book-library-provenance { display: flex; align-items: flex-start; gap: .5rem; font-size: .76rem; color: var(--ink-soft); margin-top: 1.6rem; line-height: 1.8; max-width: 85ch; }
+.book-library-provenance svg { flex-shrink: 0; margin-top: .2rem; }
+
+/* Six spatial arrangements share the same books and personal collection. */
+.personal-law-library[data-layout="estantes"] .book-library-composition { grid-template-columns: 1fr; }
+.personal-law-library[data-layout="estantes"] .book-ex-libris { display: none; }
+.personal-law-library[data-layout="estantes"] .book-shelf-row { grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 1.7rem; padding: 1rem 2rem 1.8rem; }
+.personal-law-library[data-layout="gabinete"] .book-library-composition { grid-template-columns: minmax(170px,.6fr) minmax(0,2.5fr); }
+.personal-law-library[data-layout="gabinete"] .book-shelf-row { grid-template-columns: repeat(auto-fill,minmax(90px,1fr)); gap: 1rem .6rem; }
+.personal-law-library[data-layout="galeria"] .book-library-composition { grid-template-columns: 1fr; }
+.personal-law-library[data-layout="galeria"] .book-ex-libris { display: none; }
+.personal-law-library[data-layout="galeria"] .book-shelves-area { background: transparent; box-shadow: none; padding: 0; }
+.personal-law-library[data-layout="galeria"] .book-shelf-plaque { color: var(--ink); border-bottom: 1px solid var(--line); padding: 1rem 0; }
+.personal-law-library[data-layout="galeria"] .book-shelf-plaque > span { color: var(--ink-soft); }
+.personal-law-library[data-layout="galeria"] .book-shelf-row { grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap: 3rem 2rem; padding: 2.5rem 0; }
+.personal-law-library[data-layout="galeria"] .law-book-scene { scale: 1.16; margin-block: 1.2rem; }
+.personal-law-library[data-layout="galeria"] .book-on-shelf { color: var(--ink); }
+.personal-law-library[data-layout="galeria"] .book-catalog-meta, .personal-law-library[data-layout="galeria"] .book-use-check, .personal-law-library[data-layout="galeria"] .book-extraction-state { color: var(--ink-soft); }
+.personal-law-library[data-layout="galeria"] .book-shelf-edge { display: none; }
+.personal-law-library[data-layout="archivo"] .book-library-composition { grid-template-columns: 1fr; }
+.personal-law-library[data-layout="archivo"] .book-ex-libris { display: none; }
+.personal-law-library[data-layout="salon"] .book-library-composition { grid-template-columns: 1fr; }
+.personal-law-library[data-layout="salon"] .book-ex-libris { display: grid; grid-template-columns: 80px 1fr 1fr; align-items: center; gap: 1.8rem; padding: 1.5rem 2rem; }
+.personal-law-library[data-layout="salon"] .book-ex-libris-seal { padding: 0; }
+.personal-law-library[data-layout="salon"] .book-ex-libris h2 { font-size: 1.9rem; margin: 0; }
+.personal-law-library[data-layout="salon"] .book-ex-libris > p, .personal-law-library[data-layout="salon"] .book-ex-libris-owner { display: none; }
+.personal-law-library[data-layout="salon"] .book-desk-invitation { margin: 0; justify-content: flex-end; }
+.personal-law-library[data-layout="salon"] .book-shelves-area { background-color: var(--surface-solid); background-image: none; padding: 1.3rem; box-shadow: none; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.6rem; }
+.personal-law-library[data-layout="salon"] .book-shelf-plaque, .personal-law-library[data-layout="salon"] .book-on-shelf { color: var(--ink); }
+.personal-law-library[data-layout="salon"] .book-catalog-meta, .personal-law-library[data-layout="salon"] .book-use-check, .personal-law-library[data-layout="salon"] .book-shelf-plaque > span { color: var(--ink-soft); }
+.personal-law-library[data-layout="salon"] .book-shelf-row { gap: 1.8rem; padding: 1.6rem .3rem 2rem; }
+.personal-law-library[data-layout="salon"] .book-empty-shelf { grid-column: 1 / -1; background: var(--wood-deep); border-radius: 8px; }
+.personal-law-library[data-view="spines"] .book-shelf-row, .personal-law-library[data-layout="gabinete"] .book-shelf-row { grid-template-columns: repeat(auto-fill,minmax(90px,1fr)); }
+.personal-law-library[data-view="spines"] .book-shelf .law-book-scene, .personal-law-library[data-layout="gabinete"] .book-shelf .law-book-scene { width: 55px; height: 230px; }
+.personal-law-library[data-view="spines"] .book-shelf .law-book-volume, .personal-law-library[data-layout="gabinete"] .book-shelf .law-book-volume { width: 50px; height: 223px; }
+.personal-law-library[data-view="spines"] .book-shelf .law-book-front, .personal-law-library[data-layout="gabinete"] .book-shelf .law-book-front { padding: 19px 13px; }
+.personal-law-library[data-view="spines"] .book-shelf .law-book-title, .personal-law-library[data-layout="gabinete"] .book-shelf .law-book-title { display: none; }
+.personal-law-library[data-view="spines"] .book-shelf .law-book-spine-title, .personal-law-library[data-layout="gabinete"] .book-shelf .law-book-spine-title { writing-mode: vertical-rl; font-family: var(--font-fraunces), Georgia, serif; font-size: 1rem; max-height: 170px; width: auto; display: block; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+.personal-law-library[data-view="spines"] .book-shelf .law-book-author, .personal-law-library[data-view="spines"] .book-shelf .law-book-ornament, .personal-law-library[data-view="spines"] .book-shelf .law-book-imprint, .personal-law-library[data-view="spines"] .book-shelf .law-book-press, .personal-law-library[data-layout="gabinete"] .book-shelf .law-book-author, .personal-law-library[data-layout="gabinete"] .book-shelf .law-book-ornament, .personal-law-library[data-layout="gabinete"] .book-shelf .law-book-imprint, .personal-law-library[data-layout="gabinete"] .book-shelf .law-book-press { display: none; }
+.personal-law-library[data-layout="archivo"] .book-shelves-area { background-color: var(--wood-deep); padding: 1rem 1.3rem; }
+.personal-law-library[data-layout="archivo"] .book-shelf-row { grid-template-columns: repeat(auto-fill, 76px); justify-content: start; align-items: start; gap: 1.6rem .9rem; padding: 1.2rem .8rem 1.4rem; }
+.personal-law-library[data-layout="archivo"] .book-shelf .law-book-scene { width: 55px; height: 230px; }
+.personal-law-library[data-layout="archivo"] .book-shelf .law-book-volume { width: 50px; height: 223px; }
+.personal-law-library[data-layout="archivo"] .book-shelf .law-book-front { padding: 19px 13px; }
+.personal-law-library[data-layout="archivo"] .book-shelf .law-book-title { display: none; }
+.personal-law-library[data-layout="archivo"] .book-shelf .law-book-spine-title { writing-mode: vertical-rl; font-family: var(--font-fraunces), Georgia, serif; font-size: 1rem; max-height: 170px; width: auto; display: block; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+.personal-law-library[data-layout="archivo"] .book-shelf .law-book-author, .personal-law-library[data-layout="archivo"] .book-shelf .law-book-ornament, .personal-law-library[data-layout="archivo"] .book-shelf .law-book-imprint, .personal-law-library[data-layout="archivo"] .book-shelf .law-book-press { display: none; }
+.personal-law-library[data-layout="archivo"] .book-catalog-title { font-size: .85rem; line-height: 1.35; margin-top: .75rem; }
+.personal-law-library[data-layout="archivo"] .book-catalog-meta { font-size: .64rem; }
+.personal-law-library[data-layout="archivo"] .book-use-check { font-size: .6rem; }
+.personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) { grid-column: span 2; }
+.personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-scene { width: 155px; height: 230px; }
+.personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-volume { width: 143px; height: 223px; }
+.personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-front { padding: 24px 16px 18px 21px; }
+.personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-title { display: flex; }
+.personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-spine-title { display: none; }
+.personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-author { display: -webkit-box; }
+.personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-ornament { display: flex; }
+.personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-imprint, .personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-press { display: block; }
+
+.book-form { display: flex; flex-direction: column; gap: 1.3rem; min-width: 0; }
+.book-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.2rem; align-items: start; }
+.book-field { display: flex; flex-direction: column; gap: .55rem; min-width: 0; }
+.book-field > label, .book-field > legend { font-size: .82rem; font-weight: 600; margin-bottom: .1rem; }
+.book-field .input, .book-field .textarea, .book-field .select { width: 100%; min-width: 0; }
+.book-field .textarea { line-height: 1.75; }
+.book-small { font-size: .77rem; color: var(--ink-soft); line-height: 1.75; max-width: 75ch; }
+.book-error, .book-feedback { font-size: .85rem; line-height: 1.8; padding: 1rem 1.2rem; border-radius: 10px; margin-block: 1rem; overflow-wrap: anywhere; }
+.book-error { background: color-mix(in srgb, var(--danger) 8%, var(--surface-solid)); color: var(--danger); }
+.book-feedback { background: var(--sea-soft); color: var(--ink); }
+.book-text-action { display: inline-flex; align-items: center; gap: .5rem; font-size: .82rem; font-weight: 600; color: var(--sea); padding-block: .55rem; text-align: left; }
+.book-danger { color: var(--danger); }
+.book-icon-button { width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--mist); flex-shrink: 0; }
+.book-panel-heading, .book-section-title { margin-bottom: 1.6rem; }
+.book-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.book-panel-heading h2, .book-section-title h2, .book-desk-heading h2 { font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(1.6rem,2.4vw,2.3rem); line-height: 1.2; margin: 0 0 .6rem; letter-spacing: -.025em; }
+.book-panel-heading p, .book-section-title p, .book-desk-heading p { color: var(--ink-soft); font-size: .85rem; line-height: 1.8; max-width: 75ch; margin: 0; }
+.book-import-panel, .book-personalize, .book-edit-panel { background: var(--surface-solid); border-radius: 12px; box-shadow: 0 12px 32px rgba(24,32,32,.07); padding: clamp(1.3rem,3vw,2.4rem); margin-bottom: 2rem; }
+.book-upload-zone { display: flex; flex-direction: column; align-items: center; gap: .8rem; border: 1px dashed var(--line-strong); border-radius: 10px; background: var(--paper); padding: 2.4rem 1.3rem; text-align: center; cursor: pointer; }
+.book-upload-zone > svg { color: var(--sea); }
+.book-upload-zone strong { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.5rem; font-weight: 500; }
+.book-upload-zone > span { font-size: .77rem; color: var(--ink-soft); max-width: 70ch; line-height: 1.7; }
+.book-upload-zone input { max-width: 100%; font-size: .8rem; margin-top: .7rem; }
+.book-upload-zone input::file-selector-button { border: 1px solid var(--line-strong); color: var(--ink); background: var(--surface-solid); border-radius: 7px; padding: .65rem .85rem; margin-right: .75rem; cursor: pointer; }
+.book-import-list { list-style: none; padding: 0; margin: 0; }
+.book-import-list li { display: flex; align-items: flex-start; flex-wrap: wrap; justify-content: space-between; gap: .7rem; border-bottom: 1px solid var(--line); padding: 1rem 0; font-size: .8rem; }
+.book-import-list li > span:first-child { display: flex; flex-direction: column; gap: .3rem; min-width: 0; max-width: 100%; }
+.book-import-list li strong { overflow-wrap: anywhere; }
+.book-import-list li small { color: var(--ink-soft); }
+.book-import-list li p { width: 100%; color: var(--danger); }
+.book-import-options { display: flex; flex-direction: column; gap: .8rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
+.book-import-options > legend { padding-top: 1.3rem; padding-bottom: .5rem; font-size: .9rem; font-weight: 600; }
+.book-import-options .book-field { max-width: 390px; }
+.book-import-options:disabled > label { color: var(--ink-soft); }
+.book-conversion-notice { padding: 1rem 1.1rem; background: var(--sea-soft); border-radius: 8px; font-size: .8rem; line-height: 1.8; color: var(--ink); max-width: 75ch; }
+.book-reader-bibliography > .book-conversion-notice { margin-top: 1.1rem; }
+.book-import-list li .book-import-receipt { color: var(--ink-soft); font-size: .75rem; line-height: 1.7; }
+.book-layout-choices { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1rem; }
+.book-layout-choices > legend { font-size: .9rem; font-weight: 600; padding-bottom: 1rem; }
+.book-layout-choice { position: relative; display: flex; flex-direction: column; gap: .65rem; padding: 1rem; border: 1px solid var(--line-strong); border-radius: 10px; cursor: pointer; min-width: 0; }
+.book-layout-choice:has(input:checked) { border-color: var(--sea); background: var(--sea-soft); }
+.book-layout-choice > input { position: absolute; top: 1rem; right: 1rem; accent-color: var(--sea); width: 17px; height: 17px; }
+.book-layout-choice > strong { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.1rem; font-weight: 500; }
+.book-layout-choice > span:last-child { font-size: .72rem; color: var(--ink-soft); line-height: 1.6; }
+.book-layout-miniature { display: grid; grid-template-columns: repeat(6,1fr); align-items: end; gap: 4px; background: #34251e; padding: 13px 15px 9px; border-bottom: 6px solid #8c6041; width: 110px; height: 75px; border-radius: 3px; }
+.book-layout-miniature > span { background: #764044; height: 42px; border: 1px solid #b99d69; border-radius: 1px; }
+.book-layout-miniature > span:nth-child(2n) { background: #355548; height: 37px; }
+.book-layout-miniature > span:nth-child(3n) { background: #314d63; }
+.book-layout-miniature[data-layout="mesa"] { width: 110px; padding-left: 35px; border-left: 21px solid #c9b99f; }
+.book-layout-miniature[data-layout="gabinete"] { padding-inline: 24px; gap: 3px; }
+.book-layout-miniature[data-layout="galeria"] { grid-template-columns: repeat(3,1fr); padding-inline: 16px; background: #eee8dc; border-bottom-color: #d8cbb8; }
+.book-layout-miniature[data-layout="galeria"] > span:nth-child(n+4) { display: none; }
+.book-layout-miniature[data-layout="archivo"] { grid-template-columns: repeat(7,1fr); gap: 3px; padding: 13px 8px 9px; background: #172022; border-bottom-color: #6d4b34; }
+.book-layout-miniature[data-layout="archivo"] > span:first-child { grid-column: span 2; }
+.book-layout-miniature[data-layout="salon"] { gap: 7px; padding-inline: 8px; background: #e9dfce; border-bottom-color: #c6aa7f; }
+.book-loading { display: flex; flex-direction: column; gap: 1rem; align-items: center; padding: 4rem 1rem; color: var(--ink-soft); font-size: .9rem; }
+.book-edit-grid { display: grid; grid-template-columns: minmax(180px,.7fr) minmax(0,2fr); gap: 2rem; }
+.book-binding-preview { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 2rem; padding: 2rem 1rem; background: var(--paper); border-radius: 10px; }
+.book-binding-preview p { text-align: center; font-size: .75rem; color: var(--ink-soft); max-width: 22ch; }
+.book-color-options { display: flex; flex-wrap: wrap; gap: .8rem 1.1rem; }
+.book-color-option { --binding: #64292e; display: flex; align-items: center; gap: .4rem; font-size: .75rem; cursor: pointer; }
+.book-color-option input { accent-color: var(--sea); width: 15px; height: 15px; }
+.book-color-swatch { width: 20px; height: 25px; background: var(--binding); border-radius: 2px; box-shadow: inset 2px 0 3px rgba(0,0,0,.25); }
+.book-check { display: flex; align-items: flex-start; gap: .6rem; font-size: .82rem; line-height: 1.65; padding-block: .3rem; cursor: pointer; overflow-wrap: anywhere; }
+.book-check input { flex-shrink: 0; margin-top: .25rem; width: 17px; height: 17px; accent-color: var(--sea); }
+.book-withdraw { padding: 1.1rem; background: color-mix(in srgb, var(--danger) 6%, var(--surface-solid)); border-radius: 8px; font-size: .82rem; line-height: 1.8; display: flex; flex-direction: column; gap: .7rem; align-items: flex-start; }
+
+.book-collections-grid { display: grid; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.8fr); gap: 2rem; }
+.book-collections-grid > aside { min-width: 0; }
+.book-collection-list { display: flex; flex-direction: column; gap: .7rem; margin-top: 2rem; }
+.book-collection-link { text-align: left; padding: 1rem; border: 1px solid var(--line); border-radius: 8px; width: 100%; }
+.book-collection-link.is-active { background: var(--sea-soft); border-color: var(--sea); }
+.book-collection-link > span { display: flex; align-items: flex-start; gap: .6rem; font-size: .9rem; }
+.book-collection-link strong { overflow-wrap: anywhere; }
+.book-collection-link svg { flex-shrink: 0; margin-top: .12rem; }
+.book-collection-link > small { display: block; margin-top: .6rem; color: var(--ink-soft); font-size: .74rem; }
+.book-collection-detail { min-width: 0; background: var(--surface-solid); border-radius: 12px; padding: 1.8rem; box-shadow: 0 9px 25px rgba(25,35,35,.06); }
+.book-collection-detail h3, .book-collection-empty h3 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.6rem; margin-bottom: 1rem; }
+.book-collection-detail > p { font-size: .9rem; line-height: 1.8; }
+.book-collection-detail > ul { padding-left: 1rem; margin-top: 1.4rem; }
+.book-collection-detail li { padding-block: .4rem; }
+.book-checkbox-list { max-height: 320px; overflow-y: auto; padding: .35rem .4rem .35rem 0; }
+.book-collection-empty { padding: 4rem 2rem; text-align: center; background: var(--surface-solid); border-radius: 12px; }
+.book-collection-empty svg { margin: 0 auto 1.5rem; color: var(--sea); }
+.book-collection-empty p { max-width: 45ch; margin: auto; font-size: .88rem; line-height: 1.9; color: var(--ink-soft); }
+.book-desk-heading { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-bottom: 2rem; }
+.book-desk-heading > svg { color: var(--copper-deep); flex-shrink: 0; }
+.book-desk-grid { display: grid; grid-template-columns: minmax(210px,.7fr) minmax(0,2fr); gap: 1.7rem; align-items: start; }
+.book-source-picker { padding: 1.5rem; background: var(--mist); border-radius: 12px; min-width: 0; }
+.book-source-picker h3 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.25rem; margin-bottom: .75rem; }
+.book-source-picker-list { margin-top: 1rem; max-height: 420px; overflow-y: auto; padding-right: .3rem; }
+.book-source-choice { display: flex; align-items: flex-start; gap: .6rem; padding: .9rem 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.book-source-choice > input { width: 16px; height: 16px; margin-top: .2rem; accent-color: var(--sea); flex-shrink: 0; }
+.book-source-choice > svg { margin-top: .15rem; color: var(--sea); flex-shrink: 0; }
+.book-source-choice strong { font-size: .8rem; line-height: 1.5; display: block; font-weight: 500; overflow-wrap: anywhere; }
+.book-source-choice small { font-size: .7rem; line-height: 1.7; color: var(--ink-soft); display: block; margin-top: .3rem; overflow-wrap: anywhere; }
+.book-desk-collections, .book-draft-history { margin-top: 2rem; padding-top: 1.3rem; border-top: 1px solid var(--line-strong); }
+.book-history-link { display: block; width: 100%; text-align: left; padding: .8rem 0; font-size: .82rem; color: var(--sea); overflow-wrap: anywhere; }
+.book-history-link > span { display: block; font-size: .68rem; color: var(--ink-soft); margin-top: .3rem; }
+.book-writing-paper { background: var(--surface-solid); padding: clamp(1.2rem,3vw,2.5rem); border-radius: 12px; box-shadow: 0 14px 35px rgba(28,35,30,.07); min-width: 0; }
+.book-writing-options { border-top: 1px solid var(--line); padding-top: 1.3rem; margin-top: .3rem; }
+.book-writing-options > summary { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.3rem; cursor: pointer; padding: .4rem 0; color: var(--sea); }
+.book-writing-options[open] > summary { margin-bottom: 1.4rem; }
+.book-search-results, .book-saved-draft { margin-top: 2.5rem; padding-top: 1.8rem; border-top: 1px solid var(--line-strong); }
+.book-search-results > h3, .book-saved-draft h3 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.4rem; margin-bottom: .8rem; overflow-wrap: anywhere; }
+.book-citation { padding: 1.3rem 0; min-width: 0; border-bottom: 1px solid var(--line); }
+.book-citation-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: .4rem 1rem; margin-bottom: .8rem; }
+.book-citation-heading > span { font-size: .73rem; color: var(--ink-soft); }
+.book-source-link { display: inline-flex; align-items: center; gap: .4rem; color: var(--sea); font-size: .85rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.book-source-link svg { flex-shrink: 0; }
+.book-citation blockquote { white-space: pre-wrap; font-family: var(--font-fraunces), Georgia, serif; font-size: 1.07rem; line-height: 1.9; margin: .7rem 0; max-width: 72ch; overflow-wrap: anywhere; }
+.book-prose-editor { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.1rem; line-height: 1.9 !important; }
+.book-saved-draft > .book-field { margin-top: 1.2rem; }
+.book-saved-draft > .book-actions { margin-top: 1.2rem; }
+.book-draft-preview { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-fraunces), Georgia, serif; font-size: 1rem; line-height: 1.9; background: var(--paper); padding: 1.2rem; border-radius: 8px; margin-block: 1rem; max-width: 100%; }
+.book-draft-references { margin-top: 2rem; }
+
+.book-reader-back { display: inline-flex; align-items: center; gap: .55rem; color: var(--sea); font-size: .85rem; padding: .5rem 0; margin-bottom: 1.4rem; }
+.book-reader-header { display: grid; grid-template-columns: 230px minmax(0,1fr); gap: 2.5rem; align-items: center; padding: 2rem; background: var(--surface-solid); border-radius: 12px; box-shadow: 0 10px 34px rgba(24,31,28,.06); margin-bottom: 2rem; }
+.book-reader-cover { padding: 2rem 1.2rem; background: var(--wood-deep); background-image: var(--wood-asset); border-radius: 6px; }
+.book-reader-bibliography { min-width: 0; }
+.book-reader-author { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.4rem; margin-bottom: .7rem; }
+.book-reader-bibliography > p { color: var(--ink-soft); line-height: 1.8; font-size: .86rem; }
+.book-reader-bibliography .book-actions { margin-block: 1.2rem; }
+.book-ownership { display: flex; align-items: center; gap: .5rem; margin-top: 1rem; }
+.book-original-details { margin-top: 1.2rem; font-size: .76rem; color: var(--ink-soft); max-width: 75ch; line-height: 1.9; }
+.book-original-details summary { cursor: pointer; color: var(--sea); }
+.book-original-details p { margin-top: .6rem; }
+.book-file-hash { overflow-wrap: anywhere; }
+.book-reader-body { display: grid; grid-template-columns: minmax(0,1fr); gap: 2rem; align-items: start; }
+.book-reader-body.has-pages { grid-template-columns: minmax(0,1.15fr) minmax(0,1fr); }
+.book-reader-text { padding: 1.8rem; background: var(--surface-solid); border-radius: 12px; min-width: 0; }
+.book-reader-fragment { scroll-margin-top: 7rem; }
+.book-reader-fragment:target { background: var(--sea-soft); margin-inline: -.8rem; padding: .8rem; border-radius: 8px; }
+.book-reader-fragment h3 { font-size: .78rem; font-weight: 600; padding-top: 1.1rem; color: var(--ink-soft); }
+.book-reader-fragment .book-citation { padding-top: .3rem; }
+.book-reader-fragment .book-citation-heading { display: none; }
+.book-physical-page { min-width: 0; position: sticky; top: 100px; }
+.book-page-toolbar { display: flex; gap: 1rem; align-items: end; justify-content: space-between; margin-bottom: 1rem; }
+.book-page-toolbar > .book-small { max-width: 25ch; font-size: .7rem; }
+.book-pdf-image { width: 100%; height: auto; background: white; box-shadow: 0 10px 28px rgba(18,28,28,.12); border-radius: 3px; }
+
+@media (max-width: 1120px) {
+  .book-library-composition { grid-template-columns: minmax(170px,.65fr) minmax(0,2fr); }
+  .book-ex-libris { padding: 1.5rem 1.2rem; }
+  .book-shelf-row { padding-inline: .5rem; grid-template-columns: repeat(auto-fill,minmax(138px,1fr)); gap: 1.5rem .8rem; }
+  .law-book-scene { width: 138px; height: 210px; }
+  .law-book-volume { width: 130px; height: 203px; }
+  .law-book-title { font-size: min(var(--cover-title-size, 1.08rem), 1.08rem); }
+  .book-desk-grid { grid-template-columns: 210px minmax(0,1fr); gap: 1rem; }
+  .book-source-picker { padding: 1rem; }
+  .book-reader-body.has-pages { grid-template-columns: 1fr; }
+  .book-physical-page { position: static; max-width: 700px; width: 100%; }
+  .personal-law-library[data-layout="salon"] .book-shelves-area { grid-template-columns: 1fr; }
+}
+@media (max-width: 800px) {
+  .book-library-header { flex-direction: column; align-items: flex-start; gap: 1.2rem; }
+  .book-library-header h1 { font-size: 2.4rem; }
+  .book-library-tabs { gap: 1rem; }
+  .book-library-tabs > button { font-size: .76rem; gap: .4rem; }
+  .book-library-composition, .personal-law-library[data-layout="gabinete"] .book-library-composition { grid-template-columns: 1fr; }
+  .book-ex-libris { display: grid; grid-template-columns: 1fr 1.3fr; gap: .3rem 1.5rem; padding: 1.5rem; align-items: center; }
+  .book-ex-libris-seal { display: none; }
+  .book-ex-libris h2 { grid-row: span 2; font-size: 1.9rem; margin: 0; }
+  .book-ex-libris > p { display: none; }
+  .book-ex-libris-owner { margin: 0; padding: 0; border: 0; }
+  .book-ex-libris-owner > strong { font-size: 1.15rem; }
+  .book-desk-invitation { margin: .2rem 0 0; font-size: .78rem; }
+  .book-desk-grid, .book-collections-grid { grid-template-columns: 1fr; }
+  .book-source-picker-list { max-height: 210px; }
+  .book-source-picker { padding: 1.3rem; }
+  .book-draft-history { margin-top: 1.2rem; }
+  .book-layout-choices { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .book-edit-grid { grid-template-columns: 1fr; }
+  .book-binding-preview { flex-direction: row; padding-block: 1.2rem; gap: 1rem; }
+  .book-binding-preview .law-book-scene { margin: 0; }
+  .book-reader-header { grid-template-columns: 150px minmax(0,1fr); gap: 1.4rem; padding: 1.3rem; }
+  .book-reader-cover { padding: 1rem .3rem; }
+  .book-reader h1 { font-size: 2rem; }
+  .book-reader-header .btn { font-size: .75rem; padding: .6rem .8rem; }
+}
+@media (max-width: 480px) {
+  .book-library-header h1 { font-size: 2rem; }
+  .book-library-header p { font-size: 1rem; }
+  .book-library-header > .book-actions { width: 100%; gap: .6rem; }
+  .book-library-header .btn { font-size: .76rem; padding-inline: .8rem; }
+  .book-library-tabs { gap: .65rem; justify-content: space-between; }
+  .book-library-tabs > button { font-size: .68rem; gap: .3rem; }
+  .book-library-tabs > button > svg { width: 14px; }
+  .book-library-tabs .book-selection-count { min-width: 18px; min-height: 18px; font-size: .65rem; }
+  .book-library-tools { gap: .65rem; }
+  .book-inline-filter { flex: 1 1 120px; min-width: 0; }
+  .book-inline-filter .select { font-size: .73rem; padding: .65rem .6rem; }
+  .book-ex-libris { padding: 1.2rem; gap: .6rem 1rem; }
+  .book-ex-libris h2 { font-size: 1.55rem; }
+  .book-ex-libris-owner > span { font-size: .64rem; }
+  .book-ex-libris-owner > strong { font-size: 1rem; }
+  .book-shelves-area { padding: .7rem .45rem; }
+  .book-shelf-plaque { padding: .4rem .65rem 1rem; }
+  .book-shelf-plaque h2 { font-size: 1.13rem; }
+  .book-shelf-plaque > span { font-size: .65rem; }
+  .book-shelf-row, .personal-law-library[data-layout="estantes"] .book-shelf-row { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.6rem .7rem; padding: .7rem .45rem 1.2rem; }
+  .law-book-scene { width: 122px; height: 194px; }
+  .law-book-volume { width: 115px; height: 187px; }
+  .law-book-front { padding: 21px 13px 16px 17px; }
+  .law-book-title { font-size: min(calc(var(--cover-title-size, 1.07rem) * .9), .96rem); }
+  .law-book-author { font-size: .48rem; }
+  .law-book-ornament { margin-block: 10px; }
+  .book-catalog-title { font-size: .88rem; }
+  .book-catalog-meta { font-size: .65rem; }
+  .book-use-check { font-size: .63rem; gap: .3rem; }
+  .book-empty-shelf { grid-template-columns: 1fr; gap: 1.6rem; padding: 2rem 1rem; }
+  .book-empty-copy { text-align: center; }
+  .book-empty-copy h2 { font-size: 1.9rem; }
+  .book-empty-copy p { font-size: .8rem; }
+  .book-empty-preview { gap: 1rem; }
+  .book-empty-preview .law-book-scene { scale: 1.05; margin-block: .5rem; }
+  .book-form-grid { grid-template-columns: 1fr; }
+  .book-personalize, .book-import-panel, .book-edit-panel { padding: 1.2rem; }
+  .book-layout-choices { gap: .65rem; }
+  .book-layout-choice { padding: .75rem; gap: .7rem; }
+  .book-layout-choice > input { right: .7rem; top: .75rem; width: 15px; height: 15px; }
+  .book-layout-miniature { width: 82px; height: 65px; padding-inline: 10px; gap: 3px; margin-top: 1.2rem; }
+  .book-layout-choice > strong { font-size: .98rem; }
+  .book-layout-choice > span:last-child { font-size: .66rem; }
+  .book-layout-miniature[data-layout="mesa"] { width: 82px; padding-left: 12px; border-left-width: 14px; }
+  .book-upload-zone { padding: 1.7rem .8rem; }
+  .book-upload-zone strong { font-size: 1.3rem; }
+  .book-selection-bar { padding: 1rem; }
+  .book-selection-bar .btn { width: 100%; font-size: .8rem; }
+  .book-collection-detail { padding: 1.2rem; }
+  .book-writing-paper { padding: 1.1rem; }
+  .book-desk-heading { gap: .5rem; }
+  .book-desk-heading > svg { display: none; }
+  .book-citation blockquote { font-size: 1rem; }
+  .book-reader-header { grid-template-columns: 1fr; }
+  .book-reader-cover { width: 100%; padding: 1.6rem; }
+  .book-reader-cover .law-book-scene { margin-inline: auto; }
+  .book-reader-bibliography { width: 100%; }
+  .book-reader h1 { font-size: 2rem; }
+  .book-reader-text { padding: 1.2rem; }
+  .book-page-toolbar { align-items: start; flex-direction: column; gap: .6rem; }
+  .book-page-toolbar .book-field { width: 100%; }
+  .book-page-toolbar .book-small { max-width: none; }
+  .personal-law-library[data-layout="gabinete"] .book-shelf-row, .personal-law-library[data-view="spines"] .book-shelf-row { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .personal-law-library[data-layout="galeria"] .book-shelf-row { grid-template-columns: 1fr; gap: 2.6rem; padding: 2rem 0; }
+  .personal-law-library[data-layout="galeria"] .law-book-scene { scale: 1.35; margin-block: 2rem; }
+  .personal-law-library[data-layout="archivo"] .book-shelves-area { padding-inline: .45rem; }
+  .personal-law-library[data-layout="archivo"] .book-shelf-row { grid-template-columns: repeat(auto-fill, 62px); gap: 1.4rem .6rem; padding-inline: .4rem; }
+  .personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-scene { width: 132px; height: 230px; }
+  .personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-volume { width: 120px; }
+  .personal-law-library[data-layout="archivo"][data-view="covers"] .book-on-shelf:nth-child(5n+1) .law-book-front { padding: 24px 13px 18px 17px; }
+  .personal-law-library[data-layout="salon"] .book-ex-libris { display: flex; justify-content: space-between; gap: 1rem; padding: 1.2rem; }
+  .personal-law-library[data-layout="salon"] .book-ex-libris h2 { font-size: 1.5rem; }
+  .personal-law-library[data-layout="salon"] .book-shelves-area { padding: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .law-book-volume { transition: none; }
+  .book-open-link:hover .law-book-volume, .book-open-link:focus-visible .law-book-volume { transform: rotateY(-18deg) rotateX(3deg); }
+}

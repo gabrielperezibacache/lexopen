@@ -1,0 +1,1 @@
+Book import compensation PASS: isolated own-attempt removal, idempotent missing object, other attempt intact, shared/historical/unsafe paths refused, S3 SDK DELETE transport checked with loopback fixture only.

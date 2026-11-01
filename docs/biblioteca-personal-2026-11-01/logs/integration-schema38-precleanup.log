@@ -1,0 +1,354 @@
+
+> lexopen@1.0.0 test:integration
+> node --import tsx src/lib/plazo-alerts.integration.test.ts && npm run test:auth:integration && npm run test:assistant:integration && npm run test:notify:integration && npm run test:documents:integration && npm run test:migrations:integration && npm run test:research:integration && npm run test:knowledge:integration && npm run test:books:integration
+
+audit write failed PrismaClientKnownRequestError:
+Invalid `client.auditEvent.create()` invocation in
+<workspace>/src/lib/audit.ts:37:29
+
+  34   client: Pick<Prisma.TransactionClient, "auditEvent"> = prisma
+  35 ) {
+  36   try {
+→ 37     await client.auditEvent.create(
+Foreign key constraint violated: `AuditEvent_actorId_fkey (index)`
+    at $n.handleRequestError (<workspace>/node_modules/@prisma/client/runtime/library.js:121:7315)
+    at $n.handleAndLogRequestError (<workspace>/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (<workspace>/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async writeAudit (<workspace>/src/lib/audit.ts:37:5)
+    at async <anonymous> (<workspace>/src/lib/plazo-alerts.integration.test.ts:45:7)
+    at async Proxy._transactionWithCallback (<workspace>/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async waitForActual (node:assert:644:5)
+    at async Function.rejects (node:assert:767:25)
+    at async main (<workspace>/src/lib/plazo-alerts.integration.test.ts:43:5) {
+  code: 'P2003',
+  clientVersion: '5.22.0',
+  meta: {
+    modelName: 'AuditEvent',
+    field_name: 'AuditEvent_actorId_fkey (index)'
+  }
+}
+plazo-alerts.integration.test.ts OK (rollback, concurrent delivery, audit atomicity)
+
+> lexopen@1.0.0 test:auth:integration
+> node --import tsx src/lib/auth/boundaries.integration.test.ts
+
+prisma:error
+Invalid `tx.task.update()` invocation in
+<workspace>/src/lib/tasks/service.ts:107:34
+
+  104 if (before.origen !== "manual" && causaId !== before.causaId) throw httpError("El expediente del pendiente se modifica desde su origen", 409);
+  105 const nextStatus = changes.status ?? before.status;
+  106 const completed = nextStatus === "done" && before.status !== "done";
+→ 107 const task = await tx.task.update(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+auth boundaries: negative ACL and notification source policy, reserved conflict, atomic bulk, mirror, recurrence, approval CAS/expiry, TOTP enrollment OK
+
+> lexopen@1.0.0 test:assistant:integration
+> node --import tsx src/lib/assistant/commands.integration.test.ts
+
+audit write failed Error: synthetic audit failure
+    at <anonymous> (<workspace>/src/lib/assistant/commands.integration.test.ts:23:132)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+audit write failed Error: synthetic audit failure
+    at <anonymous> (<workspace>/src/lib/assistant/commands.integration.test.ts:23:132)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+prisma:error
+Invalid `tx.commandExecution.create()` invocation in
+<workspace>/src/lib/command-execution.ts:66:49
+
+  63   return result;
+  64 }
+  65 await opts.authorize?.(tx);
+→ 66 const receipt = await tx.commandExecution.create(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+prisma:error
+Invalid `tx.assistantUndo.updateMany()` invocation in
+<workspace>/src/lib/assistant/plan-store.ts:93:42
+
+  90   id: token, ownerId: actor.userId, consumedAt: null, expiresAt: { gt: new Date() },
+  91 } });
+  92 if (!record) return null;
+→ 93 const claimed = await tx.assistantUndo.updateMany(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+audit write failed Error: synthetic audit failure
+    at <anonymous> (<workspace>/src/lib/assistant/commands.integration.test.ts:23:132)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+prisma:error
+Invalid `tx.commandExecution.create()` invocation in
+<workspace>/src/lib/command-execution.ts:66:49
+
+  63   return result;
+  64 }
+  65 await opts.authorize?.(tx);
+→ 66 const receipt = await tx.commandExecution.create(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+audit write failed Error: synthetic audit failure
+    at <anonymous> (<workspace>/src/lib/assistant/commands.integration.test.ts:23:132)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+prisma:error
+Invalid `tx.commandExecution.create()` invocation in
+<workspace>/src/lib/command-execution.ts:66:49
+
+  63   return result;
+  64 }
+  65 await opts.authorize?.(tx);
+→ 66 const receipt = await tx.commandExecution.create(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+audit write failed Error: synthetic audit failure
+    at <anonymous> (<workspace>/src/lib/assistant/commands.integration.test.ts:23:132)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+audit write failed Error: synthetic audit failure
+    at <anonymous> (<workspace>/src/lib/assistant/commands.integration.test.ts:23:132)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+prisma:error
+Invalid `tx.invoice.create()` invocation in
+<workspace>/src/lib/billing-invoices.ts:156:44
+
+  153   if (exists) throw httpError("Ya existe una factura con ese número", 409);
+  154 }
+  155
+→ 156 const created = await tx.invoice.create(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+assistant commands integration: rollback/nestedTX/concurrency/idempotency/owner/currentACL/staleUndo/delete replay+partial recovery/11 writes/retrieval/private KPIs/payment+deadline+invoice atomicity/global numbering passed
+
+> lexopen@1.0.0 test:notify:integration
+> node --import tsx src/lib/notify/notification-pipeline.integration.test.ts
+
+notify PostgreSQL integration OK: atomic rollback, concurrent dedupe, recipient/wall ack, fanout, pagination, escalation, leases, ambiguous send, digest retry, job CAS
+
+> lexopen@1.0.0 test:documents:integration
+> node --import tsx src/lib/document-processing-queue.integration.test.ts && node --import tsx src/lib/evidence/evidence.integration.test.ts && node --import tsx src/lib/evidence/pdf-evidence.integration.test.ts && node --import tsx src/lib/evidence/site-file-evidence.integration.test.ts && node --import tsx src/lib/integrations/drive-import.integration.test.ts
+
+document-processing-queue.integration OK: 201, concurrent claim, stale lease, retry, CAS, recover after failure
+prisma:error
+Invalid `client.documentResource.upsert()` invocation in
+<workspace>/src/lib/evidence/service.ts:110:37
+
+  107 if (!chunks.length && !input.pdf) throw Object.assign(new Error("Este documento aún no tiene texto para citar"), { status: 409 });
+  108 if (Boolean(input.documentoId) === Boolean(input.siteFileId)) throw new Error("A source identity is required");
+  109 const resource = input.documentoId
+→ 110   ? await client.documentResource.upsert(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+evidence integration OK: concurrent idempotency, pagination, exact quotes, current ACL, original hash, old citation beyond 100 versions
+prisma:error
+Invalid `client.documentEvidenceVersion.upsert()` invocation in
+<workspace>/src/lib/evidence/service.ts:116:56
+
+  113 const textSha256 = sha256(input.text);
+  114 const extractorVersion = input.pdf?.extractorVersion || EVIDENCE_EXTRACTOR_VERSION;
+  115 const sourceRevision = input.sourceRevision || "legacy";
+→ 116 const version = await client.documentEvidenceVersion.upsert(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+PDF evidence PostgreSQL OK: physical page/fragment binding, OCR+blank page, literal offsets/hashes, concurrent idempotency, legacy versions, frozen original, revocation and tamper rejection
+prisma:error
+Invalid `client.documentResource.upsert()` invocation in
+<workspace>/src/lib/evidence/service.ts:111:37
+
+  108 if (Boolean(input.documentoId) === Boolean(input.siteFileId)) throw new Error("A source identity is required");
+  109 const resource = input.documentoId
+  110   ? await client.documentResource.upsert({ where: { documentoId: input.documentoId }, create: { documentoId: input.documentoId }, update: {} })
+→ 111   : await client.documentResource.upsert(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+audit write failed Error: Site evidence synthetic audit failure
+    at <anonymous> (<workspace>/src/lib/evidence/site-file-evidence.integration.test.ts:25:151)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+SiteFile evidence PostgreSQL OK: original-byte extraction, concurrent idempotency, source version, stable originals/all formats, PDF/OCR/blank, literal page citations, current ACL/revocation/portal, tamper, atomic audit rollback, concurrent source change, A→B→A current revision/research and deletion
+prisma:error
+Invalid `tx.documento.create()` invocation in
+<workspace>/src/lib/integrations/drive-import.ts:167:42
+
+  164   if (!await tx.documento.count({ where: { id: existing.documentoId, ...documentReadWhere(current.actor) } })) throw fail("Documento no encontrado o sin acceso", 404, "import_not_found");
+  165   return { ...existing, reused: true };
+  166 }
+→ 167 const doc = await tx.documento.create(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+prisma:error
+Invalid `client.auditEvent.create()` invocation in
+<workspace>/src/lib/audit.ts:37:29
+
+  34   client: Pick<Prisma.TransactionClient, "auditEvent"> = prisma
+  35 ) {
+  36   try {
+→ 37     await client.auditEvent.create(
+Error occurred during query execution:
+ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "P0001", message: "Drive fixture audit failure", severity: "ERROR", detail: None, column: None, hint: None }), transient: false })
+audit write failed PrismaClientUnknownRequestError:
+Invalid `client.auditEvent.create()` invocation in
+<workspace>/src/lib/audit.ts:37:29
+
+  34   client: Pick<Prisma.TransactionClient, "auditEvent"> = prisma
+  35 ) {
+  36   try {
+→ 37     await client.auditEvent.create(
+Error occurred during query execution:
+ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "P0001", message: "Drive fixture audit failure", severity: "ERROR", detail: None, column: None, hint: None }), transient: false })
+    at $n.handleRequestError (<workspace>/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (<workspace>/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (<workspace>/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async writeAudit (<workspace>/src/lib/audit.ts:37:5)
+    at async client.$transaction.isolationLevel (<workspace>/src/lib/integrations/drive-import.ts:169:11)
+    at async Proxy._transactionWithCallback (<workspace>/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async importSelectedDriveFile (<workspace>/src/lib/integrations/drive-import.ts:158:24)
+    at async waitForActual (node:assert:644:5)
+    at async Function.rejects (node:assert:767:25) {
+  clientVersion: '5.22.0'
+}
+Drive import integration PASS: selected folder pagination, fresh ACL, blocked network, binary/export provenance, concurrency idempotence, frozen originals, revisions/parents/trashed/permissions/checksums/limits, revoked access/folder, provider errors/timeout and audit rollback. Google transport is a fixture, no live OAuth account used.
+
+> lexopen@1.0.0 test:migrations:integration
+> node --import tsx src/lib/pjud/migration-preservation.integration.test.ts
+
+PJUD preservation OK: divergent movements and pending/running job snapshots survive historical dedupe
+
+> lexopen@1.0.0 test:research:integration
+> node --import tsx src/lib/research/research.integration.test.ts
+
+audit write failed Error: research fixture audit failure
+    at <anonymous> (<workspace>/src/lib/research/research.integration.test.ts:26:131)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+audit write failed Error: research fixture audit failure
+    at <anonymous> (<workspace>/src/lib/research/research.integration.test.ts:26:131)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+research PostgreSQL OK: import concurrency, frozen versions, exact citation/hash, no network/model, accent search, abstention, 206-doc explicit selection, PDF page/OCR/partial, owner/current ACL/revocation, atomic audit rollback, original tamper
+
+> lexopen@1.0.0 test:knowledge:integration
+> node --import tsx src/lib/knowledge/citations.integration.test.ts && node --import tsx src/lib/knowledge/cases.integration.test.ts && node --import tsx src/lib/knowledge/library.integration.test.ts
+
+knowledge citations PostgreSQL OK: exact literal/whole text/original SHA, UTF-16 offsets after emoji, pinned key/hash/page integrity, private case/space/public scope, stale actor+cache ACL/capability revocation, old revision retained, physical PDF OCR, manual legal provenance, no network or model
+audit write failed Error: Synthetic case knowledge audit failure
+    at <anonymous> (<workspace>/src/lib/knowledge/cases.integration.test.ts:23:106)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+Case knowledge PostgreSQL PASS: exact sources and scope, literal/ambiguous dates, local extraction, resumable bounds, dedupe and A-B-A human review preservation, CAS/history, two-source contradictions, current ACL/role/portal, original tamper and audit rollback; network/model calls 0
+audit write failed Error: library audit fixture failure
+    at <anonymous> (<workspace>/src/lib/knowledge/library.integration.test.ts:23:167)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+audit write failed Error: library audit fixture failure
+    at <anonymous> (<workspace>/src/lib/knowledge/library.integration.test.ts:23:167)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+Library integration PASS: owned/scoped collections, create replay and concurrent dedupe, pinned historic versions, exact quote and original integrity, PDF page citations, no network/model, explicit library-only/combined research, CAS edits, removals/notes invalidate history, current role/matter/document ACL, unavailable redaction, quota and audit rollback.
+
+> lexopen@1.0.0 test:books:integration
+> node --import tsx src/lib/books/books.integration.test.ts && node --import tsx src/lib/books/rag.integration.test.ts && node --import tsx src/lib/books/conversion.integration.test.ts
+
+audit write failed Error: Synthetic book audit failure
+    at Array.create (<workspace>/src/lib/books/books.integration.test.ts:86:134)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+audit write failed Error: Synthetic book audit failure
+    at Array.create (<workspace>/src/lib/books/books.integration.test.ts:86:134)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+Personal book library PostgreSQL PASS: private ownership incl admin denial, concurrent import replay/CAS, personalization, explicit read-only collections and revocation, current actor/owner role/capability, exact original/text/Unicode/fragment hashes, EPUB sections, physical PDF/OCR page2/image, whole-PDF page/text coordinate binding and coherent-page/global/local-range tamper rejection and canonical PDF label through export after label-only corruption, preferences isolation, audit rollback and soft-removal derivative denial; network/model calls 0.
+audit write failed Error: Book RAG synthetic audit failure
+    at <anonymous> (<workspace>/src/lib/books/rag.integration.test.ts:21:173)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+Book RAG PostgreSQL PASS: explicit owned/shared scope, BM25 literal citations and retained original, zero-result abstention/no model, real-model-only structured generation, existing author text preserved, source markers as data, invented references/quotes rejected, CAS and audit rollback, authoritative bibliography refresh, per-request and history sharing revocation, text/original tampering, local_only egress and actor revocation.
+Book text retention PostgreSQL PASS: explicit conversion/original choices and replay conflicts, physical PDF/OCR retained when chosen, TXT-only storage with original hash provenance, original410 and no fake PDF page, text/citation/export tamper409, retained-text RAG footnotes, migrated37 original/citation compatibility, per-user defaults and partial PATCH preservation, heavy text threshold and strict multipart options; model/network calls 0.
