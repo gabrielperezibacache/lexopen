@@ -86,7 +86,7 @@ export async function loadBillingOverview() {
     unbilledExpenses,
     openInvoices,
     paidThisMonth,
-    latestBalances,
+    latestBalancesRaw,
     recentInvoices,
     recentTime,
   ] = await Promise.all([
@@ -110,10 +110,19 @@ export async function loadBillingOverview() {
       _sum: { amountClp: true },
       _count: true,
     }),
-    prisma.ledgerEntry.findMany({
-      distinct: ["clienteId"],
-      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
-      select: { clienteId: true, balanceClp: true },
+    // ⚡ Bolt: Fetch the latest balance per client using a relation query.
+    // This avoids a full table scan and sort on ledgerEntry required by distinct,
+    // leveraging PostgreSQL lateral joins instead.
+    prisma.cliente.findMany({
+      where: { ledgerEntries: { some: {} } },
+      select: {
+        id: true,
+        ledgerEntries: {
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+          take: 1,
+          select: { balanceClp: true },
+        },
+      },
     }),
     prisma.invoice.findMany({
       include: { cliente: true, causa: true },
@@ -127,6 +136,10 @@ export async function loadBillingOverview() {
     }),
   ]);
 
+  const latestBalances = latestBalancesRaw.map((c) => ({
+    clienteId: c.id,
+    balanceClp: c.ledgerEntries[0].balanceClp,
+  }));
   const provision = summarizeProvision(latestBalances.map((entry) => entry.balanceClp));
 
   return {
