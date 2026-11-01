@@ -17,7 +17,7 @@ test.afterAll(async()=>{
  if(documentId)await db.documento.deleteMany({where:{id:documentId}});
  if(causeId)await db.causa.deleteMany({where:{id:causeId}});await db.$disconnect();
 });
-test('fuentes propias: preparar, citar, paginar y conservar versión; portal sin acceso',async({page,browser})=>{
+test('fuentes propias: preparar, citar, paginar y conservar versión; portal sin acceso',async({page,browser},testInfo)=>{
  await loginAs(page,'socio@estudio.cl');
  await page.goto(`/documentos/${documentId}/fuentes`);
  await expect(page.getByRole('heading',{name:label+'.txt'})).toBeVisible();
@@ -27,8 +27,8 @@ test('fuentes propias: preparar, citar, paginar y conservar versión; portal sin
  expect(evidence.fragments).toHaveLength(50);expect(evidence.nextAfter).not.toBeNull();
  const verify=await page.request.post(`/api/evidence/fragments/${evidence.fragments[0].id}/verify`,{data:{quote:'Cita inexistente inventada'}});expect((await verify.json()).verified).toBe(false);
  const original=await page.request.get(`/api/evidence/versions/${evidence.selectedVersionId}/original`);expect(original.ok()).toBeTruthy();
- await page.setViewportSize({width:1366,height:900});await page.screenshot({path:'/private/tmp/lexopen-evidence-desktop.png',fullPage:false});
- await page.setViewportSize({width:360,height:800});await page.screenshot({path:'/private/tmp/lexopen-evidence-mobile.png',fullPage:false});
+ await page.setViewportSize({width:1366,height:900});await page.screenshot({path:testInfo.outputPath('evidence-desktop.png'),fullPage:false});
+ await page.setViewportSize({width:360,height:800});await page.screenshot({path:testInfo.outputPath('evidence-mobile.png'),fullPage:false});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
  await page.route(`**/api/documentos/${documentId}/evidence*`,route=>route.request().method()==='POST' ? route.fulfill({status:503,json:{error:'Error ficticio de preparación'}}) : route.continue());
  await page.getByRole('button',{name:'Preparar versión actual',exact:true}).click();

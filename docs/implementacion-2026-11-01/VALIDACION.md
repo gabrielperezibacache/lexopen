@@ -10,6 +10,7 @@ Fecha: 2026-11-01. Node 22+, Next 16.3.0, Prisma 5.22 y PostgreSQL 16.14. Base G
 | Compilación de producción | PASS, exit 0; incluye validación de TypeScript/rutas | [build.log](build.log) |
 | Integración PostgreSQL | PASS, exit 0, todas las suites encadenadas | [integration.log](integration.log) |
 | Navegador Chromium completo | PASS, exit 0, **28 pruebas** en 4 minutos | [browser.log](browser.log) |
+| Capturas portables de fuentes | PASS, flujo completo repetido tras corregir la ruta para Linux | [portable-sources.log](portable-sources.log) |
 | Respuesta perdida y reintento de pago/plazo desde UI | PASS, un registro por operación y misma clave tras recarga | [response-loss.json](response-loss.json) |
 | Servidor `next start`, `NODE_ENV=production` | PASS, exit 0; login visual compilado, CSRF y 2FA sin relajación, 12 grupos de aserciones | [production-smoke.log](production-smoke.log), [runtime.json](runtime.json) |
 | Upgrade real desde esquema `main` | PASS; 14 filas originales en 12 tablas, hashes de 56 tablas históricas, un espejo nuevo esperado; 30 migraciones completas y cero drift | [upgrade.log](upgrade.log) |
@@ -29,6 +30,8 @@ La navegación Causa → Espacio respondió 200 tras cinco segundos de compilaci
 La pasada siguiente reprodujo un envío nativo GET del login antes de su hidratación, con las credenciales ficticias en la URL y sin solicitud a la API. Se corrigió el formulario: controles deshabilitados hasta estar interactivo y método POST explícito. La regresión sin JavaScript comprueba el HTML inicial y la suite autenticada comprueba el acceso una vez listo; no se añadió una pausa artificial al helper.
 
 Los dos escenarios de acceso que recorren varias páginas y numerosas API disponen de noventa segundos totales para las compilaciones de desarrollo. Las expectativas de permisos, respuestas y contenido se mantienen. El smoke del servidor compilado conserva los controles reales y completa sus aserciones sin ese coste de compilación.
+
+La primera ejecución de GitHub aprobó instalación, migraciones, esquema, unidades, integración, lint y compilación con Turbopack. Falló al escribir una captura de la prueba nueva en `/private/tmp`, ruta específica de macOS. Se corrigió a `testInfo.outputPath` para usar la carpeta portable del runner; no cambia las aserciones funcionales.
 
 ## Repetición
 
