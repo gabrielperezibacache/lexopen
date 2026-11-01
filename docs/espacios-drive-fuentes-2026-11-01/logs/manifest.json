@@ -1,0 +1,158 @@
+{
+  "date": "2026-11-01",
+  "scope": "Pruebas ficticias aisladas; fuentes oficiales públicas obtenidas en vivo cuando se indica. No CI remoto.",
+  "normalization": "UTF-8 sin BOM, colores retirados, LF, rutas del host sustituidas por placeholders, espacios finales retirados; originales intactos.",
+  "exitStatusProvenance": "Estados de salida 0 confirmados por el agente principal; no inferidos del contenido o de la ausencia de errores.",
+  "files": [
+    {
+      "file": "units.log",
+      "sourceFile": "lexopen-spaces-units-final.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:30:47.842139+00:00",
+      "originalBytes": 11273,
+      "normalizedBytes": 11273,
+      "originalSha256": "764e137500fd27744224b158e822d1a5e7fc68f8490b63c1c536555170ff309d",
+      "normalizedSha256": "764e137500fd27744224b158e822d1a5e7fc68f8490b63c1c536555170ff309d",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "lint.log",
+      "sourceFile": "lexopen-spaces-lint-release.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:37:09.950862+00:00",
+      "originalBytes": 34,
+      "normalizedBytes": 33,
+      "originalSha256": "db58e698a71f6923f5d66425538f7b1ea17c7e16f3ce1c85858f0ab5911afc98",
+      "normalizedSha256": "dbd928d643fd9a62d3f7b403093eb025bf1d22a9f30e9b3793a4087d2ebc7b10",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "types.log",
+      "sourceFile": "lexopen-spaces-types-final.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:36:46.172002+00:00",
+      "originalBytes": 0,
+      "normalizedBytes": 0,
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "build.log",
+      "sourceFile": "lexopen-spaces-build-release.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:37:18.125797+00:00",
+      "originalBytes": 10520,
+      "normalizedBytes": 10048,
+      "originalSha256": "11d7da97213a80ca69025da76e93f41a8fa5f5dd27c52fe3beff141fd83a66be",
+      "normalizedSha256": "5a6d2aac42a557b28913097609606b7f7e21583038c8f7d148cc166083f0f90a",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "production-live-official.log",
+      "sourceFile": "lexopen-spaces-prod-smoke-final.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:38:35.261795+00:00",
+      "originalBytes": 1728,
+      "normalizedBytes": 1728,
+      "originalSha256": "672ff2a4319c3569ba03506a1e68708eebd1d664a4b9da817305b3bc2bc63000",
+      "normalizedSha256": "672ff2a4319c3569ba03506a1e68708eebd1d664a4b9da817305b3bc2bc63000",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "drive-import-integration.log",
+      "sourceFile": "lexopen-drive-import-integration.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:31:27.525414+00:00",
+      "originalBytes": 3155,
+      "normalizedBytes": 2701,
+      "originalSha256": "279c752bd9cb7961fa08590cb558c48219fa2fa4e98503d9a5735acb3750abda",
+      "normalizedSha256": "33f484930ec0315afeb7cfb5f84a7714da64f412656203bf26e419441107ce08",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "site-evidence-integration.log",
+      "sourceFile": "lexopen-site-evidence-revisions-integration.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:37:22.838730+00:00",
+      "originalBytes": 2126,
+      "normalizedBytes": 1715,
+      "originalSha256": "4da195a4d30345990c740b848ab883f7b30a863839d54f6c0c6973d6f7b017a6",
+      "normalizedSha256": "999dcf0b3ee4cd2572706d77675db7fccfea0042af802dd7b0dfedf6ce63a0bd",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "sources-native-live.jsonl",
+      "sourceFile": "lexopen-expanded-native-smoke.json",
+      "sourceModifiedAtUtc": "2026-11-01T20:28:53.923586+00:00",
+      "originalBytes": 6722,
+      "normalizedBytes": 6722,
+      "originalSha256": "e081ca79841a7896989ae471ca038fa05435b6507ce4c3802e9bf8ffc5328a2a",
+      "normalizedSha256": "e081ca79841a7896989ae471ca038fa05435b6507ce4c3802e9bf8ffc5328a2a",
+      "evidence": "Cinco respuestas públicas registradas; no se atribuye un estado del proceso no confirmado."
+    },
+    {
+      "file": "integration.log",
+      "sourceFile": "lexopen-spaces-integration-release.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:39:09.358819+00:00",
+      "originalBytes": 22726,
+      "normalizedBytes": 18202,
+      "originalSha256": "4f52681f0262626d961f94f99afb401b09af7023762e800eed37dcbfe579b501",
+      "normalizedSha256": "91c672f68780a050fb2b86cfd851661050ae461cf26f11e88fd04d65c5548746",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "upgrade-restore.log",
+      "sourceFile": "lexopen-spaces-upgrade34-restore-proof.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:39:34.285658+00:00",
+      "originalBytes": 3442,
+      "normalizedBytes": 3438,
+      "originalSha256": "e3ef7c10e4ef94bfa58831c7c305b0828f47ff837180645d795e919d111fbf20",
+      "normalizedSha256": "d1c0db48f256737a672ae30cb5bec3626d74bad3ddcd2977d9fe89c2d9daeeba",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "browser-first.log",
+      "sourceFile": "lexopen-spaces-browser-all-final.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:42:43.935687+00:00",
+      "originalBytes": 8204,
+      "normalizedBytes": 8155,
+      "originalSha256": "3144075c19826c9634129839a5b70fbaa8212a8afc016f2c682b3d9ed892c310",
+      "normalizedSha256": "cd16e65abcd1a6bc0cc84dd26069b545ddc977e2c76c806f3a2d9e848ee18c69",
+      "confirmedExitCode": 1
+    },
+    {
+      "file": "browser-research-isolated.log",
+      "sourceFile": "lexopen-spaces-research-confirm.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:43:33.690573+00:00",
+      "originalBytes": 368,
+      "normalizedBytes": 368,
+      "originalSha256": "ab0cd68ffed755df97021b80090fdf79eebacd9f31b3f4593079545623213e6c",
+      "normalizedSha256": "ab0cd68ffed755df97021b80090fdf79eebacd9f31b3f4593079545623213e6c",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "browser-interrupted.log",
+      "sourceFile": "lexopen-spaces-browser-confirm-all.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:54:10.128901+00:00",
+      "originalBytes": 19581,
+      "normalizedBytes": 19394,
+      "originalSha256": "24f2937ba040b3f4c50d49ed5d458852303eef1cf1d59600e0765c99ad1dcef2",
+      "normalizedSha256": "77158bf65e07e80078e97247bd7d43bdf2b269775d90ec7ffc0af4154b353536",
+      "confirmedExitCode": 130
+    },
+    {
+      "file": "browser-release.log",
+      "sourceFile": "lexopen-spaces-release-browser.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:54:56.457735+00:00",
+      "originalBytes": 4286,
+      "normalizedBytes": 4286,
+      "originalSha256": "f7822b73161c38e08ae17fd54540578be774d7598c10143765bcadd261f17848",
+      "normalizedSha256": "f7822b73161c38e08ae17fd54540578be774d7598c10143765bcadd261f17848",
+      "confirmedExitCode": 0
+    },
+    {
+      "file": "server-resource-observation.log",
+      "sourceFile": "lexopen-spaces-test-server-resource.log",
+      "sourceModifiedAtUtc": "2026-11-01T20:55:20.992411+00:00",
+      "originalBytes": 497,
+      "normalizedBytes": 497,
+      "originalSha256": "626634d328d634e5466ae944086f5c6790eaa30229ab3a1df8a156da75265208",
+      "normalizedSha256": "626634d328d634e5466ae944086f5c6790eaa30229ab3a1df8a156da75265208",
+      "evidence": "Observaciones de recursos propias transcritas por el ejecutor; no se atribuye un estado de salida de un proceso."
+    }
+  ]
+}

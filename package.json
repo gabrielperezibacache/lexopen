@@ -49,7 +49,7 @@
     "test:auth:integration": "node --import tsx src/lib/auth/boundaries.integration.test.ts",
     "test:assistant:integration": "node --import tsx src/lib/assistant/commands.integration.test.ts",
     "test:notify:integration": "node --import tsx src/lib/notify/notification-pipeline.integration.test.ts",
-    "test:documents:integration": "node --import tsx src/lib/document-processing-queue.integration.test.ts && node --import tsx src/lib/evidence/evidence.integration.test.ts && node --import tsx src/lib/evidence/pdf-evidence.integration.test.ts",
+    "test:documents:integration": "node --import tsx src/lib/document-processing-queue.integration.test.ts && node --import tsx src/lib/evidence/evidence.integration.test.ts && node --import tsx src/lib/evidence/pdf-evidence.integration.test.ts && node --import tsx src/lib/evidence/site-file-evidence.integration.test.ts && node --import tsx src/lib/integrations/drive-import.integration.test.ts",
     "test:migrations:integration": "node --import tsx src/lib/pjud/migration-preservation.integration.test.ts",
     "test:production:smoke": "node --import tsx scripts/production-smoke.ts",
     "test:research:integration": "node --import tsx src/lib/research/research.integration.test.ts",

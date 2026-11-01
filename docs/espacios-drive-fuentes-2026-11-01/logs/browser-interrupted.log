@@ -1,0 +1,225 @@
+
+Running 32 tests using 1 worker
+
+(node:5941) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/agente-document-scope.spec.ts:4:5 › copiloto muestra alcance documental y restaura chat con fuentes (11.1s)
+  ✓   2 [chromium] › e2e/app-quality.spec.ts:18:5 › los apartados principales cargan sin errores de servidor (2.0m)
+  ✓   3 [chromium] › e2e/app-quality.spec.ts:37:5 › menú móvil accesible, foco restaurado y preferencia de movimiento (7.8s)
+  ✓   4 [chromium] › e2e/app-quality.spec.ts:68:5 › búsqueda rechaza consultas excesivas y mantiene sincronizado el campo (5.3s)
+  ✓   5 [chromium] › e2e/app-quality.spec.ts:78:5 › una cookie con solo el ID del usuario no autentica (4.7s)
+  ✓   6 [chromium] › e2e/app-quality.spec.ts:88:5 › el cambio de contraseña limita intentos por usuario (2.8s)
+  ✓   7 [chromium] › e2e/auth-and-access.spec.ts:4:5 › un usuario del estudio puede iniciar sesión y abrir causas (38.9s)
+  ✓   8 [chromium] › e2e/auth-and-access.spec.ts:96:5 › un cliente queda limitado al portal y a sus espacios (38.5s)
+  ✓   9 [chromium] › e2e/auth-and-access.spec.ts:230:5 › una ruta protegida redirige al login sin sesión (896ms)
+  ✓  10 [chromium] › e2e/causas-section.spec.ts:4:5 › un abogado ve un menú Causas con tres pestañas y sin ítems duplicados (18.5s)
+  ✓  11 [chromium] › e2e/causas-section.spec.ts:40:5 › un asistente no opera ClaveÚnica (10.6s)
+  ✓  12 [chromium] › e2e/causas-section.spec.ts:60:5 › avisos del canal PJUD van al log de Configuración, no a Cartera (11.9s)
+  ✓  13 [chromium] › e2e/causas-section.spec.ts:80:5 › un cliente sigue sin Causas (7.7s)
+  ✓  14 [chromium] › e2e/conflict-and-messages.spec.ts:4:5 › staff puede re-ejecutar el chequeo de conflictos de una causa (10.1s)
+  ✓  15 [chromium] › e2e/conflict-and-messages.spec.ts:26:5 › el staff puede enviar un mensaje interno (12.8s)
+  ✓  16 [chromium] › e2e/conflict-and-messages.spec.ts:44:5 › el portal cliente no puede mensajear fuera de ACL (2.8s)
+  ✘  17 [chromium] › e2e/correo.spec.ts:4:5 › correo PJUD muestra conector y no inventa mensajes demo (15.0s)
+(node:7494) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  18 [chromium] › e2e/document-evidence.spec.ts:20:5 › fuentes propias: preparar, citar, paginar y conservar versión; portal sin acceso (14.2s)
+  ✓  19 [chromium] › e2e/drive-import.spec.ts:17:5 › Drive elegido: lista paginada, revisión, exportación, conflicto y recuperación (API fixture) (15.7s)
+  ✓  20 [chromium] › e2e/inicio-assistant.spec.ts:5:5 › un abogado agenda una audiencia desde Inicio y aparece en el calendario (10.4s)
+  ✓  21 [chromium] › e2e/inicio-assistant.spec.ts:36:5 › un cliente no puede acceder a Inicio ni al asistente (4.3s)
+  ✓  22 [chromium] › e2e/legal-research.spec.ts:55:5 › investigación propia: aporte manual, expediente PDF, citas, historial y abstención (28.2s)
+  ✓  23 [chromium] › e2e/login-readiness.spec.ts:3:5 › login espera su comportamiento antes de aceptar credenciales (194ms)
+  ✘  24 [chromium] › e2e/notify-reconciliation.spec.ts:7:7 › reconcile uncertain deliveries at 1366px (13.7s)
+(node:7902) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  25 [chromium] › e2e/notify-reconciliation.spec.ts:7:7 › reconcile uncertain deliveries at 360px (11.4s)
+(node:7956) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  26 [chromium] › e2e/pdf-pages.spec.ts:35:5 › PDF físico: página, OCR, original y cita conservan su versión y permisos (21.0s)
+  ✓  27 [chromium] › e2e/roles-ethical-wall.spec.ts:8:5 › personas expone roles de estudio y pendientes unificados (17.5s)
+  ✘  28 [chromium] › e2e/site-file-evidence.spec.ts:45:5 › archivos de espacios: páginas, versiones, investigación y permiso actual (2.2m)
+
+
+  1) [chromium] › e2e/correo.spec.ts:4:5 › correo PJUD muestra conector y no inventa mensajes demo ─
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('mailbox-empty')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByTestId('mailbox-empty')
+
+
+      14 |   await expect(page.getByTestId("mailbox-connect-microsoft")).toBeVisible();
+      15 |   await expect(page.getByText("Sincronizar (demo)")).toHaveCount(0);
+    > 16 |   await expect(page.getByTestId("mailbox-empty")).toBeVisible();
+         |                                                   ^
+      17 |   await expect(page.getByTestId("mailbox-empty")).toContainText("pjud.cl");
+      18 |
+      19 |   const inbox = await page.request.get("/api/mail");
+        at <repo>/e2e/correo.spec.ts:16:51
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/correo-correo-PJUD-muestra-b11f5--y-no-inventa-mensajes-demo-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/correo-correo-PJUD-muestra-b11f5--y-no-inventa-mensajes-demo-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/correo-correo-PJUD-muestra-b11f5--y-no-inventa-mensajes-demo-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/correo-correo-PJUD-muestra-b11f5--y-no-inventa-mensajes-demo-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/correo-correo-PJUD-muestra-b11f5--y-no-inventa-mensajes-demo-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e/notify-reconciliation.spec.ts:7:7 › reconcile uncertain deliveries at 1366px ─
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('region', { name: 'Envíos por revisar' }).getByTestId('delivery-notify_ui_6247f3a1-401a-4b6f-a22a-0628bf9fa6d5_delivery')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('region', { name: 'Envíos por revisar' }).getByTestId('delivery-notify_ui_6247f3a1-401a-4b6f-a22a-0628bf9fa6d5_delivery')
+
+
+      22 |       const region = page.getByRole("region", { name: "Envíos por revisar" });
+      23 |       const row = region.getByTestId(`delivery-${deliveryId}`);
+    > 24 |       await expect(row).toBeVisible();
+         |                         ^
+      25 |       expect(await region.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+      26 |       await row.getByRole("button", { name: "Autorizar reenvío" }).click();
+      27 |       const dialog = page.getByRole("dialog", { name: "Autorizar reenvío", exact: true });
+        at <repo>/e2e/notify-reconciliation.spec.ts:24:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/notify-reconciliation-reco-d88b9-ertain-deliveries-at-1366px-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/notify-reconciliation-reco-d88b9-ertain-deliveries-at-1366px-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/notify-reconciliation-reco-d88b9-ertain-deliveries-at-1366px-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/notify-reconciliation-reco-d88b9-ertain-deliveries-at-1366px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/notify-reconciliation-reco-d88b9-ertain-deliveries-at-1366px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e/notify-reconciliation.spec.ts:7:7 › reconcile uncertain deliveries at 360px ──
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('region', { name: 'Envíos por revisar' }).getByTestId('delivery-notify_ui_0b24dc26-923f-4f86-bb1a-b6467e06f423_delivery')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('region', { name: 'Envíos por revisar' }).getByTestId('delivery-notify_ui_0b24dc26-923f-4f86-bb1a-b6467e06f423_delivery')
+
+
+      22 |       const region = page.getByRole("region", { name: "Envíos por revisar" });
+      23 |       const row = region.getByTestId(`delivery-${deliveryId}`);
+    > 24 |       await expect(row).toBeVisible();
+         |                         ^
+      25 |       expect(await region.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+      26 |       await row.getByRole("button", { name: "Autorizar reenvío" }).click();
+      27 |       const dialog = page.getByRole("dialog", { name: "Autorizar reenvío", exact: true });
+        at <repo>/e2e/notify-reconciliation.spec.ts:24:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/notify-reconciliation-reco-80120-certain-deliveries-at-360px-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/notify-reconciliation-reco-80120-certain-deliveries-at-360px-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/notify-reconciliation-reco-80120-certain-deliveries-at-360px-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/notify-reconciliation-reco-80120-certain-deliveries-at-360px-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/notify-reconciliation-reco-80120-certain-deliveries-at-360px-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › e2e/site-file-evidence.spec.ts:45:5 › archivos de espacios: páginas, versiones, investigación y permiso actual
+
+    Test was interrupted.
+
+    Error: locator.selectOption: Test ended.
+    Call log:
+      - waiting for locator('section[aria-labelledby="research-title"]').locator('#research-site')
+        - locator resolved to <select id="research-site" class="select w-full">…</select>
+      - attempting select option action
+        2 × waiting for element to be visible and enabled
+          - did not find some options
+        - retrying select option action
+        - waiting 20ms
+        2 × waiting for element to be visible and enabled
+          - did not find some options
+        - retrying select option action
+          - waiting 100ms
+        91 × waiting for element to be visible and enabled
+           - did not find some options
+         - retrying select option action
+           - waiting 500ms
+      - element was detached from the DOM, retrying
+
+
+      91 |   await page.goto("/jurisprudencia");
+      92 |   const workbench = page.locator('section[aria-labelledby="research-title"]');
+    > 93 |   await workbench.locator("#research-site").selectOption(siteId);
+         |                                             ^
+      94 |   await workbench.getByRole("checkbox", { name: "Elegir archivos concretos del espacio", exact: true }).check();
+      95 |   await workbench.getByRole("checkbox", { name: textName, exact: true }).check();
+      96 |   await workbench.locator("#research-query").fill(token);
+        at <repo>/e2e/site-file-evidence.spec.ts:93:45
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/site-file-evidence-archivo-9960b-estigación-y-permiso-actual-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/site-file-evidence-archivo-9960b-estigación-y-permiso-actual-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/site-file-evidence-archivo-9960b-estigación-y-permiso-actual-chromium/error-context.md
+
+    Error Context: ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/site-file-evidence-archivo-9960b-estigación-y-permiso-actual-chromium/error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/site-file-evidence-archivo-9960b-estigación-y-permiso-actual-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../..<temporary>/lexopen-spaces-browser-confirm-results/site-file-evidence-archivo-9960b-estigación-y-permiso-actual-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3 failed
+    [chromium] › e2e/correo.spec.ts:4:5 › correo PJUD muestra conector y no inventa mensajes demo ──
+    [chromium] › e2e/notify-reconciliation.spec.ts:7:7 › reconcile uncertain deliveries at 1366px ──
+    [chromium] › e2e/notify-reconciliation.spec.ts:7:7 › reconcile uncertain deliveries at 360px ───
+  1 interrupted
+    [chromium] › e2e/site-file-evidence.spec.ts:45:5 › archivos de espacios: páginas, versiones, investigación y permiso actual
+  4 did not run
+  24 passed (9.9m)

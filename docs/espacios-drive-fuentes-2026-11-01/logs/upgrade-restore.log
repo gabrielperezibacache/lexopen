@@ -1,0 +1,27 @@
+LexOpen spaces/Drive upgrade and restore rehearsal 2026-11-01T20:38:20.497107+00:00
+Scope: previous fictitious source database read-only; two brand new disposable destinations; no production host data.
+Artifacts: <temporary>/lexopen-spaces-upgrade34-restore-5wtjhwcb
+Storage source fixture copy: <temporary>/lexopen-pdf-restored-storage-3awdbj1d
+New fixture storage: <temporary>/lexopen-spaces-upgrade-storage-lsg63obe
+Restored storage: <temporary>/lexopen-spaces-restored-storage-dc07p_d9
+PASS preflight: both destination databases absent; source has 31 completed migrations.
+Source snapshot: 80 tables; 619 rows; 13 storage objects.
+Created new lexopen_spaces_upgrade34_test
+migrate deploy exit 0: schema31 -> schema34
+PASS schema drift: exit 0.
+PASS prior evidence sourceRevision defaults: every migrated version is legacy; prior source/content hashes and locators unchanged.
+PASS upgrade preservation: every field/hash/count unchanged across all 80 prior tables; migration rows +3 only. New DriveDocumentImport is empty.
+{"phase":"fixture created","driveImportRows":1,"driveDownloads":1,"driveVersion":"7","driveReimport":"same original","targetedQueue":"needs_ocr","spaceFileVersions":[4,5,6],"currentSpaceFileVersion":6,"sourceRevisionIdentity":"A→B→A distinct ids","evidenceVersions":4,"physicalPages":12,"ocrPages":4,"blankPages":4,"researchRuns":1,"selectedSiteFileIds":["cmvyald14000syx4bu6kvw11q"],"forbiddenFetches":0,"networkRequests":0,"modelUsed":false}
+Fixture snapshot: 81 tables; 663 rows; 18 storage objects.
+PASS historical rows after adding fixtures: all source31 row/column values remain exact subsets, including migration rows.
+PASS migration checksums: 34 finished migrations match repository files.
+Created new lexopen_spaces_restore34_test
+PASS restore: every table count/row hash and every storage path/byte count/hash matches the fixture source.
+{"phase":"restored services verified","driveProvenance":"all columns and metadata exact","driveOriginal":"SHA exact","spaceOriginal":"SHA exact","snapshots":4,"pages":12,"pagePngs":"exact hashes","sourceFileVersions":"4→5→6 preserved","sourceRevision":"all exact, latest A restored","scope":"site and explicit document/file ids exact","citations":"all literal quotes and hrefs verified","outsider":"denied","forbiddenFetches":0}
+PASS source remains unchanged: all original tables and previous fixture storage exact before/after.
+PASS service reads leave restored database and storage unchanged.
+LIMITS: logical PostgreSQL dump/restore + local files, actual domain reads and PNG rendering; not physical offline Host/vault/config restore, S3, a web-server restart, live Google OAuth/Drive retrieval, live legal retrieval or production data. Drive transport was an explicit synthetic fixture; schema/storage/services are real.
+RESULT PASS. Two newly created test databases and all proof artifacts retained; no existing database was reset or deleted.
+Visual identity: final restored SiteFile page 2 is byte-identical to the previously inspected restored fixture PNG (PAGINA DOS / DOCUMENTO ESCANEADO, three expected fictional lines legible and unclipped).
+Working schema SHA256: ce36235ca7c3c4cd850174deb42031a91bbb7825146aa32c322b42db30b27bfd
+This final rehearsal targets schema34; earlier schema32 proof artifacts and the first queue-status-assertion failure were retained unchanged. All destinations were initially absent; no database was reset or deleted.

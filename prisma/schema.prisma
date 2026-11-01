@@ -310,6 +310,7 @@ model Causa {
 
   partes          Parte[]
   documentos      Documento[]
+  driveImports    DriveDocumentImport[]
   plazos          Plazo[]
   tramites        Tramite[]
   actividades     Activity[]
@@ -607,6 +608,7 @@ model Documento {
   autor   User?  @relation(fields: [autorId], references: [id])
   minutas Minuta[]
   evidenceResource DocumentResource?
+  driveImport DriveDocumentImport?
 
   @@index([causaId])
   @@index([clienteId])
@@ -1489,6 +1491,7 @@ model DocumentEvidenceVersion {
   resource         DocumentResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   sourceSha256     String
   textSha256       String
+  sourceRevision String @default("legacy")
   extractorVersion String
   sourceName       String
   sourceMimeType   String?
@@ -1502,7 +1505,7 @@ model DocumentEvidenceVersion {
   pageCount        Int?
   locatorKind      String @default("text-offset")
 
-  @@unique([resourceId, sourceSha256, textSha256, extractorVersion], map: "EvidenceVersion_content_key")
+  @@unique([resourceId, sourceSha256, textSha256, extractorVersion, sourceRevision], map: "EvidenceVersion_content_key")
   @@index([resourceId, createdAt])
 }
 
@@ -1617,4 +1620,23 @@ model PjudMigrationArchive {
   archivedAt   DateTime @default(now())
 
   @@unique([sourceTable, sourceId])
+}
+
+/// Immutable provenance and idempotency of an explicitly selected Drive revision.
+model DriveDocumentImport {
+  id String @id @default(cuid())
+  causaId String
+  documentoId String @unique
+  folderId String
+  driveFileId String
+  driveVersion String
+  exportMimeType String
+  sourceSha256 String
+  metadataJson String @default("{}") @db.Text
+  importedAt DateTime @default(now())
+  causa Causa @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  documento Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  @@unique([causaId, driveFileId, driveVersion, exportMimeType])
+  @@index([causaId, importedAt])
 }

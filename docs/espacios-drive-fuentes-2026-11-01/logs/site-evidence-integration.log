@@ -1,0 +1,21 @@
+prisma:error
+Invalid `client.documentResource.upsert()` invocation in
+<repo>/src/lib/evidence/service.ts:111:37
+
+  108 if (Boolean(input.documentoId) === Boolean(input.siteFileId)) throw new Error("A source identity is required");
+  109 const resource = input.documentoId
+  110   ? await client.documentResource.upsert({ where: { documentoId: input.documentoId }, create: { documentoId: input.documentoId }, update: {} })
+→ 111   : await client.documentResource.upsert(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+audit write failed Error: Site evidence synthetic audit failure
+    at <anonymous> (<repo>/src/lib/evidence/site-file-evidence.integration.test.ts:25:151)
+    at <repo>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<repo>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<repo>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <repo>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <repo>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<repo>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<repo>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<repo>/node_modules/@prisma/client/runtime/library.js:31:5636)
+SiteFile evidence PostgreSQL OK: original-byte extraction, concurrent idempotency, source version, stable originals/all formats, PDF/OCR/blank, literal page citations, current ACL/revocation/portal, tamper, atomic audit rollback, concurrent source change, A→B→A current revision/research and deletion

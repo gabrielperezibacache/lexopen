@@ -26,6 +26,7 @@ export default async function DocumentosPage() {
       select: {
         ...documentoListSelect,
         storageKey: true,
+        driveImport: { select: { driveVersion: true, importedAt: true, sourceSha256: true } },
         causa: { select: { id: true, rit: true, titulo: true } },
         autor: { select: publicUserSelect },
       },
@@ -100,6 +101,7 @@ export default async function DocumentosPage() {
                 <tr key={d.id} className="table-row">
                   <td className="px-4 py-3">
                     <div className="font-medium">{d.nombre}</div>
+                    {d.driveImport && <details className="mt-1 text-xs text-[var(--ink-soft)]"><summary className="cursor-pointer">Copia de Drive · revisión {d.driveImport.driveVersion}</summary><p>Importada el {formatDate(d.driveImport.importedAt)}. Se conserva esta revisión local; no se sincroniza automáticamente.</p><p className="break-all">SHA-256: {d.driveImport.sourceSha256}</p></details>}
                     {d.ruta && (
                       <div className="text-xs text-[var(--ink-soft)]/60">{d.ruta}/</div>
                     )}

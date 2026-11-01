@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
-import { authorizedEvidenceFragment } from "@/lib/evidence/service";
+import { authorizedEvidenceFragment, evidenceFragmentHref } from "@/lib/evidence/service";
 import { verifyEvidenceQuote } from "@/lib/evidence/fragments";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -9,6 +9,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     assertCsrf(req); const user = await requireStaff(); const { id } = await params;
     const body = await parseBody(req, z.object({ quote: z.string().min(1).max(4000) }));
     const fragment = await authorizedEvidenceFragment(id, user);
-    return NextResponse.json({ verified: verifyEvidenceQuote(fragment, body.quote), versionId: fragment.versionId, fragmentId: id, pageNumber: fragment.page?.pageNumber || null, sourceSha256: fragment.version.sourceSha256, href: `/documentos/${fragment.version.resource.documentoId}/fuentes?version=${fragment.versionId}&after=${fragment.ordinal - 1}${fragment.page ? `&page=${fragment.page.pageNumber}` : ""}#fragment-${fragment.ordinal}` }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ verified: verifyEvidenceQuote(fragment, body.quote), versionId: fragment.versionId, fragmentId: id, pageNumber: fragment.page?.pageNumber || null, sourceSha256: fragment.version.sourceSha256, href: evidenceFragmentHref(fragment) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) { return handleRouteError(e); }
 }

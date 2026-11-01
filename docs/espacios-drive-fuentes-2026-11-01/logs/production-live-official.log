@@ -1,0 +1,8 @@
+
+> lexopen@1.0.0 test:production:pdf-research
+> node --import tsx scripts/production-pdf-research-smoke.ts
+
+{"check":"official-live-import","url":"https://www.bcn.cl/leychile/navegar?idNorma=242302","title":"FIJA EL TEXTO REFUNDIDO, COORDINADO Y SISTEMATIZADO DE LA CONSTITUCION POLITICA DE LA REPUBLICA DE CHILE","sourceSha256":"f49fa004962f82559a19488ebbb916f0a268b37810d3a9b74659e9adff7d07ab","textSha256":"641f49a934b3d930489f34628b00ae02d3c7e137b379bf28bca33d7ee1220fda","originalBytes":561407}
+{"check":"official-live-import","url":"https://www.bcn.cl/leychile/navegar?idNorma=242302&idVersion=2005-09-22","title":"FIJA EL TEXTO REFUNDIDO, COORDINADO Y SISTEMATIZADO DE LA CONSTITUCION POLITICA DE LA REPUBLICA DE CHILE","sourceSha256":"bf8b7530fbf9a5fa4eb76d84cd07348e03f627a34c51dd3d068edd35b5fd330b","textSha256":"e22bf7462177f429cc1cb441e2957d921bd349f2b8a729b3df5fc7c3d23228f6","originalBytes":624864}
+{"check":"official-live-import","url":"https://www.sii.cl/pagina/jurisprudencia/adminis/2016/renta/ja2151.htm","title":"Oficio N° 2151, de 01.08.2016 — OTORGAMIENTO DE RUT PROVISORIO A TRABAJADORES EXTRANJEROS.","sourceSha256":"b498dd8501f9a2e05fda1465513507aa0032fcd0e66b69737de14aa67d76341d","textSha256":"4e9deadd3e2d0362251e4a686944fd2f8bcf76dbe9d9e861c878f2269a009730","originalBytes":10635}
+{"mode":"production","checks":["CSRF real","PDF physical pages and local OCR","PNG original bound and private cache","exact page citation","manual provenance","compiled research UI and restored scope","no model/network in search","false quote rejected","revoked image and history denied","portal denied","SiteFile PDF scope, citations and revocation"],"officialSourcesLive":true,"externalServicesConfigured":false}

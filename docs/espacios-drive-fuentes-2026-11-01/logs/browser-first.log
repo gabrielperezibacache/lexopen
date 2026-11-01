@@ -1,0 +1,77 @@
+
+Running 32 tests using 1 worker
+
+(node:98920) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/agente-document-scope.spec.ts:4:5 › copiloto muestra alcance documental y restaura chat con fuentes (7.7s)
+  ✓   2 [chromium] › e2e/app-quality.spec.ts:18:5 › los apartados principales cargan sin errores de servidor (1.1m)
+  ✓   3 [chromium] › e2e/app-quality.spec.ts:37:5 › menú móvil accesible, foco restaurado y preferencia de movimiento (4.4s)
+  ✓   4 [chromium] › e2e/app-quality.spec.ts:68:5 › búsqueda rechaza consultas excesivas y mantiene sincronizado el campo (3.9s)
+  ✓   5 [chromium] › e2e/app-quality.spec.ts:78:5 › una cookie con solo el ID del usuario no autentica (2.9s)
+  ✓   6 [chromium] › e2e/app-quality.spec.ts:88:5 › el cambio de contraseña limita intentos por usuario (2.8s)
+  ✓   7 [chromium] › e2e/auth-and-access.spec.ts:4:5 › un usuario del estudio puede iniciar sesión y abrir causas (21.0s)
+  ✓   8 [chromium] › e2e/auth-and-access.spec.ts:96:5 › un cliente queda limitado al portal y a sus espacios (16.2s)
+  ✓   9 [chromium] › e2e/auth-and-access.spec.ts:230:5 › una ruta protegida redirige al login sin sesión (840ms)
+  ✓  10 [chromium] › e2e/causas-section.spec.ts:4:5 › un abogado ve un menú Causas con tres pestañas y sin ítems duplicados (8.4s)
+  ✓  11 [chromium] › e2e/causas-section.spec.ts:40:5 › un asistente no opera ClaveÚnica (2.3s)
+  ✓  12 [chromium] › e2e/causas-section.spec.ts:60:5 › avisos del canal PJUD van al log de Configuración, no a Cartera (3.3s)
+  ✓  13 [chromium] › e2e/causas-section.spec.ts:80:5 › un cliente sigue sin Causas (1.7s)
+  ✓  14 [chromium] › e2e/conflict-and-messages.spec.ts:4:5 › staff puede re-ejecutar el chequeo de conflictos de una causa (5.1s)
+  ✓  15 [chromium] › e2e/conflict-and-messages.spec.ts:26:5 › el staff puede enviar un mensaje interno (4.4s)
+  ✓  16 [chromium] › e2e/conflict-and-messages.spec.ts:44:5 › el portal cliente no puede mensajear fuera de ACL (1.1s)
+  ✓  17 [chromium] › e2e/correo.spec.ts:4:5 › correo PJUD muestra conector y no inventa mensajes demo (7.1s)
+  ✓  18 [chromium] › e2e/document-evidence.spec.ts:20:5 › fuentes propias: preparar, citar, paginar y conservar versión; portal sin acceso (15.6s)
+  ✓  19 [chromium] › e2e/drive-import.spec.ts:17:5 › Drive elegido: lista paginada, revisión, exportación, conflicto y recuperación (API fixture) (4.4s)
+  ✓  20 [chromium] › e2e/inicio-assistant.spec.ts:5:5 › un abogado agenda una audiencia desde Inicio y aparece en el calendario (4.6s)
+  ✓  21 [chromium] › e2e/inicio-assistant.spec.ts:36:5 › un cliente no puede acceder a Inicio ni al asistente (2.3s)
+  ✘  22 [chromium] › e2e/legal-research.spec.ts:55:5 › investigación propia: aporte manual, expediente PDF, citas, historial y abstención (21.3s)
+(node:4020) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  23 [chromium] › e2e/login-readiness.spec.ts:3:5 › login espera su comportamiento antes de aceptar credenciales (521ms)
+  ✓  24 [chromium] › e2e/notify-reconciliation.spec.ts:7:7 › reconcile uncertain deliveries at 1366px (4.2s)
+  ✓  25 [chromium] › e2e/notify-reconciliation.spec.ts:7:7 › reconcile uncertain deliveries at 360px (2.9s)
+  ✓  26 [chromium] › e2e/pdf-pages.spec.ts:35:5 › PDF físico: página, OCR, original y cita conservan su versión y permisos (9.8s)
+  ✓  27 [chromium] › e2e/roles-ethical-wall.spec.ts:8:5 › personas expone roles de estudio y pendientes unificados (6.0s)
+  ✓  28 [chromium] › e2e/site-file-evidence.spec.ts:45:5 › archivos de espacios: páginas, versiones, investigación y permiso actual (17.0s)
+  ✓  29 [chromium] › e2e/sites-workflow.spec.ts:4:5 › espacios: hub, creación vinculada y enlace desde causa (23.0s)
+  ✓  30 [chromium] › e2e/sites-workflow.spec.ts:57:5 › espacios: filtros del hub respetan tipo (1.9s)
+  ✓  31 [chromium] › e2e/totp-and-wiki.spec.ts:5:5 › TOTP enroll, challenge on login, then disable (7.1s)
+  ✓  32 [chromium] › e2e/totp-and-wiki.spec.ts:44:5 › staff puede crear página wiki y ver historial (8.5s)
+
+
+  1) [chromium] › e2e/legal-research.spec.ts:55:5 › investigación propia: aporte manual, expediente PDF, citas, historial y abstención
+
+    SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+      180 |   const abstentionPending = page.waitForResponse(response => new URL(response.url()).pathname === "/api/research" && response.request().method() === "POST");
+      181 |   await workbench.getByRole("button", { name: "Consultar mis fuentes", exact: true }).click();
+    > 182 |   const abstention = await (await abstentionPending).json() as ResearchResult;
+          |                      ^
+      183 |   expect(abstention.status).toBe("abstained"); expect(abstention.results).toEqual([]); expect(abstention.coverage.legalSourcesAvailable).toBe(0);
+      184 |   await expect(page.getByRole("heading", { name: "Sin evidencia suficiente", exact: true })).toBeVisible();
+      185 |   const portalContext = await browser.newContext({ locale: "es-CL" });
+        at <repo>/e2e/legal-research.spec.ts:182:22
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-final-results/legal-research-investigaci-14354-itas-historial-y-abstención-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-final-results/legal-research-investigaci-14354-itas-historial-y-abstención-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../../../..<temporary>/lexopen-spaces-browser-final-results/legal-research-investigaci-14354-itas-historial-y-abstención-chromium/error-context.md
+
+    Error Context: ../../../../..<temporary>/lexopen-spaces-browser-final-results/legal-research-investigaci-14354-itas-historial-y-abstención-chromium/error-context.md
+
+    attachment #5: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../..<temporary>/lexopen-spaces-browser-final-results/legal-research-investigaci-14354-itas-historial-y-abstención-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../..<temporary>/lexopen-spaces-browser-final-results/legal-research-investigaci-14354-itas-historial-y-abstención-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › e2e/legal-research.spec.ts:55:5 › investigación propia: aporte manual, expediente PDF, citas, historial y abstención
+  31 passed (4.9m)

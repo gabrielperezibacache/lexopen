@@ -16,7 +16,8 @@ type Evidence = {
   versionHistoryLimited: boolean;
 };
 
-export function DocumentEvidenceReader({ documentId, initialVersion = "", initialAfter = 0, initialPage }: { documentId: string; initialVersion?: string; initialAfter?: number; initialPage?: number }) {
+export function DocumentEvidenceReader({ documentId, siteId, initialVersion = "", initialAfter = 0, initialPage }: { documentId: string; siteId?: string; initialVersion?: string; initialAfter?: number; initialPage?: number }) {
+  const evidenceEndpoint = siteId ? `/api/sites/${siteId}/files/${documentId}/evidence` : `/api/documentos/${documentId}/evidence`;
   const [response, setResponse] = useState<{ key: string; data: Evidence | null; error?: string } | null>(null);
   const [version, setVersion] = useState(initialVersion);
   const [after, setAfter] = useState(initialAfter);
@@ -30,7 +31,7 @@ export function DocumentEvidenceReader({ documentId, initialVersion = "", initia
   const [status, setStatus] = useState("");
   const [manualCopy, setManualCopy] = useState("");
   const copyRef = useRef<HTMLTextAreaElement>(null);
-  const requestKey = JSON.stringify([documentId, version, after, query, refresh, page]);
+  const requestKey = JSON.stringify([documentId, siteId, version, after, query, refresh, page]);
   const data = response?.key === requestKey ? response.data : null;
   const loading = response?.key !== requestKey;
   const error = localError || (response?.key === requestKey ? response.error : "");
@@ -42,7 +43,7 @@ export function DocumentEvidenceReader({ documentId, initialVersion = "", initia
     if (after) sp.set("after", String(after));
     if (query) sp.set("q", query);
     if (page) sp.set("page", String(page));
-    fetch(`/api/documentos/${documentId}/evidence?${sp}`, { cache: "no-store", signal: controller.signal })
+    fetch(`${evidenceEndpoint}?${sp}`, { cache: "no-store", signal: controller.signal })
       .then(async response => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "No se pudieron cargar las fuentes");
@@ -51,7 +52,7 @@ export function DocumentEvidenceReader({ documentId, initialVersion = "", initia
       .then(result => { if (!controller.signal.aborted) setResponse({ key: requestKey, data: result }); })
       .catch(e => { if (!controller.signal.aborted) setResponse({ key: requestKey, data: null, error: e.message || "No se pudieron cargar las fuentes" }); });
     return () => controller.abort();
-  }, [documentId, version, after, query, refresh, requestKey, page]);
+  }, [evidenceEndpoint, version, after, query, refresh, requestKey, page]);
 
   useEffect(() => {
     if (manualCopy) { copyRef.current?.focus(); copyRef.current?.select(); }
@@ -62,7 +63,7 @@ export function DocumentEvidenceReader({ documentId, initialVersion = "", initia
 
   async function prepare() {
     setPreparing(true); setError(""); setStatus("");
-    const result = await apiMutation<{ id: string }>(`/api/documentos/${documentId}/evidence`, { method: "POST" });
+    const result = await apiMutation<{ id: string }>(evidenceEndpoint, { method: "POST" });
     setPreparing(false);
     if (!result.ok) { setError(result.error); return; }
     setVersion(result.data.id); setAfter(0); setPage(undefined); setRefresh(n => n + 1); setStatus("La versión y sus fragmentos están registrados.");

@@ -23,9 +23,11 @@ export const researchQuerySchema = z.object({
   query: z.string().trim().min(3).max(1000),
   causaId: z.string().min(1).max(100).optional(),
   documentIds: z.array(z.string().min(1).max(100)).max(RESEARCH_LIMITS.documents).optional(),
+  siteId: z.string().min(1).max(100).optional(),
+  siteFileIds: z.array(z.string().min(1).max(100)).max(RESEARCH_LIMITS.documents).optional(),
   sourceKinds: z.array(z.enum(RESEARCH_SOURCE_KINDS)).max(4).optional(),
   limit: z.number().int().min(1).max(RESEARCH_LIMITS.results).optional(),
-}).strict();
+}).strict().refine(input => input.siteFileIds === undefined || Boolean(input.siteId), { message: "Seleccione el espacio de los archivos", path: ["siteId"] });
 export type ResearchQuery = z.infer<typeof researchQuerySchema>;
 
 /** Exact lexical retrieval only: never a legal conclusion or semantic confidence. */
