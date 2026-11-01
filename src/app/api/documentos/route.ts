@@ -1,23 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
-  confidentialWhere,
   assertCsrf,
+  confidentialWhere,
   handleRouteError,
   parseBody,
   requireStaff,
 } from "@/lib/api";
-import { documentoCreateSchema } from "@/lib/schemas";
-import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storage";
+import { parseListLimit } from "@/lib/api/list-limit";
 import { writeAuditStrict } from "@/lib/audit";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { assertCausaCapability, documentReadWhere as scopeddocumentReadWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { canSeeConfidential } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
+import { inferDocumentoTipo, normalizeIngestPath } from "@/lib/document-ingest";
 import { MAX_PROCESSING_BYTES } from "@/lib/document-processing";
 import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
-import { inferDocumentoTipo, normalizeIngestPath } from "@/lib/document-ingest";
+import { documentoCreateSchema } from "@/lib/schemas";
 import { sanitizeUploadMimeType } from "@/lib/security/download";
 import { documentoListSelect } from "@/lib/sites/file-select";
-import { parseListLimit } from "@/lib/api/list-limit";
+import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storage";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,11 +28,11 @@ export async function GET(req: NextRequest) {
     const clienteId = sp.get("clienteId");
     const limit = parseListLimit(sp.get("limit"), { default: 200, max: 500 });
     const documentos = await prisma.documento.findMany({
-      where: {
+      where: { AND: [scopeddocumentReadWhere(user), {
         ...(causaId ? { causaId } : {}),
         ...(clienteId ? { clienteId } : {}),
-        ...confidentialWhere(user.role),
-      },
+        ...confidentialWhere(user),
+      }] },
       select: {
         ...documentoListSelect,
         causa: true,
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest) {
     let privilegio = Boolean(body?.privilegio);
     let causaId = body?.causaId || null;
     let clienteId = body?.clienteId || null;
+    if (causaId) await assertCausaCapability(causaId, user, "causa.write");
     let ruta = body?.ruta?.trim() || null;
     if (ruta && ruta.length > 1000) {
       return NextResponse.json({ error: "Ruta demasiado larga" }, { status: 400 });
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
     let processingBytes: Buffer | null = null;
     let tipoAuto = false;
 
-    if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
+    if (!canSeeConfidential(user) && (confidencial || privilegio)) {
       return NextResponse.json(
         { error: "Su rol no puede crear contenido confidencial o privilegiado" },
         { status: 403 }
@@ -100,6 +102,7 @@ export async function POST(req: NextRequest) {
       confidencial = form.get("confidencial") === "on";
       privilegio = form.get("privilegio") === "on";
       causaId = String(form.get("causaId") || "") || null;
+      if (causaId) await assertCausaCapability(causaId, user, "causa.write");
       clienteId = String(form.get("clienteId") || "") || null;
       const rutaField = String(form.get("ruta") || "").trim();
       const relativeHint = String(form.get("relativePath") || "").trim();
@@ -115,7 +118,7 @@ export async function POST(req: NextRequest) {
           nombre = nombre || normalized.nombre;
         }
       }
-      if (!canSeeConfidential(user.role) && (confidencial || privilegio)) {
+      if (!canSeeConfidential(user) && (confidencial || privilegio)) {
         return NextResponse.json(
           { error: "Su rol no puede crear contenido confidencial o privilegiado" },
           { status: 403 }

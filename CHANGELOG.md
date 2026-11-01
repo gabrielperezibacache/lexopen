@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Núcleo fiable y fuentes propias — 2026-11-01
+- Integración corregida de roles/equipo y notificaciones: muro ético común también en derivados y avisos, capacidades de escritura, 2FA sin bypass de prefetch, reenrolamiento seguro, tareas atómicas y aprobaciones concurrentes.
+- Política `local_only` aplicada antes del transporte; comandos del asistente y planes durables, auditoría transaccional, recibos idempotentes y deshacer con propietario, acceso y estado esperado. Pagos/plazos y asientos manuales conservan su clave al reintentar desde la interfaz.
+- Outbox por destino con lease/CAS, digest recuperable y reconciliación explícita de envíos inciertos; procesamiento documental persistido con recuperación y reintentos acotados.
+- Primer lector documental propio: **Documentos → Ver fuentes**, versiones por hash, fragmentos, búsqueda, original y verificación literal de citas; sin dependencia de TRIFOLIA. Las páginas PDF y las siguientes fases siguen pendientes.
+- Archivo de duplicados PJUD antes del dedupe histórico; saldos autorizados sin aportes ocultos, compatibilidad de IDs visuales en HTTP LAN y benchmark limitado a fixtures desechables.
+- El acceso espera a estar interactivo antes de aceptar credenciales; método POST explícito evita su envío nativo por URL durante la carga inicial.
+- Detalle, migraciones, validación y límites: `docs/IMPLEMENTACION-2026-11-01.md`.
+
+### 1.1 (en curso) — Equipo y permisos
+- **Roles de estudio**: presets `socio`, `procurador`, `contabilidad`, `externo` además de `admin` / `abogado` / `asistente` / `cliente`. `admin` (Host) ≠ `socio` (negocio); grants/revokes CSV por usuario.
+- **`can(user, capacidad, scope?)`** en `lib/auth/permissions.ts`; `rbac.ts` pasa a wrappers.
+- **Equipo por causa** (`CausaMiembro`) + `Causa.acceso` (`estudio` | `equipo`) con muro ético; `causaAccessWhere` en listados/búsqueda/ficha.
+- **Delegaciones** y **aprobaciones** genéricas (`/api/delegaciones`, `/api/aprobaciones`).
+- **Pendientes unificados**: `Task` espeja `Tramite` / `MinutaAccion`; bandeja `/tareas` con filtros por origen y vencimiento.
+- **2FA obligatorio** para `admin` / `socio` / `contabilidad` cuando `FirmSettings.require2faPrivileged` (default true).
+
+### Nuevo
+- **Notificaciones 1.1**: outbox Postgres (`MensajeSaliente`), cola `Job`, preferencias/quiet hours, canales SMTP + Gmail + Telegram (long-poll) + Web Push; WhatsApp solo interfaz (`docs/NOTIFICACIONES.md`).
+- Hitos de plazo fatal (T-7…T-0) con acuse e escalamiento sin ack; UI `/cuenta/notificaciones` y panel admin.
+- PWA básica: `manifest.ts`, service worker y suscripción push (VAPID).
+
 ## 1.0.0 — 2026-10-30
 
 Primera versión estable del Host local LexOpen para práctica chilena.

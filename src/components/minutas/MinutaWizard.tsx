@@ -10,6 +10,7 @@ import {
 } from "@/lib/minutas";
 import { apiMutation } from "@/lib/api-mutation";
 import { MinutaBorradorAi } from "@/components/ai/MinutaBorradorAi";
+import { newUiId } from "@/lib/ui-id";
 
 type AccionDraft = {
   key: string;
@@ -43,7 +44,7 @@ type Props = {
 
 function emptyAccion(): AccionDraft {
   return {
-    key: crypto.randomUUID(),
+    key: newUiId("accion"),
     descripcion: "",
     responsable: "",
     fechaLimite: "",

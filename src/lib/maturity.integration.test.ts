@@ -5,6 +5,7 @@ import {
   confidentialFileWhere,
   isClientAllowedPath,
 } from "@/lib/auth/access";
+import { FOUNDER_ADMIN_GRANTS } from "@/lib/auth/permissions";
 import { validarRuc, validarRut } from "@/lib/chile";
 import { calcularVencimiento } from "@/lib/plazos";
 
@@ -18,7 +19,18 @@ assert.deepEqual(confidentialFileWhere("cliente"), {
   confidencial: false,
   privilegio: false,
 });
-assert.deepEqual(confidentialFileWhere("admin"), {});
+// Admin técnico (D9): ve confidencial, no privilegio salvo grant fundador.
+assert.deepEqual(confidentialFileWhere("admin"), { privilegio: false });
+assert.deepEqual(
+  confidentialFileWhere({
+    role: "admin",
+    capabilityGrants: FOUNDER_ADMIN_GRANTS.join(","),
+  }),
+  {}
+);
+// Socio y abogado (incl. privilegio scoped) siguen viendo todo en listados 1.0.
+assert.deepEqual(confidentialFileWhere("socio"), {});
+assert.deepEqual(confidentialFileWhere("abogado"), {});
 assert.deepEqual(clientVisibleFileWhere("cliente"), {
   AND: [
     { confidencial: false, privilegio: false },
@@ -42,6 +54,7 @@ assert.deepEqual(clientVisibleFileWhere("asistente"), {
   privilegio: false,
 });
 assert.deepEqual(clientVisibleFileWhere("abogado"), {});
+assert.deepEqual(clientVisibleFileWhere("socio"), {});
 
 assert.equal(isClientAllowedPath("/portal"), true);
 assert.equal(isClientAllowedPath(""), false);

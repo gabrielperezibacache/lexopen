@@ -1,3 +1,5 @@
+import { assertChatSourcesAccess, canReadChatSources } from "@/lib/ai/chat-access";
+import { relatedCausaWhere } from "@/lib/auth/causa-access";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -20,14 +22,18 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const user = await requireStaff();
     const { id } = await params;
+    const folder = await buildClienteFolderContext(id, user);
+    if (!folder) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
     const chats = await prisma.agentChat.findMany({
       where: {
         clienteId: id,
-        ...(user.role === "admin" ? {} : { userId: user.id }),
+        userId: user.id,
+        AND: [relatedCausaWhere(user)],
       },
       select: {
         id: true,
         title: true,
+        messagesJson: true,
         demoMode: true,
         updatedAt: true,
         createdAt: true,
@@ -38,7 +44,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
       orderBy: { updatedAt: "desc" },
       take: 30,
     });
-    return NextResponse.json(chats);
+    const visible = await Promise.all(chats.map(async chat => await canReadChatSources(chat.messagesJson, user) ? chat : null));
+    return NextResponse.json(visible.filter((chat): chat is NonNullable<typeof chat> => Boolean(chat)).map(({ messagesJson, ...metadata }) => { void messagesJson; return metadata; }));
   } catch (e) {
     return handleRouteError(e);
   }
@@ -69,7 +76,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    const built = await buildClienteFolderContext(id, user.role);
+    const built = await buildClienteFolderContext(id, user);
     if (!built) {
       return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
     }
@@ -84,12 +91,14 @@ export async function POST(req: NextRequest, { params }: Params) {
         where: {
           id: body.chatId,
           clienteId: id,
-          ...(user.role === "admin" ? {} : { userId: user.id }),
+          userId: user.id,
+          AND: [relatedCausaWhere(user)],
         },
       });
       if (!existingChat) {
         return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
       }
+      await assertChatSourcesAccess(existingChat.messagesJson, user);
       const previous = safeJsonParse<
         Array<{ role: string; content: string; source?: string; discarded?: boolean }>
       >(existingChat.messagesJson || "[]", []);
@@ -113,7 +122,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const nextMessages = [
       { role: "user", content: prompt },
-      { role: "assistant", content: result.content, source: result.source },
+      { role: "assistant", content: result.content, source: result.source, accessRefs: built.accessRefs },
     ];
 
     let chat;

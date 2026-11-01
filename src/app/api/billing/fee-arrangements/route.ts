@@ -1,18 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
   parseBody,
   requireBillingManager,
 } from "@/lib/api";
+import { assertBillingCausa, causaAccessWhere as scopedcausaAccessWhere, billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { prisma } from "@/lib/db";
 import { feeArrangementCreateSchema } from "@/lib/schemas";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    await requireBillingManager();
-    const fees = await prisma.feeArrangement.findMany({
+    const user = await requireBillingManager();
+    const fees = await prisma.feeArrangement.findMany({ where: scopedrelatedCausaWhere(user),
       include: { cliente: true, causa: true, owner: { select: publicUserSelect } },
       orderBy: { updatedAt: "desc" },
     });
@@ -27,9 +28,10 @@ export async function POST(req: NextRequest) {
     assertCsrf(req);
     const user = await requireBillingManager();
     const body = await parseBody(req, feeArrangementCreateSchema);
+    await assertBillingCausa(user, body.causaId, "billing.rates");
     if (body.causaId && body.clienteId) {
-      const causa = await prisma.causa.findUnique({
-        where: { id: body.causaId },
+      const causa = await prisma.causa.findFirst({
+        where: { AND: [scopedcausaAccessWhere(user), { id: body.causaId }] },
         select: { clienteId: true },
       });
       if (!causa) {

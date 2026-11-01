@@ -1,3 +1,6 @@
+import { assertCausaCapability } from "@/lib/auth/causa-access";
+import { canSome } from "@/lib/auth/permissions";
+import { httpError } from "@/lib/auth/access";
 import { prisma } from "@/lib/db";
 import { validarRit, validarRut } from "@/lib/chile";
 import {
@@ -46,6 +49,11 @@ export async function addCausaByRol(opts: {
     select: { id: true, pjudOrigin: true },
   });
 
+  if (opts.actorId) {
+    const actor = await prisma.user.findUniqueOrThrow({ where: { id: opts.actorId } });
+    if (!canSome(actor, "causa.create")) throw httpError("No puede crear causas", 403);
+    if (existing) await assertCausaCapability(existing.id, actor, "causa.write");
+  }
   let causaId = existing?.id;
   let created = false;
   if (!causaId) {

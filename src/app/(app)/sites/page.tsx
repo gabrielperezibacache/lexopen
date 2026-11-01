@@ -1,16 +1,17 @@
-import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
-import { isAdmin, isCliente } from "@/lib/auth/rbac";
-import { clientSiteWhere } from "@/lib/auth/access";
-import { ModuleHeader } from "@/components/sites/SiteNav";
-import { NewSiteButton } from "@/components/sites/NewSiteButton";
 import { EmptyState } from "@/components/EmptyState";
-import { SitesGuidePanel } from "@/components/sites/SitesGuidePanel";
+import { NewSiteButton } from "@/components/sites/NewSiteButton";
+import { ModuleHeader } from "@/components/sites/SiteNav";
 import { SitesFilters } from "@/components/sites/SitesFilters";
+import { SitesGuidePanel } from "@/components/sites/SitesGuidePanel";
 import { formatDate } from "@/components/ui";
+import { clientSiteWhere, clientVisibleFileWhere } from "@/lib/auth/access";
+import { siteAccessWhere as scopedsiteAccessWhere, taskAccessWhere } from "@/lib/auth/causa-access";
+import { isAdmin, isCliente } from "@/lib/auth/rbac";
+import { requireUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
 import { siteTipoLabel } from "@/lib/sites/labels";
+import Link from "next/link";
 
 const LIST_TAKE = 100;
 
@@ -34,7 +35,7 @@ export default async function SitesPage({
   const portalOnly = sp.portal === "1";
 
   const sites = await prisma.site.findMany({
-    where: {
+    where: { AND: [scopedsiteAccessWhere(user), {
       AND: [
         isCliente(user.role) ? clientSiteWhere(user.id) : {},
         q
@@ -52,7 +53,7 @@ export default async function SitesPage({
         estado ? { status: estado } : {},
         portalOnly ? { isClientVisible: true } : {},
       ],
-    },
+    }] },
     select: {
       id: true,
       name: true,
@@ -64,7 +65,7 @@ export default async function SitesPage({
       updatedAt: true,
       cliente: { select: { id: true, razonSocial: true } },
       causa: { select: { id: true, rit: true, titulo: true } },
-      _count: { select: { files: true, tasks: true, members: true, isheets: true } },
+      _count: { select: { files: { where: clientVisibleFileWhere(user) }, tasks: { where: taskAccessWhere(user) }, members: true, isheets: { where: isCliente(user.role) ? { id: "__client_hidden__" } : {} } } },
     },
     orderBy: { updatedAt: "desc" },
     take: LIST_TAKE,
@@ -79,7 +80,7 @@ export default async function SitesPage({
         title={t("sites.title")}
         subtitle={t("sites.subtitle")}
         actions={
-          staff ? <NewSiteButton isAdmin={isAdmin(user.role)} /> : undefined
+          staff ? <NewSiteButton isAdmin={isAdmin(user)} /> : undefined
         }
       />
 
@@ -97,7 +98,7 @@ export default async function SitesPage({
         <EmptyState
           title={t("sites.emptyTitle")}
           description={t("sites.emptyDescription")}
-          action={staff ? <NewSiteButton isAdmin={isAdmin(user.role)} /> : undefined}
+          action={staff ? <NewSiteButton isAdmin={isAdmin(user)} /> : undefined}
         />
       ) : staff ? (
         <>

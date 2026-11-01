@@ -12,6 +12,8 @@ import { classifyIntents } from "./classify";
 import { getAssistantFirmPolicy } from "./firm-policy";
 import { getTool } from "./tools/registry";
 import { storePlan } from "./plan-store";
+import { causaAccessWhere } from "@/lib/auth/causa-access";
+import type { PermissionSubject } from "@/lib/auth/permissions";
 import type {
   AssistantIntentId,
   AssistantPlan,
@@ -23,7 +25,7 @@ import type {
 export type AssistantTurnInput = {
   text: string;
   attachments?: string[];
-  user: { id: string; role: Role };
+  user: PermissionSubject & { id: string; role: Role };
   chatId?: string | null;
   now?: Date;
 };
@@ -55,7 +57,7 @@ export type AssistantTurnResult = {
 async function resolveCausaId(normalized: {
   rit?: string;
   ruc?: string;
-}): Promise<string | undefined> {
+}, user: PermissionSubject & { id: string }): Promise<string | undefined> {
   if (!normalized.rit && !normalized.ruc) return undefined;
   const or = [
     normalized.rit ? { rit: normalized.rit } : null,
@@ -63,7 +65,7 @@ async function resolveCausaId(normalized: {
   ].filter((v): v is { rit: string } | { ruc: string } => v !== null);
   if (or.length === 0) return undefined;
   const causa = await prisma.causa.findFirst({
-    where: { OR: or },
+    where: { AND: [causaAccessWhere(user), { OR: or }] },
     select: { id: true },
     orderBy: { updatedAt: "desc" },
   });
@@ -101,6 +103,9 @@ function buildToolInput(
         description: slots.description,
         priority: slots.priority,
         dueDate: slots.dueDate ?? fecha,
+        causaId,
+        siteId: slots.siteId,
+        assigneeId: slots.assigneeId,
       };
     case "tarea.completar":
       return { taskId: slots.taskId };
@@ -187,19 +192,23 @@ export async function executePlanSteps(
   ctx: ToolContext
 ): Promise<Array<{ toolId: AssistantIntentId; result: ToolResult }>> {
   const results: Array<{ toolId: AssistantIntentId; result: ToolResult }> = [];
-  for (const step of steps) {
+  for (const [index, step] of steps.entries()) {
     const tool = getTool(step.toolId);
     try {
-      const result = await tool.execute(step.input, ctx);
+      const result = await tool.execute(step.input, { ...ctx, commandKey: ctx.commandKey ? `${ctx.commandKey}:${index}` : undefined });
       results.push({ toolId: step.toolId, result });
+      if (!result.ok) break;
     } catch (e) {
       results.push({
         toolId: step.toolId,
         result: {
           ok: false,
-          message: e instanceof Error ? e.message : "Error al ejecutar la acción.",
+          message: e instanceof Error && Number((e as { status?: number }).status) < 500
+            ? e.message
+            : "No se pudo completar este paso. Sus cambios no se guardaron; puede reintentar el mismo plan.",
         },
       });
+      break;
     }
   }
   return results;
@@ -240,10 +249,12 @@ export async function runAssistantTurn(
     };
   }
 
-  const resolved = { causaId: await resolveCausaId(normalized) };
+  const resolved = { causaId: await resolveCausaId(normalized, input.user) };
   const ctx: ToolContext = {
     userId: input.user.id,
     role: input.user.role,
+    capabilityGrants: input.user.capabilityGrants,
+    capabilityRevokes: input.user.capabilityRevokes,
     chatId: input.chatId,
   };
 

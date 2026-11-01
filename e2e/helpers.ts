@@ -12,8 +12,10 @@ async function waitLoginResponse(page: Page, timeout = 15_000): Promise<Response
 /**
  * Login estable: selectores por name/type (no dependen del idioma).
  * Staff → /inicio (o /dashboard legado); portal → /portal.
- * En e2e (`LEXOPEN_E2E=1` / NODE_ENV=test) los buckets de login son altos;
- * aún así reintenta una vez ante 429 residual.
+ * En e2e (`LEXOPEN_E2E=1` / NODE_ENV=test) los buckets de login son altos
+ * y la puerta de enrolamiento 2FA privilegiado está relajada (seed sin TOTP;
+ * `FirmSettings.require2faPrivileged=false` en demo). Aún así reintenta una
+ * vez ante 429 residual.
  */
 export async function loginAs(page: Page, email: string) {
   await page.goto("/login");

@@ -1,25 +1,27 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
-  handleRouteError,
   assertCsrf,
+  handleRouteError,
   jsonError,
   parseBody,
   requireStaff,
 } from "@/lib/api";
-import { causaCreateSchema } from "@/lib/schemas";
-import { validarRit, validarRuc, validarRut, normalizarRut } from "@/lib/chile";
-import { checkConflicts } from "@/lib/conflict";
-import { writeAuditStrict } from "@/lib/audit";
-import { parseLocalDateInput } from "@/lib/minutas";
-import { publicUserSelect } from "@/lib/auth/public-user";
-import { canSeeConfidential, isStaff } from "@/lib/auth/rbac";
-import { duplicateCausaWhere } from "@/lib/pjud/causa-origin";
 import { parseListLimit } from "@/lib/api/list-limit";
+import { writeAuditStrict } from "@/lib/audit";
+import { ensureResponsableMiembro, causaAccessWhere as scopedcausaAccessWhere, documentReadWhere as scopeddocumentReadWhere, plazoAccessWhere } from "@/lib/auth/causa-access";
+import { can, canSome } from "@/lib/auth/permissions";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { isStaff } from "@/lib/auth/rbac";
+import { normalizarRut, validarRit, validarRuc, validarRut } from "@/lib/chile";
+import { checkConflicts } from "@/lib/conflict";
+import { prisma } from "@/lib/db";
+import { parseLocalDateInput } from "@/lib/minutas";
+import { duplicateCausaWhere } from "@/lib/pjud/causa-origin";
+import { causaCreateSchema } from "@/lib/schemas";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.trim();
     const materia = searchParams.get("materia");
@@ -30,8 +32,9 @@ export async function GET(req: NextRequest) {
     });
 
     const causas = await prisma.causa.findMany({
-      where: {
+      where: { AND: [scopedcausaAccessWhere(user), {
         AND: [
+          scopedcausaAccessWhere(user),
           q
             ? {
                 OR: [
@@ -46,17 +49,17 @@ export async function GET(req: NextRequest) {
           materia ? { materia } : {},
           estado ? { estado } : {},
         ],
-      },
+      }] },
       include: {
         cliente: true,
         abogado: { select: publicUserSelect },
         site: { select: { id: true } },
         plazos: {
-          where: { estado: "pendiente" },
+          where: { AND: [plazoAccessWhere(user), { estado: "pendiente" }] },
           orderBy: { fechaLimite: "asc" },
           take: 2,
         },
-        _count: { select: { documentos: true, partes: true } },
+        _count: { select: { documentos: { where: scopeddocumentReadWhere(user) }, partes: true } },
       },
       orderBy: { updatedAt: "desc" },
       take: limit,
@@ -72,10 +75,13 @@ export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
     const user = await requireStaff();
+    if (!canSome(user, "causa.create")) {
+      return jsonError("Prohibido: su rol no puede crear causas", 403);
+    }
     const body = await parseBody(req, causaCreateSchema);
 
-    if (body.conflictOverride && !canSeeConfidential(user.role)) {
-      return jsonError("Solo abogados o admin pueden omitir un conflicto bloqueante", 403);
+    if (body.conflictOverride && !can(user, "causa.override_walls")) {
+      return jsonError("La coincidencia requiere revisión y autorización de un socio", 403);
     }
 
     let abogadoId = user.id;
@@ -108,6 +114,8 @@ export async function POST(req: NextRequest) {
         select: { id: true, titulo: true, rit: true },
       });
       if (existing) {
+        const visible = await prisma.causa.findFirst({ where: { id: existing.id, ...scopedcausaAccessWhere(user) }, select: { id: true } });
+        if (!visible) return NextResponse.json({ error: "Existe una coincidencia reservada. Requiere revisión autorizada.", code: "causa_duplicate" }, { status: 409 });
         return NextResponse.json(
           {
             error:
@@ -128,92 +136,95 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const conflicts = await checkConflicts({
+    const risk = await checkConflicts({
+      user,
       partes: (body.partes || []).map((p) => ({
         nombre: p.nombre,
         rut: p.rut,
       })),
     });
-    const blocked = conflicts.filter((c) => c.severity === "blocked");
-    if (blocked.length && !body.conflictOverride) {
+    const conflicts = risk.conflicts;
+    const blocked = risk.status === "blocked";
+    if (blocked && !body.conflictOverride) {
       return NextResponse.json(
         {
           error: "Posible conflicto de interés detectado",
-          conflicts,
+          ...risk,
         },
         { status: 409 }
       );
     }
 
-    const causa = await prisma.causa.create({
-      data: {
-        titulo: body.titulo,
-        rit: body.rit || null,
-        ruc: body.ruc || null,
-        tribunal: body.tribunal,
-        materia: body.materia,
-        procedimiento: body.procedimiento || null,
-        estado: body.estado || "activa",
-        etapa: body.etapa || "ingreso",
-        caratula: body.caratula || null,
-        resumen: body.resumen || null,
-        sala: body.sala || null,
-        cuaderno: body.cuaderno || null,
-        abogadoContraparte: body.abogadoContraparte || null,
-        fechaNotificacion: parseLocalDateInput(body.fechaNotificacion || undefined),
-        fechaIngreso: new Date(),
-        pjudOrigin: "manual",
-        clienteId: body.clienteId || null,
-        abogadoId,
-        conflictCheckedAt: new Date(),
-        conflictStatus: blocked.length
-          ? "blocked"
-          : conflicts.length
-            ? "warning"
-            : "clear",
-        conflictNotes: body.conflictNotes || null,
-        partes: body.partes?.length
-          ? {
-              create: body.partes.map((p) => ({
-                nombre: p.nombre,
-                rut: p.rut ? normalizarRut(p.rut) : null,
-                rol: p.rol,
-                domicilio: p.domicilio || null,
-              })),
-            }
-          : undefined,
-        etapaHistorial: {
-          create: { etapa: body.etapa || "ingreso", nota: "Alta de causa" },
+    if (blocked && body.conflictOverride && !body.conflictNotes?.trim()) return jsonError("Debe registrar el fundamento de la autorización", 400);
+    return await prisma.$transaction(async (tx) => {
+      const causa = await tx.causa.create({
+        data: {
+          titulo: body.titulo,
+          rit: body.rit || null,
+          ruc: body.ruc || null,
+          tribunal: body.tribunal,
+          materia: body.materia,
+          procedimiento: body.procedimiento || null,
+          estado: body.estado || "activa",
+          etapa: body.etapa || "ingreso",
+          caratula: body.caratula || null,
+          resumen: body.resumen || null,
+          sala: body.sala || null,
+          cuaderno: body.cuaderno || null,
+          abogadoContraparte: body.abogadoContraparte || null,
+          fechaNotificacion: parseLocalDateInput(body.fechaNotificacion || undefined),
+          fechaIngreso: new Date(),
+          pjudOrigin: "manual",
+          clienteId: body.clienteId || null,
+          abogadoId,
+          conflictCheckedAt: new Date(),
+          conflictStatus: risk.status,
+          conflictNotes: body.conflictNotes || null,
+          partes: body.partes?.length
+            ? {
+                create: body.partes.map((p) => ({
+                  nombre: p.nombre,
+                  rut: p.rut ? normalizarRut(p.rut) : null,
+                  rol: p.rol,
+                  domicilio: p.domicilio || null,
+                })),
+              }
+            : undefined,
+          etapaHistorial: {
+            create: { etapa: body.etapa || "ingreso", nota: "Alta de causa" },
+          },
         },
-      },
-      include: { partes: true, cliente: true, abogado: { select: publicUserSelect } },
-    });
+        include: { partes: true, cliente: true, abogado: { select: publicUserSelect } },
+      });
 
-    await prisma.activity.create({
-      data: {
-        tipo: "estado",
-        mensaje: `Nueva causa creada: ${causa.titulo}`,
-        causaId: causa.id,
-        userId: user.id,
-      },
-    });
-    await writeAuditStrict({
-      actorId: user.id,
-      action: body.conflictOverride && blocked.length
-        ? "causa.create.conflict_override"
-        : "causa.create",
-      entityType: "Causa",
-      entityId: causa.id,
-      after: {
-        titulo: causa.titulo,
-        rit: causa.rit,
-        conflicts,
-        conflictOverride: Boolean(body.conflictOverride && blocked.length),
-        conflictNotes: body.conflictNotes || null,
-      },
-    });
+      await tx.activity.create({
+        data: {
+          tipo: "estado",
+          mensaje: `Nueva causa creada: ${causa.titulo}`,
+          causaId: causa.id,
+          userId: user.id,
+        },
+      });
+      await ensureResponsableMiembro(causa.id, abogadoId, user.id, tx);
 
-    return NextResponse.json({ ...causa, conflicts }, { status: 201 });
+      await writeAuditStrict({
+        actorId: user.id,
+        action: body.conflictOverride && blocked
+          ? "causa.create.conflict_override"
+          : "causa.create",
+        entityType: "Causa",
+        entityId: causa.id,
+        after: {
+          titulo: causa.titulo,
+          rit: causa.rit,
+          conflicts,
+          conflictOverride: Boolean(body.conflictOverride && blocked),
+          conflictNotes: body.conflictNotes || null,
+        },
+      }, tx);
+
+      return NextResponse.json({ ...causa, ...risk }, { status: 201 });
+    }, { isolationLevel: "Serializable" });
   } catch (e) {
     return handleRouteError(e);
   }

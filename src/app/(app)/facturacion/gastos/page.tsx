@@ -1,6 +1,7 @@
-import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { ExpenseForm } from "@/components/billing/ExpenseForm";
 import { ModuleHeader } from "@/components/sites/SiteNav";
+import { causaAccessWhere as scopedcausaAccessWhere, billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
+import { requireStaff } from "@/lib/auth/session";
 import {
   EXPENSE_LIST_FILTERS,
   clp,
@@ -10,31 +11,31 @@ import {
   labelExpenseCategory,
 } from "@/lib/billing";
 import { formatCivilDate } from "@/lib/chile-time";
-import { ExpenseForm } from "@/components/billing/ExpenseForm";
-import { requireStaff } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
+import Link from "next/link";
 
 export default async function GastosPage({
   searchParams,
 }: {
   searchParams: Promise<{ estado?: string }>;
 }) {
-  await requireStaff();
+  const user = await requireStaff();
   const sp = await searchParams;
   const estado = expenseListFilter(sp.estado);
   const estadoLabel = EXPENSE_LIST_FILTERS.find((item) => item.value === estado)?.label;
 
   const [unbilled, expenses, causas, clientes] = await Promise.all([
     prisma.expense.aggregate({
-      where: { billable: true, billed: false },
+      where: { AND: [scopedrelatedCausaWhere(user), { billable: true, billed: false }] },
       _sum: { amountClp: true },
       _count: true,
     }),
     prisma.expense.findMany({
-      where: expenseListWhere(estado),
+      where: { AND: [scopedrelatedCausaWhere(user), expenseListWhere(estado)] },
       include: { causa: true, cliente: true },
       orderBy: { date: "desc" },
     }),
-    prisma.causa.findMany({ select: { id: true, titulo: true, rit: true, clienteId: true } }),
+    prisma.causa.findMany({ where: scopedcausaAccessWhere(user),  select: { id: true, titulo: true, rit: true, clienteId: true } }),
     prisma.cliente.findMany({ select: { id: true, razonSocial: true } }),
   ]);
 

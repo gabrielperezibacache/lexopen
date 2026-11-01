@@ -1,11 +1,12 @@
+import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { writeAuditStrict } from "@/lib/audit";
+import { assistantDb as prisma } from "@/lib/assistant/transaction-context";
+import { writeAssistantAudit as writeAuditStrict } from "@/lib/assistant/transaction-context";
 import { renderMinutaMarkdown, formatLocalDate, isValidTipoMinuta } from "@/lib/minutas";
 import { storeUndo, consumeUndo } from "@/lib/assistant/plan-store";
 import type { AssistantTool } from "./types";
 
-const STAFF_ROLES = ["admin", "abogado", "asistente"] as const;
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 export const minutaBorradorSchema = z.object({
   causaId: z.string().min(1),
@@ -20,7 +21,7 @@ export const minutaBorradorSchema = z.object({
 export type MinutaBorradorInput = z.infer<typeof minutaBorradorSchema>;
 
 /** Genera el Markdown de la minuta sin persistir (solo lectura/preview). */
-export const minutaBorradorTool: AssistantTool<MinutaBorradorInput> = {
+export const minutaBorradorTool: AssistantTool<MinutaBorradorInput> = secureTool({
   id: "minuta.borrador",
   description: "Redacta un borrador de minuta (Markdown) sin guardarlo",
   kind: "read",
@@ -55,7 +56,7 @@ export const minutaBorradorTool: AssistantTool<MinutaBorradorInput> = {
       card: { type: "minuta-borrador", causaId: causa.id, titulo: input.titulo, markdown },
     };
   },
-};
+});
 
 export const minutaCrearSchema = z.object({
   causaId: z.string().min(1),
@@ -71,7 +72,7 @@ export const minutaCrearSchema = z.object({
 });
 export type MinutaCrearInput = z.infer<typeof minutaCrearSchema>;
 
-export const minutaCrearTool: AssistantTool<MinutaCrearInput> = {
+export const minutaCrearTool: AssistantTool<MinutaCrearInput> = secureTool({
   id: "minuta.crear",
   description: "Guarda una minuta (y su documento Markdown) en una causa",
   kind: "write",
@@ -173,7 +174,7 @@ export const minutaCrearTool: AssistantTool<MinutaCrearInput> = {
     await prisma.$transaction(async (tx) => {
       await tx.minuta.delete({ where: { id: minuta.id } });
       if (minuta.documentoId) {
-        await tx.documento.delete({ where: { id: minuta.documentoId } }).catch(() => null);
+        await tx.documento.deleteMany({ where: { id: minuta.documentoId } });
       }
     });
     await writeAuditStrict({
@@ -185,4 +186,4 @@ export const minutaCrearTool: AssistantTool<MinutaCrearInput> = {
     });
     return { ok: true, message: `Se deshizo la creación de la minuta "${minuta.titulo}".` };
   },
-};
+});

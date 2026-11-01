@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ctx: ToolContext = { userId: user.id, role: user.role as Role };
+    const ctx: ToolContext = { userId: user.id, role: user.role as Role, capabilityGrants: user.capabilityGrants, capabilityRevokes: user.capabilityRevokes };
     const result = await tool.undo(body.undoToken, ctx);
     return NextResponse.json({ ok: result.ok, message: result.message });
   } catch (e) {

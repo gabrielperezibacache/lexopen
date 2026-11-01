@@ -1,10 +1,11 @@
+import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { writeAuditStrict } from "@/lib/audit";
+import { assistantDb as prisma } from "@/lib/assistant/transaction-context";
+import { writeAssistantAudit as writeAuditStrict } from "@/lib/assistant/transaction-context";
 import { storeUndo, consumeUndo } from "@/lib/assistant/plan-store";
 import type { AssistantTool } from "./types";
 
-const STAFF_ROLES = ["admin", "abogado", "asistente"] as const;
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 export const notaCrearSchema = z.object({
   causaId: z.string().min(1, "Debe indicar la causa"),
@@ -18,7 +19,7 @@ export const notaCrearSchema = z.object({
 });
 export type NotaCrearInput = z.infer<typeof notaCrearSchema>;
 
-export const notaCrearTool: AssistantTool<NotaCrearInput> = {
+export const notaCrearTool: AssistantTool<NotaCrearInput> = secureTool({
   id: "nota.crear",
   description: "Crea una nota en una causa",
   kind: "write",
@@ -97,7 +98,7 @@ export const notaCrearTool: AssistantTool<NotaCrearInput> = {
     });
     return { ok: true, message: `Se deshizo la creación de la nota "${nota.titulo}".` };
   },
-};
+});
 
 export const notaEditarSchema = z
   .object({
@@ -111,7 +112,7 @@ export const notaEditarSchema = z
   });
 export type NotaEditarInput = z.infer<typeof notaEditarSchema>;
 
-export const notaEditarTool: AssistantTool<NotaEditarInput> = {
+export const notaEditarTool: AssistantTool<NotaEditarInput> = secureTool({
   id: "nota.editar",
   description: "Edita el título, contenido o tags de una nota existente",
   kind: "write",
@@ -185,4 +186,4 @@ export const notaEditarTool: AssistantTool<NotaEditarInput> = {
     });
     return { ok: true, message: `Se restauró la nota "${nota.titulo}".` };
   },
-};
+});

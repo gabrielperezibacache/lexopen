@@ -1,8 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireUser } from "@/lib/api";
+import { siteAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
+import { can, canSome } from "@/lib/auth/permissions";
+import { publicUserSelect, toPublicUser } from "@/lib/auth/public-user";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
-import { publicUserSelect } from "@/lib/auth/public-user";
+import { STAFF_ROLES } from "@/lib/auth/roles";
+import { prisma } from "@/lib/db";
+import { emitNotification } from "@/lib/notify/emit";
+import type { Prisma } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+function messageSites(user: CausaAccessUser): Prisma.SiteWhereInput {
+  if (can(user, "client.message")) return siteAccessWhere(user);
+  if (!canSome(user, "client.message")) return { id: "__none__" };
+  return { AND: [siteAccessWhere(user), { causa: { OR: [{ abogadoId: user.id }, { miembros: { some: { userId: user.id, desde: { lte: new Date() }, OR: [{ hasta: null }, { hasta: { gt: new Date() } }] } } }] } }] };
+}
 
 async function clientHasPortalSite(userId: string) {
   return (
@@ -16,20 +28,19 @@ async function clientHasPortalSite(userId: string) {
 }
 
 async function canMessage(
-  sender: { id: string; role: string },
+  sender: CausaAccessUser,
   receiverId: string
 ): Promise<boolean> {
   const receiver = await prisma.user.findUnique({
     where: { id: receiverId },
-    select: { id: true, role: true },
   });
   if (!receiver || receiver.id === sender.id) return false;
   if (isStaff(sender.role) && isStaff(receiver.role)) return true;
   if (isStaff(sender.role) && isCliente(receiver.role)) {
-    return clientHasPortalSite(receiver.id);
+    return canSome(sender, "client.message") && (await prisma.site.count({ where: { AND: [messageSites(sender), { isClientVisible: true, members: { some: { userId: receiver.id } } }] } })) > 0;
   }
   if (isCliente(sender.role) && isStaff(receiver.role)) {
-    return clientHasPortalSite(sender.id);
+    return canSome(sender, "client.message") && canSome(receiver, "client.message") && clientHasPortalSite(sender.id);
   }
   return false;
 }
@@ -40,21 +51,21 @@ export async function GET(req: NextRequest) {
     const directory = req.nextUrl.searchParams.get("directory") === "1";
     if (directory) {
       if (isCliente(user.role)) {
-        if (!(await clientHasPortalSite(user.id))) {
+        if (!canSome(user, "client.message") || !(await clientHasPortalSite(user.id))) {
           return NextResponse.json({ users: [] });
         }
         const staff = await prisma.user.findMany({
-          where: { role: { in: ["admin", "abogado", "asistente"] } },
-          select: publicUserSelect,
+          where: { role: { in: [...STAFF_ROLES] } },
+          select: { ...publicUserSelect, capabilityGrants: true, capabilityRevokes: true },
           orderBy: { name: "asc" },
         });
-        return NextResponse.json({ users: staff });
+        return NextResponse.json({ users: staff.filter((person) => canSome(person, "client.message")).map(toPublicUser) });
       }
       const clients = await prisma.user.findMany({
         where: {
           role: "cliente",
           siteMemberships: {
-            some: { site: { isClientVisible: true } },
+            some: { site: { AND: [{ isClientVisible: true }, messageSites(user)] } },
           },
         },
         select: publicUserSelect,
@@ -62,7 +73,7 @@ export async function GET(req: NextRequest) {
       });
       const staff = await prisma.user.findMany({
         where: {
-          role: { in: ["admin", "abogado", "asistente"] },
+          role: { in: [...STAFF_ROLES] },
           id: { not: user.id },
         },
         select: publicUserSelect,
@@ -90,7 +101,7 @@ export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
     const user = await requireUser();
-    const body = await req.json();
+    const body = z.object({ receiverId: z.string().min(1).max(100), subject: z.string().max(300).nullable().optional(), body: z.string().trim().min(1).max(10000) }).parse(await req.json());
     if (
       typeof body.receiverId !== "string" ||
       !body.receiverId ||
@@ -109,7 +120,8 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
-    const msg = await prisma.message.create({
+    return await prisma.$transaction(async (tx) => {
+    const msg = await tx.message.create({
       data: {
         subject: body.subject || null,
         body: body.body,
@@ -117,15 +129,17 @@ export async function POST(req: NextRequest) {
         receiverId: body.receiverId,
       },
     });
-    await prisma.notification.create({
-      data: {
-        userId: body.receiverId,
-        title: "Nuevo mensaje",
-        body: body.subject || body.body.slice(0, 80),
-        href: "/mensajes",
-      },
-    });
+    await emitNotification({
+      tipo: "mensaje.interno",
+      userId: body.receiverId,
+      title: "Nuevo mensaje",
+      body: body.subject || body.body.slice(0, 80),
+      href: "/mensajes",
+      entityType: "message",
+      entityId: msg.id,
+    }, tx);
     return NextResponse.json(msg, { status: 201 });
+    });
   } catch (e) {
     return handleRouteError(e);
   }

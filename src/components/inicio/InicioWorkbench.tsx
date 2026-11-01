@@ -151,6 +151,21 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
   const placeholders = dict.inicio.composer.placeholders;
 
   useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/assistant", { signal: controller.signal, cache: "no-store" })
+      .then(async (response): Promise<{ plans?: AssistantPlanLite[] }> => response.ok ? response.json() : {})
+      .then((data) => {
+        if (controller.signal.aborted || !Array.isArray(data.plans)) return;
+        setEntries((previous) => [
+          ...data.plans!.filter((plan) => !previous.some((entry) => entry.kind === "plan" && entry.plan.id === plan.id))
+            .map((plan): ChatEntry => ({ kind: "plan", id: `restored-${plan.id}`, plan, resolved: false, cancelled: false })),
+          ...previous,
+        ]);
+      }).catch(() => { /* A failed restore does not discard a live draft. */ });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
     if (placeholders.length <= 1) return;
     const id = window.setInterval(() => {
       setPlaceholderIndex((i) => (i + 1) % placeholders.length);
@@ -367,7 +382,7 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
     setEntries((prev) =>
       prev.map((x) =>
         x.id === entryId && x.kind === "plan"
-          ? { ...x, resolved: true, cancelled: !confirm }
+          ? { ...x, resolved: result.ok && (confirm ? result.data.ok : Boolean(result.data.cancelled)), cancelled: result.ok && Boolean(result.data.cancelled) }
           : x
       )
     );
@@ -377,7 +392,8 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
         { kind: "results", id: nextId(), items: result.data.results! },
       ]);
       router.refresh();
-    } else if (confirm && !result.ok) {
+      if (!result.data.ok) setEntries((prev) => [...prev, { kind: "error", id: nextId(), text: t("inicio.plan.partial") }]);
+    } else if (!result.ok) {
       setEntries((prev) => [
         ...prev,
         { kind: "error", id: nextId(), text: result.error },

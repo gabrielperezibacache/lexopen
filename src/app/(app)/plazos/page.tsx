@@ -1,15 +1,16 @@
-import { prisma } from "@/lib/db";
+import { PlazoForm } from "@/components/PlazoForm";
+import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
 import { StatusBadge, UrgenciaBadge } from "@/components/ui";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { civilDateKey, civilMonthQueryRange, formatCivilDate } from "@/lib/chile-time";
-import { diasRestantes, labelDiasRestantes, labelTipoComputo } from "@/lib/plazos";
-import Link from "next/link";
-import { PlazoGoogleButton } from "@/components/PlazoGoogleButton";
-import { PlazoForm } from "@/components/PlazoForm";
+import { causaAccessWhere as scopedcausaAccessWhere, plazoAccessWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { requireStaff } from "@/lib/auth/session";
+import { civilDateKey, civilMonthQueryRange, formatCivilDate } from "@/lib/chile-time";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
+import { diasRestantes, labelDiasRestantes, labelTipoComputo } from "@/lib/plazos";
+import Link from "next/link";
 
 type Props = {
   searchParams: Promise<{
@@ -46,7 +47,7 @@ function shiftMonthParam(year: number, monthIndex: number, delta: number) {
 }
 
 export default async function PlazosPage({ searchParams }: Props) {
-  await requireStaff();
+  const user = await requireStaff();
   const { t, dict, locale } = await getI18n();
   const h = dict.hubs.plazos;
   const sp = await searchParams;
@@ -54,12 +55,12 @@ export default async function PlazosPage({ searchParams }: Props) {
   const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
   const [plazosRaw, causas, responsables] = await Promise.all([
     prisma.plazo.findMany({
-      where: { fechaLimite: { gte: start, lte: end } },
+      where: { AND: [plazoAccessWhere(user), { fechaLimite: { gte: start, lte: end } }] },
       include: { causa: true, responsable: { select: publicUserSelect } },
       orderBy: { fechaLimite: "asc" },
     }),
     prisma.causa.findMany({
-      where: { estado: { in: ["activa", "suspensa"] } },
+      where: { AND: [scopedcausaAccessWhere(user), { estado: { in: ["activa", "suspensa"] } }] },
       select: { id: true, rit: true, titulo: true },
       orderBy: { updatedAt: "desc" },
       take: 100,

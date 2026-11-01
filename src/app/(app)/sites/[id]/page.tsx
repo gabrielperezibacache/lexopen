@@ -1,17 +1,18 @@
-import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { NewISheetButton } from "@/components/sites/NewISheetButton";
+import { SiteNav } from "@/components/sites/SiteNav";
+import { SiteSettingsPanel } from "@/components/sites/SiteSettingsPanel";
+import { StatusBadge, formatDate } from "@/components/ui";
 import {
   assertSitePageAccess,
   clientVisibleFileWhere,
   confidentialFileWhere,
 } from "@/lib/auth/access";
+import { causaAccessWhere as scopedcausaAccessWhere, documentReadWhere as scopeddocumentReadWhere, siteAccessWhere as scopedsiteAccessWhere, siteFileReadWhere as scopedsiteFileReadWhere, siteRelatedWhere as scopedsiteRelatedWhere, taskAccessWhere as scopedtaskAccessWhere } from "@/lib/auth/causa-access";
 import { isAdmin, isCliente } from "@/lib/auth/rbac";
-import { SiteNav } from "@/components/sites/SiteNav";
-import { SiteSettingsPanel } from "@/components/sites/SiteSettingsPanel";
-import { NewISheetButton } from "@/components/sites/NewISheetButton";
-import { StatusBadge, formatDate } from "@/components/ui";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -26,31 +27,31 @@ export default async function SiteOverviewPage({ params, searchParams }: Params)
   if (isCliente(user.role)) {
     redirect(`/sites/${id}/archivos`);
   }
-  const fileWhere = confidentialFileWhere(user.role);
+  const fileWhere = confidentialFileWhere(user);
   const [site, visibleFilesCount, documentoCount, clientes, causas] = await Promise.all([
-    prisma.site.findUnique({
-      where: { id },
+    prisma.site.findFirst({
+      where: { AND: [scopedsiteAccessWhere(user), { id }] },
       include: {
         cliente: true,
         causa: true,
         members: { include: { user: true } },
-        tasks: { include: { assignee: true }, orderBy: { dueDate: "asc" }, take: 6 },
-        files: { where: fileWhere, orderBy: { updatedAt: "desc" }, take: 6 },
-        wikiPages: { take: 5, orderBy: { updatedAt: "desc" } },
+        tasks: { where: scopedtaskAccessWhere(user),  include: { assignee: true }, orderBy: { dueDate: "asc" }, take: 6 },
+        files: { where: { AND: [scopedsiteFileReadWhere(user), fileWhere] }, orderBy: { updatedAt: "desc" }, take: 6 },
+        wikiPages: { where: scopedsiteRelatedWhere(user),  take: 5, orderBy: { updatedAt: "desc" } },
         isheets: { include: { _count: { select: { rows: true } } } },
-        qaThreads: { take: 4, orderBy: { updatedAt: "desc" } },
+        qaThreads: { where: scopedsiteRelatedWhere(user),  take: 4, orderBy: { updatedAt: "desc" } },
         activities: { include: { user: true }, orderBy: { createdAt: "desc" }, take: 10 },
-        _count: { select: { tasks: true, members: true, wikiPages: true } },
+        _count: { select: { tasks: { where: scopedtaskAccessWhere(user) }, members: true, wikiPages: { where: scopedsiteRelatedWhere(user) } } },
       },
     }),
     prisma.siteFile.count({
-      where: { siteId: id, ...clientVisibleFileWhere(user.role) },
+      where: { AND: [scopedsiteFileReadWhere(user), { siteId: id, ...clientVisibleFileWhere(user) }] },
     }),
     prisma.site
-      .findUnique({ where: { id }, select: { causaId: true } })
+      .findFirst({ where: { AND: [scopedsiteAccessWhere(user), { id }] }, select: { causaId: true } })
       .then((s) =>
         s?.causaId
-          ? prisma.documento.count({ where: { causaId: s.causaId } })
+          ? prisma.documento.count({ where: { AND: [scopeddocumentReadWhere(user), { causaId: s.causaId }] } })
           : Promise.resolve(0)
       ),
     prisma.cliente.findMany({
@@ -58,7 +59,7 @@ export default async function SiteOverviewPage({ params, searchParams }: Params)
       orderBy: { razonSocial: "asc" },
       take: 200,
     }),
-    prisma.causa.findMany({
+    prisma.causa.findMany({ where: scopedcausaAccessWhere(user),
       select: {
         id: true,
         titulo: true,
@@ -121,7 +122,7 @@ export default async function SiteOverviewPage({ params, searchParams }: Params)
         }}
         clientes={clientes}
         causas={causasForSettings}
-        isAdmin={isAdmin(user.role)}
+        isAdmin={isAdmin(user)}
         defaultOpen={!site.clienteId && !site.causaId}
       />
 

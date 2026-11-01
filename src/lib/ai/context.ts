@@ -1,5 +1,7 @@
+import { causaAccessWhere, documentReadWhere, plazoAccessWhere, siteAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
+import { httpError } from "@/lib/auth/access";
 import { prisma } from "@/lib/db";
-import { confidentialWhere, minutaConfidentialWhere } from "@/lib/api";
+import { minutaConfidentialWhere } from "@/lib/api";
 import { getObject } from "@/lib/storage";
 import { buildClienteFolderContext } from "@/lib/integrations/client-folder-context";
 
@@ -30,6 +32,7 @@ async function textFromDoc(doc: {
 export async function buildActionContext(opts: {
   action: string;
   userRole: string;
+  user: CausaAccessUser;
   causaId?: string | null;
   clienteId?: string | null;
   documentoId?: string | null;
@@ -39,20 +42,20 @@ export async function buildActionContext(opts: {
   const parts: unknown[] = [];
 
   if (opts.clienteId) {
-    const folder = await buildClienteFolderContext(opts.clienteId, opts.userRole);
+    const folder = await buildClienteFolderContext(opts.clienteId, opts.user);
     if (folder) parts.push(JSON.parse(folder.context));
   }
 
   if (opts.causaId) {
-    const causa = await prisma.causa.findUnique({
-      where: { id: opts.causaId },
+    const causa = await prisma.causa.findFirst({
+      where: { id: opts.causaId, ...causaAccessWhere(opts.user) },
       include: {
         cliente: { select: { id: true, razonSocial: true, rut: true } },
         partes: true,
         tramites: { orderBy: { orden: "asc" }, take: 40 },
-        plazos: { orderBy: { fechaLimite: "asc" }, take: 20 },
+        plazos: { where: plazoAccessWhere(opts.user), orderBy: { fechaLimite: "asc" }, take: 20 },
         minutas: {
-          where: minutaConfidentialWhere(opts.userRole),
+          where: minutaConfidentialWhere(opts.user),
           orderBy: { fecha: "desc" },
           take: 5,
           select: {
@@ -63,27 +66,29 @@ export async function buildActionContext(opts: {
           },
         },
         documentos: {
-          where: confidentialWhere(opts.userRole),
+          where: documentReadWhere(opts.user),
           orderBy: { updatedAt: "desc" },
           take: 8,
           select: { id: true, nombre: true, tipo: true },
         },
       },
     });
-    if (causa) parts.push({ causa });
+    if (!causa) throw httpError("Causa no encontrada o sin acceso", 404);
+    parts.push({ causa });
   }
 
   if (opts.documentoId) {
     const doc = await prisma.documento.findFirst({
       where: {
         id: opts.documentoId,
-        ...confidentialWhere(opts.userRole),
+        ...documentReadWhere(opts.user),
       },
       include: {
         causa: { select: { id: true, titulo: true, rit: true } },
         cliente: { select: { id: true, razonSocial: true } },
       },
     });
+    if (!doc) throw httpError("Documento no encontrado o sin acceso", 404);
     if (doc) {
       const extracto = await textFromDoc(doc);
       parts.push({
@@ -101,8 +106,8 @@ export async function buildActionContext(opts: {
   }
 
   if (opts.siteId) {
-    const site = await prisma.site.findUnique({
-      where: { id: opts.siteId },
+    const site = await prisma.site.findFirst({
+      where: { id: opts.siteId, ...siteAccessWhere(opts.user) },
       select: {
         id: true,
         name: true,
@@ -112,7 +117,8 @@ export async function buildActionContext(opts: {
         cliente: { select: { id: true, razonSocial: true } },
       },
     });
-    if (site) parts.push({ site });
+    if (!site) throw httpError("Espacio no encontrado o sin acceso", 404);
+    parts.push({ site });
   }
 
   if (opts.action === "jurisprudencia.brief") {

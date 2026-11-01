@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState, Suspense } from "react";
+import { FormEvent, useMemo, useState, useSyncExternalStore, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Scale } from "lucide-react";
 import { safeAppPath } from "@/lib/auth/safe-next";
@@ -11,8 +11,12 @@ import { useI18n } from "@/components/i18n/I18nProvider";
 
 /** Demo shortcuts are build-time stripped from production client bundles. */
 const SHOW_DEMO_LOGIN = process.env.NODE_ENV !== "production";
+const subscribeHydration = () => () => {};
+const hydratedSnapshot = () => true;
+const serverSnapshot = () => false;
 
 function LoginForm() {
+  const hydrated = useSyncExternalStore(subscribeHydration, hydratedSnapshot, serverSnapshot);
   const router = useRouter();
   const sp = useSearchParams();
   const next = sp.get("next") || "/inicio";
@@ -106,7 +110,7 @@ function LoginForm() {
           </div>
         </Link>
 
-        <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
+        <form method="post" onSubmit={onSubmit} aria-busy={!hydrated || busy} className="panel space-y-4 rounded-3xl p-6">
           <div>
             <h1 className="display text-3xl">{t("login.title")}</h1>
             <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
@@ -123,7 +127,7 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="username"
-              disabled={needsTotp}
+              disabled={!hydrated || needsTotp}
             />
           </label>
           {!needsTotp ? (
@@ -136,6 +140,7 @@ function LoginForm() {
                 required
                 defaultValue={SHOW_DEMO_LOGIN ? "lexopen" : ""}
                 autoComplete="current-password"
+                disabled={!hydrated}
               />
             </label>
           ) : (
@@ -150,6 +155,7 @@ function LoginForm() {
                 autoComplete="one-time-code"
                 inputMode="numeric"
                 autoFocus
+                disabled={!hydrated}
               />
             </label>
           )}
@@ -158,8 +164,8 @@ function LoginForm() {
               {error}
             </p>
           )}
-          <button className="btn btn-primary w-full" disabled={busy} type="submit">
-            {busy
+          <button className="btn btn-primary w-full" disabled={!hydrated || busy} type="submit">
+            {!hydrated ? t("login.preparing") : busy
               ? t("login.submitting")
               : needsTotp
                 ? "Verificar 2FA"
@@ -189,6 +195,7 @@ function LoginForm() {
                 <button
                   key={u.email}
                   type="button"
+                  disabled={!hydrated}
                   className="btn btn-ghost"
                   onClick={() => setEmail(u.email)}
                 >

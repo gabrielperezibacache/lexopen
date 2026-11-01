@@ -1,9 +1,11 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { MinutaWizard } from "@/components/minutas/MinutaWizard";
+import { requireStaffPage } from "@/lib/auth/access";
+import { assertCausaCapability, causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
+import { prisma } from "@/lib/db";
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { isValidTipoMinuta } from "@/lib/minutas";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -11,9 +13,11 @@ type Params = {
 };
 
 export default async function NuevaMinutaPage({ params, searchParams }: Params) {
+  const user = await requireStaffPage();
   const { id } = await params;
+  await assertCausaCapability(id, user, "causa.write");
   const sp = await searchParams;
-  const causa = await prisma.causa.findUnique({ where: { id } });
+  const causa = await prisma.causa.findFirst({ where: { AND: [scopedcausaAccessWhere(user), { id }] } });
   if (!causa) notFound();
 
   const tipo =

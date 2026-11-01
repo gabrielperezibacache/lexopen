@@ -5,6 +5,7 @@
 
 import { prisma } from "@/lib/db";
 import { civilDayQueryRange, civilSpanQueryRange, santiagoDateKey, addCivilDays } from "@/lib/chile-time";
+import { causaAccessWhere, relatedCausaWhere, plazoAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 
 export type InicioStatus = {
   plazosFatalesProximos: number;
@@ -14,7 +15,7 @@ export type InicioStatus = {
 };
 
 /** Conteos de estado para un usuario staff (agnóstico de rol para lectura propia). */
-export async function buildInicioStatus(userId: string, now: Date = new Date()): Promise<InicioStatus> {
+export async function buildInicioStatus(user: CausaAccessUser, now: Date = new Date()): Promise<InicioStatus> {
   const todayYmd = santiagoDateKey(now);
   const in7dYmd = addCivilDays(todayYmd, 7);
   const proximaSemana = civilSpanQueryRange(todayYmd, in7dYmd);
@@ -26,30 +27,33 @@ export async function buildInicioStatus(userId: string, now: Date = new Date()):
       prisma.plazo.count({
         where: {
           estado: "pendiente",
+          ...plazoAccessWhere(user),
           esFatal: true,
           fechaLimite: { gte: proximaSemana.start, lte: proximaSemana.end },
-          responsableId: userId,
+          responsableId: user.id,
         },
       }),
       prisma.plazo.count({
         where: {
           estado: "pendiente",
+          ...plazoAccessWhere(user),
           fechaLimite: { gte: proximaSemana.start, lte: proximaSemana.end },
-          responsableId: userId,
+          responsableId: user.id,
         },
       }),
       prisma.evento.count({
         where: {
           estado: { not: "cancelado" },
+          ...relatedCausaWhere(user),
           inicio: { gte: hoy.start, lte: hoy.end },
-          responsableId: userId,
+          responsableId: user.id,
         },
       }),
       prisma.causaMovimiento.count({
         where: {
           fuente: "pjud",
           createdAt: { gte: desde48h },
-          causa: { abogadoId: userId },
+          causa: { AND: [causaAccessWhere(user), { abogadoId: user.id }] },
         },
       }),
     ]);

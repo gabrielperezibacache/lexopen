@@ -1,8 +1,9 @@
+import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
 import { askLlm, legalSystemPrompt } from "@/lib/integrations/llm";
 import type { AssistantTool } from "./types";
 
-const STAFF_ROLES = ["admin", "abogado", "asistente"] as const;
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 export const respuestaLibreSchema = z.object({
   texto: z.string().trim().min(1).max(8000),
@@ -10,7 +11,7 @@ export const respuestaLibreSchema = z.object({
 export type RespuestaLibreInput = z.infer<typeof respuestaLibreSchema>;
 
 /** Fallback conversacional: ninguna herramienta específica aplicó al pedido. */
-export const respuestaLibreTool: AssistantTool<RespuestaLibreInput> = {
+export const respuestaLibreTool: AssistantTool<RespuestaLibreInput> = secureTool({
   id: "respuesta.libre",
   description: "Responde libremente con el copiloto cuando ninguna herramienta específica aplica",
   kind: "read",
@@ -42,4 +43,4 @@ export const respuestaLibreTool: AssistantTool<RespuestaLibreInput> = {
       card: { type: "respuesta-libre", source: result.source },
     };
   },
-};
+});

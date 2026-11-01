@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { visibleNotifications } from "@/lib/notify/read";
 import { requireUser } from "@/lib/auth/session";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
@@ -8,11 +9,7 @@ export default async function NotificacionesPage() {
   const user = await requireUser();
   const { dict } = await getI18n();
   const h = dict.hubs.notificaciones;
-  const notifications = await prisma.notification.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  const notifications = await visibleNotifications(user.id, prisma, 100);
   return (
     <div className="space-y-6">
       <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />

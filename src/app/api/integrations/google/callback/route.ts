@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const user = await requireStaff();
-    if (!isAdmin(user.role)) {
+    if (!isAdmin(user)) {
       return clearOauthState(
         NextResponse.redirect(
           new URL("/integraciones?google=forbidden", req.url)

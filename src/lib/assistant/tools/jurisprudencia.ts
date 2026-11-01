@@ -1,9 +1,10 @@
+import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
+import { assistantDb as prisma } from "@/lib/assistant/transaction-context";
 import { askLlm, legalSystemPrompt } from "@/lib/integrations/llm";
 import type { AssistantTool } from "./types";
 
-const STAFF_ROLES = ["admin", "abogado", "asistente"] as const;
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 export const jurisprudenciaBuscarSchema = z.object({
   q: z.string().trim().min(1).max(300),
@@ -11,7 +12,7 @@ export const jurisprudenciaBuscarSchema = z.object({
 });
 export type JurisprudenciaBuscarInput = z.infer<typeof jurisprudenciaBuscarSchema>;
 
-export const jurisprudenciaBuscarTool: AssistantTool<JurisprudenciaBuscarInput> = {
+export const jurisprudenciaBuscarTool: AssistantTool<JurisprudenciaBuscarInput> = secureTool({
   id: "jurisprudencia.buscar",
   description: "Busca fallos en el corpus de jurisprudencia LexOpen",
   kind: "read",
@@ -54,14 +55,14 @@ export const jurisprudenciaBuscarTool: AssistantTool<JurisprudenciaBuscarInput> 
       card: { type: "jurisprudencia-lista", items: rows },
     };
   },
-};
+});
 
 export const jurisprudenciaBriefSchema = z.object({
   jurisprudenciaId: z.string().min(1),
 });
 export type JurisprudenciaBriefInput = z.infer<typeof jurisprudenciaBriefSchema>;
 
-export const jurisprudenciaBriefTool: AssistantTool<JurisprudenciaBriefInput> = {
+export const jurisprudenciaBriefTool: AssistantTool<JurisprudenciaBriefInput> = secureTool({
   id: "jurisprudencia.brief",
   description: "Genera un brief con IA de un fallo del corpus local",
   kind: "read",
@@ -97,4 +98,4 @@ export const jurisprudenciaBriefTool: AssistantTool<JurisprudenciaBriefInput> = 
       card: { type: "jurisprudencia-brief", id: fallo.id, rol: fallo.rol, source: result.source },
     };
   },
-};
+});

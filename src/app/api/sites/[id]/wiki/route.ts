@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
-import { isCliente } from "@/lib/auth/rbac";
-import { publicUserSelect } from "@/lib/auth/public-user";
 import { writeAuditStrict } from "@/lib/audit";
+import { requireSiteMutationAccess } from "@/lib/auth/access";
+import { siteRelatedWhere as scopedsiteRelatedWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { isCliente } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -32,7 +34,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const pageId = req.nextUrl.searchParams.get("id");
     if (pageId) {
       const page = await prisma.wikiPage.findFirst({
-        where: { id: pageId, siteId: id },
+        where: { AND: [scopedsiteRelatedWhere(user), { id: pageId, siteId: id }] },
         include: {
           author: { select: publicUserSelect },
           revisions: {
@@ -48,7 +50,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       return NextResponse.json(page);
     }
     const pages = await prisma.wikiPage.findMany({
-      where: { siteId: id },
+      where: { AND: [scopedsiteRelatedWhere(user), { siteId: id }] },
       select: {
         ...wikiListSelect,
         author: { select: publicUserSelect },
@@ -66,7 +68,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
-    await requireSiteAccess(id, user);
+    await requireSiteMutationAccess(id, user);
     if (isCliente(user.role)) {
       return NextResponse.json({ error: "Clientes no pueden editar la wiki" }, { status: 403 });
     }
@@ -132,7 +134,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
-    await requireSiteAccess(id, user);
+    await requireSiteMutationAccess(id, user);
     if (isCliente(user.role)) {
       return NextResponse.json({ error: "Clientes no pueden editar la wiki" }, { status: 403 });
     }
@@ -141,7 +143,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "id requerido" }, { status: 400 });
     }
     const current = await prisma.wikiPage.findFirst({
-      where: { id: body.id, siteId: id },
+      where: { AND: [scopedsiteRelatedWhere(user), { id: body.id, siteId: id }] },
       select: { id: true, title: true, content: true, published: true },
     });
     if (!current) {

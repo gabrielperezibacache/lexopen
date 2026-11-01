@@ -1,0 +1,38 @@
+
+=== LexOpen isolated restore rehearsal 20261101T174229Z ===
+Scope: source lexopen_own_browser_e2e read-only; destinations lexopen_own_restore_test and lexopen_own_restore_verify_test fresh disposable test databases only.
+Storage source: /private/tmp/lexopen-own-browser-storage; proof artifacts: /private/tmp/lexopen-own-restore-20261101T174229Z-49784261
+Official scripts/guide reviewed: web-backup.mjs, web-restore.mjs, desktop/backup.cjs, docs/WEB-HOST.md lines 299-315 and 425-445.
+Method: pg_dump/pg_restore plus storage copy. Official Host scripts require offline physical pgdata copy; no Host or PostgreSQL shutdown performed.
+pg_dump (PostgreSQL) 16.14 (Homebrew)
+source-before: 75 tables; 597 rows; schema SHA-256 1b287c0ec11731a4dac9ac2a049612068e16bcd55977c11285476107ab469c1d
+source-storage-before: 8 objects; 430412 bytes; manifest SHA-256 e61ff19733010808bcbabbdd7e48cb4c12810444857fd28283ce1c8552dfcfdc
+Source evidence counts: resources=0, versions=0, fragments=0
+Logical dump source.dump: 219855 bytes; SHA-256 745c3f81a8d871e7c394b958a82e75468eaf26b163fae5ab2b64aee5baf67d80
+source-storage-backup: 8 objects; 430412 bytes; manifest SHA-256 e61ff19733010808bcbabbdd7e48cb4c12810444857fd28283ce1c8552dfcfdc
+source-after-dump: 75 tables; 597 rows; schema SHA-256 1b287c0ec11731a4dac9ac2a049612068e16bcd55977c11285476107ab469c1d
+source-storage-after-dump: 8 objects; 430412 bytes; manifest SHA-256 e61ff19733010808bcbabbdd7e48cb4c12810444857fd28283ce1c8552dfcfdc
+Created fresh disposable destination: lexopen_own_restore_test
+pg_restore completed in one transaction: lexopen_own_restore_test
+restored-before-fixture: 75 tables; 597 rows; schema SHA-256 1b287c0ec11731a4dac9ac2a049612068e16bcd55977c11285476107ab469c1d
+restored-storage-before-fixture: 8 objects; 430412 bytes; manifest SHA-256 e61ff19733010808bcbabbdd7e48cb4c12810444857fd28283ce1c8552dfcfdc
+PASS round 1: every table count and SHA-256, schema metadata, migrations and all storage object hashes equal source.
+PASS migrations: 30 applied migrations have repository-matching SHA-256 checksums; no unfinished or rolled back migration.
+Added one owned fixture only in disposable destination: document/resource/version/fragment restore-proof-929e743dce594e31939b592009addc64. Source remained read-only.
+fixture-source-before: 75 tables; 601 rows; schema SHA-256 1b287c0ec11731a4dac9ac2a049612068e16bcd55977c11285476107ab469c1d
+fixture-source-storage: 10 objects; 430822 bytes; manifest SHA-256 ae8295c440cc20e47a53fa469536e562870d2e18fda0cdefd0f519fb2e738f5b
+Logical dump fixture.dump: 220070 bytes; SHA-256 54f43764c5e2887eab0c85f7398df00bfe9da3c12dbf5db08053182053ad67e5
+fixture-backup-storage: 10 objects; 430822 bytes; manifest SHA-256 ae8295c440cc20e47a53fa469536e562870d2e18fda0cdefd0f519fb2e738f5b
+Created fresh disposable destination: lexopen_own_restore_verify_test
+pg_restore completed in one transaction: lexopen_own_restore_verify_test
+fixture-restored: 75 tables; 601 rows; schema SHA-256 1b287c0ec11731a4dac9ac2a049612068e16bcd55977c11285476107ab469c1d
+fixture-restored-storage: 10 objects; 430822 bytes; manifest SHA-256 ae8295c440cc20e47a53fa469536e562870d2e18fda0cdefd0f519fb2e738f5b
+PASS round 2: exact table/schema comparison including non-empty evidence (1 resource, 1 version, 1 fragment); 10 storage objects copied exactly.
+PASS original/evidence fixture: original bytes SHA-256 a16dc8294b5e3672e5e0623d4b8d9c50a3956ebce3f44d1a18075246bb1d01d1; frozen original hash, extracted-text hash, fragment hash and text offsets all match after restore.
+source-final: 75 tables; 597 rows; schema SHA-256 1b287c0ec11731a4dac9ac2a049612068e16bcd55977c11285476107ab469c1d
+source-storage-final: 8 objects; 430412 bytes; manifest SHA-256 e61ff19733010808bcbabbdd7e48cb4c12810444857fd28283ce1c8552dfcfdc
+PASS source untouched: all original table hashes/counts/schema and 8 storage objects identical before/after rehearsal. PostgreSQL still responds.
+LIMITS: logical PostgreSQL + local storage rehearsal only; not a test of offline physical Host backup/restore scripts, encrypted external media, .env/vault/host configuration recovery, production data, S3 recovery or application restart against the restored database.
+Cleanup: no existing database was dropped; source unmodified. Two newly created disposable test databases and proof artifacts retained for review.
+RESULT: PASS. Proof log: /private/tmp/lexopen-own-restore-proof.log
+Artifacts: /private/tmp/lexopen-own-restore-20261101T174229Z-49784261

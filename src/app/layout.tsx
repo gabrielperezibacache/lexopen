@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
+import { headers } from "next/headers";
 import Script from "next/script";
 import { Fraunces, Sora } from "next/font/google";
 import { CsrfFetchPatch } from "@/components/CsrfFetchPatch";
+import { PwaRegister } from "@/components/PwaRegister";
 import { I18nProvider } from "@/components/i18n/I18nProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -44,15 +46,17 @@ export default async function RootLayout({
 }>) {
   // Per-request CSP nonces require dynamic rendering (see Next.js CSP guide).
   await connection();
+  const nonce = (await headers()).get("x-nonce") || undefined;
   const locale = await getLocale();
 
   return (
     <html lang={locale} data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className={`${sora.variable} ${fraunces.variable} antialiased`}>
-        <Script id="lexopen-theme-boot" strategy="beforeInteractive">
+        <Script id="lexopen-theme-boot" strategy="beforeInteractive" nonce={nonce}>
           {themeBootScript}
         </Script>
         <CsrfFetchPatch />
+        <PwaRegister />
         <ThemeProvider>
           <I18nProvider locale={locale}>
             <ToastProvider>{children}</ToastProvider>

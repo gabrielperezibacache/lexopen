@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, httpError } from "@/lib/api";
 import { hashPassword } from "@/lib/auth/password";
+import { FOUNDER_ADMIN_GRANTS } from "@/lib/auth/permissions";
 import { rateLimitAsync } from "@/lib/auth/rate-limit";
 import {
   BOOTSTRAP_TOKEN_ENV,
@@ -91,6 +92,7 @@ export async function POST(req: NextRequest) {
             title: "Administrador del estudio",
             password,
             avatarColor: "#c47a3a",
+            capabilityGrants: FOUNDER_ADMIN_GRANTS.join(","),
           },
           select: {
             id: true,

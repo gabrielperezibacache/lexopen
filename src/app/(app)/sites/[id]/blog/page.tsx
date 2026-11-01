@@ -1,14 +1,15 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { assertSitePageAccess } from "@/lib/auth/access";
-import { isCliente } from "@/lib/auth/rbac";
-import { SiteNav } from "@/components/sites/SiteNav";
-import { MarkdownView } from "@/lib/markdown";
-import { formatDate } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
-import { NewBlogPostButton } from "@/components/sites/NewBlogPostButton";
 import { EditBlogPostButton } from "@/components/sites/EditBlogPostButton";
+import { NewBlogPostButton } from "@/components/sites/NewBlogPostButton";
+import { SiteNav } from "@/components/sites/SiteNav";
+import { formatDate } from "@/components/ui";
+import { assertSitePageAccess } from "@/lib/auth/access";
+import { siteAccessWhere as scopedsiteAccessWhere, siteRelatedWhere as scopedsiteRelatedWhere } from "@/lib/auth/causa-access";
+import { isCliente } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
+import { MarkdownView } from "@/lib/markdown";
+import { notFound } from "next/navigation";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -18,8 +19,8 @@ export default async function SiteBlogPage({ params }: Params) {
   const { t } = await getI18n();
   const clientView = isCliente(user.role);
   const [site, posts] = await Promise.all([
-    prisma.site.findUnique({
-      where: { id },
+    prisma.site.findFirst({
+      where: { AND: [scopedsiteAccessWhere(user), { id }] },
       select: {
         id: true,
         name: true,
@@ -32,10 +33,10 @@ export default async function SiteBlogPage({ params }: Params) {
       },
     }),
     prisma.blogPost.findMany({
-      where: {
+      where: { AND: [scopedsiteRelatedWhere(user), {
         siteId: id,
         ...(clientView ? { published: true } : {}),
-      },
+      }] },
       include: { author: true },
       orderBy: { createdAt: "desc" },
     }),

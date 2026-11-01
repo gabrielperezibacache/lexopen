@@ -1,0 +1,299 @@
+LexOpen upgrade proof
+UTC 2026-11-01T17:42:25.613709+00:00
+Source main 72400f9b9627cdc147ebf7c14a791c063747a686
+Target checkout 3737f1c8e29c78c1e3449101d23ad4c095f2a383
+Target working schema SHA256 396b20244864d526582dd92c7d3ea5300185081825e46118dc1905fa80555421  prisma/schema.prisma
+
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "lexopen_own_upgrade_test", schema "public" at "127.0.0.1:55439"
+
+23 migrations found in prisma/migrations
+
+Applying migration `20260725080000_init`
+Applying migration `20260725090000_unaccent`
+Applying migration `20260725180000_pjud_monitor`
+Applying migration `20260811000000_secure_user_password`
+Applying migration `20260811020000_session_version`
+Applying migration `20260811030000_pjud_external_unique`
+Applying migration `20260812000000_document_processing`
+Applying migration `20260812160000_pjud_causamonitor_parity`
+Applying migration `20260812170000_pjud_scrape_claveunica`
+Applying migration `20260812180000_pjud_digest_pdf`
+Applying migration `20260812190000_pjud_escrito_pendiente`
+Applying migration `20260812200000_pjud_proxima_tabla`
+Applying migration `20260812220000_crm_clientes_tramites`
+Applying migration `20260812230000_hermes_allow_demo_default_false`
+Applying migration `20260816050000_totp_wiki_blog`
+Applying migration `20260816070000_wiki_blog_indexes`
+Applying migration `20260817190000_mailbox_correo`
+Applying migration `20260818010000_causa_pjud_origin`
+Applying migration `20260818120000_mailbox_production`
+Applying migration `20260930120000_evento_agenda`
+Applying migration `20260930140000_firm_assistant_llm_settings`
+Applying migration `20260930180000_phase3_list_indexes`
+Applying migration `20261031010000_pjud_b3_b4_uniques`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260725080000_init/
+    └─ migration.sql
+  └─ 20260725090000_unaccent/
+    └─ migration.sql
+  └─ 20260725180000_pjud_monitor/
+    └─ migration.sql
+  └─ 20260811000000_secure_user_password/
+    └─ migration.sql
+  └─ 20260811020000_session_version/
+    └─ migration.sql
+  └─ 20260811030000_pjud_external_unique/
+    └─ migration.sql
+  └─ 20260812000000_document_processing/
+    └─ migration.sql
+  └─ 20260812160000_pjud_causamonitor_parity/
+    └─ migration.sql
+  └─ 20260812170000_pjud_scrape_claveunica/
+    └─ migration.sql
+  └─ 20260812180000_pjud_digest_pdf/
+    └─ migration.sql
+  └─ 20260812190000_pjud_escrito_pendiente/
+    └─ migration.sql
+  └─ 20260812200000_pjud_proxima_tabla/
+    └─ migration.sql
+  └─ 20260812220000_crm_clientes_tramites/
+    └─ migration.sql
+  └─ 20260812230000_hermes_allow_demo_default_false/
+    └─ migration.sql
+  └─ 20260816050000_totp_wiki_blog/
+    └─ migration.sql
+  └─ 20260816070000_wiki_blog_indexes/
+    └─ migration.sql
+  └─ 20260817190000_mailbox_correo/
+    └─ migration.sql
+  └─ 20260818010000_causa_pjud_origin/
+    └─ migration.sql
+  └─ 20260818120000_mailbox_production/
+    └─ migration.sql
+  └─ 20260930120000_evento_agenda/
+    └─ migration.sql
+  └─ 20260930140000_firm_assistant_llm_settings/
+    └─ migration.sql
+  └─ 20260930180000_phase3_list_indexes/
+    └─ migration.sql
+  └─ 20261031010000_pjud_b3_b4_uniques/
+    └─ migration.sql
+
+All migrations have been successfully applied.
+BEGIN
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+COMMIT
+
+BEFORE LEGACY TABLE SNAPSHOT
+Activity {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+AgentChat {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+AuditEvent {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+BlogPost {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Causa {"count": 1, "legacyCount": 1, "legacySha256": "a074d87ebf2c6219e1a11cefe50283af2bd4b1600dd74267aabfdf1e6b2b21b3"}
+CausaMovimiento {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Cliente {"count": 1, "legacyCount": 1, "legacySha256": "98a5d74eff6a21e6b1c8bcd8f409e60d2dfdffe4e481993f89eb63fccf1b671d"}
+Comment {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Documento {"count": 1, "legacyCount": 1, "legacySha256": "12b3e8ee13c929a10f33d461393331b75ec298625da8bd28c41c708777072a4a"}
+EtapaHistorial {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Evento {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Expense {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+FeeArrangement {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+FileVersion {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+FirmSettings {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Folder {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Group {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+GroupMember {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+ISheet {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+ISheetColumn {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+ISheetRow {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+IntegrationConfig {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Invoice {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+InvoiceLine {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Jurisprudencia {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+LedgerEntry {"count": 2, "legacyCount": 2, "legacySha256": "24090932f20c4388d0001b22b399291d49927afc94a8938f60436fbae18f77e0"}
+MailboxAccount {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+MailboxAttachment {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+MailboxMessage {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Message {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Minuta {"count": 1, "legacyCount": 1, "legacySha256": "93015356da3d52e4101c8178e648694063100af1bf67446459ad2c06cc4071a2"}
+MinutaAccion {"count": 1, "legacyCount": 1, "legacySha256": "2774d03270ef5cb5e7f2be40afad64b3a0496f4fed4f12c68a77b2346593290c"}
+MinutaPlantilla {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Nota {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Notification {"count": 1, "legacyCount": 1, "legacySha256": "1d8e5cdb5b606a96b08f4c6c39157f9ca803c52a8290cf8a336b8a0cd4c02adf"}
+Organization {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Parte {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Payment {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+PjudSyncJob {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Plazo {"count": 1, "legacyCount": 1, "legacySha256": "cc64b3cb9bbc8d477017d2d3032250939f990e4f184127fbda1e044da3627d2e"}
+QaPost {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+QaThread {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Site {"count": 1, "legacyCount": 1, "legacySha256": "ec7bf7d764337f4c3ccde014e60479238c140870297e92899d2ebdfbbaa7c193"}
+SiteFile {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+SiteGroup {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+SiteMember {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Task {"count": 1, "legacyCount": 1, "legacySha256": "fe3915db8a06592208667551cc790b4b2c5cca49c67f8a3ed2286d63ef15d709"}
+TimeEntry {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Tramite {"count": 1, "legacyCount": 1, "legacySha256": "a8caca91b2f4a18bf7673465d138a69b356eb082e9c79d8aef2f456d3c6c028a"}
+Tribunal {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+UfRate {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+User {"count": 2, "legacyCount": 2, "legacySha256": "aa2451e00ad8df3d08024237d0597dcbad8f7d937d5bfe8aaa34c804000f1122"}
+WikiPage {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+WikiPageRevision {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Workflow {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+WorkflowInstance {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Prisma schema loaded from ../../..<repo>/prisma/schema.prisma
+Datasource "db": PostgreSQL database "lexopen_own_upgrade_test", schema "public" at "127.0.0.1:55439"
+
+30 migrations found in prisma/migrations
+
+Applying migration `20261031000000_preserve_pjud_duplicates`
+Applying migration `20261031120000_notificaciones_outbox`
+Applying migration `20261031120000_roles_equipo_causa`
+Applying migration `20261031121000_tareas_unificadas`
+Applying migration `20261101130000_durable_commands`
+Applying migration `20261101131000_notify_leases`
+Applying migration `20261101132000_document_evidence`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20261031000000_preserve_pjud_duplicates/
+    └─ migration.sql
+  └─ 20261031120000_notificaciones_outbox/
+    └─ migration.sql
+  └─ 20261031120000_roles_equipo_causa/
+    └─ migration.sql
+  └─ 20261031121000_tareas_unificadas/
+    └─ migration.sql
+  └─ 20261101130000_durable_commands/
+    └─ migration.sql
+  └─ 20261101131000_notify_leases/
+    └─ migration.sql
+  └─ 20261101132000_document_evidence/
+    └─ migration.sql
+
+All migrations have been successfully applied.
+
+AFTER LEGACY TABLE SNAPSHOT
+Activity {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+AgentChat {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+AuditEvent {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+BlogPost {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Causa {"count": 1, "legacyCount": 1, "legacySha256": "a074d87ebf2c6219e1a11cefe50283af2bd4b1600dd74267aabfdf1e6b2b21b3"}
+CausaMovimiento {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Cliente {"count": 1, "legacyCount": 1, "legacySha256": "98a5d74eff6a21e6b1c8bcd8f409e60d2dfdffe4e481993f89eb63fccf1b671d"}
+Comment {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Documento {"count": 1, "legacyCount": 1, "legacySha256": "12b3e8ee13c929a10f33d461393331b75ec298625da8bd28c41c708777072a4a"}
+EtapaHistorial {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Evento {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Expense {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+FeeArrangement {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+FileVersion {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+FirmSettings {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Folder {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Group {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+GroupMember {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+ISheet {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+ISheetColumn {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+ISheetRow {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+IntegrationConfig {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Invoice {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+InvoiceLine {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Jurisprudencia {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+LedgerEntry {"count": 2, "legacyCount": 2, "legacySha256": "24090932f20c4388d0001b22b399291d49927afc94a8938f60436fbae18f77e0"}
+MailboxAccount {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+MailboxAttachment {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+MailboxMessage {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Message {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Minuta {"count": 1, "legacyCount": 1, "legacySha256": "93015356da3d52e4101c8178e648694063100af1bf67446459ad2c06cc4071a2"}
+MinutaAccion {"count": 1, "legacyCount": 1, "legacySha256": "2774d03270ef5cb5e7f2be40afad64b3a0496f4fed4f12c68a77b2346593290c"}
+MinutaPlantilla {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Nota {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Notification {"count": 1, "legacyCount": 1, "legacySha256": "1d8e5cdb5b606a96b08f4c6c39157f9ca803c52a8290cf8a336b8a0cd4c02adf"}
+Organization {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Parte {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Payment {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+PjudSyncJob {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Plazo {"count": 1, "legacyCount": 1, "legacySha256": "cc64b3cb9bbc8d477017d2d3032250939f990e4f184127fbda1e044da3627d2e"}
+QaPost {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+QaThread {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Site {"count": 1, "legacyCount": 1, "legacySha256": "ec7bf7d764337f4c3ccde014e60479238c140870297e92899d2ebdfbbaa7c193"}
+SiteFile {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+SiteGroup {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+SiteMember {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Task {"count": 2, "legacyCount": 1, "legacySha256": "fe3915db8a06592208667551cc790b4b2c5cca49c67f8a3ed2286d63ef15d709"}
+TimeEntry {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Tramite {"count": 1, "legacyCount": 1, "legacySha256": "a8caca91b2f4a18bf7673465d138a69b356eb082e9c79d8aef2f456d3c6c028a"}
+Tribunal {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+UfRate {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+User {"count": 2, "legacyCount": 2, "legacySha256": "aa2451e00ad8df3d08024237d0597dcbad8f7d937d5bfe8aaa34c804000f1122"}
+WikiPage {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+WikiPageRevision {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+Workflow {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+WorkflowInstance {"count": 0, "legacyCount": 0, "legacySha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}
+
+PASS: all 56 main tables retained; all original-column SHA256 match. Expected new mirror count [('Task', 1, 2)]
+       id       |  role   |                                                                   capabilityGrants                                                                   | capabilityRevokes
+----------------+---------+------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------
+ upgrade_admin  | admin   | causa.override_walls,doc.privileged.read,escrito.draft,escrito.approve,time.log,time.approve,billing.rates,ledger.provision,client.message,voice.use |
+ upgrade_lawyer | abogado |                                                                                                                                                      |
+(2 rows)
+
+    causaId    |     userId     |     rol
+---------------+----------------+-------------
+ upgrade_cause | upgrade_admin  | colaborador
+ upgrade_cause | upgrade_lawyer | responsable
+(2 rows)
+
+          id          | origen  |    causaId    |     plazoId      |     tramiteId     | status
+----------------------+---------+---------------+------------------+-------------------+--------
+ tr_upgrade_checklist | tramite | upgrade_cause |                  | upgrade_checklist | done
+ upgrade_task         | minuta  | upgrade_cause | upgrade_deadline |                   | done
+(2 rows)
+
+      id       | acceso
+---------------+---------
+ upgrade_cause | estudio
+(1 row)
+
+        id        | extractionAttempts | extractionLockedAt | extractionLockToken | extractionNextAttemptAt
+------------------+--------------------+--------------------+---------------------+-------------------------
+ upgrade_document |                  0 |                    |                     |
+(1 row)
+
+          id          |  tipo   | severidad | entityType | dedupeKey | ackAt
+----------------------+---------+-----------+------------+-----------+-------
+ upgrade_notification | general | media     |            |           |
+(1 row)
+
+ net_clp | rows
+---------+------
+   45000 |    2
+(1 row)
+
+ applied | unfinished
+---------+------------
+      30 |          0
+(1 row)
+
+
+ASSERTED BACKFILLS {"admin_grants": true, "checklist_mirror": true, "colaborador": true, "doc_lease_defaults": true, "ledger_preserved": true, "legacy_task": true, "migrations_finished": true, "notification_defaults": true, "responsable": true}
+ADDED TABLES ["Aprobacion", "AssistantPlanRecord", "AssistantUndo", "CanalUsuario", "CausaMiembro", "CommandExecution", "Delegacion", "DocumentEvidenceFragment", "DocumentEvidenceVersion", "DocumentResource", "EventoEntrega", "Job", "MensajeSaliente", "PerfilNotificacion", "PjudMigrationArchive", "PlazoAlerta", "PreferenciaNotificacion", "TaskHistorial"]
+MAIN SCHEMA DIFF EXIT0: -- This is an empty migration.
+CURRENT SCHEMA DIFF EXIT0: -- This is an empty migration.
+PASS REAL UPGRADE main72400f9 -> integrated current: 14 original fixture rows in 12 tables preserved; 56 legacy tables hashes/counts checked; Task+1 expected mirror; 74 tables/30 completed migrations; schema drift none. New test DB retained for inspection; existing databases untouched.

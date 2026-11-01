@@ -1,6 +1,8 @@
-import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { CreateInvoicePanel } from "@/components/billing/CreateInvoicePanel";
+import { InvoiceStatusPill } from "@/components/billing/InvoiceStatusPill";
 import { ModuleHeader } from "@/components/sites/SiteNav";
+import { causaAccessWhere as scopedcausaAccessWhere, billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
+import { requireStaff } from "@/lib/auth/session";
 import {
   DOC_TIPOS,
   INVOICE_STATUSES,
@@ -14,16 +16,15 @@ import {
   labelInvoiceStatus,
 } from "@/lib/billing";
 import { formatCivilDate } from "@/lib/chile-time";
-import { CreateInvoicePanel } from "@/components/billing/CreateInvoicePanel";
-import { InvoiceStatusPill } from "@/components/billing/InvoiceStatusPill";
-import { requireStaff } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
+import Link from "next/link";
 
 export default async function FacturasPage({
   searchParams,
 }: {
   searchParams: Promise<{ estado?: string; tipo?: string }>;
 }) {
-  await requireStaff();
+  const user = await requireStaff();
   const sp = await searchParams;
   const estado = invoiceStatusFilter(sp.estado);
   const tipo = docTipoFilter(sp.tipo);
@@ -36,22 +37,22 @@ export default async function FacturasPage({
 
   const [invoices, unbilledTime, unbilledExpenses, clientes, causas, firm] = await Promise.all([
     prisma.invoice.findMany({
-      where,
+      where: { AND: [scopedrelatedCausaWhere(user), where] },
       include: { cliente: true, causa: true },
       orderBy: { issueDate: "desc" },
     }),
     prisma.timeEntry.findMany({
-      where: { billable: true, billed: false },
+      where: { AND: [scopedrelatedCausaWhere(user), { billable: true, billed: false }] },
       include: { causa: true },
       orderBy: { date: "desc" },
     }),
     prisma.expense.findMany({
-      where: { billable: true, billed: false },
+      where: { AND: [scopedrelatedCausaWhere(user), { billable: true, billed: false }] },
       include: { causa: true },
       orderBy: { date: "desc" },
     }),
     prisma.cliente.findMany({ select: { id: true, razonSocial: true }, orderBy: { razonSocial: "asc" } }),
-    prisma.causa.findMany({ select: { id: true, titulo: true, rit: true, clienteId: true } }),
+    prisma.causa.findMany({ where: scopedcausaAccessWhere(user),  select: { id: true, titulo: true, rit: true, clienteId: true } }),
     prisma.firmSettings.findFirst({ select: { ivaPct: true, defaultRetencionPct: true } }),
   ]);
 

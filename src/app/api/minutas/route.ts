@@ -1,18 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
   minutaConfidentialWhere,
   requireStaff,
 } from "@/lib/api";
+import { writeAuditStrict } from "@/lib/audit";
+import { assertCausaCapability, causaAccessWhere as scopedcausaAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
 import { canSeeConfidential } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { pushMinutaToDrive } from "@/lib/integrations/google";
-import { writeAuditStrict } from "@/lib/audit";
-import { publicUserSelect } from "@/lib/auth/public-user";
-import { documentoListSelect } from "@/lib/sites/file-select";
-import { calcularVencimiento } from "@/lib/plazos";
 import {
   formatLocalDate,
   isValidModalidad,
@@ -24,6 +22,10 @@ import {
   renderMinutaMarkdown,
   type MinutaAccionInput,
 } from "@/lib/minutas";
+import { emitNotification } from "@/lib/notify/emit";
+import { calcularVencimiento } from "@/lib/plazos";
+import { documentoListSelect } from "@/lib/sites/file-select";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
@@ -35,10 +37,10 @@ export async function GET(req: NextRequest) {
     : 50;
 
   const minutas = await prisma.minuta.findMany({
-    where: {
+    where: { AND: [scopedrequiredCausaWhere(user), {
       ...(causaId ? { causaId } : {}),
-      ...minutaConfidentialWhere(user.role),
-    },
+      ...minutaConfidentialWhere(user),
+    }] },
     include: {
       causa: { select: { id: true, titulo: true, rit: true, tribunal: true } },
       autor: { select: { id: true, name: true, email: true } },
@@ -87,14 +89,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const causa = await prisma.causa.findUnique({
-    where: { id: body.causaId },
+  await assertCausaCapability(String(body.causaId), user, "causa.write");
+  const causa = await prisma.causa.findFirst({
+    where: { AND: [scopedcausaAccessWhere(user), { id: body.causaId }] },
     include: { site: true },
   });
   if (!causa) {
     return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
   }
-  if (Boolean(body.confidencial) && !canSeeConfidential(user.role)) {
+  if (Boolean(body.confidencial) && !canSeeConfidential(user)) {
     return NextResponse.json(
       { error: "Su rol no puede crear minutas confidenciales" },
       { status: 403 }
@@ -302,14 +305,18 @@ export async function POST(req: NextRequest) {
     take: 20,
   });
   if (peers.length > 0) {
-    await prisma.notification.createMany({
-      data: peers.map((p) => ({
+    for (const p of peers) {
+      await emitNotification({
+        tipo: "minuta.nueva",
+        userId: p.id,
         title: `Nueva minuta · ${causa.rit || causa.titulo}`,
         body: `${labelTipoMinuta(tipo)}: ${body.titulo.trim()}. Revise próximos pasos para continuar la tramitación.`,
         href: `/causas/${causa.id}/minutas/${minuta.id}`,
-        userId: p.id,
-      })),
-    });
+        entityType: "minuta",
+        entityId: minuta.id,
+        dedupeKey: `minuta:${minuta.id}:${p.id}`,
+      });
+    }
   }
 
   let driveResult: Record<string, unknown> | null = null;
@@ -337,8 +344,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const full = await prisma.minuta.findUnique({
-    where: { id: minuta.id },
+  const full = await prisma.minuta.findFirst({
+    where: { AND: [scopedrequiredCausaWhere(user), { id: minuta.id }] },
     include: {
       causa: true,
       autor: { select: publicUserSelect },

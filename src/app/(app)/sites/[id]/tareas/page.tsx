@@ -1,22 +1,23 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { assertSitePageAccess } from "@/lib/auth/access";
+import { EmptyState } from "@/components/EmptyState";
+import { NewTaskButton, TaskStatusButton } from "@/components/sites/NewTaskButton";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDate } from "@/components/ui";
-import { NewTaskButton, TaskStatusButton } from "@/components/sites/NewTaskButton";
-import { EmptyState } from "@/components/EmptyState";
+import { assertSitePageAccess } from "@/lib/auth/access";
+import { siteAccessWhere as scopedsiteAccessWhere, taskAccessWhere as scopedtaskAccessWhere } from "@/lib/auth/causa-access";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
 import { taskPriorityLabel, taskStatusLabel } from "@/lib/sites/labels";
+import { notFound } from "next/navigation";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function SiteTasksPage({ params }: Params) {
   const { id } = await params;
-  await assertSitePageAccess(id);
+  const user = await assertSitePageAccess(id);
   const { t, dict } = await getI18n();
   const [site, tasks] = await Promise.all([
-    prisma.site.findUnique({
-      where: { id },
+    prisma.site.findFirst({
+      where: { AND: [scopedsiteAccessWhere(user), { id }] },
       include: {
         members: { include: { user: true } },
         cliente: true,
@@ -24,7 +25,7 @@ export default async function SiteTasksPage({ params }: Params) {
       },
     }),
     prisma.task.findMany({
-      where: { siteId: id },
+      where: { AND: [scopedtaskAccessWhere(user), { siteId: id }] },
       include: { assignee: true, creator: true },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
     }),

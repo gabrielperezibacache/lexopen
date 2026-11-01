@@ -1,3 +1,8 @@
+import { assertChatSourcesAccess, canReadChatSources } from "@/lib/ai/chat-access";
+import { createHash } from "node:crypto";
+import { causaAccessWhere, relatedCausaWhere, assertCausaAccess, assertCausaCapability } from "@/lib/auth/causa-access";
+import { executeCommand } from "@/lib/command-execution";
+import { httpError } from "@/lib/auth/access";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
@@ -39,6 +44,7 @@ export async function GET(req: NextRequest) {
   try {
     const user = await requireStaff();
     const causaId = req.nextUrl.searchParams.get("causaId");
+    if (causaId) await assertCausaAccess(causaId, user);
     if (req.nextUrl.searchParams.get("utilities") === "1") {
       return NextResponse.json({ utilities: AI_UTILITIES });
     }
@@ -49,22 +55,26 @@ export async function GET(req: NextRequest) {
           where: {
             id: chatId,
             ...(causaId ? { causaId } : {}),
-            ...(user.role === "admin" ? {} : { userId: user.id }),
+            userId: user.id,
+            AND: [relatedCausaWhere(user)],
           },
         });
         if (!chat) {
           return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
         }
+        await assertChatSourcesAccess(chat.messagesJson, user);
         return NextResponse.json(chat);
       }
       const chats = await prisma.agentChat.findMany({
         where: {
           ...(causaId ? { causaId } : {}),
-          ...(user.role === "admin" ? {} : { userId: user.id }),
+          userId: user.id,
+            AND: [relatedCausaWhere(user)],
         },
         select: {
           id: true,
           title: true,
+          messagesJson: true,
           demoMode: true,
           updatedAt: true,
           createdAt: true,
@@ -75,7 +85,8 @@ export async function GET(req: NextRequest) {
         orderBy: { updatedAt: "desc" },
         take: 50,
       });
-      return NextResponse.json(chats);
+      const visible = await Promise.all(chats.map(async chat => await canReadChatSources(chat.messagesJson, user) ? chat : null));
+      return NextResponse.json(visible.filter((chat): chat is NonNullable<typeof chat> => Boolean(chat)).map(({ messagesJson, ...metadata }) => { void messagesJson; return metadata; }));
     }
 
     const [row, llmRow] = await Promise.all([
@@ -137,12 +148,14 @@ export async function POST(req: Request) {
       const existing = await prisma.agentChat.findFirst({
         where: {
           id: chatId,
-          ...(user.role === "admin" ? {} : { userId: user.id }),
+          userId: user.id,
+            AND: [relatedCausaWhere(user)],
         },
       });
       if (!existing) {
         return NextResponse.json({ error: "Chat no encontrado" }, { status: 404 });
       }
+      await assertChatSourcesAccess(existing.messagesJson, user);
       const prev = safeJsonParse<
         Array<
           Record<string, unknown> & {
@@ -209,7 +222,8 @@ export async function POST(req: Request) {
       const existing = await prisma.agentChat.findFirst({
         where: {
           id: chatId,
-          ...(user.role === "admin" ? {} : { userId: user.id }),
+          userId: user.id,
+            AND: [relatedCausaWhere(user)],
         },
       });
       if (!existing) {
@@ -218,6 +232,7 @@ export async function POST(req: Request) {
           { status: 404 }
         );
       }
+      await assertChatSourcesAccess(existing.messagesJson, user);
       if (existing.causaId && existing.causaId !== causaId) {
         return NextResponse.json(
           {
@@ -299,8 +314,9 @@ export async function POST(req: Request) {
         );
       }
 
-      const causa = await prisma.causa.findUnique({
-        where: { id: causaId },
+      await assertCausaCapability(causaId, user, "escrito.draft");
+      const causa = await prisma.causa.findFirst({
+        where: { id: causaId, ...causaAccessWhere(user) },
         select: {
           id: true,
           titulo: true,
@@ -343,73 +359,41 @@ export async function POST(req: Request) {
       });
       const docNombre = `Minuta reunion — ${titulo} — ${formatLocalDate(fecha)}.md`;
 
-      const minuta = await prisma.$transaction(async (tx) => {
-        const documento = await tx.documento.create({
-          data: {
-            nombre: docNombre,
-            tipo: "minuta",
-            mimeType: "text/markdown",
-            contenido: markdown,
-            causaId: causa.id,
-            autorId: user.id,
-          },
-        });
-        return tx.minuta.create({
-          data: {
-            tipo: "reunion",
-            titulo,
-            fecha,
-            modalidad: "presencial",
-            participantes: "",
-            resumenEjecutivo: content.slice(0, 50_000),
-            hechosRelevantes: hechos,
-            riesgosAlertas: riesgos,
-            causaId: causa.id,
-            autorId: user.id,
-            documentoId: documento.id,
-          },
-        });
-      });
-
-      let chat = null;
-      if (chatToUpdate) {
-        const prev = safeJsonParse<
-          Array<Record<string, unknown> & { role?: string }>
-        >(chatToUpdate.messagesJson, []);
-        for (let i = prev.length - 1; i >= 0; i -= 1) {
-          if (prev[i]?.role === "assistant") {
-            prev[i] = {
-              ...prev[i],
-              requireApproval: false,
-              approvedMinutaId: minuta.id,
-            };
-            break;
+      const receipt = await executeCommand({
+        ownerId: user.id,
+        key: `copilot-approve:${chatId}:${createHash("sha256").update(chatToUpdate.messagesJson).digest("hex")}`,
+        input: { chatId, causaId, content },
+        authorize: async (tx) => { await assertCausaCapability(causaId, user, "escrito.draft", tx); },
+        run: async (tx) => {
+          const currentChat = await tx.agentChat.findFirst({ where: { id: chatId, userId: user.id, ...relatedCausaWhere(user) } });
+          if (!currentChat || currentChat.messagesJson !== chatToUpdate.messagesJson) {
+            throw httpError("El borrador cambió; vuelva a revisarlo antes de aprobar", 409);
           }
-        }
-        chat = await prisma.agentChat.update({
-          where: { id: chatToUpdate.id },
-          data: {
-            messagesJson: JSON.stringify(prev),
-            causaId: causaId,
-          },
-        });
-      }
-
-      await writeAuditStrict({
-        action: "minuta.create",
-        entityType: "minuta",
-        entityId: minuta.id,
-        actorId: user.id,
-        after: { from: "copiloto", utility: utilityLabel, causaId },
+          await assertChatSourcesAccess(currentChat.messagesJson, user, tx);
+          const documento = await tx.documento.create({ data: {
+            nombre: docNombre, tipo: "minuta", mimeType: "text/markdown", contenido: markdown,
+            causaId: causa.id, autorId: user.id,
+          } });
+          const minuta = await tx.minuta.create({ data: {
+            tipo: "reunion", titulo, fecha, modalidad: "presencial", participantes: "",
+            resumenEjecutivo: content.slice(0, 50_000), hechosRelevantes: hechos, riesgosAlertas: riesgos,
+            causaId: causa.id, autorId: user.id, documentoId: documento.id,
+          } });
+          const messages = safeJsonParse<Array<Record<string, unknown> & { role?: string }>>(currentChat.messagesJson, []);
+          for (let i = messages.length - 1; i >= 0; i -= 1) {
+            if (messages[i]?.role === "assistant") {
+              messages[i] = { ...messages[i], requireApproval: false, approvedMinutaId: minuta.id };
+              break;
+            }
+          }
+          const chat = await tx.agentChat.update({ where: { id: chatId }, data: { messagesJson: JSON.stringify(messages), causaId } });
+          await writeAuditStrict({ action: "minuta.create", entityType: "minuta", entityId: minuta.id, actorId: user.id,
+            after: { from: "copiloto", utility: utilityLabel, causaId },
+          }, tx);
+          return { ok: true, minutaId: minuta.id, href: `/causas/${causa.id}/minutas/${minuta.id}`, chat };
+        },
       });
-
-      const href = `/causas/${causa.id}/minutas/${minuta.id}`;
-      return NextResponse.json({
-        ok: true,
-        minutaId: minuta.id,
-        href,
-        chat,
-      });
+      return NextResponse.json(receipt);
     }
 
     const promptRaw = String(body.prompt || "").trim();
@@ -454,6 +438,7 @@ export async function POST(req: Request) {
       utility: utility.id,
       prompt,
       role: user.role,
+      user,
       documentoIds,
       rutaPrefix,
     });
@@ -464,10 +449,12 @@ export async function POST(req: Request) {
       const existing = await prisma.agentChat.findFirst({
         where: {
           id: body.chatId,
-          ...(user.role === "admin" ? {} : { userId: user.id }),
+          userId: user.id,
+            AND: [relatedCausaWhere(user)],
         },
       });
       if (existing) {
+        await assertChatSourcesAccess(existing.messagesJson, user);
         const prev = safeJsonParse<
           Array<{
             role: string;
@@ -495,15 +482,15 @@ export async function POST(req: Request) {
       { role: "user", content: prompt },
     ];
 
-    const chatUserId =
-      user.role === "admin" && body.userId ? body.userId : user.id;
+    const chatUserId = user.id;
 
     // Si el chat pertenece a otra causa, forzar hilo nuevo
     if (body.chatId && body.causaId) {
       const bound = await prisma.agentChat.findFirst({
         where: {
           id: String(body.chatId),
-          ...(user.role === "admin" ? {} : { userId: user.id }),
+          userId: user.id,
+            AND: [relatedCausaWhere(user)],
         },
         select: { causaId: true },
       });
@@ -639,6 +626,7 @@ export async function POST(req: Request) {
         source: result.source,
         utility: utility.id,
         sources: pack.sources,
+        accessRefs: pack.accessRefs,
         suggestedActions,
         alerts: pack.alerts,
         requireApproval: Boolean(result.requireApproval),
@@ -650,7 +638,8 @@ export async function POST(req: Request) {
       const existing = await prisma.agentChat.findFirst({
         where: {
           id: body.chatId,
-          ...(user.role === "admin" ? {} : { userId: user.id }),
+          userId: user.id,
+            AND: [relatedCausaWhere(user)],
         },
       });
       if (!existing) {

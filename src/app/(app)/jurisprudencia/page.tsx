@@ -69,7 +69,7 @@ export default async function JurisprudenciaPage({
 
       <JurisprudenciaSearch materias={[...MATERIAS]} />
       <JurisprudenciaBrief />
-      {isAdmin(user.role) && <JurisprudenciaIngestForm />}
+      {isAdmin(user) && <JurisprudenciaIngestForm />}
 
       {items.length > 0 ? (
         <p className="text-xs text-[var(--ink-soft)]/65">

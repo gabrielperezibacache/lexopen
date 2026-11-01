@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { handleRouteError, requireBillingManager } from "@/lib/api";
+import { billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
 import { invoiceListWhere } from "@/lib/billing";
 import {
   billingExportToCsv,
   billingExportToXml,
   buildBillingExportRows,
 } from "@/lib/billing-export";
+import { prisma } from "@/lib/db";
 import { downloadResponseHeaders } from "@/lib/security/download";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Export invoices as CSV/XML for external DTE providers.
@@ -15,7 +16,7 @@ import { downloadResponseHeaders } from "@/lib/security/download";
  */
 export async function GET(req: NextRequest) {
   try {
-    await requireBillingManager();
+    const user = await requireBillingManager();
     const format = (req.nextUrl.searchParams.get("format") || "csv").toLowerCase();
     if (format !== "csv" && format !== "xml") {
       return NextResponse.json(
@@ -28,10 +29,10 @@ export async function GET(req: NextRequest) {
     const id = req.nextUrl.searchParams.get("id");
 
     const invoices = await prisma.invoice.findMany({
-      where: {
+      where: { AND: [scopedrelatedCausaWhere(user), {
         ...(id ? { id } : {}),
         ...invoiceListWhere(status, tipo),
-      },
+      }] },
       include: {
         cliente: { select: { rut: true, razonSocial: true } },
         causa: { select: { rit: true } },

@@ -1,3 +1,6 @@
+import { assertCausaAccess } from "@/lib/auth/causa-access";
+import { can } from "@/lib/auth/permissions";
+import { httpError } from "@/lib/api";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
@@ -37,7 +40,7 @@ export async function POST(req: Request) {
     const user = await requireStaff();
     const body = await req.json().catch(() => ({}));
     if (body.action === "sync-all" || body.action === "sync-causa") {
-      if (!isAdmin(user.role)) {
+      if (!isAdmin(user)) {
         return NextResponse.json(
           { error: "Solo admin puede sincronizar Obsidian" },
           { status: 403 }
@@ -45,6 +48,7 @@ export async function POST(req: Request) {
       }
     }
     if (body.action === "sync-all") {
+      if (!can(user, "causa.override_walls")) throw httpError("La exportación global requiere supervisión de expedientes", 403);
       const results = await syncAllCausasToObsidian();
       const ok = results.filter((r) => r.ok).length;
       const failed = results.length - ok;
@@ -57,11 +61,12 @@ export async function POST(req: Request) {
       });
     }
     if (body.action === "sync-causa" && body.causaId) {
+      await assertCausaAccess(String(body.causaId), user);
       const result = await exportCausaToObsidian(body.causaId);
       return NextResponse.json({ ok: true, result });
     }
     if (body.action === "save-config") {
-      if (!isAdmin(user.role)) {
+      if (!isAdmin(user)) {
         return NextResponse.json(
           { error: "Solo admin puede configurar Obsidian" },
           { status: 403 }

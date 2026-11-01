@@ -1,17 +1,18 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { assertSitePageAccess, clientVisibleFileWhere } from "@/lib/auth/access";
-import { isCliente } from "@/lib/auth/rbac";
-import { publicUserSelect } from "@/lib/auth/public-user";
+import { EmptyState } from "@/components/EmptyState";
+import { FileCommentForm } from "@/components/sites/FileCommentForm";
+import { SiteFileActions } from "@/components/sites/SiteFileActions";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { formatDate } from "@/components/ui";
-import { SiteFileActions } from "@/components/sites/SiteFileActions";
-import { EmptyState } from "@/components/EmptyState";
+import { assertSitePageAccess, clientVisibleFileWhere } from "@/lib/auth/access";
+import { siteAccessWhere as scopedsiteAccessWhere, siteFileReadWhere as scopedsiteFileReadWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { isCliente } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
 import {
   fileVersionListSelect,
   siteFileListSelect,
 } from "@/lib/sites/file-select";
-import { FileCommentForm } from "@/components/sites/FileCommentForm";
+import { notFound } from "next/navigation";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,7 +20,7 @@ export default async function SiteFilesPage({ params }: Params) {
   const { id } = await params;
   const user = await assertSitePageAccess(id);
   const clientView = isCliente(user.role);
-  const fileWhere = clientVisibleFileWhere(user.role);
+  const fileWhere = clientVisibleFileWhere(user);
   const fileSelect = {
     ...siteFileListSelect,
     versions: {
@@ -40,8 +41,8 @@ export default async function SiteFilesPage({ params }: Params) {
 
   // ⚡ Bolt: Fetch site, folders, and root files concurrently to save database round trips
   const [site, folders, rootFiles] = await Promise.all([
-    prisma.site.findUnique({
-      where: { id },
+    prisma.site.findFirst({
+      where: { AND: [scopedsiteAccessWhere(user), { id }] },
       select: { id: true, name: true, tipo: true, color: true },
     }),
     prisma.folder.findMany({
@@ -56,7 +57,7 @@ export default async function SiteFilesPage({ params }: Params) {
       orderBy: { name: "asc" },
     }),
     prisma.siteFile.findMany({
-      where: { siteId: id, folderId: null, ...fileWhere },
+      where: { AND: [scopedsiteFileReadWhere(user), { siteId: id, folderId: null, ...fileWhere }] },
       select: fileSelect,
     }),
   ]);

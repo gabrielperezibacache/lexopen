@@ -1,12 +1,18 @@
-import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { prisma } from "@/lib/db";
-import { getCurrentUser, requireUser } from "@/lib/auth/session";
-import { canSeeConfidential, isCliente, isStaff } from "@/lib/auth/rbac";
-import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
 import { isClientAllowedPagePath } from "@/lib/auth/client-paths";
+import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
+import type { PermissionSubject } from "@/lib/auth/permissions";
+import {
+  canSeeConfidential,
+  canSeePrivileged,
+  isCliente,
+  isStaff,
+} from "@/lib/auth/rbac";
+import { getCurrentUser, requireUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-export { isClientAllowedPath, isClientAllowedPagePath } from "@/lib/auth/client-paths";
+export { isClientAllowedPagePath, isClientAllowedPath } from "@/lib/auth/client-paths";
 
 export function httpError(message: string, status: number) {
   const err = new Error(message) as Error & { status: number };
@@ -17,9 +23,14 @@ export function httpError(message: string, status: number) {
 /** Cliente: debe ser miembro Y el site visible. Staff: libre. */
 export async function requireSiteAccess(
   siteId: string,
-  user: { id: string; role: string }
+  user: PermissionSubject & { id: string }
 ) {
-  if (isStaff(user.role)) return;
+  if (isStaff(user.role)) {
+    const { siteAccessWhere } = await import("@/lib/auth/causa-access");
+    const site = await prisma.site.findFirst({ where: { id: siteId, ...siteAccessWhere(user) }, select: { id: true } });
+    if (!site) throw httpError("Site no encontrado", 404);
+    return;
+  }
 
   const site = await prisma.site.findUnique({
     where: { id: siteId },
@@ -53,14 +64,18 @@ export function clientSiteWhere(userId: string) {
   };
 }
 
-export function confidentialFileWhere(role: string) {
-  if (canSeeConfidential(role)) return {};
-  return { confidencial: false, privilegio: false };
+export function confidentialFileWhere(
+  subject: string | PermissionSubject
+): { confidencial?: false; privilegio?: false } {
+  if (!canSeeConfidential(subject)) return { confidencial: false, privilegio: false };
+  if (!canSeePrivileged(subject)) return { privilegio: false };
+  return {};
 }
 
 /** Files shared with clients must be tagged exact token `cliente` and non-confidential. */
-export function clientVisibleFileWhere(role: string) {
-  const base = confidentialFileWhere(role);
+export function clientVisibleFileWhere(subject: string | PermissionSubject) {
+  const base = confidentialFileWhere(subject);
+  const role = typeof subject === "string" ? subject : subject.role;
   if (!isCliente(role)) return base;
   return {
     AND: [base, clientSharedTagPrismaWhere()],
@@ -89,4 +104,16 @@ export async function requireStaffPage() {
   if (!user) redirect("/login");
   if (!isStaff(user.role)) redirect("/portal");
   return user;
+}
+
+/** Portal actions retain their explicit handler policy; staff mutations inherit matter permissions. */
+export async function requireSiteMutationAccess(siteId: string, user: PermissionSubject & { id: string }) {
+  await requireSiteAccess(siteId, user);
+  if (isStaff(user.role)) {
+    const site = await prisma.site.findUniqueOrThrow({ where: { id: siteId }, select: { causaId: true } });
+    if (site.causaId) {
+      const { assertCausaCapability } = await import("@/lib/auth/causa-access");
+      await assertCausaCapability(site.causaId, user, "causa.write");
+    }
+  }
 }

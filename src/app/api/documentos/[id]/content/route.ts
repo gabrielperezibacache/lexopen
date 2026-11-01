@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
-import { handleRouteError, requireStaff } from "@/lib/api";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { canReadFlagged, handleRouteError, requireStaff } from "@/lib/api";
+import { documentReadWhere as scopeddocumentReadWhere } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
-import { getObject } from "@/lib/storage";
 import { downloadResponseHeaders } from "@/lib/security/download";
+import { getObject } from "@/lib/storage";
+import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -11,13 +11,12 @@ export async function GET(_req: Request, { params }: Params) {
   try {
     const user = await requireStaff();
     const { id } = await params;
-    const doc = await prisma.documento.findUnique({ where: { id } });
+    const doc = await prisma.documento.findFirst({ where: { AND: [scopeddocumentReadWhere(user), { id }] } });
     if (!doc) {
       return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
     }
     if (
-      (doc.confidencial || doc.privilegio) &&
-      !canSeeConfidential(user.role)
+      !canReadFlagged(user, doc)
     ) {
       return NextResponse.json({ error: "Documento confidencial" }, { status: 403 });
     }

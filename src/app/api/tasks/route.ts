@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { causaAccessWhere } from "@/lib/auth/causa-access";
+import { activeDelegadorIds } from "@/lib/auth/delegacion";
+import { createTask, updateTasks } from "@/lib/tasks/service";
+import { taskAccessWhere } from "@/lib/auth/causa-access";
+import type { Prisma } from "@prisma/client";
+
+const OPEN_STATUSES = ["todo", "in_progress", "blocked", "waiting_client"];
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,22 +16,58 @@ export async function GET(req: NextRequest) {
     const status = req.nextUrl.searchParams.get("status");
     const siteId = req.nextUrl.searchParams.get("siteId");
     const assigneeId = req.nextUrl.searchParams.get("assigneeId");
+    const causaId = req.nextUrl.searchParams.get("causaId");
+    const origen = req.nextUrl.searchParams.get("origen");
     const mine = req.nextUrl.searchParams.get("mine");
+    const delegated = req.nextUrl.searchParams.get("delegated");
+    const open = req.nextUrl.searchParams.get("open");
+
+    const causaFilter = causaAccessWhere(user);
+    const delegatedFrom =
+      delegated === "1" ? await activeDelegadorIds(user.id, "task.assign") : [];
+
+    const assigneeFilter: Prisma.TaskWhereInput =
+      mine === "1"
+        ? { assigneeId: user.id }
+        : delegated === "1"
+          ? {
+              OR: [
+                { assigneeId: user.id },
+                ...(delegatedFrom.length
+                  ? [{ assigneeId: { in: delegatedFrom } }]
+                  : []),
+              ],
+            }
+          : assigneeId
+            ? { assigneeId }
+            : {};
+
     const tasks = await prisma.task.findMany({
       where: {
         AND: [
+          taskAccessWhere(user),
           status ? { status } : {},
+          open === "1" ? { status: { in: OPEN_STATUSES } } : {},
           siteId ? { siteId } : {},
-          assigneeId ? { assigneeId } : {},
-          mine === "1" ? { assigneeId: user.id } : {},
+          causaId ? { causaId } : {},
+          origen ? { origen } : {},
+          assigneeFilter,
+          {
+            OR: [
+              { causaId: null },
+              { causa: causaFilter },
+            ],
+          },
         ],
       },
       include: {
-        site: true,
+        site: { select: { id: true, name: true } },
+        causa: { select: { id: true, titulo: true, rit: true } },
         assignee: { select: publicUserSelect },
         creator: { select: publicUserSelect },
       },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }],
+      take: 500,
     });
     return NextResponse.json(tasks);
   } catch (e) {
@@ -33,104 +76,15 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    assertCsrf(req);
-    const user = await requireStaff();
-    const body = await req.json();
-    const title = String(body.title || "").trim();
-    if (!title) {
-      return NextResponse.json({ error: "Título requerido" }, { status: 400 });
-    }
-
-    if (body.siteId) {
-      const site = await prisma.site.findUnique({ where: { id: body.siteId } });
-      if (!site) {
-        return NextResponse.json({ error: "Espacio no encontrado" }, { status: 404 });
-      }
-    }
-
-    const task = await prisma.task.create({
-      data: {
-        title,
-        description: body.description || null,
-        status: body.status || "todo",
-        priority: body.priority || "medium",
-        dueDate: body.dueDate ? new Date(body.dueDate) : null,
-        siteId: body.siteId || null,
-        assigneeId: body.assigneeId || null,
-        creatorId: user.id,
-      },
-      include: {
-        site: true,
-        assignee: { select: publicUserSelect },
-        creator: { select: publicUserSelect },
-      },
-    });
-
-    if (body.assigneeId) {
-      await prisma.notification.create({
-        data: {
-          userId: body.assigneeId,
-          title: "Nueva tarea asignada",
-          body: task.title,
-          href: task.siteId ? `/sites/${task.siteId}/tareas` : "/tareas",
-        },
-      });
-    }
-
-    if (task.siteId) {
-      await prisma.activity.create({
-        data: {
-          tipo: "sistema",
-          mensaje: `Tarea creada: ${task.title}`,
-          siteId: task.siteId,
-          userId: user.id,
-        },
-      });
-    }
-
-    return NextResponse.json(task, { status: 201 });
-  } catch (e) {
-    return handleRouteError(e);
-  }
+  try { assertCsrf(req); const user = await requireStaff(); return NextResponse.json(await createTask(user, await req.json()), { status: 201 }); }
+  catch (error) { return handleRouteError(error); }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
-    assertCsrf(req);
-    await requireStaff();
-    const body = await req.json();
-    if (!body.id) {
-      return NextResponse.json({ error: "id requerido" }, { status: 400 });
-    }
-    const task = await prisma.task.update({
-      where: { id: body.id },
-      data: {
-        ...(body.status !== undefined ? { status: body.status } : {}),
-        ...(body.title !== undefined ? { title: body.title } : {}),
-        ...(body.priority !== undefined ? { priority: body.priority } : {}),
-        ...(body.assigneeId !== undefined ? { assigneeId: body.assigneeId || null } : {}),
-        ...(body.dueDate !== undefined
-          ? { dueDate: body.dueDate ? new Date(body.dueDate) : null }
-          : {}),
-      },
-      include: {
-        site: true,
-        assignee: { select: publicUserSelect },
-        creator: { select: publicUserSelect },
-      },
-    });
-    if (body.status === "done" && task.siteId) {
-      await prisma.activity.create({
-        data: {
-          tipo: "sistema",
-          mensaje: `Tarea completada: ${task.title}`,
-          siteId: task.siteId,
-        },
-      });
-    }
-    return NextResponse.json(task);
-  } catch (e) {
-    return handleRouteError(e);
-  }
+    assertCsrf(req); const user = await requireStaff(); const body = await req.json();
+    const ids = Array.isArray(body.ids) ? body.ids : [body.id];
+    const tasks = await updateTasks(user, ids, body);
+    return NextResponse.json(Array.isArray(body.ids) ? { updated: tasks.length } : tasks[0]);
+  } catch (error) { return handleRouteError(error); }
 }

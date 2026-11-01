@@ -1,0 +1,31 @@
+import { prisma } from './src/lib/db';
+import { processPlazoHitos, ackPlazo } from './src/lib/notify/plazos';
+import { processOutboxBatch } from './src/lib/notify/worker';
+import { emitNotification } from './src/lib/notify/emit';
+import { upsertPushSubscription } from './src/lib/notify/channels';
+
+async function main() {
+  if (new URL(process.env.DATABASE_URL!).pathname !== '/lexopen_audit_notify_e2e') throw new Error('Disposable audit database required');
+  const suffix=Date.now();
+  const a = await prisma.user.create({data:{name:'Responsable ficticio',email:`audit-owner-${suffix}@example.invalid`,password:'not-a-login-password',role:'abogado'}});
+  const b = await prisma.user.create({data:{name:'Cliente sin acceso',email:`audit-stranger-${suffix}@example.invalid`,password:'not-a-login-password',role:'cliente'}});
+  const now = new Date('2087-03-10T16:00:00Z');
+  const plazo = await prisma.plazo.create({data:{titulo:'Prueba de fallo transaccional',fechaLimite:new Date('2087-03-10T12:00:00Z'),responsableId:a.id}});
+  const broken = prisma.$extends({query:{notification:{async create(){throw new Error('audit-injected-notification-failure');}}}});
+  let failure='';
+  try { await processPlazoHitos({now,client:broken as any}); } catch(e) { failure=(e as Error).message; }
+  await processPlazoHitos({now});
+  console.log(JSON.stringify({probe:'hito_before_notification',injectedFailure:failure,markers:await prisma.plazoAlerta.count({where:{plazoId:plazo.id}}),lostT3Notification:!(await prisma.notification.findUnique({where:{dedupeKey:`plazo:${plazo.id}:T-3:${a.id}`}}))}));
+  await ackPlazo({plazoId:plazo.id,userId:b.id,via:'audit'});
+  console.log(JSON.stringify({probe:'ack_other_user',ackedByUnassignedClient:await prisma.plazoAlerta.count({where:{plazoId:plazo.id,ackById:b.id}})}));
+  await prisma.mensajeSaliente.deleteMany();
+  const stuck=await prisma.mensajeSaliente.create({data:{userId:a.id,canal:'email',plantilla:'general',payloadJson:'{}',nivelDetalle:'minimo',estado:'enviando',dedupeKey:`audit-stuck-${suffix}`,lockedAt:new Date('2000-01-01T00:00:00Z')}});
+  const batch=await processOutboxBatch({now});
+  console.log(JSON.stringify({probe:'crash_recovery',...batch,stuckState:(await prisma.mensajeSaliente.findUniqueOrThrow({where:{id:stuck.id}})).estado}));
+  await prisma.preferenciaNotificacion.createMany({data:[{userId:a.id,tipo:'general',canal:'email',modo:'off'},{userId:a.id,tipo:'general',canal:'push',modo:'realtime'}]});
+  for(let i=1;i<=2;i++)await upsertPushSubscription({userId:a.id,subscription:{endpoint:`https://push.example.invalid/audit-${i}`,keys:{p256dh:'fictitious-key',auth:'fictitious-auth'}}});
+  let emission:any;
+  try {emission=await emitNotification({tipo:'general',userId:a.id,title:'Prueba multidispositivo',body:'Ficticio',dedupeKey:'audit-multiple-push',now});} catch(e){emission={error:(e as Error).message};}
+  console.log(JSON.stringify({probe:'multiple_push_destinations',emission,persistedNotification:!!(await prisma.notification.findUnique({where:{dedupeKey:'audit-multiple-push'}})),persistedMessages:await prisma.mensajeSaliente.count({where:{dedupeKey:{startsWith:'audit-multiple-push:'}}})}));
+}
+main().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>prisma.$disconnect());

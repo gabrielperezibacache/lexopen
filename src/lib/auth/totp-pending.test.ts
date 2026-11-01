@@ -1,10 +1,10 @@
-import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
 import {
   mintTotpPendingToken,
-  verifyTotpPendingToken,
   TOTP_PENDING_COOKIE,
+  verifyTotpPendingToken,
 } from "@/lib/auth/totp-pending";
+import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 
 process.env.SESSION_SECRET =
   process.env.SESSION_SECRET || "ci-session-secret-16plus-chars";
@@ -12,7 +12,7 @@ process.env.SESSION_SECRET =
 const token = mintTotpPendingToken("user-abc");
 assert.ok(token.includes("user-abc"));
 const ok = verifyTotpPendingToken(token);
-assert.deepEqual(ok, { userId: "user-abc" });
+assert.deepEqual(ok, { userId: "user-abc", sessionVersion: 0 });
 
 assert.equal(verifyTotpPendingToken("bad.token.here"), null);
 assert.equal(verifyTotpPendingToken(""), null);
@@ -20,7 +20,7 @@ assert.equal(verifyTotpPendingToken(null), null);
 
 // Tampered signature
 const parts = token.split(".");
-parts[2] = "0".repeat(parts[2]!.length);
+parts[3] = "0".repeat(parts[3]!.length);
 assert.equal(verifyTotpPendingToken(parts.join(".")), null);
 
 assert.equal(TOTP_PENDING_COOKIE, "lexopen_totp_pending");

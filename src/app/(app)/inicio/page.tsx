@@ -1,17 +1,3 @@
-import { Suspense } from "react";
-import { prisma } from "@/lib/db";
-import { requireStaff } from "@/lib/auth/session";
-import { chileGreeting } from "@/lib/assistant/greeting";
-import { buildInicioStatus } from "@/lib/assistant/status";
-import {
-  addCivilDays,
-  civilDayQueryRange,
-  civilSpanQueryRange,
-  santiagoDateKey,
-} from "@/lib/chile-time";
-import { getI18n } from "@/lib/i18n/server";
-import { pageTitleClass } from "@/components/ui";
-import { LoadingState } from "@/components/ui/LoadingState";
 import { InicioWorkbench } from "@/components/inicio/InicioWorkbench";
 import type {
   InicioActivityCard,
@@ -21,6 +7,21 @@ import type {
   InicioPlazoCard,
   InicioSuggestion,
 } from "@/components/inicio/types";
+import { pageTitleClass } from "@/components/ui";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { chileGreeting } from "@/lib/assistant/greeting";
+import { buildInicioStatus } from "@/lib/assistant/status";
+import { causaAccessWhere as scopedcausaAccessWhere, relatedCausaWhere as scopedrelatedCausaWhere, plazoAccessWhere } from "@/lib/auth/causa-access";
+import { requireStaff } from "@/lib/auth/session";
+import {
+  addCivilDays,
+  civilDayQueryRange,
+  civilSpanQueryRange,
+  santiagoDateKey,
+} from "@/lib/chile-time";
+import { prisma } from "@/lib/db";
+import { getI18n } from "@/lib/i18n/server";
+import { Suspense } from "react";
 
 /** Línea de estado server-side (sin LLM): reemplaza `{token}` por conteos. */
 function buildStatusLine(
@@ -82,7 +83,8 @@ async function InicioStream({
 }) {
   const { t } = await getI18n();
   const now = new Date();
-  const status = await buildInicioStatus(userId, now);
+  const user = await requireStaff();
+  const status = await buildInicioStatus(user, now);
 
   const todayYmd = santiagoDateKey(now);
   const in7dYmd = addCivilDays(todayYmd, 7);
@@ -97,35 +99,35 @@ async function InicioStream({
     causasRecientesRaw,
   ] = await Promise.all([
     prisma.evento.findMany({
-      where: {
+      where: { AND: [scopedrelatedCausaWhere(user), {
         estado: { not: "cancelado" },
         inicio: { gte: hoyRange.start, lte: hoyRange.end },
         responsableId: userId,
-      },
+      }] },
       orderBy: { inicio: "asc" },
       take: 5,
     }),
     prisma.plazo.findMany({
-      where: {
+      where: { AND: [plazoAccessWhere(user), {
         estado: "pendiente",
         fechaLimite: { gte: hoyRange.start, lte: hoyRange.end },
         responsableId: userId,
-      },
+      }] },
       include: { causa: { select: { id: true, rit: true, titulo: true } } },
       orderBy: { fechaLimite: "asc" },
       take: 5,
     }),
     prisma.plazo.findMany({
-      where: {
+      where: { AND: [plazoAccessWhere(user), {
         estado: "pendiente",
         fechaLimite: { gte: proxima7dRange.start, lte: proxima7dRange.end },
         responsableId: userId,
-      },
+      }] },
       include: { causa: { select: { id: true, rit: true, titulo: true } } },
       orderBy: { fechaLimite: "asc" },
       take: 5,
     }),
-    prisma.activity.findMany({
+    prisma.activity.findMany({ where: scopedrelatedCausaWhere(user),
       include: {
         user: { select: { name: true } },
         causa: { select: { id: true, rit: true, titulo: true } },
@@ -134,7 +136,7 @@ async function InicioStream({
       take: 5,
     }),
     prisma.causa.findMany({
-      where: role === "admin" ? {} : { abogadoId: userId },
+      where: { AND: [scopedcausaAccessWhere(user), role === "admin" ? {} : { abogadoId: userId }] },
       select: {
         id: true,
         titulo: true,

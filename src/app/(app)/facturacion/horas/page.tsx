@@ -1,5 +1,9 @@
-import { prisma } from "@/lib/db";
+import { TimeEntryActions } from "@/components/billing/TimeEntryActions";
+import { TimeEntryForm } from "@/components/billing/TimeEntryForm";
 import { ModuleHeader } from "@/components/sites/SiteNav";
+import { causaAccessWhere as scopedcausaAccessWhere, relatedCausaWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { requireStaff } from "@/lib/auth/session";
 import {
   TIME_LIST_FILTERS,
   clp,
@@ -11,34 +15,31 @@ import {
   timeListFilter,
 } from "@/lib/billing";
 import { formatCivilDate } from "@/lib/chile-time";
-import { publicUserSelect } from "@/lib/auth/public-user";
-import { TimeEntryForm } from "@/components/billing/TimeEntryForm";
-import { TimeEntryActions } from "@/components/billing/TimeEntryActions";
+import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth/session";
 
 export default async function HorasPage({
   searchParams,
 }: {
   searchParams: Promise<{ estado?: string }>;
 }) {
-  await requireStaff();
+  const user = await requireStaff();
   const sp = await searchParams;
   const estado = timeListFilter(sp.estado);
   const estadoLabel = TIME_LIST_FILTERS.find((item) => item.value === estado)?.label;
 
   const [unbilled, entries, causas, clientes, users] = await Promise.all([
     prisma.timeEntry.aggregate({
-      where: { billable: true, billed: false },
+      where: { AND: [scopedrelatedCausaWhere(user), { billable: true, billed: false }] },
       _sum: { hours: true, amountClp: true },
       _count: true,
     }),
     prisma.timeEntry.findMany({
-      where: timeEntryListWhere(estado),
+      where: { AND: [scopedrelatedCausaWhere(user), timeEntryListWhere(estado)] },
       include: { user: { select: publicUserSelect }, causa: true, cliente: true },
       orderBy: { date: "desc" },
     }),
-    prisma.causa.findMany({ select: { id: true, titulo: true, rit: true, clienteId: true } }),
+    prisma.causa.findMany({ where: scopedcausaAccessWhere(user),  select: { id: true, titulo: true, rit: true, clienteId: true } }),
     prisma.cliente.findMany({ select: { id: true, razonSocial: true } }),
     prisma.user.findMany({
       where: { role: { in: ["admin", "abogado", "asistente"] } },

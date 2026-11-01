@@ -1,34 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
   requireStaff,
 } from "@/lib/api";
-import { tramiteCreateSchema } from "@/lib/schemas";
 import { writeAuditStrict } from "@/lib/audit";
+import { assertCausaAccess, assertCausaCapability as mutateCausa, assertCausaAccess as readCausa, causaAccessWhere as scopedcausaAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { prisma } from "@/lib/db";
+import { emitNotification } from "@/lib/notify/emit";
+import { tramiteCreateSchema } from "@/lib/schemas";
+import { syncTaskFromTramite } from "@/lib/tasks/sync-mirrors";
 import {
   fechaLimiteFromDias,
   findTemplate,
   templatesForMateria,
 } from "@/lib/tramite-templates";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const { id } = await params;
-    const causa = await prisma.causa.findUnique({
-      where: { id },
+    await readCausa(id, user);
+    await assertCausaAccess(id, user);
+    const causa = await prisma.causa.findFirst({
+      where: { AND: [scopedcausaAccessWhere(user), { id }] },
       select: { id: true, materia: true },
     });
     if (!causa) {
       return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
     }
     const tramites = await prisma.tramite.findMany({
-      where: { causaId: id },
+      where: { AND: [scopedrequiredCausaWhere(user), { causaId: id }] },
       include: {
         responsable: { select: { id: true, name: true } },
       },
@@ -48,8 +53,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const causa = await prisma.causa.findUnique({
-      where: { id },
+    await mutateCausa(id, user, "causa.write");
+    await assertCausaAccess(id, user);
+    const causa = await prisma.causa.findFirst({
+      where: { AND: [scopedcausaAccessWhere(user), { id }] },
       select: {
         id: true,
         titulo: true,
@@ -66,6 +73,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       : `/causas/${id}#tramites`;
 
     const raw = await req.json().catch(() => ({}));
+    return await prisma.$transaction(async (tx) => {
     if (raw?.action === "apply-template") {
       const { templateId } = z
         .object({ action: z.literal("apply-template"), templateId: z.string() })
@@ -74,8 +82,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       if (!template) {
         return NextResponse.json({ error: "Plantilla no encontrada" }, { status: 404 });
       }
-      const maxOrden = await prisma.tramite.aggregate({
-        where: { causaId: id },
+      const maxOrden = await tx.tramite.aggregate({
+        where: { AND: [scopedrequiredCausaWhere(user), { causaId: id }] },
         _max: { orden: true },
       });
       let orden = (maxOrden._max.orden ?? 0) + 1;
@@ -96,11 +104,11 @@ export async function POST(req: NextRequest, { params }: Params) {
         };
       });
 
-      const created = await prisma.tramite.createManyAndReturn({
+      const created = await tx.tramite.createManyAndReturn({
         data: tramiteData,
       });
 
-      await prisma.activity.create({
+      await tx.activity.create({
         data: {
           tipo: "tramite",
           mensaje: `Plantilla «${template.label}»: +${created.length} trámites`,
@@ -114,18 +122,21 @@ export async function POST(req: NextRequest, { params }: Params) {
         entityType: "Causa",
         entityId: id,
         after: { templateId, count: created.length },
-      });
+      }, tx);
+      for (const row of created) {
+        await syncTaskFromTramite(row.id, tx);
+      }
       return NextResponse.json({ rows: created.length, tramites: created }, { status: 201 });
     }
 
     const body = tramiteCreateSchema.parse(raw);
-    const maxOrden = await prisma.tramite.aggregate({
-      where: { causaId: id },
+    const maxOrden = await tx.tramite.aggregate({
+      where: { AND: [scopedrequiredCausaWhere(user), { causaId: id }] },
       _max: { orden: true },
     });
     const estado = body.estado || "pendiente";
     const responsableId = body.responsableId || user.id;
-    const tramite = await prisma.tramite.create({
+    const tramite = await tx.tramite.create({
       data: {
         causaId: id,
         titulo: body.titulo.trim(),
@@ -142,17 +153,18 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
 
     if (responsableId && responsableId !== user.id) {
-      await prisma.notification.create({
-        data: {
-          userId: responsableId,
-          title: `Trámite asignado · ${causa.rit || causa.titulo}`,
-          body: tramite.titulo,
-          href: tramiteHref,
-        },
-      });
+      await emitNotification({
+        tipo: "tramite.asignado",
+        userId: responsableId,
+        title: `Trámite asignado · ${causa.rit || causa.titulo}`,
+        body: tramite.titulo,
+        href: tramiteHref,
+        entityType: "tramite",
+        entityId: tramite.id,
+      }, tx);
     }
 
-    await prisma.activity.create({
+    await tx.activity.create({
       data: {
         tipo: "tramite",
         mensaje: `Trámite creado: ${tramite.titulo}`,
@@ -166,9 +178,12 @@ export async function POST(req: NextRequest, { params }: Params) {
       entityType: "Tramite",
       entityId: tramite.id,
       after: tramite,
-    });
+    }, tx);
+
+    await syncTaskFromTramite(tramite.id, tx);
 
     return NextResponse.json(tramite, { status: 201 });
+    });
   } catch (e) {
     return handleRouteError(e);
   }

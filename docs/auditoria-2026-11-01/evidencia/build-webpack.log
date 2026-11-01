@@ -1,0 +1,32 @@
+
+> lexopen@1.0.0 build
+> prisma generate && next build --webpack
+
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 201ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want real-time updates to your database without manual polling? Discover how with Pulse: https://pris.ly/tip-0-pulse
+
+▲ Next.js 16.3.0 (webpack)
+✓ Running next.config.ts took 58ms
+
+  Creating an optimized production build ...
+⚠ Compiled with warnings in 6.7s
+
+./src/lib/pjud/public-scrape.ts
+module.createRequire failed parsing argument.
+
+Import trace for requested module:
+./src/lib/pjud/public-scrape.ts
+./src/lib/config-snapshot.ts
+./src/app/api/admin/config-snapshot/route.ts
+
+✓ Compiled successfully in 8.5s
+  Running TypeScript ...
+.next/types/app/api/auth/totp/route.ts(14,13): error TS2344: Type 'OmitWithTag<typeof import("/private/tmp/lexopen-audit-main-20261101/src/app/api/auth/totp/route"), "POST" | "runtime" | "prefetch" | "GET" | "HEAD" | "OPTIONS" | "PATCH" | "PUT" | "DELETE" | ... 9 more ... | "maxDuration", "">' does not satisfy the constraint '{ [x: string]: never; }'.
+  Property 'mintTotpPendingToken' is incompatible with index signature.
+    Type '(userId: string) => string' is not assignable to type 'never'.
+Failed to type check.

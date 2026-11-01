@@ -6,6 +6,7 @@ const SECTIONS = [
   { id: "llm-settings", label: "IA" },
   { id: "obsidian-settings", label: "Obsidian" },
   { id: "google-settings", label: "Google" },
+  { id: "notify-settings", label: "Notificaciones" },
   { id: "pjud-settings", label: "PJUD" },
   { id: "pjud-log", label: "Log PJUD" },
   { id: "runtime-settings", label: "Entorno" },

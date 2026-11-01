@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, parseBody, requireStaff, requireUser } from "@/lib/api";
-import { clientSiteWhere } from "@/lib/auth/access";
-import { isCliente } from "@/lib/auth/rbac";
+import { clientSiteWhere, clientVisibleFileWhere } from "@/lib/auth/access";
+import { assertCausaCapability, siteAccessWhere as scopedsiteAccessWhere, siteFileReadWhere as scopedsiteFileReadWhere, siteRelatedWhere as scopedsiteRelatedWhere, taskAccessWhere as scopedtaskAccessWhere } from "@/lib/auth/causa-access";
+import { isAdmin, isCliente } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
 import { siteCreateSchema } from "@/lib/schemas";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
     };
     const sites = isCliente(user.role)
       ? await prisma.site.findMany({
-          where,
+          where: { AND: [scopedsiteAccessWhere(user), where] },
           select: {
             id: true,
             name: true,
@@ -39,28 +40,28 @@ export async function GET(req: NextRequest) {
             cliente: { select: { razonSocial: true } },
             _count: {
               select: {
-                files: true,
-                tasks: true,
-                members: true,
-                isheets: true,
-                qaThreads: true,
+                files: { where: clientVisibleFileWhere(user) },
+                tasks: { where: { assigneeId: user.id } },
+                members: { where: { user: { role: "cliente" } } },
+                isheets: { where: { id: "__client_hidden__" } },
+                qaThreads: { where: { status: "open" } },
               },
             },
           },
           orderBy: { updatedAt: "desc" },
         })
       : await prisma.site.findMany({
-          where,
+          where: { AND: [scopedsiteAccessWhere(user), where] },
           include: {
             cliente: true,
             causa: true,
             _count: {
               select: {
-                files: true,
-                tasks: true,
+                files: { where: scopedsiteFileReadWhere(user) },
+                tasks: { where: scopedtaskAccessWhere(user) },
                 members: true,
                 isheets: true,
-                qaThreads: true,
+                qaThreads: { where: scopedsiteRelatedWhere(user) },
               },
             },
           },
@@ -77,9 +78,11 @@ export async function POST(req: NextRequest) {
     assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, siteCreateSchema);
+    if (body.isClientVisible && !isAdmin(user)) return NextResponse.json({ error: "Solo un administrador puede abrir el portal" }, { status: 403 });
+    if (body.causaId) await assertCausaCapability(body.causaId, user, "causa.write");
     if (body.causaId) {
       const existing = await prisma.site.findFirst({
-        where: { causaId: body.causaId },
+        where: { AND: [scopedsiteAccessWhere(user), { causaId: body.causaId }] },
         select: { id: true },
       });
       if (existing) {

@@ -1,9 +1,10 @@
+import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
+import { describeEventConflicts, detectEventConflicts } from "@/lib/assistant/conflicts";
+import { writeAuditStrict } from "@/lib/audit";
+import { assertEventMutation, relatedCausaWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
+import { prisma } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
-import { writeAuditStrict } from "@/lib/audit";
-import { detectEventConflicts, describeEventConflicts } from "@/lib/assistant/conflicts";
 
 const TIPOS = ["audiencia", "reunion", "recordatorio", "vencimiento", "otro"] as const;
 const MODALIDADES = ["presencial", "videollamada", "telefonica", "hibrida", "tribunal"] as const;
@@ -32,11 +33,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const before = await prisma.evento.findUnique({ where: { id } });
+    const before = await prisma.evento.findFirst({ where: { AND: [scopedrelatedCausaWhere(user), { id }] } });
     if (!before) {
       return NextResponse.json({ error: "Evento no encontrado" }, { status: 404 });
     }
     const body = await parseBody(req, eventoUpdateSchema);
+    await assertEventMutation(user, before);
+    await assertEventMutation(user, { responsableId: body.responsableId || before.responsableId, causaId: body.causaId !== undefined ? body.causaId : before.causaId });
 
     const inicio = body.inicio !== undefined ? new Date(body.inicio) : undefined;
     if (inicio && Number.isNaN(inicio.getTime())) {
@@ -54,7 +57,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             inicio || before.inicio,
             fin !== undefined ? fin : before.fin,
             body.responsableId || before.responsableId,
-            id
+            id,
+            user
           )
         : [];
 
@@ -100,10 +104,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const evento = await prisma.evento.findUnique({ where: { id } });
+    const evento = await prisma.evento.findFirst({ where: { AND: [scopedrelatedCausaWhere(user), { id }] } });
     if (!evento) {
       return NextResponse.json({ error: "Evento no encontrado" }, { status: 404 });
     }
+    await assertEventMutation(user, evento);
     await prisma.evento.delete({ where: { id } });
     await writeAuditStrict({
       actorId: user.id,

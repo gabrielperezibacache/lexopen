@@ -1,6 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
@@ -8,17 +5,21 @@ import {
   parseBody,
   requireBillingManager,
 } from "@/lib/api";
+import { billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { prisma } from "@/lib/db";
 import { invoiceUpdateSchema } from "@/lib/schemas";
+import { Prisma } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    await requireBillingManager();
+    const user = await requireBillingManager();
     const { id } = await params;
-    const invoice = await prisma.invoice.findUnique({
-      where: { id },
+    const invoice = await prisma.invoice.findFirst({
+      where: { AND: [scopedrelatedCausaWhere(user), { id }] },
       include: {
         cliente: true,
         causa: true,
@@ -39,11 +40,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     assertCsrf(req);
-    await requireBillingManager();
+    const user = await requireBillingManager();
     const { id } = await params;
     const body = await parseBody(req, invoiceUpdateSchema);
     const invoice = await prisma.$transaction(async (tx) => {
-      const current = await tx.invoice.findUnique({ where: { id } });
+      const current = await tx.invoice.findFirst({ where: { AND: [scopedrelatedCausaWhere(user), { id }] } });
       if (!current) throw httpError("No encontrada", 404);
 
       if (body.status === "emitida" && current.status !== "borrador") {
@@ -71,12 +72,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       // Al emitir por primera vez, asentar en cuenta corriente
       if (current.status === "borrador" && body.status === "emitida") {
         const existingEntry = await tx.ledgerEntry.findFirst({
-          where: { invoiceId: updated.id, tipo: "cargo_honorario" },
+          where: { AND: [scopedrelatedCausaWhere(user), { invoiceId: updated.id, tipo: "cargo_honorario" }] },
           select: { id: true },
         });
         if (!existingEntry) {
           const last = await tx.ledgerEntry.findFirst({
-            where: { clienteId: updated.clienteId },
+            where: { AND: [scopedrelatedCausaWhere(user), { clienteId: updated.clienteId }] },
             orderBy: [{ date: "desc" }, { createdAt: "desc" }],
           });
           const prev = last?.balanceClp ?? 0;

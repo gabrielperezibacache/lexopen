@@ -30,6 +30,7 @@ export function ConflictReviewPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
+  const [restrictedMatch, setRestrictedMatch] = useState(false);
 
   async function recheck() {
     setBusy(true);
@@ -48,12 +49,16 @@ export function ConflictReviewPanel({
     const data = result.data as {
       conflicts?: Hit[];
       conflictStatus?: string;
+      hasRestrictedMatch?: boolean;
+      notice?: string;
+      coverageLimited?: boolean;
     };
     setHits(Array.isArray(data.conflicts) ? data.conflicts : []);
+    setRestrictedMatch(Boolean(data.hasRestrictedMatch));
     setMsg(
-      data.conflictStatus === "clear"
+      data.notice || (data.coverageLimited ? "La revisión alcanzó su límite de cobertura; requiere revisión adicional." : data.conflictStatus === "clear"
         ? "Sin hallazgos en la revisión."
-        : `Revisión: ${data.conflicts?.length || 0} hallazgo(s).`
+        : `Revisión: ${data.conflicts?.length || 0} hallazgo(s) visibles.`)
     );
     router.refresh();
   }
@@ -116,7 +121,7 @@ export function ConflictReviewPanel({
         </ul>
       ) : (
         <p className="mt-4 text-sm text-[var(--ink-soft)]/65">
-          Sin hallazgos listados. Use «Volver a revisar» tras cambiar partes.
+          {restrictedMatch || status === "blocked" ? "Coincidencia reservada: requiere revisión de un socio autorizado" : "No hay detalles consultados. Use «Volver a revisar» tras cambiar partes."}
         </p>
       )}
     </section>

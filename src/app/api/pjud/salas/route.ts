@@ -1,3 +1,5 @@
+import { assertCausaCapability } from "@/lib/auth/causa-access";
+import { can } from "@/lib/auth/permissions";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
@@ -26,7 +28,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
-    await requireStaff();
+    const user = await requireStaff();
     const body = await parseBody(
       req,
       z.object({
@@ -91,6 +93,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (body.causaIds) {
+      if (!body.causaIds.length) return NextResponse.json({ error: "Seleccione al menos una causa" }, { status: 400 });
+      for (const id of body.causaIds) await assertCausaCapability(id, user, "causa.write");
+    } else if (!can(user, "causa.override_walls") || !can(user, "causa.write")) {
+      return NextResponse.json({ error: "Seleccione causas autorizadas para actualizar salas" }, { status: 403 });
+    }
     const result = await applySalaMatchesToCartera(agenda, {
       causaIds: body.causaIds,
     });

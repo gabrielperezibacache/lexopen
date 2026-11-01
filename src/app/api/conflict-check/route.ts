@@ -16,10 +16,10 @@ const schema = z.object({
 export async function POST(req: Request) {
   try {
     assertCsrf(req);
-    await requireStaff();
+    const user = await requireStaff();
     const body = await parseBody(req, schema);
-    const conflicts = await checkConflicts(body);
-    return NextResponse.json({ conflicts });
+    const result = await checkConflicts({ ...body, user });
+    return NextResponse.json(result);
   } catch (e) {
     return handleRouteError(e);
   }

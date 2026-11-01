@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { handleRouteError, requireStaff } from "@/lib/api";
+import { relatedCausaWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
 import { buildIcs } from "@/lib/calendario/ics";
+import { prisma } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
 
 const DEFAULT_WINDOW_DAYS = 180;
 
@@ -12,7 +13,7 @@ const DEFAULT_WINDOW_DAYS = 180;
  */
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const sp = new URL(req.url).searchParams;
     const causaId = sp.get("causaId");
     const now = new Date();
@@ -20,11 +21,11 @@ export async function GET(req: NextRequest) {
     const hasta = sp.get("hasta") ? new Date(sp.get("hasta")!) : new Date(now.getTime() + DEFAULT_WINDOW_DAYS * 86_400_000);
 
     const eventos = await prisma.evento.findMany({
-      where: {
+      where: { AND: [scopedrelatedCausaWhere(user), {
         estado: { not: "cancelado" },
         inicio: { gte: desde, lte: hasta },
         ...(causaId ? { causaId } : {}),
-      },
+      }] },
       orderBy: { inicio: "asc" },
       take: 1000,
     });

@@ -1,17 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
-import { clientVisibleFileWhere } from "@/lib/auth/access";
+import { assertCsrf, canReadFlagged, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { clientVisibleFileWhere, requireSiteMutationAccess } from "@/lib/auth/access";
+import { siteFileReadWhere as scopedsiteFileReadWhere } from "@/lib/auth/causa-access";
 import { isClientSharedTag } from "@/lib/auth/client-tags";
-import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
 import { publicUserSelect } from "@/lib/auth/public-user";
-import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storage";
+import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
 import { sanitizeUploadMimeType } from "@/lib/security/download";
 import {
   fileVersionListSelect,
   siteFileListSelect,
 } from "@/lib/sites/file-select";
 import { triggerSiteWorkflows } from "@/lib/sites/workflow-triggers";
+import { MAX_STORAGE_OBJECT_BYTES, newStorageKey, putObject } from "@/lib/storage";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 const LARGE_CONTENT_BYTES = 64 * 1024;
@@ -67,7 +68,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
-    const fileWhere = clientVisibleFileWhere(user.role);
+    const fileWhere = clientVisibleFileWhere(user);
     const clientView = isCliente(user.role);
     const folders = await prisma.folder.findMany({
       where: { siteId: id },
@@ -82,7 +83,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       orderBy: { name: "asc" },
     });
     const rootFiles = await prisma.siteFile.findMany({
-      where: { siteId: id, folderId: null, ...fileWhere },
+      where: { AND: [scopedsiteFileReadWhere(user), { siteId: id, folderId: null, ...fileWhere }] },
       select: {
         ...siteFileListSelect,
         versions: {
@@ -137,7 +138,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
     const user = await requireUser();
     const { id } = await params;
-    await requireSiteAccess(id, user);
+    await requireSiteMutationAccess(id, user);
     const body = await req.json();
     if (isCliente(user.role)) {
       return NextResponse.json(
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
     if (
-      !canSeeConfidential(user.role) &&
+      !canSeeConfidential(user) &&
       (Boolean(body.confidencial) || Boolean(body.privilegio))
     ) {
       return NextResponse.json(
@@ -227,12 +228,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     if (body.action === "new-version" && body.fileId) {
-      const existing = await prisma.siteFile.findFirst({ where: { id: body.fileId, siteId: id } });
+      const existing = await prisma.siteFile.findFirst({ where: { AND: [scopedsiteFileReadWhere(user), { id: body.fileId, siteId: id }] } });
       if (!existing) return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
-      if (existing.confidencial || existing.privilegio) {
-        if (!canSeeConfidential(user.role)) {
-          return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
-        }
+      if (!canReadFlagged(user, existing)) {
+        return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
       }
       if (body.contenido === undefined && body.contenidoBase64 === undefined) {
         return NextResponse.json(
@@ -278,15 +277,14 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (body.action === "add-comment" && body.fileId) {
       const existing = await prisma.siteFile.findFirst({
-        where: { id: body.fileId, siteId: id },
+        where: { AND: [scopedsiteFileReadWhere(user), { id: body.fileId, siteId: id }] },
         select: { id: true, confidencial: true, privilegio: true },
       });
       if (!existing) {
         return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
       }
       if (
-        (existing.confidencial || existing.privilegio) &&
-        !canSeeConfidential(user.role)
+        !canReadFlagged(user, existing)
       ) {
         return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
       }

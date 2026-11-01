@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
-import { randomBytes } from "crypto";
-import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { isAdmin } from "@/lib/auth/rbac";
+import { assertCsrf, canReadFlagged, handleRouteError, httpError, requireStaff } from "@/lib/api";
+import { assertCausaAccess, assertCausaCapability, documentReadWhere, plazoAccessWhere, requiredCausaWhere } from "@/lib/auth/causa-access";
 import { baseCookieOptions } from "@/lib/auth/cookie-options";
+import { isAdmin } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
+import { sendGmailMessage } from "@/lib/integrations/gmail";
 import {
   GoogleIntegrationError,
   createCausaDriveFolder,
@@ -20,7 +20,8 @@ import {
   unlinkCausaDriveFolder,
   updateGoogleSyncOptions,
 } from "@/lib/integrations/google";
-import { sendGmailMessage } from "@/lib/integrations/gmail";
+import { randomBytes } from "crypto";
+import { NextResponse } from "next/server";
 
 const OAUTH_STATE_COOKIE = "google_oauth_state";
 /** Cookie scoped to callback path so it is not sent on other API calls. */
@@ -90,9 +91,28 @@ export async function POST(req: Request) {
     assertCsrf(req);
     const user = await requireStaff();
     const body = await req.json();
+    if (body.causaId) {
+      if (body.action === "list-causa-folder") await assertCausaAccess(String(body.causaId), user);
+      else await assertCausaCapability(String(body.causaId), user, "causa.write");
+    }
+    if (body.documentoId) {
+      const doc = await prisma.documento.findFirst({ where: { id: String(body.documentoId), ...documentReadWhere(user) } });
+      if (!doc || !canReadFlagged(user, doc)) throw httpError("Documento no encontrado", 404);
+      if (doc.causaId) await assertCausaCapability(doc.causaId, user, "causa.write");
+    }
+    if (body.minutaId) {
+      const doc = await prisma.minuta.findFirst({ where: { id: String(body.minutaId), ...requiredCausaWhere(user) } });
+      if (!doc || !canReadFlagged(user, doc)) throw httpError("Minuta no encontrada", 404);
+      await assertCausaCapability(doc.causaId, user, "causa.write");
+    }
+    if (body.plazoId) {
+      const record = await prisma.plazo.findFirst({ where: { id: String(body.plazoId), ...plazoAccessWhere(user) } });
+      if (!record) throw httpError("Plazo no encontrado", 404);
+      if (record.causaId) await assertCausaCapability(record.causaId, user, "plazo.edit");
+    }
 
     if (body.action === "start-oauth") {
-      if (!isAdmin(user.role)) {
+      if (!isAdmin(user)) {
         return NextResponse.json(
           { error: "Solo admin puede conectar Google Workspace" },
           { status: 403 }
@@ -228,7 +248,7 @@ export async function POST(req: Request) {
       return NextResponse.json(result);
     }
     if (body.action === "disconnect") {
-      if (!isAdmin(user.role)) {
+      if (!isAdmin(user)) {
         return NextResponse.json(
           { error: "Solo admin puede desconectar Google Workspace" },
           { status: 403 }
@@ -256,7 +276,7 @@ export async function POST(req: Request) {
     }
 
     if (body.action === "test-gmail") {
-      if (!isAdmin(user.role)) {
+      if (!isAdmin(user)) {
         return NextResponse.json(
           { error: "Solo admin puede enviar prueba Gmail" },
           { status: 403 }
@@ -289,7 +309,7 @@ export async function POST(req: Request) {
     }
 
     if (body.action === "save-config") {
-      if (!isAdmin(user.role)) {
+      if (!isAdmin(user)) {
         return NextResponse.json(
           { error: "Solo admin puede configurar Google" },
           { status: 403 }

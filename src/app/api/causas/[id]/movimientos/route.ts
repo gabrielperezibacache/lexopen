@@ -1,6 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
@@ -9,18 +6,22 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { writeAuditStrict } from "@/lib/audit";
+import { assertCausaCapability as mutateCausa, assertCausaAccess as readCausa, causaAccessWhere as scopedcausaAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { prisma } from "@/lib/db";
+import { parseLocalDateInput } from "@/lib/minutas";
 import { classifyMovimiento } from "@/lib/pjud/classify";
-import { fingerprint } from "@/lib/pjud/provider";
 import {
+  MAX_CSV_BYTES,
+  MAX_CSV_ROWS,
   MOVIMIENTOS_CSV_HEADER,
   parseMovimientosCsv,
   parseReceptorFlag,
-  MAX_CSV_BYTES,
-  MAX_CSV_ROWS,
   serializeMovimientosCsv,
 } from "@/lib/pjud/import-csv";
-import { parseLocalDateInput } from "@/lib/minutas";
+import { fingerprint } from "@/lib/pjud/provider";
 import { downloadResponseHeaders } from "@/lib/security/download";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 type Params = { params: Promise<{ id: string }> };
 const MAX_PREVIEW_ROWS = 100;
@@ -33,8 +34,9 @@ function parseMovementDate(value?: string) {
 
 export async function GET(req: NextRequest, { params }: Params) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const { id } = await params;
+    await readCausa(id, user);
     if (
       req.nextUrl.searchParams.get("format") === "csv" &&
       req.nextUrl.searchParams.get("template") === "1"
@@ -47,13 +49,13 @@ export async function GET(req: NextRequest, { params }: Params) {
       });
     }
     if (req.nextUrl.searchParams.get("format") === "csv") {
-      const causa = await prisma.causa.findUnique({
-        where: { id },
+      const causa = await prisma.causa.findFirst({
+        where: { AND: [scopedcausaAccessWhere(user), { id }] },
         select: { id: true },
       });
       if (!causa) return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
       const rows = await prisma.causaMovimiento.findMany({
-        where: { causaId: id },
+        where: { AND: [scopedrequiredCausaWhere(user), { causaId: id }] },
         orderBy: { fecha: "desc" },
         take: MAX_CSV_ROWS,
         select: {
@@ -91,7 +93,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       ? Math.max(Math.trunc(rawOffset), 0)
       : 0;
     const rows = await prisma.causaMovimiento.findMany({
-      where: { causaId: id },
+      where: { AND: [scopedrequiredCausaWhere(user), { causaId: id }] },
       orderBy: { fecha: "desc" },
       skip: offset,
       take: limit,
@@ -107,6 +109,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
+    await mutateCausa(id, user, "causa.write");
     if (req.headers.get("content-type")?.includes("multipart/form-data")) {
       const form = await req.formData();
       const file = form.get("file");
@@ -153,8 +156,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         };
       });
       if (req.nextUrl.searchParams.get("preview") === "1") {
-        const causa = await prisma.causa.findUnique({
-          where: { id },
+        const causa = await prisma.causa.findFirst({
+          where: { AND: [scopedcausaAccessWhere(user), { id }] },
           select: { id: true },
         });
         if (!causa) {
@@ -175,8 +178,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         });
       }
       const created = await prisma.$transaction(async (tx) => {
-        const causa = await tx.causa.findUnique({
-          where: { id },
+        const causa = await tx.causa.findFirst({
+          where: { AND: [scopedcausaAccessWhere(user), { id }] },
           select: {
             abogadoId: true,
             abogado: { select: { role: true } },
@@ -254,8 +257,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       })
     );
     const { row, abogadoId } = await prisma.$transaction(async (tx) => {
-      const causa = await tx.causa.findUnique({
-        where: { id },
+      const causa = await tx.causa.findFirst({
+        where: { AND: [scopedcausaAccessWhere(user), { id }] },
         select: {
           abogadoId: true,
           abogado: { select: { role: true } },
