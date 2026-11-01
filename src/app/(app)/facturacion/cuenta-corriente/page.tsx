@@ -22,16 +22,25 @@ export default async function CuentaCorrientePage({
     ? requested
     : clientes[0]?.id;
 
-  const [entries, latestBalances, causas] = await Promise.all([
+  const [entries, latestBalancesRaw, causas] = await Promise.all([
     prisma.ledgerEntry.findMany({
       where: clienteId ? { clienteId } : { clienteId: { in: [] } },
       include: { causa: true, invoice: true },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
-    prisma.ledgerEntry.findMany({
-      distinct: ["clienteId"],
-      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
-      select: { clienteId: true, balanceClp: true },
+    // ⚡ Bolt: Fetch the latest balance per client using a relation query.
+    // This avoids a full table scan and sort on ledgerEntry required by distinct,
+    // leveraging PostgreSQL lateral joins instead.
+    prisma.cliente.findMany({
+      where: { ledgerEntries: { some: {} } },
+      select: {
+        id: true,
+        ledgerEntries: {
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+          take: 1,
+          select: { balanceClp: true },
+        },
+      },
     }),
     prisma.causa.findMany({
       where: clienteId ? { clienteId } : { clienteId: { in: [] } },
@@ -40,7 +49,11 @@ export default async function CuentaCorrientePage({
   ]);
 
   const balances = new Map<string, number>();
-  for (const entry of latestBalances) balances.set(entry.clienteId, entry.balanceClp);
+  for (const entry of latestBalancesRaw) {
+    if (entry.ledgerEntries.length > 0) {
+      balances.set(entry.id, entry.ledgerEntries[0].balanceClp);
+    }
+  }
   const nombre = new Map(clientes.map((cliente) => [cliente.id, cliente.razonSocial]));
   const currentBalance = clienteId ? (balances.get(clienteId) ?? 0) : 0;
   const conSaldo = [...balances.entries()].filter(([, balance]) => balance !== 0);
