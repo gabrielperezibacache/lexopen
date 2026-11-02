@@ -128,6 +128,11 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     const attachingJudgment = page.waitForResponse(response => new URL(response.url()).pathname === `${desk}/sources` && response.request().method() === "POST");
     await workbench.getByRole("button", { name: "Añadir al dossier", exact: true }).click();
     const judgmentSource = await json<AvailableSource>(await attachingJudgment);
+    let pageAttempts = 0;
+    await page.route(url => url.pathname === `${desk}/sources/${judgmentSource.id}/page` && url.searchParams.get("page") === "2", async route => {
+      if (++pageAttempts === 1) await route.fulfill({ status: 429, contentType: "application/json", body: JSON.stringify({ error: "El renderizador PDF está ocupado; vuelva a intentar" }) });
+      else await route.continue();
+    });
     await workbench.getByLabel("Página física del PDF", { exact: true }).selectOption("2");
     await expect(workbench.locator(".hearing-fragment")).toHaveCount(1);
     // OCR is an aid to reading, not a guarantee that an amount was recognized correctly.
@@ -135,6 +140,7 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     await expect(workbench.locator(".hearing-fragment")).toContainText("12 DE MAYO DE 2025");
     const judgmentImage = workbench.getByRole("img", { name: `Página 2 de ${judgmentTitle}`, exact: true });
     await expect(judgmentImage).toBeVisible();
+    expect(pageAttempts).toBeGreaterThanOrEqual(2);
     await expect.poll(() => judgmentImage.evaluate(node => { const image = node as HTMLImageElement; return image.complete && image.naturalWidth > 0; })).toBe(true);
     const judgmentReading = await json<HearingReading>(await page.request.get(`${desk}/sources/${judgmentSource.id}/read?page=2`));
     expect(judgmentReading.page).toBe(2); expect(judgmentReading.fragments).toHaveLength(1);

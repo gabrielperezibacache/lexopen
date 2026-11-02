@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:79870) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/case-preparation.spec.ts:60:5 › preparación integrada: índice, hoja con citas, incertidumbre y permisos al descargar (2.4s)
+
+  1 passed (2.9s)

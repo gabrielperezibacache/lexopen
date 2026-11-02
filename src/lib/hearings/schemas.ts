@@ -12,4 +12,11 @@ export const hearingNoteSchema = z.object({ title: z.string().trim().min(1).max(
 export const hearingNotePatchSchema = hearingNoteSchema.extend({ revision: hearingRevision }).strict();
 export const hearingChatSchema = z.object({ requestId: z.string().min(10).max(120).regex(/^[a-zA-Z0-9-]+$/), question: z.string().trim().min(3).max(4000), mode: z.enum(["extractive", "ai"]), passages: z.array(hearingQuoteSchema).max(8), noteIds: z.array(hearingId).max(8).default([]) }).strict();
 export const hearingVerifySchema = z.union([z.object({ citation: hearingQuoteSchema }).strict(), z.object({ noteId: hearingId }).strict(), z.object({ turnId: hearingId }).strict()]);
+export const hearingBriefSchema = z.object({
+  notes: z.array(z.object({ id: hearingId, revision: hearingRevision }).strict()).min(1).max(20)
+    .refine(notes => new Set(notes.map(note => note.id)).size === notes.length, "Seleccione cada nota una sola vez"),
+  opening: z.string().trim().max(8000).default(""),
+  closing: z.string().trim().max(8000).default(""),
+}).strict();
+export type HearingBriefInput = z.infer<typeof hearingBriefSchema>;
 export const hearingReadQuerySchema = z.object({ versionId: hearingId.optional(), page: z.coerce.number().int().min(1).max(500).optional(), after: z.coerce.number().int().min(0).max(1_000_000).optional() }).strict();

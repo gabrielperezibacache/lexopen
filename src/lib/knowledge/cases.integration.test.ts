@@ -8,6 +8,7 @@ import { PrismaClient } from "@prisma/client";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { captureDocumentEvidence, captureSiteFileEvidence } from "@/lib/evidence/service";
 import { putObject } from "@/lib/storage";
+import { exportCaseKnowledge } from "./export";
 import { analyzeCaseSources, createCaseConflict, createCaseFact, listCaseKnowledgeSources, readCaseConflict, readCaseFact, readCaseKnowledge, updateCaseConflict, updateCaseFact, CASE_ANALYSIS_VERSION } from "./cases";
 
 const code = (expected: number) => (error: unknown) => (error as {status?:number}).status === expected;
@@ -60,6 +61,9 @@ async function main() {
     await updateCaseFact(causa.id,factB.id,owner,{revision:factB.revision,status:"accepted",statement:"El pago del arriendo registrado fue CLP35.000.",comparisonKey:"arriendo-mayo",reason:"Revisión profesional de la fuente B"},db);
     const compared=await analyzeCaseSources(causa.id,owner,{},db);assert.equal(compared.newFacts,0);assert.equal(compared.newConflicts,1);
     const withConflict=await readCaseKnowledge(causa.id,owner,{},db);const conflict=withConflict.conflicts.find(row=>row.kind==="money");assert.ok(conflict);assert.equal(conflict.status,"proposed");
+    const preparation=await exportCaseKnowledge(causa.id,owner,{},"markdown",db);assert.ok(preparation.includes("CLP25.000"));assert.ok(preparation.includes("CLP35.000"));assert.match(preparation,/03\/04\/2025/);assert.match(preparation,/Ambigua/);assert.match(preparation,/Referencias para volver al origen/);
+    const chronologyCsv=await exportCaseKnowledge(causa.id,owner,{status:"accepted"},"csv",db);assert.ok(chronologyCsv.startsWith("\uFEFF"));assert.match(chronologyCsv,/Revisado/);assert.match(chronologyCsv,/SHA-256 cita/);
+    await assert.rejects(exportCaseKnowledge(causa.id,outsider,{},"markdown",db),code(404));
     const duplicate=await createCaseConflict(causa.id,owner,{leftFactId:factB.id,rightFactId:factA.id,kind:"money",reason:"La misma comparación se intentó dos veces."},db);assert.equal(duplicate.reused,true);assert.equal(duplicate.conflict.id,conflict.id);
     const confirmed=await updateCaseConflict(causa.id,conflict.id,owner,{revision:conflict.revision,status:"confirmed",reason:"Se mantienen importes distintos en las dos fuentes del mismo arriendo.",reviewReason:"Cotejados ambos pasajes"},db);assert.equal(confirmed.status,"confirmed");
     await analyzeCaseSources(causa.id,owner,{},db);assert.equal((await readCaseConflict(causa.id,conflict.id,owner,db)).status,"confirmed");
@@ -119,6 +123,7 @@ async function main() {
     // Confidential revocation hides derived text, both sides of a comparison, and its history.
     await db.documento.update({where:{id:a.doc.id},data:{confidencial:true}});await db.user.update({where:{id:owner.id},data:{capabilityRevokes:"doc.confidential.read"}});
     const limited=await readCaseKnowledge(causa.id,owner,{},db);assert.equal(limited.restricted,true);assert.ok(!limited.facts.some(fact=>fact.id===factA.id));assert.ok(!limited.conflicts.some(row=>row.id===conflict.id));assert.ok(!JSON.stringify(limited).includes(reviewedA.statement));
+    for(const format of ["markdown","csv"] as const){const revokedExport=await exportCaseKnowledge(causa.id,owner,{},format,db);assert.ok(!revokedExport.includes("CLP25.000"));assert.ok(!revokedExport.includes("Fuente A ficticia"));assert.match(revokedExport,/Se omitió conocimiento/);}
     const secretSearch=await readCaseKnowledge(causa.id,owner,{q:reviewedA.statement},db);
     const absentSearch=await readCaseKnowledge(causa.id,owner,{q:"UNICORNIOINEXISTENTE"},db);
     assert.deepEqual(secretSearch,absentSearch,"Hidden statements must not influence search flags, cursors, counts, facts or chronology");
@@ -131,6 +136,7 @@ async function main() {
     await db.user.update({where:{id:owner.id},data:{capabilityRevokes:""}});await db.documento.update({where:{id:a.doc.id},data:{confidencial:false}});
     const frozen=await db.documentEvidenceVersion.findUniqueOrThrow({where:{id:a.captured.id}});await putObject({key:frozen.sourceStorageKey!,body:"altered original"});
     const tampered=await readCaseKnowledge(causa.id,owner,{},db);assert.equal(tampered.restricted,true);assert.ok(!tampered.facts.some(fact=>fact.id===factA.id));await assert.rejects(readCaseFact(causa.id,factA.id,owner,db),code(409));
+    assert.ok(!(await exportCaseKnowledge(causa.id,owner,{},"markdown",db)).includes("CLP25.000"));
     await db.causa.update({where:{id:causa.id},data:{abogadoId:outsider.id}});await assert.rejects(readCaseKnowledge(causa.id,owner,{},db),code(404));
     assert.equal(calls,0);
     console.log("Case knowledge PostgreSQL PASS: exact sources and scope, literal/ambiguous dates, local extraction, resumable bounds, dedupe and A-B-A human review preservation, CAS/history, two-source contradictions, current ACL/role/portal, original tamper and audit rollback; network/model calls 0");
