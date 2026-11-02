@@ -20,6 +20,8 @@ La verificación descubrió que publicar una transcripción en el gestor de audi
 
 Ahora una publicación o una grabación incorporada emite un aviso local acotado a la causa. El panel obtiene nuevamente el catálogo desde el servidor con sus permisos actuales y actualiza la carpeta documental. Se conservan mesa, página, pasajes seleccionados y borrador. El aviso sólo contiene el identificador de causa; no incluye texto, audio ni credenciales. Las suscripciones se retiran al desmontar y las solicitudes anteriores se cancelan.
 
+La ejecución de CI sobre `main` integrado terminó aprobada con 38 pruebas directas y un reintento de la conversión de biblioteca. Se identificó una carrera al abrir la importación inmediatamente después de guardar sus preferencias: podía inicializarse con la elección anterior de conservar el original, mientras llegaba la lectura actualizada. Esta entrega aplica la respuesta confirmada del guardado antes de cerrar la personalización y descarta lecturas anteriores a esa confirmación. No reescribe las opciones manuales de una tanda abierta. La regresión mantiene detenida la lectura posterior y exige las opciones nuevas sin recargar ni ampliar tiempos.
+
 ## Recorrido comprobado
 
 1. Un profesional comparte una colección con una sentencia PDF ficticia. Otro accede a su ficha judicial, tribunal/rol y página física 2 con OCR.
@@ -38,6 +40,7 @@ El ensayo de servidor compilado repite la combinación con autenticación y CSRF
 - [Recorrido de navegador](integracion-conjunta-2026-11-01/logs/browser-final.log) y [confirmación final: recorrido completo en 20,9 segundos](integracion-conjunta-2026-11-01/logs/browser-confirmation.log).
 - [Servidor compilado](integracion-conjunta-2026-11-01/logs/production.log), [compilación](integracion-conjunta-2026-11-01/logs/build.log), [tipos](integracion-conjunta-2026-11-01/logs/types-final.log) y [lint](integracion-conjunta-2026-11-01/logs/lint-final.log).
 - Migraciones aplicadas hasta esquema 40 y comprobación sin diferencias. Esta corrección no añade ni modifica migraciones anteriores.
+- [Regresión de preferencias con GET detenido](integracion-conjunta-2026-11-01/logs/preferences-final.log): aprobada en 9,3 segundos, sin reintentos.
 - Prueba unitaria de avisos: aislamiento entre causas, contenido mínimo, eventos inválidos y retirada de suscripciones. Los controles de permisos siguen en servidor.
 - Capturas conjuntas en [escritorio](integracion-conjunta-2026-11-01/capturas/integrated-legal-workspace-desktop.png) y [móvil](integracion-conjunta-2026-11-01/capturas/integrated-legal-workspace-mobile.png).
 - Sin coincidencias de TRIFOLIA en código de producto, dependencias o esquema; el navegador bloquea ese dominio durante el recorrido y registra cero intentos. Los conectores jurídicos propios y los proveedores configurables conservan sus políticas.

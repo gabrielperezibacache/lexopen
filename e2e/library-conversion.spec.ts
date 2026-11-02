@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Route } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
@@ -22,7 +22,12 @@ test.afterAll(async () => {
 test("conversión opcional: aviso de peso, OCR, texto retenido y citas sin afirmar original", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   await loginAs(page, "abogado@estudio.cl"); const owner = await db.user.findUniqueOrThrow({ where: { email: "abogado@estudio.cl" } }); ownerId = owner.id; previous = await db.userBookPreference.findUnique({ where: { userId: owner.id } });
+  // Force the old defaults to differ from the saved choice, independently of earlier tests.
+  const baseline = await page.request.patch("/api/books/preferences", { data: { defaultConvertToText: false, defaultPreserveOriginal: true } });
+  expect(baseline.status(), await baseline.text()).toBe(200);
   await page.goto("/biblioteca"); await page.getByRole("button", { name: "Personalizar biblioteca", exact: true }).click();
+  await expect(page.locator('input[name="defaultConvertToText"]')).not.toBeChecked();
+  await expect(page.locator('input[name="defaultPreserveOriginal"]')).toBeChecked();
   await page.locator('input[name="defaultPreserveOriginal"]').uncheck();
   await expect(page.locator('input[name="defaultConvertToText"]')).toBeChecked();
   await page.locator('input[name="heavyFileThresholdMb"]').fill("1");
@@ -30,10 +35,40 @@ test("conversión opcional: aviso de peso, OCR, texto retenido y citas sin afirm
     await page.setViewportSize(viewport); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`conversion-preferences-${name}.png`), fullPage: true });
   }
-  await page.getByRole("button", { name: "Guardar mi biblioteca", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Tu biblioteca, a tu manera", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Añadir libros", exact: true }).click();
-  await expect(page.getByTestId("import-convert-text")).toBeChecked(); await expect(page.getByTestId("import-preserve-original")).not.toBeChecked();
+  let heldBooksGet = false;
+  let releaseBooksGet!: () => void;
+  let finishHeldBooksGet!: () => void;
+  const booksGetGate = new Promise<void>(resolve => { releaseBooksGet = resolve; });
+  const heldBooksGetFinished = new Promise<void>(resolve => { finishHeldBooksGet = resolve; });
+  const booksUrl = (url: URL) => url.pathname === "/api/books";
+  const holdBooksGet = async (route: Route) => {
+    if (route.request().method() === "GET" && !heldBooksGet) {
+      heldBooksGet = true;
+      try {
+        await booksGetGate;
+        await route.continue();
+      } finally { finishHeldBooksGet(); }
+      return;
+    }
+    await route.continue();
+  };
+  await page.route(booksUrl, holdBooksGet);
+  try {
+    const savingPreferences = page.waitForResponse(response => new URL(response.url()).pathname === "/api/books/preferences" && response.request().method() === "PATCH");
+    await page.getByRole("button", { name: "Guardar mi biblioteca", exact: true }).click();
+    const savedPreferences = await savingPreferences;
+    expect(savedPreferences.status(), await savedPreferences.text()).toBe(200);
+    await expect.poll(() => heldBooksGet).toBe(true);
+    await expect(page.getByRole("heading", { name: "Tu biblioteca, a tu manera", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Añadir libros", exact: true }).click();
+    // The follow-up GET is still held: importing must already use the successful PATCH result.
+    await expect(page.getByTestId("import-convert-text")).toBeChecked();
+    await expect(page.getByTestId("import-preserve-original")).not.toBeChecked();
+  } finally {
+    releaseBooksGet();
+    if (heldBooksGet) await heldBooksGetFinished;
+    await page.unroute(booksUrl, holdBooksGet);
+  }
   await page.locator('input[name="files"]').setInputFiles({ name: "archivo-pesado-ficticio.txt", mimeType: "text/plain", buffer: Buffer.alloc(1_200_000, "a") });
   await expect(page.getByTestId("book-heavy-warning")).toBeVisible();
   for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 360, height: 800 }]] as const) {

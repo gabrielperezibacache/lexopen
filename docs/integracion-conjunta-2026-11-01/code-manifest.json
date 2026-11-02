@@ -7,6 +7,8 @@
     "src/components/audio/CaseAudioManager.tsx": "af13b60f394c793d97bc8eda66ff5d1a183c2a0459feee7c1f5f84f2faf8550f",
     "src/components/hearings/HearingWorkbench.tsx": "618a78c39a0bc308e699559d4fbfecda1ab3d73e3071e30d9920388b6b5e5020",
     "src/lib/causas/document-events.test.ts": "f1d9126c058580c2aeee45be8c06986f7738638d04ba1ed2a5bfbd914d69f0e6",
-    "src/lib/causas/document-events.ts": "102fde6d203d875b55b25073fccc519d4a58c3173d8e6bf3203e65db34678d89"
+    "src/lib/causas/document-events.ts": "102fde6d203d875b55b25073fccc519d4a58c3173d8e6bf3203e65db34678d89",
+    "src/components/books/Bookshelf.tsx": "f1459790292dd800ff25de6a6ccc65074bd769b7d3fd4438ba3c52277fb84c6a",
+    "e2e/library-conversion.spec.ts": "5285ce1aec16360133673b24061235366c2ee016b712573edf76360c4b26bd10"
   }
 }

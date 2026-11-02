@@ -1,0 +1,13 @@
+{
+  "headSha": "f4ca7b602d8514055f67a59dfa07b98a365d2905",
+  "runId": 41371763450,
+  "url": "https://github.com/gabrielperezibacache/lexopen/actions/runs/41371763450",
+  "status": "completed",
+  "conclusion": "success",
+  "browserTests": 39,
+  "passedWithoutRetry": 38,
+  "flaky": 1,
+  "flakyTest": "e2e/library-conversion.spec.ts",
+  "identifiedCause": "Import form could initialize with old preferences before the post-save GET completed",
+  "addressedByCurrentChange": true
+}

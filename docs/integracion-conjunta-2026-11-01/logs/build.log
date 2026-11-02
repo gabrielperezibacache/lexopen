@@ -4,25 +4,25 @@
 
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 396ms
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 365ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
-Tip: Curious about the SQL queries Prisma ORM generates? Optimize helps you enhance your visibility: https://pris.ly/tip-2-optimize
+Tip: Easily identify and fix slow SQL queries in your app. Optimize helps you enhance your visibility: https://pris.ly/--optimize
 
 ▲ Next.js 16.3.0 (Turbopack)
-✓ Running next.config.ts took 12ms
+✓ Running next.config.ts took 11ms
 
   Creating an optimized production build ...
-✓ Compiled successfully in 1666ms
+✓ Compiled successfully in 1719ms
   Running TypeScript ...
-  Finished TypeScript in 1814ms ...
+  Finished TypeScript in 2.1s ...
   Collecting page data using 13 workers ...
   Generating static pages using 13 workers (0/140) ...
   Generating static pages using 13 workers (35/140)
   Generating static pages using 13 workers (70/140)
   Generating static pages using 13 workers (105/140)
-✓ Generating static pages using 13 workers (140/140) in 141ms
+✓ Generating static pages using 13 workers (140/140) in 142ms
 Turbopack build encountered 4 warnings:
 ./src/lib/auth/rate-limit.ts:28:25
 Warning: Dynamic filesystem access causes tracing of the whole project
