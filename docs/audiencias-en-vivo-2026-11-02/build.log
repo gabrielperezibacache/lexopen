@@ -1,4 +1,3 @@
-
 > lexopen@1.0.0 build
 > prisma generate && next build
 
@@ -19,9 +18,9 @@ Tip: Want real-time updates to your database without manual polling? Discover ho
   Finished TypeScript in 11.3s ...
   Collecting page data using 13 workers ...
   Generating static pages using 13 workers (0/141) ...
-  Generating static pages using 13 workers (35/141) 
-  Generating static pages using 13 workers (70/141) 
-  Generating static pages using 13 workers (105/141) 
+  Generating static pages using 13 workers (35/141)
+  Generating static pages using 13 workers (70/141)
+  Generating static pages using 13 workers (105/141)
 ✓ Generating static pages using 13 workers (141/141) in 160ms
 Turbopack build encountered 4 warnings:
 ./src/lib/auth/rate-limit.ts:28:25
@@ -404,4 +403,3 @@ Route (app)
 
 ○  (Static)   prerendered as static content
 ƒ  (Dynamic)  server-rendered on demand
-

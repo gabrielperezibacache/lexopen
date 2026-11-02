@@ -1,8 +1,7 @@
-
 > lexopen@1.0.0 test:integration
 > node --import tsx src/lib/plazo-alerts.integration.test.ts && npm run test:auth:integration && npm run test:assistant:integration && npm run test:notify:integration && npm run test:documents:integration && npm run test:migrations:integration && npm run test:research:integration && npm run test:knowledge:integration && npm run test:books:integration && npm run test:courtroom:integration && npm run test:writings:integration
 
-audit write failed PrismaClientKnownRequestError: 
+audit write failed PrismaClientKnownRequestError:
 Invalid `client.auditEvent.create()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/audit.ts:37:29
 
@@ -33,7 +32,7 @@ plazo-alerts.integration.test.ts OK (rollback, concurrent delivery, audit atomic
 > lexopen@1.0.0 test:auth:integration
 > node --import tsx src/lib/auth/boundaries.integration.test.ts
 
-prisma:error 
+prisma:error
 Invalid `tx.task.update()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/tasks/service.ts:107:34
 
@@ -69,7 +68,7 @@ audit write failed Error: synthetic audit failure
     at Object.runInChildSpan (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:121:1509)
     at Proxy._request (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:130:9836)
     at s (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:31:5636)
-prisma:error 
+prisma:error
 Invalid `tx.commandExecution.create()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/command-execution.ts:66:49
 
@@ -78,7 +77,7 @@ Invalid `tx.commandExecution.create()` invocation in
   65 await opts.authorize?.(tx);
 → 66 const receipt = await tx.commandExecution.create(
 Transaction failed due to a write conflict or a deadlock. Please retry your transaction
-prisma:error 
+prisma:error
 Invalid `tx.assistantUndo.updateMany()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/assistant/plan-store.ts:93:42
 
@@ -98,7 +97,7 @@ audit write failed Error: synthetic audit failure
     at Object.runInChildSpan (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:121:1509)
     at Proxy._request (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:130:9836)
     at s (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:31:5636)
-prisma:error 
+prisma:error
 Invalid `tx.commandExecution.create()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/command-execution.ts:66:49
 
@@ -118,7 +117,7 @@ audit write failed Error: synthetic audit failure
     at Object.runInChildSpan (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:121:1509)
     at Proxy._request (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:130:9836)
     at s (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:31:5636)
-prisma:error 
+prisma:error
 Invalid `tx.commandExecution.create()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/command-execution.ts:66:49
 
@@ -149,13 +148,13 @@ audit write failed Error: synthetic audit failure
     at Object.runInChildSpan (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:121:1509)
     at Proxy._request (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:130:9836)
     at s (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:31:5636)
-prisma:error 
+prisma:error
 Invalid `tx.invoice.create()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/billing-invoices.ts:156:44
 
   153   if (exists) throw httpError("Ya existe una factura con ese número", 409);
   154 }
-  155 
+  155
 → 156 const created = await tx.invoice.create(
 Transaction failed due to a write conflict or a deadlock. Please retry your transaction
 assistant commands integration: rollback/nestedTX/concurrency/idempotency/owner/currentACL/staleUndo/delete replay+partial recovery/11 writes/retrieval/private KPIs/payment+deadline+invoice atomicity/global numbering passed
@@ -169,7 +168,7 @@ notify PostgreSQL integration OK: atomic rollback, concurrent dedupe, recipient/
 > node --import tsx src/lib/document-processing-queue.integration.test.ts && node --import tsx src/lib/evidence/evidence.integration.test.ts && node --import tsx src/lib/evidence/pdf-evidence.integration.test.ts && node --import tsx src/lib/evidence/site-file-evidence.integration.test.ts && node --import tsx src/lib/integrations/drive-import.integration.test.ts
 
 document-processing-queue.integration OK: 201, concurrent claim, stale lease, retry, CAS, recover after failure
-prisma:error 
+prisma:error
 Invalid `client.documentResource.upsert()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/evidence/service.ts:110:37
 
@@ -179,7 +178,7 @@ Invalid `client.documentResource.upsert()` invocation in
 → 110   ? await client.documentResource.upsert(
 Transaction failed due to a write conflict or a deadlock. Please retry your transaction
 evidence integration OK: concurrent idempotency, pagination, exact quotes, current ACL, original hash, old citation beyond 100 versions
-prisma:error 
+prisma:error
 Invalid `client.documentEvidenceVersion.upsert()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/evidence/service.ts:116:56
 
@@ -189,7 +188,7 @@ Invalid `client.documentEvidenceVersion.upsert()` invocation in
 → 116 const version = await client.documentEvidenceVersion.upsert(
 Transaction failed due to a write conflict or a deadlock. Please retry your transaction
 PDF evidence PostgreSQL OK: physical page/fragment binding, OCR+blank page, literal offsets/hashes, concurrent idempotency, legacy versions, frozen original, revocation and tamper rejection
-prisma:error 
+prisma:error
 Invalid `client.documentResource.upsert()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/evidence/service.ts:111:37
 
@@ -210,7 +209,7 @@ audit write failed Error: Site evidence synthetic audit failure
     at Proxy._request (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:130:9836)
     at s (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:31:5636)
 SiteFile evidence PostgreSQL OK: original-byte extraction, concurrent idempotency, source version, stable originals/all formats, PDF/OCR/blank, literal page citations, current ACL/revocation/portal, tamper, atomic audit rollback, concurrent source change, A→B→A current revision/research and deletion
-prisma:error 
+prisma:error
 Invalid `tx.documento.create()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/integrations/drive-import.ts:167:42
 
@@ -219,7 +218,7 @@ Invalid `tx.documento.create()` invocation in
   166 }
 → 167 const doc = await tx.documento.create(
 Transaction failed due to a write conflict or a deadlock. Please retry your transaction
-prisma:error 
+prisma:error
 Invalid `client.auditEvent.create()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/audit.ts:37:29
 
@@ -229,7 +228,7 @@ Invalid `client.auditEvent.create()` invocation in
 → 37     await client.auditEvent.create(
 Error occurred during query execution:
 ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "P0001", message: "Drive fixture audit failure", severity: "ERROR", detail: None, column: None, hint: None }), transient: false })
-audit write failed PrismaClientUnknownRequestError: 
+audit write failed PrismaClientUnknownRequestError:
 Invalid `client.auditEvent.create()` invocation in
 /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/audit.ts:37:29
 

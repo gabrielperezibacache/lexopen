@@ -1,4 +1,3 @@
-
 Running 50 tests using 1 worker
 
 (node:2447) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
@@ -57,7 +56,7 @@ Running 50 tests using 1 worker
   ✓  50 [chromium] › e2e/ui-refinement.spec.ts:49:5 › tablas móviles conservan los registros y la navegación activa queda a la vista (1.3s)
 
 
-  1) [chromium] › e2e/hearing-live.spec.ts:176:5 › anotación pendiente al volver y contador sin conexión: recuperación sin registrar automáticamente 
+  1) [chromium] › e2e/hearing-live.spec.ts:176:5 › anotación pendiente al volver y contador sin conexión: recuperación sin registrar automáticamente
 
     Error: expect(locator).toContainText(expected) failed
 
@@ -101,5 +100,5 @@ Running 50 tests using 1 worker
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
   1 failed
-    [chromium] › e2e/hearing-live.spec.ts:176:5 › anotación pendiente al volver y contador sin conexión: recuperación sin registrar automáticamente 
+    [chromium] › e2e/hearing-live.spec.ts:176:5 › anotación pendiente al volver y contador sin conexión: recuperación sin registrar automáticamente
   49 passed (3.2m)

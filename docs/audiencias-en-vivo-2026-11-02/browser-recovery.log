@@ -1,4 +1,3 @@
-
 Running 1 test using 1 worker
 
 (node:5536) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
