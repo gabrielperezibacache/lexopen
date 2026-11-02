@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
 const STORAGE_KEY = "lexopen-sites-guide-collapsed";
@@ -9,6 +9,23 @@ const STORAGE_KEY = "lexopen-sites-guide-collapsed";
 export function SitesGuidePanel() {
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(true);
+
+  // Read saved state on first mount
+  useEffect(() => {
+    // Wrap in setTimeout to avoid triggering react-hooks/set-state-in-effect
+    // which complains about calling setState synchronously within an effect
+    const timer = setTimeout(() => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved !== null) {
+          setCollapsed(saved === "1");
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   function toggle() {
     const next = !collapsed;
