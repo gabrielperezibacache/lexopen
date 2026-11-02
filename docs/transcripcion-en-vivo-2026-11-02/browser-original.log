@@ -1,0 +1,99 @@
+Running 53 tests using 1 worker
+
+(node:15647) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/agente-document-scope.spec.ts:4:5 › copiloto muestra alcance documental y restaura chat con fuentes (994ms)
+  ✓   2 [chromium] › e2e/app-quality.spec.ts:18:5 › los apartados principales cargan sin errores de servidor (7.2s)
+  ✓   3 [chromium] › e2e/app-quality.spec.ts:37:5 › menú móvil accesible, foco restaurado y preferencia de movimiento (876ms)
+  ✓   4 [chromium] › e2e/app-quality.spec.ts:68:5 › búsqueda rechaza consultas excesivas y mantiene sincronizado el campo (604ms)
+  ✓   5 [chromium] › e2e/app-quality.spec.ts:78:5 › una cookie con solo el ID del usuario no autentica (481ms)
+  ✓   6 [chromium] › e2e/app-quality.spec.ts:88:5 › el cambio de contraseña limita intentos por usuario (1.0s)
+  ✓   7 [chromium] › e2e/auth-and-access.spec.ts:4:5 › un usuario del estudio puede iniciar sesión y abrir causas (1.9s)
+  ✓   8 [chromium] › e2e/auth-and-access.spec.ts:96:5 › un cliente queda limitado al portal y a sus espacios (2.9s)
+  ✓   9 [chromium] › e2e/auth-and-access.spec.ts:230:5 › una ruta protegida redirige al login sin sesión (297ms)
+  ✓  10 [chromium] › e2e/case-audio.spec.ts:17:5 › audios de causa: original reproducible, TXT manual, revisión, copias independientes e historial (5.6s)
+  ✓  11 [chromium] › e2e/case-knowledge.spec.ts:44:5 › hechos y cronología: revisión humana, dos citas, ambigüedad y revocación (11.5s)
+  ✓  12 [chromium] › e2e/case-preparation.spec.ts:60:5 › preparación integrada: índice, hoja con citas, incertidumbre y permisos al descargar (2.6s)
+  ✓  13 [chromium] › e2e/case-writing.spec.ts:71:5 › escrito por causa: guardado, tres orígenes, historial y salida con respaldos (10.1s)
+  ✓  14 [chromium] › e2e/case-writing.spec.ts:149:5 › guardado perdido y edición durante la solicitud: conserva texto y evita duplicados (2.3s)
+  ✓  15 [chromium] › e2e/case-writing.spec.ts:178:5 › volver en el navegador antes de la pausa de guardado conserva la última edición (2.0s)
+  ✓  16 [chromium] › e2e/case-writing.spec.ts:193:5 › conflicto de pestañas y revocación: no sobrescribe ni exporta derivados sin acceso (2.8s)
+  ✓  17 [chromium] › e2e/causas-section.spec.ts:4:5 › un abogado ve un menú Causas con tres pestañas y sin ítems duplicados (1.3s)
+  ✓  18 [chromium] › e2e/causas-section.spec.ts:40:5 › un asistente no opera ClaveÚnica (820ms)
+  ✓  19 [chromium] › e2e/causas-section.spec.ts:60:5 › avisos del canal PJUD van al log de Configuración, no a Cartera (1.2s)
+  ✓  20 [chromium] › e2e/causas-section.spec.ts:80:5 › un cliente sigue sin Causas (716ms)
+  ✓  21 [chromium] › e2e/conflict-and-messages.spec.ts:4:5 › staff puede re-ejecutar el chequeo de conflictos de una causa (974ms)
+  ✓  22 [chromium] › e2e/conflict-and-messages.spec.ts:26:5 › el staff puede enviar un mensaje interno (567ms)
+  ✓  23 [chromium] › e2e/conflict-and-messages.spec.ts:44:5 › el portal cliente no puede mensajear fuera de ACL (511ms)
+  ✓  24 [chromium] › e2e/correo.spec.ts:4:5 › correo PJUD muestra conector y no inventa mensajes demo (973ms)
+  ✓  25 [chromium] › e2e/document-evidence.spec.ts:20:5 › fuentes propias: preparar, citar, paginar y conservar versión; portal sin acceso (3.1s)
+  ✓  26 [chromium] › e2e/drive-import.spec.ts:17:5 › Drive elegido: lista paginada, revisión, exportación, conflicto y recuperación (API fixture) (2.6s)
+  ✓  27 [chromium] › e2e/hearing-live-transcription.spec.ts:107:5 › captura nativa por tramos: transcripción, pasaje, hecho propuesto, nota y escrito con citas (19.8s)
+  ✘  28 [chromium] › e2e/hearing-live-transcription.spec.ts:196:5 › salir por navegación detiene la captura y recupera el tramo pendiente sin enviarlo (7.7s)
+(node:16662) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  29 [chromium] › e2e/hearing-live-transcription.spec.ts:225:5 › fallo del transcriptor: conserva audio, detiene el micrófono y permite reintentar (17.3s)
+  ✓  30 [chromium] › e2e/hearing-live.spec.ts:70:5 › audiencia en vivo: guion guardado, tiempo con pausas, puntos tratados y registros con fuentes (10.9s)
+  ✓  31 [chromium] › e2e/hearing-live.spec.ts:131:5 › registro perdido, escrito de causa y fuente retirada: conserva privacidad y evita duplicados (2.2s)
+  ✓  32 [chromium] › e2e/hearing-live.spec.ts:176:5 › anotación pendiente al volver y contador sin conexión: recuperación sin registrar automáticamente (9.5s)
+  ✓  33 [chromium] › e2e/hearing-workspace.spec.ts:28:5 › mesa de audiencia: lectura, marcadores, notas, conversación con fuentes y privacidad (13.6s)
+  ✓  34 [chromium] › e2e/inicio-assistant.spec.ts:5:5 › un abogado agenda una audiencia desde Inicio y aparece en el calendario (993ms)
+  ✓  35 [chromium] › e2e/inicio-assistant.spec.ts:36:5 › un cliente no puede acceder a Inicio ni al asistente (758ms)
+  ✓  36 [chromium] › e2e/integrated-legal-workspace.spec.ts:70:5 › flujo conjunto: sentencia compartida, audio y transcripción citada en la misma audiencia, con revocación (11.3s)
+  ✓  37 [chromium] › e2e/judicial-library.spec.ts:45:5 › sentencias: ficha manual, TXT privado, cita corroborada y reclasificación sin consultar el enlace declarado (7.7s)
+  ✓  38 [chromium] › e2e/knowledge-library.spec.ts:31:5 › biblioteca: guardar cita, fijar versión, consultar y restaurar alcance, retirar y revocar historial (10.4s)
+  ✓  39 [chromium] › e2e/legal-research.spec.ts:55:5 › investigación propia: aporte manual, expediente PDF, citas, historial y abstención (10.3s)
+  ✓  40 [chromium] › e2e/library-conversion.spec.ts:22:5 › conversión opcional: aviso de peso, OCR, texto retenido y citas sin afirmar original (3.1s)
+  ✓  41 [chromium] › e2e/login-readiness.spec.ts:3:5 › login espera su comportamiento antes de aceptar credenciales (135ms)
+  ✓  42 [chromium] › e2e/notify-reconciliation.spec.ts:7:7 › reconcile uncertain deliveries at 1366px (4.1s)
+  ✓  43 [chromium] › e2e/notify-reconciliation.spec.ts:7:7 › reconcile uncertain deliveries at 360px (4.6s)
+  ✓  44 [chromium] › e2e/pdf-pages.spec.ts:35:5 › PDF físico: página, OCR, original y cita conservan su versión y permisos (6.1s)
+  ✓  45 [chromium] › e2e/personal-library.spec.ts:28:5 › biblioteca personal: libros propios, seis distribuciones, pasajes, escrito y revocación compartida (8.7s)
+  ✓  46 [chromium] › e2e/roles-ethical-wall.spec.ts:8:5 › personas expone roles de estudio y pendientes unificados (1.0s)
+  ✓  47 [chromium] › e2e/site-file-evidence.spec.ts:45:5 › archivos de espacios: páginas, versiones, investigación y permiso actual (6.4s)
+  ✓  48 [chromium] › e2e/sites-workflow.spec.ts:4:5 › espacios: hub, creación vinculada y enlace desde causa (2.1s)
+  ✓  49 [chromium] › e2e/sites-workflow.spec.ts:57:5 › espacios: filtros del hub respetan tipo (748ms)
+  ✓  50 [chromium] › e2e/totp-and-wiki.spec.ts:5:5 › TOTP enroll, challenge on login, then disable (2.9s)
+  ✓  51 [chromium] › e2e/totp-and-wiki.spec.ts:44:5 › staff puede crear página wiki y ver historial (1.7s)
+  ✓  52 [chromium] › e2e/ui-refinement.spec.ts:22:5 › diálogos de trabajo: foco, Escape, móvil y movimiento reducido (1.9s)
+  ✓  53 [chromium] › e2e/ui-refinement.spec.ts:49:5 › tablas móviles conservan los registros y la navegación activa queda a la vista (1.3s)
+
+
+  1) [chromium] › e2e/hearing-live-transcription.spec.ts:196:5 › salir por navegación detiene la captura y recupera el tramo pendiente sin enviarlo
+
+    Error: expect(page).toHaveURL(expected) failed
+
+    Expected pattern: /\/causas$/
+    Received string:  "http://127.0.0.1:3223/causas/cmvzugq3z00136znt23vax3uf/audiencias"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toHaveURL" with timeout 5000ms
+        14 × locator resolved to <html lang="es" data-scroll-behavior="smooth">…</html>
+           - unexpected value "http://127.0.0.1:3223/causas/cmvzugq3z00136znt23vax3uf/audiencias"
+
+
+      208 |     const calls = providerCalls;
+      209 |     await page.getByRole("complementary").getByRole("link", { name: "Causas", exact: true }).click();
+    > 210 |     await expect(page).toHaveURL(/\/causas$/);
+          |                        ^
+      211 |     await microphoneEnded(page);
+      212 |     await page.goBack();
+      213 |     await expect(page).toHaveURL(new RegExp(`/causas/${causaId}/audiencias`));
+        at /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/e2e/hearing-live-transcription.spec.ts:210:24
+
+    Error Context: ../../../../../private/tmp/lexopen-live-transcription-browser-release/hearing-live-transcription-6f489-ramo-pendiente-sin-enviarlo-chromium/error-context.md
+
+    Error Context: ../../../../../private/tmp/lexopen-live-transcription-browser-release/hearing-live-transcription-6f489-ramo-pendiente-sin-enviarlo-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../private/tmp/lexopen-live-transcription-browser-release/hearing-live-transcription-6f489-ramo-pendiente-sin-enviarlo-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../../private/tmp/lexopen-live-transcription-browser-release/hearing-live-transcription-6f489-ramo-pendiente-sin-enviarlo-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › e2e/hearing-live-transcription.spec.ts:196:5 › salir por navegación detiene la captura y recupera el tramo pendiente sin enviarlo
+  52 passed (3.9m)

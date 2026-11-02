@@ -19,7 +19,8 @@ export async function workspaceFor(causaId: string, workspaceId: string, user: C
   if (!row) throw unavailable();
   return { ...access, row };
 }
-export async function hearingTransaction<T>(client: PrismaClient, action: (tx: Prisma.TransactionClient) => Promise<T>) {
+export async function hearingTransaction<T>(client: HearingClient, action: (tx: Prisma.TransactionClient) => Promise<T>) {
+  if (!("$transaction" in client)) return action(client);
   for (let attempt = 0; ; attempt++) {
     try { return await client.$transaction(action, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 }); }
     catch (error) { if (attempt < 3 && error instanceof Prisma.PrismaClientKnownRequestError && ["P2034", "P2002"].includes(error.code)) continue; throw error; }

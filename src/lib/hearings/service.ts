@@ -56,8 +56,8 @@ export async function attachHearingSource(causaId: string, workspaceId: string, 
     const { actor } = await workspaceFor(causaId, workspaceId, user, tx, true), option = await sourceOption(causaId, input.kind, input.refId, actor, tx);
     const prior = await tx.hearingSource.findUnique({ where: { workspaceId_kind_refId: { workspaceId, ...input } } });
     if (prior && !prior.deletedAt) return sourceView(prior, option);
-    if (await tx.hearingSource.count({ where: { workspaceId, deletedAt: null } }) >= HEARING_LIMITS.sources) throw httpError("La mesa admite hasta 200 fuentes", 413);
-    const row = prior ? await tx.hearingSource.update({ where: { id: prior.id }, data: { deletedAt: null, state: "pending", locationJson: "{}", position: await tx.hearingSource.count({ where: { workspaceId, deletedAt: null } }), revision: { increment: 1 } } }) : await tx.hearingSource.create({ data: { workspaceId, ...input, position: await tx.hearingSource.count({ where: { workspaceId, deletedAt: null } }) } });
+    if (await tx.hearingSource.count({ where: { workspaceId, deletedAt: null, liveAudioClipId: null } }) >= HEARING_LIMITS.sources) throw httpError("La mesa admite hasta 200 fuentes", 413);
+    const row = prior ? await tx.hearingSource.update({ where: { id: prior.id }, data: { deletedAt: null, state: "pending", locationJson: "{}", position: await tx.hearingSource.count({ where: { workspaceId, deletedAt: null, liveAudioClipId: null } }), revision: { increment: 1 } } }) : await tx.hearingSource.create({ data: { workspaceId, ...input, position: await tx.hearingSource.count({ where: { workspaceId, deletedAt: null, liveAudioClipId: null } }) } });
     await writeAuditStrict({ actorId: actor.id, action: "hearing.source.attach", entityType: "HearingSource", entityId: row.id, after: { workspaceId, kind: row.kind, refId: row.refId, revision: row.revision } }, tx);
     return sourceView(row, option);
   });
@@ -70,7 +70,7 @@ export async function updateHearingSource(causaId: string, workspaceId: string, 
     const { actor } = await workspaceFor(causaId, workspaceId, user, tx, true), { row, option } = await sourceFor(causaId, workspaceId, sourceId, actor, tx);
     if (row.revision !== input.revision) throw changed();
     if (input.position !== row.position) {
-      const peers = await tx.hearingSource.findMany({ where: { workspaceId, deletedAt: null, position: input.position, NOT: { id: row.id } }, select: { id: true, revision: true } });
+      const peers = await tx.hearingSource.findMany({ where: { workspaceId, deletedAt: null, liveAudioClipId: null, position: input.position, NOT: { id: row.id } }, select: { id: true, revision: true } });
       for (const peer of peers) {
         await tx.hearingSource.update({ where: { id: peer.id }, data: { position: row.position, revision: { increment: 1 } } });
         await writeAuditStrict({ actorId: actor.id, action: "hearing.source.reorder", entityType: "HearingSource", entityId: peer.id, before: { revision: peer.revision, position: input.position }, after: { revision: peer.revision + 1, position: row.position } }, tx);
@@ -107,7 +107,7 @@ async function noteData(causaId: string, workspaceId: string, input: { title: st
   const citation = input.citation ? await resolveHearingCitation(causaId, workspaceId, input.citation, actor, client) : null;
   return { title: input.title, body: input.body, sourceId: citation?.sourceId || null, citationJson: citation ? JSON.stringify(storedHearingCitation(citation)) : "" };
 }
-export async function createHearingNote(causaId: string, workspaceId: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+export async function createHearingNote(causaId: string, workspaceId: string, raw: unknown, user: CausaAccessUser, client: HearingClient = prisma) {
   const input = hearingNoteSchema.parse(raw);
   return hearingTransaction(client, async tx => {
     const { actor } = await workspaceFor(causaId, workspaceId, user, tx, true);
@@ -140,7 +140,7 @@ export async function deleteHearingNote(causaId: string, workspaceId: string, no
 export async function readHearing(causaId: string, workspaceId: string, user: CausaAccessUser, client: PrismaClient = prisma): Promise<HearingWorkspaceView> {
   return hearingTransaction(client, async tx => {
     const { actor, row, canWrite } = await workspaceFor(causaId, workspaceId, user, tx), sources = [], notes: HearingNoteView[] = [], cache = new Map<string, unknown>();
-    const sourceRows = await tx.hearingSource.findMany({ where: { workspaceId, deletedAt: null }, orderBy: [{ position: "asc" }, { id: "asc" }], take: HEARING_LIMITS.sources });
+    const sourceRows = await tx.hearingSource.findMany({ where: { workspaceId, deletedAt: null, liveAudioClipId: null }, orderBy: [{ position: "asc" }, { id: "asc" }], take: HEARING_LIMITS.sources });
     for (const source of sourceRows) { try { const option = await sourceOption(causaId, source.kind as "document" | "site_file" | "book" | "legal", source.refId, actor, tx); sources.push(sourceView(source, option)); } catch (error) { if (!isUnavailable(error)) throw error; sources.push({ id: source.id, available: false as const }); } }
     const noteRows = await tx.hearingNote.findMany({ where: { workspaceId }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: HEARING_LIMITS.notes, select: { id: true } });
     for (const note of noteRows) { try { notes.push((await checkedNote(causaId, workspaceId, note.id, actor, tx, cache)).view); } catch (error) { if (!isUnavailable(error)) throw error; notes.push({ id: note.id, available: false }); } }

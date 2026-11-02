@@ -250,6 +250,8 @@ Prioridades por apartado: **P0** habilita el recorrido prioritario o evita pérd
 
 **Ruta:** `/causas/[id]/audiencias`. **Base:** mesas con agenda, dossier de documentos/libros/archivos, lector, notas citadas, conversación con IA o extractiva, cotejo y exportación en `src/lib/hearings/*`. El panel **En vivo** añade control de sesión persistente, guion guardado, puntos tratados ligados a la revisión de la nota y registros rápidos reutilizables en escritos. Su entrega y límites están en [Audiencias en vivo](ENTREGA-AUDIENCIAS-EN-VIVO-2026-11-02.md). La integración anterior ensayó una resolución y una transcripción en la misma mesa con revocación posterior.
 
+La [transcripción en vivo y conversión a la causa](ENTREGA-TRANSCRIPCION-EN-VIVO-2026-11-02.md) añade captura explícita por tramos, originales privados, publicaciones TXT citables y conversión revisable del registro a hechos propuestos, notas y borradores con referencias. Conserva recuperación temporal sin envío automático y distingue cotejo de texto de fidelidad al audio.
+
 **P0 · pasos:**
 
 1. Hacer evidente qué se está preparando, qué se puede leer y qué falta cotejar antes de entrar a la audiencia.

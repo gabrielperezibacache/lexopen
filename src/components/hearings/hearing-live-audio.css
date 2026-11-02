@@ -1,0 +1,28 @@
+.hearing-live-audio { margin-block: 1.75rem; padding-block: 1.5rem; border-block: 1px solid var(--line-strong); scroll-margin-top: 7rem; min-width: 0; }
+.hearing-workbench :is(.hearing-live-audio, .hearing-live-promotion) :where(p, label, label > span, button, a, select, input, textarea) { font-size: 1rem; }
+.hearing-live-audio > header, .hearing-live-audio-transcript > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 1rem; }
+.hearing-live-audio-recording { display: inline-flex; align-items: center; gap: .5rem; color: var(--danger); font-size: 1rem; }
+.hearing-live-audio-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
+.hearing-live-audio-capture { display: grid; gap: 1rem; margin-block: 1.25rem; }
+.hearing-live-audio-capture > label { margin-block: 0; }
+.hearing-live-audio label { display: grid; gap: .5rem; margin-block: .75rem; }
+.hearing-live-audio .hearing-live-check { display: flex; }
+.hearing-live-audio-transcript { margin-top: 1.5rem; }
+.hearing-live-audio-transcript :where(ol, ul), .hearing-live-audio-pending ol { list-style: none; margin: 0; padding: 0; }
+.hearing-live-audio-transcript li { padding-block: 1.25rem; border-top: 1px solid var(--line); }
+.hearing-live-audio-transcript li > header { display: grid; gap: .5rem; margin-bottom: 1rem; }
+.hearing-live-audio-transcript li > header span, .hearing-live-audio-transcript > header span { color: var(--muted); line-height: 1.7; }
+.hearing-live-audio-transcript audio { display: block; width: 100%; max-width: 100%; margin-block: .75rem 1rem; }
+.hearing-live-audio-passage { padding-bottom: 1rem; }
+.hearing-live-audio-pending { margin-block: 1rem; padding-block: 1rem; border-block: 1px solid var(--line-strong); }
+.hearing-live-audio-pending li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; padding-block: .75rem; }
+.hearing-live-promotion { margin-block: 1.5rem; padding-block: 1.5rem; border-block: 1px solid var(--line-strong); scroll-margin-top: 7rem; }
+.hearing-live-promotion form { display: grid; gap: .75rem; }
+.hearing-live-promotion form > p { margin: 0; }
+.hearing-live-promotion form > label { display: grid; gap: .5rem; }
+.hearing-live-promotion textarea { min-height: 7.5rem; }
+.hearing-live-promotion .hearing-live-check { display: flex; }
+.hearing-live-scope { margin-block: 1rem; border-block: 1px solid var(--line); }
+.hearing-live-scope > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--sea); font-weight: 600; }
+.hearing-live-promotion-result { color: var(--sea); padding-block: 1rem; line-height: 1.75; }
+@media (max-width: 760px) { .hearing-live-audio, .hearing-live-promotion { scroll-margin-top: 11rem; } }

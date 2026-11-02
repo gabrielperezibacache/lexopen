@@ -14,6 +14,7 @@ import { analyzeCaseSourcesSchema, createCaseConflictSchema, createCaseFactSchem
 export const CASE_KNOWLEDGE_LIMITS = { facts: 200, verificationFacts: 400, verificationReferences: 2000, sources: 200, versionsPerAnalysis: 20, fragmentsPerAnalysis: 200, proposalsPerAnalysis: 200, conflicts: 100 } as const;
 export const CASE_ANALYSIS_VERSION = "lexopen-case-extractive-1";
 type Client = Prisma.TransactionClient;
+type CaseClient = PrismaClient | Client;
 type FactRow = Prisma.CaseFactGetPayload<{ include: { _count: { select: { reviews: true; citations: true } } } }>;
 type FactMeta = { amounts?: ReturnType<typeof extractFactAmounts>; warnings?: string[]; inferenceReason?: string | null };
 export type CaseFactView = {
@@ -27,7 +28,8 @@ const factInclude = { _count: { select: { reviews: true, citations: true } } } a
 function jsonObject<T>(text: string): T { try { const parsed = JSON.parse(text); if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(); return parsed as T; } catch { throw httpError("El registro de conocimiento no pudo verificarse", 409); } }
 const day = (value: Date | null) => value?.toISOString().slice(0, 10) || null;
 const normalize = (text: string) => text.normalize("NFC").replace(/\s+/gu, " ").trim();
-async function transaction<T>(client: PrismaClient, operation: (tx: Client) => Promise<T>): Promise<T> {
+async function transaction<T>(client: CaseClient, operation: (tx: Client) => Promise<T>): Promise<T> {
+  if (!("$transaction" in client)) return operation(client);
   for (let attempt = 0; ; attempt++) {
     try { return await client.$transaction(operation, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 }); }
     catch (error) { if (attempt >= 3 || !(error instanceof Prisma.PrismaClientKnownRequestError) || !["P2034", "P2002"].includes(error.code)) throw error; }
@@ -117,7 +119,7 @@ export async function readCaseKnowledge(causaId: string, user: CausaAccessUser, 
     return { caseIdentity, facts, chronology: { dated, undated }, conflicts: conflicts.slice(0, CASE_KNOWLEDGE_LIMITS.conflicts).flatMap(row => { const view = conflictView(row, factsById); return view ? [view] : []; }), canWrite, restricted, coverage: { factsLimited: limited, conflictsLimited: conflicts.length > CASE_KNOWLEDGE_LIMITS.conflicts, factsShown: facts.length, factsLimit: CASE_KNOWLEDGE_LIMITS.facts, nextAfter: limited ? facts.at(-1)!.id : null, verificationLimited, verificationFactsLimit: CASE_KNOWLEDGE_LIMITS.verificationFacts, verificationReferencesLimit: CASE_KNOWLEDGE_LIMITS.verificationReferences, chronologyScope: "Hechos autorizados de esta página dentro de una ventana acotada de verificación; fecha del acontecimiento, nunca fecha de carga", networkRequests: 0, modelUsed: false } };
   });
 }
-export async function readCaseFact(causaId: string, factId: string, user: CausaAccessUser, client: PrismaClient = prisma) {
+export async function readCaseFact(causaId: string, factId: string, user: CausaAccessUser, client: CaseClient = prisma) {
   return transaction(client, async tx => {
     const { actor } = await access(causaId, user, tx);
     const row = await tx.caseFact.findFirst({ where: { id: factId, causaId }, include: factInclude });
@@ -168,7 +170,7 @@ async function attachCitation(tx: Client, factId: string, citation: ResolvedCita
   return true;
 }
 function factFingerprint(citation: ResolvedCitation, quote: string) { return sha256(`${citation.resourceId || `${citation.kind}:${citation.versionId}`}\n${normalize(quote)}`); }
-export async function createCaseFact(causaId: string, user: CausaAccessUser, raw: CreateCaseFactInput, client: PrismaClient = prisma) {
+export async function createCaseFact(causaId: string, user: CausaAccessUser, raw: CreateCaseFactInput, client: CaseClient = prisma) {
   const input = createCaseFactSchema.parse(raw);
   return transaction(client, async tx => {
     const { actor } = await access(causaId, user, tx, true);

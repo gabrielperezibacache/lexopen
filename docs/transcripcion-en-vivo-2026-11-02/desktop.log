@@ -1,0 +1,4 @@
+desktop/media-permissions.test.cjs OK: exact secure app origin/window/main frame, audio only, existing non-media behavior and Mac usage/entitlements; no actual OS capture or installer test
+desktop/renderer.test.cjs OK
+desktop/media-permissions.test.cjs OK: exact secure app origin/window/main frame, audio only, existing non-media behavior and Mac usage/entitlements; no actual OS capture or installer test
+desktop/build/entitlements.mac.plist: OK

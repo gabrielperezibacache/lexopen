@@ -13,6 +13,7 @@ import { AUDIO_MAX_BYTES, audioEditSchema, audioRevisionSchema, identifyAudio, v
 import { discardAudioAttempt } from "./storage";
 import { transcribeAudioBytes } from "./provider";
 import type { AudioSegment, CaseAudioDetail, CaseAudioView } from "./types";
+import { workspaceFor } from "@/lib/hearings/access";
 
 type AudioClient = PrismaClient | Prisma.TransactionClient;
 export const AUDIO_LEASE_MS = 120_000;
@@ -32,6 +33,11 @@ async function audioFor(causaId: string, id: string, user: CausaAccessUser, clie
   const actor = await audioActorFor(user, client);
   const access = write ? await assertCausaCapability(causaId, actor, "causa.write", client) : await assertCausaAccess(causaId, actor, { auditOverride: false }, client);
   const audio = await client.caseAudio.findFirst({ where: { id, causaId, deletedAt: null } }); if (!audio) throw missing();
+  if (audio.liveSessionId) {
+    const session = await client.hearingLiveAudioSession.findUnique({ where: { id: audio.liveSessionId }, select: { workspaceId: true } });
+    if (!session) throw missing();
+    await workspaceFor(causaId, session.workspaceId, actor, client, write);
+  }
   const source = await client.documento.findFirst({ where: { AND: [{ id: audio.sourceDocumentId, causaId, storageKey: audio.storageKey }, documentReadWhere(actor)] } });
   if (!source) throw missing();
   return { actor, audio, source, canWrite: can(actor, "causa.write", { causaRol: access.causaRol }) };
@@ -60,7 +66,7 @@ async function recordRevision(audio: CaseAudio, actorId: string, tx: Prisma.Tran
 
 export async function listCaseAudio(causaId: string, user: CausaAccessUser, client: PrismaClient = prisma) {
   const actor = await audioActorFor(user, client), access = await assertCausaAccess(causaId, actor, { auditOverride: false }, client);
-  const rows = await client.caseAudio.findMany({ where: { causaId, deletedAt: null, sourceDocument: { AND: [{ causaId }, documentReadWhere(actor)] } }, include: { sourceDocument: { select: { storageKey: true } } }, orderBy: [{ createdAt: "desc" }, { id: "asc" }], take: 201 });
+  const rows = await client.caseAudio.findMany({ where: { causaId, deletedAt: null, liveSessionId: null, sourceDocument: { AND: [{ causaId }, documentReadWhere(actor)] } }, include: { sourceDocument: { select: { storageKey: true } } }, orderBy: [{ createdAt: "desc" }, { id: "asc" }], take: 201 });
   return { audios: rows.slice(0, 200).filter(row => row.sourceDocument.storageKey === row.storageKey).map(row => view(row)), limited: rows.length > 200, canWrite: can(actor, "causa.write", { causaRol: access.causaRol }), canConfigure: can(actor, "host.admin"), maxBytes: AUDIO_MAX_BYTES };
 }
 export async function readCaseAudio(causaId: string, id: string, user: CausaAccessUser, client: PrismaClient = prisma): Promise<CaseAudioDetail> {
@@ -75,13 +81,23 @@ async function discardAttempt(key: string, failure?: unknown) {
   try { await discardAudioAttempt(key); }
   catch (error) { console.error("audio.upload.cleanup_failed", { key }); throw Object.assign(new AggregateError(failure === undefined ? [error] : [failure, error], "No se pudo retirar un archivo temporal; consulte al administrador del almacenamiento"), { status: 503 }); }
 }
-export async function uploadCaseAudio(causaId: string, input: AudioUpload, user: CausaAccessUser, client: PrismaClient = prisma) {
+type LiveUploadScope = { workspaceId: string; sessionId: string; clipId: string };
+async function liveUploadGuard(causaId: string, scope: LiveUploadScope, input: AudioUpload, actor: CausaAccessUser, client: AudioClient) {
+  await workspaceFor(causaId, scope.workspaceId, actor, client, true);
+  const clip = await client.hearingLiveAudioClip.findFirst({ where: { id: scope.clipId, sessionId: scope.sessionId, session: { workspaceId: scope.workspaceId }, sourceSha256: sha256(input.bytes), sizeBytes: input.bytes.length } });
+  if (!clip) throw missing();
+}
+export async function uploadCaseAudio(causaId: string, input: AudioUpload, user: CausaAccessUser, client: PrismaClient = prisma) { return uploadAudio(causaId, input, user, client); }
+/** Internal entry point. The public multipart import has no way to select a live scope or bypass its 200-file limit. */
+export async function uploadHearingLiveAudio(causaId: string, scope: LiveUploadScope, input: AudioUpload, user: CausaAccessUser, client: PrismaClient = prisma) { return uploadAudio(causaId, input, user, client, scope); }
+async function uploadAudio(causaId: string, input: AudioUpload, user: CausaAccessUser, client: PrismaClient, live?: LiveUploadScope) {
   const actor = await audioActorFor(user, client); await assertCausaCapability(causaId, actor, "causa.write", client);
+  if (live) await liveUploadGuard(causaId, live, input, actor, client);
   const requestId = z.string().trim().min(8).max(100).parse(input.requestId), title = z.string().trim().min(1).max(240).parse(input.title), sourceName = z.string().trim().min(1).max(240).parse(input.name).replace(/[\r\n\0]/g, "_");
   const format = identifyAudio(sourceName, input.bytes), sourceSha256 = sha256(input.bytes);
   const where = { causaId_uploadedById_requestId: { causaId, uploadedById: actor.id, requestId } };
   const prior = await client.caseAudio.findUnique({ where });
-  const same = (row: CaseAudio) => { if (row.deletedAt || row.sourceSha256 !== sourceSha256 || row.title !== title || row.sourceName !== sourceName) throw httpError("Esta importación ya se utilizó para otra grabación; inicie una nueva", 409); };
+  const same = (row: CaseAudio) => { if (row.deletedAt || row.liveSessionId !== (live?.sessionId || null) || row.sourceSha256 !== sourceSha256 || row.title !== title || row.sourceName !== sourceName) throw httpError("Esta importación ya se utilizó para otra grabación; inicie una nueva", 409); };
   if (prior) { same(prior); return { audio: (await readCaseAudio(causaId, prior.id, actor, client)).audio, reused: true }; }
   const id = `audio_${sha256(`${causaId}:${actor.id}:${requestId}`).slice(0, 40)}`, storageKey = `case-audio/${id}/attempts/${randomUUID()}/original/${sourceSha256}`;
   let result: { audio: CaseAudioView; reused: boolean };
@@ -89,11 +105,12 @@ export async function uploadCaseAudio(causaId: string, input: AudioUpload, user:
     await putObject({ key: storageKey, body: input.bytes, contentType: format.mimeType });
     result = await transaction(client, async tx => {
       const current = await audioActorFor(user, tx); await assertCausaCapability(causaId, current, "causa.write", tx);
+      if (live) await liveUploadGuard(causaId, live, input, current, tx);
       const existing = await tx.caseAudio.findUnique({ where });
       if (existing) { same(existing); const checked = await audioFor(causaId, existing.id, current, tx); await originalBytes(checked.audio); return { audio: view(checked.audio), reused: true }; }
-      if (await tx.caseAudio.count({ where: { causaId, deletedAt: null } }) >= 200) throw httpError("El expediente admite hasta 200 grabaciones", 413);
-      const source = await tx.documento.create({ data: { nombre: sourceName, tipo: "audio", mimeType: format.mimeType, storageKey, ruta: "Audiencias/Grabaciones", causaId, autorId: current.id, extractionStatus: "unsupported", extractionJson: JSON.stringify({ method: "audio-original", sourceSha256, textAvailable: false }) } });
-      const audio = await tx.caseAudio.create({ data: { id, causaId, uploadedById: current.id, requestId, sourceDocumentId: source.id, storageKey, title, sourceName, sourceSha256, mimeType: format.mimeType, sizeBytes: input.bytes.length, durationMs: format.durationMs } });
+      if (!live && await tx.caseAudio.count({ where: { causaId, deletedAt: null, liveSessionId: null } }) >= 200) throw httpError("El expediente admite hasta 200 grabaciones importadas; los tramos en vivo se organizan por sesión", 413);
+      const source = await tx.documento.create({ data: { nombre: sourceName, tipo: "audio", mimeType: format.mimeType, storageKey, confidencial: Boolean(live), ruta: live ? `Audiencias/En vivo/${live.sessionId}/Grabaciones` : "Audiencias/Grabaciones", causaId, autorId: current.id, extractionStatus: "unsupported", extractionJson: JSON.stringify({ method: "audio-original", sourceSha256, textAvailable: false }) } });
+      const audio = await tx.caseAudio.create({ data: { id, causaId, uploadedById: current.id, requestId, liveSessionId: live?.sessionId, sourceDocumentId: source.id, storageKey, title, sourceName, sourceSha256, mimeType: format.mimeType, sizeBytes: input.bytes.length, durationMs: format.durationMs } });
       await audit(audio, current.id, "audio.upload", tx); return { audio: view(audio), reused: false };
     });
   } catch (error) { await discardAttempt(storageKey, error); throw error; }
@@ -118,9 +135,10 @@ export async function editCaseAudio(causaId: string, id: string, raw: unknown, u
     return { audio: view(saved, true) };
   });
 }
-export async function transcribeCaseAudio(causaId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+export async function transcribeCaseAudio(causaId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma, guard?: (client: AudioClient) => Promise<void>) {
   const { revision } = audioRevisionSchema.parse(raw), token = randomUUID();
   const claimed = await transaction(client, async tx => {
+    if (guard) await guard(tx);
     const { audio, actor } = await audioFor(causaId, id, user, tx, true); await originalBytes(audio); assertRevision(audio, revision); assertIdle(audio);
     const result = await tx.caseAudio.updateMany({ where: { id, revision, operationToken: audio.operationToken }, data: { status: "transcribing", operationToken: token, operationLockedAt: new Date(), lastError: null } });
     if (!result.count) throw httpError("Otra transcripción ya está en curso", 409);
@@ -128,8 +146,9 @@ export async function transcribeCaseAudio(causaId: string, id: string, raw: unkn
   });
   try {
     const bytes = await originalBytes(claimed);
-    const result = await transcribeAudioBytes({ bytes, name: claimed.sourceName, mimeType: claimed.mimeType, durationMs: claimed.durationMs, beforeEgress: async () => { const { audio } = await audioFor(causaId, id, user, client, true); if (audio.operationToken !== token || audio.revision !== revision) throw httpError("La operación fue reemplazada", 409); await originalBytes(audio); } }, client);
+    const result = await transcribeAudioBytes({ bytes, name: claimed.sourceName, mimeType: claimed.mimeType, durationMs: claimed.durationMs, beforeEgress: async () => { if (guard) await guard(client); const { audio } = await audioFor(causaId, id, user, client, true); if (audio.operationToken !== token || audio.revision !== revision) throw httpError("La operación fue reemplazada", 409); await originalBytes(audio); } }, client);
     return await transaction(client, async tx => {
+      if (guard) await guard(tx);
       const { audio, actor } = await audioFor(causaId, id, user, tx, true); await originalBytes(audio);
       if (audio.operationToken !== token || audio.revision !== revision || !audio.operationLockedAt || Date.now() - audio.operationLockedAt.getTime() >= AUDIO_LEASE_MS) throw httpError("La transcripción caducó o fue reemplazada; vuelva a solicitarla", 409);
       const changed = await tx.caseAudio.updateMany({ where: { id, revision, operationToken: token }, data: { transcriptText: result.text, transcriptSha256: sha256(result.text), segmentsJson: JSON.stringify(result.segments), durationMs: result.durationMs, status: "ready", reviewStatus: "unreviewed", reviewedById: null, provider: result.provider, model: result.model, operationToken: null, operationLockedAt: null, lastError: null, revision: { increment: 1 } } });
