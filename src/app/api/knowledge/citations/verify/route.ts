@@ -11,6 +11,6 @@ export async function POST(req: Request) {
     assertCsrf(req); const user = await requireStaff();
     const input = await parseKnowledgeBody(req, schema, 40_000);
     const citation = "sourceKey" in input.citation ? await verifyStoredCitation(input.citation, user, { causaId: input.causaId }) : await resolveCitation(input.citation, user, { causaId: input.causaId });
-    return NextResponse.json({ verified: true, href: citation.href, pageNumber: citation.pageNumber, causaId: citation.causaId, siteId: citation.siteId }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ verified: true, href: citation.href, pageNumber: citation.pageNumber, causaId: citation.causaId, siteId: citation.siteId, warnings: citation.warnings, ...(citation.audioTranscript ? { audioTranscript: citation.audioTranscript } : {}) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return handleRouteError(error); }
 }

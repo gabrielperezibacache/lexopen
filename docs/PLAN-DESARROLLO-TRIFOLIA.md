@@ -290,3 +290,9 @@ Una historia termina con migración/reversibilidad evaluada, permisos negativos,
 - [Arquitectura actual](auditoria-2026-11-01/ARQUITECTURA.md) y [evidencia de privacidad/integridad](auditoria-2026-11-01/PRUEBAS-PRIVACIDAD.md).
 
 La documentación pública usada para descomponer funciones está identificada en la matriz. Las propuestas de entidades, etapas, métricas y pruebas son diseño de LexOpen, no afirmaciones sobre la implementación interna de TRIFOLIA.
+
+## 10 Continuación: biblioteca, audiencia y transcripciones
+
+La biblioteca personal del PR #211 se amplía con sentencias y resoluciones, ficha judicial y citas con tribunal, rol y fecha. Se incorpora una mesa privada de audiencia dentro de cada causa, con dossier, lector PDF, marcadores, notas, agenda y conversación respaldada por pasajes. Las grabaciones y sus transcripciones se gestionan en las carpetas de la causa, con revisión humana, historial y copias independientes. Son implementaciones propias de LexOpen, con proveedores de IA/transcripción configurables y sin cuenta ni dependencia de TRIFOLIA.
+
+La entrega y sus pruebas se describen en [Sentencias, mesa de audiencia y audios](AUDIENCIAS-BIBLIOTECA-AUDIOS-2026-11-01.md). Continúa las épicas E2/E3/E5; no acredita por sí sola el resto de capacidades ni los objetivos propuestos de calidad jurídica. Quedan por evaluar reconocimiento con audio real autorizado, precisión jurídica con corpus revisado, rendimiento en el Host objetivo e integración operativa de la cadena de PR antes del despliegue.

@@ -418,3 +418,7 @@
   .law-book-volume { transition: none; }
   .book-open-link:hover .law-book-volume, .book-open-link:focus-visible .law-book-volume { transform: rotateY(-18deg) rotateX(3deg); }
 }
+.book-judicial-fields { border: 1px solid var(--line); padding: 1.25rem; border-radius: 1rem; min-width: 0; }
+.book-judicial-fields legend { padding-inline: .4rem; font-weight: 600; color: var(--ink); }
+.book-judicial-notice { border-left: 2px solid var(--copper); padding-left: 1rem; font-size: .8rem; line-height: 1.65; max-width: 60ch; margin-block: 1rem; }
+.book-judicial-notice a { color: var(--sea); text-decoration: underline; text-underline-offset: 3px; }

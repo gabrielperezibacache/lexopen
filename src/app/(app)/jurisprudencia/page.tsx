@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { formatDate } from "@/components/ui";
 import { labelMateria, MATERIAS } from "@/lib/chile";
@@ -71,6 +72,7 @@ export default async function JurisprudenciaPage({
     <div className="space-y-6">
       <PageHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
 
+      <Link href="/biblioteca?fuentes=judicial" className="btn btn-secondary">Mis sentencias y resoluciones · archivo, lectura y citas</Link>
       <LegalResearchWorkbench initialCases={cases} initialRunId={sp.investigacion} />
       <LibraryPanel initialCases={cases} />
 

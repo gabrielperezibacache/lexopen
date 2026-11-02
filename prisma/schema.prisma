@@ -124,6 +124,10 @@ model User {
   bookShelfMemberships BookShelfMember[]
   bookPreference UserBookPreference?
   libraryWritingDrafts LibraryWritingDraft[]
+  hearingWorkspaces HearingWorkspace[] @relation("HearingWorkspaceOwner")
+  uploadedCaseAudios CaseAudio[] @relation("CaseAudioUploader")
+  reviewedCaseAudios CaseAudio[] @relation("CaseAudioReviewer")
+  caseAudioTranscriptRevisions CaseAudioTranscriptRevision[] @relation("CaseAudioRevisionActor")
 
 }
 
@@ -362,6 +366,8 @@ model Causa {
   caseConflicts CaseConflict[]
   caseAnalysisSources CaseAnalysisSource[]
   knowledgeCollections KnowledgeCollection[]
+  hearingWorkspaces HearingWorkspace[]
+  audioRecordings CaseAudio[]
 
 }
 
@@ -627,6 +633,9 @@ model Documento {
   minutas Minuta[]
   evidenceResource DocumentResource?
   driveImport DriveDocumentImport?
+  caseAudioSource CaseAudio? @relation("CaseAudioSourceDocument")
+  caseAudioPublications CaseAudio[] @relation("CaseAudioTranscriptDocument")
+  audioPublication CaseAudioPublication?
 
   @@index([causaId])
   @@index([clienteId])
@@ -1794,6 +1803,8 @@ model LibraryBook {
   edition String @default("")
   publisher String @default("")
   identifier String @default("")
+  sourceType String @default("book")
+  judicialJson String @default("{}") @db.Text
   coverColor String @default("oxblood")
   coverStyle String @default("leather")
   spineLabel String @default("")
@@ -1823,6 +1834,7 @@ model LibraryBook {
   collectionItems BookShelfItem[]
   @@unique([ownerId, requestId])
   @@index([ownerId, deletedAt, createdAt])
+  @@index([ownerId, sourceType, deletedAt])
 }
 model LibraryBookFragment {
   id String @id @default(cuid())
@@ -1909,4 +1921,136 @@ model LibraryWritingDraft {
   updatedAt DateTime @updatedAt
   @@unique([ownerId, requestId])
   @@index([ownerId, updatedAt])
+}
+
+// A professional's private preparation desk within an authorized case.
+model HearingWorkspace {
+  id String @id @default(cuid())
+  causaId String
+  ownerId String
+  title String
+  scheduledFor DateTime?
+  status String @default("preparation")
+  agendaText String @default("") @db.Text
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  causa Causa @relation(fields:[causaId],references:[id],onDelete:Restrict)
+  owner User @relation("HearingWorkspaceOwner",fields:[ownerId],references:[id],onDelete:Restrict)
+  sources HearingSource[]
+  notes HearingNote[]
+  chatTurns HearingChatTurn[]
+  @@index([ownerId,causaId,updatedAt])
+}
+model HearingSource {
+  id String @id @default(cuid())
+  workspaceId String
+  kind String
+  refId String
+  locationJson String @default("{}") @db.Text
+  state String @default("pending")
+  position Int @default(0)
+  revision Int @default(1)
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace HearingWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  notes HearingNote[]
+  @@unique([workspaceId,kind,refId])
+  @@index([workspaceId,position])
+}
+model HearingNote {
+  id String @id @default(cuid())
+  workspaceId String
+  sourceId String?
+  title String
+  body String @db.Text
+  citationJson String @default("") @db.Text
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace HearingWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  source HearingSource? @relation(fields:[sourceId],references:[id],onDelete:Restrict)
+  @@index([workspaceId,updatedAt])
+}
+model HearingChatTurn {
+  id String @id @default(cuid())
+  workspaceId String
+  requestId String
+  question String @db.Text
+  responseText String @db.Text
+  citationsJson String @default("[]") @db.Text
+  scopeJson String @default("{}") @db.Text
+  mode String
+  modelUsed Boolean @default(false)
+  provider String?
+  model String?
+  createdAt DateTime @default(now())
+  workspace HearingWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  @@unique([workspaceId,requestId])
+  @@index([workspaceId,createdAt])
+}
+model CaseAudio {
+  id String @id @default(cuid())
+  causaId String
+  uploadedById String
+  sourceDocumentId String @unique
+  transcriptDocumentId String?
+  requestId String
+  title String
+  sourceName String
+  mimeType String
+  sizeBytes Int
+  sourceSha256 String
+  storageKey String
+  durationMs Int?
+  status String @default("uploaded")
+  transcriptText String @default("") @db.Text
+  segmentsJson String @default("[]") @db.Text
+  transcriptSha256 String?
+  reviewStatus String @default("unreviewed")
+  reviewedById String?
+  revision Int @default(1)
+  provider String?
+  model String?
+  operationToken String?
+  operationLockedAt DateTime?
+  lastError String? @db.Text
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  causa Causa @relation(fields:[causaId],references:[id],onDelete:Restrict)
+  uploadedBy User @relation("CaseAudioUploader",fields:[uploadedById],references:[id],onDelete:Restrict)
+  sourceDocument Documento @relation("CaseAudioSourceDocument",fields:[sourceDocumentId],references:[id],onDelete:Restrict)
+  transcriptDocument Documento? @relation("CaseAudioTranscriptDocument",fields:[transcriptDocumentId],references:[id],onDelete:SetNull)
+  reviewedBy User? @relation("CaseAudioReviewer",fields:[reviewedById],references:[id],onDelete:SetNull)
+  revisions CaseAudioTranscriptRevision[]
+  publications CaseAudioPublication[]
+  @@unique([causaId,uploadedById,requestId])
+  @@index([causaId,status,createdAt])
+}
+model CaseAudioTranscriptRevision {
+  id String @id @default(cuid())
+  audioId String
+  actorId String
+  revision Int
+  text String @db.Text
+  segmentsJson String @default("[]") @db.Text
+  textSha256 String
+  reviewStatus String
+  provider String?
+  model String?
+  createdAt DateTime @default(now())
+  audio CaseAudio @relation(fields:[audioId],references:[id],onDelete:Cascade)
+  actor User @relation("CaseAudioRevisionActor",fields:[actorId],references:[id],onDelete:Restrict)
+  @@unique([audioId,revision])
+}
+model CaseAudioPublication {
+  id String @id @default(cuid())
+  audioId String
+  documentId String @unique
+  createdAt DateTime @default(now())
+  audio CaseAudio @relation(fields:[audioId],references:[id],onDelete:Cascade)
+  document Documento @relation(fields:[documentId],references:[id],onDelete:Cascade)
+  @@index([audioId,createdAt])
 }

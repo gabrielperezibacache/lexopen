@@ -1,4 +1,5 @@
 import { apiMutation } from "@/lib/api-mutation";
+import { formatBookReference } from "@/lib/books/references";
 import type { BookCitation, BookCitationInput, BookCollectionView, BookFragmentView, BookPreferences, BookSummary } from "@/lib/books/types";
 
 export type BooksData = {
@@ -19,7 +20,7 @@ export async function booksJson<T>(url: string, signal?: AbortSignal): Promise<T
 }
 
 export function citationText(citation: BookCitation) {
-  const edition = [citation.author, citation.title, citation.edition, citation.publisher, citation.year].filter(Boolean).join(". ");
+  const edition = formatBookReference(citation);
   const textOnly = citation.verificationBasis === "retained_text";
   const basis = textOnly ? "Cotejada con texto conservado; original no conservado." : "Cotejada con el original conservado.";
   const hash = textOnly ? citation.retainedSha256 : citation.sourceSha256;

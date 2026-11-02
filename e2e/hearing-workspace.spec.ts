@@ -1,0 +1,72 @@
+import { test, expect, type Page } from "@playwright/test";
+import { PrismaClient } from "@prisma/client";
+import { randomUUID } from "node:crypto";
+import { readFile, rm } from "node:fs/promises";
+import path from "node:path";
+import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
+import { loginAs } from "./helpers";
+const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
+const tag = randomUUID(), bookIds: string[] = [], collectionIds: string[] = [], keys: string[] = [], workspaceIds: string[] = [];
+let causaId = "";
+async function settleCapture(page: Page) {
+ await page.evaluate(async () => {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  window.scrollTo({top:0,left:0,behavior:"instant"});
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+ });
+}
+test.afterAll(async () => {
+ try {
+  const derived = await Promise.all([db.hearingSource.findMany({where:{workspaceId:{in:workspaceIds}},select:{id:true}}), db.hearingNote.findMany({where:{workspaceId:{in:workspaceIds}},select:{id:true}}), db.hearingChatTurn.findMany({where:{workspaceId:{in:workspaceIds}},select:{id:true}})]);
+  const entityIds = [...bookIds,...collectionIds,...workspaceIds,...derived.flat().map(row=>row.id)];
+  await db.hearingNote.deleteMany({ where: { workspaceId: { in: workspaceIds } } }); await db.hearingChatTurn.deleteMany({ where: { workspaceId: { in: workspaceIds } } }); await db.hearingSource.deleteMany({ where: { workspaceId: { in: workspaceIds } } }); await db.hearingWorkspace.deleteMany({ where: { id: { in: workspaceIds } } });
+  await db.bookShelfCollection.deleteMany({ where: { id: { in: collectionIds } } }); await db.libraryBook.deleteMany({ where: { id: { in: bookIds } } }); if (causaId) await db.causa.deleteMany({ where: { id: causaId } });
+  await db.auditEvent.deleteMany({ where: { OR: [{ entityId: { in: entityIds } }, { action: { startsWith: "hearing." }, afterJson: { contains: tag } }] } });
+  await Promise.all(keys.map(key => rm(path.join(process.env.STORAGE_PATH || "storage", key), { force:true })));
+ } finally { await db.$disconnect(); }
+});
+test("mesa de audiencia: lectura, marcadores, notas, conversación con fuentes y privacidad", async ({ page, browser }, testInfo) => {
+ test.setTimeout(150_000);
+ await loginAs(page, "abogado@estudio.cl");
+ const owner = await db.user.findUniqueOrThrow({ where: { email:"abogado@estudio.cl" } }), recipient = await db.user.findUniqueOrThrow({ where: { email:"asistente@estudio.cl" } });
+ const causa = await db.causa.create({ data: { titulo:`Audiencia ficticia E2E ${tag}`, tribunal:"Tribunal ficticio", materia:"civil", acceso:"equipo", abogadoId:owner.id } }); causaId=causa.id;
+ await db.causaMiembro.create({ data: { causaId, userId:recipient.id, rol:"colaborador" } });
+ const title = `Texto ficticio para audiencia ${tag}`;
+ const imported = await page.request.post("/api/books", { multipart: { requestId:randomUUID(), title, author:"Autor ficticio", preserveOriginal:"true", convertToText:"false", file:{ name:"audiencia-ficticia.txt", mimeType:"text/plain", buffer:Buffer.from("La buena fe debe observarse durante la ejecución del contrato. La prueba del pago requiere antecedentes verificables.") } } });
+ expect(imported.status(), await imported.text()).toBe(201); const book=(await imported.json()).book; bookIds.push(book.id);
+ keys.push((await db.libraryBook.findUniqueOrThrow({ where:{id:book.id} })).storageKey);
+ await page.setViewportSize({width:1440,height:1000}); await page.goto(`/causas/${causaId}/audiencias`);
+ const workbench=page.getByRole("region", {name:"Acompañante de audiencia"}); await expect(workbench.getByRole("heading", {name:"La mesa de audiencia"})).toBeVisible();
+ await workbench.getByLabel("Crear otra mesa").fill("Audiencia ficticia E2E"); const created=page.waitForResponse(r=>new URL(r.url()).pathname===`/api/causas/${causaId}/hearings` && r.request().method()==="POST"); await workbench.getByRole("button",{name:"Crear mesa",exact:true}).click();
+ const workspace=await(await created).json(); workspaceIds.push(workspace.id);
+ await workbench.getByLabel("Añadir material accesible").selectOption(`book:${book.id}`); await workbench.getByRole("button",{name:"Añadir al dossier"}).click();
+ await expect(workbench.getByRole("heading",{name:"Pasajes preparados"})).toBeVisible(); await expect(workbench.locator(".hearing-fragment")).toHaveCount(1);
+ await workbench.getByRole("button",{name:"Guardar punto",exact:true}).click(); await expect(workbench.getByText("Organizador de lectura guardado.", {exact:true})).toBeVisible();
+ await workbench.getByLabel("Estado de revisión de la fuente",{exact:true}).selectOption("reviewed"); await expect(workbench.locator(".hearing-source-button")).toContainText("Revisada");
+ await workbench.locator(".hearing-fragment").getByRole("button",{name:"Anotar",exact:true}).click(); await workbench.getByLabel("Título de la nota",{exact:true}).fill("Comprobar antecedentes del pago"); await workbench.getByLabel("Su observación").fill("Preguntar por los documentos originales y contrastar el argumento.");
+ await workbench.getByRole("button",{name:"Guardar nota",exact:true}).click(); await expect(workbench.locator(".hearing-saved-note").getByRole("heading",{name:"Comprobar antecedentes del pago"})).toBeVisible();
+ await workbench.locator(".hearing-fragment").getByRole("button",{name:"Conversar",exact:true}).click(); await workbench.getByLabel("Qué quiere revisar").fill("¿Qué permite sostener el pasaje sobre la prueba del pago?"); await workbench.getByRole("button",{name:"Guardar pasajes",exact:true}).click(); await expect(workbench.locator(".hearing-turn")).toContainText("sin llamada a IA");
+ const verify = page.waitForResponse(r=>new URL(r.url()).pathname===`/api/causas/${causaId}/hearings/${workspace.id}/verify`); await workbench.locator(".hearing-turn").getByRole("button",{name:"Corroborar y copiar",exact:true}).click(); expect((await verify).status()).toBe(200);
+ const downloaded=page.waitForEvent("download"); await workbench.getByRole("button",{name:"Exportar mesa"}).click(); expect((await downloaded).suggestedFilename()).toBe("mesa-audiencia.txt");
+ await page.reload(); await expect(workbench.locator(".hearing-source-button")).toContainText("Revisada"); await expect(workbench.locator(".hearing-saved-note")).toContainText("Comprobar antecedentes del pago");
+ const pdfResponse=await page.request.post("/api/books",{multipart:{requestId:randomUUID(),title:`PDF ficticio audiencia ${tag}`,preserveOriginal:"true",convertToText:"false",file:{name:"paginas-ficticias.pdf",mimeType:"application/pdf",buffer:await readFile("src/lib/evidence/pdf-fixtures/mixed-three-pages.pdf")}}}); expect(pdfResponse.status(),await pdfResponse.text()).toBe(201); const pdf=(await pdfResponse.json()).book; bookIds.push(pdf.id); keys.push((await db.libraryBook.findUniqueOrThrow({where:{id:pdf.id}})).storageKey);
+ await page.reload(); await workbench.getByLabel("Añadir material accesible").selectOption(`book:${pdf.id}`); await workbench.getByRole("button",{name:"Añadir al dossier"}).click(); await workbench.getByLabel("Página física del PDF",{exact:true}).selectOption("2"); await expect(workbench.getByRole("img",{name:`Página 2 de PDF ficticio audiencia ${tag}`})).toBeVisible(); await workbench.getByRole("button",{name:"Guardar punto",exact:true}).click(); await expect(workbench.getByText("Organizador de lectura guardado.",{exact:true})).toBeVisible();
+ for(const [name,viewport] of [["desktop",{width:1440,height:1000}],["mobile",{width:360,height:800}]] as const){await page.setViewportSize(viewport); await expect(workbench.getByText("Preparando la mesa…",{exact:true})).toHaveCount(0); await expect(workbench.getByText("Abriendo el material autorizado…",{exact:true})).toHaveCount(0); const image=workbench.getByRole("img",{name:`Página 2 de PDF ficticio audiencia ${tag}`}); await expect(image).toBeVisible(); await expect.poll(() => image.evaluate(node => {const loaded=node as HTMLImageElement;return loaded.complete && loaded.naturalWidth>0;})).toBe(true); expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true); await settleCapture(page); await page.screenshot({path:testInfo.outputPath(`hearing-pdf-${name}.png`),fullPage:true});}
+ await workbench.locator(".hearing-mobile-tabs").getByRole("button",{name:"Notas",exact:true}).click(); await expect(workbench.getByRole("heading",{name:"Cuaderno de audiencia"})).toBeVisible(); await settleCapture(page); await page.screenshot({path:testInfo.outputPath("hearing-notes-mobile.png"),fullPage:true});
+ await page.setViewportSize({width:1440,height:1000});
+ const context=await browser.newContext(); const other=await context.newPage();
+ try {
+  await loginAs(other,"asistente@estudio.cl"); const privateView=await other.request.get(`/api/causas/${causaId}/hearings/${workspace.id}`); expect(privateView.status()).toBe(404);
+  const importedShared=await other.request.post("/api/books",{multipart:{requestId:randomUUID(),title:`Colección ficticia revocable ${tag}`,file:{name:"compartida.txt",mimeType:"text/plain",buffer:Buffer.from("El deber de colaboración constituye un antecedente para la revisión humana.")}}}); expect(importedShared.status(),await importedShared.text()).toBe(201); const sharedBook=(await importedShared.json()).book; bookIds.push(sharedBook.id); keys.push((await db.libraryBook.findUniqueOrThrow({where:{id:sharedBook.id}})).storageKey);
+  const collResponse=await other.request.post("/api/books/collections",{data:{name:`Compartición E2E ${tag}`}}); expect(collResponse.ok()).toBe(true); const coll=(await collResponse.json()).collection; collectionIds.push(coll.id);
+  const granted=await other.request.patch(`/api/books/collections/${coll.id}`,{data:{revision:coll.revision,bookIds:[sharedBook.id],memberIds:[owner.id]}}); expect(granted.ok()).toBe(true); const grant=(await granted.json()).collection;
+  const attached=await page.request.post(`/api/causas/${causaId}/hearings/${workspace.id}/sources`,{data:{kind:"book",refId:sharedBook.id}}); expect(attached.ok()).toBe(true); const source=await attached.json();
+  const sourceRead=await page.request.get(`/api/causas/${causaId}/hearings/${workspace.id}/sources/${source.id}/read`), fragment=(await sourceRead.json()).fragments[0];
+  const q={sourceId:source.id,fragmentId:fragment.id,quote:fragment.text}; const noteResponse=await page.request.post(`/api/causas/${causaId}/hearings/${workspace.id}/notes`,{data:{title:"Nota derivada que debe ocultarse",body:"Texto privado de la colección retirada",citation:q}}); expect(noteResponse.ok()).toBe(true); const sharedNote=await noteResponse.json();
+  const turnResponse=await page.request.post(`/api/causas/${causaId}/hearings/${workspace.id}/chat`,{data:{requestId:randomUUID(),question:"Consulta derivada que debe ocultarse",mode:"extractive",passages:[q]}}); expect(turnResponse.ok()).toBe(true); const sharedTurn=(await turnResponse.json()).turn;
+  expect((await other.request.patch(`/api/books/collections/${coll.id}`,{data:{revision:grant.revision,memberIds:[]}})).ok()).toBe(true);
+  const revoked=await page.request.get(`/api/causas/${causaId}/hearings/${workspace.id}`); expect(revoked.ok()).toBe(true); const result=await revoked.json(); expect(result.notes.find((n:{id:string})=>n.id===sharedNote.id)).toEqual({id:sharedNote.id,available:false}); expect(result.turns.find((t:{id:string})=>t.id===sharedTurn.id)).toEqual({id:sharedTurn.id,available:false});
+  const exported=await page.request.get(`/api/causas/${causaId}/hearings/${workspace.id}/export`); expect(JSON.stringify(await exported.json())).not.toContain("Texto privado de la colección retirada");
+  await page.reload(); await workbench.locator(".hearing-tool-tabs").getByRole("button",{name:"Conversación",exact:true}).click(); await expect(workbench.getByText("Consulta derivada que debe ocultarse",{exact:true})).toHaveCount(0);
+ } finally {await context.close();}
+});

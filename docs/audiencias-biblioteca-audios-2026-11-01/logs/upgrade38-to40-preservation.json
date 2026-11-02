@@ -1,0 +1,396 @@
+{
+  "date": "2026-11-02T00:16:29.011343+00:00",
+  "source": "read-only lexopen_books_conversion_restore_test, schema38",
+  "destination": "lexopen_courtroom_upgrade_test",
+  "oldTables": 96,
+  "oldRows": 745,
+  "historicalColumnsAndRowsUnchanged": true,
+  "newMigrations": 2,
+  "schemaDriftExitCode": 0,
+  "snapshots": {
+    "Activity": {
+      "rows": 19,
+      "sha256": "8675f44376947210cd5400f80aa301128d17f44214035704bac051f2076090a6"
+    },
+    "AgentChat": {
+      "rows": 4,
+      "sha256": "9cb8172bdba5e7ca442102057cc7e25ba6647e52d0e3bd7add3b4c6b7f57da05"
+    },
+    "Aprobacion": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "AssistantPlanRecord": {
+      "rows": 3,
+      "sha256": "6f0dc753ad5613565e1f3c58fdebe4c9dbb236e0a0a1c49b9f10c984b4337257"
+    },
+    "AssistantUndo": {
+      "rows": 3,
+      "sha256": "c0d6a3bc078551f7406597e51151d9e6166483a19dfe171d27e7c5a12cee3548"
+    },
+    "AuditEvent": {
+      "rows": 64,
+      "sha256": "dbc8920a01e25903339a2f5045ac6d050ec34deebbd3d6369a3448df9f254c92"
+    },
+    "BlogPost": {
+      "rows": 2,
+      "sha256": "1868f7cb660a0a4a47b0dab6859f3e7b22a8c0dd72b6d6f87c2c765b2771c270"
+    },
+    "BookShelfCollection": {
+      "rows": 2,
+      "sha256": "75529006d47eefa34129a93bc2c176e9bb89663ace222ecf99b642ce0674b58f"
+    },
+    "BookShelfItem": {
+      "rows": 5,
+      "sha256": "5240f7b03bc643e341ef0233f6d019b420e81b1e9c0b11a834013262e0afde2d"
+    },
+    "BookShelfMember": {
+      "rows": 2,
+      "sha256": "fa41b39fed752412be75c43340f8caa81e5d58456f4e4246a03e35e5f341f115"
+    },
+    "CanalUsuario": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "CaseAnalysisSource": {
+      "rows": 3,
+      "sha256": "15c0bd4e50cf42def9a7c006ff42c890f676d3b77512d15ea8e721ae6d522951"
+    },
+    "CaseConflict": {
+      "rows": 1,
+      "sha256": "e07717fa289f7be718f80e1ee457231fd1449fc0c02be3de965fe4dd1c99aab3"
+    },
+    "CaseConflictReview": {
+      "rows": 1,
+      "sha256": "3838f1ba0de3a62934fda921986235d7e99f5fb3dc5163e34976d1ea47f19e80"
+    },
+    "CaseFact": {
+      "rows": 4,
+      "sha256": "6e2eb3a850ea8e12cc24a7e451061674d7739f71e3f8d733f27c96e6aa5246c7"
+    },
+    "CaseFactCitation": {
+      "rows": 4,
+      "sha256": "5c5535af82451cd38721aee8132a0b0ee8e0b0bc133def50136a6b257ecd08c5"
+    },
+    "CaseFactReview": {
+      "rows": 2,
+      "sha256": "2350a82698288df3069b31a2060d916c69ce220d0c1c96e4e399384aca465d99"
+    },
+    "Causa": {
+      "rows": 8,
+      "sha256": "cd43865df7b48eba3e14c7e6b4639931d7d8883033553b417fa35e46e190e986"
+    },
+    "CausaMiembro": {
+      "rows": 2,
+      "sha256": "ed2f8cc7adc0b2475f2cece489ae2dfc3c5ca04db80bbc1fe48c6ebf3223864a"
+    },
+    "CausaMovimiento": {
+      "rows": 2,
+      "sha256": "ea97c26ec6207519344e035732c23b4a9740862c7e056d536e066538686e32ad"
+    },
+    "Cliente": {
+      "rows": 2,
+      "sha256": "a36904010970bdc987f06ca183ec4b5687cdfb57162052260354820a2eaec0bb"
+    },
+    "CommandExecution": {
+      "rows": 3,
+      "sha256": "9cd1bd25612b98e799ab77211ce97a429ea7b87c0f5c061959285c91309504f7"
+    },
+    "Comment": {
+      "rows": 1,
+      "sha256": "56462a4bbfadf4783c8afd81e42c799f7c65b87e5acc6128e6a492821c1ff133"
+    },
+    "Delegacion": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "DocumentEvidenceFragment": {
+      "rows": 16,
+      "sha256": "2109a1611a5c175ced3a462d7a9a3e9a5aba8a0c775ddee9f4ff56ba39a503a5"
+    },
+    "DocumentEvidencePage": {
+      "rows": 18,
+      "sha256": "86c0d060fd72e741ffa3a236919e80919d8ab175a23714c5c7bf52bcb618f2c9"
+    },
+    "DocumentEvidenceVersion": {
+      "rows": 10,
+      "sha256": "a5aa63b88fee6b40d49e86b236a6c7dbe60299373909f34dd1d7d343943b7c7d"
+    },
+    "DocumentResource": {
+      "rows": 7,
+      "sha256": "b722be43ba82ac8175d65cfcf2d57bc4cad2e6bd3afa2fe40bcf93cdbc09ef1c"
+    },
+    "Documento": {
+      "rows": 15,
+      "sha256": "aba99006714264028f86cc4d64709bb3618696719e91e8d87bc826a9aa75b0f2"
+    },
+    "DriveDocumentImport": {
+      "rows": 1,
+      "sha256": "62badafbdd6ca18984a519951c83a49cc64c98c1624988a1113538020ce77d61"
+    },
+    "EtapaHistorial": {
+      "rows": 2,
+      "sha256": "5fbab6994774cf0f02266dc0695e4153f15ca9a5a8605478fdc3e66b4356c0d2"
+    },
+    "Evento": {
+      "rows": 3,
+      "sha256": "61ce98ffaa84497fd1aee6ac9cf70e4ecb762463f5ae3f37187afc7d170da7ca"
+    },
+    "EventoEntrega": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "Expense": {
+      "rows": 3,
+      "sha256": "e52a22bfeec700ac86a823478b09dc19a11babad3375aaedb0f0d2d10a752861"
+    },
+    "FeeArrangement": {
+      "rows": 3,
+      "sha256": "c0226266bc73d0213ca58b570ba63a8b145b22d0dfb53c6023a9a0ac1a4f32e7"
+    },
+    "FileVersion": {
+      "rows": 4,
+      "sha256": "b49c7c068e6f080625469749fb80b72d41fccbfe8cc95630696ec77b91f7bc4b"
+    },
+    "FirmSettings": {
+      "rows": 1,
+      "sha256": "da0e40e0b9e58b8b5a2f78227fcda736aa6167a09e587a2b3db7f11b9dd8638b"
+    },
+    "Folder": {
+      "rows": 5,
+      "sha256": "cc69cc34eb0835d861aa929268c6629fb7aa55b799a2095659342e2f58aa2dcc"
+    },
+    "Group": {
+      "rows": 1,
+      "sha256": "9515f478887f193def271a126924d6ec59a0340cf2005850acd81a8b19a5928b"
+    },
+    "GroupMember": {
+      "rows": 3,
+      "sha256": "6ce56459f0276db68a119495432aef263d9afdb9fedb24c063537860ad4452f4"
+    },
+    "ISheet": {
+      "rows": 2,
+      "sha256": "91f60882369da766e8c5b984e2f7e5e411789a0fa8c452e460955196ab5eefdd"
+    },
+    "ISheetColumn": {
+      "rows": 8,
+      "sha256": "8940bbfc7b2c4759b69339fb74d519de3d0e4d3b3630f160f9002ff345e2813a"
+    },
+    "ISheetRow": {
+      "rows": 5,
+      "sha256": "ecc1db9b684eb7be8addf4b53a63ccccd46e1995cacd7182bb85ac39bc90d02e"
+    },
+    "IntegrationConfig": {
+      "rows": 3,
+      "sha256": "c9a5da5913ad9e217f51f6759f32cf47def6d860dff64a3b518a32663f10af73"
+    },
+    "Invoice": {
+      "rows": 2,
+      "sha256": "93e75cf60b20e5296ca548831ccfa544555017e04ba13ae06d3f4d0c68ffcc1a"
+    },
+    "InvoiceLine": {
+      "rows": 3,
+      "sha256": "1376a33c7f8d1f1b21d341978b5045ac5fcc4aca04bc174e8c313b7fdee53bd7"
+    },
+    "Job": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "Jurisprudencia": {
+      "rows": 6,
+      "sha256": "8fe898273609b7aebef1b6305f8323ed169ddff9fbf6702c5b0674e9f3018ede"
+    },
+    "KnowledgeCollection": {
+      "rows": 1,
+      "sha256": "501c090d76e2d1f768a14dbb010ee5c4006a63cc9b59a8e6d025421b3af00ca4"
+    },
+    "KnowledgeCollectionItem": {
+      "rows": 3,
+      "sha256": "590225c09767e60d1576d23a0c02440b26386779ca4309476c11e888abd0f4c8"
+    },
+    "LedgerEntry": {
+      "rows": 5,
+      "sha256": "a3ee66c98bfb7c6b5afaa8a428edae54ef7cbd9a36ade75e19ae4413b440af95"
+    },
+    "LegalSource": {
+      "rows": 2,
+      "sha256": "64383704da08a38d13e44e2f54c3c78fa0aa33e055b2558df6c40960febc1dea"
+    },
+    "LegalSourceFragment": {
+      "rows": 2,
+      "sha256": "614488f5d2087054e8b49fdb39321ebea118a553046d3fc554bdb9bf464a20f2"
+    },
+    "LegalSourceVersion": {
+      "rows": 2,
+      "sha256": "0cb0619ea42085b3cd30ae72609ce6c64fb1ca7f64d19df32523bfb19403f4b8"
+    },
+    "LibraryBook": {
+      "rows": 5,
+      "sha256": "2c6e160235b2f97078fd33964fa877b571df417af3acb143b80062287429b7a7"
+    },
+    "LibraryBookFragment": {
+      "rows": 8,
+      "sha256": "3f62e7f0322a03032ee59eb37e6c577a85321aaaee6aa26a15c7c001d0e71c25"
+    },
+    "LibraryBookPage": {
+      "rows": 3,
+      "sha256": "470f98889be0bc422aaab8b72d656d1ac7b76e4d6bdb16aa2b3826570011c9e8"
+    },
+    "LibraryWritingDraft": {
+      "rows": 4,
+      "sha256": "9e193faa1caf7c9f35a9c1a833fb789ebb3e68c92698188eee4c67d00f2a90f7"
+    },
+    "MailboxAccount": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "MailboxAttachment": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "MailboxMessage": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "MensajeSaliente": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "Message": {
+      "rows": 5,
+      "sha256": "24c8a966848c71ebc68981edf3f57782c847354c48c46269deef52fee40ce69b"
+    },
+    "Minuta": {
+      "rows": 2,
+      "sha256": "aaf2731595a45b87fddc12d51ee6bdf34e7887e9b7aa244261eba79b82f0db22"
+    },
+    "MinutaAccion": {
+      "rows": 3,
+      "sha256": "80c9874519e2af6484c6dae2bcf84f16ca6b2a47fefaada0a92b7d2476ef9ee7"
+    },
+    "MinutaPlantilla": {
+      "rows": 2,
+      "sha256": "4530db1d1fe80c566acfd4d3a9bcdf1644cc7810432cc168490e8768dd8b0e52"
+    },
+    "Nota": {
+      "rows": 2,
+      "sha256": "e1f025a2bdbced1a677924f492c7a2443091a2bc7beed92c237a4b44574dab7d"
+    },
+    "Notification": {
+      "rows": 5,
+      "sha256": "690e6d286a4b663c01bbca81d14b9e434b760968b1f62771938b5a58a31353f8"
+    },
+    "Organization": {
+      "rows": 1,
+      "sha256": "83face0ef335ec3f175545fe6b34ef18b9198aa41ea5e3571a4a92adbc892873"
+    },
+    "Parte": {
+      "rows": 6,
+      "sha256": "bb4cd18975789cf963094ae68f861359aee959d525909b1a4914f53898157b67"
+    },
+    "Payment": {
+      "rows": 1,
+      "sha256": "248523459be86883474febba139b33028cd44361a46dacd4f27ab7dc655a6151"
+    },
+    "PerfilNotificacion": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "PjudMigrationArchive": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "PjudSyncJob": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "Plazo": {
+      "rows": 3,
+      "sha256": "ff157f041dac0c21962de1331360bdf2f75c733e7586f963d3af95c2cf9c47e1"
+    },
+    "PlazoAlerta": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "PreferenciaNotificacion": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "QaPost": {
+      "rows": 3,
+      "sha256": "a3785dd69e761ee68330bf43dd3b350f50e56d38a5dfe95aaa41d942c69b60de"
+    },
+    "QaThread": {
+      "rows": 2,
+      "sha256": "54840657228b8e0850009fbe0597b98fb4664be8a021d56dc82474e767a1f3f2"
+    },
+    "ResearchRun": {
+      "rows": 3,
+      "sha256": "db2eb82cd0126cf95f227aa9aaa98c8b4786501560e3e5084eacfac74b3fde2d"
+    },
+    "Site": {
+      "rows": 8,
+      "sha256": "26fcc8a4030bc32826e4522522b49a7445b05563a5b14e26c1340b077445cdf4"
+    },
+    "SiteFile": {
+      "rows": 7,
+      "sha256": "7a3d994925eb03470c4d9f94b6e98625849a21017eaf57ea574fa1a4daa09613"
+    },
+    "SiteGroup": {
+      "rows": 1,
+      "sha256": "d1361e7a5895d2ba5e45454fc8a039df62de2ffc4397ebf090964fec2a640326"
+    },
+    "SiteMember": {
+      "rows": 16,
+      "sha256": "60fc6180fc1f49dd846a74e245b9360439f8e22b4953385a387ded54a59136e3"
+    },
+    "Task": {
+      "rows": 5,
+      "sha256": "5129c0c150c14f2ec1532564bec5dcc383f887ab5fe999fe38de7cef598fa3e8"
+    },
+    "TaskHistorial": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "TimeEntry": {
+      "rows": 5,
+      "sha256": "2a9e515d5a51ab0317f62effa4f1a1b7eadc0cd943a84e0b052eac1a20a92de8"
+    },
+    "Tramite": {
+      "rows": 6,
+      "sha256": "2473bb7fbaa5a4224921844bc6a18afb9bb80538bbfd98322579a0b5c4561a1f"
+    },
+    "Tribunal": {
+      "rows": 334,
+      "sha256": "9caa2635a3e9453c0b4ec2b23ea23b82f3b1e2385ce92a3cb46f0f5f9a9e70ed"
+    },
+    "UfRate": {
+      "rows": 1,
+      "sha256": "a736b781c978698783083f7eb39c965faae9151bdc5410e68602258719f84981"
+    },
+    "User": {
+      "rows": 14,
+      "sha256": "27f346889f62d1db85bb7f7a0e35c1f3b2f95a628c27e1896ed5b4f2d6fd5c77"
+    },
+    "UserBookPreference": {
+      "rows": 3,
+      "sha256": "a40fbe24c8a0fa5c2b7f1c207ba83607e31fb454f97145c2e8e1d2979262a6d0"
+    },
+    "WikiPage": {
+      "rows": 7,
+      "sha256": "d0f71fcd97b7e26a56cccda117e0f50b4a342c8b6f1ab05b87fcf97727513e16"
+    },
+    "WikiPageRevision": {
+      "rows": 4,
+      "sha256": "710e47ffc2d2f268682c236330a03389f966263960099a431151d8004695c4cd"
+    },
+    "Workflow": {
+      "rows": 2,
+      "sha256": "62d0e4baa3b5252bc2c2a137b5c5c57238c699514253b263a273be04b5849925"
+    },
+    "WorkflowInstance": {
+      "rows": 1,
+      "sha256": "62eda6edbd8f7c2682bf0ae73e25d0cbb50a8ed2eea23da9c3e4e1d445f3eb60"
+    }
+  }
+}
