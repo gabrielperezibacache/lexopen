@@ -7,7 +7,8 @@ import { sha256 } from "@/lib/evidence/fragments";
 import { hearingActor, hearingTransaction, workspaceFor, changed, unavailable, isUnavailable, type HearingClient } from "./access";
 import { listSourceOptions, readHearingSource, sourceFor, sourceOption, sourceView } from "./sources";
 import { resolveHearingCitation, verifyHearingCitation, storedHearingCitation, citationText } from "./citations";
-import { hearingCreateSchema, hearingPatchSchema, hearingSourceSchema, hearingSourcePatchSchema, hearingDeleteSchema, hearingNoteSchema, hearingNotePatchSchema, hearingVerifySchema } from "./schemas";
+import { hearingBriefSchema, hearingCreateSchema, hearingPatchSchema, hearingSourceSchema, hearingSourcePatchSchema, hearingDeleteSchema, hearingNoteSchema, hearingNotePatchSchema, hearingVerifySchema } from "./schemas";
+import { renderHearingBrief } from "./brief";
 import type { HearingCitationStored, HearingLibraryView, HearingNoteView, HearingWorkspaceSummary, HearingWorkspaceView } from "./types";
 import { checkedTurn, listCheckedTurns } from "./chat";
 export const HEARING_LIMITS = { workspaces: 100, sources: 200, notes: 100, turns: 40 } as const;
@@ -150,6 +151,22 @@ export async function exportHearing(causaId: string, workspaceId: string, user: 
   const view = await readHearing(causaId, workspaceId, user, client);
   // Export only currently available content; unavailable stubs reveal neither titles nor quotes.
   return { name: "mesa-audiencia.txt", text: [view.title, view.scheduledFor ? `Programada: ${view.scheduledFor}` : "", `Estado: ${view.status}`, view.agendaText && `Agenda\n${view.agendaText}`, "Dossier de lectura", ...view.sources.map(source => source.available ? `${source.title} · ${source.state}\n${source.href}` : "Material no disponible"), "Notas personales", ...view.notes.map(note => note.available ? `${note.title}\n${note.body}${note.citation ? `\n${citationText(note.citation)}` : "\nNota personal sin corroboración como fuente."}` : "Material no disponible"), "Conversación con fuentes", ...view.turns.map(turn => turn.available ? `${turn.question}\n${turn.responseText}\n${turn.citations.map(citationText).join("\n\n")}` : "Material no disponible"), "La corroboración permite volver al pasaje conservado. Revise el razonamiento y la vigencia antes de usarlo."].filter(Boolean).join("\n\n") };
+}
+export async function exportHearingBrief(causaId: string, workspaceId: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const input = hearingBriefSchema.parse(raw);
+  return hearingTransaction(client, async tx => {
+    const { actor, row } = await workspaceFor(causaId, workspaceId, user, tx);
+    const notes: Extract<HearingNoteView, { available: true }>[] = [], cache = new Map<string, unknown>();
+    for (const selected of input.notes) {
+      // Never accept note bodies or citations supplied by the browser. Revoked, changed,
+      // deleted or foreign notes stop the whole export rather than silently dropping a point.
+      const { view } = await checkedNote(causaId, workspaceId, selected.id, actor, tx, cache);
+      if (view.revision !== selected.revision) throw changed();
+      notes.push(view);
+    }
+    await workspaceFor(causaId, workspaceId, actor, tx);
+    return renderHearingBrief(row.title, notes, input);
+  });
 }
 // Private note bindings invalidate derived conversations when a note changes or disappears.
 export const noteBinding = (row: NoteRow) => ({ id: row.id, revision: row.revision, bodySha256: sha256(`${row.title}\n${row.body}\n${row.citationJson}`) });

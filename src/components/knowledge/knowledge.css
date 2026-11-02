@@ -120,6 +120,19 @@
 .knowledge-chronology > div > h3 { font-family: var(--font-fraunces),Georgia,serif; font-size: 1.25rem; font-weight: 500; line-height: 1.6; }
 .knowledge-edit-form { background: var(--surface-solid); }
 
+.knowledge-export { border-block: 1px solid var(--line-strong); }
+.knowledge-export > summary { display: flex; align-items: center; gap: 1rem; min-height: 64px; color: var(--sea); }
+.knowledge-export-chevron { margin-left: auto; flex-shrink: 0; }
+.knowledge-export[open] .knowledge-export-chevron { transform: rotate(180deg); }
+.knowledge-export-body { display: grid; gap: 1rem; padding: .5rem 0 1.5rem; }
+.knowledge-export-body > p { max-width: 72ch; font-size: 1rem; line-height: 1.8; }
+.knowledge-export-body > p:empty { display: none; }
+.knowledge-export-body .knowledge-export-footnote { color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .knowledge-export[open] .knowledge-export-body { animation: export-unfold 180ms cubic-bezier(.16,1,.3,1); }
+  @keyframes export-unfold { from { clip-path: inset(0 0 10% 0); transform: translateY(-4px); } to { clip-path: inset(0); transform: translateY(0); } }
+}
+
 .evidence-toolbar { padding-bottom: 1.4rem; border-bottom: 1px solid var(--line); }
 .evidence-reading-fragment { padding-block: 1.7rem; }
 .evidence-reading-fragment > p { font-family: var(--font-fraunces),Georgia,serif; font-size: 1.07rem; line-height: 1.95; max-width: 70ch; }

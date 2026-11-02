@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { requestPdfPage } from "@/lib/evidence/page-request";
 import { useEffect, useState } from "react";
 
 export function PdfEvidencePagePreview({ versionId, pageNumber, name }: { versionId: string; pageNumber: number; name: string }) {
@@ -10,12 +11,7 @@ export function PdfEvidencePagePreview({ versionId, pageNumber, name }: { versio
   useEffect(() => {
     const controller = new AbortController();
     let url: string | undefined;
-    fetch(`/api/evidence/versions/${versionId}/pages/${pageNumber}`, { signal: controller.signal, cache: "no-store" })
-      .then(async res => {
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "No se pudo abrir esta página");
-        if (!res.headers.get("content-type")?.startsWith("image/png")) throw new Error("La página recibida no es una imagen verificable");
-        return res.blob();
-      }).then(blob => {
+    requestPdfPage(`/api/evidence/versions/${versionId}/pages/${pageNumber}`, controller.signal).then(blob => {
         if (controller.signal.aborted) return;
         url = URL.createObjectURL(blob); setResponse({ key, url });
       }).catch(error => { if (!controller.signal.aborted) setResponse({ key, error: error.message }); });

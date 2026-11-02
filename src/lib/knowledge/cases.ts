@@ -94,6 +94,7 @@ export async function readCaseKnowledge(causaId: string, user: CausaAccessUser, 
   if ((query.after?.length || 0) > 100 || (query.q?.length || 0) > 100 || query.status && !["proposed", "accepted", "rejected", "hidden"].includes(query.status)) throw httpError("Filtro de hechos inválido", 400);
   return transaction(client, async tx => {
     const { actor, canWrite } = await access(causaId, user, tx);
+    const caseIdentity = await tx.causa.findUniqueOrThrow({ where: { id: causaId }, select: { id: true, titulo: true, rit: true } });
     // Verify a fixed, unfiltered cohort before q/status/cursors can inspect any
     // statement. Restricted/verification signals never depend on a hidden match.
     const rows = await tx.caseFact.findMany({ where: { causaId }, orderBy: { id: "desc" }, take: CASE_KNOWLEDGE_LIMITS.verificationFacts + 1, include: factInclude });
@@ -113,7 +114,7 @@ export async function readCaseKnowledge(causaId: string, user: CausaAccessUser, 
     const active = facts.filter(fact => !["hidden", "rejected"].includes(fact.status));
     const dated = active.filter(fact => fact.dateStart && !["unknown", "ambiguous"].includes(fact.datePrecision)).sort((a, b) => a.dateStart!.localeCompare(b.dateStart!) || (a.dateEnd || "").localeCompare(b.dateEnd || "") || a.id.localeCompare(b.id));
     const undated = active.filter(fact => !fact.dateStart || ["unknown", "ambiguous"].includes(fact.datePrecision));
-    return { facts, chronology: { dated, undated }, conflicts: conflicts.slice(0, CASE_KNOWLEDGE_LIMITS.conflicts).flatMap(row => { const view = conflictView(row, factsById); return view ? [view] : []; }), canWrite, restricted, coverage: { factsLimited: limited, conflictsLimited: conflicts.length > CASE_KNOWLEDGE_LIMITS.conflicts, factsShown: facts.length, factsLimit: CASE_KNOWLEDGE_LIMITS.facts, nextAfter: limited ? facts.at(-1)!.id : null, verificationLimited, verificationFactsLimit: CASE_KNOWLEDGE_LIMITS.verificationFacts, verificationReferencesLimit: CASE_KNOWLEDGE_LIMITS.verificationReferences, chronologyScope: "Hechos autorizados de esta página dentro de una ventana acotada de verificación; fecha del acontecimiento, nunca fecha de carga", networkRequests: 0, modelUsed: false } };
+    return { caseIdentity, facts, chronology: { dated, undated }, conflicts: conflicts.slice(0, CASE_KNOWLEDGE_LIMITS.conflicts).flatMap(row => { const view = conflictView(row, factsById); return view ? [view] : []; }), canWrite, restricted, coverage: { factsLimited: limited, conflictsLimited: conflicts.length > CASE_KNOWLEDGE_LIMITS.conflicts, factsShown: facts.length, factsLimit: CASE_KNOWLEDGE_LIMITS.facts, nextAfter: limited ? facts.at(-1)!.id : null, verificationLimited, verificationFactsLimit: CASE_KNOWLEDGE_LIMITS.verificationFacts, verificationReferencesLimit: CASE_KNOWLEDGE_LIMITS.verificationReferences, chronologyScope: "Hechos autorizados de esta página dentro de una ventana acotada de verificación; fecha del acontecimiento, nunca fecha de carga", networkRequests: 0, modelUsed: false } };
   });
 }
 export async function readCaseFact(causaId: string, factId: string, user: CausaAccessUser, client: PrismaClient = prisma) {

@@ -11,6 +11,7 @@ import { CausaResumenAi } from "@/components/ai/CausaResumenAi";
 import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 import { PlazoSugerirAi } from "@/components/ai/PlazoSugerirAi";
 import { CausaEquipoPanel } from "@/components/causas/CausaEquipoPanel";
+import { CasePreparation, CasePreparationIndex } from "@/components/causas/CasePreparation";
 import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
 import { PjudMonitorPanel } from "@/components/pjud/PjudMonitorPanel";
@@ -55,6 +56,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
   const { id } = await params;
   const access = await assertCausaAccess(id, user).catch(() => null);
   if (!access) notFound();
+  const canUseKnowledge = canSome(user, "assistant.use");
   const sp = await searchParams;
   const from = sp.from?.trim();
   const backHref =
@@ -69,7 +71,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       : from === "mis-causas"
         ? h.backMisCausas
         : h.backExpediente;
-  const [causa, responsables, totalAccionesAbiertas, textStatus] = await Promise.all([
+  const [causa, responsables, totalAccionesAbiertas, textStatus, preparation] = await Promise.all([
     prisma.causa.findFirst({
       where: { AND: [scopedcausaAccessWhere(user), { id }] },
       include: {
@@ -117,6 +119,11 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           include: { user: { select: publicUserSelect } },
           orderBy: [{ rol: "asc" }, { createdAt: "asc" }],
         },
+        _count: {
+          select: {
+            minutas: { where: { AND: [scopedrequiredCausaWhere(user), minutaConfidentialWhere(user)] } },
+          },
+        },
       },
     }),
     prisma.user.findMany({
@@ -131,7 +138,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
     }),
     prisma.minutaAccion.count({
       where: {
-        minuta: { causaId: id },
+        minuta: { AND: [{ causaId: id }, scopedrequiredCausaWhere(user), minutaConfidentialWhere(user)] },
         estado: { in: [...ACCIONES_ABIERTAS] },
       },
     }),
@@ -143,6 +150,16 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       FROM "Documento"
       WHERE "causaId" = ${id}
     `,
+    canUseKnowledge ? Promise.all([
+      // A hearing desk belongs to its professional, even within a shared cause.
+      prisma.hearingWorkspace.count({ where: { causaId: id, ownerId: user.id } }),
+      prisma.caseAudio.findMany({
+        where: { causaId: id, deletedAt: null, sourceDocument: { AND: [{ causaId: id }, scopeddocumentReadWhere(user)] } },
+        select: { sourceDocumentId: true, storageKey: true, transcriptSha256: true },
+        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+        take: 201,
+      }),
+    ]).then(([privateHearingCount, audios]) => ({ privateHearingCount, audios })) : Promise.resolve({ privateHearingCount: 0, audios: [] }),
   ]);
   if (!causa) notFound();
 
@@ -156,6 +173,9 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       hasBinary: Boolean(storageKey),
     })
   );
+  const audioDocuments = new Map(causa.documentos.map(document => [document.id, document.storageKey]));
+  // Match the audio listing's source binding without exposing a hidden document.
+  const visibleAudios = preparation.audios.slice(0, 200).filter(audio => audioDocuments.get(audio.sourceDocumentId) === audio.storageKey);
 
   const origen = labelCausaOrigen({
     pjudOrigin: causa.pjudOrigin,
@@ -223,8 +243,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           </div>
 
 
-      <section className="panel rounded-[var(--radius-lg)] p-5 flex flex-wrap items-center justify-between gap-4"><div><h2 className="display text-xl">Tu mesa de audiencia</h2><p className="text-sm text-[var(--ink-soft)]">Prepara lecturas, reúne pasajes, toma notas y consulta a la IA con las fuentes de esta causa.</p></div><Link className="btn btn-primary" href={`/causas/${id}/audiencias`}>Abrir acompañante de audiencias</Link></section>
-
+      <CasePreparationIndex canUseKnowledge={canUseKnowledge} />
       {proximosPlazos.length > 0 && (
         <section className="panel rounded-[var(--radius-lg)] px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -256,13 +275,24 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         </section>
       )}
 
+      <CasePreparation
+        causaId={id}
+        documentCount={documentos.length}
+        documentsWithText={documentos.filter(document => document.hasText).length}
+        pendingDocuments={documentos.filter(document => ["pending", "processing", "queued"].includes(document.extractionStatus || "")).length}
+        minutaCount={causa._count.minutas}
+        pendingActions={accionesAbiertas}
+        canUseKnowledge={canUseKnowledge}
+        privateHearingCount={preparation.privateHearingCount}
+        audioCount={visibleAudios.length}
+        transcriptCount={visibleAudios.filter(audio => Boolean(audio.transcriptSha256)).length}
+        audioLimited={preparation.audios.length > 200}
+      />
+
       <div className="panel rounded-[var(--radius-lg)] border border-[var(--sea)]/20 bg-[var(--mist)] px-5 py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-xl">
-            <div className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--sea)]">
-              Continuidad del expediente
-            </div>
-            <h2 className="mt-2 text-xl font-semibold">
+            <h2 className="text-xl font-semibold">
               ¿Acaba de salir de una audiencia, reunión o llamada?
             </h2>
             <p className="mt-2 text-sm text-[var(--ink-soft)]/80">
@@ -360,7 +390,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="panel rounded-[var(--radius-lg)] p-5 lg:col-span-2">
+        <div id="ficha" className="panel case-destination rounded-[var(--radius-lg)] p-5 lg:col-span-2">
           <h2 className="text-lg font-semibold">Ficha procesal</h2>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
@@ -436,7 +466,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         />
       </div>
 
-      {canSome(user, "assistant.use") && <CaseKnowledgePanel causaId={causa.id} proceduralEvents={causa.movimientos.map(m => ({ id: m.id, title: m.titulo, at: m.fecha.toISOString(), dateLabel: formatCivilDate(m.fecha), source: m.fuente }))} />}
+      {canUseKnowledge && <CaseKnowledgePanel causaId={causa.id} proceduralEvents={causa.movimientos.map(m => ({ id: m.id, title: m.titulo, at: m.fecha.toISOString(), dateLabel: formatCivilDate(m.fecha), source: m.fuente }))} />}
 
       <CausaEquipoPanel
         causaId={causa.id}
@@ -464,7 +494,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         notes={causa.conflictNotes}
       />
 
-      <section id="tramites" className="panel scroll-mt-24 rounded-[var(--radius-lg)] p-5">
+      <section id="tramites" className="panel case-destination rounded-[var(--radius-lg)] p-5">
         <h2 className="mb-3 text-lg font-semibold">Trámites</h2>
         <p className="mb-4 text-sm text-[var(--muted)]">
           Checklist operativo de la causa. Puede generar tareas o plazos desde
@@ -479,7 +509,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       </section>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="panel rounded-[var(--radius-lg)] p-5 sm:col-span-2">
+        <div id="minutas" className="panel case-destination rounded-[var(--radius-lg)] p-5 sm:col-span-2">
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Minutas del expediente</h2>
             <Link href="/minutas" className="text-sm text-[var(--sea)]">
@@ -590,7 +620,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="panel rounded-[var(--radius-lg)] p-5">
+        <section id="plazos" className="panel case-destination rounded-[var(--radius-lg)] p-5">
           <h2 className="text-lg font-semibold">Plazos</h2>
           <div className="mt-4 space-y-3">
             {causa.plazos.map((p) => (
@@ -626,7 +656,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           <PlazoSugerirAi causaId={causa.id} />
         </section>
 
-        <section className="panel rounded-[var(--radius-lg)] p-5">
+        <section id="documentos" className="panel case-destination rounded-[var(--radius-lg)] p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Documentos del expediente</h2>
             <div className="flex flex-wrap items-center gap-3">
@@ -700,7 +730,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         </section>
       </div>
 
-      <CaseAudioManager causaId={id} />
+      {canUseKnowledge && <div id="audios" className="case-destination"><CaseAudioManager causaId={id} /></div>}
 
       <DocumentoIngestForm lockedCausaId={causa.id} compact />
 
@@ -722,7 +752,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           </div>
         </section>
 
-        <section className="panel rounded-[var(--radius-lg)] p-5">
+        <section id="actividad" className="panel case-destination rounded-[var(--radius-lg)] p-5">
           <h2 className="text-lg font-semibold">Actividad</h2>
           <div className="mt-4 space-y-3">
             {causa.actividades.map((a) => (

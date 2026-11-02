@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-02",
+  "base": "8cb233ffccac2dca86db4b4333b228188c06d15b",
+  "fixtures": "local and fictitious only",
+  "checks": {
+    "unit": "passed; new export and PDF request tests separately passed",
+    "integration": "passed on isolated empty migrated database",
+    "browser": "43 passed (2.1m), no retries",
+    "visual_confirmation": "1 affected test passed (2.9s)",
+    "lint": "passed",
+    "typescript": "passed",
+    "build": "passed after visual correction; four existing tracing warnings"
+  },
+  "visual_review": {
+    "initial": "fix",
+    "finding": "Functional prose in case preparation too small",
+    "correction": "1rem instruction and scope paragraphs",
+    "final": "ship"
+  },
+  "production_host_deployed": false,
+  "hashes": {
+    "browser.log": "f43b06bf6d6a06a9add18020e549fedc95afb425488b08ba3adbed603b1a2ce1",
+    "build.log": "b39dac67e92ff598b57a4a5d6cc2512347c388bee3de8dde93588746cdc6686c",
+    "hearing-brief-desktop.png": "a8f73b92f105c32c08d5b4f611f50ac56deff69a65f2b35a9e349cfac1e28896",
+    "hearing-brief-mobile.png": "d5e2f7239f2c07f1df97e6068ffaab1057b5e41aeb830b70709162b4177e4764",
+    "integration.log": "ac1978671bb7c1cb3551bea617eddb992666970722c76943609e1fc36e8ef6eb",
+    "lint.log": "db58e698a71f6923f5d66425538f7b1ea17c7e16f3ce1c85858f0ab5911afc98",
+    "preparation-desktop.png": "a808169ceb23ee7fbfc269c0dfe99ddf7c59c688ccf700608e200800b04ebc63",
+    "preparation-export-desktop.png": "63f7d2608699e198fda372c19a487cf9129b3d4f427d70189b3e18ae7afcd297",
+    "preparation-export-mobile.png": "e6b823c2482062709d51b062e985a5327ce74960afc1e05b215fa07f8581d360",
+    "preparation-mobile.png": "0a92f9b27490f965489513f0161d7d918bb6f1514511193528a510f52c342cb6",
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unit.log": "51d8c8a786797cc494e3ca8fa806a4971ceeb460170e8db55febc12d68dc8e28",
+    "visual-confirmation.log": "726afef9cbfea7d81a4b8b35cb0e45025ff47895406b93d5291419679448460e"
+  }
+}
