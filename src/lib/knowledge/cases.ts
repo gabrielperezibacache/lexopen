@@ -331,6 +331,7 @@ export async function analyzeCaseSources(causaId: string, user: CausaAccessUser,
         const verified = await resolveCitation({ kind: "document", fragmentId: fragment.id, quote: fragment.text }, actor, { causaId, client: tx, cache });
         if (verified.partial) warnings.add("Hay fuentes con extracción parcial; analizar el texto disponible no revisa sus páginas pendientes");
         if (!verified.isCurrent) warnings.add("Se revisó una captura anterior del archivo; prepare su revisión actual para actualizar la evidencia");
+        for (const warning of verified.warnings) warnings.add(warning);
         const extraction = analyzeEvidenceFragment({ id: fragment.id, text: fragment.text }, { maxProposals: 10 });
         for (const warning of extraction.warnings) warnings.add(warning);
         if (processedProposals + extraction.proposals.length > CASE_KNOWLEDGE_LIMITS.proposalsPerAnalysis) { stopped = true; hasMore = true; break; }
@@ -341,7 +342,7 @@ export async function analyzeCaseSources(causaId: string, user: CausaAccessUser,
           if (!fact) {
             const dateFields = temporalData({ dateLiteral: proposal.temporal.literal }, [proposal.quote]);
             const { inferenceReason, warnings: temporalWarnings, ...dates } = dateFields;
-            fact = await tx.caseFact.create({ data: { causaId, fingerprint, statement: proposal.statement, ...dates, origin: "extracted", createdById: actor.id, status: "proposed", metadataJson: JSON.stringify({ amounts: proposal.amounts, warnings: [...new Set([...temporalWarnings, ...extraction.warnings])].slice(0, 20), inferenceReason }) }, select: { id: true } }); newFacts++;
+            fact = await tx.caseFact.create({ data: { causaId, fingerprint, statement: proposal.statement, ...dates, origin: "extracted", createdById: actor.id, status: "proposed", metadataJson: JSON.stringify({ amounts: proposal.amounts, warnings: [...new Set([...verified.warnings, ...temporalWarnings, ...extraction.warnings])].slice(0, 20), inferenceReason }) }, select: { id: true } }); newFacts++;
           }
           if (await attachCitation(tx, fact.id, citation)) newCitations++;
           processedProposals++;

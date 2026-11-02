@@ -9,6 +9,7 @@ import { getObject, putObject, MAX_STORAGE_OBJECT_BYTES } from "@/lib/storage";
 import { MAX_EVIDENCE_TEXT, sha256, splitEvidenceText, verifyEvidencePageBinding, verifyEvidenceQuote } from "@/lib/evidence/fragments";
 import { evidenceResourceReadWhere, evidenceFragmentHref } from "@/lib/evidence/service";
 import { resolveCitation } from "@/lib/knowledge/citations";
+import { audioPublicationContext, type AudioTranscriptCitation } from "@/lib/knowledge/audio-transcript";
 import { resolveLibraryScope, libraryScopeStillAuthorized, type LibrarySelection } from "@/lib/knowledge/library";
 import { validatePublicLegalSourceUrl } from "./sources";
 import type { FetchedLegalSource } from "./source-types";
@@ -22,7 +23,7 @@ export type ResearchCitation = {
   documentId: string | null; siteFileId?: string | null; siteId?: string | null; quote: string; textSha256: string; sourceSha256: string; href: string;
   pageNumber: number | null; extractionMethod: string | null; partial: boolean; publishedAt: string | null; effectiveFrom: string | null;
   effectiveTo: string | null; retrievedAt: string; acquisitionMethod: string;
-  matchedTerms: string[]; score: number;
+  matchedTerms: string[]; score: number; audioTranscript?: AudioTranscriptCitation; warnings?: string[];
 };
 export type ResearchResult = {
   id: string; query: string; status: "completed" | "abstained"; answerMode: "extractive";
@@ -104,7 +105,7 @@ export async function importLegalSource(input: LegalSourceImport, user: CausaAcc
 }
 
 const legalVersionSelect = { id: true, title: true, organism: true, kind: true, externalId: true, sourceSha256: true, textSha256: true, mimeType: true, publishedAt: true, effectiveFrom: true, effectiveTo: true, retrievedAt: true, acquisitionMethod: true, metadataJson: true, source: { select: { canonicalUrl: true } } } as const;
-const documentVersionSelect = { id: true, sourceName: true, sourceSha256: true, createdAt: true, extractionStatus: true, locatorKind: true, metadataJson: true, resource: { select: { documentoId: true, siteFileId: true, siteFile: { select: { siteId: true } } } } } as const;
+const documentVersionSelect = { id: true, sourceName: true, sourceSha256: true, createdAt: true, extractionStatus: true, locatorKind: true, metadataJson: true, resource: { select: { documentoId: true, siteFileId: true, documento: { select: { extractionJson: true, audioPublication: { select: { audioId: true } } } }, siteFile: { select: { siteId: true } } } } } as const;
 
 async function rankFragmentIds(tx: ResearchClient, kind: "legal" | "document", versionIds: string[], terms: string[]) {
   if (!versionIds.length) return [];
@@ -162,10 +163,11 @@ export async function searchResearch(user: CausaAccessUser, raw: ResearchQuery, 
     }
     for (const row of documentRows) {
       if (!verifyEvidenceQuote(row, row.text) || !row.version.resource.documentoId && !row.version.resource.siteFileId) { warnings.push("Se excluyó un fragmento documental que no pudo verificarse"); continue; }
+      const transcript = audioPublicationContext(row.version.resource.documento);
       const partial = Boolean(metadata(row.version.metadataJson).partial || ["needs_ocr", "partial", "failed"].includes(row.version.extractionStatus));
       citations.push({ id: `document:${row.id}`, kind: "document", sourceKind: row.version.resource.siteFileId ? "space_file" : "case_document", title: row.version.sourceName, organism: null, url: null, versionId: row.version.id, fragmentId: row.id, documentId: row.version.resource.documentoId, siteFileId: row.version.resource.siteFileId, siteId: row.version.resource.siteFile?.siteId, quote: row.text, textSha256: row.textSha256, sourceSha256: row.version.sourceSha256,
         href: evidenceFragmentHref(row), pageNumber: row.page?.pageNumber || null, extractionMethod: row.page?.method || null, partial,
-        publishedAt: null, effectiveFrom: null, effectiveTo: null, retrievedAt: row.version.createdAt.toISOString(), acquisitionMethod: row.version.resource.siteFileId ? "space_file" : "case_document", ...rankResearchText(row.text, row.version.sourceName, terms) });
+        publishedAt: null, effectiveFrom: null, effectiveTo: null, retrievedAt: row.version.createdAt.toISOString(), ...transcript, acquisitionMethod: row.version.resource.siteFileId ? "space_file" : "case_document", ...rankResearchText(row.text, row.version.sourceName, terms) });
     }
     citations.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
     const limit = input.limit || 8, shortlisted = citations.slice(0, limit);
@@ -191,7 +193,7 @@ export async function searchResearch(user: CausaAccessUser, raw: ResearchQuery, 
     const results: ResearchCitation[] = [];
     const integrityCache = new Map<string, unknown>();
     for (const citation of pageVerified) {
-      if (library.selections.length) {
+      if (library.selections.length || citation.audioTranscript) {
         try {
           const verified = await resolveCitation(citation, actor, { client: tx, cache: integrityCache });
           if (verified.versionId !== citation.versionId || verified.sourceSha256 !== citation.sourceSha256 || verified.textSha256 !== citation.textSha256 || verified.href !== citation.href || verified.pageNumber !== citation.pageNumber) throw httpError("La cita no coincide con su versión", 409);
@@ -219,6 +221,7 @@ export async function searchResearch(user: CausaAccessUser, raw: ResearchQuery, 
     if (legalRanks.length > RESEARCH_LIMITS.candidatesPerKind || documentRanks.length > RESEARCH_LIMITS.candidatesPerKind) warnings.push("Hay más fragmentos coincidentes que el presupuesto de recuperación");
     warnings.push("Extractos recuperados por coincidencia textual; la pertinencia y la vigencia jurídica requieren revisión profesional");
     for (const citation of results) if (citation.kind === "legal") warnings.push(...sourceWarnings.get(citation.versionId) || []);
+    warnings.unshift(...results.flatMap(citation => citation.warnings || []));
     const searchedAt = new Date().toISOString();
     const scope: StoredScope = { causaId: input.causaId, documentIds: documents.map(doc => doc.id), sourceKinds, selectedDocumentIds: selectedIds || null, ...(input.libraryCollectionIds?.length ? { librarySelections: library.selections, libraryOnly: Boolean(input.libraryOnly) } : {}), ...(input.siteId ? { siteId: input.siteId, siteFileIds: siteFiles.map(file => file.id), selectedSiteFileIds: selectedFileIds || null } : {}) };
     const result: ResearchResult = { id: "", query: input.query, status: results.length ? "completed" : "abstained", answerMode: "extractive", scope: { causaId: input.causaId || null, documentIds: scope.documentIds, sourceKinds, selectedDocumentIds: scope.selectedDocumentIds || null, ...(scope.librarySelections ? { librarySelections: scope.librarySelections, libraryOnly: scope.libraryOnly } : {}), ...(scope.siteId ? { siteId: scope.siteId, siteFileIds: scope.siteFileIds, selectedSiteFileIds: scope.selectedSiteFileIds } : {}) }, summary: results.length ? `Se recuperaron ${results.length} fragmentos verificables. No se generó una conclusión jurídica automática.` : "No se encontró evidencia suficiente en las fuentes y documentos revisados. Incorpore fuentes o ajuste la búsqueda.", results, warnings: [...new Set(warnings)].slice(0, 30), coverage: { sourceKinds, sourcesByKind, legalSourcesAvailable, legalSourcesSearched: legalVersionIds.length, documentsAvailable: documentCount, documentsSearched: caseVersionIds.length, siteFilesAvailable: siteFileCount, siteFilesSearched: siteVersionIds.length, siteFilesWithoutEvidence, siteFilesWithPartialEvidence, documentsWithoutEvidence, documentsWithPartialEvidence, legalCandidates: Math.min(legalRanks.length, RESEARCH_LIMITS.candidatesPerKind), documentCandidates: Math.min(documentRanks.length, RESEARCH_LIMITS.candidatesPerKind), resultsLimited: citations.length > limit, corpusLimited, ...(scope.librarySelections ? { libraryCollections: library.selections.length, libraryVersionsSearched: library.legalVersionIds.length + library.documentVersionIds.length, libraryItemsUnavailable: library.itemsUnavailable, libraryOnly: Boolean(input.libraryOnly) } : {}), terms, searchedAt, networkRequests: 0, modelUsed: false } };
@@ -249,13 +252,15 @@ async function verifiedCitation(input: Pick<ResearchCitation, "kind" | "fragment
   if (input.kind === "legal") {
     const row = await tx.legalSourceFragment.findUnique({ where: { id: input.fragmentId }, select: { id: true, ordinal: true, text: true, textSha256: true, versionId: true, version: { select: { sourceSha256: true } } } });
     if (!row) throw httpError("Cita no encontrada", 404);
-    return { verified: verifyEvidenceQuote(row, input.quote), fragmentId: row.id, quote: input.quote, versionId: row.versionId, textSha256: row.textSha256, sourceSha256: row.version.sourceSha256, pageNumber: null, href: `/jurisprudencia/fuentes/${row.versionId}?fragment=${row.ordinal}#fragment-${row.ordinal}` };
+    return { verified: verifyEvidenceQuote(row, input.quote), fragmentId: row.id, quote: input.quote, versionId: row.versionId, textSha256: row.textSha256, sourceSha256: row.version.sourceSha256, ...audioPublicationContext(null), pageNumber: null, href: `/jurisprudencia/fuentes/${row.versionId}?fragment=${row.ordinal}#fragment-${row.ordinal}` };
   }
   const sourceScope = { resource: evidenceResourceReadWhere(user) };
-  const row = await tx.documentEvidenceFragment.findFirst({ where: { id: input.fragmentId, version: sourceScope, OR: [{ pageId: null }, { page: { version: sourceScope } }] }, select: { id: true, ordinal: true, text: true, textSha256: true, versionId: true, pageId: true, pageStartOffset: true, pageEndOffset: true, page: { select: { versionId: true, pageNumber: true, text: true, textSha256: true } }, version: { select: { sourceSha256: true, locatorKind: true, resource: { select: { documentoId: true, siteFileId: true, siteFile: { select: { siteId: true } } } } } } } });
+  const row = await tx.documentEvidenceFragment.findFirst({ where: { id: input.fragmentId, version: sourceScope, OR: [{ pageId: null }, { page: { version: sourceScope } }] }, select: { id: true, ordinal: true, text: true, textSha256: true, versionId: true, pageId: true, pageStartOffset: true, pageEndOffset: true, page: { select: { versionId: true, pageNumber: true, text: true, textSha256: true } }, version: { select: { sourceSha256: true, locatorKind: true, resource: { select: { documentoId: true, siteFileId: true, documento: { select: { extractionJson: true, audioPublication: { select: { audioId: true } } } }, siteFile: { select: { siteId: true } } } } } } } });
   if (!row || !row.version.resource.documentoId && !row.version.resource.siteFileId) throw httpError("Cita no encontrada o sin acceso", 404);
   if (row.version.locatorKind === "pdf-page" && !row.page || !verifyEvidencePageBinding(row)) throw httpError("El fragmento no coincide con su página registrada", 409);
-  return { verified: verifyEvidenceQuote(row, input.quote), fragmentId: row.id, quote: input.quote, versionId: row.versionId, textSha256: row.textSha256, sourceSha256: row.version.sourceSha256, pageNumber: row.page?.pageNumber || null, href: evidenceFragmentHref(row) };
+  const transcript = audioPublicationContext(row.version.resource.documento), verified = verifyEvidenceQuote(row, input.quote);
+  if (verified && transcript.audioTranscript) await resolveCitation(input, user, { client: tx });
+  return { verified, fragmentId: row.id, quote: input.quote, versionId: row.versionId, textSha256: row.textSha256, sourceSha256: row.version.sourceSha256, ...transcript, pageNumber: row.page?.pageNumber || null, href: evidenceFragmentHref(row) };
 }
 export async function verifyResearchCitation(input: Pick<ResearchCitation, "kind" | "fragmentId" | "quote">, user: CausaAccessUser, client: PrismaClient = prisma) {
   return transaction(client, async tx => verifiedCitation(input, await actorFor(user, tx), tx));
@@ -273,6 +278,9 @@ export async function readResearchRun(id: string, user: CausaAccessUser, client:
     for (const citation of result.results) {
       const verified = storedScope.librarySelections ? { ...await resolveCitation(citation, actor, { client: tx, cache: integrityCache }), verified: true } : await verifiedCitation(citation, actor, tx);
       if (!verified.verified || verified.versionId !== citation.versionId || verified.href !== citation.href || verified.textSha256 !== citation.textSha256 || verified.sourceSha256 !== citation.sourceSha256 || verified.pageNumber !== citation.pageNumber) throw httpError("La evidencia guardada cambió o dejó de ser verificable", 409);
+      if (verified.warnings.length || citation.warnings !== undefined) citation.warnings = verified.warnings;
+      if (verified.audioTranscript) citation.audioTranscript = verified.audioTranscript; else delete citation.audioTranscript;
+      result.warnings = [...new Set([...result.warnings, ...verified.warnings])];
     }
     return result;
   });

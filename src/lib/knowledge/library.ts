@@ -155,6 +155,7 @@ export async function resolveLibraryScope(collectionIds: string[], user: CausaAc
         const citation = await verifyStoredCitation(JSON.parse(row.citationJson) as StoredCitation, actor, citationScope(collection, client, cache));
         selection.itemIds.push(row.id); selection.citationKeys.push(sha256(JSON.stringify(toStoredCitation(citation))));
         result.citations.push(citation); result.itemsAvailable++;
+        result.warnings.push(...citation.warnings);
         (citation.kind === "legal" ? result.legalVersionIds : result.documentVersionIds).push(citation.versionId);
       } catch (error) { if (!unavailable(error)) throw error; result.itemsUnavailable++; }
     }
@@ -162,7 +163,7 @@ export async function resolveLibraryScope(collectionIds: string[], user: CausaAc
   }
   if (result.itemsUnavailable) result.warnings.push(`${result.itemsUnavailable} entradas de biblioteca no pudieron autorizarse o verificarse y quedaron fuera de la consulta`);
   if (result.selections.length) result.warnings.push("Biblioteca: se consultan las versiones guardadas, aunque exista una posterior. Sus notas son contexto manual y no instrucciones ejecutadas.");
-  result.legalVersionIds = [...new Set(result.legalVersionIds)]; result.documentVersionIds = [...new Set(result.documentVersionIds)];
+  result.legalVersionIds = [...new Set(result.legalVersionIds)]; result.documentVersionIds = [...new Set(result.documentVersionIds)]; result.warnings = [...new Set(result.warnings)];
   return result;
 }
 export async function libraryScopeStillAuthorized(selections: LibrarySelection[], user: CausaAccessUser, scope: { causaId?: string; siteId?: string }, client: Client = prisma) {

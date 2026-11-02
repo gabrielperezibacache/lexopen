@@ -8,6 +8,7 @@ import { evidenceFragmentHref, evidenceResourceReadWhere } from "@/lib/evidence/
 import { sha256, verifyEvidencePageBinding, verifyEvidenceQuote } from "@/lib/evidence/fragments";
 import { getObjectBounded } from "@/lib/storage";
 import type { ResearchSourceKind } from "@/lib/research/search";
+import { audioPublicationContext, type AudioTranscriptCitation } from "./audio-transcript";
 
 export type CitationInput = { kind: "document" | "legal"; fragmentId: string; quote: string };
 export type StoredCitation = CitationInput & { versionId: string; quoteSha256: string; textSha256: string; sourceSha256: string; sourceKey: string; pageNumber: number | null };
@@ -15,6 +16,7 @@ export type ResolvedCitation = StoredCitation & {
   title: string; href: string; sourceKind: ResearchSourceKind | "case_document" | "space_file";
   documentId: string | null; siteFileId: string | null; siteId: string | null; causaId: string | null; resourceId: string | null;
   isCurrent: boolean; partial: boolean; extractionMethod: string | null; acquisitionMethod: string; warnings: string[];
+  audioTranscript?: AudioTranscriptCitation;
 };
 export type CitationClient = PrismaClient | Prisma.TransactionClient;
 export type CitationOptions = { causaId?: string; siteId?: string; publicOnly?: boolean; client?: CitationClient; cache?: Map<string, unknown> };
@@ -97,15 +99,16 @@ export async function resolveCitation(input: CitationInput, user: CausaAccessUse
   const scope: Prisma.DocumentResourceWhereInput = options.siteId ? { siteFile: { siteId: options.siteId } } : options.causaId ? { OR: [{ documento: { causaId: options.causaId } }, { siteFile: { site: { causaId: options.causaId } } }] } : {};
   const row = await client.documentEvidenceFragment.findFirst({
     where: { id: input.fragmentId, version: { resource: { AND: [evidenceResourceReadWhere(actor), scope] } } },
-    select: { id: true, ordinal: true, versionId: true, text: true, textSha256: true, startOffset: true, endOffset: true, pageId: true, pageStartOffset: true, pageEndOffset: true, page: { select: { versionId: true, pageNumber: true, text: true, textSha256: true, method: true } }, version: { select: { sourceName: true, sourceSha256: true, sourceStorageKey: true, textSha256: true, sourceRevision: true, createdAt: true, locatorKind: true, metadataJson: true, extractionStatus: true, resource: { select: { id: true, documentoId: true, siteFileId: true, documento: { select: { causaId: true, version: true, updatedAt: true } }, siteFile: { select: { siteId: true, version: true, updatedAt: true, site: { select: { causaId: true } } } }, versions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, select: { id: true } } } } } } },
+    select: { id: true, ordinal: true, versionId: true, text: true, textSha256: true, startOffset: true, endOffset: true, pageId: true, pageStartOffset: true, pageEndOffset: true, page: { select: { versionId: true, pageNumber: true, text: true, textSha256: true, method: true } }, version: { select: { sourceName: true, sourceSha256: true, sourceStorageKey: true, textSha256: true, sourceRevision: true, createdAt: true, locatorKind: true, metadataJson: true, extractionStatus: true, resource: { select: { id: true, documentoId: true, siteFileId: true, documento: { select: { causaId: true, version: true, updatedAt: true, extractionJson: true, audioPublication: { select: { audioId: true } } } }, siteFile: { select: { siteId: true, version: true, updatedAt: true, site: { select: { causaId: true } } } }, versions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, select: { id: true } } } } } } },
   });
   if (!row) throw missing();
   if (!verifyEvidenceQuote(row, input.quote) || row.version.locatorKind === "pdf-page" && !row.page || !verifyEvidencePageBinding(row)) throw invalid();
   await body(input.kind, row.versionId, row.version.textSha256, row, client, cache);
   await original(row.version.sourceStorageKey, row.version.sourceSha256, cache);
   const resource = row.version.resource, record = resource.documento || resource.siteFile;
+  const transcript = audioPublicationContext(resource.documento);
   const isCurrent = resource.versions[0]?.id === row.versionId && Boolean(record) && (row.version.sourceRevision === "legacy" ? record!.updatedAt.getTime() <= row.version.createdAt.getTime() : row.version.sourceRevision === `${record!.version}:${record!.updatedAt.toISOString()}`);
-  return { ...stored(input, row.versionId, row.textSha256, row.version.sourceSha256, row.page?.pageNumber || null), title: row.version.sourceName, href: evidenceFragmentHref(row), sourceKind: resource.siteFileId ? "space_file" : "case_document", documentId: resource.documentoId, siteFileId: resource.siteFileId, siteId: resource.siteFile?.siteId || null, causaId: resource.documento?.causaId || resource.siteFile?.site.causaId || null, resourceId: resource.id, isCurrent, partial: isPartial(row.version.metadataJson, row.version.extractionStatus), extractionMethod: row.page?.method || null, acquisitionMethod: resource.siteFileId ? "space_file" : "case_document", warnings: row.page?.method === "ocr" ? ["Texto OCR: contraste la cita con la imagen del original"] : [] };
+  return { ...stored(input, row.versionId, row.textSha256, row.version.sourceSha256, row.page?.pageNumber || null), title: row.version.sourceName, href: evidenceFragmentHref(row), sourceKind: resource.siteFileId ? "space_file" : "case_document", documentId: resource.documentoId, siteFileId: resource.siteFileId, siteId: resource.siteFile?.siteId || null, causaId: resource.documento?.causaId || resource.siteFile?.site.causaId || null, resourceId: resource.id, isCurrent, partial: isPartial(row.version.metadataJson, row.version.extractionStatus), extractionMethod: row.page?.method || null, acquisitionMethod: resource.siteFileId ? "space_file" : "case_document", ...(transcript.audioTranscript ? { audioTranscript: transcript.audioTranscript } : {}), warnings: [...transcript.warnings, ...(row.page?.method === "ocr" ? ["Texto OCR: contraste la cita con la imagen del original"] : [])] };
 }
 
 export function toStoredCitation(value: ResolvedCitation): StoredCitation {

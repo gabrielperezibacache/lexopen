@@ -1,0 +1,17 @@
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "lexopen_courtroom_upgrade_test", schema "public" at "127.0.0.1:55439"
+
+40 migrations found in prisma/migrations
+
+Applying migration `20261102130000_courtroom_workspace`
+Applying migration `20261102131000_audio_publication_permissions`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20261102130000_courtroom_workspace/
+    └─ migration.sql
+  └─ 20261102131000_audio_publication_permissions/
+    └─ migration.sql
+      
+All migrations have been successfully applied.

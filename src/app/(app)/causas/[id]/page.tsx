@@ -1,3 +1,4 @@
+import { CaseAudioManager } from "@/components/audio/CaseAudioManager";
 import { CaseKnowledgePanel } from "@/components/knowledge/CaseKnowledgePanel";
 import { CausaActions } from "@/components/CausaActions";
 import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
@@ -221,6 +222,8 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           isAdmin={user.role === "admin"}
         />
       </div>
+
+      <section className="panel rounded-3xl p-5 flex flex-wrap items-center justify-between gap-4"><div><h2 className="display text-xl">Tu mesa de audiencia</h2><p className="text-sm text-[var(--ink-soft)]">Prepara lecturas, reúne pasajes, toma notas y consulta a la IA con las fuentes de esta causa.</p></div><Link className="btn btn-primary" href={`/causas/${id}/audiencias`}>Abrir acompañante de audiencias</Link></section>
 
       {proximosPlazos.length > 0 && (
         <section className="panel rounded-3xl px-5 py-4">
@@ -696,6 +699,8 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           </div>
         </section>
       </div>
+
+      <CaseAudioManager causaId={id} />
 
       <DocumentoIngestForm lockedCausaId={causa.id} compact />
 

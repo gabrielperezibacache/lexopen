@@ -1,0 +1,20 @@
+{
+  "userIds": [
+    "cmvyiqjyp0002ftis16bexj6q",
+    "cmvyiqk0b0003ftispy6r1fyi",
+    "cmvyiqk1v0004ftiseivsff7u"
+  ],
+  "caseIds": [
+    "cmvyiqk930006ftisnpzgfm4z",
+    "cmvyiqk970008ftis9d6buu2f"
+  ],
+  "bookId": "book_d633aacf8f36eb206cccd2dc9c7963409551b0a2",
+  "audioId": "audio_4d41f7a370aaf2f4d6e89dcb6a927fbb4d917488",
+  "sourceDocumentId": "cmvyiqkc40006bjuo5uqmm5iq",
+  "transcriptDocumentId": "cmvyiqkh50013bjuovazlltsz",
+  "workspaceId": "cmvyiqkht001bbjuoh5zv5l3d",
+  "sourceId": "cmvyiqki3001gbjuoly0dd4da",
+  "noteId": "cmvyiqkip001lbjuomp6agslf",
+  "turnId": "hearingturn_80670ff4beece52723ce69ef7affdefaa6cab7b6",
+  "organizationId": "cmvyiqjwy0000ftis2ovib5p8"
+}

@@ -8,10 +8,11 @@ export function KnowledgeCitation({ citation, causaId }: { citation: ResolvedCit
   async function copy() {
     setBusy(true); setMessage("");
     const { kind, fragmentId, versionId, quote, quoteSha256, textSha256, sourceSha256, sourceKey, pageNumber } = citation;
-    const result = await apiMutation<{ verified: boolean; href: string }>("/api/knowledge/citations/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ citation: { kind, fragmentId, versionId, quote, quoteSha256, textSha256, sourceSha256, sourceKey, pageNumber }, ...(causaId ? { causaId } : {}) }) });
+    const result = await apiMutation<{ verified: boolean; href: string; warnings?: string[] }>("/api/knowledge/citations/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ citation: { kind, fragmentId, versionId, quote, quoteSha256, textSha256, sourceSha256, sourceKey, pageNumber }, ...(causaId ? { causaId } : {}) }) });
     setBusy(false);
     if (!result.ok) { setMessage(result.error); return; }
-    const text = `“${quote}”\n${citation.title}${pageNumber ? ` · Página ${pageNumber}` : ""}\n${new URL(result.data.href, window.location.origin).href}`;
+    const warnings = result.data.warnings ?? citation.warnings;
+    const text = `“${quote}”\n${citation.title}${pageNumber ? ` · Página ${pageNumber}` : ""}\n${new URL(result.data.href, window.location.origin).href}${warnings?.length ? `\n${warnings.join("\n")}` : ""}`;
     try { if (!navigator.clipboard?.writeText) throw new Error(); await navigator.clipboard.writeText(text); setMessage("Cita del texto registrado copiada."); } catch { setManual(text); setMessage("Seleccione y copie la cita comprobada."); }
   }
   return <div className="space-y-2"><a href={citation.href} target="_blank" rel="noopener noreferrer" className="break-words text-sm font-medium text-[var(--sea)] underline">{citation.title}{citation.pageNumber ? ` · Página ${citation.pageNumber}` : ""} · Abrir fuente</a><blockquote className="max-w-[75ch] whitespace-pre-wrap break-words text-sm text-[var(--ink-soft)]">{citation.quote}</blockquote>

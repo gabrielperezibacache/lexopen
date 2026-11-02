@@ -11,11 +11,16 @@ import { discardBookImportAttempt, getObjectBounded, putObject } from "@/lib/sto
 import { actorFor, bookAccessWhere, bookFor, collectionAccessWhere, missingBook, type BookClient } from "./access";
 import { extractBook, BOOK_FORMATS, BOOK_MAX_BYTES } from "./formats";
 import { bookMetadataSchema, bookPatchSchema, bookRevisionSchema, type BookUpload } from "./ingest";
+import { bookSourceTypeSchema, normalizeJudicialMetadata, parseStoredJudicialSource } from "./judicial";
 import type { BookCitation, BookCitationInput, BookCollectionView, BookPreferences, BookSummary } from "./types";
 export const BOOK_LIMITS = { books: 200, collections: 100, collectionBooks: 200, collectionMembers: 50, fragmentsPerPage: 100 } as const;
-const summarySelect = { id: true, ownerId: true, title: true, author: true, year: true, edition: true, publisher: true, identifier: true, coverColor: true, coverStyle: true, spineLabel: true, shelf: true, favorite: true, sourceName: true, mimeType: true, sourceSha256: true, originalRetained: true, convertedToText: true, retainedSha256: true, originalBytes: true, retainedBytes: true, conversionJson: true, status: true, pageCount: true, locatorKind: true, revision: true, createdAt: true, owner: { select: { name: true } }, _count: { select: { fragments: true } } } satisfies Prisma.LibraryBookSelect;
+const summarySelect = { id: true, ownerId: true, title: true, author: true, year: true, edition: true, publisher: true, identifier: true, sourceType: true, judicialJson: true, coverColor: true, coverStyle: true, spineLabel: true, shelf: true, favorite: true, sourceName: true, mimeType: true, sourceSha256: true, originalRetained: true, convertedToText: true, retainedSha256: true, originalBytes: true, retainedBytes: true, conversionJson: true, status: true, pageCount: true, locatorKind: true, revision: true, createdAt: true, owner: { select: { name: true } }, _count: { select: { fragments: true } } } satisfies Prisma.LibraryBookSelect;
 type SummaryRow = Prisma.LibraryBookGetPayload<{ select: typeof summarySelect }>;
-function summary(row: SummaryRow, ownerId: string): BookSummary { const { owner, _count, ...book } = row; return { ...book, ownerName: owner.name, owned: row.ownerId === ownerId, fragmentCount: _count.fragments, createdAt: row.createdAt.toISOString() }; }
+function sourceMetadata(row: { sourceType: string; judicialJson: string }) {
+  try { return parseStoredJudicialSource(row); }
+  catch { throw httpError("Los datos judiciales conservados no son válidos; revise la ficha antes de utilizar esta fuente", 409); }
+}
+function summary(row: SummaryRow, ownerId: string): BookSummary { const { owner, _count, judicialJson: _judicialJson, ...book } = row; void _judicialJson; return { ...book, ...sourceMetadata(row), ownerName: owner.name, owned: row.ownerId === ownerId, fragmentCount: _count.fragments, createdAt: row.createdAt.toISOString() }; }
 export async function bookTransaction<T>(client: PrismaClient, action: (tx: Prisma.TransactionClient) => Promise<T>) {
   for (let attempt = 0; ; attempt++) { try { return await client.$transaction(action, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 }); } catch (error) { if (attempt < 3 && error instanceof Prisma.PrismaClientKnownRequestError && ["P2034", "P2002"].includes(error.code)) continue; throw error; } }
 }
@@ -34,6 +39,7 @@ async function discardImportAttempt(key: string, failure?: unknown) {
 }
 export async function importBook(input: BookUpload, user: CausaAccessUser, client: PrismaClient = prisma) {
   const actor = await actorFor(user, client), metadata = bookMetadataSchema.parse(input), sourceSha256 = sha256(input.bytes), preferences = await readBookPreferences(actor, client);
+  const sourceType = bookSourceTypeSchema.parse(input.sourceType ?? "book"), judicial = normalizeJudicialMetadata(sourceType, input.judicial), judicialJson = JSON.stringify(judicial ?? {});
   const convertToText = z.boolean().parse(input.convertToText ?? preferences.defaultConvertToText), preserveOriginal = z.boolean().parse(input.preserveOriginal ?? preferences.defaultPreserveOriginal);
   if (!preserveOriginal && !convertToText) throw httpError("Para omitir el original, active la conversión a texto", 400);
   const requestId = z.string().trim().min(8).max(100).parse(input.requestId);
@@ -54,8 +60,8 @@ export async function importBook(input: BookUpload, user: CausaAccessUser, clien
     const existing = await tx.libraryBook.findUnique({ where: { ownerId_requestId: { ownerId: actor.id, requestId } }, select: { id: true, sourceSha256: true, deletedAt: true, originalRetained: true, convertedToText: true } });
     if (existing) { if (!sameImport(existing)) throw httpError("La clave de importación ya corresponde a otro archivo u opciones", 409); const book = await tx.libraryBook.findUniqueOrThrow({ where: { id: existing.id }, select: summarySelect }); return { book: summary(book, actor.id), reused: true }; }
     if (await tx.libraryBook.count({ where: { ownerId: actor.id, deletedAt: null } }) >= BOOK_LIMITS.books) throw httpError("Su biblioteca admite hasta 200 libros", 413);
-    const book = await tx.libraryBook.create({ data: { id, ownerId: actor.id, requestId, ...metadata, sourceName: input.name, mimeType: extracted.mimeType, storageKey, sourceSha256, originalRetained: preserveOriginal, convertedToText: convertToText, retainedSha256, originalBytes: input.bytes.length, retainedBytes: retained.length, conversionJson: JSON.stringify(conversion), textSha256: sha256(extracted.text), extractedText: extracted.text, status: extracted.status, pageCount, locatorKind, fragments: { create: fragments }, pages: { create: pages.map(p => ({ pageNumber: p.pageNumber, text: p.text, textSha256: p.textSha256, method: p.method, status: p.status })) } }, select: summarySelect });
-    await writeAuditStrict({ actorId: actor.id, action: "library.book.import", entityType: "LibraryBook", entityId: id, after: { sourceSha256, retainedSha256, originalRetained: preserveOriginal, convertedToText: convertToText, textSha256: sha256(extracted.text), fragments: fragments.length, pageCount } }, tx);
+    const book = await tx.libraryBook.create({ data: { id, ownerId: actor.id, requestId, ...metadata, sourceType, judicialJson, sourceName: input.name, mimeType: extracted.mimeType, storageKey, sourceSha256, originalRetained: preserveOriginal, convertedToText: convertToText, retainedSha256, originalBytes: input.bytes.length, retainedBytes: retained.length, conversionJson: JSON.stringify(conversion), textSha256: sha256(extracted.text), extractedText: extracted.text, status: extracted.status, pageCount, locatorKind, fragments: { create: fragments }, pages: { create: pages.map(p => ({ pageNumber: p.pageNumber, text: p.text, textSha256: p.textSha256, method: p.method, status: p.status })) } }, select: summarySelect });
+    await writeAuditStrict({ actorId: actor.id, action: "library.book.import", entityType: "LibraryBook", entityId: id, after: { sourceType, sourceSha256, retainedSha256, originalRetained: preserveOriginal, convertedToText: convertToText, textSha256: sha256(extracted.text), fragments: fragments.length, pageCount } }, tx);
     return { book: summary(book, actor.id), reused: false };
     });
   } catch (error) {
@@ -75,8 +81,17 @@ export async function readBook(id: string, user: CausaAccessUser, query: { after
   return { book: summary(row, actor.id), fragments, pages: await client.libraryBookPage.findMany({ where: { bookId: id }, orderBy: { pageNumber: "asc" }, select: { pageNumber: true, method: true, status: true } }), nextAfter: more ? fragments.at(-1)!.ordinal : null, limited: more };
 }
 export async function updateBook(id: string, raw: z.input<typeof bookPatchSchema>, user: CausaAccessUser, client: PrismaClient = prisma) {
-  const { revision, ...metadata } = bookPatchSchema.parse(raw);
-  return bookTransaction(client, async tx => { const { actor, book } = await bookFor(id, user, tx, true); const changed = await tx.libraryBook.updateMany({ where: { id, ownerId: actor.id, deletedAt: null, revision }, data: { ...metadata, revision: { increment: 1 } } }); if (!changed.count) throw httpError("El libro cambió; vuelva a cargarlo antes de guardar", 409); await writeAuditStrict({ actorId: actor.id, action: "library.book.customize", entityType: "LibraryBook", entityId: id, before: { revision: book.revision }, after: { revision: revision + 1, fields: Object.keys(metadata) } }, tx); return { book: summary(await tx.libraryBook.findUniqueOrThrow({ where: { id }, select: summarySelect }), actor.id) }; });
+  const { revision, sourceType: sourceTypePatch, judicial: judicialPatch, ...metadata } = bookPatchSchema.parse(raw);
+  return bookTransaction(client, async tx => {
+    const { actor, book } = await bookFor(id, user, tx, true);
+    const sourceType = sourceTypePatch ?? bookSourceTypeSchema.parse(book.sourceType);
+    const previous = book.sourceType === "book" ? null : sourceMetadata(book).judicial;
+    const judicial = sourceType === "book" ? normalizeJudicialMetadata(sourceType, judicialPatch) : normalizeJudicialMetadata(sourceType, judicialPatch === null ? null : { ...previous, ...judicialPatch });
+    const changed = await tx.libraryBook.updateMany({ where: { id, ownerId: actor.id, deletedAt: null, revision }, data: { ...metadata, sourceType, judicialJson: JSON.stringify(judicial ?? {}), revision: { increment: 1 } } });
+    if (!changed.count) throw httpError("El libro cambió; vuelva a cargarlo antes de guardar", 409);
+    await writeAuditStrict({ actorId: actor.id, action: "library.book.customize", entityType: "LibraryBook", entityId: id, before: { revision: book.revision, sourceType: book.sourceType }, after: { revision: revision + 1, sourceType, fields: [...Object.keys(metadata), ...(sourceTypePatch !== undefined ? ["sourceType"] : []), ...(judicialPatch !== undefined ? ["judicial"] : [])] } }, tx);
+    return { book: summary(await tx.libraryBook.findUniqueOrThrow({ where: { id }, select: summarySelect }), actor.id) };
+  });
 }
 export async function deleteBook(id: string, raw: z.input<typeof bookRevisionSchema>, user: CausaAccessUser, client: PrismaClient = prisma) {
   const { revision } = bookRevisionSchema.parse(raw);
@@ -133,7 +148,7 @@ export async function resolveBookCitation(input: BookCitationInput, user: CausaA
   const verificationBasis = book.originalRetained ? "original" as const : "retained_text" as const;
   const quoteSha256 = sha256(valid.quote), identity = [book.id, fragment.id, quoteSha256, fragment.textSha256, book.sourceSha256, fragment.pageNumber];
   const sourceKey = sha256(JSON.stringify(verificationBasis === "original" ? identity : [...identity, verificationBasis, book.retainedSha256]));
-  return { ...valid, sourceKind: "library_book", verificationBasis, retainedSha256: book.retainedSha256, ordinal: fragment.ordinal, quoteSha256, textSha256: fragment.textSha256, sourceSha256: book.sourceSha256, sourceKey, pageNumber: fragment.pageNumber, locatorLabel: verificationBasis === "retained_text" ? `Texto retenido · fragmento ${fragment.ordinal}` : fragment.pageNumber === null ? fragment.locatorLabel : `Página ${fragment.pageNumber}`, href: `/biblioteca/${book.id}?fragment=${fragment.ordinal}#fragment-${fragment.ordinal}`, title: book.title, author: book.author, year: book.year, edition: book.edition, publisher: book.publisher, extractionMethod, partial: book.status !== "completed" };
+  return { ...valid, ...sourceMetadata(book), sourceKind: "library_book", verificationBasis, retainedSha256: book.retainedSha256, ordinal: fragment.ordinal, quoteSha256, textSha256: fragment.textSha256, sourceSha256: book.sourceSha256, sourceKey, pageNumber: fragment.pageNumber, locatorLabel: verificationBasis === "retained_text" ? `Texto retenido · fragmento ${fragment.ordinal}` : fragment.pageNumber === null ? fragment.locatorLabel : `Página ${fragment.pageNumber}`, href: `/biblioteca/${book.id}?fragment=${fragment.ordinal}#fragment-${fragment.ordinal}`, title: book.title, author: book.author, year: book.year, edition: book.edition, publisher: book.publisher, extractionMethod, partial: book.status !== "completed" };
 }
 const collectionCreateSchema = z.object({ name: z.string().trim().min(1).max(100) }).strict();
 export const collectionPatchSchema = z.object({ revision: z.number().int().positive(), name: z.string().trim().min(1).max(100).optional(), bookIds: z.array(z.string().min(1).max(100)).max(BOOK_LIMITS.collectionBooks).optional(), memberIds: z.array(z.string().min(1).max(100)).max(BOOK_LIMITS.collectionMembers).optional() }).strict();

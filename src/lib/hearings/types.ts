@@ -1,0 +1,14 @@
+import type { BookCitation } from "@/lib/books/types";
+import type { StoredCitation } from "@/lib/knowledge/citations";
+export type HearingSourceKind = "document" | "site_file" | "book" | "legal";
+export type HearingLocation = { versionId?: string; page?: number; after?: number };
+export type HearingCitationStored = { sourceId: string; origin: "book"; snapshot: BookCitation } | { sourceId: string; origin: "knowledge"; snapshot: StoredCitation };
+export type HearingCitation = HearingCitationStored & { title: string; reference: string; locator: string; href: string; quote: string; sourceKey: string; warning: string | null };
+export type HearingSourceOption = { kind: HearingSourceKind; refId: string; title: string; detail: string; href: string };
+export type HearingSourceView = { id: string; available: false } | (HearingSourceOption & { id: string; available: true; revision: number; state: "pending" | "reading" | "reviewed"; position: number; location: HearingLocation });
+export type HearingNoteView = { id: string; available: false } | { id: string; available: true; sourceId: string | null; title: string; body: string; citation: HearingCitation | null; revision: number; updatedAt: string };
+export type HearingTurnView = { id: string; available: false } | { id: string; available: true; question: string; responseText: string; citations: HearingCitation[]; mode: "extractive" | "ai"; modelUsed: boolean; provider: string | null; model: string | null; createdAt: string };
+export type HearingWorkspaceSummary = { id: string; title: string; scheduledFor: string | null; status: "preparation" | "live" | "closed"; revision: number; updatedAt: string };
+export type HearingWorkspaceView = HearingWorkspaceSummary & { causaId: string; agendaText: string; canWrite: boolean; sources: HearingSourceView[]; notes: HearingNoteView[]; turns: HearingTurnView[]; limited: boolean };
+export type HearingLibraryView = { workspaces: HearingWorkspaceSummary[]; options: HearingSourceOption[]; canWrite: boolean; limited: boolean };
+export type HearingReading = { source: Extract<HearingSourceView, { available: true }>; title: string; locatorKind: string; page: number | null; pageCount: number | null; pages: { pageNumber: number; status: string; method: string }[]; versions: { id: string; label: string }[]; versionId: string | null; fragments: { id: string; ordinal: number; text: string; locator: string; pageNumber: number | null }[]; nextAfter: number | null; originalHref: string | null; imageHref: string | null; prepareHref: string | null; warnings: string[] };

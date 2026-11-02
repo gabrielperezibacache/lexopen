@@ -244,11 +244,18 @@ function privilegedMatterWhere(user: CausaAccessUser): Prisma.CausaWhereInput {
 }
 
 /** Flags and scoped privilege are enforced before returning candidates or bytes. */
-export function documentReadWhere(user: CausaAccessUser): Prisma.DocumentoWhereInput {
+function directDocumentReadWhere(user: CausaAccessUser): Prisma.DocumentoWhereInput {
   const confidential = can(user, "doc.confidential.read");
   const privilege = confidential && can(user, "doc.privileged.read");
   const scoped = confidential && canSome(user, "doc.privileged.read");
   return { AND: [relatedCausaWhere(user), confidential ? {} : { confidencial: false }, privilege ? {} : scoped ? { OR: [{ privilegio: false }, { autorId: user.id }, { causa: privilegedMatterWhere(user) }] } : { privilegio: false }] };
+}
+
+export function documentReadWhere(user: CausaAccessUser): Prisma.DocumentoWhereInput {
+  return { AND: [directDocumentReadWhere(user), { OR: [
+    { audioPublication: null },
+    { audioPublication: { audio: { deletedAt: null, causa: causaAccessWhere(user), sourceDocument: directDocumentReadWhere(user) } } },
+  ] }] };
 }
 
 export function siteFileReadWhere(user: CausaAccessUser): Prisma.SiteFileWhereInput {

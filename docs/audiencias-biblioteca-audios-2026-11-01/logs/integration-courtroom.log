@@ -1,0 +1,17 @@
+
+> lexopen@1.0.0 test:courtroom:integration
+> node --import tsx src/lib/audio/audio.integration.test.ts && node --import tsx src/lib/hearings/hearings.integration.test.ts && node --import tsx src/lib/knowledge/audio-transcript.integration.test.ts
+
+audit write failed Error: Synthetic audit outage
+    at Array.create (<workspace>/src/lib/audio/audio.integration.test.ts:27:113)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+audit write failed Error: Synthetic audit outage
+    at Array.create (<workspace>/src/lib/audio/audio.integration.test.ts:27:113)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+Audio integration PASS: bounded immutable original, duplicate upload race cleanup, transactional audit rollback, redacted encrypted configuration, local-only no egress, actual local multipart HTTP provider, persistent lease/concurrency/retry, source and role revocation during work, version CAS/history, explicit manual edits clearing alignment, publication v1/v2 with inherited ACL and preserved user edits, malformed/oversize provider rejection; synthetic transport only, no speech-recognition claim.
+hearings integration OK: private workspace, case/collection ACL revocation, exact quotes, redaction, notes/CAS/audit, immutable replay, no evidence/no model, genuine model only, invented quotes refused, post-model scope check, document/site/book/legal/PDF sources, original tamper, read-only case, exports
+Audio transcript citations PostgreSQL PASS: each publication's immutable review status, old/new snapshots, TXT versus voice/timing warning, common citation and research/history/verify propagation, unchanged stored source identity, original-source ACL revocation across all snapshots, retained TXT integrity and zero speech/network calls.

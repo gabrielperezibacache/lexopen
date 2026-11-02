@@ -6,6 +6,7 @@ import { researchTerms, normalizeResearchText } from "@/lib/research/search";
 import { actorFor, bookAccessWhere, collectionAccessWhere, type BookClient } from "./access";
 import { resolveBookCitation } from "./service";
 import type { BookCitation } from "./types";
+import { judicialMetadataNotice } from "./references";
 
 const identifier = z.string().min(1).max(100);
 export const BOOK_RAG_LIMITS = { books: 20, collections: 10, fragments: 3000, results: 12, quoteChars: 1800 } as const;
@@ -87,6 +88,7 @@ export async function searchBooksWithScope(raw: z.input<typeof bookSearchSchema>
   if (unverifiable) warnings.push("Se excluyeron pasajes cuyo texto, material conservado o acceso no pudo corroborarse.");
   if (citations.some(c => c.partial)) warnings.push("Hay extracciones parciales; revise su lectura y contraste el original cuando esté conservado.");
   if (citations.some(c => c.verificationBasis === "retained_text")) warnings.push("Algunas citas se corroboran contra texto conservado; sus originales no están disponibles para cotejo.");
+  if (citations.some(c => c.sourceType && c.sourceType !== "book")) warnings.push(judicialMetadataNotice);
   return { scope, result: { status: citations.length ? "completed" : "abstained", query: input.query, results: citations, coverage: { algorithm: "bm25", fragmentsConsidered: rows.length, booksSearched: scope.bookIds.length, corpusLimited, networkRequests: 0, modelUsed: false }, warnings } };
 }
 export async function searchBooks(raw: z.input<typeof bookSearchSchema>, user: CausaAccessUser, client: BookClient = prisma) { return (await searchBooksWithScope(raw, user, client)).result; }

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth/session";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { getI18n } from "@/lib/i18n/server";
+import { TranscriptionSettings } from "@/components/audio/TranscriptionSettings";
 import { LanguageSettingsPanel } from "@/components/i18n/LanguageSettingsPanel";
 import { FirmSettingsForm } from "@/components/FirmSettingsForm";
 import { LlmSettingsForm } from "@/components/LlmSettingsForm";
@@ -100,8 +101,10 @@ export default async function ConfiguracionPage() {
           })),
         }))}
       />
+      <TranscriptionSettings />
       <div id="llm-settings">
-        <LlmSettingsForm />
+        <TranscriptionSettings />
+      <LlmSettingsForm />
       </div>
       <ObsidianSettingsForm />
       <GoogleSettingsForm />
