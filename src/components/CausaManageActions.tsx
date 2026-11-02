@@ -67,10 +67,10 @@ export function CausaManageActions({
     router.refresh();
   }
 
-  const btn = compact ? "text-xs text-[var(--sea)] underline-offset-2 hover:underline" : "btn btn-ghost";
+  const btn = compact ? "inline-flex min-h-11 items-center rounded-[var(--radius-sm)] px-2 text-sm font-medium text-[var(--sea)] transition-colors hover:bg-[var(--mist)]" : "btn btn-ghost";
   const btnDanger = compact
-    ? "text-xs text-rose-700 underline-offset-2 hover:underline"
-    : "btn btn-ghost text-rose-800";
+    ? "inline-flex min-h-11 items-center rounded-[var(--radius-sm)] px-2 text-sm font-medium text-[var(--danger)] transition-colors hover:bg-[var(--mist)]"
+    : "btn btn-ghost text-[var(--danger)]";
 
   return (
     <div className={compact ? "flex flex-wrap items-center gap-2" : "space-y-2"}>
@@ -101,7 +101,7 @@ export function CausaManageActions({
         )}
       </div>
       {msg && (
-        <p className="text-xs text-[var(--ink-soft)]/75" role="status">
+        <p className="text-sm text-[var(--muted)]" role="status">
           {msg}
         </p>
       )}

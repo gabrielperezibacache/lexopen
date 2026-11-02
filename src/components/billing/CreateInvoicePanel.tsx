@@ -145,7 +145,7 @@ export function CreateInvoicePanel({
           ) : (
             <form onSubmit={onSubmit} className="mt-5 space-y-4 border-t border-[var(--line)] pt-5">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]/60">
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-[var(--ink-soft)]">
               Cliente
               <select
                 className="select"
@@ -160,7 +160,7 @@ export function CreateInvoicePanel({
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]/60">
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-[var(--ink-soft)]">
               Causa
               <select className="select" value={causaId} onChange={(e) => setCausaId(e.target.value)}>
                 <option value="">Sin causa</option>
@@ -171,7 +171,7 @@ export function CreateInvoicePanel({
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]/60">
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-[var(--ink-soft)]">
               Tipo
               <select className="select" value={tipo} onChange={(e) => setTipo(e.target.value)}>
                 {DOC_TIPOS.map((d) => (
@@ -237,7 +237,7 @@ export function CreateInvoicePanel({
               ) : (
                 <span className="text-[var(--ink-soft)]/65">Seleccione horas o gastos del cliente.</span>
               )}
-              <p className="text-xs text-[var(--ink-soft)]/60">
+              <p className="text-sm text-[var(--ink-soft)]">
                 Cálculo interno con las tasas del estudio. No es un DTE del SII.
               </p>
             </div>

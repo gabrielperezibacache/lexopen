@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
 import { labelDiasRestantes, labelUrgencia } from "@/lib/plazos";
@@ -27,6 +27,7 @@ export function PlazoForm({
   defaults?: PlazoFormDefaults;
 }) {
   const router = useRouter();
+  const fieldId = useId();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const submission = useRef(createSubmissionKeys(undefined, `lexopen:deadline:${defaults?.causaId || "global"}`));
@@ -123,11 +124,11 @@ export function PlazoForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="panel grid grid-cols-1 gap-4 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4"
+      className="panel grid grid-cols-1 gap-4 rounded-[var(--radius-lg)] p-5 sm:grid-cols-2 lg:grid-cols-4"
     >
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-sm font-medium">Título</label>
-        <input
+        <label htmlFor={`${fieldId}-titulo`} className="mb-2 block text-sm font-medium">Título</label>
+        <input id={`${fieldId}-titulo`}
           className="input"
           name="titulo"
           required
@@ -136,8 +137,8 @@ export function PlazoForm({
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Causa</label>
-        <select
+        <label htmlFor={`${fieldId}-causaId`} className="mb-2 block text-sm font-medium">Causa</label>
+        <select id={`${fieldId}-causaId`}
           className="select"
           name="causaId"
           value={causaId}
@@ -152,8 +153,8 @@ export function PlazoForm({
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Responsable</label>
-        <select className="select" name="responsableId" defaultValue="">
+        <label htmlFor={`${fieldId}-responsableId`} className="mb-2 block text-sm font-medium">Responsable</label>
+        <select id={`${fieldId}-responsableId`} className="select" name="responsableId" defaultValue="">
           <option value="">Yo / por asignar</option>
           {responsables.map((u) => (
             <option key={u.id} value={u.id}>
@@ -163,8 +164,8 @@ export function PlazoForm({
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Notificación</label>
-        <input
+        <label htmlFor={`${fieldId}-fechaNotificacion`} className="mb-2 block text-sm font-medium">Notificación</label>
+        <input id={`${fieldId}-fechaNotificacion`}
           className="input"
           type="date"
           name="fechaNotificacion"
@@ -173,8 +174,8 @@ export function PlazoForm({
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Días plazo</label>
-        <input
+        <label htmlFor={`${fieldId}-diasPlazo`} className="mb-2 block text-sm font-medium">Días plazo</label>
+        <input id={`${fieldId}-diasPlazo`}
           className="input"
           type="number"
           min="1"
@@ -185,8 +186,8 @@ export function PlazoForm({
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Cómputo</label>
-        <select
+        <label htmlFor={`${fieldId}-tipoComputo`} className="mb-2 block text-sm font-medium">Cómputo</label>
+        <select id={`${fieldId}-tipoComputo`}
           className="select"
           name="tipoComputo"
           value={tipoComputo}
@@ -201,10 +202,10 @@ export function PlazoForm({
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">
+        <label htmlFor={`${fieldId}-fechaLimite`} className="mb-2 block text-sm font-medium">
           Fecha límite directa
         </label>
-        <input
+        <input id={`${fieldId}-fechaLimite`}
           className="input"
           type="date"
           name="fechaLimite"
@@ -213,8 +214,8 @@ export function PlazoForm({
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Tipo</label>
-        <select className="select" name="tipo" defaultValue="procesal">
+        <label htmlFor={`${fieldId}-tipo`} className="mb-2 block text-sm font-medium">Tipo</label>
+        <select id={`${fieldId}-tipo`} className="select" name="tipo" defaultValue="procesal">
           <option value="procesal">Procesal</option>
           <option value="interno">Interno</option>
           <option value="audiencia">Audiencia</option>
@@ -224,8 +225,8 @@ export function PlazoForm({
         <input type="checkbox" name="esFatal" /> Fatal
       </label>
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-sm font-medium">Descripción</label>
-        <input
+        <label htmlFor={`${fieldId}-descripcion`} className="mb-2 block text-sm font-medium">Descripción</label>
+        <input id={`${fieldId}-descripcion`}
           className="input"
           name="descripcion"
           placeholder="Notas del cómputo"
@@ -236,14 +237,14 @@ export function PlazoForm({
           {busy ? "Guardando..." : "Crear plazo"}
         </button>
       </div>
-      <p className="text-xs leading-relaxed text-[var(--ink-soft)]/70 sm:col-span-2 lg:col-span-4">
+      <p className="text-xs leading-relaxed text-[var(--muted)] sm:col-span-2 lg:col-span-4">
         Hábiles: lunes a viernes, sin feriados nacionales (el sábado no se
         cuenta). Corridos: todos los días; si el último cae en sábado, domingo
         o feriado, el vencimiento pasa al día hábil siguiente. No descuenta la
         feria judicial de febrero.
       </p>
       {estimate && !estimate.error && estimate.vencimiento && (
-        <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm sm:col-span-2 lg:col-span-4">
+        <div className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 text-sm sm:col-span-2 lg:col-span-4">
           <p>
             Estimación LexOpen: <strong>{estimate.vencimiento}</strong>
             {estimate.urgencia ? (
@@ -263,7 +264,7 @@ export function PlazoForm({
               ? ` · ${labelDiasRestantes(estimate.diasRestantes)}`
               : ""}
           </p>
-          <p className="mt-1 text-xs text-[var(--ink-soft)]/70">
+          <p className="mt-1 text-xs text-[var(--muted)]">
             {estimate.disclaimer}
           </p>
           <button

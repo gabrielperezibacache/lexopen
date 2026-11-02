@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/chile";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { pageTitleClass } from "@/components/ui";
+import { FileStack, BookOpen, Newspaper, Table2, ListTodo, MessagesSquare, Users, GitBranch, LayoutDashboard } from "lucide-react";
 
 type Tab = { href: string; label: string; group: "content" | "collab" };
 
@@ -31,6 +33,20 @@ export function SiteNav({
   status?: string;
 }) {
   const { t, dict } = useI18n();
+  const navRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const revealActive = () => {
+      const selected = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      if (selected) nav.scrollLeft += selected.getBoundingClientRect().left - nav.getBoundingClientRect().left - 8;
+    };
+    revealActive();
+    const observer = new ResizeObserver(revealActive);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [active]);
   const allTabs: Tab[] = [
     { href: "", label: t("siteTabs.overview"), group: "content" },
     { href: "/archivos", label: t("siteTabs.files"), group: "content" },
@@ -52,38 +68,26 @@ export function SiteNav({
     dict.siteTabs.types[tipo as keyof typeof dict.siteTabs.types] ||
     tipo.replace("_", " ");
 
-  const groups: Array<{ key: Tab["group"]; tabs: Tab[] }> = clientView
-    ? [{ key: "content", tabs: visibleTabs }]
-    : [
-        {
-          key: "content",
-          tabs: visibleTabs.filter((tab) => tab.group === "content"),
-        },
-        {
-          key: "collab",
-          tabs: visibleTabs.filter((tab) => tab.group === "collab"),
-        },
-      ];
-
-  const breadcrumb = [clienteName, causaRit, siteName].filter(Boolean).join(" · ");
+  const icons = [LayoutDashboard, FileStack, BookOpen, Newspaper, Table2, ListTodo, MessagesSquare, Users, GitBranch];
+  const breadcrumb = [clienteName, causaRit].filter(Boolean).join(" · ");
 
   return (
-    <div className="mb-6 space-y-4">
+    <div className="mb-6 min-w-0 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <Link href={clientView ? "/portal" : "/sites"} className="text-sm text-[var(--sea)]">
+          <Link href={clientView ? "/portal" : "/sites"} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
             {clientView ? t("siteTabs.backToPortal") : t("siteTabs.backToSites")}
           </Link>
           <div className="mt-2 flex min-w-0 items-start gap-3">
             <span
-              className="mt-1.5 h-4 w-4 shrink-0 rounded-full"
+              className="mt-2.5 h-3 w-3 shrink-0 rounded-full"
               style={{ background: color }}
             />
-            <h1 className={cn(pageTitleClass, "mt-0")} title={siteName}>
+            <h1 className={cn(pageTitleClass, "mt-0 min-w-0 break-words")} title={siteName}>
               {siteName}
             </h1>
           </div>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">
             {tipoLabel}
             {isClientVisible && (
               <span className="ml-2 badge badge-sea">{t("siteTabs.portalVisible")}</span>
@@ -93,47 +97,35 @@ export function SiteNav({
             )}
           </p>
           {breadcrumb && !clientView && (
-            <p className="mt-1 text-xs text-[var(--ink-soft)]/60">{breadcrumb}</p>
+            <p className="mt-2 break-words text-sm text-[var(--ink-soft)]">{breadcrumb}</p>
           )}
         </div>
       </div>
-      <div className="relative space-y-2">
-        {groups.map((group) => (
-          <div key={group.key}>
-            {!clientView && (
-              <p className="mb-1 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
-                {t(`siteTabs.tabGroups.${group.key}`)}
-              </p>
-            )}
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-8 bg-gradient-to-l from-[var(--paper)] to-transparent md:hidden" />
-              <div className="-mx-1 overflow-x-auto overscroll-x-contain border-b border-[var(--line)] pb-1 [scrollbar-width:thin]">
-                <div className="flex min-w-max gap-1 px-1">
-                  {group.tabs.map((tab) => {
+      <nav ref={navRef} aria-label={siteName} className="max-w-full overflow-x-auto overscroll-x-contain border-b border-[var(--line)] pb-2 [scrollbar-width:thin]">
+        <div className="flex min-w-max items-center gap-1">
+          {visibleTabs.map((tab) => {
                     const href = `/sites/${siteId}${tab.href}`;
                     const isActive = active === tab.href;
+                    const Icon = icons[allTabs.indexOf(tab)];
                     return (
                       <Link
                         key={tab.href || "overview"}
                         href={href}
                         aria-current={isActive ? "page" : undefined}
                         className={cn(
-                          "rounded-t-lg px-3 py-2.5 text-sm font-medium whitespace-nowrap transition touch-manipulation",
+                          "inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium whitespace-nowrap transition-colors touch-manipulation",
                           isActive
-                            ? "bg-white text-[var(--ink)] shadow-sm"
-                            : "text-[var(--ink-soft)]/70 hover:text-[var(--ink)]"
+                            ? "bg-[var(--sea-soft)] text-[var(--sea)]"
+                            : "text-[var(--ink-soft)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"
                         )}
                       >
+                        <Icon size={16} aria-hidden="true" className="shrink-0" />
                         {tab.label}
                       </Link>
                     );
                   })}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+        </div>
+      </nav>
     </div>
   );
 }

@@ -77,7 +77,7 @@ export function DocumentDriveAction({
       <span className="inline-flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="text-xs text-[var(--sea)] underline disabled:opacity-50"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline disabled:opacity-50"
           disabled={pending || disabled || !canUpload}
           title={
             canUpload
@@ -99,14 +99,14 @@ export function DocumentDriveAction({
             href={openUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-[var(--sea)] underline"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline"
           >
             Abrir en Drive
           </a>
         )}
       </span>
-      {msg && <span className="text-[10px] text-[var(--sea)]">{msg}</span>}
-      {error && <span className="text-[10px] text-red-700">{error}</span>}
+      {msg && <span className="text-xs text-[var(--sea)]" role="status">{msg}</span>}
+      {error && <span className="text-xs text-[var(--danger)]" role="alert">{error}</span>}
     </span>
   );
 }

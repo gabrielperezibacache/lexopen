@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
+import { Dialog } from "@/components/ui/Dialog";
+import { Plus } from "lucide-react";
 
 export function NewClienteForm({
   abogados,
@@ -41,32 +43,45 @@ export function NewClienteForm({
     router.push(`/clientes/${result.data.id}`);
   }
 
-  if (!open) {
-    return (
-      <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>
-        Nuevo cliente
-      </button>
-    );
-  }
-
   return (
-    <form onSubmit={onSubmit} className="panel space-y-3 rounded-3xl p-5">
-      <h2 className="text-lg font-semibold">Nuevo cliente</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <>
+      <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>
+        <Plus size={16} aria-hidden="true" /> Nuevo cliente
+      </button>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Nuevo cliente" className="!w-[min(40rem,calc(100vw-1.5rem))]">
+      {open && <form onSubmit={onSubmit} className="space-y-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+          <span>Razón social / nombre</span>
         <input
-          className="input sm:col-span-2"
+          className="input"
           name="razonSocial"
           required
           placeholder="Razón social / nombre"
         />
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>RUT</span>
         <input className="input" name="rut" placeholder="RUT" />
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Tipo</span>
         <select className="select" name="tipo" defaultValue="empresa">
           <option value="persona">Persona natural</option>
           <option value="empresa">Empresa</option>
         </select>
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Email</span>
         <input className="input" name="email" type="email" placeholder="Email" />
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Teléfono</span>
         <input className="input" name="telefono" placeholder="Teléfono" />
-        <select className="select sm:col-span-2" name="abogadoId" defaultValue="">
+        </label>
+        <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+          <span>Abogado responsable</span>
+        <select className="select" name="abogadoId" defaultValue="">
           <option value="">Sin abogado responsable</option>
           {abogados.map((a) => (
             <option key={a.id} value={a.id}>
@@ -74,14 +89,18 @@ export function NewClienteForm({
             </option>
           ))}
         </select>
+        </label>
+        <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+          <span>Notas internas</span>
         <textarea
-          className="input sm:col-span-2"
+          className="textarea"
           name="notas"
           rows={2}
           placeholder="Notas internas"
         />
+        </label>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 border-t border-[var(--line)] pt-4">
         <button className="btn btn-primary" disabled={busy} type="submit">
           {busy ? "Guardando…" : "Crear cliente"}
         </button>
@@ -93,7 +112,9 @@ export function NewClienteForm({
           Cancelar
         </button>
       </div>
-      {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
-    </form>
+      {error && <p className="text-sm text-[var(--danger)]" role="alert">{error}</p>}
+    </form>}
+    </Dialog>
+    </>
   );
 }

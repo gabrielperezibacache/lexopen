@@ -12,7 +12,7 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   await expect(
     page.getByRole("heading", { name: /María/i })
   ).toBeVisible();
-  await expect(page.getByText("Turno de hoy")).toBeVisible();
+  await expect(page.getByTestId("inicio-composer")).toBeVisible();
 
   const hostStatusResponse = await page.request.get("/api/admin/host-status");
   expect(hostStatusResponse.ok()).toBeTruthy();

@@ -1,3 +1,4 @@
+import { BillingNav } from "@/components/billing/BillingNav";
 import { FeeForm } from "@/components/billing/FeeForm";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { causaAccessWhere as scopedcausaAccessWhere, billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
@@ -23,6 +24,7 @@ export default async function TarifasPage() {
         title="Tarifas y honorarios"
         subtitle="Condiciones por hora, suma alzada, retainer, cuota litis o mixtas — por cliente o causa."
       />
+      <BillingNav />
       <FeeForm clientes={clientes} causas={causas} />
       <div className="grid gap-4 md:grid-cols-2">
         {fees.map((f) => (

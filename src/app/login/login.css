@@ -1,0 +1,18 @@
+.login-page { min-height: 100svh; display: grid; place-items: center; padding: clamp(1rem,4vw,4rem); }
+.login-spread { display: grid; grid-template-columns: 1.05fr 1fr; width: min(100%,72rem); min-height: 42rem; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: clip; background: var(--surface-solid); }
+.login-story { display: flex; flex-direction: column; justify-content: space-between; gap: 2rem; padding: clamp(2rem,4vw,3.5rem); background: #0c1c24; color: #f3f6f4; }
+.login-wordmark { display: flex; align-items: center; gap: .75rem; }
+.login-emblem { width: 11rem; height: 11rem; color: var(--copper); margin-block: 1rem; }
+.login-story h2 { max-width: 12ch; font-size: clamp(2rem,3vw,3.35rem); line-height: 1.08; }
+.login-story p { max-width: 33ch; margin-top: 1.5rem; color: #c5d4da; line-height: 1.8; font-size: .875rem; }
+.login-story-tools { display: flex; flex-wrap: wrap; gap: 1.25rem; border-top: 1px solid rgba(232,240,242,.22); margin-top: 2rem; padding-top: 1.25rem; font-size: .875rem; color: #c5d4da; }
+.login-access { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: clamp(1.5rem,4vw,3.5rem); }
+.login-brand-mobile { display: none; }
+.login-demo { margin-top: 2rem; border-top: 1px solid var(--line); padding-top: 1.25rem; }
+@media (max-width: 767px) {
+  .login-page { padding: 1rem; }
+  .login-spread { grid-template-columns: minmax(0,1fr); max-width: 30rem; min-height: auto; }
+  .login-story { display: none; }
+  .login-brand-mobile { display: flex; }
+  .login-access { padding: 1.5rem; }
+}

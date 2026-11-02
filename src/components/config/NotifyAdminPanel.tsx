@@ -245,33 +245,46 @@ export function NotifyAdminPanel() {
           Habilitado (preferido sobre Gmail)
         </label>
         <div className="grid gap-2 md:grid-cols-2">
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[var(--ink-soft)]">
+          <span>Host</span>
           <input
-            className="rounded-xl border border-[var(--line)] bg-transparent px-3 py-2 text-sm"
+            className="input"
             placeholder="Host"
             value={smtp.host}
             onChange={(e) => setSmtp({ ...smtp, host: e.target.value })}
           />
+          </label>
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[var(--ink-soft)]">
+          <span>Remitente (From)</span>
           <input
-            className="rounded-xl border border-[var(--line)] bg-transparent px-3 py-2 text-sm"
+            className="input"
             placeholder="From"
             value={smtp.from}
             onChange={(e) => setSmtp({ ...smtp, from: e.target.value })}
           />
+          </label>
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[var(--ink-soft)]">
+          <span>Usuario</span>
           <input
-            className="rounded-xl border border-[var(--line)] bg-transparent px-3 py-2 text-sm"
+            className="input"
             placeholder="Usuario"
             value={smtp.user}
             onChange={(e) => setSmtp({ ...smtp, user: e.target.value })}
           />
+          </label>
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[var(--ink-soft)]">
+          <span>Contraseña</span>
           <input
-            className="rounded-xl border border-[var(--line)] bg-transparent px-3 py-2 text-sm"
+            className="input"
             placeholder={
               snapshot?.smtp.hasPass ? "Contraseña (sin cambio)" : "Contraseña"
             }
             type="password"
+            autoComplete="new-password"
             value={smtp.pass}
             onChange={(e) => setSmtp({ ...smtp, pass: e.target.value })}
           />
+          </label>
         </div>
         <div className="flex flex-wrap gap-2">
           <button className="btn btn-primary" type="submit">
@@ -299,27 +312,34 @@ export function NotifyAdminPanel() {
           />
           Habilitado (long-poll; TELEGRAM_POLLING=1)
         </label>
+        <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[var(--ink-soft)]">
+        <span>Usuario del bot (sin @)</span>
         <input
-          className="w-full rounded-xl border border-[var(--line)] bg-transparent px-3 py-2 text-sm"
+          className="input"
           placeholder="Bot username (sin @)"
           value={telegram.botUsername}
           onChange={(e) =>
             setTelegram({ ...telegram, botUsername: e.target.value })
           }
         />
+        </label>
+        <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[var(--ink-soft)]">
+        <span>Token del bot</span>
         <input
-          className="w-full rounded-xl border border-[var(--line)] bg-transparent px-3 py-2 text-sm"
+          className="input"
           placeholder={
             snapshot?.telegram.hasToken
               ? "Bot token (sin cambio)"
               : "Bot token"
           }
           type="password"
+          autoComplete="new-password"
           value={telegram.botToken}
           onChange={(e) =>
             setTelegram({ ...telegram, botToken: e.target.value })
           }
         />
+        </label>
         <div className="flex flex-wrap gap-2">
           <button className="btn btn-primary" type="submit">
             Guardar Telegram
@@ -346,12 +366,15 @@ export function NotifyAdminPanel() {
           />
           Habilitado
         </label>
+        <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[var(--ink-soft)]">
+        <span>Contacto del servicio (mailto: o https:)</span>
         <input
-          className="w-full rounded-xl border border-[var(--line)] bg-transparent px-3 py-2 text-sm"
+          className="input"
           placeholder="mailto: o https: subject"
           value={webpush.subject}
           onChange={(e) => setWebpush({ ...webpush, subject: e.target.value })}
         />
+        </label>
         {snapshot?.webpush.publicKey && (
           <p className="break-all text-xs text-[var(--ink-soft)]/60">
             Public key: {snapshot.webpush.publicKey}

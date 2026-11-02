@@ -15,11 +15,11 @@ function Row({
 }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--line)]/70 py-2 text-sm last:border-0">
-      <div>
+      <div className="min-w-0 [overflow-wrap:anywhere]">
         <div className="font-medium text-[var(--ink)]">{label}</div>
         {hint && <div className="text-xs text-[var(--ink-soft)]/60">{hint}</div>}
       </div>
-      <div className="text-right text-[var(--ink-soft)]/85">{value}</div>
+      <div className="min-w-0 text-[var(--ink-soft)]/85 [overflow-wrap:anywhere] sm:text-right">{value}</div>
     </div>
   );
 }
@@ -149,7 +149,7 @@ export function PjudSettingsPanel() {
             hint="Variable CAPTCHA_SOLVER_FALLBACK"
           />
           {pjud.captchaSnippet && (
-            <pre className="mt-3 overflow-x-auto rounded-xl bg-[var(--ink)] p-3 text-[11px] text-white/85">
+            <pre className="mt-3 overflow-x-auto rounded-xl bg-[#0c1c24] p-3 text-xs text-white/85">
               {pjud.captchaSnippet}
             </pre>
           )}
@@ -216,7 +216,7 @@ export function PjudSettingsPanel() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[var(--line)] bg-white/60 p-4 text-xs text-[var(--ink-soft)]/75">
+      <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-xs text-[var(--ink-soft)]/75">
         <p className="font-medium text-[var(--ink)]">Flags de entorno (presencia)</p>
         <ul className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
           {Object.entries(pjud.env).map(([k, v]) => (

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/PageHeader";
 import {
   CalendarioBoard,
   type BoardDay,
@@ -7,7 +8,7 @@ import {
   type EventoListItem,
 } from "@/components/calendario/CalendarioClient";
 import { GoogleCalendarPullButton } from "@/components/calendario/GoogleCalendarPullButton";
-import { UrgenciaBadge, pageTitleClass } from "@/components/ui";
+import { UrgenciaBadge } from "@/components/ui";
 import { causaAccessWhere as scopedcausaAccessWhere, relatedCausaWhere as scopedrelatedCausaWhere, plazoAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere, taskAccessWhere as scopedtaskAccessWhere } from "@/lib/auth/causa-access";
 import { requireStaff } from "@/lib/auth/session";
 import {
@@ -336,106 +337,62 @@ export default async function CalendarioPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            Agenda del estudio
-          </p>
-          <h1 className={pageTitleClass}>Calendario</h1>
-          <p className="mt-2 text-sm text-[var(--ink-soft)]/80 sm:text-base">
-            Plazos procesales, tareas, eventos y audiencias. Arrastre eventos
-            (verde) entre días en mes o semana.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2 text-sm">
-            {(
-              [
-                ["mes", "Mes"],
-                ["semana", "Semana"],
-                ["agenda", "Agenda"],
-              ] as const
-            ).map(([value, label]) => (
-              <Link
-                key={value}
-                href={qs({ vista: value })}
-                className={`rounded-full px-3 py-1 ${
-                  vista === value
-                    ? "bg-[var(--ink)] text-white"
-                    : "bg-white/70 text-[var(--ink-soft)]"
-                }`}
-                data-testid={`cal-vista-${value}`}
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2 text-sm">
-            {[
-              ["todos", "Todos"],
-              ["plazo", "Plazos"],
-              ["tarea", "Tareas"],
-              ["audiencia", "Audiencias"],
-              ["evento", "Eventos"],
-            ].map(([value, label]) => (
-              <Link
-                key={value}
-                href={qs({ tipo: value })}
-                className={`rounded-full px-3 py-1 ${
-                  filterTipo === value
-                    ? "bg-[var(--sea)] text-white"
-                    : "bg-white/70 text-[var(--ink-soft)]"
-                }`}
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        </div>
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+      <PageHeader
+        title="Calendario"
+        subtitle="Plazos procesales, tareas, eventos y audiencias. Arrastre eventos (verde) entre días en mes o semana."
+        actions={<>
           <GoogleCalendarPullButton />
-          <Link href={qs({ nuevo: "1" })} className="btn btn-primary flex-1 sm:flex-none">
-            Nuevo evento
-          </Link>
-          <Link
-            href={
-              vista === "semana"
-                ? qs({ semana: prevSemana })
-                : qs({ ym: prevYm })
-            }
-            className="btn btn-ghost flex-1 sm:flex-none"
-            aria-label={vista === "semana" ? "Semana anterior" : "Mes anterior"}
-          >
-            ← <span className="sm:hidden">Ant.</span>
-            <span className="hidden sm:inline">Anterior</span>
-          </Link>
-          <Link href="/calendario" className="btn btn-secondary flex-1 sm:flex-none">
-            Hoy
-          </Link>
-          <Link
-            href={
-              vista === "semana"
-                ? qs({ semana: nextSemana })
-                : qs({ ym: nextYm })
-            }
-            className="btn btn-ghost flex-1 sm:flex-none"
-            aria-label={vista === "semana" ? "Semana siguiente" : "Mes siguiente"}
-          >
-            <span className="sm:hidden">Sig.</span>
-            <span className="hidden sm:inline">Siguiente</span> →
-          </Link>
-        </div>
+          <Link href={qs({ nuevo: "1" })} className="btn btn-primary">Nuevo evento</Link>
+        </>}
+      />
+      <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+        <nav aria-label="Vista del calendario" className="flex w-fit max-w-full flex-wrap gap-1 rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface)] p-1">
+          {([["mes", "Mes"], ["semana", "Semana"], ["agenda", "Agenda"]] as const).map(([value, label]) => (
+            <Link
+              key={value}
+              href={qs({ vista: value })}
+              className={`inline-flex min-h-11 items-center justify-center rounded-[var(--radius-sm)] px-4 text-sm font-medium transition-colors ${vista === value ? "bg-[var(--ink)] text-[var(--paper)]" : "text-[var(--muted)] hover:bg-[var(--mist)]"}`}
+              data-testid={`cal-vista-${value}`}
+              aria-current={vista === value ? "page" : undefined}
+            >{label}</Link>
+          ))}
+        </nav>
+        <nav aria-label="Tipo de actividad" className="flex flex-wrap gap-2">
+          {[["todos", "Todos"], ["plazo", "Plazos"], ["tarea", "Tareas"], ["audiencia", "Audiencias"], ["evento", "Eventos"]].map(([value, label]) => (
+            <Link
+              key={value}
+              href={qs({ tipo: value })}
+              className={`inline-flex min-h-11 items-center rounded-[var(--radius-sm)] px-3 text-sm font-medium transition-colors ${filterTipo === value ? "bg-[var(--sea)] text-white" : "text-[var(--muted)] hover:bg-[var(--mist)]"}`}
+              aria-current={filterTipo === value ? "page" : undefined}
+            >{label}</Link>
+          ))}
+        </nav>
       </div>
 
-      <section className="panel rounded-3xl p-4">
-        <h2 className="mb-3 text-center text-lg font-semibold capitalize">
-          {heading}
-        </h2>
+      <section className="panel rounded-[var(--radius-lg)] p-4 sm:p-5">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] pb-4">
+          <h2 className="w-full text-lg font-semibold capitalize sm:w-auto">{heading}</h2>
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+            <Link
+              href={vista === "semana" ? qs({ semana: prevSemana }) : qs({ ym: prevYm })}
+              className="btn btn-ghost flex-1 sm:flex-none"
+              aria-label={vista === "semana" ? "Semana anterior" : "Mes anterior"}
+            >← <span className="sm:hidden">Ant.</span><span className="hidden sm:inline">Anterior</span></Link>
+            <Link href="/calendario" className="btn btn-secondary flex-1 sm:flex-none">Hoy</Link>
+            <Link
+              href={vista === "semana" ? qs({ semana: nextSemana }) : qs({ ym: nextYm })}
+              className="btn btn-ghost flex-1 sm:flex-none"
+              aria-label={vista === "semana" ? "Semana siguiente" : "Mes siguiente"}
+            ><span className="sm:hidden">Sig.</span><span className="hidden sm:inline">Siguiente</span> →</Link>
+          </div>
+        </div>
 
         {/* Mobile: always agenda list */}
         <div className="space-y-3 md:hidden">
           {agendaDays.map(({ ymd, p, t, a, ev }) => (
             <div
               key={ymd}
-              className="rounded-2xl border border-[var(--line)] bg-white/60 px-3 py-3"
+              className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-3"
             >
               <div className="text-sm font-semibold">{dayLabel(ymd)}</div>
               <div className="mt-2 space-y-1.5">
@@ -487,7 +444,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
             </div>
           ))}
           {agendaDays.length === 0 && (
-            <p className="text-sm text-[var(--ink-soft)]/65">
+            <p className="text-sm text-[var(--muted)]">
               Sin eventos en este periodo para el filtro seleccionado.
             </p>
           )}
@@ -500,7 +457,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
               {agendaDays.map(({ ymd, p, t, a, ev }) => (
                 <div
                   key={ymd}
-                  className="rounded-2xl border border-[var(--line)] bg-white/60 px-3 py-3"
+                  className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-3"
                 >
                   <div className="text-sm font-semibold">{dayLabel(ymd)}</div>
                   <div className="mt-2 space-y-1.5 text-sm">
@@ -542,7 +499,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
                 </div>
               ))}
               {agendaDays.length === 0 && (
-                <p className="text-sm text-[var(--ink-soft)]/65">
+                <p className="text-sm text-[var(--muted)]">
                   Sin eventos en este periodo.
                 </p>
               )}
@@ -565,20 +522,20 @@ export default async function CalendarioPage({ searchParams }: Props) {
         currentYm={currentYm}
       />
 
-      <section className="panel rounded-3xl p-5">
+      <section className="panel rounded-[var(--radius-lg)] p-5">
         <h2 className="text-lg font-semibold">Próximos plazos</h2>
         <div className="mt-4 space-y-2">
           {upcomingPlazos.map((p) => (
             <div
               key={p.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--line)] px-3 py-2 text-sm"
             >
               <div className="min-w-0">
                 <div className="font-medium break-words">
                   {p.esFatal ? "Fatal · " : ""}
                   {p.titulo}
                 </div>
-                <div className="text-xs text-[var(--ink-soft)]/65">
+                <div className="text-xs text-[var(--muted)]">
                   {p.causa?.rit || "Sin causa"} · {labelTipoComputo(p.tipoComputo)} ·{" "}
                   {formatCivilDate(p.fechaLimite)}
                 </div>
@@ -587,7 +544,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
             </div>
           ))}
           {upcomingPlazos.length === 0 && (
-            <p className="text-sm text-[var(--ink-soft)]/65">No hay plazos pendientes.</p>
+            <p className="text-sm text-[var(--muted)]">No hay plazos pendientes.</p>
           )}
         </div>
       </section>

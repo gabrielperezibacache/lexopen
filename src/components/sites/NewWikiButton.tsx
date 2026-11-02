@@ -1,5 +1,8 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+import { WorkspaceField } from "./WorkspaceField";
+
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
@@ -39,14 +42,8 @@ export function NewWikiButton({ siteId }: { siteId: string }) {
         Nueva página
       </button>
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="new-wiki-title"
-        >
-          <form onSubmit={onSubmit} className="panel w-full max-w-lg space-y-3 rounded-3xl p-6">
-            <h3 id="new-wiki-title" className="text-lg font-semibold">Nueva página wiki</h3>
+        <Dialog open onClose={() => setOpen(false)} title="Nueva página wiki">
+          <form onSubmit={onSubmit} className="space-y-4">
             <WikiBorradorAi
               siteId={siteId}
               onApply={(draft) => {
@@ -54,21 +51,21 @@ export function NewWikiButton({ siteId }: { siteId: string }) {
                 if (draft.content) setContent(draft.content);
               }}
             />
-            <input
+            <WorkspaceField label="Título"><input
               className="input"
               name="title"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Título"
-            />
-            <textarea
+            /></WorkspaceField>
+            <WorkspaceField label="Contenido en Markdown"><textarea
               className="textarea min-h-[180px]"
               name="content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Escriba en Markdown: títulos (#), listas (-), negrita (**texto**)"
-            />
+            /></WorkspaceField>
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
               <button
@@ -84,7 +81,7 @@ export function NewWikiButton({ siteId }: { siteId: string }) {
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </>
   );

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Scale,
   Inbox,
   LayoutDashboard,
   Home,
@@ -32,6 +31,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/chile";
+import { FolioSymbol } from "@/components/ui/FolioSymbol";
 import { STAFF_ROLES, type Role } from "@/lib/auth/roles";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
@@ -72,7 +72,7 @@ function NavGroup({
   return (
     <div className="mb-4">
       {!collapsed && (
-        <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">
+        <div className="px-3 pb-2 text-xs font-medium text-white/65">
           {title}
         </div>
       )}
@@ -232,13 +232,13 @@ function SidebarChrome({
             className={cn("flex min-w-0 flex-1 items-center gap-3", collapsed && "justify-center")}
             onClick={onNavigate}
           >
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] shadow-[0_10px_24px_rgba(196,122,58,0.35)]">
-              <Scale size={18} />
+            <span className="folio-brand grid h-11 w-11 shrink-0 place-items-center rounded-xl">
+              <FolioSymbol className="h-8 w-8" />
             </span>
             {!collapsed && (
               <div className="min-w-0">
                 <div className="display text-xl leading-none">LexOpen</div>
-                <div className="mt-1 truncate text-[11px] uppercase tracking-[0.16em] text-white/55">
+                <div className="mt-1 truncate text-xs text-white/70">
                   {t("brand.tagline")}
                 </div>
               </div>

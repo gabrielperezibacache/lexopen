@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { labelSemaforo, type Semaforo } from "@/lib/pjud/classify";
@@ -191,24 +192,11 @@ export default function MonitoreoCausasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            Pulso judicial
-          </p>
-          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">
-            Cartera PJUD
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-[var(--ink-soft)]/80 sm:text-base">
-            Esta vista es el pulso judicial (semáforo, sync, CSV). El expediente
-            se edita en{" "}
-            <Link href="/causas" className="text-[var(--sea)]">
-              Expediente
-            </Link>
-            . ClaveÚnica se configura en su pestaña, no aquí.
-          </p>
-        </div>
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+      <PageHeader
+        title="Cartera PJUD"
+        subtitle={<>Esta vista es el pulso judicial (semáforo, sync, CSV). El expediente se edita en <Link href="/causas" className="text-[var(--sea)] hover:underline">Expediente</Link>. ClaveÚnica se configura en su pestaña, no aquí.</>}
+        actions={
+          <>
           <Link
             className="btn btn-secondary"
             href="/api/causas/monitoreo?format=csv"
@@ -270,8 +258,9 @@ export default function MonitoreoCausasPage() {
           >
             {busy ? "Sincronizando…" : "Sincronizar monitoreadas"}
           </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {msg && (
         <div className="flex flex-wrap items-start justify-between gap-2 text-sm text-[var(--ink-soft)]/80">
@@ -289,7 +278,7 @@ export default function MonitoreoCausasPage() {
       <PjudQuickAddPanel />
 
       {resumen && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-6 border-y border-[var(--line)] py-5 sm:grid-cols-3 xl:grid-cols-6">
           {[
             { label: "Cartera", value: resumen.total },
             { label: "Monitoreadas", value: resumen.monitoreadas },
@@ -298,18 +287,18 @@ export default function MonitoreoCausasPage() {
             { label: "Críticas", value: resumen.rojas },
             { label: "Fallidas", value: resumen.fallidas },
           ].map((s) => (
-            <div key={s.label} className="panel rounded-2xl px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
+            <div key={s.label}>
+              <dt className="text-sm text-[var(--muted)]">
                 {s.label}
-              </div>
-              <div className="display mt-1 text-3xl">{s.value}</div>
+              </dt>
+              <dd className="display mt-2 text-3xl tabular-nums">{s.value}</dd>
             </div>
           ))}
-        </div>
+        </dl>
       )}
 
       {fallidos.length > 0 && (
-        <section className="rounded-3xl border border-rose-200 bg-rose-50/60 p-4">
+        <section className="rounded-[var(--radius-lg)] border border-rose-200 bg-rose-50/60 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-rose-800">
               Fallidos ({fallidos.length})
@@ -353,7 +342,7 @@ export default function MonitoreoCausasPage() {
       )}
 
       {(resumen?.fallidas ?? 0) > 0 && fallidos.length === 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
           <p>
             Hay {resumen?.fallidas} causa(s) con fallo de sync marcado. Puede
             limpiar los avisos sin reintentar.
@@ -385,35 +374,39 @@ export default function MonitoreoCausasPage() {
             <button
               key={key}
               type="button"
-              className={`rounded-full border px-3 py-1 text-sm ${
+              className={`inline-flex min-h-11 items-center rounded-[var(--radius-sm)] border px-3 py-2 text-sm font-medium transition-colors ${
                 filter === key
                   ? "border-[var(--sea)] bg-[var(--sea)]/10 text-[var(--ink)]"
-                  : "border-[var(--line)] text-[var(--ink-soft)]/75"
+                  : "border-[var(--line)] text-[var(--muted)]"
               }`}
               onClick={() => setFilter(key)}
+              aria-pressed={filter === key}
             >
               {label}
             </button>
           ))}
         </div>
+        <label className="block w-full space-y-2 text-sm font-medium sm:ml-auto sm:max-w-sm">
+          <span>Buscar causa</span>
         <input
-          className="input w-full max-w-xs sm:ml-auto"
+          className="input"
           placeholder="Buscar RIT, título, sala, cliente…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        </label>
       </div>
 
-      <div className="overflow-x-auto rounded-3xl border border-[var(--line)] bg-white/60">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-[var(--line)] text-xs uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
-            <tr>
-              <th className="px-4 py-3">Actividad PJUD</th>
-              <th className="px-4 py-3">Causa</th>
-              <th className="px-4 py-3">Tribunal / Sala</th>
-              <th className="px-4 py-3">Último movimiento</th>
-              <th className="px-4 py-3">Días</th>
-              <th className="px-4 py-3">Sync</th>
+      <div className="panel overflow-x-auto rounded-[var(--radius-lg)]">
+        <table role="table" className="data-table min-w-full text-left text-sm">
+          <thead className="border-b border-[var(--line)] text-sm text-[var(--muted)]">
+            <tr role="row">
+              <th role="columnheader" scope="col" className="px-4 py-3">Actividad PJUD</th>
+              <th role="columnheader" scope="col" className="px-4 py-3">Causa</th>
+              <th role="columnheader" scope="col" className="px-4 py-3">Tribunal / Sala</th>
+              <th role="columnheader" scope="col" className="px-4 py-3">Último movimiento</th>
+              <th role="columnheader" scope="col" className="px-4 py-3">Días</th>
+              <th role="columnheader" scope="col" className="px-4 py-3">Sync</th>
             </tr>
           </thead>
           <tbody>
@@ -424,38 +417,38 @@ export default function MonitoreoCausasPage() {
                 pjudSource: i.pjudSource,
               });
               return (
-              <tr key={i.id} className="border-b border-[var(--line)]/70">
-                <td className="px-4 py-3">
+              <tr role="row" key={i.id} className="border-b border-[var(--line)]/70">
+                <td role="cell" data-label="Actividad PJUD" className="px-4 py-3">
                   <span className="inline-flex items-center gap-2">
                     <span
                       className={`h-2.5 w-2.5 rounded-full ${DOT[i.semaforo]}`}
                     />
                     {labelSemaforo(i.semaforo)}
                     {i.failed && (
-                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-rose-700">
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs uppercase tracking-wide text-rose-700">
                         fallido
                       </span>
                     )}
                   </span>
                 </td>
-                <td className="px-4 py-3">
+                <td role="cell" data-label="Causa" className="data-table-primary px-4 py-3">
                   <Link
                     href={`/causas/${i.id}?from=monitoreo`}
                     className="font-medium text-[var(--sea)]"
                   >
                     {i.rit || i.titulo}
                   </Link>
-                  <div className="text-xs text-[var(--ink-soft)]/60">
+                  <div className="text-xs text-[var(--muted)]">
                     {i.cliente?.razonSocial || "—"} ·{" "}
                     {i.abogado?.name || "Sin abogado"}
                     {i.monitoreoActivo ? " · ON" : ""}
                     {origen ? ` · ${origen}` : ""}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-[var(--ink-soft)]/80">
+                <td role="cell" data-label="Tribunal / Sala" className="px-4 py-3 text-[var(--ink-soft)]/80">
                   <div>{i.tribunal}</div>
                   {i.sala && (
-                    <div className="text-xs text-[var(--ink-soft)]/60">
+                    <div className="text-xs text-[var(--muted)]">
                       Sala {i.sala}
                     </div>
                   )}
@@ -469,13 +462,13 @@ export default function MonitoreoCausasPage() {
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3">
+                <td role="cell" data-label="Último movimiento" className="px-4 py-3">
                   {i.lastMovimiento ? (
                     <>
-                      <div className="max-w-xs truncate">
+                      <div className="max-w-xs break-words">
                         {i.lastMovimiento.titulo}
                       </div>
-                      <div className="text-xs text-[var(--ink-soft)]/60">
+                      <div className="text-xs text-[var(--muted)]">
                         {new Date(i.lastMovimiento.fecha).toLocaleDateString(
                           "es-CL"
                         )}{" "}
@@ -489,12 +482,12 @@ export default function MonitoreoCausasPage() {
                     "—"
                   )}
                 </td>
-                <td className="px-4 py-3">
+                <td role="cell" data-label="Días" className="px-4 py-3">
                   {i.diasSinMovimiento === null
                     ? "—"
                     : `${i.diasSinMovimiento}d`}
                 </td>
-                <td className="px-4 py-3 text-xs text-[var(--ink-soft)]/65">
+                <td role="cell" data-label="Sync" className="px-4 py-3 text-xs text-[var(--muted)]">
                   <div>
                     Último: {fmtShort(i.lastSyncAt)}
                     {i.lastSyncStatus
@@ -504,7 +497,7 @@ export default function MonitoreoCausasPage() {
                   <div>Próximo: {fmtShort(i.nextSyncAt)}</div>
                   {i.lastSyncNote && (
                     <div
-                      className="mt-0.5 max-w-[14rem] truncate text-[var(--copper)]"
+                      className="mt-1 max-w-[18rem] break-words text-[var(--copper-deep)]"
                       title={i.lastSyncNote}
                     >
                       {i.lastSyncNote}
@@ -515,10 +508,10 @@ export default function MonitoreoCausasPage() {
               );
             })}
             {filtered.length === 0 && (
-              <tr>
-                <td
+              <tr role="row">
+                <td role="cell"
                   colSpan={6}
-                  className="px-4 py-8 text-center text-[var(--ink-soft)]/65"
+                  className="px-4 py-8 text-center text-[var(--muted)]"
                 >
                   No hay causas con este filtro.{" "}
                   {filter === "monitoreadas" ? (

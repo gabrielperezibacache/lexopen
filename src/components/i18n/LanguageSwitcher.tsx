@@ -18,14 +18,14 @@ export function LanguageSwitcher({
     variant === "dark"
       ? "border-white/20 bg-white/5 text-white"
       : variant === "compact"
-        ? "border-[var(--line)] bg-white/80 text-[var(--ink)] text-xs"
-        : "border-[var(--line)] bg-white text-[var(--ink)]";
+        ? "border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] text-xs"
+        : "border-[var(--line)] bg-[var(--surface-solid)] text-[var(--ink)]";
 
   return (
     <label className={`inline-flex items-center gap-2 ${className}`}>
       <span className="sr-only">{t("common.language")}</span>
       <select
-        className={`rounded-full border px-3 py-1.5 font-medium outline-none focus:ring-2 focus:ring-[var(--sea)]/40 ${base}`}
+        className={`min-h-11 rounded-full border px-3 py-1.5 font-medium outline-none focus:ring-2 focus:ring-[var(--sea)]/40 ${base}`}
         value={locale}
         disabled={pending}
         aria-label={t("common.language")}

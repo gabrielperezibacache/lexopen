@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/PageHeader";
 import { MinutaDetailActions } from "@/components/minutas/MinutaDetailActions";
 import { formatDateTime } from "@/components/ui";
 import { requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
@@ -50,12 +51,15 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link href={`/causas/${id}`} className="text-sm text-[var(--sea)]">
-            ← {minuta.causa.titulo}
-          </Link>
-          <div className="mt-3 flex flex-wrap gap-2">
+      <Link href={`/causas/${id}`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
+        ← {minuta.causa.titulo}
+      </Link>
+      <PageHeader
+        title={minuta.titulo}
+        subtitle={<>{formatDateTime(minuta.fecha)} · {minuta.autor?.name || "Sin autor"} · {minuta.causa.rit || "Sin RIT"}</>}
+        actions={<Link href={`/causas/${id}/minuta/nueva?tipo=${minuta.tipo}`} className="btn btn-primary">Nueva minuta</Link>}
+      />
+          <div className="flex flex-wrap gap-2">
             <span className="badge badge-sea">{labelTipoMinuta(minuta.tipo)}</span>
             <span className="badge badge-ink">
               {labelModalidadMinuta(minuta.modalidad)}
@@ -64,23 +68,9 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
               <span className="badge badge-pendiente">confidencial</span>
             )}
           </div>
-          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">{minuta.titulo}</h1>
-          <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
-            {formatDateTime(minuta.fecha)} ·{" "}
-            {minuta.autor?.name || "Sin autor"} ·{" "}
-            {minuta.causa.rit || "Sin RIT"}
-          </p>
-        </div>
-        <Link
-          href={`/causas/${id}/minuta/nueva?tipo=${minuta.tipo}`}
-          className="btn btn-primary"
-        >
-          Nueva minuta
-        </Link>
-      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="panel space-y-5 rounded-3xl p-5 lg:col-span-2">
+        <div className="panel space-y-5 rounded-[var(--radius-lg)] p-5 lg:col-span-2">
           <section>
             <h2 className="text-lg font-semibold">Resumen ejecutivo</h2>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[var(--ink-soft)]/90">
@@ -122,26 +112,26 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
         </div>
 
         <aside className="space-y-4">
-          <div className="panel rounded-3xl p-5 text-sm">
+          <div className="panel rounded-[var(--radius-lg)] p-5 text-sm">
             <h2 className="text-lg font-semibold">Contexto</h2>
             <dl className="mt-3 space-y-2">
               <div>
-                <dt className="text-[var(--ink-soft)]/55">Lugar</dt>
+                <dt className="text-[var(--muted)]">Lugar</dt>
                 <dd className="font-medium">{minuta.lugar || "—"}</dd>
               </div>
               <div>
-                <dt className="text-[var(--ink-soft)]/55">Participantes</dt>
+                <dt className="text-[var(--muted)]">Participantes</dt>
                 <dd className="font-medium">{minuta.participantes || "—"}</dd>
               </div>
               <div>
-                <dt className="text-[var(--ink-soft)]/55">Documento</dt>
+                <dt className="text-[var(--muted)]">Documento</dt>
                 <dd className="font-medium">
                   {minuta.documento?.nombre || "—"}
                 </dd>
               </div>
               {minuta.googleDriveFileId && (
                 <div>
-                  <dt className="text-[var(--ink-soft)]/55">Drive</dt>
+                  <dt className="text-[var(--muted)]">Drive</dt>
                   <dd className="font-medium">
                     <a
                       href={driveFileUrl(minuta.googleDriveFileId)}

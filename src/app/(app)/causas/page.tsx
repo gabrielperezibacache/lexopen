@@ -146,26 +146,26 @@ export default async function CausasPage({
       <CausasFilters defaultEstado={estado || ""} />
 
       {total > 0 ? (
-        <p className="text-xs text-[var(--ink-soft)]/65">
+        <p className="text-xs text-[var(--muted)]">
           {interpolate(t("causas.showing"), { from, to, total })}
           {estado === "activa" ? t("causas.showingActive") : estado ? ` (${estado})` : ""}
           .
         </p>
       ) : null}
-      <div className="panel overflow-hidden rounded-3xl">
+      <div className="panel overflow-hidden rounded-[var(--radius-lg)]">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[var(--ink)] text-white/90">
-              <tr>
-                <th className="px-4 py-3 font-medium">{t("causas.colCase")}</th>
-                <th className="px-4 py-3 font-medium">{t("causas.colCourt")}</th>
-                <th className="px-4 py-3 font-medium">{t("causas.colMatter")}</th>
-                <th className="px-4 py-3 font-medium">{t("causas.colStage")}</th>
-                <th className="px-4 py-3 font-medium">{t("causas.colProcedural")}</th>
-                <th className="px-4 py-3 font-medium">{t("causas.colOrigin")}</th>
-                <th className="px-4 py-3 font-medium">{t("causas.colPjud")}</th>
-                <th className="px-4 py-3 font-medium">{t("causas.colUpdated")}</th>
-                <th className="px-4 py-3 font-medium">{t("causas.colActions")}</th>
+          <table role="table" className="data-table min-w-full text-left text-sm">
+            <thead className="border-b border-[var(--line)] text-[var(--muted)]">
+              <tr role="row">
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("causas.colCase")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("causas.colCourt")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("causas.colMatter")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("causas.colStage")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("causas.colProcedural")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("causas.colOrigin")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("causas.colPjud")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("causas.colUpdated")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("causas.colActions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -187,28 +187,28 @@ export default async function CausasPage({
                       ? t("causas.daysToday")
                       : interpolate(t("causas.daysAgo"), { n: dias });
                 return (
-                  <tr key={c.id} className="table-row">
-                    <td className="px-4 py-3">
+                  <tr role="row" key={c.id} className="table-row">
+                    <td role="cell" data-label={t("causas.colCase")} className="data-table-primary px-4 py-3">
                       <Link
                         href={`/causas/${c.id}`}
                         className="font-medium hover:text-[var(--sea)]"
                       >
                         {c.titulo}
                       </Link>
-                      <div className="mt-1 text-xs text-[var(--ink-soft)]/65">
+                      <div className="mt-1 text-xs text-[var(--muted)]">
                         {c.rit || "Sin RIT"} ·{" "}
                         {c.cliente?.razonSocial || "Sin cliente"} ·{" "}
                         {c._count.documentos} docs · {c._count.plazos} plazos
                       </div>
                     </td>
-                    <td className="px-4 py-3">{c.tribunal}</td>
-                    <td className="px-4 py-3">{labelMateria(c.materia)}</td>
-                    <td className="px-4 py-3">{labelEtapa(c.etapa)}</td>
-                    <td className="px-4 py-3">
+                    <td role="cell" data-label={t("causas.colCourt")} className="px-4 py-3">{c.tribunal}</td>
+                    <td role="cell" data-label={t("causas.colMatter")} className="px-4 py-3">{labelMateria(c.materia)}</td>
+                    <td role="cell" data-label={t("causas.colStage")} className="px-4 py-3">{labelEtapa(c.etapa)}</td>
+                    <td role="cell" data-label={t("causas.colProcedural")} className="px-4 py-3">
                       <StatusBadge estado={c.estado} />
                     </td>
-                    <td className="px-4 py-3 text-xs">{origenLabel}</td>
-                    <td className="px-4 py-3">
+                    <td role="cell" data-label={t("causas.colOrigin")} className="px-4 py-3 text-xs">{origenLabel}</td>
+                    <td role="cell" data-label={t("causas.colPjud")} className="px-4 py-3">
                       {c.pjudMonitoreoActivo ? (
                         <div className="flex flex-col gap-0.5">
                           <span className="inline-flex items-center gap-1.5 text-xs">
@@ -218,22 +218,22 @@ export default async function CausasPage({
                                 title={labelSemaforo(semaforo)}
                               />
                             ) : null}
-                            <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+                            <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-800">
                               {t("causas.pjudOn")}
                             </span>
                           </span>
-                          <span className="text-[11px] text-[var(--ink-soft)]/65">
+                          <span className="text-xs text-[var(--muted)]">
                             {diasLabel}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-xs text-[var(--ink-soft)]/50">
+                        <span className="text-xs text-[var(--muted)]">
                           {t("causas.pjudOff")}
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3">{formatDate(c.updatedAt)}</td>
-                    <td className="px-4 py-3">
+                    <td role="cell" data-label={t("causas.colUpdated")} className="px-4 py-3">{formatDate(c.updatedAt)}</td>
+                    <td role="cell" data-label={t("causas.colActions")} className="data-table-actions px-4 py-3">
                       <CausaManageActions
                         causaId={c.id}
                         titulo={c.titulo}
@@ -246,10 +246,10 @@ export default async function CausasPage({
                 );
               })}
               {causas.length === 0 && (
-                <tr>
-                  <td
+                <tr role="row">
+                  <td role="cell"
                     colSpan={9}
-                    className="px-4 py-10 text-center text-[var(--ink-soft)]/70"
+                    className="px-4 py-10 text-center text-[var(--muted)]"
                   >
                     {hasExtraFilters ? (
                       <>

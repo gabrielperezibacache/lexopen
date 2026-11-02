@@ -1,0 +1,34 @@
+.unified-search-page { min-width: 0; color: var(--ink); }
+.unified-search-page :where(button,a,input):focus-visible { outline: 2px solid var(--sea); outline-offset: 4px; }
+.unified-search-page .btn { min-height: 44px; }
+.unified-search-form { align-items: stretch; min-width: 0; border-radius: 12px; }
+.unified-search-form > input { flex: 1 1 0; width: 100%; min-width: 0; font-size: 1rem; }
+.unified-search-form > .btn { flex-shrink: 0; min-width: 120px; }
+.unified-search-page > [role="status"]:empty { display: none; }
+.unified-search-error { border: 1px solid color-mix(in srgb,var(--danger) 25%,var(--line)); border-radius: 10px; background: color-mix(in srgb,var(--danger) 6%,var(--surface-solid)); color: var(--danger); line-height: 1.75; }
+.unified-search-intro { max-width: 48rem; padding: 1.5rem .25rem; border-top: 1px solid var(--line); }
+.unified-search-intro > h2 { font-family: var(--font-fraunces),Georgia,serif; font-size: 1.25rem; font-weight: 500; line-height: 1.5; }
+.unified-search-intro > p { max-width: 60ch; line-height: 1.8; }
+.unified-search-intro .btn { font-size: .82rem; background: var(--surface-solid); }
+.unified-search-results { align-items: start; }
+.unified-search-block { min-width: 0; border-top: 1px solid var(--line-strong); padding-block: 1rem; }
+.unified-search-block-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.unified-search-block-heading > h2 { font-family: var(--font-fraunces),Georgia,serif; font-size: 1.25rem; font-weight: 500; line-height: 1.6; }
+.unified-search-block-heading > span { font-size: .82rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.unified-search-block[data-empty="true"] { border-top-color: var(--line); }
+.unified-search-result { min-height: 56px; padding: .85rem .75rem; border-bottom: 1px solid var(--line); border-radius: .5rem; transition: background-color 150ms ease; overflow-wrap: anywhere; }
+.unified-search-result:hover { background: var(--sea-soft); }
+.unified-search-result > div:first-child { font-size: 1rem; line-height: 1.7; color: var(--sea); }
+.unified-search-result-meta { font-size: .82rem; line-height: 1.75; margin-top: .3rem; }
+.unified-search-result-meta:empty { display: none; }
+
+@media (max-width: 639px) {
+  .unified-search-form > input { flex-basis: auto; min-height: 48px; }
+  .unified-search-form > .btn { width: 100%; }
+  .unified-search-intro { padding-block: 1.25rem; }
+  .unified-search-result { padding-inline: .5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unified-search-result { transition: none; }
+}

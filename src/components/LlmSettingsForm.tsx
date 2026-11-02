@@ -335,7 +335,7 @@ export function LlmSettingsForm() {
           entorno salvo que quiera fijar el valor al arrancar.
         </p>
         <pre
-          className="mt-2 overflow-x-auto rounded-xl bg-[var(--ink)] p-3 text-[11px] text-white/85"
+          className="mt-2 overflow-x-auto rounded-xl bg-[#0c1c24] p-3 text-xs text-white/85"
           data-testid="llm-env-snippet"
         >
           {llmEnvSnippet({

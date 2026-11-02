@@ -298,6 +298,9 @@ export const es = {
   },
   login: {
     access: "Acceso al estudio",
+    storyTitle: "Cada causa, con sus fundamentos.",
+    storyBody: "Causas, biblioteca y herramientas de trabajo reunidas en tu espacio jurídico.",
+    library: "Biblioteca",
     title: "Iniciar sesión",
     subtitle: "Use un usuario demo o sus credenciales del estudio.",
     subtitleProd: "Ingrese con las credenciales del estudio.",
@@ -718,7 +721,7 @@ export const es = {
       eyebrow: "Copiloto legal",
       title: "Asistente LexOpen",
       subtitle:
-        "Entiende lo que pide, recuerda el hilo y ancla la respuesta a la carpeta investigativa, documentos indexados (OCR/Markdown), VDR vinculado y plazos del host. Borradores siempre sujetos a revisión humana.",
+        "Consulte sus documentos y el contexto de sus causas. Las respuestas y los borradores requieren revisión humana.",
       plazoCalc: "Cálculo interno de plazo",
       desde: "Desde",
       dias: "Días",

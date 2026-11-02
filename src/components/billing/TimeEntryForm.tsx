@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ACTIVITY_CODES } from "@/lib/billing";
 import { apiMutation } from "@/lib/api-mutation";
+import { BillingField } from "./BillingField";
 
 export function TimeEntryForm({
   causas,
@@ -50,12 +51,13 @@ export function TimeEntryForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-3">
+    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-4 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-3" aria-label="Registrar horas">
       {error && (
-        <p className="sm:col-span-2 lg:col-span-3 text-sm text-[var(--danger)]">{error}</p>
+        <p className="sm:col-span-2 lg:col-span-3 text-sm text-[var(--danger)]" role="alert">{error}</p>
       )}
-      <input className="input" type="date" name="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
-      <input className="input" type="number" step="0.25" min="0.25" name="hours" required placeholder="Horas" />
+      <BillingField label="Fecha"><input className="input" type="date" name="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></BillingField>
+      <BillingField label="Horas"><input className="input" type="number" step="0.25" min="0.25" name="hours" required placeholder="Horas" /></BillingField>
+      <BillingField label="Actividad">
       <select className="select" name="activityCode" defaultValue="drafting">
         {ACTIVITY_CODES.map((a) => (
           <option key={a.value} value={a.value}>
@@ -63,7 +65,9 @@ export function TimeEntryForm({
           </option>
         ))}
       </select>
-      <input className="input md:col-span-3" name="description" required placeholder="Descripción del trabajo" />
+      </BillingField>
+      <BillingField label="Descripción del trabajo" className="sm:col-span-2 lg:col-span-3"><input className="input" name="description" required placeholder="Descripción del trabajo" /></BillingField>
+      <BillingField label="Causa">
       <select className="select" name="causaId" defaultValue="">
         <option value="">Sin causa</option>
         {causas.map((c) => (
@@ -72,6 +76,8 @@ export function TimeEntryForm({
           </option>
         ))}
       </select>
+      </BillingField>
+      <BillingField label="Cliente (opcional)">
       <select className="select" name="clienteId" defaultValue="">
         <option value="">Cliente (opcional)</option>
         {clientes.map((c) => (
@@ -80,6 +86,8 @@ export function TimeEntryForm({
           </option>
         ))}
       </select>
+      </BillingField>
+      <BillingField label="Profesional">
       <select className="select" name="userId" defaultValue={users[0]?.id || ""}>
         {users.map((u) => (
           <option key={u.id} value={u.id}>
@@ -87,10 +95,11 @@ export function TimeEntryForm({
           </option>
         ))}
       </select>
-      <label className="flex items-center gap-2 text-sm md:col-span-2">
+      </BillingField>
+      <label className="flex min-h-11 items-center gap-2 text-sm sm:col-span-2">
         <input type="checkbox" name="billable" defaultChecked /> Facturable
       </label>
-      <button className="btn btn-primary" disabled={busy} type="submit">
+      <button className="btn btn-primary self-end sm:col-span-2 lg:col-span-1" disabled={busy} type="submit">
         {busy ? "Guardando…" : "Registrar horas"}
       </button>
     </form>

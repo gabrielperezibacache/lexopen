@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/sites/SiteNav";
@@ -24,6 +24,7 @@ type ConflictHit = {
 };
 
 function NuevaCausaInner() {
+  const fieldId = useId();
   const router = useRouter();
   const searchParams = useSearchParams();
   const clienteIdFromQuery = searchParams.get("clienteId") || "";
@@ -159,27 +160,32 @@ function NuevaCausaInner() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader eyebrow="Alta de litigio" title="Nueva causa" />
+      <PageHeader
+        eyebrow="Alta de litigio"
+        title="Nueva causa"
+        actions={<Link href="/causas" className="btn btn-ghost">Volver a causas</Link>}
+      />
 
-      <form id="nueva-causa-form" onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
+      <form id="nueva-causa-form" onSubmit={onSubmit} className="panel space-y-4 rounded-[var(--radius-lg)] p-6">
         <CausaExtraerAi formId="nueva-causa-form" />
+        <h2 className="text-lg font-semibold">Identificación de la causa</h2>
         <div>
-          <label className="mb-1 block text-sm font-medium">Título</label>
-          <input className="input" name="titulo" required placeholder="Ej. Cobro de pesos — contrato" />
+          <label htmlFor={`${fieldId}-titulo`} className="mb-2 block text-sm font-medium">Título</label>
+          <input id={`${fieldId}-titulo`} className="input" name="titulo" required placeholder="Ej. Cobro de pesos — contrato" />
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">RIT</label>
-            <input className="input" name="rit" placeholder="C-1234-2026" />
+            <label htmlFor={`${fieldId}-rit`} className="mb-2 block text-sm font-medium">RIT</label>
+            <input id={`${fieldId}-rit`} className="input" name="rit" placeholder="C-1234-2026" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">RUC</label>
-            <input className="input" name="ruc" placeholder="2500123456-7" />
+            <label htmlFor={`${fieldId}-ruc`} className="mb-2 block text-sm font-medium">RUC</label>
+            <input id={`${fieldId}-ruc`} className="input" name="ruc" placeholder="2500123456-7" />
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Tribunal</label>
-          <input
+          <label htmlFor={`${fieldId}-tribunal`} className="mb-2 block text-sm font-medium">Tribunal</label>
+          <input id={`${fieldId}-tribunal`}
             className="input"
             name="tribunal"
             required
@@ -193,14 +199,14 @@ function NuevaCausaInner() {
               <option key={t} value={t} />
             ))}
           </datalist>
-          <p className="mt-1 text-xs text-[var(--ink-soft)]/60">
+          <p className="mt-1 text-xs text-[var(--muted)]">
             Puede escribir cualquier nombre de tribunal (no solo la lista).
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">Materia</label>
-            <select className="select" name="materia" defaultValue="civil">
+            <label htmlFor={`${fieldId}-materia`} className="mb-2 block text-sm font-medium">Materia</label>
+            <select id={`${fieldId}-materia`} className="select" name="materia" defaultValue="civil">
               {MATERIAS.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
@@ -209,8 +215,8 @@ function NuevaCausaInner() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Etapa</label>
-            <select className="select" name="etapa" defaultValue="ingreso">
+            <label htmlFor={`${fieldId}-etapa`} className="mb-2 block text-sm font-medium">Etapa</label>
+            <select id={`${fieldId}-etapa`} className="select" name="etapa" defaultValue="ingreso">
               {ETAPAS.map((m) => (
                 <option key={m.value} value={m.value}>
                   {m.label}
@@ -220,27 +226,34 @@ function NuevaCausaInner() {
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Procedimiento</label>
-          <input className="input" name="procedimiento" placeholder="Ordinario, monitorio, protección…" />
+          <label htmlFor={`${fieldId}-procedimiento`} className="mb-2 block text-sm font-medium">Procedimiento</label>
+          <input id={`${fieldId}-procedimiento`} className="input" name="procedimiento" placeholder="Ordinario, monitorio, protección…" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Carátula</label>
-          <input className="input" name="caratula" placeholder="A con B" />
+          <label htmlFor={`${fieldId}-caratula`} className="mb-2 block text-sm font-medium">Carátula</label>
+          <input id={`${fieldId}-caratula`} className="input" name="caratula" placeholder="A con B" />
         </div>
+        <h2 className="border-t border-[var(--line)] pt-5 text-lg font-semibold">Partes</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">Demandante / recurrente</label>
-            <input className="input" name="demandante" />
-            <input className="input mt-2" name="demandanteRut" placeholder="RUT parte" />
+            <label htmlFor={`${fieldId}-demandante`} className="mb-2 block text-sm font-medium">Demandante / recurrente</label>
+            <input id={`${fieldId}-demandante`} className="input" name="demandante" />
+            <label className="mt-3 block space-y-2 text-sm font-medium">
+              <span>RUT parte</span>
+              <input className="input" name="demandanteRut" placeholder="RUT parte" />
+            </label>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Demandado / recorrido</label>
-            <input className="input" name="demandado" />
-            <input className="input mt-2" name="demandadoRut" placeholder="RUT parte" />
+            <label htmlFor={`${fieldId}-demandado`} className="mb-2 block text-sm font-medium">Demandado / recorrido</label>
+            <input id={`${fieldId}-demandado`} className="input" name="demandado" />
+            <label className="mt-3 block space-y-2 text-sm font-medium">
+              <span>RUT parte</span>
+              <input className="input" name="demandadoRut" placeholder="RUT parte" />
+            </label>
           </div>
         </div>
         {conflictStatus !== "idle" && (
-          <div className="rounded-2xl border border-[var(--line)] bg-white/70 p-4 text-sm">
+          <div className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] p-4 text-sm">
             <div className="font-semibold">
               Conflictos:{" "}
               {conflictStatus === "clear"
@@ -263,24 +276,27 @@ function NuevaCausaInner() {
           </div>
         )}
         {overrideRequired && (
-          <div className="rounded-2xl border border-[var(--danger)]/30 bg-red-50 p-4">
+          <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-red-50 p-4">
             <label className="flex items-center gap-2 text-sm font-medium">
               <input type="checkbox" name="conflictOverride" /> Autorizar override de conflicto
             </label>
+            <label className="mt-4 block space-y-2 text-sm font-medium">
+              <span>Fundamento del override y aprobación interna</span>
             <textarea
-              className="textarea mt-3"
+              className="textarea"
               name="conflictNotes"
               required={overrideRequired}
               placeholder="Fundamento del override y aprobación interna"
             />
+            </label>
           </div>
         )}
         <div>
-          <label className="mb-1 block text-sm font-medium">Resumen</label>
-          <textarea className="textarea" name="resumen" />
+          <label htmlFor={`${fieldId}-resumen`} className="mb-2 block text-sm font-medium">Resumen</label>
+          <textarea id={`${fieldId}-resumen`} className="textarea" name="resumen" />
         </div>
         {error && (
-          <p className="text-sm text-[var(--danger)]">
+          <p className="text-sm text-[var(--danger)]" role="alert">
             {error}
             {duplicateId ? (
               <>
@@ -302,7 +318,7 @@ function NuevaCausaInner() {
 
 export default function NuevaCausaPage() {
   return (
-    <Suspense fallback={<div className="panel h-40 animate-pulse rounded-3xl" />}>
+    <Suspense fallback={<div className="panel h-40 animate-pulse rounded-[var(--radius-lg)]" />}>
       <NuevaCausaInner />
     </Suspense>
   );

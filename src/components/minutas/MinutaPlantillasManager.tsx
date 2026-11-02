@@ -62,28 +62,40 @@ export function MinutaPlantillasManager({
   }
 
   return (
-    <section className="panel rounded-3xl p-5">
+    <section className="panel rounded-[var(--radius-lg)] p-5">
       <div className="mb-4">
         <h2 className="text-lg font-semibold">Plantillas de minutas</h2>
-        <p className="text-sm text-[var(--ink-soft)]/70">
+        <p className="text-sm text-[var(--muted)]">
           Cree plantillas reutilizables para audiencias, reuniones y llamadas.
         </p>
       </div>
-      <form onSubmit={create} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <form onSubmit={create} className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="block space-y-2 text-sm font-medium">
+        <span>Tipo</span>
         <input className="input" name="tipo" required placeholder="Tipo" />
+      </label>
+        <label className="block space-y-2 text-sm font-medium">
+        <span>Nombre</span>
         <input className="input" name="nombre" required placeholder="Nombre" />
+      </label>
+        <label className="block space-y-2 text-sm font-medium">
+        <span>Materia</span>
         <input className="input" name="materia" placeholder="Materia" />
+      </label>
         <button className="btn btn-primary" disabled={busy} type="submit">
           Crear
         </button>
+        <label className="block space-y-2 text-sm font-medium sm:col-span-2 lg:col-span-4">
+        <span>Contenido de la plantilla (JSON)</span>
         <textarea
-          className="textarea md:col-span-4"
+          className="textarea"
           name="bodyJson"
           placeholder='{"titulo":"Audiencia"}'
         />
+      </label>
       </form>
       {error && (
-        <p className="mt-3 text-sm text-red-700" role="status">
+        <p className="mt-3 text-sm text-[var(--danger)]" role="status">
           {error}
         </p>
       )}
@@ -95,7 +107,7 @@ export function MinutaPlantillasManager({
           >
             <div>
               <div className="font-medium">{p.nombre}</div>
-              <div className="text-xs text-[var(--ink-soft)]/65">
+              <div className="text-xs text-[var(--muted)]">
                 {p.tipo}
                 {p.materia ? ` · ${p.materia}` : ""}
               </div>
@@ -111,7 +123,7 @@ export function MinutaPlantillasManager({
           </div>
         ))}
         {plantillas.length === 0 && (
-          <p className="py-3 text-sm text-[var(--ink-soft)]/65">
+          <p className="py-3 text-sm text-[var(--muted)]">
             Sin plantillas configuradas.
           </p>
         )}

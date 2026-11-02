@@ -1,5 +1,8 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+import { WorkspaceField } from "./WorkspaceField";
+
 import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -252,12 +255,7 @@ export function SiteFileActions({
         }}
       />
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="site-file-actions-title"
-        >
+        <Dialog open onClose={() => setOpen(null)} title={open === "folder" ? "Nueva carpeta" : open === "import" ? "Importar carpeta al VDR" : "Nuevo archivo"}>
           <form
             onSubmit={
               open === "import"
@@ -267,25 +265,18 @@ export function SiteFileActions({
                   }
                 : submit
             }
-            className="panel w-full max-w-md space-y-3 rounded-3xl p-6"
+            className="space-y-4"
           >
-            <h3 id="site-file-actions-title" className="text-lg font-semibold">
-              {open === "folder"
-                ? "Nueva carpeta"
-                : open === "import"
-                  ? "Importar carpeta al VDR"
-                  : "Nuevo archivo"}
-            </h3>
             {folderSelect}
             {open === "folder" && (
-              <input className="input" name="name" required placeholder="Nombre de carpeta" />
+              <WorkspaceField label="Nombre de carpeta"><input className="input" name="name" required placeholder="Nombre de carpeta" /></WorkspaceField>
             )}
             {open === "file" && (
               <>
-                <input className="input" name="name" placeholder="Nombre (opcional si sube archivo)" />
-                <input className="input" name="tags" placeholder="tags (csv)" />
-                <input className="input" type="file" name="file" />
-                <textarea className="textarea" name="contenido" placeholder="Contenido markdown" />
+                <WorkspaceField label="Nombre (opcional si sube archivo)"><input className="input" name="name" placeholder="Nombre (opcional si sube archivo)" /></WorkspaceField>
+                <WorkspaceField label="Etiquetas (separadas por comas)"><input className="input" name="tags" placeholder="tags (csv)" /></WorkspaceField>
+                <WorkspaceField label="Archivo"><input className="input" type="file" name="file" /></WorkspaceField>
+                <WorkspaceField label="Contenido en Markdown"><textarea className="textarea" name="contenido" placeholder="Contenido markdown" /></WorkspaceField>
               </>
             )}
             {open === "import" && (
@@ -300,7 +291,7 @@ export function SiteFileActions({
               </p>
             )}
             {error && (
-              <p className="text-sm text-red-700" role="alert">
+              <p className="text-sm text-[var(--danger)]" role="alert">
                 {error}
               </p>
             )}
@@ -322,7 +313,7 @@ export function SiteFileActions({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </div>
   );

@@ -26,15 +26,20 @@ function FiltersInner({ defaultEstado }: { defaultEstado: string }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="panel grid grid-cols-1 gap-3 rounded-3xl p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+      className="panel grid grid-cols-2 items-end gap-4 rounded-[var(--radius-lg)] p-4 xl:grid-cols-3"
     >
+      <label className="col-span-2 block space-y-2 text-sm font-medium xl:col-span-1">
+        <span>{t("causas.colCase")}</span>
       <input
-        className="input sm:col-span-2"
+        className="input"
         name="q"
         placeholder={t("causas.filterSearch")}
         defaultValue={sp.get("q") || ""}
         aria-label={t("causas.filterSearch")}
       />
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>{t("causas.colMatter")}</span>
       <select
         className="select"
         name="materia"
@@ -48,6 +53,9 @@ function FiltersInner({ defaultEstado }: { defaultEstado: string }) {
           </option>
         ))}
       </select>
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>{t("causas.colProcedural")}</span>
       <select
         className="select"
         name="estado"
@@ -61,6 +69,9 @@ function FiltersInner({ defaultEstado }: { defaultEstado: string }) {
           </option>
         ))}
       </select>
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>{t("causas.colOrigin")}</span>
       <select
         className="select"
         name="origen"
@@ -74,7 +85,9 @@ function FiltersInner({ defaultEstado }: { defaultEstado: string }) {
         <option value="csv">{t("causas.filterOriginCsv")}</option>
         <option value="webhook">{t("causas.filterOriginWebhook")}</option>
       </select>
-      <div className="flex gap-2">
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>{t("causas.filterMonitor")}</span>
         <select
           className="select"
           name="monitoreo"
@@ -85,7 +98,9 @@ function FiltersInner({ defaultEstado }: { defaultEstado: string }) {
           <option value="on">{t("causas.filterMonitorOn")}</option>
           <option value="off">{t("causas.filterMonitorOff")}</option>
         </select>
-        <button className="btn btn-secondary shrink-0" type="submit">
+      </label>
+      <div className="col-span-2 flex sm:justify-end xl:col-span-1">
+        <button className="btn btn-secondary w-full sm:w-auto" type="submit">
           {t("causas.filterSubmit")}
         </button>
       </div>
@@ -99,7 +114,7 @@ export function CausasFilters({
   defaultEstado?: string;
 }) {
   return (
-    <Suspense fallback={<div className="panel h-16 rounded-3xl" />}>
+    <Suspense fallback={<div className="panel h-16 rounded-[var(--radius-lg)]" />}>
       <FiltersInner defaultEstado={defaultEstado} />
     </Suspense>
   );

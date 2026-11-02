@@ -1,5 +1,6 @@
 "use client";
 
+import styles from "@/components/config/WorkspaceArea.module.css";
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -135,7 +136,7 @@ function IntegracionesInner() {
   const googleFlash = sp.get("google");
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.area} space-y-6`}>
       <PageHeader
         eyebrow={h.eyebrow}
         title={h.title}
@@ -147,7 +148,7 @@ function IntegracionesInner() {
           className={`rounded-2xl border px-4 py-3 text-sm ${
             googleFlash === "connected" || googleFlash === "ok"
               ? "border-[var(--ok)]/30 bg-[rgba(31,122,76,0.08)] text-[var(--ink)]"
-              : "border-[var(--line)] bg-white/80 text-[var(--ink-soft)]/85"
+              : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink-soft)]/85"
           }`}
         >
           {googleFlash === "connected" || googleFlash === "ok"
@@ -284,7 +285,7 @@ function IntegracionesInner() {
           .
         </p>
         {captcha && (
-          <div className="mt-4 space-y-3 rounded-2xl border border-[var(--line)] bg-white/70 p-4 text-sm">
+          <div className="mt-4 space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-sm">
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[var(--ink-soft)]/80">
               <span>
                 Resolutor CAPTCHA:{" "}
@@ -317,7 +318,7 @@ function IntegracionesInner() {
               </span>
             </div>
             {claveUnica && (
-              <div className="rounded-xl border border-[var(--line)] bg-white/60 px-3 py-2 text-sm text-[var(--ink-soft)]/85">
+              <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink-soft)]/85">
                 <div>
                   ClaveÚnica:{" "}
                   <strong className="text-[var(--ink)]">
@@ -339,7 +340,7 @@ function IntegracionesInner() {
                   <p className="mt-1 text-[var(--copper)]">{claveUnica.lastSyncNote}</p>
                 )}
                 {claveUnica.blockers && claveUnica.blockers.length > 0 && (
-                  <ul className="mt-2 list-disc pl-4 text-rose-800">
+                  <ul className="mt-2 list-disc pl-4 text-[var(--danger)]">
                     {claveUnica.blockers.slice(0, 3).map((b) => (
                       <li key={b}>{b}</li>
                     ))}
@@ -390,7 +391,7 @@ function IntegracionesInner() {
               </ul>
             )}
             {captcha.captcha?.envSnippet && (
-              <pre className="overflow-x-auto rounded-xl bg-[var(--ink)] p-3 text-xs text-white/85">
+              <pre className="overflow-x-auto rounded-xl bg-[#0c1c24] p-3 text-xs text-white/85">
                 {captcha.captcha.envSnippet}
               </pre>
             )}
@@ -408,7 +409,7 @@ function IntegracionesInner() {
 
       <section className="panel rounded-3xl p-5">
         <h2 className="text-lg font-semibold">Variables de entorno</h2>
-        <pre className="mt-3 overflow-x-auto rounded-2xl bg-[var(--ink)] p-4 text-xs text-white/85">{`# IA multi-proveedor (prioridad sobre HERMES_*)
+        <pre className="mt-3 overflow-x-auto rounded-2xl bg-[#0c1c24] p-4 text-xs text-white/85">{`# IA multi-proveedor (prioridad sobre HERMES_*)
 LLM_API_URL=https://api.openai.com/v1
 LLM_API_KEY=
 LLM_MODEL=gpt-4o-mini

@@ -34,7 +34,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
         <input
           id="lexopen-global-search"
           type="search"
-          className="input !py-2 pl-9 pr-3"
+          className="input !py-2 !pl-10 !pr-3"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={t("common.searchPlaceholder")}

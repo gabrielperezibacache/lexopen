@@ -178,7 +178,7 @@ export function ObsidianSettingsForm() {
         </button>
       </div>
       {message && (
-        <p className={`text-sm ${ok ? "text-[var(--sea)]" : "text-red-700"}`} role="status">
+        <p className={`text-sm ${ok ? "text-[var(--sea)]" : "text-[var(--danger)]"}`} role="status">
           {message}
         </p>
       )}

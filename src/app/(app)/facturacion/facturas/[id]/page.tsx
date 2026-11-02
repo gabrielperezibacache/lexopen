@@ -1,3 +1,4 @@
+import { BillingNav } from "@/components/billing/BillingNav";
 import { InvoiceActions } from "@/components/billing/InvoiceActions";
 import { InvoiceAiPanel } from "@/components/billing/InvoiceAiPanel";
 import { InvoiceStatusPill } from "@/components/billing/InvoiceStatusPill";
@@ -38,6 +39,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      <BillingNav />
       <div>
         <Link href="/facturacion/facturas" className="text-sm text-[var(--sea)]">
           ← Facturas
@@ -125,7 +127,7 @@ export default async function InvoiceDetailPage({ params }: Params) {
       <section className="panel overflow-hidden rounded-3xl">
         <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-[var(--ink)] text-white/90">
+          <thead className="table-heading">
             <tr>
               <th className="px-4 py-3">Descripción</th>
               <th className="px-4 py-3">Cant.</th>

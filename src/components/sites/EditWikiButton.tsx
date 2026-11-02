@@ -1,5 +1,8 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+import { WorkspaceField } from "./WorkspaceField";
+
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
@@ -45,27 +48,21 @@ export function EditWikiButton({
         Editar
       </button>
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="edit-wiki-title"
-        >
-          <form onSubmit={onSubmit} className="panel w-full max-w-lg space-y-3 rounded-3xl p-6">
-            <h3 id="edit-wiki-title" className="text-lg font-semibold">Editar página</h3>
-            <input
+        <Dialog open onClose={() => setOpen(false)} title="Editar página">
+          <form onSubmit={onSubmit} className="space-y-4">
+            <WorkspaceField label="Título"><input
               className="input"
               name="title"
               required
               defaultValue={page.title}
               placeholder="Título"
-            />
-            <textarea
+            /></WorkspaceField>
+            <WorkspaceField label="Contenido en Markdown"><textarea
               className="textarea min-h-[220px]"
               name="content"
               defaultValue={page.content}
               placeholder="Contenido en Markdown"
-            />
+            /></WorkspaceField>
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
               <button
@@ -81,7 +78,7 @@ export function EditWikiButton({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </>
   );

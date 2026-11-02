@@ -52,7 +52,7 @@ export function Dialog({
         </h2>
         <button
           type="button"
-          className="btn btn-ghost !min-h-0 !rounded-xl !px-2 !py-2"
+          className="btn btn-ghost !min-h-[44px] !min-w-[44px] !px-2 !py-2"
           onClick={onClose}
           aria-label={t("common.close")}
         >

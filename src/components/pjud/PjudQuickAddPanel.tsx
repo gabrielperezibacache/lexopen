@@ -187,27 +187,33 @@ export function PjudQuickAddPanel() {
       </div>
 
       {mode === "rol" ? (
-        <form ref={rolFormRef} className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <form ref={rolFormRef} className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="block space-y-2 text-sm font-medium">
+          <span>ROL / RIT</span>
           <input
             className="input"
             name="rit"
             required
             placeholder="ROL/RIT (C-100-2024)"
           />
+        </label>
+          <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+          <span>Tribunal</span>
           <input
-            className="input sm:col-span-2"
+            className="input"
             name="tribunal"
             required
             list="pjud-tribunales"
             placeholder="Tribunal (escriba para buscar…)"
             autoComplete="off"
           />
+        </label>
           <datalist id="pjud-tribunales">
             {tribunales.map((t) => (
               <option key={t} value={t} />
             ))}
           </datalist>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-end gap-2">
             <button
               className="btn btn-secondary"
               disabled={busy}
@@ -225,20 +231,26 @@ export function PjudQuickAddPanel() {
               {busy ? "…" : "Agregar y sync"}
             </button>
           </div>
+          <label className="block space-y-2 text-sm font-medium sm:col-span-2 lg:col-span-4">
+          <span>Carátula opcional</span>
           <input
-            className="input sm:col-span-2 lg:col-span-4"
+            className="input"
             name="titulo"
             placeholder="Carátula opcional"
           />
+        </label>
         </form>
       ) : (
-        <form onSubmit={onBuscarRut} className="flex flex-wrap gap-2">
+        <form onSubmit={onBuscarRut} className="flex flex-wrap items-end gap-2">
+          <label className="block space-y-2 text-sm font-medium w-full sm:max-w-xs">
+          <span>RUT litigante</span>
           <input
-            className="input w-full max-w-xs"
+            className="input"
             name="rut"
             required
             placeholder="RUT litigante (12.345.678-9)"
           />
+        </label>
           <button className="btn btn-secondary" disabled={busy} type="submit">
             {busy ? "Buscando…" : "Buscar causas"}
           </button>

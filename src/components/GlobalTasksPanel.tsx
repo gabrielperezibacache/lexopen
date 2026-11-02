@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { StatusBadge, formatDate } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
 import { apiMutation } from "@/lib/api-mutation";
+import { Dialog } from "@/components/ui/Dialog";
+import { Plus } from "lucide-react";
 
 type Task = {
   id: string;
@@ -143,9 +145,9 @@ export function GlobalTasksPanel({
 
   return (
     <div className="space-y-4">
-      <div className="panel flex flex-wrap items-end gap-3 rounded-3xl p-4">
+      <div className="panel grid items-end gap-4 rounded-[var(--radius-lg)] p-4 sm:grid-cols-2 xl:grid-cols-3">
         <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">Estado</span>
+          <span className="mb-1 block text-xs text-[var(--muted)]">Estado</span>
           <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Todos</option>
             <option value="todo">Por hacer</option>
@@ -157,7 +159,7 @@ export function GlobalTasksPanel({
           </select>
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">Bandeja</span>
+          <span className="mb-1 block text-xs text-[var(--muted)]">Bandeja</span>
           <select
             className="select"
             value={bucket}
@@ -170,7 +172,7 @@ export function GlobalTasksPanel({
           </select>
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">Origen</span>
+          <span className="mb-1 block text-xs text-[var(--muted)]">Origen</span>
           <select className="select" value={origen} onChange={(e) => setOrigen(e.target.value)}>
             <option value="">Todos</option>
             {Object.entries(ORIGEN_LABEL).map(([value, label]) => (
@@ -181,7 +183,7 @@ export function GlobalTasksPanel({
           </select>
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">Espacio</span>
+          <span className="mb-1 block text-xs text-[var(--muted)]">Espacio</span>
           <select className="select" value={siteId} onChange={(e) => setSiteId(e.target.value)}>
             <option value="">Todos</option>
             {sites.map((s) => (
@@ -192,7 +194,7 @@ export function GlobalTasksPanel({
           </select>
         </label>
         <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">Asignado</span>
+          <span className="mb-1 block text-xs text-[var(--muted)]">Asignado</span>
           <select
             className="select"
             value={assigneeId}
@@ -207,8 +209,8 @@ export function GlobalTasksPanel({
             ))}
           </select>
         </label>
-        <button className="btn btn-primary ml-auto" type="button" onClick={() => setOpen(true)}>
-          Nueva tarea
+        <button className="btn btn-primary sm:justify-self-end" type="button" onClick={() => setOpen(true)}>
+          <Plus size={16} aria-hidden="true" /> Nueva tarea
         </button>
       </div>
 
@@ -223,15 +225,15 @@ export function GlobalTasksPanel({
           }
         />
       ) : (
-        <div className="space-y-3">
+        <div className="panel divide-y divide-[var(--line)] overflow-hidden rounded-[var(--radius-lg)]">
           {filtered.map((t) => (
             <div
               key={t.id}
-              className="panel flex flex-wrap items-center justify-between gap-3 rounded-3xl px-5 py-4"
+              className="flex min-w-0 flex-col justify-between gap-4 px-5 py-5 lg:flex-row lg:items-center"
             >
-              <div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-semibold">{t.title}</h2>
+                  <h2 className="break-words font-semibold">{t.title}</h2>
                   <StatusBadge
                     estado={
                       t.status === "done"
@@ -243,7 +245,7 @@ export function GlobalTasksPanel({
                   />
                   <span className="badge badge-ink">{STATUS_LABEL[t.status] || t.status}</span>
                 </div>
-                <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                <p className="mt-2 break-words text-sm leading-relaxed text-[var(--muted)]">
                   {t.assignee?.name || "Sin asignar"} · {formatDate(t.dueDate)}
                   {t.origen ? ` · ${ORIGEN_LABEL[t.origen] || t.origen}` : ""}
                   {" · "}
@@ -260,7 +262,7 @@ export function GlobalTasksPanel({
                   )}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 {t.status !== "in_progress" && t.status !== "done" && (
                   <button
                     className="btn btn-ghost"
@@ -293,17 +295,19 @@ export function GlobalTasksPanel({
         </div>
       )}
 
-      {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="new-task-title"
-        >
-          <form onSubmit={createTask} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 id="new-task-title" className="text-lg font-semibold">Nueva tarea</h3>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Nueva tarea">
+        {open && (
+          <form onSubmit={createTask} className="space-y-4">
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Título</span>
             <input className="input" name="title" required placeholder="Título" />
+            </label>
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Descripción</span>
             <textarea className="textarea" name="description" placeholder="Descripción" />
+            </label>
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Espacio</span>
             <select className="select" name="siteId" defaultValue="">
               <option value="">Sin espacio</option>
               {sites.map((s) => (
@@ -312,6 +316,9 @@ export function GlobalTasksPanel({
                 </option>
               ))}
             </select>
+            </label>
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Asignado</span>
             <select className="select" name="assigneeId" defaultValue="">
               <option value="">Sin asignar</option>
               {users.map((u) => (
@@ -320,14 +327,23 @@ export function GlobalTasksPanel({
                 </option>
               ))}
             </select>
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Prioridad</span>
             <select className="select" name="priority" defaultValue="medium">
               <option value="low">Baja</option>
               <option value="medium">Media</option>
               <option value="high">Alta</option>
               <option value="urgent">Urgente</option>
             </select>
+            </label>
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Fecha límite</span>
             <input className="input" type="date" name="dueDate" />
-            <div className="flex justify-end gap-2">
+            </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[var(--line)] pt-4">
               <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
                 Cancelar
               </button>
@@ -336,8 +352,8 @@ export function GlobalTasksPanel({
               </button>
             </div>
           </form>
-        </div>
-      )}
+        )}
+      </Dialog>
     </div>
   );
 }

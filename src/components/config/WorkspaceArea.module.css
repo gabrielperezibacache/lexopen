@@ -1,0 +1,28 @@
+.area {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.area :global(.panel),
+.area :global(.grid) > * {
+  min-width: 0;
+}
+
+.area :where(p, code, dd, h2, h3) {
+  overflow-wrap: anywhere;
+}
+
+.area pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.area :where(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.area [id] {
+  scroll-margin-top: 12rem;
+}

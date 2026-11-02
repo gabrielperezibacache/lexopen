@@ -1,0 +1,9 @@
+
+Running 2 tests using 1 worker
+
+(node:44935) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/ui-refinement.spec.ts:22:5 › diálogos de trabajo: foco, Escape, móvil y movimiento reducido (1.8s)
+  ✓  2 [chromium] › e2e/ui-refinement.spec.ts:49:5 › tablas móviles conservan los registros y la navegación activa queda a la vista (1.2s)
+
+  2 passed (3.4s)

@@ -350,9 +350,9 @@ export default function MisCausasPage() {
         subtitle="Credenciales y sync de cartera OJV. Las causas quedan en Expediente; los movimientos, en Cartera PJUD."
       />
 
-      <section className="panel space-y-4 rounded-3xl p-5">
+      <section className="panel space-y-4 rounded-[var(--radius-lg)] p-5">
         <div
-          className={`rounded-2xl border px-4 py-3 ${
+          className={`rounded-[var(--radius-md)] border px-4 py-3 ${
             ready
               ? "border-emerald-200 bg-emerald-50/70 text-emerald-950"
               : "border-amber-200 bg-amber-50/70 text-amber-950"
@@ -375,7 +375,7 @@ export default function MisCausasPage() {
         </div>
 
         <ol className="grid gap-3 text-sm sm:grid-cols-3">
-          <li className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3">
+          <li className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--sea)]">
               1. Guardar acceso
             </div>
@@ -384,7 +384,7 @@ export default function MisCausasPage() {
               cifrados en este Host.
             </p>
           </li>
-          <li className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3">
+          <li className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--sea)]">
               2. Sincronizar
             </div>
@@ -393,7 +393,7 @@ export default function MisCausasPage() {
               incorpora o actualiza en el estudio.
             </p>
           </li>
-          <li className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3">
+          <li className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3">
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--sea)]">
               3. Seguir en el apartado
             </div>
@@ -413,17 +413,17 @@ export default function MisCausasPage() {
       </section>
 
       {!canOperate && role === "asistente" && (
-        <p className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+        <p className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
           Su perfil de asistente puede ver el estado, pero no guardar
           credenciales ni sincronizar. Pida a un abogado o administrador.
         </p>
       )}
 
-      <section className="panel space-y-5 rounded-3xl p-5">
+      <section className="panel space-y-5 rounded-[var(--radius-lg)] p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold">Estado actual</h2>
-            <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+            <p className="mt-1 text-sm text-[var(--muted)]">
               Resumen de lo que LexOpen tiene configurado para este estudio.
             </p>
           </div>
@@ -444,7 +444,7 @@ export default function MisCausasPage() {
         </div>
 
         {(syncTitle || status?.lastSyncNote) && (
-          <div className="rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 text-sm">
+          <div className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 {syncTitle && (
@@ -477,7 +477,7 @@ export default function MisCausasPage() {
 
         {status?.blockers && status.blockers.length > 0 && (
           <div
-            className="rounded-2xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-sm text-rose-950"
+            className="rounded-[var(--radius-md)] border border-rose-200 bg-rose-50/70 px-4 py-3 text-sm text-rose-950"
             role="status"
           >
             <p className="font-semibold">Qué falta para poder sincronizar</p>
@@ -497,7 +497,7 @@ export default function MisCausasPage() {
         )}
 
         {adminOnly && (
-          <p className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+          <p className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
             Su usuario puede sincronizar, pero no cambiar el RUT ni la contraseña.
             Pida a un administrador del estudio que guarde la ClaveÚnica.
           </p>
@@ -505,7 +505,7 @@ export default function MisCausasPage() {
 
         <div className="space-y-3">
           <h3 className="text-base font-semibold">Guardar ClaveÚnica</h3>
-          <p className="text-sm text-[var(--ink-soft)]/75">
+          <p className="text-sm text-[var(--muted)]">
             Use la misma ClaveÚnica con la que entra a la Oficina Judicial Virtual.
             LexOpen la cifra y la guarda solo aquí; no la muestra después en
             pantalla.
@@ -515,7 +515,7 @@ export default function MisCausasPage() {
             className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
           >
             <label className="block text-sm sm:col-span-1">
-              <span className="mb-1 block text-[var(--ink-soft)]/70">RUT</span>
+              <span className="mb-1 block text-[var(--muted)]">RUT</span>
               <input
                 className="input"
                 name="rut"
@@ -525,7 +525,7 @@ export default function MisCausasPage() {
               />
             </label>
             <label className="block text-sm sm:col-span-1">
-              <span className="mb-1 block text-[var(--ink-soft)]/70">
+              <span className="mb-1 block text-[var(--muted)]">
                 Contraseña
               </span>
               <input
@@ -543,7 +543,7 @@ export default function MisCausasPage() {
               </button>
             </div>
           </form>
-          <p className="text-xs text-[var(--ink-soft)]/65">
+          <p className="text-xs text-[var(--muted)]">
             Al guardar, LexOpen podrá iniciar sesión automáticamente en su nombre
             para listar causas. Puede pausar o borrar el acceso cuando quiera.
           </p>
@@ -621,7 +621,7 @@ export default function MisCausasPage() {
 
         {msg && (
           <div
-            className={`flex flex-wrap items-start justify-between gap-2 rounded-2xl border px-4 py-3 text-sm ${
+            className={`flex flex-wrap items-start justify-between gap-2 rounded-[var(--radius-md)] border px-4 py-3 text-sm ${
               msgTone === "err"
                 ? "border-rose-200 bg-rose-50 text-rose-900"
                 : msgTone === "warn"
@@ -644,7 +644,7 @@ export default function MisCausasPage() {
       </section>
 
       {result && (
-        <section className="panel rounded-3xl p-5">
+        <section className="panel rounded-[var(--radius-lg)] p-5">
           <h2 className="text-lg font-semibold">
             Resultado de la sincronización ({result.listed})
           </h2>
@@ -654,7 +654,7 @@ export default function MisCausasPage() {
               reintentar desde Cartera PJUD.
             </p>
           ) : (
-            <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+            <p className="mt-1 text-sm text-[var(--muted)]">
               Listado desde OJV. Abra las causas en Expediente; los movimientos
               se procesan en{" "}
               <Link href="/causas/monitoreo" className="text-[var(--sea)]">
@@ -672,7 +672,7 @@ export default function MisCausasPage() {
             {result.items.map((item) => (
               <li
                 key={`${item.causaId || item.rit}-${item.tribunal}`}
-                className="rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3"
+                className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3"
               >
                 {item.causaId ? (
                   <Link
@@ -684,14 +684,14 @@ export default function MisCausasPage() {
                 ) : (
                   <div className="font-medium">{item.rit}</div>
                 )}
-                <div className="mt-0.5 break-words text-xs text-[var(--ink-soft)]/65">
+                <div className="mt-0.5 break-words text-xs text-[var(--muted)]">
                   {item.tribunal}
                   {item.caratula ? ` · ${item.caratula}` : ""}
                 </div>
               </li>
             ))}
             {result.items.length === 0 && (
-              <li className="text-sm text-[var(--ink-soft)]/65">
+              <li className="text-sm text-[var(--muted)]">
                 No aparecieron causas en esta sincronización.
               </li>
             )}
@@ -699,12 +699,12 @@ export default function MisCausasPage() {
         </section>
       )}
 
-      <section className="panel rounded-3xl p-5">
+      <section className="panel rounded-[var(--radius-lg)] p-5">
         <h2 className="text-lg font-semibold">
           {linkedCount} causa{linkedCount === 1 ? "" : "s"} vinculada
           {linkedCount === 1 ? "" : "s"} desde ClaveÚnica
         </h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+        <p className="mt-1 text-sm text-[var(--muted)]">
           No es un segundo expediente: abra el filtro de origen en Expediente.
         </p>
         <Link href="/causas?origen=claveunica" className="btn btn-secondary mt-4">

@@ -1,0 +1,11 @@
+{
+  "loginStatus": 200,
+  "demoVisible": false,
+  "configPath": "/configuracion",
+  "bounds": {
+    "top": 96,
+    "bottom": 158,
+    "headerBottom": 86.046875
+  },
+  "errors": []
+}

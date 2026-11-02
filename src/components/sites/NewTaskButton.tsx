@@ -1,5 +1,8 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+import { WorkspaceField } from "./WorkspaceField";
+
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
@@ -54,31 +57,25 @@ export function NewTaskButton({
         Nueva tarea
       </button>
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="new-task-title"
-        >
-          <form onSubmit={onSubmit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 id="new-task-title" className="text-lg font-semibold">Nueva tarea</h3>
-            <input className="input" name="title" required placeholder="Título" />
-            <textarea className="textarea" name="description" placeholder="Descripción" />
-            <select className="select" name="priority" defaultValue="medium">
+        <Dialog open onClose={() => setOpen(false)} title="Nueva tarea">
+          <form onSubmit={onSubmit} className="space-y-4">
+            <WorkspaceField label="Título"><input className="input" name="title" required placeholder="Título" /></WorkspaceField>
+            <WorkspaceField label="Descripción"><textarea className="textarea" name="description" placeholder="Descripción" /></WorkspaceField>
+            <WorkspaceField label="Prioridad"><select className="select" name="priority" defaultValue="medium">
               <option value="low">Baja</option>
               <option value="medium">Media</option>
               <option value="high">Alta</option>
               <option value="urgent">Urgente</option>
-            </select>
-            <select className="select" name="assigneeId" defaultValue="">
+            </select></WorkspaceField>
+            <WorkspaceField label="Responsable"><select className="select" name="assigneeId" defaultValue="">
               <option value="">Sin asignar</option>
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
                 </option>
               ))}
-            </select>
-            <input className="input" type="date" name="dueDate" />
+            </select></WorkspaceField>
+            <WorkspaceField label="Fecha límite"><input className="input" type="date" name="dueDate" /></WorkspaceField>
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
               <button
@@ -94,7 +91,7 @@ export function NewTaskButton({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </>
   );

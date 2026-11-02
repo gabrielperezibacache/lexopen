@@ -1,10 +1,8 @@
 import type { ReactNode } from "react";
-import { cn } from "@/lib/chile";
 import { pageTitleClass } from "@/components/ui/typography";
 
 /** Shared page header for app and module routes. */
 export function PageHeader({
-  eyebrow,
   title,
   subtitle,
   actions,
@@ -15,14 +13,9 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+    <div className="page-header mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
       <div className="min-w-0">
-        {eyebrow ? (
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-            {eyebrow}
-          </p>
-        ) : null}
-        <h1 className={cn(pageTitleClass, !eyebrow && "mt-0")}>{title}</h1>
+        <h1 className={pageTitleClass}>{title}</h1>
         {subtitle ? (
           <div className="mt-2 max-w-2xl text-sm text-[var(--muted)] sm:text-base">
             {subtitle}

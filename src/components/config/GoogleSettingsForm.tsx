@@ -148,7 +148,7 @@ export function GoogleSettingsForm() {
         </p>
       </div>
 
-      <div className="rounded-2xl border border-[var(--line)] bg-white/70 p-4 text-sm">
+      <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-sm">
         <p>
           Estado:{" "}
           <strong>
@@ -318,7 +318,7 @@ export function GoogleSettingsForm() {
         )}
       </div>
       {message && (
-        <p className={`text-sm ${ok ? "text-[var(--sea)]" : "text-red-700"}`} role="status">
+        <p className={`text-sm ${ok ? "text-[var(--sea)]" : "text-[var(--danger)]"}`} role="status">
           {message}
         </p>
       )}

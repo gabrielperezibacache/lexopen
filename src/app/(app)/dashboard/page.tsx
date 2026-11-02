@@ -182,7 +182,7 @@ export default async function DashboardPage() {
         {stats.map(({ label, value, icon: Icon, href }) => (
           <Link key={label} href={href} className="panel rounded-3xl p-5 transition hover:border-[var(--sea)]/40">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[var(--ink-soft)]/70">{label}</span>
+              <span className="text-sm text-[var(--muted)]">{label}</span>
               <Icon size={18} className="text-[var(--copper)]" />
             </div>
             <div className="display mt-3 text-3xl sm:text-4xl">{value}</div>
@@ -194,7 +194,7 @@ export default async function DashboardPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold">{t("dashboard.tramites.title")}</h2>
-            <p className="text-sm text-[var(--ink-soft)]/70">
+            <p className="text-sm text-[var(--muted)]">
               {t("dashboard.tramites.openCount").replace(
                 "{count}",
                 String(tramitesPendientesCount)
@@ -217,11 +217,11 @@ export default async function DashboardPage() {
               <Link
                 key={tramite.id}
                 href={tramiteHref(tramite)}
-                className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+                className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
                 <div className="min-w-0">
                   <div className="break-words font-medium">{tramite.titulo}</div>
-                  <div className="mt-1 break-words text-sm text-[var(--ink-soft)]/70">
+                  <div className="mt-1 break-words text-sm text-[var(--muted)]">
                     {tramite.causa.cliente?.razonSocial || t("dashboard.tramites.noClient")} ·{" "}
                     {tramite.causa.rit || tramite.causa.titulo}
                     {tramite.fechaLimite ? ` · ${formatDate(tramite.fechaLimite)}` : ""}
@@ -238,7 +238,7 @@ export default async function DashboardPage() {
             )
           )}
           {tramitesPendientes.length === 0 && (
-            <p className="text-sm text-[var(--ink-soft)]/65">
+            <p className="text-sm text-[var(--muted)]">
               {t("dashboard.tramites.empty")}
             </p>
           )}
@@ -257,7 +257,7 @@ export default async function DashboardPage() {
             {sitesList.map((s) => (
               <div
                 key={s.id}
-                className="rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+                className="rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
@@ -265,7 +265,7 @@ export default async function DashboardPage() {
                     {s.name}
                   </Link>
                 </div>
-                <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                <div className="mt-1 text-sm text-[var(--muted)]">
                   {t("dashboard.sites.meta")
                     .replace("{tipo}", siteTipoLabel(dict, s.tipo))
                     .replace("{files}", String(s._count.files))
@@ -283,7 +283,7 @@ export default async function DashboardPage() {
               </div>
             ))}
             {sitesList.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">
+              <p className="text-sm text-[var(--muted)]">
                 {t("dashboard.sites.empty")}{" "}
                 <Link href="/sites" className="text-[var(--sea)]">
                   {t("dashboard.sites.create")}
@@ -305,11 +305,11 @@ export default async function DashboardPage() {
               <Link
                 key={task.id}
                 href={task.siteId ? `/sites/${task.siteId}/tareas` : "/tareas"}
-                className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+                className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
                 <div className="min-w-0">
                   <div className="break-words font-medium">{task.title}</div>
-                  <div className="mt-1 break-words text-sm text-[var(--ink-soft)]/70">
+                  <div className="mt-1 break-words text-sm text-[var(--muted)]">
                     {task.site?.name || "—"} · {formatDate(task.dueDate)}
                   </div>
                 </div>
@@ -321,7 +321,7 @@ export default async function DashboardPage() {
               </Link>
             ))}
             {tasks.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">
+              <p className="text-sm text-[var(--muted)]">
                 {t("dashboard.tasks.empty")}{" "}
                 <Link href="/tareas" className="text-[var(--sea)]">
                   {t("dashboard.tasks.globalInbox")}
@@ -344,10 +344,10 @@ export default async function DashboardPage() {
             <Link
               key={m.id}
               href={`/causas/${m.causaId}/minutas/${m.id}`}
-              className="block rounded-2xl border border-[var(--line)] bg-white/60 px-4 py-3 transition hover:border-[var(--sea)]/40"
+              className="block rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 transition hover:border-[var(--sea)]/40"
             >
               <div className="font-medium">{m.titulo}</div>
-              <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+              <div className="mt-1 text-sm text-[var(--muted)]">
                 {m.causa.rit || m.causa.titulo} · {m.tipo} ·{" "}
                 {t("dashboard.minutes.pendingCount").replace(
                   "{count}",
@@ -357,7 +357,7 @@ export default async function DashboardPage() {
             </Link>
           ))}
           {minutasRecientes.length === 0 && (
-            <p className="text-sm text-[var(--ink-soft)]/65">
+            <p className="text-sm text-[var(--muted)]">
               {t("dashboard.minutes.empty")}
             </p>
           )}
@@ -372,7 +372,7 @@ export default async function DashboardPage() {
               <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--copper)]" />
               <div>
                 <div className="text-sm">{a.mensaje}</div>
-                <div className="mt-1 text-xs text-[var(--ink-soft)]/60">
+                <div className="mt-1 text-xs text-[var(--muted)]">
                   {a.user?.name || t("dashboard.activity.system")} ·{" "}
                   {a.site?.name ||
                     a.causa?.rit ||
@@ -384,7 +384,7 @@ export default async function DashboardPage() {
             </div>
           ))}
           {actividades.length === 0 && (
-            <p className="text-sm text-[var(--ink-soft)]/65">{t("dashboard.activity.empty")}</p>
+            <p className="text-sm text-[var(--muted)]">{t("dashboard.activity.empty")}</p>
           )}
         </div>
       </section>

@@ -422,7 +422,7 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
               {attachments.map((a, i) => (
                 <li
                   key={`${a.name}-${i}`}
-                  className="inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs"
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-1 text-xs"
                 >
                   <Paperclip size={12} />
                   <span className="max-w-[10rem] truncate">{a.name}</span>
@@ -430,7 +430,7 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
                     type="button"
                     aria-label="Quitar adjunto"
                     onClick={() => removeAttachment(i)}
-                    className="text-[var(--ink-soft)]/70"
+                    className="text-[var(--muted)]"
                   >
                     <X size={12} />
                   </button>
@@ -441,7 +441,7 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
           {attachmentError && (
             <p className="text-xs text-[var(--danger)]">{attachmentError}</p>
           )}
-          <div className="flex items-end gap-2">
+          <div className="inicio-composer">
             <textarea
               ref={textareaRef}
               className="textarea max-h-[260px] min-h-[52px] flex-1 resize-none"
@@ -453,7 +453,7 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
               data-testid="inicio-composer"
               disabled={busy}
             />
-            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+            <div className="inicio-composer-tools">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -492,7 +492,7 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
               </button>
             </div>
           </div>
-          <p className="text-xs text-[var(--ink-soft)]/60">{t("inicio.composer.hint")}</p>
+          <p className="text-xs text-[var(--muted)]">{t("inicio.composer.hint")}</p>
           {statusMessage && (
             <p className="text-xs text-[var(--sea)]" role="status">
               {statusMessage}
@@ -500,12 +500,12 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
           )}
         </form>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="inicio-suggestions mt-3 flex flex-wrap gap-2">
           {initialData.suggestions.map((s) => (
             <button
               key={s.label}
               type="button"
-              className="rounded-full border border-[var(--line)] bg-white/70 px-3 py-1 text-xs text-[var(--ink)] hover:border-[var(--sea)]/50"
+              className="rounded-full border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-1 text-xs text-[var(--ink)] hover:border-[var(--sea)]/50"
               onClick={() => applySuggestion(s.prompt)}
             >
               {s.label}
@@ -519,13 +519,13 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
           {entries.map((entry) => (
             <div key={entry.id}>
               {entry.kind === "user" && (
-                <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
-                  <p className="mb-1 text-xs uppercase tracking-[0.1em] text-[var(--ink-soft)]/55">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-2 text-sm">
+                  <p className="mb-1 text-xs uppercase tracking-[0.1em] text-[var(--muted)]">
                     {t("inicio.you")}
                   </p>
                   <p className="whitespace-pre-wrap">{entry.text}</p>
                   {entry.attachmentNames.length > 0 && (
-                    <p className="mt-1 text-xs text-[var(--ink-soft)]/60">
+                    <p className="mt-1 text-xs text-[var(--muted)]">
                       {entry.attachmentNames.join(", ")}
                     </p>
                   )}
@@ -551,14 +551,14 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
                   </p>
                   <ul className="space-y-1">
                     {entry.plan.steps.map((step, i) => (
-                      <li key={`${entry.id}-${i}`} className="rounded-lg bg-white/70 px-2 py-1.5">
+                      <li key={`${entry.id}-${i}`} className="rounded-lg bg-[var(--surface-solid)] px-2 py-1.5">
                         {step.preview}
                       </li>
                     ))}
                   </ul>
                   {!entry.resolved ? (
                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <p className="text-xs text-[var(--ink-soft)]/70">
+                      <p className="text-xs text-[var(--muted)]">
                         {t("inicio.plan.needsConfirm")}
                       </p>
                       <button
@@ -581,7 +581,7 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
                       </button>
                     </div>
                   ) : entry.cancelled ? (
-                    <p className="mt-2 text-xs text-[var(--ink-soft)]/70">
+                    <p className="mt-2 text-xs text-[var(--muted)]">
                       {t("inicio.plan.cancelled")}
                     </p>
                   ) : null}
@@ -600,10 +600,10 @@ export function InicioWorkbench({ initialData }: { initialData: InicioInitialDat
       )}
 
       {!hasHistory && (
-        <p className="text-sm text-[var(--ink-soft)]/60">{t("inicio.empty")}</p>
+        <p className="text-sm text-[var(--muted)]">{t("inicio.empty")}</p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="inicio-cards grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <HoyCard eventos={initialData.hoy.eventos} plazos={initialData.hoy.plazos} />
         <PlazosCard plazos={initialData.plazosProximos} />
         <ActividadCard items={initialData.actividad} />

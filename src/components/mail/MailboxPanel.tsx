@@ -245,12 +245,12 @@ export function MailboxPanel() {
   return (
     <div className="space-y-6">
       <section
-        className="panel space-y-4 rounded-3xl p-5"
+        className="panel space-y-4 rounded-[var(--radius-lg)] p-5"
         data-testid="mailbox-connect"
       >
         <div>
           <h2 className="text-lg font-semibold">{t("mailbox.connectTitle")}</h2>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+          <p className="mt-1 text-sm text-[var(--muted)]">
             {t("mailbox.connectHint")}
           </p>
         </div>
@@ -284,7 +284,7 @@ export function MailboxPanel() {
             </button>
           )}
         </div>
-        <p className="text-sm text-[var(--ink-soft)]/75" data-testid="mailbox-status">
+        <p className="break-words rounded-[var(--radius-md)] bg-[var(--mist)] px-4 py-3 text-sm leading-relaxed text-[var(--ink-soft)]" data-testid="mailbox-status" role="status">
           {account.email || t("mailbox.notConnected")} ·{" "}
           {account.status === "connected"
             ? t("mailbox.statusConnected")
@@ -303,7 +303,7 @@ export function MailboxPanel() {
           <label className="block text-sm">
             <span className="font-medium">{t("mailbox.imapPreset")}</span>
             <select
-              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white/80 px-3 py-2"
+              className="select mt-2"
               value={imapPreset}
               onChange={(e) => applyPreset(e.target.value)}
               data-testid="mailbox-imap-preset"
@@ -318,7 +318,7 @@ export function MailboxPanel() {
           <label className="block text-sm">
             <span className="font-medium">{t("mailbox.imapEmail")}</span>
             <input
-              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+              className="input mt-2"
               value={imapEmail}
               onChange={(e) => setImapEmail(e.target.value)}
               data-testid="mailbox-imap-email"
@@ -328,7 +328,7 @@ export function MailboxPanel() {
           <label className="block text-sm">
             <span className="font-medium">{t("mailbox.imapHost")}</span>
             <input
-              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+              className="input mt-2"
               value={imapHost}
               onChange={(e) => setImapHost(e.target.value)}
               data-testid="mailbox-imap-host"
@@ -338,7 +338,7 @@ export function MailboxPanel() {
             <span className="font-medium">{t("mailbox.imapPassword")}</span>
             <input
               type="password"
-              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+              className="input mt-2"
               value={imapPassword}
               onChange={(e) => setImapPassword(e.target.value)}
               data-testid="mailbox-imap-password"
@@ -357,8 +357,8 @@ export function MailboxPanel() {
         </button>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-        <section className="panel space-y-4 rounded-3xl p-5">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <section className="panel min-w-0 space-y-4 rounded-[var(--radius-lg)] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">{t("mailbox.inbox")}</h2>
             <button
@@ -381,29 +381,30 @@ export function MailboxPanel() {
             </p>
           )}
           {loading ? (
-            <p className="text-sm text-[var(--ink-soft)]/70">{t("common.loading")}</p>
+            <p className="text-sm text-[var(--muted)]">{t("common.loading")}</p>
           ) : messages.length === 0 ? (
-            <p className="text-sm text-[var(--ink-soft)]/70" data-testid="mailbox-empty">
+            <p className="grid min-h-40 place-items-center text-center text-sm leading-relaxed text-[var(--muted)]" data-testid="mailbox-empty">
               {t("mailbox.empty")}
             </p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="max-h-[40rem] divide-y divide-[var(--line)] overflow-auto">
               {messages.map((m) => (
                 <li key={m.id}>
                   <button
                     type="button"
-                    className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                    className={`w-full rounded-[var(--radius-sm)] px-3 py-4 text-left transition-colors ${
                       selectedId === m.id
-                        ? "border-[var(--sea)] bg-white/80"
-                        : "border-[var(--line)] bg-white/60 hover:border-[var(--sea)]/40"
+                        ? "bg-[var(--mist)] text-[var(--ink)]"
+                        : "hover:bg-[var(--mist)]"
                     }`}
+                    aria-pressed={selectedId === m.id}
                     onClick={() => {
                       setSelectedId(m.id);
                       setCausaPick(m.causaId || "");
                     }}
                   >
-                    <div className="font-medium">{m.subject}</div>
-                    <div className="mt-1 text-xs text-[var(--ink-soft)]/70">
+                    <div className="break-words font-semibold">{m.subject}</div>
+                    <div className="mt-2 break-words text-xs leading-relaxed text-[var(--muted)]">
                       {m.fromAddress || "—"} · {mailKindLabel(m.kind, locale)} ·{" "}
                       {m.rit || "—"} · {formatDate(m.receivedAt)} · {m.status}
                       {m.attachments?.length
@@ -417,14 +418,14 @@ export function MailboxPanel() {
           )}
         </section>
 
-        <section className="panel space-y-4 rounded-3xl p-5">
+        <section className="panel min-w-0 space-y-5 rounded-[var(--radius-lg)] p-5">
           {!selected ? (
-            <p className="text-sm text-[var(--ink-soft)]/70">{t("mailbox.selectHint")}</p>
+            <p className="grid min-h-60 place-items-center text-center text-sm leading-relaxed text-[var(--muted)]">{t("mailbox.selectHint")}</p>
           ) : (
             <>
               <div>
-                <h2 className="text-lg font-semibold">{selected.subject}</h2>
-                <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                <h2 className="break-words text-lg font-semibold">{selected.subject}</h2>
+                <p className="mt-2 break-words text-sm leading-relaxed text-[var(--muted)]">
                   {selected.fromAddress || "—"} · {mailKindLabel(selected.kind, locale)} ·{" "}
                   {selected.rit || "—"}
                 </p>
@@ -439,13 +440,13 @@ export function MailboxPanel() {
                   ))}
                 </ul>
               )}
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-2xl border border-[var(--line)] bg-white/60 p-4 text-xs">
+              <div className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] p-4 text-sm leading-relaxed text-[var(--ink-soft)]">
                 {selected.bodyText}
-              </pre>
+              </div>
               <label className="block text-sm">
                 <span className="font-medium">{t("mailbox.linkCausa")}</span>
                 <select
-                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white/80 px-3 py-2"
+                  className="select mt-2"
                   value={causaPick}
                   onChange={(e) => setCausaPick(e.target.value)}
                 >
@@ -488,21 +489,27 @@ export function MailboxPanel() {
 
           <div className="border-t border-[var(--line)] pt-4">
             <h3 className="font-semibold">{t("mailbox.pasteTitle")}</h3>
-            <p className="mt-1 text-xs text-[var(--ink-soft)]/65">
+            <p className="mt-1 text-xs text-[var(--muted)]">
               {t("mailbox.pasteHint")}
             </p>
+            <label className="mt-4 block space-y-2 text-sm font-medium">
+              <span>{t("mailbox.pasteSubject")}</span>
             <input
-              className="mt-2 w-full rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
+              className="input"
               placeholder={t("mailbox.pasteSubject")}
               value={pasteSubject}
               onChange={(e) => setPasteSubject(e.target.value)}
             />
+            </label>
+            <label className="mt-4 block space-y-2 text-sm font-medium">
+              <span>{t("mailbox.pasteBody")}</span>
             <textarea
-              className="mt-2 min-h-24 w-full rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
+              className="textarea min-h-24"
               placeholder={t("mailbox.pasteBody")}
               value={pasteBody}
               onChange={(e) => setPasteBody(e.target.value)}
             />
+            </label>
             <button
               type="button"
               className="btn btn-secondary mt-2 text-sm"

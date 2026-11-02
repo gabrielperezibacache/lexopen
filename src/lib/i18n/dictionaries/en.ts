@@ -300,6 +300,9 @@ export const en: Dictionary = {
   },
   login: {
     access: "Firm access",
+    storyTitle: "Every case, with its foundations.",
+    storyBody: "Cases, your library and working tools together in your legal workspace.",
+    library: "Library",
     title: "Sign in",
     subtitle: "Use a demo user or your firm credentials.",
     subtitleProd: "Sign in with your firm credentials.",
@@ -718,7 +721,7 @@ export const en: Dictionary = {
       eyebrow: "Legal copilot",
       title: "LexOpen assistant",
       subtitle:
-        "Understands your request, remembers the thread and anchors answers to the investigative folder, indexed documents (OCR/Markdown), linked VDR and host deadlines. Drafts always require human review.",
+        "Consult your documents and the context of your matters. Answers and drafts require human review.",
       plazoCalc: "Internal deadline calculator",
       desde: "From",
       dias: "Days",

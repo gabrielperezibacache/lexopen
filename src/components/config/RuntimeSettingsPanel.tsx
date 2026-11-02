@@ -17,13 +17,13 @@ function Row({
 }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--line)]/70 py-2 text-sm last:border-0">
-      <div>
-        <div className={`font-medium ${warn ? "text-rose-800" : "text-[var(--ink)]"}`}>
+      <div className="min-w-0 [overflow-wrap:anywhere]">
+        <div className={`font-medium ${warn ? "text-[var(--danger)]" : "text-[var(--ink)]"}`}>
           {label}
         </div>
         {hint && <div className="text-xs text-[var(--ink-soft)]/60">{hint}</div>}
       </div>
-      <div className={`text-right ${warn ? "text-rose-800" : "text-[var(--ink-soft)]/85"}`}>
+      <div className={`min-w-0 [overflow-wrap:anywhere] sm:text-right ${warn ? "text-[var(--danger)]" : "text-[var(--ink-soft)]/85"}`}>
         {value}
       </div>
     </div>

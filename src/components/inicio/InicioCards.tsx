@@ -21,9 +21,9 @@ function CardShell({
   action?: ReactNode;
 }) {
   return (
-    <div className="panel flex flex-col gap-3 rounded-3xl p-4">
+    <div className="panel flex min-w-0 flex-col gap-3 p-5">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.1em] text-[var(--ink-soft)]/70">
+        <h2 className="text-base font-semibold text-[var(--ink)]">
           {title}
         </h2>
         {action}
@@ -45,7 +45,7 @@ export function HoyCard({
   return (
     <CardShell title={t("inicio.cards.hoy.title")}>
       {empty && (
-        <p className="text-[var(--ink-soft)]/65">{t("inicio.cards.hoy.empty")}</p>
+        <p className="text-[var(--muted)]">{t("inicio.cards.hoy.empty")}</p>
       )}
       {eventos.map((e) => (
         <Link
@@ -86,13 +86,13 @@ export function PlazosCard({ plazos }: { plazos: InicioPlazoCard[] }) {
       }
     >
       {plazos.length === 0 && (
-        <p className="text-[var(--ink-soft)]/65">{t("inicio.cards.plazos.empty")}</p>
+        <p className="text-[var(--muted)]">{t("inicio.cards.plazos.empty")}</p>
       )}
       {plazos.map((p) => (
         <Link
           key={p.id}
           href={p.causaId ? `/causas/${p.causaId}` : "/plazos"}
-          className="flex items-center justify-between gap-2 rounded-lg border border-[var(--line)] px-2 py-1.5 hover:bg-white/70"
+          className="flex items-center justify-between gap-2 rounded-lg border border-[var(--line)] px-2 py-1.5 hover:bg-[var(--surface-solid)]"
         >
           <span className="min-w-0 truncate">
             {p.esFatal ? "Fatal · " : ""}
@@ -110,12 +110,12 @@ export function ActividadCard({ items }: { items: InicioActivityCard[] }) {
   return (
     <CardShell title={t("inicio.cards.actividad.title")}>
       {items.length === 0 && (
-        <p className="text-[var(--ink-soft)]/65">{t("inicio.cards.actividad.empty")}</p>
+        <p className="text-[var(--muted)]">{t("inicio.cards.actividad.empty")}</p>
       )}
       {items.map((a) => (
         <div key={a.id} className="rounded-lg border border-[var(--line)] px-2 py-1.5">
           <p className="truncate">{a.mensaje}</p>
-          <p className="text-xs text-[var(--ink-soft)]/60">
+          <p className="text-xs text-[var(--muted)]">
             {a.userName || t("dashboard.activity.system")} · {formatDate(a.createdAt, locale)}
             {a.causaId && (
               <>
@@ -144,13 +144,13 @@ export function CausasCard({ items }: { items: InicioCausaCard[] }) {
       }
     >
       {items.length === 0 && (
-        <p className="text-[var(--ink-soft)]/65">{t("inicio.cards.causas.empty")}</p>
+        <p className="text-[var(--muted)]">{t("inicio.cards.causas.empty")}</p>
       )}
       {items.map((c) => (
         <Link
           key={c.id}
           href={`/causas/${c.id}`}
-          className="flex items-center justify-between gap-2 rounded-lg border border-[var(--line)] px-2 py-1.5 hover:bg-white/70"
+          className="flex items-center justify-between gap-2 rounded-lg border border-[var(--line)] px-2 py-1.5 hover:bg-[var(--surface-solid)]"
         >
           <span className="min-w-0 truncate">{c.rit || c.titulo}</span>
           <span className="badge badge-ink shrink-0">{c.estado}</span>

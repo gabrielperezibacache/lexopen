@@ -105,7 +105,7 @@ export function TotpSettingsPanel() {
       )}
       {msg && <p className="text-sm text-[var(--ink-soft)]/80">{msg}</p>}
       {backupCodes && (
-        <div className="rounded-xl border border-[var(--line)] bg-white/70 p-3 text-sm">
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 text-sm">
           <p className="font-medium">Códigos de respaldo (un uso):</p>
           <ul className="mt-2 grid grid-cols-2 gap-1 font-mono text-xs">
             {backupCodes.map((c) => (

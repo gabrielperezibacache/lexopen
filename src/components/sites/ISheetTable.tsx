@@ -1,5 +1,7 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -136,7 +138,7 @@ export function ISheetTable({
       )}
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-[var(--ink)] text-white/90">
+          <thead className="table-heading">
             <tr>
               {columns.map((c) => (
                 <th key={c.key} className="px-4 py-3 font-medium">
@@ -190,14 +192,8 @@ export function ISheetTable({
       />
 
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="isheet-add-row-title"
-        >
-          <form onSubmit={addRow} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 id="isheet-add-row-title" className="text-lg font-semibold">Nueva fila</h3>
+        <Dialog open onClose={() => setOpen(false)} title="Nueva fila">
+          <form onSubmit={addRow} className="space-y-4">
             {fieldInputs()}
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
@@ -209,18 +205,12 @@ export function ISheetTable({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {editing && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="isheet-edit-row-title"
-        >
-          <form onSubmit={saveEdit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 id="isheet-edit-row-title" className="text-lg font-semibold">Editar fila</h3>
+        <Dialog open onClose={() => setEditing(null)} title="Editar fila">
+          <form onSubmit={saveEdit} className="space-y-4">
             {fieldInputs(editing.data)}
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
@@ -232,7 +222,7 @@ export function ISheetTable({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </div>
   );

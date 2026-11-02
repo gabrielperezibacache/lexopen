@@ -1,3 +1,4 @@
+import { BillingNav } from "@/components/billing/BillingNav";
 import { CreateInvoicePanel } from "@/components/billing/CreateInvoicePanel";
 import { InvoiceStatusPill } from "@/components/billing/InvoiceStatusPill";
 import { ModuleHeader } from "@/components/sites/SiteNav";
@@ -80,6 +81,7 @@ export default async function FacturasPage({
           </div>
         }
       />
+      <BillingNav />
 
       <CreateInvoicePanel
         clientes={clientes}
@@ -103,7 +105,7 @@ export default async function FacturasPage({
       />
 
       <form className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]/60">
+        <label className="flex flex-col gap-1 text-sm font-medium text-[var(--ink-soft)]">
           Estado
           <select className="select" name="estado" defaultValue={estado}>
             <option value="">Todos</option>
@@ -114,7 +116,7 @@ export default async function FacturasPage({
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]/60">
+        <label className="flex flex-col gap-1 text-sm font-medium text-[var(--ink-soft)]">
           Tipo
           <select className="select" name="tipo" defaultValue={tipo}>
             <option value="">Todos</option>
@@ -150,7 +152,7 @@ export default async function FacturasPage({
 
       <div className="panel overflow-x-auto rounded-3xl">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-[var(--ink)] text-white/90">
+          <thead className="table-heading">
             <tr>
               <th className="px-4 py-3">Número</th>
               <th className="px-4 py-3">Cliente</th>

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/PageHeader";
 import { MinutaWizard } from "@/components/minutas/MinutaWizard";
 import { requireStaffPage } from "@/lib/auth/access";
 import { assertCausaCapability, causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
@@ -25,16 +26,13 @@ export default async function NuevaMinutaPage({ params, searchParams }: Params) 
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <Link href={`/causas/${causa.id}`} className="text-sm text-[var(--sea)]">
-          ← Volver a la causa
-        </Link>
-        <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">Nueva minuta</h1>
-        <p className="mt-2 text-[var(--ink-soft)]/80">
-          Tras cada audiencia, reunión o llamada, deje el handoff listo para que
-          cualquier abogado continúe la tramitación.
-        </p>
-      </div>
+      <Link href={`/causas/${causa.id}`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
+        ← Volver a la causa
+      </Link>
+      <PageHeader
+        title="Nueva minuta"
+        subtitle="Tras cada audiencia, reunión o llamada, deje el handoff listo para que cualquier abogado continúe la tramitación."
+      />
       <MinutaWizard
         causaId={causa.id}
         causaTitulo={causa.titulo}

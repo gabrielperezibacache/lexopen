@@ -1,5 +1,7 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
@@ -82,14 +84,8 @@ export function WikiHistoryPanel({
         Historial
       </button>
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="wiki-history-title"
-        >
-          <div className="panel w-full max-w-lg space-y-3 rounded-3xl p-6">
-            <h3 id="wiki-history-title" className="text-lg font-semibold">Historial de revisiones</h3>
+        <Dialog open onClose={() => setOpen(false)} title="Historial de revisiones">
+          <div className="space-y-4">
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             {busy && !revisions && (
               <p className="text-sm text-[var(--ink-soft)]/70">Cargando…</p>
@@ -101,11 +97,11 @@ export function WikiHistoryPanel({
               {(revisions || []).map((r) => (
                 <li
                   key={r.id}
-                  className="flex items-start justify-between gap-3 rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
+                  className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[var(--line)] px-3 py-3 text-sm"
                 >
                   <div className="min-w-0">
-                    <div className="font-medium">{r.title}</div>
-                    <div className="text-xs text-[var(--ink-soft)]/60">
+                    <div className="break-words font-medium">{r.title}</div>
+                    <div className="text-sm text-[var(--ink-soft)]">
                       {r.author?.name || "—"} ·{" "}
                       {new Date(r.createdAt).toLocaleString("es-CL")}
                     </div>
@@ -132,7 +128,7 @@ export function WikiHistoryPanel({
               </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
     </>
   );

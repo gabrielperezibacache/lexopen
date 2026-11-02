@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EXPENSE_CATEGORIES } from "@/lib/billing";
 import { apiMutation } from "@/lib/api-mutation";
+import { BillingField } from "./BillingField";
 
 export function ExpenseForm({
   causas,
@@ -49,13 +50,14 @@ export function ExpenseForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-3">
+    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-4 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-3" aria-label="Registrar gasto">
       {error && (
-        <p className="md:col-span-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p className="sm:col-span-2 lg:col-span-3 rounded-xl border border-[var(--danger)]/25 bg-[var(--danger)]/5 px-3 py-2 text-sm text-[var(--danger)]" role="alert">
           {error}
         </p>
       )}
-      <input className="input" type="date" name="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
+      <BillingField label="Fecha"><input className="input" type="date" name="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></BillingField>
+      <BillingField label="Categoría">
       <select className="select" name="category" defaultValue="notario">
         {EXPENSE_CATEGORIES.map((c) => (
           <option key={c.value} value={c.value}>
@@ -63,9 +65,11 @@ export function ExpenseForm({
           </option>
         ))}
       </select>
-      <input className="input" type="number" name="amountClp" required placeholder="Monto CLP" />
-      <input className="input md:col-span-2" name="description" required placeholder="Descripción" />
-      <input className="input" name="vendor" placeholder="Proveedor" />
+      </BillingField>
+      <BillingField label="Monto CLP"><input className="input" type="number" name="amountClp" required placeholder="Monto CLP" /></BillingField>
+      <BillingField label="Descripción" className="sm:col-span-2"><input className="input" name="description" required placeholder="Descripción" /></BillingField>
+      <BillingField label="Proveedor"><input className="input" name="vendor" placeholder="Proveedor" /></BillingField>
+      <BillingField label="Causa">
       <select className="select" name="causaId" defaultValue="">
         <option value="">Sin causa</option>
         {causas.map((c) => (
@@ -74,6 +78,8 @@ export function ExpenseForm({
           </option>
         ))}
       </select>
+      </BillingField>
+      <BillingField label="Cliente">
       <select className="select" name="clienteId" defaultValue="">
         <option value="">Cliente</option>
         {clientes.map((c) => (
@@ -82,7 +88,8 @@ export function ExpenseForm({
           </option>
         ))}
       </select>
-      <button className="btn btn-primary" disabled={busy} type="submit">
+      </BillingField>
+      <button className="btn btn-primary self-end" disabled={busy} type="submit">
         {busy ? 'Registrando…' : 'Registrar gasto'}
       </button>
     </form>

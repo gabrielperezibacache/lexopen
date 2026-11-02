@@ -1,3 +1,4 @@
+import styles from "@/components/config/WorkspaceArea.module.css";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth/session";
@@ -60,15 +61,15 @@ export default async function AuditoriaPage({ searchParams }: Props) {
   });
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.area} space-y-6`}>
       <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
 
-      <p className="text-xs text-[var(--ink-soft)]/65">
+      <p className="text-sm text-[var(--ink-soft)]">
         Mostrando hasta 300 eventos más recientes (luego filtros en pantalla).
       </p>
-      <form className="panel flex flex-wrap items-end gap-3 rounded-3xl p-4" method="get">
-        <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">Acción</span>
+      <form className="panel grid grid-cols-1 items-end gap-3 rounded-3xl p-4 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_2fr_auto_auto]" method="get">
+        <label className="min-w-0 text-sm">
+          <span className="mb-1.5 block font-medium text-[var(--ink-soft)]">Acción</span>
           <select className="select" name="action" defaultValue={actionFilter}>
             <option value="">Todas</option>
             {actionOptions.map((a) => (
@@ -78,8 +79,8 @@ export default async function AuditoriaPage({ searchParams }: Props) {
             ))}
           </select>
         </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">Actor</span>
+        <label className="min-w-0 text-sm">
+          <span className="mb-1.5 block font-medium text-[var(--ink-soft)]">Actor</span>
           <select className="select" name="actor" defaultValue={actorFilter}>
             <option value="">Todos</option>
             {actors.map((a) => (
@@ -89,8 +90,8 @@ export default async function AuditoriaPage({ searchParams }: Props) {
             ))}
           </select>
         </label>
-        <label className="w-full min-w-0 flex-1 text-sm sm:min-w-[200px]">
-          <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">Buscar</span>
+        <label className="min-w-0 text-sm sm:col-span-2 xl:col-span-1">
+          <span className="mb-1.5 block font-medium text-[var(--ink-soft)]">Buscar</span>
           <input
             className="input"
             name="q"
@@ -117,7 +118,7 @@ export default async function AuditoriaPage({ searchParams }: Props) {
         <div className="panel overflow-hidden rounded-3xl">
           <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-[var(--ink)] text-white/90">
+            <thead className="table-heading">
               <tr>
                 <th className="px-4 py-3">Fecha</th>
                 <th className="px-4 py-3">Actor</th>

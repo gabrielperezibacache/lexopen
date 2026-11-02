@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import "@/components/search/search.css";
 
 type Results = {
   q: string;
@@ -126,13 +127,13 @@ export default function SearchPage() {
   }
 
   return (
-    <div>
+    <div className="unified-search-page">
       <ModuleHeader
         eyebrow={h.eyebrow}
         title={h.title}
         subtitle={h.subtitle}
       />
-      <form role="search" onSubmit={onSubmit} className="panel mb-6 flex flex-col gap-2 rounded-3xl p-4 sm:flex-row">
+      <form role="search" onSubmit={onSubmit} className="unified-search-form panel mb-6 flex flex-col gap-3 p-4 sm:flex-row">
         <label htmlFor="unified-search" className="sr-only">
           {t("common.searchInApp")}
         </label>
@@ -148,8 +149,8 @@ export default function SearchPage() {
           aria-label={t("common.searchInApp")}
           required
         />
-        <button className="btn btn-primary" disabled={busy} type="submit">
-          {busy ? "…" : h.title}
+        <button className="btn btn-primary" disabled={busy} type="submit" aria-busy={busy}>
+          {busy ? h.searching : h.title}
         </button>
       </form>
 
@@ -162,15 +163,15 @@ export default function SearchPage() {
       </p>
 
       {error && (
-        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p className="unified-search-error mb-4 px-4 py-3 text-sm" role="alert">
           {error}
         </p>
       )}
 
       {!results && (
-        <section className="panel rounded-3xl p-6">
+        <section className="unified-search-intro">
           <h2 className="font-semibold">Empiece a buscar</h2>
-          <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">
             Pruebe con un RIT, cliente, palabra de minuta o término de jurisprudencia.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -189,7 +190,7 @@ export default function SearchPage() {
       )}
 
       {results && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="unified-search-results grid gap-5 lg:grid-cols-2" aria-busy={busy}>
           <ResultBlock
             title="Espacios"
             items={results.sites.map((s) => ({
@@ -264,7 +265,7 @@ export default function SearchPage() {
             }))}
           />
           <ResultBlock
-            title="Archivos VDR"
+            title="Archivos de espacios"
             items={results.files.map((f) => ({
               href: `/sites/${f.site.id}/archivos`,
               label: f.name,
@@ -309,18 +310,18 @@ function ResultBlock({
   items: Array<{ href: string; label: string; meta: string }>;
 }) {
   return (
-    <section className="panel rounded-3xl p-5">
-      <h2 className="font-semibold">{title}</h2>
+    <section className="unified-search-block" data-empty={items.length === 0}>
+      <div className="unified-search-block-heading"><h2 className="font-semibold">{title}</h2><span>{items.length}</span></div>
       <div className="mt-3 space-y-2">
-        {items.length === 0 && <p className="text-sm text-[var(--ink-soft)]/60">Sin resultados</p>}
+        {items.length === 0 && <p className="text-sm text-[var(--ink-soft)]">Sin resultados</p>}
         {items.map((i) => (
           <Link
             key={i.href + i.label}
             href={i.href}
-            className="block rounded-xl border border-[var(--line)] px-3 py-2 text-sm hover:border-[var(--sea)]/40"
+            className="unified-search-result block text-sm"
           >
             <div className="font-medium">{i.label}</div>
-            <div className="text-xs text-[var(--ink-soft)]/65">{i.meta}</div>
+            <div className="unified-search-result-meta text-[var(--ink-soft)]">{i.meta}</div>
           </Link>
         ))}
       </div>

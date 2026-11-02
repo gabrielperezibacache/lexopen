@@ -272,24 +272,24 @@ export function MinutaWizard({
 
   return (
     <div className="space-y-6">
-      <div className="panel rounded-3xl px-5 py-4">
-        <div className="text-sm text-[var(--ink-soft)]/70">
+      <div className="panel rounded-[var(--radius-lg)] px-5 py-4">
+        <div className="text-sm text-[var(--muted)]">
           Causa · {causaRit || "Sin RIT"}
         </div>
         <div className="mt-1 font-semibold">{causaTitulo}</div>
-        <ol className="mt-4 flex flex-wrap gap-2" aria-label="Pasos del wizard">
+        <ol className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Pasos de la minuta">
           {steps.map((label, i) => (
             <li key={label}>
               <button
                 type="button"
                 disabled={i > step}
                 onClick={() => i <= step && setStep(i)}
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                className={`inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-sm)] px-3 py-2 text-sm font-medium transition-colors ${
                   i === step
                     ? "bg-[var(--sea)] text-white"
                     : i < step
                       ? "bg-[var(--sea)]/15 text-[var(--sea)]"
-                      : "bg-[var(--line)]/60 text-[var(--ink-soft)]/70"
+                      : "bg-[var(--line)]/60 text-[var(--muted)]"
                 }`}
                 aria-current={i === step ? "step" : undefined}
               >
@@ -303,10 +303,10 @@ export function MinutaWizard({
       <MinutaBorradorAi causaId={causaId} onApply={applyMinutaDraft} />
 
       {step === 0 && (
-        <section className="panel space-y-5 rounded-3xl p-5">
+        <section className="panel space-y-5 rounded-[var(--radius-lg)] p-5">
           <div>
             <h2 className="text-lg font-semibold">¿Qué tipo de acto fue?</h2>
-            <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+            <p className="mt-1 text-sm text-[var(--muted)]">
               Elija el formato: la minuta quedará como handoff para cualquier
               abogado del estudio.
             </p>
@@ -334,14 +334,14 @@ export function MinutaWizard({
                     );
                   }
                 }}
-                className={`rounded-2xl border px-4 py-4 text-left transition ${
+                className={`rounded-[var(--radius-md)] border px-4 py-4 text-left transition ${
                   tipo === t.value
                     ? "border-[var(--sea)] bg-[var(--sea)]/8"
-                    : "border-[var(--line)] bg-white/70 hover:border-[var(--sea)]/40"
+                    : "border-[var(--line)] bg-[var(--surface-solid)] hover:border-[var(--sea)]/40"
                 }`}
               >
                 <div className="font-semibold">{t.label}</div>
-                <div className="mt-1 text-xs text-[var(--ink-soft)]/70">
+                <div className="mt-1 text-xs text-[var(--muted)]">
                   {t.hint}
                 </div>
               </button>
@@ -349,7 +349,7 @@ export function MinutaWizard({
           </div>
           {plantillasTipo.length > 0 && (
             <label className="block text-sm">
-              <span className="mb-1 block text-[var(--ink-soft)]/70">
+              <span className="mb-1 block text-[var(--muted)]">
                 Aplicar plantilla
               </span>
               <select
@@ -370,7 +370,7 @@ export function MinutaWizard({
             </label>
           )}
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">Título</span>
+            <span className="mb-1 block text-[var(--muted)]">Título</span>
             <input
               className="input"
               value={titulo}
@@ -380,7 +380,7 @@ export function MinutaWizard({
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
-              <span className="mb-1 block text-[var(--ink-soft)]/70">
+              <span className="mb-1 block text-[var(--muted)]">
                 Fecha y hora
               </span>
               <input
@@ -391,7 +391,7 @@ export function MinutaWizard({
               />
             </label>
             <label className="block text-sm">
-              <span className="mb-1 block text-[var(--ink-soft)]/70">
+              <span className="mb-1 block text-[var(--muted)]">
                 Modalidad
               </span>
               <select
@@ -408,7 +408,7 @@ export function MinutaWizard({
             </label>
           </div>
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">
+            <span className="mb-1 block text-[var(--muted)]">
               Lugar / sala / enlace
             </span>
             <input
@@ -419,7 +419,7 @@ export function MinutaWizard({
             />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">
+            <span className="mb-1 block text-[var(--muted)]">
               Participantes
             </span>
             <input
@@ -433,16 +433,16 @@ export function MinutaWizard({
       )}
 
       {step === 1 && (
-        <section className="panel space-y-5 rounded-3xl p-5">
+        <section className="panel space-y-5 rounded-[var(--radius-lg)] p-5">
           <div>
             <h2 className="text-lg font-semibold">Información clave</h2>
-            <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+            <p className="mt-1 text-sm text-[var(--muted)]">
               Escriba lo que otro abogado necesita saber mañana para seguir sin
               perder el hilo.
             </p>
           </div>
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">
+            <span className="mb-1 block text-[var(--muted)]">
               Resumen ejecutivo *
             </span>
             <textarea
@@ -453,7 +453,7 @@ export function MinutaWizard({
             />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">
+            <span className="mb-1 block text-[var(--muted)]">
               Hechos relevantes
             </span>
             <textarea
@@ -464,7 +464,7 @@ export function MinutaWizard({
             />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">
+            <span className="mb-1 block text-[var(--muted)]">
               Acuerdos / resoluciones
             </span>
             <textarea
@@ -475,7 +475,7 @@ export function MinutaWizard({
             />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">
+            <span className="mb-1 block text-[var(--muted)]">
               Cómo queda la causa
             </span>
             <textarea
@@ -486,7 +486,7 @@ export function MinutaWizard({
             />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">
+            <span className="mb-1 block text-[var(--muted)]">
               Riesgos y alertas
             </span>
             <textarea
@@ -500,11 +500,11 @@ export function MinutaWizard({
       )}
 
       {step === 2 && (
-        <section className="panel space-y-5 rounded-3xl p-5">
+        <section className="panel space-y-5 rounded-[var(--radius-lg)] p-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Próximos pasos</h2>
-              <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+              <p className="mt-1 text-sm text-[var(--muted)]">
                 Cada acción puede crear task y/o plazo en la causa.
               </p>
             </div>
@@ -520,11 +520,13 @@ export function MinutaWizard({
             {acciones.map((a, idx) => (
               <div
                 key={a.key}
-                className="rounded-2xl border border-[var(--line)] bg-white/70 p-4"
+                className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] p-4"
               >
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--ink-soft)]/55">
+                <div className="mb-4 text-sm font-semibold text-[var(--ink)]">
                   Acción {idx + 1}
                 </div>
+                <label className="block space-y-2 text-sm font-medium">
+                  <span>Acción</span>
                 <input
                   className="input"
                   value={a.descripcion}
@@ -533,7 +535,10 @@ export function MinutaWizard({
                   }
                   placeholder="Ej. Presentar lista de testigos"
                 />
+                </label>
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <label className="block space-y-2 text-sm font-medium">
+                    <span>Responsable</span>
                   <input
                     className="input"
                     value={a.responsable}
@@ -542,6 +547,9 @@ export function MinutaWizard({
                     }
                     placeholder="Responsable"
                   />
+                  </label>
+                  <label className="block space-y-2 text-sm font-medium">
+                    <span>Fecha límite</span>
                   <input
                     className="input"
                     type="date"
@@ -555,6 +563,9 @@ export function MinutaWizard({
                       })
                     }
                   />
+                  </label>
+                  <label className="block space-y-2 text-sm font-medium">
+                    <span>Días plazo</span>
                   <input
                     className="input"
                     type="number"
@@ -568,8 +579,11 @@ export function MinutaWizard({
                     }
                     placeholder="Días plazo"
                   />
+                  </label>
+                  <label className="block space-y-2 text-sm font-medium">
+                    <span>Prioridad</span>
                   <select
-                    className="input"
+                    className="select"
                     value={a.prioridad}
                     onChange={(e) =>
                       updateAccion(a.key, { prioridad: e.target.value })
@@ -581,6 +595,7 @@ export function MinutaWizard({
                       </option>
                     ))}
                   </select>
+                  </label>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-4 text-sm text-[var(--ink-soft)]/80">
                   <label className="inline-flex items-center gap-2">
@@ -650,17 +665,17 @@ export function MinutaWizard({
       )}
 
       {step === 3 && (
-        <section className="panel space-y-5 rounded-3xl p-5">
+        <section className="panel space-y-5 rounded-[var(--radius-lg)] p-5">
           <div>
             <h2 className="text-lg font-semibold">Publicar y notificar</h2>
-            <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+            <p className="mt-1 text-sm text-[var(--muted)]">
               Se genera documento Markdown, actividad en la causa y aviso al
               equipo.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
-              <span className="mb-1 block text-[var(--ink-soft)]/70">
+              <span className="mb-1 block text-[var(--muted)]">
                 Etapa sugerida
               </span>
               <select
@@ -695,7 +710,7 @@ export function MinutaWizard({
                 />
                 Subir a carpeta Google Drive
                 {!hasRealDriveFolder && (
-                  <span className="text-xs text-[var(--ink-soft)]/55">
+                  <span className="text-xs text-[var(--muted)]">
                     (requiere carpeta real, no stub)
                   </span>
                 )}
@@ -710,7 +725,7 @@ export function MinutaWizard({
               </label>
             </div>
           </div>
-          <div className="rounded-2xl border border-[var(--line)] bg-white/70 p-4 text-sm">
+          <div className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] p-4 text-sm">
             <div className="font-medium">Vista previa del handoff</div>
             <ul className="mt-2 space-y-1 text-[var(--ink-soft)]/80">
               <li>
@@ -725,7 +740,7 @@ export function MinutaWizard({
           </div>
           {error && (
             <p
-              className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+              className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
               role="alert"
               aria-live="assertive"
             >
@@ -737,7 +752,7 @@ export function MinutaWizard({
 
       {error && step !== 3 && (
         <p
-          className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
           role="alert"
           aria-live="assertive"
         >
