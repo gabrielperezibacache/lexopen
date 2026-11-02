@@ -1,0 +1,117 @@
+{
+  "normalization": [
+    "ANSI colors removed",
+    "host paths replaced by placeholders",
+    "line endings and trailing whitespace normalized"
+  ],
+  "logs": [
+    {
+      "file": "units.log",
+      "sourceLogName": "lexopen-pdf-research-units.log",
+      "recordedAtUtc": "2026-11-01T19:43:10.896516+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "a1b100bbe8651c1a5dd856c7b9ab34b566259a4b674c79bbc35f0fb4a09e6a9d",
+      "normalizedSha256": "a1b100bbe8651c1a5dd856c7b9ab34b566259a4b674c79bbc35f0fb4a09e6a9d"
+    },
+    {
+      "file": "integration.log",
+      "sourceLogName": "lexopen-pdf-research-integration-all.log",
+      "recordedAtUtc": "2026-11-01T19:45:46.713877+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "cd3c6e6c795ebbb71f5cced7497872a666a722575b19d69f749e4ae413f55ea0",
+      "normalizedSha256": "94af82a99768fc0286e6b876bdd522b61ab8d17d337c3c0c33472fe11bd767c0"
+    },
+    {
+      "file": "lint-release.log",
+      "sourceLogName": "lexopen-pdf-research-lint-release.log",
+      "recordedAtUtc": "2026-11-01T19:54:01.459748+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "db58e698a71f6923f5d66425538f7b1ea17c7e16f3ce1c85858f0ab5911afc98",
+      "normalizedSha256": "dbd928d643fd9a62d3f7b403093eb025bf1d22a9f30e9b3793a4087d2ebc7b10"
+    },
+    {
+      "file": "types-release.log",
+      "sourceLogName": "lexopen-pdf-research-types-release.log",
+      "recordedAtUtc": "2026-11-01T19:55:57.177851+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "build-release.log",
+      "sourceLogName": "lexopen-pdf-research-build-release.log",
+      "recordedAtUtc": "2026-11-01T19:57:37.422987+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "1a6207b807cd3c5b6912d3a790963e7ecb506666aa32e9eef20ff2039e8e6cf7",
+      "normalizedSha256": "6565cb3842161af42ed867a803292b490d639d756afa11126fe29f3715c83e1f"
+    },
+    {
+      "file": "browser-all.log",
+      "sourceLogName": "lexopen-pdf-research-all-browser.log",
+      "recordedAtUtc": "2026-11-01T19:54:14.785158+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "4e2abd73e83decaa1f4c78166ef2ced89452c27bc519f4e2ecd390fc93c7ae44",
+      "normalizedSha256": "4e2abd73e83decaa1f4c78166ef2ced89452c27bc519f4e2ecd390fc93c7ae44"
+    },
+    {
+      "file": "browser-reviewed.log",
+      "sourceLogName": "lexopen-pdf-research-review-browser.log",
+      "recordedAtUtc": "2026-11-01T19:56:10.176251+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "2012b7d4930e9d9a638c8efae63e9cb44c9bcfdc2199e1f6ed5e48983df0e331",
+      "normalizedSha256": "2012b7d4930e9d9a638c8efae63e9cb44c9bcfdc2199e1f6ed5e48983df0e331"
+    },
+    {
+      "file": "production.log",
+      "sourceLogName": "lexopen-pdf-research-prod-smoke.log",
+      "recordedAtUtc": "2026-11-01T19:59:13.677701+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "45a24606bc7b5638916f4568fdc2ed24dacfd81776db34aa7a198bccd57a5bc0",
+      "normalizedSha256": "45a24606bc7b5638916f4568fdc2ed24dacfd81776db34aa7a198bccd57a5bc0"
+    },
+    {
+      "file": "upgrade-restore.log",
+      "sourceLogName": "lexopen-pdf-upgrade-restore-proof.log",
+      "recordedAtUtc": "2026-11-01T19:54:43.312984+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "b56b82e27fb45f83422ffeed05a2f9c733c69f0c6fdda1dea129560e947fdf0b",
+      "normalizedSha256": "f2dd15dcde9b265b5ae04a1ec064b5e1184cd10469c33461a1cbc3dec7eecda8"
+    },
+    {
+      "file": "source-live.log",
+      "sourceLogName": "lexopen-sources-live-smoke.log",
+      "recordedAtUtc": "2026-11-01T19:31:32.258681+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "699ebf2fcbe8b1ad95cf4b0bb3f29b3d510ea989ba12a3137dbadf53263a7048",
+      "normalizedSha256": "699ebf2fcbe8b1ad95cf4b0bb3f29b3d510ea989ba12a3137dbadf53263a7048"
+    },
+    {
+      "file": "pdf-native-ocr.log",
+      "sourceLogName": "lexopen-pdf-pages-test.log",
+      "recordedAtUtc": "2026-11-01T19:29:50.810277+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "c4996f35a30474116265f290967410774921946bb74662d6b550584baf9165eb",
+      "normalizedSha256": "c4996f35a30474116265f290967410774921946bb74662d6b550584baf9165eb"
+    },
+    {
+      "file": "source-contracts.log",
+      "sourceLogName": "lexopen-sources-final-tests.log",
+      "recordedAtUtc": "2026-11-01T19:31:28.851958+00:00",
+      "exitCode": 0,
+      "exitEvidence": "returned by executor; transcribed from observed process result",
+      "sourceSha256": "33802723f4c2c6d4270b651252df1509a94fe1467a4db34e1940066b8e8835d4",
+      "normalizedSha256": "33802723f4c2c6d4270b651252df1509a94fe1467a4db34e1940066b8e8835d4"
+    }
+  ]
+}

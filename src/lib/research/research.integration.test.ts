@@ -1,0 +1,148 @@
+/** Isolated PostgreSQL corpus: no real legal answers, network request or model call. */
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { PrismaClient } from "@prisma/client";
+import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
+import { storeEvidenceSnapshot } from "@/lib/evidence/service";
+import { putObject, getObject } from "@/lib/storage";
+import { sha256 } from "@/lib/evidence/fragments";
+import { importLegalSource, listLegalSources, listResearchRuns, readLegalSourceOriginal, readLegalSourceVersion, readResearchRun, searchResearch, verifyResearchCitation, type LegalSourceImport } from "./service";
+
+async function main() {
+  const connection = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
+  assert.equal(connection, new URL(process.env.DATABASE_URL!).toString());
+  const client = new PrismaClient({ datasources: { db: { url: connection } } });
+  const directory = await mkdtemp(path.join(tmpdir(), "lexopen-research-test-"));
+  process.env.STORAGE_PATH = directory;
+  const tag = randomUUID(), ownerId = `research-${tag}-owner`, outsiderId = `research-${tag}-other`, caseId = `research-${tag}-case`;
+  const numericId = 9_000_000_000 + Number.parseInt(tag.slice(0, 7), 16);
+  const urls = [numericId, numericId + 1].map(id => `https://www.bcn.cl/leychile/navegar?idNorma=${id}`);
+  const canonicalUrls: string[] = [];
+  let failAudit = false;
+  client.$use(async (params, next) => {
+    if (failAudit && params.model === "AuditEvent" && params.action === "create" && params.args?.data?.actorId === ownerId) throw new Error("research fixture audit failure");
+    return next(params);
+  });
+  try {
+    assert.equal(await client.legalSource.count({ where: { canonicalUrl: { in: urls } } }), 0, "Fixture identifiers must not collide with an existing source");
+    const owner = await client.user.create({ data: { id: ownerId, email: `${ownerId}@example.invalid`, name: "Synthetic owner", role: "abogado", password: "unused-fixture" } });
+    const outsider = await client.user.create({ data: { id: outsiderId, email: `${outsiderId}@example.invalid`, name: "Synthetic outsider", role: "abogado", password: "unused-fixture" } });
+    await client.causa.create({ data: { id: caseId, titulo: "Synthetic private matter", tribunal: "Fixture", materia: "civil", acceso: "equipo", abogadoId: owner.id } });
+    const input: LegalSourceImport = {
+      canonicalUrl: urls[0], retrievalUrl: urls[0], title: `Fuente ficticia ${tag}`, organism: "Fixture pública identificada", kind: "legislation", text: `Prescripción del contrato: texto ficticio ${tag}. No es asesoría ni una norma real.`, rawBytes: Buffer.from(`Original ficticio ${tag}`), mimeType: "text/plain", coverageWarnings: [], retrievedAt: new Date("2025-01-01T00:00:00Z"), acquisitionMethod: "manual",
+    };
+    canonicalUrls.push(input.canonicalUrl, urls[1]);
+    const versions = await Promise.all([importLegalSource(input, owner, client), importLegalSource(input, owner, client)]);
+    assert.equal(versions[0].id, versions[1].id);
+    assert.equal(await client.legalSourceVersion.count({ where: { sourceId: versions[0].sourceId } }), 1);
+    assert.equal(versions[0].acquisitionMethod, "manual");
+    assert.match(versions[0].warnings.join(" "), /manualmente/);
+    const sourceView = await readLegalSourceVersion(versions[0].id, owner, {}, client);
+    assert.equal(sourceView.fragments[0].text, input.text);
+    assert.equal(sourceView.fragments[0].textSha256, sha256(input.text));
+    assert.deepEqual((await readLegalSourceOriginal(versions[0].id, owner, client)).bytes, input.rawBytes);
+    const validQuote = await verifyResearchCitation({ kind: "legal", fragmentId: sourceView.fragments[0].id, quote: "Prescripción del contrato" }, owner, client);
+    assert.equal(validQuote.verified, true);
+    assert.equal((await verifyResearchCitation({ kind: "legal", fragmentId: sourceView.fragments[0].id, quote: "Una conclusión inventada" }, owner, client)).verified, false);
+    const previousFetch = globalThis.fetch;
+    let networkRequests = 0;
+    globalThis.fetch = async () => { networkRequests++; throw new Error("A local corpus query must not use the network"); };
+    let firstRun;
+    try { firstRun = await searchResearch(owner, { query: "prescripcion contrato", sourceKinds: ["legislation"] }, client); }
+    finally { globalThis.fetch = previousFetch; }
+    assert.equal(networkRequests, 0);
+    assert.equal(firstRun.status, "completed");
+    assert.equal(firstRun.coverage.networkRequests, 0); assert.equal(firstRun.coverage.modelUsed, false);
+    assert.equal(firstRun.results.some(row => row.versionId === versions[0].id && row.quote === input.text), true);
+    assert.deepEqual(await readResearchRun(firstRun.id, owner, client), firstRun);
+    await assert.rejects(readResearchRun(firstRun.id, outsider, client), error => (error as { status?: number }).status === 404);
+    const newer = await importLegalSource({ ...input, text: `Texto posterior distinto ${tag}`, rawBytes: Buffer.from(`Original posterior ${tag}`), title: "Título posterior", retrievedAt: new Date("2026-01-01T00:00:00Z") }, owner, client);
+    assert.notEqual(newer.id, versions[0].id);
+    await assert.rejects(importLegalSource({ ...input, title: "Metadatos incompatibles" }, owner, client), error => (error as { status?: number }).status === 409);
+    await assert.rejects(importLegalSource({ ...input, publishedAt: new Date("2024-01-01T00:00:00Z") }, owner, client), error => (error as { status?: number }).status === 409);
+    assert.equal((await client.legalSource.findUniqueOrThrow({where:{id:newer.sourceId}})).title,"Título posterior");
+    assert.equal((await importLegalSource(input,owner,client)).id,versions[0].id);
+    assert.equal((await client.legalSource.findUniqueOrThrow({where:{id:newer.sourceId}})).title,"Título posterior","Reimporting an older frozen version must not downgrade the current source metadata");
+    assert.equal((await readResearchRun(firstRun.id, owner, client)).results.find(row => row.versionId === versions[0].id)?.title, input.title);
+    assert.equal((await readLegalSourceVersion(versions[0].id, owner, {}, client)).title, input.title);
+    assert.equal((await listLegalSources(owner, client)).some(source => source.id === newer.sourceId && source.versions[0].id === newer.id), true);
+    const abstained = await searchResearch(owner, { query: `sincoincidencia${tag.replaceAll("-", "")}` }, client);
+    assert.equal(abstained.status, "abstained"); assert.equal(abstained.results.length, 0);
+    assert.match(abstained.warnings.join(" "), /Sin fuentes incorporadas/);
+
+    const oldDoc = await client.documento.create({ data: { id: `old-${tag}`, nombre: "Archivo anterior.pdf", contenido: `Contrato con prescripción privada ${tag}`, extractionStatus: "completed", causaId: caseId, autorId: owner.id } });
+    await client.documento.createMany({ data: Array.from({length: 205}, (_, i) => ({ id: `${tag}-new-${i}`, nombre: `Reciente ${i}`, causaId: caseId, autorId: owner.id })) });
+    const docVersion = await client.$transaction(tx => storeEvidenceSnapshot(tx, { documentoId: oldDoc.id, name: oldDoc.nombre, bytes: Buffer.from(oldDoc.contenido!), text: oldDoc.contenido!, status: "partial", metadata: { partial: true } }));
+    const fragment = await client.documentEvidenceFragment.findFirstOrThrow({ where: { versionId: docVersion.id } });
+    const page = await client.documentEvidencePage.create({ data: { versionId: docVersion.id, pageNumber: 2, text: fragment.text, textSha256: fragment.textSha256, method: "ocr", status: "completed" } });
+    await client.documentEvidenceFragment.update({ where: { id: fragment.id }, data: { pageId: page.id, pageStartOffset: 0, pageEndOffset: fragment.text.length } });
+    await client.documentEvidenceVersion.update({ where: { id: docVersion.id }, data: { locatorKind: "pdf-page", pageCount: 2 } });
+    const bounded = await searchResearch(owner, { query: "contrato", causaId: caseId, sourceKinds: [] }, client);
+    assert.equal(bounded.coverage.documentsAvailable, 206); assert.equal(bounded.coverage.corpusLimited, true);
+    assert.match(bounded.warnings.join(" "), /acote/);
+    const scoped = await searchResearch(owner, { query: "prescripcion contrato", causaId: caseId, documentIds: [oldDoc.id], sourceKinds: [] }, client);
+    assert.equal(scoped.coverage.documentsAvailable, 1); assert.equal(scoped.coverage.documentsSearched, 1);
+    assert.equal(scoped.results.length, 1); assert.equal(scoped.results[0].pageNumber, 2); assert.equal(scoped.results[0].extractionMethod, "ocr"); assert.equal(scoped.results[0].partial, true);
+    assert.match(scoped.warnings.join(" "), /extracción parcial/);
+    assert.equal(scoped.results[0].documentId, oldDoc.id);
+    assert.deepEqual(scoped.scope,{causaId:caseId,documentIds:[oldDoc.id],sourceKinds:[],selectedDocumentIds:[oldDoc.id]});
+    assert.deepEqual((await readResearchRun(scoped.id,owner,client)).scope,scoped.scope);
+    const legacyResult={...scoped};delete (legacyResult as Partial<typeof scoped>).scope;
+    await client.researchRun.update({where:{id:scoped.id},data:{resultJson:JSON.stringify(legacyResult)}});
+    assert.deepEqual((await readResearchRun(scoped.id,owner,client)).scope,scoped.scope);
+    assert.match(scoped.results[0].href,/&page=2#fragment-/);
+    assert.match((await verifyResearchCitation({kind:"document",fragmentId:fragment.id,quote:fragment.text},owner,client)).href,/&page=2#fragment-/);
+    await client.documentEvidencePage.update({where:{id:page.id},data:{text:"La página fue alterada"}});
+    await assert.rejects(verifyResearchCitation({kind:"document",fragmentId:fragment.id,quote:fragment.text},owner,client), error => (error as {status?:number}).status === 409);
+    await assert.rejects(readResearchRun(scoped.id,owner,client), error => (error as {status?:number}).status === 409);
+    assert.equal((await searchResearch(owner,{query:"contrato",documentIds:[oldDoc.id],sourceKinds:[]},client)).results.length,0);
+    await client.documentEvidencePage.update({where:{id:page.id},data:{text:fragment.text}});
+    const foreignVersion=await client.$transaction(tx=>storeEvidenceSnapshot(tx,{documentoId:oldDoc.id,name:oldDoc.nombre,bytes:Buffer.from("Otro original ficticio"),text:fragment.text,status:"completed"}));
+    await client.documentEvidenceVersion.update({where:{id:foreignVersion.id},data:{createdAt:new Date("2020-01-01T00:00:00Z")}});
+    const foreignPage=await client.documentEvidencePage.create({data:{versionId:foreignVersion.id,pageNumber:2,text:fragment.text,textSha256:fragment.textSha256,method:"native",status:"completed"}});
+    await client.documentEvidenceFragment.update({where:{id:fragment.id},data:{pageId:foreignPage.id}});
+    await assert.rejects(verifyResearchCitation({kind:"document",fragmentId:fragment.id,quote:fragment.text},owner,client), error => (error as {status?:number}).status === 409);
+    assert.equal((await searchResearch(owner,{query:"contrato",documentIds:[oldDoc.id],sourceKinds:[]},client)).results.length,0);
+    await client.documentEvidenceFragment.update({where:{id:fragment.id},data:{pageId:page.id}});
+    const partialAbstention = await searchResearch(owner, { query: `sincoincidencia${tag.replaceAll("-", "")}`, causaId: caseId, documentIds: [oldDoc.id], sourceKinds: [] }, client);
+    assert.equal(partialAbstention.status, "abstained"); assert.equal(partialAbstention.coverage.documentsWithPartialEvidence, 1);
+    assert.match(partialAbstention.warnings.join(" "), /páginas pendientes/);
+    await assert.rejects(searchResearch(outsider, { query: "contrato", documentIds: [oldDoc.id] }, client), error => (error as {status?:number}).status === 404);
+    await assert.rejects(verifyResearchCitation({kind:"document",fragmentId:fragment.id,quote:fragment.text},outsider,client), error => (error as {status?:number}).status === 404);
+    assert.equal((await searchResearch(outsider,{query:tag.replaceAll("-", ""),sourceKinds:[]},client)).results.length,0);
+    await client.causa.update({ where: { id: caseId }, data: { abogadoId: outsider.id } });
+    await assert.rejects(readResearchRun(scoped.id,owner,client), error => (error as {status?:number}).status === 404);
+    assert.equal((await listResearchRuns(owner,client)).some(run=>run.id===scoped.id),false);
+    assert.equal((await readResearchRun(firstRun.id,owner,client)).results.length>0,true);
+    await client.user.update({where:{id:owner.id},data:{capabilityRevokes:"assistant.use"}});
+    await assert.rejects(searchResearch(owner,{query:"contrato"},client), error => (error as {status?:number}).status === 403);
+    await client.user.update({where:{id:owner.id},data:{capabilityRevokes:""}});
+
+    failAudit=true;
+    await assert.rejects(importLegalSource({...input,canonicalUrl:urls[1],retrievalUrl:urls[1]},owner,client),/auditoría/);
+    assert.equal(await client.legalSource.count({where:{canonicalUrl:urls[1]}}),0);
+    const runCount=await client.researchRun.count({where:{ownerId}});
+    await assert.rejects(searchResearch(owner,{query:"contrato"},client),/auditoría/);
+    assert.equal(await client.researchRun.count({where:{ownerId}}),runCount);
+    failAudit=false;
+    const stored=await client.legalSourceVersion.findUniqueOrThrow({where:{id:versions[0].id}});
+    const bytes=await getObject(stored.sourceStorageKey!);assert.ok(bytes);
+    await putObject({key:stored.sourceStorageKey!,body:"changed original"});
+    await assert.rejects(readLegalSourceOriginal(stored.id,owner,client), error => (error as {status?:number}).status === 409);
+    await client.legalSourceFragment.update({where:{id:sourceView.fragments[0].id},data:{text:"tampered fragment"}});
+    await assert.rejects(readResearchRun(firstRun.id,owner,client), error => (error as {status?:number}).status === 409);
+    console.log("research PostgreSQL OK: import concurrency, frozen versions, exact citation/hash, no network/model, accent search, abstention, 206-doc explicit selection, PDF page/OCR/partial, owner/current ACL/revocation, atomic audit rollback, original tamper");
+  } finally {
+    failAudit=false;
+    await client.researchRun.deleteMany({where:{ownerId:{in:[ownerId,outsiderId]}}});
+    await client.legalSource.deleteMany({where:{canonicalUrl:{in:canonicalUrls}}});
+    await client.causa.deleteMany({where:{id:caseId}});
+    await client.auditEvent.deleteMany({where:{actorId:{in:[ownerId,outsiderId]}}});
+    await client.user.deleteMany({where:{id:{in:[ownerId,outsiderId]}}});
+    await client.$disconnect();await rm(directory,{recursive:true,force:true});
+  }
+}
+void main().catch(error=>{console.error(error);process.exitCode=1});

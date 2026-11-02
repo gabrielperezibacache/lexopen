@@ -1,0 +1,25 @@
+LexOpen PDF/legal upgrade and restore rehearsal 2026-11-01T19:53:25.513804+00:00
+Scope: previous fictitious source database read-only; two brand new disposable destinations; no production host data.
+Artifacts: <proof-artifacts>
+Storage source fixture copy: <previous-fixture-storage>
+New fixture storage: <upgrade-storage>
+Restored storage: <restored-storage>
+PASS preflight: both destination databases absent; source has 30 completed migrations.
+Source snapshot: 75 tables; 601 rows; 10 storage objects.
+Created new lexopen_pdf_upgrade_test
+migrate deploy exit 0: schema30 -> schema31
+PASS schema drift: exit 0.
+PASS upgrade preservation: original hashes/counts match in all 75 tables; migration row +1 only. Defaults {"fragments": 1, "legacyLocatorDefaults": 1, "legacyPageDefaults": 1, "legalSources": 0, "pages": 0, "runs": 0, "versions": 1}
+{"phase":"fixture created","physicalPages":3,"nativePages":1,"ocrPages":1,"blankPages":1,"documentFragments":2,"legalVersions":1,"researchRuns":1,"scopeRestored":true,"networkRequests":0,"modelUsed":false}
+Fixture snapshot: 80 tables; 619 rows; 13 storage objects.
+PASS migration checksums: 31 finished migrations match repository files.
+Created new lexopen_pdf_restore_test
+PASS restore: every table count/row hash and every storage path/byte count/hash matches the fixture source.
+{"phase":"restored services verified","originalBytes":"exact hash match","frozenOriginal":"exact hash match","pages":3,"fragments":2,"page2Png":"exact hash match","legalText":"exact hash match","legalProvenance":"manual preserved","runScope":"exact match","allCitations":"verified","foreignUser":"denied"}
+PASS source remains unchanged: all original tables and previous fixture storage exact before/after.
+PASS service reads leave restored database and storage unchanged.
+LIMITS: logical PostgreSQL dump/restore + local files, actual domain reads and PNG rendering; not physical offline Host/vault/config restore, S3, a web-server restart, live legal retrieval or production data.
+RESULT PASS. Two newly created test databases and all proof artifacts retained; no existing database was reset or deleted.
+Visual verification: rendered restored physical page 2 shows PAGINA DOS / DOCUMENTO ESCANEADO and the three expected fictional lines; text is legible and unclipped. PNG before/after hashes identical.
+Working schema SHA256: d32f0af2b0ec84c7559fd04ff623a004effda7155a3f1a3e955d1c98c4c29130
+Reproducible script copies retained in artifacts directory. Scripts refuse pre-existing destination databases and log overwrite; source sessions are read-only.

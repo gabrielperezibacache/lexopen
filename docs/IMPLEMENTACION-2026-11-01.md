@@ -2,6 +2,8 @@
 
 Fecha: 1 de noviembre de 2026. Base: `main` 72400f9b9627cdc147ebf7c14a791c063747a686. Rama de implementación: `codex/lexopen-own-core`.
 
+Seguimiento: este documento conserva el alcance y las pruebas del primer incremento. La continuación en `codex/pdf-legal-research` incorpora [páginas PDF físicas e investigación jurídica propia](PDF-INVESTIGACION-2026-11-01.md); sus resultados se registran por separado.
+
 Este incremento integra y corrige los HEAD auditados de los PR [202](https://github.com/gabrielperezibacache/lexopen/pull/202) y [203](https://github.com/gabrielperezibacache/lexopen/pull/203), junto con los bloqueantes de la base. Añade el primer flujo documental propio del [plan](PLAN-DESARROLLO-TRIFOLIA.md). No usa cuentas, API, MCP, índices ni servicios de TRIFOLIA.
 
 ## Qué se puede usar

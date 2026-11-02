@@ -1,0 +1,1 @@
+{"mode":"production","checks":["CSRF real","PDF physical pages and local OCR","PNG original bound and private cache","exact page citation","manual provenance","compiled research UI and restored scope","no model/network in search","false quote rejected","revoked image and history denied","portal denied"],"externalServicesConfigured":false}
