@@ -370,14 +370,15 @@ export async function ensureGoogleAccessToken(): Promise<GoogleConfig> {
   return next;
 }
 
-async function requireDriveSession() {
+export async function requireDriveSession() {
   const enabled = await isGoogleIntegrationEnabled();
-  const config = await ensureGoogleAccessToken();
+  const stored = await getGoogleConfig();
   assertGoogleFeatureEnabled({
     enabled,
-    syncDrive: config.syncDrive,
+    syncDrive: stored.syncDrive,
     feature: "drive",
   });
+  const config = await ensureGoogleAccessToken();
   if (!config.accessToken) {
     throw new GoogleIntegrationError(
       "needs_oauth",

@@ -25,7 +25,7 @@ function validDate(value: string | undefined): Date | undefined {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : undefined;
 }
 
-type Location = { provider: "dt" | "bcn"; canonicalUrl: string; retrievalUrl: string; externalId: string; version?: string };
+type Location = { provider: "dt" | "bcn" | "sii"; format: "html" | "xml" | "json"; canonicalUrl: string; retrievalUrl: string; externalId: string; version?: string };
 function sourceLocation(raw: string): Location {
   if (raw.length > 2000 || !isSafeOutboundHttpUrl(raw, { allowHttp: false })) {
     throw sourceError("Use una URL HTTPS de una fuente oficial admitida", 400, "unsupported_source_url");
@@ -37,24 +37,47 @@ function sourceLocation(raw: string): Location {
     const id = /^\/legislacion\/1624\/w3-article-(\d{1,10})\.html$/.exec(url.pathname)?.[1];
     if (!id || url.search) throw sourceError("Importe el enlace individual de un dictamen de la Dirección del Trabajo", 400, "unsupported_source_url");
     const canonicalUrl = `https://www.dt.gob.cl/legislacion/1624/w3-article-${id}.html`;
-    return { provider: "dt", canonicalUrl, retrievalUrl: canonicalUrl, externalId: `DT:${id}` };
+    return { provider: "dt", format: "html", canonicalUrl, retrievalUrl: canonicalUrl, externalId: `DT:${id}` };
+  }
+  if (["www.sii.cl", "sii.cl"].includes(host)) {
+    const legacy = /^\/pagina\/jurisprudencia\/adminis\/(\d{4})\/(renta|ventas)\/ja(\d{1,10})\.htm$/.exec(url.pathname);
+    const modern = /^\/normativa_legislacion\/jurisprudencia_administrativa\/(ley_impuesto_renta|ley_impuesto_ventas)\/(\d{4})\/ja(\d{1,10})\.htm$/.exec(url.pathname);
+    if ((!legacy && !modern) || url.search) throw sourceError("Importe el enlace individual de un oficio de Renta o IVA del SII", 400, "unsupported_source_url");
+    const year = legacy?.[1] || modern![2];
+    const section = legacy ? legacy[2] === "renta" ? "ley_impuesto_renta" : "ley_impuesto_ventas" : modern![1];
+    const id = legacy?.[3] || modern![3];
+    const canonicalUrl = `https://www.sii.cl/normativa_legislacion/jurisprudencia_administrativa/${section}/${year}/ja${id}.htm`;
+    return { provider: "sii", format: "html", canonicalUrl, retrievalUrl: `https://www.sii.cl${url.pathname}`, externalId: `SII:${year}:${Number(id)}` };
   }
   if (["www.bcn.cl", "bcn.cl", "www.leychile.cl", "leychile.cl"].includes(host)) {
     if (!/^\/(?:leychile\/)?(?:navegar|consulta\/obtxml)$/i.test(url.pathname)) throw sourceError("Use el enlace de una norma individual de LeyChile", 400, "unsupported_source_url");
     const id = url.searchParams.get("idNorma");
     const version = url.searchParams.get("idVersion") || undefined;
     const allowed = new Set(["idNorma", "idVersion", "opt"]);
-    if (!id || !/^\d{1,10}$/.test(id) || [...url.searchParams.keys()].some(k => !allowed.has(k)) || [...url.searchParams.keys()].some(k => url.searchParams.getAll(k).length !== 1) || (version && !validDate(version))) {
+    if (!id || !/^\d{1,10}$/.test(id) || [...url.searchParams.keys()].some(k => !allowed.has(k)) || [...url.searchParams.keys()].some(k => url.searchParams.getAll(k).length !== 1) || (url.searchParams.has("opt") && url.searchParams.get("opt") !== "7") || (url.searchParams.has("idVersion") && (!version || !validDate(version)))) {
       throw sourceError("LeyChile requiere idNorma y, opcionalmente, idVersion con fecha válida", 400, "unsupported_source_url");
     }
     const query = new URLSearchParams({ idNorma: id, ...(version ? { idVersion: version } : {}) });
-    return { provider: "bcn", canonicalUrl: `https://www.bcn.cl/leychile/navegar?${query}`, retrievalUrl: `https://www.bcn.cl/leychile/consulta/obtxml?opt=7&${query}`, externalId: `BCN:${id}`, version };
+    // The documented XML service always returns the latest consolidated text.
+    // Historical versions use the same public JSON service as the BCN web app.
+    const retrievalUrl = version
+      ? `https://nuevo.leychile.cl/servicios/Navegar/get_norma_json?${query}&idLey=&tipoVersion=&cve=&agrupa_partes=1&r=`
+      : `https://www.bcn.cl/leychile/consulta/obtxml?opt=7&${query}`;
+    return { provider: "bcn", format: version ? "json" : "xml", canonicalUrl: `https://www.bcn.cl/leychile/navegar?${query}`, retrievalUrl, externalId: `BCN:${id}`, version };
   }
-  throw sourceError("Fuente no admitida. Use una norma de LeyChile o un dictamen individual de la Dirección del Trabajo", 400, "unsupported_source_url");
+  throw sourceError("Fuente no admitida. Use una norma de LeyChile, un dictamen de la Dirección del Trabajo o un oficio de Renta o IVA del SII", 400, "unsupported_source_url");
 }
 
 /** Closed allowlist also applies to an explicitly identified manual import. */
 export function validatePublicLegalSourceUrl(raw: string): string { return sourceLocation(raw).canonicalUrl; }
+
+/** Authority and class come from the approved URL, including for manual copies. */
+export function describePublicLegalSource(raw: string): { canonicalUrl: string; organism: string; kind: "legislation" | "administrative" } {
+  const location = sourceLocation(raw);
+  return { canonicalUrl: location.canonicalUrl,
+    organism: location.provider === "dt" ? "Dirección del Trabajo" : location.provider === "sii" ? "Servicio de Impuestos Internos" : "Biblioteca del Congreso Nacional de Chile",
+    kind: location.provider === "bcn" ? "legislation" : "administrative" };
+}
 
 export function isPublicSourceAddress(address: string): boolean {
   const family = isIP(address);
@@ -81,7 +104,7 @@ const publicLookup: LookupFunction = (hostname, options, callback) => {
 async function officialRequest(url: string, init: RequestInit): Promise<Response> {
   return new Promise((resolve, reject) => {
     const req = request(url, { method: "GET", signal: init.signal || undefined, lookup: publicLookup,
-      headers: { Accept: "application/xml, text/xml, text/html;q=0.9", "Accept-Encoding": "identity", "User-Agent": "LexOpen/1.0 (public legal source importer)" } }, response => {
+      headers: { Accept: "application/xml, text/xml, application/json, text/html;q=0.9", "Accept-Encoding": "identity", "User-Agent": "LexOpen/1.0 (public legal source importer)" } }, response => {
       // node:https never follows a Location header; the caller rejects 3xx.
       try {
         const headers = new Headers();
@@ -122,8 +145,10 @@ async function readBounded(response: Response, signal: AbortSignal, limit: numbe
 }
 
 function decode(bytes: Buffer, mime: string) {
-  const declaration = bytes.subarray(0, 200).toString("ascii");
-  const encoding = /charset\s*=\s*["']?([\w-]+)/i.exec(mime)?.[1] || /encoding\s*=\s*["']([\w-]+)/i.exec(declaration)?.[1] || "utf-8";
+  const declaration = bytes.subarray(0, 4096).toString("ascii");
+  // Legacy SII HTML declares ISO-8859-1 in a meta element, not HTTP headers.
+  const meta = declaration.match(/<meta\b[^>]*>/gi)?.map(tag => /charset\s*=\s*["']?([\w-]+)/i.exec(tag)?.[1]).find(Boolean);
+  const encoding = /charset\s*=\s*["']?([\w-]+)/i.exec(mime)?.[1] || /encoding\s*=\s*["']([\w-]+)/i.exec(declaration)?.[1] || meta || "utf-8";
   if (!/^(?:utf-8|utf8|iso-8859-1|windows-1252)$/i.test(encoding)) throw sourceError("Codificación de la fuente no admitida");
   return new TextDecoder(encoding, { fatal: true }).decode(bytes);
 }
@@ -173,6 +198,29 @@ function parseDt(raw: string, location: Location): Omit<FetchedLegalSource, "raw
     coverageWarnings: [VERSION_WARNING, "Importación de un pronunciamiento individual; no acredita cobertura completa de la Dirección del Trabajo.", "La fecha de cabecera corresponde al documento publicado; no se deduce una fecha de inicio o término de efectos."] };
 }
 
+function parseSii(raw: string, location: Location): ReturnType<typeof parseDt> {
+  const document = parseDocument(raw);
+  const [, year, id] = location.externalId.split(":");
+  const identity = /\bORD\.?\s*N[°ºo.]\s*(\d+)\s*,\s*DE\s*(\d{2})[.-](\d{2})[.-](\d{4})\b/iu;
+  const header = find(document, node => (node.name === "title" || (node.name === "div" && !descendants(node).some(child => element(child) && ["div", "p"].includes(child.name)))) && identity.test(cleanText(literalText(node))));
+  const match = header && identity.exec(cleanText(literalText(header)));
+  const publishedAt = match && validDate(`${match[4]}-${match[3]}-${match[2]}`);
+  if (!match || Number(match[1]) !== Number(id) || match[4] !== year || !publishedAt) throw sourceError("El oficio del SII no confirma el número, año y fecha solicitados", 502, "public_source_format");
+  const body = find(document, node => node.name === "div" && descendants(node).some(child => element(child) && child.name === "p"));
+  const text = body ? cleanText(literalText(body)) : "";
+  const footer = /\bOficio\s+N[°ºo.]\s*(\d+)\s*,\s*de\s*(\d{2})[.-](\d{2})[.-](\d{4})\b/iu.exec(text.slice(-2000));
+  if (text.length < 80 || !footer || Number(footer[1]) !== Number(id) || footer.slice(2).join("-") !== match.slice(2).join("-")) throw sourceError("El oficio del SII no contiene un cuerpo y cierre concordantes", 502, "public_source_format");
+  const siblings = body?.parent ? descendants(body.parent) : [];
+  const beforeBody = siblings.slice(0, siblings.indexOf(body!)).filter(element);
+  const subject = beforeBody.at(-1);
+  const subjectText = subject ? cleanText(literalText(subject)) : "";
+  const title = `Oficio N° ${Number(id)}, de ${match[2]}.${match[3]}.${match[4]}${subjectText && !identity.test(subjectText) && subjectText.length <= 600 ? ` — ${subjectText}` : ""}`;
+  return { title, organism: "Servicio de Impuestos Internos", kind: "administrative", externalId: location.externalId,
+    publishedAt, text, coverageWarnings: [VERSION_WARNING,
+      "Importación de un oficio individual de Renta o IVA del SII. No incluye la totalidad de la jurisprudencia administrativa tributaria.",
+      "La fecha identifica el oficio; no acredita la vigencia de su criterio ni incorpora por sí sola las reconsideraciones posteriores."] };
+}
+
 function parseBcn(raw: string, location: Location): Omit<FetchedLegalSource, "rawBytes" | "mimeType" | "retrievedAt" | "retrievalUrl" | "canonicalUrl"> {
   if (/<!DOCTYPE|<!ENTITY/i.test(raw)) throw sourceError("El XML de la fuente contiene declaraciones no admitidas", 502, "public_source_format");
   assertClosedXml(raw);
@@ -196,10 +244,59 @@ function parseBcn(raw: string, location: Location): Omit<FetchedLegalSource, "ra
   const text = texts.filter(Boolean).join("\n\n");
   if (text.length < 40) throw sourceError("El XML no contiene texto suficiente para investigar", 502, "public_source_format");
   const warnings = [VERSION_WARNING, "Importación de una norma individual. Las imágenes, adjuntos y notas binarias requieren revisión en el original.", "Las fechas de versión de LeyChile no se convierten automáticamente en fechas de vigencia comprobada."];
+  const versionDate = validDate(norma.attribs.fechaVersion);
+  if (!versionDate) throw sourceError("El XML no declara una fecha de versión válida", 502, "public_source_format");
+  warnings.push(`Fecha de versión declarada por BCN: ${versionDate.toISOString().slice(0, 10)}. Se conserva como metadato de procedencia, sin certificar vigencia.`);
   if (norma.attribs.derogado === "derogado") warnings.push("La fuente identifica esta norma como derogada.");
   if (location.version && norma.attribs.fechaVersion !== location.version) throw sourceError("La fuente no confirmó la versión histórica solicitada", 409, "public_source_version_mismatch");
   return { title: cleanText(literalText(titleNode)), organism: "Biblioteca del Congreso Nacional de Chile", kind: "legislation", externalId: location.externalId,
     publishedAt: validDate(identifier?.attribs.fechaPublicacion), text, coverageWarnings: warnings };
+}
+
+/** Only the normative HTML tree is evidence; related projects and doctrine are not. */
+function parseBcnHistoricalJson(raw: string, location: Location): ReturnType<typeof parseDt> {
+  type Row = Record<string, unknown>;
+  const row = (value: unknown): value is Row => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  const document: unknown = JSON.parse(raw);
+  if (!row(document) || !row(document.metadatos)) throw sourceError("El servicio histórico de BCN no contiene metadatos reconocibles", 502, "public_source_format");
+  const meta = document.metadatos;
+  if (String(meta.id_norma) !== location.externalId.split(":")[1] || typeof meta.titulo_norma !== "string" || !meta.titulo_norma.trim() || !Array.isArray(document.html) || !document.html.length || !Array.isArray(document.estructura) || !document.estructura.length) throw sourceError("El servicio histórico de BCN no identifica la norma solicitada", 502, "public_source_format");
+  const version = typeof meta.fecha_version === "string" && validDate(meta.fecha_version);
+  const interval = row(meta.vigencia) ? meta.vigencia : null;
+  if (!version || meta.fecha_version !== location.version || interval?.inicio_vigencia !== location.version) throw sourceError("La fuente no confirmó la versión histórica solicitada", 409, "public_source_version_mismatch");
+  const texts: string[] = [];
+  const ids = new Set<number>();
+  let count = 0;
+  function collect(parts: unknown[], depth: number) {
+    if (depth > 40) throw sourceError("La estructura histórica de BCN supera el límite de preparación", 413, "public_source_too_large");
+    for (const part of parts) {
+      if (++count > 20_000 || !row(part) || !Number.isSafeInteger(part.i) || (part.i as number) <= 0 || ids.has(part.i as number) || typeof part.t !== "string" || (part.h !== undefined && !Array.isArray(part.h))) throw sourceError("La estructura histórica de BCN está incompleta o es incompatible", 502, "public_source_format");
+      ids.add(part.i as number);
+      texts.push(cleanText(literalText(parseDocument(part.t))));
+      if (Array.isArray(part.h)) collect(part.h, depth + 1);
+    }
+  }
+  collect(document.html, 0);
+  const structureIds = new Set<number>();
+  let structureCount = 0;
+  function checkStructure(parts: unknown[], depth: number) {
+    if (depth > 40) throw sourceError("La estructura histórica de BCN supera el límite de preparación", 413, "public_source_too_large");
+    for (const part of parts) {
+      if (++structureCount > 20_000 || !row(part) || !Number.isSafeInteger(part.i) || !ids.has(part.i as number) || structureIds.has(part.i as number) || (part.h !== undefined && !Array.isArray(part.h))) throw sourceError("La estructura histórica de BCN no coincide con sus partes de texto", 502, "public_source_format");
+      structureIds.add(part.i as number);
+      if (Array.isArray(part.h)) checkStructure(part.h, depth + 1);
+    }
+  }
+  checkStructure(document.estructura, 0);
+  if (structureIds.size !== ids.size) throw sourceError("La estructura histórica de BCN no coincide con sus partes de texto", 502, "public_source_format");
+  const text = texts.filter(Boolean).join("\n\n");
+  if (text.length < 80) throw sourceError("La versión histórica no contiene texto suficiente para investigar", 502, "public_source_format");
+  const warnings = [VERSION_WARNING, `Versión histórica declarada por BCN: ${meta.fecha_version}. No se convierte en una fecha de vigencia comprobada por LexOpen.`,
+    "Importación de una norma individual. Se conserva su texto y notas; las imágenes y adjuntos deben revisarse en el original. Los proyectos, jurisprudencia y doctrina relacionados no se incorporan como articulado."];
+  if (meta.derogado === true) warnings.push("La fuente identifica esta norma como derogada.");
+  if (row(document.alerta_global) && Array.isArray(document.alerta_global.m)) for (const warning of document.alerta_global.m) if (typeof warning === "string" && warning.trim()) warnings.push(`Alerta de BCN: ${cleanText(warning).slice(0, 500)}`);
+  return { title: cleanText(meta.titulo_norma), organism: "Biblioteca del Congreso Nacional de Chile", kind: "legislation", externalId: location.externalId,
+    publishedAt: typeof meta.fecha_publicacion === "string" ? validDate(meta.fecha_publicacion) : undefined, text, coverageWarnings: warnings.slice(0, 20) };
 }
 
 /** One explicit public URL only; no user/case text, cookies, credentials or model calls. */
@@ -212,21 +309,25 @@ export async function fetchPublicLegalSource(rawUrl: string, options: PublicSour
   const transport = options.fetch || officialRequest;
   let response: Response;
   try {
-    response = await transport(location.retrievalUrl, { method: "GET", redirect: "error", credentials: "omit", cache: "no-store", signal, headers: { Accept: "application/xml, text/xml, text/html;q=0.9" } });
+    response = await transport(location.retrievalUrl, { method: "GET", redirect: "error", credentials: "omit", cache: "no-store", signal, headers: { Accept: "application/xml, text/xml, application/json, text/html;q=0.9" } });
   } catch { throw sourceError(signal.aborted ? "La consulta a la fuente fue cancelada o agotó su tiempo" : "No fue posible consultar la fuente oficial; puede importar una copia identificada manualmente", 503); }
   if (!response.ok || response.redirected) {
     await response.body?.cancel();
     throw sourceError(`La fuente oficial no está disponible (HTTP ${response.status}). Puede conservar una copia identificada mediante importación manual`, 503);
   }
   const mime = response.headers.get("content-type") || "";
-  if (location.provider === "dt" ? !/^text\/html\b/i.test(mime) : !/^(?:text|application)\/xml\b/i.test(mime)) {
+  const mimePattern = location.format === "html" ? /^text\/html\b/i : location.format === "json" ? /^application\/json\b/i : /^(?:text|application)\/xml\b/i;
+  if (!mimePattern.test(mime)) {
     await response.body?.cancel(); throw sourceError("La fuente devolvió un formato distinto del documento esperado", 502, "public_source_format");
   }
   let rawBytes: Buffer;
   try { rawBytes = await readBounded(response, signal, maxBytes); }
   catch (error) { if (error && typeof error === "object" && "status" in error) throw error; throw sourceError("Se interrumpió la descarga de la fuente oficial. Reintente la consulta", 503); }
   let parsed: ReturnType<typeof parseDt>;
-  try { parsed = location.provider === "dt" ? parseDt(decode(rawBytes, mime), location) : parseBcn(decode(rawBytes, mime), location); }
+  try {
+    const raw = decode(rawBytes, mime);
+    parsed = location.provider === "dt" ? parseDt(raw, location) : location.provider === "sii" ? parseSii(raw, location) : location.format === "json" ? parseBcnHistoricalJson(raw, location) : parseBcn(raw, location);
+  }
   catch (error) { if (error && typeof error === "object" && "status" in error) throw error; throw sourceError("No fue posible interpretar el documento oficial", 502, "public_source_format"); }
   if (parsed.text.length > MAX_SOURCE_TEXT) throw sourceError("El texto de la fuente supera el límite de preparación", 413, "public_source_too_large");
   return { ...parsed, canonicalUrl: location.canonicalUrl, retrievalUrl: location.retrievalUrl, mimeType: mime.split(";")[0].trim().toLowerCase(), rawBytes, retrievedAt: new Date() };

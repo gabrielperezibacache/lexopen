@@ -1,0 +1,6 @@
+Observed during the second local Webpack development-server browser run, before restart.
+Own test next-server PID 98557: RSS 7775408 KiB, CPU 440.5%, elapsed 14:18.
+The server was stopped; the runner was interrupted with SIGINT (exit 130).
+No application code or test timeouts were changed for the clean rerun.
+Clean rerun uses a new disposable database and Turbopack (CI default), with a 4096 MiB Node heap limit.
+This is development-test evidence, not a production Host performance measurement.

@@ -1,0 +1,152 @@
+/** New, isolated SiteFile snapshots; no real documents or external services. */
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { prisma } from "@/lib/db";
+import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
+import { putObject } from "@/lib/storage";
+import { searchResearch } from "@/lib/research/service";
+import { sha256, verifyEvidenceQuote } from "./fragments";
+import { authorizedEvidenceFragment, authorizedEvidenceOriginal, captureSiteFileEvidence, evidenceFragmentHref, readEvidencePageImage, readSiteFileEvidence } from "./service";
+
+assert.equal(assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL), new URL(process.env.DATABASE_URL!).toString());
+if ([process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw new Error("Site evidence integration requires isolated local storage");
+const code = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
+
+async function main() {
+  const tag = randomUUID(), users: string[] = [];
+  let caseId = "", siteId = "", failAudit = false, raceFileId = "", raceReads = 0;
+  const previousStorage = process.env.STORAGE_PATH, previousOcr = process.env.OCR_ENABLED;
+  const storage = await mkdtemp(path.join(tmpdir(), "lexopen-site-evidence-it-"));
+  process.env.STORAGE_PATH = storage; delete process.env.OCR_ENABLED;
+  prisma.$use(async (params, next) => {
+    if (failAudit && params.model === "AuditEvent" && params.action === "create" && params.args?.data?.action === "site.file.evidence.capture") throw new Error("Site evidence synthetic audit failure");
+    if (raceFileId && params.model === "SiteFile" && params.action === "findFirst" && JSON.stringify(params.args.where).includes(raceFileId) && ++raceReads === 2) {
+      await prisma.siteFile.update({ where: { id: raceFileId }, data: { version: { increment: 1 }, contenido: "Changed during capture" } });
+    }
+    return next(params);
+  });
+  try {
+    const owner = await prisma.user.create({ data: { name: "Site owner fixture", email: `${tag}@site-evidence.invalid`, password: "unused-fixture", role: "abogado" } }); users.push(owner.id);
+    const member = await prisma.user.create({ data: { name: "Site member fixture", email: `${tag}-member@site-evidence.invalid`, password: "unused-fixture", role: "abogado" } }); users.push(member.id);
+    const outsider = await prisma.user.create({ data: { name: "Site excluded fixture", email: `${tag}-other@site-evidence.invalid`, password: "unused-fixture", role: "abogado" } }); users.push(outsider.id);
+    const portal = await prisma.user.create({ data: { name: "Site portal fixture", email: `${tag}-portal@site-evidence.invalid`, password: "unused-fixture", role: "cliente" } }); users.push(portal.id);
+    const matter = await prisma.causa.create({ data: { titulo: `Site evidence ${tag}`, tribunal: "Fixture", materia: "civil", acceso: "equipo", abogadoId: owner.id, miembros: { create: { userId: member.id, rol: "lectura" } } } }); caseId = matter.id;
+    const site = await prisma.site.create({ data: { name: "Private space fixture", slug: `evidence-${tag}`, causaId: caseId, isClientVisible: true, members: { create: { userId: portal.id, role: "client" } } } }); siteId = site.id;
+    const key = `site-evidence-it/${tag}/source.txt`, originalText = "Contrato ficticio: un pago documentado en el archivo del espacio.\nInformación de prueba con acentos.";
+    await putObject({ key, body: originalText, contentType: "text/plain" });
+    const file = await prisma.siteFile.create({ data: { name: "original.txt", mimeType: "text/plain", contenido: "PREVIEW NOT THE ORIGINAL", storageKey: key, siteId } });
+    const captures = await Promise.all([captureSiteFileEvidence(siteId, file.id, owner), captureSiteFileEvidence(siteId, file.id, owner)]);
+    assert.equal(captures[0].id, captures[1].id, "Concurrent identical SiteFile snapshots must be idempotent");
+    const first = await readSiteFileEvidence(siteId, file.id, owner);
+    assert.equal(first.fragments[0].text, originalText, "Extract original bytes instead of a mutable preview");
+    const fragment = await authorizedEvidenceFragment(first.fragments[0].id, owner);
+    assert.equal(fragment.version.resource.siteFileId, file.id); assert.equal(fragment.version.resource.documentoId, null);
+    assert.match(evidenceFragmentHref(fragment), new RegExp(`/sites/${siteId}/archivos/${file.id}/fuentes`));
+    assert.ok(verifyEvidenceQuote(fragment, fragment.text)); assert.equal(verifyEvidenceQuote(fragment, "Invented quotation"), false);
+    const snapshot = await prisma.documentEvidenceVersion.findUniqueOrThrow({ where: { id: captures[0].id } });
+    assert.notEqual(snapshot.sourceStorageKey, key); assert.equal(snapshot.sourceSha256, sha256(originalText));
+    assert.equal(JSON.parse(snapshot.metadataJson).sourceFileVersion, 1);
+    assert.equal((await authorizedEvidenceOriginal(snapshot.id, owner)).bytes.toString(), originalText);
+    await assert.rejects(readSiteFileEvidence("wrong-space", file.id, owner), code(404));
+    await assert.rejects(readSiteFileEvidence(siteId, file.id, outsider), code(404));
+    await assert.rejects(captureSiteFileEvidence(siteId, file.id, outsider), code(404));
+    await assert.rejects(authorizedEvidenceFragment(fragment.id, outsider), code(404));
+    await assert.rejects(authorizedEvidenceOriginal(snapshot.id, outsider), code(404));
+    // Portal membership and sharing tags never grant the internal evidence surface.
+    await prisma.siteFile.update({ where: { id: file.id }, data: { tags: "client_shared" } });
+    await assert.rejects(readSiteFileEvidence(siteId, file.id, portal), code(404));
+    await assert.rejects(authorizedEvidenceFragment(fragment.id, portal), code(404));
+    await assert.rejects(authorizedEvidenceOriginal(snapshot.id, portal), code(404));
+    await putObject({ key, body: "Updated source bytes uniquebetastage.", contentType: "text/plain" });
+    await prisma.siteFile.update({ where: { id: file.id }, data: { version: 2, contenido: "Later preview" } });
+    const second = await captureSiteFileEvidence(siteId, file.id, owner);
+    assert.notEqual(second.id, snapshot.id);
+    assert.equal((await authorizedEvidenceOriginal(snapshot.id, owner)).bytes.toString(), originalText);
+    assert.equal((await readSiteFileEvidence(siteId, file.id, owner, { versionId: snapshot.id })).fragments[0].text, originalText);
+    // A later return to the same bytes is a new source revision, not a rewind
+    // to the old snapshot. Retrieval must use revision 3 instead of revision 2.
+    await putObject({ key, body: originalText, contentType: "text/plain" });
+    await prisma.siteFile.update({ where: { id: file.id }, data: { version: 3, contenido: "Preview of the third revision" } });
+    const third = await captureSiteFileEvidence(siteId, file.id, owner);
+    assert.equal(new Set([snapshot.id, second.id, third.id]).size, 3, "A → B → A creates three immutable source revisions");
+    const thirdSnapshot = await prisma.documentEvidenceVersion.findUniqueOrThrow({ where: { id: third.id } });
+    assert.equal(thirdSnapshot.sourceSha256, snapshot.sourceSha256, "Reverting source bytes keeps their content hash");
+    assert.notEqual(thirdSnapshot.sourceRevision, snapshot.sourceRevision);
+    assert.equal(JSON.parse(thirdSnapshot.metadataJson).sourceFileVersion, 3);
+    const latest = await readSiteFileEvidence(siteId, file.id, owner);
+    assert.equal(latest.selectedVersionId, third.id);
+    assert.equal(latest.fragments[0].text, originalText);
+    const queryScope = { siteId, siteFileIds: [file.id], documentIds: [], sourceKinds: [] };
+    const foundA = await searchResearch(owner, { ...queryScope, query: "contrato" });
+    assert.equal(foundA.status, "completed");
+    assert.equal(foundA.results.length, 1);
+    assert.equal(foundA.results[0].versionId, third.id);
+    assert.equal(foundA.results[0].quote, originalText);
+    const oldB = await searchResearch(owner, { ...queryScope, query: "uniquebetastage" });
+    assert.equal(oldB.status, "abstained");
+    assert.equal(oldB.results.length, 0, "A term found only in superseded B is excluded from current research");
+    assert.equal((await authorizedEvidenceOriginal(snapshot.id, owner)).bytes.toString(), originalText);
+    assert.equal((await readSiteFileEvidence(siteId, file.id, owner, { versionId: snapshot.id })).fragments[0].text, originalText);
+    const originalPdf = await readFile(path.join(process.cwd(), "src/lib/evidence/pdf-fixtures/mixed-three-pages.pdf"));
+    const pdfKey = `site-evidence-it/${tag}/source.pdf`;
+    await putObject({ key: pdfKey, body: originalPdf, contentType: "application/pdf" });
+    const pdfFile = await prisma.siteFile.create({ data: { siteId, name: "three-pages.pdf", mimeType: "application/pdf", storageKey: pdfKey, version: 3 } });
+    const pdfVersion = await captureSiteFileEvidence(siteId, pdfFile.id, owner);
+    const page = await readSiteFileEvidence(siteId, pdfFile.id, owner, { versionId: pdfVersion.id, page: 2 });
+    assert.deepEqual(page.pages.map(p => [p.pageNumber, p.method, p.status]), [[1, "native", "completed"], [2, "ocr", "completed"], [3, "empty", "empty"]]);
+    assert.match(page.fragments[0].text, /PAGO EL 12 DE MAYO DE 2025/);
+    const pageFragment = await authorizedEvidenceFragment(page.fragments[0].id, owner);
+    assert.equal(pageFragment.page?.pageNumber, 2); assert.match(evidenceFragmentHref(pageFragment), /&page=2#fragment-/);
+    const png = await readEvidencePageImage(pdfVersion.id, 2, owner);
+    assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.equal((await readSiteFileEvidence(siteId, pdfFile.id, owner, { page: 3 })).fragments.length, 0);
+    await readEvidencePageImage(pdfVersion.id, 2, member);
+    await prisma.causaMiembro.deleteMany({ where: { causaId: caseId, userId: member.id } });
+    await assert.rejects(readSiteFileEvidence(siteId, pdfFile.id, member), code(404));
+    await assert.rejects(authorizedEvidenceFragment(pageFragment.id, member), code(404));
+    await assert.rejects(authorizedEvidenceOriginal(pdfVersion.id, member), code(404));
+    await assert.rejects(readEvidencePageImage(pdfVersion.id, 2, member), code(404));
+    await assert.rejects(readEvidencePageImage(pdfVersion.id, 2, portal), code(404));
+    await prisma.siteFile.update({ where: { id: pdfFile.id }, data: { confidencial: true } });
+    const revoked = { ...owner, capabilityRevokes: "doc.confidential.read" };
+    await assert.rejects(readSiteFileEvidence(siteId, pdfFile.id, revoked), code(404));
+    await assert.rejects(readEvidencePageImage(pdfVersion.id, 2, revoked), code(404));
+    await prisma.siteFile.update({ where: { id: pdfFile.id }, data: { confidencial: false } });
+    const pageRow = await prisma.documentEvidencePage.findFirstOrThrow({ where: { versionId: pdfVersion.id, pageNumber: 2 } });
+    await prisma.documentEvidencePage.update({ where: { id: pageRow.id }, data: { text: "Changed page" } });
+    await assert.rejects(authorizedEvidenceFragment(pageFragment.id, owner), code(409));
+    await prisma.documentEvidencePage.update({ where: { id: pageRow.id }, data: { text: pageRow.text } });
+    const pdfStored = await prisma.documentEvidenceVersion.findUniqueOrThrow({ where: { id: pdfVersion.id } });
+    await putObject({ key: pdfStored.sourceStorageKey!, body: "Tampered frozen source" });
+    await assert.rejects(readEvidencePageImage(pdfVersion.id, 2, owner), code(409));
+    await assert.rejects(authorizedEvidenceOriginal(pdfVersion.id, owner), code(409));
+    await putObject({ key: pdfStored.sourceStorageKey!, body: originalPdf, contentType: "application/pdf" });
+    const rollback = await prisma.siteFile.create({ data: { siteId, name: "rollback.txt", contenido: "New snapshot must roll back with its audit." } });
+    failAudit = true;
+    await assert.rejects(captureSiteFileEvidence(siteId, rollback.id, owner), code(500));
+    failAudit = false;
+    assert.equal(await prisma.documentResource.count({ where: { siteFileId: rollback.id } }), 0);
+    const race = await prisma.siteFile.create({ data: { siteId, name: "race.txt", contenido: "Original before concurrent change." } });
+    raceFileId = race.id;
+    await assert.rejects(captureSiteFileEvidence(siteId, race.id, owner), code(409));
+    raceFileId = "";
+    assert.equal(await prisma.documentResource.count({ where: { siteFileId: race.id } }), 0);
+    await prisma.siteFile.delete({ where: { id: pdfFile.id } });
+    await assert.rejects(authorizedEvidenceOriginal(pdfVersion.id, owner), code(404));
+    await assert.rejects(authorizedEvidenceFragment(pageFragment.id, owner), code(404));
+    console.log("SiteFile evidence PostgreSQL OK: original-byte extraction, concurrent idempotency, source version, stable originals/all formats, PDF/OCR/blank, literal page citations, current ACL/revocation/portal, tamper, atomic audit rollback, concurrent source change, A→B→A current revision/research and deletion");
+  } finally {
+    failAudit = false; raceFileId = "";
+    if (siteId) await prisma.site.deleteMany({ where: { id: siteId } });
+    if (caseId) await prisma.causa.deleteMany({ where: { id: caseId } });
+    await prisma.auditEvent.deleteMany({ where: { actorId: { in: users } } });
+    await prisma.user.deleteMany({ where: { id: { in: users } } });
+    await prisma.$disconnect(); await rm(storage, { recursive: true, force: true });
+    if (previousStorage === undefined) delete process.env.STORAGE_PATH; else process.env.STORAGE_PATH = previousStorage;
+    if (previousOcr === undefined) delete process.env.OCR_ENABLED; else process.env.OCR_ENABLED = previousOcr;
+  }
+}
+void main().catch(error => { console.error(error); process.exitCode = 1; });

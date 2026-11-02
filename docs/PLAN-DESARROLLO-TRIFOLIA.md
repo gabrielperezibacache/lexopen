@@ -8,6 +8,8 @@ La referencia funcional comprende 58 capacidades públicas, trazadas en [la matr
 
 Segunda entrega en `codex/pdf-legal-research`: [páginas PDF verificadas e investigación local](PDF-INVESTIGACION-2026-11-01.md), con imagen del original, OCR local, fuentes jurídicas versionadas, extractos literales e historial autorizado. Completa ese flujo de `Documento` y abre F2; no cierra F1 ni F2 completos. La cobertura oficial comprobada y los límites se documentan por separado.
 
+Tercera entrega en `codex/spaces-drive-official-sources`: [archivos de espacios, importación elegida de Drive y fuentes oficiales](ESPACIOS-DRIVE-FUENTES-2026-11-01.md). Integra `SiteFile` con evidencia e investigación, conserva revisiones de Drive, habilita BCN actual/histórica y oficios individuales SII. El resto de F1/F2 y la cobertura no comprobada siguen pendientes.
+
 ## 1 Decisiones de producto
 
 1. **Cero dependencia operativa de TRIFOLIA.** Sin cuenta, API, MCP, índices, tokens ni suscripción de ese proveedor. La prueba de independencia bloqueará sus dominios y repetirá los flujos de aceptación.

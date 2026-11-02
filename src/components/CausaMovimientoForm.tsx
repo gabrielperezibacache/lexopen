@@ -132,7 +132,7 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
         onSubmit={onImport}
         className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/60 p-3 text-sm"
       >
-        <span className="text-[var(--ink-soft)]/75">
+        <span className="min-w-0 [overflow-wrap:anywhere] text-[var(--ink-soft)]/75">
           Importar CSV (titulo…id,cuaderno,folio,etapa,tramite,receptor,documento)
         </span>
         <a

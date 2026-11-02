@@ -1,0 +1,42 @@
+prisma:error
+Invalid `tx.documento.create()` invocation in
+<repo>/src/lib/integrations/drive-import.ts:167:42
+
+  164   if (!await tx.documento.count({ where: { id: existing.documentoId, ...documentReadWhere(current.actor) } })) throw fail("Documento no encontrado o sin acceso", 404, "import_not_found");
+  165   return { ...existing, reused: true };
+  166 }
+→ 167 const doc = await tx.documento.create(
+Transaction failed due to a write conflict or a deadlock. Please retry your transaction
+prisma:error
+Invalid `client.auditEvent.create()` invocation in
+<repo>/src/lib/audit.ts:37:29
+
+  34   client: Pick<Prisma.TransactionClient, "auditEvent"> = prisma
+  35 ) {
+  36   try {
+→ 37     await client.auditEvent.create(
+Error occurred during query execution:
+ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "P0001", message: "Drive fixture audit failure", severity: "ERROR", detail: None, column: None, hint: None }), transient: false })
+audit write failed PrismaClientUnknownRequestError:
+Invalid `client.auditEvent.create()` invocation in
+<repo>/src/lib/audit.ts:37:29
+
+  34   client: Pick<Prisma.TransactionClient, "auditEvent"> = prisma
+  35 ) {
+  36   try {
+→ 37     await client.auditEvent.create(
+Error occurred during query execution:
+ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "P0001", message: "Drive fixture audit failure", severity: "ERROR", detail: None, column: None, hint: None }), transient: false })
+    at $n.handleRequestError (<repo>/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (<repo>/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (<repo>/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (<repo>/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async writeAudit (<repo>/src/lib/audit.ts:37:5)
+    at async client.$transaction.isolationLevel (<repo>/src/lib/integrations/drive-import.ts:169:11)
+    at async Proxy._transactionWithCallback (<repo>/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async importSelectedDriveFile (<repo>/src/lib/integrations/drive-import.ts:158:24)
+    at async waitForActual (node:assert:644:5)
+    at async Function.rejects (node:assert:767:25) {
+  clientVersion: '5.22.0'
+}
+Drive import integration PASS: selected folder pagination, fresh ACL, blocked network, binary/export provenance, concurrency idempotence, frozen originals, revisions/parents/trashed/permissions/checksums/limits, revoked access/folder, provider errors/timeout and audit rollback. Google transport is a fixture, no live OAuth account used.

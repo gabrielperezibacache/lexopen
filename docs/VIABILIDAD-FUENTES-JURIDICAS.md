@@ -2,6 +2,8 @@
 
 Comprobación: 1 de noviembre de 2026. Este incremento obtiene fuentes directamente de organismos oficiales y mantiene su snapshot local; no usa TRIFOLIA, índices de terceros ni una cuenta comercial de búsqueda.
 
+Seguimiento: los resultados de esta página corresponden al primer ensayo. La [ampliación posterior](FUENTES-OFICIALES-AMPLIACION.md) comprobó BCN actual e histórica en vivo y añadió oficios SII; sustituye el estado anterior de indisponibilidad para las vías expresamente verificadas.
+
 ## Resultado comprobado
 
 | Organismo y recurso | Acceso observado | Implementación |

@@ -424,6 +424,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         </div>
 
         <DriveFolderPanel
+          canImport={can(user, "causa.write", { causaRol: access.causaRol })}
           causaId={causa.id}
           folderId={causa.googleDriveFolderId}
           folderName={causa.googleDriveFolderName}

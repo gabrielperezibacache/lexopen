@@ -12,6 +12,7 @@ import {
   fileVersionListSelect,
   siteFileListSelect,
 } from "@/lib/sites/file-select";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 type Params = { params: Promise<{ id: string }> };
@@ -49,7 +50,7 @@ export default async function SiteFilesPage({ params }: Params) {
       where: { siteId: id },
       include: {
         files: {
-          where: fileWhere,
+          where: { AND: [scopedsiteFileReadWhere(user), fileWhere] },
           select: fileSelect,
           orderBy: { name: "asc" },
         },
@@ -150,6 +151,7 @@ export default async function SiteFilesPage({ params }: Params) {
                       Descargar
                     </a>{" "}
                     · {f.versions.length} versiones
+                    {!clientView && <Link href={`/sites/${site.id}/archivos/${f.id}/fuentes`} className="ml-3 text-[var(--sea)]">Ver fuentes</Link>}
                     {!clientView && (
                       <div className="mt-2">
                         <FileCommentForm siteId={site.id} fileId={f.id} />
@@ -178,6 +180,7 @@ export default async function SiteFilesPage({ params }: Params) {
                   >
                     Descargar
                   </a>
+                  {!clientView && <Link href={`/sites/${site.id}/archivos/${f.id}/fuentes`} className="ml-3 text-[var(--sea)]">Ver fuentes</Link>}
                 </div>
               ))}
             </div>
