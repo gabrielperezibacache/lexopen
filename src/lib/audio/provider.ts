@@ -46,6 +46,13 @@ export async function readTranscriptionConfig(user: CausaAccessUser, client: Pri
   await adminFor(user, client); const [config, policy] = await Promise.all([configFor(client), getAssistantFirmPolicy()]);
   return { config: publicConfig(config, policy.assistantLlmMode === "local_only") };
 }
+/** Safe readiness information for an already-authorized hearing; no endpoint or credential leaves the Host. */
+export async function hearingTranscriptionReadiness(client: PrismaClient = prisma) {
+  const [config, policy] = await Promise.all([configFor(client), getAssistantFirmPolicy()]);
+  const localOnly = policy.assistantLlmMode === "local_only";
+  const warnings = [!config.enabled ? "Active un transcriptor en Configuración → Audios antes de capturar." : null, localOnly && config.preset !== "local" ? "El estudio permite solo IA local; la captura no enviará audio al proveedor remoto." : null, config.preset === "openai" && !config.apiKey ? "Falta la clave del transcriptor configurado." : null].filter((value): value is string => Boolean(value));
+  return { enabled: config.enabled, preset: config.preset, model: config.model, localOnly, canCapture: config.enabled && !warnings.length, warnings };
+}
 export async function saveTranscriptionConfig(raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
   const input = transcriptionConfigSchema.parse(raw), apiUrl = providerUrl(input.apiUrl, input.preset);
   return client.$transaction(async tx => {
@@ -90,6 +97,8 @@ export async function transcribeAudioBytes(input: { bytes: Buffer; name: string;
   if (config.preset === "openai" && !config.apiKey) throw httpError("Falta la clave del transcriptor OpenAI", 409);
   // A second policy/actor check immediately precedes byte egress.
   await input.beforeEgress();
+  const currentConfig = await configFor(client);
+  if (!currentConfig.enabled || JSON.stringify(currentConfig) !== JSON.stringify(config)) throw httpError("La configuración del transcriptor cambió antes del envío. No se envió audio; vuelva a comprobarla", 409);
   const currentPolicy = await getAssistantFirmPolicy();
   if (currentPolicy.assistantLlmMode === "local_only" && !local) throw httpError("El estudio permite solo IA local; no se envió audio a un proveedor remoto", 403);
   const body = new FormData(); body.set("file", new File([new Uint8Array(input.bytes)], input.name, { type: input.mimeType })); body.set("model", config.model);

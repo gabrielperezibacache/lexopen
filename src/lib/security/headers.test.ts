@@ -32,6 +32,10 @@ assert.match(devNonced, /style-src 'self' 'unsafe-inline'/);
 assert.match(devNonced, /script-src 'self' 'nonce-dev1' 'strict-dynamic' 'unsafe-eval'/);
 
 const headers = buildSecurityHeaders({ https: true });
+assert.equal(
+  headers.find(header => header.key === "Permissions-Policy")?.value,
+  "camera=(), microphone=(self), display-capture=(self), geolocation=(), payment=()"
+);
 assert.ok(headers.some((h) => h.key === "Strict-Transport-Security"));
 assert.ok(headers.some((h) => h.key === "Content-Security-Policy"));
 

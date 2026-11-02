@@ -1,12 +1,12 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { z } from "zod";
 import { prisma } from "@/lib/db";
-import type { CausaAccessUser } from "@/lib/auth/causa-access";
+import { assertCausaCapability, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { httpError } from "@/lib/auth/access";
 import { writeAuditStrict } from "@/lib/audit";
 import { sha256 } from "@/lib/evidence/fragments";
 import { captureWritingSource, verifyWritingSource } from "./sources";
-import { writingAddSourceSchema, writingCreateSchema, writingRestoreSchema, writingSaveSchema } from "./schemas";
+import { writingAddSourceSchema, writingCreateSchema, writingRestoreSchema, writingSaveSchema, writingSourceInputSchema } from "./schemas";
 import { writingActor, writingChanged, writingMissing, writingTransaction, writingUnavailable, type WritingClient } from "./access";
 import type { WritingChange, WritingDraftList, WritingDraftView, WritingHistory, WritingMutationResult, WritingReference, WritingReferenceView, WritingRevisionView } from "./types";
 
@@ -102,6 +102,26 @@ export async function createCaseWriting(causaId: string, raw: z.input<typeof wri
     return { draft: await view(row, actor, tx, canWrite), reused: false };
   });
 }
+/** Create one reviewed draft and its first source in the caller's transaction. */
+export async function createCaseWritingFromSource(causaId: string, raw: z.input<typeof writingCreateSchema> & { source: z.input<typeof writingSourceInputSchema> }, user: CausaAccessUser, client: WritingClient = prisma): Promise<WritingMutationResult> {
+  const schema = writingCreateSchema.extend({ source: writingSourceInputSchema }).strict();
+  const input = schema.parse(raw), hash = inputHash("created_from_source", input);
+  return writingTransaction(client, async tx => {
+    const { actor, canWrite } = await writingActor(causaId, user, tx, true);
+    await assertCausaCapability(causaId, actor, "escrito.draft", tx);
+    const existing = await tx.caseWritingDraft.findUnique({ where: { ownerId_causaId_requestId: { ownerId: actor.id, causaId, requestId: input.requestId } } });
+    if (existing) {
+      if (existing.createInputSha256 !== hash) throw Object.assign(writingChanged(), { code: "writing_conflict" });
+      return { draft: await view(existing, actor, tx, canWrite), reused: true };
+    }
+    if (await tx.caseWritingDraft.count({ where: { ownerId: actor.id, causaId } }) >= WRITING_LIMITS.draftsPerOwnerCase) throw httpError("La causa admite hasta 200 escritos privados por profesional", 413);
+    const source = await captureWritingSource(causaId, input.source, actor, tx), body = `${input.body.trimEnd()}\n\n[^R1]`;
+    if (body.length > WRITING_LIMITS.body) throw httpError("El escrito supera los 100.000 caracteres con su referencia", 413);
+    const row = await tx.caseWritingDraft.create({ data: { causaId, ownerId: actor.id, requestId: input.requestId, createInputSha256: hash, title: input.title, body, nextReferenceNumber: 2, referencesJson: JSON.stringify([{ id: "R1", source }]) } });
+    await snapshot(tx, row, "created"); await audit(tx, actor, row, "created");
+    return { draft: await view(row, actor, tx, canWrite), reused: false };
+  });
+}
 export async function listCaseWritings(causaId: string, user: CausaAccessUser, after?: string, client: PrismaClient = prisma): Promise<WritingDraftList> {
   return writingTransaction(client, async tx => {
     const { actor, canWrite } = await writingActor(causaId, user, tx);
@@ -115,7 +135,7 @@ export async function listCaseWritings(causaId: string, user: CausaAccessUser, a
     return { drafts, canWrite, limited: rows.length > WRITING_LIMITS.listPage, nextAfter: rows.length > WRITING_LIMITS.listPage ? rows[WRITING_LIMITS.listPage - 1].id : null };
   });
 }
-export async function readCaseWriting(causaId: string, id: string, user: CausaAccessUser, client: PrismaClient = prisma): Promise<WritingDraftView> {
+export async function readCaseWriting(causaId: string, id: string, user: CausaAccessUser, client: WritingClient = prisma): Promise<WritingDraftView> {
   return writingTransaction(client, async tx => { const { actor, row, canWrite } = await rowFor(causaId, id, user, tx); return view(row, actor, tx, canWrite); });
 }
 export async function readCaseWritingForExport(causaId: string, id: string, user: CausaAccessUser, client: PrismaClient = prisma) {

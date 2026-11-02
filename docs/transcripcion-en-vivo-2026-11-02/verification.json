@@ -1,0 +1,51 @@
+{
+  "date": "2026-11-02",
+  "base": "2f63c892414f789429024c01275260203d1b6903",
+  "branch": "codex/hearing-live-transcription",
+  "fixtures": "Usuarios, causa y texto ficticios. Chromium MediaRecorder nativo con micrófono sintético; proveedor HTTP simulado local. PostgreSQL desechable puerto 55439.",
+  "checks": {
+    "unit": "passed plus additional Desktop/security targeted tests",
+    "integration": "passed complete suite",
+    "productionBuild": "passed with four incumbent dependency tracing warnings",
+    "lint": "passed",
+    "types": "passed",
+    "schemaDrift": "none",
+    "browser": {
+      "total": 53,
+      "passedFullRun": 52,
+      "passedDirectedRerun": 1,
+      "originalFailure": "Recuperación de archivo final al navegar con Atrás. Corregida limpieza de instancia vacía en StrictMode; mismo escenario aprobado sin retirar aserciones.",
+      "targetedFile": "e2e/hearing-live-transcription.spec.ts"
+    },
+    "functionalReviews": "Audio and promotion independent review; five material audio findings fixed. Runtime additionally found and verified StrictMode recovery fix.",
+    "visualReview": "ship, two material hierarchy findings resolved in one batched confirmation"
+  },
+  "limits": [
+    "Speech recognition accuracy not tested with a real model or court audio.",
+    "System/tab capture depends on browser/OS and was not exercised in this synthetic mic fixture.",
+    "Mac usage/entitlements and permission contracts checked; signed installer/OS microphone prompt not exercised.",
+    "Per-desk RAM recovery covers at most two clips up to 4MiB each, twenty desks/eight hours; not reload/close."
+  ],
+  "productionHostDeployed": false,
+  "logRepresentation": "Trailing whitespace, progress carriage returns and ANSI escapes normalized.",
+  "files": {
+    "browser-original.log": "ff52d5b4d68ab6b883c24e38bf5fc2c14319c258358fc20fea6826ad8757ae06",
+    "browser-recovery.log": "da70f891a60d694bf9da9d7d452f03e544c04c51f22a2d393420a474916b3430",
+    "build.log": "429602b7a63874be1d5dc5652d95309552232d9ad24b4f6e249c38dec6f2803b",
+    "capture-active-desktop.png": "082466dc6b903db5fcf9c7be67ee7d17d9742ba0fdeef4308c8bb64220e51f5b",
+    "capture-active-mobile.png": "2e9b8c78775ec5b129645252c2b23b27d1b2072d65af7501109ed48d93d6ff2c",
+    "desktop.log": "63f67a971680d88ad3488bfcffe5fa3e16c6b0fc3389158d244af5477710efd3",
+    "integration.log": "655b6879f54385a9d5718a66c759edf7fa7a3d3298280828770571fc6833d679",
+    "lint.log": "b04310b3aae2a08d911d181f608391825a76d9b9266920fd0f230cd0cbd12e50",
+    "promotion-desktop.png": "ef06493c2affd8a4a8666973871f5ad567e49024ba17f46f4316cd2cd24a3cdd",
+    "promotion-mobile.png": "b3ead245a1dfcf687ebe685147f385f2bb299d42dd7f89548d00b7eb285c0fd8",
+    "schema.log": "728442980e143e18c2aa9bd7d747a8ea8d85f510529e7540f90f35ea9dd1b268",
+    "transcription-clips-desktop.png": "61392e4709aeaf791f0c3c20142adb6dbe4449bf4ea7d37555662b3c38c23b2c",
+    "transcription-clips-mobile.png": "c001451cf09906c2c3261d8752693cf8740555373ba83f6377fef7e1f9820a27",
+    "transcription-dark.png": "10ea80d346f7a22b740368bf9390ebe73959a61f5322ea1b4b8a5e9010113499",
+    "transcription-desktop.png": "61cdef5a2538d13e6eb25c3ae4f6e47f3e8c642f7c998dfdd4903568d1ba1965",
+    "transcription-mobile.png": "6110f8c946544d6ea71650884270fddbbc80afa22cb532a0434c65ab830e8f8f",
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unit.log": "b20384383d0f5dba120eb661f96647bba82960ed120090572151a70f9d4f907a"
+  }
+}

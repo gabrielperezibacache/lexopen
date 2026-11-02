@@ -38,7 +38,7 @@ export function sourceView(row: SourceRow, option: HearingSourceOption): Extract
 export async function listSourceOptions(causaId: string, user: CausaAccessUser, client: PrismaClient = prisma) {
   const { actor } = await hearingActor(causaId, user, client);
   const [documents, files, books, legal] = await Promise.all([
-    client.documento.findMany({ where: { AND: [{ causaId }, documentReadWhere(actor)] }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 101, select: { id: true, nombre: true } }),
+    client.documento.findMany({ where: { AND: [{ causaId }, documentReadWhere(actor), { OR: [{ caseAudioSource: null }, { caseAudioSource: { liveSessionId: null } }] }, { OR: [{ audioPublication: null }, { audioPublication: { audio: { liveSessionId: null } } }] }] }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 101, select: { id: true, nombre: true } }),
     client.siteFile.findMany({ where: { AND: [{ site: { causaId } }, siteFileReadWhere(actor)] }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 101, select: { id: true, name: true, siteId: true } }),
     client.libraryBook.findMany({ where: bookAccessWhere(actor), orderBy: [{ favorite: "desc" }, { createdAt: "desc" }, { id: "asc" }], take: 201, select: { id: true, title: true, ownerId: true, sourceType: true } }),
     client.legalSourceVersion.findMany({ orderBy: [{ retrievedAt: "desc" }, { id: "asc" }], take: 101, select: { id: true, title: true, organism: true } }),

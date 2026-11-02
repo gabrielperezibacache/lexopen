@@ -39,3 +39,4 @@ assert.match(builder, /\.next\/static/);
 assert.match(builder, /"\*\*\/\.\*"/);
 
 console.log("desktop/renderer.test.cjs OK");
+require("./media-permissions.test.cjs");

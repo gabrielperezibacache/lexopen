@@ -252,9 +252,10 @@ function directDocumentReadWhere(user: CausaAccessUser): Prisma.DocumentoWhereIn
 }
 
 export function documentReadWhere(user: CausaAccessUser): Prisma.DocumentoWhereInput {
-  return { AND: [directDocumentReadWhere(user), { OR: [
+  const liveOwner: Prisma.CaseAudioWhereInput = { OR: [{ liveSessionId: null }, { liveSession: { workspace: { ownerId: user.id } } }] };
+  return { AND: [directDocumentReadWhere(user), { OR: [{ caseAudioSource: null }, { caseAudioSource: liveOwner }] }, { OR: [
     { audioPublication: null },
-    { audioPublication: { audio: { deletedAt: null, causa: causaAccessWhere(user), sourceDocument: directDocumentReadWhere(user) } } },
+    { audioPublication: { audio: { AND: [liveOwner, { deletedAt: null, causa: causaAccessWhere(user), sourceDocument: directDocumentReadWhere(user) }] } } },
   ] }] };
 }
 

@@ -13,7 +13,8 @@ export async function writingActor(causaId: string, user: CausaAccessUser, clien
   const access = write ? await assertCausaCapability(causaId, actor, "causa.write", client) : await assertCausaAccess(causaId, actor, { auditOverride: false }, client);
   return { actor, canWrite: can(actor, "causa.write", { causaRol: access.causaRol }) };
 }
-export async function writingTransaction<T>(client: PrismaClient, action: (tx: Prisma.TransactionClient) => Promise<T>) {
+export async function writingTransaction<T>(client: WritingClient, action: (tx: Prisma.TransactionClient) => Promise<T>) {
+  if (!("$transaction" in client)) return action(client);
   for (let attempt = 0; ; attempt++) {
     try { return await client.$transaction(action, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 }); }
     catch (error) { if (attempt < 3 && error instanceof Prisma.PrismaClientKnownRequestError && ["P2034", "P2002"].includes(error.code)) continue; throw error; }

@@ -1988,6 +1988,8 @@ model HearingWorkspace {
   chatTurns HearingChatTurn[]
   liveState HearingLiveState?
   liveRequests HearingLiveRequest[]
+  liveAudioSessions HearingLiveAudioSession[]
+  livePromotions HearingLivePromotion[]
   @@index([ownerId,causaId,updatedAt])
 }
 model HearingSource {
@@ -1995,6 +1997,7 @@ model HearingSource {
   workspaceId String
   kind String
   refId String
+  liveAudioClipId String? @unique
   locationJson String @default("{}") @db.Text
   state String @default("pending")
   position Int @default(0)
@@ -2068,6 +2071,60 @@ model HearingChatTurn {
   @@unique([workspaceId,requestId])
   @@index([workspaceId,createdAt])
 }
+model HearingLiveAudioSession {
+  id String @id @default(cuid())
+  workspaceId String
+  requestId String
+  title String
+  status String @default("recording")
+  nextSequence Int @default(0)
+  totalBytes Int @default(0)
+  createdAt DateTime @default(now())
+  closedAt DateTime?
+  workspace HearingWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  clips HearingLiveAudioClip[]
+  audios CaseAudio[]
+  @@unique([workspaceId,requestId])
+  @@index([workspaceId,createdAt])
+}
+model HearingLiveAudioClip {
+  id String @id @default(cuid())
+  sessionId String
+  requestId String
+  sequence Int
+  sourceName String
+  sourceSha256 String
+  sizeBytes Int
+  attemptIdsJson String @default("[]") @db.Text
+  audioId String?
+  documentId String?
+  sourceId String?
+  text String @default("") @db.Text
+  textSha256 String?
+  status String @default("pending")
+  operationToken String?
+  operationLockedAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  session HearingLiveAudioSession @relation(fields:[sessionId],references:[id],onDelete:Cascade)
+  @@unique([sessionId,requestId])
+  @@unique([sessionId,sequence])
+  @@index([sessionId,status])
+}
+model HearingLivePromotion {
+  id String @id @default(cuid())
+  workspaceId String
+  requestId String
+  inputSha256 String
+  sourceNoteId String
+  sourceRevision Int
+  targetKind String
+  targetId String
+  createdAt DateTime @default(now())
+  workspace HearingWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  @@unique([workspaceId,requestId])
+}
 model CaseAudio {
   id String @id @default(cuid())
   causaId String
@@ -2075,6 +2132,7 @@ model CaseAudio {
   sourceDocumentId String @unique
   transcriptDocumentId String?
   requestId String
+  liveSessionId String?
   title String
   sourceName String
   mimeType String
@@ -2102,10 +2160,12 @@ model CaseAudio {
   sourceDocument Documento @relation("CaseAudioSourceDocument",fields:[sourceDocumentId],references:[id],onDelete:Restrict)
   transcriptDocument Documento? @relation("CaseAudioTranscriptDocument",fields:[transcriptDocumentId],references:[id],onDelete:SetNull)
   reviewedBy User? @relation("CaseAudioReviewer",fields:[reviewedById],references:[id],onDelete:SetNull)
+  liveSession HearingLiveAudioSession? @relation(fields:[liveSessionId],references:[id],onDelete:Restrict)
   revisions CaseAudioTranscriptRevision[]
   publications CaseAudioPublication[]
   @@unique([causaId,uploadedById,requestId])
   @@index([causaId,status,createdAt])
+  @@index([liveSessionId,createdAt])
 }
 model CaseAudioTranscriptRevision {
   id String @id @default(cuid())

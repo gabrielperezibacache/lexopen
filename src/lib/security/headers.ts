@@ -60,7 +60,10 @@ export function buildSecurityHeaders(opts?: {
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     {
       key: "Permissions-Policy",
-      value: "camera=(), microphone=(), geolocation=(), payment=()",
+      // A document keeps its policy across Next.js client navigation. Capture
+      // therefore needs same-origin permission even when entering from Inicio.
+      // The browser prompt and the hearing's explicit consent still apply.
+      value: "camera=(), microphone=(self), display-capture=(self), geolocation=(), payment=()",
     },
     { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   ];

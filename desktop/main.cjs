@@ -22,8 +22,10 @@ const {
   rollbackRestore,
 } = require("./backup.cjs");
 const { isAllowedExternalUrl } = require("./external-url.cjs");
+const { attachMicrophoneGuards } = require("./media-permissions.cjs");
 
 let mainWindow = null;
+let currentDesktopAppUrl = "";
 let hostHandle = null;
 let lastStatus = { phase: "idle", message: "Iniciando…" };
 let lastRemoteVersion = null;
@@ -257,8 +259,10 @@ function ensureWindow() {
     },
   });
   attachWindowGuards(mainWindow);
+  attachMicrophoneGuards(mainWindow, () => currentDesktopAppUrl);
   mainWindow.on("closed", () => {
     mainWindow = null;
+    currentDesktopAppUrl = "";
   });
   return mainWindow;
 }
@@ -273,6 +277,7 @@ function rendererPath(...parts) {
  * a white page of unstyled HTML). Inline both into the HTML before loading.
  */
 async function loadSetupShell(win) {
+  currentDesktopAppUrl = "";
   const css = fs.readFileSync(rendererPath("setup.css"), "utf8");
   const js = fs.readFileSync(rendererPath("setup.js"), "utf8");
   const html = fs
@@ -328,6 +333,7 @@ async function probeRemote(url) {
 
 function loadAppUrl(url, version) {
   const win = ensureWindow();
+  currentDesktopAppUrl = url;
   const v = version || bundledVersion();
   const sep = url.includes("?") ? "&" : "?";
   win.loadURL(`${url}${sep}lexopen_v=${encodeURIComponent(v)}`);

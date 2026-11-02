@@ -1,0 +1,48 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { attachMicrophoneGuards, secureAppOrigin } = require("./media-permissions.cjs");
+let check, request, appUrl = "https://lexopen.example.test", current = `${appUrl}/causas/ficticia/audiencias`, destroyed = false;
+const contents = { isDestroyed: () => destroyed, getURL: () => current, session: { setPermissionCheckHandler: fn => { check = fn; }, setPermissionRequestHandler: fn => { request = fn; } } };
+const win = { isDestroyed: () => destroyed, webContents: contents };
+attachMicrophoneGuards(win, () => appUrl);
+const details = { isMainFrame: true, requestingUrl: current, securityOrigin: appUrl, mediaTypes: ["audio"] };
+const allowed = (wc = contents, permission = "media", extra = {}) => { let answer; request(wc, permission, value => { answer = value; }, { ...details, ...extra }); return answer; };
+assert.equal(allowed(), true);
+// Exact Electron 43.3.0 PermissionCheckHandlerHandlerDetails (not a MediaAccessPermissionRequest).
+const checkDetails = { securityOrigin: appUrl, mediaType: "audio", requestingUrl: current, isMainFrame: true };
+assert.equal(check(contents, "media", appUrl, checkDetails), true);
+assert.equal(allowed(contents, "media", { mediaTypes: ["video"] }), false);
+assert.equal(allowed(contents, "media", { mediaTypes: ["audio", "video"] }), false);
+assert.equal(allowed(contents, "media", { mediaTypes: [] }), false);
+assert.equal(allowed(contents, "media", { mediaTypes: undefined }), false);
+assert.equal(check(contents, "media", appUrl, { ...checkDetails, mediaType: "video" }), false);
+assert.equal(check(contents, "media", appUrl, { ...checkDetails, mediaType: "unknown" }), false);
+assert.equal(allowed(contents, "media", { isMainFrame: false }), false);
+assert.equal(check(contents, "media", appUrl, { ...checkDetails, isMainFrame: false, embeddingOrigin: appUrl }), false);
+assert.equal(check(contents, "media", "https://embedded.example.test", { ...checkDetails, isMainFrame: false, securityOrigin: "https://embedded.example.test", embeddingOrigin: appUrl }), false);
+assert.equal(allowed(contents, "media", { requestingUrl: "https://sub.lexopen.example.test" }), false);
+assert.equal(allowed(contents, "media", { requestingUrl: "https://lexopen.example.test:8443" }), false);
+assert.equal(allowed(contents, "media", { securityOrigin: "https://github.com" }), false);
+assert.equal(allowed({ ...contents }), false);
+assert.equal(allowed(null), false);
+current = "https://github.com"; assert.equal(allowed(), false);
+current = "file:///setup.html"; assert.equal(allowed(), false);
+current = `${appUrl}/audiencias`; destroyed = true; assert.equal(allowed(), false); destroyed = false;
+appUrl = ""; assert.equal(allowed(), false);
+appUrl = "http://192.0.2.1:3000"; current = `${appUrl}/audiencias`; assert.equal(allowed(contents, "media", { requestingUrl: current, securityOrigin: appUrl }), false);
+assert.equal(secureAppOrigin("http://127.0.0.1:3000/causas"), "http://127.0.0.1:3000");
+assert.equal(secureAppOrigin("http://localhost:3223"), "http://localhost:3223");
+assert.equal(secureAppOrigin("https://user:secret@example.test"), null);
+// Incumbent notifications, copying and display-picker behavior are not changed by a microphone-only rule.
+for (const permission of ["notifications", "clipboard-sanitized-write", "display-capture"]) { assert.equal(allowed(contents, permission), true); assert.equal(check(contents, permission, appUrl, { isMainFrame: true }), true); }
+const builder = fs.readFileSync(path.join(__dirname, "electron-builder.yml"), "utf8"), plist = fs.readFileSync(path.join(__dirname, "build/entitlements.mac.plist"), "utf8"), main = fs.readFileSync(path.join(__dirname, "main.cjs"), "utf8");
+for (const key of ["com.apple.security.cs.allow-jit", "com.apple.security.cs.allow-unsigned-executable-memory", "com.apple.security.cs.disable-library-validation", "com.apple.security.device.audio-input"]) assert.ok(plist.includes(`<key>${key}</key>\n    <true/>`), key);
+assert.doesNotMatch(plist, /com\.apple\.security\.device\.camera/);
+assert.match(builder, /NSMicrophoneUsageDescription:\s*.+/);
+assert.match(builder, /entitlements:\s*build\/entitlements\.mac\.plist/);
+assert.match(builder, /entitlementsInherit:\s*build\/entitlements\.mac\.plist/);
+assert.match(builder, /- media-permissions\.cjs/); assert.match(builder, /- external-url\.cjs/);
+assert.match(main, /attachMicrophoneGuards\(mainWindow/);
+assert.doesNotMatch(main, /unsafely-treat-insecure-origin-as-secure|disable-web-security|askForMediaAccess/);
+console.log("desktop/media-permissions.test.cjs OK: exact secure app origin/window/main frame, audio only, existing non-media behavior and Mac usage/entitlements; no actual OS capture or installer test");
