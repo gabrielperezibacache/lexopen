@@ -1,6 +1,6 @@
 # Biblioteca jurídica personal
 
-Entrega del 1 de noviembre de 2026. Rama `codex/personal-law-library`, sobre `codex/case-knowledge-library` ([PR 210](https://github.com/gabrielperezibacache/lexopen/pull/210)). Amplía el [plan de capacidades propias](PLAN-DESARROLLO-TRIFOLIA.md) con una librería de archivos personales y una mesa de escritura con fuentes, sin dependencia de TRIFOLIA. Requiere las entregas anteriores; no incluye despliegue ni migración de datos de una instalación del estudio.
+Entrega del 1 de noviembre de 2026. Rama `codex/personal-law-library`, sobre `codex/case-knowledge-library` ([PR 210](https://github.com/gabrielperezibacache/lexopen/pull/210)). Amplía el [plan de capacidades propias](PLAN-DESARROLLO-LEXOPEN.md) con una librería de archivos personales y una mesa de escritura con fuentes. Requiere las entregas anteriores; no incluye despliegue ni migración de datos de una instalación del estudio.
 
 ## Libros propios y personalización
 

@@ -15,7 +15,7 @@ Fecha: 2026-11-01. Node 22+, Next 16.3.0, Prisma 5.22 y PostgreSQL 16.14. Base G
 | Servidor `next start`, `NODE_ENV=production` | PASS, exit 0; login visual compilado, CSRF y 2FA sin relajación, 12 grupos de aserciones | [production-smoke.log](production-smoke.log), [runtime.json](runtime.json) |
 | Upgrade real desde esquema `main` | PASS; 14 filas originales en 12 tablas, hashes de 56 tablas históricas, un espejo nuevo esperado; 30 migraciones completas y cero drift | [upgrade.log](upgrade.log) |
 | Respaldo/restauración lógica | PASS; primera vuelta 597 filas/8 objetos; segunda 601 filas/10 objetos e identidad de hashes de evidencia | [restore.log](restore.log) |
-| Independencia de TRIFOLIA | Ninguna referencia en código runtime, dependencias ni esquema; fuentes propias no requieren IA; transporte local_only probado sin red | `rg -i trifolia src package.json prisma/schema.prisma` sin coincidencias; pruebas de egress en units.log |
+| Política de transporte | Fuentes preparadas utilizables sin IA; transporte `local_only` probado sin red | Pruebas de egress en [units.log](units.log) |
 
 El build usa la opción oficial Webpack. La limitación ambiental previa de Turbopack no se interpreta como defecto del producto. Permanece una advertencia de `createRequire` en el scraper público PJUD, que no impide compilar; el acceso externo vivo sigue sin verificar.
 

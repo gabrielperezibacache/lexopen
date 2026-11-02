@@ -69,11 +69,18 @@ test.afterAll(async () => {
 
 test("flujo conjunto: sentencia compartida, audio y transcripción citada en la misma audiencia, con revocación", async ({ page, browser, context }, testInfo) => {
   test.setTimeout(150_000);
-  let trifoliaRequests = 0;
-  const blockTrifolia = async (target: typeof context) => {
-    await target.route(/trifolia/i, route => { trifoliaRequests++; return route.abort(); });
+  let unexpectedBrowserRequests = 0;
+  const hostOrigin = new URL(process.env.E2E_BASE_URL || "http://127.0.0.1:3100").origin;
+  const restrictBrowserToHost = async (target: typeof context) => {
+    await target.route("**/*", route => {
+      const url = new URL(route.request().url());
+      if (["http:", "https:"].includes(url.protocol) && url.origin !== hostOrigin) {
+        unexpectedBrowserRequests++; return route.abort();
+      }
+      return route.continue();
+    });
   };
-  await blockTrifolia(context);
+  await restrictBrowserToHost(context);
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
       writeText: async (text: string) => { (window as typeof window & { __jointCopiedText: string }).__jointCopiedText = text; },
@@ -87,7 +94,7 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
   const transcriptNoteTitle = `Revisar la transcripción conservada ${tag}`;
   const transcript = `Declaración enteramente ficticia ${tag}: el importe del pago debe contrastarse con el documento de la causa. Texto de prueba aportado manualmente; no representa el silencio del audio sintético.`;
   const otherContext = await browser.newContext({ locale: "es-CL" }), other = await otherContext.newPage();
-  await blockTrifolia(otherContext);
+  await restrictBrowserToHost(otherContext);
   try {
     await loginAs(other, "asistente@estudio.cl");
     const judgmentPdfBytes = await readFile("src/lib/evidence/pdf-fixtures/mixed-three-pages.pdf");
@@ -277,6 +284,6 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     await expect(workbench.locator(".hearing-turn")).toHaveCount(0);
     await expect(workbench.getByText("Conversación no disponible: alguno de sus respaldos o notas cambió de acceso.", { exact: true })).toBeVisible();
     await expect(audioPanel.getByLabel("Transcripción de trabajo", { exact: true })).toHaveValue(transcript);
-    expect(trifoliaRequests).toBe(0);
+    expect(unexpectedBrowserRequests).toBe(0);
   } finally { await otherContext.close(); }
 });

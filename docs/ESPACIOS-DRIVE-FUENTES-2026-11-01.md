@@ -1,6 +1,6 @@
 # Espacios, Drive y fuentes oficiales
 
-Entrega del 1 de noviembre de 2026. Rama `codex/spaces-drive-official-sources`, sobre `codex/pdf-legal-research` f931738 ([PR 208](https://github.com/gabrielperezibacache/lexopen/pull/208)). Requiere esa base y las correcciones del PR 207; no incluye despliegue de un Host. Continúa el [plan de capacidades propias](PLAN-DESARROLLO-TRIFOLIA.md), sin servicios de TRIFOLIA.
+Entrega del 1 de noviembre de 2026. Rama `codex/spaces-drive-official-sources`, sobre `codex/pdf-legal-research` f931738 ([PR 208](https://github.com/gabrielperezibacache/lexopen/pull/208)). Requiere esa base y las correcciones del PR 207; no incluye despliegue de un Host. Continúa el [plan de capacidades propias](PLAN-DESARROLLO-LEXOPEN.md).
 
 ## Archivos de espacios
 

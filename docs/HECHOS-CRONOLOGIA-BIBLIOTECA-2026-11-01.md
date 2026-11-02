@@ -1,6 +1,6 @@
 # Hechos, cronología, contradicciones y biblioteca
 
-Entrega del 1 de noviembre de 2026. Rama `codex/case-knowledge-library`, sobre `codex/spaces-drive-official-sources` 13f8f20 ([PR 209](https://github.com/gabrielperezibacache/lexopen/pull/209)). Requiere las entregas anteriores de evidencia, PDF e investigación. Continúa el [plan de capacidades propias](PLAN-DESARROLLO-TRIFOLIA.md), sin cuentas, servicios ni API de TRIFOLIA. No incluye despliegue de un Host del estudio.
+Entrega del 1 de noviembre de 2026. Rama `codex/case-knowledge-library`, sobre `codex/spaces-drive-official-sources` 13f8f20 ([PR 209](https://github.com/gabrielperezibacache/lexopen/pull/209)). Requiere las entregas anteriores de evidencia, PDF e investigación. Continúa el [plan de capacidades propias](PLAN-DESARROLLO-LEXOPEN.md). No incluye despliegue de un Host del estudio.
 
 ## Conocimiento del expediente
 

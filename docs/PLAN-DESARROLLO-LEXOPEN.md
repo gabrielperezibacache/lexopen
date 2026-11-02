@@ -1,10 +1,10 @@
 # Desarrollo de capacidades jurídicas propias en LexOpen
 
-Fecha: 1 de noviembre de 2026. Base de producto auditada: LexOpen 1.0.0, main 72400f9b9627cdc147ebf7c14a791c063747a686. Dirección del usuario: descomponer las capacidades de TRIFOLIA e implementarlas dentro de LexOpen para prescindir de esa plataforma.
+Fecha: 1 de noviembre de 2026. Base de producto auditada: LexOpen 1.0.0, main 72400f9b9627cdc147ebf7c14a791c063747a686. Dirección del producto: ampliar la investigación, la evidencia y la redacción dentro de LexOpen.
 
 LexOpen debe conservar su operación de estudio jurídico y sumar un motor propio de investigación, evidencia y redacción. La base existente permite reutilizar causas, clientes, documentos, colaboración, minutas y dos superficies de asistente. La prioridad es asegurar permisos, privacidad y recuperación; después construir fuentes y evidencia comunes, y sobre ellas investigación, cronología, revisión, Word y MCP. Crear varios chats o copiar pantallas no alcanza esa integración.
 
-La referencia funcional comprende 58 capacidades públicas, trazadas en [la matriz de capacidades](auditoria-2026-11-01/MATRIZ-TRIFOLIA.md). No se promete equivalencia con funciones privadas que no se pudieron observar. La implementación comenzó en `codex/lexopen-own-core`: correcciones del núcleo y de los PR 202/203, más el primer lector de fuentes versionadas. El [registro del incremento](IMPLEMENTACION-2026-11-01.md) distingue lo implementado y probado de las fases que siguen pendientes.
+La planificación histórica comprende 58 capacidades, trazadas en [la matriz de capacidades](auditoria-2026-11-01/MATRIZ-CAPACIDADES.md). Se elaboró a partir de investigación pública y de la auditoría del repositorio; no es una lista de funciones ya implementadas. Los estados y estimaciones de este documento corresponden a su fecha original. La [continuación del plan](PLAN-MAESTRO-LEXOPEN-2026-11-02.md) recoge los incrementos posteriores. La implementación comenzó en `codex/lexopen-own-core`: correcciones del núcleo y de los PR 202/203, más el primer lector de fuentes versionadas. El [registro del incremento](IMPLEMENTACION-2026-11-01.md) distingue lo implementado y probado de las fases que siguen pendientes.
 
 Segunda entrega en `codex/pdf-legal-research`: [páginas PDF verificadas e investigación local](PDF-INVESTIGACION-2026-11-01.md), con imagen del original, OCR local, fuentes jurídicas versionadas, extractos literales e historial autorizado. Completa ese flujo de `Documento` y abre F2; no cierra F1 ni F2 completos. La cobertura oficial comprobada y los límites se documentan por separado.
 
@@ -16,14 +16,14 @@ Quinta entrega en `codex/personal-law-library`: [biblioteca jurídica personal](
 
 ## 1 Decisiones de producto
 
-1. **Cero dependencia operativa de TRIFOLIA.** Sin cuenta, API, MCP, índices, tokens ni suscripción de ese proveedor. La prueba de independencia bloqueará sus dominios y repetirá los flujos de aceptación.
+1. **Servicios jurídicos de LexOpen.** Mantener almacenamiento, índices, hechos, citas y flujos dentro de su dominio. Declarar los transportes y proveedores utilizados y verificar sus políticas de acceso y salida de datos.
 2. **Un Host por estudio como base.** Conservar PostgreSQL, archivos y configuración bajo control del estudio. Acceso de equipo mediante la arquitectura ya admitida. Multiempresa SaaS y alta disponibilidad son proyectos distintos; no agregarlos por imitar planes comerciales.
 3. **IA intercambiable.** Mantener proveedores compatibles, permitir inferencia local y separar el permiso para consultar fuentes públicas del permiso para enviar documentos a un modelo remoto. El modo local debe cumplirse en todas las herramientas y adaptadores.
-4. **Un expediente y una identidad documental.** Los nuevos hechos, citas, borradores y mapas se vinculan con Causa/Cliente/Site y sus documentos existentes. No crear una carpeta TRIFOLIA paralela.
+4. **Un expediente y una identidad documental.** Los nuevos hechos, citas, borradores y mapas se vinculan con Causa/Cliente/Site y sus documentos existentes. Evitar repositorios documentales paralelos sin identidad ni permisos compartidos.
 5. **Evidencia antes de fluidez.** Mostrar documento, página o párrafo, versión, procedencia y fecha relevante. Separar hecho extraído, inferencia del modelo y conclusión del profesional.
 6. **Control humano sobre cambios y conclusiones.** Las extracciones son propuestas; las escrituras tienen vista previa, aceptación, historial y reversión segura. Los documentos adjuntos son datos y no instrucciones para ejecutar herramientas.
 7. **Continuidad visual.** Reutilizar tokens, modo oscuro, componentes, navegación y accesibilidad de 1.0. Hacer refinamientos locales; no rediseñar toda la aplicación.
-8. **Límites propios configurables.** El tamaño de archivo, biblioteca, presupuesto de inferencia y concurrencia se determina con el Host objetivo. Los límites y asientos comerciales de la referencia no se convierten en restricciones artificiales de LexOpen.
+8. **Límites propios configurables.** El tamaño de archivo, biblioteca, presupuesto de inferencia y concurrencia se determina con el Host objetivo. Los límites se justifican por capacidad, seguridad y operación comprobadas.
 
 ## 2 Qué existe y qué hay que ampliar
 
@@ -90,7 +90,7 @@ La respuesta debe expresar qué se revisó, qué falta por procesar y qué fuent
 
 ## 4 Fases y entregas
 
-Estimación inicial: **20 a 28 semanas de calendario** para paridad pública amplia, con dos desarrolladores a tiempo completo, QA parcial y revisión jurídica recurrente. Es una hipótesis de planificación, no una fecha comprometida. Debe recalibrarse al terminar la fase de fuentes, usando un Host concreto y mediciones de extracción/modelo. Con una sola persona, el trabajo no conserva ese plazo. Las fases se solapan solo donde no comparten dependencias bloqueantes.
+Estimación inicial: **20 a 28 semanas de calendario** para el alcance amplio de capacidades planificadas, con dos desarrolladores a tiempo completo, QA parcial y revisión jurídica recurrente. Es una hipótesis de planificación, no una fecha comprometida. Debe recalibrarse al terminar la fase de fuentes, usando un Host concreto y mediciones de extracción/modelo. Con una sola persona, el trabajo no conserva ese plazo. Las fases se solapan solo donde no comparten dependencias bloqueantes.
 
 | Fase | Ventana orientativa | Resultado utilizable | Dependencia de salida |
 | --- | --- | --- | --- |
@@ -144,7 +144,7 @@ Descomponer investigación en búsqueda, obtención, normalización, recuperaci�
 | Paquete | Cobertura que se debe construir | Primer corte y expansión |
 | --- | --- | --- |
 | Legislación | LeyChile/BCN, versión y fecha relevante | Un corpus acotado con versiones comprobadas; después actualización incremental y relaciones |
-| Jurisprudencia | Resoluciones de cortes y materias documentadas en la referencia | Separar investigación de fallos públicos del monitoreo de causas privadas OJV; filtros por órgano, rol, fecha y materia |
+| Jurisprudencia | Resoluciones de cortes y materias definidas en el alcance del corpus | Separar investigación de fallos públicos del monitoreo de causas privadas OJV; filtros por órgano, rol, fecha y materia |
 | Documentos administrativos | CGR, DT, SII, CMF, FNE, TDLC, SMA, tribunales ambientales, TC, TTA y SUSESO | Registro por organismo con acceso real, identificadores y formato comprobados; no declarar el conjunto listo por un buscador genérico |
 | Doctrina | Publicaciones académicas y documentos de acceso permitido | Metadatos, resumen y enlace; texto completo solo cuando se obtiene legítimamente; búsqueda restringida y transparente |
 | Material del estudio | Documentos autorizados y biblioteca propia | Diferenciar fuente interna, documento oficial y comentario doctrinal en resultados y citas |
@@ -193,13 +193,13 @@ Fijar versión del protocolo/SDK y clientes objetivo durante el ensayo de compat
 
 En equipo, completar roles, delegaciones, instrucciones comunes y administración. Mostrar de manera explícita quién puede ver conversaciones/actividad; un administrador técnico no obtiene por defecto acceso irrestricto a un expediente protegido. SSO se implementa mediante adaptadores estándar de identidad, con pertenencia y rol controlados por el estudio; el dominio por sí solo no concede acceso a causas.
 
-Los planes y bolsas comerciales de TRIFOLIA se traducen en presupuestos locales de inferencia/búsqueda y administración, no en un sistema de cobro de suscripciones. Facturación interna de LexOpen conserva su propósito actual.
+Los presupuestos de inferencia, búsqueda y administración se definen con los recursos del Host y las necesidades del equipo. Facturación interna de LexOpen conserva su propósito actual.
 
 Aceptación: dos clientes MCP objetivo, credencial revocada/caducada, documento no autorizado, intento de prompt injection en fuente y repetición de comando; acceso coherente entre web/Word/MCP; identidad corporativa desactivada retira sesión y permisos.
 
 ### F6 Inmuebles y móvil
 
-El mapa de referencia es **cartografía de inmuebles y parcelas**, no un mapa de normativa tributaria. Extraer candidatos de rol/comuna desde documentos, conservar fragmento de origen y pedir revisión si falta identificación. Enlazar la referencia predial con causa/cliente y capas o recursos cartográficos de fuente identificada.
+El módulo cartográfico previsto comprende **inmuebles y parcelas**, no un mapa de normativa tributaria. Extraer candidatos de rol/comuna desde documentos, conservar fragmento de origen y pedir revisión si falta identificación. Enlazar la referencia predial con causa/cliente y capas o recursos cartográficos de fuente identificada.
 
 Antes de comprometer mapas offline o descarga masiva, verificar los formatos y condiciones de acceso a la cartografía SII. Mostrar atribución, fecha, incertidumbre y estado de disponibilidad; no inventar un polígono cuando la fuente falla. La ubicación de una parcela no prueba dominio ni sustituye los documentos del caso.
 
@@ -219,7 +219,7 @@ Piloto inicial con datos ficticios y documentos públicos permitidos; después c
 
 ## 5 Backlog y dependencias
 
-| Épica | Entregas identificables | Depende de | Trazabilidad de referencia |
+| Épica | Entregas identificables | Depende de | Trazabilidad de capacidades |
 | --- | --- | --- | --- |
 | E0 Confianza | C00 a C10, comandos/privacidad/ACL/leases/build | Base actual | Transversal |
 | E1 Evidencia | Recursos/versiones/páginas/fragmentos/citas, selección e ingestión | E0 | T06, T12 a T15, T18, T48, T52 a T54 |
@@ -263,11 +263,11 @@ No obliga a terminar seis PR en diez días: permite trabajar con alcances claros
 | Exportación | PDF/DOCX renderizados e inspeccionados, referencias y tablas verificadas; conservar original y versión |
 | Operación | Restauración comprobada, migraciones desde versión anterior, índices reconstruidos, health sin efectos secundarios inesperados |
 | Accesibilidad | Teclado completo, foco, avisos de progreso, lector de pantalla y móviles objetivo; roles ARIA por sí solos no bastan |
-| Independencia | Flujos aceptados funcionan sin cuentas/credenciales y con dominios TRIFOLIA bloqueados; fuentes/modelos externos declarados y sustituibles donde corresponde |
+| Transportes y proveedores | Flujos aceptados respetan la política de salida; fuentes y modelos externos declarados y sustituibles donde corresponde |
 
 Estos objetivos son criterios propuestos de aceptación y no métricas obtenidas en esta auditoría. La calidad de inferencia local depende del modelo y equipo elegido; no se promete equivalencia de calidad por implementar la interfaz.
 
-Una historia termina con migración/reversibilidad evaluada, permisos negativos, error/cancelación, recuperación, prueba funcional apropiada y documentación de operación. El registro de aceptación enlaza ID T, historia, SHA, fixture y evidencia. Si una fuente o plataforma no permite la función, su celda permanece parcial o bloqueada; no se oculta bajo una etiqueta de paridad.
+Una historia termina con migración/reversibilidad evaluada, permisos negativos, error/cancelación, recuperación, prueba funcional apropiada y documentación de operación. El registro de aceptación enlaza ID T, historia, SHA, fixture y evidencia. Si una fuente o plataforma no permite la función, su celda permanece parcial o bloqueada; no se oculta bajo una etiqueta de completitud.
 
 ## 8 Riesgos y decisiones de control
 
@@ -278,22 +278,22 @@ Una historia termina con migración/reversibilidad evaluada, permisos negativos,
 | Migración pierde versiones o información divergente | Migraciones aditivas, archivo de conflictos y restore probado; no editar retroactivamente migraciones aplicadas |
 | Word cambia texto durante generación | Anclas/versiones, vista de diferencias y conflicto; ensayo temprano por plataforma |
 | Índice o respuesta conserva datos revocados | Filtrado y revalidación de acceso, invalidación y pruebas sobre derivados/cachés |
-| Ampliación excesiva del producto | Entregas verticales; separar facturación SII, cómputo jurídico certificado, CRM comercial y SaaS multiempresa del objetivo funcional de referencia |
+| Ampliación excesiva del producto | Entregas verticales; separar facturación SII, cómputo jurídico certificado, CRM comercial y SaaS multiempresa del alcance funcional de este plan |
 | Estado de PR y documentación divergen | Registro de evidencia por SHA; revalidación antes de integrar, sin reabrir todas las ramas históricas |
 
 ## 9 Documentos de trabajo
 
 - [Auditoría y decisiones de integración](AUDITORIA-PR-2026-11-01.md).
-- [Catálogo de 58 capacidades y correspondencia con épicas](auditoria-2026-11-01/MATRIZ-TRIFOLIA.md).
+- [Catálogo de 58 capacidades y correspondencia con épicas](auditoria-2026-11-01/MATRIZ-CAPACIDADES.md).
 - [Inventario de 206 PR](auditoria-2026-11-01/pull-requests.csv).
 - [Revisión PR 202](auditoria-2026-11-01/PR-202.md) y [revisión PR 203](auditoria-2026-11-01/PR-203.md).
 - [Arquitectura actual](auditoria-2026-11-01/ARQUITECTURA.md) y [evidencia de privacidad/integridad](auditoria-2026-11-01/PRUEBAS-PRIVACIDAD.md).
 
-La documentación pública usada para descomponer funciones está identificada en la matriz. Las propuestas de entidades, etapas, métricas y pruebas son diseño de LexOpen, no afirmaciones sobre la implementación interna de TRIFOLIA.
+Las propuestas de entidades, etapas, métricas y pruebas son planificación de LexOpen. Los IDs y estados históricos se conservan para seguir sus entregas; la evidencia enlazada determina qué se implementó y probó realmente.
 
 ## 10 Continuación: biblioteca, audiencia y transcripciones
 
-La biblioteca personal del PR #211 se amplía con sentencias y resoluciones, ficha judicial y citas con tribunal, rol y fecha. Se incorpora una mesa privada de audiencia dentro de cada causa, con dossier, lector PDF, marcadores, notas, agenda y conversación respaldada por pasajes. Las grabaciones y sus transcripciones se gestionan en las carpetas de la causa, con revisión humana, historial y copias independientes. Son implementaciones propias de LexOpen, con proveedores de IA/transcripción configurables y sin cuenta ni dependencia de TRIFOLIA.
+La biblioteca personal del PR #211 se amplía con sentencias y resoluciones, ficha judicial y citas con tribunal, rol y fecha. Se incorpora una mesa privada de audiencia dentro de cada causa, con dossier, lector PDF, marcadores, notas, agenda y conversación respaldada por pasajes. Las grabaciones y sus transcripciones se gestionan en las carpetas de la causa, con revisión humana, historial y copias independientes. Los proveedores de IA y transcripción son configurables.
 
 La entrega y sus pruebas se describen en [Sentencias, mesa de audiencia y audios](AUDIENCIAS-BIBLIOTECA-AUDIOS-2026-11-01.md). Continúa las épicas E2/E3/E5; no acredita por sí sola el resto de capacidades ni los objetivos propuestos de calidad jurídica. Quedan por evaluar reconocimiento con audio real autorizado, precisión jurídica con corpus revisado, rendimiento en el Host objetivo e instalación controlada en el Host después de integrar la cadena de PR.
 

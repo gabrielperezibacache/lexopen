@@ -4,7 +4,7 @@ Fecha: 1 de noviembre de 2026. Base: `main` 72400f9b9627cdc147ebf7c14a791c063747
 
 Seguimiento: este documento conserva el alcance y las pruebas del primer incremento. La continuación en `codex/pdf-legal-research` incorpora [páginas PDF físicas e investigación jurídica propia](PDF-INVESTIGACION-2026-11-01.md); sus resultados se registran por separado.
 
-Este incremento integra y corrige los HEAD auditados de los PR [202](https://github.com/gabrielperezibacache/lexopen/pull/202) y [203](https://github.com/gabrielperezibacache/lexopen/pull/203), junto con los bloqueantes de la base. Añade el primer flujo documental propio del [plan](PLAN-DESARROLLO-TRIFOLIA.md). No usa cuentas, API, MCP, índices ni servicios de TRIFOLIA.
+Este incremento integra y corrige los HEAD auditados de los PR [202](https://github.com/gabrielperezibacache/lexopen/pull/202) y [203](https://github.com/gabrielperezibacache/lexopen/pull/203), junto con los bloqueantes de la base. Añade el primer flujo documental propio del [plan](PLAN-DESARROLLO-LEXOPEN.md).
 
 ## Qué se puede usar
 
@@ -39,7 +39,7 @@ Las notificaciones cuyo envío externo pudo ocurrir antes de una caída quedan *
 
 Se añaden `DocumentResource`, `DocumentEvidenceVersion` y `DocumentEvidenceFragment`, con vínculos aditivos al esquema existente, versiones por hash, fragmentos literales y API autorizada. El primer flujo habilitado corresponde a `Documento`. El modelo admite el origen `SiteFile`, pero su captura y lector todavía necesitan implementación.
 
-Este incremento aporta base parcial a T03, T13, T18 y T53 de la [matriz de capacidades](auditoria-2026-11-01/MATRIZ-TRIFOLIA.md); no cierra esas filas completas. Todavía faltan páginas PDF verificadas, selección/importación de Drive, recuperación semántica evaluada, corpus jurídicos propios, hechos y cronología, contradicciones, biblioteca, redacción y exportaciones, Word, MCP y cartografía.
+Este incremento aporta base parcial a T03, T13, T18 y T53 de la [matriz de capacidades](auditoria-2026-11-01/MATRIZ-CAPACIDADES.md); no cierra esas filas completas. Todavía faltan páginas PDF verificadas, selección/importación de Drive, recuperación semántica evaluada, corpus jurídicos propios, hechos y cronología, contradicciones, biblioteca, redacción y exportaciones, Word, MCP y cartografía.
 
 ## Validación y evidencia
 

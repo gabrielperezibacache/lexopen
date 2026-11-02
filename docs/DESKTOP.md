@@ -94,7 +94,7 @@ Solo cambia el código del clon. Los datos viven fuera del repo.
 
 Flujo operativo:
 
-1. En el **Host**: `git pull origin main && npm ci`.
+1. Detenga el **Host**. En su clon: `git pull origin main`, `npm ci` y `npm run desktop:build`. Descargar código no recompila un artefacto standalone ya existente.
 2. Arrancar de nuevo (`npm run web:host` o `npm run desktop:dev`) → log `Actualización reconocida: x → y` → `prisma migrate deploy` → listo.
 3. Clientes: si usan Desktop, recarga automática; si usan navegador, F5.
 

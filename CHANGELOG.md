@@ -6,7 +6,7 @@
 - Integración corregida de roles/equipo y notificaciones: muro ético común también en derivados y avisos, capacidades de escritura, 2FA sin bypass de prefetch, reenrolamiento seguro, tareas atómicas y aprobaciones concurrentes.
 - Política `local_only` aplicada antes del transporte; comandos del asistente y planes durables, auditoría transaccional, recibos idempotentes y deshacer con propietario, acceso y estado esperado. Pagos/plazos y asientos manuales conservan su clave al reintentar desde la interfaz.
 - Outbox por destino con lease/CAS, digest recuperable y reconciliación explícita de envíos inciertos; procesamiento documental persistido con recuperación y reintentos acotados.
-- Primer lector documental propio: **Documentos → Ver fuentes**, versiones por hash, fragmentos, búsqueda, original y verificación literal de citas; sin dependencia de TRIFOLIA. Las páginas PDF y las siguientes fases siguen pendientes.
+- Primer lector documental propio: **Documentos → Ver fuentes**, versiones por hash, fragmentos, búsqueda, original y verificación literal de citas. Las páginas PDF y las siguientes fases siguen pendientes.
 - Archivo de duplicados PJUD antes del dedupe histórico; saldos autorizados sin aportes ocultos, compatibilidad de IDs visuales en HTTP LAN y benchmark limitado a fixtures desechables.
 - El acceso espera a estar interactivo antes de aceptar credenciales; método POST explícito evita su envío nativo por URL durante la carga inicial.
 - Detalle, migraciones, validación y límites: `docs/IMPLEMENTACION-2026-11-01.md`.
