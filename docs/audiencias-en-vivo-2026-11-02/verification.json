@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-02",
+  "base": "49f3dab8e70829ac37b9e6bf33791b51fd34097e",
+  "branch": "codex/hearing-live-session",
+  "fixtures": "Usuarios, causas, colecciones, libros y registros ficticios. PostgreSQL desechable en puerto 55439.",
+  "checks": {
+    "unit": "passed",
+    "integration": "passed",
+    "productionBuild": "passed",
+    "lint": "passed",
+    "types": "passed",
+    "schemaDrift": "none",
+    "browser": {
+      "total": 50,
+      "passedFullRun": 49,
+      "passedDirectedRerun": 1,
+      "originalFailure": "Selector del escenario de recuperación: role alert frente a role status. Corregido y verificado.",
+      "targetedFile": "e2e/hearing-live.spec.ts"
+    },
+    "functionalReview": "3 hallazgos resueltos; clear",
+    "visualReview": "2 hallazgos resueltos; clear"
+  },
+  "productionHostDeployed": false,
+  "files": {
+    "browser-original.log": "97b66f86002b2c29527ed018f9ae860202fe1188e82faf70075bd77e16887b01",
+    "browser-recovery.log": "a3672287296ec2233b02032f36bf3d6d39995400af689375e0fba8a9ada8fe83",
+    "build.log": "f4f82f4af26b726f30f26756625596cd873e4fd620509ed22e76043721923da3",
+    "integration.log": "c754218c07a671e09bd138b3d4c7437d371582820bea916416d2b66581fd82fa",
+    "lint.log": "b04310b3aae2a08d911d181f608391825a76d9b9266920fd0f230cd0cbd12e50",
+    "live-dark.png": "216927354e107e861c3a0ffd069c1ea52c393bf80153f42c5494e5eb5c8e5bc4",
+    "live-desktop.png": "ad9db41bcdd687e99b28095aaa85e820b0545c48003f1a71c96872cf61751582",
+    "live-log-desktop.png": "583e6bb750601513aedc4bf238bf2cedae5f878071e4b2d95712fc3d163af341",
+    "live-log-mobile.png": "89502a50e29be35c53e842fc84f052b24f3ae9819a6fc3678dd5940647558f5e",
+    "live-mobile.png": "30377babd86854bfdbc6f9e1ac14283e9bbd6e6914976c2c641238176394a883",
+    "live-quick-desktop.png": "f83f5a93befb620a29f19d2d9f08b4df0e2182bdfab9568877ac79f9ba610856",
+    "live-quick-mobile.png": "3a420bc2899fa34199ac8029b72545380820f9f18ecc54c53f0190be2b522bca",
+    "schema.log": "728442980e143e18c2aa9bd7d747a8ea8d85f510529e7540f90f35ea9dd1b268",
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unit.log": "b20384383d0f5dba120eb661f96647bba82960ed120090572151a70f9d4f907a"
+  },
+  "logRepresentation": "Salida local conservada; espacios finales y retornos de progreso normalizados para el repositorio."
+}

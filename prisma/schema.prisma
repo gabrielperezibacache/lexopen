@@ -1986,6 +1986,8 @@ model HearingWorkspace {
   sources HearingSource[]
   notes HearingNote[]
   chatTurns HearingChatTurn[]
+  liveState HearingLiveState?
+  liveRequests HearingLiveRequest[]
   @@index([ownerId,causaId,updatedAt])
 }
 model HearingSource {
@@ -2013,11 +2015,41 @@ model HearingNote {
   body String @db.Text
   citationJson String @default("") @db.Text
   revision Int @default(1)
+  liveKind String?
+  liveElapsedSeconds Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   workspace HearingWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
   source HearingSource? @relation(fields:[sourceId],references:[id],onDelete:Restrict)
   @@index([workspaceId,updatedAt])
+}
+model HearingLiveState {
+  workspaceId String @id
+  phase String @default("idle")
+  elapsedSeconds Int @default(0)
+  runningSince DateTime?
+  startedAt DateTime?
+  endedAt DateTime?
+  opening String @default("") @db.Text
+  closing String @default("") @db.Text
+  noteIdsJson String @default("[]") @db.Text
+  noteRevisionsJson String @default("{}") @db.Text
+  addressedNoteIdsJson String @default("[]") @db.Text
+  activeNoteId String?
+  revision Int @default(1)
+  updatedAt DateTime @updatedAt
+  workspace HearingWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+}
+model HearingLiveRequest {
+  id String @id @default(cuid())
+  workspaceId String
+  requestId String
+  inputSha256 String
+  resultingRevision Int
+  resultNoteId String?
+  createdAt DateTime @default(now())
+  workspace HearingWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  @@unique([workspaceId,requestId])
 }
 model HearingChatTurn {
   id String @id @default(cuid())

@@ -59,7 +59,7 @@
     "test:books:integration": "node --import tsx src/lib/books/books.integration.test.ts && node --import tsx src/lib/books/rag.integration.test.ts && node --import tsx src/lib/books/conversion.integration.test.ts && node --import tsx src/lib/books/judicial.integration.test.ts",
     "test:production:books": "node --import tsx scripts/production-books-smoke.ts",
     "test:writings:integration": "node --import tsx src/lib/writings/sources.integration.test.ts && node --import tsx src/lib/writings/service.integration.test.ts",
-    "test:courtroom:integration": "node --import tsx src/lib/audio/audio.integration.test.ts && node --import tsx src/lib/hearings/hearings.integration.test.ts && node --import tsx src/lib/knowledge/audio-transcript.integration.test.ts",
+    "test:courtroom:integration": "node --import tsx src/lib/audio/audio.integration.test.ts && node --import tsx src/lib/hearings/hearings.integration.test.ts && node --import tsx src/lib/knowledge/audio-transcript.integration.test.ts && node --import tsx src/lib/hearings/live-integration.test.ts",
     "test:production:courtroom": "node --import tsx scripts/production-courtroom-smoke.ts"
   },
   "prisma": {

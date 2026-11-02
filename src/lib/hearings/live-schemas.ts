@@ -1,0 +1,10 @@
+import { z } from "zod";
+import { hearingId, hearingRevision, hearingQuoteSchema } from "./schemas";
+const requestId = z.string().min(10).max(120).regex(/^[a-zA-Z0-9-]+$/);
+const ids = z.array(hearingId).max(20).refine(value => new Set(value).size === value.length, "Seleccione cada punto una sola vez");
+export const hearingLivePlanSchema = z.object({ requestId, expectedRevision: hearingRevision, opening: z.string().max(8000), closing: z.string().max(8000), noteIds: ids, noteRevisions: z.record(hearingId, hearingRevision), addressedNoteIds: ids, activeNoteId: hearingId.nullable() }).strict().refine(value => Object.keys(value.noteRevisions).length === value.noteIds.length && value.noteIds.every(id => Number.isSafeInteger(value.noteRevisions[id])) && value.addressedNoteIds.every(id => value.noteIds.includes(id)) && (!value.activeNoteId || value.noteIds.includes(value.activeNoteId)), "Las revisiones, el punto activo y los tratados deben corresponder a los puntos elegidos");
+export const hearingLiveControlSchema = z.object({ requestId, expectedRevision: hearingRevision, action: z.enum(["start", "pause", "resume", "finish"]) }).strict();
+export const hearingLiveEntrySchema = z.object({ requestId, expectedRevision: hearingRevision, kind: z.enum(["observation", "objection", "decision", "commitment"]), title: z.string().trim().min(1).max(150), body: z.string().trim().min(1).max(20_000), citation: hearingQuoteSchema.nullable().default(null) }).strict();
+export type HearingLivePlanInput = z.infer<typeof hearingLivePlanSchema>;
+export type HearingLiveControlInput = z.infer<typeof hearingLiveControlSchema>;
+export type HearingLiveEntryInput = z.infer<typeof hearingLiveEntrySchema>;

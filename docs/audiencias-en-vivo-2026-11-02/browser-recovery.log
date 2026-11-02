@@ -1,0 +1,7 @@
+Running 1 test using 1 worker
+
+(node:5536) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/hearing-live.spec.ts:176:5 › anotación pendiente al volver y contador sin conexión: recuperación sin registrar automáticamente (9.7s)
+
+  1 passed (10.2s)
