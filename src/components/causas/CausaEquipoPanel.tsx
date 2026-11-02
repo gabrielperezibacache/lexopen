@@ -127,11 +127,16 @@ export function CausaEquipoPanel({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div
+        className="flex flex-wrap items-center gap-3"
+        role="group"
+        aria-label="Nivel de acceso"
+      >
         <span className="text-sm text-[var(--ink-soft)]/70">Acceso:</span>
         <button
           type="button"
           className={`btn ${acceso === "estudio" ? "btn-primary" : "btn-ghost"}`}
+          aria-pressed={acceso === "estudio"}
           disabled={!canManage || busy}
           onClick={() => void setAccesoMode("estudio")}
         >
@@ -140,6 +145,7 @@ export function CausaEquipoPanel({
         <button
           type="button"
           className={`btn ${acceso === "equipo" ? "btn-primary" : "btn-ghost"}`}
+          aria-pressed={acceso === "equipo"}
           disabled={!canManage || busy}
           onClick={() => void setAccesoMode("equipo")}
         >
@@ -163,6 +169,7 @@ export function CausaEquipoPanel({
               <button
                 type="button"
                 className="btn btn-ghost text-xs"
+                aria-label={`Quitar a ${m.user.name}`}
                 disabled={busy}
                 onClick={() => void removeMember(m.userId)}
               >
@@ -205,8 +212,13 @@ export function CausaEquipoPanel({
               ))}
             </select>
           </label>
-          <button className="btn btn-primary" type="submit" disabled={busy}>
-            Agregar
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={busy}
+            aria-busy={busy}
+          >
+            {busy ? "Agregando…" : "Agregar"}
           </button>
         </form>
       )}
