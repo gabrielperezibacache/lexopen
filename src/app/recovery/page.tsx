@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, Suspense, useState } from "react";
-import { Scale } from "lucide-react";
+import { FolioSymbol } from "@/components/ui/FolioSymbol";
 
 function RecoveryForm() {
   const [error, setError] = useState("");
@@ -136,7 +136,7 @@ export default function RecoveryPage() {
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
         <Link href="/" className="mb-8 flex items-center gap-3">
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] text-white">
-            <Scale size={20} />
+            <FolioSymbol className="h-8 w-8" />
           </span>
           <div>
             <div className="display text-2xl">LexOpen</div>
