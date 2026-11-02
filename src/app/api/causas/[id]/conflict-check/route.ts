@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
   requireStaff,
 } from "@/lib/api";
-import {
-  checkConflicts,
-  summarizeConflictStatus,
-} from "@/lib/conflict";
 import { writeAuditStrict } from "@/lib/audit";
+import { assertCausaCapability as mutateCausa, causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
+import {
+  checkConflicts
+} from "@/lib/conflict";
+import { prisma } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,37 +19,42 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const causa = await prisma.causa.findUnique({
-      where: { id },
+    await mutateCausa(id, user, "causa.write");
+    const causa = await prisma.causa.findFirst({
+      where: { AND: [scopedcausaAccessWhere(user), { id }] },
       include: { partes: true },
     });
     if (!causa) {
       return NextResponse.json({ error: "No encontrada" }, { status: 404 });
     }
 
-    const conflicts = await checkConflicts({
+    const risk = await checkConflicts({
+      user,
       partes: causa.partes.map((p) => ({ nombre: p.nombre, rut: p.rut })),
       excludeCausaId: id,
     });
-    const conflictStatus = summarizeConflictStatus(conflicts);
+    const conflicts = risk.conflicts;
+    const conflictStatus = risk.status;
 
-    await prisma.causa.update({
-      where: { id },
-      data: {
-        conflictCheckedAt: new Date(),
-        conflictStatus,
-      },
-    });
+    return await prisma.$transaction(async (tx) => {
+      await tx.causa.update({
+        where: { id },
+        data: {
+          conflictCheckedAt: new Date(),
+          conflictStatus,
+        },
+      });
 
-    await writeAuditStrict({
-      actorId: user.id,
-      action: "causa.conflict_recheck",
-      entityType: "Causa",
-      entityId: id,
-      after: { conflictStatus, hits: conflicts.length },
-    });
+      await writeAuditStrict({
+        actorId: user.id,
+        action: "causa.conflict_recheck",
+        entityType: "Causa",
+        entityId: id,
+        after: { conflictStatus, hits: conflicts.length },
+      }, tx);
 
-    return NextResponse.json({ conflicts, conflictStatus });
+      return NextResponse.json({ ...risk, conflictStatus });
+    }, { isolationLevel: "Serializable" });
   } catch (e) {
     return handleRouteError(e);
   }

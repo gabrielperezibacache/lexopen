@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PAYMENT_METHODS, canRegisterInvoicePayment, clp } from "@/lib/billing";
 import { apiMutation } from "@/lib/api-mutation";
+import { createSubmissionKeys } from "@/lib/client-submission-key";
 
 export function InvoiceActions({
   invoiceId,
@@ -20,6 +21,7 @@ export function InvoiceActions({
   const [payOpen, setPayOpen] = useState(false);
   const [loadingAction, setLoadingAction] = useState<"anular" | "emitir" | "pagar" | null>(null);
   const [error, setError] = useState("");
+  const paymentSubmission = useMemo(() => createSubmissionKeys(undefined, `lexopen:payment:${invoiceId}`), [invoiceId]);
 
   async function anular() {
     if (!window.confirm("¿Anular este borrador? El documento quedará anulado.")) return;
@@ -66,21 +68,20 @@ export function InvoiceActions({
     setError("");
     try {
       const fd = new FormData(e.currentTarget);
+      const payload = {
+        invoiceId, clienteId, amountClp: Number(fd.get("amountClp")),
+        method: fd.get("method"), reference: fd.get("reference"),
+      };
       const result = await apiMutation("/api/billing/payments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          invoiceId,
-          clienteId,
-          amountClp: Number(fd.get("amountClp")),
-          method: fd.get("method"),
-          reference: fd.get("reference"),
-        }),
+        headers: { "Content-Type": "application/json", "Idempotency-Key": paymentSubmission.forPayload(payload) },
+        body: JSON.stringify(payload),
       });
       if (!result.ok) {
         setError(result.error);
         return;
       }
+      paymentSubmission.complete(payload);
       setPayOpen(false);
       router.refresh();
     } finally {

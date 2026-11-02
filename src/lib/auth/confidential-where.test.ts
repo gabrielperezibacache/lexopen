@@ -3,8 +3,19 @@ import {
   confidentialWhere,
   minutaConfidentialWhere,
 } from "@/lib/api";
+import { FOUNDER_ADMIN_GRANTS } from "@/lib/auth/permissions";
 
-assert.deepEqual(confidentialWhere("admin"), {});
+// Admin técnico sin grants: ve confidencial, no privilegio (D9).
+assert.deepEqual(confidentialWhere("admin"), { privilegio: false });
+assert.deepEqual(
+  confidentialWhere({
+    role: "admin",
+    capabilityGrants: FOUNDER_ADMIN_GRANTS.join(","),
+  }),
+  {}
+);
+
+assert.deepEqual(confidentialWhere("socio"), {});
 assert.deepEqual(confidentialWhere("abogado"), {});
 assert.deepEqual(confidentialWhere("asistente"), {
   confidencial: false,

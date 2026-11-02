@@ -27,6 +27,7 @@ export function isClientAllowedPath(pathname: string): boolean {
   if (/^\/api\/sites\/[^/]+\/(files|qa|blog)(?:\/.*)?$/.test(pathname)) return true;
   if (pathname.startsWith("/api/notifications")) return true;
   if (CLIENT_AUTH_API.test(pathname)) return true;
+  if (["/api/notify/preferences", "/api/notify/push/subscribe", "/api/notify/vapid-public", "/api/notify/telegram/link", "/api/notify/ack"].includes(pathname)) return true;
   if (pathname === "/api/health") return true;
   if (pathname.startsWith("/api/search")) return true;
   if (pathname === "/api/messages" || pathname.startsWith("/api/messages/"))

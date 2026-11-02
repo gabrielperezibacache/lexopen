@@ -90,7 +90,9 @@ await run("npx", ["--no-install", "tsx", "prisma/seed.ts"], env);
 
 const server = spawn(
   npm,
-  ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(port)],
+  process.env.E2E_BUNDLER === "webpack"
+    ? ["exec", "--", "next", "dev", "--webpack", "--hostname", "127.0.0.1", "--port", String(port)]
+    : ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(port)],
   {
     cwd: root,
     env,

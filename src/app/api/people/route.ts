@@ -1,18 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { isAdmin } from "@/lib/auth/rbac";
+import { parseListLimit } from "@/lib/api/list-limit";
 import { writeAuditStrict } from "@/lib/audit";
+import { siteAccessWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { isAdmin } from "@/lib/auth/rbac";
+import { ROLES } from "@/lib/auth/roles";
+import { prisma } from "@/lib/db";
 import {
   createStudioUser,
   deleteStudioUser,
   updateStudioUser,
 } from "@/lib/users-admin";
-import { parseListLimit } from "@/lib/api/list-limit";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
-const roleEnum = z.enum(["admin", "abogado", "asistente", "cliente"]);
+const roleEnum = z.enum(ROLES);
 
 const createUserSchema = z.object({
   action: z.literal("create-user"),
@@ -31,6 +33,8 @@ const updateUserSchema = z.object({
   role: roleEnum.optional(),
   title: z.string().max(200).optional().nullable(),
   password: z.string().min(12).max(256).optional(),
+  capabilityGrants: z.string().max(2000).optional().nullable(),
+  capabilityRevokes: z.string().max(2000).optional().nullable(),
 });
 
 const updateRoleSchema = z.object({
@@ -66,7 +70,7 @@ const deleteGroupSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const limit = parseListLimit(req.nextUrl.searchParams.get("limit"), {
       default: 200,
       max: 500,
@@ -80,8 +84,11 @@ export async function GET(req: NextRequest) {
           role: true,
           title: true,
           avatarColor: true,
+          capabilityGrants: true,
+          capabilityRevokes: true,
           createdAt: true,
           siteMemberships: {
+            where: { site: siteAccessWhere(user) },
             include: { site: { select: { id: true, name: true } } },
           },
           groupMembers: {
@@ -112,7 +119,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (body.action === "create-user") {
-      if (!isAdmin(actor.role)) {
+      if (!isAdmin(actor)) {
         return NextResponse.json(
           { error: "Solo admin puede crear usuarios" },
           { status: 403 }
@@ -131,7 +138,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "delete-user") {
-      if (!isAdmin(actor.role)) {
+      if (!isAdmin(actor)) {
         return NextResponse.json(
           { error: "Solo admin puede eliminar usuarios" },
           { status: 403 }
@@ -146,7 +153,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "create-group") {
-      if (!isAdmin(actor.role)) {
+      if (!isAdmin(actor)) {
         return NextResponse.json(
           { error: "Solo admin puede crear grupos" },
           { status: 403 }
@@ -176,7 +183,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "update-group") {
-      if (!isAdmin(actor.role)) {
+      if (!isAdmin(actor)) {
         return NextResponse.json(
           { error: "Solo admin puede editar grupos" },
           { status: 403 }
@@ -229,7 +236,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "delete-group") {
-      if (!isAdmin(actor.role)) {
+      if (!isAdmin(actor)) {
         return NextResponse.json(
           { error: "Solo admin puede eliminar grupos" },
           { status: 403 }
@@ -263,7 +270,7 @@ export async function PATCH(req: NextRequest) {
   try {
     assertCsrf(req);
     const actor = await requireStaff();
-    if (!isAdmin(actor.role)) {
+    if (!isAdmin(actor)) {
       return NextResponse.json(
         { error: "Solo admin puede administrar usuarios" },
         { status: 403 }
@@ -281,6 +288,8 @@ export async function PATCH(req: NextRequest) {
         title: data.title,
         role: data.role,
         password: data.password,
+        capabilityGrants: data.capabilityGrants,
+        capabilityRevokes: data.capabilityRevokes,
       });
       return NextResponse.json(user);
     }

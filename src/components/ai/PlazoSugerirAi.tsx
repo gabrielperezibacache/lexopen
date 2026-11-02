@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 import { apiMutation } from "@/lib/api-mutation";
 import { civilDateKey } from "@/lib/chile-time";
 import { calcularVencimiento } from "@/lib/plazos";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import { createSubmissionKeys } from "@/lib/client-submission-key";
 
 type PlazoSugerido = {
   titulo?: string;
@@ -23,6 +24,7 @@ export function PlazoSugerirAi({ causaId }: { causaId: string }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [sugeridos, setSugeridos] = useState<PlazoSugerido[]>([]);
+  const submissions = useRef(new Map<number, ReturnType<typeof createSubmissionKeys>>());
 
   async function applyPlazos(result: AiActionResponse) {
     const data = result.data as { plazos?: PlazoSugerido[] } | null;
@@ -36,16 +38,14 @@ export function PlazoSugerirAi({ causaId }: { causaId: string }) {
     setNote("");
     const hoy = new Date();
     let created = 0;
-    for (const item of items) {
+    const sent: Array<{ submission: ReturnType<typeof createSubmissionKeys>; payload: unknown }> = [];
+    for (const [index, item] of items.entries()) {
       const dias = typeof item.dias === "number" && item.dias > 0 ? item.dias : 5;
       const tipoComputo = item.tipoComputo === "corridos" ? "corridos" : "habiles";
       const fechaLimite = civilDateKey(
         calcularVencimiento({ desde: hoy, dias, tipoComputo })
       );
-      const res = await apiMutation("/api/plazos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = {
           causaId,
           titulo: item.titulo,
           descripcion: item.descripcion || null,
@@ -55,9 +55,20 @@ export function PlazoSugerirAi({ causaId }: { causaId: string }) {
           diasPlazo: dias,
           fechaNotificacion: civilDateKey(hoy),
           fechaLimite,
-        }),
+      };
+      let submission = submissions.current.get(index);
+      if (!submission) { submission = createSubmissionKeys(undefined, `lexopen:suggested-deadline:${causaId}:${index}`); submissions.current.set(index, submission); }
+      sent.push({ submission, payload });
+      const res = await apiMutation("/api/plazos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": submission.forPayload(payload) },
+        body: JSON.stringify(payload),
       });
       if (res.ok) created += 1;
+    }
+    if (created === items.length) {
+      for (const item of sent) item.submission.complete(item.payload);
+      submissions.current.clear();
     }
     setBusy(false);
     setNote(

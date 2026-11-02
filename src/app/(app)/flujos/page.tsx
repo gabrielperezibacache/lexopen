@@ -1,19 +1,20 @@
-import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { ModuleHeader } from "@/components/ui/PageHeader";
-import { StatusBadge, formatDate } from "@/components/ui";
 import { WorkflowActions } from "@/components/sites/WorkflowActions";
+import { StatusBadge, formatDate } from "@/components/ui";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { safeJsonParse } from "@/lib/safe-json";
+import { ModuleHeader } from "@/components/ui/PageHeader";
+import { siteRelatedWhere as scopedsiteRelatedWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { requireStaff } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
+import { safeJsonParse } from "@/lib/safe-json";
+import Link from "next/link";
 
 export default async function WorkflowsGlobalPage() {
-  await requireStaff();
+  const user = await requireStaff();
   const { dict } = await getI18n();
   const h = dict.hubs.flujos;
-  const workflows = await prisma.workflow.findMany({
+  const workflows = await prisma.workflow.findMany({ where: scopedsiteRelatedWhere(user),
     include: {
       site: true,
       instances: {

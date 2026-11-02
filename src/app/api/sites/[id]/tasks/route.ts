@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { createTask, updateTasks } from "@/lib/tasks/service";
+import { taskAccessWhere } from "@/lib/auth/causa-access";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireStaff } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
-import { triggerSiteWorkflows } from "@/lib/sites/workflow-triggers";
 import { parseListLimit } from "@/lib/api/list-limit";
 
 type Params = { params: Promise<{ id: string }> };
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       max: 500,
     });
     const tasks = await prisma.task.findMany({
-      where: { siteId: id },
+      where: { siteId: id, ...taskAccessWhere(user) },
       include: {
         assignee: { select: publicUserSelect },
         creator: { select: publicUserSelect },
@@ -33,89 +34,10 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
-  try {
-    assertCsrf(req);
-    const user = await requireStaff();
-    const { id } = await params;
-    await requireSiteAccess(id, user);
-    const body = await req.json();
-    const task = await prisma.task.create({
-      data: {
-        title: body.title,
-        description: body.description || null,
-        status: body.status || "todo",
-        priority: body.priority || "medium",
-        dueDate: body.dueDate ? new Date(body.dueDate) : null,
-        siteId: id,
-        assigneeId: body.assigneeId || null,
-        creatorId: user.id,
-      },
-    });
-    if (body.assigneeId) {
-      await prisma.notification.create({
-        data: {
-          userId: body.assigneeId,
-          title: "Nueva tarea asignada",
-          body: task.title,
-          href: `/sites/${id}/tareas`,
-        },
-      });
-    }
-    await prisma.activity.create({
-      data: {
-        tipo: "sistema",
-        mensaje: `Tarea creada: ${task.title}`,
-        siteId: id,
-        userId: user.id,
-      },
-    });
-    return NextResponse.json(task, { status: 201 });
-  } catch (e) {
-    return handleRouteError(e);
-  }
+  try { assertCsrf(req); const user = await requireStaff(); const { id } = await params; await requireSiteAccess(id, user); return NextResponse.json(await createTask(user, { ...await req.json(), siteId: id }), { status: 201 }); }
+  catch (error) { return handleRouteError(error); }
 }
-
 export async function PATCH(req: NextRequest, { params }: Params) {
-  try {
-    assertCsrf(req);
-    const user = await requireStaff();
-    const { id } = await params;
-    await requireSiteAccess(id, user);
-    const body = await req.json();
-    const current = await prisma.task.findFirst({
-      where: { id: body.id, siteId: id },
-      select: { id: true },
-    });
-    if (!current) {
-      return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
-    }
-    const task = await prisma.task.update({
-      where: { id: current.id },
-      data: {
-        status: body.status,
-        title: body.title,
-        priority: body.priority,
-        assigneeId: body.assigneeId,
-        dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
-      },
-    });
-    if (body.status === "done") {
-      await prisma.activity.create({
-        data: {
-          tipo: "sistema",
-          mensaje: `Tarea completada: ${task.title}`,
-          siteId: id,
-        },
-      });
-      await triggerSiteWorkflows({
-        siteId: id,
-        triggerType: "task_done",
-        actorId: user.id,
-        payload: { taskId: task.id, title: task.title },
-      });
-    }
-    return NextResponse.json(task);
-  } catch (e) {
-    return handleRouteError(e);
-  }
+  try { assertCsrf(req); const user = await requireStaff(); const { id } = await params; await requireSiteAccess(id, user); const body = await req.json(); const tasks = await updateTasks(user, [body.id], body, id); return NextResponse.json(tasks[0]); }
+  catch (error) { return handleRouteError(error); }
 }

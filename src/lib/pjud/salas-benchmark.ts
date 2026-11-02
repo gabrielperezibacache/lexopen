@@ -1,45 +1,35 @@
-import { applySalaMatchesToCartera, parseSalasTablaHtml } from "./salas";
-import { prisma } from "../db";
+import { randomUUID } from "node:crypto";
+import { assertDisposableDatabaseUrl } from "../testing/disposable-db";
 
 async function runBenchmark() {
-  console.log("Setting up benchmark data...");
-  // Create 500 causas
-  const causas = await Promise.all(
-    Array.from({ length: 500 }).map((_, i) =>
-      prisma.causa.create({
-        data: {
-          titulo: `Causa ${i}`,
-          rit: `C-${i}-2024`,
-          tribunal: "Corte de Apelaciones de Santiago",
-          pjudMonitoreoActivo: true,
-          estado: "activa",
-          materia: "civil",
-        },
-      })
-    )
-  );
-
-  // Generate agenda matching these causas
-  let html = "<table><tr><th>ROL</th><th>Carátula</th><th>Fecha</th><th>Sala</th><th>Corte</th></tr>";
-  for (let i = 0; i < 500; i++) {
-    html += `<tr><td>C-${i}-2024</td><td>Pérez con Soto</td><td>15/08/2026</td><td>Sala ${i}</td><td>Corte de Apelaciones de Santiago</td></tr>`;
+  const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
+  if (process.env.LEXOPEN_RUN_BENCHMARK !== "1" || !new URL(url).pathname.includes("benchmark")) {
+    throw new Error("Use LEXOPEN_RUN_BENCHMARK=1 y una base desechable benchmark_test/e2e");
   }
-  html += "</table>";
-  const agenda = parseSalasTablaHtml(html);
-
-  console.log("Running benchmark (transaction)...");
-  const start = performance.now();
-  await applySalaMatchesToCartera(agenda);
-  const end = performance.now();
-
-  console.log(`Time taken: ${(end - start).toFixed(2)}ms`);
-
-  // Cleanup
-  await prisma.causa.deleteMany({
-    where: {
-      id: { in: causas.map(c => c.id) }
-    }
-  });
+  if (process.env.DATABASE_URL && new URL(process.env.DATABASE_URL).toString() !== url) {
+    throw new Error("DATABASE_URL debe coincidir con la base desechable del benchmark");
+  }
+  process.env.DATABASE_URL = url;
+  const { prisma } = await import("../db");
+  const { applySalaMatchesToCartera, parseSalasTablaHtml } = await import("./salas");
+  const suffix = randomUUID();
+  let ids: string[] = [];
+  try {
+    const causas = await prisma.causa.createManyAndReturn({
+      data: Array.from({ length: 500 }, (_, i) => ({ titulo: `Benchmark ${suffix}-${i}`, rit: `C-${i}-2024`, tribunal: "Corte de Apelaciones de Santiago", pjudMonitoreoActivo: true, estado: "activa", materia: "civil" })),
+      select: { id: true },
+    });
+    ids = causas.map((c) => c.id);
+    let html = "<table><tr><th>ROL</th><th>Carátula</th><th>Fecha</th><th>Sala</th><th>Corte</th></tr>";
+    for (let i = 0; i < 500; i++) html += `<tr><td>C-${i}-2024</td><td>Fixture</td><td>15/08/2026</td><td>Sala ${i}</td><td>Corte de Apelaciones de Santiago</td></tr>`;
+    const agenda = parseSalasTablaHtml(html + "</table>");
+    const start = performance.now();
+    const result = await applySalaMatchesToCartera(agenda, { causaIds: ids });
+    console.log(JSON.stringify({ scanned: result.scanned, matched: result.matched, elapsedMs: performance.now() - start }));
+  } finally {
+    try { if (ids.length) await prisma.causa.deleteMany({ where: { id: { in: ids } } }); }
+    finally { await prisma.$disconnect(); }
+  }
 }
 
-runBenchmark().catch(console.error).finally(() => process.exit(0));
+runBenchmark().catch((error) => { console.error(error.message); process.exitCode = 1; });

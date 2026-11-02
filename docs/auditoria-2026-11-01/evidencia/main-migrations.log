@@ -1,0 +1,90 @@
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "lexopen_audit_main_e2e", schema "public" at "127.0.0.1:55439"
+
+23 migrations found in prisma/migrations
+
+Applying migration `20260725080000_init`
+Applying migration `20260725090000_unaccent`
+Applying migration `20260725180000_pjud_monitor`
+Applying migration `20260811000000_secure_user_password`
+Applying migration `20260811020000_session_version`
+Applying migration `20260811030000_pjud_external_unique`
+Applying migration `20260812000000_document_processing`
+Applying migration `20260812160000_pjud_causamonitor_parity`
+Applying migration `20260812170000_pjud_scrape_claveunica`
+Applying migration `20260812180000_pjud_digest_pdf`
+Applying migration `20260812190000_pjud_escrito_pendiente`
+Applying migration `20260812200000_pjud_proxima_tabla`
+Applying migration `20260812220000_crm_clientes_tramites`
+Applying migration `20260812230000_hermes_allow_demo_default_false`
+Applying migration `20260816050000_totp_wiki_blog`
+Applying migration `20260816070000_wiki_blog_indexes`
+Applying migration `20260817190000_mailbox_correo`
+Applying migration `20260818010000_causa_pjud_origin`
+Applying migration `20260818120000_mailbox_production`
+Applying migration `20260930120000_evento_agenda`
+Applying migration `20260930140000_firm_assistant_llm_settings`
+Applying migration `20260930180000_phase3_list_indexes`
+Applying migration `20261031010000_pjud_b3_b4_uniques`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260725080000_init/
+    └─ migration.sql
+  └─ 20260725090000_unaccent/
+    └─ migration.sql
+  └─ 20260725180000_pjud_monitor/
+    └─ migration.sql
+  └─ 20260811000000_secure_user_password/
+    └─ migration.sql
+  └─ 20260811020000_session_version/
+    └─ migration.sql
+  └─ 20260811030000_pjud_external_unique/
+    └─ migration.sql
+  └─ 20260812000000_document_processing/
+    └─ migration.sql
+  └─ 20260812160000_pjud_causamonitor_parity/
+    └─ migration.sql
+  └─ 20260812170000_pjud_scrape_claveunica/
+    └─ migration.sql
+  └─ 20260812180000_pjud_digest_pdf/
+    └─ migration.sql
+  └─ 20260812190000_pjud_escrito_pendiente/
+    └─ migration.sql
+  └─ 20260812200000_pjud_proxima_tabla/
+    └─ migration.sql
+  └─ 20260812220000_crm_clientes_tramites/
+    └─ migration.sql
+  └─ 20260812230000_hermes_allow_demo_default_false/
+    └─ migration.sql
+  └─ 20260816050000_totp_wiki_blog/
+    └─ migration.sql
+  └─ 20260816070000_wiki_blog_indexes/
+    └─ migration.sql
+  └─ 20260817190000_mailbox_correo/
+    └─ migration.sql
+  └─ 20260818010000_causa_pjud_origin/
+    └─ migration.sql
+  └─ 20260818120000_mailbox_production/
+    └─ migration.sql
+  └─ 20260930120000_evento_agenda/
+    └─ migration.sql
+  └─ 20260930140000_firm_assistant_llm_settings/
+    └─ migration.sql
+  └─ 20260930180000_phase3_list_indexes/
+    └─ migration.sql
+  └─ 20261031010000_pjud_b3_b4_uniques/
+    └─ migration.sql
+
+All migrations have been successfully applied.
+┌─────────────────────────────────────────────────────────┐
+│  Update available 5.22.0 -> 8.0.0-rc.29                 │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘

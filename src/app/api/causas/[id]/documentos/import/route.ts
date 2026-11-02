@@ -1,20 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { writeAuditStrict } from "@/lib/audit";
+import { assertCausaCapability as mutateCausa, assertCausaAccess as readCausa, causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import {
   getCausaDocImportStatus,
   startCausaDocImport,
 } from "@/lib/pjud/import-causa-documents";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const { id } = await params;
-    const causa = await prisma.causa.findUnique({
-      where: { id },
+    await readCausa(id, user);
+    const causa = await prisma.causa.findFirst({
+      where: { AND: [scopedcausaAccessWhere(user), { id }] },
       select: { id: true },
     });
     if (!causa) {
@@ -31,8 +33,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const causa = await prisma.causa.findUnique({
-      where: { id },
+    await mutateCausa(id, user, "causa.write");
+    const causa = await prisma.causa.findFirst({
+      where: { AND: [scopedcausaAccessWhere(user), { id }] },
       select: { id: true, rit: true },
     });
     if (!causa) {

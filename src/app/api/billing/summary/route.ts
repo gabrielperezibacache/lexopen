@@ -1,15 +1,16 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { handleRouteError, requireBillingManager } from "@/lib/api";
+import { billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
 import { OPEN_INVOICE_STATUSES } from "@/lib/billing";
 import { loadBillingOverview } from "@/lib/billing-overview";
+import { prisma } from "@/lib/db";
+import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    await requireBillingManager();
-    const { month, kpis, recentInvoices, recentTime } = await loadBillingOverview();
+    const user = await requireBillingManager();
+    const { month, kpis, recentInvoices, recentTime } = await loadBillingOverview(user);
     const openInvoices = await prisma.invoice.findMany({
-      where: { status: { in: [...OPEN_INVOICE_STATUSES] } },
+      where: { AND: [scopedrelatedCausaWhere(user), { status: { in: [...OPEN_INVOICE_STATUSES] } }] },
       include: { cliente: true, causa: true },
       orderBy: { issueDate: "desc" },
       take: 8,

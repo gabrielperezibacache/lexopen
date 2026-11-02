@@ -1,13 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { publicUserSelect } from "@/lib/auth/public-user";
 import { writeAuditStrict } from "@/lib/audit";
+import { requireSiteMutationAccess } from "@/lib/auth/access";
+import { siteAccessWhere as scopedsiteAccessWhere, siteRelatedWhere as scopedsiteRelatedWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { prisma } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    await requireStaff();
-    const workflows = await prisma.workflow.findMany({
+    const user = await requireStaff();
+    const workflows = await prisma.workflow.findMany({ where: scopedsiteRelatedWhere(user),
       include: {
         site: true,
         instances: {
@@ -31,8 +33,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (body.action === "start" && body.workflowId) {
-      const workflow = await prisma.workflow.findUnique({
-        where: { id: body.workflowId },
+      const workflow = await prisma.workflow.findFirst({
+        where: { AND: [scopedsiteRelatedWhere(user), { id: body.workflowId }] },
         select: { id: true },
       });
       if (!workflow) {
@@ -56,6 +58,7 @@ export async function POST(req: NextRequest) {
         include: { workflow: true },
       });
       if (!inst) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+      await requireSiteMutationAccess(inst.workflow.siteId, user);
       if (inst.status === "approved" || inst.status === "rejected") {
         return NextResponse.json({ error: "El workflow ya terminó" }, { status: 409 });
       }
@@ -120,13 +123,14 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      const site = await prisma.site.findUnique({
-        where: { id: body.siteId },
+      const site = await prisma.site.findFirst({
+        where: { AND: [scopedsiteAccessWhere(user), { id: body.siteId }] },
         select: { id: true },
       });
       if (!site) {
         return NextResponse.json({ error: "Site no encontrado" }, { status: 404 });
       }
+      await requireSiteMutationAccess(String(body.siteId), user);
       const wf = await prisma.workflow.create({
         data: {
           name: body.name,

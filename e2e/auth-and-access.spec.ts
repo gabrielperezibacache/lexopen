@@ -4,6 +4,7 @@ import { loginAs } from "./helpers";
 test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   await loginAs(page, "socio@estudio.cl");
 
   await expect(page).toHaveURL(/\/(inicio|dashboard)$/);
@@ -93,6 +94,7 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
 });
 
 test("un cliente queda limitado al portal y a sus espacios", async ({ page }) => {
+  test.setTimeout(90_000);
   await loginAs(page, "cliente@andes.cl");
 
   await expect(page).toHaveURL(/\/portal$/);

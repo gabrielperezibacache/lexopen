@@ -1,13 +1,12 @@
-import Link from "next/link";
-import type { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
-import { labelEtapa, labelMateria } from "@/lib/chile";
-import { StatusBadge, formatDate } from "@/components/ui";
-import { Plus } from "lucide-react";
-import { CausasFilters } from "@/components/CausasFilters";
 import { CausaManageActions } from "@/components/CausaManageActions";
-import { requireStaff } from "@/lib/auth/session";
+import { CausasFilters } from "@/components/CausasFilters";
 import { PageHeader } from "@/components/sites/SiteNav";
+import { StatusBadge, formatDate } from "@/components/ui";
+import { causaAccessWhere as scopedcausaAccessWhere, documentReadWhere as scopeddocumentReadWhere, plazoAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { requireStaff } from "@/lib/auth/session";
+import { labelEtapa, labelMateria } from "@/lib/chile";
+import { prisma } from "@/lib/db";
+import { getI18n } from "@/lib/i18n/server";
 import {
   causaOrigenWhere,
   labelCausaOrigen,
@@ -17,7 +16,9 @@ import {
   labelSemaforo,
   semaforoPorDiasSinMovimiento,
 } from "@/lib/pjud/classify";
-import { getI18n } from "@/lib/i18n/server";
+import type { Prisma } from "@prisma/client";
+import { Plus } from "lucide-react";
+import Link from "next/link";
 
 const PAGE_SIZE = 50;
 
@@ -89,14 +90,14 @@ export default async function CausasPage({
   };
 
   const [total, causas] = await Promise.all([
-    prisma.causa.count({ where }),
+    prisma.causa.count({   where: { AND: [scopedcausaAccessWhere(user), where] } }),
     prisma.causa.findMany({
-      where,
+      where: { AND: [scopedcausaAccessWhere(user), where] },
       include: {
         cliente: true,
         abogado: true,
-        movimientos: { orderBy: { fecha: "desc" }, take: 1 },
-        _count: { select: { documentos: true, plazos: true } },
+        movimientos: { where: scopedrequiredCausaWhere(user),  orderBy: { fecha: "desc" }, take: 1 },
+        _count: { select: { documentos: { where: scopeddocumentReadWhere(user) }, plazos: { where: plazoAccessWhere(user) } } },
       },
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,

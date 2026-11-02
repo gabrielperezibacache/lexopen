@@ -1,6 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
@@ -8,37 +5,34 @@ import {
   parseBody,
   requireBillingManager,
 } from "@/lib/api";
+import { writeAuditStrict } from "@/lib/audit";
+import { assertBillingCausa, causaAccessWhere as scopedcausaAccessWhere, billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
+import { can } from "@/lib/auth/permissions";
+import { ledgerAccessWhere, loadScopedLedgerBalances, scopedLedgerRunningBalances } from "@/lib/billing-overview";
+import { executeCommand, requestCommandKey } from "@/lib/command-execution";
+import { prisma } from "@/lib/db";
 import { ledgerCreateSchema } from "@/lib/schemas";
+import type { Prisma } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireBillingManager();
+    const user = await requireBillingManager();
     const clienteId = req.nextUrl.searchParams.get("clienteId");
-    const entries = await prisma.ledgerEntry.findMany({
-      where: clienteId ? { clienteId } : undefined,
+    const rawEntries = await prisma.ledgerEntry.findMany({
+      where: { AND: [ledgerAccessWhere(user), clienteId ? { clienteId } : {}] },
       include: { cliente: true, causa: true, invoice: true, payment: true },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     });
-
-    // Saldos por cliente
-    const latestBalances = await prisma.ledgerEntry.findMany({
-      // ⚡ Bolt: Fetches only the latest ledger entry per client instead of the entire history.
-      distinct: ["clienteId"],
-      orderBy: [{ clienteId: "asc" }, { date: "desc" }, { createdAt: "desc" }],
-      include: { cliente: true },
-    });
-    const balances = new Map<string, { clienteId: string; nombre: string; balanceClp: number }>();
-    for (const e of latestBalances) {
-      balances.set(e.clienteId, {
-        clienteId: e.clienteId,
-        nombre: e.cliente.razonSocial,
-        balanceClp: e.balanceClp,
-      });
-    }
+    const totals = await loadScopedLedgerBalances(user);
+    const clients = await prisma.cliente.findMany({ where: { id: { in: totals.map(t => t.clienteId) } }, select: { id: true, razonSocial: true } });
+    const names = new Map(clients.map(c => [c.id, c.razonSocial]));
+    const entries = scopedLedgerRunningBalances(rawEntries);
+    const balances = totals.map(total => ({ ...total, nombre: names.get(total.clienteId) || "Cliente" }));
 
     return NextResponse.json({
       entries,
-      balances: [...balances.values()],
+      balances,
     });
   } catch (e) {
     return handleRouteError(e);
@@ -48,12 +42,15 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
-    await requireBillingManager();
+    const user = await requireBillingManager();
     const body = await parseBody(req, ledgerCreateSchema);
+    const tipo = body.tipo || "provision";
     const debitClp = body.debitClp || 0;
     const creditClp = body.creditClp || 0;
 
-    const entry = await prisma.$transaction(async (tx) => {
+    async function resolveReferences(tx: Prisma.TransactionClient) {
+      let causaId = body.causaId || null;
+      let invoiceId = body.invoiceId || null;
       const cliente = await tx.cliente.findUnique({
         where: { id: body.clienteId },
         select: { id: true },
@@ -63,9 +60,9 @@ export async function POST(req: NextRequest) {
         throw httpError("Un movimiento no puede tener débito y crédito simultáneamente", 400);
       }
 
-      if (body.causaId) {
-        const causa = await tx.causa.findUnique({
-          where: { id: body.causaId },
+      if (causaId) {
+        const causa = await tx.causa.findFirst({
+          where: { AND: [scopedcausaAccessWhere(user), { id: causaId }] },
           select: { clienteId: true },
         });
         if (!causa) throw httpError("Causa no encontrada", 404);
@@ -73,57 +70,58 @@ export async function POST(req: NextRequest) {
           throw httpError("La causa no pertenece al cliente", 400);
         }
       }
-      if (body.invoiceId) {
-        const invoice = await tx.invoice.findUnique({
-          where: { id: body.invoiceId },
+      if (body.paymentId) {
+        const payment = await tx.payment.findUnique({ where: { id: body.paymentId }, select: { clienteId: true, invoiceId: true } });
+        if (!payment || payment.clienteId !== body.clienteId) throw httpError("Pago no encontrado", 404);
+        if (!payment.invoiceId && !can(user, "billing.manage")) throw httpError("Pago no encontrado", 404);
+        if (invoiceId && payment.invoiceId !== invoiceId) throw httpError("El pago no pertenece a la factura", 400);
+        invoiceId ||= payment.invoiceId;
+      }
+      if (invoiceId) {
+        const invoice = await tx.invoice.findFirst({
+          where: { AND: [scopedrelatedCausaWhere(user), { id: invoiceId }] },
           select: { clienteId: true, causaId: true },
         });
         if (!invoice) throw httpError("Factura no encontrada", 404);
         if (invoice.clienteId !== body.clienteId) {
           throw httpError("La factura no pertenece al cliente", 400);
         }
-        if (body.causaId && invoice.causaId && invoice.causaId !== body.causaId) {
+        if (causaId && invoice.causaId !== causaId) {
           throw httpError("La factura no pertenece a la causa", 400);
         }
+        causaId ||= invoice.causaId;
       }
-      if (body.paymentId) {
-        const payment = await tx.payment.findUnique({
-          where: { id: body.paymentId },
-          select: { clienteId: true, invoiceId: true },
-        });
-        if (!payment) throw httpError("Pago no encontrado", 404);
-        if (payment.clienteId !== body.clienteId) {
-          throw httpError("El pago no pertenece al cliente", 400);
-        }
-        if (body.invoiceId && payment.invoiceId && payment.invoiceId !== body.invoiceId) {
-          throw httpError("El pago no pertenece a la factura", 400);
-        }
-      }
-
-      const last = await tx.ledgerEntry.findFirst({
-        where: { clienteId: body.clienteId },
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      });
-      const prev = last?.balanceClp ?? 0;
+      await assertBillingCausa(user, causaId, tipo === "provision" ? "ledger.provision" : "billing.manage", tx);
+      return { causaId, invoiceId };
+    }
+    const entry = await executeCommand({ key: requestCommandKey(req, "billing.ledger"), ownerId: user.id, input: body, run: async (tx) => {
+      const { causaId, invoiceId } = await resolveReferences(tx);
+      const totals = await tx.ledgerEntry.aggregate({ where: { clienteId: body.clienteId }, _sum: { debitClp: true, creditClp: true } });
+      const prev = (totals._sum.creditClp || 0) - (totals._sum.debitClp || 0);
       const balanceClp = prev - debitClp + creditClp;
 
-      return tx.ledgerEntry.create({
+      const created = await tx.ledgerEntry.create({
         data: {
           date: body.date ? new Date(body.date) : new Date(),
-          tipo: body.tipo || "provision",
+          tipo,
           description: body.description,
           debitClp,
           creditClp,
           balanceClp,
           clienteId: body.clienteId,
-          causaId: body.causaId || null,
-          invoiceId: body.invoiceId || null,
+          causaId,
+          invoiceId,
           paymentId: body.paymentId || null,
         },
         include: { cliente: true, causa: true },
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-    return NextResponse.json(entry, { status: 201 });
+      await writeAuditStrict({ actorId: user.id, action: "billing.ledger.create", entityType: "LedgerEntry", entityId: created.id, after: { clienteId: body.clienteId, causaId, invoiceId, debitClp, creditClp } }, tx);
+      return { id: created.id };
+    }, authorize: async (tx) => { await resolveReferences(tx); } });
+    const saved = await prisma.ledgerEntry.findFirst({ where: { id: entry.id, ...ledgerAccessWhere(user) }, include: { cliente: true, causa: true } });
+    if (!saved) throw httpError("Movimiento no encontrado", 404);
+    const visible = await prisma.ledgerEntry.aggregate({ where: { AND: [ledgerAccessWhere(user), { clienteId: body.clienteId }] }, _sum: { debitClp: true, creditClp: true } });
+    return NextResponse.json({ ...saved, balanceClp: (visible._sum.creditClp || 0) - (visible._sum.debitClp || 0) }, { status: 201 });
   } catch (e) {
     return handleRouteError(e);
   }

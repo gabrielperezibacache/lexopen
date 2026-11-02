@@ -252,6 +252,76 @@ export async function startLocalHostSchedulers(opts) {
         }
       },
     }),
+    startIntervalJob({
+      env,
+      baseUrl,
+      alreadyHealthy,
+      intervalKey: "NOTIFY_WORKER_INTERVAL_MINUTES",
+      label: "notify outbox",
+      log,
+      timeoutMs: 120_000,
+      run: async ({ baseUrl: url, secret, log: l, timeoutMs }) => {
+        const body = await postCron({
+          url: `${url}/api/notify/worker`,
+          secret,
+          body: "{}",
+          timeoutMs,
+          log: l,
+          failLabel: "Notify worker falló",
+        });
+        if (body?.outbox) {
+          l.info(
+            `Notify outbox: ${body.outbox.sent || 0} enviados · ${body.outbox.failed || 0} fallidos · ${body.outbox.dead || 0} muertos`
+          );
+        }
+      },
+    }),
+    startIntervalJob({
+      env,
+      baseUrl,
+      alreadyHealthy,
+      intervalKey: "ESCALATION_INTERVAL_MINUTES",
+      label: "escalamiento plazos",
+      log,
+      timeoutMs: 60_000,
+      run: async ({ baseUrl: url, secret, log: l, timeoutMs }) => {
+        const body = await postCron({
+          url: `${url}/api/notify/escalamiento`,
+          secret,
+          body: "{}",
+          timeoutMs,
+          log: l,
+          failLabel: "Escalamiento de plazos falló",
+        });
+        if (body) {
+          l.info(
+            `Escalamiento: hitos ${body.hitos?.generated || 0} · escalados ${body.escalamiento?.escalated || 0}`
+          );
+        }
+      },
+    }),
+    startIntervalJob({
+      env,
+      baseUrl,
+      alreadyHealthy,
+      intervalKey: "DIGEST_INTERVAL_MINUTES",
+      label: "digest notificaciones",
+      log,
+      timeoutMs: 120_000,
+      run: async ({ baseUrl: url, secret, log: l, timeoutMs }) => {
+        const body = await postCron({
+          url: `${url}/api/notify/digest`,
+          secret,
+          body: "{}",
+          timeoutMs,
+          log: l,
+          failLabel: "Digest notificaciones falló",
+        });
+        if (body) {
+          l.info(`Digest notificaciones: ${body.sent || 0} enviados`);
+        }
+      },
+    }),
   ]);
 
   return {

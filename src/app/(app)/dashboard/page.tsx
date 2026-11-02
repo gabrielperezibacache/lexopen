@@ -1,22 +1,23 @@
-import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { formatDate, StatusBadge } from "@/components/ui";
-import { labelMateria } from "@/lib/chile";
-import { TRAMITES_ABIERTOS, isTramiteVencido } from "@/lib/tramites";
-import {
-  ArrowRight,
-  Briefcase,
-  ListTodo,
-  ContactRound,
-  AlertTriangle,
-} from "lucide-react";
-import { getCurrentUser } from "@/lib/auth/session";
 import { PageHeader } from "@/components/sites/SiteNav";
+import { formatDate, StatusBadge } from "@/components/ui";
+import { requireStaffPage } from "@/lib/auth/access";
+import { causaAccessWhere as scopedcausaAccessWhere, relatedCausaWhere as scopedrelatedCausaWhere, requiredCausaWhere as scopedrequiredCausaWhere, siteAccessWhere as scopedsiteAccessWhere, siteFileReadWhere as scopedsiteFileReadWhere, taskAccessWhere as scopedtaskAccessWhere } from "@/lib/auth/causa-access";
+import { labelMateria } from "@/lib/chile";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
 import { siteTipoLabel } from "@/lib/sites/labels";
+import { isTramiteVencido, TRAMITES_ABIERTOS } from "@/lib/tramites";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Briefcase,
+  ContactRound,
+  ListTodo,
+} from "lucide-react";
+import Link from "next/link";
 
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
+  const user = await requireStaffPage();
   const { t, dict } = await getI18n();
   const now = new Date();
 
@@ -33,18 +34,18 @@ export default async function DashboardPage() {
     tramitesPendientes,
     tramitesVencidos,
   ] = await Promise.all([
-    prisma.causa.count({ where: { estado: "activa" } }),
-    prisma.task.count({ where: { status: { in: ["todo", "in_progress", "blocked"] } } }),
+    prisma.causa.count({ where: { AND: [scopedcausaAccessWhere(user), { estado: "activa" }] } }),
+    prisma.task.count({ where: { AND: [scopedtaskAccessWhere(user), { status: { in: ["todo", "in_progress", "blocked"] } }] } }),
     user
       ? prisma.notification.count({ where: { userId: user.id, read: false } })
       : Promise.resolve(0),
     prisma.cliente.count({ where: { estado: "activo" } }),
     prisma.tramite.count({
-      where: { estado: { in: [...TRAMITES_ABIERTOS] } },
+      where: { AND: [scopedrequiredCausaWhere(user), { estado: { in: [...TRAMITES_ABIERTOS] } }] },
     }),
-    prisma.site.findMany({
+    prisma.site.findMany({ where: scopedsiteAccessWhere(user),
       include: {
-        _count: { select: { files: true, tasks: true } },
+        _count: { select: { files: { where: scopedsiteFileReadWhere(user) }, tasks: { where: scopedtaskAccessWhere(user) } } },
         causa: true,
         cliente: { select: { id: true, razonSocial: true } },
       },
@@ -52,20 +53,20 @@ export default async function DashboardPage() {
       take: 6,
     }),
     prisma.task.findMany({
-      where: {
+      where: { AND: [scopedtaskAccessWhere(user), {
         status: { not: "done" },
         ...(user ? { assigneeId: user.id } : {}),
-      },
+      }] },
       include: { site: true, assignee: true },
       orderBy: { dueDate: "asc" },
       take: 6,
     }),
-    prisma.activity.findMany({
+    prisma.activity.findMany({ where: scopedrelatedCausaWhere(user),
       include: { user: true, site: true, causa: true },
       orderBy: { createdAt: "desc" },
       take: 8,
     }),
-    prisma.minuta.findMany({
+    prisma.minuta.findMany({ where: scopedrequiredCausaWhere(user),
       include: {
         causa: { select: { id: true, rit: true, titulo: true } },
         // ⚡ Bolt: Fetches the count from the database rather than loading the whole array into memory.
@@ -81,7 +82,7 @@ export default async function DashboardPage() {
       take: 5,
     }),
     prisma.tramite.findMany({
-      where: { estado: { in: [...TRAMITES_ABIERTOS] } },
+      where: { AND: [scopedrequiredCausaWhere(user), { estado: { in: [...TRAMITES_ABIERTOS] } }] },
       include: {
         causa: {
           select: {
@@ -97,10 +98,10 @@ export default async function DashboardPage() {
       take: 8,
     }),
     prisma.tramite.findMany({
-      where: {
+      where: { AND: [scopedrequiredCausaWhere(user), {
         estado: { in: [...TRAMITES_ABIERTOS] },
         fechaLimite: { lt: now },
-      },
+      }] },
       include: {
         causa: {
           select: {

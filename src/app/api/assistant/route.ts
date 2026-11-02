@@ -8,6 +8,31 @@ import { runAssistantTurn } from "@/lib/assistant/pipeline";
 import { getAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { writeAudit } from "@/lib/audit";
 import { safeJsonParse } from "@/lib/safe-json";
+import { getTool } from "@/lib/assistant/tools/registry";
+import type { AssistantPlan, ToolContext } from "@/lib/assistant/types";
+
+/** Restore only still-authorized pending plans after a reload or Host restart. */
+export async function GET() {
+  try {
+    const user = await requireStaff();
+    const records = await prisma.assistantPlanRecord.findMany({
+      where: { ownerId: user.id, expiresAt: { gt: new Date() }, status: { in: ["pending", "partial", "running"] } },
+      orderBy: { createdAt: "desc" }, take: 20,
+    });
+    const ctx: ToolContext = { userId: user.id, role: user.role as Role, capabilityGrants: user.capabilityGrants, capabilityRevokes: user.capabilityRevokes };
+    const plans = [];
+    for (const record of records) {
+      try {
+        const stored = JSON.parse(record.planJson) as AssistantPlan;
+        if (!stored.needsConfirm) continue;
+        const steps = [];
+        for (const step of stored.steps) steps.push({ toolId: step.toolId, preview: await getTool(step.toolId).preview(step.input, ctx) });
+        plans.push({ id: record.id, needsConfirm: true, steps, status: record.status });
+      } catch { /* Revoked, invalid or removed resources never expose old previews. */ }
+    }
+    return NextResponse.json({ plans });
+  } catch (error) { return handleRouteError(error); }
+}
 
 const AUDIT_PROMPT_MAX_CHARS = 8_000;
 
@@ -55,7 +80,7 @@ export async function POST(req: NextRequest) {
           const result = await runAssistantTurn({
             text: body.text,
             attachments: body.attachments,
-            user: { id: user.id, role: user.role as Role },
+            user: { ...user, role: user.role as Role },
             chatId: body.chatId,
           });
 
@@ -113,7 +138,7 @@ export async function POST(req: NextRequest) {
             const existing = await prisma.agentChat.findFirst({
               where: {
                 id: body.chatId,
-                ...(user.role === "admin" ? {} : { userId: user.id }),
+                userId: user.id,
               },
             });
             if (existing) {

@@ -1,13 +1,15 @@
+import { causaAccessWhere, plazoAccessWhere } from "@/lib/auth/causa-access";
+import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { writeAuditStrict } from "@/lib/audit";
+import { assistantDb as prisma } from "@/lib/assistant/transaction-context";
+import { writeAssistantAudit as writeAuditStrict } from "@/lib/assistant/transaction-context";
 import { civilDateKey } from "@/lib/chile-time";
 import { clasificarUrgencia, labelUrgencia } from "@/lib/plazos";
 import { labelEstado, labelEtapa } from "@/lib/chile";
 import { storeUndo, consumeUndo } from "@/lib/assistant/plan-store";
 import type { AssistantTool } from "./types";
 
-const STAFF_ROLES = ["admin", "abogado", "asistente"] as const;
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 export const causaVincularSchema = z.object({
   causaId: z.string().min(1),
@@ -18,14 +20,14 @@ export const causaVincularSchema = z.object({
 });
 export type CausaVincularInput = z.infer<typeof causaVincularSchema>;
 
-export const causaVincularTool: AssistantTool<CausaVincularInput> = {
+export const causaVincularTool: AssistantTool<CausaVincularInput> = secureTool({
   id: "causa.vincular",
   description: "Vincula una causa a un cliente y/o abogado responsable",
   kind: "write",
   roles: [...STAFF_ROLES],
-  async preview(input) {
+  async preview(input, ctx) {
     const [causa, cliente, abogado] = await Promise.all([
-      prisma.causa.findUnique({ where: { id: input.causaId }, select: { titulo: true } }),
+      prisma.causa.findFirst({ where: { id: input.causaId, ...causaAccessWhere({ ...ctx, id: ctx.userId }) }, select: { titulo: true } }),
       input.clienteId
         ? prisma.cliente.findUnique({ where: { id: input.clienteId }, select: { razonSocial: true } })
         : Promise.resolve(null),
@@ -40,7 +42,7 @@ export const causaVincularTool: AssistantTool<CausaVincularInput> = {
   },
   inputSchema: causaVincularSchema,
   async execute(input, ctx) {
-    const before = await prisma.causa.findUnique({ where: { id: input.causaId } });
+    const before = await prisma.causa.findFirst({ where: { id: input.causaId, ...causaAccessWhere({ ...ctx, id: ctx.userId }) } });
     if (!before) return { ok: false, message: "Causa no encontrada." };
     const causa = await prisma.causa.update({
       where: { id: input.causaId },
@@ -87,14 +89,14 @@ export const causaVincularTool: AssistantTool<CausaVincularInput> = {
     });
     return { ok: true, message: `Se restauró la vinculación de la causa "${causa.titulo}".` };
   },
-};
+});
 
 export const causaBuscarSchema = z.object({
   q: z.string().trim().min(1).max(300),
 });
 export type CausaBuscarInput = z.infer<typeof causaBuscarSchema>;
 
-export const causaBuscarTool: AssistantTool<CausaBuscarInput> = {
+export const causaBuscarTool: AssistantTool<CausaBuscarInput> = secureTool({
   id: "causa.buscar",
   description: "Busca causas por título, RIT, RUC, carátula o tribunal",
   kind: "read",
@@ -103,9 +105,10 @@ export const causaBuscarTool: AssistantTool<CausaBuscarInput> = {
   preview(input) {
     return `Buscar causas que coincidan con "${input.q}".`;
   },
-  async execute(input) {
+  async execute(input, ctx) {
     const causas = await prisma.causa.findMany({
       where: {
+        AND: [causaAccessWhere({ ...ctx, id: ctx.userId })],
         OR: [
           { titulo: { contains: input.q, mode: "insensitive" } },
           { rit: { contains: input.q, mode: "insensitive" } },
@@ -127,14 +130,14 @@ export const causaBuscarTool: AssistantTool<CausaBuscarInput> = {
       card: { type: "causa-lista", items: causas },
     };
   },
-};
+});
 
 export const causaResumenSchema = z.object({
   causaId: z.string().min(1),
 });
 export type CausaResumenInput = z.infer<typeof causaResumenSchema>;
 
-export const causaResumenTool: AssistantTool<CausaResumenInput> = {
+export const causaResumenTool: AssistantTool<CausaResumenInput> = secureTool({
   id: "causa.resumen",
   description: "Resume el estado actual de una causa (datos LexOpen, sin IA)",
   kind: "read",
@@ -143,11 +146,11 @@ export const causaResumenTool: AssistantTool<CausaResumenInput> = {
   preview(input) {
     return `Resumir la causa ${input.causaId} (etapa, plazos y últimos movimientos).`;
   },
-  async execute(input) {
-    const causa = await prisma.causa.findUnique({
-      where: { id: input.causaId },
+  async execute(input, ctx) {
+    const causa = await prisma.causa.findFirst({
+      where: { id: input.causaId, ...causaAccessWhere({ ...ctx, id: ctx.userId }) },
       include: {
-        plazos: { where: { estado: "pendiente" }, orderBy: { fechaLimite: "asc" }, take: 5 },
+        plazos: { where: { ...plazoAccessWhere({ ...ctx, id: ctx.userId }), estado: "pendiente" }, orderBy: { fechaLimite: "asc" }, take: 5 },
         movimientos: { orderBy: { fecha: "desc" }, take: 5 },
       },
     });
@@ -177,7 +180,7 @@ export const causaResumenTool: AssistantTool<CausaResumenInput> = {
       },
     };
   },
-};
+});
 
 export const causaMovimientosSchema = z.object({
   causaId: z.string().min(1),
@@ -185,7 +188,7 @@ export const causaMovimientosSchema = z.object({
 });
 export type CausaMovimientosInput = z.infer<typeof causaMovimientosSchema>;
 
-export const causaMovimientosTool: AssistantTool<CausaMovimientosInput> = {
+export const causaMovimientosTool: AssistantTool<CausaMovimientosInput> = secureTool({
   id: "causa.movimientos",
   description: "Lista los últimos movimientos registrados de una causa",
   kind: "read",
@@ -194,9 +197,9 @@ export const causaMovimientosTool: AssistantTool<CausaMovimientosInput> = {
   preview(input) {
     return `Listar los últimos movimientos de la causa ${input.causaId}.`;
   },
-  async execute(input) {
-    const causa = await prisma.causa.findUnique({
-      where: { id: input.causaId },
+  async execute(input, ctx) {
+    const causa = await prisma.causa.findFirst({
+      where: { id: input.causaId, ...causaAccessWhere({ ...ctx, id: ctx.userId }) },
       select: { id: true, titulo: true },
     });
     if (!causa) return { ok: false, message: "Causa no encontrada." };
@@ -216,14 +219,14 @@ export const causaMovimientosTool: AssistantTool<CausaMovimientosInput> = {
       card: { type: "causa-movimientos", causaId: causa.id, items: movimientos },
     };
   },
-};
+});
 
 export const causaEstadoSchema = z.object({
   causaId: z.string().min(1),
 });
 export type CausaEstadoInput = z.infer<typeof causaEstadoSchema>;
 
-export const causaEstadoTool: AssistantTool<CausaEstadoInput> = {
+export const causaEstadoTool: AssistantTool<CausaEstadoInput> = secureTool({
   id: "causa.estado",
   description: "Consulta el estado/etapa procesal de una causa",
   kind: "read",
@@ -232,9 +235,9 @@ export const causaEstadoTool: AssistantTool<CausaEstadoInput> = {
   preview(input) {
     return `Consultar estado y etapa de la causa ${input.causaId}.`;
   },
-  async execute(input) {
-    const causa = await prisma.causa.findUnique({
-      where: { id: input.causaId },
+  async execute(input, ctx) {
+    const causa = await prisma.causa.findFirst({
+      where: { id: input.causaId, ...causaAccessWhere({ ...ctx, id: ctx.userId }) },
       select: { id: true, titulo: true, estado: true, etapa: true, rit: true },
     });
     if (!causa) return { ok: false, message: "Causa no encontrada." };
@@ -246,4 +249,4 @@ export const causaEstadoTool: AssistantTool<CausaEstadoInput> = {
       card: { type: "causa-estado", id: causa.id, titulo: causa.titulo, estado: causa.estado, etapa: causa.etapa },
     };
   },
-};
+});

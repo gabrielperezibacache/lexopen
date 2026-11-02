@@ -30,6 +30,8 @@ function NuevaCausaInner() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [conflicts, setConflicts] = useState<ConflictHit[]>([]);
+  const [restrictedMatch, setRestrictedMatch] = useState(false);
+  const [coverageLimited, setCoverageLimited] = useState(false);
   const [conflictStatus, setConflictStatus] = useState<"idle" | "clear" | "warning" | "blocked">("idle");
   const [overrideRequired, setOverrideRequired] = useState(false);
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
@@ -72,7 +74,7 @@ function NuevaCausaInner() {
       }
     }
 
-    const preflight = await apiMutation<{ conflicts: ConflictHit[] }>(
+    const preflight = await apiMutation<{ conflicts: ConflictHit[]; status: "clear" | "warning" | "blocked"; hasRestrictedMatch?: boolean; coverageLimited?: boolean }>(
       "/api/conflict-check",
       {
         method: "POST",
@@ -83,8 +85,16 @@ function NuevaCausaInner() {
     if (preflight.ok) {
       const result = preflight.data;
       setConflicts(result.conflicts || []);
-      const hasBlocked = (result.conflicts || []).some((c) => c.severity === "blocked");
-      setConflictStatus(hasBlocked ? "blocked" : result.conflicts?.length ? "warning" : "clear");
+      const hasBlocked = result.status === "blocked";
+      setRestrictedMatch(Boolean(result.hasRestrictedMatch));
+      setCoverageLimited(Boolean(result.coverageLimited));
+      setConflictStatus(result.status);
+      if (result.hasRestrictedMatch && hasBlocked) {
+        setError("Coincidencia reservada: requiere revisión de un socio autorizado");
+        setOverrideRequired(false);
+        setLoading(false);
+        return;
+      }
       if (hasBlocked && !fd.get("conflictOverride")) {
         setOverrideRequired(true);
         setError("Se detectó un conflicto bloqueante. Revise y confirme override con notas.");
@@ -239,6 +249,8 @@ function NuevaCausaInner() {
                   ? "bloqueante"
                   : "advertencias"}
             </div>
+            {restrictedMatch && <p className="mt-2" role="alert">Coincidencia reservada: requiere revisión de un socio autorizado</p>}
+            {coverageLimited && <p className="mt-2">La revisión alcanzó su límite de cobertura. No confirma ausencia de otros conflictos.</p>}
             {conflicts.length > 0 && (
               <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--ink-soft)]/80">
                 {conflicts.map((c) => (

@@ -2,11 +2,15 @@ import assert from "node:assert/strict";
 import { isUserRole, pickAvatarColor } from "./users-admin";
 
 assert.equal(isUserRole("admin"), true);
+assert.equal(isUserRole("socio"), true);
 assert.equal(isUserRole("abogado"), true);
+assert.equal(isUserRole("procurador"), true);
 assert.equal(isUserRole("asistente"), true);
+assert.equal(isUserRole("contabilidad"), true);
+assert.equal(isUserRole("externo"), true);
 assert.equal(isUserRole("cliente"), true);
-assert.equal(isUserRole("socio"), false);
 assert.equal(isUserRole(""), false);
+assert.equal(isUserRole("paralegal"), false);
 
 const a = pickAvatarColor("Ana Pérez");
 const b = pickAvatarColor("Ana Pérez");

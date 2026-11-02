@@ -1,14 +1,15 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { assertSitePageAccess } from "@/lib/auth/access";
-import { SiteNav } from "@/components/sites/SiteNav";
-import { NewWikiButton } from "@/components/sites/NewWikiButton";
-import { EditWikiButton } from "@/components/sites/EditWikiButton";
-import { WikiHistoryPanel } from "@/components/sites/WikiHistoryPanel";
-import { MarkdownView } from "@/lib/markdown";
 import { EmptyState } from "@/components/EmptyState";
+import { EditWikiButton } from "@/components/sites/EditWikiButton";
+import { NewWikiButton } from "@/components/sites/NewWikiButton";
+import { SiteNav } from "@/components/sites/SiteNav";
+import { WikiHistoryPanel } from "@/components/sites/WikiHistoryPanel";
+import { assertSitePageAccess } from "@/lib/auth/access";
+import { siteAccessWhere as scopedsiteAccessWhere, siteRelatedWhere as scopedsiteRelatedWhere } from "@/lib/auth/causa-access";
 import { isCliente } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
+import { MarkdownView } from "@/lib/markdown";
+import { notFound } from "next/navigation";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -17,12 +18,12 @@ export default async function SiteWikiPage({ params }: Params) {
   const user = await assertSitePageAccess(id);
   const { t } = await getI18n();
   const [site, pages] = await Promise.all([
-    prisma.site.findUnique({
-      where: { id },
+    prisma.site.findFirst({
+      where: { AND: [scopedsiteAccessWhere(user), { id }] },
       include: { cliente: true, causa: true },
     }),
     prisma.wikiPage.findMany({
-      where: { siteId: id },
+      where: { AND: [scopedsiteRelatedWhere(user), { siteId: id }] },
       include: { author: true },
       orderBy: { title: "asc" },
     }),

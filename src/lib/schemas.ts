@@ -59,6 +59,7 @@ export const causaUpdateSchema = z
     sala: z.string().max(120).optional().nullable(),
     cuaderno: z.string().max(120).optional().nullable(),
     abogadoContraparte: z.string().max(300).optional().nullable(),
+    acceso: z.enum(["estudio", "equipo"]).optional(),
   })
   .refine((obj) => Object.keys(obj).length > 0, {
     message: "Sin campos para actualizar",

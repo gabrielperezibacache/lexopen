@@ -1,25 +1,26 @@
-import { prisma } from "@/lib/db";
-import { formatDate, StatusBadge } from "@/components/ui";
-import Link from "next/link";
-import { requireUser } from "@/lib/auth/session";
-import { isCliente, isStaff } from "@/lib/auth/rbac";
-import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
 import { EmptyState } from "@/components/EmptyState";
-import { labelTramiteEstado } from "@/lib/tramites";
 import { PageHeader } from "@/components/sites/SiteNav";
+import { formatDate, StatusBadge } from "@/components/ui";
+import { siteAccessWhere as scopedsiteAccessWhere } from "@/lib/auth/causa-access";
+import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
+import { isCliente, isStaff } from "@/lib/auth/rbac";
+import { requireUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
+import { labelTramiteEstado } from "@/lib/tramites";
+import Link from "next/link";
 
 export default async function PortalPage() {
   const user = await requireUser();
   const { t } = await getI18n();
 
   const sites = await prisma.site.findMany({
-    where: {
+    where: { AND: [scopedsiteAccessWhere(user), {
       isClientVisible: true,
       ...(isCliente(user.role)
         ? { members: { some: { userId: user.id } } }
         : {}),
-    },
+    }] },
     select: {
       id: true,
       name: true,
@@ -45,7 +46,7 @@ export default async function PortalPage() {
             },
           },
           plazos: {
-            where: { estado: { in: ["pendiente", "vencido"] } },
+            where: { estado: { in: ["pendiente", "vencido"] }, minutaAcciones: { none: { minuta: { confidencial: true } } } },
             orderBy: { fechaLimite: "asc" },
             take: 5,
             select: {

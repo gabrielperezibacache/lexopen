@@ -1,3 +1,4 @@
+import { can } from "@/lib/auth/permissions";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
     } else {
       assertCsrf(req);
       const user = await requireStaff();
+      if (!can(user, "causa.override_walls") || !can(user, "causa.write")) return NextResponse.json({ error: "La sincronización global requiere supervisión del estudio" }, { status: 403 });
       actorId = user.id;
     }
 

@@ -1,0 +1,31 @@
+
+> lexopen@1.0.0 test:integration
+> tsx src/lib/plazo-alerts.integration.test.ts
+
+audit write failed PrismaClientKnownRequestError:
+Invalid `client.auditEvent.create()` invocation in
+/private/tmp/lexopen-audit-main-20261101/src/lib/audit.ts:37:29
+
+  34   client: Pick<Prisma.TransactionClient, "auditEvent"> = prisma
+  35 ) {
+  36   try {
+→ 37     await client.auditEvent.create(
+Foreign key constraint violated: `AuditEvent_actorId_fkey (index)`
+    at $n.handleRequestError (/private/tmp/lexopen-audit-main-20261101/node_modules/@prisma/client/runtime/library.js:121:7315)
+    at $n.handleAndLogRequestError (/private/tmp/lexopen-audit-main-20261101/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/private/tmp/lexopen-audit-main-20261101/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/private/tmp/lexopen-audit-main-20261101/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async writeAudit (/private/tmp/lexopen-audit-main-20261101/src/lib/audit.ts:37:5)
+    at async <anonymous> (/private/tmp/lexopen-audit-main-20261101/src/lib/plazo-alerts.integration.test.ts:45:7)
+    at async Proxy._transactionWithCallback (/private/tmp/lexopen-audit-main-20261101/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async waitForActual (node:assert:644:5)
+    at async Function.rejects (node:assert:767:25)
+    at async main (/private/tmp/lexopen-audit-main-20261101/src/lib/plazo-alerts.integration.test.ts:43:5) {
+  code: 'P2003',
+  clientVersion: '5.22.0',
+  meta: {
+    modelName: 'AuditEvent',
+    field_name: 'AuditEvent_actorId_fkey (index)'
+  }
+}
+plazo-alerts.integration.test.ts OK (rollback, concurrent delivery, audit atomicity)

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/chile";
+import { newUiId } from "@/lib/ui-id";
 
 type ToastTone = "info" | "ok" | "warn" | "danger";
 
@@ -28,7 +29,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
 
   const push = useCallback((message: string, tone: ToastTone = "info") => {
-    const id = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    const id = newUiId("toast");
     setItems((prev) => [...prev, { id, message, tone }]);
     window.setTimeout(() => {
       setItems((prev) => prev.filter((t) => t.id !== id));

@@ -1,11 +1,14 @@
+import { causaAccessWhere, documentReadWhere, plazoAccessWhere, siteFileReadWhere, siteAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
+import { httpError } from "@/lib/auth/access";
+import type { Prisma } from "@prisma/client";
+import type { ChatAccessRef } from "@/lib/ai/chat-access";
 /**
  * Empaqueta contexto anclado del estudio para el copiloto (estilo Julia:
  * busca en causas/documentos del estudio, no inventa fuentes).
  */
 
 import { prisma } from "@/lib/db";
-import { confidentialWhere, minutaConfidentialWhere } from "@/lib/api";
-import { confidentialFileWhere } from "@/lib/auth/access";
+import { minutaConfidentialWhere } from "@/lib/api";
 import { clasificarUrgencia, diasRestantes } from "@/lib/plazos";
 import { extractSearchNeedles, type AiUtilityId } from "@/lib/ai/utilities";
 import {
@@ -35,6 +38,7 @@ export type AiSourceRef = {
 };
 
 export type AiContextPack = {
+  accessRefs: ChatAccessRef[];
   text: string;
   sources: AiSourceRef[];
   alerts: string[];
@@ -45,6 +49,17 @@ export type AiContextPack = {
     needsOcr: number;
   }>;
 };
+
+export const AI_DOCUMENT_CONTEXT_LIMIT = 120;
+
+/** Apply the user's scope before limiting results, including old documents. */
+export function documentScopeWhere(opts: { documentoIds?: string[] | null; rutaPrefix?: string | null }): Prisma.DocumentoWhereInput {
+  const filters: Prisma.DocumentoWhereInput[] = [];
+  if (opts.documentoIds?.length) filters.push({ id: { in: [...new Set(opts.documentoIds)].slice(0, 40) } });
+  const prefix = (opts.rutaPrefix || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  if (prefix) filters.push({ OR: [{ ruta: { equals: prefix, mode: "insensitive" } }, { ruta: { startsWith: `${prefix}/`, mode: "insensitive" } }] });
+  return filters.length ? { AND: filters } : {};
+}
 
 function utilitiesWantDocuments(utility: AiUtilityId) {
   return (
@@ -64,38 +79,43 @@ export async function buildAiContextPack(opts: {
   utility: AiUtilityId;
   prompt: string;
   role: string;
+  user: CausaAccessUser;
   documentoIds?: string[] | null;
   rutaPrefix?: string | null;
 }): Promise<AiContextPack> {
   const sources: AiSourceRef[] = [];
+  const accessRefs: ChatAccessRef[] = [];
   const alerts: string[] = [];
   const blocks: string[] = [];
   let folderIndexRows: AiContextPack["folderIndex"] = [];
-  const conf = confidentialWhere(opts.role);
-  const minutaConf = minutaConfidentialWhere(opts.role);
-  const fileConf = confidentialFileWhere(opts.role);
+  const conf = documentReadWhere(opts.user);
+  const minutaConf = minutaConfidentialWhere(opts.user);
+  const fileConf = siteFileReadWhere(opts.user);
+  const docScope: Prisma.DocumentoWhereInput = { AND: [conf, documentScopeWhere(opts)] };
   const budget = excerptBudgetForUtility(opts.utility);
 
   let causaId = opts.causaId || null;
   if (!causaId && opts.documentoId) {
-    const doc = await prisma.documento.findUnique({
-      where: { id: opts.documentoId },
+    const doc = await prisma.documento.findFirst({
+      where: { id: opts.documentoId, ...conf },
       select: { causaId: true },
     });
-    causaId = doc?.causaId || null;
+    if (!doc) throw httpError("Documento no encontrado o sin acceso", 404);
+    causaId = doc.causaId || null;
   }
 
   if (causaId) {
-    const causa = await prisma.causa.findUnique({
-      where: { id: causaId },
+    const causa = await prisma.causa.findFirst({
+      where: { id: causaId, ...causaAccessWhere(opts.user) },
       include: {
+        _count: { select: { documentos: { where: docScope } } },
         partes: true,
-        plazos: { orderBy: { fechaLimite: "asc" }, take: 20 },
+        plazos: { where: plazoAccessWhere(opts.user), orderBy: { fechaLimite: "asc" }, take: 20 },
         movimientos: { orderBy: { fecha: "desc" }, take: 15 },
         documentos: {
-          where: conf,
+          where: docScope,
           orderBy: { updatedAt: "desc" },
-          take: 80,
+          take: AI_DOCUMENT_CONTEXT_LIMIT,
           select: {
             id: true,
             nombre: true,
@@ -159,7 +179,10 @@ export async function buildAiContextPack(opts: {
       },
     });
 
+    if (!causa) throw httpError("Causa no encontrada o sin acceso", 404);
     if (causa) {
+      accessRefs.push(...causa.documentos.map((documento) => ({ type: "documento", id: documento.id })));
+      accessRefs.push(...causa.minutas.map((minuta) => ({ type: "minuta", id: minuta.id })));
       sources.push({
         type: "causa",
         id: causa.id,
@@ -239,6 +262,9 @@ export async function buildAiContextPack(opts: {
       }
 
       if (utilitiesWantDocuments(opts.utility)) {
+        if (causa._count.documentos > causa.documentos.length) {
+          alerts.push(`Contexto documental parcial: ${causa.documentos.length} de ${causa._count.documentos} documentos accesibles del alcance; límite ${AI_DOCUMENT_CONTEXT_LIMIT}. Acote por carpeta o documentos para revisar los restantes.`);
+        }
         let docsList: AiDocumentCandidate[] = [...causa.documentos];
         if (opts.documentoId && !docsList.some((d) => d.id === opts.documentoId)) {
           const extra = await prisma.documento.findFirst({
@@ -294,7 +320,10 @@ export async function buildAiContextPack(opts: {
           blocks.push(
             `CARPETA_INVESTIGATIVA:\n${JSON.stringify(
               {
-                total: ranked.length,
+                total: causa._count.documentos,
+                indexadosEnEsteTurno: ranked.length,
+                limite: AI_DOCUMENT_CONTEXT_LIMIT,
+                coberturaParcial: causa._count.documentos > causa.documentos.length,
                 seleccionados: selected.length,
                 alcance: {
                   rutaPrefix: opts.rutaPrefix || null,
@@ -312,6 +341,7 @@ export async function buildAiContextPack(opts: {
         alerts.push(...documentExtractionAlerts(selected, opts.utility));
 
         const docsPayload = selected.map((d) => {
+          accessRefs.push({ type: "documento", id: d.id });
           const md = (d.extractedMarkdown || "").trim();
           const pinned = opts.documentoId === d.id;
           if (md || budget.includeEmptyInIndex) {
@@ -449,7 +479,7 @@ export async function buildAiContextPack(opts: {
         (opts.utility === "research" || opts.utility === "copilot")
       ) {
         const wiki = await prisma.wikiPage.findMany({
-          where: { siteId: site.id },
+          where: { siteId: site.id, site: siteAccessWhere(opts.user) },
           take: 6,
           orderBy: { updatedAt: "desc" },
           select: { id: true, title: true, content: true },
@@ -545,6 +575,7 @@ export async function buildAiContextPack(opts: {
     const wikiPages = await prisma.wikiPage.findMany({
       where: {
         published: true,
+        site: siteAccessWhere(opts.user),
         OR: textOr(["title", "content"]),
       },
       include: { site: { select: { id: true, name: true } } },
@@ -556,7 +587,7 @@ export async function buildAiContextPack(opts: {
         ? wikiPages
         : opts.utility === "research"
           ? await prisma.wikiPage.findMany({
-              where: { published: true },
+              where: { published: true, site: siteAccessWhere(opts.user) },
               include: { site: { select: { id: true, name: true } } },
               take: 4,
               orderBy: { updatedAt: "desc" },
@@ -595,8 +626,8 @@ export async function buildAiContextPack(opts: {
   }
 
   if (opts.utility === "similar" && opts.causaId) {
-    const base = await prisma.causa.findUnique({
-      where: { id: opts.causaId },
+    const base = await prisma.causa.findFirst({
+      where: { id: opts.causaId, ...causaAccessWhere(opts.user) },
       select: { materia: true, tribunal: true, etapa: true },
     });
     if (base) {
@@ -607,6 +638,7 @@ export async function buildAiContextPack(opts: {
         ? await prisma.causa.findMany({
             where: {
               id: { not: opts.causaId },
+              AND: [causaAccessWhere(opts.user)],
               OR: or,
               estado: "activa",
             },
@@ -640,5 +672,5 @@ export async function buildAiContextPack(opts: {
     ? blocks.join("\n\n")
     : "(Sin causa ni corpus adicional; responde de forma general y señala límites.)";
 
-  return { text, sources, alerts, folderIndex: folderIndexRows };
+  return { text, sources, alerts, folderIndex: folderIndexRows, accessRefs: [...accessRefs, ...sources.map(({ type, id }) => ({ type, id }))] };
 }

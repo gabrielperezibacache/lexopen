@@ -1,0 +1,27 @@
+(async () => {
+  const rows: Record<string, any> = {};
+  let auditFails = true;
+  const fake = {
+    causa: { findUnique: async () => ({ id: 'fixture-c', titulo: 'Fixture' }) },
+    nota: {
+      create: async ({ data }: any) => (rows['fixture-note'] = { id: 'fixture-note', ...data }),
+      findUnique: async ({ where }: any) => rows[where.id] ?? null,
+      update: async ({ where, data }: any) => (rows[where.id] = { ...rows[where.id], ...data }),
+    },
+    activity: { create: async () => ({ id: 'fixture-a' }) },
+    auditEvent: { create: async () => { if (auditFails) throw new Error('fixture audit failure'); return { id: 'fixture-audit' }; } },
+  };
+  (globalThis as any).prisma = fake;
+  delete process.env.LEXOPEN_DATA_DIR;
+  delete process.env.LEXOPEN_ASSISTANT_PLANS_PATH;
+  const { notaCrearTool, notaEditarTool } = await import('/private/tmp/lexopen-audit-main-20261101/src/lib/assistant/tools/nota.ts');
+  const { storeUndo } = await import('/private/tmp/lexopen-audit-main-20261101/src/lib/assistant/plan-store.ts');
+  let failure = '';
+  try { await notaCrearTool.execute({causaId:'fixture-c', titulo:'Creada antes de auditoría', contenido:'fixture'}, {userId:'user-A', role:'abogado'}); } catch (e) { failure = (e as Error).message; }
+  console.log(JSON.stringify({probe:'audit failure', returnedError:failure, noteStillExists:!!rows['fixture-note']}));
+  auditFails = false;
+  const token = await storeUndo({toolId:'nota.editar',entityType:'Nota',entityId:'fixture-note',before:{titulo:'Versión original',contenido:'original',tags:''}});
+  rows['fixture-note'].contenido = 'Cambio posterior por colega';
+  const result = await notaEditarTool.undo!(token,{userId:'user-B', role:'asistente'});
+  console.log(JSON.stringify({probe:'undo from another user after newer edit',result,contentAfter:rows['fixture-note'].contenido}));
+})().catch(e=>{console.error(e.message);process.exitCode=1;});

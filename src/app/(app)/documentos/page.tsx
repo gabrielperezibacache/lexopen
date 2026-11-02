@@ -1,18 +1,19 @@
-import { prisma } from "@/lib/db";
-import { formatDate } from "@/components/ui";
-import Link from "next/link";
-import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
-import { EmptyState } from "@/components/EmptyState";
-import { publicUserSelect } from "@/lib/auth/public-user";
-import { DocumentProcessingAction } from "@/components/DocumentProcessingAction";
-import { DocumentOcrStatus } from "@/components/DocumentOcrStatus";
 import { DocumentDriveAction } from "@/components/DocumentDriveAction";
-import { requireStaff } from "@/lib/auth/session";
-import { confidentialWhere } from "@/lib/api";
-import { documentoListSelect } from "@/lib/sites/file-select";
+import { DocumentOcrStatus } from "@/components/DocumentOcrStatus";
+import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
+import { DocumentProcessingAction } from "@/components/DocumentProcessingAction";
+import { EmptyState } from "@/components/EmptyState";
+import { formatDate } from "@/components/ui";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
+import { confidentialWhere } from "@/lib/api";
+import { causaAccessWhere as scopedcausaAccessWhere, documentReadWhere as scopeddocumentReadWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { requireStaff } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
+import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
+import { documentoListSelect } from "@/lib/sites/file-select";
+import Link from "next/link";
 
 export default async function DocumentosPage() {
   const user = await requireStaff();
@@ -21,7 +22,7 @@ export default async function DocumentosPage() {
   const LIST_TAKE = 100;
   const [rawDocumentos, causas] = await Promise.all([
     prisma.documento.findMany({
-      where: confidentialWhere(user.role),
+      where: { AND: [scopeddocumentReadWhere(user), confidentialWhere(user)] },
       select: {
         ...documentoListSelect,
         storageKey: true,
@@ -31,7 +32,7 @@ export default async function DocumentosPage() {
       orderBy: { updatedAt: "desc" },
       take: LIST_TAKE,
     }),
-    prisma.causa.findMany({
+    prisma.causa.findMany({ where: scopedcausaAccessWhere(user),
       select: { id: true, rit: true, titulo: true },
       orderBy: { updatedAt: "desc" },
       take: 100,
@@ -109,6 +110,7 @@ export default async function DocumentosPage() {
                       >
                         Descargar
                       </a>
+                      <Link href={`/documentos/${d.id}/fuentes`} className="text-xs text-[var(--sea)]">Ver fuentes</Link>
                       {d.causaId && (
                         <Link
                           href={`/agente?causaId=${d.causaId}&utility=doc_qa&documentoId=${d.id}`}

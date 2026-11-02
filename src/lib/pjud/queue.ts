@@ -1,3 +1,4 @@
+import { causaAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { mapWithConcurrency } from "@/lib/pjud/concurrency";
@@ -278,14 +279,16 @@ export async function requeueFailedJobs(opts?: {
  * Shape compatible con CausaMonitor `GET /api/queue/stats`
  * (`waiting` / `active` / `completed` / `failed` / `delayed`) más aliases LexOpen.
  */
-export async function getPjudQueueStatus() {
+export async function getPjudQueueStatus(user?: CausaAccessUser) {
+  const scope = user ? { causa: causaAccessWhere(user) } : {};
   const [waiting, active, completed, failed, okToday] = await Promise.all([
-    prisma.pjudSyncJob.count({ where: { status: "pending" } }),
-    prisma.pjudSyncJob.count({ where: { status: "running" } }),
-    prisma.pjudSyncJob.count({ where: { status: "ok" } }),
-    prisma.pjudSyncJob.count({ where: { status: "failed" } }),
+    prisma.pjudSyncJob.count({ where: { ...scope, status: "pending" } }),
+    prisma.pjudSyncJob.count({ where: { ...scope, status: "running" } }),
+    prisma.pjudSyncJob.count({ where: { ...scope, status: "ok" } }),
+    prisma.pjudSyncJob.count({ where: { ...scope, status: "failed" } }),
     prisma.pjudSyncJob.count({
       where: {
+        ...scope,
         status: "ok",
         finishedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       },

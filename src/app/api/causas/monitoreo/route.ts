@@ -1,3 +1,5 @@
+import { assertCausaCapability, type CausaAccessUser } from "@/lib/auth/causa-access";
+import { can, canSome } from "@/lib/auth/permissions";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
@@ -26,16 +28,16 @@ import { addCausaByRol } from "@/lib/pjud/lookup";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const view = req.nextUrl.searchParams.get("view");
     if (view === "fallidos") {
-      const fallidos = await listFallidosMonitoreo();
+      const fallidos = await listFallidosMonitoreo(50, user);
       return NextResponse.json({
         fallidos,
         provider: await providerStatusPublicAsync(),
       });
     }
-    const items = await listCarteraMonitoreo();
+    const items = await listCarteraMonitoreo(user);
     const format = req.nextUrl.searchParams.get("format");
     if (format === "csv") {
       const csv = serializeCausasCsv(
@@ -51,8 +53,8 @@ export async function GET(req: NextRequest) {
         headers: downloadResponseHeaders("cartera-pjud.csv", "text/csv"),
       });
     }
-    const fallidos = await listFallidosMonitoreo(20);
-    const queue = await getPjudQueueStatus().catch(() => null);
+    const fallidos = await listFallidosMonitoreo(20, user);
+    const queue = await getPjudQueueStatus(user).catch(() => null);
     // ⚡ Bolt: Use a single O(N) reduce loop to aggregate counts instead of
     // iterating over the items array 6 separate times with filter().length.
     // This improves performance as the number of monitored causes grows.
@@ -85,6 +87,7 @@ export async function POST(req: NextRequest) {
   try {
     const cron = req.headers.get("x-cron-secret");
     let actorId: string | null = null;
+    let actor: CausaAccessUser | undefined;
     if (cron) {
       if (!verifyCronSecret(cron)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -93,6 +96,7 @@ export async function POST(req: NextRequest) {
       assertCsrf(req);
       const user = await requireStaff();
       actorId = user.id;
+      actor = user;
     }
 
     const body = await parseBody(
@@ -121,6 +125,17 @@ export async function POST(req: NextRequest) {
       csv: undefined,
       syncNow: undefined,
     }));
+
+    if (actor) {
+      if (body?.causaIds && body.causaIds.length === 0) return NextResponse.json({ error: "Seleccione al menos una causa" }, { status: 400 });
+      if (body?.action === "import-cartera") {
+        if (!canSome(actor, "causa.create")) return NextResponse.json({ error: "No puede crear causas" }, { status: 403 });
+      } else if (body?.causaIds?.length && body.action !== "process-queue") {
+        for (const id of body.causaIds) await assertCausaCapability(id, actor, "causa.write");
+      } else if (!can(actor, "causa.override_walls") || !can(actor, "causa.write")) {
+        return NextResponse.json({ error: "La operación global requiere supervisión; seleccione causas autorizadas" }, { status: 403 });
+      }
+    }
 
     if (body?.action === "import-cartera") {
       if (!body.csv?.trim()) {
@@ -209,7 +224,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         ...cleared,
-        fallidos: await listFallidosMonitoreo(20),
+        fallidos: await listFallidosMonitoreo(20, actor),
         provider: await providerStatusPublicAsync(),
       });
     }

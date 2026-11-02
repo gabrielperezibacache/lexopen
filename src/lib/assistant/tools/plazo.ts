@@ -1,13 +1,14 @@
+import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { writeAuditStrict } from "@/lib/audit";
+import { assistantDb as prisma } from "@/lib/assistant/transaction-context";
+import { writeAssistantAudit as writeAuditStrict } from "@/lib/assistant/transaction-context";
 import { civilDateKey, isValidYmd, ymdToLocalNoon } from "@/lib/chile-time";
 import { calcularVencimiento } from "@/lib/plazos";
 import { formatPlazoEstimate } from "@/lib/ai/local-assist";
 import { storeUndo, consumeUndo } from "@/lib/assistant/plan-store";
 import type { AssistantTool } from "./types";
 
-const STAFF_ROLES = ["admin", "abogado", "asistente"] as const;
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 export const plazoCrearSchema = z.object({
   titulo: z.string().trim().min(2).max(200),
@@ -40,7 +41,7 @@ function resolveFechaLimite(input: PlazoCrearInput): Date | null {
   return null;
 }
 
-export const plazoCrearTool: AssistantTool<PlazoCrearInput> = {
+export const plazoCrearTool: AssistantTool<PlazoCrearInput> = secureTool({
   id: "plazo.crear",
   description: "Crea un plazo (fecha límite calculada o explícita)",
   kind: "write",
@@ -129,7 +130,7 @@ export const plazoCrearTool: AssistantTool<PlazoCrearInput> = {
     });
     return { ok: true, message: `Se deshizo la creación del plazo "${plazo.titulo}".` };
   },
-};
+});
 
 export const plazoEstimarSchema = z.object({
   desde: z.string().trim().min(1).max(10),
@@ -138,7 +139,7 @@ export const plazoEstimarSchema = z.object({
 });
 export type PlazoEstimarInput = z.infer<typeof plazoEstimarSchema>;
 
-export const plazoEstimarTool: AssistantTool<PlazoEstimarInput> = {
+export const plazoEstimarTool: AssistantTool<PlazoEstimarInput> = secureTool({
   id: "plazo.estimar",
   description: "Estima un vencimiento (días hábiles o corridos) sin persistir nada",
   kind: "read",
@@ -173,4 +174,4 @@ export const plazoEstimarTool: AssistantTool<PlazoEstimarInput> = {
       card: { type: "plazo-estimacion", ...estimate },
     };
   },
-};
+});

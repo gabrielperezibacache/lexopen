@@ -1,12 +1,13 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { assertSitePageAccess } from "@/lib/auth/access";
-import { isCliente } from "@/lib/auth/rbac";
-import { publicUserSelect } from "@/lib/auth/public-user";
+import { EmptyState } from "@/components/EmptyState";
+import { QaActions } from "@/components/sites/QaActions";
 import { SiteNav } from "@/components/sites/SiteNav";
 import { StatusBadge, formatDateTime } from "@/components/ui";
-import { QaActions } from "@/components/sites/QaActions";
-import { EmptyState } from "@/components/EmptyState";
+import { assertSitePageAccess } from "@/lib/auth/access";
+import { siteAccessWhere as scopedsiteAccessWhere, siteRelatedWhere as scopedsiteRelatedWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { isCliente } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
+import { notFound } from "next/navigation";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -15,15 +16,15 @@ export default async function SiteQaPage({ params }: Params) {
   const user = await assertSitePageAccess(id);
   const clientView = isCliente(user.role);
   const [site, threads] = await Promise.all([
-    prisma.site.findUnique({
-      where: { id },
+    prisma.site.findFirst({
+      where: { AND: [scopedsiteAccessWhere(user), { id }] },
       select: { id: true, name: true, tipo: true, color: true },
     }),
     prisma.qaThread.findMany({
-      where: {
+      where: { AND: [scopedsiteRelatedWhere(user), {
         siteId: id,
         ...(clientView ? { status: "open" } : {}),
-      },
+      }] },
       include: {
         posts: {
           include: { author: { select: publicUserSelect } },

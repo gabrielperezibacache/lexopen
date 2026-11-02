@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
     const context = await buildActionContext({
       action,
       userRole: user.role,
+      user,
       causaId: body.causaId,
       clienteId: body.clienteId,
       documentoId: body.documentoId,

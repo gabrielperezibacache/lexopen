@@ -1,6 +1,9 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { InvoiceActions } from "@/components/billing/InvoiceActions";
+import { InvoiceAiPanel } from "@/components/billing/InvoiceAiPanel";
+import { InvoiceStatusPill } from "@/components/billing/InvoiceStatusPill";
+import { billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { requireStaff } from "@/lib/auth/session";
 import {
   clp,
   labelDocTipo,
@@ -8,19 +11,17 @@ import {
   labelPaymentMethod,
 } from "@/lib/billing";
 import { formatCivilDate } from "@/lib/chile-time";
-import { publicUserSelect } from "@/lib/auth/public-user";
-import { InvoiceStatusPill } from "@/components/billing/InvoiceStatusPill";
-import { InvoiceActions } from "@/components/billing/InvoiceActions";
-import { InvoiceAiPanel } from "@/components/billing/InvoiceAiPanel";
-import { requireStaff } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function InvoiceDetailPage({ params }: Params) {
-  await requireStaff();
+  const user = await requireStaff();
   const { id } = await params;
-  const invoice = await prisma.invoice.findUnique({
-    where: { id },
+  const invoice = await prisma.invoice.findFirst({
+    where: { AND: [scopedrelatedCausaWhere(user), { id }] },
     include: {
       cliente: true,
       causa: true,

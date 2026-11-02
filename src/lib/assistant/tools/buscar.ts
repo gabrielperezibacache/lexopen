@@ -1,10 +1,11 @@
+import { causaAccessWhere, documentReadWhere } from "@/lib/auth/causa-access";
+import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { confidentialWhere } from "@/lib/api";
+import { assistantDb as prisma } from "@/lib/assistant/transaction-context";
 import { ftsCausaIds, ftsDocumentoIds } from "@/lib/search";
 import type { AssistantTool } from "./types";
 
-const STAFF_ROLES = ["admin", "abogado", "asistente"] as const;
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 export const buscarSchema = z.object({
   q: z.string().trim().min(1).max(300),
@@ -12,7 +13,7 @@ export const buscarSchema = z.object({
 export type BuscarInput = z.infer<typeof buscarSchema>;
 
 /** Búsqueda global (causas + documentos) reutilizando `lib/search` (FTS + fallback ILIKE). */
-export const buscarTool: AssistantTool<BuscarInput> = {
+export const buscarTool: AssistantTool<BuscarInput> = secureTool({
   id: "buscar",
   description: "Búsqueda global en causas y documentos",
   kind: "read",
@@ -28,11 +29,12 @@ export const buscarTool: AssistantTool<BuscarInput> = {
     const [causas, documentos] = await Promise.all([
       causaIds !== null
         ? prisma.causa.findMany({
-            where: { id: { in: causaIds } },
+            where: { id: { in: causaIds }, ...causaAccessWhere({ ...ctx, id: ctx.userId }) },
             select: { id: true, titulo: true, rit: true },
           })
         : prisma.causa.findMany({
             where: {
+              AND: [causaAccessWhere({ ...ctx, id: ctx.userId })],
               OR: [
                 { titulo: { contains: input.q, mode: "insensitive" } },
                 { rit: { contains: input.q, mode: "insensitive" } },
@@ -44,12 +46,12 @@ export const buscarTool: AssistantTool<BuscarInput> = {
           }),
       documentoIds !== null
         ? prisma.documento.findMany({
-            where: { id: { in: documentoIds }, ...confidentialWhere(ctx.role) },
+            where: { id: { in: documentoIds }, ...documentReadWhere({ ...ctx, id: ctx.userId }) },
             select: { id: true, nombre: true, causaId: true },
           })
         : prisma.documento.findMany({
             where: {
-              ...confidentialWhere(ctx.role),
+              ...documentReadWhere({ ...ctx, id: ctx.userId }),
               nombre: { contains: input.q, mode: "insensitive" },
             },
             select: { id: true, nombre: true, causaId: true },
@@ -66,4 +68,4 @@ export const buscarTool: AssistantTool<BuscarInput> = {
       card: { type: "busqueda-global", causas, documentos },
     };
   },
-};
+});

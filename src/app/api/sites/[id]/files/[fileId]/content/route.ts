@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
-import { canSeeConfidential, isCliente } from "@/lib/auth/rbac";
+import { canReadFlagged, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { siteFileReadWhere as scopedsiteFileReadWhere } from "@/lib/auth/causa-access";
 import { isClientSharedTag } from "@/lib/auth/client-tags";
-import { handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
+import { isCliente } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db";
-import { getObject } from "@/lib/storage";
 import { downloadResponseHeaders } from "@/lib/security/download";
+import { getObject } from "@/lib/storage";
+import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string; fileId: string }> };
 
@@ -14,14 +15,13 @@ export async function GET(_req: Request, { params }: Params) {
     const { id, fileId } = await params;
     await requireSiteAccess(id, user);
     const file = await prisma.siteFile.findFirst({
-      where: { id: fileId, siteId: id },
+      where: { AND: [scopedsiteFileReadWhere(user), { id: fileId, siteId: id }] },
     });
     if (!file) {
       return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
     }
     if (
-      (file.confidencial || file.privilegio) &&
-      !canSeeConfidential(user.role)
+      !canReadFlagged(user, file)
     ) {
       return NextResponse.json({ error: "Archivo confidencial" }, { status: 403 });
     }

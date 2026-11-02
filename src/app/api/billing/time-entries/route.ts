@@ -1,5 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
@@ -8,14 +6,18 @@ import {
   requireBillingManager,
   requireStaff,
 } from "@/lib/api";
+import { assertBillingCausa, assertCausaAccess, relatedCausaWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
+import { canSome } from "@/lib/auth/permissions";
+import { publicUserSelect } from "@/lib/auth/public-user";
 import { canManageBilling } from "@/lib/auth/rbac";
 import { DEFAULT_HOURLY_CLP, timeEntryListWhere } from "@/lib/billing";
 import { csvDocument } from "@/lib/billing-export";
 import { civilDateKey } from "@/lib/chile-time";
-import { ufToClp } from "@/lib/uf";
+import { prisma } from "@/lib/db";
 import { timeEntrySchema } from "@/lib/schemas";
-import { publicUserSelect } from "@/lib/auth/public-user";
 import { downloadResponseHeaders } from "@/lib/security/download";
+import { ufToClp } from "@/lib/uf";
+import { NextRequest, NextResponse } from "next/server";
 
 function minutesBetween(start: Date, end: Date) {
   return Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
@@ -28,14 +30,14 @@ export async function GET(req: NextRequest) {
     const causaId = req.nextUrl.searchParams.get("causaId");
     const estado = req.nextUrl.searchParams.get("estado");
     const entries = await prisma.timeEntry.findMany({
-      where: {
+      where: { AND: [scopedrelatedCausaWhere(user), {
         AND: [
           unbilled === "1" ? { billable: true, billed: false } : {},
           timeEntryListWhere(estado),
           causaId ? { causaId } : {},
-          canManageBilling(user.role) ? {} : { userId: user.id },
+          canManageBilling(user) ? {} : { userId: user.id },
         ],
-      },
+      }] },
       include: { user: { select: publicUserSelect }, causa: true, cliente: true },
       orderBy: { date: "desc" },
     });
@@ -70,6 +72,8 @@ export async function POST(req: NextRequest) {
     assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, timeEntrySchema);
+    if (!canSome(user, "time.log")) throw httpError("No puede registrar horas", 403);
+    if (body.causaId) await assertCausaAccess(body.causaId, user);
     const timerStartedAt = body.timerStartedAt ? new Date(body.timerStartedAt) : null;
     const timerStoppedAt =
       body.timerStoppedAt || body.stoppedAt || body.stopTimer
@@ -82,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     if (rateClp == null && body.causaId) {
       const fee = await prisma.feeArrangement.findFirst({
-        where: { causaId: body.causaId, active: true, tipo: { in: ["hourly", "mixed"] } },
+        where: { AND: [scopedrelatedCausaWhere(user), { causaId: body.causaId, active: true, tipo: { in: ["hourly", "mixed"] } }] },
         orderBy: { startDate: "desc" },
       });
       rateClp =
@@ -95,7 +99,7 @@ export async function POST(req: NextRequest) {
     const amountClp = Math.round(hours * rateClp);
     const targetUserId =
       body.userId && body.userId !== user.id
-        ? canManageBilling(user.role)
+        ? canManageBilling(user)
           ? body.userId
           : null
         : user.id;
@@ -129,7 +133,10 @@ export async function PATCH(req: NextRequest) {
     assertCsrf(req);
     const body = await req.json();
     if (body.action === "approve" || body.action === "reject") {
-      const user = await requireBillingManager();
+      const user = await requireStaff();
+      const current = await prisma.timeEntry.findFirst({ where: { id: body.id, ...scopedrelatedCausaWhere(user) } });
+      if (!current) throw httpError("Entrada no encontrada", 404);
+      await assertBillingCausa(user, current.causaId, "time.approve");
       const entry = await prisma.timeEntry.update({
         where: { id: body.id },
         data: {
@@ -148,11 +155,11 @@ export async function PATCH(req: NextRequest) {
 
     const user = await requireStaff();
     if (body.action === "stop" && body.id) {
-      const current = await prisma.timeEntry.findUnique({ where: { id: body.id } });
+      const current = await prisma.timeEntry.findFirst({ where: { AND: [scopedrelatedCausaWhere(user), { id: body.id }] } });
       if (!current?.startedAt) {
         return NextResponse.json({ error: "Timer no iniciado" }, { status: 400 });
       }
-      if (current.userId !== user.id && !canManageBilling(user.role)) {
+      if (current.userId !== user.id && !canManageBilling(user)) {
         return NextResponse.json(
           { error: "Solo puede detener sus propios timers" },
           { status: 403 }
@@ -180,21 +187,22 @@ export async function PATCH(req: NextRequest) {
     ) {
       await requireBillingManager();
     } else if (body.billable !== undefined || body.description !== undefined) {
-      const current = await prisma.timeEntry.findUnique({ where: { id: body.id } });
+      const current = await prisma.timeEntry.findFirst({ where: { AND: [scopedrelatedCausaWhere(user), { id: body.id }] } });
       if (!current) {
         return NextResponse.json({ error: "Entrada no encontrada" }, { status: 404 });
       }
-      if (current.userId !== user.id && !canManageBilling(user.role)) {
+      if (current.userId !== user.id && !canManageBilling(user)) {
         return NextResponse.json({ error: "Prohibido" }, { status: 403 });
       }
     } else {
       await requireBillingManager();
     }
 
-    const current = await prisma.timeEntry.findUnique({ where: { id: body.id } });
+    const current = await prisma.timeEntry.findFirst({ where: { AND: [scopedrelatedCausaWhere(user), { id: body.id }] } });
     if (!current) {
       return NextResponse.json({ error: "Entrada no encontrada" }, { status: 404 });
     }
+    if (current.userId !== user.id || body.amountClp !== undefined || body.hours !== undefined || body.billed !== undefined) await assertBillingCausa(user, current.causaId);
     if (current.invoiceId && (body.hours !== undefined || body.amountClp !== undefined)) {
       return NextResponse.json(
         { error: "No se pueden ajustar horas/monto de una entrada ya facturada" },

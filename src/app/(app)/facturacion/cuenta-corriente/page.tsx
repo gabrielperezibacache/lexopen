@@ -1,17 +1,19 @@
-import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { ModuleHeader } from "@/components/sites/SiteNav";
-import { clp, labelLedgerTipo } from "@/lib/billing";
-import { formatCivilDate } from "@/lib/chile-time";
 import { LedgerForm } from "@/components/billing/LedgerForm";
+import { ModuleHeader } from "@/components/sites/SiteNav";
+import { causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
 import { requireStaff } from "@/lib/auth/session";
+import { clp, labelLedgerTipo } from "@/lib/billing";
+import { ledgerAccessWhere, loadScopedLedgerBalances, scopedLedgerRunningBalances } from "@/lib/billing-overview";
+import { formatCivilDate } from "@/lib/chile-time";
+import { prisma } from "@/lib/db";
+import Link from "next/link";
 
 export default async function CuentaCorrientePage({
   searchParams,
 }: {
   searchParams: Promise<{ clienteId?: string }>;
 }) {
-  await requireStaff();
+  const user = await requireStaff();
   const sp = await searchParams;
   const clientes = await prisma.cliente.findMany({
     orderBy: { razonSocial: "asc" },
@@ -22,38 +24,21 @@ export default async function CuentaCorrientePage({
     ? requested
     : clientes[0]?.id;
 
-  const [entries, latestBalancesRaw, causas] = await Promise.all([
+  const [rawEntries, latestBalancesRaw, causas] = await Promise.all([
     prisma.ledgerEntry.findMany({
-      where: clienteId ? { clienteId } : { clienteId: { in: [] } },
+      where: { AND: [ledgerAccessWhere(user), clienteId ? { clienteId } : { clienteId: { in: [] } }] },
       include: { causa: true, invoice: true },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
-    // ⚡ Bolt: Fetch the latest balance per client using a relation query.
-    // This avoids a full table scan and sort on ledgerEntry required by distinct,
-    // leveraging PostgreSQL lateral joins instead.
-    prisma.cliente.findMany({
-      where: { ledgerEntries: { some: {} } },
-      select: {
-        id: true,
-        ledgerEntries: {
-          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-          take: 1,
-          select: { balanceClp: true },
-        },
-      },
-    }),
+    loadScopedLedgerBalances(user),
     prisma.causa.findMany({
-      where: clienteId ? { clienteId } : { clienteId: { in: [] } },
+      where: { AND: [scopedcausaAccessWhere(user), clienteId ? { clienteId } : { clienteId: { in: [] } }] },
       select: { id: true, rit: true, titulo: true, clienteId: true },
     }),
   ]);
 
-  const balances = new Map<string, number>();
-  for (const entry of latestBalancesRaw) {
-    if (entry.ledgerEntries.length > 0) {
-      balances.set(entry.id, entry.ledgerEntries[0].balanceClp);
-    }
-  }
+  const entries = scopedLedgerRunningBalances(rawEntries);
+  const balances = new Map(latestBalancesRaw.map(entry => [entry.clienteId, entry.balanceClp]));
   const nombre = new Map(clientes.map((cliente) => [cliente.id, cliente.razonSocial]));
   const currentBalance = clienteId ? (balances.get(clienteId) ?? 0) : 0;
   const conSaldo = [...balances.entries()].filter(([, balance]) => balance !== 0);

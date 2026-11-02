@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createSubmissionKeys } from "@/lib/client-submission-key";
 import { apiMutation } from "@/lib/api-mutation";
 
 export function LedgerForm({
@@ -12,6 +13,7 @@ export function LedgerForm({
   causas: Array<{ id: string; rit: string | null; titulo: string }>;
 }) {
   const router = useRouter();
+  const keys = useRef(createSubmissionKeys(undefined, `lexopen:ledger:${clienteId}`));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -24,23 +26,14 @@ export function LedgerForm({
     const tipo = String(fd.get("tipo"));
     const amount = Number(fd.get("amountClp"));
     const isCredit = tipo === "provision" || tipo === "pago" || tipo === "reembolso";
-    const result = await apiMutation("/api/billing/ledger", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        clienteId,
-        causaId: fd.get("causaId") || null,
-        tipo,
-        description: fd.get("description"),
-        creditClp: isCredit ? amount : 0,
-        debitClp: isCredit ? 0 : amount,
-      }),
-    });
+    const payload = { clienteId, causaId: fd.get("causaId") || null, tipo, description: fd.get("description"), creditClp: isCredit ? amount : 0, debitClp: isCredit ? 0 : amount };
+    const result = await apiMutation("/api/billing/ledger", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": keys.current.forPayload(payload) }, body: JSON.stringify(payload) });
     setBusy(false);
     if (!result.ok) {
       setError(result.error || "No se pudo registrar el movimiento");
       return;
     }
+    keys.current.complete(payload);
     form.reset();
     router.refresh();
   }

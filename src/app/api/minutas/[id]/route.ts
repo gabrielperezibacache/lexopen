@@ -1,15 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
+import { writeAuditStrict } from "@/lib/audit";
+import { assertCausaCapability, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { canSeeConfidential } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db";
 import { googleActionHttpStatus, pushMinutaToDrive } from "@/lib/integrations/google";
 import {
   isValidEstadoAccion,
   renderMinutaMarkdown,
 } from "@/lib/minutas";
-import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { canSeeConfidential } from "@/lib/auth/rbac";
-import { writeAuditStrict } from "@/lib/audit";
-import { publicUserSelect } from "@/lib/auth/public-user";
 import { documentoListSelect } from "@/lib/sites/file-select";
+import { syncTaskFromMinutaAccion } from "@/lib/tasks/sync-mirrors";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -17,8 +19,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
   const user = await requireStaff();
   const { id } = await params;
-  const minuta = await prisma.minuta.findUnique({
-    where: { id },
+  const minuta = await prisma.minuta.findFirst({
+    where: { AND: [scopedrequiredCausaWhere(user), { id }] },
     include: {
       causa: {
         include: {
@@ -35,7 +37,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (!minuta) {
     return NextResponse.json({ error: "Minuta no encontrada" }, { status: 404 });
   }
-  if (minuta.confidencial && !canSeeConfidential(user.role)) {
+  if (minuta.confidencial && !canSeeConfidential(user)) {
     return NextResponse.json({ error: "Minuta confidencial" }, { status: 403 });
   }
 
@@ -68,17 +70,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
 
-  const existingMinuta = await prisma.minuta.findUnique({
-    where: { id },
-    select: { id: true, confidencial: true },
+  const existingMinuta = await prisma.minuta.findFirst({
+    where: { AND: [scopedrequiredCausaWhere(user), { id }] },
+    select: { id: true, confidencial: true, causaId: true },
   });
   if (!existingMinuta) {
     return NextResponse.json({ error: "Minuta no encontrada" }, { status: 404 });
   }
-  if (existingMinuta.confidencial && !canSeeConfidential(user.role)) {
+  await assertCausaCapability(existingMinuta.causaId, user, "causa.write");
+  if (existingMinuta.confidencial && !canSeeConfidential(user)) {
     return NextResponse.json({ error: "Minuta confidencial" }, { status: 403 });
   }
-  if (body.confidencial === true && !canSeeConfidential(user.role)) {
+  if (body.confidencial === true && !canSeeConfidential(user)) {
     return NextResponse.json(
       { error: "Su rol no puede marcar minutas como confidenciales" },
       { status: 403 }
@@ -117,44 +120,28 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       );
     }
 
-    const accion = await prisma.minutaAccion.update({
+    return await prisma.$transaction(async (tx) => {
+    const accion = await tx.minutaAccion.update({
       where: { id: existing.id },
       data: { estado: body.estado },
     });
 
-    if (accion.taskId) {
-      if (body.estado === "hecha") {
-        await prisma.task.update({
-          where: { id: accion.taskId },
-          data: { status: "done" },
-        });
-      } else if (body.estado === "pendiente" || body.estado === "en_curso") {
-        await prisma.task.update({
-          where: { id: accion.taskId },
-          data: { status: body.estado === "en_curso" ? "in_progress" : "todo" },
-        });
-      } else if (body.estado === "cancelada") {
-        await prisma.task.update({
-          where: { id: accion.taskId },
-          data: { status: "blocked" },
-        });
-      }
-    }
+    await syncTaskFromMinutaAccion(accion.id, tx);
 
     if (accion.plazoId) {
       if (body.estado === "hecha") {
-        await prisma.plazo.update({
+        await tx.plazo.update({
           where: { id: accion.plazoId },
           data: { estado: "cumplido" },
         });
       } else if (body.estado === "pendiente" || body.estado === "en_curso") {
-        await prisma.plazo.update({
+        await tx.plazo.update({
           where: { id: accion.plazoId },
           data: { estado: "pendiente" },
         });
       } else if (body.estado === "cancelada") {
         // Cancelación ≠ cumplimiento: mantener el plazo abierto.
-        await prisma.plazo.update({
+        await tx.plazo.update({
           where: { id: accion.plazoId },
           data: { estado: "pendiente" },
         });
@@ -162,10 +149,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     return NextResponse.json(accion);
+    });
   }
 
-  const current = await prisma.minuta.findUnique({
-    where: { id },
+  const current = await prisma.minuta.findFirst({
+    where: { AND: [scopedrequiredCausaWhere(user), { id }] },
     include: {
       causa: true,
       autor: { select: publicUserSelect },
@@ -201,8 +189,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   // Regenerar Markdown del documento vinculado
   if (current.documentoId) {
-    const refreshed = await prisma.minuta.findUnique({
-      where: { id },
+    const refreshed = await prisma.minuta.findFirst({
+      where: { AND: [scopedrequiredCausaWhere(user), { id }] },
       include: { causa: true, autor: true, acciones: true },
     });
     if (refreshed) {

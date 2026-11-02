@@ -1,12 +1,13 @@
+import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { writeAuditStrict } from "@/lib/audit";
+import { assistantDb as prisma } from "@/lib/assistant/transaction-context";
+import { writeAssistantAudit as writeAuditStrict } from "@/lib/assistant/transaction-context";
 import { parseLocalDateInput, formatLocalDateTime } from "@/lib/minutas";
 import { detectEventConflicts, describeEventConflicts } from "@/lib/assistant/conflicts";
 import { storeUndo, consumeUndo } from "@/lib/assistant/plan-store";
 import type { AssistantTool } from "./types";
 
-const STAFF_ROLES = ["admin", "abogado", "asistente"] as const;
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 export const eventoCrearSchema = z.object({
   titulo: z.string().trim().min(1).max(200),
@@ -23,7 +24,7 @@ export const eventoCrearSchema = z.object({
 });
 export type EventoCrearInput = z.infer<typeof eventoCrearSchema>;
 
-export const eventoCrearTool: AssistantTool<EventoCrearInput> = {
+export const eventoCrearTool: AssistantTool<EventoCrearInput> = secureTool({
   id: "evento.crear",
   description: "Agenda un evento/audiencia/reunión",
   kind: "write",
@@ -34,7 +35,7 @@ export const eventoCrearTool: AssistantTool<EventoCrearInput> = {
     if (!inicio) return `Agendar "${input.titulo}" — fecha de inicio inválida.`;
     const fin = input.fin ? parseLocalDateInput(input.fin) : null;
     const responsableId = input.responsableId || ctx.userId;
-    const conflicts = await detectEventConflicts(inicio, fin, responsableId);
+    const conflicts = await detectEventConflicts(inicio, fin, responsableId, undefined, { ...ctx, id: ctx.userId });
     const warning = describeEventConflicts(conflicts);
     return `Agendar "${input.titulo}" (${input.tipo || "reunion"}) el ${formatLocalDateTime(
       inicio
@@ -98,7 +99,7 @@ export const eventoCrearTool: AssistantTool<EventoCrearInput> = {
     });
     return { ok: true, message: `Se deshizo la creación del evento "${evento.titulo}".` };
   },
-};
+});
 
 export const eventoEditarSchema = z.object({
   eventoId: z.string().min(1),
@@ -111,13 +112,13 @@ export const eventoEditarSchema = z.object({
 });
 export type EventoEditarInput = z.infer<typeof eventoEditarSchema>;
 
-export const eventoEditarTool: AssistantTool<EventoEditarInput> = {
+export const eventoEditarTool: AssistantTool<EventoEditarInput> = secureTool({
   id: "evento.editar",
   description: "Edita o reprograma un evento existente",
   kind: "write",
   roles: [...STAFF_ROLES],
   inputSchema: eventoEditarSchema,
-  async preview(input) {
+  async preview(input, ctx) {
     const evento = await prisma.evento.findUnique({ where: { id: input.eventoId } });
     if (!evento) return `Editar evento ${input.eventoId} (no encontrado).`;
     const nuevoInicio = input.inicio ? parseLocalDateInput(input.inicio) : null;
@@ -126,7 +127,8 @@ export const eventoEditarTool: AssistantTool<EventoEditarInput> = {
           nuevoInicio,
           input.fin ? parseLocalDateInput(input.fin) : evento.fin,
           evento.responsableId,
-          evento.id
+          evento.id,
+          { ...ctx, id: ctx.userId },
         )
       : [];
     const warning = describeEventConflicts(conflicts);
@@ -198,14 +200,14 @@ export const eventoEditarTool: AssistantTool<EventoEditarInput> = {
     });
     return { ok: true, message: `Se restauró el evento "${evento.titulo}".` };
   },
-};
+});
 
 export const eventoEliminarSchema = z.object({
   eventoId: z.string().min(1),
 });
 export type EventoEliminarInput = z.infer<typeof eventoEliminarSchema>;
 
-export const eventoEliminarTool: AssistantTool<EventoEliminarInput> = {
+export const eventoEliminarTool: AssistantTool<EventoEliminarInput> = secureTool({
   id: "evento.eliminar",
   description: "Cancela/elimina un evento",
   kind: "write",
@@ -259,6 +261,7 @@ export const eventoEliminarTool: AssistantTool<EventoEliminarInput> = {
       estado: string;
       tipoAudiencia: string | null;
       tribunal: string | null;
+      googleEventId: string | null;
       causaId: string | null;
       clienteId: string | null;
       responsableId: string;
@@ -278,6 +281,7 @@ export const eventoEliminarTool: AssistantTool<EventoEliminarInput> = {
         estado: before.estado,
         tipoAudiencia: before.tipoAudiencia,
         tribunal: before.tribunal,
+        googleEventId: before.googleEventId,
         causaId: before.causaId,
         clienteId: before.clienteId,
         responsableId: before.responsableId,
@@ -292,4 +296,4 @@ export const eventoEliminarTool: AssistantTool<EventoEliminarInput> = {
     });
     return { ok: true, message: `Se restauró el evento "${evento.titulo}".` };
   },
-};
+});

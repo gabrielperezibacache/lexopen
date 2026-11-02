@@ -15,6 +15,8 @@ type UserRow = {
   role: string;
   title: string | null;
   avatarColor: string;
+  capabilityGrants?: string;
+  capabilityRevokes?: string;
   siteMemberships: Array<{ site: { id: string; name: string } }>;
   groupMembers: Array<{ group: { id: string; name: string } }>;
 };
@@ -27,9 +29,13 @@ type GroupRow = {
 };
 
 const ROLE_LABEL: Record<string, string> = {
-  admin: "Admin",
-  abogado: "Abogado",
-  asistente: "Asistente",
+  admin: "Admin del Host",
+  socio: "Socio/a",
+  abogado: "Abogado/a",
+  procurador: "Procurador/a",
+  asistente: "Asistente / secretaria",
+  contabilidad: "Contabilidad",
+  externo: "Externo",
   cliente: "Cliente",
 };
 
@@ -116,6 +122,8 @@ export function PeopleManager({
         email: fd.get("email"),
         role: fd.get("role"),
         title: fd.get("title") || null,
+        capabilityGrants: String(fd.get("capabilityGrants") || ""),
+        capabilityRevokes: String(fd.get("capabilityRevokes") || ""),
         ...(password ? { password } : {}),
       }),
     });
@@ -497,7 +505,8 @@ export function PeopleManager({
           >
             <h3 id="create-user-title" className="text-lg font-semibold">Crear usuario</h3>
             <p className="text-xs text-[var(--ink-soft)]/65">
-              Roles: admin (configuración), abogado, asistente o cliente (portal).
+              Roles: admin (Host), socio, abogado, procurador, asistente,
+              contabilidad, externo o cliente (portal). Admin ≠ socio.
             </p>
             <input
               className="input"
@@ -515,10 +524,11 @@ export function PeopleManager({
             />
             <input className="input" name="title" placeholder="Cargo (opcional)" />
             <select className="select" name="role" defaultValue="abogado">
-              <option value="abogado">Abogado</option>
-              <option value="asistente">Asistente</option>
-              <option value="admin">Admin</option>
-              <option value="cliente">Cliente</option>
+              {Object.entries(ROLE_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
             <input
               className="input"
@@ -583,6 +593,24 @@ export function PeopleManager({
                 </option>
               ))}
             </select>
+            <label className="block text-xs text-[var(--ink-soft)]/65">
+              Capacidades extra (CSV)
+              <input
+                className="input mt-1"
+                name="capabilityGrants"
+                defaultValue={editing.capabilityGrants || ""}
+                placeholder="p. ej. host.admin,causa.override_walls"
+              />
+            </label>
+            <label className="block text-xs text-[var(--ink-soft)]/65">
+              Capacidades revocadas (CSV)
+              <input
+                className="input mt-1"
+                name="capabilityRevokes"
+                defaultValue={editing.capabilityRevokes || ""}
+                placeholder="p. ej. voice.use"
+              />
+            </label>
             <input
               className="input"
               name="password"
@@ -592,8 +620,8 @@ export function PeopleManager({
               autoComplete="new-password"
             />
             <p className="text-xs text-[var(--ink-soft)]/60">
-              Si cambia el rol o la contraseña, se invalidan las sesiones activas
-              del usuario.
+              Si cambia el rol, grants o la contraseña, se invalidan las sesiones
+              activas del usuario.
             </p>
             <div className="flex justify-end gap-2">
               <button

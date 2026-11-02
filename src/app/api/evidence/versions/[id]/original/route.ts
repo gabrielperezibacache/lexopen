@@ -1,0 +1,12 @@
+import { NextResponse } from "next/server";
+import { handleRouteError, requireStaff } from "@/lib/api";
+import { downloadResponseHeaders } from "@/lib/security/download";
+import { authorizedEvidenceOriginal } from "@/lib/evidence/service";
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await requireStaff(); const { id } = await params;
+    const original = await authorizedEvidenceOriginal(id, user);
+    return new NextResponse(new Uint8Array(original.bytes), { headers: downloadResponseHeaders(original.name, "application/octet-stream") });
+  } catch (e) { return handleRouteError(e); }
+}

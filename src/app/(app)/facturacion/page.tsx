@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 
 export default async function FacturacionPage() {
-  await requireStaff();
+  const user = await requireStaff();
   const locale = await getLocale();
   const dict = getDictionary(locale);
   const b = dict.billingHub;
-  const { month, kpis, recentInvoices, recentTime } = await loadBillingOverview();
+  const { month, kpis, recentInvoices, recentTime } = await loadBillingOverview(user);
 
   const provisionSub =
     kpis.adeudoClp > 0

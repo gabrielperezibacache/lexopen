@@ -1,25 +1,27 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
 import { writeAuditStrict } from "@/lib/audit";
+import { causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
+import { can } from "@/lib/auth/permissions";
+import { prisma } from "@/lib/db";
 import {
   claimMisCausasSync,
   clearClaveUnicaSyncMessages,
   getClaveUnicaStatus,
   syncMisCausas,
 } from "@/lib/pjud/claveunica";
-import { prisma } from "@/lib/db";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 /** Hosts that honor this (not Cloudflare 524) get more headroom for cron. */
 export const maxDuration = 300;
 
 export async function GET() {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const [status, causasCount] = await Promise.all([
       getClaveUnicaStatus(),
-      prisma.causa.count({ where: { pjudFromMisCausas: true } }),
+      prisma.causa.count({ where: { AND: [scopedcausaAccessWhere(user), { pjudFromMisCausas: true }] } }),
     ]);
     return NextResponse.json({
       status,
@@ -42,6 +44,7 @@ export async function POST(req: NextRequest) {
     } else {
       assertCsrf(req);
       const user = await requireStaff();
+      if (!can(user, "causa.override_walls") || !can(user, "causa.write")) return NextResponse.json({ error: "La sincronización global requiere supervisión del estudio" }, { status: 403 });
       if (user.role === "asistente") {
         return NextResponse.json(
           {

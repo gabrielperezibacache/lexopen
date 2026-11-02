@@ -1,3 +1,4 @@
+import { causaAccessWhere, documentReadWhere, siteAccessWhere } from "@/lib/auth/causa-access";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -34,7 +35,7 @@ export default async function ClienteDetailPage({
       include: {
         abogado: { select: { id: true, name: true } },
         documentos: {
-          where: confidentialWhere(user.role),
+          where: { AND: [documentReadWhere(user), confidentialWhere(user)] },
           orderBy: { updatedAt: "desc" },
           select: {
             id: true,
@@ -49,7 +50,7 @@ export default async function ClienteDetailPage({
           },
         },
         causas: {
-          orderBy: { updatedAt: "desc" },
+          where: causaAccessWhere(user),          orderBy: { updatedAt: "desc" },
           include: {
             abogado: { select: { id: true, name: true } },
             tramites: {
@@ -62,7 +63,7 @@ export default async function ClienteDetailPage({
           },
         },
         sites: {
-          orderBy: { updatedAt: "desc" },
+          where: siteAccessWhere(user),          orderBy: { updatedAt: "desc" },
           select: {
             id: true,
             name: true,

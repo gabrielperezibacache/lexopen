@@ -1,13 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
   parseBody,
   requireStaff,
 } from "@/lib/api";
-import { tramiteUpdateSchema } from "@/lib/schemas";
 import { writeAuditStrict } from "@/lib/audit";
+import { assertCausaCapability, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { prisma } from "@/lib/db";
+import { emitNotification } from "@/lib/notify/emit";
+import { tramiteUpdateSchema } from "@/lib/schemas";
+import { syncTaskFromTramite } from "@/lib/tasks/sync-mirrors";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,8 +19,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const existing = await prisma.tramite.findUnique({
-      where: { id },
+    const existing = await prisma.tramite.findFirst({
+      where: { AND: [scopedrequiredCausaWhere(user), { id }] },
       include: {
         causa: {
           select: { id: true, titulo: true, rit: true, clienteId: true },
@@ -27,6 +30,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!existing) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
+    await assertCausaCapability(existing.causaId, user, "causa.write");
     const body = await parseBody(req, tramiteUpdateSchema);
 
     let fechaHecho = existing.fechaHecho;
@@ -42,7 +46,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       fechaHecho = null;
     }
 
-    const tramite = await prisma.tramite.update({
+    return await prisma.$transaction(async (tx) => {
+    const tramite = await tx.tramite.update({
       where: { id },
       data: {
         ...(body.titulo !== undefined ? { titulo: body.titulo.trim() } : {}),
@@ -75,18 +80,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       const href = existing.causa.clienteId
         ? `/clientes/${existing.causa.clienteId}`
         : `/causas/${existing.causaId}#tramites`;
-      await prisma.notification.create({
-        data: {
-          userId: newResponsableId,
-          title: `Trámite asignado · ${existing.causa.rit || existing.causa.titulo}`,
-          body: tramite.titulo,
-          href,
-        },
-      });
+      await emitNotification({
+        tipo: "tramite.asignado",
+        userId: newResponsableId,
+        title: `Trámite asignado · ${existing.causa.rit || existing.causa.titulo}`,
+        body: tramite.titulo,
+        href,
+        entityType: "tramite",
+        entityId: tramite.id,
+      }, tx);
     }
 
     if (body.estado && body.estado !== existing.estado) {
-      await prisma.activity.create({
+      await tx.activity.create({
         data: {
           tipo: "tramite",
           mensaje: `Trámite «${tramite.titulo}» → ${tramite.estado}`,
@@ -103,9 +109,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       entityId: id,
       before: existing,
       after: tramite,
-    });
+    }, tx);
+
+    await syncTaskFromTramite(tramite.id, tx);
 
     return NextResponse.json(tramite);
+    });
   } catch (e) {
     return handleRouteError(e);
   }
@@ -116,19 +125,22 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const existing = await prisma.tramite.findUnique({ where: { id } });
+    const existing = await prisma.tramite.findFirst({ where: { AND: [scopedrequiredCausaWhere(user), { id }] } });
     if (!existing) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
-    await prisma.tramite.delete({ where: { id } });
+    await assertCausaCapability(existing.causaId, user, "causa.write");
+    return await prisma.$transaction(async (tx) => {
+    await tx.tramite.delete({ where: { id } });
     await writeAuditStrict({
       actorId: user.id,
       action: "tramite.delete",
       entityType: "Tramite",
       entityId: id,
       before: existing,
-    });
+    }, tx);
     return NextResponse.json({ ok: true });
+    });
   } catch (e) {
     return handleRouteError(e);
   }

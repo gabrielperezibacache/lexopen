@@ -1,10 +1,11 @@
+import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
+import { describeEventConflicts, detectEventConflicts } from "@/lib/assistant/conflicts";
+import { writeAuditStrict } from "@/lib/audit";
+import { assertEventMutation, relatedCausaWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { prisma } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
-import { writeAuditStrict } from "@/lib/audit";
-import { publicUserSelect } from "@/lib/auth/public-user";
-import { detectEventConflicts, describeEventConflicts } from "@/lib/assistant/conflicts";
 
 const TIPOS = ["audiencia", "reunion", "recordatorio", "vencimiento", "otro"] as const;
 const MODALIDADES = ["presencial", "videollamada", "telefonica", "hibrida", "tribunal"] as const;
@@ -28,19 +29,19 @@ const eventoCreateSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const sp = new URL(req.url).searchParams;
     const desde = sp.get("desde");
     const hasta = sp.get("hasta");
     const causaId = sp.get("causaId");
 
     const eventos = await prisma.evento.findMany({
-      where: {
+      where: { AND: [scopedrelatedCausaWhere(user), {
         ...(causaId ? { causaId } : {}),
         ...(desde && hasta
           ? { inicio: { gte: new Date(desde), lte: new Date(hasta) } }
           : {}),
-      },
+      }] },
       include: {
         causa: { select: { id: true, titulo: true, rit: true } },
         cliente: { select: { id: true, razonSocial: true } },
@@ -70,8 +71,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Fecha de fin inválida" }, { status: 400 });
     }
     const responsableId = body.responsableId || user.id;
+    await assertEventMutation(user, { responsableId, causaId: body.causaId });
 
-    const conflicts = await detectEventConflicts(inicio, fin, responsableId);
+    const conflicts = await detectEventConflicts(inicio, fin, responsableId, undefined, user);
 
     const evento = await prisma.evento.create({
       data: {

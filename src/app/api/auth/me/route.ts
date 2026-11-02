@@ -4,7 +4,7 @@ import { canImpersonate, isAdmin } from "@/lib/auth/rbac";
 
 export async function GET() {
   const user = await getCurrentUser();
-  const demoSwitcher = Boolean(user && isAdmin(user.role) && canImpersonate());
+  const demoSwitcher = Boolean(user && isAdmin(user) && canImpersonate());
   const users = demoSwitcher ? await listUsers() : user ? [user] : [];
   return NextResponse.json({
     user: user

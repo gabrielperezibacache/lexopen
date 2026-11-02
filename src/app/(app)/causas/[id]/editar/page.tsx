@@ -1,16 +1,17 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { requireStaff } from "@/lib/auth/session";
 import { CausaEditForm } from "@/components/CausaEditForm";
+import { causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
+import { requireStaff } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
+import { notFound } from "next/navigation";
 
 type Params = { params: Promise<{ id: string }> };
 
 export default async function EditarCausaPage({ params }: Params) {
-  await requireStaff();
+  const user = await requireStaff();
   const { id } = await params;
   const [causa, clientes, abogados] = await Promise.all([
-    prisma.causa.findUnique({
-      where: { id },
+    prisma.causa.findFirst({
+      where: { AND: [scopedcausaAccessWhere(user), { id }] },
       select: {
         id: true,
         titulo: true,

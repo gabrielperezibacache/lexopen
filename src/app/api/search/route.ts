@@ -1,5 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
   confidentialWhere,
   handleRouteError,
@@ -7,13 +5,16 @@ import {
   requireUser,
 } from "@/lib/api";
 import { clientSiteWhere, confidentialFileWhere } from "@/lib/auth/access";
+import { causaAccessWhere as scopedcausaAccessWhere, documentReadWhere as scopeddocumentReadWhere, requiredCausaWhere as scopedrequiredCausaWhere, siteAccessWhere as scopedsiteAccessWhere, siteFileReadWhere as scopedsiteFileReadWhere, siteRelatedWhere as scopedsiteRelatedWhere, taskAccessWhere as scopedtaskAccessWhere } from "@/lib/auth/causa-access";
+import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
 import { isCliente, isStaff } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
 import { ftsCausaIds, ftsDocumentoIds, ftsWikiIds } from "@/lib/search";
 import {
   documentoListSelect,
   siteFileListSelect,
 } from "@/lib/sites/file-select";
-import { clientSharedTagPrismaWhere } from "@/lib/auth/client-tags";
+import { NextRequest, NextResponse } from "next/server";
 
 const textMatch = (q: string) => ({ contains: q, mode: "insensitive" as const });
 
@@ -63,14 +64,14 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const confFilter = confidentialFileWhere(user.role);
-    const docFilter = confidentialWhere(user.role);
-    const minutaFilter = minutaConfidentialWhere(user.role);
+    const confFilter = confidentialFileWhere(user);
+    const docFilter = confidentialWhere(user);
+    const minutaFilter = minutaConfidentialWhere(user);
 
     if (isCliente(user.role)) {
       const [sites, files, tasks] = await Promise.all([
         prisma.site.findMany({
-          where: {
+          where: { AND: [scopedsiteAccessWhere(user), {
             AND: [
               clientSiteWhere(user.id),
               {
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
                 ],
               },
             ],
-          },
+          }] },
           select: {
             id: true,
             name: true,
@@ -91,7 +92,7 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.siteFile.findMany({
-          where: {
+          where: { AND: [scopedsiteFileReadWhere(user), {
             AND: [
               { site: clientSiteWhere(user.id) },
               { confidencial: false, privilegio: false },
@@ -104,7 +105,7 @@ export async function GET(req: NextRequest) {
                 ],
               },
             ],
-          },
+          }] },
           select: {
             ...siteFileListSelect,
             site: { select: { id: true, name: true, slug: true } },
@@ -112,14 +113,15 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.task.findMany({
-          where: {
+          where: { AND: [scopedtaskAccessWhere(user), {
             AND: [
               { site: clientSiteWhere(user.id) },
+              { assigneeId: user.id },
               {
                 OR: [{ title: textMatch(q) }, { description: textMatch(q) }],
               },
             ],
-          },
+          }] },
           select: {
             id: true,
             title: true,
@@ -169,13 +171,13 @@ export async function GET(req: NextRequest) {
       minutas,
     ] = await Promise.all([
         prisma.site.findMany({
-          where: {
+          where: { AND: [scopedsiteAccessWhere(user), {
             OR: [
               { name: textMatch(q) },
               { description: textMatch(q) },
               { slug: textMatch(q) },
             ],
-          },
+          }] },
           select: {
             id: true,
             name: true,
@@ -186,16 +188,21 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.causa.findMany({
-          where: ftsIds?.length
-            ? { id: { in: ftsIds } }
-            : {
-                OR: [
-                  { titulo: textMatch(q) },
-                  { rit: textMatch(q) },
-                  { caratula: textMatch(q) },
-                  { tribunal: textMatch(q) },
-                ],
-              },
+          where: { AND: [scopedcausaAccessWhere(user), {
+            AND: [
+              scopedcausaAccessWhere(user),
+              ftsIds?.length
+                ? { id: { in: ftsIds } }
+                : {
+                    OR: [
+                      { titulo: textMatch(q) },
+                      { rit: textMatch(q) },
+                      { caratula: textMatch(q) },
+                      { tribunal: textMatch(q) },
+                    ],
+                  },
+            ],
+          }] },
           select: causaSearchSelect,
           take: 10,
         }),
@@ -212,9 +219,9 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.tramite.findMany({
-          where: {
+          where: { AND: [scopedrequiredCausaWhere(user), {
             OR: [{ titulo: textMatch(q) }, { detalle: textMatch(q) }],
-          },
+          }] },
           select: {
             id: true,
             titulo: true,
@@ -234,7 +241,7 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.siteFile.findMany({
-          where: {
+          where: { AND: [scopedsiteFileReadWhere(user), {
             AND: [
               confFilter,
               {
@@ -245,7 +252,7 @@ export async function GET(req: NextRequest) {
                 ],
               },
             ],
-          },
+          }] },
           select: {
             ...siteFileListSelect,
             site: { select: { id: true, name: true, slug: true } },
@@ -253,7 +260,7 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.documento.findMany({
-          where: {
+          where: { AND: [scopeddocumentReadWhere(user), {
             AND: [
               docFilter,
               docFtsIds?.length
@@ -268,7 +275,7 @@ export async function GET(req: NextRequest) {
                     ],
                   },
             ],
-          },
+          }] },
           select: {
             ...documentoListSelect,
             causa: { select: { id: true, rit: true, titulo: true } },
@@ -277,9 +284,9 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.task.findMany({
-          where: {
+          where: { AND: [scopedtaskAccessWhere(user), {
             OR: [{ title: textMatch(q) }, { description: textMatch(q) }],
-          },
+          }] },
           select: {
             id: true,
             title: true,
@@ -310,11 +317,11 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.wikiPage.findMany({
-          where: wikiFtsIds?.length
+          where: { AND: [scopedsiteRelatedWhere(user), wikiFtsIds?.length
             ? { id: { in: wikiFtsIds } }
             : {
                 OR: [{ title: textMatch(q) }, { content: textMatch(q) }],
-              },
+              }] },
           select: {
             id: true,
             title: true,
@@ -325,7 +332,7 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.minuta.findMany({
-          where: {
+          where: { AND: [scopedrequiredCausaWhere(user), {
             AND: [
               minutaFilter,
               {
@@ -338,7 +345,7 @@ export async function GET(req: NextRequest) {
                 ],
               },
             ],
-          },
+          }] },
           select: {
             id: true,
             titulo: true,

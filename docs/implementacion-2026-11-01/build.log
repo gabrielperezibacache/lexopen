@@ -1,0 +1,220 @@
+
+> lexopen@1.0.0 build
+> prisma generate && next build --webpack
+
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 341ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+
+▲ Next.js 16.3.0 (webpack)
+✓ Running next.config.ts took 59ms
+
+  Creating an optimized production build ...
+⚠ Compiled with warnings in 6.3s
+
+./src/lib/pjud/public-scrape.ts
+module.createRequire failed parsing argument.
+
+Import trace for requested module:
+./src/lib/pjud/public-scrape.ts
+./src/lib/config-snapshot.ts
+./src/app/api/admin/config-snapshot/route.ts
+
+✓ Compiled successfully in 7.3s
+  Running TypeScript ...
+  Finished TypeScript in 5.4s ...
+  Collecting page data using 13 workers ...
+  Generating static pages using 13 workers (0/125) ...
+  Generating static pages using 13 workers (31/125)
+  Generating static pages using 13 workers (62/125)
+  Generating static pages using 13 workers (93/125)
+✓ Generating static pages using 13 workers (125/125) in 319ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /agente
+├ ƒ /api/activity
+├ ƒ /api/admin/config-snapshot
+├ ƒ /api/admin/host-status
+├ ƒ /api/admin/purge-demo
+├ ƒ /api/admin/self-update
+├ ƒ /api/admin/update-check
+├ ƒ /api/ai/actions
+├ ƒ /api/aprobaciones
+├ ƒ /api/aprobaciones/[id]/resolver
+├ ƒ /api/assistant
+├ ƒ /api/assistant/confirm
+├ ƒ /api/assistant/undo
+├ ƒ /api/auth/impersonate
+├ ƒ /api/auth/login
+├ ƒ /api/auth/logout
+├ ƒ /api/auth/me
+├ ƒ /api/auth/password
+├ ƒ /api/auth/recover
+├ ƒ /api/auth/totp
+├ ƒ /api/billing/expenses
+├ ƒ /api/billing/fee-arrangements
+├ ƒ /api/billing/invoices
+├ ƒ /api/billing/invoices/[id]
+├ ƒ /api/billing/invoices/[id]/pdf
+├ ƒ /api/billing/invoices/export
+├ ƒ /api/billing/ledger
+├ ƒ /api/billing/payments
+├ ƒ /api/billing/summary
+├ ƒ /api/billing/time-entries
+├ ƒ /api/calendario/ics
+├ ƒ /api/causas
+├ ƒ /api/causas/[id]
+├ ƒ /api/causas/[id]/conflict-check
+├ ƒ /api/causas/[id]/documentos/import
+├ ƒ /api/causas/[id]/equipo
+├ ƒ /api/causas/[id]/movimientos
+├ ƒ /api/causas/[id]/pjud
+├ ƒ /api/causas/[id]/tramites
+├ ƒ /api/causas/monitoreo
+├ ƒ /api/clientes
+├ ƒ /api/clientes/[id]
+├ ƒ /api/clientes/[id]/ai
+├ ƒ /api/configuracion
+├ ƒ /api/conflict-check
+├ ƒ /api/delegaciones
+├ ƒ /api/documentos
+├ ƒ /api/documentos/[id]
+├ ƒ /api/documentos/[id]/content
+├ ƒ /api/documentos/[id]/evidence
+├ ƒ /api/documentos/[id]/markdown
+├ ƒ /api/documentos/[id]/process
+├ ƒ /api/eventos
+├ ƒ /api/eventos/[id]
+├ ƒ /api/evidence/fragments/[id]/verify
+├ ƒ /api/evidence/versions/[id]/original
+├ ƒ /api/health
+├ ƒ /api/integrations/google
+├ ƒ /api/integrations/google/callback
+├ ƒ /api/integrations/hermes
+├ ƒ /api/integrations/llm
+├ ƒ /api/integrations/notify
+├ ƒ /api/integrations/notify/test
+├ ƒ /api/integrations/obsidian
+├ ƒ /api/integrations/pjud/webhook
+├ ƒ /api/jurisprudencia
+├ ƒ /api/locale
+├ ƒ /api/mail
+├ ƒ /api/mail/account
+├ ƒ /api/mail/google/callback
+├ ƒ /api/mail/google/start
+├ ƒ /api/mail/messages/[id]
+├ ƒ /api/mail/microsoft/callback
+├ ƒ /api/mail/microsoft/start
+├ ƒ /api/mail/paste
+├ ƒ /api/mail/sync
+├ ƒ /api/messages
+├ ƒ /api/minutas
+├ ƒ /api/minutas/[id]
+├ ƒ /api/minutas/plantillas
+├ ƒ /api/notifications
+├ ƒ /api/notify/ack
+├ ƒ /api/notify/digest
+├ ƒ /api/notify/escalamiento
+├ ƒ /api/notify/outbox/reconcile
+├ ƒ /api/notify/preferences
+├ ƒ /api/notify/push/subscribe
+├ ƒ /api/notify/telegram/link
+├ ƒ /api/notify/vapid-public
+├ ƒ /api/notify/worker
+├ ƒ /api/people
+├ ƒ /api/pjud/captcha
+├ ƒ /api/pjud/claveunica
+├ ƒ /api/pjud/digest
+├ ƒ /api/pjud/lookup
+├ ƒ /api/pjud/mis-causas
+├ ƒ /api/pjud/queue
+├ ƒ /api/pjud/salas
+├ ƒ /api/plazos
+├ ƒ /api/plazos/alertas
+├ ƒ /api/search
+├ ƒ /api/setup
+├ ƒ /api/sites
+├ ƒ /api/sites/[id]
+├ ƒ /api/sites/[id]/blog
+├ ƒ /api/sites/[id]/files
+├ ƒ /api/sites/[id]/files/[fileId]/content
+├ ƒ /api/sites/[id]/isheets
+├ ƒ /api/sites/[id]/members
+├ ƒ /api/sites/[id]/qa
+├ ƒ /api/sites/[id]/tasks
+├ ƒ /api/sites/[id]/wiki
+├ ƒ /api/tasks
+├ ƒ /api/tasks/[id]/reasignar
+├ ƒ /api/tramites/[id]
+├ ƒ /api/tribunales
+├ ƒ /api/uf
+├ ƒ /api/uf/sync
+├ ƒ /api/workflows
+├ ƒ /auditoria
+├ ƒ /buscar
+├ ƒ /calendario
+├ ƒ /causas
+├ ƒ /causas/[id]
+├ ƒ /causas/[id]/editar
+├ ƒ /causas/[id]/minuta/nueva
+├ ƒ /causas/[id]/minutas/[minutaId]
+├ ƒ /causas/mis-causas
+├ ƒ /causas/monitoreo
+├ ƒ /causas/nueva
+├ ƒ /clientes
+├ ƒ /clientes/[id]
+├ ƒ /configuracion
+├ ƒ /correo
+├ ƒ /cuenta
+├ ƒ /cuenta/notificaciones
+├ ƒ /dashboard
+├ ƒ /documentos
+├ ƒ /documentos/[id]/fuentes
+├ ƒ /facturacion
+├ ƒ /facturacion/cuenta-corriente
+├ ƒ /facturacion/facturas
+├ ƒ /facturacion/facturas/[id]
+├ ƒ /facturacion/gastos
+├ ƒ /facturacion/horas
+├ ƒ /facturacion/tarifas
+├ ƒ /facturacion/uf
+├ ƒ /flujos
+├ ƒ /inicio
+├ ƒ /integraciones
+├ ƒ /jurisprudencia
+├ ƒ /login
+├ ○ /manifest.webmanifest
+├ ƒ /mensajes
+├ ƒ /minutas
+├ ƒ /notificaciones
+├ ƒ /personas
+├ ƒ /plazos
+├ ƒ /portal
+├ ƒ /recovery
+├ ƒ /setup
+├ ƒ /sites
+├ ƒ /sites/[id]
+├ ƒ /sites/[id]/archivos
+├ ƒ /sites/[id]/blog
+├ ƒ /sites/[id]/flujos
+├ ƒ /sites/[id]/isheets
+├ ƒ /sites/[id]/isheets/[sheetId]
+├ ƒ /sites/[id]/personas
+├ ƒ /sites/[id]/qa
+├ ƒ /sites/[id]/tareas
+├ ƒ /sites/[id]/wiki
+└ ƒ /tareas
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

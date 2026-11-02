@@ -1,23 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
 import { writeAuditStrict } from "@/lib/audit";
+import { assertCausaCapability as mutateCausa, assertCausaAccess as readCausa, causaAccessWhere as scopedcausaAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { prisma } from "@/lib/db";
 import {
   clearCausaPjudSyncMessages,
   providerStatusPublicAsync,
   setMonitoreoActivo,
   syncCausaPjud,
 } from "@/lib/pjud/sync";
-import { prisma } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const { id } = await params;
-    const causa = await prisma.causa.findUnique({
-      where: { id },
+    await readCausa(id, user);
+    const causa = await prisma.causa.findFirst({
+      where: { AND: [scopedcausaAccessWhere(user), { id }] },
       select: {
         id: true,
         rit: true,
@@ -34,7 +36,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     });
     if (!causa) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
     const recentJobs = await prisma.pjudSyncJob.findMany({
-      where: { causaId: id },
+      where: { AND: [scopedrequiredCausaWhere(user), { causaId: id }] },
       orderBy: { createdAt: "desc" },
       take: 10,
     });
@@ -53,6 +55,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
+    await mutateCausa(id, user, "causa.write");
     const body = await parseBody(
       req,
       z.object({

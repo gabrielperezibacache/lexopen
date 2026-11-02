@@ -3,6 +3,7 @@ import {
   namesLikelyMatch,
   labelConflictStatus,
   summarizeConflictStatus,
+  sanitizeConflictHits,
 } from "@/lib/conflict";
 
 assert.equal(namesLikelyMatch("Juan Pérez Soto", "Juan Perez Soto"), true);
@@ -19,5 +20,15 @@ assert.equal(
   "warning"
 );
 assert.equal(summarizeConflictStatus([]), "clear");
+const hidden = { causaId: "private-id", titulo: "Secret title", rit: "C-PRIVATE", match: "Private party name", severity: "blocked" as const };
+const visible = { causaId: "visible-id", titulo: "Visible title", rit: null, match: "Visible match", severity: "warning" as const };
+const restricted = sanitizeConflictHits([hidden, { ...hidden, causaId: "second-private-id" }, visible], new Set(["visible-id"]));
+assert.equal(restricted.hasRestrictedMatch, true);
+assert.equal(restricted.status, "blocked", "hidden matches still block an unsafe clearance");
+assert.deepEqual(restricted.conflicts, [visible]);
+assert.equal(restricted.notice, "Coincidencia reservada: requiere revisión de un socio autorizado");
+assert.doesNotMatch(JSON.stringify(restricted), /private-id|Secret title|C-PRIVATE|Private party/);
+assert.deepEqual(sanitizeConflictHits([hidden], new Set()), sanitizeConflictHits([hidden, { ...hidden, causaId: "another-hidden" }], new Set()), "no hidden match count is exposed");
+assert.deepEqual(sanitizeConflictHits([visible], new Set(["visible-id"])).conflicts, [visible]);
 
 console.log("conflict.test.ts: ok");

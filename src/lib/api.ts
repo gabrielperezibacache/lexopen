@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError, type ZodSchema } from "zod";
 import {
   getCurrentUser,
+  requireCapability,
   requireRole,
   requireStaff,
   requireUser,
@@ -9,9 +10,11 @@ import {
 import {
   canManageBilling,
   canSeeConfidential,
+  canSeePrivileged,
   isCliente,
   isStaff,
 } from "@/lib/auth/rbac";
+import type { PermissionSubject } from "@/lib/auth/permissions";
 import { requireSiteAccess, httpError } from "@/lib/auth/access";
 import {
   buildAllowedOrigins,
@@ -80,6 +83,7 @@ export {
   requireUser,
   requireStaff,
   requireRole,
+  requireCapability,
   requireSiteAccess,
   httpError,
 };
@@ -90,22 +94,37 @@ export async function assertStaffApi() {
 
 export async function requireBillingManager() {
   const user = await requireUser();
-  if (!canManageBilling(user.role)) {
+  if (!canManageBilling(user)) {
     throw httpError("Prohibido: se requiere rol de facturación", 403);
   }
   return user;
 }
 
 /** Documents / site files — both confidencial and privilegio flags. */
-export function confidentialWhere(userRole: string) {
-  if (canSeeConfidential(userRole)) return {};
-  return { confidencial: false, privilegio: false };
+export function confidentialWhere(
+  subject: string | PermissionSubject
+): { confidencial?: false; privilegio?: false } {
+  if (!canSeeConfidential(subject)) return { confidencial: false, privilegio: false };
+  if (!canSeePrivileged(subject)) return { privilegio: false };
+  return {};
 }
 
 /** Minutas only have `confidencial` (no `privilegio` column). */
-export function minutaConfidentialWhere(userRole: string) {
-  if (canSeeConfidential(userRole)) return {};
+export function minutaConfidentialWhere(
+  subject: string | PermissionSubject
+): { confidencial?: false } {
+  if (canSeeConfidential(subject)) return {};
   return { confidencial: false };
+}
+
+/** Lectura puntual de un documento/archivo según sus flags. */
+export function canReadFlagged(
+  subject: string | PermissionSubject,
+  flags: { confidencial?: boolean | null; privilegio?: boolean | null }
+) {
+  if (flags.privilegio) return canSeePrivileged(subject);
+  if (flags.confidencial) return canSeeConfidential(subject);
+  return true;
 }
 
 export function portalBlockedResponse(userRole: string) {

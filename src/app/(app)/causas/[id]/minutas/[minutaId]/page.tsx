@@ -1,13 +1,14 @@
+import { MinutaDetailActions } from "@/components/minutas/MinutaDetailActions";
+import { formatDateTime } from "@/components/ui";
+import { requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { canSeeConfidential } from "@/lib/auth/rbac";
+import { requireStaff } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
+import { driveFileUrl } from "@/lib/integrations/drive-folder";
+import { labelModalidadMinuta, labelTipoMinuta } from "@/lib/minutas";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { formatDateTime } from "@/components/ui";
-import { labelModalidadMinuta, labelTipoMinuta } from "@/lib/minutas";
-import { MinutaDetailActions } from "@/components/minutas/MinutaDetailActions";
-import { driveFileUrl } from "@/lib/integrations/drive-folder";
-import { requireStaff } from "@/lib/auth/session";
-import { canSeeConfidential } from "@/lib/auth/rbac";
-import { publicUserSelect } from "@/lib/auth/public-user";
 
 type Params = {
   params: Promise<{ id: string; minutaId: string }>;
@@ -18,8 +19,8 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
   const user = await requireStaff();
   const { id, minutaId } = await params;
   const sp = await searchParams;
-  const minuta = await prisma.minuta.findUnique({
-    where: { id: minutaId },
+  const minuta = await prisma.minuta.findFirst({
+    where: { AND: [scopedrequiredCausaWhere(user), { id: minutaId }] },
     include: {
       causa: true,
       autor: { select: publicUserSelect },
@@ -28,7 +29,7 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
     },
   });
   if (!minuta || minuta.causaId !== id) notFound();
-  if (minuta.confidencial && !canSeeConfidential(user.role)) {
+  if (minuta.confidencial && !canSeeConfidential(user)) {
     notFound();
   }
 

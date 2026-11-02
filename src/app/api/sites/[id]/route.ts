@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, parseBody, requireSiteAccess, requireStaff, requireUser } from "@/lib/api";
-import { clientVisibleFileWhere } from "@/lib/auth/access";
-import { isAdmin, isCliente } from "@/lib/auth/rbac";
+import { clientVisibleFileWhere, requireSiteMutationAccess } from "@/lib/auth/access";
+import { assertCausaCapability, causaAccessWhere as scopedcausaAccessWhere, siteAccessWhere as scopedsiteAccessWhere, siteFileReadWhere as scopedsiteFileReadWhere, siteRelatedWhere as scopedsiteRelatedWhere, taskAccessWhere as scopedtaskAccessWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
-import { siteFileListSelect } from "@/lib/sites/file-select";
+import { isAdmin, isCliente } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
 import { siteUpdateSchema } from "@/lib/schemas";
+import { siteFileListSelect } from "@/lib/sites/file-select";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -14,10 +15,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await requireUser();
     const { id } = await params;
     await requireSiteAccess(id, user);
-    const fileWhere = clientVisibleFileWhere(user.role);
+    const fileWhere = clientVisibleFileWhere(user);
     const clientView = isCliente(user.role);
-    const site = await prisma.site.findUnique({
-      where: { id },
+    const site = await prisma.site.findFirst({
+      where: { AND: [scopedsiteAccessWhere(user), { id }] },
       include: {
         cliente: clientView
           ? { select: { id: true, razonSocial: true } }
@@ -45,11 +46,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
         folders: {
           include: {
             children: true,
-            files: { where: fileWhere, select: siteFileListSelect },
+            files: { where: { AND: [scopedsiteFileReadWhere(user), fileWhere] }, select: siteFileListSelect },
           },
         },
         files: {
-          where: { folderId: null, ...fileWhere },
+          where: { AND: [scopedsiteFileReadWhere(user), { folderId: null, ...fileWhere }] },
           orderBy: { updatedAt: "desc" },
           take: 20,
           select: siteFileListSelect,
@@ -69,7 +70,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
               },
             },
         tasks: {
-          where: clientView ? { assigneeId: user.id } : undefined,
+          where: { AND: [scopedtaskAccessWhere(user), (clientView ? { assigneeId: user.id } : undefined) ?? {}] },
           include: { assignee: { select: publicUserSelect } },
           orderBy: { dueDate: "asc" },
           take: 12,
@@ -78,7 +79,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
           ? { where: { id: "__client_hidden__" } }
           : { include: { _count: { select: { rows: true, columns: true } } } },
         qaThreads: {
-          where: clientView ? { status: "open" } : undefined,
+          where: { AND: [scopedsiteRelatedWhere(user), (clientView ? { status: "open" } : undefined) ?? {}] },
           include: { _count: { select: { posts: true } } },
           orderBy: { updatedAt: "desc" },
           take: 8,
@@ -119,7 +120,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     if (clientView) {
       const visibleFiles = await prisma.siteFile.count({
-        where: { siteId: id, ...fileWhere },
+        where: { AND: [scopedsiteFileReadWhere(user), { siteId: id, ...fileWhere }] },
       });
       return NextResponse.json({
         ...site,
@@ -142,9 +143,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const actor = await requireStaff();
     const { id } = await params;
-    await requireSiteAccess(id, actor);
+    await requireSiteMutationAccess(id, actor);
     const body = await parseBody(req, siteUpdateSchema);
-    if (body.isClientVisible !== undefined && !isAdmin(actor.role)) {
+    if (body.isClientVisible !== undefined && !isAdmin(actor)) {
       return NextResponse.json(
         { error: "Solo admin puede cambiar la visibilidad del portal cliente" },
         { status: 403 }
@@ -154,8 +155,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     let clienteId = body.clienteId;
 
     if (body.causaId) {
+      await assertCausaCapability(body.causaId, actor, "causa.write");
       const existing = await prisma.site.findFirst({
-        where: { causaId: body.causaId, NOT: { id } },
+        where: { AND: [scopedsiteAccessWhere(actor), { causaId: body.causaId, NOT: { id } }] },
         select: { id: true, name: true },
       });
       if (existing) {
@@ -164,8 +166,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           { status: 409 }
         );
       }
-      const causa = await prisma.causa.findUnique({
-        where: { id: body.causaId },
+      const causa = await prisma.causa.findFirst({
+        where: { AND: [scopedcausaAccessWhere(actor), { id: body.causaId }] },
         select: { clienteId: true },
       });
       if (!causa) {

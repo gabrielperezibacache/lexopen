@@ -163,6 +163,9 @@ export async function applySalaMatchesToCartera(
   agenda: SalaTablaEntry[],
   opts?: { causaIds?: string[] }
 ) {
+  if (opts?.causaIds && opts.causaIds.length === 0) {
+    return { scanned: 0, matched: 0, matches: [] as SalaMatch[] };
+  }
   const { prisma } = await import("@/lib/db");
   const causas = await prisma.causa.findMany({
     where: {

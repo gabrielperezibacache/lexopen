@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
 import { labelDiasRestantes, labelUrgencia } from "@/lib/plazos";
+import { createSubmissionKeys } from "@/lib/client-submission-key";
 
 type Option = { id: string; label: string };
 
@@ -28,6 +29,7 @@ export function PlazoForm({
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const submission = useRef(createSubmissionKeys(undefined, `lexopen:deadline:${defaults?.causaId || "global"}`));
   const [causaId, setCausaId] = useState(defaults?.causaId || "");
   const [fechaNotificacion, setFechaNotificacion] = useState(
     defaults?.fechaNotificacion || ""
@@ -99,7 +101,7 @@ export function PlazoForm({
     };
     const result = await apiMutation("/api/plazos", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Idempotency-Key": submission.current.forPayload(payload) },
       body: JSON.stringify(payload),
     });
     setBusy(false);
@@ -107,6 +109,7 @@ export function PlazoForm({
       setError(result.error || "No se pudo crear el plazo");
       return;
     }
+    submission.current.complete(payload);
     form.reset();
     setCausaId("");
     setFechaNotificacion("");

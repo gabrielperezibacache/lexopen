@@ -1,3 +1,4 @@
+import { requireSiteMutationAccess } from "@/lib/auth/access";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -51,14 +52,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     assertCsrf(req);
     const actor = await requireStaff();
-    if (!isAdmin(actor.role)) {
+    if (!isAdmin(actor)) {
       return NextResponse.json(
         { error: "Solo admin puede administrar miembros del site" },
         { status: 403 }
       );
     }
     const { id } = await params;
-    await requireSiteAccess(id, actor);
+    await requireSiteMutationAccess(id, actor);
     const body = upsertMemberSchema.parse(await req.json());
     const target = await prisma.user.findUnique({
       where: { id: body.userId },

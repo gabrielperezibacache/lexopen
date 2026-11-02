@@ -7,6 +7,8 @@ import {
 } from "@/lib/net/safe-url";
 import { safeJsonParse } from "@/lib/safe-json";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
+import { getAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
+import { canSome } from "@/lib/auth/permissions";
 
 export type LlmPreset =
   | "openai"
@@ -228,8 +230,8 @@ function allowLocalLlmUrl() {
   );
 }
 
-function isAllowedLlmUrl(value: string) {
-  const allowLocal = allowLocalLlmUrl();
+function isAllowedLlmUrl(value: string, localOnly = false) {
+  const allowLocal = localOnly || allowLocalLlmUrl();
   if (
     isSafeOutboundHttpUrl(value, {
       allowHttp: allowLocal || process.env.NODE_ENV !== "production",
@@ -492,6 +494,17 @@ export async function askLlm(params: {
   timeoutMs?: number;
 }) {
   const config = await getLlmConfig();
+  // This is the single egress boundary for Inicio, Agente, document/cliente
+  // actions and connection tests. A classifier-only gate is insufficient.
+  const policy = await getAssistantFirmPolicy();
+  const localOnly = policy.assistantLlmMode === "local_only";
+  if (params.userId) {
+    const user = await prisma.user.findUnique({ where: { id: params.userId }, select: { role: true, capabilityGrants: true, capabilityRevokes: true } });
+    if (!user || !canSome(user, "assistant.use")) {
+      return { source: "error" as const, content: "", requireApproval: true, provider: config.preset, model: config.model,
+        note: "No tiene permiso para usar la IA del estudio.", error: "llm_forbidden", code: "llm_forbidden" as const };
+    }
+  }
   const messages = sanitizeLlmMessages(params.messages);
   if (!messages.some((m) => m.role === "user")) {
     return {
@@ -507,7 +520,19 @@ export async function askLlm(params: {
   let apiUrl: URL;
   try {
     apiUrl = new URL(config.apiUrl);
-    if (!isAllowedLlmUrl(config.apiUrl)) {
+    if (localOnly && !isLoopbackHostname(apiUrl.hostname)) {
+      return {
+        source: "error" as const,
+        content: "",
+        requireApproval: true,
+        provider: config.preset,
+        model: config.model,
+        note: "El estudio permite solo IA local. Configure un proveedor en localhost; no se envió texto a un proveedor remoto.",
+        error: "llm_remote_forbidden",
+        code: "llm_remote_forbidden" as const,
+      };
+    }
+    if (!isAllowedLlmUrl(config.apiUrl, localOnly)) {
       return {
         source: "error" as const,
         content: "",
@@ -544,7 +569,7 @@ export async function askLlm(params: {
     Accept: "application/json",
   };
   if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
-  const allowLocal = allowLocalLlmUrl();
+  const allowLocal = localOnly || allowLocalLlmUrl();
 
   try {
     const endpoint = `${apiUrl.toString().replace(/\/+$/, "")}/chat/completions`;

@@ -1,13 +1,14 @@
-import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { MinutaPlantillasManager } from "@/components/minutas/MinutaPlantillasManager";
 import { formatDateTime, StatusBadge } from "@/components/ui";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { minutaConfidentialWhere } from "@/lib/api";
+import { causaAccessWhere as scopedcausaAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { requireStaff } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
+import { getI18n } from "@/lib/i18n/server";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
 import { ClipboardPen } from "lucide-react";
-import { requireStaff } from "@/lib/auth/session";
-import { minutaConfidentialWhere } from "@/lib/api";
-import { MinutaPlantillasManager } from "@/components/minutas/MinutaPlantillasManager";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { getI18n } from "@/lib/i18n/server";
+import Link from "next/link";
 
 export default async function MinutasPage() {
   const user = await requireStaff();
@@ -15,7 +16,7 @@ export default async function MinutasPage() {
   const h = dict.hubs.minutas;
   const [minutas, causas, accionesAbiertasTotal, plantillas] = await Promise.all([
     prisma.minuta.findMany({
-      where: minutaConfidentialWhere(user.role),
+      where: { AND: [scopedrequiredCausaWhere(user), minutaConfidentialWhere(user)] },
       include: {
         causa: { select: { id: true, titulo: true, rit: true } },
         autor: { select: { name: true } },
@@ -32,7 +33,7 @@ export default async function MinutasPage() {
       take: 40,
     }),
     prisma.causa.findMany({
-      where: { estado: "activa" },
+      where: { AND: [scopedcausaAccessWhere(user), { estado: "activa" }] },
       select: { id: true, titulo: true, rit: true },
       orderBy: { updatedAt: "desc" },
       take: 8,
@@ -40,7 +41,7 @@ export default async function MinutasPage() {
     prisma.minutaAccion.count({
       where: {
         estado: { in: [...ACCIONES_ABIERTAS] },
-        minuta: minutaConfidentialWhere(user.role),
+        minuta: minutaConfidentialWhere(user),
       },
     }),
     prisma.minutaPlantilla.findMany({

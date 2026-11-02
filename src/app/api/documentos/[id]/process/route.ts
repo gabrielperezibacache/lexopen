@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { assertCsrf, canReadFlagged, handleRouteError, requireStaff } from "@/lib/api";
+import { assertCausaCapability, documentReadWhere as scopeddocumentReadWhere } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
-import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { canSeeConfidential } from "@/lib/auth/rbac";
-import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
+import { documentProcessingReset, enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 import { getObject } from "@/lib/storage";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,10 +12,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const document = await prisma.documento.findUnique({
-      where: { id },
+    const document = await prisma.documento.findFirst({
+      where: { AND: [scopeddocumentReadWhere(user), { id }] },
       select: {
         id: true,
+        causaId: true,
         nombre: true,
         contenido: true,
         storageKey: true,
@@ -25,12 +26,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
     if (!document) return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
     if (
-      (document.confidencial || document.privilegio) &&
-      !canSeeConfidential(user.role)
+      !canReadFlagged(user, document)
     ) {
       return NextResponse.json({ error: "Documento confidencial" }, { status: 403 });
     }
 
+    if (document.causaId) await assertCausaCapability(document.causaId, user, "causa.write");
     const bytes = document.storageKey
       ? await getObject(document.storageKey)
       : document.contenido
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     await prisma.documento.update({
       where: { id },
       data: {
+        ...documentProcessingReset,
         extractionStatus: "pending",
         extractionJson: JSON.stringify({ requestedBy: user.id }),
       },

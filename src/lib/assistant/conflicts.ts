@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { relatedCausaWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 
 export type EventConflict = {
   id: string;
@@ -20,12 +21,15 @@ export async function detectEventConflicts(
   inicio: Date,
   fin: Date | null | undefined,
   responsableId: string,
-  excludeId?: string
+  excludeId?: string,
+  user?: CausaAccessUser,
 ): Promise<EventConflict[]> {
+  if (!user) return [];
   const finEfectivo = fin ?? inicio;
   const eventos = await prisma.evento.findMany({
     where: {
       responsableId,
+      ...relatedCausaWhere(user),
       estado: { not: "cancelado" },
       ...(excludeId ? { id: { not: excludeId } } : {}),
       inicio: { lte: finEfectivo },

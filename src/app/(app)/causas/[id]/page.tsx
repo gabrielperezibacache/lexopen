@@ -1,40 +1,44 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { TRIBUNALES_CHILE, labelEtapa, labelMateria } from "@/lib/chile";
-import { formatCivilDate } from "@/lib/chile-time";
-import { labelDiasRestantes, labelTipoComputo, diasRestantes } from "@/lib/plazos";
-import { StatusBadge, UrgenciaBadge, formatDate, formatDateTime } from "@/components/ui";
 import { CausaActions } from "@/components/CausaActions";
-import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
+import { ConflictReviewPanel } from "@/components/ConflictReviewPanel";
+import { DocumentDriveAction } from "@/components/DocumentDriveAction";
+import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
+import { DriveFolderPanel } from "@/components/DriveFolderPanel";
+import { CausaResumenAi } from "@/components/ai/CausaResumenAi";
+import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
+import { PlazoSugerirAi } from "@/components/ai/PlazoSugerirAi";
+import { CausaEquipoPanel } from "@/components/causas/CausaEquipoPanel";
+import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
 import { PjudMonitorPanel } from "@/components/pjud/PjudMonitorPanel";
-import { TramitesPanel } from "@/components/clientes/TramitesPanel";
-import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
-import {
-  diasEntre,
-  semaforoPorDiasSinMovimiento,
-} from "@/lib/pjud/classify";
-import { labelCausaOrigen } from "@/lib/pjud/causa-origin";
+import { CreateSiteFromCausaButton } from "@/components/sites/NewSiteButton";
+import { StatusBadge, UrgenciaBadge, formatDate, formatDateTime } from "@/components/ui";
+import { confidentialWhere, minutaConfidentialWhere } from "@/lib/api";
+import { assertCausaAccess, causaAccessWhere as scopedcausaAccessWhere, documentReadWhere as scopeddocumentReadWhere, plazoAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { can } from "@/lib/auth/permissions";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { STAFF_ROLES } from "@/lib/auth/roles";
+import { requireStaff } from "@/lib/auth/session";
+import { TRIBUNALES_CHILE, labelEtapa, labelMateria } from "@/lib/chile";
+import { formatCivilDate } from "@/lib/chile-time";
+import { labelConflictStatus } from "@/lib/conflict";
+import { prisma } from "@/lib/db";
+import { getI18n } from "@/lib/i18n/server";
 import {
   isPlaceholderDriveFolderId,
   isRealDriveFolderId,
 } from "@/lib/integrations/drive-folder";
-import { labelConflictStatus } from "@/lib/conflict";
-import { ConflictReviewPanel } from "@/components/ConflictReviewPanel";
-import { requireStaff } from "@/lib/auth/session";
-import { confidentialWhere, minutaConfidentialWhere } from "@/lib/api";
+import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
+import { labelCausaOrigen } from "@/lib/pjud/causa-origin";
+import {
+  diasEntre,
+  semaforoPorDiasSinMovimiento,
+} from "@/lib/pjud/classify";
+import { diasRestantes, labelDiasRestantes, labelTipoComputo } from "@/lib/plazos";
 import { documentoListSelect } from "@/lib/sites/file-select";
-import { publicUserSelect } from "@/lib/auth/public-user";
-import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
-import { DocumentDriveAction } from "@/components/DocumentDriveAction";
-import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
-import { CausaResumenAi } from "@/components/ai/CausaResumenAi";
-import { PlazoSugerirAi } from "@/components/ai/PlazoSugerirAi";
-import { CreateSiteFromCausaButton } from "@/components/sites/NewSiteButton";
-import { getI18n } from "@/lib/i18n/server";
 import { siteTipoLabel } from "@/lib/sites/labels";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -46,6 +50,8 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
   const { t, dict } = await getI18n();
   const h = dict.hubs.causaDetail;
   const { id } = await params;
+  const access = await assertCausaAccess(id, user).catch(() => null);
+  if (!access) notFound();
   const sp = await searchParams;
   const from = sp.from?.trim();
   const backHref =
@@ -61,30 +67,30 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         ? h.backMisCausas
         : h.backExpediente;
   const [causa, responsables, totalAccionesAbiertas, textStatus] = await Promise.all([
-    prisma.causa.findUnique({
-      where: { id },
+    prisma.causa.findFirst({
+      where: { AND: [scopedcausaAccessWhere(user), { id }] },
       include: {
         cliente: true,
         abogado: { select: publicUserSelect },
         partes: true,
         documentos: {
-          where: confidentialWhere(user.role),
+          where: { AND: [scopeddocumentReadWhere(user), confidentialWhere(user)] },
           orderBy: { updatedAt: "desc" },
           select: {
             ...documentoListSelect,
             storageKey: true,
           },
         },
-        plazos: { orderBy: { fechaLimite: "asc" } },
-        tramites: {
+        plazos: { where: plazoAccessWhere(user),  orderBy: { fechaLimite: "asc" } },
+        tramites: { where: scopedrequiredCausaWhere(user),
           orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
           include: { responsable: { select: { id: true, name: true } } },
         },
         notas: { orderBy: { updatedAt: "desc" } },
         etapaHistorial: { orderBy: { createdAt: "desc" } },
-        movimientos: { orderBy: { fecha: "desc" }, take: 200 },
+        movimientos: { where: scopedrequiredCausaWhere(user),  orderBy: { fecha: "desc" }, take: 200 },
         minutas: {
-          where: minutaConfidentialWhere(user.role),
+          where: { AND: [scopedrequiredCausaWhere(user), minutaConfidentialWhere(user)] },
           include: {
             autor: { select: { name: true } },
             _count: {
@@ -104,11 +110,20 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           take: 30,
         },
         site: { select: { id: true, name: true, tipo: true, isClientVisible: true } },
+        miembros: {
+          include: { user: { select: publicUserSelect } },
+          orderBy: [{ rol: "asc" }, { createdAt: "asc" }],
+        },
       },
     }),
     prisma.user.findMany({
-      where: { role: { in: ["admin", "abogado", "asistente"] } },
-      select: { id: true, name: true },
+      where: {
+        OR: [
+          { role: { in: [...STAFF_ROLES] } },
+          { role: "externo" },
+        ],
+      },
+      select: { id: true, name: true, role: true },
       orderBy: { name: "asc" },
     }),
     prisma.minutaAccion.count({
@@ -415,6 +430,26 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           folderUrl={causa.googleDriveFolderUrl}
         />
       </div>
+
+      <CausaEquipoPanel
+        causaId={causa.id}
+        initialAcceso={causa.acceso}
+        initialMiembros={causa.miembros.map((m) => ({
+          id: m.id,
+          userId: m.userId,
+          rol: m.rol,
+          user: {
+            id: m.user.id,
+            name: m.user.name,
+            email: m.user.email,
+            role: m.user.role,
+          },
+        }))}
+        staffOptions={responsables}
+        canManage={can(user, "causa.team.manage", {
+          causaRol: access.causaRol,
+        })}
+      />
 
       <ConflictReviewPanel
         causaId={causa.id}

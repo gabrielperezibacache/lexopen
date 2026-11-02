@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { PasswordChangeForm } from "@/components/PasswordChangeForm";
 import { TotpSettingsPanel } from "@/components/TotpSettingsPanel";
@@ -16,6 +17,11 @@ export default async function CuentaPage() {
         title={h.title}
         subtitle={`${user.name} · ${user.email}`}
       />
+      <p className="text-sm">
+        <Link className="text-[var(--sea)] underline" href="/cuenta/notificaciones">
+          Preferencias de notificaciones →
+        </Link>
+      </p>
       <PasswordChangeForm />
       <TotpSettingsPanel />
     </div>

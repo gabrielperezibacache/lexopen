@@ -1,3 +1,4 @@
+import { causaAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
 import {
@@ -539,9 +540,9 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
   };
 }
 
-export async function listCarteraMonitoreo() {
+export async function listCarteraMonitoreo(user?: CausaAccessUser) {
   const causas = await prisma.causa.findMany({
-    where: { estado: "activa" },
+    where: { AND: [{ estado: "activa" }, user ? causaAccessWhere(user) : {}] },
     include: {
       abogado: { select: { id: true, name: true } },
       cliente: { select: { id: true, razonSocial: true } },
@@ -606,9 +607,9 @@ export async function listCarteraMonitoreo() {
   });
 }
 
-export async function listFallidosMonitoreo(limit = 50) {
+export async function listFallidosMonitoreo(limit = 50, user?: CausaAccessUser) {
   const jobs = await prisma.pjudSyncJob.findMany({
-    where: { status: "failed" },
+    where: { status: "failed", ...(user ? { causa: causaAccessWhere(user) } : {}) },
     include: {
       causa: {
         select: {

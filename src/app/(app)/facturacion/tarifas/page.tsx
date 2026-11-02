@@ -1,18 +1,19 @@
-import { prisma } from "@/lib/db";
-import { ModuleHeader } from "@/components/sites/SiteNav";
-import { clp, formatUf, labelFeeTipo } from "@/lib/billing";
 import { FeeForm } from "@/components/billing/FeeForm";
+import { ModuleHeader } from "@/components/sites/SiteNav";
+import { causaAccessWhere as scopedcausaAccessWhere, billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
 import { requireStaff } from "@/lib/auth/session";
+import { clp, formatUf, labelFeeTipo } from "@/lib/billing";
+import { prisma } from "@/lib/db";
 
 export default async function TarifasPage() {
-  await requireStaff();
+  const user = await requireStaff();
   const [fees, clientes, causas] = await Promise.all([
-    prisma.feeArrangement.findMany({
+    prisma.feeArrangement.findMany({ where: scopedrelatedCausaWhere(user),
       include: { cliente: true, causa: true },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.cliente.findMany({ select: { id: true, razonSocial: true } }),
-    prisma.causa.findMany({ select: { id: true, titulo: true, rit: true, clienteId: true } }),
+    prisma.causa.findMany({ where: scopedcausaAccessWhere(user),  select: { id: true, titulo: true, rit: true, clienteId: true } }),
   ]);
 
   return (

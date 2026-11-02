@@ -1,9 +1,10 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { assertSitePageAccess } from "@/lib/auth/access";
-import { isStaff } from "@/lib/auth/rbac";
-import { SiteNav } from "@/components/sites/SiteNav";
 import { AddMemberButton } from "@/components/sites/AddMemberButton";
+import { SiteNav } from "@/components/sites/SiteNav";
+import { assertSitePageAccess } from "@/lib/auth/access";
+import { siteAccessWhere as scopedsiteAccessWhere } from "@/lib/auth/causa-access";
+import { isStaff } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
+import { notFound } from "next/navigation";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,8 +13,8 @@ export default async function SitePeoplePage({ params }: Params) {
   const user = await assertSitePageAccess(id);
   // ⚡ Bolt: Fetch site and available users concurrently to save one database round trip per page load
   const [site, allUsers] = await Promise.all([
-    prisma.site.findUnique({
-      where: { id },
+    prisma.site.findFirst({
+      where: { AND: [scopedsiteAccessWhere(user), { id }] },
       include: {
         members: { include: { user: true } },
         groups: { include: { group: { include: { members: { include: { user: true } } } } } },

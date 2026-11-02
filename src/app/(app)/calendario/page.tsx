@@ -1,24 +1,25 @@
-import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { civilDateKey, civilMonthQueryRange, formatCivilDate } from "@/lib/chile-time";
-import { clasificarUrgencia, labelTipoComputo } from "@/lib/plazos";
-import { UrgenciaBadge, pageTitleClass } from "@/components/ui";
-import { requireStaff } from "@/lib/auth/session";
-import {
-  CalendarioClient,
-  type EventoListItem,
-} from "@/components/calendario/CalendarioClient";
 import {
   CalendarioBoard,
   type BoardDay,
 } from "@/components/calendario/CalendarioBoard";
+import {
+  CalendarioClient,
+  type EventoListItem,
+} from "@/components/calendario/CalendarioClient";
+import { GoogleCalendarPullButton } from "@/components/calendario/GoogleCalendarPullButton";
+import { UrgenciaBadge, pageTitleClass } from "@/components/ui";
+import { causaAccessWhere as scopedcausaAccessWhere, relatedCausaWhere as scopedrelatedCausaWhere, plazoAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere, taskAccessWhere as scopedtaskAccessWhere } from "@/lib/auth/causa-access";
+import { requireStaff } from "@/lib/auth/session";
 import {
   mondayOfWeek,
   shiftWeek,
   weekDays,
   weekQueryRange,
 } from "@/lib/calendario/week";
-import { GoogleCalendarPullButton } from "@/components/calendario/GoogleCalendarPullButton";
+import { civilDateKey, civilMonthQueryRange, formatCivilDate } from "@/lib/chile-time";
+import { prisma } from "@/lib/db";
+import { clasificarUrgencia, labelTipoComputo } from "@/lib/plazos";
+import Link from "next/link";
 
 function monthMatrix(year: number, monthIndex: number) {
   const firstDow = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay();
@@ -83,7 +84,7 @@ type Props = {
 };
 
 export default async function CalendarioPage({ searchParams }: Props) {
-  await requireStaff();
+  const user = await requireStaff();
   const sp = await searchParams;
   const vista = parseVista(sp.vista);
   const { year, monthIndex } = parseYm(sp.ym);
@@ -108,25 +109,25 @@ export default async function CalendarioPage({ searchParams }: Props) {
   const [plazos, tasks, causasTabla, movAudiencias, eventosRaw, causasOptions] =
     await Promise.all([
       prisma.plazo.findMany({
-        where: {
+        where: { AND: [plazoAccessWhere(user), {
           estado: { in: ["pendiente", "vencido"] },
           fechaLimite: { gte: range.start, lte: range.end },
-        },
+        }] },
         include: { causa: true },
         orderBy: { fechaLimite: "asc" },
       }),
       prisma.task.findMany({
-        where: {
+        where: { AND: [scopedtaskAccessWhere(user), {
           status: { not: "done" },
           dueDate: { gte: range.start, lte: range.end },
-        },
+        }] },
         include: { site: true },
         orderBy: { dueDate: "asc" },
       }),
       prisma.causa.findMany({
-        where: {
+        where: { AND: [scopedcausaAccessWhere(user), {
           proximaTabla: { gte: range.start, lte: range.end },
-        },
+        }] },
         select: {
           id: true,
           rit: true,
@@ -137,10 +138,10 @@ export default async function CalendarioPage({ searchParams }: Props) {
         },
       }),
       prisma.causaMovimiento.findMany({
-        where: {
+        where: { AND: [scopedrequiredCausaWhere(user), {
           tipo: "audiencia",
           fecha: { gte: range.start, lte: range.end },
-        },
+        }] },
         select: {
           id: true,
           titulo: true,
@@ -151,16 +152,16 @@ export default async function CalendarioPage({ searchParams }: Props) {
         take: 200,
       }),
       prisma.evento.findMany({
-        where: {
+        where: { AND: [scopedrelatedCausaWhere(user), {
           estado: { not: "cancelado" },
           inicio: { gte: range.start, lte: range.end },
-        },
+        }] },
         include: { causa: { select: { id: true, rit: true, titulo: true } } },
         orderBy: { inicio: "asc" },
         take: 300,
       }),
       prisma.causa.findMany({
-        where: { estado: { in: ["activa", "suspensa"] } },
+        where: { AND: [scopedcausaAccessWhere(user), { estado: { in: ["activa", "suspensa"] } }] },
         select: { id: true, rit: true, titulo: true },
         orderBy: { updatedAt: "desc" },
         take: 100,
@@ -184,7 +185,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
   }));
 
   const upcomingPlazos = await prisma.plazo.findMany({
-    where: { estado: { in: ["pendiente", "vencido"] } },
+    where: { AND: [plazoAccessWhere(user), { estado: { in: ["pendiente", "vencido"] } }] },
     include: { causa: true },
     orderBy: { fechaLimite: "asc" },
     take: 12,

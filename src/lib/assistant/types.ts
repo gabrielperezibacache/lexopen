@@ -47,7 +47,11 @@ export type ToolKind = "read" | "write";
 export type ToolContext = {
   userId: string;
   role: Role;
+  capabilityGrants?: string | null;
+  capabilityRevokes?: string | null;
   chatId?: string | null;
+  /** Stable server-generated plan-step key; never taken from tool slots. */
+  commandKey?: string;
 };
 
 export type ToolResult = {

@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (user.totpEnabled && user.totpSecretEnc) {
-      const pending = mintTotpPendingToken(user.id);
+      const pending = mintTotpPendingToken(user.id, user.sessionVersion);
       const res = NextResponse.json({
         ok: true,
         needsTotp: true,

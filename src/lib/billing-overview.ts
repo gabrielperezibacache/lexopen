@@ -1,3 +1,6 @@
+import type { Prisma, PrismaClient } from "@prisma/client";
+import { billingRelatedWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
+import { can } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { OPEN_INVOICE_STATUSES } from "@/lib/billing";
@@ -78,8 +81,33 @@ export function summarizeProvision(balances: number[]) {
   };
 }
 
-/** KPIs de /facturacion con agregados de base de datos (O(1) en filas históricas). */
-export async function loadBillingOverview() {
+/** A legacy ledger row can inherit a private matter through invoice/payment too. */
+export function ledgerAccessWhere(user: CausaAccessUser): Prisma.LedgerEntryWhereInput {
+  const scope = billingRelatedWhere(user);
+  return { AND: [scope,
+    { OR: [{ invoiceId: null }, { invoice: scope }] },
+    { OR: [{ paymentId: null }, { payment: { OR: [{ invoice: scope }, ...(can(user, "billing.manage") ? [{ invoiceId: null }] : [])] } }] },
+  ] };
+}
+
+/** Sum visible movements in SQL; stored running balances can include hidden cases. */
+export async function loadScopedLedgerBalances(user: CausaAccessUser, client: PrismaClient = prisma) {
+  const rows = await client.ledgerEntry.groupBy({ by: ["clienteId"], where: ledgerAccessWhere(user), _sum: { creditClp: true, debitClp: true } });
+  return rows.map(row => ({ clienteId: row.clienteId, balanceClp: (row._sum.creditClp || 0) - (row._sum.debitClp || 0) }));
+}
+
+export function scopedLedgerRunningBalances<T extends { id: string; clienteId: string; date: Date; createdAt: Date; creditClp: number; debitClp: number; balanceClp: number }>(rows: T[]): T[] {
+  const balances = new Map<string, number>();
+  return [...rows].sort((a,b) => a.date.getTime() - b.date.getTime() || a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id)).map(row => {
+    const balanceClp = (balances.get(row.clienteId) || 0) + row.creditClp - row.debitClp;
+    balances.set(row.clienteId, balanceClp);
+    return { ...row, balanceClp };
+  }).reverse();
+}
+
+/** KPIs use only the actor's authorized billing scope. */
+export async function loadBillingOverview(user: CausaAccessUser, client: PrismaClient = prisma) {
+  const scope = billingRelatedWhere(user);
   const month = billingMonthRange();
   const [
     unbilledTime,
@@ -90,56 +118,42 @@ export async function loadBillingOverview() {
     recentInvoices,
     recentTime,
   ] = await Promise.all([
-    prisma.timeEntry.aggregate({
-      where: { billable: true, billed: false },
+    client.timeEntry.aggregate({
+      where: { AND: [scope, { billable: true, billed: false }] },
       _sum: { hours: true, amountClp: true },
       _count: true,
     }),
-    prisma.expense.aggregate({
-      where: { billable: true, billed: false },
+    client.expense.aggregate({
+      where: { AND: [scope, { billable: true, billed: false }] },
       _sum: { amountClp: true },
       _count: true,
     }),
-    prisma.invoice.aggregate({
-      where: { status: { in: [...OPEN_INVOICE_STATUSES] } },
+    client.invoice.aggregate({
+      where: { AND: [scope, { status: { in: [...OPEN_INVOICE_STATUSES] } }] },
       _sum: { totalClp: true, paidClp: true },
       _count: true,
     }),
-    prisma.payment.aggregate({
-      where: { date: { gte: month.start, lte: month.end } },
+    client.payment.aggregate({
+      where: { date: { gte: month.start, lte: month.end }, OR: [{ invoice: scope }, { invoiceId: null, ledger: { some: scope } }] },
       _sum: { amountClp: true },
       _count: true,
     }),
-    // ⚡ Bolt: Fetch the latest balance per client using a relation query.
-    // This avoids a full table scan and sort on ledgerEntry required by distinct,
-    // leveraging PostgreSQL lateral joins instead.
-    prisma.cliente.findMany({
-      where: { ledgerEntries: { some: {} } },
-      select: {
-        id: true,
-        ledgerEntries: {
-          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-          take: 1,
-          select: { balanceClp: true },
-        },
-      },
-    }),
-    prisma.invoice.findMany({
+    loadScopedLedgerBalances(user, client),
+    client.invoice.findMany({
+      where: scope,
       include: { cliente: true, causa: true },
       orderBy: { updatedAt: "desc" },
       take: 6,
     }),
-    prisma.timeEntry.findMany({
+    client.timeEntry.findMany({
+      where: scope,
       include: { user: { select: publicUserSelect }, causa: true, cliente: true },
       orderBy: { date: "desc" },
       take: 6,
     }),
   ]);
 
-  const latestBalances = latestBalancesRaw.map((c) => ({
-    clienteId: c.id,
-    balanceClp: c.ledgerEntries[0].balanceClp,
-  }));
+  const latestBalances = latestBalancesRaw;
   const provision = summarizeProvision(latestBalances.map((entry) => entry.balanceClp));
 
   return {

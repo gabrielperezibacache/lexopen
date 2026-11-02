@@ -67,7 +67,7 @@ export const es = {
     misCausas: "Mis Causas CU",
     minutes: "Minutas",
     billing: "Facturación",
-    tasks: "Tareas",
+    tasks: "Pendientes",
     calendar: "Calendario",
     search: "Buscar",
     messages: "Mensajes",
@@ -89,7 +89,7 @@ export const es = {
   siteTabs: {
     overview: "Resumen",
     files: "Archivos",
-    tasks: "Tareas",
+    tasks: "Pendientes",
     wiki: "Wiki",
     blog: "Blog",
     isheets: "iSheets",
@@ -173,7 +173,7 @@ export const es = {
       case: "Causa",
       portal: "Portal",
       files: "Archivos",
-      tasks: "Tareas",
+      tasks: "Pendientes",
       updated: "Actualizado",
       actions: "Acciones",
       open: "Abrir",
@@ -209,7 +209,7 @@ export const es = {
       ],
       stats: {
         files: "Archivos",
-        tasks: "Tareas",
+        tasks: "Pendientes",
         wiki: "Páginas wiki",
         people: "Personas",
       },
@@ -303,13 +303,18 @@ export const es = {
     email: "Email",
     password: "Contraseña",
     submit: "Entrar",
+    preparing: "Preparando acceso…",
     submitting: "Entrando…",
     error: "No se pudo iniciar sesión",
     demoUsers: "Usuarios demo · contraseña lexopen",
     roles: {
-      admin: "Socia / admin",
-      lawyer: "Abogado",
+      admin: "Admin del Host",
+      socio: "Socio/a",
+      lawyer: "Abogado/a",
+      procurador: "Procurador/a",
       assistant: "Asistente",
+      contabilidad: "Contabilidad",
+      externo: "Externo",
       client: "Cliente (portal)",
     },
   },
@@ -388,6 +393,7 @@ export const es = {
       confirming: "Ejecutando…",
       cancelled: "Plan descartado.",
       needsConfirm: "Requiere su confirmación antes de escribir en la base de datos.",
+      partial: "El plan quedó incompleto. Revise los resultados y vuelva a confirmar este mismo plan: las acciones ya guardadas no se duplicarán.",
     },
     result: {
       view: "Ver",
@@ -827,9 +833,10 @@ export const es = {
       emptyAction: "Ver espacios",
     },
     tareas: {
-      eyebrow: "Gestión de proyecto",
-      title: "Tareas",
-      subtitle: "Vista global de tareas del estudio y por espacio.",
+      eyebrow: "Bandeja unificada",
+      title: "Pendientes",
+      subtitle:
+        "Tareas, trámites y acciones de minuta en una sola bandeja para",
     },
     documentos: {
       eyebrow: "Repositorio por causa",
@@ -867,7 +874,7 @@ export const es = {
     cuenta: {
       eyebrow: "Seguridad personal",
       title: "Mi cuenta",
-      subtitle: "Contraseña, 2FA e idioma.",
+      subtitle: "Contraseña, 2FA, notificaciones e idioma.",
     },
     jurisprudencia: {
       eyebrow: "Base doctrinal",

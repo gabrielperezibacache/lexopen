@@ -1,0 +1,27 @@
+{
+  "server": "next start",
+  "next": "16.3.0",
+  "mode": "production",
+  "bind": "127.0.0.1:3211",
+  "database": "lexopen_own_prod_test",
+  "databaseKind": "disposable loopback PostgreSQL",
+  "e2eRelaxation": false,
+  "csrfRelaxation": false,
+  "privileged2FARequired": true,
+  "llmDemo": false,
+  "llmCredentialsConfigured": false,
+  "pjudDemo": false,
+  "storage": "dedicated temporary local directory, explicitly enabled",
+  "smokeExitCode": 0,
+  "fixtureRowsAfterCleanup": {
+    "User": 0,
+    "Causa": 0,
+    "Plazo": 0,
+    "CommandExecution": 0,
+    "DocumentEvidenceVersion": 0
+  },
+  "deployedToUserHost": false,
+  "compiledBrowserLogin": true,
+  "hydrationErrors": 0,
+  "productionSmokeAssertionGroups": 12
+}

@@ -1,17 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { handleRouteError, requireBillingManager } from "@/lib/api";
+import { billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
 import { renderInvoiceHtml } from "@/lib/billing-pdf";
+import { prisma } from "@/lib/db";
 import { downloadResponseHeaders } from "@/lib/security/download";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
-    await requireBillingManager();
+    const user = await requireBillingManager();
     const { id } = await params;
-    const invoice = await prisma.invoice.findUnique({
-      where: { id },
+    const invoice = await prisma.invoice.findFirst({
+      where: { AND: [scopedrelatedCausaWhere(user), { id }] },
       include: { cliente: true, causa: true, lines: true },
     });
     if (!invoice) {

@@ -1,5 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   confidentialWhere,
@@ -7,10 +5,13 @@ import {
   parseBody,
   requireStaff,
 } from "@/lib/api";
-import { clienteUpdateSchema } from "@/lib/schemas";
 import { writeAuditStrict } from "@/lib/audit";
-import { TRAMITES_ABIERTOS } from "@/lib/tramites";
+import { causaAccessWhere, documentReadWhere } from "@/lib/auth/causa-access";
+import { prisma } from "@/lib/db";
+import { clienteUpdateSchema } from "@/lib/schemas";
 import { documentoListSelect } from "@/lib/sites/file-select";
+import { TRAMITES_ABIERTOS } from "@/lib/tramites";
+import { NextRequest, NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       include: {
         abogado: { select: { id: true, name: true, email: true } },
         documentos: {
-          where: confidentialWhere(user.role),
+          where: { AND: [documentReadWhere(user), confidentialWhere(user)] },
           orderBy: { updatedAt: "desc" },
           select: {
             ...documentoListSelect,
@@ -31,7 +32,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
           },
         },
         causas: {
-          orderBy: { updatedAt: "desc" },
+          where: causaAccessWhere(user),          orderBy: { updatedAt: "desc" },
           include: {
             abogado: { select: { id: true, name: true } },
             tramites: {

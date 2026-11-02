@@ -14,6 +14,7 @@ import { ConfigSectionNav } from "@/components/config/ConfigSectionNav";
 import { UsersAdminPanel } from "@/components/config/UsersAdminPanel";
 import { IntegrationsOverviewPanel } from "@/components/IntegrationsOverviewPanel";
 import { HostStatusPanel } from "@/components/HostStatusPanel";
+import { NotifyAdminPanel } from "@/components/config/NotifyAdminPanel";
 import { PurgeDemoPanel } from "@/components/PurgeDemoPanel";
 import { getHostStatus } from "@/lib/host-status";
 import { buildPjudOpsLog } from "@/lib/pjud/ops-log";
@@ -110,6 +111,7 @@ export default async function ConfiguracionPage() {
         entries={pjudOpsLog}
       />
       <RuntimeSettingsPanel />
+      <NotifyAdminPanel />
       <IntegrationsOverviewPanel />
       <HostStatusPanel status={hostStatus} />
       <PurgeDemoPanel />

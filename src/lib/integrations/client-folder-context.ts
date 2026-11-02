@@ -1,5 +1,5 @@
+import { causaAccessWhere, documentReadWhere, plazoAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
-import { confidentialWhere } from "@/lib/api";
 import { getObject } from "@/lib/storage";
 import { TRAMITES_ABIERTOS } from "@/lib/tramites";
 
@@ -34,25 +34,26 @@ async function extractDocText(doc: {
 
 export async function buildClienteFolderContext(
   clienteId: string,
-  userRole: string
+  user: CausaAccessUser
 ) {
-  const cliente = await prisma.cliente.findUnique({
-    where: { id: clienteId },
+  const cliente = await prisma.cliente.findFirst({
+    where: { id: clienteId, OR: [{ causas: { some: causaAccessWhere(user) } }, { causas: { none: {} } }] },
     include: {
       abogado: { select: { name: true } },
       documentos: {
-        where: confidentialWhere(userRole),
+        where: documentReadWhere(user),
         orderBy: { updatedAt: "desc" },
         take: 20,
       },
       causas: {
+        where: causaAccessWhere(user),
         orderBy: { updatedAt: "desc" },
         include: {
           tramites: {
             orderBy: [{ orden: "asc" }, { createdAt: "asc" }],
           },
           plazos: {
-            where: { estado: { in: ["pendiente", "vencido"] } },
+            where: { ...plazoAccessWhere(user), estado: { in: ["pendiente", "vencido"] } },
             orderBy: { fechaLimite: "asc" },
             take: 10,
           },
@@ -123,5 +124,9 @@ export async function buildClienteFolderContext(
   return {
     cliente,
     context: JSON.stringify(resumen, null, 2),
+    accessRefs: [
+      ...cliente.causas.map((causa) => ({ type: "causa", id: causa.id })),
+      ...cliente.documentos.map((documento) => ({ type: "documento", id: documento.id })),
+    ],
   };
 }

@@ -1,14 +1,23 @@
-import { cookies } from "next/headers";
-import { createHmac, randomBytes, timingSafeEqual } from "crypto";
-import { prisma } from "@/lib/db";
-import { canImpersonate, isStaff } from "@/lib/auth/rbac";
+import {
+  can,
+  canSome,
+  type Capability,
+  type PermissionScope,
+} from "@/lib/auth/permissions";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { canImpersonate, isStaff } from "@/lib/auth/rbac";
+import { VALID_ROLE_SET } from "@/lib/auth/roles";
+import { prisma } from "@/lib/db";
 import { isStrongSessionSecret } from "@/lib/security/production-env";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { cookies, headers } from "next/headers";
+
+import { isTwoFactorExemptPath, mustEnrollTwoFactor } from "@/lib/auth/two-factor-policy";
 
 export const SESSION_COOKIE = "lexopen_session";
 export const ROLE_COOKIE = "lexopen_role";
 const SESSION_DAYS = 14;
-const ROLES = new Set(["admin", "abogado", "asistente", "cliente"]);
+const ROLES = VALID_ROLE_SET;
 
 export function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
@@ -75,7 +84,7 @@ export async function getCurrentUser() {
   const parsed = verifySessionToken(raw);
   if (!parsed) return null;
   const user = await prisma.user.findUnique({ where: { id: parsed.userId } });
-  if (!user || user.sessionVersion !== parsed.sessionVersion) return null;
+  if (!user || !ROLES.has(user.role) || user.sessionVersion !== parsed.sessionVersion) return null;
   return user;
 }
 
@@ -85,6 +94,14 @@ export async function requireUser() {
     const err = new Error("No autenticado") as Error & { status: number };
     err.status = 401;
     throw err;
+  }
+  const h = await headers();
+  const path = h.get("x-lexopen-pathname") || "";
+  if (!isTwoFactorExemptPath(path) && !user.totpEnabled) {
+    const settings = await prisma.firmSettings.findFirst({ select: { require2faPrivileged: true } });
+    if (mustEnrollTwoFactor({ role: user.role, totpEnabled: user.totpEnabled, policyEnabled: settings?.require2faPrivileged ?? true })) {
+      throw Object.assign(new Error("Active la verificación en dos pasos en Mi cuenta"), { status: 403 });
+    }
   }
   return user;
 }
@@ -101,8 +118,25 @@ export async function requireStaff() {
 
 export async function requireRole(...roles: string[]) {
   const user = await requireUser();
-  if (!roles.includes(user.role)) {
+  if (roles.length === 1 && roles[0] === "admin" ? !can(user, "host.admin") : !roles.includes(user.role)) {
     const err = new Error("Prohibido") as Error & { status: number };
+    err.status = 403;
+    throw err;
+  }
+  return user;
+}
+
+/**
+ * Exige una capacidad. Sin `scope`, `scoped` (◐) basta para pasar la puerta;
+ * el handler debe acotar el recurso (p. ej. `assertCausaAccess`).
+ */
+export async function requireCapability(cap: Capability, scope?: PermissionScope) {
+  const user = await requireUser();
+  const ok = scope ? can(user, cap, scope) : canSome(user, cap);
+  if (!ok) {
+    const err = new Error("Prohibido: su rol no tiene este permiso") as Error & {
+      status: number;
+    };
     err.status = 403;
     throw err;
   }

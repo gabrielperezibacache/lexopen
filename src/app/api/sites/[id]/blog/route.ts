@@ -1,7 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { z } from "zod";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
@@ -9,9 +5,15 @@ import {
   requireSiteAccess,
   requireUser,
 } from "@/lib/api";
-import { isCliente } from "@/lib/auth/rbac";
-import { publicUserSelect } from "@/lib/auth/public-user";
 import { writeAuditStrict } from "@/lib/audit";
+import { requireSiteMutationAccess } from "@/lib/auth/access";
+import { siteRelatedWhere as scopedsiteRelatedWhere } from "@/lib/auth/causa-access";
+import { publicUserSelect } from "@/lib/auth/public-user";
+import { isCliente } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -30,10 +32,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params;
     await requireSiteAccess(id, user);
     const posts = await prisma.blogPost.findMany({
-      where: {
+      where: { AND: [scopedsiteRelatedWhere(user), {
         siteId: id,
         ...(isCliente(user.role) ? { published: true } : {}),
-      },
+      }] },
       include: { author: { select: publicUserSelect } },
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
-    await requireSiteAccess(id, user);
+    await requireSiteMutationAccess(id, user);
     if (isCliente(user.role)) {
       return NextResponse.json({ error: "Clientes no pueden publicar" }, { status: 403 });
     }
@@ -110,7 +112,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
-    await requireSiteAccess(id, user);
+    await requireSiteMutationAccess(id, user);
     if (isCliente(user.role)) {
       return NextResponse.json({ error: "Clientes no pueden editar el blog" }, { status: 403 });
     }
@@ -124,7 +126,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       })
     );
     const existing = await prisma.blogPost.findFirst({
-      where: { id: body.id, siteId: id },
+      where: { AND: [scopedsiteRelatedWhere(user), { id: body.id, siteId: id }] },
       select: { id: true, title: true },
     });
     if (!existing) {

@@ -9,8 +9,8 @@ import { providerStatusPublic } from "@/lib/pjud/sync";
  */
 export async function GET() {
   try {
-    await requireStaff();
-    const queue = await getPjudQueueStatus();
+    const user = await requireStaff();
+    const queue = await getPjudQueueStatus(user);
     return NextResponse.json(
       {
         // Bull / CausaMonitor shape

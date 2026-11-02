@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { randomUUID } from "node:crypto";
 import { loginAs } from "./helpers";
 
 test("un abogado agenda una audiencia desde Inicio y aparece en el calendario", async ({
@@ -9,7 +10,8 @@ test("un abogado agenda una audiencia desde Inicio y aparece en el calendario", 
   await expect(page.getByTestId("inicio-status-line")).toBeVisible();
 
   const composer = page.getByTestId("inicio-composer");
-  await composer.fill("agenda una audiencia hoy a las 15 sobre prueba e2e");
+  const eventTitle = `prueba e2e ${randomUUID()}`;
+  await composer.fill(`agenda una audiencia hoy a las 15 sobre ${eventTitle}`);
   await page.getByTestId("inicio-send").click();
 
   const confirmButton = page.getByTestId("plan-confirm");
@@ -26,7 +28,7 @@ test("un abogado agenda una audiencia desde Inicio y aparece en el calendario", 
     .locator("section")
     .filter({ has: page.getByRole("heading", { name: "Eventos y audiencias" }) });
   await expect(eventosPanel).toBeVisible();
-  await expect(eventosPanel.getByText(/prueba e2e/i)).toBeVisible({
+  await expect(eventosPanel.getByText(`Audiencia · ${eventTitle}`, { exact: true })).toBeVisible({
     timeout: 10_000,
   });
 });

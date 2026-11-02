@@ -1,0 +1,71 @@
+{
+  "realExternalRequests": 0,
+  "payment": [
+    {
+      "key": "op-e9ac6ff6a77f9603eb2074d5ae6d26d8",
+      "body": {
+        "invoiceId": "cmvy3isb10005om5b34q8wp4j",
+        "clienteId": "cmvy3isaz0001om5bdy0bzi6q",
+        "amountClp": 100,
+        "method": "transferencia",
+        "reference": "caller-key-79e1eb8a-7e98-405f-8ca0-546e1b198c8c"
+      }
+    },
+    {
+      "key": "op-e9ac6ff6a77f9603eb2074d5ae6d26d8",
+      "body": {
+        "invoiceId": "cmvy3isb10005om5b34q8wp4j",
+        "clienteId": "cmvy3isaz0001om5bdy0bzi6q",
+        "amountClp": 100,
+        "method": "transferencia",
+        "reference": "caller-key-79e1eb8a-7e98-405f-8ca0-546e1b198c8c"
+      }
+    },
+    {
+      "key": "op-adf7f1020423105588485a56904d7948",
+      "body": {
+        "invoiceId": "cmvy3isb10005om5b34q8wp4j",
+        "clienteId": "cmvy3isaz0001om5bdy0bzi6q",
+        "amountClp": 101,
+        "method": "transferencia",
+        "reference": "caller-key-79e1eb8a-7e98-405f-8ca0-546e1b198c8c-changed"
+      }
+    }
+  ],
+  "deadline": [
+    {
+      "key": "op-940ac9387af958e56a3373aa10a9b1cb",
+      "body": {
+        "titulo": "caller-key-79e1eb8a-7e98-405f-8ca0-546e1b198c8c",
+        "descripcion": "",
+        "fechaLimite": "2026-12-31",
+        "fechaNotificacion": null,
+        "diasPlazo": null,
+        "tipoComputo": "habiles",
+        "esFatal": false,
+        "tipo": "procesal",
+        "causaId": "cmvy3isb00003om5bq2ekq6u5",
+        "responsableId": null
+      }
+    },
+    {
+      "key": "op-940ac9387af958e56a3373aa10a9b1cb",
+      "body": {
+        "titulo": "caller-key-79e1eb8a-7e98-405f-8ca0-546e1b198c8c",
+        "descripcion": "",
+        "fechaLimite": "2026-12-31",
+        "fechaNotificacion": null,
+        "diasPlazo": null,
+        "tipoComputo": "habiles",
+        "esFatal": false,
+        "tipo": "procesal",
+        "causaId": "cmvy3isb00003om5bq2ekq6u5",
+        "responsableId": null
+      }
+    }
+  ],
+  "checks": [
+    "payment commit/lost-response/reload/retry uses same key and one payment",
+    "deadline commit/lost-response/reload/retry uses same key and one deadline"
+  ]
+}

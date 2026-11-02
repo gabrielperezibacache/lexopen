@@ -1,0 +1,5 @@
+
+> lexopen@1.0.0 test:production:smoke
+> node --import tsx scripts/production-smoke.ts
+
+{"mode":"production","tests":["login real","compiled browser login ready; no hydration errors","privileged 2FA enforced with both prefetch headers","CSRF token required","foreign origin rejected","idempotent deadline retry","own evidence read and false quote rejection","anonymous evidence denied","ledger private references denied","ledger case inferred and client checked","ledger scoped balance and idempotent retry","invoice numbering independent of hidden scope; collision returns 409"],"externalServicesConfigured":false}

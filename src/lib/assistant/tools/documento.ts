@@ -1,13 +1,14 @@
+import { documentReadWhere } from "@/lib/auth/causa-access";
+import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import { confidentialWhere } from "@/lib/api";
-import { writeAuditStrict } from "@/lib/audit";
+import { assistantDb as prisma } from "@/lib/assistant/transaction-context";
+import { writeAssistantAudit as writeAuditStrict } from "@/lib/assistant/transaction-context";
 import { askLlm, legalSystemPrompt } from "@/lib/integrations/llm";
 import { inferDocumentoTipo } from "@/lib/document-ingest";
 import { storeUndo, consumeUndo } from "@/lib/assistant/plan-store";
 import type { AssistantTool } from "./types";
 
-const STAFF_ROLES = ["admin", "abogado", "asistente"] as const;
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 export const documentoBuscarSchema = z.object({
   q: z.string().trim().min(1).max(300),
@@ -15,7 +16,7 @@ export const documentoBuscarSchema = z.object({
 });
 export type DocumentoBuscarInput = z.infer<typeof documentoBuscarSchema>;
 
-export const documentoBuscarTool: AssistantTool<DocumentoBuscarInput> = {
+export const documentoBuscarTool: AssistantTool<DocumentoBuscarInput> = secureTool({
   id: "documento.buscar",
   description: "Busca documentos por nombre o contenido indexado",
   kind: "read",
@@ -30,7 +31,7 @@ export const documentoBuscarTool: AssistantTool<DocumentoBuscarInput> = {
     const documentos = await prisma.documento.findMany({
       where: {
         ...(input.causaId ? { causaId: input.causaId } : {}),
-        ...confidentialWhere(ctx.role),
+        ...documentReadWhere({ ...ctx, id: ctx.userId }),
         OR: [
           { nombre: { contains: input.q, mode: "insensitive" } },
           { extractedMarkdown: { contains: input.q, mode: "insensitive" } },
@@ -50,14 +51,14 @@ export const documentoBuscarTool: AssistantTool<DocumentoBuscarInput> = {
       card: { type: "documento-lista", items: documentos },
     };
   },
-};
+});
 
 export const documentoDescargarSchema = z.object({
   documentoId: z.string().min(1),
 });
 export type DocumentoDescargarInput = z.infer<typeof documentoDescargarSchema>;
 
-export const documentoDescargarTool: AssistantTool<DocumentoDescargarInput> = {
+export const documentoDescargarTool: AssistantTool<DocumentoDescargarInput> = secureTool({
   id: "documento.descargar",
   description: "Obtiene el enlace de descarga de un documento",
   kind: "read",
@@ -68,7 +69,7 @@ export const documentoDescargarTool: AssistantTool<DocumentoDescargarInput> = {
   },
   async execute(input, ctx) {
     const doc = await prisma.documento.findFirst({
-      where: { id: input.documentoId, ...confidentialWhere(ctx.role) },
+      where: { id: input.documentoId, ...documentReadWhere({ ...ctx, id: ctx.userId }) },
       select: { id: true, nombre: true, mimeType: true },
     });
     if (!doc) return { ok: false, message: "Documento no encontrado o sin acceso." };
@@ -83,14 +84,14 @@ export const documentoDescargarTool: AssistantTool<DocumentoDescargarInput> = {
       },
     };
   },
-};
+});
 
 export const documentoResumirSchema = z.object({
   documentoId: z.string().min(1),
 });
 export type DocumentoResumirInput = z.infer<typeof documentoResumirSchema>;
 
-export const documentoResumirTool: AssistantTool<DocumentoResumirInput> = {
+export const documentoResumirTool: AssistantTool<DocumentoResumirInput> = secureTool({
   id: "documento.resumir",
   description: "Resume un documento con el proveedor de IA configurado",
   kind: "read",
@@ -101,7 +102,7 @@ export const documentoResumirTool: AssistantTool<DocumentoResumirInput> = {
   },
   async execute(input, ctx) {
     const doc = await prisma.documento.findFirst({
-      where: { id: input.documentoId, ...confidentialWhere(ctx.role) },
+      where: { id: input.documentoId, ...documentReadWhere({ ...ctx, id: ctx.userId }) },
     });
     if (!doc) return { ok: false, message: "Documento no encontrado o sin acceso." };
     const texto = (doc.extractedMarkdown || doc.contenido || "").trim();
@@ -132,14 +133,14 @@ export const documentoResumirTool: AssistantTool<DocumentoResumirInput> = {
       card: { type: "documento-resumen", id: doc.id, nombre: doc.nombre, source: result.source },
     };
   },
-};
+});
 
 export const documentoClasificarSchema = z.object({
   documentoId: z.string().min(1),
 });
 export type DocumentoClasificarInput = z.infer<typeof documentoClasificarSchema>;
 
-export const documentoClasificarTool: AssistantTool<DocumentoClasificarInput> = {
+export const documentoClasificarTool: AssistantTool<DocumentoClasificarInput> = secureTool({
   id: "documento.clasificar",
   description: "Sugiere y aplica un tipo de documento a partir del nombre/ruta",
   kind: "write",
@@ -147,7 +148,7 @@ export const documentoClasificarTool: AssistantTool<DocumentoClasificarInput> = 
   inputSchema: documentoClasificarSchema,
   async preview(input, ctx) {
     const doc = await prisma.documento.findFirst({
-      where: { id: input.documentoId, ...confidentialWhere(ctx.role) },
+      where: { id: input.documentoId, ...documentReadWhere({ ...ctx, id: ctx.userId }) },
       select: { nombre: true, ruta: true, tipo: true },
     });
     if (!doc) return `Clasificar documento ${input.documentoId} (no encontrado o sin acceso).`;
@@ -156,7 +157,7 @@ export const documentoClasificarTool: AssistantTool<DocumentoClasificarInput> = 
   },
   async execute(input, ctx) {
     const before = await prisma.documento.findFirst({
-      where: { id: input.documentoId, ...confidentialWhere(ctx.role) },
+      where: { id: input.documentoId, ...documentReadWhere({ ...ctx, id: ctx.userId }) },
     });
     if (!before) return { ok: false, message: "Documento no encontrado o sin acceso." };
     const tipo = inferDocumentoTipo(before.ruta ? `${before.ruta}/${before.nombre}` : before.nombre);
@@ -205,4 +206,4 @@ export const documentoClasificarTool: AssistantTool<DocumentoClasificarInput> = 
     });
     return { ok: true, message: `Se restauró el tipo del documento "${doc.nombre}".` };
   },
-};
+});

@@ -1,3 +1,4 @@
+import { requireSiteMutationAccess } from "@/lib/auth/access";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, requireSiteAccess, requireUser } from "@/lib/api";
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
-    await requireSiteAccess(id, user);
+    await requireSiteMutationAccess(id, user);
     if (isCliente(user.role)) {
       return NextResponse.json({ error: "Clientes no pueden editar iSheets" }, { status: 403 });
     }

@@ -1,6 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { prisma } from "@/lib/db";
 import {
   assertCsrf,
   handleRouteError,
@@ -8,7 +5,13 @@ import {
   requireSiteAccess,
   requireUser,
 } from "@/lib/api";
+import { requireSiteMutationAccess } from "@/lib/auth/access";
+import { siteRelatedWhere as scopedsiteRelatedWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
+import { isCliente } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -37,10 +40,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params;
     await requireSiteAccess(id, user);
     const threads = await prisma.qaThread.findMany({
-      where: {
+      where: { AND: [scopedsiteRelatedWhere(user), {
         siteId: id,
-        ...(user.role === "cliente" ? { status: "open" } : {}),
-      },
+        ...(isCliente(user.role) ? { status: "open" } : {}),
+      }] },
       include: {
         posts: {
           include: { author: { select: publicUserSelect } },
@@ -60,7 +63,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireUser();
     const { id } = await params;
-    await requireSiteAccess(id, user);
+    await requireSiteMutationAccess(id, user);
     const body = await parseBody(req, postSchema);
 
     if (body.action === "create-thread") {
@@ -90,13 +93,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const thread = await prisma.qaThread.findFirst({
-      where: { id: body.threadId, siteId: id },
+      where: { AND: [scopedsiteRelatedWhere(user), { id: body.threadId, siteId: id }] },
       select: { id: true, status: true },
     });
     if (!thread) {
       return NextResponse.json({ error: "Hilo no encontrado" }, { status: 404 });
     }
-    if (user.role === "cliente" && thread.status !== "open") {
+    if (isCliente(user.role) && thread.status !== "open") {
       return NextResponse.json(
         { error: "El hilo ya no acepta respuestas del portal" },
         { status: 403 }
@@ -106,14 +109,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       data: {
         threadId: body.threadId,
         body: body.body,
-        isAnswer: user.role !== "cliente" && Boolean(body.isAnswer),
+        isAnswer: !isCliente(user.role) && Boolean(body.isAnswer),
         authorId: user.id,
       },
     });
     await prisma.qaThread.update({
       where: { id: thread.id },
       data: {
-        status: user.role !== "cliente" && body.isAnswer ? "answered" : undefined,
+        status: !isCliente(user.role) && body.isAnswer ? "answered" : undefined,
         updatedAt: new Date(),
       },
     });

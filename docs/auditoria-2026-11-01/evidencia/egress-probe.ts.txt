@@ -1,0 +1,83 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+
+async function main() {
+  const probeDir = await mkdtemp(path.join(os.tmpdir(), 'lexopen-egress-probe-'));
+  process.env.NODE_ENV = process.env.PROBE_NODE_ENV || 'test';
+  process.env.LLM_API_URL = 'https://203.0.113.10/v1';
+  process.env.LLM_API_KEY = 'synthetic-non-secret-key';
+  process.env.LLM_MODEL = 'synthetic-test-model';
+  process.env.LLM_ALLOW_DEMO = '0';
+  process.env.HERMES_ALLOW_DEMO = '0';
+  process.env.LEXOPEN_ASSISTANT_PLANS_PATH = path.join(probeDir, 'plans.json');
+
+  const calls: Array<{ url: string; method?: string; body: unknown }> = [];
+  const dbReads: unknown[] = [];
+  const fakePrisma = {
+    firmSettings: {
+      findFirst: async (args: unknown) => {
+        dbReads.push(args);
+        return { assistantLlmMode: 'local_only', auditLlmPrompts: false, hermesAllowDemo: false };
+      },
+    },
+    integrationConfig: {
+      findUnique: async () => null,
+    },
+  };
+  (globalThis as unknown as { prisma: unknown }).prisma = fakePrisma;
+
+  // All network is intercepted before loading any application module.
+  // No DNS, socket, HTTP server or real provider is contacted.
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    assert.equal(url, 'https://203.0.113.10/v1/chat/completions');
+    calls.push({
+      url,
+      method: init?.method,
+      body: typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body,
+    });
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'SYNTHETIC_PROVIDER_RESPONSE' } }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  const { runAssistantTurn } = await import('/private/tmp/lexopen-audit-main-20261101/src/lib/assistant/pipeline.ts');
+  const text = 'Explícame el concepto de confidencialidad profesional';
+  const result = await runAssistantTurn({
+    text,
+    user: { id: 'synthetic-user-A', role: 'abogado' },
+    now: new Date('2026-11-01T15:00:00Z'),
+  });
+
+  assert.equal(result.classification.source, 'rule');
+  assert.deepEqual(result.classification.toolIds, ['respuesta.libre']);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, 'POST');
+  assert.ok(JSON.stringify(calls[0].body).includes(text));
+  assert.equal(result.autoResults?.[0].result.ok, true);
+  assert.equal(result.autoResults?.[0].result.message, 'SYNTHETIC_PROVIDER_RESPONSE');
+
+  const evidence = {
+    baseCommit: '72400f9',
+    nodeEnv: process.env.NODE_ENV,
+    fixtureOnly: true,
+    realNetworkRequests: 0,
+    realDatabaseRequests: 0,
+    firmPolicy: 'local_only',
+    classificationSource: result.classification.source,
+    selectedTools: result.classification.toolIds,
+    interceptedProviderRequests: calls,
+    toolResult: result.autoResults?.[0].result,
+    dbReadSelections: dbReads,
+  };
+  await writeFile(`/private/tmp/lexopen-main-egress-probe-${process.env.NODE_ENV}-result.json`, JSON.stringify(evidence, null, 2));
+  console.log(JSON.stringify(evidence, null, 2));
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
