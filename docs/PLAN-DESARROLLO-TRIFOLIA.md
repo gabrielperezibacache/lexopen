@@ -10,6 +10,8 @@ Segunda entrega en `codex/pdf-legal-research`: [páginas PDF verificadas e inves
 
 Tercera entrega en `codex/spaces-drive-official-sources`: [archivos de espacios, importación elegida de Drive y fuentes oficiales](ESPACIOS-DRIVE-FUENTES-2026-11-01.md). Integra `SiteFile` con evidencia e investigación, conserva revisiones de Drive, habilita BCN actual/histórica y oficios individuales SII. El resto de F1/F2 y la cobertura no comprobada siguen pendientes.
 
+Cuarta entrega en `codex/case-knowledge-library`: [hechos, cronología, contradicciones y biblioteca](HECHOS-CRONOLOGIA-BIBLIOTECA-2026-11-01.md), con citas comprobadas, revisión humana e historial, fechas inciertas y versiones elegidas para investigación local. Abre F3; las instrucciones aplicadas al asistente, colaboración de colecciones, evaluación jurídica y escala siguen pendientes.
+
 ## 1 Decisiones de producto
 
 1. **Cero dependencia operativa de TRIFOLIA.** Sin cuenta, API, MCP, índices, tokens ni suscripción de ese proveedor. La prueba de independencia bloqueará sus dominios y repetirá los flujos de aceptación.
@@ -152,6 +154,8 @@ Flujo de investigación: aclarar la consulta cuando falten fecha, materia o prop
 Salida F2: preguntas de evaluación con fuentes oficiales accesibles, contradicción entre precedentes visible, norma histórica diferenciada de vigente y abstención cuando no existe respaldo. Los valores de calidad propuestos en la sección 7 se fijan definitivamente con la primera muestra revisada.
 
 ### F3 Casos, cronología y biblioteca
+
+Avance del 1 de noviembre: el [cuarto incremento](HECHOS-CRONOLOGIA-BIBLIOTECA-2026-11-01.md) implementa hechos citados, cronología con incertidumbre, contradicciones revisables y biblioteca personal con versiones fijadas. El [registro de comprobaciones](conocimiento-2026-11-01/VALIDACION.md) distingue pruebas terminadas de las pendientes. Los párrafos siguientes mantienen el alcance completo de F3, aún abierto.
 
 La cronología debe representar hechos y su evidencia, sin confundir fecha de carga, fecha del documento y fecha del acontecimiento. Guardar texto temporal literal, normalización, rango/precisión y carácter inferido. Integrar movimientos PJUD como una fuente diferenciada, no como verdad equivalente a toda alegación documental.
 

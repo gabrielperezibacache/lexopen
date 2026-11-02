@@ -1,0 +1,28 @@
+LexOpen F3 knowledge/library upgrade and restore rehearsal 2026-11-01T22:07:29.422397+00:00
+Scope: existing fictitious schema34 source is read-only; new disposable destinations only; no production installation.
+Artifacts: <temporary>/lexopen-knowledge-upgrade-restore-5n_5p4ta
+Source storage: <temporary>/lexopen-spaces-restored-storage-dc07p_d9
+Fixture storage: <temporary>/lexopen-knowledge-upgrade-storage-ad7k8say
+Restored storage: <temporary>/lexopen-knowledge-restored-storage-6ub90xq8
+Source snapshot: 81 tables; 663 rows; 18 objects. Hashes use sorted SQL JSON text, preserving numeric precision and timestamps.
+Created NEW lexopen_knowledge_upgrade_test
+PASS migrate deploy: schema34 -> schema35, exit 0
+PASS Prisma schema drift check: exit 0
+PASS upgrade preservation: every row/column hash/count across all 81 old tables unchanged; migration rows +1 only. Eight new F3 tables initially empty.
+{"phase":"fixture created","facts":4,"reviewedFacts":2,"factReviews":2,"conflicts":1,"conflictReviews":1,"analysisSources":3,"libraryItems":3,"libraryRevision":4,"pinnedOldVersion":true,"pdfPages":3,"runScope":{"causaId":"cmvydrzow000310yb20k7j46g","documentIds":[],"sourceKinds":[],"selectedDocumentIds":null,"librarySelections":[{"collectionId":"col_00be8614041a0ee1db8148f0aacf9f5713ac293c","itemIds":["cmvyds056002o10yb9e5hafzc","cmvyds05e002t10yb3mg7bf1d","cmvyds05j002y10yb6f74hg4u"],"citationKeys":["59cddedba2f201d716c7b995bde352f3a6b267b4d0405e3af75b09e9c9405302","4eaf3cb49d3cc403c9126250d91ad0a282b9a77af95b466472e108afa291d7f5","a3e801f0e3b778d6c4cac9ca185f33cfdb4297212e6d9c83c3968b4923892c67"],"instructionsSha256":"0a32e64bcb17a4e1f1d9e4161cea78f8dd5939a247829834ebaf845fe7834b4e"}],"libraryOnly":true},"networkRequests":0,"forbiddenFetches":0}
+Fixture snapshot: 89 tables; 723 rows; 27 storage objects. All previous rows remain exact subsets; all 35 migration checksums match repository files.
+Created NEW lexopen_knowledge_restore_test
+PASS restore: every table count/row hash and every storage path/byte count/hash exactly match the upgraded fixture database.
+{"phase":"restored services verified","factFields":"all exact","reviews":"status/date/statement/revision/history preserved","contradiction":"apparent + stale and both cited facts exact","library":"scope/instructions/pinned versions/item IDs/revision exact","research":"libraryOnly scope/citations/hashes exact","originals":"all source hashes exact","physicalPage2":"PNG exact hash","outsider":"denied","forbiddenFetches":0}
+PASS source34 remains unchanged: every original field/row hash/count and storage object exact before/after.
+PASS restored service reads leave restored database and storage unchanged.
+LIMITS: logical PostgreSQL dump/restore and local files with domain reads and actual physical PDF PNG; not physical Host/vault/configuration, S3, a compiled HTTP server restart, live legal retrieval, OAuth, or production data.
+Working schema SHA256: 931a440cb6e6801bb55d42fc53763d6e414acd63bb47cb5ecbacafa4d0254faf
+RESULT PASS. Both destinations were absent before creation; no database was reset or deleted. Proof databases, dumps, descriptors and storage copies retained.
+Visual verification: restored physical page 2 shows PAGINA DOS / DOCUMENTO ESCANEADO, fictional payment date 12 May 2025 and 25000 pesos legibly and without clipping; PNG bytes match before/after.
+{"phase":"restored CAS verified","staleFactRevision":409,"staleConflictRevision":409,"staleCollectionRevision":409,"staleItemRemoval":409,"revisions":"unchanged","writes":"none"}
+PASS supplemental restored CAS: stale fact/conflict/collection edits and item removal each reject 409; all 89 table hashes and 27 storage objects remain exact. Supplemental process exit 0.
+FINAL CURRENT CORE PASS, Node PID 29910 / wrapper exit 0; retained restore only; 89 tables / 723 rows / 27 objects exact against restoration baseline. Detailed log: <temporary>/lexopen-knowledge-upgrade-restore-5n_5p4ta/final-current-core-ol2tbetv/proof.log
+Final imported module SHA256: {"src/lib/knowledge/cases.ts": "b3ffc455f1751f24f08bb4f77c50da002b9a48529ffa954f90ef9dcadb736498", "src/lib/knowledge/citations.ts": "cc2621342f8821d147f16abd8acca1f71f861ee0f0020660016243780fa0039a", "src/lib/knowledge/library.ts": "3da447895123cb86a5e33d7b99a303f13efb2a0f344da086afa386722b3f4e52", "src/lib/research/service.ts": "827ddb016baaab39b4d08a9063764d784934dced29fd49b2c69b73cb83ab001c"}
+Final coverage adds current bounded-verification limits 400 facts / 2000 references; all returned facts, chronology, conflicts and historical fields exact. Eight outsider reads 404; four stale CAS operations 409; forbidden fetches 0.
+Harness transparency: initial final-current-core-6_fmkmq1 failed only because temporary adapter treated ResearchCitation as StoredCitation; corrected temporary script resolves kind/fragmentId/quote and compares canonical fields. No application code or stored data changed.

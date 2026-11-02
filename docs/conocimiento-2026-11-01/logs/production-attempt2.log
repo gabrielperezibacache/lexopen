@@ -1,0 +1,16 @@
+
+> lexopen@1.0.0 test:production:knowledge
+> node --import tsx scripts/production-knowledge-smoke.ts
+
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(run.results.some((c:{fragmentId:string})=>c.fragmentId===anchor.fragmentId))
+
+    at main (<workspace>/scripts/production-knowledge-smoke.ts:62:335) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

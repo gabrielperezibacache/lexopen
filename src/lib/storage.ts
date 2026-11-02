@@ -165,3 +165,38 @@ export async function getObject(key: string): Promise<Buffer | null> {
     return null;
   }
 }
+
+/** A retained original may be missing or altered; never buffer beyond the verified-read budget. */
+export async function getObjectBounded(key: string, maxBytes = MAX_STORAGE_OBJECT_BYTES): Promise<Buffer | null> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_STORAGE_OBJECT_BYTES) throw new RangeError("Límite de lectura inválido");
+  try { assertSafeStorageKey(key); } catch { return null; }
+  if (storageMode() === "incomplete") throw Object.assign(new Error("La configuración de almacenamiento está incompleta"), { status: 503 });
+  const tooLarge = () => Object.assign(new Error("El original supera el límite de lectura verificable"), { status: 413 });
+  if (storageConfigured()) {
+    try {
+      const response = await s3Client().send(new GetObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: key }), { abortSignal: AbortSignal.timeout(30_000) });
+      if (!response.Body) return null;
+      const reader = response.Body.transformToWebStream().getReader();
+      const chunks: Uint8Array[] = []; let total = 0;
+      try {
+        if (response.ContentLength && response.ContentLength > maxBytes) { await reader.cancel(); throw tooLarge(); }
+        for (;;) { const part = await reader.read(); if (part.done) break; total += part.value.length; if (total > maxBytes) { await reader.cancel(); throw tooLarge(); } chunks.push(part.value); }
+        return Buffer.concat(chunks, total);
+      } finally { reader.releaseLock(); }
+    } catch (error) { if (error && typeof error === "object" && "status" in error) throw error; return null; }
+  }
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+  try {
+    handle = await fs.open(localPathForKey(key), "r");
+    if ((await handle.stat()).size > maxBytes) throw tooLarge();
+    const chunks: Buffer[] = []; let total = 0;
+    for (;;) {
+      const chunk = Buffer.allocUnsafe(Math.min(64 * 1024, maxBytes - total + 1));
+      const { bytesRead } = await handle.read(chunk);
+      if (!bytesRead) break;
+      total += bytesRead; if (total > maxBytes) throw tooLarge(); chunks.push(chunk.subarray(0, bytesRead));
+    }
+    return Buffer.concat(chunks, total);
+  } catch (error) { if (error && typeof error === "object" && "status" in error) throw error; return null; }
+  finally { await handle?.close(); }
+}

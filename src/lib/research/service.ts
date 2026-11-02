@@ -8,6 +8,8 @@ import { isStaff } from "@/lib/auth/rbac";
 import { getObject, putObject, MAX_STORAGE_OBJECT_BYTES } from "@/lib/storage";
 import { MAX_EVIDENCE_TEXT, sha256, splitEvidenceText, verifyEvidencePageBinding, verifyEvidenceQuote } from "@/lib/evidence/fragments";
 import { evidenceResourceReadWhere, evidenceFragmentHref } from "@/lib/evidence/service";
+import { resolveCitation } from "@/lib/knowledge/citations";
+import { resolveLibraryScope, libraryScopeStillAuthorized, type LibrarySelection } from "@/lib/knowledge/library";
 import { validatePublicLegalSourceUrl } from "./sources";
 import type { FetchedLegalSource } from "./source-types";
 import { RESEARCH_LIMITS, RESEARCH_SOURCE_KINDS, rankResearchText, researchQuerySchema, researchTerms, type ResearchQuery, type ResearchSourceKind } from "./search";
@@ -24,17 +26,17 @@ export type ResearchCitation = {
 };
 export type ResearchResult = {
   id: string; query: string; status: "completed" | "abstained"; answerMode: "extractive";
-  scope: { causaId: string | null; documentIds: string[]; sourceKinds: ResearchSourceKind[]; selectedDocumentIds: string[] | null; siteId?: string; siteFileIds?: string[]; selectedSiteFileIds?: string[] | null };
+  scope: { causaId: string | null; documentIds: string[]; sourceKinds: ResearchSourceKind[]; selectedDocumentIds: string[] | null; siteId?: string; siteFileIds?: string[]; selectedSiteFileIds?: string[] | null; librarySelections?: LibrarySelection[]; libraryOnly?: boolean };
   summary: string; results: ResearchCitation[]; warnings: string[];
   coverage: {
     sourceKinds: ResearchSourceKind[]; sourcesByKind: Record<ResearchSourceKind, number>;
     legalSourcesAvailable: number; legalSourcesSearched: number; documentsAvailable: number;
     documentsSearched: number; documentsWithoutEvidence: number; documentsWithPartialEvidence: number; legalCandidates: number;
     siteFilesAvailable?: number; siteFilesSearched?: number; siteFilesWithoutEvidence?: number; siteFilesWithPartialEvidence?: number; documentCandidates: number; resultsLimited: boolean; corpusLimited: boolean;
-    terms: string[]; searchedAt: string; networkRequests: 0; modelUsed: false;
+    libraryCollections?: number; libraryVersionsSearched?: number; libraryItemsUnavailable?: number; libraryOnly?: boolean; terms: string[]; searchedAt: string; networkRequests: 0; modelUsed: false;
   };
 };
-type StoredScope = { causaId?: string; documentIds: string[]; sourceKinds: ResearchSourceKind[]; selectedDocumentIds?: string[] | null; siteId?: string; siteFileIds?: string[]; selectedSiteFileIds?: string[] | null };
+type StoredScope = { causaId?: string; documentIds: string[]; sourceKinds: ResearchSourceKind[]; selectedDocumentIds?: string[] | null; siteId?: string; siteFileIds?: string[]; selectedSiteFileIds?: string[] | null; librarySelections?: LibrarySelection[]; libraryOnly?: boolean };
 
 async function actorFor(user: CausaAccessUser, tx: ResearchClient) {
   const actor = await tx.user.findUnique({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
@@ -118,33 +120,35 @@ async function rankFragmentIds(tx: ResearchClient, kind: "legal" | "document", v
 export async function searchResearch(user: CausaAccessUser, raw: ResearchQuery, client: PrismaClient = prisma): Promise<ResearchResult> {
   const input = researchQuerySchema.parse(raw), terms = researchTerms(input.query);
   const sourceKinds = [...new Set(input.sourceKinds || RESEARCH_SOURCE_KINDS)];
-  const selectedIds = input.documentIds ? [...new Set(input.documentIds)] : undefined;
-  const selectedFileIds = input.siteFileIds ? [...new Set(input.siteFileIds)] : undefined;
+  const selectedIds = !input.libraryOnly && input.documentIds ? [...new Set(input.documentIds)] : undefined;
+  const selectedFileIds = !input.libraryOnly && input.siteFileIds ? [...new Set(input.siteFileIds)] : undefined;
   return transaction(client, async tx => {
     const actor = await actorFor(user, tx);
     if (input.causaId && !await tx.causa.findFirst({ where: { AND: [{ id: input.causaId }, causaAccessWhere(actor)] }, select: { id: true } })) throw httpError("Expediente no encontrado o sin acceso", 404);
     if (input.siteId && !await tx.site.findFirst({ where: { AND: [{ id: input.siteId }, siteAccessWhere(actor)] }, select: { id: true } })) throw httpError("Espacio no encontrado o sin acceso", 404);
+    const library = await resolveLibraryScope(input.libraryCollectionIds || [], actor, { causaId: input.causaId, siteId: input.siteId }, tx);
     const siteFileWhere: Prisma.SiteFileWhereInput = { AND: [siteFileReadWhere(actor), { siteId: input.siteId || "__none__" }, ...(selectedFileIds ? [{ id: { in: selectedFileIds } }] : [])] };
-    const siteFileCount = input.siteId ? await tx.siteFile.count({ where: siteFileWhere }) : 0;
+    const siteFileCount = input.siteId && !input.libraryOnly ? await tx.siteFile.count({ where: siteFileWhere }) : 0;
     if (selectedFileIds && selectedFileIds.length !== siteFileCount) throw httpError("Algún archivo seleccionado no existe o dejó de estar autorizado", 404);
-    const siteFiles = input.siteId ? await tx.siteFile.findMany({ where: siteFileWhere, orderBy: { id: "asc" }, take: RESEARCH_LIMITS.documents, select: { id: true, evidenceResource: { select: { versions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, select: { id: true, extractionStatus: true, metadataJson: true } } } } } }) : [];
-    const includeDocuments = Boolean(input.causaId || selectedIds?.length);
+    const siteFiles = input.siteId && !input.libraryOnly ? await tx.siteFile.findMany({ where: siteFileWhere, orderBy: { id: "asc" }, take: RESEARCH_LIMITS.documents, select: { id: true, evidenceResource: { select: { versions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, select: { id: true, extractionStatus: true, metadataJson: true } } } } } }) : [];
+    const includeDocuments = !input.libraryOnly && Boolean(input.causaId || selectedIds?.length);
     const documentWhere: Prisma.DocumentoWhereInput = { AND: [documentReadWhere(actor), ...(input.causaId ? [{ causaId: input.causaId }] : []), ...(selectedIds ? [{ id: { in: selectedIds } }] : [])] };
     const documentCount = includeDocuments ? await tx.documento.count({ where: documentWhere }) : 0;
     if (selectedIds && selectedIds.length !== documentCount) throw httpError("Algún documento seleccionado no existe o dejó de estar autorizado", 404);
     const documents = includeDocuments ? await tx.documento.findMany({ where: documentWhere, orderBy: { id: "asc" }, take: RESEARCH_LIMITS.documents, select: { id: true, evidenceResource: { select: { versions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, select: { id: true, extractionStatus: true, metadataJson: true } } } } } }) : [];
     const caseVersionIds = documents.flatMap(doc => doc.evidenceResource?.versions.map(v => v.id) || []);
     const siteVersionIds = siteFiles.flatMap(file => file.evidenceResource?.versions.map(v => v.id) || []);
-    const documentVersionIds = [...caseVersionIds, ...siteVersionIds];
-    const resourceWhere: Prisma.DocumentResourceWhereInput = { AND: [evidenceResourceReadWhere(actor), { OR: [{ documento: documentWhere }, { siteFile: siteFileWhere }] }] };
+    const documentVersionIds = [...new Set([...caseVersionIds, ...siteVersionIds, ...library.documentVersionIds])];
+    const resourceWhere: Prisma.DocumentResourceWhereInput = { AND: [evidenceResourceReadWhere(actor), { OR: [{ documento: documentWhere }, { siteFile: siteFileWhere }, { id: { in: library.citations.flatMap(citation => citation.resourceId ? [citation.resourceId] : []) } }] }] };
     const legalWhere = { kind: { in: sourceKinds } };
-    const legalSourcesAvailable = await tx.legalSource.count({ where: legalWhere });
-    const sources = await tx.legalSource.findMany({ where: legalWhere, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: RESEARCH_LIMITS.legalSources, select: { id: true, kind: true, versions: { orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], take: 1, select: { id: true } } } });
-    const legalVersionIds = sources.flatMap(source => source.versions.map(v => v.id));
+    const legalSourcesAvailable = input.libraryOnly ? 0 : await tx.legalSource.count({ where: legalWhere });
+    const sources = input.libraryOnly ? [] : await tx.legalSource.findMany({ where: legalWhere, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: RESEARCH_LIMITS.legalSources, select: { id: true, kind: true, versions: { orderBy: [{ retrievedAt: "desc" }, { id: "desc" }], take: 1, select: { id: true } } } });
+    const legalVersionIds = [...new Set([...sources.flatMap(source => source.versions.map(v => v.id)), ...library.legalVersionIds])];
+    const legalVersionsInScope = legalVersionIds.length ? await tx.legalSourceVersion.findMany({ where: { id: { in: legalVersionIds } }, select: { id: true, kind: true } }) : [];
     const [legalRanks, documentRanks] = await Promise.all([rankFragmentIds(tx, "legal", legalVersionIds, terms), rankFragmentIds(tx, "document", documentVersionIds, terms)]);
     const legalRows = legalRanks.length ? await tx.legalSourceFragment.findMany({ where: { id: { in: legalRanks.slice(0, RESEARCH_LIMITS.candidatesPerKind).map(row => row.id) }, versionId: { in: legalVersionIds } }, select: { id: true, ordinal: true, text: true, textSha256: true, version: { select: legalVersionSelect } } }) : [];
     const documentRows = documentRanks.length ? await tx.documentEvidenceFragment.findMany({ where: { id: { in: documentRanks.slice(0, RESEARCH_LIMITS.candidatesPerKind).map(row => row.id) }, versionId: { in: documentVersionIds }, version: { resource: resourceWhere }, OR: [{ pageId: null }, { page: { version: { resource: resourceWhere } } }] }, select: { id: true, versionId: true, ordinal: true, text: true, textSha256: true, pageId: true, pageStartOffset: true, pageEndOffset: true, version: { select: documentVersionSelect }, page: { select: { pageNumber: true, method: true, status: true } } } }) : [];
-    const warnings: string[] = [];
+    const warnings: string[] = [...library.warnings];
     const sourceWarnings = new Map<string, string[]>();
     if (documentRows.length < Math.min(documentRanks.length, RESEARCH_LIMITS.candidatesPerKind)) warnings.push("Se excluyeron fragmentos cuya localización no pudo autorizarse o verificarse");
     const citations: ResearchCitation[] = [];
@@ -174,7 +178,7 @@ export async function searchResearch(user: CausaAccessUser, raw: ResearchQuery, 
     // candidate fragment. The page's own source is authorized before its text loads.
     const pageBodies = pageIds.length ? await tx.documentEvidencePage.findMany({ where: { id: { in: pageIds }, versionId: { in: documentVersionIds }, version: { resource: resourceWhere } }, select: { id: true, versionId: true, text: true, textSha256: true } }) : [];
     const pageById = new Map(pageBodies.map(page => [page.id, page]));
-    const results = shortlisted.filter(citation => {
+    const pageVerified = shortlisted.filter(citation => {
       if (citation.kind === "legal") return true;
       const row = documentById.get(citation.fragmentId);
       const page = row?.pageId ? pageById.get(row.pageId) || null : null;
@@ -184,7 +188,22 @@ export async function searchResearch(user: CausaAccessUser, raw: ResearchQuery, 
       }
       return true;
     });
-    const sourcesByKind = Object.fromEntries(RESEARCH_SOURCE_KINDS.map(kind => [kind, sources.filter(source => source.kind === kind && source.versions.length).length])) as Record<ResearchSourceKind, number>;
+    const results: ResearchCitation[] = [];
+    const integrityCache = new Map<string, unknown>();
+    for (const citation of pageVerified) {
+      if (library.selections.length) {
+        try {
+          const verified = await resolveCitation(citation, actor, { client: tx, cache: integrityCache });
+          if (verified.versionId !== citation.versionId || verified.sourceSha256 !== citation.sourceSha256 || verified.textSha256 !== citation.textSha256 || verified.href !== citation.href || verified.pageNumber !== citation.pageNumber) throw httpError("La cita no coincide con su versión", 409);
+        } catch (error) {
+          if (!error || typeof error !== "object" || !("status" in error) || ![404, 409].includes(Number(error.status))) throw error;
+          warnings.push("Se excluyó una cita cuya versión, posiciones u original no pudieron verificarse");
+          continue;
+        }
+      }
+      results.push(citation);
+    }
+    const sourcesByKind = Object.fromEntries(RESEARCH_SOURCE_KINDS.map(kind => [kind, legalVersionsInScope.filter(version => version.kind === kind).length])) as Record<ResearchSourceKind, number>;
     const kindLabels: Record<ResearchSourceKind, string> = { legislation: "legislación", jurisprudence: "jurisprudencia", administrative: "documentos administrativos", doctrine: "doctrina" };
     for (const kind of sourceKinds) if (!sourcesByKind[kind]) warnings.push(`Sin fuentes incorporadas de ${kindLabels[kind]}; esta búsqueda no cubre esa clase`);
     const documentsWithoutEvidence = documents.length - caseVersionIds.length;
@@ -201,8 +220,8 @@ export async function searchResearch(user: CausaAccessUser, raw: ResearchQuery, 
     warnings.push("Extractos recuperados por coincidencia textual; la pertinencia y la vigencia jurídica requieren revisión profesional");
     for (const citation of results) if (citation.kind === "legal") warnings.push(...sourceWarnings.get(citation.versionId) || []);
     const searchedAt = new Date().toISOString();
-    const scope: StoredScope = { causaId: input.causaId, documentIds: documents.map(doc => doc.id), sourceKinds, selectedDocumentIds: selectedIds || null, ...(input.siteId ? { siteId: input.siteId, siteFileIds: siteFiles.map(file => file.id), selectedSiteFileIds: selectedFileIds || null } : {}) };
-    const result: ResearchResult = { id: "", query: input.query, status: results.length ? "completed" : "abstained", answerMode: "extractive", scope: { causaId: input.causaId || null, documentIds: scope.documentIds, sourceKinds, selectedDocumentIds: scope.selectedDocumentIds || null, ...(scope.siteId ? { siteId: scope.siteId, siteFileIds: scope.siteFileIds, selectedSiteFileIds: scope.selectedSiteFileIds } : {}) }, summary: results.length ? `Se recuperaron ${results.length} fragmentos verificables. No se generó una conclusión jurídica automática.` : "No se encontró evidencia suficiente en las fuentes y documentos revisados. Incorpore fuentes o ajuste la búsqueda.", results, warnings: [...new Set(warnings)].slice(0, 30), coverage: { sourceKinds, sourcesByKind, legalSourcesAvailable, legalSourcesSearched: legalVersionIds.length, documentsAvailable: documentCount, documentsSearched: caseVersionIds.length, siteFilesAvailable: siteFileCount, siteFilesSearched: siteVersionIds.length, siteFilesWithoutEvidence, siteFilesWithPartialEvidence, documentsWithoutEvidence, documentsWithPartialEvidence, legalCandidates: Math.min(legalRanks.length, RESEARCH_LIMITS.candidatesPerKind), documentCandidates: Math.min(documentRanks.length, RESEARCH_LIMITS.candidatesPerKind), resultsLimited: citations.length > limit, corpusLimited, terms, searchedAt, networkRequests: 0, modelUsed: false } };
+    const scope: StoredScope = { causaId: input.causaId, documentIds: documents.map(doc => doc.id), sourceKinds, selectedDocumentIds: selectedIds || null, ...(input.libraryCollectionIds?.length ? { librarySelections: library.selections, libraryOnly: Boolean(input.libraryOnly) } : {}), ...(input.siteId ? { siteId: input.siteId, siteFileIds: siteFiles.map(file => file.id), selectedSiteFileIds: selectedFileIds || null } : {}) };
+    const result: ResearchResult = { id: "", query: input.query, status: results.length ? "completed" : "abstained", answerMode: "extractive", scope: { causaId: input.causaId || null, documentIds: scope.documentIds, sourceKinds, selectedDocumentIds: scope.selectedDocumentIds || null, ...(scope.librarySelections ? { librarySelections: scope.librarySelections, libraryOnly: scope.libraryOnly } : {}), ...(scope.siteId ? { siteId: scope.siteId, siteFileIds: scope.siteFileIds, selectedSiteFileIds: scope.selectedSiteFileIds } : {}) }, summary: results.length ? `Se recuperaron ${results.length} fragmentos verificables. No se generó una conclusión jurídica automática.` : "No se encontró evidencia suficiente en las fuentes y documentos revisados. Incorpore fuentes o ajuste la búsqueda.", results, warnings: [...new Set(warnings)].slice(0, 30), coverage: { sourceKinds, sourcesByKind, legalSourcesAvailable, legalSourcesSearched: legalVersionIds.length, documentsAvailable: documentCount, documentsSearched: caseVersionIds.length, siteFilesAvailable: siteFileCount, siteFilesSearched: siteVersionIds.length, siteFilesWithoutEvidence, siteFilesWithPartialEvidence, documentsWithoutEvidence, documentsWithPartialEvidence, legalCandidates: Math.min(legalRanks.length, RESEARCH_LIMITS.candidatesPerKind), documentCandidates: Math.min(documentRanks.length, RESEARCH_LIMITS.candidatesPerKind), resultsLimited: citations.length > limit, corpusLimited, ...(scope.librarySelections ? { libraryCollections: library.selections.length, libraryVersionsSearched: library.legalVersionIds.length + library.documentVersionIds.length, libraryItemsUnavailable: library.itemsUnavailable, libraryOnly: Boolean(input.libraryOnly) } : {}), terms, searchedAt, networkRequests: 0, modelUsed: false } };
     const run = await tx.researchRun.create({ data: { ownerId: actor.id, causaId: input.causaId, query: input.query, scopeJson: JSON.stringify(scope), resultJson: "{}", status: result.status } });
     result.id = run.id;
     await tx.researchRun.update({ where: { id: run.id }, data: { resultJson: JSON.stringify(result) } });
@@ -221,6 +240,7 @@ async function scopeStillAuthorized(scopeJson: string, actor: CausaAccessUser, t
     if (!await tx.site.findFirst({ where: { AND: [{ id: scope.siteId }, siteAccessWhere(actor)] }, select: { id: true } })) return false;
     if (scope.siteFileIds.length && await tx.siteFile.count({ where: { AND: [{ id: { in: scope.siteFileIds }, siteId: scope.siteId }, siteFileReadWhere(actor)] } }) !== new Set(scope.siteFileIds).size) return false;
   } else if (scope.siteFileIds?.length) return false;
+  if (scope.librarySelections && !await libraryScopeStillAuthorized(scope.librarySelections, actor, { causaId: scope.causaId, siteId: scope.siteId }, tx)) return false;
   return true;
 }
 
@@ -248,9 +268,10 @@ export async function readResearchRun(id: string, user: CausaAccessUser, client:
     let result: ResearchResult;
     try { result = JSON.parse(run.resultJson); if (result.id !== run.id || result.query !== run.query || !Array.isArray(result.results) || result.results.length > RESEARCH_LIMITS.results || result.results.some(c => !["legal", "document"].includes(c.kind) || typeof c.quote !== "string" || typeof c.fragmentId !== "string")) throw new Error("invalid"); } catch { throw httpError("La investigación guardada no pudo verificarse", 409); }
     const storedScope = JSON.parse(run.scopeJson) as StoredScope;
-    result.scope = { causaId: storedScope.causaId || null, documentIds: storedScope.documentIds, sourceKinds: storedScope.sourceKinds, selectedDocumentIds: storedScope.selectedDocumentIds === undefined ? storedScope.documentIds.length ? storedScope.documentIds : null : storedScope.selectedDocumentIds, ...(storedScope.siteId ? { siteId: storedScope.siteId, siteFileIds: storedScope.siteFileIds, selectedSiteFileIds: storedScope.selectedSiteFileIds ?? null } : {}) };
+    result.scope = { causaId: storedScope.causaId || null, documentIds: storedScope.documentIds, sourceKinds: storedScope.sourceKinds, ...(storedScope.librarySelections ? { librarySelections: storedScope.librarySelections, libraryOnly: storedScope.libraryOnly } : {}), selectedDocumentIds: storedScope.selectedDocumentIds === undefined ? storedScope.documentIds.length ? storedScope.documentIds : null : storedScope.selectedDocumentIds, ...(storedScope.siteId ? { siteId: storedScope.siteId, siteFileIds: storedScope.siteFileIds, selectedSiteFileIds: storedScope.selectedSiteFileIds ?? null } : {}) };
+    const integrityCache = new Map<string, unknown>();
     for (const citation of result.results) {
-      const verified = await verifiedCitation(citation, actor, tx);
+      const verified = storedScope.librarySelections ? { ...await resolveCitation(citation, actor, { client: tx, cache: integrityCache }), verified: true } : await verifiedCitation(citation, actor, tx);
       if (!verified.verified || verified.versionId !== citation.versionId || verified.href !== citation.href || verified.textSha256 !== citation.textSha256 || verified.sourceSha256 !== citation.sourceSha256 || verified.pageNumber !== citation.pageNumber) throw httpError("La evidencia guardada cambió o dejó de ser verificable", 409);
     }
     return result;

@@ -1,0 +1,12 @@
+audit write failed Error: Synthetic case knowledge audit failure
+    at <anonymous> (<workspace>/src/lib/knowledge/cases.integration.test.ts:23:106)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (<workspace>/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (<workspace>/node_modules/@prisma/client/runtime/library.js:31:5636)
+Case knowledge PostgreSQL PASS: exact sources and scope, literal/ambiguous dates, local extraction, resumable bounds, dedupe and A-B-A human review preservation, CAS/history, two-source contradictions, current ACL/role/portal, original tamper and audit rollback; network/model calls 0

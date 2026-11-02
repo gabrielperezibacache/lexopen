@@ -1,0 +1,16 @@
+
+> lexopen@1.0.0 test:production:knowledge
+> node --import tsx scripts/production-knowledge-smoke.ts
+
+AssertionError [ERR_ASSERTION]: {"error":"No autenticado"}
+
+401 !== 201
+
+    at main (<workspace>/scripts/production-knowledge-smoke.ts:37:91) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 401,
+  expected: 201,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

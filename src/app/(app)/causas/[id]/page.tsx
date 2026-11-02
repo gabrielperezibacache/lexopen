@@ -1,3 +1,4 @@
+import { CaseKnowledgePanel } from "@/components/knowledge/CaseKnowledgePanel";
 import { CausaActions } from "@/components/CausaActions";
 import { CausaMovimientoForm } from "@/components/CausaMovimientoForm";
 import { ConflictReviewPanel } from "@/components/ConflictReviewPanel";
@@ -15,7 +16,7 @@ import { CreateSiteFromCausaButton } from "@/components/sites/NewSiteButton";
 import { StatusBadge, UrgenciaBadge, formatDate, formatDateTime } from "@/components/ui";
 import { confidentialWhere, minutaConfidentialWhere } from "@/lib/api";
 import { assertCausaAccess, causaAccessWhere as scopedcausaAccessWhere, documentReadWhere as scopeddocumentReadWhere, plazoAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
-import { can } from "@/lib/auth/permissions";
+import { can, canSome } from "@/lib/auth/permissions";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { STAFF_ROLES } from "@/lib/auth/roles";
 import { requireStaff } from "@/lib/auth/session";
@@ -431,6 +432,8 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           folderUrl={causa.googleDriveFolderUrl}
         />
       </div>
+
+      {canSome(user, "assistant.use") && <CaseKnowledgePanel causaId={causa.id} proceduralEvents={causa.movimientos.map(m => ({ id: m.id, title: m.titulo, at: m.fecha.toISOString(), dateLabel: formatCivilDate(m.fecha), source: m.fuente }))} />}
 
       <CausaEquipoPanel
         causaId={causa.id}

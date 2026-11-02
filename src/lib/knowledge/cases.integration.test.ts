@@ -1,0 +1,144 @@
+/** Fictitious case knowledge, actual PostgreSQL/storage and zero model/network transport. */
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { PrismaClient } from "@prisma/client";
+import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
+import { captureDocumentEvidence, captureSiteFileEvidence } from "@/lib/evidence/service";
+import { putObject } from "@/lib/storage";
+import { analyzeCaseSources, createCaseConflict, createCaseFact, listCaseKnowledgeSources, readCaseConflict, readCaseFact, readCaseKnowledge, updateCaseConflict, updateCaseFact, CASE_ANALYSIS_VERSION } from "./cases";
+
+const code = (expected: number) => (error: unknown) => (error as {status?:number}).status === expected;
+async function main() {
+  const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
+  assert.equal(url, new URL(process.env.DATABASE_URL!).toString());
+  const db = new PrismaClient({datasources:{db:{url}}});
+  const root = await mkdtemp(path.join(tmpdir(),"lexopen-case-knowledge-test-")); process.env.STORAGE_PATH = root;
+  const tag=randomUUID(), users:string[]=[], cases:string[]=[], docs:string[]=[], sites:string[]=[];
+  let failAudit=false, calls=0;
+  const realFetch=globalThis.fetch;
+  globalThis.fetch=(async()=>{calls++;throw new Error("Network forbidden in case knowledge");}) as typeof fetch;
+  db.$use(async(params,next)=>{if(failAudit&&params.model==="AuditEvent"&&params.action==="create")throw new Error("Synthetic case knowledge audit failure");return next(params);});
+  try {
+    const owner=await db.user.create({data:{email:`knowledge-owner-${tag}@example.invalid`,name:"Fictitious owner",role:"abogado",password:"unused"}});users.push(owner.id);
+    const outsider=await db.user.create({data:{email:`knowledge-other-${tag}@example.invalid`,name:"Fictitious outsider",role:"abogado",password:"unused"}});users.push(outsider.id);
+    const reader=await db.user.create({data:{email:`knowledge-read-${tag}@example.invalid`,name:"Fictitious read member",role:"contabilidad",capabilityGrants:"assistant.use",password:"unused"}});users.push(reader.id);
+    const portal=await db.user.create({data:{email:`knowledge-client-${tag}@example.invalid`,name:"Fictitious client",role:"cliente",password:"unused"}});users.push(portal.id);
+    const causa=await db.causa.create({data:{titulo:`Synthetic knowledge ${tag}`,tribunal:"Fixture",materia:"civil",acceso:"equipo",abogadoId:owner.id}});cases.push(causa.id);
+    await db.causaMiembro.create({data:{causaId:causa.id,userId:reader.id,rol:"lectura"}});
+    async function document(causaId:string,name:string,text:string,version=1) {
+      const key=`case-knowledge-${tag}/${randomUUID()}`;await putObject({key,body:text,contentType:"text/plain"});
+      const doc=await db.documento.create({data:{nombre:name,mimeType:"text/plain",contenido:text,extractedMarkdown:text,extractionStatus:"completed",storageKey:key,causaId,autorId:owner.id,version}});docs.push(doc.id);
+      const captured=await captureDocumentEvidence(doc.id,owner,db);
+      const fragments=await db.documentEvidenceFragment.findMany({where:{versionId:captured.id},orderBy:{ordinal:"asc"}});
+      return{doc,captured,fragments};
+    }
+    const textA="El pago del arriendo se realizó el 12 de mayo de 2025 por CLP25.000. La audiencia se celebró en mayo de 2025. La firma consta el 03/04/2025.";
+    const a=await document(causa.id,"Fuente A ficticia.txt",textA);
+    const b=await document(causa.id,"Fuente B ficticia.txt","El pago del arriendo se realizó el 12 de mayo de 2025 por CLP35.000.");
+    const site=await db.site.create({data:{name:"Knowledge fixture space",slug:`knowledge-${tag}`,causaId:causa.id}});sites.push(site.id);
+    const file=await db.siteFile.create({data:{siteId:site.id,name:"Fuente del espacio.txt",contenido:"La entrega se realizó el 20 de junio de 2025."}});
+    const fileVersion=await captureSiteFileEvidence(site.id,file.id,owner,db);
+    const missing=await db.documento.create({data:{nombre:"Sin captura.txt",causaId:causa.id,autorId:owner.id,contenido:"Sin captura"}});docs.push(missing.id);
+    const sourceList=await listCaseKnowledgeSources(causa.id,owner,{},db);
+    assert.equal("sources" in sourceList,true);if("sources" in sourceList){assert.ok(sourceList.sources.some(source=>source.versionId===null));assert.ok(sourceList.sources.some(source=>source.siteFileId===file.id));}
+    const sourceView=await listCaseKnowledgeSources(causa.id,owner,{versionId:a.captured.id},db);assert.ok("fragments"in sourceView&&sourceView.fragments?.length);
+    const first=await analyzeCaseSources(causa.id,owner,{versionIds:[a.captured.id,b.captured.id,fileVersion.id]},db);
+    assert.ok(first.newFacts>=5);assert.equal(first.newConflicts,0);assert.equal(first.networkRequests,0);assert.equal(first.modelUsed,false);
+    const initial=await readCaseKnowledge(causa.id,owner,{},db);
+    assert.equal(initial.canWrite,true);assert.equal(initial.restricted,false);
+    const ambiguous=initial.facts.find(fact=>fact.statement.includes("03/04/2025"));assert.ok(ambiguous);assert.equal(ambiguous.datePrecision,"ambiguous");assert.equal(ambiguous.dateStart,null);assert.ok(initial.chronology.undated.some(fact=>fact.id===ambiguous.id));
+    assert.ok(initial.chronology.dated.every(fact=>fact.dateStart?.startsWith("2025-")),"Never substitute the 2026 upload clock for occurrence dates");
+    const month=initial.facts.find(fact=>fact.statement.includes("audiencia"));assert.ok(month);assert.equal(month.datePrecision,"month");assert.equal(month.dateStart,"2025-05-01");assert.equal(month.dateEnd,"2025-05-31");
+    const factA=initial.facts.find(fact=>fact.citations.some(citation=>citation.documentId===a.doc.id)&&fact.statement.includes("CLP25.000"));
+    const factB=initial.facts.find(fact=>fact.citations.some(citation=>citation.documentId===b.doc.id));assert.ok(factA&&factB);
+    const stableCount=await db.caseFact.count({where:{causaId:causa.id}});
+    const repeat=await analyzeCaseSources(causa.id,owner,{},db);assert.equal(repeat.newFacts,0);assert.equal(repeat.newCitations,0);assert.equal(await db.caseFact.count({where:{causaId:causa.id}}),stableCount);
+    const reviewedA=await updateCaseFact(causa.id,factA.id,owner,{revision:factA.revision,status:"accepted",statement:"El pago del arriendo registrado fue CLP25.000.",comparisonKey:"arriendo-mayo",reason:"Revisión profesional de la fuente A"},db);
+    await updateCaseFact(causa.id,factB.id,owner,{revision:factB.revision,status:"accepted",statement:"El pago del arriendo registrado fue CLP35.000.",comparisonKey:"arriendo-mayo",reason:"Revisión profesional de la fuente B"},db);
+    const compared=await analyzeCaseSources(causa.id,owner,{},db);assert.equal(compared.newFacts,0);assert.equal(compared.newConflicts,1);
+    const withConflict=await readCaseKnowledge(causa.id,owner,{},db);const conflict=withConflict.conflicts.find(row=>row.kind==="money");assert.ok(conflict);assert.equal(conflict.status,"proposed");
+    const duplicate=await createCaseConflict(causa.id,owner,{leftFactId:factB.id,rightFactId:factA.id,kind:"money",reason:"La misma comparación se intentó dos veces."},db);assert.equal(duplicate.reused,true);assert.equal(duplicate.conflict.id,conflict.id);
+    const confirmed=await updateCaseConflict(causa.id,conflict.id,owner,{revision:conflict.revision,status:"confirmed",reason:"Se mantienen importes distintos en las dos fuentes del mismo arriendo.",reviewReason:"Cotejados ambos pasajes"},db);assert.equal(confirmed.status,"confirmed");
+    await analyzeCaseSources(causa.id,owner,{},db);assert.equal((await readCaseConflict(causa.id,conflict.id,owner,db)).status,"confirmed");
+    const writes=await Promise.allSettled([updateCaseFact(causa.id,factA.id,owner,{revision:reviewedA.revision,highlighted:true,reason:"Destacar revisión A"},db),updateCaseFact(causa.id,factA.id,owner,{revision:reviewedA.revision,highlighted:false,reason:"Otra revisión concurrente"},db)]);
+    assert.equal(writes.filter(result=>result.status==="fulfilled").length,1);const rejected=writes.find(result=>result.status==="rejected");assert.ok(rejected?.status==="rejected"&&code(409)(rejected.reason));
+    assert.equal((await readCaseConflict(causa.id,conflict.id,owner,db)).stale,true);
+    const refreshed=await updateCaseConflict(causa.id,conflict.id,owner,{revision:confirmed.revision,status:"apparent",reason:"Se revisaron nuevamente las versiones y se conserva como discrepancia aparente.",reviewReason:"Revisión posterior"},db);assert.equal(refreshed.stale,false);
+    assert.equal((await readCaseFact(causa.id,factA.id,owner,db)).history.length,2);
+    await assert.rejects(createCaseFact(causa.id,owner,{statement:"Una cita inventada",citations:[{kind:"document",fragmentId:a.fragments[0].id,quote:"Frase que no consta"}]},db),code(409));
+    await assert.rejects(createCaseConflict(causa.id,owner,{leftFactId:factA.id,rightFactId:month.id,kind:"claim",reason:"Dos hechos extraídos del mismo fragmento no son dos evidencias distintas."},db),code(400));
+    await assert.rejects(updateCaseFact(causa.id,ambiguous.id,owner,{revision:ambiguous.revision,dateLiteral:"03/04/2025",dateStart:"2025-04-03",dateEnd:"2025-04-03",datePrecision:"day",dateInferred:false,reason:"Interpretar fecha ambigua"},db),code(400));
+    const inferred=await updateCaseFact(causa.id,ambiguous.id,owner,{revision:ambiguous.revision,dateLiteral:"03/04/2025",dateStart:"2025-04-03",dateEnd:"2025-04-03",datePrecision:"day",dateInferred:true,inferenceReason:"Interpretación humana del orden día/mes",reason:"Se conserva la ambigüedad literal y se anota la interpretación"},db);assert.equal(inferred.dateInferred,true);assert.equal(inferred.dateLiteral,"03/04/2025");
+    const otherCase=await db.causa.create({data:{titulo:"Other private source",tribunal:"Fixture",materia:"civil",acceso:"equipo",abogadoId:owner.id}});cases.push(otherCase.id);
+    const other=await document(otherCase.id,"Otro expediente.txt","El pago se realizó el 1 de enero de 2025 por CLP10.000.");
+    await assert.rejects(createCaseFact(causa.id,owner,{statement:"Cruce indebido de expedientes",citations:[{kind:"document",fragmentId:other.fragments[0].id,quote:other.fragments[0].text}]},db),code(404));
+    await assert.rejects(readCaseKnowledge(causa.id,outsider,{},db),code(404));await assert.rejects(readCaseKnowledge(causa.id,portal,{},db),code(403));
+    assert.equal((await readCaseKnowledge(causa.id,reader,{},db)).canWrite,false);
+    await assert.rejects(analyzeCaseSources(causa.id,reader,{},db),code(403));
+    // Source revision B and then A attach references without replacing the human correction.
+    const secondText=textA+" La recepción se realizó el 30 de julio de 2025.";const secondKey=`case-knowledge-${tag}/source-A-v2`;
+    await putObject({key:secondKey,body:secondText});await db.documento.update({where:{id:a.doc.id},data:{version:2,contenido:secondText,extractedMarkdown:secondText,storageKey:secondKey}});
+    const second=await captureDocumentEvidence(a.doc.id,owner,db);assert.equal((await readCaseFact(causa.id,factA.id,owner,db)).stale,true);
+    await analyzeCaseSources(causa.id,owner,{versionIds:[second.id]},db);
+    const preserved=await readCaseFact(causa.id,factA.id,owner,db);assert.equal(preserved.statement,reviewedA.statement);assert.equal(preserved.status,"accepted");assert.equal(preserved.revision,reviewedA.revision+1);assert.equal(preserved.stale,false);assert.ok(preserved.citationCount>=2);
+    const thirdKey=`case-knowledge-${tag}/source-A-v3`;await putObject({key:thirdKey,body:textA});await db.documento.update({where:{id:a.doc.id},data:{version:3,contenido:textA,extractedMarkdown:textA,storageKey:thirdKey}});
+    const third=await captureDocumentEvidence(a.doc.id,owner,db);const revert=await analyzeCaseSources(causa.id,owner,{versionIds:[third.id]},db);assert.equal(revert.newFacts,0);assert.ok(revert.newCitations>=3);assert.equal((await readCaseFact(causa.id,factA.id,owner,db)).status,"accepted");
+    const beforeFailure=await readCaseFact(causa.id,factA.id,owner,db);failAudit=true;
+    await assert.rejects(updateCaseFact(causa.id,factA.id,owner,{revision:beforeFailure.revision,statement:"Un cambio que debe revertirse",reason:"Rollback de auditoría"},db),code(500));failAudit=false;
+    const afterFailure=await readCaseFact(causa.id,factA.id,owner,db);assert.equal(afterFailure.statement,beforeFailure.statement);assert.equal(afterFailure.revision,beforeFailure.revision);assert.equal(afterFailure.history.length,beforeFailure.history.length);
+    const manualCitation={kind:"document" as const,fragmentId:a.fragments[0].id,quote:a.fragments[0].text};
+    const manualOne={statement:"La audiencia requiere una revisión separada.",citations:[manualCitation]};
+    const separateOne=await createCaseFact(causa.id,owner,manualOne,db);
+    const separateTwo=await createCaseFact(causa.id,owner,{statement:"La firma conserva su expresión temporal ambigua.",citations:[manualCitation]},db);
+    assert.notEqual(separateOne.fact.id,separateTwo.fact.id,"Distinct assertions using one paragraph must not collapse");
+    const replayManual=await createCaseFact(causa.id,owner,manualOne,db);assert.equal(replayManual.reused,true);assert.equal(replayManual.fact.id,separateOne.fact.id);
+    // A bounded source cursor resumes after the first batch, never loses the unprocessed tail.
+    const largeCase=await db.causa.create({data:{titulo:"Cursor fixture",tribunal:"Fixture",materia:"civil",acceso:"equipo",abogadoId:owner.id}});cases.push(largeCase.id);
+    const largeText=Array.from({length:205},(_,index)=>`El pago contractual número ${index} se realizó el 12 de mayo de 2025 por CLP25.000. ${"Antecedente complementario sin fecha. ".repeat(38)}`).join("\n\n");
+    const large=await document(largeCase.id,"Lote extenso ficticio.txt",largeText);
+    const batch1=await analyzeCaseSources(largeCase.id,owner,{versionIds:[large.captured.id]},db);assert.equal(batch1.hasMore,true);
+    const progress1=await db.caseAnalysisSource.findUniqueOrThrow({where:{causaId_versionId_extractorVersion:{causaId:largeCase.id,versionId:large.captured.id,extractorVersion:CASE_ANALYSIS_VERSION}}});assert.ok(progress1.afterOrdinal>0);assert.equal(progress1.completed,false);
+    const batch2=await analyzeCaseSources(largeCase.id,owner,{versionIds:[large.captured.id]},db);
+    const progress2=await db.caseAnalysisSource.findUniqueOrThrow({where:{id:progress1.id}});assert.ok(progress2.afterOrdinal>progress1.afterOrdinal);assert.ok(batch2.newFacts>0);assert.equal(progress2.completed,true);
+    const largeCount=await db.caseFact.count({where:{causaId:largeCase.id}});assert.ok(largeCount>=205);assert.equal((await analyzeCaseSources(largeCase.id,owner,{versionIds:[large.captured.id]},db)).newFacts,0);assert.equal(await db.caseFact.count({where:{causaId:largeCase.id}}),largeCount);
+    const firstPage=await readCaseKnowledge(largeCase.id,owner,{},db);assert.equal(firstPage.facts.length,200);assert.equal(firstPage.coverage.factsLimited,true);assert.ok(firstPage.facts.some(fact=>fact.id===firstPage.coverage.nextAfter),"Cursor belongs to a returned authorized fact");
+    const nextPage=await readCaseKnowledge(largeCase.id,owner,{after:firstPage.coverage.nextAfter!},db);assert.equal(firstPage.facts.length+nextPage.facts.length,largeCount);assert.equal(nextPage.coverage.nextAfter,null);assert.equal(firstPage.restricted,nextPage.restricted);assert.equal(firstPage.coverage.verificationLimited,nextPage.coverage.verificationLimited);
+    const legacyCase=await db.causa.create({data:{titulo:"Legacy freshness fixture",tribunal:"Fixture",materia:"civil",acceso:"equipo",abogadoId:owner.id}});cases.push(legacyCase.id);
+    const legacy=await document(legacyCase.id,"Captura heredada.txt","El pago legado se realizó el 12 de mayo de 2025 por CLP10.000.");
+    await db.documentEvidenceVersion.update({where:{id:legacy.captured.id},data:{sourceRevision:"legacy"}});
+    await db.documento.update({where:{id:legacy.doc.id},data:{updatedAt:new Date(Date.now()-60000)}});
+    const priorLegacy=await listCaseKnowledgeSources(legacyCase.id,owner,{},db);assert.ok("sources"in priorLegacy&&priorLegacy.sources.find(source=>source.versionId===legacy.captured.id)?.isCurrent);
+    const newerLegacyKey=`case-knowledge-${tag}/legacy-replacement`;await putObject({key:newerLegacyKey,body:"Otra revisión que aún no tiene captura."});
+    await db.documento.update({where:{id:legacy.doc.id},data:{version:2,contenido:"Otra revisión que aún no tiene captura.",extractedMarkdown:"Otra revisión que aún no tiene captura.",storageKey:newerLegacyKey}});
+    const staleLegacy=await listCaseKnowledgeSources(legacyCase.id,owner,{},db);assert.ok("sources"in staleLegacy);if("sources"in staleLegacy)assert.equal(staleLegacy.sources.find(source=>source.versionId===legacy.captured.id)?.isCurrent,false);
+    assert.equal((await analyzeCaseSources(legacyCase.id,owner,{},db)).newFacts,0);assert.equal(await db.caseAnalysisSource.count({where:{causaId:legacyCase.id}}),0);
+    const explicitLegacy=await analyzeCaseSources(legacyCase.id,owner,{versionIds:[legacy.captured.id]},db);assert.ok(explicitLegacy.newFacts>0);assert.match(explicitLegacy.warnings.join(" "),/captura anterior/);
+    // Confidential revocation hides derived text, both sides of a comparison, and its history.
+    await db.documento.update({where:{id:a.doc.id},data:{confidencial:true}});await db.user.update({where:{id:owner.id},data:{capabilityRevokes:"doc.confidential.read"}});
+    const limited=await readCaseKnowledge(causa.id,owner,{},db);assert.equal(limited.restricted,true);assert.ok(!limited.facts.some(fact=>fact.id===factA.id));assert.ok(!limited.conflicts.some(row=>row.id===conflict.id));assert.ok(!JSON.stringify(limited).includes(reviewedA.statement));
+    const secretSearch=await readCaseKnowledge(causa.id,owner,{q:reviewedA.statement},db);
+    const absentSearch=await readCaseKnowledge(causa.id,owner,{q:"UNICORNIOINEXISTENTE"},db);
+    assert.deepEqual(secretSearch,absentSearch,"Hidden statements must not influence search flags, cursors, counts, facts or chronology");
+    const secretStatus=await readCaseKnowledge(causa.id,owner,{q:reviewedA.statement,status:"accepted"},db);
+    const otherStatus=await readCaseKnowledge(causa.id,owner,{q:"UNICORNIOINEXISTENTE",status:"hidden"},db);
+    assert.deepEqual(secretStatus,otherStatus,"Hidden states must not become a search oracle");
+    await assert.rejects(readCaseKnowledge(causa.id,owner,{after:factA.id},db),code(404));
+    await assert.rejects(readCaseKnowledge(causa.id,owner,{after:"unknown-private-cursor"},db),code(404));
+    await assert.rejects(readCaseFact(causa.id,factA.id,owner,db),code(404));await assert.rejects(readCaseConflict(causa.id,conflict.id,owner,db),code(404));
+    await db.user.update({where:{id:owner.id},data:{capabilityRevokes:""}});await db.documento.update({where:{id:a.doc.id},data:{confidencial:false}});
+    const frozen=await db.documentEvidenceVersion.findUniqueOrThrow({where:{id:a.captured.id}});await putObject({key:frozen.sourceStorageKey!,body:"altered original"});
+    const tampered=await readCaseKnowledge(causa.id,owner,{},db);assert.equal(tampered.restricted,true);assert.ok(!tampered.facts.some(fact=>fact.id===factA.id));await assert.rejects(readCaseFact(causa.id,factA.id,owner,db),code(409));
+    await db.causa.update({where:{id:causa.id},data:{abogadoId:outsider.id}});await assert.rejects(readCaseKnowledge(causa.id,owner,{},db),code(404));
+    assert.equal(calls,0);
+    console.log("Case knowledge PostgreSQL PASS: exact sources and scope, literal/ambiguous dates, local extraction, resumable bounds, dedupe and A-B-A human review preservation, CAS/history, two-source contradictions, current ACL/role/portal, original tamper and audit rollback; network/model calls 0");
+  } finally {
+    failAudit=false;globalThis.fetch=realFetch;
+    await db.site.deleteMany({where:{id:{in:sites}}});await db.caseFact.deleteMany({where:{causaId:{in:cases}}});await db.caseConflict.deleteMany({where:{causaId:{in:cases}}});
+    await db.documento.deleteMany({where:{id:{in:docs}}});await db.causa.deleteMany({where:{id:{in:cases}}});await db.auditEvent.deleteMany({where:{actorId:{in:users}}});await db.user.deleteMany({where:{id:{in:users}}});
+    await db.$disconnect();await rm(root,{recursive:true,force:true});
+  }
+}
+void main().catch(error=>{console.error(error);process.exitCode=1;});

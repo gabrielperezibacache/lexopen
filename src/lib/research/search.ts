@@ -25,9 +25,11 @@ export const researchQuerySchema = z.object({
   documentIds: z.array(z.string().min(1).max(100)).max(RESEARCH_LIMITS.documents).optional(),
   siteId: z.string().min(1).max(100).optional(),
   siteFileIds: z.array(z.string().min(1).max(100)).max(RESEARCH_LIMITS.documents).optional(),
+  libraryCollectionIds: z.array(z.string().min(1).max(100)).max(10).optional(),
+  libraryOnly: z.boolean().optional(),
   sourceKinds: z.array(z.enum(RESEARCH_SOURCE_KINDS)).max(4).optional(),
   limit: z.number().int().min(1).max(RESEARCH_LIMITS.results).optional(),
-}).strict().refine(input => input.siteFileIds === undefined || Boolean(input.siteId), { message: "Seleccione el espacio de los archivos", path: ["siteId"] });
+}).strict().refine(input => input.siteFileIds === undefined || Boolean(input.siteId), { message: "Seleccione el espacio de los archivos", path: ["siteId"] }).refine(input => !input.libraryOnly || Boolean(input.libraryCollectionIds?.length), { message: "Elija una colección para consultar solo la biblioteca", path: ["libraryCollectionIds"] });
 export type ResearchQuery = z.infer<typeof researchQuerySchema>;
 
 /** Exact lexical retrieval only: never a legal conclusion or semantic confidence. */

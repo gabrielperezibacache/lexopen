@@ -45,3 +45,7 @@ Antes de actualizar una instalación: detener el Host y sus workers, conservar r
 ## Continuación del plan
 
 Quedan habilitados los flujos de evidencia de `Documento`, `SiteFile` y copias identificadas de Drive. Continúan pendientes sincronización elegida de revisiones, lotes recuperables de espacios, Google Picker si se necesita ampliar la elección con `drive.file`, evaluación de extracción en el Host objetivo y mediciones de calidad/escala. En investigación, siguen los conectores oficiales pendientes, evaluación jurídica revisada, comparación entre versiones y precedentes y recuperación semántica medida. No se atribuye paridad completa con las 58 capacidades.
+
+## Incremento posterior
+
+La entrega de [hechos, cronología, contradicciones y biblioteca](HECHOS-CRONOLOGIA-BIBLIOTECA-2026-11-01.md) utiliza estas fuentes preparadas para construir conocimiento revisable del expediente y consultas sobre versiones elegidas. Su validación se conserva por separado; no modifica los resultados históricos de esta entrega.
