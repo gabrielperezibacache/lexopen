@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { AiAssist, type AiActionResponse } from "@/components/ai/AiAssist";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
@@ -28,6 +28,7 @@ type Extracted = {
 };
 
 export function CausaExtraerAi({ formId }: { formId: string }) {
+  const inputLabelId = useId();
   const { t } = useI18n();
   const [note, setNote] = useState("");
   const [text, setText] = useState("");
@@ -62,9 +63,10 @@ export function CausaExtraerAi({ formId }: { formId: string }) {
 
   return (
     <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white/50 p-4">
-      <h3 className="text-sm font-semibold">{t("ai.extraer.title")}</h3>
+      <h3 id={inputLabelId} className="text-sm font-semibold">{t("ai.extraer.title")}</h3>
       <p className="mt-1 text-xs text-[var(--ink-soft)]/70">{t("ai.extraer.hint")}</p>
       <textarea
+        aria-labelledby={inputLabelId}
         className="textarea mt-3 min-h-[100px]"
         value={text}
         onChange={(e) => setText(e.target.value)}

@@ -4,6 +4,7 @@ import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 import { apiMutation } from "@/lib/api-mutation";
+import { BillingField } from "./BillingField";
 
 export function LedgerForm({
   clienteId,
@@ -39,29 +40,29 @@ export function LedgerForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4">
+    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-4 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4" aria-label="Registrar movimiento de cuenta corriente">
       {error && (
-        <p className="sm:col-span-2 lg:col-span-4 text-sm text-[var(--danger)]">{error}</p>
+        <p className="sm:col-span-2 lg:col-span-4 text-sm text-[var(--danger)]" role="alert">{error}</p>
       )}
-      <select className="select" name="tipo" defaultValue="provision">
+      <BillingField label="Tipo de movimiento"><select className="select" name="tipo" defaultValue="provision">
         <option value="provision">Provisión de fondos</option>
         <option value="ajuste">Ajuste</option>
         <option value="reembolso">Reembolso al cliente</option>
         <option value="cargo_gasto">Cargo gasto</option>
-      </select>
-      <input className="input" type="number" name="amountClp" required placeholder="Monto CLP" />
-      <select className="select" name="causaId" defaultValue="">
+      </select></BillingField>
+      <BillingField label="Monto CLP"><input className="input" type="number" name="amountClp" required placeholder="Monto CLP" /></BillingField>
+      <BillingField label="Causa"><select className="select" name="causaId" defaultValue="">
         <option value="">Sin causa</option>
         {causas.map((c) => (
           <option key={c.id} value={c.id}>
             {c.rit || c.titulo}
           </option>
         ))}
-      </select>
-      <button className="btn btn-primary" disabled={busy} type="submit">
+      </select></BillingField>
+      <button className="btn btn-primary self-end" disabled={busy} type="submit">
         {busy ? 'Registrando…' : 'Registrar'}
       </button>
-      <input className="input md:col-span-4" name="description" required placeholder="Descripción del movimiento" />
+      <BillingField label="Descripción del movimiento" className="sm:col-span-2 lg:col-span-4"><input className="input" name="description" required placeholder="Descripción del movimiento" /></BillingField>
     </form>
   );
 }

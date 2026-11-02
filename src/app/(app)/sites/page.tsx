@@ -1,3 +1,4 @@
+import styles from "@/components/config/WorkspaceArea.module.css";
 import { EmptyState } from "@/components/EmptyState";
 import { NewSiteButton } from "@/components/sites/NewSiteButton";
 import { ModuleHeader } from "@/components/sites/SiteNav";
@@ -74,7 +75,7 @@ export default async function SitesPage({
   const staff = !isCliente(user.role);
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.area} space-y-6`}>
       <ModuleHeader
         eyebrow={t("sites.eyebrow")}
         title={t("sites.title")}
@@ -105,7 +106,7 @@ export default async function SitesPage({
           <div className="hidden md:block panel overflow-hidden rounded-3xl">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-[var(--ink)] text-white/90">
+                <thead className="table-heading">
                   <tr>
                     <th className="px-4 py-3 font-medium">{t("sites.table.site")}</th>
                     <th className="px-4 py-3 font-medium">{t("sites.table.type")}</th>

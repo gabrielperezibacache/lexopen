@@ -85,7 +85,7 @@ export function PasswordChangeForm() {
         />
       </label>
       {error && (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p className="rounded-xl border border-[var(--danger)]/25 bg-[var(--danger)]/5 px-3 py-2 text-sm text-[var(--danger)]" role="alert">
           {error}
         </p>
       )}

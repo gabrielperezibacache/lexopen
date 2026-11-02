@@ -65,7 +65,7 @@ export function SitesGuidePanel() {
   ];
 
   return (
-    <section className="panel mb-6 rounded-3xl border border-[var(--sea)]/15 bg-[linear-gradient(135deg,rgba(31,111,120,0.06),rgba(255,255,255,0.9))] p-5">
+    <section className="panel mb-6 rounded-3xl border border-[var(--sea)]/15 p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-lg font-semibold">{t("sites.guide.title")}</h2>
         <button

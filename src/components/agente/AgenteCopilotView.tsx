@@ -5,6 +5,7 @@ import { MarkdownView } from "@/lib/markdown";
 import { PageHeader } from "@/components/sites/SiteNav";
 import { SourceChip } from "@/components/agente/SourceChip";
 import type { AgenteCopilotState } from "@/components/agente/useAgenteCopilot";
+import "./agente.css";
 
 export function AgenteCopilotView(props: AgenteCopilotState) {
   const {
@@ -68,28 +69,28 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
   } = props;
 
   return (
-    <div className="space-y-6">
+    <div className="lexopen-copilot space-y-6">
       <PageHeader
-        eyebrow={t("ai.agente.eyebrow")}
         title={t("ai.agente.title")}
         subtitle={t("ai.agente.subtitle")}
       />
 
       {utilities.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="copilot-utilities grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" role="group" aria-label="Herramientas del asistente">
           {utilities.map((u) => (
             <button
               key={u.id}
               type="button"
               onClick={() => selectUtility(u)}
-              className={`rounded-2xl border px-4 py-3 text-left transition ${
+              aria-pressed={utility === u.id}
+              className={`copilot-utility rounded-2xl border px-4 py-3 text-left transition ${
                 utility === u.id
-                  ? "border-[var(--sea)] bg-[rgba(31,122,140,0.08)]"
-                  : "border-[var(--line)] bg-white/70 hover:border-[var(--sea)]/40"
+                  ? "border-[var(--sea)] bg-[var(--sea-soft)]"
+                  : "border-[var(--line)] bg-[var(--surface-solid)] hover:border-[var(--sea)]/40"
               }`}
             >
               <div className="font-semibold">{u.label}</div>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--ink-soft)]/75">
+              <p className="mt-1 text-xs leading-relaxed text-[var(--ink-soft)]">
                 {u.short}
               </p>
             </button>
@@ -98,14 +99,15 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
       )}
 
       {utility === "plazos" && (
-        <section className="panel space-y-3 rounded-3xl p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
+        <section className="copilot-section panel space-y-3 rounded-3xl p-5">
+          <h2 className="copilot-section-title font-semibold text-[var(--ink)]">
             Cálculo interno de plazo
           </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">Desde</label>
+              <label htmlFor="copilot-plazo-desde" className="mb-1 block text-sm font-medium">Desde</label>
               <input
+                id="copilot-plazo-desde"
                 className="input"
                 type="date"
                 value={plazoDesde}
@@ -113,8 +115,9 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Días</label>
+              <label htmlFor="copilot-plazo-dias" className="mb-1 block text-sm font-medium">Días</label>
               <input
+                id="copilot-plazo-dias"
                 className="input"
                 type="number"
                 min={1}
@@ -123,8 +126,9 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Cómputo</label>
+              <label htmlFor="copilot-plazo-computo" className="mb-1 block text-sm font-medium">Cómputo</label>
               <select
+                id="copilot-plazo-computo"
                 className="select"
                 value={plazoComputo}
                 onChange={(e) =>
@@ -149,7 +153,7 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
           </div>
           {plazoPreview && (
             <div className="space-y-2">
-              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--line)] bg-white/70 p-3 font-sans text-sm">
+              <pre className="whitespace-pre-wrap rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] p-3 font-sans text-sm">
                 {plazoPreview}
               </pre>
               {plazoVencimiento && (
@@ -185,13 +189,14 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <aside className="panel rounded-3xl p-4">
+      <div className="copilot-workspace grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="copilot-conversations panel rounded-3xl p-4">
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <h2 className="font-semibold">Conversaciones</h2>
             <button
-              className="text-sm text-[var(--sea)]"
+              className="copilot-text-action text-sm text-[var(--sea)]"
               type="button"
+              aria-label="Nuevo chat"
               onClick={() => {
                 setChatId("");
                 setMessages([]);
@@ -210,7 +215,7 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
             </button>
           </div>
           {causaId && (
-            <p className="mb-2 text-xs text-[var(--ink-soft)]/65">
+            <p className="mb-2 text-xs text-[var(--ink-soft)]">
               Filtrado por causa seleccionada
             </p>
           )}
@@ -219,48 +224,50 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
               <button
                 key={chat.id}
                 type="button"
-                className={`w-full rounded-2xl border px-3 py-2 text-left text-sm ${
+                aria-current={chat.id === chatId ? "true" : undefined}
+                className={`copilot-chat-link w-full rounded-2xl border px-3 py-2 text-left text-sm ${
                   chat.id === chatId
                     ? "border-[var(--sea)] bg-[var(--sea)]/8"
-                    : "border-[var(--line)] bg-white/70"
+                    : "border-[var(--line)] bg-[var(--surface-solid)]"
                 }`}
                 onClick={() => void resumeChat(chat)}
               >
                 <div className="font-medium">{chat.title}</div>
-                <div className="text-xs text-[var(--ink-soft)]/60">
+                <div className="text-xs text-[var(--ink-soft)]">
                   {chat.demoMode ? "demo" : "conectado"} ·{" "}
                   {new Date(chat.updatedAt).toLocaleDateString("es-CL")}
                 </div>
               </button>
             ))}
             {chats.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">
+              <p className="text-sm text-[var(--ink-soft)]">
                 Sin chats guardados.
               </p>
             )}
           </div>
         </aside>
 
-        <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
+        <form onSubmit={onSubmit} className="copilot-compose panel space-y-4 rounded-3xl p-6">
           {messages.length === 0 && !reply && !busy && (
-            <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white/50 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
-              Elija una utilidad y una causa. Puede acotar por carpeta
-              investigativa o documentos concretos; el ranking prioriza
-              coincidencias con su pregunta.
-            </div>
+            <p className="copilot-hint text-sm text-[var(--ink-soft)]">
+              Elija una herramienta y escriba su consulta. Si selecciona una causa,
+              puede elegir qué documentos usar como contexto.
+            </p>
           )}
           {busy && (
-            <div className="animate-pulse space-y-2 rounded-2xl border border-[var(--line)] bg-white/60 p-4">
-              <div className="h-3 w-1/3 rounded bg-[var(--line)]" />
-              <div className="h-3 w-full rounded bg-[var(--line)]" />
-              <div className="h-3 w-5/6 rounded bg-[var(--line)]" />
+            <div role="status" className="copilot-loading animate-pulse space-y-2 rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] p-4">
+              <span className="sr-only">Preparando la respuesta…</span>
+              <div aria-hidden="true" className="h-3 w-1/3 rounded bg-[var(--line)]" />
+              <div aria-hidden="true" className="h-3 w-full rounded bg-[var(--line)]" />
+              <div aria-hidden="true" className="h-3 w-5/6 rounded bg-[var(--line)]" />
             </div>
           )}
           <div>
-            <label className="mb-1 block text-sm font-medium">
-              Causa (contexto del estudio)
+            <label htmlFor="copilot-causa" className="mb-1 block text-sm font-medium">
+              Causa de referencia
             </label>
             <select
+              id="copilot-causa"
               className="select"
               value={causaId}
               onChange={(e) => {
@@ -293,15 +300,16 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
 
           {(utility === "doc_qa" || docs.length > 0) && causaId && (
             <div>
-              <label className="mb-1 block text-sm font-medium">
-                Documento anclado (opcional)
+              <label htmlFor="copilot-documento" className="mb-1 block text-sm font-medium">
+                Documento de referencia (opcional)
               </label>
               <select
+                id="copilot-documento"
                 className="select"
                 value={documentoId}
                 onChange={(e) => setDocumentoId(e.target.value)}
               >
-                <option value="">Todos los documentos indexados</option>
+                <option value="">Todos los documentos de la causa</option>
                 {docs.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.nombre}
@@ -312,7 +320,7 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
           )}
 
           {causaId && (
-            <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-white/60 p-4">
+            <div className="copilot-document-scope space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">Alcance documental</h3>
                 <Link
@@ -323,10 +331,11 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
                 </Link>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--ink-soft)]/70">
+                <label htmlFor="copilot-carpeta" className="mb-1 block text-xs font-medium text-[var(--ink-soft)]">
                   Carpeta investigativa
                 </label>
                 <select
+                  id="copilot-carpeta"
                   className="select"
                   aria-label="Carpeta investigativa"
                   value={rutaPrefix}
@@ -335,7 +344,7 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
                     setSelectedDocIds([]);
                   }}
                 >
-                  <option value="">Toda la causa (ranking automático)</option>
+                  <option value="">Toda la causa (selección automática)</option>
                   {folderPrefixes.map((f) => (
                     <option key={f} value={f}>
                       {f}/
@@ -346,24 +355,24 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
               {visibleDocs.length > 0 ? (
                 <div>
                   <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
-                    <label className="min-w-0 text-xs font-medium text-[var(--ink-soft)]/70">
-                      Documentos ({selectedDocIds.length || "auto"} / {visibleDocs.length})
-                    </label>
+                    <p className="min-w-0 text-xs font-medium text-[var(--ink-soft)]">
+                      Documentos ({selectedDocIds.length || "selección automática"} / {visibleDocs.length})
+                    </p>
                     <button
                       type="button"
                       className="text-xs text-[var(--sea)]"
                       onClick={() => setSelectedDocIds([])}
                     >
-                      Usar ranking automático
+                      Usar selección automática
                     </button>
                   </div>
-                  <ul className="max-h-40 space-y-1 overflow-y-auto text-sm">
+                  <ul className="copilot-document-list max-h-40 space-y-1 overflow-y-auto text-sm">
                     {visibleDocs.slice(0, 40).map((d) => {
                       const path = d.ruta ? `${d.ruta}/${d.nombre}` : d.nombre;
                       const checked = selectedDocIds.includes(d.id);
                       return (
                         <li key={d.id}>
-                          <label className="flex cursor-pointer items-start gap-2 rounded-lg px-1 py-1 hover:bg-white/80">
+                          <label className="flex cursor-pointer items-start gap-2 rounded-lg px-1 py-1 hover:bg-[var(--surface-solid)]">
                             <input
                               type="checkbox"
                               className="mt-1"
@@ -371,8 +380,8 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
                               onChange={() => toggleDoc(d.id)}
                             />
                             <span className="min-w-0">
-                              <span className="block truncate font-medium">{path}</span>
-                              <span className="text-[11px] text-[var(--ink-soft)]/60">
+                              <span className="block break-words font-medium">{path}</span>
+                              <span className="text-[11px] text-[var(--ink-soft)]">
                                 {d.tipo}
                                 {d.extractionStatus ? ` · ${d.extractionStatus}` : ""}
                               </span>
@@ -384,7 +393,7 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
                   </ul>
                 </div>
               ) : (
-                <p className="text-xs text-[var(--ink-soft)]/65">
+                <p className="text-xs text-[var(--ink-soft)]">
                   Sin documentos en esta causa. Incorpore una carpeta investigativa desde
                   Documentos o la ficha de la causa.
                 </p>
@@ -392,31 +401,32 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
             </div>
           )}
           <div>
-            <label className="mb-1 block text-sm font-medium">Instrucción</label>
+            <label htmlFor="copilot-prompt" className="mb-1 block text-sm font-medium">Instrucción</label>
             <textarea
+              id="copilot-prompt"
               className="textarea min-h-[140px]"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
             />
           </div>
-          <button className="btn btn-primary" type="submit" disabled={busy}>
+          <button className="btn btn-primary" type="submit" disabled={busy} aria-busy={busy}>
             {busy ? "Trabajando…" : "Enviar al copiloto"}
           </button>
         </form>
       </div>
 
       {(sources.length > 0 || actions.length > 0) && (
-        <section className="panel space-y-3 rounded-3xl p-5">
+        <section className="copilot-section panel space-y-3 rounded-3xl p-5">
           {sources.length > 0 && (
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
+              <h2 className="copilot-section-title font-semibold text-[var(--ink)]">
                 Fuentes del estudio
               </h2>
               <ul className="mt-2 flex flex-wrap gap-2">
                 {sources.slice(0, 16).map((s) => (
                   <li
                     key={`${s.type}-${s.id}`}
-                    className="inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs"
+                    className="copilot-source-ref inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-1 text-xs"
                   >
                     <SourceChip
                       s={s}
@@ -425,10 +435,10 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
                     {s.downloadHref && (
                       <a
                         href={s.downloadHref}
-                        className="text-[var(--ink-soft)]/70 underline"
-                        title="Descargar Markdown extraído"
+                        className="text-[var(--ink-soft)] underline"
+                        title="Descargar texto extraído"
                       >
-                        MD
+                        Texto
                       </a>
                     )}
                   </li>
@@ -449,18 +459,18 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
       )}
 
       {(requireApproval || approveMsg) && reply && (
-        <section className="panel space-y-3 rounded-3xl border border-[var(--copper)]/40 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--copper)]">
+        <section className="copilot-approval panel space-y-3 rounded-3xl border border-[var(--copper)]/40 p-5">
+          <h2 className="copilot-section-title font-semibold text-[var(--copper-deep)]">
             Revisión humana
           </h2>
           {requireApproval ? (
             <>
-              <p className="text-sm text-[var(--ink-soft)]/80">
+              <p className="text-sm text-[var(--ink-soft)]">
                 Este borrador no es asesoría automática. Apruébelo para
                 guardarlo como minuta de la causa, o descártelo.
               </p>
               {lastSource === "demo" && (
-                <label className="flex items-center gap-2 text-sm text-[var(--ink-soft)]/80">
+                <label className="flex items-center gap-2 text-sm text-[var(--ink-soft)]">
                   <input
                     type="checkbox"
                     checked={allowDemoApproval}
@@ -491,7 +501,7 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
                 </button>
               </div>
               {!causaId && (
-                <p className="text-xs text-[var(--ink-soft)]/70">
+                <p className="text-xs text-[var(--ink-soft)]">
                   Seleccione una causa para habilitar el guardado como minuta.
                 </p>
               )}
@@ -511,9 +521,9 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
       )}
 
       {messages.length > 0 && (
-        <section className="panel rounded-3xl p-6">
+        <section className="copilot-thread panel rounded-3xl p-6">
           {meta && (
-            <p className="mb-4 text-xs uppercase tracking-[0.12em] text-[var(--copper)]">
+            <p className="copilot-meta mb-4 text-sm text-[var(--copper-deep)]">
               {meta}
             </p>
           )}
@@ -522,9 +532,9 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
             {messages.map((m, i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-[var(--line)] bg-white/70 p-3"
+                className="copilot-message rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] p-3"
               >
-                <div className="mb-1 text-xs uppercase tracking-[0.12em] text-[var(--ink-soft)]/55">
+                <div className="copilot-message-role mb-1 text-xs text-[var(--ink-soft)]">
                   {m.role === "user"
                     ? "Usted"
                     : m.source === "demo"
@@ -536,7 +546,7 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
                   {m.approvedMinutaId ? " · aprobado" : ""}
                 </div>
                 {m.role === "assistant" ? (
-                  <div className="prose-sm max-w-none text-sm leading-relaxed text-[var(--ink)]">
+                  <div className="copilot-message-content prose-sm max-w-none text-sm leading-relaxed text-[var(--ink)]">
                     <MarkdownView content={m.content} />
                   </div>
                 ) : (
@@ -554,8 +564,8 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
                             s={s}
                             className={
                               s.href
-                                ? "rounded-full border border-[var(--line)] bg-white px-2 py-0.5 text-[11px] text-[var(--sea)]"
-                                : "rounded-full border border-[var(--line)] px-2 py-0.5 text-[11px]"
+                                ? "copilot-source-link rounded-full border border-[var(--line)] bg-[var(--surface-solid)] px-2 py-0.5 text-[11px] text-[var(--sea)]"
+                                : "copilot-source-link rounded-full border border-[var(--line)] px-2 py-0.5 text-[11px]"
                             }
                           />
                         </li>
@@ -569,9 +579,9 @@ export function AgenteCopilotView(props: AgenteCopilotState) {
       )}
 
       {(reply || meta) && messages.length === 0 && (
-        <section className="panel rounded-3xl p-6">
+        <section className="copilot-thread panel rounded-3xl p-6">
           {meta && (
-            <p className="mb-3 text-xs uppercase tracking-[0.12em] text-[var(--copper)]">
+            <p className="copilot-meta mb-3 text-sm text-[var(--copper-deep)]">
               {meta}
             </p>
           )}

@@ -1,0 +1,60 @@
+.lexopen-copilot { min-width: 0; color: var(--ink); }
+.lexopen-copilot :where(button,a,input,select,textarea):focus-visible { outline: 2px solid var(--sea); outline-offset: 4px; }
+.lexopen-copilot .btn { min-height: 44px; }
+.lexopen-copilot :where(.input,.select,.textarea) { width: 100%; min-width: 0; }
+.copilot-utilities { min-width: 0; }
+.copilot-utility { min-width: 0; min-height: 110px; border-radius: 12px; transition: border-color 150ms ease,background-color 150ms ease; }
+.copilot-utility > div { font-size: 1rem; line-height: 1.5; }
+.copilot-utility > p { font-size: .82rem; line-height: 1.75; }
+.copilot-utility[aria-pressed="true"] { border-color: var(--sea); background: var(--sea-soft); }
+.copilot-utility:hover { border-color: var(--sea); }
+.copilot-workspace { align-items: start; }
+.copilot-conversations,.copilot-compose,.copilot-section,.copilot-thread,.copilot-approval { min-width: 0; }
+.copilot-conversations > div:first-child { flex-direction: row; align-items: center; justify-content: space-between; gap: .75rem; }
+.copilot-text-action { display: inline-flex; align-items: center; min-height: 44px; padding-inline: .25rem; }
+.copilot-chat-link { min-height: 62px; border-radius: 10px; overflow-wrap: anywhere; }
+.copilot-chat-link > div:first-child { line-height: 1.65; }
+.copilot-chat-link > div:last-child { font-size: .82rem; margin-top: .25rem; }
+.copilot-compose { padding: clamp(1.2rem,2.5vw,2rem); }
+.copilot-compose > div > label { margin-bottom: .5rem; }
+.copilot-hint { max-width: 70ch; line-height: 1.8; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.copilot-compose #copilot-prompt { min-height: 10rem; line-height: 1.85; }
+.copilot-section-title { font-family: var(--font-fraunces),Georgia,serif; font-size: 1.25rem; font-weight: 500; line-height: 1.5; }
+.copilot-document-scope { border-radius: 10px; background: var(--paper); }
+.copilot-document-scope :is(a,button) { display: inline-flex; align-items: center; min-height: 44px; font-size: .82rem; }
+.copilot-document-scope :is(label,p) { font-size: .82rem; line-height: 1.7; }
+.copilot-document-list { max-height: 15rem; }
+.copilot-document-list label { min-height: 48px; padding: .7rem .5rem; border-bottom: 1px solid var(--line); }
+.copilot-document-list label:has(input:checked) { background: var(--sea-soft); }
+.copilot-document-list input { flex-shrink: 0; width: 17px; height: 17px; accent-color: var(--sea); }
+.copilot-document-list label > span > span:last-child { font-size: .82rem; }
+.copilot-source-ref { max-width: 100%; gap: .65rem; border-radius: 10px; padding-block: .1rem; font-size: .82rem; overflow-wrap: anywhere; }
+.copilot-source-ref > :is(a,span) { display: inline-flex; align-items: center; min-height: 44px; }
+.copilot-source-link { display: inline-flex; align-items: center; min-height: 44px; max-width: 100%; border-radius: 10px; padding: .45rem .7rem; font-size: .82rem; overflow-wrap: anywhere; }
+.copilot-approval { background: var(--copper-soft); }
+.copilot-approval p { max-width: 70ch; line-height: 1.8; }
+.copilot-approval label { min-height: 44px; align-items: flex-start; line-height: 1.7; }
+.copilot-approval input { accent-color: var(--sea); margin-top: .3rem; flex-shrink: 0; }
+.copilot-message { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 1.5rem 0; background: transparent; overflow-wrap: anywhere; }
+.copilot-message-role { font-size: .82rem; font-weight: 600; line-height: 1.7; }
+.copilot-meta { line-height: 1.75; overflow-wrap: anywhere; }
+.copilot-message-content,.copilot-message > pre { max-width: 75ch; font-size: 1rem; line-height: 1.85; }
+.copilot-thread .markdown-body :is(p,li,ul,ol) { font-size: 1rem; line-height: 1.85; color: var(--ink); }
+.copilot-thread .markdown-body pre { max-width: 100%; }
+
+@media (max-width: 639px) {
+  .copilot-utilities { display: flex; flex-wrap: nowrap; gap: .75rem; overflow-x: auto; padding: .2rem .2rem .9rem; margin-inline: -.2rem; scroll-snap-type: x proximity; scrollbar-width: thin; }
+  .copilot-utility { flex: 0 0 78%; min-height: 116px; scroll-snap-align: start; }
+  .copilot-conversations { padding: 1rem; }
+  .copilot-conversations > div:first-child { margin-bottom: .35rem; }
+  .copilot-compose { padding: 1.2rem; }
+  .lexopen-copilot :is(.input,.select,.textarea) { font-size: 1rem; }
+  .copilot-compose > .btn[type="submit"] { width: 100%; }
+  .copilot-message { padding-block: 1.2rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copilot-utility { transition: none; }
+  .copilot-loading { animation: none; }
+  .copilot-utilities { scroll-snap-type: none; }
+}

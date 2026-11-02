@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { PAYMENT_METHODS, canRegisterInvoicePayment, clp } from "@/lib/billing";
 import { apiMutation } from "@/lib/api-mutation";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
+import { Dialog } from "@/components/ui/Dialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { BillingField } from "./BillingField";
 
 export function InvoiceActions({
   invoiceId,
@@ -19,12 +22,12 @@ export function InvoiceActions({
 }) {
   const router = useRouter();
   const [payOpen, setPayOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [loadingAction, setLoadingAction] = useState<"anular" | "emitir" | "pagar" | null>(null);
   const [error, setError] = useState("");
   const paymentSubmission = useMemo(() => createSubmissionKeys(undefined, `lexopen:payment:${invoiceId}`), [invoiceId]);
 
   async function anular() {
-    if (!window.confirm("¿Anular este borrador? El documento quedará anulado.")) return;
     setLoadingAction("anular");
     setError("");
     try {
@@ -37,6 +40,7 @@ export function InvoiceActions({
         setError(result.error);
         return;
       }
+      setCancelOpen(false);
       router.refresh();
     } finally {
       setLoadingAction(null);
@@ -91,8 +95,8 @@ export function InvoiceActions({
 
   return (
     <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:items-end">
-      {error && (
-        <p className="max-w-xs rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+      {error && !payOpen && (
+        <p className="max-w-xs rounded-xl border border-[var(--danger)]/25 bg-[var(--danger)]/5 px-3 py-2 text-sm text-[var(--danger)]" role="alert">
           {error}
         </p>
       )}
@@ -103,35 +107,37 @@ export function InvoiceActions({
           </button>
         )}
         {status === "borrador" && (
-          <button className="btn btn-ghost" type="button" disabled={loadingAction !== null} onClick={anular}>
+          <button className="btn btn-ghost" type="button" disabled={loadingAction !== null} onClick={() => { setError(""); setCancelOpen(true); }}>
             {loadingAction === "anular" ? "Anulando…" : "Anular borrador"}
           </button>
         )}
         {canRegisterInvoicePayment(status, balanceClp) && (
-          <button className="btn btn-primary" type="button" onClick={() => setPayOpen(true)}>
+          <button className="btn btn-primary" type="button" aria-haspopup="dialog" onClick={() => setPayOpen(true)}>
             Registrar pago
           </button>
         )}
       </div>
       {payOpen && (
-        <form onSubmit={pay} className="panel w-full max-w-xs space-y-2 rounded-2xl p-4 sm:w-72">
-          <div className="text-xs text-[var(--ink-soft)]/65">Saldo {clp(balanceClp)}</div>
-          <input
+        <Dialog open onClose={() => setPayOpen(false)} title="Registrar pago">
+        <form onSubmit={pay} className="space-y-4">
+          <div className="text-sm text-[var(--ink-soft)]">Saldo <strong className="font-semibold tabular-nums text-[var(--ink)]">{clp(balanceClp)}</strong></div>
+          <BillingField label="Monto CLP"><input
             className="input"
             type="number"
             name="amountClp"
             required
             defaultValue={balanceClp}
             max={balanceClp}
-          />
-          <select className="select" name="method" defaultValue="transferencia" aria-label="Medio de pago">
+          /></BillingField>
+          <BillingField label="Medio de pago"><select className="select" name="method" defaultValue="transferencia" aria-label="Medio de pago">
             {PAYMENT_METHODS.map((method) => (
               <option key={method.value} value={method.value}>
                 {method.label}
               </option>
             ))}
-          </select>
-          <input className="input" name="reference" placeholder="Nº transferencia / ref." />
+          </select></BillingField>
+          <BillingField label="Nº transferencia / ref."><input className="input" name="reference" placeholder="Nº transferencia / ref." /></BillingField>
+          {error && <p className="text-sm text-[var(--danger)]" role="alert">{error}</p>}
           <div className="flex gap-2">
             <button className="btn btn-ghost" type="button" onClick={() => setPayOpen(false)}>
               Cancelar
@@ -141,7 +147,9 @@ export function InvoiceActions({
             </button>
           </div>
         </form>
+        </Dialog>
       )}
+      <ConfirmDialog open={cancelOpen} onClose={() => setCancelOpen(false)} onConfirm={anular} title="¿Anular este borrador?" description={error || "El documento quedará anulado."} confirmLabel="Anular borrador" busy={loadingAction === "anular"} />
     </div>
   );
 }

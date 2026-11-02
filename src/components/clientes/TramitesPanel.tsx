@@ -272,21 +272,29 @@ export function TramitesPanel({
     return (
       <form
         onSubmit={(e) => void saveEdit(e, t.id)}
-        className="mt-2 grid grid-cols-1 gap-2 rounded-xl border border-dashed border-[var(--line)] p-2 sm:grid-cols-2"
+        className="mt-2 grid grid-cols-1 items-end gap-4 rounded-xl border border-dashed border-[var(--line)] p-2 sm:grid-cols-2"
       >
-        <input
-          className="input sm:col-span-2"
+        <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+          <span>Trámite</span>
+          <input
+          className="input"
           name="titulo"
           required
           defaultValue={t.titulo}
         />
-        <input
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Fecha límite</span>
+          <input
           className="input"
           type="date"
           name="fechaLimite"
           defaultValue={toDateInput(t.fechaLimite)}
         />
-        <select
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Responsable</span>
+          <select
           className="select"
           name="responsableId"
           defaultValue={t.responsable?.id || ""}
@@ -298,12 +306,16 @@ export function TramitesPanel({
             </option>
           ))}
         </select>
-        <input
-          className="input sm:col-span-2"
+        </label>
+        <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+          <span>Detalle opcional</span>
+          <input
+          className="input"
           name="detalle"
           defaultValue={t.detalle || ""}
           placeholder="Detalle opcional"
         />
+        </label>
         <div className="flex flex-wrap gap-2 sm:col-span-2">
           <button className="btn btn-primary text-xs" disabled={busy} type="submit">
             Guardar
@@ -442,19 +454,27 @@ export function TramitesPanel({
 
       <form
         onSubmit={(e) => void createTramite(e)}
-        className="grid grid-cols-1 gap-2 rounded-2xl border border-dashed border-[var(--line)] p-3 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid grid-cols-1 items-end gap-4 rounded-2xl border border-dashed border-[var(--line)] p-3 sm:grid-cols-2 lg:grid-cols-4"
       >
-        <input
-          className="input sm:col-span-2"
+        <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+          <span>Trámite</span>
+          <input
+          className="input"
           name="titulo"
           required
           placeholder="Nuevo trámite pendiente"
         />
-        <input className="input" type="date" name="fechaLimite" />
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Fecha límite</span>
+          <input className="input" type="date" name="fechaLimite" />
+        </label>
         <button className="btn btn-primary" disabled={busy} type="submit">
           Agregar
         </button>
-        <select className="select sm:col-span-2" name="responsableId" defaultValue="">
+        <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+          <span>Responsable</span>
+          <select className="select" name="responsableId" defaultValue="">
           <option value="">Responsable (yo por defecto)</option>
           {responsables.map((u) => (
             <option key={u.id} value={u.id}>
@@ -462,11 +482,15 @@ export function TramitesPanel({
             </option>
           ))}
         </select>
-        <input
-          className="input sm:col-span-2"
+        </label>
+        <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+          <span>Detalle opcional</span>
+          <input
+          className="input"
           name="detalle"
           placeholder="Detalle opcional"
         />
+        </label>
       </form>
 
       <ConfirmDialog

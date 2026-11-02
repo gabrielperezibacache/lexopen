@@ -5,6 +5,7 @@ import { siteAccessWhere as scopedsiteAccessWhere } from "@/lib/auth/causa-acces
 import { isStaff } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
+import styles from "@/components/config/WorkspaceArea.module.css";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,7 +28,7 @@ export default async function SitePeoplePage({ params }: Params) {
   if (!site) notFound();
 
   return (
-    <div>
+    <div className={styles.area}>
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/personas" />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <p className="text-sm text-[var(--ink-soft)]/75">
@@ -45,9 +46,9 @@ export default async function SitePeoplePage({ params }: Params) {
           <h2 className="text-lg font-semibold">Miembros</h2>
           <div className="mt-4 space-y-3">
             {site.members.map((m) => (
-              <div key={m.id} className="flex items-center gap-3 rounded-2xl border border-[var(--line)] px-3 py-2">
+              <div key={m.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-2xl border border-[var(--line)] px-3 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
                 <span
-                  className="grid h-9 w-9 place-items-center rounded-full text-xs font-bold text-white"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold text-white"
                   style={{ background: m.user.avatarColor }}
                 >
                   {m.user.name
@@ -57,12 +58,12 @@ export default async function SitePeoplePage({ params }: Params) {
                     .join("")}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium">{m.user.name}</div>
-                  <div className="truncate text-xs text-[var(--ink-soft)]/65">
+                  <div className="break-words font-medium">{m.user.name}</div>
+                  <div className="break-words text-sm text-[var(--ink-soft)]">
                     {m.user.email} · {m.user.title || m.user.role}
                   </div>
                 </div>
-                <span className="badge badge-sea">
+                <span className="badge badge-sea col-start-2 w-fit sm:col-start-auto">
                   {m.role === "admin"
                     ? "Admin"
                     : m.role === "contributor"

@@ -30,6 +30,18 @@ const LABEL_KEYS: Record<string, string> = {
   agente: "nav.assistant",
   cuenta: "nav.account",
 };
+const DETAIL_LABELS: Record<string, string> = {
+  biblioteca: "Biblioteca", audiencias: "Audiencias", editar: "Editar", nueva: "Nueva",
+  "mis-causas": "Mis causas", monitoreo: "Monitoreo", archivos: "Archivos", personas: "Personas",
+  horas: "Horas", gastos: "Gastos", tarifas: "Tarifas", uf: "UF", facturas: "Facturas",
+  "cuenta-corriente": "Cuenta corriente", isheets: "Tablas", wiki: "Wiki", blog: "Blog", qa: "Preguntas",
+};
+function detailLabel(part: string, parent?: string) {
+  if (/^(?:c[a-z0-9]{20,}|[a-f0-9]{32,}|[a-f0-9-]{36})$/i.test(part)) {
+    return ({ causas: "Causa", clientes: "Cliente", sites: "Espacio", biblioteca: "Libro", fuentes: "Fuente", facturas: "Factura", minutas: "Minuta", isheets: "Tabla", archivos: "Archivo" } as Record<string, string>)[parent || ""] || "Detalle";
+  }
+  return DETAIL_LABELS[part] || decodeURIComponent(part);
+}
 
 export function Breadcrumbs() {
   const pathname = usePathname() || "/";
@@ -40,7 +52,7 @@ export function Breadcrumbs() {
   const crumbs = parts.map((part, index) => {
     const href = "/" + parts.slice(0, index + 1).join("/");
     const key = LABEL_KEYS[part];
-    const label = parts[0] === "jurisprudencia" && parts[1] === "fuentes" && index === 2 ? "Fuente jurídica" : key ? t(key) : part === "fuentes" ? "Fuentes" : decodeURIComponent(part);
+    const label = parts[0] === "jurisprudencia" && parts[1] === "fuentes" && index === 2 ? "Fuente jurídica" : key ? t(key) : part === "fuentes" ? "Fuentes" : detailLabel(part, parts[index - 1]);
     return { href, label, last: index === parts.length - 1 };
   }).filter((_, index) => !(parts[0] === "documentos" && parts[2] === "fuentes" && index === 1) && !(parts[0] === "jurisprudencia" && parts[1] === "fuentes" && index === 1));
 

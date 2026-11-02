@@ -71,7 +71,7 @@ export function MessagesClient({
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <ModuleHeader
         eyebrow="Mensajería"
         title="Mensajes"
@@ -90,39 +90,42 @@ export function MessagesClient({
           {error}
         </p>
       )}
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <section className="panel rounded-3xl p-5">
-          <h2 className="font-semibold">Bandeja</h2>
-          <div className="mt-4 max-h-[420px] space-y-3 overflow-auto">
-            {messages.length === 0 && (
+      <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        {messages.length === 0 ? (
               <EmptyState
                 title="Bandeja vacía"
                 description="Envíe el primer mensaje a un colega o al canal del portal."
               />
-            )}
+        ) : (
+        <section className="panel min-w-0 overflow-hidden rounded-[var(--radius-lg)]">
+          <h2 className="border-b border-[var(--line)] px-5 py-4 text-lg font-semibold">Bandeja</h2>
+          <div className="max-h-[min(70vh,48rem)] divide-y divide-[var(--line)] overflow-auto">
             {messages.map((m) => (
-              <div
+              <article
                 key={m.id}
-                className="rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
+                className="min-w-0 px-5 py-5 text-sm"
               >
-                <div className="font-medium">{m.subject || "(sin asunto)"}</div>
-                <div className="text-xs text-[var(--ink-soft)]/60">
+                <h3 className="break-words font-semibold">{m.subject || "(sin asunto)"}</h3>
+                <div className="mt-2 break-words text-xs leading-relaxed text-[var(--muted)]">
                   {m.sender.name} → {m.receiver.name}
                 </div>
-                <p className="mt-1 text-[var(--ink-soft)]/85">{m.body}</p>
-              </div>
+                <p className="mt-3 whitespace-pre-wrap break-words leading-relaxed text-[var(--ink-soft)]">{m.body}</p>
+              </article>
             ))}
           </div>
         </section>
-        <section className="panel rounded-3xl p-5">
-          <h2 className="font-semibold">Nuevo mensaje</h2>
+        )}
+        <section className="panel min-w-0 rounded-[var(--radius-lg)] p-5">
+          <h2 className="mb-4 text-lg font-semibold">Nuevo mensaje</h2>
           <MensajeBorradorAi
             onApply={(draft) => {
               setSubject(draft.subject);
               setBody(draft.body);
             }}
           />
-          <form onSubmit={send} className="mt-4 space-y-2">
+          <form onSubmit={send} className="mt-5 space-y-4">
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Destinatario</span>
             <select className="select" name="receiverId" required defaultValue="">
               <option value="" disabled>
                 Destinatario
@@ -134,6 +137,9 @@ export function MessagesClient({
                 </option>
               ))}
             </select>
+            </label>
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Asunto</span>
             <input
               className="input"
               name="subject"
@@ -141,6 +147,9 @@ export function MessagesClient({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
             />
+            </label>
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Mensaje</span>
             <textarea
               className="textarea"
               name="body"
@@ -149,6 +158,7 @@ export function MessagesClient({
               value={body}
               onChange={(e) => setBody(e.target.value)}
             />
+            </label>
             <button
               className="btn btn-primary"
               type="submit"

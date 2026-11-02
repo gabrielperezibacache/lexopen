@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { FormEvent, useMemo, useState, useSyncExternalStore, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Scale } from "lucide-react";
+import { FolioSymbol } from "@/components/ui/FolioSymbol";
+import "./login.css";
 import { safeAppPath } from "@/lib/auth/safe-next";
 import { resolvePostLoginPath } from "@/lib/auth/home-path";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
@@ -90,35 +91,42 @@ function LoginForm() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute -right-24 top-0 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(196,122,58,0.22),transparent_70%)]" />
-      <div className="pointer-events-none absolute -left-16 bottom-10 h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(31,111,120,0.18),transparent_70%)]" />
-
-      <div className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
+    <div className="login-page">
+      <div className="login-spread">
+      <aside className="login-story">
+        <Link href="/" className="login-wordmark"><FolioSymbol className="h-10 w-10" /><span className="display text-3xl">LexOpen</span></Link>
+        <div className="login-emblem"><FolioSymbol className="h-full w-full" /></div>
+        <div>
+          <h2 className="display">{t("login.storyTitle")}</h2>
+          <p>{t("login.storyBody")}</p>
+          <div className="login-story-tools"><span>{t("nav.cases")}</span><span>{t("login.library")}</span><span>{t("nav.documents")}</span></div>
+        </div>
+      </aside>
+      <div className="login-access">
         <div className="mb-4 flex justify-end">
           <LanguageSwitcher variant="compact" />
         </div>
-        <Link href="/" className="mb-8 flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] text-white">
-            <Scale size={20} />
+        <Link href="/" className="login-brand-mobile mb-8 flex items-center gap-3">
+          <span className="folio-brand grid h-11 w-11 place-items-center rounded-xl">
+            <FolioSymbol className="h-8 w-8" />
           </span>
           <div>
             <div className="display text-2xl">LexOpen</div>
-            <div className="text-xs uppercase tracking-[0.16em] text-[var(--ink-soft)]/65">
+            <div className="text-sm text-[var(--muted)]">
               {t("login.access")}
             </div>
           </div>
         </Link>
 
-        <form method="post" onSubmit={onSubmit} aria-busy={!hydrated || busy} className="panel space-y-4 rounded-3xl p-6">
+        <form method="post" onSubmit={onSubmit} aria-busy={!hydrated || busy} className="space-y-5">
           <div>
             <h1 className="display text-3xl">{t("login.title")}</h1>
-            <p className="mt-2 text-sm text-[var(--ink-soft)]/75">
+            <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
               {SHOW_DEMO_LOGIN ? t("login.subtitle") : t("login.subtitleProd")}
             </p>
           </div>
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--ink-soft)]/70">{t("login.email")}</span>
+            <span className="mb-1 block text-[var(--muted)]">{t("login.email")}</span>
             <input
               className="input"
               name="email"
@@ -132,7 +140,7 @@ function LoginForm() {
           </label>
           {!needsTotp ? (
             <label className="block text-sm">
-              <span className="mb-1 block text-[var(--ink-soft)]/70">{t("login.password")}</span>
+              <span className="mb-1 block text-[var(--muted)]">{t("login.password")}</span>
               <input
                 className="input"
                 name="password"
@@ -145,7 +153,7 @@ function LoginForm() {
             </label>
           ) : (
             <label className="block text-sm">
-              <span className="mb-1 block text-[var(--ink-soft)]/70">
+              <span className="mb-1 block text-[var(--muted)]">
                 Código 2FA o respaldo
               </span>
               <input
@@ -186,8 +194,8 @@ function LoginForm() {
         </form>
 
         {SHOW_DEMO_LOGIN && (
-          <div className="panel mt-4 rounded-3xl p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-soft)]/55">
+          <div className="login-demo">
+            <p className="text-sm text-[var(--muted)]">
               {t("login.demoUsers")}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -205,6 +213,7 @@ function LoginForm() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

@@ -11,6 +11,7 @@
   --copper-deep: #9a5a28;
   --copper-soft: rgba(196, 122, 58, 0.14);
   --sea: #1f6f78;
+  --sea-solid: #1f6f78;
   --sea-bright: #2a8f99;
   --sea-soft: rgba(31, 111, 120, 0.12);
 
@@ -22,12 +23,12 @@
   --sand: #d6c4a8;
   --danger: #b42318;
   --ok: #1f7a4c;
-  --warn: #b86e1a;
+  --warn: #8d5414;
   --line: rgba(12, 28, 36, 0.12);
   --line-strong: rgba(12, 28, 36, 0.22);
-  --surface: rgba(255, 255, 255, 0.78);
+  --surface: #ffffff;
   --surface-solid: #ffffff;
-  --muted: rgba(12, 28, 36, 0.55);
+  --muted: #52656d;
   --shadow: 0 12px 36px rgba(12, 28, 36, 0.1);
   --shadow-sm: 0 2px 8px rgba(12, 28, 36, 0.06);
   --background: var(--paper);
@@ -47,8 +48,8 @@
   /* Radius */
   --radius-sm: 0.5rem;
   --radius-md: 0.85rem;
-  --radius-lg: 1.25rem;
-  --radius-xl: 1.5rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1rem;
   --radius-pill: 999px;
 
   /* Motion */
@@ -57,7 +58,7 @@
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Typography */
-  --text-xs: 0.72rem;
+  --text-xs: 0.8rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
@@ -77,9 +78,12 @@ html.dark {
   --warn: #e8a23a;
   --line: rgba(232, 240, 242, 0.12);
   --line-strong: rgba(232, 240, 242, 0.22);
-  --surface: rgba(20, 36, 44, 0.88);
+  --surface: #14242c;
   --surface-solid: #14242c;
-  --muted: rgba(232, 240, 242, 0.6);
+  --muted: #a2b7bf;
+  --sea: #77c8cd;
+  --sea-bright: #8edce0;
+  --copper-deep: #d59a67;
   --shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
   --background: var(--paper);
@@ -121,7 +125,7 @@ html.dark {
 
 html {
   scroll-behavior: smooth;
-  font-size: clamp(14px, 0.25vw + 13.2px, 16px);
+  font-size: 16px;
 }
 
 body {
@@ -130,24 +134,13 @@ body {
   width: 100%;
   overflow-wrap: break-word;
   color: var(--ink);
-  background:
-    radial-gradient(1200px 600px at 85% -10%, rgba(196, 122, 58, 0.16), transparent 55%),
-    radial-gradient(900px 500px at -10% 20%, rgba(31, 111, 120, 0.14), transparent 50%),
-    linear-gradient(180deg, color-mix(in srgb, var(--paper) 92%, white) 0%, var(--paper) 45%, var(--mist) 100%);
+  background: var(--paper);
   font-family: var(--font-sora), "Segoe UI", sans-serif;
   transition: background var(--motion-base) var(--motion-ease), color var(--motion-base) var(--motion-ease);
 }
 
-html.dark body {
-  background:
-    radial-gradient(1000px 500px at 90% -15%, rgba(196, 122, 58, 0.12), transparent 55%),
-    radial-gradient(800px 420px at -5% 15%, rgba(42, 143, 153, 0.1), transparent 50%),
-    linear-gradient(180deg, #0e1a20 0%, #0c181e 50%, #101e26 100%);
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
+@layer base {
+  a { color: inherit; text-decoration: none; }
 }
 
 ::selection {
@@ -162,8 +155,7 @@ a {
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
-  backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-lg);
 }
 
 .btn {
@@ -171,9 +163,10 @@ a {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: var(--radius-pill);
+  min-height: 44px;
+  border-radius: var(--radius-md);
   padding: 0.65rem 1.1rem;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   border: 1px solid transparent;
   transition:
@@ -188,9 +181,8 @@ a {
 }
 
 .btn-primary {
-  background: var(--copper-deep);
+  background: #9a5a28;
   color: white;
-  box-shadow: 0 8px 20px rgba(154, 90, 40, 0.28);
 }
 
 .btn-secondary {
@@ -199,7 +191,7 @@ a {
 }
 
 html.dark .btn-secondary {
-  background: var(--sea);
+  background: #1f6f78;
   color: white;
 }
 
@@ -267,6 +259,8 @@ html.dark .badge-copper {
 .input,
 .select,
 .textarea {
+  min-width: 0;
+  min-height: 44px;
   width: 100%;
   border: 1px solid var(--line);
   background: var(--surface-solid);
@@ -364,12 +358,14 @@ html.dark .badge-copper {
 }
 
 .nav-link {
+  position: relative;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 0.7rem;
   padding: 0.65rem 0.85rem;
   border-radius: var(--radius-md);
-  color: rgba(243, 246, 244, 0.72);
+  color: rgba(243, 246, 244, 0.82);
   transition:
     background var(--motion-fast) var(--motion-ease),
     color var(--motion-fast) var(--motion-ease);
@@ -380,7 +376,7 @@ html.dark .badge-copper {
   .nav-link {
     min-height: 44px;
     padding: 0.85rem 1rem;
-    font-size: 0.95rem;
+    font-size: var(--text-base);
   }
 
   .btn {
@@ -481,6 +477,52 @@ html.dark dialog::backdrop {
   box-shadow: var(--shadow);
 }
 
+/* Shared working surfaces: one hierarchy in every module. */
+.app-content { max-width: 112rem; margin-inline: auto; }
+.app-content > *, .page-header > *, .panel { min-width: 0; }
+.page-header { padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
+.page-header h1 { max-width: 30ch; }
+.empty-state { background: var(--surface-solid); }
+.empty-state p { line-height: 1.7; }
+.panel .panel { box-shadow: none; }
+.table-heading,
+thead[class~="bg-[var(--ink)]"] { background: var(--mist); color: var(--ink-soft); }
+.table-heading th { padding-block: .9rem; font-size: var(--text-sm); }
+.nav-link.active { background: rgba(255,255,255,.12); color: white; }
+.nav-link.active::before { content: ""; position: absolute; left: 0; top: 25%; bottom: 25%; width: 3px; background: var(--copper); border-radius: 2px; }
+.folio-brand { color: #f3f6f4; background: #9a5a28; }
+.folio-brand svg { transition: transform 220ms var(--motion-ease); }
+a:hover .folio-brand svg { transform: translateY(-1px) rotate(-4deg); }
+.inicio-cards > * { min-width: 0; }
+.inicio-cards a { min-height: 44px; }
+.inicio-composer { display: flex; flex-direction: column; gap: .75rem; }
+.inicio-composer textarea { width: 100%; min-height: 104px; }
+.inicio-composer-tools { display: flex; justify-content: flex-end; gap: .5rem; }
+.inicio-suggestions button { min-height: 44px; text-align: left; }
+
+@media (max-width: 639px) {
+  .data-table { width: 100%; min-width: 0; border-collapse: separate; }
+  .data-table thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .data-table tbody { display: grid; gap: .75rem; padding: .5rem; }
+  .data-table tr { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-solid); padding: .5rem; }
+  .data-table td { display: block; min-width: 0; padding: .5rem; white-space: normal; overflow-wrap: anywhere; }
+  .data-table td::before { content: attr(data-label); display: block; margin-bottom: .3rem; color: var(--muted); font-size: var(--text-xs); font-weight: 500; }
+  .data-table td:first-child, .data-table td:last-child, .data-table .data-table-primary, .data-table .data-table-actions, .data-table td[colspan] { grid-column: 1 / -1; }
+  .data-table td:first-child { font-weight: 600; }
+  .data-table .data-table-actions { border-top: 1px solid var(--line); }
+  .data-table a, .data-table button { display: inline-flex; align-items: center; min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  dialog[open] { animation: folio-open 180ms var(--motion-ease); }
+  .app-content details[open] > :not(summary) { animation: folio-open 180ms var(--motion-ease); }
+  [role="tabpanel"] { animation: folio-open 160ms var(--motion-ease); }
+}
+@keyframes folio-open {
+  from { opacity: .65; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .fade-up, .fade-up-delay, .fade-up-delay-2, .hero-glow, .skeleton {
@@ -491,4 +533,6 @@ html.dark dialog::backdrop {
   }
   .btn:hover { transform: none; }
   #lexopen-mobile-nav { transition: none; }
+  .folio-brand svg { transition: none; }
+  a:hover .folio-brand svg { transform: none; }
 }

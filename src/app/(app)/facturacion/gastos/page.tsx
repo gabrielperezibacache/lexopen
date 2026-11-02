@@ -1,3 +1,4 @@
+import { BillingNav } from "@/components/billing/BillingNav";
 import { ExpenseForm } from "@/components/billing/ExpenseForm";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { causaAccessWhere as scopedcausaAccessWhere, billingRelatedWhere as scopedrelatedCausaWhere } from "@/lib/auth/causa-access";
@@ -46,9 +47,10 @@ export default async function GastosPage({
         title="Gastos"
         subtitle="Notaría, receptor, peritos, costas y otros desembolsos por cuenta del cliente."
       />
+      <BillingNav />
 
       <form className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]/60">
+        <label className="flex flex-col gap-1 text-sm font-medium text-[var(--ink-soft)]">
           Estado
           <select className="select" name="estado" defaultValue={estado}>
             <option value="">Todos</option>
@@ -81,7 +83,7 @@ export default async function GastosPage({
       <ExpenseForm causas={causas} clientes={clientes} />
       <div className="panel overflow-x-auto rounded-3xl">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-[var(--ink)] text-white/90">
+          <thead className="table-heading">
             <tr>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Descripción</th>

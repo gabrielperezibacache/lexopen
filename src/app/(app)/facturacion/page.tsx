@@ -1,3 +1,4 @@
+import { BillingNav } from "@/components/billing/BillingNav";
 import Link from "next/link";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp, formatHours, labelTimeBillingState } from "@/lib/billing";
@@ -104,19 +105,34 @@ export default async function FacturacionPage() {
           </div>
         }
       />
+      <BillingNav />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {stats.map(({ label, value, sub, icon: Icon, href }) => (
-          <Link key={label} href={href} className="panel rounded-3xl p-5 transition hover:shadow-[var(--shadow)]">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[var(--ink-soft)]/70">{label}</span>
-              <Icon size={18} className="text-[var(--copper)]" />
-            </div>
-            <div className="display mt-3 text-3xl">{value}</div>
-            <div className="mt-1 text-sm text-[var(--ink-soft)]/65">{sub}</div>
-          </Link>
-        ))}
-      </div>
+      <section className="panel overflow-hidden rounded-3xl" aria-label={b.title}>
+        <div className="grid sm:grid-cols-2 xl:grid-cols-4">
+          {stats.slice(0, 4).map(({ label, value, sub, icon: Icon, href }) => (
+            <Link key={label} href={href} className="min-w-0 p-5 transition-colors hover:bg-[var(--sea-soft)]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-[var(--ink-soft)]">{label}</span>
+                <Icon size={18} aria-hidden="true" className="shrink-0 text-[var(--copper-deep)]" />
+              </div>
+              <div className="display mt-3 break-words text-2xl tabular-nums">{value}</div>
+              <div className="mt-1 text-sm text-[var(--ink-soft)]">{sub}</div>
+            </Link>
+          ))}
+        </div>
+        <div className="grid border-t border-[var(--line)] md:grid-cols-3">
+          {stats.slice(4).map(({ label, value, sub, icon: Icon, href }) => (
+            <Link key={label} href={href} className="flex min-w-0 items-start gap-3 p-5 transition-colors hover:bg-[var(--sea-soft)]">
+              <Icon size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--sea)]" />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold">{label} <span aria-hidden="true">→</span></div>
+                <div className="mt-1 text-sm text-[var(--ink-soft)]">{value}</div>
+                <div className="mt-1 text-sm text-[var(--ink-soft)]">{sub}</div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel rounded-3xl p-5">

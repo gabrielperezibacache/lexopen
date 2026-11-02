@@ -1,5 +1,8 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+import { WorkspaceField } from "./WorkspaceField";
+
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
@@ -39,16 +42,10 @@ export function NewISheetButton({ siteId }: { siteId: string }) {
         Nueva iSheet
       </button>
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="new-isheet-title"
-        >
-          <form onSubmit={onSubmit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 id="new-isheet-title" className="text-lg font-semibold">Nueva iSheet</h3>
-            <input className="input" name="name" required placeholder="Nombre" />
-            <textarea className="textarea" name="description" placeholder="Descripción" />
+        <Dialog open onClose={() => setOpen(false)} title="Nueva iSheet">
+          <form onSubmit={onSubmit} className="space-y-4">
+            <WorkspaceField label="Nombre"><input className="input" name="name" required placeholder="Nombre" /></WorkspaceField>
+            <WorkspaceField label="Descripción"><textarea className="textarea" name="description" placeholder="Descripción" /></WorkspaceField>
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
               <button
@@ -64,7 +61,7 @@ export function NewISheetButton({ siteId }: { siteId: string }) {
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </>
   );

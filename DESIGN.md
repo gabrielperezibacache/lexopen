@@ -6,6 +6,7 @@ colors:
   copper-deep: "#9a5a28"
   copper-soft: "rgba(196, 122, 58, 0.14)"
   sea: "#1f6f78"
+  sea-solid: "#1f6f78"
   sea-bright: "#2a8f99"
   sea-soft: "rgba(31, 111, 120, 0.12)"
   ink: "#0c1c24"
@@ -18,7 +19,12 @@ colors:
   line-strong: "rgba(12, 28, 36, 0.22)"
   danger: "#b42318"
   ok: "#1f7a4c"
-  warn: "#b86e1a"
+  warn: "#8d5414"
+  muted: "#52656d"
+  dark-muted: "#a2b7bf"
+  dark-sea: "#77c8cd"
+  dark-sea-bright: "#8edce0"
+  dark-copper-deep: "#d59a67"
   dark-ink: "#e8f0f2"
   dark-ink-soft: "#c5d4da"
   dark-paper: "#0e1a20"
@@ -54,7 +60,7 @@ typography:
     fontWeight: 500
   body:
     fontFamily: 'var(--font-sora), "Segoe UI", sans-serif'
-    fontSize: "clamp(14px, 0.25vw + 13.2px, 16px)"
+    fontSize: "16px"
   label:
     fontFamily: 'var(--font-sora), "Segoe UI", sans-serif'
     fontSize: "0.82rem"
@@ -72,8 +78,9 @@ typography:
 rounded:
   sm: "0.5rem"
   md: "0.85rem"
-  lg: "1.25rem"
-  xl: "1.5rem"
+  lg: "1rem"
+  xl: "1rem"
+  indicator: "2px"
   pill: "999px"
   library-paper: "12px"
   library-control: "10px"
@@ -89,22 +96,22 @@ components:
   button-primary:
     backgroundColor: "{colors.copper-deep}"
     textColor: "white"
-    rounded: "{rounded.pill}"
+    rounded: "{rounded.md}"
     padding: "0.65rem 1.1rem"
   button-secondary:
     backgroundColor: "{colors.ink}"
     textColor: "{colors.paper}"
-    rounded: "{rounded.pill}"
+    rounded: "{rounded.md}"
     padding: "0.65rem 1.1rem"
   button-secondary-dark:
     backgroundColor: "{colors.sea}"
     textColor: "white"
-    rounded: "{rounded.pill}"
+    rounded: "{rounded.md}"
     padding: "0.65rem 1.1rem"
   button-ghost:
     backgroundColor: "transparent"
     textColor: "{colors.ink}"
-    rounded: "{rounded.pill}"
+    rounded: "{rounded.md}"
     padding: "0.65rem 1.1rem"
   input:
     backgroundColor: "{colors.surface-solid}"
@@ -112,7 +119,7 @@ components:
     rounded: "{rounded.md}"
     padding: "0.75rem 0.9rem"
   navigation:
-    textColor: "rgba(243, 246, 244, 0.72)"
+    textColor: "rgba(243, 246, 244, 0.82)"
     rounded: "{rounded.md}"
     padding: "0.65rem 0.85rem"
   chip-sea:
@@ -281,3 +288,13 @@ La mesa de escritura mantiene selección de fuentes, recuperación de pasajes, e
 - **Don't** presentar una comprobación de literalidad como verdad jurídica o autoría certificada.
 - **Don't** rasterizar títulos, controles, pasajes o avisos de la interfaz.
 - **Don't** añadir lámparas, plantas u objetos del mock a la superficie operativa de biblioteca.
+
+## Refinamiento general · noviembre 2026
+
+El marco conserva Sora, Fraunces, cobre y verde mar. El símbolo propio usa folios geométricos: marca, colección y documento cotejado. Los paneles de trabajo usan una superficie opaca, una línea y radios de 16 px; los controles, 14 px y 44 px de altura mínima. El texto base es 16 px también en móvil. Las tablas operativas se convierten en registros de dos columnas en móvil sin duplicar los datos, preservando sus encabezados para lectores de pantalla.
+
+Los nuevos tonos muted (#52656d claro, #a2b7bf oscuro), sea oscuro (#77c8cd / #8edce0) y cobre oscuro (#d59a67) aportan contraste sobre papel o tinta. El botón principal mantiene #9a5a28 con texto blanco en ambos temas. Las cabeceras de tabla usan mist/ink; la consola conserva fondo tinta fijo. Los degradados de barra lateral ya existentes y la oscuridad de los fondos de diálogo son tratamientos contextuales, no una nueva paleta ornamental.
+
+El movimiento describe apertura de folios: diálogos 180 ms, paneles de pestañas 160 ms, y una respuesta breve del símbolo al pasar sobre la marca. Se limita a cambios iniciados por el usuario y desaparece con prefers-reduced-motion. No hay vídeo de fondo ni contenido oculto esperando una animación. La navegación activa se reconoce por línea de cobre, fondo y aria-current.
+
+`sea-solid` conserva #1f6f78 en ambos temas para controles con texto blanco; `sea` se aclara en oscuro para enlaces y texto. No intercambiar esos usos.

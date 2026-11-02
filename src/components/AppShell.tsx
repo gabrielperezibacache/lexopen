@@ -194,7 +194,7 @@ export function AppShell({
         <main
           id="main-content"
           tabIndex={-1}
-          className="min-w-0 w-full flex-1 px-3 py-4 sm:px-5 sm:py-5 md:px-8 md:py-7"
+          className="app-content min-w-0 w-full flex-1 px-4 py-6 sm:px-6 md:px-8 md:py-8"
           style={{
             paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
           }}

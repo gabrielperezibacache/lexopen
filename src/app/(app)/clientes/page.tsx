@@ -71,40 +71,46 @@ export default async function ClientesPage({
         actions={<NewClienteForm abogados={abogados} />}
       />
 
-      <form className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <form className="panel grid items-end gap-4 rounded-[var(--radius-lg)] p-4 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,0.5fr)_auto]" role="search">
+        <label className="block space-y-2 text-sm font-medium">
+          <span>{t("crm.colClient")}</span>
         <input
-          className="input w-full max-w-xs"
+          className="input"
           name="q"
           defaultValue={q || ""}
           placeholder={t("crm.searchPlaceholder")}
         />
-        <select className="select w-full max-w-xs sm:w-auto" name="estado" defaultValue={estado || ""}>
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>{t("crm.colStatus")}</span>
+        <select className="select" name="estado" defaultValue={estado || ""}>
           <option value="">{t("crm.filterAll")}</option>
           <option value="activo">{t("crm.filterActive")}</option>
           <option value="inactivo">{t("crm.filterInactive")}</option>
         </select>
+        </label>
         <button className="btn btn-secondary" type="submit">
           {t("crm.filter")}
         </button>
       </form>
 
       {clientes.length > 0 ? (
-        <p className="text-xs text-[var(--ink-soft)]/65">
+        <p className="text-xs text-[var(--muted)]">
           Mostrando hasta {LIST_TAKE} clientes más recientes.
         </p>
       ) : null}
-      <div className="panel overflow-hidden rounded-3xl">
+      <div className="panel overflow-hidden rounded-[var(--radius-lg)]">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[var(--ink)] text-white/90">
-              <tr>
-                <th className="px-4 py-3 font-medium">{t("crm.colClient")}</th>
-                <th className="px-4 py-3 font-medium">{t("crm.colRut")}</th>
-                <th className="px-4 py-3 font-medium">{t("crm.colCases")}</th>
-                <th className="px-4 py-3 font-medium">{t("crm.colPending")}</th>
-                <th className="px-4 py-3 font-medium">{t("crm.colDocs")}</th>
-                <th className="px-4 py-3 font-medium">{t("crm.colLawyer")}</th>
-                <th className="px-4 py-3 font-medium">{t("crm.colStatus")}</th>
+          <table role="table" className="data-table min-w-full text-left text-sm">
+            <thead className="border-b border-[var(--line)] text-[var(--muted)]">
+              <tr role="row">
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("crm.colClient")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("crm.colRut")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("crm.colCases")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("crm.colPending")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("crm.colDocs")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("crm.colLawyer")}</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">{t("crm.colStatus")}</th>
               </tr>
             </thead>
             <tbody>
@@ -114,24 +120,24 @@ export default async function ClientesPage({
                   0
                 );
                 return (
-                  <tr key={c.id} className="table-row">
-                    <td className="px-4 py-3">
+                  <tr role="row" key={c.id} className="table-row">
+                    <td role="cell" data-label={t("crm.colClient")} className="data-table-primary px-4 py-3">
                       <Link
                         href={`/clientes/${c.id}`}
                         className="font-medium hover:text-[var(--sea)]"
                       >
                         {c.razonSocial}
                       </Link>
-                      <div className="text-xs text-[var(--ink-soft)]/60">
+                      <div className="text-xs text-[var(--muted)]">
                         {c.tipo} · {c.email || t("crm.noEmail")}
                       </div>
                     </td>
-                    <td className="px-4 py-3">{c.rut || "—"}</td>
-                    <td className="px-4 py-3">{c._count.causas}</td>
-                    <td className="px-4 py-3">{pend}</td>
-                    <td className="px-4 py-3">{c._count.documentos}</td>
-                    <td className="px-4 py-3">{c.abogado?.name || "—"}</td>
-                    <td className="px-4 py-3">
+                    <td role="cell" data-label={t("crm.colRut")} className="px-4 py-3">{c.rut || "—"}</td>
+                    <td role="cell" data-label={t("crm.colCases")} className="px-4 py-3">{c._count.causas}</td>
+                    <td role="cell" data-label={t("crm.colPending")} className="px-4 py-3">{pend}</td>
+                    <td role="cell" data-label={t("crm.colDocs")} className="px-4 py-3">{c._count.documentos}</td>
+                    <td role="cell" data-label={t("crm.colLawyer")} className="px-4 py-3">{c.abogado?.name || "—"}</td>
+                    <td role="cell" data-label={t("crm.colStatus")} className="px-4 py-3">
                       <StatusBadge
                         estado={c.estado === "activo" ? "activa" : "suspendida"}
                       />
@@ -140,10 +146,10 @@ export default async function ClientesPage({
                 );
               })}
               {clientes.length === 0 && (
-                <tr>
-                  <td
+                <tr role="row">
+                  <td role="cell"
                     colSpan={7}
-                    className="px-4 py-10 text-center text-[var(--ink-soft)]/70"
+                    className="px-4 py-10 text-center text-[var(--muted)]"
                   >
                     {t("crm.empty")}
                   </td>

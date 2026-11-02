@@ -46,36 +46,56 @@ export function ClienteEditForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <input
-        className="input sm:col-span-2"
+    <form onSubmit={onSubmit} className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2">
+      <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+        <span>Razón social / nombre</span>
+        <input
+        className="input"
         name="razonSocial"
         required
         defaultValue={cliente.razonSocial}
       />
-      <input className="input" name="rut" defaultValue={cliente.rut || ""} placeholder="RUT" />
-      <select className="select" name="tipo" defaultValue={cliente.tipo}>
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>RUT</span>
+        <input className="input" name="rut" defaultValue={cliente.rut || ""} placeholder="RUT" />
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>Tipo</span>
+        <select className="select" name="tipo" defaultValue={cliente.tipo}>
         <option value="persona">Persona natural</option>
         <option value="empresa">Empresa</option>
       </select>
-      <input
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>Email</span>
+        <input
         className="input"
         name="email"
         type="email"
         defaultValue={cliente.email || ""}
         placeholder="Email"
       />
-      <input
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>Teléfono</span>
+        <input
         className="input"
         name="telefono"
         defaultValue={cliente.telefono || ""}
         placeholder="Teléfono"
       />
-      <select className="select" name="estado" defaultValue={cliente.estado}>
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>Estado</span>
+        <select className="select" name="estado" defaultValue={cliente.estado}>
         <option value="activo">Activo</option>
         <option value="inactivo">Inactivo</option>
       </select>
-      <select
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>Abogado responsable</span>
+        <select
         className="select"
         name="abogadoId"
         defaultValue={cliente.abogadoId || ""}
@@ -87,18 +107,22 @@ export function ClienteEditForm({
           </option>
         ))}
       </select>
-      <textarea
-        className="input sm:col-span-2"
+      </label>
+      <label className="block space-y-2 text-sm font-medium sm:col-span-2">
+        <span>Notas</span>
+        <textarea
+        className="textarea"
         name="notas"
         rows={2}
         defaultValue={cliente.notas || ""}
         placeholder="Notas"
       />
+      </label>
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
         <button className="btn btn-secondary" type="submit">
           Guardar datos
         </button>
-        {msg && <span className="text-sm text-[var(--ink-soft)]/70">{msg}</span>}
+        {msg && <span className="text-sm text-[var(--muted)]">{msg}</span>}
       </div>
     </form>
   );

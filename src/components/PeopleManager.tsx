@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Dialog } from "@/components/ui/Dialog";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { apiMutation } from "@/lib/api-mutation";
 
@@ -38,6 +39,10 @@ const ROLE_LABEL: Record<string, string> = {
   externo: "Externo",
   cliente: "Cliente",
 };
+
+function PeopleField({ label, children }: { label: string; children: ReactNode }) {
+  return <label className="grid min-w-0 gap-1.5 text-sm font-medium text-[var(--ink-soft)]"><span>{label}</span>{children}</label>;
+}
 
 export function PeopleManager({
   initialUsers,
@@ -264,7 +269,7 @@ export function PeopleManager({
     <div className="space-y-4" data-testid="people-manager">
       {error && (
         <div
-          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-2xl border border-[var(--danger)]/25 bg-[var(--danger)]/5 px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
         >
           {error}
@@ -318,7 +323,7 @@ export function PeopleManager({
         <section className="panel rounded-3xl p-5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Usuarios</h2>
-            <span className="text-xs text-[var(--ink-soft)]/60">
+            <span className="text-sm text-[var(--ink-soft)]">
               {users.length} en el estudio
             </span>
           </div>
@@ -357,14 +362,14 @@ export function PeopleManager({
                             </span>
                           ) : null}
                         </div>
-                        <div className="break-words text-xs text-[var(--ink-soft)]/65">
+                        <div className="break-words text-sm text-[var(--ink-soft)]">
                           {u.email} · {u.title || "Sin cargo"}
                         </div>
                       </div>
                     </div>
                     {canManage ? (
                       <select
-                        className="select w-full max-w-[140px] sm:w-auto"
+                        className="select w-full max-w-[180px] sm:w-auto"
                         value={u.role}
                         aria-label={`Rol de ${u.name}`}
                         onChange={(e) => updateRole(u.id, e.target.value)}
@@ -400,7 +405,7 @@ export function PeopleManager({
                   {canManage && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
-                        className="btn btn-ghost text-xs"
+                        className="btn btn-ghost text-sm"
                         type="button"
                         onClick={() => {
                           setError(null);
@@ -410,7 +415,7 @@ export function PeopleManager({
                         Editar
                       </button>
                       <button
-                        className="btn btn-ghost text-xs text-rose-800"
+                        className="btn btn-ghost text-sm text-[var(--danger)]"
                         type="button"
                         disabled={busy || u.id === currentUserId}
                         onClick={() => requestDeleteUser(u)}
@@ -428,7 +433,7 @@ export function PeopleManager({
         <section className="panel rounded-3xl p-5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Grupos</h2>
-            <span className="text-xs text-[var(--ink-soft)]/60">
+            <span className="text-sm text-[var(--ink-soft)]">
               {groups.length} grupos
             </span>
           </div>
@@ -459,14 +464,14 @@ export function PeopleManager({
                   <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
                     {g.description || "Sin descripción"}
                   </p>
-                  <div className="mt-2 text-xs text-[var(--ink-soft)]/65">
+                  <div className="mt-2 text-sm text-[var(--ink-soft)]">
                     {g.members.map((m) => m.user.name).join(", ") ||
                       "Sin miembros"}
                   </div>
                   {canManage && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
-                        className="btn btn-ghost text-xs"
+                        className="btn btn-ghost text-sm"
                         type="button"
                         onClick={() => {
                           setError(null);
@@ -476,7 +481,7 @@ export function PeopleManager({
                         Editar
                       </button>
                       <button
-                        className="btn btn-ghost text-xs text-rose-800"
+                        className="btn btn-ghost text-sm text-[var(--danger)]"
                         type="button"
                         disabled={busy}
                         onClick={() => setPendingGroupDelete(g)}
@@ -493,44 +498,38 @@ export function PeopleManager({
       </div>
 
       {userOpen && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-user-title"
-        >
+        <Dialog open onClose={() => setUserOpen(false)} title="Crear usuario">
           <form
             onSubmit={createUser}
-            className="panel w-full max-w-md space-y-3 rounded-3xl p-6"
+            className="space-y-4"
           >
-            <h3 id="create-user-title" className="text-lg font-semibold">Crear usuario</h3>
-            <p className="text-xs text-[var(--ink-soft)]/65">
+            <p className="text-sm text-[var(--ink-soft)]">
               Roles: admin (Host), socio, abogado, procurador, asistente,
               contabilidad, externo o cliente (portal). Admin ≠ socio.
             </p>
-            <input
+            <PeopleField label="Nombre completo"><input
               className="input"
               name="name"
               required
               placeholder="Nombre completo"
               autoFocus
-            />
-            <input
+            /></PeopleField>
+            <PeopleField label="Email"><input
               className="input"
               name="email"
               type="email"
               required
               placeholder="Email"
-            />
-            <input className="input" name="title" placeholder="Cargo (opcional)" />
-            <select className="select" name="role" defaultValue="abogado">
+            /></PeopleField>
+            <PeopleField label="Cargo (opcional)"><input className="input" name="title" placeholder="Cargo (opcional)" /></PeopleField>
+            <PeopleField label="Rol"><select className="select" name="role" defaultValue="abogado">
               {Object.entries(ROLE_LABEL).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
               ))}
-            </select>
-            <input
+            </select></PeopleField>
+            <PeopleField label="Contraseña (mínimo 12 caracteres)"><input
               className="input"
               name="password"
               type="password"
@@ -538,7 +537,7 @@ export function PeopleManager({
               minLength={12}
               required
               autoComplete="new-password"
-            />
+            /></PeopleField>
             <div className="flex justify-end gap-2">
               <button
                 className="btn btn-ghost"
@@ -552,48 +551,42 @@ export function PeopleManager({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {editing && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="edit-user-title"
-        >
+        <Dialog open onClose={() => setEditing(null)} title="Editar usuario">
           <form
             onSubmit={saveUser}
-            className="panel w-full max-w-md space-y-3 rounded-3xl p-6"
+            className="space-y-4"
           >
-            <h3 id="edit-user-title" className="text-lg font-semibold">Editar usuario</h3>
-            <input
+            <PeopleField label="Nombre completo"><input
               className="input"
               name="name"
               required
               defaultValue={editing.name}
-            />
-            <input
+            /></PeopleField>
+            <PeopleField label="Email"><input
               className="input"
               name="email"
               type="email"
               required
               defaultValue={editing.email}
-            />
-            <input
+            /></PeopleField>
+            <PeopleField label="Cargo (opcional)"><input
               className="input"
               name="title"
               placeholder="Cargo (opcional)"
               defaultValue={editing.title || ""}
-            />
-            <select className="select" name="role" defaultValue={editing.role}>
+            /></PeopleField>
+            <PeopleField label="Rol"><select className="select" name="role" defaultValue={editing.role}>
               {Object.entries(ROLE_LABEL).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
               ))}
-            </select>
-            <label className="block text-xs text-[var(--ink-soft)]/65">
+            </select></PeopleField>
+            <label className="block text-sm text-[var(--ink-soft)]">
               Capacidades extra (CSV)
               <input
                 className="input mt-1"
@@ -602,7 +595,7 @@ export function PeopleManager({
                 placeholder="p. ej. host.admin,causa.override_walls"
               />
             </label>
-            <label className="block text-xs text-[var(--ink-soft)]/65">
+            <label className="block text-sm text-[var(--ink-soft)]">
               Capacidades revocadas (CSV)
               <input
                 className="input mt-1"
@@ -611,15 +604,15 @@ export function PeopleManager({
                 placeholder="p. ej. voice.use"
               />
             </label>
-            <input
+            <PeopleField label="Nueva contraseña (opcional, mín. 12)"><input
               className="input"
               name="password"
               type="password"
               placeholder="Nueva contraseña (opcional, mín. 12)"
               minLength={12}
               autoComplete="new-password"
-            />
-            <p className="text-xs text-[var(--ink-soft)]/60">
+            /></PeopleField>
+            <p className="text-sm text-[var(--ink-soft)]">
               Si cambia el rol, grants o la contraseña, se invalidan las sesiones
               activas del usuario.
             </p>
@@ -636,34 +629,28 @@ export function PeopleManager({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {groupOpen && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-group-title"
-        >
+        <Dialog open onClose={() => setGroupOpen(false)} title="Nuevo grupo">
           <form
             onSubmit={createGroup}
-            className="panel w-full max-w-md space-y-3 rounded-3xl p-6"
+            className="space-y-4"
           >
-            <h3 id="create-group-title" className="text-lg font-semibold">Nuevo grupo</h3>
-            <input
+            <PeopleField label="Nombre del grupo"><input
               className="input"
               name="name"
               required
               placeholder="Nombre del grupo"
-            />
-            <textarea
+            /></PeopleField>
+            <PeopleField label="Descripción"><textarea
               className="textarea"
               name="description"
               placeholder="Descripción"
-            />
+            /></PeopleField>
             <label className="block text-sm">
-              <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">
+              <span className="mb-1 block text-sm text-[var(--ink-soft)]">
                 Miembros
               </span>
               <select className="select min-h-[120px]" name="memberIds" multiple>
@@ -687,35 +674,29 @@ export function PeopleManager({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {editingGroup && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="edit-group-title"
-        >
+        <Dialog open onClose={() => setEditingGroup(null)} title="Editar grupo">
           <form
             onSubmit={saveGroup}
-            className="panel w-full max-w-md space-y-3 rounded-3xl p-6"
+            className="space-y-4"
           >
-            <h3 id="edit-group-title" className="text-lg font-semibold">Editar grupo</h3>
-            <input
+            <PeopleField label="Nombre del grupo"><input
               className="input"
               name="name"
               required
               defaultValue={editingGroup.name}
-            />
-            <textarea
+            /></PeopleField>
+            <PeopleField label="Descripción"><textarea
               className="textarea"
               name="description"
               placeholder="Descripción"
               defaultValue={editingGroup.description || ""}
-            />
+            /></PeopleField>
             <label className="block text-sm">
-              <span className="mb-1 block text-xs text-[var(--ink-soft)]/65">
+              <span className="mb-1 block text-sm text-[var(--ink-soft)]">
                 Miembros (Ctrl/Cmd para múltiple)
               </span>
               <select
@@ -744,7 +725,7 @@ export function PeopleManager({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       <ConfirmDialog

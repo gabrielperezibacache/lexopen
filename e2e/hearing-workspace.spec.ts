@@ -36,7 +36,7 @@ test("mesa de audiencia: lectura, marcadores, notas, conversación con fuentes y
  expect(imported.status(), await imported.text()).toBe(201); const book=(await imported.json()).book; bookIds.push(book.id);
  keys.push((await db.libraryBook.findUniqueOrThrow({ where:{id:book.id} })).storageKey);
  await page.setViewportSize({width:1440,height:1000}); await page.goto(`/causas/${causaId}/audiencias`);
- const workbench=page.getByRole("region", {name:"Acompañante de audiencia"}); await expect(workbench.getByRole("heading", {name:"La mesa de audiencia"})).toBeVisible();
+ const workbench=page.getByRole("region", {name:"Acompañante de audiencia"}); await expect(workbench.getByRole("heading", {name:"Dossier y herramientas"})).toBeVisible();
  await workbench.getByLabel("Crear otra mesa").fill("Audiencia ficticia E2E"); const created=page.waitForResponse(r=>new URL(r.url()).pathname===`/api/causas/${causaId}/hearings` && r.request().method()==="POST"); await workbench.getByRole("button",{name:"Crear mesa",exact:true}).click();
  const workspace=await(await created).json(); workspaceIds.push(workspace.id);
  await workbench.getByLabel("Añadir material accesible").selectOption(`book:${book.id}`); await workbench.getByRole("button",{name:"Añadir al dossier"}).click();

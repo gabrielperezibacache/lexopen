@@ -83,40 +83,40 @@ export default async function DocumentosPage() {
           actionHref="/sites"
         />
       ) : (
-        <div className="panel overflow-hidden rounded-3xl">
+        <div className="panel overflow-hidden rounded-[var(--radius-lg)]">
           <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[var(--ink)] text-white/90">
-              <tr>
-                <th className="px-4 py-3 font-medium">Documento</th>
-                <th className="px-4 py-3 font-medium">Tipo</th>
-                <th className="px-4 py-3 font-medium">Causa</th>
-                <th className="px-4 py-3 font-medium">Autor</th>
-                <th className="px-4 py-3 font-medium">Procesamiento</th>
-                <th className="px-4 py-3 font-medium">Actualizado</th>
+          <table role="table" className="data-table min-w-full text-left text-sm">
+            <thead className="border-b border-[var(--line)] text-[var(--muted)]">
+              <tr role="row">
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Documento</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Tipo</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Causa</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Autor</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Procesamiento</th>
+                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Actualizado</th>
               </tr>
             </thead>
             <tbody>
               {documentos.map((d) => (
-                <tr key={d.id} className="table-row">
-                  <td className="px-4 py-3">
+                <tr role="row" key={d.id} className="table-row">
+                  <td role="cell" data-label="Documento" className="data-table-primary px-4 py-3">
                     <div className="font-medium">{d.nombre}</div>
                     {d.driveImport && <details className="mt-1 text-xs text-[var(--ink-soft)]"><summary className="cursor-pointer">Copia de Drive · revisión {d.driveImport.driveVersion}</summary><p>Importada el {formatDate(d.driveImport.importedAt)}. Se conserva esta revisión local; no se sincroniza automáticamente.</p><p className="break-all">SHA-256: {d.driveImport.sourceSha256}</p></details>}
                     {d.ruta && (
-                      <div className="text-xs text-[var(--ink-soft)]/60">{d.ruta}/</div>
+                      <div className="text-xs text-[var(--muted)]">{d.ruta}/</div>
                     )}
-                    <div className="mt-1 flex flex-wrap items-center gap-3">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
                       <a
                         href={`/api/documentos/${d.id}/content`}
-                        className="text-xs text-[var(--sea)]"
+                        className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline"
                       >
                         Descargar
                       </a>
-                      <Link href={`/documentos/${d.id}/fuentes`} className="text-xs text-[var(--sea)]">Ver fuentes</Link>
+                      <Link href={`/documentos/${d.id}/fuentes`} className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline">Ver fuentes</Link>
                       {d.causaId && (
                         <Link
                           href={`/agente?causaId=${d.causaId}&utility=doc_qa&documentoId=${d.id}`}
-                          className="text-xs text-[var(--sea)]"
+                          className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline"
                         >
                           Preguntar IA
                         </Link>
@@ -129,20 +129,20 @@ export default async function DocumentosPage() {
                       />
                     </div>
                     {d.obsidianPath && (
-                      <div className="text-xs text-[var(--ink-soft)]/60">
+                      <div className="text-xs text-[var(--muted)]">
                         Obsidian: {d.obsidianPath}
                       </div>
                     )}
                     {d.googleDriveId && (
-                      <div className="text-xs text-[var(--ink-soft)]/60">
+                      <div className="text-xs text-[var(--muted)]">
                         {isRealDriveFolderId(d.googleDriveId)
                           ? `Drive: ${d.googleDriveId}`
                           : "Drive: stub / demo (conecte OAuth para IDs reales)"}
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">{d.tipo}</td>
-                  <td className="px-4 py-3">
+                  <td role="cell" data-label="Tipo" className="px-4 py-3">{d.tipo}</td>
+                  <td role="cell" data-label="Causa" className="px-4 py-3">
                     {d.causa ? (
                       <Link href={`/causas/${d.causa.id}`} className="text-[var(--sea)]">
                         {d.causa.rit || d.causa.titulo}
@@ -151,10 +151,10 @@ export default async function DocumentosPage() {
                       "—"
                     )}
                   </td>
-                  <td className="px-4 py-3">{d.autor?.name || "—"}</td>
-                  <td className="px-4 py-3 text-xs">
+                  <td role="cell" data-label="Autor" className="px-4 py-3">{d.autor?.name || "—"}</td>
+                  <td role="cell" data-label="Procesamiento" className="px-4 py-3 text-xs">
                     {d.extractionStatus === "pending" || d.extractionStatus === "processing" ? (
-                      <span className="text-[var(--ink-soft)]/65">Procesando…</span>
+                      <span className="text-[var(--muted)]">Procesando…</span>
                     ) : d.extractionStatus === "completed" && d.hasMarkdown ? (
                       <a
                         href={`/api/documentos/${d.id}/markdown`}
@@ -168,7 +168,7 @@ export default async function DocumentosPage() {
                         <DocumentProcessingAction documentId={d.id} />
                       </span>
                     ) : d.extractionStatus === "unsupported" ? (
-                      <span className="text-[var(--ink-soft)]/65">
+                      <span className="text-[var(--muted)]">
                         Formato no soportado{" "}
                         <DocumentProcessingAction documentId={d.id} />
                       </span>
@@ -181,7 +181,7 @@ export default async function DocumentosPage() {
                       "No procesado"
                     )}
                   </td>
-                  <td className="px-4 py-3">{formatDate(d.updatedAt)}</td>
+                  <td role="cell" data-label="Actualizado" className="px-4 py-3">{formatDate(d.updatedAt)}</td>
                 </tr>
               ))}
             </tbody>

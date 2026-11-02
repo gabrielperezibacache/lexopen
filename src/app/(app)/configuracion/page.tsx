@@ -19,6 +19,7 @@ import { NotifyAdminPanel } from "@/components/config/NotifyAdminPanel";
 import { PurgeDemoPanel } from "@/components/PurgeDemoPanel";
 import { getHostStatus } from "@/lib/host-status";
 import { buildPjudOpsLog } from "@/lib/pjud/ops-log";
+import styles from "@/components/config/WorkspaceArea.module.css";
 
 export default async function ConfiguracionPage() {
   const me = await requireRole("admin");
@@ -71,10 +72,10 @@ export default async function ConfiguracionPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.area} space-y-6`}>
       <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
       <ConfigSectionNav />
-      <LanguageSettingsPanel />
+      <div id="idioma" className="scroll-mt-28"><LanguageSettingsPanel /></div>
       <FirmSettingsForm organization={settingsOrganization} />
       <UsersAdminPanel
         currentUserId={me.id}
@@ -101,10 +102,9 @@ export default async function ConfiguracionPage() {
           })),
         }))}
       />
-      <TranscriptionSettings />
-      <div id="llm-settings">
-        <TranscriptionSettings />
-      <LlmSettingsForm />
+      <div id="transcription-settings" className="scroll-mt-28"><TranscriptionSettings /></div>
+      <div id="llm-settings" className="scroll-mt-28">
+        <LlmSettingsForm />
       </div>
       <ObsidianSettingsForm />
       <GoogleSettingsForm />

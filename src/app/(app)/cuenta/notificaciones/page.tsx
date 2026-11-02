@@ -1,4 +1,5 @@
 import Link from "next/link";
+import styles from "@/components/config/WorkspaceArea.module.css";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { NotificationPreferencesPanel } from "@/components/notify/NotificationPreferencesPanel";
 import { TelegramLinkPanel } from "@/components/notify/TelegramLinkPanel";
@@ -9,7 +10,7 @@ export default async function CuentaNotificacionesPage() {
   await requireUser();
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.area} space-y-6`}>
       <ModuleHeader
         eyebrow="Cuenta"
         title="Notificaciones"

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
+import { BillingField } from "./BillingField";
 
 export function UfRateForm() {
   const router = useRouter();
@@ -73,8 +74,9 @@ export function UfRateForm() {
       {msg && <p className="text-sm text-[var(--ink-soft)]/80">{msg}</p>}
       <form
         onSubmit={onSubmit}
-        className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4"
+        className="panel grid grid-cols-1 gap-4 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4"
       >
+        <BillingField label="Fecha de la UF">
         <input
           className="input"
           type="date"
@@ -82,6 +84,8 @@ export function UfRateForm() {
           required
           aria-label="Fecha de la UF"
         />
+        </BillingField>
+        <BillingField label="UF en CLP">
         <input
           className="input"
           type="number"
@@ -91,6 +95,8 @@ export function UfRateForm() {
           placeholder="UF en CLP"
           aria-label="Valor de la UF en CLP"
         />
+        </BillingField>
+        <BillingField label="Fuente">
         <input
           className="input"
           name="source"
@@ -98,11 +104,12 @@ export function UfRateForm() {
           defaultValue="manual"
           aria-label="Fuente de la UF"
         />
-        <button className="btn btn-primary" disabled={busy} type="submit">
+        </BillingField>
+        <button className="btn btn-primary self-end" disabled={busy} type="submit">
           {busy ? "Guardando..." : "Guardar UF"}
         </button>
         {error && (
-          <p className="text-sm text-[var(--danger)] md:col-span-4">{error}</p>
+          <p className="text-sm text-[var(--danger)] sm:col-span-2 lg:col-span-4" role="alert">{error}</p>
         )}
       </form>
     </div>

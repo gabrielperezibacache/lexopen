@@ -30,7 +30,7 @@ export function CausasSectionTabs({
     <nav
       aria-label={t("causas.tabs.nav")}
       data-testid="causas-section-tabs"
-      className="flex flex-wrap gap-1 rounded-2xl border border-[var(--line)] bg-white/70 p-1"
+      className="flex flex-nowrap gap-1 overflow-x-auto rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] p-1"
     >
       {tabs.map((tab) => {
         const active = "exact" in tab && tab.exact
@@ -43,9 +43,9 @@ export function CausasSectionTabs({
             title={"hint" in tab ? tab.hint : undefined}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+              "inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-[var(--radius-sm)] px-2 py-2 text-sm font-medium transition-colors sm:px-3",
               active
-                ? "bg-[var(--sea)] text-white"
+                ? "bg-[var(--sea-solid)] text-white"
                 : "text-[var(--ink-soft)]/80 hover:bg-[var(--sea)]/8 hover:text-[var(--ink)]"
             )}
           >

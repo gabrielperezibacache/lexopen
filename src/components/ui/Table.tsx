@@ -73,6 +73,8 @@ export function Table<T extends { id: string }>({
 
   return (
     <div className="space-y-3">
+      <label className="block max-w-sm space-y-1.5 text-sm font-medium">
+      <span>{filterPlaceholder || t("common.filter")}</span>
       <input
         className="input max-w-sm"
         value={query}
@@ -83,14 +85,16 @@ export function Table<T extends { id: string }>({
         placeholder={filterPlaceholder || t("common.filter")}
         aria-label={filterPlaceholder || t("common.filter")}
       />
+      </label>
       <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--line)]">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-[color-mix(in_srgb,var(--mist)_70%,transparent)] text-[var(--muted)]">
-            <tr>
+        <table role="table" className={`${columns.some(column => column.sortable) ? "" : "data-table "}min-w-full text-left text-sm`}>
+          <thead role="rowgroup" className="table-heading">
+            <tr role="row">
               {columns.map((c) => (
                 <th
                   key={c.id}
                   scope="col"
+                  role="columnheader"
                   className="px-3 py-2 font-semibold"
                   aria-sort={
                     c.sortable && sortId === c.id
@@ -116,11 +120,11 @@ export function Table<T extends { id: string }>({
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {pageRows.map((row) => (
-              <tr key={row.id} className="table-row">
+              <tr role="row" key={row.id} className="table-row">
                 {columns.map((c) => (
-                  <td key={c.id} className="px-3 py-2 align-top text-[var(--ink)]">
+                  <td role="cell" key={c.id} data-label={c.header} className="px-3 py-2 align-top text-[var(--ink)]">
                     {c.cell(row)}
                   </td>
                 ))}
@@ -149,7 +153,7 @@ export function Table<T extends { id: string }>({
           <div className="flex gap-2">
             <button
               type="button"
-              className="btn btn-ghost !min-h-0 !py-1.5"
+              className="btn btn-ghost"
               disabled={page === 0}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
             >
@@ -157,7 +161,7 @@ export function Table<T extends { id: string }>({
             </button>
             <button
               type="button"
-              className="btn btn-ghost !min-h-0 !py-1.5"
+              className="btn btn-ghost"
               disabled={page >= pageCount - 1}
               onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
             >

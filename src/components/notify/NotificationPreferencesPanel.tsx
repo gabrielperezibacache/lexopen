@@ -97,17 +97,17 @@ export function NotificationPreferencesPanel() {
   }
 
   return (
-    <form className="space-y-6" onSubmit={onSave}>
+    <form className="min-w-0 space-y-6" onSubmit={onSave}>
       <section className="panel space-y-3 rounded-3xl p-5">
         <h2 className="font-semibold">Horas de silencio</h2>
         <p className="text-sm text-[var(--ink-soft)]/70">
           Los plazos fatales atraviesan el silencio. Email del Host: {state.email}
         </p>
-        <div className="flex flex-wrap gap-3">
-          <label className="text-sm">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium">
             Desde
             <input
-              className="ml-2 rounded-xl border border-[var(--line)] bg-transparent px-3 py-1.5"
+              className="input"
               value={state.perfil.quietDesde}
               onChange={(e) =>
                 setState({
@@ -119,10 +119,10 @@ export function NotificationPreferencesPanel() {
               required
             />
           </label>
-          <label className="text-sm">
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium">
             Hasta
             <input
-              className="ml-2 rounded-xl border border-[var(--line)] bg-transparent px-3 py-1.5"
+              className="input"
               value={state.perfil.quietHasta}
               onChange={(e) =>
                 setState({
@@ -134,7 +134,7 @@ export function NotificationPreferencesPanel() {
               required
             />
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex min-h-11 items-center gap-2 text-sm sm:col-span-2">
             <input
               type="checkbox"
               checked={state.perfil.quietFinesSemana}
@@ -151,10 +151,10 @@ export function NotificationPreferencesPanel() {
             Silenciar fines de semana
           </label>
         </div>
-        <label className="block text-sm">
+        <label className="grid max-w-md gap-1.5 text-sm font-medium">
           Detalle del email
           <select
-            className="ml-2 rounded-xl border border-[var(--line)] bg-transparent px-3 py-1.5"
+            className="select"
             value={state.perfil.nivelEmail}
             onChange={(e) =>
               setState({
@@ -196,7 +196,8 @@ export function NotificationPreferencesPanel() {
                   {(["email", "telegram", "push"] as const).map((canal) => (
                     <td key={canal} className="py-2 pr-3">
                       <select
-                        className="rounded-lg border border-[var(--line)] bg-transparent px-2 py-1"
+                        className="select min-w-[9rem]"
+                        aria-label={`${row.label} · ${canal}`}
                         value={row.canales[canal]}
                         onChange={(e) => {
                           const matriz = [...state.matriz];
@@ -229,7 +230,7 @@ export function NotificationPreferencesPanel() {
           {saving ? "Guardando…" : "Guardar preferencias"}
         </button>
         {message && (
-          <p className="text-sm text-[var(--ink-soft)]">{message}</p>
+          <p className="text-sm text-[var(--ink-soft)]" role="status">{message}</p>
         )}
       </div>
     </form>

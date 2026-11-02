@@ -1,0 +1,28 @@
+{
+  "base": "00b709c5899ce764c123ed1cb4fa227dd42420a3",
+  "unitSuite": "passed (exit 0)",
+  "lint": "passed (0 errors, 0 warnings)",
+  "typescript": "passed (exit 0)",
+  "build": "passed (exit 0); 4 existing filesystem tracing warnings in storage/rate-limit",
+  "visual": {
+    "base": 127,
+    "final": 128,
+    "targetedConfirmation": 40,
+    "appRouteTemplates": 56,
+    "finalOverflow": 0,
+    "finalJavaScriptErrors": 0,
+    "unnamedVisibleFieldsInConfirmation": 0
+  },
+  "browserRegression": {
+    "cases": 42,
+    "latestBatch": {
+      "passed": 41,
+      "failed": 1,
+      "reason": "Previous heading expected; renamed to Dossier y herramientas"
+    },
+    "hearingConfirmation": "passed after updating expected heading",
+    "uiInteractionConfirmation": "2 passed: focus, Escape, reduced motion, mobile records, active navigation after resize"
+  },
+  "productionSmoke": "passed with normal production security settings; demo shortcuts absent; configuration navigation and target visible",
+  "ci": "Exact-head full run reported in pull request checks"
+}

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/PageHeader";
 import { CaseAudioManager } from "@/components/audio/CaseAudioManager";
 import { CaseKnowledgePanel } from "@/components/knowledge/CaseKnowledgePanel";
 import { CausaActions } from "@/components/CausaActions";
@@ -177,16 +178,22 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <Link href={backHref} className="text-sm text-[var(--sea)]">
-            {backLabel}
-          </Link>
-          <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">{causa.titulo}</h1>
-          <p className="mt-2 break-words text-[var(--ink-soft)]/80">
-            {causa.caratula || h.noCaratula} · {causa.rit || h.noRit}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+      <Link href={backHref} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
+        {backLabel}
+      </Link>
+      <PageHeader
+        title={causa.titulo}
+        subtitle={<>{causa.caratula || h.noCaratula} · {causa.rit || h.noRit}</>}
+        actions={
+        <CausaActions
+          causaId={causa.id}
+          titulo={causa.titulo}
+          estado={causa.estado}
+          isAdmin={user.role === "admin"}
+        />
+        }
+      />
+          <div className="flex flex-wrap gap-2">
             <StatusBadge estado={causa.estado} />
             <span className="badge badge-sea">{labelMateria(causa.materia)}</span>
             <span className="badge badge-ink">{labelEtapa(causa.etapa)}</span>
@@ -214,19 +221,12 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
                 <span className="badge badge-pendiente">{h.driveStub}</span>
               )}
           </div>
-        </div>
-        <CausaActions
-          causaId={causa.id}
-          titulo={causa.titulo}
-          estado={causa.estado}
-          isAdmin={user.role === "admin"}
-        />
-      </div>
 
-      <section className="panel rounded-3xl p-5 flex flex-wrap items-center justify-between gap-4"><div><h2 className="display text-xl">Tu mesa de audiencia</h2><p className="text-sm text-[var(--ink-soft)]">Prepara lecturas, reúne pasajes, toma notas y consulta a la IA con las fuentes de esta causa.</p></div><Link className="btn btn-primary" href={`/causas/${id}/audiencias`}>Abrir acompañante de audiencias</Link></section>
+
+      <section className="panel rounded-[var(--radius-lg)] p-5 flex flex-wrap items-center justify-between gap-4"><div><h2 className="display text-xl">Tu mesa de audiencia</h2><p className="text-sm text-[var(--ink-soft)]">Prepara lecturas, reúne pasajes, toma notas y consulta a la IA con las fuentes de esta causa.</p></div><Link className="btn btn-primary" href={`/causas/${id}/audiencias`}>Abrir acompañante de audiencias</Link></section>
 
       {proximosPlazos.length > 0 && (
-        <section className="panel rounded-3xl px-5 py-4">
+        <section className="panel rounded-[var(--radius-lg)] px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Próximos plazos</h2>
             <Link href={`/plazos?causaId=${causa.id}`} className="text-sm text-[var(--sea)]">
@@ -237,14 +237,14 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
             {proximosPlazos.slice(0, 4).map((p) => (
               <div
                 key={p.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-2 text-sm"
               >
                 <div className="min-w-0">
                   <div className="font-medium break-words">
                     {p.esFatal ? "Fatal · " : ""}
                     {p.titulo}
                   </div>
-                  <div className="text-xs text-[var(--ink-soft)]/65">
+                  <div className="text-xs text-[var(--muted)]">
                     {formatCivilDate(p.fechaLimite)} · {labelTipoComputo(p.tipoComputo)} ·{" "}
                     {labelDiasRestantes(diasRestantes(p.fechaLimite))}
                   </div>
@@ -256,7 +256,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         </section>
       )}
 
-      <div className="panel rounded-3xl border border-[var(--sea)]/20 bg-[linear-gradient(135deg,rgba(31,111,120,0.08),rgba(255,255,255,0.85))] px-5 py-5">
+      <div className="panel rounded-[var(--radius-lg)] border border-[var(--sea)]/20 bg-[var(--mist)] px-5 py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-xl">
             <div className="text-sm font-semibold uppercase tracking-[0.14em] text-[var(--sea)]">
@@ -270,7 +270,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
               que cualquier abogado del estudio pueda continuar la tramitación.
             </p>
             {ultimaMinuta && (
-              <p className="mt-3 text-sm text-[var(--ink-soft)]/70">
+              <p className="mt-3 text-sm text-[var(--muted)]">
                 Última:{" "}
                 <Link
                   href={`/causas/${causa.id}/minutas/${ultimaMinuta.id}`}
@@ -305,10 +305,10 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         </div>
       </div>
 
-      <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-3xl px-5 py-4">
+      <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] px-5 py-4">
         <div>
           <div className="text-sm font-semibold">Facturación de la causa</div>
-          <p className="text-sm text-[var(--ink-soft)]/75">
+          <p className="text-sm text-[var(--muted)]">
             Horas, gastos, tarifas y documentos tributarios vinculados al cliente.
           </p>
         </div>
@@ -328,10 +328,10 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         </div>
       </div>
 
-      <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-3xl px-5 py-4">
+      <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] px-5 py-4">
         <div>
           <div className="text-sm font-semibold">{t("sites.causaPanel.title")}</div>
-          <p className="text-sm text-[var(--ink-soft)]/75">
+          <p className="text-sm text-[var(--muted)]">
             {causa.site ? t("sites.causaPanel.hasSite") : t("sites.causaPanel.noSite")}
           </p>
           {causa.site && (
@@ -360,38 +360,38 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="panel rounded-3xl p-5 lg:col-span-2">
+        <div className="panel rounded-[var(--radius-lg)] p-5 lg:col-span-2">
           <h2 className="text-lg font-semibold">Ficha procesal</h2>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
-              <dt className="text-[var(--ink-soft)]/60">RIT</dt>
+              <dt className="text-[var(--muted)]">RIT</dt>
               <dd className="font-medium">{causa.rit || "—"}</dd>
             </div>
             <div>
-              <dt className="text-[var(--ink-soft)]/60">Tribunal</dt>
+              <dt className="text-[var(--muted)]">Tribunal</dt>
               <dd className="font-medium">
                 {causa.tribunal}
                 {!tribunalEnCatalogo && causa.tribunal ? (
-                  <span className="mt-1 block text-xs font-normal text-[var(--ink-soft)]/60">
+                  <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
                     No está en el catálogo de tribunales. Puede corregirlo al editar.
                   </span>
                 ) : null}
               </dd>
             </div>
             <div>
-              <dt className="text-[var(--ink-soft)]/60">Procedimiento</dt>
+              <dt className="text-[var(--muted)]">Procedimiento</dt>
               <dd className="font-medium">{causa.procedimiento || "—"}</dd>
             </div>
             <div>
-              <dt className="text-[var(--ink-soft)]/60">RUC</dt>
+              <dt className="text-[var(--muted)]">RUC</dt>
               <dd className="font-medium">{causa.ruc || "—"}</dd>
             </div>
             <div>
-              <dt className="text-[var(--ink-soft)]/60">Ingreso</dt>
+              <dt className="text-[var(--muted)]">Ingreso</dt>
               <dd className="font-medium">{formatDate(causa.fechaIngreso)}</dd>
             </div>
             <div>
-              <dt className="text-[var(--ink-soft)]/60">Cliente</dt>
+              <dt className="text-[var(--muted)]">Cliente</dt>
               <dd className="font-medium">
                 {causa.cliente ? (
                   <Link
@@ -406,18 +406,18 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
               </dd>
             </div>
             <div>
-              <dt className="text-[var(--ink-soft)]/60">Abogado</dt>
+              <dt className="text-[var(--muted)]">Abogado</dt>
               <dd className="font-medium">{causa.abogado?.name || "—"}</dd>
             </div>
             <div>
-              <dt className="text-[var(--ink-soft)]/60">Conflicto</dt>
+              <dt className="text-[var(--muted)]">Conflicto</dt>
               <dd className="font-medium">
                 {labelConflictStatus(causa.conflictStatus)}
                 {causa.conflictCheckedAt ? ` · ${formatDate(causa.conflictCheckedAt)}` : ""}
               </dd>
             </div>
             <div>
-              <dt className="text-[var(--ink-soft)]/60">Notas conflicto</dt>
+              <dt className="text-[var(--muted)]">Notas conflicto</dt>
               <dd className="font-medium">{causa.conflictNotes || "—"}</dd>
             </div>
           </dl>
@@ -464,9 +464,9 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         notes={causa.conflictNotes}
       />
 
-      <section id="tramites" className="panel scroll-mt-24 rounded-3xl p-5">
+      <section id="tramites" className="panel scroll-mt-24 rounded-[var(--radius-lg)] p-5">
         <h2 className="mb-3 text-lg font-semibold">Trámites</h2>
-        <p className="mb-4 text-sm text-[var(--ink-soft)]/70">
+        <p className="mb-4 text-sm text-[var(--muted)]">
           Checklist operativo de la causa. Puede generar tareas o plazos desde
           cada ítem.
         </p>
@@ -479,7 +479,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       </section>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="panel rounded-3xl p-5 sm:col-span-2">
+        <div className="panel rounded-[var(--radius-lg)] p-5 sm:col-span-2">
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Minutas del expediente</h2>
             <Link href="/minutas" className="text-sm text-[var(--sea)]">
@@ -491,7 +491,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
               <Link
                 key={m.id}
                 href={`/causas/${causa.id}/minutas/${m.id}`}
-                className="block rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 transition hover:border-[var(--sea)]/40"
+                className="block rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 transition hover:border-[var(--sea)]/40"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="badge badge-sea">
@@ -499,7 +499,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
                   </span>
                   <span className="text-sm font-medium">{m.titulo}</span>
                 </div>
-                <div className="mt-1 text-xs text-[var(--ink-soft)]/65">
+                <div className="mt-1 text-xs text-[var(--muted)]">
                   {formatDateTime(m.fecha)} · {m.autor?.name || "Sin autor"} ·{" "}
                   {m._count.acciones} abiertas
                 </div>
@@ -509,20 +509,20 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
               </Link>
             ))}
             {causa.minutas.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">
+              <p className="text-sm text-[var(--muted)]">
                 Aún no hay minutas. Registre la primera tras el próximo acto.
               </p>
             )}
           </div>
         </div>
 
-        <div className="panel rounded-3xl p-5">
+        <div className="panel rounded-[var(--radius-lg)] p-5">
           <h2 className="text-lg font-semibold">Partes</h2>
           <ul className="mt-4 space-y-3">
             {causa.partes.map((p) => (
-              <li key={p.id} className="rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
+              <li key={p.id} className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-2 text-sm">
                 <div className="font-medium">{p.nombre}</div>
-                <div className="text-[var(--ink-soft)]/65">
+                <div className="text-[var(--muted)]">
                   {p.rol}
                   {p.rut ? ` · ${p.rut}` : ""}
                 </div>
@@ -532,20 +532,20 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         </div>
       </div>
 
-      <section className="panel rounded-3xl p-5">
+      <section className="panel rounded-[var(--radius-lg)] p-5">
         <h2 className="text-lg font-semibold">Historial de etapa</h2>
         <div className="mt-4 space-y-3">
           {causa.etapaHistorial.map((h) => (
-            <div key={h.id} className="rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
+            <div key={h.id} className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-2 text-sm">
               <div className="font-medium">{labelEtapa(h.etapa)}</div>
-              <div className="text-xs text-[var(--ink-soft)]/65">
+              <div className="text-xs text-[var(--muted)]">
                 {formatDateTime(h.createdAt)}
                 {h.nota ? ` · ${h.nota}` : ""}
               </div>
             </div>
           ))}
           {causa.etapaHistorial.length === 0 && (
-            <p className="text-sm text-[var(--ink-soft)]/65">Sin cambios de etapa registrados.</p>
+            <p className="text-sm text-[var(--muted)]">Sin cambios de etapa registrados.</p>
           )}
         </div>
       </section>
@@ -580,9 +580,9 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         }))}
       />
 
-      <section className="panel rounded-3xl p-5">
+      <section className="panel rounded-[var(--radius-lg)] p-5">
         <h2 className="text-lg font-semibold">Carga manual / CSV</h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
+        <p className="mt-1 text-sm text-[var(--muted)]">
           Alternativa al sync: registre un movimiento o importe CSV exportado
           desde la consulta oficial del PJUD.
         </p>
@@ -590,17 +590,17 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="panel rounded-3xl p-5">
+        <section className="panel rounded-[var(--radius-lg)] p-5">
           <h2 className="text-lg font-semibold">Plazos</h2>
           <div className="mt-4 space-y-3">
             {causa.plazos.map((p) => (
-              <div key={p.id} className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-[var(--line)] px-3 py-2 sm:items-center">
+              <div key={p.id} className="flex min-w-0 items-start justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--line)] px-3 py-2 sm:items-center">
                 <div className="min-w-0">
                   <div className="break-words text-sm font-medium">
                     {p.esFatal ? "Fatal · " : ""}
                     {p.titulo}
                   </div>
-                  <div className="text-xs text-[var(--ink-soft)]/65">
+                  <div className="text-xs text-[var(--muted)]">
                     {formatCivilDate(p.fechaLimite)} · {labelTipoComputo(p.tipoComputo)}
                     {p.estado === "pendiente"
                       ? ` · ${labelDiasRestantes(diasRestantes(p.fechaLimite))}`
@@ -614,7 +614,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
               </div>
             ))}
             {causa.plazos.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">
+              <p className="text-sm text-[var(--muted)]">
                 Sin plazos.{" "}
                 <Link href={`/plazos?causaId=${causa.id}`} className="text-[var(--sea)]">
                   Registrar uno
@@ -626,7 +626,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           <PlazoSugerirAi causaId={causa.id} />
         </section>
 
-        <section className="panel rounded-3xl p-5">
+        <section className="panel rounded-[var(--radius-lg)] p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Documentos del expediente</h2>
             <div className="flex flex-wrap items-center gap-3">
@@ -642,19 +642,19 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
               </Link>
             </div>
           </div>
-          <p className="mt-2 text-xs text-[var(--ink-soft)]/65">
+          <p className="mt-2 text-xs text-[var(--muted)]">
             «Importar documentos PJUD» descarga anexos/resoluciones en cola (uno
             a uno) y los guarda de inmediato en LexOpen para verlos, descargarlos
             y usarlos con IA.
           </p>
           <div className="mt-4 space-y-3">
             {documentos.map((d) => (
-              <div key={d.id} className="rounded-2xl border border-[var(--line)] px-3 py-2 text-sm">
+              <div key={d.id} className="rounded-[var(--radius-md)] border border-[var(--line)] px-3 py-2 text-sm">
                 <div className="font-medium">{d.nombre}</div>
                 {d.ruta && (
-                  <div className="text-xs text-[var(--ink-soft)]/55">{d.ruta}/</div>
+                  <div className="text-xs text-[var(--muted)]">{d.ruta}/</div>
                 )}
-                <div className="text-xs text-[var(--ink-soft)]/65">
+                <div className="text-xs text-[var(--muted)]">
                   {d.tipo} · v{d.version}
                   {d.extractionStatus ? ` · ${d.extractionStatus}` : ""}
                   {d.googleDriveId ? ` · Drive: ${d.googleDriveId}` : ""}
@@ -692,7 +692,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
               </div>
             ))}
             {documentos.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">
+              <p className="text-sm text-[var(--muted)]">
                 Sin documentos. Incorpore archivos o una carpeta investigativa abajo.
               </p>
             )}
@@ -705,11 +705,11 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       <DocumentoIngestForm lockedCausaId={causa.id} compact />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="panel rounded-3xl p-5">
+        <section className="panel rounded-[var(--radius-lg)] p-5">
           <h2 className="text-lg font-semibold">Notas (Obsidian)</h2>
           <div className="mt-4 space-y-4">
             {causa.notas.map((n) => (
-              <article key={n.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+              <article key={n.id} className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] p-4">
                 <h3 className="font-medium">{n.titulo}</h3>
                 <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-[var(--ink-soft)]/85">
                   {n.contenido}
@@ -717,18 +717,18 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
               </article>
             ))}
             {causa.notas.length === 0 && (
-              <p className="text-sm text-[var(--ink-soft)]/65">Sin notas.</p>
+              <p className="text-sm text-[var(--muted)]">Sin notas.</p>
             )}
           </div>
         </section>
 
-        <section className="panel rounded-3xl p-5">
+        <section className="panel rounded-[var(--radius-lg)] p-5">
           <h2 className="text-lg font-semibold">Actividad</h2>
           <div className="mt-4 space-y-3">
             {causa.actividades.map((a) => (
               <div key={a.id} className="border-b border-[var(--line)] pb-3 text-sm last:border-0">
                 <div>{a.mensaje}</div>
-                <div className="mt-1 text-xs text-[var(--ink-soft)]/60">
+                <div className="mt-1 text-xs text-[var(--muted)]">
                   {a.user?.name || "Sistema"} · {formatDateTime(a.createdAt)} · {a.tipo}
                 </div>
               </div>

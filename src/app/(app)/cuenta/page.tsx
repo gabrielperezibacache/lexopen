@@ -1,3 +1,4 @@
+import styles from "@/components/config/WorkspaceArea.module.css";
 import Link from "next/link";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { PasswordChangeForm } from "@/components/PasswordChangeForm";
@@ -11,7 +12,7 @@ export default async function CuentaPage() {
   const h = dict.hubs.cuenta;
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.area} space-y-6`}>
       <ModuleHeader
         eyebrow={h.eyebrow}
         title={h.title}

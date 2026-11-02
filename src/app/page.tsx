@@ -7,11 +7,11 @@ import {
   Bot,
   Building2,
   FolderSync,
-  Scale,
   Sheet,
   Shield,
 } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { FolioSymbol } from "@/components/ui/FolioSymbol";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
 const moduleIcons = [Building2, Shield, Sheet, BookOpen, FolderSync, Bot];
@@ -26,8 +26,8 @@ export default function LandingPage() {
 
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-6">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] text-white shadow-[0_12px_28px_rgba(196,122,58,0.35)]">
-            <Scale size={20} />
+          <span className="folio-brand grid h-11 w-11 shrink-0 place-items-center rounded-xl">
+            <FolioSymbol className="h-8 w-8" />
           </span>
           <div className="min-w-0">
             <div className="display text-2xl leading-none">LexOpen</div>

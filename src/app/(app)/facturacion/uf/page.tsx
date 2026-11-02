@@ -1,3 +1,4 @@
+import { BillingNav } from "@/components/billing/BillingNav";
 import { prisma } from "@/lib/db";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { clp } from "@/lib/billing";
@@ -18,11 +19,12 @@ export default async function UfPage() {
         title="UF"
         subtitle="Valores diarios para convertir tarifas pactadas en UF a CLP al registrar horas o facturar."
       />
+      <BillingNav />
       <UfRateForm />
       <div className="panel overflow-hidden rounded-3xl">
         <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-[var(--ink)] text-white/90">
+          <thead className="table-heading">
             <tr>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Valor</th>

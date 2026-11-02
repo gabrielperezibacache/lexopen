@@ -1,3 +1,4 @@
+import { BillingNav } from "@/components/billing/BillingNav";
 import { LedgerForm } from "@/components/billing/LedgerForm";
 import { ModuleHeader } from "@/components/sites/SiteNav";
 import { causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
@@ -50,6 +51,7 @@ export default async function CuentaCorrientePage({
         title="Cuenta corriente"
         subtitle="Provisiones, cargos y pagos por cliente. El saldo positivo es plata a favor del cliente; el negativo, un adeudo al estudio. Los documentos se exportan a un facturador externo desde Facturas (CSV/XML, no DTE SII)."
       />
+      <BillingNav />
 
       {clientes.length === 0 ? (
         <p className="panel rounded-3xl p-5 text-sm text-[var(--ink-soft)]/70">
@@ -61,7 +63,7 @@ export default async function CuentaCorrientePage({
         </p>
       ) : (
         <form className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-          <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium uppercase tracking-wide text-[var(--ink-soft)]/60">
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium text-[var(--ink-soft)]">
             Cliente
             <select className="select" name="clienteId" defaultValue={clienteId || ""}>
               {clientes.map((cliente) => (
@@ -116,7 +118,7 @@ export default async function CuentaCorrientePage({
 
       <div className="panel overflow-x-auto rounded-3xl">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-[var(--ink)] text-white/90">
+          <thead className="table-heading">
             <tr>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Tipo</th>

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-02T00:09:33.138468+00:00",
+  "generatedAt": "2026-11-02T03:05:04.626Z",
   "title": "Design System: LexOpen",
   "extensions": {
     "colorMeta": {
@@ -641,6 +641,11 @@
         "name": "reduced-motion",
         "value": "none",
         "purpose": "Sin transición ni transformación dinámica; permanece la pose estática del libro."
+      },
+      {
+        "name": "folio-open",
+        "value": "180ms (dialog), 160ms (tab panel)",
+        "purpose": "Apertura iniciada por el usuario; sin movimiento con prefers-reduced-motion."
       }
     ],
     "breakpoints": [
@@ -705,7 +710,7 @@
       "refersTo": "navigation",
       "description": "Enlace del marco de aplicación; fondo e identidad existentes.",
       "html": "<nav class=\"ds-sidebar\" aria-label=\"Navegación de ejemplo\"><a class=\"ds-nav-link\" href=\"#biblioteca\" aria-current=\"page\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/></svg>Biblioteca</a></nav>",
-      "css": ".ds-sidebar{background:var(--sidebar-bg,linear-gradient(180deg,#0c1c24 0%,#14313d 55%,#1a3d3f 100%));padding:.75rem;font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;}.ds-nav-link{display:flex;align-items:center;gap:.7rem;padding:.65rem .85rem;border-radius:var(--radius-md,.85rem);color:rgba(243,246,244,.72);text-decoration:none;transition:background var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),color var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1));touch-action:manipulation}.ds-nav-link:hover,.ds-nav-link[aria-current=\"page\"]{background:rgba(255,255,255,.08);color:#fff}.ds-nav-link:focus-visible{outline:3px solid var(--sea-bright,#2a8f99);outline-offset:3px}@media(max-width:767px){.ds-nav-link{min-height:44px;padding:.85rem 1rem;font-size:.95rem}}@media(prefers-reduced-motion:reduce){.ds-nav-link{transition:none}}"
+      "css": ".ds-sidebar{background:var(--sidebar-bg,linear-gradient(180deg,#0c1c24 0%,#14313d 55%,#1a3d3f 100%));padding:.75rem;font-family:var(--font-sora,Sora),\"Segoe UI\",sans-serif;}.ds-nav-link{display:flex;align-items:center;gap:.7rem;padding:.65rem .85rem;border-radius:var(--radius-md,.85rem);color:rgba(243,246,244,.82);text-decoration:none;transition:background var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1)),color var(--motion-fast,150ms) var(--motion-ease,cubic-bezier(.22,1,.36,1));touch-action:manipulation}.ds-nav-link:hover,.ds-nav-link[aria-current=\"page\"]{background:rgba(255,255,255,.08);color:#fff}.ds-nav-link:focus-visible{outline:3px solid var(--sea-bright,#2a8f99);outline-offset:3px}@media(max-width:767px){.ds-nav-link{min-height:44px;padding:.85rem 1rem;font-size:.95rem}}@media(prefers-reduced-motion:reduce){.ds-nav-link{transition:none}}"
     },
     {
       "name": "Etiqueta de verde mar",

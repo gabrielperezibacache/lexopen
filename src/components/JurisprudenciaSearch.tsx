@@ -23,21 +23,28 @@ function SearchInner({
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-4 sm:grid-cols-2 lg:grid-cols-[1fr_220px_auto]">
-      <input
-        className="input sm:col-span-2 lg:col-span-1"
-        name="q"
-        placeholder="Buscar por rol, doctrina, carátula, tags…"
-        defaultValue={sp.get("q") || ""}
-      />
-      <select className="select" name="materia" defaultValue={sp.get("materia") || ""}>
-        <option value="">Todas las materias</option>
-        {materias.map((m) => (
-          <option key={m.value} value={m.value}>
-            {m.label}
-          </option>
-        ))}
-      </select>
+    <form onSubmit={onSubmit} className="panel grid grid-cols-1 items-end gap-3 rounded-3xl p-4 sm:grid-cols-2 lg:grid-cols-[1fr_220px_auto]">
+      <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+        <label htmlFor="jurisprudencia-query" className="mb-2 block text-sm font-medium">Rol, doctrina o carátula</label>
+        <input
+          id="jurisprudencia-query"
+          className="input w-full"
+          name="q"
+          placeholder="Buscar por rol, doctrina, carátula, tags…"
+          defaultValue={sp.get("q") || ""}
+        />
+      </div>
+      <div className="min-w-0">
+        <label htmlFor="jurisprudencia-materia" className="mb-2 block text-sm font-medium">Materia</label>
+        <select id="jurisprudencia-materia" className="select w-full" name="materia" defaultValue={sp.get("materia") || ""}>
+          <option value="">Todas las materias</option>
+          {materias.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </div>
       <button className="btn btn-secondary" type="submit">
         Buscar
       </button>

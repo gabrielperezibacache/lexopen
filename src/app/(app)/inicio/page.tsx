@@ -235,9 +235,6 @@ export default async function InicioPage() {
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sea)]">
-          {t("inicio.eyebrow")}
-        </p>
         <h1 className={pageTitleClass}>{greeting}</h1>
       </header>
 

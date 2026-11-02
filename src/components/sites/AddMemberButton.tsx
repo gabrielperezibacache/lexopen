@@ -1,5 +1,8 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+import { WorkspaceField } from "./WorkspaceField";
+
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
@@ -44,15 +47,9 @@ export function AddMemberButton({
         Agregar persona
       </button>
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-member-title"
-        >
-          <form onSubmit={onSubmit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 id="add-member-title" className="text-lg font-semibold">Agregar al espacio</h3>
-            <select className="select" name="userId" required defaultValue="">
+        <Dialog open onClose={() => setOpen(false)} title="Agregar al espacio">
+          <form onSubmit={onSubmit} className="space-y-4">
+            <WorkspaceField label="Persona"><select className="select" name="userId" required defaultValue="">
               <option value="" disabled>
                 Seleccione usuario
               </option>
@@ -61,13 +58,13 @@ export function AddMemberButton({
                   {u.name} · {u.email}
                 </option>
               ))}
-            </select>
-            <select className="select" name="role" defaultValue="contributor">
+            </select></WorkspaceField>
+            <WorkspaceField label="Rol en el espacio"><select className="select" name="role" defaultValue="contributor">
               <option value="admin">Administrador</option>
               <option value="contributor">Colaborador</option>
               <option value="viewer">Solo lectura</option>
               <option value="client">Cliente</option>
-            </select>
+            </select></WorkspaceField>
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
               <button
@@ -83,7 +80,7 @@ export function AddMemberButton({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </>
   );

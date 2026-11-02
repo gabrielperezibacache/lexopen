@@ -119,18 +119,18 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
           <article
             key={n.id}
             className={`panel rounded-3xl p-5 ${
-              n.read ? "" : "border border-[var(--copper)]/35 bg-[rgba(196,122,58,0.05)]"
+              n.read ? "" : "border border-[var(--copper)]/35 bg-[var(--copper-soft)]"
             }`}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                 <h2 className="font-semibold">{n.title}</h2>
-                <p className="mt-1 text-sm text-[var(--ink-soft)]/75">{n.body}</p>
-                <p className="mt-2 text-xs text-[var(--ink-soft)]/60">
+                <p className="mt-1 text-sm leading-relaxed text-[var(--ink-soft)]">{n.body}</p>
+                <p className="mt-2 text-sm text-[var(--ink-soft)]">
                   {formatDateTime(n.createdAt)} · {n.read ? "leída" : "pendiente"}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                 {(n.tipo === "plazo.fatal" ||
                   n.tipo === "plazo.fatal.escalamiento" ||
                   n.severidad === "critica") &&

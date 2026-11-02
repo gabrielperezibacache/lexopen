@@ -97,7 +97,7 @@ export function CausaActions({
         </Link>
       </div>
       {msg && (
-        <p className="text-xs text-[var(--ink-soft)]/75" role="status">
+        <p className="text-xs text-[var(--muted)]" role="status">
           {msg}
         </p>
       )}

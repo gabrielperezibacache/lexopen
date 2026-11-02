@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 import { Copy, Download, Search } from "lucide-react";
 import { PdfEvidencePagePreview } from "./PdfEvidencePagePreview";
+import "./knowledge/knowledge.css";
 
 type Evidence = {
   document: { id: string; name: string; status: string | null; causaId: string | null };
@@ -85,8 +86,8 @@ export function DocumentEvidenceReader({ documentId, siteId, initialVersion = ""
   const processing = ["pending", "processing"].includes(data?.document.status || "");
   const selectedPage = data?.pages.find(p => p.pageNumber === data.selectedPageNumber);
 
-  return <div className="space-y-6">
-    <div className="flex flex-wrap items-end justify-between gap-4">
+  return <div className="evidence-reader space-y-6">
+    <div className="evidence-toolbar flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0 flex-1">
         <label htmlFor="evidence-version" className="mb-1 block text-sm font-medium">Versión consultada</label>
         <select id="evidence-version" className="select w-full sm:max-w-xl" disabled={!data?.versions.length || loading} value={data?.selectedVersionId || ""} onChange={e => { setVersion(e.target.value); setAfter(0); setPage(undefined); }}>
@@ -121,7 +122,7 @@ export function DocumentEvidenceReader({ documentId, siteId, initialVersion = ""
       </form>
       <div className="divide-y divide-[var(--line)] border-y border-[var(--line)]" aria-busy={loading}>
         {!data.fragments.length && !loading && <p className="py-8 text-sm">{selectedPage?.status === "empty" ? "Esta página no contiene texto ni imágenes que requieran OCR." : selectedPage && selectedPage.status !== "completed" ? "Esta página todavía no tiene texto verificable. Consulte la imagen y reintente preparar las fuentes cuando el procesamiento esté disponible." : "No hay fragmentos para esta búsqueda. Pruebe otra palabra o quite el filtro."}</p>}
-        {data.fragments.map(fragment => <section id={`fragment-${fragment.ordinal}`} key={fragment.id} className="scroll-mt-24 py-6">
+        {data.fragments.map(fragment => <section id={`fragment-${fragment.ordinal}`} key={fragment.id} className="evidence-reading-fragment scroll-mt-24 py-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Fragmento {fragment.ordinal}{fragment.pageNumber ? ` · Página ${fragment.pageNumber}` : ""}</h2><button type="button" className="btn btn-ghost text-sm" onClick={() => copy(fragment)} aria-label={`Copiar referencia del fragmento ${fragment.ordinal}`}><Copy size={16} aria-hidden="true" />Copiar referencia</button></div>
           <p className="max-w-[75ch] whitespace-pre-wrap break-words text-[var(--ink)] leading-relaxed">{fragment.text}</p>
           <BookmarkCitationButton citation={{ kind: "document", fragmentId: fragment.id, quote: fragment.text }} causaId={data.document.causaId} siteId={siteId} />

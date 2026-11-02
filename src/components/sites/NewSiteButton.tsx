@@ -1,5 +1,8 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+import { WorkspaceField } from "./WorkspaceField";
+
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -109,23 +112,18 @@ export function NewSiteButton({
         {label || t("sites.newSite")}
       </button>
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="new-site-title"
-        >
-          <form onSubmit={onSubmit} className="panel max-h-[90vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-3xl p-6">
-            <h2 id="new-site-title" className="text-xl font-semibold">{t("sites.createTitle")}</h2>
-            <input
+        <Dialog open onClose={() => setOpen(false)} title={t("sites.createTitle")}>
+          <form onSubmit={onSubmit} className="space-y-4">
+            <WorkspaceField label={t("sites.settings.name")}><input
               className="input"
               name="name"
               required
               placeholder={t("sites.settings.name")}
               defaultValue={defaultName}
-            />
-            <textarea className="textarea" name="description" placeholder={t("sites.settings.description")} />
+            /></WorkspaceField>
+            <WorkspaceField label={t("sites.settings.description")}><textarea className="textarea" name="description" placeholder={t("sites.settings.description")} /></WorkspaceField>
             <div>
+              <WorkspaceField label={t("sites.settings.type")}>
               <select
                 className="select w-full"
                 name="tipo"
@@ -138,6 +136,7 @@ export function NewSiteButton({
                   </option>
                 ))}
               </select>
+              </WorkspaceField>
               {tipoHint && <p className="mt-1 text-xs text-[var(--ink-soft)]/70">{tipoHint}</p>}
             </div>
             <label className="block text-sm">
@@ -198,7 +197,7 @@ export function NewSiteButton({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </>
   );

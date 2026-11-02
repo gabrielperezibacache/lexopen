@@ -1,3 +1,4 @@
+import styles from "@/components/config/WorkspaceArea.module.css";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/sites/SiteNav";
 import { formatDate, StatusBadge } from "@/components/ui";
@@ -90,7 +91,7 @@ export default async function PortalPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className={`${styles.area} space-y-6`}>
       <PageHeader
         eyebrow={t("portal.eyebrow")}
         title={t("portal.title")}
@@ -100,7 +101,7 @@ export default async function PortalPage() {
       />
 
       {isCliente(user.role) && (
-        <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-[var(--ink-soft)]/80">
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink-soft)]/80">
           {t("portal.notice")}
         </div>
       )}
@@ -122,7 +123,7 @@ export default async function PortalPage() {
             <article key={s.id} className="panel rounded-3xl p-5">
               <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-xs uppercase tracking-[0.14em] text-[var(--ink-soft)]/55">
+                  <div className="text-sm font-medium text-[var(--ink-soft)]">
                     {s.cliente?.razonSocial || "Cliente"}
                   </div>
                   <h2 className="mt-1 break-words text-xl font-semibold">{s.name}</h2>
@@ -142,13 +143,13 @@ export default async function PortalPage() {
                       {s.causa.movimientos.map((m) => (
                         <li key={m.id} className="text-sm text-[var(--ink-soft)]/85">
                           {m.titulo}
-                          <span className="block text-xs text-[var(--ink-soft)]/55">
+                          <span className="block text-sm text-[var(--ink-soft)]">
                             {formatDate(m.fecha)} · {m.tipo}
                           </span>
                         </li>
                       ))}
                       {s.causa.movimientos.length === 0 && (
-                        <li className="text-sm text-[var(--ink-soft)]/60">Sin movimientos.</li>
+                        <li className="text-sm text-[var(--ink-soft)]">Sin movimientos.</li>
                       )}
                     </ul>
                   </div>
@@ -159,13 +160,13 @@ export default async function PortalPage() {
                         <li key={p.id} className="text-sm text-[var(--ink-soft)]/85">
                           {p.esFatal ? "Fatal · " : ""}
                           {p.titulo}
-                          <span className="block text-xs text-[var(--ink-soft)]/55">
+                          <span className="block text-sm text-[var(--ink-soft)]">
                             {formatDate(p.fechaLimite)}
                           </span>
                         </li>
                       ))}
                       {s.causa.plazos.length === 0 && (
-                        <li className="text-sm text-[var(--ink-soft)]/60">Sin plazos listados.</li>
+                        <li className="text-sm text-[var(--ink-soft)]">Sin plazos listados.</li>
                       )}
                     </ul>
                   </div>
@@ -175,7 +176,7 @@ export default async function PortalPage() {
               <div className="mt-5">
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Documentos compartidos</h3>
-                  <Link href={`/sites/${s.id}/archivos`} className="text-xs text-[var(--sea)]">
+                  <Link href={`/sites/${s.id}/archivos`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
                     Ver archivos
                   </Link>
                 </div>
@@ -191,7 +192,7 @@ export default async function PortalPage() {
                     </li>
                   ))}
                   {s.files.length === 0 && (
-                    <li className="text-sm text-[var(--ink-soft)]/60">
+                    <li className="text-sm text-[var(--ink-soft)]">
                       Sin archivos etiquetados cliente.
                     </li>
                   )}
@@ -201,7 +202,7 @@ export default async function PortalPage() {
               {s.causa && (
                 <div className="mt-5">
                   <h3 className="text-sm font-semibold">Trámites de la causa</h3>
-                  <p className="mt-1 text-xs text-[var(--ink-soft)]/55">
+                  <p className="mt-1 text-sm text-[var(--ink-soft)]">
                     Vista informativa (solo lectura).
                   </p>
                   <ul className="mt-2 space-y-1.5">
@@ -211,7 +212,7 @@ export default async function PortalPage() {
                         className="flex flex-wrap items-baseline justify-between gap-2 text-sm text-[var(--ink-soft)]/85"
                       >
                         <span>{t.titulo}</span>
-                        <span className="text-xs text-[var(--ink-soft)]/55">
+                        <span className="text-sm text-[var(--ink-soft)]">
                           {labelTramiteEstado(t.estado)}
                           {t.fechaLimite
                             ? ` · ${formatDate(t.fechaLimite)}`
@@ -220,7 +221,7 @@ export default async function PortalPage() {
                       </li>
                     ))}
                     {s.causa.tramites.length === 0 && (
-                      <li className="text-sm text-[var(--ink-soft)]/60">
+                      <li className="text-sm text-[var(--ink-soft)]">
                         Sin trámites publicados aún.
                       </li>
                     )}
@@ -231,7 +232,7 @@ export default async function PortalPage() {
               <div className="mt-5">
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Q&A abiertas</h3>
-                  <Link href={`/sites/${s.id}/qa`} className="text-xs text-[var(--sea)]">
+                  <Link href={`/sites/${s.id}/qa`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
                     Ir a Q&A
                   </Link>
                 </div>
@@ -247,7 +248,7 @@ export default async function PortalPage() {
                     </li>
                   ))}
                   {s.qaThreads.length === 0 && (
-                    <li className="text-sm text-[var(--ink-soft)]/60">Sin hilos abiertos.</li>
+                    <li className="text-sm text-[var(--ink-soft)]">Sin hilos abiertos.</li>
                   )}
                 </ul>
               </div>

@@ -1,5 +1,8 @@
 "use client";
 
+import { Dialog } from "@/components/ui/Dialog";
+import { WorkspaceField } from "./WorkspaceField";
+
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
@@ -99,17 +102,11 @@ export function QaActions({
         Nueva pregunta
       </button>
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="new-qa-title"
-        >
-          <form onSubmit={onSubmit} className="panel w-full max-w-md space-y-3 rounded-3xl p-6">
-            <h3 id="new-qa-title" className="text-lg font-semibold">Nueva pregunta Q&A</h3>
-            <input className="input" name="subject" required placeholder="Asunto" />
-            <input className="input" name="category" placeholder="Categoría" />
-            <textarea className="textarea" name="body" required placeholder="Detalle" />
+        <Dialog open onClose={() => setOpen(false)} title="Nueva pregunta Q&A">
+          <form onSubmit={onSubmit} className="space-y-4">
+            <WorkspaceField label="Asunto"><input className="input" name="subject" required placeholder="Asunto" /></WorkspaceField>
+            <WorkspaceField label="Categoría"><input className="input" name="category" placeholder="Categoría" /></WorkspaceField>
+            <WorkspaceField label="Detalle"><textarea className="textarea" name="body" required placeholder="Detalle" /></WorkspaceField>
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
             <div className="flex justify-end gap-2">
               <button
@@ -125,7 +122,7 @@ export function QaActions({
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </>
   );

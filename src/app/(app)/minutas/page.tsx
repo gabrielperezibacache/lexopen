@@ -1,6 +1,7 @@
 import { MinutaPlantillasManager } from "@/components/minutas/MinutaPlantillasManager";
 import { formatDateTime, StatusBadge } from "@/components/ui";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { minutaConfidentialWhere } from "@/lib/api";
 import { causaAccessWhere as scopedcausaAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
 import { requireStaff } from "@/lib/auth/session";
@@ -63,31 +64,31 @@ export default async function MinutasPage() {
             <Link className="btn btn-secondary" href="/agente?utility=draft">
               Borrador con IA
             </Link>
-            <div className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm">
-              <div className="text-[var(--ink-soft)]/65">Acciones abiertas</div>
-              <div className="display text-2xl sm:text-3xl">{pendientes}</div>
+            <div className="inline-flex items-center gap-3 px-2 text-sm">
+              <span className="text-[var(--muted)]">Acciones abiertas</span>
+              <span className="display text-2xl tabular-nums">{pendientes}</span>
             </div>
           </>
         }
       />
 
-      <section className="panel rounded-3xl p-5">
+      <section className="panel rounded-[var(--radius-lg)] p-5">
         <h2 className="text-lg font-semibold">Registrar ahora</h2>
-        <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+        <p className="mt-1 text-sm text-[var(--muted)]">
           Elija la causa y genere la minuta en cuatro pasos.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {causas.map((c) => (
             <div
               key={c.id}
-              className="rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 transition hover:border-[var(--sea)]/40"
+              className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 transition hover:border-[var(--sea)]/40"
             >
               <Link href={`/causas/${c.id}/minuta/nueva`} className="block">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <ClipboardPen size={14} className="text-[var(--copper)]" />
                   {c.rit || "Sin RIT"}
                 </div>
-                <div className="mt-1 line-clamp-2 text-xs text-[var(--ink-soft)]/70">
+                <div className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">
                   {c.titulo}
                 </div>
               </Link>
@@ -101,7 +102,7 @@ export default async function MinutasPage() {
           ))}
         </div>
         {causas.length === 0 && (
-          <p className="mt-4 text-sm text-[var(--ink-soft)]/65">
+          <p className="mt-4 text-sm text-[var(--muted)]">
             No hay causas activas.{" "}
             <Link href="/causas/nueva" className="text-[var(--sea)]">
               Cree una causa
@@ -115,7 +116,13 @@ export default async function MinutasPage() {
         <MinutaPlantillasManager plantillas={plantillas} />
       )}
 
-      <section className="panel overflow-hidden rounded-3xl">
+      {minutas.length === 0 ? (
+        <EmptyState
+          title="Sin minutas"
+          description="Aún no hay minutas. Genere la primera tras una audiencia, reunión o llamada."
+        />
+      ) : (
+      <section className="panel overflow-hidden rounded-[var(--radius-lg)]">
         <div className="border-b border-[var(--line)] px-5 py-4">
           <h2 className="text-lg font-semibold">Recientes</h2>
         </div>
@@ -124,40 +131,35 @@ export default async function MinutasPage() {
             <Link
               key={m.id}
               href={`/causas/${m.causaId}/minutas/${m.id}`}
-              className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition hover:bg-white/50"
+              className="flex min-w-0 flex-wrap items-center justify-between gap-4 px-5 py-5 transition-colors hover:bg-[var(--mist)]"
             >
-              <div>
+              <div className="min-w-0 flex-1 basis-64">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="badge badge-sea">
                     {labelTipoMinuta(m.tipo)}
                   </span>
-                  <span className="font-medium">{m.titulo}</span>
+                  <span className="break-words font-semibold">{m.titulo}</span>
                 </div>
-                <div className="mt-1 text-sm text-[var(--ink-soft)]/70">
+                <div className="mt-1 text-sm text-[var(--muted)]">
                   {m.causa.rit || m.causa.titulo} ·{" "}
                   {m.autor?.name || "Sin autor"} · {formatDateTime(m.fecha)}
                 </div>
               </div>
-              <div className="text-right text-sm">
+              <div className="text-sm sm:text-right">
                 {m._count.acciones > 0 ? (
                   <StatusBadge estado="pendiente" />
                 ) : (
                   <StatusBadge estado="cumplido" />
                 )}
-                <div className="mt-1 text-xs text-[var(--ink-soft)]/60">
+                <div className="mt-1 text-xs text-[var(--muted)]">
                   {m._count.acciones} acción(es) abierta(s)
                 </div>
               </div>
             </Link>
           ))}
-          {minutas.length === 0 && (
-            <p className="px-5 py-8 text-sm text-[var(--ink-soft)]/65">
-              Aún no hay minutas. Genere la primera tras una audiencia, reunión
-              o llamada.
-            </p>
-          )}
         </div>
       </section>
+      )}
     </div>
   );
 }

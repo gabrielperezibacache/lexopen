@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useId, useMemo, useRef, useState } from "react";
+import { Files, FolderOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   inferDocumentoTipo,
@@ -83,6 +84,7 @@ export function DocumentoIngestForm({
   onComplete,
 }: Props) {
   const router = useRouter();
+  const fieldId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<"files" | "folder">("files");
@@ -225,12 +227,12 @@ export function DocumentoIngestForm({
   return (
     <form
       onSubmit={onSubmit}
-      className={`panel space-y-4 rounded-3xl p-5 ${compact ? "" : ""}`}
+      className="panel space-y-5 rounded-[var(--radius-lg)] p-5"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Incorporar al expediente</h2>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[var(--muted)]">
             Suba archivos sueltos o una carpeta investigativa completa. Se preserva la
             estructura de subcarpetas y se encola el OCR/Markdown.
           </p>
@@ -239,24 +241,26 @@ export function DocumentoIngestForm({
           <button
             type="button"
             className={`btn ${mode === "files" ? "btn-secondary" : "btn-ghost"}`}
+            aria-pressed={mode === "files"}
             onClick={() => {
               setMode("files");
               setRows([]);
               fileRef.current?.click();
             }}
           >
-            Archivos
+            <Files size={16} aria-hidden="true" /> Archivos
           </button>
           <button
             type="button"
             className={`btn ${mode === "folder" ? "btn-secondary" : "btn-ghost"}`}
+            aria-pressed={mode === "folder"}
             onClick={() => {
               setMode("folder");
               setRows([]);
               folderRef.current?.click();
             }}
           >
-            Carpeta
+            <FolderOpen size={16} aria-hidden="true" /> Carpeta
           </button>
         </div>
       </div>
@@ -283,10 +287,11 @@ export function DocumentoIngestForm({
         }}
       />
 
-      <div className={`grid gap-3 grid-cols-1 ${compact ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
-        <div>
-          <label className="mb-1 block text-sm font-medium">Tipo</label>
+      <div className={`grid grid-cols-2 gap-3 ${compact ? "" : "lg:grid-cols-4"}`}>
+        <div className="col-span-2 sm:col-span-1">
+          <label htmlFor={`${fieldId}-tipo`} className="mb-2 block text-sm font-medium">Tipo</label>
           <select
+            id={`${fieldId}-tipo`}
             className="select"
             value={tipo}
             onChange={(e) => setTipo(e.target.value)}
@@ -301,9 +306,10 @@ export function DocumentoIngestForm({
           </select>
         </div>
         {!lockedCausaId && (
-          <div>
-            <label className="mb-1 block text-sm font-medium">Causa</label>
+          <div className="col-span-2 sm:col-span-1">
+            <label htmlFor={`${fieldId}-causa`} className="mb-2 block text-sm font-medium">Causa</label>
             <select
+              id={`${fieldId}-causa`}
               className="select"
               value={causaId}
               onChange={(e) => setCausaId(e.target.value)}
@@ -317,7 +323,7 @@ export function DocumentoIngestForm({
             </select>
           </div>
         )}
-        <label className="flex items-end gap-2 pb-2 text-sm">
+        <label className="flex min-h-11 items-center gap-3 self-end rounded-[var(--radius-md)] border border-[var(--line)] px-3 py-3 text-sm">
           <input
             type="checkbox"
             checked={confidencial}
@@ -325,7 +331,7 @@ export function DocumentoIngestForm({
           />
           Confidencial
         </label>
-        <label className="flex items-end gap-2 pb-2 text-sm">
+        <label className="flex min-h-11 items-center gap-3 self-end rounded-[var(--radius-md)] border border-[var(--line)] px-3 py-3 text-sm">
           <input
             type="checkbox"
             checked={privilegio}
@@ -335,7 +341,7 @@ export function DocumentoIngestForm({
         </label>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex min-h-11 items-center gap-3 text-sm leading-relaxed">
         <input
           type="checkbox"
           checked={pushDrive}
@@ -345,7 +351,7 @@ export function DocumentoIngestForm({
       </label>
 
       {rows.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-[var(--line)]">
+        <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--line)]">
           <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--ink)] px-4 py-2 text-xs text-white/85">
             <span>
               {rows.length} ítem(s)
@@ -363,12 +369,12 @@ export function DocumentoIngestForm({
               Limpiar lista
             </button>
           </div>
-          <ul className="max-h-56 overflow-y-auto divide-y divide-[var(--line)] bg-white/70 text-sm">
+          <ul className="max-h-56 overflow-y-auto divide-y divide-[var(--line)] bg-[var(--surface-solid)] text-sm">
             {rows.map((row) => (
               <li key={row.key} className="flex min-w-0 flex-col gap-2 px-4 py-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="break-all font-medium sm:truncate">{row.relativePath}</div>
-                  <div className="text-xs text-[var(--ink-soft)]/65">
+                  <div className="text-xs text-[var(--muted)]">
                     {row.message ||
                       (row.status === "pending"
                         ? tipo === "auto"
@@ -384,8 +390,8 @@ export function DocumentoIngestForm({
                       : row.status === "error"
                         ? "text-red-700"
                         : row.status === "skipped"
-                          ? "text-[var(--ink-soft)]/55"
-                          : "text-[var(--ink-soft)]/70"
+                          ? "text-[var(--muted)]"
+                          : "text-[var(--muted)]"
                   }
                 >
                   {row.status === "uploading"
@@ -406,7 +412,7 @@ export function DocumentoIngestForm({
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         {rows.length === 0 && (
-          <p className="mr-auto text-sm text-[var(--ink-soft)]/65">
+          <p className="mr-auto text-sm text-[var(--muted)]">
             Elija <strong>Archivos</strong> o <strong>Carpeta</strong> para preparar la carga.
           </p>
         )}

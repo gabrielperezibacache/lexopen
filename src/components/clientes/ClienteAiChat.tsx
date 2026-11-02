@@ -88,14 +88,17 @@ export function ClienteAiChat({
         ))}
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-2 sm:flex-row">
+      <form onSubmit={onSubmit} className="flex flex-col items-end gap-3 sm:flex-row">
+        <label className="block w-full flex-1 space-y-2 text-sm font-medium">
+          <span>{t("ai.clienteChat.placeholder")}</span>
         <input
-          className="input flex-1"
+          className="input"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder={t("ai.clienteChat.placeholder")}
           disabled={busy}
         />
+        </label>
         <button className="btn btn-primary" disabled={busy || !prompt.trim()} type="submit">
           {busy ? t("ai.clienteChat.thinking") : t("ai.clienteChat.ask")}
         </button>

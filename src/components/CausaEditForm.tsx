@@ -108,9 +108,9 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
         }
       />
 
-      <form onSubmit={onSubmit} className="panel space-y-4 rounded-3xl p-6">
+      <form onSubmit={onSubmit} className="panel space-y-4 rounded-[var(--radius-lg)] p-6">
         <div>
-          <label htmlFor="titulo" className="mb-1 block text-sm font-medium">Título</label>
+          <label htmlFor="titulo" className="mb-2 block text-sm font-medium">Título</label>
           <input
             id="titulo"
             className="input"
@@ -121,7 +121,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="rit" className="mb-1 block text-sm font-medium">RIT</label>
+            <label htmlFor="rit" className="mb-2 block text-sm font-medium">RIT</label>
             <input
               id="rit"
               className="input"
@@ -131,7 +131,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
             />
           </div>
           <div>
-            <label htmlFor="ruc" className="mb-1 block text-sm font-medium">RUC</label>
+            <label htmlFor="ruc" className="mb-2 block text-sm font-medium">RUC</label>
             <input
               id="ruc"
               className="input"
@@ -142,7 +142,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
           </div>
         </div>
         <div>
-          <label htmlFor="tribunal" className="mb-1 block text-sm font-medium">Tribunal</label>
+          <label htmlFor="tribunal" className="mb-2 block text-sm font-medium">Tribunal</label>
           <input
             id="tribunal"
             className="input"
@@ -160,7 +160,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="materia" className="mb-1 block text-sm font-medium">Materia</label>
+            <label htmlFor="materia" className="mb-2 block text-sm font-medium">Materia</label>
             <select
               id="materia"
               className="select"
@@ -175,7 +175,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
             </select>
           </div>
           <div>
-            <label htmlFor="etapa" className="mb-1 block text-sm font-medium">Etapa</label>
+            <label htmlFor="etapa" className="mb-2 block text-sm font-medium">Etapa</label>
             <select id="etapa" className="select" name="etapa" defaultValue={causa.etapa}>
               {ETAPAS.map((m) => (
                 <option key={m.value} value={m.value}>
@@ -187,7 +187,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="estado" className="mb-1 block text-sm font-medium">Estado</label>
+            <label htmlFor="estado" className="mb-2 block text-sm font-medium">Estado</label>
             <select
               id="estado"
               className="select"
@@ -202,7 +202,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
             </select>
           </div>
           <div>
-            <label htmlFor="procedimiento" className="mb-1 block text-sm font-medium">Procedimiento</label>
+            <label htmlFor="procedimiento" className="mb-2 block text-sm font-medium">Procedimiento</label>
             <input
               id="procedimiento"
               className="input"
@@ -213,7 +213,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="sala" className="mb-1 block text-sm font-medium">Sala</label>
+            <label htmlFor="sala" className="mb-2 block text-sm font-medium">Sala</label>
             <input
               id="sala"
               className="input"
@@ -222,7 +222,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
             />
           </div>
           <div>
-            <label htmlFor="cuaderno" className="mb-1 block text-sm font-medium">Cuaderno</label>
+            <label htmlFor="cuaderno" className="mb-2 block text-sm font-medium">Cuaderno</label>
             <input
               id="cuaderno"
               className="input"
@@ -232,7 +232,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
           </div>
         </div>
         <div>
-          <label htmlFor="caratula" className="mb-1 block text-sm font-medium">Carátula</label>
+          <label htmlFor="caratula" className="mb-2 block text-sm font-medium">Carátula</label>
           <input
             id="caratula"
             className="input"
@@ -242,7 +242,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="clienteId" className="mb-1 block text-sm font-medium">Cliente</label>
+            <label htmlFor="clienteId" className="mb-2 block text-sm font-medium">Cliente</label>
             <select
               id="clienteId"
               className="select"
@@ -258,7 +258,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
             </select>
           </div>
           <div>
-            <label htmlFor="abogadoId" className="mb-1 block text-sm font-medium">
+            <label htmlFor="abogadoId" className="mb-2 block text-sm font-medium">
               Abogado responsable
             </label>
             <select
@@ -277,7 +277,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
           </div>
         </div>
         <div>
-          <label htmlFor="abogadoContraparte" className="mb-1 block text-sm font-medium">
+          <label htmlFor="abogadoContraparte" className="mb-2 block text-sm font-medium">
             Abogado contraparte
           </label>
           <input
@@ -288,7 +288,7 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
           />
         </div>
         <div>
-          <label htmlFor="resumen" className="mb-1 block text-sm font-medium">Resumen</label>
+          <label htmlFor="resumen" className="mb-2 block text-sm font-medium">Resumen</label>
           <textarea
             id="resumen"
             className="textarea min-h-28"

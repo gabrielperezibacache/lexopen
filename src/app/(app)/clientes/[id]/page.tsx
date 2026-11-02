@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/PageHeader";
 import { causaAccessWhere, documentReadWhere, siteAccessWhere } from "@/lib/auth/causa-access";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -99,16 +100,14 @@ export default async function ClienteDetailPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link href="/clientes" className="text-sm text-[var(--sea)]">
-          ← Clientes
-        </Link>
-        <h1 className="display mt-2 break-words text-2xl sm:text-3xl md:text-4xl">{cliente.razonSocial}</h1>
-        <p className="mt-2 break-words text-[var(--ink-soft)]/80">
-          {cliente.rut || "Sin RUT"} · {cliente.tipo} ·{" "}
-          {cliente.abogado?.name || "Sin abogado asignado"}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
+      <Link href="/clientes" className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
+        ← Clientes
+      </Link>
+      <PageHeader
+        title={cliente.razonSocial}
+        subtitle={<>{cliente.rut || "Sin RUT"} · {cliente.tipo} · {cliente.abogado?.name || "Sin abogado asignado"}</>}
+      />
+      <div className="flex flex-wrap gap-2">
           <StatusBadge
             estado={cliente.estado === "activo" ? "activa" : "suspendida"}
           />
@@ -120,24 +119,23 @@ export default async function ClienteDetailPage({
           <span className="badge badge-sea">
             {cliente.documentos.length} docs
           </span>
-        </div>
       </div>
 
-      <section className="panel rounded-3xl p-5">
+      <section className="panel rounded-[var(--radius-lg)] p-5">
         <h2 className="mb-4 text-lg font-semibold">Datos del cliente</h2>
         <ClienteEditForm cliente={cliente} abogados={abogados} />
       </section>
 
-      <section className="panel rounded-3xl p-5">
+      <section className="panel rounded-[var(--radius-lg)] p-5">
         <h2 className="mb-4 text-lg font-semibold">{t("sites.clientSection.title")}</h2>
         {cliente.sites.length === 0 ? (
-          <p className="text-sm text-[var(--ink-soft)]/70">{t("sites.clientSection.empty")}</p>
+          <p className="text-sm text-[var(--muted)]">{t("sites.clientSection.empty")}</p>
         ) : (
           <div className="space-y-3">
             {cliente.sites.map((site) => (
               <div
                 key={site.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-4 py-3"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--line)] px-4 py-3"
               >
                 <div>
                   <div className="font-medium">{site.name}</div>
@@ -166,7 +164,7 @@ export default async function ClienteDetailPage({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">Causas y trámites</h2>
-            <p className="text-sm text-[var(--ink-soft)]/70">
+            <p className="text-sm text-[var(--muted)]">
               Por cada causa: trámites pendientes vs hechos del estudio.
             </p>
           </div>
@@ -182,7 +180,7 @@ export default async function ClienteDetailPage({
           <details
             key={causa.id}
             id={`causa-${causa.id}`}
-            className="panel group scroll-mt-24 rounded-3xl p-5"
+            className="panel group scroll-mt-24 rounded-[var(--radius-lg)] p-5"
             open={
               cliente.causas.length === 1 || focusCausaId === causa.id
             }
@@ -196,7 +194,7 @@ export default async function ClienteDetailPage({
                   >
                     {causa.rit || causa.titulo}
                   </Link>
-                  <div className="mt-1 text-sm text-[var(--ink-soft)]/75">
+                  <div className="mt-1 text-sm text-[var(--muted)]">
                     {causa.titulo} · {causa.tribunal}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -219,7 +217,7 @@ export default async function ClienteDetailPage({
                     </span>
                   </div>
                 </div>
-                <span className="text-xs text-[var(--ink-soft)]/55 group-open:hidden">
+                <span className="text-xs text-[var(--muted)] group-open:hidden">
                   Expandir trámites
                 </span>
               </div>
@@ -249,7 +247,7 @@ export default async function ClienteDetailPage({
       <section className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold">Carpeta de documentos</h2>
-          <p className="text-sm text-[var(--ink-soft)]/70">
+          <p className="text-sm text-[var(--muted)]">
             Archivos del cliente (también puede asociarlos a una causa).
           </p>
         </div>
@@ -264,12 +262,12 @@ export default async function ClienteDetailPage({
           {cliente.documentos.map((d) => (
             <div
               key={d.id}
-              className="rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm"
+              className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-2 text-sm"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <div className="font-medium">{d.nombre}</div>
-                  <div className="text-xs text-[var(--ink-soft)]/60">
+                  <div className="text-xs text-[var(--muted)]">
                     {d.tipo}
                     {d.causa ? ` · ${d.causa.rit || d.causa.titulo}` : " · carpeta cliente"}
                     {" · "}
@@ -291,7 +289,7 @@ export default async function ClienteDetailPage({
             </div>
           ))}
           {cliente.documentos.length === 0 && (
-            <p className="text-sm text-[var(--ink-soft)]/65">
+            <p className="text-sm text-[var(--muted)]">
               Carpeta vacía. Suba el primer documento.
             </p>
           )}

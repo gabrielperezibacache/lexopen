@@ -14,7 +14,7 @@ export default async function CorreoPage() {
         title={t("mailbox.title")}
         subtitle={t("mailbox.subtitle")}
       />
-      <Suspense fallback={<div className="panel rounded-3xl p-6">{t("common.loading")}</div>}>
+      <Suspense fallback={<div className="panel rounded-[var(--radius-lg)] p-6">{t("common.loading")}</div>}>
         <MailboxPanel />
       </Suspense>
     </div>

@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FEE_TIPOS } from "@/lib/billing";
 import { apiMutation } from "@/lib/api-mutation";
+import { BillingField } from "./BillingField";
 
 export function FeeForm({
   clientes,
@@ -50,11 +51,12 @@ export function FeeForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-3 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-3">
+    <form onSubmit={onSubmit} className="panel grid grid-cols-1 gap-4 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-3" aria-label="Guardar tarifa">
       {error && (
-        <p className="sm:col-span-2 lg:col-span-3 text-sm text-[var(--danger)]">{error}</p>
+        <p className="sm:col-span-2 lg:col-span-3 text-sm text-[var(--danger)]" role="alert">{error}</p>
       )}
-      <input className="input md:col-span-2" name="name" required placeholder="Nombre de la condición" />
+      <BillingField label="Nombre de la condición" className="sm:col-span-2"><input className="input" name="name" required placeholder="Nombre de la condición" /></BillingField>
+      <BillingField label="Tipo de honorarios">
       <select className="select" value={tipo} onChange={(e) => setTipo(e.target.value)} name="tipo">
         {FEE_TIPOS.map((f) => (
           <option key={f.value} value={f.value}>
@@ -62,39 +64,40 @@ export function FeeForm({
           </option>
         ))}
       </select>
+      </BillingField>
       {(tipo === "hourly" || tipo === "mixed") && (
         <>
-          <input className="input" type="number" name="rateHourlyClp" placeholder="Tarifa hora CLP" />
-          <input className="input" type="number" step="0.01" name="rateHourlyUf" placeholder="Tarifa hora UF" />
+          <BillingField label="Tarifa hora CLP"><input className="input" type="number" name="rateHourlyClp" placeholder="Tarifa hora CLP" /></BillingField>
+          <BillingField label="Tarifa hora UF"><input className="input" type="number" step="0.01" name="rateHourlyUf" placeholder="Tarifa hora UF" /></BillingField>
         </>
       )}
       {(tipo === "flat" || tipo === "mixed") && (
-        <input className="input" type="number" name="flatFeeClp" placeholder="Suma alzada CLP" />
+        <BillingField label="Suma alzada CLP"><input className="input" type="number" name="flatFeeClp" placeholder="Suma alzada CLP" /></BillingField>
       )}
       {(tipo === "retainer" || tipo === "mixed") && (
-        <input className="input" type="number" name="retainerClp" placeholder="Retainer CLP" />
+        <BillingField label="Retainer CLP"><input className="input" type="number" name="retainerClp" placeholder="Retainer CLP" /></BillingField>
       )}
       {(tipo === "cuota_litis" || tipo === "mixed") && (
-        <input className="input" type="number" step="0.1" name="cuotaLitisPct" placeholder="% cuota litis" />
+        <BillingField label="% cuota litis"><input className="input" type="number" step="0.1" name="cuotaLitisPct" placeholder="% cuota litis" /></BillingField>
       )}
-      <select className="select" name="clienteId" defaultValue="">
+      <BillingField label="Cliente"><select className="select" name="clienteId" defaultValue="">
         <option value="">Cliente</option>
         {clientes.map((c) => (
           <option key={c.id} value={c.id}>
             {c.razonSocial}
           </option>
         ))}
-      </select>
-      <select className="select" name="causaId" defaultValue="">
+      </select></BillingField>
+      <BillingField label="Causa"><select className="select" name="causaId" defaultValue="">
         <option value="">Causa</option>
         {causas.map((c) => (
           <option key={c.id} value={c.id}>
             {c.rit || c.titulo}
           </option>
         ))}
-      </select>
-      <input className="input md:col-span-2" name="notes" placeholder="Notas / condiciones" />
-      <button className="btn btn-primary" disabled={busy} type="submit">
+      </select></BillingField>
+      <BillingField label="Notas / condiciones" className="sm:col-span-2"><input className="input" name="notes" placeholder="Notas / condiciones" /></BillingField>
+      <button className="btn btn-primary self-end" disabled={busy} type="submit">
         {busy ? 'Guardando…' : 'Guardar tarifa'}
       </button>
     </form>

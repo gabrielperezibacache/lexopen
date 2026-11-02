@@ -134,7 +134,7 @@ export function IntegrationsOverviewPanel() {
             <a
               key={card.id}
               href={card.href || "/integraciones"}
-              className="rounded-2xl border border-[var(--line)] bg-white/70 p-4 transition hover:border-[var(--sea)]/40"
+              className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 transition hover:border-[var(--sea)]/40"
             >
               <div className="flex items-center justify-between gap-2">
                 <h3 className="font-semibold">{card.title}</h3>
@@ -157,7 +157,7 @@ export function IntegrationsOverviewPanel() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-[var(--line)] bg-white/60 p-4 text-xs text-[var(--ink-soft)]/75">
+      <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-xs text-[var(--ink-soft)]/75">
         <p className="font-medium text-[var(--ink)]">Referencia rápida de APIs</p>
         <ul className="mt-2 grid gap-1 sm:grid-cols-2">
           <li>
