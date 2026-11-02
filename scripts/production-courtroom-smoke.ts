@@ -29,7 +29,7 @@ async function main() {
     const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(Buffer.from(chunk)); const body = Buffer.concat(chunks);
     res.setHeader("Content-Type", "application/json");
     if (req.url === "/v1/audio/transcriptions") { speechCalls++; assert.match(req.headers["content-type"] || "", /multipart\/form-data/); assert.ok(body.includes(Buffer.from("WAVE"))); assert.ok(body.includes(Buffer.from("modelo-ficticio"))); res.end(JSON.stringify({ text: transcript, duration: 1, segments: [{ start: 0, end: 1, text: transcript }] })); }
-    else if (req.url === "/v1/chat/completions") { modelCalls++; const payload = JSON.parse(body.toString()); assert.match(JSON.stringify(payload), /no confiables/i); res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ paragraphs: [{ text: "El pasaje ficticio seleccionado ayuda a ordenar la revisión del contrato.", citationIds: ["S1"] }] }) } }] })); }
+    else if (req.url === "/v1/chat/completions") { modelCalls++; const payload = JSON.parse(body.toString()); assert.match(JSON.stringify(payload), /no confiables/i); assert.match(JSON.stringify(payload), /Cotejo contra la transcripción TXT/); res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ paragraphs: [{ text: "Los dos pasajes ficticios seleccionados ayudan a ordenar la revisión del contrato.", citationIds: ["S1", "S2"] }] }) } }] })); }
     else { res.statusCode = 404; res.end("{}"); }
     } catch (error) { res.statusCode = 500; res.end(JSON.stringify({ error: String(error) })); }
   });
@@ -71,24 +71,33 @@ async function main() {
     const hearing = await json(await professional.post(`${root}/hearings`, { headers, data: { title: "Preparación ficticia de audiencia" } }), 201), desk = `${root}/hearings/${hearing.id}`;
     const source = await json(await professional.post(`${desk}/sources`, { headers, data: { kind: "book", refId: imported.book.id } }));
     const reading = await json(await professional.get(`${desk}/sources/${source.id}/read`)); assert.equal(reading.fragments[0].text, fragment.text);
+    const transcriptSource = await json(await professional.post(`${desk}/sources`, { headers, data: { kind: "document", refId: document.id } }));
+    await json(await professional.post(`${desk}/sources/${transcriptSource.id}/prepare`, { headers, data: {} }));
+    const transcriptReading = await json(await professional.get(`${desk}/sources/${transcriptSource.id}/read`));
+    assert.equal(transcriptReading.page, null); assert.equal(transcriptReading.locatorKind, "text-offset");
+    const transcriptFragment = transcriptReading.fragments.find((value: { text: string }) => value.text.includes(transcript)); assert.ok(transcriptFragment);
+    const transcriptPassage = { sourceId: transcriptSource.id, fragmentId: transcriptFragment.id, quote: transcriptFragment.text };
     const passage = { sourceId: source.id, fragmentId: fragment.id, quote: fragment.text };
     const note = await json(await professional.post(`${desk}/notes`, { headers, data: { title: "Nota ficticia sobre el contrato", body: "Contrastar este pasaje durante la audiencia ficticia.", citation: passage } }));
-    const input = { requestId: randomUUID(), question: "Qué antecedente del contrato debo revisar", mode: "extractive", passages: [passage], noteIds: [note.id] };
+    const input = { requestId: randomUUID(), question: "Qué antecedentes del contrato y de la transcripción debo revisar", mode: "extractive", passages: [passage, transcriptPassage], noteIds: [note.id] };
     await json(await professional.post(`${desk}/chat`, { headers, data: input })); assert.equal(modelCalls, 0);
     await db.integrationConfig.create({ data: { provider: "llm", enabled: true, configJson: JSON.stringify({ preset: "custom", apiUrl: `http://127.0.0.1:${port}/v1`, model: "modelo-ficticio", apiKey: "", allowDemo: false }) } });
     const turn = await json(await professional.post(`${desk}/chat`, { headers, data: { ...input, requestId: randomUUID(), mode: "ai" } })); assert.equal(turn.turn.modelUsed, true); assert.equal(modelCalls, 1);
+    assert.equal(turn.turn.citations.length, 2); assert.ok(turn.turn.citations.some((value: { origin: string; warning: string }) => value.origin === "knowledge" && value.warning.includes("Cotejo contra la transcripción TXT")));
     assert.equal((await admin.get(desk)).status(), 404, "Even an administrator cannot read another professional's private desk");
-    const exported = await professional.get(`${desk}/export`); assert.equal(exported.status(), 200); assert.match(await exported.text(), /Rol FICTICIO-2026/);
+    const exported = await professional.get(`${desk}/export`); assert.equal(exported.status(), 200); const exportText = (await exported.json()).text; assert.match(exportText, /Rol FICTICIO-2026/); assert.match(exportText, /Cotejo contra la transcripción TXT/); assert.ok(exportText.includes(transcript));
     assert.equal((await professional.post(`${desk}/notes`, { headers: { Origin: base }, data: { title: "No guardar", body: "Sin token", citation: null } })).status(), 403);
     await db.libraryBook.update({ where: { id: imported.book.id }, data: { deletedAt: new Date() } });
     const revoked = await json(await professional.get(desk)); assert.equal(revoked.notes[0].available, false); assert.ok(revoked.turns.every((value: { available: boolean }) => !value.available)); assert.ok(!JSON.stringify(revoked).includes("Contrastar este pasaje"));
     assert.equal((await professional.post(`${desk}/verify`, { headers, data: { turnId: turn.turn.id } })).status(), 404);
+    const stillAuthorized = await json(await professional.get(`${desk}/sources/${transcriptSource.id}/read`)); assert.ok(stillAuthorized.fragments.some((value: { text: string }) => value.text.includes(transcript)));
     if (keepFixtures) { await db.libraryBook.update({ where: { id: imported.book.id }, data: { deletedAt: null } }); console.log(JSON.stringify({ fixtureManifest: { userIds, caseIds, bookId: imported.book.id, audioId: audio.id, sourceDocumentId: audio.sourceDocumentId, transcriptDocumentId: document.id, workspaceId: hearing.id, sourceId: source.id, noteId: note.id, turnId: turn.turn.id, organizationId } })); }
     completed = true;
-    console.log(JSON.stringify({ mode: "production", deployed: false, judicialMetadataAndReferences: true, audioOriginalAndRanges: true, speechTransport: "real HTTP to local fixture; recognition accuracy untested", speechCalls, manualReviewHistory: true, transcriptInCaseFolder: true, hearingNotesAndReader: true, modelCalls, aiTransport: "real configured askLlm HTTP to local fixture", normalCookiesAndCsrf: true, revokedDerivedContentHidden: true, privateDeskEvenForAdmin: true }));
+    console.log(JSON.stringify({ mode: "production", deployed: false, judicialMetadataAndReferences: true, audioOriginalAndRanges: true, speechTransport: "real HTTP to local fixture; recognition accuracy untested", speechCalls, manualReviewHistory: true, transcriptInCaseFolder: true, hearingNotesAndReader: true, mixedJudgmentAndTranscriptConversation: true, transcriptIndexedAndWarningInModelContext: true, mixedSourceExport: true, remainingAuthorizedTranscriptAfterJudgmentRevocation: true, modelCalls, aiTransport: "real configured askLlm HTTP to local fixture", normalCookiesAndCsrf: true, revokedDerivedContentHidden: true, privateDeskEvenForAdmin: true }));
   } finally {
     for (const book of await db.libraryBook.findMany({ where: { ownerId: { in: userIds } } })) keys.push(book.storageKey);
     for (const audio of await db.caseAudio.findMany({ where: { causaId: { in: caseIds } } })) keys.push(audio.storageKey);
+    for (const version of await db.documentEvidenceVersion.findMany({ where: { resource: { documento: { causaId: { in: caseIds } } } }, select: { sourceStorageKey: true } })) if (version.sourceStorageKey) keys.push(version.sourceStorageKey);
     await Promise.all([admin.dispose(), professional.dispose(), outsider.dispose()]);
     if (!keepFixtures || !completed) {
     await db.hearingWorkspace.deleteMany({ where: { causaId: { in: caseIds } } }); await db.caseAudio.deleteMany({ where: { causaId: { in: caseIds } } }); await db.documento.deleteMany({ where: { causaId: { in: caseIds } } }); await db.causa.deleteMany({ where: { id: { in: caseIds } } }); await db.auditEvent.deleteMany({ where: { actorId: { in: userIds } } }); await db.user.deleteMany({ where: { id: { in: userIds } } });

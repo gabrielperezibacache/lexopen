@@ -1,0 +1,5 @@
+
+> lexopen@1.0.0 test:production:courtroom
+> node --import tsx scripts/production-courtroom-smoke.ts
+
+{"mode":"production","deployed":false,"judicialMetadataAndReferences":true,"audioOriginalAndRanges":true,"speechTransport":"real HTTP to local fixture; recognition accuracy untested","speechCalls":1,"manualReviewHistory":true,"transcriptInCaseFolder":true,"hearingNotesAndReader":true,"mixedJudgmentAndTranscriptConversation":true,"transcriptIndexedAndWarningInModelContext":true,"mixedSourceExport":true,"remainingAuthorizedTranscriptAfterJudgmentRevocation":true,"modelCalls":1,"aiTransport":"real configured askLlm HTTP to local fixture","normalCookiesAndCsrf":true,"revokedDerivedContentHidden":true,"privateDeskEvenForAdmin":true}

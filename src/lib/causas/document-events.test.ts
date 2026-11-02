@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { CASE_DOCUMENTS_CHANGED, notifyCaseDocumentsChanged, subscribeCaseDocumentsChanged } from "./document-events";
+
+const target = new EventTarget();
+let firstCase = 0, otherCase = 0;
+const unsubscribe = subscribeCaseDocumentsChanged("case-first", () => firstCase++, target);
+const unsubscribeOther = subscribeCaseDocumentsChanged("case-other", () => otherCase++, target);
+notifyCaseDocumentsChanged("case-first", target);
+assert.equal(firstCase, 1);
+assert.equal(otherCase, 0, "Publishing in one case must not refresh another case's workbench");
+target.dispatchEvent(new Event(CASE_DOCUMENTS_CHANGED));
+target.dispatchEvent(new CustomEvent(CASE_DOCUMENTS_CHANGED, { detail: { text: "No case identity" } }));
+assert.equal(firstCase, 1, "Incomplete events must not notify readers");
+let payload: unknown;
+target.addEventListener(CASE_DOCUMENTS_CHANGED, event => { payload = (event as CustomEvent<unknown>).detail; }, { once: true });
+notifyCaseDocumentsChanged("case-first", target);
+assert.deepEqual(payload, { causaId: "case-first" }, "The notification must carry no document, transcript or credentials");
+unsubscribe(); notifyCaseDocumentsChanged("case-first", target);
+assert.equal(firstCase, 2, "Unmounted workbenches must stop receiving updates");
+notifyCaseDocumentsChanged("case-other", target); assert.equal(otherCase, 1);
+unsubscribeOther();
+assert.doesNotThrow(() => notifyCaseDocumentsChanged("case-first", null));
+assert.doesNotThrow(() => subscribeCaseDocumentsChanged("case-first", () => {}, null)());
+console.log("Case document events PASS: scoped identity only, malformed events ignored, independent cases and subscription cleanup.");
