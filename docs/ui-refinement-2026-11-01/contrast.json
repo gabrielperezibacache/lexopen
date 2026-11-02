@@ -1,0 +1,35 @@
+{
+  "method": "WCAG relative luminance; opaque token pairs only, not an accessibility certification",
+  "pairs": [
+    {
+      "name": "light-muted",
+      "text": "#52656d",
+      "background": "#ffffff",
+      "contrast": 6.1
+    },
+    {
+      "name": "dark-muted",
+      "text": "#a2b7bf",
+      "background": "#14242c",
+      "contrast": 7.63
+    },
+    {
+      "name": "dark-sea-text",
+      "text": "#77c8cd",
+      "background": "#14242c",
+      "contrast": 8.29
+    },
+    {
+      "name": "sea-solid-action",
+      "text": "#ffffff",
+      "background": "#1f6f78",
+      "contrast": 5.83
+    },
+    {
+      "name": "copper-action",
+      "text": "#ffffff",
+      "background": "#9a5a28",
+      "contrast": 5.43
+    }
+  ]
+}

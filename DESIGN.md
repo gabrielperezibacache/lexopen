@@ -6,6 +6,7 @@ colors:
   copper-deep: "#9a5a28"
   copper-soft: "rgba(196, 122, 58, 0.14)"
   sea: "#1f6f78"
+  sea-solid: "#1f6f78"
   sea-bright: "#2a8f99"
   sea-soft: "rgba(31, 111, 120, 0.12)"
   ink: "#0c1c24"
@@ -295,3 +296,5 @@ El marco conserva Sora, Fraunces, cobre y verde mar. El símbolo propio usa foli
 Los nuevos tonos muted (#52656d claro, #a2b7bf oscuro), sea oscuro (#77c8cd / #8edce0) y cobre oscuro (#d59a67) aportan contraste sobre papel o tinta. El botón principal mantiene #9a5a28 con texto blanco en ambos temas. Las cabeceras de tabla usan mist/ink; la consola conserva fondo tinta fijo. Los degradados de barra lateral ya existentes y la oscuridad de los fondos de diálogo son tratamientos contextuales, no una nueva paleta ornamental.
 
 El movimiento describe apertura de folios: diálogos 180 ms, paneles de pestañas 160 ms, y una respuesta breve del símbolo al pasar sobre la marca. Se limita a cambios iniciados por el usuario y desaparece con prefers-reduced-motion. No hay vídeo de fondo ni contenido oculto esperando una animación. La navegación activa se reconoce por línea de cobre, fondo y aria-current.
+
+`sea-solid` conserva #1f6f78 en ambos temas para controles con texto blanco; `sea` se aclara en oscuro para enlaces y texto. No intercambiar esos usos.

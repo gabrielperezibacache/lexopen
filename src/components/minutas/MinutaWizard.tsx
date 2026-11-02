@@ -286,7 +286,7 @@ export function MinutaWizard({
                 onClick={() => i <= step && setStep(i)}
                 className={`inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-sm)] px-3 py-2 text-sm font-medium transition-colors ${
                   i === step
-                    ? "bg-[var(--sea)] text-white"
+                    ? "bg-[var(--sea-solid)] text-white"
                     : i < step
                       ? "bg-[var(--sea)]/15 text-[var(--sea)]"
                       : "bg-[var(--line)]/60 text-[var(--muted)]"

@@ -362,7 +362,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
             <Link
               key={value}
               href={qs({ tipo: value })}
-              className={`inline-flex min-h-11 items-center rounded-[var(--radius-sm)] px-3 text-sm font-medium transition-colors ${filterTipo === value ? "bg-[var(--sea)] text-white" : "text-[var(--muted)] hover:bg-[var(--mist)]"}`}
+              className={`inline-flex min-h-11 items-center rounded-[var(--radius-sm)] px-3 text-sm font-medium transition-colors ${filterTipo === value ? "bg-[var(--sea-solid)] text-white" : "text-[var(--muted)] hover:bg-[var(--mist)]"}`}
               aria-current={filterTipo === value ? "page" : undefined}
             >{label}</Link>
           ))}

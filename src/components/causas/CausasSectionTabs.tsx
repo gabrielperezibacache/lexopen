@@ -45,7 +45,7 @@ export function CausasSectionTabs({
             className={cn(
               "inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-[var(--radius-sm)] px-2 py-2 text-sm font-medium transition-colors sm:px-3",
               active
-                ? "bg-[var(--sea)] text-white"
+                ? "bg-[var(--sea-solid)] text-white"
                 : "text-[var(--ink-soft)]/80 hover:bg-[var(--sea)]/8 hover:text-[var(--ink)]"
             )}
           >

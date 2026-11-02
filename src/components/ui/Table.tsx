@@ -87,7 +87,7 @@ export function Table<T extends { id: string }>({
       />
       </label>
       <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--line)]">
-        <table role="table" className="data-table min-w-full text-left text-sm">
+        <table role="table" className={`${columns.some(column => column.sortable) ? "" : "data-table "}min-w-full text-left text-sm`}>
           <thead role="rowgroup" className="table-heading">
             <tr role="row">
               {columns.map((c) => (
