@@ -1,7 +1,9 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCheck, Download, FileAudio, FileText, FolderPlus, Headphones, History, Play, RefreshCw, Upload } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
+import { notifyCaseDocumentsChanged } from "@/lib/causas/document-events";
 import type { CaseAudioDetail, CaseAudioView } from "@/lib/audio/types";
 import { TranscriptionSettings } from "./TranscriptionSettings";
 import "./audio.css";
@@ -12,6 +14,7 @@ function clock(ms: number) { const seconds = Math.floor(ms / 1000); return `${Ma
 async function json<T>(url: string, signal?: AbortSignal): Promise<T> { const response = await fetch(url, { cache: "no-store", signal }); const data = await response.json(); if (!response.ok) throw new Error(data.error || "No se pudieron abrir las grabaciones"); return data; }
 
 export function CaseAudioManager({ causaId }: { causaId: string }) {
+  const router = useRouter();
   const id = useId(), fileRef = useRef<HTMLInputElement>(null), player = useRef<HTMLAudioElement>(null), importRef = useRef<HTMLInputElement>(null), requestId = useRef<string | null>(null);
   const [listingData, setListing] = useState<Listing | null>(null), [selected, setSelected] = useState(""), [detailData, setDetail] = useState<CaseAudioDetail | null>(null), [text, setText] = useState(""), [reviewed, setReviewed] = useState(false), [busy, setBusy] = useState(""), [error, setError] = useState(""), [notice, setNotice] = useState(""), [loadedListKey, setLoadedListKey] = useState(""), [title, setTitle] = useState(""), [file, setFile] = useState<File | null>(null), [refresh, setRefresh] = useState(0), [loadedDetailKey, setLoadedDetailKey] = useState("");
   const base = `/api/causas/${encodeURIComponent(causaId)}/audios`, listKey = `${base}:${refresh}`, detailKey = `${base}/${selected}:${refresh}`, listing = loadedListKey === listKey ? listingData : null, detail = loadedDetailKey === detailKey ? detailData : null, loading = loadedListKey !== listKey, audio = detail?.audio, dirty = Boolean(audio && (text !== audio.transcriptText || reviewed !== (audio.reviewStatus === "reviewed")));
@@ -24,12 +27,14 @@ export function CaseAudioManager({ causaId }: { causaId: string }) {
     if (!requestId.current) requestId.current = crypto.randomUUID(); const form = new FormData(); form.set("file", file); form.set("requestId", requestId.current); form.set("title", title.trim() || file.name.replace(/\.[^.]+$/, "")); setBusy("upload");
     const result = await apiMutation<{ audio: CaseAudioView }>(base, { method: "POST", body: form }); setBusy(""); if (!result.ok) { setError(result.error); return; }
     setSelected(result.data.audio.id); setFile(null); setTitle(""); requestId.current = null; if (fileRef.current) fileRef.current.value = ""; setNotice("Original guardado en Audiencias / Grabaciones. Puedes transcribirlo o incorporar un texto manual."); reload();
+    notifyCaseDocumentsChanged(causaId); router.refresh();
   }
   async function mutate(action: "save" | "transcribe" | "publish") {
     if (!audio || busy) return; setBusy(action); setError(""); setNotice("");
     const result = await apiMutation(`${base}/${audio.id}${action === "save" ? "" : `/${action}`}`, { method: action === "save" ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action === "save" ? { revision: audio.revision, transcriptText: text, reviewed } : { revision: audio.revision }) });
     setBusy(""); if (!result.ok) { setError(result.error); if (action === "transcribe") reload(); return; }
     setNotice(action === "save" ? reviewed ? "Revisión humana registrada. Se conserva una versión en el historial." : "Texto guardado; pendiente de corroboración con el audio." : action === "transcribe" ? "Transcripción recibida. Escucha el audio para revisar sus palabras antes de usarla." : "Nueva copia guardada en Audiencias / Transcripciones. Las versiones anteriores se conservan."); reload();
+    if (action === "publish") { notifyCaseDocumentsChanged(causaId); router.refresh(); }
   }
   async function importText(file: File | undefined) {
     if (!file) return; setError(""); if (!/\.txt$/i.test(file.name) || file.size > 200 * 1024) { setError("Importa un TXT UTF-8 de hasta 200 KiB."); return; }

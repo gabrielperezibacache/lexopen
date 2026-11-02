@@ -1,0 +1,118 @@
+[WebServer] (node:8621) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:8798) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:8821) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:8822) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:8860) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:8869) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:8873) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:8874) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:8878) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9052) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9054) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9073) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9074) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9076) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9077) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9081) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9243) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9244) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9245) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9247) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9248) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9249) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9260) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:9266) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 [chromium] › e2e/integrated-legal-workspace.spec.ts:70:5 › flujo conjunto: sentencia compartida, audio y transcripción citada en la misma audiencia, con revocación (12.5s)
+
+
+  1) [chromium] › e2e/integrated-legal-workspace.spec.ts:70:5 › flujo conjunto: sentencia compartida, audio y transcripción citada en la misma audiencia, con revocación
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByRole('region', { name: 'Acompañante de audiencia' }).locator('.hearing-fragment')
+    Timeout: 5000ms
+    - Expected substring  - 1
+    + Received string     + 5
+
+    - 250000
+    + Página 2 Anotar ConversarPAGINA DOS - DOCUMENTO ESCANEADO
+    +
+    + HECHO FICTICIO: PAGO EL 12 DE MAYO DE 2025.
+    +
+    + IMPORTE CONFIRMADO: 25000 PESOS. Corroborar y copiar cita
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for getByRole('region', { name: 'Acompañante de audiencia' }).locator('.hearing-fragment')
+        14 × locator resolved to <article class="hearing-fragment">…</article>
+           - unexpected value "Página 2 Anotar ConversarPAGINA DOS - DOCUMENTO ESCANEADO
+
+    HECHO FICTICIO: PAGO EL 12 DE MAYO DE 2025.
+
+    IMPORTE CONFIRMADO: 25000 PESOS. Corroborar y copiar cita"
+
+
+      129 |     await workbench.getByLabel("Página física del PDF", { exact: true }).selectOption("2");
+      130 |     await expect(workbench.locator(".hearing-fragment")).toHaveCount(1);
+    > 131 |     await expect(workbench.locator(".hearing-fragment")).toContainText("250000");
+          |                                                          ^
+      132 |     await workbench.getByRole("button", { name: "Guardar punto", exact: true }).click();
+      133 |     await expect(workbench.getByText("Organizador de lectura guardado.", { exact: true })).toBeVisible();
+      134 |     await workbench.locator(".hearing-fragment").getByRole("button", { name: "Conversar", exact: true }).click();
+        at <workspace>/e2e/integrated-legal-workspace.spec.ts:131:58
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/integrated-legal-workspace-f9126-ma-audiencia-con-revocación-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/integrated-legal-workspace-f9126-ma-audiencia-con-revocación-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/integrated-legal-workspace-f9126-ma-audiencia-con-revocación-chromium/test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/integrated-legal-workspace-f9126-ma-audiencia-con-revocación-chromium/error-context.md
+
+    Error Context: test-results/integrated-legal-workspace-f9126-ma-audiencia-con-revocación-chromium/error-context.md
+
+    attachment #6: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/integrated-legal-workspace-f9126-ma-audiencia-con-revocación-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/integrated-legal-workspace-f9126-ma-audiencia-con-revocación-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › e2e/integrated-legal-workspace.spec.ts:70:5 › flujo conjunto: sentencia compartida, audio y transcripción citada en la misma audiencia, con revocación

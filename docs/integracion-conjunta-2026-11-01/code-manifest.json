@@ -1,0 +1,12 @@
+{
+  "baseMain": "f4ca7b602d8514055f67a59dfa07b98a365d2905",
+  "files": {
+    "e2e/integrated-legal-workspace.spec.ts": "28d9836d0599d966a7ad2b09cda0df8989d1f7146cfece582b0f54ba1d6af1be",
+    "package.json": "0b62fe30858697a86f9a5f21c81c26e295ee0f274f63e0ddf66837e3ac74f51c",
+    "scripts/production-courtroom-smoke.ts": "f6674fb20580993923df28b0c6e1d32eca6ab26b3be65937e0869ca44a79a8fe",
+    "src/components/audio/CaseAudioManager.tsx": "af13b60f394c793d97bc8eda66ff5d1a183c2a0459feee7c1f5f84f2faf8550f",
+    "src/components/hearings/HearingWorkbench.tsx": "618a78c39a0bc308e699559d4fbfecda1ab3d73e3071e30d9920388b6b5e5020",
+    "src/lib/causas/document-events.test.ts": "f1d9126c058580c2aeee45be8c06986f7738638d04ba1ed2a5bfbd914d69f0e6",
+    "src/lib/causas/document-events.ts": "102fde6d203d875b55b25073fccc519d4a58c3173d8e6bf3203e65db34678d89"
+  }
+}
