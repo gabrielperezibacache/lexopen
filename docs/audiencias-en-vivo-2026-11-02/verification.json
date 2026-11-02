@@ -1,0 +1,41 @@
+{
+  "date": "2026-11-02",
+  "base": "49f3dab8e70829ac37b9e6bf33791b51fd34097e",
+  "branch": "codex/hearing-live-session",
+  "fixtures": "Usuarios, causas, colecciones, libros y registros ficticios. PostgreSQL desechable en puerto 55439.",
+  "checks": {
+    "unit": "passed",
+    "integration": "passed",
+    "productionBuild": "passed",
+    "lint": "passed",
+    "types": "passed",
+    "schemaDrift": "none",
+    "browser": {
+      "total": 50,
+      "passedFullRun": 49,
+      "passedDirectedRerun": 1,
+      "originalFailure": "Selector del escenario de recuperación: role alert frente a role status. Corregido y verificado.",
+      "targetedFile": "e2e/hearing-live.spec.ts"
+    },
+    "functionalReview": "3 hallazgos resueltos; clear",
+    "visualReview": "2 hallazgos resueltos; clear"
+  },
+  "productionHostDeployed": false,
+  "files": {
+    "browser-original.log": "0a84268e5d2fe37fda6377a4d5be7cf00d05f5df0d44d9b2a373f74739854bd0",
+    "browser-recovery.log": "c331f46802717a05db39331c8a77fc8ffded2b1deecf2fdc5d91c37ae0eeebfb",
+    "build.log": "9a19c9c81d21e9f48498e1032357ff4a46293f4759aac04070e96607e454285a",
+    "integration.log": "15f9cafeaf1466f70b21b43a5e080ba12728d8cbbce0e7e18489ae385be3cd7e",
+    "lint.log": "db58e698a71f6923f5d66425538f7b1ea17c7e16f3ce1c85858f0ab5911afc98",
+    "live-dark.png": "216927354e107e861c3a0ffd069c1ea52c393bf80153f42c5494e5eb5c8e5bc4",
+    "live-desktop.png": "ad9db41bcdd687e99b28095aaa85e820b0545c48003f1a71c96872cf61751582",
+    "live-log-desktop.png": "583e6bb750601513aedc4bf238bf2cedae5f878071e4b2d95712fc3d163af341",
+    "live-log-mobile.png": "89502a50e29be35c53e842fc84f052b24f3ae9819a6fc3678dd5940647558f5e",
+    "live-mobile.png": "30377babd86854bfdbc6f9e1ac14283e9bbd6e6914976c2c641238176394a883",
+    "live-quick-desktop.png": "f83f5a93befb620a29f19d2d9f08b4df0e2182bdfab9568877ac79f9ba610856",
+    "live-quick-mobile.png": "3a420bc2899fa34199ac8029b72545380820f9f18ecc54c53f0190be2b522bca",
+    "schema.log": "198913094e3f41610eb893459ab65a3c79991b65d4ef5fcb8c325ebe52ebf1ed",
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unit.log": "9bc5c708b57355e35f8dad5218ab13ba65e266a3b943ea87e98852aab5e2d4f0"
+  }
+}

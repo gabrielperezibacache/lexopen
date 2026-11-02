@@ -11,6 +11,7 @@ import { hearingBriefSchema, hearingCreateSchema, hearingPatchSchema, hearingSou
 import { renderHearingBrief } from "./brief";
 import type { HearingCitationStored, HearingLibraryView, HearingNoteView, HearingWorkspaceSummary, HearingWorkspaceView } from "./types";
 import { checkedTurn, listCheckedTurns } from "./chat";
+import { hearingElapsedSeconds } from "./live-time";
 export const HEARING_LIMITS = { workspaces: 100, sources: 200, notes: 100, turns: 40 } as const;
 export const summary = (row: { id: string; title: string; scheduledFor: Date | null; status: string; revision: number; updatedAt: Date }): HearingWorkspaceSummary => ({ id: row.id, title: row.title, scheduledFor: row.scheduledFor?.toISOString() || null, status: row.status as HearingWorkspaceSummary["status"], revision: row.revision, updatedAt: row.updatedAt.toISOString() });
 export async function listHearings(causaId: string, user: CausaAccessUser, client: PrismaClient = prisma): Promise<HearingLibraryView> {
@@ -36,6 +37,15 @@ export async function updateHearing(causaId: string, workspaceId: string, raw: u
     if (row.revision !== input.revision) throw changed();
     const result = await tx.hearingWorkspace.updateMany({ where: { id: row.id, revision: input.revision, ownerId: actor.id }, data: { title: input.title, scheduledFor: input.scheduledFor ? new Date(input.scheduledFor) : null, status: input.status, agendaText: input.agendaText, revision: { increment: 1 } } });
     if (result.count !== 1) throw changed();
+    if (input.status !== "live") {
+      const live = await tx.hearingLiveState.findUnique({ where: { workspaceId } });
+      const phase = input.status === "closed" ? "finished" : "paused";
+      if (live && live.phase !== "idle" && (live.phase === "running" || input.status === "closed" && live.phase !== "finished")) {
+        const now = new Date();
+        await tx.hearingLiveState.update({ where: { workspaceId }, data: { phase, elapsedSeconds: hearingElapsedSeconds(live, now), runningSince: null, endedAt: phase === "finished" ? now : null, revision: { increment: 1 } } });
+        await writeAuditStrict({ actorId: actor.id, action: "hearing.live.status_sync", entityType: "HearingWorkspace", entityId: workspaceId, after: { revision: live.revision + 1, phase } }, tx);
+      }
+    }
     await writeAuditStrict({ actorId: actor.id, action: "hearing.workspace.update", entityType: "HearingWorkspace", entityId: row.id, before: { revision: row.revision }, after: { revision: row.revision + 1, status: input.status } }, tx);
     return summary(await tx.hearingWorkspace.findUniqueOrThrow({ where: { id: row.id } }));
   });

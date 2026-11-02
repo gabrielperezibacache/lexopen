@@ -248,7 +248,7 @@ Prioridades por apartado: **P0** habilita el recorrido prioritario o evita pérd
 
 ## 12. Audiencias y acompañante de lectura
 
-**Ruta:** `/causas/[id]/audiencias`. **Base:** mesas con agenda, dossier de documentos/libros/archivos, lector, notas citadas, conversación con IA o extractiva, cotejo y exportación en `src/lib/hearings/*`. La integración anterior ensayó una resolución y una transcripción en la misma mesa con revocación posterior.
+**Ruta:** `/causas/[id]/audiencias`. **Base:** mesas con agenda, dossier de documentos/libros/archivos, lector, notas citadas, conversación con IA o extractiva, cotejo y exportación en `src/lib/hearings/*`. El panel **En vivo** añade control de sesión persistente, guion guardado, puntos tratados ligados a la revisión de la nota y registros rápidos reutilizables en escritos. Su entrega y límites están en [Audiencias en vivo](ENTREGA-AUDIENCIAS-EN-VIVO-2026-11-02.md). La integración anterior ensayó una resolución y una transcripción en la misma mesa con revocación posterior.
 
 **P0 · pasos:**
 
