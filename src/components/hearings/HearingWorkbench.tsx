@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Bookmark, BookOpen, Check, ChevronLeft, ChevronRight, Copy, Download, FileText, ListChecks, MessageSquare, Plus, Search, Trash2, X } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
 import { newUiId } from "@/lib/ui-id";
+import { subscribeCaseDocumentsChanged } from "@/lib/causas/document-events";
 import type { HearingCitation, HearingLibraryView, HearingLocation, HearingNoteView, HearingReading, HearingSourceView, HearingWorkspaceView } from "@/lib/hearings/types";
 import type { HearingQuote } from "@/lib/hearings/citations";
 import "./hearings.css";
@@ -12,7 +13,7 @@ type AvailableNote = Extract<HearingNoteView, { available: true }>;
 type Panel = "sources" | "reading" | "notes" | "chat" | "agenda";
 const stateLabel = { pending: "Pendiente", reading: "En lectura", reviewed: "Revisada" };
 const statusLabel = { preparation: "Preparación", live: "En audiencia", closed: "Cerrada" };
-async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> { const res = await fetch(url, { cache: "no-store", signal }); const body = await res.json(); if (!res.ok) throw new Error(body.error || "No se pudo abrir la mesa. Vuelva a cargarla"); return body; }
+async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> { const res = await fetch(url, { cache: "no-store", signal }); const body = await res.json(); if (!res.ok) throw Object.assign(new Error(body.error || "No se pudo abrir la mesa. Vuelva a cargarla"), { status: res.status }); return body; }
 function PageImage({ url, title, page }: { url: string; title: string; page: number }) {
   const [retry, setRetry] = useState(0), key = `${url}:${retry}`, [response, setResponse] = useState<{ key: string; url?: string; error?: string }>();
   useEffect(() => { const control = new AbortController(); let objectUrl: string | undefined;
@@ -25,7 +26,7 @@ function PageImage({ url, title, page }: { url: string; title: string; page: num
 function Citation({ citation }: { citation: HearingCitation }) { return <div className="hearing-citation"><a href={citation.href} target="_blank" rel="noreferrer">{citation.reference} · {citation.locator}</a><blockquote>{citation.quote}</blockquote>{citation.warning && <p>{citation.warning}</p>}</div>; }
 export function HearingWorkbench({ causaId }: { causaId: string }) {
   const base = `/api/causas/${causaId}/hearings`;
-  const [listState, setListState] = useState<{ data?: HearingLibraryView; error?: string }>(), [selectedWorkspace, selectWorkspace] = useState(""), [refresh, setRefresh] = useState(0);
+  const [listState, setListState] = useState<{ data?: HearingLibraryView; error?: string }>(), [selectedWorkspace, selectWorkspace] = useState(""), [refresh, setRefresh] = useState(0), [catalogRefresh, setCatalogRefresh] = useState(0);
   const [workspaceState, setWorkspaceState] = useState<{ key: string; data?: HearingWorkspaceView; error?: string }>(), [selectedSource, selectSource] = useState(""), [readQuery, setReadQuery] = useState<HearingLocation>({});
   const [readingState, setReadingState] = useState<{ key: string; data?: HearingReading; error?: string }>(), [panel, setPanel] = useState<Panel>("reading");
   const [newTitle, setNewTitle] = useState(""), [sourceQuery, setSourceQuery] = useState(""), [sourceKind, setSourceKind] = useState("all"), [optionValue, setOptionValue] = useState("");
@@ -37,7 +38,9 @@ export function HearingWorkbench({ causaId }: { causaId: string }) {
   const canWrite = Boolean(workspace?.canWrite), availableNotes = workspace?.notes.filter((n): n is AvailableNote => n.available) || [];
   const activePassages = passages.filter(p => workspace?.sources.some(s => s.id === p.sourceId && s.available));
   const noteDraftAvailable = !noteQuote || Boolean(workspace?.sources.some(s => s.id === noteQuote.sourceId && s.available) && (!editingNote || availableNotes.some(n => n.id === editingNote.id)));
-  useEffect(() => { const control = new AbortController(); getJson<HearingLibraryView>(base, control.signal).then(data => { if (!control.signal.aborted) { setListState({ data }); selectWorkspace(id => id && data.workspaces.some(w => w.id === id) ? id : data.workspaces[0]?.id || ""); } }).catch(e => { if (!control.signal.aborted) setListState({ error: e.message }); }); return () => control.abort(); }, [base, refresh]);
+  // A newly published document updates the catalogue without invalidating this desk's drafts or reading state.
+  useEffect(() => subscribeCaseDocumentsChanged(causaId, () => setCatalogRefresh(value => value + 1)), [causaId]);
+  useEffect(() => { const control = new AbortController(); getJson<HearingLibraryView>(base, control.signal).then(data => { if (!control.signal.aborted) { setListState({ data }); selectWorkspace(id => id && data.workspaces.some(w => w.id === id) ? id : data.workspaces[0]?.id || ""); } }).catch(e => { if (!control.signal.aborted) { if ([401,403,404].includes(e.status)) { setListState({ error: e.message }); setWorkspaceState(undefined); setReadingState(undefined); } else setListState(previous => ({ ...previous, error: e.message })); } }); return () => control.abort(); }, [base, refresh, catalogRefresh]);
   useEffect(() => { if (!selectedWorkspace) return; const control = new AbortController(); getJson<HearingWorkspaceView>(`${base}/${selectedWorkspace}`, control.signal).then(data => { if (!control.signal.aborted) { setWorkspaceState({ key: workspaceKey, data }); selectSource(id => id && data.sources.some(s => s.id === id && s.available) ? id : data.sources.find(s => s.available)?.id || ""); } }).catch(e => { if (!control.signal.aborted) setWorkspaceState({ key: workspaceKey, error: e.message }); }); return () => control.abort(); }, [base, selectedWorkspace, workspaceKey]);
   useEffect(() => { if (!selectedSource || !workspace) return; const control = new AbortController(), query = new URLSearchParams(); Object.entries(readQuery).forEach(([key,value]) => query.set(key, String(value))); getJson<HearingReading>(`${base}/${selectedWorkspace}/sources/${selectedSource}/read?${query}`, control.signal).then(data => { if (!control.signal.aborted) setReadingState({ key: readingKey, data }); }).catch(e => { if (!control.signal.aborted) setReadingState({ key: readingKey, error: e.message }); }); return () => control.abort(); }, [base, selectedWorkspace, selectedSource, readingKey, workspace, readQuery]);
   useEffect(() => { if (manualCopy) { copyRef.current?.focus(); copyRef.current?.select(); } }, [manualCopy]);

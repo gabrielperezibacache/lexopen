@@ -36,6 +36,6 @@ Las migraciones **39 y 40** son aditivas. Añaden fichas judiciales, mesas, fuen
 - Hasta 100 mesas por profesional y causa; 200 fuentes, 100 notas y 400 consultas por mesa. La lectura de historial muestra las 40 consultas más recientes y advierte el límite.
 - La investigación jurídica, el lector PDF/OCR y el RAG de biblioteca reutilizan la infraestructura propia de LexOpen. La calidad de reconocimiento, de interpretación jurídica y del modelo elegido requiere evaluación con material autorizado.
 - Las pruebas usan exclusivamente bases y archivos ficticios, audio sintético y proveedores locales de prueba. No acreditan precisión de reconocimiento de voz real ni disponibilidad de un proveedor comercial.
-- No se migró el Host del estudio ni se desplegó esta versión en producción. La propuesta se apila sobre el PR #211 y requiere integrar previamente la cadena #207–#211.
+- No se migró el Host del estudio ni se desplegó esta versión en producción. La cadena #207–#212 está fusionada en `main` y verificada hasta `f4ca7b602d8514055f67a59dfa07b98a365d2905`. La comprobación conjunta y la corrección de actualización de fuentes se describen en [Integración conjunta](INTEGRACION-CONJUNTA-2026-11-01.md).
 
 La evidencia reproducible está en [VALIDACION.md](audiencias-biblioteca-audios-2026-11-01/VALIDACION.md).

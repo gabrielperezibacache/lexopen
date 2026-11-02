@@ -1,0 +1,21 @@
+{
+  "files": {
+    "capturas/integrated-legal-workspace-desktop.png": "a5797db55bd767e1f8f5733e2165cc54a3b73acac50859dae40399e6fcbea278",
+    "capturas/integrated-legal-workspace-mobile.png": "9aa7d307b5cfc99f688a60a8ffbfc457bdb0d4ad7dc49da90be1c92f047a46e1",
+    "code-manifest.json": "fda447babd6cbac0a2ce5673daa7987b0fd926c40ca84acf42576a8c40d17a02",
+    "integration-ledger.json": "fa5ff1c19fdf926d83c7d8fc80b65dab18974a9c20395612c204aa785465cbe6",
+    "logs/browser-confirmation.log": "0cb44ce54dbd5688df605de7d056b40ee46b27d1404126a9c9a68551444c2d10",
+    "logs/browser-final.log": "45f8b641902e52e00449a54031ca6187649f3aab2b643297b7c277cadba390bd",
+    "logs/browser.log": "1dbf84e8d8d363319d88032869e71221032e19166fc7d5e8a849732babc2603a",
+    "logs/build.log": "1d1ae8e20f0ca0c4d742179195ea9081b8081fa847eeb82a0dd83be43dfdc12f",
+    "logs/drift.log": "728442980e143e18c2aa9bd7d747a8ea8d85f510529e7540f90f35ea9dd1b268",
+    "logs/events.log": "48c4affd88f822c947832d6fadf537df164cb7775886a314eba4d646f6b4960c",
+    "logs/lint-final.log": "dbd928d643fd9a62d3f7b403093eb025bf1d22a9f30e9b3793a4087d2ebc7b10",
+    "logs/migrations.log": "c663031dcf9d4e81fbdb377e2e9a8d8588221a511b7e17cf8449cad1c39128bf",
+    "logs/preferences-final.log": "b6d53852ad5d7435ea014703381928929faea388b3fd9a814d27c72a46eb136a",
+    "logs/production.log": "cb707b3138227c04606dbb5c253068e162b25d059d271283fefed7013ccda9bd",
+    "logs/regressions-first.log": "87eb27e58b661b61d034f140704f79e2d7b76aec1726b6e20319b86c32ba4dae",
+    "logs/types-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "main-baseline-ci.json": "ca5e27fa2adbd30047beae30bc9f30955cbb70e4d181be2d6feab8e3b3047908"
+  }
+}
