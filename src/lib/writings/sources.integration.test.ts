@@ -1,0 +1,123 @@
+/** Fictitious sources only: real PostgreSQL and local storage, no provider or model. */
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { PrismaClient } from "@prisma/client";
+import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
+import { putObject } from "@/lib/storage";
+import { captureDocumentEvidence } from "@/lib/evidence/service";
+import { createCaseFact, updateCaseFact } from "@/lib/knowledge/cases";
+import { createHearing, createHearingNote, updateHearingNote, attachHearingSource } from "@/lib/hearings/service";
+import { importBook, createBookCollection, updateBookCollection, readBook, updateBook } from "@/lib/books/service";
+import { bookMetadataSchema } from "@/lib/books/ingest";
+import { captureWritingSource, verifyWritingSource, writingSourceCatalog } from "./sources";
+import type { WritingSourceInput } from "./source-types";
+
+const status = (value: number) => (error: unknown) => (error as { status?: number }).status === value;
+async function main() {
+  const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
+  assert.equal(url, new URL(process.env.DATABASE_URL!).toString());
+  if ([process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw Error("Requires local fixture storage");
+  const db = new PrismaClient({ datasources: { db: { url } } }), tag = randomUUID(), ids: string[] = [], cases: string[] = [], docs: string[] = [];
+  const storage = await mkdtemp(path.join(tmpdir(), "lexopen-writing-sources-")), previousStorage = process.env.STORAGE_PATH, originalFetch = globalThis.fetch;
+  process.env.STORAGE_PATH = storage;
+  let calls = 0;
+  globalThis.fetch = (async () => { calls++; throw Error("No network permitted in writing sources fixture"); }) as typeof fetch;
+  try {
+    const owner = await db.user.create({ data: { name: "Autora ficticia", email: `writing-source-owner-${tag}@example.invalid`, role: "abogado", password: "unused" } }); ids.push(owner.id);
+    const colleague = await db.user.create({ data: { name: "Colega ficticio", email: `writing-source-peer-${tag}@example.invalid`, role: "abogado", password: "unused" } }); ids.push(colleague.id);
+    const excluded = await db.user.create({ data: { name: "Sin acceso", email: `writing-source-other-${tag}@example.invalid`, role: "abogado", password: "unused" } }); ids.push(excluded.id);
+    const causa = await db.causa.create({ data: { titulo: "Causa de prueba de escritos", tribunal: "Tribunal ficticio", materia: "civil", acceso: "equipo", abogadoId: owner.id } }); cases.push(causa.id);
+    const otherCase = await db.causa.create({ data: { titulo: "Otro expediente ficticio", tribunal: "Tribunal ficticio", materia: "civil", acceso: "equipo", abogadoId: owner.id } }); cases.push(otherCase.id);
+    await db.causaMiembro.create({ data: { causaId: causa.id, userId: colleague.id, rol: "colaborador" } });
+
+    const text = "El pago del arriendo fue CLP25.000 el 03/04/2025. La fecha conserva una expresión ambigua.", key = `writing-source-${tag}/antecedente.txt`;
+    await putObject({ key, body: text, contentType: "text/plain" });
+    const document = await db.documento.create({ data: { causaId: causa.id, autorId: owner.id, nombre: "Antecedente ficticio.txt", mimeType: "text/plain", storageKey: key, contenido: text, extractedMarkdown: text, extractionStatus: "completed" } }); docs.push(document.id);
+    const version = await captureDocumentEvidence(document.id, owner, db), fragment = await db.documentEvidenceFragment.findFirstOrThrow({ where: { versionId: version.id }, orderBy: { ordinal: "asc" } });
+    const fact = (await createCaseFact(causa.id, owner, { statement: "El pago registrado fue CLP25.000.", dateLiteral: "03/04/2025", citations: [{ kind: "document", fragmentId: fragment.id, quote: text }] }, db)).fact;
+    const factInput: WritingSourceInput = { kind: "fact", factId: fact.id, revision: fact.revision }, capturedFact = await captureWritingSource(causa.id, factInput, owner, db);
+    assert.equal(capturedFact.text, fact.statement); assert.equal(capturedFact.citations[0].quote, text); assert.match(capturedFact.warnings.join(" "), /ambigua/); assert.match(capturedFact.warnings.join(" "), /propuesto/);
+    await assert.rejects(captureWritingSource(otherCase.id, factInput, owner, db), status(404));
+    await assert.rejects(captureWritingSource(causa.id, factInput, excluded, db), status(404));
+    const reviewed = await updateCaseFact(causa.id, fact.id, owner, { revision: fact.revision, statement: "El pago requiere una nueva valoración profesional.", status: "accepted", reason: "Revisión ficticia del contenido" }, db);
+    const historicalFact = await verifyWritingSource(causa.id, capturedFact, owner, db);
+    assert.equal(historicalFact.text, fact.statement); assert.match(historicalFact.warnings.join(" "), /cambió desde su incorporación/);
+    await assert.rejects(captureWritingSource(causa.id, factInput, owner, db), status(409));
+    const hidden = await updateCaseFact(causa.id, fact.id, owner, { revision: reviewed.revision, status: "hidden", reason: "Retirada ficticia del hecho" }, db);
+    await assert.rejects(verifyWritingSource(causa.id, capturedFact, owner, db), status(404));
+    const hiddenQuery = await writingSourceCatalog(causa.id, owner, { kind: "fact", q: reviewed.statement }, db);
+    const absentQuery = await writingSourceCatalog(causa.id, owner, { kind: "fact", q: "UNICORNIO-INEXISTENTE" }, db);
+    assert.deepEqual(hiddenQuery, absentQuery, "Hidden text must not influence search flags, cursors or result metadata");
+    await updateCaseFact(causa.id, fact.id, owner, { revision: hidden.revision, status: "accepted", reason: "Restituir hecho para otros ensayos" }, db);
+
+    const desk = await createHearing(causa.id, { title: "Preparación ficticia de audiencia" }, owner, db);
+    const personal = await createHearingNote(causa.id, desk.id, { title: "Pregunta personal", body: "Preguntar por la fecha del comprobante.", citation: null }, owner, db);
+    const personalInput: WritingSourceInput = { kind: "note", workspaceId: desk.id, noteId: personal.id, revision: personal.revision }, capturedPersonal = await captureWritingSource(causa.id, personalInput, owner, db);
+    assert.equal(capturedPersonal.citations.length, 0); assert.match(capturedPersonal.warnings.join(" "), /Observación personal.*sin respaldo/); assert.ok(capturedPersonal.href.endsWith(`#note-${personal.id}`));
+    const revisedPersonal = await updateHearingNote(causa.id, desk.id, personal.id, { revision: personal.revision, title: "Pregunta personal corregida", body: "Nueva pregunta profesional.", citation: null }, owner, db);
+    const historicalNote = await verifyWritingSource(causa.id, capturedPersonal, owner, db); assert.equal(historicalNote.text, personal.body); assert.match(historicalNote.warnings.join(" "), /cambió desde su incorporación/);
+    await assert.rejects(captureWritingSource(causa.id, personalInput, owner, db), status(409));
+    const colleagueDesk = await createHearing(causa.id, { title: "Mesa privada de otro profesional" }, colleague, db);
+    const colleagueNote = await createHearingNote(causa.id, colleagueDesk.id, { title: "Nota ajena", body: "Contenido privado del colega.", citation: null }, colleague, db);
+    await assert.rejects(captureWritingSource(causa.id, { kind: "note", workspaceId: colleagueDesk.id, noteId: colleagueNote.id, revision: colleagueNote.revision }, owner, db), status(404));
+    assert.ok(!(await writingSourceCatalog(causa.id, owner, { kind: "note" }, db)).candidates.some(row => row.text.includes("Contenido privado")));
+    const source = await attachHearingSource(causa.id, desk.id, { kind: "document", refId: document.id }, owner, db);
+    const noted = await createHearingNote(causa.id, desk.id, { title: "Pasaje para audiencia", body: "Se debe contrastar el importe consignado.", citation: { sourceId: source.id, fragmentId: fragment.id, quote: text } }, owner, db);
+    const capturedNote = await captureWritingSource(causa.id, { kind: "note", workspaceId: desk.id, noteId: noted.id, revision: noted.revision }, owner, db);
+    assert.equal(capturedNote.citations[0].quote, text); assert.equal(capturedNote.citations[0].kind, "hearing");
+
+    const upload = { ...bookMetadataSchema.parse({ title: "Doctrina ficticia compartible" }), requestId: randomUUID(), name: "doctrina.txt", bytes: Buffer.from("La buena fe objetiva gobierna el contrato. La prueba del pago exige antecedentes comprobables.") };
+    const book = (await importBook(upload, colleague, db)).book, collection = (await createBookCollection({ name: "Fuentes de prueba" }, colleague, db)).collection;
+    const shared = (await updateBookCollection(collection.id, { revision: collection.revision, bookIds: [book.id], memberIds: [owner.id] }, colleague, db)).collection;
+    const bookView = await readBook(book.id, colleague, {}, db), bookInput: WritingSourceInput = { kind: "book", bookId: book.id, fragmentId: bookView.fragments[0].id, quote: "La buena fe objetiva gobierna el contrato." };
+    const capturedBook = await captureWritingSource(causa.id, bookInput, owner, db); assert.equal(capturedBook.citations[0].verificationBasis, "original"); assert.equal(capturedBook.citations[0].pageNumber, null);
+    const catalog = await writingSourceCatalog(causa.id, owner, { kind: "book", bookId: book.id, q: "buena fe" }, db);
+    assert.ok(catalog.candidates.length); assert.equal(catalog.books.find(row => row.id === book.id)?.owned, false); assert.equal(catalog.coverage.networkRequests, 0);
+    await updateBook(book.id, { revision: book.revision, title: "Datos descriptivos nuevos" }, colleague, db);
+    const historicalBook = await verifyWritingSource(causa.id, capturedBook, owner, db); assert.equal(historicalBook.title, capturedBook.title); assert.match(historicalBook.warnings.join(" "), /datos descriptivos.*cambiaron|cambió desde su incorporación/i);
+    const cached = new Map<string, unknown>(); await verifyWritingSource(causa.id, capturedBook, owner, db, cached);
+    const revoked = (await updateBookCollection(collection.id, { revision: shared.revision, memberIds: [] }, colleague, db)).collection;
+    await assert.rejects(verifyWritingSource(causa.id, capturedBook, owner, db, cached), status(404));
+    assert.ok(!(await writingSourceCatalog(causa.id, owner, { kind: "book" }, db)).books.some(row => row.id === book.id));
+    await updateBookCollection(collection.id, { revision: revoked.revision, memberIds: [owner.id] }, colleague, db);
+    const retained = (await importBook({ ...upload, title: "Sólo texto ficticio", requestId: randomUUID(), convertToText: true, preserveOriginal: false }, owner, db)).book;
+    const retainedView = await readBook(retained.id, owner, {}, db), retainedInput: WritingSourceInput = { kind: "book", bookId: retained.id, fragmentId: retainedView.fragments[0].id, quote: retainedView.fragments[0].text };
+    const retainedSource = await captureWritingSource(causa.id, retainedInput, owner, db); assert.equal(retainedSource.citations[0].verificationBasis, "retained_text"); assert.ok(retainedSource.citations[0].retainedSha256); assert.match(retainedSource.warnings.join(" "), /original no se conservó/);
+    const bookRow = await db.libraryBook.findUniqueOrThrow({ where: { id: retained.id } }); await putObject({ key: bookRow.storageKey, body: "Contenido de texto retenido alterado" });
+    await assert.rejects(verifyWritingSource(causa.id, retainedSource, owner, db), status(409));
+    await assert.rejects(verifyWritingSource(causa.id, { ...capturedFact, text: "Texto que no fue incorporado por el servidor" }, owner, db), status(409));
+    await assert.rejects(verifyWritingSource(causa.id, { ...capturedFact, citations: [null] } as unknown as typeof capturedFact, owner, db), status(409));
+
+    await db.documento.update({ where: { id: document.id }, data: { confidencial: true } }); await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "doc.confidential.read" } });
+    await assert.rejects(verifyWritingSource(causa.id, capturedFact, owner, db), status(404));
+    await assert.rejects(verifyWritingSource(causa.id, capturedNote, owner, db), status(404));
+    assert.ok(!(await writingSourceCatalog(causa.id, owner, { kind: "note" }, db)).candidates.some(row => row.text === noted.body));
+    const secret = await writingSourceCatalog(causa.id, owner, { kind: "fact", q: reviewed.statement }, db), absent = await writingSourceCatalog(causa.id, owner, { kind: "fact", q: "OTRO-INEXISTENTE" }, db); assert.deepEqual(secret, absent);
+    await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "" } }); await db.documento.update({ where: { id: document.id }, data: { confidencial: false } });
+    const frozen = await db.documentEvidenceVersion.findUniqueOrThrow({ where: { id: version.id }, select: { sourceStorageKey: true } });
+    await putObject({ key: frozen.sourceStorageKey!, body: "Original congelado alterado" });
+    await assert.rejects(verifyWritingSource(causa.id, capturedFact, owner, db), status(409)); await assert.rejects(verifyWritingSource(causa.id, capturedNote, owner, db), status(409));
+    await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "assistant.use" } }); await assert.rejects(verifyWritingSource(causa.id, capturedPersonal, owner, db), status(403));
+    assert.equal(revisedPersonal.revision, 2); assert.equal(calls, 0);
+    console.log("Writing source adapters PostgreSQL PASS: fact/note/book, prior text and changed-origin warning, plain observation, current scope/private workspace, hidden-search parity, shared library revocation, retained text, hashes/tamper and no network/model");
+  } finally {
+    globalThis.fetch = originalFetch;
+    await db.hearingNote.deleteMany({ where: { workspace: { causaId: { in: cases } } } });
+    await db.hearingChatTurn.deleteMany({ where: { workspace: { causaId: { in: cases } } } });
+    await db.hearingSource.deleteMany({ where: { workspace: { causaId: { in: cases } } } });
+    await db.hearingWorkspace.deleteMany({ where: { causaId: { in: cases } } });
+    await db.caseFact.deleteMany({ where: { causaId: { in: cases } } });
+    await db.documento.deleteMany({ where: { id: { in: docs } } });
+    await db.causa.deleteMany({ where: { id: { in: cases } } });
+    await db.bookShelfCollection.deleteMany({ where: { ownerId: { in: ids } } });
+    await db.libraryBook.deleteMany({ where: { ownerId: { in: ids } } });
+    await db.auditEvent.deleteMany({ where: { actorId: { in: ids } } });
+    await db.user.deleteMany({ where: { id: { in: ids } } });
+    await db.$disconnect(); await rm(storage, { recursive: true, force: true });
+    if (previousStorage === undefined) delete process.env.STORAGE_PATH; else process.env.STORAGE_PATH = previousStorage;
+  }
+}
+void main().catch(error => { console.error(error); process.exitCode = 1; });

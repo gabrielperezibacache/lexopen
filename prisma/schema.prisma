@@ -124,6 +124,7 @@ model User {
   bookShelfMemberships BookShelfMember[]
   bookPreference UserBookPreference?
   libraryWritingDrafts LibraryWritingDraft[]
+  caseWritingDrafts CaseWritingDraft[]
   hearingWorkspaces HearingWorkspace[] @relation("HearingWorkspaceOwner")
   uploadedCaseAudios CaseAudio[] @relation("CaseAudioUploader")
   reviewedCaseAudios CaseAudio[] @relation("CaseAudioReviewer")
@@ -368,6 +369,7 @@ model Causa {
   knowledgeCollections KnowledgeCollection[]
   hearingWorkspaces HearingWorkspace[]
   audioRecordings CaseAudio[]
+  writingDrafts CaseWritingDraft[]
 
 }
 
@@ -1924,6 +1926,50 @@ model LibraryWritingDraft {
 }
 
 // A professional's private preparation desk within an authorized case.
+model CaseWritingDraft {
+  id String @id @default(cuid())
+  causaId String
+  ownerId String
+  requestId String
+  createInputSha256 String
+  title String
+  body String @default("") @db.Text
+  referencesJson String @default("[]") @db.Text
+  nextReferenceNumber Int @default(1)
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  causa Causa @relation(fields:[causaId],references:[id],onDelete:Restrict)
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict)
+  revisions CaseWritingRevision[]
+  requests CaseWritingRequest[]
+  @@unique([ownerId,causaId,requestId])
+  @@index([ownerId,causaId,updatedAt])
+}
+model CaseWritingRevision {
+  id String @id @default(cuid())
+  draftId String
+  revision Int
+  title String
+  body String @db.Text
+  referencesJson String @db.Text
+  change String
+  restoredFrom Int?
+  createdAt DateTime @default(now())
+  draft CaseWritingDraft @relation(fields:[draftId],references:[id],onDelete:Cascade)
+  @@unique([draftId,revision])
+}
+model CaseWritingRequest {
+  id String @id @default(cuid())
+  draftId String
+  requestId String
+  inputSha256 String
+  resultingRevision Int
+  createdAt DateTime @default(now())
+  draft CaseWritingDraft @relation(fields:[draftId],references:[id],onDelete:Cascade)
+  @@unique([draftId,requestId])
+}
+
 model HearingWorkspace {
   id String @id @default(cuid())
   causaId String

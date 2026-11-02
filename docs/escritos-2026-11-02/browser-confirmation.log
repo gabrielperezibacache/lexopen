@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:92604) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/case-writing.spec.ts:71:5 › escrito por causa: guardado, tres orígenes, historial y salida con respaldos (7.5s)
+
+  1 passed (8.1s)

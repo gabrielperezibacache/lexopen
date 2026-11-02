@@ -1,0 +1,17 @@
+
+> lexopen@1.0.0 test:writings:integration
+> node --import tsx src/lib/writings/sources.integration.test.ts && node --import tsx src/lib/writings/service.integration.test.ts
+
+Writing source adapters PostgreSQL PASS: fact/note/book, prior text and changed-origin warning, plain observation, current scope/private workspace, hidden-search parity, shared library revocation, retained text, hashes/tamper and no network/model
+audit write failed Error: Synthetic writing audit failure
+    at <anonymous> (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/src/lib/writings/service.integration.test.ts:23:121)
+    at /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:130:9452
+    at Object.runInChildSpan (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at l (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:130:9421)
+    at /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:130:9933
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at /Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:130:9913
+    at Object.runInChildSpan (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:121:1509)
+    at Proxy._request (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:130:9836)
+    at s (/Users/gabrielsimonpi/Documents/ChatGPT/Lexopen/node_modules/@prisma/client/runtime/library.js:31:5636)
+Case writing PostgreSQL PASS: private owner/case/current ACL, concurrent idempotent create/save/CAS, no-op receipts and current-version replay, immutable full history/pagination, restore adds revision and keeps citation IDs monotonic, verified book footnotes and safe Markdown/unknown-marker rejection, source revocation/history denial/clean recovery, audit rollback and zero network/model.

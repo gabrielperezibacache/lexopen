@@ -62,6 +62,7 @@ export const PURGE_DATA_MODELS = [
   "pjudSyncJob",
   "agentChat",
   "evento",
+  "caseWritingDraft", // Revisions and request receipts cascade.
   "causa",
   "cliente",
   "jurisprudencia",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ArrowDown, ArrowUp, Download, X } from "lucide-react";
 import type { HearingBriefInput } from "@/lib/hearings/schemas";
 import type { HearingWorkspaceView } from "@/lib/hearings/types";
@@ -51,5 +52,6 @@ export function HearingBrief({ workspace, busy, download, openNotes }: {
     <label>Petición de cierre<textarea className="textarea" value={closing} onChange={event => setClosing(event.target.value)} maxLength={8000} rows={4} disabled={busy} placeholder="La petición concreta y los puntos que requieren decisión…" /><span>Revise su correspondencia con los antecedentes.</span></label>
     <button type="submit" className="btn btn-primary" disabled={busy || unavailable || !selected.length}><Download size={16} aria-hidden="true" />{busy ? "Corroborando respaldos…" : "Corroborar y descargar guion"}</button>
     <p className="hearing-muted">Se genera un archivo de texto con observaciones y citas numeradas, sin llamar a la IA. Apertura, cierre y orden permanecen en esta pantalla hasta cambiar de mesa o recargar; descargue el guion para conservarlos.</p>
+    <Link className="btn btn-ghost" href={`/causas/${workspace.causaId}/escritos?fuentes=note`}>Continuar en escritos de la causa</Link>
   </form>;
 }

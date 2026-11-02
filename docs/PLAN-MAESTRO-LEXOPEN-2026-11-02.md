@@ -72,7 +72,7 @@ Se implementa el primer corte de la iteración A. Su estado de pruebas e integra
 | Guion de intervención de audiencia | Notas seleccionadas y ordenadas, con apertura y petición redactadas por el profesional; exportación que revalida las referencias. No genera hechos ni llama a IA para completar el guion. |
 | Identidad editorial aplicada al recorrido | Índice, folio, margen y remisión dentro de los tokens actuales; controles legibles y movimiento reducido. No sustituye los seis ambientes aprobados de biblioteca. |
 
-La siguiente entrega debe unir esta preparación al borrador persistido de causa: elección de fuentes, versión esperada, revisión por bloques y referencias. Una descarga reutilizable es un avance útil; todavía no es un editor común con historial de decisiones.
+La segunda entrega une esta preparación al editor persistido de causa en `/causas/[id]/escritos`: guardado automático, versiones recuperables, hechos, notas privadas de audiencia y pasajes de biblioteca con comprobación de sus referencias. El alcance construido y su validación están en [la entrega del editor](ENTREGA-ESCRITOS-2026-11-02.md). Continúan pendientes la revisión de propuestas por bloques, las plantillas, DOCX y el complemento Word; la existencia del editor no da por terminados esos pasos.
 
 ## Orden de ejecución
 
@@ -278,7 +278,7 @@ Prioridades por apartado: **P0** habilita el recorrido prioritario o evita pérd
 
 ## 14. Escritos, minutas y revisión
 
-**Rutas:** `/minutas`, `/causas/[id]/minuta/nueva`, `/causas/[id]/minutas/[minutaId]`; mesa de escritura en biblioteca y utilidad de borrador en `/agente`. **Base:** minutas, acciones, plantillas, borradores con libros y utilidades AI. Son superficies distintas; no se debe presentar su coexistencia como un editor jurídico ya unificado.
+**Rutas:** `/causas/[id]/escritos`, `/minutas`, `/causas/[id]/minuta/nueva`, `/causas/[id]/minutas/[minutaId]`; mesa de escritura en biblioteca y utilidad de borrador en `/agente`. **Base:** editor privado de causa con guardado automático, historial recuperable y referencias comunes para hechos, notas de audiencia y biblioteca; minutas, acciones, plantillas, borradores con libros y utilidades AI. Las utilidades y minutas conservan sus funciones propias; la incorporación de propuestas de investigación y su revisión por bloques siguen pendientes.
 
 **P0 · pasos:**
 
@@ -380,13 +380,14 @@ Prioridades por apartado: **P0** habilita el recorrido prioritario o evita pérd
 
 ## Mapa completo de rutas de interfaz
 
-Inventario de **56 plantillas internas** inspeccionadas. `[id]`, `[fileId]`, `[sheetId]` y `[minutaId]` representan parámetros, no rutas literales navegables. Audios, hechos y varias herramientas son paneles dentro de estas rutas; no necesitan una página nueva para aparecer en el mapa.
+Inventario de **57 plantillas internas** tras añadir el editor de causa. `[id]`, `[fileId]`, `[sheetId]` y `[minutaId]` representan parámetros, no rutas literales navegables. Audios, hechos y varias herramientas son paneles dentro de estas rutas; no necesitan una página nueva para aparecer en el mapa.
 
 | Apartado | Plantillas presentes |
 | --- | --- |
 | Inicio y supervisión | `/inicio`, `/dashboard` |
 | Causas | `/causas`, `/causas/nueva`, `/causas/[id]`, `/causas/[id]/editar`, `/causas/monitoreo`, `/causas/mis-causas` |
 | Audiencia y minutas de causa | `/causas/[id]/audiencias`, `/causas/[id]/minuta/nueva`, `/causas/[id]/minutas/[minutaId]` |
+| Escritos de causa | `/causas/[id]/escritos` |
 | Clientes | `/clientes`, `/clientes/[id]` |
 | Agenda y tareas | `/calendario`, `/plazos`, `/tareas` |
 | Documentos | `/documentos`, `/documentos/[id]/fuentes` |
