@@ -75,8 +75,8 @@ test("preparación integrada: índice, hoja con citas, incertidumbre y permisos 
   await expect(preparation).toContainText("2 documentos · 2 con texto");
   await expect(preparation).toContainText("1 mesa privada de tu propiedad");
   await expect(preparation).toContainText("2 minutas accesibles · 2 acciones abiertas");
-  const draft = preparation.getByRole("link", { name: "Preparar un borrador con IA" });
-  await expect(draft).toHaveAttribute("href", `/agente?causaId=${causaId}&utility=draft`);
+  const draft = preparation.getByRole("link", { name: "Escribir con fuentes" });
+  await expect(draft).toHaveAttribute("href", `/causas/${causaId}/escritos`);
   const navigation = page.getByRole("navigation", { name: "Índice del expediente", exact: true });
   for (const [mode, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 360, height: 900 }]] as const) {
     await page.setViewportSize(viewport);

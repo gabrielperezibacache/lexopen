@@ -72,7 +72,7 @@ export function CasePreparation(props: Props) {
         <h2 id="case-preparation-title">Preparar la causa</h2>
         <p>Del expediente a la audiencia, con cada fuente a mano y los próximos pasos a la vista.</p>
         <p className="case-preparation-note">Estos estados describen el trabajo guardado. La revisión de una fuente y de su alcance jurídico se realiza al abrirla.</p>
-        {canUseKnowledge && <Link href={`/agente?causaId=${causaId}&utility=draft`} className="case-preparation-draft">Preparar un borrador con IA<ArrowUpRight size={16} aria-hidden="true" /></Link>}
+        {canUseKnowledge && <Link href={`/causas/${causaId}/escritos`} className="case-preparation-draft">Escribir con fuentes<ArrowUpRight size={16} aria-hidden="true" /></Link>}
       </div>
       <ol className="case-preparation-steps">
         {rows.map(row => <li key={row.title}>

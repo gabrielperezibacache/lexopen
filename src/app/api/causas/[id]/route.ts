@@ -167,7 +167,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return await prisma.$transaction(async (tx) => {
       const prev = await tx.causa.findFirst({
         where: { AND: [scopedcausaAccessWhere(user), { id }] },
-        select: { id: true, titulo: true, rit: true, site: { select: { id: true } }, _count: { select: { documentos: true, plazos: true, tramites: true, notas: true, minutas: true, feeArrangements: true, timeEntries: true, expenses: true, invoices: true, ledgerEntries: true, agentChats: true, movimientos: true, mailboxMessages: true, eventos: true, tasks: true, researchRuns: true, caseFacts: true, caseConflicts: true, caseAnalysisSources: true, knowledgeCollections: true, hearingWorkspaces: true, audioRecordings: true } } },
+        select: { id: true, titulo: true, rit: true, site: { select: { id: true } }, _count: { select: { documentos: true, plazos: true, tramites: true, notas: true, minutas: true, feeArrangements: true, timeEntries: true, expenses: true, invoices: true, ledgerEntries: true, agentChats: true, movimientos: true, mailboxMessages: true, eventos: true, tasks: true, researchRuns: true, caseFacts: true, caseConflicts: true, caseAnalysisSources: true, knowledgeCollections: true, hearingWorkspaces: true, audioRecordings: true, writingDrafts: true } } },
       });
       if (!prev) {
         return NextResponse.json({ error: "No encontrada" }, { status: 404 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ChevronDown, Download } from "lucide-react";
 import { FolioSymbol } from "@/components/ui/FolioSymbol";
 
@@ -32,6 +33,7 @@ export function CasePreparationExport({ causaId, filter, disabled }: { causaId: 
       <h3 className="display text-xl">Una hoja de trabajo, con su respaldo</h3>
       <p>Reúna los hechos activos de esta página, su cronología y los pasajes que los respaldan. Se respetan los filtros actuales y se vuelven a comprobar las fuentes al descargar.</p>
       <div className="flex flex-wrap gap-2">
+        <Link className="btn btn-primary" href={`/causas/${causaId}/escritos`}>Abrir editor de escritos</Link>
         <button type="button" className="btn btn-secondary" disabled={disabled || busy} onClick={() => download("markdown")}><Download size={16} aria-hidden="true" />Descargar hoja de preparación</button>
         <button type="button" className="btn btn-ghost" disabled={disabled || busy} onClick={() => download("csv")}>Descargar cronología CSV</button>
       </div>

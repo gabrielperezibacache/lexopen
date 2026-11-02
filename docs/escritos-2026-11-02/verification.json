@@ -1,0 +1,48 @@
+{
+  "date": "2026-11-02",
+  "base": "adeaaf8f2f61fcc320d3bb3f9957b1886336014d",
+  "fixtures": "isolated local and fictitious only",
+  "checks": {
+    "unit": "passed; demo purge delta separately passed",
+    "integration": "all existing components passed; initial new-service Markdown identity assertion corrected; final complete writing-domain checks passed",
+    "browser": "46 passed in full run; remaining flow passed after correcting semantic selector (7.5s); source-loss clean history recovery additionally passed (3.1s)",
+    "lint": "passed",
+    "typescript": "passed",
+    "build": "passed; four existing tracing warnings",
+    "schema": "no difference detected"
+  },
+  "visual_review": {
+    "initial": "fix",
+    "findings": [
+      {
+        "finding": "Mobile source/history access",
+        "result": "resolved"
+      },
+      {
+        "finding": "History discovery and preview",
+        "result": "resolved"
+      }
+    ],
+    "remaining": "clear",
+    "disposition": "ship"
+  },
+  "production_host_deployed": false,
+  "hashes": {
+    "browser-confirmation.log": "8ea4764410b3d3086af60f8fbdda7351f7f14e96df8f71973e74a5c94d236cad",
+    "browser.log": "3a2c9e60ea724a3ecdc1254ffc8da6d18c7a21708f9d8f78069adce5d389183f",
+    "build.log": "4e363e8ec398e790198161b4cccebeb7b424cd8d77bad0d8f4c29547ceff8362",
+    "clean-recovery.log": "2d24cc01029c700d05af7ddd078ece1362543e931297b8178c4681cfde487828",
+    "integration-initial.log": "40671b62e265d9d4dd77f8f1d3d00d1adc7b8a3734ba36561a0e0a22b80e27b4",
+    "lint.log": "db58e698a71f6923f5d66425538f7b1ea17c7e16f3ce1c85858f0ab5911afc98",
+    "schema.log": "198913094e3f41610eb893459ab65a3c79991b65d4ef5fcb8c325ebe52ebf1ed",
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "unit.log": "9bc5c708b57355e35f8dad5218ab13ba65e266a3b943ea87e98852aab5e2d4f0",
+    "writing-dark.png": "6aeb8751a7bc24b1154102e3a6ed36e77314afaecabdc67e35c82661f8a83c9e",
+    "writing-desktop.png": "bc75e3a46ab1a49e525560e38c6894e6a42481f135614030e3f4d0b9ae24e226",
+    "writing-domain.log": "2af257d456101fda3d1abca52c9db42e2e1b11ec92e10b5ba3e59f8c21316201",
+    "writing-mobile-editor.png": "9b212c907d9792b3a30484a2561e632e084c7fc75841ba59ba2eb66a83944b3f",
+    "writing-mobile-sources.png": "6241e3cec4972e1340846417adc01e994afcdc9d23325dc1cdcac7a2cadb9b6a",
+    "writing-mobile.png": "29c116e184373afb1d146f72b63bd6f38e6e5c69cf16a6782e9d7cdbf46ae0f9",
+    "writing-references-desktop.png": "a899f88f607a87067a78f91edb764738bf3b5603aa9fc13445595fbcd1c859f2"
+  }
+}

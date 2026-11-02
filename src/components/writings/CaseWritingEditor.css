@@ -1,0 +1,87 @@
+.writing-page { min-width: 0; }
+.writing-page-heading { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin-bottom: 2rem; }
+.writing-page-heading h1 { font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(2rem, 3vw, 3.35rem); line-height: 1.15; letter-spacing: -.025em; margin: .75rem 0; }
+.writing-page-heading p { color: var(--ink-soft); line-height: 1.75; overflow-wrap: anywhere; }
+.writing-back, .writing-text-link { color: var(--sea); min-height: 44px; display: inline-flex; align-items: center; gap: .5rem; text-underline-offset: .3rem; }
+.writing-back:hover, .writing-text-link:hover { text-decoration: underline; }
+.writing-overview { border-block: 1px solid var(--line-strong); padding-block: 1.25rem; margin-bottom: 1.5rem; display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(17rem, 1.2fr); gap: 1.5rem; align-items: end; }
+.writing-overview label, .writing-companion label { display: grid; gap: .5rem; font-size: 1rem; }
+.writing-overview select, .writing-overview input, .writing-companion input, .writing-companion select { min-height: 44px; width: 100%; min-width: 0; }
+.writing-create { display: flex; gap: .75rem; align-items: end; }
+.writing-create label { flex: 1; min-width: 0; }
+.writing-create button { flex-shrink: 0; }
+.writing-overview-note { grid-column: 1 / -1; margin: -.5rem 0 0; font-size: 1rem; color: var(--muted); line-height: 1.7; }
+.writing-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(19rem, 23rem); gap: 1.5rem; align-items: start; }
+.writing-mobile-tools { display: none; }
+.writing-session-message { grid-column: 1 / -1; margin-bottom: 0; }
+.writing-paper { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); padding: clamp(1.25rem, 3vw, 2.5rem); background: var(--surface-solid); }
+.writing-paper-meta { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 1rem; }
+.writing-paper-meta > span { display: inline-flex; align-items: center; gap: .5rem; }
+.writing-title-label { display: block; font-size: 1rem; color: var(--muted); margin-top: 1.5rem; }
+.writing-title { display: block; width: 100%; min-width: 0; margin-top: .5rem; padding-block: .5rem; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(1.6rem, 2.4vw, 2.3rem); line-height: 1.4; color: var(--ink); }
+.writing-body-label { display: block; font-size: 1rem; color: var(--muted); margin-top: 1.5rem; }
+.writing-body { display: block; width: 100%; min-width: 0; min-height: 34rem; resize: vertical; margin-top: .75rem; padding: .5rem 0; background: transparent; border: 0; color: var(--ink); font-family: var(--font-fraunces), Georgia, serif; font-size: 1.1rem; line-height: 1.9; overflow-wrap: anywhere; }
+.writing-body::placeholder { color: var(--muted); opacity: 1; }
+.writing-title:focus-visible, .writing-body:focus-visible { outline: 2px solid var(--sea); outline-offset: .35rem; }
+.writing-help { color: var(--muted); font-size: 1rem; line-height: 1.7; max-width: 72ch; margin-top: .75rem; }
+.writing-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
+.writing-actions-top { margin-top: 1rem; }
+.writing-actions button, .writing-actions a, .writing-companion button, .writing-overview button { min-height: 44px; }
+.writing-status { color: var(--sea); }
+.writing-status[data-state="error"], .writing-status[data-state="offline"], .writing-status[data-state="conflict"] { color: var(--danger); }
+.writing-message { padding: 1rem 0; margin-bottom: 1rem; border-block: 1px solid var(--line-strong); color: var(--ink-soft); font-size: 1rem; line-height: 1.75; }
+.writing-message[data-error="true"] { color: var(--danger); }
+.writing-empty { padding: 2rem 0; max-width: 68ch; font-size: 1rem; line-height: 1.8; }
+.writing-empty h2 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.6rem; margin-bottom: .75rem; }
+.writing-empty p + p { margin-top: .75rem; }
+.writing-companion { min-width: 0; padding-inline: .5rem; }
+.writing-companion-tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--line-strong); gap: .25rem 1rem; margin-bottom: 1.5rem; }
+.writing-companion-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; color: var(--ink-soft); padding: .5rem .1rem; border-bottom: 2px solid transparent; font-size: 1rem; }
+.writing-companion-tabs button[aria-selected="true"] { color: var(--sea); border-bottom-color: var(--sea); font-weight: 600; }
+.writing-companion h2, .writing-companion h3 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.25rem; line-height: 1.35; margin-bottom: .75rem; overflow-wrap: anywhere; }
+.writing-companion p { font-size: 1rem; line-height: 1.75; overflow-wrap: anywhere; }
+.writing-source-kinds { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1.25rem; }
+.writing-source-kinds button { padding: .5rem .75rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink-soft); font-size: 1rem; }
+.writing-source-kinds button[aria-selected="true"] { background: var(--sea-soft); color: var(--sea); border-color: var(--sea); }
+.writing-source-search { display: grid; gap: 1rem; margin-block: 1.25rem; }
+.writing-source-search button { justify-self: start; }
+.writing-candidates, .writing-reference-list, .writing-history-list { list-style: none; padding: 0; margin: 1.25rem 0 0; }
+.writing-candidates > li, .writing-reference-list > li, .writing-history-list > li { padding-block: 1.5rem; border-top: 1px solid var(--line); }
+.writing-candidates > li:first-child, .writing-reference-list > li:first-child { padding-top: 0; border-top: 0; }
+.writing-candidate-text, .writing-history-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-soft); }
+.writing-candidate-text { margin-block: .75rem; max-height: 20rem; overflow: auto; }
+.writing-review { display: inline-block; color: var(--sea); font-size: 1rem; margin-bottom: .5rem; }
+.writing-candidates .btn { margin-top: 1rem; }
+.writing-candidate-origin { margin-top: .5rem; }
+.writing-candidate-origin a, .writing-reference-list a { color: var(--sea); text-decoration: underline; text-underline-offset: .25rem; overflow-wrap: anywhere; }
+.writing-warnings { list-style: disc; padding-left: 1.25rem; margin-top: 1rem; color: var(--muted); font-size: 1rem; line-height: 1.75; }
+.writing-warnings li + li { margin-top: .5rem; }
+.writing-reference-list h3 { margin-bottom: .75rem; }
+.writing-reference-list blockquote { white-space: pre-wrap; overflow-wrap: anywhere; margin: 1rem 0; padding-block: .75rem; border-block: 1px solid var(--line); font-family: var(--font-fraunces), Georgia, serif; font-size: 1.05rem; line-height: 1.8; }
+.writing-reference-list details { margin-top: 1rem; }
+.writing-reference-list summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--sea); }
+.writing-history-list button { display: grid; text-align: left; gap: .25rem; width: 100%; font-size: 1rem; color: var(--ink); padding: .75rem; border-radius: var(--radius-sm); }
+.writing-history-list button[aria-pressed="true"] { color: var(--sea); background: var(--sea-soft); font-weight: 600; }
+.writing-history-list time, .writing-history-list span { color: var(--muted); font-weight: 400; line-height: 1.6; }
+.writing-history-list .writing-history-action { display: inline-flex; align-items: center; gap: .5rem; color: var(--sea); font-weight: 600; margin-top: .5rem; text-decoration: underline; text-underline-offset: .25rem; }
+.writing-history-preview { border-top: 1px solid var(--line-strong); margin-top: 1.5rem; padding-top: 1.5rem; scroll-margin-top: 7rem; }
+.writing-history-preview pre { font: inherit; line-height: 1.8; max-height: 28rem; overflow: auto; margin-block: 1rem; }
+.writing-history-preview .btn { margin-top: 1rem; }
+.writing-blocked-history { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line-strong); }
+.writing-companion-panel { animation: writing-sheet-open 180ms cubic-bezier(.16, 1, .3, 1); }
+@keyframes writing-sheet-open { from { clip-path: inset(0 0 12% 0); } to { clip-path: inset(0); } }
+@media (max-width: 1120px) {
+  .writing-layout { grid-template-columns: minmax(0, 1fr); }
+  .writing-mobile-tools { display: block; position: sticky; top: 6rem; z-index: 2; padding-block: .5rem; background: var(--surface-solid); border-block: 1px solid var(--line-strong); scroll-margin-top: 6rem; }
+  .writing-mobile-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .25rem; }
+  .writing-mobile-tabs button { min-height: 44px; padding: .5rem .25rem; font-size: 1rem; color: var(--ink-soft); border-bottom: 2px solid transparent; overflow-wrap: anywhere; }
+  .writing-mobile-tabs button[aria-selected="true"] { border-bottom-color: var(--sea); color: var(--sea); font-weight: 600; }
+  .writing-mobile-state { color: var(--sea); font-size: 1rem; line-height: 1.7; padding: .5rem; }
+  .writing-mobile-state[data-state="error"], .writing-mobile-state[data-state="offline"], .writing-mobile-state[data-state="conflict"] { color: var(--danger); }
+  .writing-layout[data-mobile-pane="write"] > .writing-companion, .writing-layout:not([data-mobile-pane="write"]) > .writing-paper { display: none; }
+  .writing-companion { padding: 0; }
+  .writing-companion-tabs, .writing-paper .writing-status { display: none; }
+  .writing-body { min-height: 28rem; }
+}
+@media (max-width: 700px) { .writing-page-heading { display: block; } .writing-overview { grid-template-columns: minmax(0, 1fr); gap: 1rem; } .writing-create { display: grid; grid-template-columns: minmax(0, 1fr); } .writing-create button { justify-self: start; } .writing-overview-note { margin: 0; } .writing-paper { padding: 1.25rem; } .writing-body { min-height: 24rem; } .writing-actions { align-items: stretch; } .writing-actions .btn { flex: 1 1 auto; } .writing-mobile-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .writing-companion-panel { animation: none; } }
