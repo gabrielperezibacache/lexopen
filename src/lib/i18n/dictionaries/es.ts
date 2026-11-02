@@ -74,6 +74,7 @@ export const es = {
     workflows: "Flujos",
     people: "Personas",
     documents: "Documentos",
+    library: "Biblioteca",
     deadlines: "Plazos",
     jurisprudence: "Jurisprudencia",
     agent: "Copiloto IA",

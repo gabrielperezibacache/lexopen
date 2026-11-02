@@ -76,6 +76,7 @@ export const en: Dictionary = {
     workflows: "Workflows",
     people: "People",
     documents: "Documents",
+    library: "Library",
     deadlines: "Deadlines",
     jurisprudence: "Case law",
     agent: "AI Copilot",

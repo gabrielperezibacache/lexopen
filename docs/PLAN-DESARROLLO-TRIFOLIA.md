@@ -12,6 +12,8 @@ Tercera entrega en `codex/spaces-drive-official-sources`: [archivos de espacios,
 
 Cuarta entrega en `codex/case-knowledge-library`: [hechos, cronología, contradicciones y biblioteca](HECHOS-CRONOLOGIA-BIBLIOTECA-2026-11-01.md), con citas comprobadas, revisión humana e historial, fechas inciertas y versiones elegidas para investigación local. Abre F3; las instrucciones aplicadas al asistente, colaboración de colecciones, evaluación jurídica y escala siguen pendientes.
 
+Quinta entrega en `codex/personal-law-library`: [biblioteca jurídica personal](BIBLIOTECA-PERSONAL-2026-11-01.md), con archivos propios PDF/EPUB/texto y otros formatos, libros 3D personalizables, seis distribuciones, colecciones de lectura compartida y mesa de escritura con recuperación local y citas corroboradas. La generación utiliza la IA configurada y conserva el texto previo del profesional. La conversión opcional a TXT permite mantener u omitir el original en una importación nueva; citas y escritos distinguen el cotejo contra original del cotejo contra texto retenido. Esta colaboración corresponde a las nuevas colecciones de libros; la biblioteca de versiones de causa/espacio mantiene su alcance anterior. Evaluación jurídica, recuperación semántica y escala siguen abiertas.
+
 ## 1 Decisiones de producto
 
 1. **Cero dependencia operativa de TRIFOLIA.** Sin cuenta, API, MCP, índices, tokens ni suscripción de ese proveedor. La prueba de independencia bloqueará sus dominios y repetirá los flujos de aceptación.
@@ -156,6 +158,8 @@ Salida F2: preguntas de evaluación con fuentes oficiales accesibles, contradicc
 ### F3 Casos, cronología y biblioteca
 
 Avance del 1 de noviembre: el [cuarto incremento](HECHOS-CRONOLOGIA-BIBLIOTECA-2026-11-01.md) implementa hechos citados, cronología con incertidumbre, contradicciones revisables y biblioteca personal con versiones fijadas. El [registro de comprobaciones](conocimiento-2026-11-01/VALIDACION.md) distingue pruebas terminadas de las pendientes. Los párrafos siguientes mantienen el alcance completo de F3, aún abierto.
+
+Ampliación del mismo día: la [librería personal de archivos](BIBLIOTECA-PERSONAL-2026-11-01.md) añade propiedad independiente, encuadernación y estantes por usuario, lectura compartida explícita y borradores con pasajes literales recuperados. Su [validación](biblioteca-personal-2026-11-01/VALIDACION.md) incluye actualización 35→37 y 37→38 con originales previos conservados, nuevas copias TXT opcionales y restauración. La corroboración de citas no sustituye evaluar la inferencia jurídica de un modelo ni completa F3.
 
 La cronología debe representar hechos y su evidencia, sin confundir fecha de carga, fecha del documento y fecha del acontecimiento. Guardar texto temporal literal, normalización, rango/precisión y carácter inferido. Integrar movimientos PJUD como una fuente diferenciada, no como verdad equivalente a toda alegación documental.
 

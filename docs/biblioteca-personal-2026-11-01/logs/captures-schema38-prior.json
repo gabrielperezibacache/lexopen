@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-01",
+  "schema": 38,
+  "status": "Targeted conversion/preferences/retained-text reader; desktop and mobile; combined with schema37 library layouts for24UIcaptures total.",
+  "files": [
+    {
+      "file": "conversion-options-desktop.png",
+      "source": "conversion-options-desktop.png",
+      "bytes": 718234,
+      "sha256": "288fcd9f6b042373181e1a5b0a0aaa4f0c8ff8819367d2472a73d6fbacdd06ee"
+    },
+    {
+      "file": "conversion-options-mobile.png",
+      "source": "conversion-options-mobile.png",
+      "bytes": 405323,
+      "sha256": "bf962162564e82ba6066b81913aa6d8a819658b11e216385863d41801f6cfedf"
+    },
+    {
+      "file": "conversion-preferences-desktop.png",
+      "source": "conversion-preferences-desktop.png",
+      "bytes": 731391,
+      "sha256": "9db6da33b1a9cf1bbcbf301cc2dbb57ccadb204f072635d4a092ab916786fa8b"
+    },
+    {
+      "file": "conversion-preferences-mobile.png",
+      "source": "conversion-preferences-mobile.png",
+      "bytes": 405922,
+      "sha256": "ff48562c2c41bd1944779b45ef94fa24032acad4d5625299af834249b61d836b"
+    },
+    {
+      "file": "conversion-reader-desktop.png",
+      "source": "conversion-reader-desktop.png",
+      "bytes": 369504,
+      "sha256": "1fce8b0b28af70e085c5c1694b19f7a21139ba924eaa1cbd74624370b220649b"
+    },
+    {
+      "file": "conversion-reader-mobile.png",
+      "source": "conversion-reader-mobile.png",
+      "bytes": 223646,
+      "sha256": "2bc1bdacc5e12ca2287df5e74405127363ae3300d7d540176cd56091137f8d76"
+    }
+  ]
+}

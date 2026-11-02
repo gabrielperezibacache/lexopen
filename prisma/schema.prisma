@@ -119,6 +119,11 @@ model User {
   createdCaseConflicts CaseConflict[] @relation("ConflictCreator")
   caseConflictReviews CaseConflictReview[]
   knowledgeCollections KnowledgeCollection[]
+  libraryBooks LibraryBook[]
+  bookShelfCollections BookShelfCollection[]
+  bookShelfMemberships BookShelfMember[]
+  bookPreference UserBookPreference?
+  libraryWritingDrafts LibraryWritingDraft[]
 
 }
 
@@ -1775,4 +1780,133 @@ model KnowledgeCollectionItem {
   createdAt DateTime @default(now())
   collection KnowledgeCollection @relation(fields:[collectionId],references:[id],onDelete:Cascade)
   @@unique([collectionId,versionKey])
+}
+
+// Personal library: ownership remains independent from case documents.
+model LibraryBook {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  requestId String
+  title String
+  author String @default("")
+  year String @default("")
+  edition String @default("")
+  publisher String @default("")
+  identifier String @default("")
+  coverColor String @default("oxblood")
+  coverStyle String @default("leather")
+  spineLabel String @default("")
+  shelf String @default("General")
+  favorite Boolean @default(false)
+  sourceName String
+  mimeType String
+  storageKey String
+  sourceSha256 String
+  originalRetained Boolean @default(true)
+  convertedToText Boolean @default(false)
+  retainedSha256 String?
+  originalBytes Int?
+  retainedBytes Int?
+  conversionJson String @default("{}") @db.Text
+  textSha256 String
+  extractedText String @db.Text
+  status String @default("completed")
+  pageCount Int?
+  locatorKind String @default("text-offset")
+  revision Int @default(1)
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  fragments LibraryBookFragment[]
+  pages LibraryBookPage[]
+  collectionItems BookShelfItem[]
+  @@unique([ownerId, requestId])
+  @@index([ownerId, deletedAt, createdAt])
+}
+model LibraryBookFragment {
+  id String @id @default(cuid())
+  bookId String
+  book LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  ordinal Int
+  text String @db.Text
+  textSha256 String
+  startOffset Int
+  endOffset Int
+  pageNumber Int?
+  pageStartOffset Int?
+  pageEndOffset Int?
+  locatorLabel String
+  @@unique([bookId, ordinal])
+}
+model LibraryBookPage {
+  id String @id @default(cuid())
+  bookId String
+  book LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  pageNumber Int
+  text String @db.Text
+  textSha256 String
+  method String
+  status String
+  @@unique([bookId, pageNumber])
+}
+model BookShelfCollection {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name String
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items BookShelfItem[]
+  members BookShelfMember[]
+  @@index([ownerId, createdAt])
+}
+model BookShelfItem {
+  id String @id @default(cuid())
+  collectionId String
+  collection BookShelfCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  bookId String
+  book LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([collectionId, bookId])
+  @@index([bookId])
+}
+model BookShelfMember {
+  id String @id @default(cuid())
+  collectionId String
+  collection BookShelfCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([collectionId, userId])
+  @@index([userId])
+}
+model UserBookPreference {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  libraryName String @default("Mi biblioteca jurídica")
+  shelfTheme String @default("walnut")
+  layout String @default("mesa")
+  view String @default("covers")
+  defaultConvertToText Boolean @default(false)
+  defaultPreserveOriginal Boolean @default(true)
+  heavyFileThresholdMb Int @default(10)
+  updatedAt DateTime @updatedAt
+}
+model LibraryWritingDraft {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  requestId String
+  title String
+  query String @db.Text
+  body String @db.Text
+  citationsJson String @db.Text
+  scopeJson String @db.Text
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([ownerId, requestId])
+  @@index([ownerId, updatedAt])
 }

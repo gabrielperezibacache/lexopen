@@ -1,0 +1,5 @@
+
+> lexopen@1.0.0 test:production:books
+> node --import tsx scripts/production-books-smoke.ts
+
+{"mode":"production","formats":["txt","epub","docx","pdf"],"physicalPdfPage":2,"layouts":6,"ai":"loopback fixture via actual configured askLlm HTTP transport","modelCalls":2,"inventedQuoteRejected":true,"zeroResultsNoModel":true,"normalCsrf":true,"chunkedJson413":3,"privateAndSharedReadonly":true,"revokedDerivatives404":true,"deployed":false}

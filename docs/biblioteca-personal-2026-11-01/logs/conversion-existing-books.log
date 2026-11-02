@@ -1,0 +1,11 @@
+audit write failed Error: Synthetic book audit failure
+    at Array.create (<workspace>/src/lib/books/books.integration.test.ts:86:134)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+audit write failed Error: Synthetic book audit failure
+    at Array.create (<workspace>/src/lib/books/books.integration.test.ts:86:134)
+    at <workspace>/node_modules/@prisma/client/runtime/library.js:31:9641
+    at i (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1016)
+    at PrismaPromise.then (<workspace>/node_modules/@prisma/client/runtime/library.js:121:1091)
+Personal book library PostgreSQL PASS: private ownership incl admin denial, concurrent import replay/CAS, personalization, explicit read-only collections and revocation, current actor/owner role/capability, exact original/text/Unicode/fragment hashes, EPUB sections, physical PDF/OCR page2/image, whole-PDF page/text coordinate binding and coherent-page/global/local-range tamper rejection and canonical PDF label through export after label-only corruption, preferences isolation, audit rollback and soft-removal derivative denial; network/model calls 0.

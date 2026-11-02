@@ -1,9 +1,21 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomBytes } from "crypto";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 export const MAX_STORAGE_OBJECT_BYTES = 25 * 1024 * 1024;
+
+/** Compensation is restricted to an isolated book-import attempt, never a shared source key. */
+export async function discardBookImportAttempt(key: string): Promise<void> {
+  assertSafeStorageKey(key);
+  if (!/^library-books\/book_[a-f0-9]{40}\/attempts\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\/(?:original|text)\/[a-f0-9]{64}$/.test(key)) throw new Error("Sólo se puede limpiar un intento aislado de importación");
+  if (storageMode() === "incomplete") throw Object.assign(new Error("La configuración de almacenamiento está incompleta"), { status: 503 });
+  if (storageConfigured()) {
+    await s3Client().send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: key }), { abortSignal: AbortSignal.timeout(30_000) });
+  } else {
+    await fs.rm(localPathForKey(key), { force: true });
+  }
+}
 
 /**
  * Almacenamiento de archivos:

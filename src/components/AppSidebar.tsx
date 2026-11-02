@@ -32,6 +32,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/chile";
+import { STAFF_ROLES, type Role } from "@/lib/auth/roles";
 import { UserSwitcher } from "@/components/auth/UserSwitcher";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -42,7 +43,7 @@ type NavItem = {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
-  roles?: Array<"admin" | "abogado" | "asistente">;
+  roles?: readonly Role[];
   badge?: number;
 };
 
@@ -50,7 +51,7 @@ function filterNav(links: NavItem[], role?: string | null) {
   return links.filter(
     (l) =>
       !l.roles ||
-      (role != null && l.roles.includes(role as "admin" | "abogado" | "asistente"))
+      (role != null && l.roles.includes(role as Role))
   );
 }
 
@@ -169,6 +170,7 @@ function SidebarChrome({
   const documents = useMemo<NavItem[]>(
     () => [
       { href: "/documentos", label: t("nav.documents"), icon: Files },
+      { href: "/biblioteca", label: t("nav.library"), icon: BookOpen, roles: STAFF_ROLES },
       { href: "/minutas", label: t("nav.minutes"), icon: ClipboardPen },
       { href: "/jurisprudencia", label: t("nav.jurisprudence"), icon: BookOpen },
       { href: "/agente", label: t("nav.assistant"), icon: Bot },

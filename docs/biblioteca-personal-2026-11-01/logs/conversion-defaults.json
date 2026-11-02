@@ -1,0 +1,40 @@
+{
+  "books": [
+    {
+      "originalRetained": true,
+      "convertedToText": false,
+      "retainedSha256": null,
+      "originalBytes": null,
+      "retainedBytes": null,
+      "conversionJson": "{}"
+    },
+    {
+      "originalRetained": true,
+      "convertedToText": false,
+      "retainedSha256": null,
+      "originalBytes": null,
+      "retainedBytes": null,
+      "conversionJson": "{}"
+    },
+    {
+      "originalRetained": true,
+      "convertedToText": false,
+      "retainedSha256": null,
+      "originalBytes": null,
+      "retainedBytes": null,
+      "conversionJson": "{}"
+    }
+  ],
+  "preferences": [
+    {
+      "defaultConvertToText": false,
+      "defaultPreserveOriginal": true,
+      "heavyFileThresholdMb": 10
+    },
+    {
+      "defaultConvertToText": false,
+      "defaultPreserveOriginal": true,
+      "heavyFileThresholdMb": 10
+    }
+  ]
+}

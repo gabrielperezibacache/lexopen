@@ -1,0 +1,91 @@
+{
+  "role": "impeccable_asset_producer",
+  "reviewed_references": [
+    ".impeccable/mocks/library-mesa.png",
+    ".impeccable/mocks/library-estantes.png",
+    ".impeccable/mocks/library-gabinete.png"
+  ],
+  "production_mode": "built-in image_gen",
+  "produce": [
+    {
+      "id": "library-leather",
+      "source_crop": "Approved mock leather bindings, visual reference only; no mock pixels shipped",
+      "output_path": "public/library/textures/leather.webp",
+      "source_path": ".impeccable/assets/leather-source.png",
+      "prompt_path": ".impeccable/assets/leather.prompt.txt",
+      "strategy": "Faithful clean material regeneration; resize and WebP conversion with cwebp quality 85",
+      "prompt_used": "Use case: photorealistic-natural. Asset type: seamless-looking material texture map for interactive CSS 3D book bindings in LexOpen. Primary request: one square, orthographic, edge-to-edge macro photograph of classic fine-grain bookbinding leather only. Output 1024 x 1024 pixels. Color palette: strictly neutral grayscale, light midgray base, tiny charcoal pores and subtle pale high points; no brown or warm tint. Materials: naturally irregular, very fine dense calfskin grain with microscopic branching creases, understated and refined like a traditional leather-bound law book. Composition: a perfectly flat continuous surface fills all pixels, no perspective, no object edges. Lighting: uniform neutral diffuse illumination across the entire image; retain small-scale surface relief but eliminate large-scale shading. Intended use: repeated texture multiplied over six independently chosen book colors, so keep tonal contrast subtle and luminance consistent edge to edge. Constraints: visually tileable repeating texture, edges blend unobtrusively; no seams, stitching, border, ornament, embossing, titles, lettering, symbols, logos, watermark, objects, books, shelves, room, highlights, directional shadows, vignette, or global gradient. Opaque background.",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "format": "webp",
+      "transparency": false,
+      "deviations": "Native output 1254x1254 downsampled to requested production size; grayscale intentionally supports six CSS binding colors",
+      "qa_status": "accepted",
+      "implementation_notes": "Apply as repeating background-image with multiply over binding background color. Keep book faces, depth, perspective, ornamental rules, typography, focus, and shadows in CSS/HTML. Grain is deliberately neutral and uniform."
+    },
+    {
+      "id": "library-walnut",
+      "source_crop": "Approved mock walnut shelves and back panels, visual reference only; no mock pixels shipped",
+      "output_path": "public/library/textures/walnut.webp",
+      "source_path": ".impeccable/assets/walnut-source.png",
+      "prompt_path": ".impeccable/assets/walnut.prompt.txt",
+      "strategy": "Faithful clean material regeneration; resize and WebP conversion with cwebp quality 85",
+      "prompt_used": "Use case: photorealistic-natural. Asset type: real walnut wood material texture map for horizontal CSS shelves and shelf back panels in the LexOpen legal library. Primary request: one landscape, orthographic, edge-to-edge close-up photograph of dark walnut wood grain only, 2:1 aspect ratio intended final size 1024 x 512 pixels. Materials: finely finished natural walnut with long flowing horizontal grain, small restrained pores, subtle organic variations; deep chocolate brown with muted warm walnut tones. Composition: a perfectly flat continuous wooden surface fills every pixel, grain runs horizontally left to right, no perspective and no visible board edges or joints. Lighting: perfectly even soft diffuse neutral illumination, matte finish, no large scale light gradient. Constraints: unobtrusively repeatable texture and nearly matching edges, no knots dominating the frame, no planks or seams, no shelves, books, furniture, plants, lamps, objects, hardware, lettering, text, logos, watermark, borders, strong gloss, specular highlights, bevels, directional shadows, vignette, or room scene. Opaque background.",
+      "dimensions": {
+        "width": 1024,
+        "height": 512
+      },
+      "format": "webp",
+      "transparency": false,
+      "deviations": "Native output 1774x887 downsampled to requested production size",
+      "qa_status": "accepted",
+      "implementation_notes": "Apply horizontal grain as repeating background-image on shelf panels and ledges. CSS owns shelf geometry, panel depth, edge highlights and local contact shadows."
+    }
+  ],
+  "direct": [],
+  "semantic": [
+    {
+      "id": "library-shell",
+      "implementation": "Reuse AppShell, AppSidebar, icon library and existing navigation DOM. Main heading, owner inscription, tabs, search, import and personalization remain semantic HTML. Use existing Sora and Fraunces tokens, paper surfaces, visible keyboard focus and mobile stacking.",
+      "notes": "No rasterized copy or controls. Main actions retain existing copper styling.",
+      "qa_status": "accepted"
+    },
+    {
+      "id": "interactive-books",
+      "implementation": "Each real book is a semantic interactive element with HTML title and metadata, front cover, spine, page edge and back face composed as CSS 3D layers. Compose the produced leather texture over six CSS colors; CSS owns gold rules, cover borders, curvature, perspective and local shadows. Provide reduced-motion behavior, keyboard focus and a flat catalog alternative.",
+      "notes": "Generated texture supplies physical grain; no full-book raster or fake collection data.",
+      "qa_status": "accepted"
+    },
+    {
+      "id": "library-shelves",
+      "implementation": "Build shelf panels, dividers and ledges in HTML/CSS with the walnut image on visible wood surfaces. Six compositions alter shelf topology and density; scale or stack responsively without shrinking text or relying on horizontal overflow.",
+      "notes": "Wood texture supplies natural grain while geometry and lighting remain responsive CSS.",
+      "qa_status": "accepted"
+    },
+    {
+      "id": "writing-desk-and-locators",
+      "implementation": "Use semantic editor, source list, book details, passage text, original links and verified locators. Paper backgrounds, borders and type hierarchy inherit the application tokens; locators must remain real HTML text.",
+      "notes": "No generated factual passages, author claims or pagination.",
+      "qa_status": "accepted"
+    }
+  ],
+  "accepted_omissions": [
+    {
+      "id": "decorative-lamps-and-plants",
+      "reason": "Surface brief explicitly excludes these composition decorations from the operational surface; they are not collection content or features."
+    }
+  ],
+  "execution_order": [
+    "library-leather",
+    "library-walnut",
+    "CSS/HTML composition by book_experience"
+  ],
+  "blockers": [],
+  "assumptions": [
+    "All three reviewed compositions were approved as personalization options.",
+    "The parent explicitly authorized three additional layouts and excluded decorative lamps/plants in the surface brief.",
+    "Only two generation calls are needed; native tool used once for each material."
+  ]
+}

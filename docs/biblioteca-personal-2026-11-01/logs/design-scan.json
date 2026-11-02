@@ -1,0 +1,44 @@
+[
+  {
+    "antipattern": "side-tab",
+    "name": "Side-tab accent border",
+    "description": "Thick colored border on one side of a card — the most recognizable tell of AI-generated UIs. Use a subtler accent or remove it entirely.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "<workspace>/src/components/books/library.css",
+    "line": 189,
+    "snippet": "border-left: 21px solid #c9b99f",
+    "importedBy": [
+      "BookReader.tsx",
+      "Bookshelf.tsx"
+    ]
+  },
+  {
+    "antipattern": "side-tab",
+    "name": "Side-tab accent border",
+    "description": "Thick colored border on one side of a card — the most recognizable tell of AI-generated UIs. Use a subtler accent or remove it entirely.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "<workspace>/src/components/books/library.css",
+    "line": 369,
+    "snippet": "border-left-width: 14px",
+    "importedBy": [
+      "BookReader.tsx",
+      "Bookshelf.tsx"
+    ]
+  },
+  {
+    "antipattern": "border-accent-on-rounded",
+    "name": "Border accent on rounded element",
+    "description": "Thick accent border on a rounded card — the border clashes with the rounded corners. Remove the border or the border-radius.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "<workspace>/src/components/books/library.css",
+    "line": 185,
+    "snippet": "border-bottom: 6px solid",
+    "importedBy": [
+      "BookReader.tsx",
+      "Bookshelf.tsx"
+    ]
+  }
+]
