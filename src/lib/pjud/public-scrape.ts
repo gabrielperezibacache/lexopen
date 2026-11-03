@@ -51,9 +51,12 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import type { MisCausasItem } from "@/lib/pjud/types";
 import { omitLegacyScrapeAliases, type PjudCausaRef, type PjudFetchedMovimiento } from "@/lib/pjud/types";
+import { isClaveUnicaAccountsUrl, startClaveUnicaOidcFromOjv, waitForOidcPageAfterTrigger } from "@/lib/pjud/ojv-oidc";
+import { clearManualMisCausasRows, snapshotManualMisCausasRows, waitForFreshManualMisCausasRows } from "@/lib/pjud/manual-mis-causas-response";
 
 export type { MisCausasItem } from "@/lib/pjud/types";
 export { OJV_CONSULTA_URL as PJUD_CONSULTA_URL };
+export { isClaveUnicaAccountsUrl } from "@/lib/pjud/ojv-oidc";
 
 export function publicScrapeEnabled() {
   return process.env.PJUD_PUBLIC_SCRAPE === "1";
@@ -324,49 +327,159 @@ async function maybeSolveCaptchaOnPage(page: PlaywrightPage, signal?: AbortSigna
   return true;
 }
 
-/** Follow the visible guest entry and the shell's observed Consulta Unificada menu. */
+export type ConsultaFormState = {
+  stage: "ready" | "login-required" | "captcha-required" | "prompt-required" | "guest-shell" | "unknown";
+  readyState: DocumentReadyState;
+  ready: boolean;
+  loginRequired: boolean;
+  captchaVisible: boolean;
+  promptVisible: boolean;
+  guestEntryVisible: boolean;
+  consultaMenuVisible: boolean;
+  consultaTabsVisible: boolean;
+  fields: Array<{ tag: "input" | "select"; id: string; name: string; type: string; disabled: boolean; optionCount: number }>;
+};
+
+const CONSULTA_FIELD_SELECTOR = "select#jurCompetencia, input#rutJur";
+
+/** Safe entry diagnostics: no field values, page text, URLs, cookies or tokens. */
+export async function readConsultaFormState(page: PlaywrightPage): Promise<ConsultaFormState> {
+  return page.evaluate(({ fieldsSelector, guestSelector, captchaSelector, tabsSelector }) => {
+    const loginSelector = 'input[type="password"]';
+    const promptSelector = '.sweet-alert.showSweetAlert.visible, .modal.in, .modal.show, .modal[style*="display: block"]';
+    const visibleNodes = [...document.querySelectorAll(`${fieldsSelector}, ${guestSelector}, ${captchaSelector}, ${tabsSelector}, ${loginSelector}, ${promptSelector}, a`)].filter((node) => {
+      const rect = node.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      let current: Element | null = node;
+      while (current) {
+        const style = getComputedStyle(current);
+        if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+        current = current.parentElement;
+      }
+      return true;
+    });
+    const fields = visibleNodes.filter((node) => node.matches(fieldsSelector)).map((node) => {
+      const field = node as HTMLInputElement | HTMLSelectElement;
+      return {
+        tag: field.tagName.toLowerCase() as "input" | "select",
+        id: field.id,
+        name: field.name,
+        type: field instanceof HTMLInputElement ? field.type : "select",
+        disabled: field.disabled,
+        optionCount: field instanceof HTMLSelectElement ? field.options.length : 0,
+      };
+    });
+    const ready = fields.length > 0;
+    const loginRequired = visibleNodes.some((node) => node.matches(loginSelector));
+    // An invisible reCAPTCHA badge/anchor is infrastructure, not a challenge.
+    // A visible checkbox outside the badge or a challenge bframe still blocks.
+    const captchaVisible = visibleNodes.some((node) => node.matches(captchaSelector) && (
+      node.matches('iframe[src*="/recaptcha/api2/bframe"]') || (
+        !node.closest('.grecaptcha-badge, .g-recaptcha[data-size="invisible"]') &&
+        !node.matches('iframe[src*="/recaptcha/api2/anchor"][src*="size=invisible"]')
+      ))
+    );
+    const promptVisible = visibleNodes.some((node) => node.matches(promptSelector));
+    const guestEntryVisible = visibleNodes.some((node) => node.matches(guestSelector));
+    const consultaMenuVisible = visibleNodes.some((node) => node.tagName === "A" && /^Consulta Unificada$/i.test((node.textContent || "").trim()));
+    const consultaTabsVisible = visibleNodes.some((node) => node.matches(tabsSelector));
+    const stage = loginRequired ? "login-required" : captchaVisible ? "captcha-required" : promptVisible ? "prompt-required" : ready ? "ready" : consultaMenuVisible || location.pathname === "/indexN.php" ? "guest-shell" : "unknown";
+    return { stage, readyState: document.readyState, ready, loginRequired, captchaVisible, promptVisible, guestEntryVisible, consultaMenuVisible, consultaTabsVisible, fields };
+  }, {
+    fieldsSelector: CONSULTA_FIELD_SELECTOR,
+    guestSelector: OJV.accesoConsulta,
+    captchaSelector: `${OJV.captchaImg}, ${OJV.captchaInput}, .g-recaptcha, .h-captcha, iframe[src*="/recaptcha/api2/bframe"], iframe[src*="/recaptcha/api2/anchor"], iframe[src*="hcaptcha.com"]`,
+    tabsSelector: 'a[href="#BusJuridica"], a[href="#BusCausa"], a[href="#buscCausa"], a[href*="BusRol" i]',
+  });
+}
+
+async function waitForObservedClickHandler(
+  page: PlaywrightPage,
+  locator: import("playwright").Locator,
+  timeout: number
+) {
+  const inline = await locator.getAttribute("onclick");
+  if (!inline) return;
+  // Read only direct function calls observed on this control. Never invoke them.
+  const names = [...inline.matchAll(/(?:^|;)\s*(?:return\s+)?(?:window\.)?([A-Za-z_$][\w$]*)\s*\(/g)]
+    .map((match) => match[1]).filter((name) => !["if", "for", "while", "switch", "function"].includes(name));
+  if (!names.length) return;
+  await page.waitForFunction((observed) => observed.every((name) =>
+    typeof (window as unknown as Record<string, unknown>)[name] === "function"
+  ), names, { timeout });
+}
+
+async function waitForConsultaEntryState(
+  page: PlaywrightPage,
+  timeout: number,
+  accept: (state: ConsultaFormState) => boolean,
+  signal?: AbortSignal
+) {
+  const deadline = Date.now() + timeout;
+  do {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const state = await readConsultaFormState(page).catch(() => null);
+    if (state && accept(state)) return state;
+    await delay(100);
+  } while (Date.now() < deadline);
+  return readConsultaFormState(page);
+}
+
+function assertManualConsultaState(state: ConsultaFormState) {
+  if (state.loginRequired || state.captchaVisible || state.promptVisible) {
+    throw new PjudScrapeError(`La entrada OJV requiere intervención manual (${state.stage}). No se aceptaron avisos, no se resolvió CAPTCHA y no se inició una búsqueda de causas.`);
+  }
+}
+
+/** Follow visible controls only. Manual mode leaves all prompts and CAPTCHA untouched. */
 export async function enterConsultaCausas(
   page: PlaywrightPage,
-  opts: { formTimeoutMs?: number; signal?: AbortSignal } = {}
+  opts: { formTimeoutMs?: number; signal?: AbortSignal; mode?: "automatic" | "manual" } = {}
 ) {
   const timeout = opts.formTimeoutMs ?? 20_000;
-  const form = () => page.locator(
-    '#jurCompetencia, #rutJur, a[href="#BusJuridica"], a[href="#BusCausa"], a[href="#buscCausa"], a[href*="BusRol" i]'
-  ).filter({ visible: true }).first();
-  await closeSweetAlerts(page);
-  await closeBootstrapModals(page);
-
-  if (!(await form().count())) {
-    const acceso = page.locator(OJV.accesoConsulta).filter({ visible: true }).first();
-    if (await acceso.count()) {
-      try {
-        await acceso.click({ timeout: 15_000 });
-        await page.waitForLoadState("domcontentloaded", { timeout: 30_000 });
-      } catch {
-        throw new PjudScrapeError("No se pudo completar el acceso invitado a OJV. No se inició una búsqueda de causas.");
-      }
+  const manual = opts.mode === "manual";
+  const prepare = async () => {
+    if (manual) assertManualConsultaState(await readConsultaFormState(page));
+    else {
       await closeSweetAlerts(page);
       await closeBootstrapModals(page);
     }
-    if (!(await form().count())) {
+  };
+  await prepare();
+
+  if (!(await readConsultaFormState(page)).ready) {
+    const acceso = page.locator(OJV.accesoConsulta).filter({ visible: true }).first();
+    if (await acceso.count()) {
+      try {
+        await waitForObservedClickHandler(page, acceso, timeout);
+        await acceso.click({ timeout: 15_000 });
+        await waitForConsultaEntryState(page, timeout, (state) => state.ready || state.consultaMenuVisible || state.loginRequired || state.captchaVisible || state.promptVisible, opts.signal);
+      } catch {
+        throw new PjudScrapeError("No se pudo completar el acceso invitado a OJV. No se inició una búsqueda de causas.");
+      }
+      await prepare();
+    }
+    if (!(await readConsultaFormState(page)).ready) {
       const menu = page.getByRole("link", { name: /^Consulta Unificada$/i })
         .filter({ visible: true }).first();
       try {
         await menu.waitFor({ state: "visible", timeout });
+        await waitForObservedClickHandler(page, menu, timeout);
         await menu.click({ timeout: 15_000 });
-        await page.waitForLoadState("domcontentloaded", { timeout: 30_000 });
       } catch {
         throw new PjudScrapeError("No se encontró o no se pudo abrir el acceso visible a Consulta Unificada en OJV. No se inició una búsqueda de causas.");
       }
     }
   }
-  await closeSweetAlerts(page);
-  await closeBootstrapModals(page);
-  await maybeSolveCaptchaOnPage(page, opts.signal);
-  try {
-    await form().waitFor({ state: "visible", timeout });
-  } catch {
-    throw new PjudScrapeError("OJV abrió Consulta Unificada pero no mostró el formulario de búsqueda. El portal puede requerir una validación o haber cambiado su estructura. No se inició una búsqueda de causas.");
+  await prepare();
+  if (!manual) await maybeSolveCaptchaOnPage(page, opts.signal);
+  const state = await waitForConsultaEntryState(page, timeout, (current) => current.ready || (manual && (current.loginRequired || current.captchaVisible || current.promptVisible)), opts.signal);
+  if (manual) assertManualConsultaState(state);
+  if (!state.ready) {
+    if (state.stage === "guest-shell") {
+      throw new PjudScrapeError("OJV abrió Consulta Unificada pero no mostró el formulario de búsqueda: el portal quedó en el menú sin campos de consulta. Reintente desde la OJV o pruebe más tarde. No se inició una búsqueda de causas.");
+    }
+    throw new PjudScrapeError(`OJV abrió Consulta Unificada pero no mostró el formulario de búsqueda (estado: ${state.stage}; documento: ${state.readyState}). El portal puede requerir una validación o haber cambiado su estructura. No se inició una búsqueda de causas.`);
   }
 }
 
@@ -1285,7 +1398,19 @@ async function dismissOjvPrompts(page: AnyPage) {
   }
 }
 
-async function openMisCausasMenu(page: AnyPage): Promise<boolean> {
+type MisCausasReadOptions = { allowPrompts?: boolean; responseTimeoutMs?: number };
+
+async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = {}): Promise<boolean> {
+  if (options.allowPrompts === false) {
+    const visible = page.getByRole("link", { name: /^Mis Causas$/i })
+      .or(page.getByRole("button", { name: /^Mis Causas$/i }))
+      .or(page.locator(OJV.misCausasMenu)).filter({ visible: true }).first();
+    if (!(await visible.count())) return false;
+    await visible.click({ timeout: 8_000 });
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+    await sleep(700);
+    return true;
+  }
   const candidates = [
     page.getByRole("link", { name: /^Mis Causas$/i }).first(),
     page.getByRole("button", { name: /^Mis Causas$/i }).first(),
@@ -1316,13 +1441,21 @@ async function openMisCausasMenu(page: AnyPage): Promise<boolean> {
   return false;
 }
 
-async function clickMisCausasBuscar(page: AnyPage) {
-  const buscar = page
+async function clickMisCausasBuscar(page: AnyPage, options: MisCausasReadOptions = {}) {
+  let buscar = page
     .getByRole("button", { name: /^Buscar$/i })
-    .or(page.locator(OJV.misCausasBuscar))
-    .first();
-  if ((await buscar.count().catch(() => 0)) === 0) return false;
-  if (!(await buscar.isVisible().catch(() => false))) {
+    .or(page.locator(OJV.misCausasBuscar));
+  if (options.allowPrompts === false) buscar = buscar.filter({ visible: true });
+  buscar = buscar.first();
+  if ((await buscar.count().catch(() => 0)) === 0) {
+    if (options.allowPrompts === false) throw new PjudScrapeError("No se encontró un botón Buscar visible en Mis Causas.");
+    return false;
+  }
+  if (options.allowPrompts === false) {
+    await snapshotManualMisCausasRows(page);
+    await buscar.click({ timeout: 8_000 });
+    return waitForFreshManualMisCausasRows(page, options.responseTimeoutMs);
+  } else if (!(await buscar.isVisible().catch(() => false))) {
     await buscar.click({ force: true, timeout: 8_000 }).catch(() => undefined);
   } else {
     await buscar.click({ timeout: 8_000 }).catch(() => undefined);
@@ -1417,7 +1550,10 @@ async function pagesAndFramesHtml(page: AnyPage): Promise<string> {
   return chunks.join("\n");
 }
 
-async function ensureAuthenticatedOjvShell(page: AnyPage): Promise<AnyPage> {
+async function ensureAuthenticatedOjvShell(page: AnyPage, options: MisCausasReadOptions = {}): Promise<AnyPage> {
+  // A manual probe must use the user's current session, without navigating
+  // past terms/login screens or confirming prompts on their behalf.
+  if (options.allowPrompts === false) return page;
   await dismissOjvPrompts(page);
   const onOjv = /oficinajudicialvirtual\.pjud\.cl|ojv\.pjud\.cl/i.test(page.url());
   const needsShell =
@@ -1436,69 +1572,80 @@ async function ensureAuthenticatedOjvShell(page: AnyPage): Promise<AnyPage> {
   return page;
 }
 
-async function collectMisCausasFromAuthenticatedOjv(
-  page: AnyPage
+export async function collectMisCausasFromAuthenticatedOjv(
+  page: AnyPage,
+  options: MisCausasReadOptions = {}
 ): Promise<{ items: MisCausasItem[]; openedMenu: boolean; materiasTried: string[] }> {
-  page = await ensureAuthenticatedOjvShell(page);
+  page = await ensureAuthenticatedOjvShell(page, options);
 
-  const openedMenu = await openMisCausasMenu(page);
+  const openedMenu = await openMisCausasMenu(page, options);
   const materiasTried: string[] = [];
   const all: MisCausasItem[] = [];
   const seen = new Set<string>();
 
-  const pushParsed = async () => {
-    const html = await pagesAndFramesHtml(page);
-    for (const item of parseMisCausasItemsFromHtml(html)) {
+  const pushItems = (items: MisCausasItem[]) => {
+    for (const item of items) {
       const key = `${item.rit}|${item.tribunal}`.toUpperCase();
       if (seen.has(key)) continue;
       seen.add(key);
       all.push(item);
     }
   };
-
-  await pushParsed();
-
-  for (const materia of MIS_CAUSAS_MATERIAS) {
-    const tab = page
-      .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
-      .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
-      .or(
-        page.locator(
-          `a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a, div.card:has-text("${materia}")`
-        )
-      )
-      .first();
-    if ((await tab.count().catch(() => 0)) === 0) continue;
-    if (!(await tab.isVisible().catch(() => false))) {
-      // Algunas materias están en acordeón colapsado.
-      await tab.click({ force: true, timeout: 8_000 }).catch(() => undefined);
+  const pushParsed = async () => pushItems(parseMisCausasItemsFromHtml(await pagesAndFramesHtml(page)));
+  const searchAndCollect = async () => {
+    const firstResponse = await clickMisCausasBuscar(page, options);
+    if (options.allowPrompts === false) {
+      let first = true;
+      await collectOjvResultPages(page, async () => {
+        const fresh = first && Array.isArray(firstResponse)
+          ? firstResponse
+          : await waitForFreshManualMisCausasRows(page, options.responseTimeoutMs);
+        first = false;
+        pushItems(fresh);
+      });
     } else {
-      await tab.click({ timeout: 8_000 }).catch(() => undefined);
+      await collectOjvResultPages(page, pushParsed);
     }
-    materiasTried.push(materia);
-    await sleep(500);
+  };
 
-    await applyMisCausasFiltros(page);
-    await clickMisCausasBuscar(page);
-    await collectOjvResultPages(page, pushParsed);
-  }
-
-  if (materiasTried.length === 0) {
-    await applyMisCausasFiltros(page);
-    await clickMisCausasBuscar(page);
-    await collectOjvResultPages(page, pushParsed);
-  }
-
-  return { items: all, openedMenu, materiasTried };
-}
-
-/** True only for the OIDC login host — not the citizen marketing portal. */
-export function isClaveUnicaAccountsUrl(url: string): boolean {
   try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" && parsed.hostname === "accounts.claveunica.gob.cl";
-  } catch {
-    return false;
+    if (options.allowPrompts !== false) await pushParsed();
+
+    for (const materia of MIS_CAUSAS_MATERIAS) {
+      let tab = page
+        .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
+        .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
+        .or(
+          page.locator(
+            `a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a, div.card:has-text("${materia}")`
+          )
+        );
+      if (options.allowPrompts === false) tab = tab.filter({ visible: true });
+      tab = tab.first();
+      if ((await tab.count().catch(() => 0)) === 0) continue;
+      if (options.allowPrompts === false) {
+        await tab.click({ timeout: 8_000 });
+      } else if (!(await tab.isVisible().catch(() => false))) {
+        // Algunas materias están en acordeón colapsado.
+        await tab.click({ force: true, timeout: 8_000 }).catch(() => undefined);
+      } else {
+        await tab.click({ timeout: 8_000 }).catch(() => undefined);
+      }
+      materiasTried.push(materia);
+      await sleep(500);
+
+      await applyMisCausasFiltros(page);
+      await searchAndCollect();
+    }
+
+    if (materiasTried.length === 0) {
+      await applyMisCausasFiltros(page);
+      await searchAndCollect();
+    }
+
+    return { items: all, openedMenu, materiasTried };
+  } finally {
+    if (options.allowPrompts === false) await clearManualMisCausasRows(page);
   }
 }
 
@@ -1509,44 +1656,11 @@ export function isClaveUnicaAccountsUrl(url: string): boolean {
  * y el OIDC (`AutenticaCUnica()` → submit `#cuform`). El selector genérico
  * `a[href*="claveunica"]` caía en el portal ciudadano y el login fallaba.
  */
-async function openClaveUnicaFromOjv(page: AnyPage): Promise<AnyPage | null> {
-  const waitForAccounts = async (): Promise<AnyPage | null> => {
-    const popupPromise = page
-      .context()
-      .waitForEvent("page", { timeout: 8_000 })
-      .catch(() => null);
-    const navPromise = page
-      .waitForURL(/accounts\.claveunica\.gob\.cl/i, { timeout: 45_000 })
-      .catch(() => undefined);
-    const popup = await popupPromise;
-    if (popup) {
-      await popup.waitForLoadState("domcontentloaded").catch(() => undefined);
-      if (isClaveUnicaAccountsUrl(popup.url())) return popup;
-    }
-    await navPromise;
-    if (isClaveUnicaAccountsUrl(page.url())) return page;
-    return null;
-  };
-
-  const oidcStarted = await page
-    .evaluate(() => {
-      const w = window as unknown as { AutenticaCUnica?: () => void };
-      if (typeof w.AutenticaCUnica === "function") {
-        w.AutenticaCUnica();
-        return "AutenticaCUnica";
-      }
-      const form = document.querySelector("#cuform") as HTMLFormElement | null;
-      if (form) {
-        form.submit();
-        return "cuform";
-      }
-      return null;
-    })
-    .catch(() => null);
-
-  if (oidcStarted) {
-    const viaOidc = await waitForAccounts();
-    if (viaOidc) return viaOidc;
+export async function openClaveUnicaFromOjv(page: AnyPage): Promise<AnyPage | null> {
+  const oidc = await startClaveUnicaOidcFromOjv(page).catch(() => ({ page: null, started: null }));
+  if (oidc.page) {
+    await oidc.page.waitForLoadState("domcontentloaded").catch(() => undefined);
+    return oidc.page;
   }
 
   const authLink = page
@@ -1555,22 +1669,12 @@ async function openClaveUnicaFromOjv(page: AnyPage): Promise<AnyPage | null> {
     )
     .first();
   if ((await authLink.count()) > 0) {
-    const popupPromise = page
-      .context()
-      .waitForEvent("page", { timeout: 8_000 })
-      .catch(() => null);
-    const navPromise = page
-      .waitForURL(/accounts\.claveunica\.gob\.cl/i, { timeout: 45_000 })
-      .catch(() => undefined);
     // El enlace OIDC suele estar oculto en el DOM; force evita el marketing visible.
-    await authLink.click({ timeout: 10_000, force: true });
-    const popup = await popupPromise;
-    if (popup) {
-      await popup.waitForLoadState("domcontentloaded").catch(() => undefined);
-      if (isClaveUnicaAccountsUrl(popup.url())) return popup;
+    const transition = await waitForOidcPageAfterTrigger(page, () => authLink.click({ timeout: 10_000, force: true }));
+    if (transition.page) {
+      await transition.page.waitForLoadState("domcontentloaded").catch(() => undefined);
+      return transition.page;
     }
-    await navPromise;
-    if (isClaveUnicaAccountsUrl(page.url())) return page;
   }
 
   // Último recurso: solo accounts.* (nunca claveunica.gob.cl marketing).
@@ -1578,11 +1682,11 @@ async function openClaveUnicaFromOjv(page: AnyPage): Promise<AnyPage | null> {
     .locator('a[href*="accounts.claveunica.gob.cl"]')
     .first();
   if ((await accountsLink.count()) > 0) {
-    await accountsLink.click({ timeout: 10_000, force: true });
-    await page
-      .waitForURL(/accounts\.claveunica\.gob\.cl/i, { timeout: 45_000 })
-      .catch(() => undefined);
-    if (isClaveUnicaAccountsUrl(page.url())) return page;
+    const transition = await waitForOidcPageAfterTrigger(page, () => accountsLink.click({ timeout: 10_000, force: true }));
+    if (transition.page) {
+      await transition.page.waitForLoadState("domcontentloaded").catch(() => undefined);
+      return transition.page;
+    }
   }
 
   return null;
