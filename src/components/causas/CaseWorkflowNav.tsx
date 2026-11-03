@@ -8,16 +8,18 @@ import "./CaseWorkflowNav.css";
 
 type Stage = "case" | "library" | "hearing" | "writing";
 
-export function CaseWorkflowNav({ causaId, title, current }: { causaId: string; title: string; current: Stage }) {
+export function CaseWorkflowNav({ causaId, title, current, workspaceId }: { causaId: string; title: string; current: Stage; workspaceId?: string }) {
   const query = useSearchParams();
   const requestedDraft = query.get(current === "writing" ? "draft" : "escrito");
   const draftId = requestedDraft && /^[a-zA-Z0-9_-]{1,100}$/.test(requestedDraft) ? requestedDraft : undefined;
   const base = `/causas/${encodeURIComponent(causaId)}`;
   const context = draftId ? `?${new URLSearchParams({ escrito: draftId })}` : "";
+  const requestedWorkspace = workspaceId || (current === "hearing" ? query.get("mesa") : undefined);
+  const selectedWorkspace = requestedWorkspace && /^[a-zA-Z0-9_-]{1,100}$/.test(requestedWorkspace) ? requestedWorkspace : undefined;
   const steps = [
     { stage: "case", label: "Expediente", href: base + context, icon: FolderOpen },
     { stage: "library", label: "Biblioteca", href: caseLibraryHref(causaId, draftId), icon: BookOpen },
-    { stage: "hearing", label: "Audiencias", href: `${base}/audiencias${context}`, icon: MessagesSquare },
+    { stage: "hearing", label: "Audiencias", href: selectedWorkspace ? `/audiencias/${encodeURIComponent(selectedWorkspace)}${context}` : `${base}/audiencias${context}`, icon: MessagesSquare },
     { stage: "writing", label: "Escritos", href: `${base}/escritos${draftId ? `?${new URLSearchParams({ draft: draftId })}` : ""}`, icon: FilePenLine },
   ];
   return <nav className="case-workflow" aria-label="Recorrido de la causa" data-testid="case-workflow">

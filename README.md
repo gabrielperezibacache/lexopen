@@ -44,7 +44,9 @@ La investigación reúne material incorporado al Host y fuentes oficiales admiti
 
 Prepare un guion guardado, ordene sus puntos, tome notas y conserve registros durante la sesión. El panel en vivo ofrece control de tiempo, acceso al lector y conversión revisable a hechos propuestos, notas y borradores.
 
-![Mesa de audiencia de LexOpen con guion y registros vinculados a fuentes](docs/assets/screenshots/audiencia.png)
+**Audiencias en vivo** (`/audiencias`) reúne sus mesas privadas vinculadas a cada causa. Abra una mesa para entrar directamente al panel independiente, con fuentes, lectura, notas, conversación, guion y agenda, además de enlaces al expediente y a sus escritos. Abrir el panel no inicia el reloj ni activa el micrófono.
+
+![Panel independiente de audiencia de LexOpen con herramientas en vivo, lectura y transcripción](docs/codex-audiencias-2026-11-02/live-desktop.png)
 
 La captura de audio requiere una acción y autorización explícitas. La transcripción aparece por tramos de unos quince segundos, después del procesamiento, y conserva originales privados. Se pueden escuchar, elegir pasajes y reintentar fallos. La recuperación temporal al navegar no activa el micrófono ni envía audio automáticamente. [Funcionamiento y límites de la transcripción](docs/ENTREGA-TRANSCRIPCION-EN-VIVO-2026-11-02.md).
 
@@ -150,6 +152,7 @@ Las integraciones son opcionales y necesitan su configuración o credenciales:
 
 - **Google Workspace:** archivos elegidos de Drive, carpetas por causa, Calendar y funciones de correo admitidas.
 - **IA y transcripción:** proveedores configurables, con política de envío del estudio y opción de servicios locales.
+- **Codex personal:** cada profesional puede conectar su cuenta de ChatGPT/Codex desde **Mi cuenta**, elegir modelo y activar su uso en las próximas consultas de texto, sin API key. Requiere Codex CLI en el Host y respeta la política de sólo IA local. [Preparación, uso y límites verificados](docs/CODEX.md).
 - **PJUD:** importación CSV y conectores de seguimiento según el acceso y la configuración. Las consultas automatizadas son opt-in; no se presentan como un canal oficial. [Guía PJUD](docs/PJUD.md).
 - **Obsidian y almacenamiento:** exportación Markdown y archivos locales o almacenamiento compatible con S3.
 
@@ -198,6 +201,7 @@ El [workflow de CI](.github/workflows/ci.yml) comprueba migraciones y diferencia
 | [Host web](docs/WEB-HOST.md) | Instalación, red, configuración, respaldos y operación. |
 | [Desktop](docs/DESKTOP.md) | Aplicación de escritorio, modos Host y Cliente. |
 | [Asistente](docs/ASISTENTE.md) | Inicio, herramientas operativas y permisos. |
+| [Codex personal](docs/CODEX.md) | Cuenta de ChatGPT/Codex por profesional, preparación del Host, modelos y política de envío. |
 | [Biblioteca](docs/BIBLIOTECA-PERSONAL-2026-11-01.md) | Archivos personales, colecciones, lectores y citas. |
 | [Audiencias en vivo](docs/ENTREGA-AUDIENCIAS-EN-VIVO-2026-11-02.md) | Guion, sesión, notas y continuidad con escritos. |
 | [Transcripción y conversiones](docs/ENTREGA-TRANSCRIPCION-EN-VIVO-2026-11-02.md) | Captura, recuperación, fuentes y destinos revisables. |

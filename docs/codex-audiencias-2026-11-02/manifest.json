@@ -1,0 +1,225 @@
+{
+  "baseCommit": "f49eb0be9815e2a22dd9a6079e9ff1afe7555e4f",
+  "sourceState": "working tree on base commit; hashes bind validated implementation",
+  "realAccountAuthorized": false,
+  "checks": {
+    "browserDistinct": 14,
+    "confirmation": 1,
+    "unitSuitePassed": true,
+    "lintPassed": true,
+    "typesPassed": true,
+    "standaloneBuildPassed": true,
+    "buildWarnings": 4,
+    "warningFiles": [
+      "src/lib/auth/rate-limit.ts",
+      "src/lib/storage.ts"
+    ],
+    "visualVerdict": "ship",
+    "materialFindings": [
+      {
+        "id": "P2-mobile-tools",
+        "status": "resolved"
+      }
+    ]
+  },
+  "screenshots": [
+    {
+      "file": "audience-hub-desktop.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "afad6dda8c617254d992dfd7cfef286944e007fa02ff95d05a0c862efacd5549",
+      "syntheticData": true
+    },
+    {
+      "file": "audience-hub-mobile.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "afd810747fd5abf4173a2e87c2a825350f3b20d9583b2a42e03a084f161394de",
+      "syntheticData": true
+    },
+    {
+      "file": "codex-authorization-desktop.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "bae3ed5ef7a46bad28eb793a62b0c1c978e64c36ae5fa95d4a813a4a9c8c800f",
+      "syntheticData": true
+    },
+    {
+      "file": "codex-authorization-mobile.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "152640a3f607f960dee42f5570d8c25fed5879d8b05d9ee18fc9db6f3cb6901f",
+      "syntheticData": true
+    },
+    {
+      "file": "codex-connected-desktop.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "dd3bc49961b01682126397c0066a3b65296c65badf383f80db6efdaaf8c2507d",
+      "syntheticData": true
+    },
+    {
+      "file": "codex-connected-mobile.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "7950541dec4e5e9f9c7ff9bf55d5ca4c20d5a486739df29ed1d23ba87431b7ce",
+      "syntheticData": true
+    },
+    {
+      "file": "live-desktop.png",
+      "width": 1440,
+      "height": 1100,
+      "sha256": "0390753f3f38ec39bbf9d66fea92259ae9bb8e81a8a266d933db7bc672d1dacf",
+      "syntheticData": true
+    },
+    {
+      "file": "live-mobile.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "bfb1db1c8277fab196aa6a6080f8b0929c1f19e07f3f2fc8a73570e5cb5ea822",
+      "syntheticData": true
+    }
+  ],
+  "sources": [
+    {
+      "file": "e2e/audience-hub.spec.ts",
+      "sha256": "cb5f571b7e7a3fa1fb928416a69527326b01af2bfd30b6ac21af9417cde1197e"
+    },
+    {
+      "file": "e2e/codex-connection.spec.ts",
+      "sha256": "ce7d7f306233431abab267af55c1c6d3a8583bcf18677cdc0040ecce9cb53826"
+    },
+    {
+      "file": "e2e/fixtures/codex-app-server.mjs",
+      "sha256": "ee807eb8d5e85376a262968379f6a28f286a63fd1e05225408d120864ab11c11"
+    },
+    {
+      "file": "src/app/(app)/audiencias/[workspaceId]/page.tsx",
+      "sha256": "2526a715cfb6d23f7048c6f7bdbbb30eb0a052c65d5d1d469b16835231c7770c"
+    },
+    {
+      "file": "src/app/(app)/audiencias/page.tsx",
+      "sha256": "0412275ab0984244b86b65966550d25efe4e6f266a27ba2fe7b697f8be4a9a4a"
+    },
+    {
+      "file": "src/app/api/hearings/route.ts",
+      "sha256": "5a1b17113aa74ec9b572e125fadefe70e60e29c826b07efcc780f7daf1615bc0"
+    },
+    {
+      "file": "src/app/api/integrations/codex/route.ts",
+      "sha256": "97aff0cb75283db68e0de9aea653e93d76e4fb4ab7db279210057bac28cedb0d"
+    },
+    {
+      "file": "src/components/config/CodexConnection.css",
+      "sha256": "a9f3f19054f63c60a7874c82c91df5bc58bd19a8f1dc0b56b3b8b96546250c5a"
+    },
+    {
+      "file": "src/components/config/CodexConnection.tsx",
+      "sha256": "0f5f7bf2a8efa374764ac7a1dedb336583b9f9df69c01d8d75e7072c080f8638"
+    },
+    {
+      "file": "src/components/hearings/AudienceHub.tsx",
+      "sha256": "1eefa061d71338c017c2cbe293d3a5589d29e710b1844bf10bb735fc07671a7e"
+    },
+    {
+      "file": "src/components/hearings/audience-hub.css",
+      "sha256": "0653c04078236196e9279f8e801b6a802908d631625289deb3515dbaafb3364b"
+    },
+    {
+      "file": "src/components/hearings/independent-hearing.css",
+      "sha256": "f6fbc0f6ef07f235f9fb3da3b1ae07de15231dfb9113df5b055add5cbf909f88"
+    },
+    {
+      "file": "src/lib/hearings/hub-types.ts",
+      "sha256": "10d57f8a48a682a29991bff6b88e0b64b6ba8f2c2a5d5d0bed2502a51aabcf01"
+    },
+    {
+      "file": "src/lib/integrations/codex-dispatch.test.ts",
+      "sha256": "28344223b2d44737d28ff49cc17a2db0b264e4501c48b748470e9487c37cafd7"
+    },
+    {
+      "file": "src/lib/integrations/codex-dispatch.ts",
+      "sha256": "c44176675dcfae91a4e6611a45a45f775b465e4f86b04a38f5f8c8585754bf4a"
+    },
+    {
+      "file": "src/lib/integrations/codex-preference.ts",
+      "sha256": "74f331eafa2863b5841dd88d81bcaa57db21069651b37f7e4a69f8120415df69"
+    },
+    {
+      "file": "src/lib/integrations/codex-rpc.test.ts",
+      "sha256": "61bb77b7f1a441885455efe7a48470b586147c5a509b86809d5a43eda7c3e66e"
+    },
+    {
+      "file": "src/lib/integrations/codex-rpc.ts",
+      "sha256": "dd8d9c0efa00cf16770fdf6a3a7ac372bf2248fc1286bd04443789b43a603b99"
+    },
+    {
+      "file": "src/lib/integrations/codex-session.test.ts",
+      "sha256": "6ee1a6558466bbde5d9d9cf7c083209ff814f9534c5df632e4eb5bc16714aa55"
+    },
+    {
+      "file": "src/lib/integrations/codex-session.ts",
+      "sha256": "0e762b76514b6e362614cad029d1bff20fdfdc5da2f7f4ca06e67cdefd3145ba"
+    },
+    {
+      "file": "src/lib/integrations/fixtures/codex-app-server.mjs",
+      "sha256": "00fbbb181724d219c7f832e90f33424d8362e41490837f3c813642485b16a3cc"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "sha256": "eaa5c0cbe062679f578c94d58f8b1765b497cce150929302eb67ac235ff3d9ea"
+    },
+    {
+      "file": "e2e/hearing-live.spec.ts",
+      "sha256": "6b24d9f156eeb69185f50b950cc2c3bf7fb303f3845747e2e1d328691d3b2e64"
+    },
+    {
+      "file": "next.config.ts",
+      "sha256": "a37e9633cfed320db9eaf48240e8bb12564c2c0225d72a5ffd525115494539f0"
+    },
+    {
+      "file": "package.json",
+      "sha256": "158149175619dbab0701ca1456821087349ee7b7420ca901906dbb9eb9fe65dc"
+    },
+    {
+      "file": "src/app/(app)/causas/[id]/audiencias/page.tsx",
+      "sha256": "715971aa33a24496ede8ad8e883adcb0e0d579e9eee1b4b433c05f85793dffcb"
+    },
+    {
+      "file": "src/app/(app)/cuenta/page.tsx",
+      "sha256": "bcb2573fa3fb759915ddb22adc574005d503ca207e5bc30483b99406a5d2d9c8"
+    },
+    {
+      "file": "src/app/(app)/integraciones/page.tsx",
+      "sha256": "b366392141d3c478238389d0b8dc5b2b1393c0301de40368e8c5897f87b61669"
+    },
+    {
+      "file": "src/components/AppSidebar.tsx",
+      "sha256": "393ccd9e6d5e947fa5ec3c9fbc2448c7fe1f8e147eea4e6f02951a5f552068b8"
+    },
+    {
+      "file": "src/components/causas/CaseWorkflowNav.tsx",
+      "sha256": "e074977d268cf292fb26437416397ac66937cd88820fc03f5cf297e9fc586664"
+    },
+    {
+      "file": "src/components/hearings/HearingWorkbench.tsx",
+      "sha256": "1755d9f9f44561cbf8bce4534e3face2a21517b1be40516fb20bbd6607e4f68e"
+    },
+    {
+      "file": "src/components/shell/Breadcrumbs.tsx",
+      "sha256": "272d6b876af81613aabffa9523ec6f614c8e54a0c6afe073021b9d33fb31867b"
+    },
+    {
+      "file": "src/lib/i18n/dictionaries/en.ts",
+      "sha256": "41f199e446767334bcf15051681e73c62c6d9f99c2c200f9e7b575442d163a85"
+    },
+    {
+      "file": "src/lib/i18n/dictionaries/es.ts",
+      "sha256": "2365f4d128f324c5519fe799c888c7cc5468c129dd22c079e317d6fba3c17d0f"
+    },
+    {
+      "file": "src/lib/integrations/llm.ts",
+      "sha256": "4538aef41a0a29b3b6e2c1b522b23de83457b7ac9975caa0798c09356fdccb61"
+    }
+  ]
+}

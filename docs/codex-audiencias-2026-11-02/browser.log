@@ -1,0 +1,21 @@
+
+Running 14 tests using 1 worker
+
+(node:51539) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/audience-hub.spec.ts:33:5 › panel independiente: mesas propias, búsqueda, recuperación, creación y privacidad por causa (4.7s)
+  ✓   2 [chromium] › e2e/case-writing.spec.ts:71:5 › escrito por causa: guardado, tres orígenes, historial y salida con respaldos (12.4s)
+  ✓   3 [chromium] › e2e/case-writing.spec.ts:149:5 › cuaderno de fuentes: recupera cargas fallidas y conserva libro y búsqueda al revisar referencias (4.2s)
+  ✓   4 [chromium] › e2e/case-writing.spec.ts:251:5 › guardado perdido y edición durante la solicitud: conserva texto y evita duplicados (2.2s)
+  ✓   5 [chromium] › e2e/case-writing.spec.ts:280:5 › volver en el navegador antes de la pausa de guardado conserva la última edición (2.3s)
+  ✓   6 [chromium] › e2e/case-writing.spec.ts:295:5 › conflicto de pestañas y revocación: no sobrescribe ni exporta derivados sin acceso (2.8s)
+  ✓   7 [chromium] › e2e/codex-connection.spec.ts:50:5 › Codex personal: autorización explícita, modelos, prueba, aislamiento, política local y desconexión (9.3s)
+  ✓   8 [chromium] › e2e/hearing-live-transcription.spec.ts:107:5 › captura nativa por tramos: transcripción, pasaje, hecho propuesto, nota y escrito con citas (22.9s)
+  ✓   9 [chromium] › e2e/hearing-live-transcription.spec.ts:196:5 › protege enlaces y Atrás detiene la captura con recuperación del tramo sin envío automático (3.2s)
+  ✓  10 [chromium] › e2e/hearing-live-transcription.spec.ts:228:5 › fallo del transcriptor: conserva audio, detiene el micrófono y permite reintentar (17.3s)
+  ✓  11 [chromium] › e2e/hearing-live.spec.ts:70:5 › audiencia en vivo: guion guardado, tiempo con pausas, puntos tratados y registros con fuentes (12.1s)
+  ✓  12 [chromium] › e2e/hearing-live.spec.ts:140:5 › registro perdido, escrito de causa y fuente retirada: conserva privacidad y evita duplicados (2.3s)
+  ✓  13 [chromium] › e2e/hearing-live.spec.ts:189:5 › anotación pendiente al volver y contador sin conexión: recuperación sin registrar automáticamente (8.7s)
+  ✓  14 [chromium] › e2e/hearing-workspace.spec.ts:28:5 › mesa de audiencia: lectura, marcadores, notas, conversación con fuentes y privacidad (15.1s)
+
+  14 passed (2.0m)

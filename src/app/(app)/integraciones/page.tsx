@@ -142,6 +142,7 @@ function IntegracionesInner() {
         title={h.title}
         subtitle={h.subtitle}
       />
+      <p><Link className="btn btn-secondary" href="/cuenta#codex">Conectar mi cuenta de ChatGPT/Codex</Link></p>
 
       {googleFlash && (
         <div

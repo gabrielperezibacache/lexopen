@@ -1,7 +1,8 @@
 "use client";
 import { requestPdfPage } from "@/lib/evidence/page-request";
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowDown, ArrowUp, Bookmark, BookOpen, Check, ChevronLeft, ChevronRight, Copy, Download, FileText, ListChecks, MessageSquare, Plus, Search, Trash2, X, Play } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
 import { newUiId } from "@/lib/ui-id";
@@ -13,6 +14,7 @@ import { HearingBrief } from "./HearingBrief";
 import { HearingLivePanel } from "./HearingLivePanel";
 import type { HearingLiveView } from "@/lib/hearings/live-types";
 import "./hearings.css";
+import "./independent-hearing.css";
 type AvailableSource = Extract<HearingSourceView, { available: true }>;
 type AvailableNote = Extract<HearingNoteView, { available: true }>;
 type Panel = "live" | "sources" | "reading" | "notes" | "chat" | "brief" | "agenda";
@@ -32,12 +34,19 @@ function PageImage({ url, title, page }: { url: string; title: string; page: num
   const current = response?.key === key ? response : null;
   return <figure className="hearing-page-image"><figcaption>Página {page} del PDF conservado</figcaption>{!current && <p role="status">Abriendo la página…</p>}{current?.error && <div role="alert"><p>{current.error}</p><button className="btn btn-secondary" type="button" onClick={() => setRetry(n => n + 1)}>Reintentar página</button></div>}{current?.url && <Image unoptimized src={current.url} alt={`Página ${page} de ${title}`} width={1100} height={1500} />}</figure>;
 }
+function subscribeClock(update: () => void) { const timer = setInterval(update, 15_000); return () => clearInterval(timer); }
+const clockMinute = () => Math.floor(Date.now() / 60_000);
+function HearingClock() {
+  const minute = useSyncExternalStore(subscribeClock, clockMinute, () => null);
+  const date = minute === null ? null : new Date(minute * 60_000);
+  return <span className="hearing-session-clock"><span>Hora de Chile</span><time dateTime={date?.toISOString()}>{date ? new Intl.DateTimeFormat("es-CL", { hour: "2-digit", minute: "2-digit", timeZone: "America/Santiago" }).format(date) : "—"}</time></span>;
+}
 function Citation({ citation }: { citation: HearingCitation }) { return <div className="hearing-citation"><a href={citation.href} target="_blank" rel="noreferrer">{citation.reference} · {citation.locator}</a><blockquote>{citation.quote}</blockquote>{citation.warning && <p>{citation.warning}</p>}</div>; }
-export function HearingWorkbench({ causaId, initialWorkspaceId, initialNoteId }: { causaId: string; initialWorkspaceId?: string; initialNoteId?: string }) {
+export function HearingWorkbench({ causaId, initialWorkspaceId, initialNoteId, initialPanel = "reading", independent = false }: { causaId: string; initialWorkspaceId?: string; initialNoteId?: string; initialPanel?: Panel; independent?: boolean }) {
   const base = `/api/causas/${causaId}/hearings`;
   const [listState, setListState] = useState<{ data?: HearingLibraryView; error?: string }>(), [selectedWorkspace, selectWorkspace] = useState(""), [refresh, setRefresh] = useState(0), [catalogRefresh, setCatalogRefresh] = useState(0);
   const [workspaceState, setWorkspaceState] = useState<{ key: string; data?: HearingWorkspaceView; error?: string }>(), [selectedSource, selectSource] = useState(""), [readQuery, setReadQuery] = useState<HearingLocation>({});
-  const [readingState, setReadingState] = useState<{ key: string; data?: HearingReading; error?: string }>(), [panel, setPanel] = useState<Panel>(initialNoteId ? "notes" : "reading");
+  const [readingState, setReadingState] = useState<{ key: string; data?: HearingReading; error?: string }>(), [panel, setPanel] = useState<Panel>(initialNoteId ? "notes" : initialPanel);
   const [newTitle, setNewTitle] = useState(""), [sourceQuery, setSourceQuery] = useState(""), [sourceKind, setSourceKind] = useState("all"), [optionValue, setOptionValue] = useState("");
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [status, setStatus] = useState(""), [manualCopy, setManualCopy] = useState(""), copyRef = useRef<HTMLTextAreaElement>(null);
   const [noteTitle, setNoteTitle] = useState(""), [noteBody, setNoteBody] = useState(""), [noteQuote, setNoteQuote] = useState<HearingQuote | null>(null), [editingNote, setEditingNote] = useState<AvailableNote | null>(null), [noteQuery, setNoteQuery] = useState("");
@@ -99,11 +108,14 @@ export function HearingWorkbench({ causaId, initialWorkspaceId, initialNoteId }:
   useEffect(() => {
     if (!workspace) return;
     const destination = new URL(location.href);
-    if (destination.searchParams.get("mesa") === workspace.id) return;
-    destination.searchParams.set("mesa", workspace.id); destination.searchParams.delete("nota");
+    const workspacePath = `/audiencias/${encodeURIComponent(workspace.id)}`;
+    if (independent ? destination.pathname === workspacePath && !destination.searchParams.has("mesa") : destination.searchParams.get("mesa") === workspace.id) return;
+    if (independent) { destination.pathname = workspacePath; destination.searchParams.delete("mesa"); }
+    else destination.searchParams.set("mesa", workspace.id);
+    destination.searchParams.delete("nota");
     if (destination.hash.startsWith("#note-")) destination.hash = "";
     window.history.replaceState(null, "", `${destination.pathname}${destination.search}${destination.hash}`);
-  }, [workspace]);
+  }, [workspace, independent]);
   useEffect(() => {
     if (!workspace || !initialNoteId || workspace.id !== initialWorkspaceId || !workspace.notes.some(note => note.id === initialNoteId && note.available)) return;
     const frame = requestAnimationFrame(() => document.getElementById(`note-${initialNoteId}`)?.scrollIntoView({ block: "center", behavior: "instant" }));
@@ -147,11 +159,12 @@ export function HearingWorkbench({ causaId, initialWorkspaceId, initialNoteId }:
   async function converse() { const payload = { question, mode, passages: activePassages.map(({ label: _label, ...p }) => { void _label; return p; }), noteIds: selectedNotes.filter(id => availableNotes.some(n => n.id === id)) }, fingerprint = JSON.stringify(payload); if (requestRef.current?.fingerprint !== fingerprint) requestRef.current = { fingerprint, id: newUiId("hearing") }; const result = await mutate<{ status: string; warning?: string }>(`${base}/${selectedWorkspace}/chat`, "POST", { ...payload, requestId: requestRef.current.id }); if (result) { reload(); setStatus(result.status === "abstained" ? result.warning || "Seleccione pasajes para continuar" : mode === "ai" ? "Respuesta de IA guardada con sus respaldos para revisión." : "Pasajes corroborados guardados sin llamar a la IA."); } }
   const options = (list?.options || []).filter(o => (!sourceQuery || `${o.title} ${o.detail}`.toLocaleLowerCase("es").includes(sourceQuery.toLocaleLowerCase("es"))) && (sourceKind === "all" || o.kind === sourceKind));
   const shownSources = workspace?.sources.filter(s => !s.available || (sourceKind === "all" || s.kind === sourceKind) && (!sourceQuery || `${s.title} ${s.detail}`.toLocaleLowerCase("es").includes(sourceQuery.toLocaleLowerCase("es")))) || [];
-  return <section className="hearing-workbench" aria-label="Acompañante de audiencia">
-    <header className="hearing-heading"><div><h2>Dossier y herramientas</h2><p>Su dossier, su lectura y sus argumentos, en un mismo lugar. Cada mesa es privada.</p></div>{workspace && <div className="hearing-heading-actions"><button type="button" className="btn btn-primary" aria-pressed={panel === "live"} onClick={() => setPanel(panel === "live" ? "reading" : "live")}><Play size={16} aria-hidden="true" />{panel === "live" ? "Volver a la lectura" : "Abrir panel en vivo"}</button><button type="button" className="btn btn-secondary" disabled={busy || liveBusy} onClick={exportWorkspace}><Download size={16} aria-hidden="true" /> Exportar mesa</button></div>}</header>
+  const workspaceControls = list && <div className="hearing-workspace-switch"><label>Mesa privada<select aria-label="Mesa privada" className="select" value={selectedWorkspace} onChange={e => void chooseWorkspace(e.target.value)} disabled={busy || liveBusy || !list.workspaces.length}><option value="">Seleccione una mesa</option>{list.workspaces.map(w => <option key={w.id} value={w.id}>{w.title} · {statusLabel[w.status]}</option>)}</select></label>{list.canWrite && <form onSubmit={e => { e.preventDefault(); void create(); }}><label>Crear otra mesa<input className="input" placeholder="Ej. Audiencia preparatoria" value={newTitle} maxLength={180} minLength={3} required onChange={e => setNewTitle(e.target.value)} disabled={busy} /></label><button type="submit" className="btn btn-primary" disabled={busy || newTitle.trim().length < 3}><Plus size={16} aria-hidden="true" /> Crear mesa</button></form>}</div>;
+  return <section className="hearing-workbench" aria-label="Acompañante de audiencia" data-independent={independent || undefined}>
+    <header className="hearing-heading"><div><h2>{independent ? "Herramientas de la audiencia" : "Dossier y herramientas"}</h2><p>{independent ? "Lecturas, intervención, notas y fuentes de esta mesa privada. Inicie el tiempo de sesión o la captura cuando esté preparado." : "Su dossier, su lectura y sus argumentos, en un mismo lugar. Cada mesa es privada."}</p></div>{workspace && <div className="hearing-heading-actions">{independent && <HearingClock />}{!independent && <><button type="button" className="btn btn-primary" aria-pressed={panel === "live"} onClick={() => setPanel(panel === "live" ? "reading" : "live")}><Play size={16} aria-hidden="true" />{panel === "live" ? "Volver a la lectura" : "Abrir panel en vivo"}</button><Link className="btn btn-secondary" href={`/audiencias/${workspace.id}`}>Abrir panel independiente</Link></>}<button type="button" className="btn btn-secondary" disabled={busy || liveBusy} onClick={exportWorkspace}><Download size={16} aria-hidden="true" /> Exportar mesa</button></div>}</header>
     {listState?.error && <p role="alert" className="hearing-error">{listState.error} <button type="button" className="btn btn-secondary" onClick={reload}>Reintentar</button></p>}
     {!listState && <p role="status">Abriendo sus mesas de audiencia…</p>}
-    {list && <div className="hearing-workspace-switch"><label>Mesa privada<select aria-label="Mesa privada" className="select" value={selectedWorkspace} onChange={e => void chooseWorkspace(e.target.value)} disabled={busy || liveBusy || !list.workspaces.length}><option value="">Seleccione una mesa</option>{list.workspaces.map(w => <option key={w.id} value={w.id}>{w.title} · {statusLabel[w.status]}</option>)}</select></label>{list.canWrite && <form onSubmit={e => { e.preventDefault(); void create(); }}><label>Crear otra mesa<input className="input" placeholder="Ej. Audiencia preparatoria" value={newTitle} maxLength={180} minLength={3} required onChange={e => setNewTitle(e.target.value)} disabled={busy} /></label><button type="submit" className="btn btn-primary" disabled={busy || newTitle.trim().length < 3}><Plus size={16} aria-hidden="true" /> Crear mesa</button></form>}</div>}
+    {independent && workspaceControls ? <details className="hearing-session-organizer"><summary>Organizar mesas de esta causa</summary>{workspaceControls}</details> : workspaceControls}
     {error && <p className="hearing-error" role="alert">{error}</p>}{status && <p className="hearing-status" role="status">{status}</p>}
     {noteReplacement && <div className="hearing-warning hearing-note-guard" role="status"><p>Tiene {noteDirty && noteReplacement.all && agendaDirty ? "una nota y la agenda" : noteDirty ? "una nota" : "la agenda"} sin guardar. Elija qué conservar antes de {noteReplacement.label}.</p><div className="hearing-actions"><button className="btn btn-secondary" type="button" disabled={busy} onClick={() => { setNoteReplacement(null); setPanel(noteDirty ? "notes" : "agenda"); if (noteDirty) focusNote(); }}>Seguir editando</button><button className="btn btn-primary" type="button" disabled={busy || !canWrite || noteSaveState === "conflict" || noteDirty && (!noteTitle.trim() || !noteBody.trim()) || noteReplacement.all && agendaDirty && agendaDraft?.values.revision !== workspace?.revision} onClick={async () => { const action = noteReplacement; if (await savePendingChanges(action.all)) action.run(); }}>Guardar cambios y continuar</button><button className="hearing-copy-link" type="button" disabled={busy} onClick={() => { const action = noteReplacement; if (action.all) resetDrafts(); else resetNote(); action.run(); }}>Descartar cambios y continuar</button></div></div>}
     {workspaceState?.key === workspaceKey && workspaceState.error && <p role="alert" className="hearing-error">{workspaceState.error}</p>}
@@ -167,7 +180,7 @@ export function HearingWorkbench({ causaId, initialWorkspaceId, initialNoteId }:
           {canWrite && <form className="hearing-add-source" onSubmit={e => { e.preventDefault(); void addSource(); }}><label>Añadir material accesible<select className="select" value={optionValue} onChange={e => setOptionValue(e.target.value)} disabled={busy}><option value="">Elija una fuente…</option>{options.map(option => <option value={`${option.kind}:${option.refId}`} key={`${option.kind}:${option.refId}`}>{option.title} · {option.detail}</option>)}</select></label><button type="submit" className="btn btn-secondary" disabled={busy || !optionValue}><Plus size={15} aria-hidden="true" /> Añadir al dossier</button><p>Los libros privados y las colecciones mantienen sus permisos originales.</p></form>}
         </aside>
         <section className="hearing-reading" aria-label="Lector de fuentes" tabIndex={panel === "live" ? 0 : undefined}>
-          {!source && <div className="hearing-empty"><BookOpen size={42} strokeWidth={1.3} aria-hidden="true" /><h4>Abra una fuente del dossier</h4><p>Lea el PDF junto a su texto preparado, guarde el punto de lectura y elija los pasajes que respaldarán sus notas o su conversación.</p></div>}
+          {!source && <div className="hearing-empty"><BookOpen size={42} strokeWidth={1.3} aria-hidden="true" /><h4>Abra una fuente del dossier</h4><p>Lea el PDF junto a su texto preparado, guarde el punto de lectura y elija los pasajes que respaldarán sus notas o su conversación.</p>{independent && <button type="button" className="btn btn-secondary" onClick={() => setPanel("sources")}>Reunir fuentes para esta audiencia</button>}</div>}
           {source && <><header className="hearing-reader-heading"><div><h4>{source.title}</h4><p>{source.detail}</p></div><a href={source.href} target="_blank" rel="noreferrer">Abrir ficha</a></header>
             {readingState?.key === readingKey && readingState.error && <p className="hearing-error" role="alert">{readingState.error} <button type="button" className="btn btn-secondary" onClick={reload}>Volver a cargar</button></p>}
             {!reading && readingState?.key !== readingKey && <p role="status">Abriendo el material autorizado…</p>}

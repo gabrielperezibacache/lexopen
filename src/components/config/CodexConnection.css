@@ -1,0 +1,25 @@
+.codex-connection { padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-solid); scroll-margin-top: 7rem; }
+.codex-connection header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.codex-connection header svg { flex-shrink: 0; color: var(--sea); }
+.codex-connection h2 { font-family: var(--font-fraunces), Georgia, serif; font-size: var(--text-xl); line-height: 1.3; margin: 0 0 .75rem; }
+.codex-connection h3 { font-family: var(--font-fraunces), Georgia, serif; font-size: var(--text-lg); margin: 0 0 .75rem; }
+.codex-connection p { max-width: 72ch; line-height: 1.75; color: var(--ink-soft); }
+.codex-help { margin-block: .75rem 1.25rem; font-size: var(--text-sm); }
+.codex-account-state { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem 1.5rem; padding-block: 1rem; margin-bottom: 1.25rem; border-block: 1px solid var(--line); }
+.codex-account-state strong { color: var(--sea); }
+.codex-account-state span { color: var(--ink-soft); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.codex-authorize { display: grid; justify-items: start; gap: 1rem; padding-block: .5rem 1.5rem; }
+.codex-authorize code { max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; font-size: var(--text-xl); letter-spacing: .08em; padding: .75rem 1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); }
+.codex-preferences { display: grid; gap: 1rem; max-width: 52rem; }
+.codex-preferences > label:first-child { display: grid; gap: .5rem; }
+.codex-check { display: flex; align-items: flex-start; gap: .75rem; min-height: 44px; line-height: 1.7; padding-block: .5rem; }
+.codex-check input { margin-top: .35rem; width: 18px; height: 18px; accent-color: var(--sea); flex-shrink: 0; }
+.codex-actions { display: flex; flex-wrap: wrap; gap: .75rem 1rem; align-items: center; }
+.codex-text-action { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; color: var(--sea); font-size: var(--text-sm); text-decoration: underline; text-underline-offset: .3rem; justify-self: start; }
+.codex-message { padding-block: 1rem; margin-block: 1rem; border-block: 1px solid var(--line-strong); }
+.codex-message[data-error="true"] p { color: var(--danger); }
+.codex-host-help { margin-top: 1.5rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+.codex-host-help summary { min-height: 44px; cursor: pointer; color: var(--ink-soft); }
+.codex-connection .select { min-height: 44px; width: 100%; }
+.codex-connection :is(button,a,input,select,summary):focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
+@media (max-width: 600px) { .codex-actions { align-items: stretch; flex-direction: column; } .codex-actions .btn { width: 100%; } }

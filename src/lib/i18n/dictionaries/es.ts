@@ -63,6 +63,7 @@ export const es = {
     sites: "Espacios",
     clients: "Clientes",
     cases: "Causas",
+    hearings: "Panel de audiencias",
     pjudMonitor: "Monitoreo PJUD",
     misCausas: "Mis Causas CU",
     minutes: "Minutas",

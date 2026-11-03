@@ -9,6 +9,7 @@ import { safeJsonParse } from "@/lib/safe-json";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
 import { getAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { canSome } from "@/lib/auth/permissions";
+import { askPersonalCodex } from "@/lib/integrations/codex-dispatch";
 
 export type LlmPreset =
   | "openai"
@@ -516,6 +517,9 @@ export async function askLlm(params: {
       note: "Prompt vacío: indique una instrucción para el copiloto.",
     };
   }
+
+  const personal = await askPersonalCodex({ ...params, messages }, localOnly);
+  if (personal) return personal;
 
   let apiUrl: URL;
   try {

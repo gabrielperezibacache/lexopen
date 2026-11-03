@@ -1,0 +1,26 @@
+.hearing-session-page { display: grid; gap: 1.5rem; min-width: 0; }
+.hearing-session-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 1rem 2rem; }
+.hearing-session-heading h1 { margin: 0; font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(2rem, 3vw, 3.35rem); line-height: 1.15; letter-spacing: -.025em; text-wrap: balance; }
+.hearing-session-heading p { margin-top: .75rem; max-width: 70ch; color: var(--ink-soft); line-height: 1.7; overflow-wrap: anywhere; }
+.hearing-session-heading a { display: inline-flex; align-items: center; min-height: 44px; gap: .5rem; color: var(--sea); font-size: var(--text-sm); text-decoration: underline; text-underline-offset: .3rem; }
+.hearing-session-organizer, .hearing-session-audio { border-block: 1px solid var(--line); }
+.hearing-session-organizer > summary, .hearing-session-audio > summary { display: list-item; padding-block: 1rem; min-height: 52px; color: var(--sea); font-weight: 600; line-height: 1.7; cursor: pointer; }
+.hearing-session-organizer .hearing-workspace-switch { border: 0; padding-top: 0; }
+.hearing-session-clock { display: grid; gap: .15rem; padding-inline: .5rem; color: var(--ink-soft); }
+.hearing-session-clock span { font-size: var(--text-sm); }
+.hearing-session-clock time { font-size: var(--text-lg); color: var(--ink); font-variant-numeric: tabular-nums; }
+.hearing-session-page > .hearing-workbench { margin: 0; }
+.hearing-workbench[data-independent=true] > .hearing-mobile-tabs { display: flex; position: sticky; top: 5.5rem; z-index: 3; flex-wrap: wrap; align-items: center; gap: .25rem .65rem; padding-block: .35rem; margin-bottom: 1rem; background: var(--surface-solid); border-block: 1px solid var(--line); }
+.hearing-workbench[data-independent=true] > .hearing-mobile-tabs button { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: .55rem .75rem; color: var(--ink-soft); font-size: var(--text-sm); border-bottom: 2px solid transparent; }
+.hearing-workbench[data-independent=true] > .hearing-mobile-tabs button[aria-current=page] { color: var(--sea); border-color: var(--sea); font-weight: 600; }
+.hearing-workbench[data-independent=true] .hearing-tool-tabs { display: none; }
+.hearing-workbench[data-independent=true] :is(.hearing-live-heading, .hearing-live-record) { scroll-margin-top: 10rem; }
+.hearing-workbench[data-independent=true] .hearing-workspace-title { margin-top: 1.25rem; }
+.hearing-session-audio > div { margin-block: 1rem 1.5rem; }
+.hearing-session-page :where(a,summary):focus-visible { outline: 2px solid var(--sea); outline-offset: 4px; }
+@media (max-width: 760px) {
+  .hearing-workbench[data-independent=true] > .hearing-mobile-tabs { top: 4rem; flex-wrap: wrap; overflow-x: visible; }
+  .hearing-workbench[data-independent=true] > .hearing-mobile-tabs button { flex-shrink: 0; }
+  .hearing-workbench[data-independent=true] :is(.hearing-live-heading, .hearing-live-record) { scroll-margin-top: 16rem; }
+  .hearing-session-heading h1 { font-size: 2rem; }
+}

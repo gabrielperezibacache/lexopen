@@ -65,6 +65,7 @@ export const en: Dictionary = {
     sites: "Sites",
     clients: "Clients",
     cases: "Matters",
+    hearings: "Hearing panel",
     pjudMonitor: "PJUD monitoring",
     misCausas: "My Cases CU",
     minutes: "Minutes",
