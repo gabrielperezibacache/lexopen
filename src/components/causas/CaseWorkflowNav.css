@@ -1,0 +1,25 @@
+.case-workflow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem 1.5rem;
+  padding-block: .65rem;
+  border-block: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+.case-workflow-title { display: inline-flex; align-items: center; gap: .65rem; min-width: 0; max-width: 38rem; min-height: 44px; font-family: var(--font-fraunces), Georgia, serif; font-size: 1.1rem; line-height: 1.45; }
+.case-workflow-title span { overflow-wrap: anywhere; }
+.case-workflow svg { flex-shrink: 0; }
+.case-workflow ol { display: flex; flex-wrap: wrap; gap: .25rem 1rem; padding: 0; margin: 0; list-style: none; }
+.case-workflow li a { display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; padding: .3rem .1rem; font-size: .85rem; border-bottom: 2px solid transparent; transition: color var(--motion-base) var(--motion-ease), border-color var(--motion-base) var(--motion-ease); }
+.case-workflow a:hover { color: var(--sea); }
+.case-workflow li a[aria-current="page"] { color: var(--sea); border-color: var(--sea); font-weight: 600; }
+.case-workflow a:focus-visible { outline: 2px solid var(--sea); outline-offset: 4px; border-radius: 2px; }
+@media (max-width: 600px) {
+  .case-workflow { gap: .25rem; }
+  .case-workflow-title { width: 100%; font-size: 1rem; }
+  .case-workflow ol { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .15rem 1rem; }
+  .case-workflow li a { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .case-workflow li a { transition: none; } }

@@ -80,6 +80,55 @@ test("biblioteca personal: libros propios, seis distribuciones, pasajes, escrito
   await page.getByRole("button", { name: "Crear borrador con citas", exact: true }).click();
   const created = await createPending; expect(created.status(), await created.text()).toBe(201); const draft = (await created.json()).draft; draftIds.push(draft.id);
   await expect(page.getByLabel("Texto del borrador", { exact: true })).toHaveValue(/Texto propio ficticio/);
+  // Switching library sections keeps the live desk, including unsaved prose and inputs.
+  const prose = page.getByLabel("Texto del borrador", { exact: true });
+  const pendingProse = `${draft.prose}\n\nObservación propia pendiente de guardar.`;
+  await prose.fill(pendingProse);
+  await page.getByRole("button", { name: "Mis libros", exact: true }).click();
+  await page.getByRole("button", { name: "Mesa de escritura", exact: false }).first().click();
+  await expect(prose).toHaveValue(pendingProse);
+  await expect(page.locator(".book-desk-session")).toContainText("Cambios sin guardar");
+  await expect(page.getByLabel("Qué necesitas fundamentar", { exact: true })).toHaveValue("buena fe contrato");
+  // A failed catalog refresh hides stale material without unmounting the local draft.
+  await page.getByRole("button", { name: "Personalizar biblioteca", exact: true }).click();
+  await page.route("**/api/books", async route => { if (route.request().method() === "GET") await route.abort("failed"); else await route.continue(); });
+  await page.getByRole("button", { name: "Guardar mi biblioteca", exact: true }).click();
+  await expect(page.locator(".book-error[role=alert]")).toContainText("El material queda oculto");
+  await expect(prose).not.toBeVisible();
+  await page.unroute("**/api/books");
+  await page.getByRole("button", { name: "Volver a cargar biblioteca", exact: true }).click();
+  await expect(prose).toBeVisible();
+  await expect(prose).toHaveValue(pendingProse);
+  for (const action of [page.getByRole("button", { name: "Crear borrador con citas", exact: true }), page.locator(".book-draft-history button").first(), page.locator(".book-draft-references .book-source-link").first()]) {
+    page.once("dialog", dialog => dialog.dismiss());
+    await action.click();
+    await expect(prose).toHaveValue(pendingProse);
+  }
+  // A late response cannot overwrite keystrokes: the editor is locked until the save resolves.
+  let releaseSave!: () => void;
+  const saveGate = new Promise<void>(resolve => { releaseSave = resolve; });
+  const draftRoute = `**/api/books/drafts/${draft.id}`;
+  await page.route(draftRoute, async route => { if (route.request().method() === "PATCH") await saveGate; await route.continue(); });
+  await page.getByRole("button", { name: "Guardar escrito", exact: true }).click();
+  await expect(prose).toBeDisabled();
+  await expect(page.getByLabel("Título guardado", { exact: true })).toBeDisabled();
+  await expect(page.locator(".book-desk-session")).toContainText("Guardando el escrito");
+  releaseSave();
+  await expect(prose).toBeEnabled();
+  await expect(prose).toHaveValue(pendingProse);
+  await expect(page.locator(".book-desk-session")).toContainText("Guardado · revisión 2");
+  await page.unroute(draftRoute);
+  // A failed save retains the exact local text and exposes an explicit retry.
+  const recoveredProse = `${pendingProse}\n\nSegunda observación para reintentar.`;
+  await prose.fill(recoveredProse);
+  await page.route(draftRoute, async route => { if (route.request().method() === "PATCH") await route.abort("failed"); else await route.continue(); });
+  await page.getByRole("button", { name: "Guardar escrito", exact: true }).click();
+  await expect(page.locator(".book-error[role=alert]")).toContainText("Tu texto sigue en esta mesa");
+  await expect(prose).toHaveValue(recoveredProse);
+  await page.unroute(draftRoute);
+  await page.getByRole("button", { name: "Reintentar guardado", exact: true }).click();
+  await expect(page.locator(".book-desk-session")).toContainText("Guardado · revisión 3");
+  await expect(prose).toHaveValue(recoveredProse);
   const exported = await page.request.get(`/api/books/drafts/${draft.id}/export?format=txt`); expect(exported.status()).toBe(200); expect(await exported.text()).toContain("Original SHA-256:");
   for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 360, height: 800 }]] as const) {
     await page.setViewportSize(viewport); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -108,7 +157,15 @@ test("biblioteca personal: libros propios, seis distribuciones, pasajes, escrito
     expect((await other.request.get(`/api/books/${ids[0]}`)).status()).toBe(200);
     expect((await other.request.patch(`/api/books/${ids[0]}`, { data: { revision: textBook.revision, title: "No permitido" } })).status()).toBe(404);
     const otherDraft = await other.request.post("/api/books/drafts", { data: { requestId: randomUUID(), title: "Borrador compartido ficticio", query: "buena fe", instruction: "Reunir pasajes de la colección", collectionIds: [collection.id], mode: "extractive" } }); expect(otherDraft.status(), await otherDraft.text()).toBe(201); const dependent = (await otherDraft.json()).draft; draftIds.push(dependent.id);
+    await other.goto(`/biblioteca?escribir=${ids[0]}`);
+    await other.locator(".book-draft-history button").filter({ hasText: "Borrador compartido ficticio" }).click();
+    await expect(other.getByLabel("Texto del borrador", { exact: true })).toBeVisible();
+    await other.getByRole("button", { name: "Mis libros", exact: true }).click();
     expect((await page.request.patch(`/api/books/collections/${collection.id}`, { data: { revision: collection.revision, memberIds: [] } })).status()).toBe(200);
+    await other.getByRole("button", { name: "Mesa de escritura", exact: false }).first().click();
+    await expect(other.locator(".book-protected-draft")).toBeVisible();
+    await expect(other.locator(".book-saved-draft")).toHaveCount(0);
+    await expect(other.locator(".book-search-results")).toHaveCount(0);
     for (const route of [`/api/books/${ids[0]}`, `/api/books/${ids[0]}/original`, `/api/books/drafts/${dependent.id}`, `/api/books/drafts/${dependent.id}/export?format=txt`]) expect((await other.request.get(route)).status()).toBe(404);
   } finally { await context.close(); }
 });

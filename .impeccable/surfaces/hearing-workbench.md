@@ -22,6 +22,8 @@ Cada tramo ofrece escucha del original, texto automático, advertencias, descarg
 
 ## Saved work and recovery
 
+Las notas ordinarias y la agenda se conservan al consultar otras herramientas y actualizar el dossier. Antes de sustituir una nota, cambiar de mesa o seguir un enlace con cambios pendientes, una elección en el flujo permite seguir editando, guardar o descartar. Un conflicto conserva el texto local y permite comparar la revisión guardada antes de continuar. La mesa se refleja en la dirección tras abrirla con acceso vigente para retomarla al recargar.
+
 El guion guarda apertura, cierre, orden, punto activo y puntos tratados tras una pausa de escritura de 900 ms. Los puntos se vinculan a la revisión de cada nota: una nota modificada exige volver a revisarla antes de considerarla tratada. Las anotaciones rápidas se guardan sólo al confirmar; quedan como notas de audiencia disponibles para seleccionar en los escritos de la causa.
 
 Cambiar de herramienta conserva los campos. Antes de cambiar de mesa se guarda el guion y se exige registrar o descartar una anotación pendiente. Ante navegación SPA, una copia temporal en RAM conserva únicamente texto propio y tipo de registro: hasta veinte mesas y durante ocho horas, dentro de la misma pestaña. Se recupera sólo después de una lectura nuevamente autorizada. No conserva el pasaje citado ni sustituye el guardado en el Host; se borra al guardar, descartar o perder acceso. Una petición cuyo resultado no se confirmó exige revisar el registro antes de volver a guardarla.

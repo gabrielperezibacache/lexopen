@@ -26,6 +26,10 @@ Conservar AppShell, AppSidebar, Fraunces, Sora, cobre, verde mar y papel. Los bo
 - Escritorio: hoja flexible y cuaderno lateral de 19 a 23 rem. A 1120 píxeles o menos: barra superior adherida con Escribir, Fuentes, Referencias e Historial y estado de guardado persistente; sólo se muestra el panel elegido. A 700 píxeles: selección y creación se apilan, las pestañas se ordenan en dos columnas y la hoja reduce su relleno. Acciones y campos principales mantienen 44 píxeles de altura mínima.
 - Las pestañas principales admiten flechas, Inicio y Fin. La apertura del panel de cuaderno usa 180 ms con `cubic-bezier(.16, 1, .3, 1)` y recorte de hoja; `prefers-reduced-motion` elimina la animación.
 
+## Continuidad entre herramientas
+
+El recorrido común conserva causa y escrito al abrir la biblioteca o un libro. La remisión del lector selecciona el volumen en el cuaderno sin incorporar texto automáticamente. El cuaderno mantiene búsqueda, volumen y página al consultar referencias o historial; al regresar comprueba nuevamente el acceso antes de mostrar pasajes. Los fallos temporales tienen reintento explícito. Los orígenes admiten flechas, Inicio y Fin con una única pestaña tabulable y panel asociado.
+
 ## Fuentes
 
 `src/components/writings/CaseWritingEditor.tsx`, `src/components/writings/CaseWritingEditor.css` y `src/app/(app)/causas/[id]/escritos/page.tsx`; tokens y controles compartidos de `src/app/globals.css`. Este brief documenta la implementación y no acredita publicación ni una revisión visual final.

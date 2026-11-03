@@ -12,6 +12,7 @@ import { DocumentoAiActions } from "@/components/ai/DocumentoAiActions";
 import { PlazoSugerirAi } from "@/components/ai/PlazoSugerirAi";
 import { CausaEquipoPanel } from "@/components/causas/CausaEquipoPanel";
 import { CasePreparation, CasePreparationIndex } from "@/components/causas/CasePreparation";
+import { CaseWorkflowNav } from "@/components/causas/CaseWorkflowNav";
 import { TramitesPanel } from "@/components/clientes/TramitesPanel";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
 import { PjudMonitorPanel } from "@/components/pjud/PjudMonitorPanel";
@@ -243,6 +244,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           </div>
 
 
+      {canUseKnowledge && <CaseWorkflowNav causaId={causa.id} title={causa.titulo} current="case" />}
       <CasePreparationIndex canUseKnowledge={canUseKnowledge} />
       {proximosPlazos.length > 0 && (
         <section className="panel rounded-[var(--radius-lg)] px-5 py-4">
