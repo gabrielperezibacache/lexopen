@@ -1,7 +1,7 @@
 /** Offline browser fixtures only. No OJV navigation, credentials, or CAPTCHA. */
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { clickBuscar, collectOjvResultPages, enterConsultaCausas, openExactCauseModal, readConsultaFormState } from "@/lib/pjud/public-scrape";
+import { clickBuscar, collectOjvResultPages, enterConsultaCausas, fillRolSearchFields, openExactCauseModal, readConsultaFormState, selectTribunalOrCorte } from "@/lib/pjud/public-scrape";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -153,6 +153,62 @@ async function main() {
     assert.equal(await page.locator("#resultConsultaJuridica").innerText(), "C-2-2024", "submission must await the new response before parsing");
     await page.setContent(`<button id="btnBuscar">Buscar</button><div id="resultConsultaJuridica">C-1-2024</div>`);
     await assert.rejects(() => clickBuscar(page, 100), /No se usarán resultados anteriores/);
+
+    // Current public form, observed through PJUD's published session entry.
+    // The RIT, parties and history below are fictitious. Every request is local.
+    const current = await browser.newPage();
+    await current.route("**/*", (route) => route.abort());
+    await current.route("https://ojv-current-fixture.test/**", async (route) => {
+      const entry = new URL(route.request().url()).pathname.endsWith("sesion-consultaunificada.php");
+      await route.fulfill({ contentType: "text/html; charset=utf-8", body: entry ? `<script>location.href='/indexN.php'</script>` : `
+        <section style="display:none">
+          <select id="jurCompetencia"><option value="3">Civil</option></select>
+          <select id="corteJur"><option value="99">Corte oculta</option></select>
+          <select id="jurTribunal"><option value="999">Tribunal oculto</option></select>
+          <button id="btnConConsultaJur" onclick="window.wrongSearch=true">Buscar</button>
+        </section>
+        <a href="#busRit">Búsqueda por RIT</a>
+        <section id="busRit" class="tab-pane active">
+          <select id="competencia" onchange="document.querySelector('#conTribunal').innerHTML='<option value=0>Todos</option>'"><option value="0">Seleccione</option><option value="3">Civil</option></select>
+          <select id="conCorte" onchange="setTimeout(()=>document.querySelector('#conTribunal').innerHTML='<option value=0>Todos</option><option value=260>2º Juzgado Civil de Santiago</option><option value=261>3º Juzgado Civil de Santiago</option>',50)"><option value="0">Todos</option><option value="90">C.A. Santiago</option><option value="91">C.A. San Miguel</option></select>
+          <select id="conTribunal"><option value="0">Todos</option></select>
+          <select id="conTipoCausa" onchange="document.querySelector('#conRolCausa').value='';document.querySelector('#conEraCausa').value=''"><option value="E">E</option><option value="C">C</option></select>
+          <input id="conRolCausa"><input id="conEraCausa">
+          <button id="btnConConsulta" onclick="setTimeout(()=>document.querySelector('#dtaTableDetalle tbody').innerHTML=document.querySelector('#response').innerHTML,50)">Buscar</button>
+        </section>
+        <table id="dtaTableDetalle"><thead><tr><th></th><th>Rol</th><th>Fecha</th><th>Caratulado</th><th>Tribunal</th></tr></thead><tbody><tr><td></td><td>C-9-2024</td><td>01/01/2024</td><td>Ejemplo anterior</td><td>3º Juzgado Civil de Santiago</td></tr></tbody></table>
+        <template id="response">
+          <tr><td><button onclick="window.wrongDetail=true">Ver</button></td><td>C-142-2024</td><td>01/01/2024</td><td>Otro ejemplo</td><td>3º Juzgado Civil de Santiago</td></tr>
+          <tr><td><button onclick="window.wrongDetail=true">Ver</button></td><td>C-42-2024</td><td>01/01/2024</td><td>Otro tribunal</td><td>2º Juzgado Civil de Santiago</td></tr>
+          <tr><td><a class="toggle-modal" title="Detalle de la causa" href="#" onclick="event.preventDefault();document.querySelector('#historiaCivFixture tbody td:nth-child(6)').textContent='Resolución ficticia cargada desde la causa exacta';document.querySelector('#modalDetalleCivil').style.display='block';document.querySelector('#modalDetalleCivil').classList.add('in')">Ver</a></td><td>C-42-2024</td><td>01/01/2024</td><td>Sociedad Ejemplo / Persona Ejemplo</td><td>3º Juzgado Civil de Santiago</td></tr>
+        </template>
+        <div id="modalDetalleCivil" class="modal" style="display:none">
+          <a href="#historiaCivFixture">Historia</a>
+          <table id="historiaCivFixture"><thead><tr><th>Folio</th><th>Doc.</th><th>Anexo</th><th>Etapa</th><th>Trámite</th><th>Desc. Trámite</th><th>Fec. Trámite</th><th>Foja</th><th>Georref.</th></tr></thead><tbody><tr><td>1</td><td></td><td></td><td>Ingreso</td><td>Resolución</td><td>Resolución ficticia de prueba</td><td>02/01/2024</td><td>1</td><td></td></tr></tbody></table>
+        </div>
+      ` });
+    });
+    await current.goto("https://ojv-current-fixture.test/includes/sesion-consultaunificada.php");
+    await enterConsultaCausas(current, { mode: "manual", formTimeoutMs: 2_000 });
+    assert.equal((await readConsultaFormState(current)).fields[0].id, "competencia");
+    await selectTribunalOrCorte(current, "3º Juzgado Civil de Santiago");
+    await fillRolSearchFields(current, { tipo: "C", numero: "42", era: "2024" });
+    assert.equal(await current.locator("#conCorte").inputValue(), "90");
+    assert.equal(await current.locator("#conTribunal").inputValue(), "261");
+    assert.equal(await current.locator("#conRolCausa").inputValue(), "42");
+    assert.equal(await current.locator("#conEraCausa").inputValue(), "2024");
+    assert.equal(await current.locator("#conTipoCausa").inputValue(), "C");
+    await clickBuscar(current, 2_000);
+    assert.equal(await current.locator("#dtaTableDetalle tbody tr").count(), 3);
+    assert.equal(await current.evaluate(() => Boolean((window as typeof window & { wrongSearch?: boolean }).wrongSearch)), false);
+    assert.equal(await openExactCauseModal(current, { rit: "C-42-2024", tribunal: "3º Juzgado Civil de Santiago" }), "3º Juzgado Civil de Santiago");
+    assert.equal(await current.evaluate(() => Boolean((window as typeof window & { wrongDetail?: boolean }).wrongDetail)), false);
+    assert.equal(await current.locator("#modalDetalleCivil").isVisible(), true);
+
+    await current.setContent(`<select id="competencia"><option value="3">Civil</option></select><select id="conCorte"><option value="0">Todos</option><option value="90">C.A. Santiago</option><option value="92">C.A. Santiago</option></select><select id="conTribunal"><option value="0">Todos</option></select>`);
+    await assert.rejects(() => selectTribunalOrCorte(current, "3º Juzgado Civil de Santiago"), /única corte/);
+    assert.equal(await current.locator("#conCorte").inputValue(), "0", "an ambiguous court is not selected");
+    await current.close();
     console.log("pjud/public-scrape.dom.test.ts OK (offline fixtures)");
   } finally {
     await browser.close();

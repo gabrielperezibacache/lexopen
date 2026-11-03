@@ -6,17 +6,22 @@ import {
   isPlaceholderTribunal,
   parseRitParts,
   pickBestTribunalOption,
+  pickCorteForTribunal,
   pickTribunalFromTexts,
   splitRut,
   tribunalLabelsMatch,
   tribunalMatchScore,
   ritLabelsMatch,
+  OJV_CONSULTA_URL,
+  OJV_HOME,
 } from "@/lib/pjud/ojv-dom";
 import { parseVerDetalleJuridicaHtml } from "@/lib/pjud/parse-html";
 
 assert.deepEqual(splitRut("12.345.678-9"), { cuerpo: "12345678", dv: "9" });
 assert.deepEqual(splitRut("12345678-K"), { cuerpo: "12345678", dv: "K" });
 assert.equal(splitRut("bad"), null);
+assert.equal(OJV_HOME, "https://oficinajudicialvirtual.pjud.cl/home/");
+assert.equal(OJV_CONSULTA_URL, "https://oficinajudicialvirtual.pjud.cl/includes/sesion-consultaunificada.php");
 
 assert.deepEqual(parseRitParts("C-100-2024"), {
   tipo: "C",
@@ -31,8 +36,22 @@ assert.deepEqual(parseRitParts("100-2024"), {
 
 assert.equal(inferCompetenciaFromTribunal("1º Juzgado Civil de Santiago"), "3");
 assert.equal(inferCompetenciaFromTribunal("Corte de Apelaciones de Santiago"), "2");
+assert.equal(inferCompetenciaFromTribunal("C.A. Santiago"), "2");
 assert.equal(inferCompetenciaFromTribunal("Juzgado de Cobranza de Santiago"), "6");
 assert.equal(inferCompetenciaFromTribunal("Tribunal de Juicio Oral en lo Penal"), "5");
+assert.equal(tribunalLabelsMatch("C.A. Santiago", "Corte de Apelaciones de Santiago"), true);
+assert.equal(pickCorteForTribunal([
+  { value: "0", label: "Todos" },
+  { value: "90", label: "C.A. Santiago" },
+  { value: "91", label: "C.A. San Miguel" },
+], "3º Juzgado Civil de Santiago")?.value, "90");
+assert.equal(pickCorteForTribunal([
+  { value: "90", label: "C.A. Santiago" },
+  { value: "92", label: "Corte de Apelaciones de Santiago" },
+], "3º Juzgado Civil de Santiago"), null, "ambiguous courts must not select the first option");
+assert.equal(pickCorteForTribunal([
+  { value: "90", label: "C.A. Santiago" },
+], "Juzgado Civil de Puente Alto"), null, "court jurisdiction is not inferred from an unmatched locality");
 
 assert.equal(isPlaceholderTribunal("Tribunal no identificado"), true);
 assert.equal(isPlaceholderTribunal("Por identificar"), true);

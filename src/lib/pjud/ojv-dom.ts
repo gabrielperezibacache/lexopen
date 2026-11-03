@@ -4,18 +4,20 @@
  * Paridad producto: CausaMonitor — acceso invitado **y** ClaveÚnica
  * (credenciales cifradas en vault local).
  *
- * Flujo invitado:
- *   home → accesoConsultaCausas() → tabs (#BusJuridica / ROL) →
- *   #jurCompetencia + #jurTribunal|#corteJur → #btnConConsultaJur →
- *   #verDetalleJuridica → modal .modal.in (table.table-titulos + historia)
+ * Flujo público observado desde el enlace de pjud.cl:
+ *   includes/sesion-consultaunificada.php → #busRit →
+ *   #competencia + #conCorte + #conTribunal → #btnConConsulta →
+ *   #dtaTableDetalle → #modalDetalleCivil (historia activa).
+ * Se conservan los selectores anteriores para compatibilidad.
  */
 
 export const OJV_BASE = "https://oficinajudicialvirtual.pjud.cl";
-export const OJV_HOME = `${OJV_BASE}/home/index.php`;
+/** General OJV entry published by pjud.cl; distinct from the public query entry. */
+export const OJV_HOME = `${OJV_BASE}/home/`;
 /** Shell autenticado post ClaveÚnica (aparece referenciado desde el home). */
 export const OJV_INDEX_N = `${OJV_BASE}/indexN.php`;
-/** Entrada pública comprobada; la antigua consulta-unificada-de-causas devuelve 404. */
-export const OJV_CONSULTA_URL = OJV_HOME;
+/** Public session entry linked by pjud.cl → Tramitación → revisión de causas. */
+export const OJV_CONSULTA_URL = `${OJV_BASE}/includes/sesion-consultaunificada.php`;
 
 export const OJV_POST_AUTH_URLS = [OJV_INDEX_N, OJV_HOME] as const;
 
@@ -33,17 +35,17 @@ export const OJV = {
   eraJur: "#eraJur",
   // ROL / RIT (tabs variables según layout OJV)
   tabBusRol:
-    'a[href="#BusCausa"], a[href="#buscCausa"], a[href*="BusRol" i], a:has-text("RIT"), a:has-text("ROL")',
-  competencia: "#jurCompetencia",
-  tribunal: "#jurTribunal",
-  corte: "#corteJur",
+    'a[href="#busRit"], a[href="#BusCausa"], a[href="#buscCausa"], a[href*="BusRol" i], a:has-text("RIT"), a:has-text("ROL")',
+  competencia: "#competencia, #jurCompetencia",
+  tribunal: "#conTribunal, #jurTribunal",
+  corte: "#conCorte, #corteJur",
   /** Prefer visible active-pane Buscar; juridica id is often hidden on ROL tab. */
-  btnBuscar: "#btnConConsultaJur",
+  btnBuscar: "#btnConConsulta, #btnConConsultaJur",
   btnBuscarAny:
-    '#btnConConsultaJur, #btnConConsultaCausa, #btnConConsultaRol, #btnBuscar, .tab-pane.active button.btn-primary, button.btn-primary:has-text("Buscar")',
+    '#btnConConsulta, #btnConConsultaJur, #btnConConsultaCausa, #btnConConsultaRol, #btnBuscar, .tab-pane.active button.btn-primary, button.btn-primary:has-text("Buscar")',
   loader: "#loadPreJuridica, #loadPreCausa, .loadingConsulta",
-  resultsHost: "#resultConsultaJuridica",
-  resultsTable: "#verDetalleJuridica",
+  resultsHost: "#dtaTableDetalle, #resultConsultaJuridica",
+  resultsTable: "#dtaTableDetalle, #verDetalleJuridica",
   noResultsText: "No se han encontrado resultados",
   modal: '.modal.in[style*="display: block"], .modal.in, .modal.show',
   modalTitulos: "table.table-titulos",
@@ -71,7 +73,7 @@ export function inferCompetenciaFromTribunal(
 ): OjvCompetenciaValue {
   const t = tribunal.toLowerCase();
   if (/suprema/.test(t)) return "1";
-  if (/apelaci[oó]n|corte de apel/.test(t)) return "2";
+  if (/apelaci[oó]n|corte de apel|^\s*c\s*\.\s*a\s*\./.test(t)) return "2";
   if (/laboral|juzgado del trabajo|cobranza laboral|previsional/.test(t))
     return "4";
   if (
@@ -87,6 +89,7 @@ export function inferCompetenciaFromTribunal(
 /** Tokenize for fuzzy tribunal matching (º/°/1er ≈ 1). */
 export function tribunalMatchTokens(label: string) {
   return normalizeTribunalLabel(label)
+    .replace(/^c\s*\.\s*a\s*\.\s*/, "corte de apelaciones de ")
     .replace(/\b(\d+)(?:º|°|o|er|ra|do|da|to|ta|mo|ma|vo|va|no|na)?\b/gi, "$1")
     .replace(/\bprimer[oa]?\b/g, "1")
     .replace(/\bsegund[oa]\b/g, "2")
@@ -94,6 +97,23 @@ export function tribunalMatchTokens(label: string) {
     .split(/[^a-z0-9áéíóúñ]+/i)
     .map((t) => t.trim())
     .filter((t) => t.length > 0 && !/^(de|del|la|el|los|las|y|en|lo)$/i.test(t));
+}
+
+/** A court locality is only a hint: the loaded tribunal must still match exactly. */
+export function pickCorteForTribunal(
+  options: Array<{ value: string; label: string }>,
+  tribunal: string
+): { value: string; label: string } | null {
+  const wanted = normalizeTribunalLabel(tribunal);
+  const matches = options.filter((option) => {
+    if (!option.value || option.value === "0" || /^(?:todos|seleccione)/i.test(option.label.trim())) return false;
+    const court = normalizeTribunalLabel(option.label);
+    if (!/^(?:corte de apelaciones|c\s*\.\s*a\s*\.)/.test(court)) return false;
+    const place = court.replace(/^(?:corte de apelaciones|c\s*\.\s*a\s*\.)\s*(?:de\s+)?/, "").trim();
+    return Boolean(place && wanted.endsWith(` ${place}`));
+  });
+  const unique = [...new Map(matches.map((option) => [option.value, option])).values()];
+  return unique.length === 1 ? unique[0] : null;
 }
 
 /** 0..1 score; prefer exact / containment. */

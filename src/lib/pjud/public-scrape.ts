@@ -6,8 +6,8 @@
  * NO depende de mcp-legal-chile (flujo MCP no comprobado en producción).
  *
  * Dos vías (como CausaMonitor):
- * 1) Invitado: home → accesoConsultaCausas() → menú Consulta Unificada → tab RUT/ROL →
- *    competencia/tribunal → #btnConConsultaJur → #verDetalleJuridica → modal.
+ * 1) Público: entrada de sesión publicada por pjud.cl → tab RIT/ROL →
+ *    competencia/corte/tribunal → Buscar → fila exacta → modal.
  * 2) ClaveÚnica: vault local AES-GCM → login accounts.claveunica.gob.cl →
  *    Mis Causas → monitoreo (ver scrapeMisCausasWithClaveUnica).
  *
@@ -35,6 +35,7 @@ import {
   OJV_POST_AUTH_URLS,
   parseRitParts,
   pickBestTribunalOption,
+  pickCorteForTribunal,
   pickTribunalFromTexts,
   splitRut,
   type OjvCompetenciaValue,
@@ -340,7 +341,7 @@ export type ConsultaFormState = {
   fields: Array<{ tag: "input" | "select"; id: string; name: string; type: string; disabled: boolean; optionCount: number }>;
 };
 
-const CONSULTA_FIELD_SELECTOR = "select#jurCompetencia, input#rutJur";
+const CONSULTA_FIELD_SELECTOR = "select#competencia, select#jurCompetencia, input#rutJur";
 
 /** Safe entry diagnostics: no field values, page text, URLs, cookies or tokens. */
 export async function readConsultaFormState(page: PlaywrightPage): Promise<ConsultaFormState> {
@@ -389,7 +390,7 @@ export async function readConsultaFormState(page: PlaywrightPage): Promise<Consu
     fieldsSelector: CONSULTA_FIELD_SELECTOR,
     guestSelector: OJV.accesoConsulta,
     captchaSelector: `${OJV.captchaImg}, ${OJV.captchaInput}, .g-recaptcha, .h-captcha, iframe[src*="/recaptcha/api2/bframe"], iframe[src*="/recaptcha/api2/anchor"], iframe[src*="hcaptcha.com"]`,
-    tabsSelector: 'a[href="#BusJuridica"], a[href="#BusCausa"], a[href="#buscCausa"], a[href*="BusRol" i]',
+    tabsSelector: 'a[href="#BusJuridica"], a[href="#busRit"], a[href="#BusCausa"], a[href="#buscCausa"], a[href*="BusRol" i]',
   });
 }
 
@@ -503,7 +504,7 @@ async function selectCompetencia(
   page: PlaywrightPage,
   value: OjvCompetenciaValue
 ) {
-  const sel = page.locator(`${OJV.competencia}:visible`).first();
+  const sel = page.locator(OJV.competencia).filter({ visible: true }).first();
   if ((await sel.count()) === 0) throw new PjudScrapeError("No está disponible el selector de competencia OJV.");
   await sel.selectOption(value);
   await delay(900);
@@ -511,9 +512,10 @@ async function selectCompetencia(
 
 async function readTribunalSelectOptions(
   page: PlaywrightPage,
-  selector: string
+  selector: string,
+  waitForOptions = true
 ) {
-  await page
+  if (waitForOptions) await page
     .waitForFunction(
       (sel) => {
         const s = [...document.querySelectorAll(sel)].find((node) => (node as HTMLElement).getBoundingClientRect().height > 0);
@@ -524,8 +526,8 @@ async function readTribunalSelectOptions(
     )
     .catch(() => undefined);
   // OJV a veces rellena el select en 2 oleadas AJAX
-  await delay(500);
-  return page.locator(`${selector}:visible`).first().locator("option").evaluateAll((arr) =>
+  if (waitForOptions) await delay(500);
+  return page.locator(selector).filter({ visible: true }).first().locator("option").evaluateAll((arr) =>
     arr.map((o) => ({
       value: (o as HTMLOptionElement).value,
       label: (o.textContent || "").trim(),
@@ -533,7 +535,7 @@ async function readTribunalSelectOptions(
   );
 }
 
-async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: string) {
+export async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: string) {
   const competencia = inferCompetenciaFromTribunal(tribunal);
   await selectCompetencia(page, competencia);
 
@@ -543,7 +545,7 @@ async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: string) {
   }
 
   if (competencia === "2") {
-    const corte = page.locator(`${OJV.corte}:visible`).first();
+    const corte = page.locator(OJV.corte).filter({ visible: true }).first();
     await corte.waitFor({ state: "visible", timeout: 12_000 });
     const options = await readTribunalSelectOptions(page, OJV.corte);
     const match = pickBestTribunalOption(options, tribunal);
@@ -555,11 +557,25 @@ async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: string) {
   if (["3", "4", "5", "6"].includes(competencia)) {
     // Prefer visible select in active tab (ROL vs Jurídica).
     const trib = page
-      .locator(`${OJV.tribunal}:visible`)
+      .locator(OJV.tribunal).filter({ visible: true })
       .first();
     await trib.waitFor({ state: "visible", timeout: 12_000 });
-    const options = await readTribunalSelectOptions(page, OJV.tribunal);
-    const match = pickBestTribunalOption(options, tribunal);
+    // The current RIT form intentionally has only Todos until a court is chosen.
+    const needsCourt = await trib.getAttribute("id") === "conTribunal" &&
+      await page.locator(OJV.corte).filter({ visible: true }).count() > 0;
+    let options = await readTribunalSelectOptions(page, OJV.tribunal, !needsCourt);
+    let match = pickBestTribunalOption(options, tribunal);
+    if (!match) {
+      const corte = page.locator(OJV.corte).filter({ visible: true }).first();
+      if (await corte.count()) {
+        const courts = await readTribunalSelectOptions(page, OJV.corte);
+        const court = pickCorteForTribunal(courts, tribunal);
+        if (!court) throw new PjudScrapeError(`No se pudo identificar una única corte para cargar el tribunal «${tribunal}». No se usará Todos.`);
+        await corte.selectOption(court.value);
+        options = await readTribunalSelectOptions(page, OJV.tribunal);
+        match = pickBestTribunalOption(options, tribunal);
+      }
+    }
     if (match) {
       await trib.selectOption(match.value);
       return;
@@ -584,7 +600,7 @@ export async function clickBuscar(page: PlaywrightPage, responseTimeoutMs = 30_0
   await page.evaluate(() => {
     const state = window as typeof window & { lexopenConsulta?: { changed: boolean; observer: MutationObserver } };
     state.lexopenConsulta?.observer.disconnect();
-    const results = "#resultConsultaJuridica, #resultConsultaCausa, #resultConsultaRol, #verDetalleJuridica";
+    const results = "#dtaTableDetalle, #resultConsultaJuridica, #resultConsultaCausa, #resultConsultaRol, #verDetalleJuridica";
     const observer = new MutationObserver((mutations) => {
       if (mutations.some((mutation) => {
         const parent = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement;
@@ -624,7 +640,7 @@ export async function clickBuscar(page: PlaywrightPage, responseTimeoutMs = 30_0
       const tryClick = (root: ParentNode) => {
         const nodes = [
           ...root.querySelectorAll<HTMLElement>(
-            "#btnConConsultaJur, #btnConConsultaCausa, #btnConConsultaRol, #btnBuscar, button.btn-primary, button[type='submit'], input[type='submit']"
+            "#btnConConsulta, #btnConConsultaJur, #btnConConsultaCausa, #btnConConsultaRol, #btnBuscar, button.btn-primary, button[type='submit'], input[type='submit']"
           ),
         ];
         for (const el of nodes) {
@@ -678,7 +694,7 @@ export async function clickBuscar(page: PlaywrightPage, responseTimeoutMs = 30_0
 export async function openExactCauseModal(
   page: PlaywrightPage,
   causa: { rit: string; tribunal: string },
-  selector = "#verDetalleJuridica tr, #resultConsultaJuridica tr"
+  selector = "#dtaTableDetalle tr, #verDetalleJuridica tr, #resultConsultaJuridica tr"
 ): Promise<string | null> {
   const rows = page.locator(selector);
   const snapshots = await rows.evaluateAll((nodes) => nodes.map((node) => {
@@ -721,11 +737,10 @@ export async function openExactCauseModal(
   }
   await delay(800);
 
-  const hist = page.locator(
-    `${OJV.modal}, .modal.in, .modal.show`
-  ).locator(OJV.historiaTab);
+  const hist = page.locator(OJV.modal).filter({ visible: true }).first()
+    .locator(OJV.historiaTab).filter({ visible: true });
   if ((await hist.count()) > 0) {
-    await hist.first().click({ force: true }).catch(() => undefined);
+    await hist.first().click().catch(() => undefined);
     await delay(1200);
   }
   // Espera filas de historia / table-titulos
@@ -900,7 +915,7 @@ async function attachDocumentoBytesFromPage(
   return out;
 }
 
-async function fillRolSearchFields(
+export async function fillRolSearchFields(
   page: PlaywrightPage,
   ritParts: NonNullable<ReturnType<typeof parseRitParts>>,
   tipoOverride?: string | null
@@ -908,17 +923,18 @@ async function fillRolSearchFields(
   const tipo = tipoOverride === undefined ? ritParts.tipo : tipoOverride;
   const fills: Array<[string, string]> = [
     [
-      'input[id*="rit" i], input[name*="rit" i], input[id*="rol" i], input[name*="rol" i]',
+      '#conRolCausa, input[id*="rit" i], input[name*="rit" i], input[id*="rol" i], input[name*="rol" i]',
       ritParts.numero,
     ],
     [
-      'input[id*="era" i], input[name*="era" i], input[id*="ano" i], input[name*="ano" i]',
+      '#conEraCausa, input[id*="era" i], input[name*="era" i], input[id*="ano" i], input[name*="ano" i]',
       ritParts.era,
     ],
   ];
   if (tipo) {
-    fills.push([
-      'input[id*="tipo" i], select[id*="tipo" i], input[name*="tipo" i], select[id*="rit" i]',
+    // Selecting the book/type can reset the remaining cause fields.
+    fills.unshift([
+      '#conTipoCausa, input[id*="tipo" i], select[id*="tipo" i], input[name*="tipo" i], select[id*="rit" i]',
       tipo,
     ]);
   }
@@ -952,7 +968,7 @@ async function solveNewSession(signal?: AbortSignal): Promise<PjudSession> {
       Object.defineProperty(navigator, "webdriver", { get: () => undefined });
     });
     const page = await context.newPage();
-    await page.goto(OJV_HOME, {
+    await page.goto(OJV_CONSULTA_URL, {
       waitUntil: "domcontentloaded",
       timeout: 45_000,
     });
@@ -1005,7 +1021,7 @@ async function withConsultaPage<T>(
     });
     await context.addCookies(session.cookies as never[]);
     const page = await context.newPage();
-    await page.goto(OJV_HOME, {
+    await page.goto(OJV_CONSULTA_URL, {
       waitUntil: "domcontentloaded",
       timeout: 45_000,
     });
@@ -1441,12 +1457,19 @@ async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = 
   return false;
 }
 
-async function clickMisCausasBuscar(page: AnyPage, options: MisCausasReadOptions = {}) {
-  let buscar = page
+async function misCausasActiveScope(page: AnyPage) {
+  const active = page.locator(".tab-pane.active").filter({ visible: true });
+  const current = active.filter({ has: page.locator('[id^="filtroMisCau"], [id^="btnConsultaMisCau"], table[id^="dtaTableDetalleMisCau"]') });
+  if (await current.count()) return current.last();
+  return await active.count() ? active.last() : page.locator("body");
+}
+
+export async function clickMisCausasBuscar(page: AnyPage, options: MisCausasReadOptions = {}) {
+  const scope = await misCausasActiveScope(page);
+  const buscar = scope
     .getByRole("button", { name: /^Buscar$/i })
-    .or(page.locator(OJV.misCausasBuscar));
-  if (options.allowPrompts === false) buscar = buscar.filter({ visible: true });
-  buscar = buscar.first();
+    .or(scope.locator(OJV.misCausasBuscar))
+    .filter({ visible: true }).first();
   if ((await buscar.count().catch(() => 0)) === 0) {
     if (options.allowPrompts === false) throw new PjudScrapeError("No se encontró un botón Buscar visible en Mis Causas.");
     return false;
@@ -1455,10 +1478,8 @@ async function clickMisCausasBuscar(page: AnyPage, options: MisCausasReadOptions
     await snapshotManualMisCausasRows(page);
     await buscar.click({ timeout: 8_000 });
     return waitForFreshManualMisCausasRows(page, options.responseTimeoutMs);
-  } else if (!(await buscar.isVisible().catch(() => false))) {
-    await buscar.click({ force: true, timeout: 8_000 }).catch(() => undefined);
   } else {
-    await buscar.click({ timeout: 8_000 }).catch(() => undefined);
+    await buscar.click({ timeout: 8_000 });
   }
   await sleep(1200);
   await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined);
@@ -1503,23 +1524,36 @@ export async function collectOjvResultPages(
   return false;
 }
 
-async function applyMisCausasFiltros(page: AnyPage) {
-  const filtros = page.getByRole("button", { name: /Filtros/i }).first();
-  if (await filtros.isVisible().catch(() => false)) {
-    await filtros.click().catch(() => undefined);
-    await sleep(300);
+export async function applyMisCausasFiltros(page: AnyPage) {
+  const scope = await misCausasActiveScope(page);
+  // The current portal hides the input itself; its visible label is the control.
+  const switchLabel = scope.locator('label.switch:has(input[id^="filtroMisCau"])').filter({ visible: true }).first();
+  if (await switchLabel.count()) {
+    const checkbox = switchLabel.locator('input[id^="filtroMisCau"]').first();
+    if (!(await checkbox.isChecked())) {
+      await switchLabel.click({ timeout: 8_000 });
+      if (!(await checkbox.isChecked())) throw new PjudScrapeError("No se pudo activar el filtro visible de Mis Causas.");
+    }
+  } else {
+    const filtros = scope.getByRole("button", { name: /Filtros/i }).filter({ visible: true }).first();
+    if (await filtros.count()) {
+      await filtros.click();
+      await sleep(300);
+    }
   }
   // Manual OJV: Estado → Seleccionar Todos para no omitir concluidas.
-  const estado = page
+  const estado = scope
     .getByRole("button", { name: /^Estado$/i })
-    .or(page.getByText(/^Estado$/i))
+    .or(scope.getByText(/^Estado$/i))
+    .filter({ visible: true })
     .first();
   if (await estado.isVisible().catch(() => false)) {
     await estado.click().catch(() => undefined);
     await sleep(200);
   }
-  const selectAll = page
+  const selectAll = scope
     .getByText(/Seleccionar Todos|Seleccionar todos/i)
+    .filter({ visible: true })
     .first();
   if (await selectAll.isVisible().catch(() => false)) {
     await selectAll.click().catch(() => undefined);
@@ -1557,7 +1591,7 @@ async function ensureAuthenticatedOjvShell(page: AnyPage, options: MisCausasRead
   await dismissOjvPrompts(page);
   const onOjv = /oficinajudicialvirtual\.pjud\.cl|ojv\.pjud\.cl/i.test(page.url());
   const needsShell =
-    !onOjv || /return\.php|\/home\/index\.php|accounts\.claveunica/i.test(page.url());
+    !onOjv || /return\.php|\/home\/(?:index\.php)?(?:[?#]|$)|accounts\.claveunica/i.test(page.url());
   if (!needsShell) return page;
 
   for (const url of OJV_POST_AUTH_URLS) {
