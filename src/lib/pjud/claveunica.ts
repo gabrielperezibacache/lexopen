@@ -20,6 +20,7 @@ import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import { misCausasClaimableWhere } from "@/lib/pjud/mis-causas-sync-state";
 import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
 import type { PjudCausaRef, PjudFetchResult } from "@/lib/pjud/types";
+import { duplicateCausaWhere } from "@/lib/pjud/causa-origin";
 
 export {
   isMisCausasSyncInFlight,
@@ -240,8 +241,14 @@ export async function clearClaveUnicaSyncMessages() {
   const failed =
     settings.claveUnicaLastSyncStatus === "failed" ||
     settings.claveUnicaLastSyncStatus === "partial";
-  await prisma.firmSettings.update({
-    where: { id: settings.id },
+  await prisma.firmSettings.updateMany({
+    // No limpiar la nota de un claim iniciado después de esta lectura.
+    // Si ya cambió, la respuesta inferior devuelve el estado fresco.
+    where: {
+      id: settings.id,
+      claveUnicaLastSyncStatus: settings.claveUnicaLastSyncStatus,
+      claveUnicaLastSyncAt: settings.claveUnicaLastSyncAt,
+    },
     data: {
       claveUnicaLastSyncNote: null,
       ...(failed ? { claveUnicaLastSyncStatus: null } : {}),
@@ -251,6 +258,12 @@ export async function clearClaveUnicaSyncMessages() {
 }
 
 async function resolveMisCausasList(): Promise<MisCausasItem[]> {
+  if (!claveUnicaAutomationAllowed(true)) {
+    throw httpError(
+      "Automatización ClaveÚnica deshabilitada (PJUD_CLAVEUNICA_SCRAPE=0).",
+      409
+    );
+  }
   const { settings } = await getOrCreateFirmSettings();
   if (!settings.claveUnicaEnabled) {
     throw httpError("ClaveÚnica deshabilitada en el estudio.", 409);
@@ -288,15 +301,6 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
         sidecarError = error instanceof Error ? error : new Error(String(error));
       }
     }
-  }
-
-  if (!claveUnicaAutomationAllowed(settings.claveUnicaEnabled)) {
-    throw httpError(
-      sidecarError
-        ? `Sidecar PJUD no responde (${sidecarError.message}) y ClaveÚnica está bloqueada (PJUD_CLAVEUNICA_SCRAPE=0).`
-        : "Automatización ClaveÚnica deshabilitada (PJUD_CLAVEUNICA_SCRAPE=0).",
-      409
-    );
   }
 
   try {
@@ -382,25 +386,14 @@ export async function tryScrapeCausaDetailAuthenticated(
 }
 
 async function findExistingCausa(item: MisCausasItem) {
-  const select = { id: true, pjudOrigin: true } as const;
-  if (item.ruc) {
-    const byRuc = await prisma.causa.findFirst({
-      where: { ruc: item.ruc },
-      select,
-    });
-    if (byRuc) return byRuc;
-  }
-  // Prefer rit+tribunal. Do not fall back to rit-only when tribunal is known —
-  // the same RIT can exist in another tribunal and would link the wrong causa.
-  if (item.tribunal) {
-    return prisma.causa.findFirst({
-      where: { rit: item.rit, tribunal: item.tribunal },
-      select,
-    });
-  }
+  // RIT y RUC pueden repetirse entre tribunales. Sin uno identificado no es
+  // seguro vincular la entrada a una causa de la cartera.
+  if (isPlaceholderTribunal(item.tribunal)) return null;
+  const where = duplicateCausaWhere(item);
+  if (!where) return null;
   return prisma.causa.findFirst({
-    where: { rit: item.rit },
-    select,
+    where,
+    select: { id: true, pjudOrigin: true },
   });
 }
 
@@ -411,7 +404,7 @@ async function findExistingCausa(item: MisCausasItem) {
 export async function claimMisCausasSync(opts?: {
   note?: string;
   now?: Date;
-}): Promise<{ alreadyRunning: boolean; settingsId: string }> {
+}): Promise<{ alreadyRunning: boolean; settingsId: string; claimedAt: Date | null }> {
   const { settings } = await getOrCreateFirmSettings();
   const now = opts?.now ?? new Date();
   // Compare-and-swap: solo un caller gana el slot (evita TOCTOU).
@@ -426,9 +419,9 @@ export async function claimMisCausasSync(opts?: {
     },
   });
   if (claimed.count === 0) {
-    return { alreadyRunning: true, settingsId: settings.id };
+    return { alreadyRunning: true, settingsId: settings.id, claimedAt: null };
   }
-  return { alreadyRunning: false, settingsId: settings.id };
+  return { alreadyRunning: false, settingsId: settings.id, claimedAt: now };
 }
 
 export async function syncMisCausas(opts?: {
@@ -440,11 +433,22 @@ export async function syncMisCausas(opts?: {
    * Movimientos se procesan vía cron de monitoreo (`processPendingSyncJobs`).
    */
   processJobsInline?: boolean;
-  /** Skip claim when the HTTP layer already marked running. */
-  alreadyClaimed?: boolean;
+  /** Claim adquirido por el Route Handler antes de responder 202. */
+  claim?: { settingsId: string; claimedAt: Date };
 }) {
   const { settings } = await getOrCreateFirmSettings();
-  if (!opts?.alreadyClaimed) {
+  let claimedAt = opts?.claim?.claimedAt ?? null;
+  if (opts?.claim && (
+    opts.claim.settingsId !== settings.id ||
+    settings.claveUnicaLastSyncStatus !== "running" ||
+    settings.claveUnicaLastSyncAt?.getTime() !== claimedAt?.getTime()
+  )) {
+    throw httpError(
+      "La sincronización fue reemplazada. Revise su estado antes de reintentar.",
+      409
+    );
+  }
+  if (!opts?.claim) {
     const claim = await claimMisCausasSync();
     if (claim.alreadyRunning) {
       throw httpError(
@@ -452,169 +456,206 @@ export async function syncMisCausas(opts?: {
         409
       );
     }
+    claimedAt = claim.claimedAt;
   }
-
-  let items: MisCausasItem[];
+  if (!claimedAt) {
+    throw httpError("No se pudo iniciar la sincronización. Vuelva a intentarlo.", 409);
+  }
+  const claimWhere = {
+    id: settings.id,
+    claveUnicaLastSyncStatus: "running",
+    claveUnicaLastSyncAt: claimedAt,
+  };
+  const created: string[] = [];
+  const linked: string[] = [];
+  let phase: "scrape" | "import" | "queue" = "scrape";
   try {
-    items = await resolveMisCausasList();
-  } catch (error) {
-    const note = error instanceof Error ? error.message : "Error Mis Causas";
-    await prisma.firmSettings.update({
-      where: { id: settings.id },
+    const items = await resolveMisCausasList();
+    phase = "import";
+    const causaIdsForSync: string[] = [];
+    const itemsWithIds: Array<MisCausasItem & { causaId: string }> = [];
+
+    for (const item of items) {
+      const existing = await findExistingCausa(item);
+      let causaId = existing?.id;
+      if (!causaId) {
+        const createdCausa = await prisma.causa.create({
+          data: {
+            titulo: item.caratula || item.rit,
+            rit: item.rit,
+            ruc: item.ruc || null,
+            tribunal: isPlaceholderTribunal(item.tribunal)
+              ? "Por identificar"
+              : item.tribunal,
+            materia: "Por clasificar",
+            caratula: item.caratula || null,
+            estado: item.estado?.toLowerCase().includes("termin")
+              ? "terminada"
+              : "activa",
+            pjudMonitoreoActivo: true,
+            pjudFromMisCausas: true,
+            pjudOrigin: "claveunica",
+            pjudSource: "claveunica",
+            pjudLastSyncStatus: "never",
+            pjudNextSyncAt: new Date(),
+            pjudLastSyncNote: "Importada desde Mis Causas (ClaveÚnica).",
+          },
+        });
+        causaId = createdCausa.id;
+        created.push(causaId);
+      } else {
+        await prisma.causa.update({
+          where: { id: causaId },
+          data: {
+            pjudFromMisCausas: true,
+            pjudMonitoreoActivo: true,
+            ...(existing?.pjudOrigin ? {} : { pjudOrigin: "claveunica" }),
+            pjudSource: "claveunica",
+            pjudNextSyncAt: new Date(),
+            ...(!isPlaceholderTribunal(item.tribunal)
+              ? { tribunal: item.tribunal }
+              : {}),
+            ...(item.ruc ? { ruc: item.ruc } : {}),
+          },
+        });
+        linked.push(causaId);
+      }
+      itemsWithIds.push({ ...item, causaId });
+      causaIdsForSync.push(causaId);
+    }
+
+    let syncResults: Array<{
+      causaId: string;
+      status: string;
+      note?: string;
+      inserted?: number;
+    }> = [];
+    let enqueued = 0;
+
+    if (opts?.syncMovimientos !== false && causaIdsForSync.length) {
+      phase = "queue";
+      // Enqueue durable jobs instead of N serial scrapes (avoids proxy timeouts).
+      // Todas las causas seleccionadas entran en cola, incluidas terminadas
+      // que el cron periódico no volvería a seleccionar por sí solo.
+      const jobs: Awaited<ReturnType<typeof enqueueDueSyncJobs>> = [];
+      const uniqueIds = [...new Set(causaIdsForSync)];
+      for (let offset = 0; offset < uniqueIds.length; offset += 100) {
+        const batch = uniqueIds.slice(offset, offset + 100);
+        jobs.push(...await enqueueDueSyncJobs({
+          causaIds: batch,
+          trigger: "manual",
+          limit: batch.length,
+        }));
+      }
+      enqueued = jobs.length;
+      if (opts?.processJobsInline) {
+        const processed = await processPendingSyncJobs({
+          actorId: opts?.actorId,
+          limit: Math.min(jobs.length || 20, 40),
+          jobIds: jobs.map((j) => j.id),
+        });
+        syncResults = processed.map((r) => ({
+          causaId: r.causaId,
+          status: r.status,
+          note: r.note,
+          inserted: r.inserted,
+        }));
+      }
+    }
+
+    const syncFailed = syncResults.filter(
+      (r) => r.status === "failed" || r.status === "error"
+    ).length;
+    const syncOk = syncResults.length - syncFailed;
+    const insertedTotal = syncResults.reduce(
+      (sum, r) => sum + (r.inserted || 0),
+      0
+    );
+    let lastSyncStatus: string = "ok";
+    if (syncResults.length > 0 && syncFailed === syncResults.length) {
+      lastSyncStatus = "failed";
+    } else if (syncFailed > 0) {
+      lastSyncStatus = "partial";
+    }
+    const noteParts = [
+      `Se encontraron ${items.length} causa${items.length === 1 ? "" : "s"}`,
+      `${created.length} nueva${created.length === 1 ? "" : "s"}`,
+      `${linked.length} ya estaba${linked.length === 1 ? "" : "n"} en LexOpen`,
+    ];
+    if (enqueued) {
+      noteParts.push(
+        `${enqueued} puesta${enqueued === 1 ? "" : "s"} en cola para actualizar movimientos`
+      );
+    }
+    if (syncResults.length) {
+      if (syncFailed === 0) {
+        noteParts.push(
+          `movimientos al día (+${insertedTotal} nuevo${insertedTotal === 1 ? "" : "s"})`
+        );
+      } else if (syncOk === 0) {
+        noteParts.push(
+          `no se pudieron actualizar los movimientos (${syncFailed} con error)`
+        );
+      } else {
+        noteParts.push(
+          `${syncOk} actualizadas bien, ${syncFailed} con error (+${insertedTotal} movimientos nuevos)`
+        );
+      }
+    }
+
+    const finished = await prisma.firmSettings.updateMany({
+      // Un proceso viejo no debe sobrescribir el estado de un claim nuevo ni
+      // volver a marcar conectada una cuenta cuyos datos se eliminaron.
+      where: claimWhere,
       data: {
         claveUnicaLastSyncAt: new Date(),
-        claveUnicaLastSyncStatus: "failed",
+        claveUnicaLastSyncStatus: lastSyncStatus,
+        claveUnicaLastSyncNote: `${noteParts.join(". ")}.`,
+      },
+    });
+    if (!finished.count) {
+      throw httpError(
+        "La sincronización fue reemplazada o la conexión se eliminó. Revise su estado antes de reintentar.",
+        409
+      );
+    }
+
+    return {
+      listed: items.length,
+      created: created.length,
+      linked: linked.length,
+      enqueued,
+      syncOk,
+      syncFailed,
+      inserted: insertedTotal,
+      items: itemsWithIds,
+      syncResults,
+    };
+  } catch (error) {
+    const imported = created.length + linked.length;
+    let note = "No se pudo consultar Mis Causas. Vuelva a intentarlo.";
+    if (phase === "scrape" && error instanceof Error && "status" in error) {
+      // Sólo los errores curados (httpError/PjudScrapeError) van al estado
+      // visible; no guardar mensajes de Prisma ni respuestas ajenas completas.
+      note = error.message.slice(0, 1000);
+    } else if (phase !== "scrape") {
+      note = phase === "queue"
+        ? "No se pudo completar la actualización de movimientos."
+        : "No se pudo completar la importación de causas.";
+      note += imported
+        ? ` Se conservaron ${imported} causa(s) importadas o vinculadas; puede reintentar.`
+        : " Vuelva a intentarlo.";
+    }
+    await prisma.firmSettings.updateMany({
+      where: claimWhere,
+      data: {
+        claveUnicaLastSyncAt: new Date(),
+        claveUnicaLastSyncStatus: imported ? "partial" : "failed",
         claveUnicaLastSyncNote: note,
       },
     });
     throw error;
   }
-
-  const created: string[] = [];
-  const linked: string[] = [];
-  const causaIdsForSync: string[] = [];
-  const itemsWithIds: Array<MisCausasItem & { causaId: string }> = [];
-
-  for (const item of items) {
-    const existing = await findExistingCausa(item);
-    let causaId = existing?.id;
-    if (!causaId) {
-      const createdCausa = await prisma.causa.create({
-        data: {
-          titulo: item.caratula || item.rit,
-          rit: item.rit,
-          ruc: item.ruc || null,
-          tribunal: isPlaceholderTribunal(item.tribunal)
-            ? "Por identificar"
-            : item.tribunal,
-          materia: "Por clasificar",
-          caratula: item.caratula || null,
-          estado: item.estado?.toLowerCase().includes("termin")
-            ? "terminada"
-            : "activa",
-          pjudMonitoreoActivo: true,
-          pjudFromMisCausas: true,
-          pjudOrigin: "claveunica",
-          pjudSource: "claveunica",
-          pjudLastSyncStatus: "never",
-          pjudNextSyncAt: new Date(),
-          pjudLastSyncNote: "Importada desde Mis Causas (ClaveÚnica).",
-        },
-      });
-      causaId = createdCausa.id;
-      created.push(causaId);
-    } else {
-      await prisma.causa.update({
-        where: { id: causaId },
-        data: {
-          pjudFromMisCausas: true,
-          pjudMonitoreoActivo: true,
-          ...(existing?.pjudOrigin ? {} : { pjudOrigin: "claveunica" }),
-          pjudSource: "claveunica",
-          pjudNextSyncAt: new Date(),
-          ...(!isPlaceholderTribunal(item.tribunal)
-            ? { tribunal: item.tribunal }
-            : {}),
-          ...(item.ruc ? { ruc: item.ruc } : {}),
-        },
-      });
-      linked.push(causaId);
-    }
-    itemsWithIds.push({ ...item, causaId });
-    causaIdsForSync.push(causaId);
-  }
-
-  let syncResults: Array<{
-    causaId: string;
-    status: string;
-    note?: string;
-    inserted?: number;
-  }> = [];
-  let enqueued = 0;
-
-  if (opts?.syncMovimientos !== false && causaIdsForSync.length) {
-    // Enqueue durable jobs instead of N serial scrapes (avoids proxy timeouts).
-    const jobs = await enqueueDueSyncJobs({
-      causaIds: causaIdsForSync,
-      trigger: "manual",
-      limit: Math.min(causaIdsForSync.length, 100),
-    });
-    enqueued = jobs.length;
-    if (opts?.processJobsInline) {
-      const processed = await processPendingSyncJobs({
-        actorId: opts?.actorId,
-        limit: Math.min(jobs.length || 20, 40),
-        jobIds: jobs.map((j) => j.id),
-      });
-      syncResults = processed.map((r) => ({
-        causaId: r.causaId,
-        status: r.status,
-        note: r.note,
-        inserted: r.inserted,
-      }));
-    }
-  }
-
-  const syncFailed = syncResults.filter(
-    (r) => r.status === "failed" || r.status === "error"
-  ).length;
-  const syncOk = syncResults.length - syncFailed;
-  const insertedTotal = syncResults.reduce(
-    (sum, r) => sum + (r.inserted || 0),
-    0
-  );
-  let lastSyncStatus: string = "ok";
-  if (syncResults.length > 0 && syncFailed === syncResults.length) {
-    lastSyncStatus = "failed";
-  } else if (syncFailed > 0) {
-    lastSyncStatus = "partial";
-  }
-  const noteParts = [
-    `Se encontraron ${items.length} causa${items.length === 1 ? "" : "s"}`,
-    `${created.length} nueva${created.length === 1 ? "" : "s"}`,
-    `${linked.length} ya estaba${linked.length === 1 ? "" : "n"} en LexOpen`,
-  ];
-  if (enqueued) {
-    noteParts.push(
-      `${enqueued} puesta${enqueued === 1 ? "" : "s"} en cola para actualizar movimientos`
-    );
-  }
-  if (syncResults.length) {
-    if (syncFailed === 0) {
-      noteParts.push(
-        `movimientos al día (+${insertedTotal} nuevo${insertedTotal === 1 ? "" : "s"})`
-      );
-    } else if (syncOk === 0) {
-      noteParts.push(
-        `no se pudieron actualizar los movimientos (${syncFailed} con error)`
-      );
-    } else {
-      noteParts.push(
-        `${syncOk} actualizadas bien, ${syncFailed} con error (+${insertedTotal} movimientos nuevos)`
-      );
-    }
-  }
-
-  await prisma.firmSettings.update({
-    where: { id: settings.id },
-    data: {
-      claveUnicaLastSyncAt: new Date(),
-      claveUnicaLastSyncStatus: lastSyncStatus,
-      claveUnicaLastSyncNote: `${noteParts.join(". ")}.`,
-    },
-  });
-
-  return {
-    listed: items.length,
-    created: created.length,
-    linked: linked.length,
-    enqueued,
-    syncOk,
-    syncFailed,
-    inserted: insertedTotal,
-    items: itemsWithIds,
-    syncResults,
-  };
 }
 
 /** Causas marcadas como importadas/enlazadas desde Mis Causas (ClaveÚnica). */

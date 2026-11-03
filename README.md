@@ -153,7 +153,7 @@ Las integraciones son opcionales y necesitan su configuración o credenciales:
 - **Google Workspace:** archivos elegidos de Drive, carpetas por causa, Calendar y funciones de correo admitidas.
 - **IA y transcripción:** proveedores configurables, con política de envío del estudio y opción de servicios locales.
 - **Codex personal:** cada profesional puede conectar su cuenta de ChatGPT/Codex desde **Mi cuenta**, elegir modelo y activar su uso en las próximas consultas de texto, sin API key. Requiere Codex CLI en el Host y respeta la política de sólo IA local. [Preparación, uso y límites verificados](docs/CODEX.md).
-- **PJUD:** importación CSV y conectores de seguimiento según el acceso y la configuración. Las consultas automatizadas son opt-in; no se presentan como un canal oficial. [Guía PJUD](docs/PJUD.md).
+- **PJUD / OJV:** consulta por RIT/ROL y tribunal, candidatos por RUT y Mis Causas con ClaveÚnica; lectura separada del registro y resultados parciales identificados. Importación CSV y seguimiento según el acceso y la configuración. Las consultas automatizadas son opt-in; no se presentan como un canal oficial. [Guía PJUD](docs/PJUD.md) · [Capturas y verificación](docs/ojv-2026-11-03/README.md).
 - **Obsidian y almacenamiento:** exportación Markdown y archivos locales o almacenamiento compatible con S3.
 
 Las citas comprueban pasajes, versiones, huellas y permisos; la fidelidad de una transcripción, la pertinencia jurídica y la vigencia de las fuentes necesitan revisión profesional. Los importadores oficiales admiten determinados tipos de documentos y no constituyen un corpus completo de toda la legislación o jurisprudencia.

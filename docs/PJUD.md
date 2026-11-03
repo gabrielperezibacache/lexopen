@@ -1,4 +1,14 @@
-# PJUD / CausaMonitor parity (scrape + ClaveÚnica)
+# Consulta de causas OJV y seguimiento PJUD
+
+## Consulta pública y Mis Causas
+
+En **Causas → Cartera PJUD → Consultar en OJV**, escriba el RIT/ROL completo y el tribunal concreto. **Consultar movimientos** sólo lee: no crea una causa ni activa monitoreo. El resultado identifica la consulta, su fecha, el canal utilizado y una muestra con cuadernos. El número indica movimientos recuperados, sin certificar que la historia esté completa. Cambiar los criterios retira el resultado anterior.
+
+**Agregar a mi cartera** es una acción independiente: crea o vincula el expediente existente, activa monitoreo y solicita sincronización. **Registrar sin consulta previa** conserva la alternativa de guardar los datos sin consultar la OJV. Revise la cartera antes de repetir un registro cuya respuesta se haya perdido. La búsqueda por RUT devuelve candidatos del alcance disponible en el formulario; actualmente está limitada por año y filtros, y no representa toda la cartera de una persona.
+
+En **Causas → ClaveÚnica**, guardar acceso y sincronizar son acciones distintas. Guardar las credenciales no prueba que la OJV las acepte. Los permisos efectivos del profesional controlan las acciones; las respuestas privadas no se almacenan en caché. Un fallo inicial ofrece reintento, una lista vacía no se presenta como «todo al día» y las sincronizaciones parciales conservan su advertencia. El seguimiento de un trabajo en curso se detiene al salir de la página.
+
+La configuración del canal y su disponibilidad real son estados diferentes. Los límites y comprobaciones de esta mejora están en la [entrega OJV del 3 de noviembre de 2026](ojv-2026-11-03/README.md), con capturas ficticias y pruebas reproducibles.
 
 ## Principio: host local, APIs externas OK
 
@@ -246,7 +256,9 @@ Cron Host: `MAIL_SYNC_INTERVAL_MINUTES=15` + `CRON_SECRET` → `POST /api/mail/s
 
 Con scrape activo, tras sync se importan anexos OJV como `Documento` (preferencia: bytes capturados con la sesión Playwright; fallback `fetch` si `PJUD_PDF_BACKUP` lo permite). El movimiento queda con `doc:<id>`; la ficha muestra **Ver / descargar** y **Revisar con IA**.
 
-En la ficha de causa (timeline PJUD y expediente), **Importar documentos PJUD** descarga anexos en cola **secuencial** (pausa `PJUD_DOC_DOWNLOAD_DELAY_MS`, tope `PJUD_DOC_DOWNLOAD_MAX`) y los **persiste de inmediato** como `Documento` (`doc:<id>`), listos para Ver/descargar e IA. Solo una importación corre a la vez en el host.
+En la ficha de causa (timeline PJUD y expediente), **Importar documentos PJUD** descarga anexos en cola **secuencial** (pausa `PJUD_DOC_DOWNLOAD_DELAY_MS`, tope `PJUD_DOC_DOWNLOAD_MAX`) y los **persiste de inmediato** como `Documento` (`doc:<id>`), listos para Ver/descargar e IA. La asociación exige identidad de movimiento y cuaderno compatibles; un folio aislado no basta. Sólo se descargan enlaces identificados en su fila; el eBook completo no se atribuye a un folio. Los pendientes avanzan hacia documentos más antiguos sin quedar bloqueados por los ya importados. El bloqueo de esta importación es por proceso; está pensado para una única instancia Host.
+
+Los identificadores nuevos distinguen cuadernos. Cuando un identificador anterior coincide de forma inequívoca con el mismo cuaderno, se actualiza en la fila existente conservando el ID interno, sus notas y la referencia documental. No se adivina un cuaderno desconocido ni se eliminan documentos anteriores.
 
 ## Programación de salas
 

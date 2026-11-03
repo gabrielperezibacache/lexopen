@@ -1,0 +1,199 @@
+{
+  "baseCommit": "5109ccf830bb6eaefbeee142224d9130ef0d9f9f",
+  "sourceState": "branch implementation plus observed guest menu navigation; hashes bind validated sources",
+  "checks": {
+    "unitSuite": 0,
+    "integrationSuite": 0,
+    "lint": 0,
+    "types": 0,
+    "productionBuild": 0,
+    "buildWarnings": 4,
+    "uiScenarios": 10,
+    "apiScenarios": 7,
+    "offlineBrowserFixture": true,
+    "actualPostgresPreservation": true,
+    "productionHttp": true,
+    "visualVerdict": "ship",
+    "backendIdentityFinding": "resolved",
+    "liveOjvQuery": false,
+    "realCredentialsUsed": false,
+    "entryMenuObserved": true,
+    "entryMenuFixture": true
+  },
+  "screenshots": [
+    {
+      "file": "ojv-lookup-desktop.png",
+      "width": 1440,
+      "height": 2227,
+      "sha256": "9d4fa1bd879ea196677d16b49ccc8300853e09aa8b36ef99b82119c9001196d1",
+      "syntheticData": true
+    },
+    {
+      "file": "ojv-lookup-mobile.png",
+      "width": 360,
+      "height": 3792,
+      "sha256": "e226580e68c9afd601f5e997bd5054600147bb26882a3a4d3a9b81e951d16e40",
+      "syntheticData": true
+    },
+    {
+      "file": "claveunica-partial-desktop.png",
+      "width": 1440,
+      "height": 1667,
+      "sha256": "2d5ecf872a29501e5cb180ffdaf2953b42893ba83c9761c62f3066a3d181c2d4",
+      "syntheticData": true
+    },
+    {
+      "file": "claveunica-partial-mobile.png",
+      "width": 360,
+      "height": 3021,
+      "sha256": "792c1cad11f7f1d341903aad04ea5ec50718ffb4def28d81c40b94351ff08483",
+      "syntheticData": true
+    }
+  ],
+  "sources": [
+    {
+      "file": "e2e/ojv-api.spec.ts",
+      "sha256": "e1e2c95188813c9c5db544fb7455c89ee403da1862e20c8828c82e2668cf3b51"
+    },
+    {
+      "file": "e2e/ojv-lookup.spec.ts",
+      "sha256": "7363cf9069c5882e725ee9c988d1799d308f4a3c48d3db502972d7844c595fe4"
+    },
+    {
+      "file": "src/components/pjud/pjud-lookup.css",
+      "sha256": "400477fb879a48d357f2684c2d944eb03af201ddcec4c6201a6583fe960ddb89"
+    },
+    {
+      "file": "src/lib/pjud/claveunica-sync.test.ts",
+      "sha256": "db723e5a8fb5aaf0f601a0b18824973a6743041b1b9cef481eb1c08ee03094e3"
+    },
+    {
+      "file": "src/lib/pjud/document-import-identity.test.ts",
+      "sha256": "e025d1ab184c0ccae13c2fad32eac40b095af34cf2b977cd06ff0582478f7d60"
+    },
+    {
+      "file": "src/lib/pjud/lookup.test.ts",
+      "sha256": "d18b0d7c54ed0fb26196a8d31c9c7b6dff034a755f03ff6ecf1a6fa74ff6a854"
+    },
+    {
+      "file": "src/lib/pjud/mis-causas-access.test.ts",
+      "sha256": "f602fc6c25acb67b025fa4b47965ce1f5e9bcf2a584540d0e18ab93396d04077"
+    },
+    {
+      "file": "src/lib/pjud/mis-causas-access.ts",
+      "sha256": "502526c8416dc8910e99688e63aee499bd6042480e227de27be31751f37e3e3c"
+    },
+    {
+      "file": "src/lib/pjud/mis-causas-request.test.ts",
+      "sha256": "f1b5171be0aa6c29c353f8b6ed27a66cf680675e9da16563b0c7e232e7d9bf89"
+    },
+    {
+      "file": "src/lib/pjud/mis-causas-request.ts",
+      "sha256": "f24921862273f127eab9143254d6aa3fc7ba591eabeadc4e309349535761934d"
+    },
+    {
+      "file": "src/lib/pjud/movement-identity.test.ts",
+      "sha256": "eaae3eba1db533acabecf852922e556f6976b5b836633cd46a307bc9d34d5b03"
+    },
+    {
+      "file": "src/lib/pjud/movement-preservation.integration.test.ts",
+      "sha256": "5a4ac7fadcd5f4afe5f922c533955780f5b42a44071623696330ebaa75552bd4"
+    },
+    {
+      "file": "src/lib/pjud/private-response.test.ts",
+      "sha256": "cc70103e3745f6b93bb1e989ac140a40eec58605ff8c57f6ba2eb9dc7c280df6"
+    },
+    {
+      "file": "src/lib/pjud/private-response.ts",
+      "sha256": "569d69075f2612b4af6418f2396a329b1a48bcce2fdaf71fdc7251dc871496c6"
+    },
+    {
+      "file": "src/lib/pjud/public-scrape.dom.test.ts",
+      "sha256": "5da1a7ebb17f5558cf18c214219d4d3c4b634ff5b65b38b2fb0a833fcca2c0b7"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "sha256": "f9cf3afbae786ad134591a4ab1f9dae2e883f689e561208988af0b626c6edced"
+    },
+    {
+      "file": "package.json",
+      "sha256": "cad70bcf1cc567b100fda59d22f72944a4853cece9177690f4194e66034c3809"
+    },
+    {
+      "file": "src/app/(app)/causas/mis-causas/page.tsx",
+      "sha256": "c83f0d62e24aa51797fe79d340d8b3dc6001b39ca7e362a7404547890f062d30"
+    },
+    {
+      "file": "src/app/api/pjud/claveunica/route.ts",
+      "sha256": "aad85f27d12100659199628b541833e98b4882e5f9e01ace0f9a32fedf1d50a8"
+    },
+    {
+      "file": "src/app/api/pjud/lookup/route.ts",
+      "sha256": "70968ed441a68817e5bf4e68551a3cf5a0dfd8a364ac6ca49eec7baacd47c5eb"
+    },
+    {
+      "file": "src/app/api/pjud/mis-causas/route.ts",
+      "sha256": "3dd20116a95d17b2627948e8d43cdb2546cada4200510c0c91c5d8b9fae65ee9"
+    },
+    {
+      "file": "src/components/pjud/PjudQuickAddPanel.tsx",
+      "sha256": "c2ad045c620273750adabfc8044067045817d7ba1e84eeb4544880b6ad795cfd"
+    },
+    {
+      "file": "src/lib/pjud/claveunica.ts",
+      "sha256": "ba9cf3dff7552e44dd112a1bbe234c6edc81ca4bdb0a2c38e9e4f3096835364c"
+    },
+    {
+      "file": "src/lib/pjud/import-causa-documents.ts",
+      "sha256": "2cfc9dee3e5a92a0bde5420be76297118a68dec8de42a5664af66696eb0af0eb"
+    },
+    {
+      "file": "src/lib/pjud/lookup.ts",
+      "sha256": "870364c7a6255e0e3d5aaeaafd4d8b8cf8da160d483e86535461da071c1794c1"
+    },
+    {
+      "file": "src/lib/pjud/ojv-dom.test.ts",
+      "sha256": "95bd40d7c1f29bef5cbc08274eb30740f0e8e036ea0a9f4239b6cef3595ab5ed"
+    },
+    {
+      "file": "src/lib/pjud/ojv-dom.ts",
+      "sha256": "64f4bf58b2fd39e388b2aff5a084d77d99386ccf39b3341f043175c7c4154347"
+    },
+    {
+      "file": "src/lib/pjud/parse-html.test.ts",
+      "sha256": "01e30105db47d0868b014c1c74e28ca0cb61bd6653e426424abecb3d7b52b0dd"
+    },
+    {
+      "file": "src/lib/pjud/parse-html.ts",
+      "sha256": "eb6794371d5f579c02c6c2b26c29eda570b5bfac4b69af4e93a4399311f1e72d"
+    },
+    {
+      "file": "src/lib/pjud/pdf-backup.ts",
+      "sha256": "b275f0072afde621377bdd232f3331dea7fbdbb384e3be292ce05f8c6f7561e6"
+    },
+    {
+      "file": "src/lib/pjud/public-scrape.ts",
+      "sha256": "d5c096abb81f48617aaa3689ab16c2ce95eb84bfa99da267242322ccf1ac5de6"
+    },
+    {
+      "file": "src/lib/pjud/scrape-claveunica.test.ts",
+      "sha256": "175f30a5010dfe2f7e2bb4dfbf5923288b715c48ac6a1452fefda9693128ecee"
+    },
+    {
+      "file": "src/lib/pjud/scraper-server.ts",
+      "sha256": "0b9fb7aea73d6d4d8b1e21311789372b418928c4140dba7dd503b8ef9177b4a1"
+    },
+    {
+      "file": "src/lib/pjud/scraper-sidecar.ts",
+      "sha256": "3723f068e04a2d0d158bbd2f42542ae2f496c26a807d7f21be13bd5c3e081eb8"
+    },
+    {
+      "file": "src/lib/pjud/sync.ts",
+      "sha256": "fc762a99de51ec2a58b57b65f88b73bc0cc889db6acbee5f0cd313478da1b8c0"
+    },
+    {
+      "file": "src/lib/pjud/types.ts",
+      "sha256": "dc42c063445873020243c42691ddb66816ebea8d1d9444664cd5ed733e5b356a"
+    }
+  ]
+}

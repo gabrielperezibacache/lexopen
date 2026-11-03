@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
 import { fetchPjudMovimientos } from "@/lib/pjud/provider";
+import { normalizePjudCuaderno, type PjudFetchedMovimiento } from "@/lib/pjud/types";
 import {
   backupMovimientoDocuments,
   ingestPjudDocumentBuffer,
@@ -33,6 +34,41 @@ type JobRecord = CausaDocImportStatus & {
 const jobs = new Map<string, JobRecord>();
 /** Global lock: only one causa document import at a time (protect OJV). */
 let globalRunningCausaId: string | null = null;
+
+/** Folio sólo es identidad dentro de su cuaderno y cuando hay un único match. */
+export async function findDocumentImportMovimiento(
+  causaId: string,
+  movement: Pick<PjudFetchedMovimiento, "externalId" | "folio" | "cuaderno">
+) {
+  const select = { id: true, documentoRef: true, folio: true, cuaderno: true, titulo: true } as const;
+  if (movement.externalId) {
+    const exact = await prisma.causaMovimiento.findFirst({
+      where: { causaId, externalId: movement.externalId },
+      select,
+    });
+    if (exact) {
+      const cuaderno = normalizePjudCuaderno(movement.cuaderno);
+      if (!cuaderno || cuaderno !== normalizePjudCuaderno(exact.cuaderno)) return null;
+      const incomingFolio = movement.folio?.trim();
+      const storedFolio = exact.folio?.trim();
+      if (incomingFolio && storedFolio && incomingFolio !== storedFolio) return null;
+      return exact;
+    }
+  }
+  const folio = movement.folio?.trim();
+  const cuaderno = movement.cuaderno?.trim();
+  if (!folio || !normalizePjudCuaderno(cuaderno)) return null;
+  const matches = await prisma.causaMovimiento.findMany({
+    where: {
+      causaId,
+      folio,
+      cuaderno: { equals: cuaderno, mode: "insensitive" },
+    },
+    select,
+    take: 2,
+  });
+  return matches.length === 1 ? matches[0] : null;
+}
 
 function idleStatus(causaId: string): CausaDocImportStatus {
   return {
@@ -167,34 +203,7 @@ async function runImport(causaId: string) {
         if (scrapeSaved >= max) break;
         if (!m.documentoBytes?.byteLength) continue;
 
-        let mov =
-          m.externalId
-            ? await prisma.causaMovimiento.findFirst({
-                where: { causaId, externalId: m.externalId },
-                select: {
-                  id: true,
-                  documentoRef: true,
-                  folio: true,
-                  titulo: true,
-                },
-              })
-            : null;
-        if (!mov && m.folio?.trim()) {
-          mov = await prisma.causaMovimiento.findFirst({
-            where: {
-              causaId,
-              folio: m.folio.trim(),
-              NOT: { documentoRef: { startsWith: "doc:" } },
-            },
-            select: {
-              id: true,
-              documentoRef: true,
-              folio: true,
-              titulo: true,
-            },
-            orderBy: { fecha: "desc" },
-          });
-        }
+        const mov = await findDocumentImportMovimiento(causaId, m);
         if (!mov || mov.documentoRef?.startsWith("doc:")) {
           job.skipped += 1;
           job.completed += 1;

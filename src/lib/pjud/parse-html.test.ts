@@ -6,6 +6,7 @@ import {
   parseMovimientosFromHtml,
   parseSalaFromHtml,
   extractDocumentoHrefFromRowHtml,
+  hasExplicitEmptyHistory,
 } from "@/lib/pjud/parse-html";
 
 const html = `
@@ -80,6 +81,27 @@ assert.ok(
   merged.some((x) => x.rit === "F-9-2020"),
   "loose rows must survive beside verDetalle"
 );
+assert.equal(merged.length, 2, "loose extraction must not duplicate table rows or concatenate adjacent tribunals");
+
+const separateCards = parseMisCausasFromHtml(`
+<div class="panel">
+  <div class="card"><h3>C-1-2024</h3><p>1º Juzgado Civil de Santiago · Tramitación</p><p>RUT 12.345.678-5</p></div>
+  <div class="card"><h3>C-11-2024</h3><p>2º Juzgado Civil de Valpara&iacute;so · Terminada</p><p>RUC 00-12345678-9</p></div>
+</div>
+<script>const stale = 'F-9-2020 3º Juzgado de Familia de Santiago';</script>
+<div class="card" hidden><h3>C-99-2024</h3><p>Juzgado Civil de Talca</p></div>
+`);
+assert.equal(separateCards.length, 2);
+assert.deepEqual(separateCards.map((row) => row.tribunal), ["1º Juzgado Civil de Santiago", "2º Juzgado Civil de Valparaíso"]);
+assert.equal(separateCards[0].ruc, null);
+assert.equal(separateCards[1].ruc, "00-12345678-9");
+assert.deepEqual(parseMisCausasFromHtml(`<script>"C-10-2024 Juzgado Civil de Santiago"</script>`), []);
+assert.deepEqual(parseMisCausasFromHtml(`<div style="display:none"><table><tr><td>C-99-2024</td><td>Juzgado Civil de Talca</td></tr></table><div class="card"><h3>C-99-2024</h3><p>Juzgado Civil de Talca</p></div></div>`), [], "hidden tables and cards from a previous result are ignored");
+assert.deepEqual(parseMisCausasFromHtml(`<section class="tab-pane"><table><tr><td>C-99-2024</td><td>Juzgado Civil de Talca</td></tr></table></section>`), [], "inactive tab data is not a current result");
+
+assert.equal(hasExplicitEmptyHistory(`<table><tr><th>Fecha</th><th>Trámite</th></tr><tr><td colspan="2">Ningún dato disponible en esta tabla</td></tr></table>`), true);
+assert.equal(hasExplicitEmptyHistory(`<p>Sin registros</p>`), false, "an empty DOM is not a confirmed empty history");
+assert.equal(hasExplicitEmptyHistory(`<table><tr><th>Fecha</th><th>Tribunal</th></tr><tr><td>Sin registros</td></tr></table>`), false, "a case listing is not a history");
 
 const movsLongDate = parseMovimientosFromHtml(`
 <table class="table-titulos">
@@ -89,5 +111,6 @@ const movsLongDate = parseMovimientosFromHtml(`
 `);
 assert.equal(movsLongDate.length, 1);
 assert.equal(movsLongDate[0].fecha.toISOString().slice(0, 10), "2025-08-13");
+assert.equal(movsLongDate[0].titulo, "Resolución: se tiene por presentada");
 
 console.log("pjud/parse-html.test.ts OK");

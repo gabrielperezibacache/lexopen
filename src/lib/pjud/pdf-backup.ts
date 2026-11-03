@@ -152,18 +152,7 @@ export async function backupMovimientoDocuments(
   const max = opts?.max ?? pjudDocDownloadMaxPerRun();
   const delayMs = opts?.delayMs ?? pjudDocDownloadDelayMs();
 
-  const movimientos = await prisma.causaMovimiento.findMany({
-    where: {
-      causaId,
-      documentoRef: { not: null },
-    },
-    orderBy: { fecha: "desc" },
-    take: Math.max(max * 2, 40),
-  });
-
-  const pending = movimientos.filter((mov) =>
-    isBackupableDocumentoRef(mov.documentoRef)
-  ).slice(0, max);
+  const pending = await listPendingPjudDocumentMovimientos(causaId, max);
 
   let saved = 0;
   let skipped = 0;
@@ -226,4 +215,32 @@ export async function backupMovimientoDocuments(
   }
 
   return { enabled: true, saved, skipped, attempted };
+}
+
+/** Avanza por todo el expediente; los documentos importados no consumen cupo. */
+export async function listPendingPjudDocumentMovimientos(causaId: string, max: number) {
+  const batchSize = Math.max(max * 2, 40);
+  const pending = [];
+  let cursor: string | undefined;
+  while (pending.length < max) {
+    const rows = await prisma.causaMovimiento.findMany({
+      where: {
+        causaId,
+        OR: [
+          { documentoRef: { startsWith: "https://", mode: "insensitive" } },
+          { documentoRef: { startsWith: "http://", mode: "insensitive" } },
+        ],
+      },
+      orderBy: [{ fecha: "desc" }, { id: "desc" }],
+      take: batchSize,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    for (const row of rows) {
+      if (isBackupableDocumentoRef(row.documentoRef)) pending.push(row);
+      if (pending.length === max) break;
+    }
+    if (rows.length < batchSize) break;
+    cursor = rows.at(-1)!.id;
+  }
+  return pending;
 }

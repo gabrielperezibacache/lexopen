@@ -30,6 +30,7 @@ import {
   probePjudOnline,
 } from "@/lib/pjud/online-probe";
 import { parseSalasTablaHtml } from "@/lib/pjud/salas";
+import { isPlaceholderTribunal, parseRitParts } from "@/lib/pjud/ojv-dom";
 
 if (process.env.PJUD_PUBLIC_SCRAPE !== "0") {
   process.env.PJUD_PUBLIC_SCRAPE = process.env.PJUD_PUBLIC_SCRAPE || "1";
@@ -87,8 +88,9 @@ function send(
   res.end(payload);
 }
 
-function serializeMovimiento(m: {
+export function serializeMovimiento(m: {
   externalId: string;
+  legacyExternalId?: string;
   titulo: string;
   detalle?: string | null;
   fecha: Date;
@@ -102,6 +104,7 @@ function serializeMovimiento(m: {
 }) {
   return {
     id: m.externalId.replace(/^(scrape|pjud|demo):/, ""),
+    ...(m.legacyExternalId ? { legacyExternalId: m.legacyExternalId } : {}),
     titulo: m.titulo,
     detalle: m.detalle,
     fecha: m.fecha.toISOString().slice(0, 10),
@@ -150,9 +153,11 @@ export function createScraperServer() {
         const rit = String(body.rit || "").trim();
         const ruc = body.ruc ? String(body.ruc).trim() : null;
         const tribunal = String(body.tribunal || "").trim();
-        if ((!rit && !ruc) || !tribunal) {
-          return send(res, 400, { error: "rit/ruc y tribunal requeridos" });
+        if (!parseRitParts(rit) || isPlaceholderTribunal(tribunal)) {
+          return send(res, 400, { error: "RIT/ROL completo y tribunal identificado requeridos" });
         }
+        const controller = new AbortController();
+        res.once("close", () => { if (!res.writableEnded) controller.abort(); });
         const result = await scrapeCausaByRol({
           id: "sidecar",
           rit: rit || null,
@@ -160,8 +165,9 @@ export function createScraperServer() {
           tribunal,
           titulo: rit || ruc || "causa",
           caratula: null,
-        });
+        }, controller.signal);
         return send(res, 200, {
+          identity: { rit, tribunal: result.resolvedTribunal || tribunal },
           sala: result.sala,
           note: result.note,
           movimientos: result.movimientos.map(serializeMovimiento),
@@ -194,7 +200,9 @@ export function createScraperServer() {
         const body = await readJson(req);
         const rut = String(body.rut || "").trim();
         if (!rut) return send(res, 400, { error: "rut requerido" });
-        const causas = await scrapeCausasByRut(rut);
+        const controller = new AbortController();
+        res.once("close", () => { if (!res.writableEnded) controller.abort(); });
+        const causas = await scrapeCausasByRut(rut, controller.signal);
         return send(res, 200, { causas });
       }
 
@@ -240,6 +248,7 @@ export function createScraperServer() {
 
       return send(res, 404, { error: "Not found" });
     } catch (error) {
+      if (res.destroyed) return;
       const message = error instanceof Error ? error.message : String(error);
       const status = error instanceof PjudScrapeError ? error.status || 502 : 500;
       return send(res, status, { error: message });

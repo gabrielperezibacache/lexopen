@@ -1,0 +1,11 @@
+{
+  "checkedDate": "2026-11-03",
+  "homepage": "https://oficinajudicialvirtual.pjud.cl/home/index.php",
+  "guestRoute": "/indexN.php",
+  "visibleMenu": "Consulta Unificada",
+  "menuClicked": true,
+  "searchFormVerified": false,
+  "liveCauseQuery": false,
+  "credentialsUsed": false,
+  "captchaSolved": false
+}

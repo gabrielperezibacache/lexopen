@@ -1,7 +1,6 @@
-import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
+import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { writeAuditStrict } from "@/lib/audit";
 import { causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
-import { can } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/db";
 import {
   claimMisCausasSync,
@@ -10,8 +9,10 @@ import {
   syncMisCausas,
 } from "@/lib/pjud/claveunica";
 import { verifyCronSecret } from "@/lib/security/cron-secret";
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { parseMisCausasRequest } from "@/lib/pjud/mis-causas-request";
+import { misCausasCapabilities } from "@/lib/pjud/mis-causas-access";
+import { privatePjudJson as json, privatePjudResponse } from "@/lib/pjud/private-response";
+import { after, NextRequest } from "next/server";
 
 /** Hosts that honor this (not Cloudflare 524) get more headroom for cron. */
 export const maxDuration = 300;
@@ -23,13 +24,14 @@ export async function GET() {
       getClaveUnicaStatus(),
       prisma.causa.count({ where: { AND: [scopedcausaAccessWhere(user), { pjudFromMisCausas: true }] } }),
     ]);
-    return NextResponse.json({
+    return json({
       status,
       causasCount,
       causas: [],
+      capabilities: misCausasCapabilities(user),
     });
   } catch (e) {
-    return handleRouteError(e);
+    return privatePjudResponse(handleRouteError(e));
   }
 }
 
@@ -39,17 +41,18 @@ export async function POST(req: NextRequest) {
     let actorId: string | null = null;
     if (cron) {
       if (!verifyCronSecret(cron)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return json({ error: "Unauthorized" }, { status: 401 });
       }
     } else {
       assertCsrf(req);
       const user = await requireStaff();
-      if (!can(user, "causa.override_walls") || !can(user, "causa.write")) return NextResponse.json({ error: "La sincronización global requiere supervisión del estudio" }, { status: 403 });
-      if (user.role === "asistente") {
-        return NextResponse.json(
+      if (!misCausasCapabilities(user).sync) {
+        return json(
           {
             error:
-              "Solo abogados o admin pueden sincronizar o limpiar avisos de ClaveÚnica",
+              user.role === "asistente"
+                ? "Solo abogados o admin pueden sincronizar o limpiar avisos de ClaveÚnica"
+                : "La sincronización global requiere supervisión del estudio",
           },
           { status: 403 }
         );
@@ -57,25 +60,11 @@ export async function POST(req: NextRequest) {
       actorId = user.id;
     }
 
-    const body = await parseBody(
-      req,
-      z
-        .object({
-          action: z.enum(["sync", "clear_errors"]).optional(),
-          syncMovimientos: z.boolean().optional(),
-          /** Dev/ops only: wait for full sync in this request (can 524 behind CF). */
-          wait: z.boolean().optional(),
-        })
-        .optional()
-    ).catch(() => ({
-      action: "sync" as const,
-      syncMovimientos: true as boolean | undefined,
-      wait: false as boolean | undefined,
-    }));
+    const body = await parseMisCausasRequest(req);
 
     if (body?.action === "clear_errors") {
       if (cron) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return json({ error: "Unauthorized" }, { status: 401 });
       }
       const status = await clearClaveUnicaSyncMessages();
       if (actorId) {
@@ -85,7 +74,7 @@ export async function POST(req: NextRequest) {
           entityType: "FirmSettings",
         });
       }
-      return NextResponse.json({ ok: true, status });
+      return json({ ok: true, status });
     }
 
     const syncMovimientos = body?.syncMovimientos !== false;
@@ -95,7 +84,7 @@ export async function POST(req: NextRequest) {
     if (!waitForResult) {
       const claim = await claimMisCausasSync();
       if (claim.alreadyRunning) {
-        return NextResponse.json(
+        return json(
           {
             ok: true,
             async: true,
@@ -107,13 +96,13 @@ export async function POST(req: NextRequest) {
       }
 
       const actor = actorId;
-      void (async () => {
+      after(async () => {
         try {
           const result = await syncMisCausas({
             actorId: actor,
             syncMovimientos,
             processJobsInline: false,
-            alreadyClaimed: true,
+            claim: { settingsId: claim.settingsId, claimedAt: claim.claimedAt! },
           });
           if (actor) {
             await writeAuditStrict({
@@ -135,9 +124,9 @@ export async function POST(req: NextRequest) {
             error instanceof Error ? error.message : error
           );
         }
-      })();
+      });
 
-      return NextResponse.json(
+      return json(
         {
           ok: true,
           async: true,
@@ -167,12 +156,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    return json({
       ok: true,
       ...result,
       status: await getClaveUnicaStatus(),
     });
   } catch (e) {
-    return handleRouteError(e);
+    return privatePjudResponse(handleRouteError(e));
   }
 }

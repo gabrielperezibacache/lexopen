@@ -1,0 +1,138 @@
+mail/parse.test.ts OK
+mail/imap.test.ts OK
+mail/pjud-sender.test.ts OK
+mail/mime.test.ts OK
+mail/types.test.ts OK
+mail/ingest.test.ts OK
+mail/file-to-folders.test.ts OK
+mail/apply.test.ts OK
+pjud/classify.test.ts OK
+pjud/causa-origin.test.ts OK
+pjud/ops-log.test.ts OK
+pjud/sync-clear-status.test.ts OK
+pjud/movimientos-unique.test.ts OK
+causas/section-tabs.test.ts OK
+pjud/provider.test.ts OK
+pjud/concurrency.test.ts OK
+pjud/webhook.test.ts OK
+pjud/import-csv.test.ts OK
+pjud/scrape-claveunica.test.ts OK
+pjud/parse-html.test.ts OK
+pjud/ojv-dom.test.ts OK
+pjud/scraper-server.test.ts OK
+pjud/digest.test.ts OK
+pjud/mis-causas-sync-state.test.ts OK
+pjud/mis-causas-claim.test.ts OK
+pjud/queue.test.ts OK
+pjud/queue-unique.test.ts OK
+pjud/salas.test.ts OK
+pjud/salas-url.test.ts OK
+pjud/seguimiento.causamonitor.test.ts OK
+pjud/captcha-solver.test.ts OK
+demo-purge.test.ts OK
+ai/utilities.test.ts OK
+ai/local-assist.test.ts OK
+ai/suggested-actions.test.ts OK
+ai/document-context.test.ts OK
+ai/chat-history.test.ts OK
+ai/ai-routes.contract.test.ts OK
+app-version.test.ts OK
+integrations/llm.test.ts OK
+self-update.test.ts OK
+integrations/google-crypto.test.ts OK
+integrations/obsidian-path.test.ts OK
+config-snapshot.test.ts OK
+users-admin.test.ts OK
+obsidian-docs.test.ts OK
+obsidian.test.ts OK
+backup-health.test.ts OK
+billing.test.ts OK
+billing-export.test.ts OK
+billing-overview.test.ts OK
+drive-folder.test.ts OK
+google-calendar-pull.test.ts OK
+calendario/week.test.ts OK
+minutas.render.test.ts OK
+minutas.api-contract.test.ts OK
+chile.test.ts OK
+assistant/normalize.test.ts OK
+assistant/classify-rules.test.ts OK
+assistant/classify.test.ts OK
+assistant/firm-policy.test.ts OK
+assistant/tools.zod.test.ts OK
+api/list-limit.test.ts OK
+log.test.ts OK
+assistant/greeting.test.ts OK
+assistant/conflicts.test.ts OK
+assistant/assistant.contract.test.ts OK
+api-mutation.test.ts OK
+wiki-blog-contract.test.ts OK
+bootstrap.test.ts OK
+safe-next.test.ts OK
+session-version.test.ts OK
+permissions.test.ts OK
+two-factor-policy.test.ts OK
+causa-access.test.ts OK
+sync-mirrors.test.ts OK
+confidential-where.test.ts OK
+loopback-request.test.ts OK
+chile-time.test.ts OK
+plazos.test.ts OK
+storage.test.ts OK
+document-processing.test.ts OK
+local-ocr.test.ts OK
+document-ingest.test.ts OK
+tramites.test.ts OK
+tramites.api-contract.test.ts OK
+tramite-templates.test.ts OK
+ai/parse.test.ts OK
+ai/actions.test.ts OK
+i18n/i18n.test.ts OK
+e2e.smoke.test.ts OK
+api.csrf-origins.test.ts OK
+api.handle-route-error.test.ts OK
+csrf.test.ts OK
+security/cron-paths.test.ts OK
+rate-limit.test.ts OK
+e2e-limits.test.ts OK
+security/headers.test.ts OK
+security/download.test.ts OK
+desktop/config.test.cjs OK
+desktop/external-url.test.cjs OK
+desktop/backup.test.cjs OK
+desktop/host-runtime.test.mjs OK
+desktop/renderer.test.cjs OK
+desktop/media-permissions.test.cjs OK: exact secure app origin/window/main frame, audio only, existing non-media behavior and Mac usage/entitlements; no actual OS capture or installer test
+desktop/media-permissions.test.cjs OK: exact secure app origin/window/main frame, audio only, existing non-media behavior and Mac usage/entitlements; no actual OS capture or installer test
+scripts/web-backup-scheduler.test.mjs OK
+scripts/prod-host-check.test.mjs OK
+web-self-update.test.mjs OK
+scripts/local-host-schedulers.test.mjs OK
+web-uninstall.test.mjs OK
+scripts/pjud-host.test.mjs OK
+pjud/online-probe.contract.test.ts OK
+notify/preferences.test.ts OK
+notify/time.test.ts OK
+notify/minimize.test.ts OK
+notify/plazos-hitos.test.ts OK
+notify/secrets.test.ts OK
+notify/providers/whatsapp.test.ts OK
+notify/providers/webpush.test.ts OK: allowlist, encrypted payload, safe transport, expired destination
+Knowledge JSON PASS: exact Unicode, bounded declared/chunked bodies, cancellation, strict UTF-8 and invalid JSON
+Book formats PASS: UTF8/Unicode exact offsets, EPUB spine order and section locators, DOCX, safe HTML, PDF physical/OCR page2, unsupported/encrypted/XXE/traversal/size abstention and chunked multipart bounded/cancelled; no remote fetch.
+Book RAG unit PASS: lexical BM25, explicit bounded selection, structured references, invented quotations/URLs/footnotes rejected and deterministic corroborated notes.
+Book import compensation PASS: isolated own-attempt removal, idempotent missing object, other attempt intact, shared/historical/unsafe paths refused, S3 SDK DELETE transport checked with loopback fixture only.
+Judicial library unit PASS: explicit classification, bounded strict manual metadata, civil/leap dates without timezone conversion, safe descriptive URLs with zero fetch, legacy bibliography, judicial references and grounded AI context.
+Audio unit PASS: container signatures, WAV duration, bounded multipart including chunked/cancellation, duplicate fields, single ranges, real/unknown timestamps and ordered/aligned segments, restricted cleanup namespace.
+Audio transcript citation unit PASS: authoritative publication relation, snapshot review status, literal-TXT versus speech/timing distinction, reviewed/manual/automatic wording and safe unknown metadata fallback.
+Case document events PASS: scoped identity only, malformed events ignored, independent cases and subscription cleanup.
+Knowledge export render PASS: uncertainty, scope, source warnings, relative links, Markdown escaping, CSV formula guards and transcript caveats
+PDF page request PASS: bounded busy recovery, current authorization failures, cancellation and verified image type
+Personal Codex dispatch: policy, capabilities, isolation and fail-closed checks passed (zero network).
+OJV lookup: read-only, identity, empty/error, abort, permissions, duplicate and registration checks passed (zero network).
+pjud/claveunica-sync.test.ts OK (fixtures only, no network/database)
+pjud/document-import-identity.test.ts OK (fixtures only)
+pjud/mis-causas-request.test.ts OK
+pjud/mis-causas-access.test.ts OK
+pjud/private-response.test.ts OK
+pjud/movement-identity.test.ts OK (fixtures only)

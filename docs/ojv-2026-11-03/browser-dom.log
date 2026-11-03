@@ -1,0 +1,5 @@
+
+> lexopen@1.0.0 test:pjud:browser
+> node --import tsx src/lib/pjud/public-scrape.dom.test.ts
+
+pjud/public-scrape.dom.test.ts OK (offline fixtures)

@@ -1,15 +1,60 @@
 import { classifyMovimiento } from "@/lib/pjud/classify";
-import { fingerprint, type PjudFetchedMovimiento } from "@/lib/pjud/types";
+import { scrapeMovimientoIdentity, type PjudFetchedMovimiento } from "@/lib/pjud/types";
 import { parseLocalDateInput } from "@/lib/minutas";
-import { pickTribunalFromTexts } from "@/lib/pjud/ojv-dom";
+import { extractRitsFromText, normalizeTribunalLabel, pickTribunalFromTexts } from "@/lib/pjud/ojv-dom";
+import { DomUtils, parseDocument } from "htmlparser2";
+
+type HtmlNode = ReturnType<typeof parseDocument>["children"][number];
+
+function excludedNode(node: HtmlNode): boolean {
+  if (node.type === "script" || node.type === "style") return true;
+  return node.type === "tag" && (
+    /^(noscript|template)$/.test(node.name) ||
+    "hidden" in node.attribs ||
+    node.attribs["aria-hidden"] === "true" ||
+    /display\s*:\s*none|visibility\s*:\s*hidden/i.test(node.attribs.style || "") ||
+    (/\btab-pane\b/.test(node.attribs.class || "") && !/\bactive\b/.test(node.attribs.class || ""))
+  );
+}
+
+function visibleDocument(html: string) {
+  const document = parseDocument(html);
+  const clean = (node: HtmlNode) => {
+    if (!("children" in node)) return;
+    node.children = node.children.filter((child) => !excludedNode(child));
+    node.children.forEach(clean);
+  };
+  clean(document);
+  return document;
+}
+
+function nodeText(node: HtmlNode): string {
+  if (node.type === "text") return node.data;
+  if (excludedNode(node)) return "";
+  return "children" in node ? node.children.map(nodeText).join(" ") : "";
+}
 
 function stripTags(s: string) {
-  return s
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/\s+/g, " ")
-    .trim();
+  return nodeText(parseDocument(s)).replace(/\s+/g, " ").trim();
+}
+
+function hasTable(node: HtmlNode): boolean {
+  return (node.type === "tag" && /^(table|tr)$/.test(node.name)) ||
+    ("children" in node && node.children.some(hasTable));
+}
+
+/** An empty history is valid only when OJV labels a recognizable history table. */
+export function hasExplicitEmptyHistory(html: string): boolean {
+  const visit = (node: HtmlNode): boolean => {
+    if (!("children" in node)) return false;
+    if (node.type === "tag" && node.name === "table") {
+      const text = nodeText(node).replace(/\s+/g, " ");
+      return /fecha/i.test(text) && /tr[aá]mite|actuaci[oó]n|resoluci[oó]n|descripci[oó]n/i.test(text) &&
+        /sin (?:movimientos|registros)|no (?:hay|existen|se (?:han encontrado|encontraron)) (?:movimientos|registros)|ning[uú]n dato disponible/i.test(text);
+    }
+    return node.children.some(visit);
+  };
+  return visit(visibleDocument(html));
 }
 
 function normalizeChileanDate(raw: string): string | null {
@@ -132,13 +177,23 @@ export function extractDocumentoHrefFromRowHtml(rowHtml: string): string | null 
  * Rows without a parseable fecha are skipped (never invent "today").
  */
 export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] {
+  html = DomUtils.getOuterHTML(visibleDocument(html));
   const movimientos: PjudFetchedMovimiento[] = [];
   const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
   let rowMatch: RegExpExecArray | null;
   let folioSeq = 0;
+  let cuadernoColumn = -1;
+  let tramiteColumn = -1;
+  let tableAt = -1;
 
   while ((rowMatch = rowRe.exec(html)) !== null) {
+    const currentTable = html.lastIndexOf("<table", rowMatch.index);
+    if (currentTable !== tableAt) {
+      tableAt = currentTable;
+      cuadernoColumn = -1;
+      tramiteColumn = -1;
+    }
     const cells: string[] = [];
     let cellMatch: RegExpExecArray | null;
     cellRe.lastIndex = 0;
@@ -146,7 +201,11 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
       cells.push(stripTags(cellMatch[1]));
     }
     if (cells.length < 2) continue;
-    if (isHeaderRow(cells)) continue;
+    if (isHeaderRow(cells)) {
+      cuadernoColumn = cells.findIndex((cell) => /^cuaderno$/i.test(cell));
+      tramiteColumn = cells.findIndex((cell) => /^(?:tr[aá]mite|actuaci[oó]n|descripci[oó]n)$/i.test(cell));
+      continue;
+    }
 
     const joined = cells.join(" | ");
     if (
@@ -164,13 +223,15 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
     const fecha = parseLocalDateInput(normalized);
     if (!fecha) continue;
 
-    const titulo =
+    const identifiedCuaderno = (cuadernoColumn >= 0 ? cells[cuadernoColumn] : null) ||
+      cells.find((c) => /^(?:principal|apelaci[oó]n|incidente|exhorto)(?:\s+(?:n[°ºo.]?\s*)?\d+)?$/i.test(c)) || null;
+    const titulo = (tramiteColumn >= 0 ? cells[tramiteColumn] : null) ||
       cells.find(
         (c) =>
           c.length > 8 &&
           !/^\d+$/.test(c) &&
-          !/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(c) &&
-          !/^\d{4}-\d{2}-\d{2}/.test(c)
+          c !== identifiedCuaderno &&
+          !cellLooksLikeDate(c)
       ) || cells[cells.length - 1];
     if (!titulo || titulo.length < 4) continue;
     if (/^(folio|fecha|trámite|tramite|etapa|descargar)$/i.test(titulo)) continue;
@@ -181,9 +242,7 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
       classified.tipo === "notificacion" ||
       /receptor|c[eé]dula|notificaci[oó]n/i.test(titulo);
     const pendienteResolucion = Boolean(classified.pendienteResolucion);
-    const cuaderno =
-      cells.find((c) => /principal|apelaci[oó]n|incidente|exhorto/i.test(c)) ||
-      "Principal";
+    const cuaderno = identifiedCuaderno;
     const folioCandidate = cells.find(
       (c, idx) => idx === 0 && /^\d{1,5}$/.test(c)
     );
@@ -191,7 +250,7 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
     const documentoRef = extractDocumentoHrefFromRowHtml(rowMatch[1]);
 
     movimientos.push({
-      externalId: `scrape:${fingerprint(titulo, fecha, folio)}`,
+      ...scrapeMovimientoIdentity(titulo, fecha, folio, identifiedCuaderno),
       titulo,
       detalle: joined.slice(0, 4000),
       fecha,
@@ -233,6 +292,7 @@ export function parseCausasListFromHtml(html: string): Array<{
   ruc?: string | null;
   estado?: string | null;
 }> {
+  html = DomUtils.getOuterHTML(visibleDocument(html));
   const items: Array<{
     rit: string;
     tribunal: string;
@@ -254,11 +314,9 @@ export function parseCausasListFromHtml(html: string): Array<{
     }
     if (cells.length < 2 || isHeaderRow(cells)) continue;
     const joined = cells.join(" ");
-    const ritMatch =
-      joined.match(/\b([A-Z]{1,3}-\d{1,6}-\d{4})\b/i) ||
-      joined.match(/\b(\d{1,6}-\d{4})\b/);
-    if (!ritMatch) continue;
-    const rit = ritMatch[1].toUpperCase();
+    const rits = extractRitsFromText(joined);
+    if (rits.length !== 1) continue;
+    const rit = rits[0];
     const tribunal =
       pickTribunalFromTexts(cells) || "Tribunal no identificado";
     if (/sin tribunal/i.test(tribunal)) continue;
@@ -278,7 +336,7 @@ export function parseCausasListFromHtml(html: string): Array<{
 
 /**
  * Fallback cuando Mis Causas no usa `<table>` clásica (cards / divs).
- * Busca RIT + tribunal en ventanas de texto plano del HTML.
+ * Cada card debe contener una sola causa. Nunca asociar un tribunal de otra card.
  */
 export function parseMisCausasLooseFromHtml(html: string): Array<{
   rit: string;
@@ -287,7 +345,6 @@ export function parseMisCausasLooseFromHtml(html: string): Array<{
   ruc?: string | null;
   estado?: string | null;
 }> {
-  const text = stripTags(html);
   const items: Array<{
     rit: string;
     tribunal: string;
@@ -296,28 +353,32 @@ export function parseMisCausasLooseFromHtml(html: string): Array<{
     estado?: string | null;
   }> = [];
   const seen = new Set<string>();
-  const ritRe = /\b([A-ZÁÉÍÓÚÑ]{1,4}-\d{1,6}-\d{4}|\d{1,6}-\d{4})\b/gi;
-  let match: RegExpExecArray | null;
-  while ((match = ritRe.exec(text)) !== null) {
-    const rit = match[1].toUpperCase();
-    if (/^\d{1,2}-\d{4}$/.test(rit)) continue; // fechas dd-yyyy raras
-    const start = Math.max(0, match.index - 220);
-    const end = Math.min(text.length, match.index + match[0].length + 320);
-    const window = text.slice(start, end);
-    const tribunalMatch = window.match(
-      /\b(\d{0,2}\s*[ºo°.]?\s*(?:Juzgado|Tribunal|Corte|JPL|Polic[ií]a\s+Local)[^|]{0,80})/i
-    );
-    const tribunal =
-      pickTribunalFromTexts([
-        tribunalMatch?.[1] || "",
-        window.slice(0, 120),
-        window.slice(-120),
-      ]) || "Tribunal no identificado";
+  const cards: HtmlNode[] = [];
+  const visit = (node: HtmlNode, inTable = false) => {
+    if (!("children" in node)) return;
+    const table = inTable || (node.type === "tag" && /^(table|tr|td|th)$/.test(node.name));
+    if (!table && node.type === "tag" && /(?:^|\s)(?:card|list-group-item|panel|causa)(?:\s|$)/.test(node.attribs.class || "")) {
+      const rits = extractRitsFromText(nodeText(node));
+      if (rits.length === 1 && !hasTable(node)) {
+        cards.push(node);
+        return;
+      }
+    }
+    node.children.forEach((child) => visit(child, table));
+  };
+  visit(visibleDocument(html));
+  for (const card of cards) {
+    const text = nodeText(card).replace(/\s+/g, " ").trim();
+    const rit = extractRitsFromText(text)[0];
+    const parts = "children" in card
+      ? card.children.flatMap((child) => nodeText(child).split(/[|·]/)).map((s) => s.trim()).filter(Boolean)
+      : [];
+    const tribunal = pickTribunalFromTexts(parts) || "Tribunal no identificado";
     const key = `${rit}|${tribunal}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const rucMatch = window.match(/\b(\d{1,3}-\d{8,}-\d|\d{7,8}-[\dkK])\b/i);
-    const estadoMatch = window.match(
+    const rucMatch = text.match(/\b(\d{1,3}-\d{8,}-\d)\b/i);
+    const estadoMatch = text.match(
       /\b(Tramitaci[oó]n|Terminad[oa]|Archivad[oa]|Vigente|Activa|Concluida)\b/i
     );
     items.push({
@@ -349,7 +410,7 @@ export function parseMisCausasFromHtml(html: string): MisCausasParsedItem[] {
   const push = (items: MisCausasParsedItem[]) => {
     for (const item of items) {
       if (!item.rit) continue;
-      const key = `${item.rit}|${item.tribunal}`.toUpperCase();
+      const key = `${item.rit.toUpperCase()}|${normalizeTribunalLabel(item.tribunal)}`;
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({
@@ -390,6 +451,7 @@ export type VerDetalleRow = {
  * First TD is usually the detail link; remaining TDs vary by competencia.
  */
 export function parseVerDetalleJuridicaHtml(html: string): VerDetalleRow[] {
+  html = DomUtils.getOuterHTML(visibleDocument(html));
   const out: VerDetalleRow[] = [];
   const tableMatch =
     html.match(
@@ -416,11 +478,9 @@ export function parseVerDetalleJuridicaHtml(html: string): VerDetalleRow[] {
         ? cells.slice(1)
         : cells;
     const joined = dataCells.join(" ");
-    const ritMatch =
-      joined.match(/\b([A-ZÁÉÍÓÚÑ]{1,4}-\d{1,6}-\d{4})\b/i) ||
-      joined.match(/\b(\d{1,6}-\d{4})\b/);
-    if (!ritMatch) continue;
-    const rit = ritMatch[1].toUpperCase();
+    const rits = extractRitsFromText(joined);
+    if (rits.length !== 1) continue;
+    const rit = rits[0];
     const tribunal =
       pickTribunalFromTexts(dataCells) || "Tribunal no identificado";
     const key = `${rit}|${tribunal}`;
@@ -435,7 +495,7 @@ export function parseVerDetalleJuridicaHtml(html: string): VerDetalleRow[] {
         dataCells.find((c) => /\bvs\.?\b|\/|con\b/i.test(c)) ||
         dataCells.find((c) => c.length > 8 && c !== rit && c !== tribunal) ||
         null,
-      ruc: dataCells.find((c) => /\d{1,3}-\d{8,}-\d|\d{7,8}-[\dkK]/i.test(c)) || null,
+      ruc: dataCells.find((c) => /\d{1,3}-\d{8,}-\d/.test(c)) || null,
       estado:
         dataCells.find((c) => /tramitaci|terminad|archiv|vigente|activ/i.test(c)) ||
         null,
