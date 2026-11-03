@@ -31,6 +31,8 @@
 .writing-status[data-state="error"], .writing-status[data-state="offline"], .writing-status[data-state="conflict"] { color: var(--danger); }
 .writing-message { padding: 1rem 0; margin-bottom: 1rem; border-block: 1px solid var(--line-strong); color: var(--ink-soft); font-size: 1rem; line-height: 1.75; }
 .writing-message[data-error="true"] { color: var(--danger); }
+.writing-load-recovery { display: grid; justify-items: start; gap: .75rem; }
+.writing-load-recovery .btn { min-height: 44px; }
 .writing-empty { padding: 2rem 0; max-width: 68ch; font-size: 1rem; line-height: 1.8; }
 .writing-empty h2 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.6rem; margin-bottom: .75rem; }
 .writing-empty p + p { margin-top: .75rem; }
@@ -43,6 +45,7 @@
 .writing-source-kinds { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1.25rem; }
 .writing-source-kinds button { padding: .5rem .75rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink-soft); font-size: 1rem; }
 .writing-source-kinds button[aria-selected="true"] { background: var(--sea-soft); color: var(--sea); border-color: var(--sea); }
+.writing-source-kinds button:focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
 .writing-source-search { display: grid; gap: 1rem; margin-block: 1.25rem; }
 .writing-source-search button { justify-self: start; }
 .writing-candidates, .writing-reference-list, .writing-history-list { list-style: none; padding: 0; margin: 1.25rem 0 0; }

@@ -74,6 +74,8 @@ Se implementa el primer corte de la iteración A. Su estado de pruebas e integra
 
 La segunda entrega une esta preparación al editor persistido de causa en `/causas/[id]/escritos`: guardado automático, versiones recuperables, hechos, notas privadas de audiencia y pasajes de biblioteca con comprobación de sus referencias. El alcance construido y su validación están en [la entrega del editor](ENTREGA-ESCRITOS-2026-11-02.md). Continúan pendientes la revisión de propuestas por bloques, las plantillas, DOCX y el complemento Word; la existencia del editor no da por terminados esos pasos.
 
+La iteración de [continuidad entre herramientas](ENTREGA-CONTINUIDAD-2026-11-02.md) añade el recorrido común de causa, biblioteca, audiencia y escritos; remisiones autorizadas desde un libro al escrito de origen; protección de notas, agenda y mesa de escritura pendientes; y recuperación de cargas fallidas conservando la selección. Las plantillas, la revisión por bloques y las exportaciones pendientes de la iteración B conservan su estado pendiente.
+
 ## Orden de ejecución
 
 Las iteraciones se cierran por aceptación, no por una fecha estimada. Se puede desarrollar en paralelo una mejora visual y un servicio de dominio cuando no cambian el mismo contrato.

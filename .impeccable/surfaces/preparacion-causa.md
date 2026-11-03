@@ -10,7 +10,7 @@ Continuar el trabajo propio del profesional dentro de una causa autorizada: reun
 
 ## Hierarchy
 
-El índice del expediente precede a «Preparar la causa». La introducción explica el recorrido y su alcance; las filas presentan tarea, instrucción, estado guardado y una acción hacia documentos, hechos y fuentes, grabaciones, mesa de audiencia o minutas. «Preparar un borrador con IA» enlaza al agente con la causa y la utilidad de borrador seleccionadas cuando existe el permiso correspondiente.
+El índice del expediente precede a «Preparar la causa». La introducción explica el recorrido y su alcance; las filas presentan tarea, instrucción, estado guardado y una acción hacia documentos, hechos y fuentes, grabaciones, mesa de audiencia o minutas. «Escribir con fuentes» enlaza al editor privado de la causa cuando existe el permiso correspondiente. El recorrido compartido reúne Expediente, Biblioteca, Audiencias y Escritos, con causa y destino visibles; en móvil se organiza en dos columnas con controles de al menos 44 píxeles.
 
 En hechos y fuentes, «Llevar los hechos al escrito» abre una hoja de trabajo con descarga Markdown y cronología CSV. En la mesa de audiencia, «Guion de intervención» separa apertura, selección de notas, orden y petición de cierre. El respaldo enlazado y la observación del profesional permanecen identificados por texto.
 
@@ -21,7 +21,7 @@ En hechos y fuentes, «Llevar los hechos al escrito» abre una hoja de trabajo c
 | Preparación e índice de expediente | `/causas/[id]`; `src/components/causas/CasePreparation.tsx` y `src/components/causas/CasePreparation.css`. |
 | Lectura autorizada y recuentos | `src/app/(app)/causas/[id]/page.tsx`. |
 | Destinos dentro del expediente | `#preparacion`, `#ficha`, `#conocimiento`, `#documentos`, `#audios`, `#minutas`, `#plazos`, `#tramites` y `#actividad`; conocimiento y grabaciones dependen del permiso de uso. |
-| Continuación hacia audiencia y borrador | `/causas/[id]/audiencias` y `/agente?causaId=[id]&utility=draft`. |
+| Continuación hacia audiencia y borrador | `/biblioteca?causa=[id]`, `/causas/[id]/audiencias` y `/causas/[id]/escritos`. El contexto de biblioteca se autoriza en servidor. |
 | Desplegable de hoja y CSV | `src/components/knowledge/CasePreparationExport.tsx`; sus estilos están en `src/components/knowledge/knowledge.css`. |
 | Descarga de hechos y cronología | `GET /api/causas/[id]/knowledge/export`; `src/app/api/causas/[id]/knowledge/export/route.ts`, `src/lib/knowledge/export.ts` y `src/lib/knowledge/export-render.ts`. |
 | Composición del guion | `src/components/hearings/HearingBrief.tsx` y `src/components/hearings/hearings.css`. |

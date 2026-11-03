@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { BookOpen, Check, Download, FileText, History, Plus, Save } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
 import { newUiId } from "@/lib/ui-id";
+import { withCaseBookContext } from "@/lib/causas/workflow-links";
 import type { WritingDraftList, WritingDraftView, WritingHistory, WritingMutationResult, WritingReferenceView, WritingRevisionView } from "@/lib/writings/types";
 import type { WritingSourceCatalog, WritingSourceInput } from "@/lib/writings/source-types";
 import "./CaseWritingEditor.css";
@@ -39,10 +40,11 @@ function errorFrom(result: { status: number; error: string; data?: ErrorBody }):
   return Object.assign(new Error(result.error), { status: result.status, code: result.data?.code });
 }
 
-export function CaseWritingEditor({ causaId, initialDraftId = "", initialSources = "fact" }: { causaId: string; initialDraftId?: string; initialSources?: WritingSourceInput["kind"] }) {
+export function CaseWritingEditor({ causaId, initialDraftId = "", initialSources = "fact", initialBookId = "" }: { causaId: string; initialDraftId?: string; initialSources?: WritingSourceInput["kind"]; initialBookId?: string }) {
   const base = "/api/causas/" + causaId + "/writings";
   const [list, setList] = useState<WritingDraftList>(), [selected, setSelected] = useState(""), [loaded, setLoaded] = useState<WritingDraftView>();
   const [newTitle, setNewTitle] = useState(""), [busy, setBusy] = useState(false), [creationPending, setCreationPending] = useState(false), [error, setError] = useState(""), [blocked, setBlocked] = useState(false), [recoverable, setRecoverable] = useState(false), [reload, setReload] = useState(0);
+  const [listError, setListError] = useState(""), [listAttempt, setListAttempt] = useState(0);
   const guard = useRef<(() => Promise<boolean>) | null>(null);
   const createRequest = useRef<{ requestId: string; title: string; body: string } | null>(null);
   const registerGuard = useCallback((value: (() => Promise<boolean>) | null) => { guard.current = value; }, []);
@@ -53,15 +55,23 @@ export function CaseWritingEditor({ causaId, initialDraftId = "", initialSources
     getJson<WritingDraftList>(base, control.signal).then(data => {
       if (!control.signal.aborted) {
         setList(data);
+        setListError("");
         setSelected(previous => previous || initialDraftId || data.drafts.find(item => item.available)?.id || "");
       }
-    }).catch((reason: ApiError) => { if (!control.signal.aborted) { setError(reason.message); if (unavailable(reason)) block(reason.message); } });
+    }).catch((reason: ApiError) => { if (!control.signal.aborted) { if (unavailable(reason)) block(reason.message); else setListError(reason.message); } });
     return () => control.abort();
-  }, [base, initialDraftId, block, blocked]);
+  }, [base, initialDraftId, block, blocked, listAttempt]);
   useEffect(() => {
     if (!selected || blocked) return;
     const control = new AbortController();
-    getJson<WritingDraftView>(base + "/" + selected, control.signal).then(value => { if (!control.signal.aborted) { setLoaded(value); setError(""); } }).catch((reason: ApiError) => {
+    getJson<WritingDraftView>(base + "/" + selected, control.signal).then(value => {
+      if (control.signal.aborted) return;
+      setLoaded(value); setError("");
+      const url = new URL(location.href);
+      // Next copies its internal history state when data is null and updates
+      // useSearchParams, keeping the shared navigation on this exact draft.
+      if (url.searchParams.get("draft") !== value.id) { url.searchParams.set("draft", value.id); history.replaceState(null, "", url); }
+    }).catch((reason: ApiError) => {
       if (!control.signal.aborted) { setLoaded(undefined); setError(reason.message); if (unavailable(reason) && reason.status !== 404) block(reason.message, reason.code === "writing_source_unavailable"); }
     });
     return () => control.abort();
@@ -72,7 +82,7 @@ export function CaseWritingEditor({ causaId, initialDraftId = "", initialSources
   async function choose(id: string) {
     if (id === selected || guard.current && !await guard.current()) return;
     setLoaded(undefined); setSelected(id); setError("");
-    const url = new URL(location.href); url.searchParams.set("draft", id); history.replaceState(history.state, "", url);
+    const url = new URL(location.href); url.searchParams.set("draft", id); history.replaceState(null, "", url);
   }
   async function create() {
     if (guard.current && !await guard.current()) return;
@@ -89,7 +99,7 @@ export function CaseWritingEditor({ causaId, initialDraftId = "", initialSources
     const draft = result.data.draft; createRequest.current = null; setCreationPending(false); setNewTitle(""); setLoaded(draft);
     setList(current => ({ drafts: [{ id: draft.id, available: true, title: draft.title, revision: draft.revision, updatedAt: draft.updatedAt }, ...(current?.drafts || []).filter(item => item.id !== draft.id)], canWrite: draft.canWrite, limited: current?.limited || false, nextAfter: current?.nextAfter || null }));
     setSelected(draft.id);
-    const url = new URL(location.href); url.searchParams.set("draft", draft.id); history.replaceState(history.state, "", url);
+    const url = new URL(location.href); url.searchParams.set("draft", draft.id); history.replaceState(null, "", url);
   }
   async function moreDrafts() {
     if (!list?.nextAfter) return;
@@ -107,22 +117,23 @@ export function CaseWritingEditor({ causaId, initialDraftId = "", initialSources
       {list?.nextAfter && <button type="button" className="writing-text-link" disabled={busy} onClick={() => void moreDrafts()}>Cargar más escritos</button>}
     </div>
     {error && <p className="writing-message" data-error="true" role="alert">{error}</p>}
-    {!list && !error && <p role="status">Abriendo sus escritos…</p>}
+    {listError && <div className="writing-message writing-load-recovery" data-error="true" role="alert"><p>{listError}</p><button type="button" className="btn btn-secondary" onClick={() => { setListError(""); setListAttempt(value => value + 1); }}>Reintentar carga de escritos</button></div>}
+    {!list && !error && !listError && <p role="status">Abriendo sus escritos…</p>}
     {list && !list.drafts.length && <div className="writing-empty"><h2>Un escrito, con sus antecedentes a mano</h2><p>Cree el primer borrador para redactar sobre una hoja continua. A su lado podrá consultar hechos, recuperar notas de audiencia y elegir pasajes de su biblioteca.</p><p>El guardado es automático. Cada cambio confirmado queda en el historial y puede recuperarse como una versión nueva.</p></div>}
     {selected && !loaded && !error && <p role="status">Abriendo y comprobando respaldos…</p>}
-    {loaded && loaded.id === selected && <WritingSession key={selected + ":" + reload} causaId={causaId} initial={loaded} initialSources={initialSources} onSaved={changed} onPrivateBlocked={block} registerGuard={registerGuard} reloadServer={() => { setLoaded(undefined); setReload(value => value + 1); }} />}
+    {loaded && loaded.id === selected && <WritingSession key={selected + ":" + reload} causaId={causaId} initial={loaded} initialSources={initialSources} initialBookId={initialBookId} onSaved={changed} onPrivateBlocked={block} registerGuard={registerGuard} reloadServer={() => { setLoaded(undefined); setReload(value => value + 1); }} />}
   </section>;
 }
 
-function WritingSession({ causaId, initial, initialSources, onSaved, onPrivateBlocked, registerGuard, reloadServer }: {
-  causaId: string; initial: WritingDraftView; initialSources: WritingSourceInput["kind"];
+function WritingSession({ causaId, initial, initialSources, initialBookId, onSaved, onPrivateBlocked, registerGuard, reloadServer }: {
+  causaId: string; initial: WritingDraftView; initialSources: WritingSourceInput["kind"]; initialBookId: string;
   onSaved: (draft: WritingDraftView) => void; onPrivateBlocked: (message: string, allowRecovery?: boolean) => void;
   registerGuard: (guard: (() => Promise<boolean>) | null) => void; reloadServer: () => void;
 }) {
   const url = "/api/causas/" + causaId + "/writings/" + initial.id;
   const [draft, setDraft] = useState(initial), [fields, setFields] = useState<Fields>({ title: initial.title, body: initial.body });
   const [state, setState] = useState<SaveState>("saved"), [error, setError] = useState(""), [notice, setNotice] = useState(""), [panel, setPanel] = useState<Panel>("sources");
-  const [mobilePane, setMobilePane] = useState<MobilePane>("write"), mobileTools = useRef<HTMLElement>(null);
+  const [mobilePane, setMobilePane] = useState<MobilePane>("write"), [sourceVisit, setSourceVisit] = useState(0), mobileTools = useRef<HTMLElement>(null);
   const [actionBusy, setActionBusy] = useState(false), [pendingAction, setPendingAction] = useState(false);
   const draftRef = useRef(initial), fieldsRef = useRef(fields), stateRef = useRef<SaveState>("saved"), failedSave = useRef<FailedSave | null>(null);
   const flight = useRef<Promise<boolean> | null>(null), mounted = useRef(true), frozen = useRef(false), actionFlight = useRef(false);
@@ -130,6 +141,13 @@ function WritingSession({ causaId, initial, initialSources, onSaved, onPrivateBl
   const setSaveState = useCallback((value: SaveState) => { stateRef.current = value; if (mounted.current) setState(value); }, []);
   const publish = useCallback((value: WritingDraftView) => { draftRef.current = value; if (mounted.current) { setDraft(value); onSaved(value); } }, [onSaved]);
   const privateFailure = useCallback((reason: ApiError) => { if (unavailable(reason)) { frozen.current = true; fieldsRef.current = { title: "", body: "" }; failedSave.current = null; structural.current = null; if (mounted.current) onPrivateBlocked(reason.message, reason.code === "writing_source_unavailable"); return true; } return false; }, [onPrivateBlocked]);
+  const catalogFailure = useCallback(async (reason: ApiError, signal: AbortSignal) => {
+    if (reason.status !== 404) { privateFailure(reason); return; }
+    // A revoked candidate is not necessarily part of this draft. Check the
+    // actual draft before hiding its text, without replacing local edits.
+    try { await getJson<WritingDraftView>(url, signal); }
+    catch (failure) { if (!signal.aborted) privateFailure(failure as ApiError); }
+  }, [url, privateFailure]);
   const flush = useCallback(async (): Promise<boolean> => {
     if (flight.current) return flight.current;
     if (frozen.current || stateRef.current === "conflict" || structural.current || !draftRef.current.canWrite) return !frozen.current && stateRef.current !== "conflict" && !structural.current && same(fieldsRef.current, draftRef.current);
@@ -232,11 +250,18 @@ function WritingSession({ causaId, initial, initialSources, onSaved, onPrivateBl
     finally { if (mounted.current) setActionBusy(false); }
   }
   const operating = actionBusy || pendingAction, locked = operating || !draft.canWrite;
-  function choosePanel(value: Panel) { setPanel(value); setMobilePane(value); }
+  function choosePanel(value: Panel) {
+    setPanel(value); setMobilePane(value);
+    if (value === "sources") setSourceVisit(visit => visit + 1);
+  }
+  function chooseMobilePane(value: MobilePane) {
+    if (value === "write") setMobilePane(value);
+    else choosePanel(value);
+  }
   return <div className="writing-layout" data-testid="writing-editor" data-mobile-pane={mobilePane}>
     <nav className="writing-mobile-tools" ref={mobileTools} aria-label="Herramientas del escrito">
-      <div className="writing-mobile-tabs" role="tablist" aria-label="Vista del escrito" onKeyDown={event => { const order: MobilePane[] = ["write", "sources", "references", "history"]; let index = order.indexOf(mobilePane); if (event.key === "ArrowRight") index = (index + 1) % 4; else if (event.key === "ArrowLeft") index = (index + 3) % 4; else if (event.key === "Home") index = 0; else if (event.key === "End") index = 3; else return; event.preventDefault(); const selected = order[index]; setMobilePane(selected); if (selected !== "write") setPanel(selected); (event.currentTarget.children[index] as HTMLButtonElement).focus(); }}>
-        {([["write", "Escribir"], ["sources", "Fuentes"], ["references", "Referencias"], ["history", "Historial"]] as const).map(([value, label]) => <button type="button" role="tab" key={value} aria-selected={mobilePane === value} tabIndex={mobilePane === value ? 0 : -1} onClick={() => { setMobilePane(value); if (value !== "write") setPanel(value); }}>{label}</button>)}
+      <div className="writing-mobile-tabs" role="tablist" aria-label="Vista del escrito" onKeyDown={event => { const order: MobilePane[] = ["write", "sources", "references", "history"]; let index = order.indexOf(mobilePane); if (event.key === "ArrowRight") index = (index + 1) % 4; else if (event.key === "ArrowLeft") index = (index + 3) % 4; else if (event.key === "Home") index = 0; else if (event.key === "End") index = 3; else return; event.preventDefault(); const selected = order[index]; chooseMobilePane(selected); (event.currentTarget.children[index] as HTMLButtonElement).focus(); }}>
+        {([["write", "Escribir"], ["sources", "Fuentes"], ["references", "Referencias"], ["history", "Historial"]] as const).map(([value, label]) => <button type="button" role="tab" key={value} aria-selected={mobilePane === value} tabIndex={mobilePane === value ? 0 : -1} onClick={() => chooseMobilePane(value)}>{label}</button>)}
       </div>
       <p className="writing-mobile-state" data-state={state} role="status" aria-live="polite">{labels[state]} · versión {draft.revision}</p>
     </nav>
@@ -254,30 +279,65 @@ function WritingSession({ causaId, initial, initialSources, onSaved, onPrivateBl
     </div>
     <aside className="writing-companion" aria-label="Cuaderno del escrito">
       <div className="writing-companion-tabs" role="tablist" aria-label="Cuaderno del escrito" onKeyDown={event => { const order: Panel[] = ["sources", "references", "history"]; let index = order.indexOf(panel); if (event.key === "ArrowRight") index = (index + 1) % 3; else if (event.key === "ArrowLeft") index = (index + 2) % 3; else if (event.key === "Home") index = 0; else if (event.key === "End") index = 2; else return; event.preventDefault(); choosePanel(order[index]); (event.currentTarget.children[index] as HTMLButtonElement).focus(); }}><button type="button" role="tab" tabIndex={panel === "sources" ? 0 : -1} aria-selected={panel === "sources"} onClick={() => choosePanel("sources")}><BookOpen size={16} aria-hidden="true" />Incorporar fuentes</button><button type="button" role="tab" tabIndex={panel === "references" ? 0 : -1} aria-selected={panel === "references"} onClick={() => choosePanel("references")}>Referencias ({draft.references.length})</button><button type="button" role="tab" tabIndex={panel === "history" ? 0 : -1} aria-selected={panel === "history"} onClick={() => choosePanel("history")}><History size={16} aria-hidden="true" />Historial</button></div>
-      {panel === "sources" && <SourcePicker causaId={causaId} initialKind={initialSources} disabled={locked || state === "conflict"} add={async source => { await commit("/sources", { source }, "Fuente incorporada al final del escrito. Sus citas quedan vinculadas a esta versión."); }} onPrivateError={privateFailure} />}
-      {panel === "references" && <div className="writing-companion-panel"><h2>Respaldos incorporados</h2><p>Son los pasajes vinculados a esta versión. Al abrir o exportar el escrito se comprueban otra vez su integridad y su acceso.</p><References references={draft.references} /><Warnings warnings={draft.warnings} /></div>}
+      <div hidden={panel !== "sources"}><SourcePicker causaId={causaId} draftId={draft.id} active={panel === "sources"} visit={sourceVisit} initialKind={initialSources} initialBookId={initialBookId} disabled={locked || state === "conflict"} add={async source => { await commit("/sources", { source }, "Fuente incorporada al final del escrito. Sus citas quedan vinculadas a esta versión."); }} onCatalogError={catalogFailure} /></div>
+      {panel === "references" && <div className="writing-companion-panel"><h2>Respaldos incorporados</h2><p>Son los pasajes vinculados a esta versión. Al abrir o exportar el escrito se comprueban otra vez su integridad y su acceso.</p><References causaId={causaId} draftId={draft.id} references={draft.references} /><Warnings warnings={draft.warnings} /></div>}
       {panel === "history" && <HistoryPanel url={url} current={draft.revision} canWrite={draft.canWrite} disabled={operating || state === "conflict"} restore={revision => commit("/restore", { targetRevision: revision }, "Versión recuperada como un nuevo guardado. El historial anterior se conserva.")} onPrivateError={privateFailure} />}
     </aside>
   </div>;
 }
 
-function SourcePicker({ causaId, initialKind, disabled, add, onPrivateError }: { causaId: string; initialKind: WritingSourceInput["kind"]; disabled: boolean; add: (source: WritingSourceInput) => Promise<void>; onPrivateError: (error: ApiError) => boolean }) {
-  const [kind, setKind] = useState(initialKind), [query, setQuery] = useState(""), [search, setSearch] = useState(""), [bookId, setBookId] = useState("");
-  const [cursor, setCursor] = useState("");
-  const requestKey = JSON.stringify([kind, search, bookId, cursor]);
+function SourcePicker({ causaId, draftId, active, visit, initialKind, initialBookId, disabled, add, onCatalogError }: { causaId: string; draftId: string; active: boolean; visit: number; initialKind: WritingSourceInput["kind"]; initialBookId: string; disabled: boolean; add: (source: WritingSourceInput) => Promise<void>; onCatalogError: (error: ApiError, signal: AbortSignal) => Promise<void> }) {
+  const [kind, setKind] = useState<WritingSourceInput["kind"]>(initialBookId ? "book" : initialKind), [query, setQuery] = useState(""), [search, setSearch] = useState(""), [bookId, setBookId] = useState(initialBookId);
+  const [cursor, setCursor] = useState(""), [attempt, setAttempt] = useState(0);
+  const [bookOptions, setBookOptions] = useState<{ visit: number; books: WritingSourceCatalog["books"] }>({ visit, books: [] });
+  const books = bookOptions.visit === visit ? bookOptions.books : [];
+  const sourceId = useId(), kinds = ["fact", "note", "book"] as const;
+  const requestKey = JSON.stringify([kind, search, bookId, cursor, attempt, visit]);
   const [catalogState, setCatalogState] = useState<{ key: string; catalog?: WritingSourceCatalog; error?: string }>();
   const catalog = catalogState?.key === requestKey ? catalogState.catalog : undefined, error = catalogState?.key === requestKey ? catalogState.error : "", loading = !catalog && !error;
   useEffect(() => {
+    if (!active) return;
     const control = new AbortController(), params = new URLSearchParams({ kind });
     if (search) params.set("q", search); if (bookId && kind === "book") params.set("bookId", bookId); if (cursor) params.set("after", cursor);
-    getJson<WritingSourceCatalog>("/api/causas/" + causaId + "/writing-sources?" + params, control.signal).then(value => { if (!control.signal.aborted) { setCatalogState({ key: requestKey, catalog: value }); if (kind === "book" && !bookId && value.books.length === 1) setBookId(value.books[0].id); } }).catch((reason: ApiError) => { if (!control.signal.aborted) { setCatalogState({ key: requestKey, error: reason.message }); onPrivateError(reason); } });
+    getJson<WritingSourceCatalog>("/api/causas/" + causaId + "/writing-sources?" + params, control.signal).then(value => {
+      if (control.signal.aborted) return;
+      setCatalogState({ key: requestKey, catalog: value });
+      if (kind === "book") {
+        setBookOptions({ visit, books: value.books });
+        if (!bookId && value.books.length === 1) setBookId(value.books[0].id);
+      }
+    }).catch(async (reason: ApiError) => {
+      if (control.signal.aborted) return;
+      setCatalogState({ key: requestKey, error: reason.message });
+      if (unavailable(reason)) setBookOptions({ visit, books: [] });
+      await onCatalogError(reason, control.signal);
+    });
     return () => control.abort();
-  }, [causaId, kind, search, bookId, cursor, onPrivateError, requestKey]);
+  }, [causaId, active, visit, kind, search, bookId, cursor, onCatalogError, requestKey]);
+  function chooseKind(value: WritingSourceInput["kind"]) {
+    if (value === kind) return;
+    setKind(value); setSearch(""); setQuery(""); setCursor("");
+  }
   return <div className="writing-companion-panel"><h2>Cuaderno de fuentes</h2><p>Elija qué incorporar. El pasaje o la nota se añaden al final con su referencia; su texto actual se guarda primero.</p>
-    <div className="writing-source-kinds" role="tablist" aria-label="Origen del respaldo">{([["fact", "Hechos"], ["note", "Notas de audiencia"], ["book", "Biblioteca"]] as const).map(([value, label]) => <button type="button" role="tab" aria-selected={kind === value} key={value} onClick={() => { setKind(value); setSearch(""); setQuery(""); setCursor(""); setBookId(""); }}>{label}</button>)}</div>
-    <form className="writing-source-search" onSubmit={event => { event.preventDefault(); setCursor(""); setSearch(query.trim()); }}>{kind === "book" && <label>Libro o sentencia<select className="select" value={bookId} onChange={event => { setBookId(event.target.value); setCursor(""); }}><option value="">Seleccione un volumen</option>{catalog?.books.map(book => <option key={book.id} value={book.id}>{book.title}{book.owned ? "" : " · colección compartida"}</option>)}</select></label>}<label>Buscar en {kind === "fact" ? "los hechos" : kind === "note" ? "las notas" : "el volumen"}<input className="input" value={query} onChange={event => setQuery(event.target.value)} maxLength={100} placeholder={kind === "book" ? "Palabras del pasaje…" : "Texto o título…"} /></label><button className="btn btn-secondary" type="submit" disabled={loading || kind === "book" && !bookId}>Buscar fuentes</button></form>
-    {loading && <p role="status">Comprobando fuentes disponibles…</p>}{error && <p className="writing-message" data-error="true" role="alert">{error}</p>}
-    {catalog && <><p className="writing-help">{catalog.coverage.scope}</p><Warnings warnings={catalog.warnings} /><ul className="writing-candidates">{catalog.candidates.map((candidate, index) => <li key={JSON.stringify(candidate.input) + ":" + index} data-testid="writing-source-candidate"><span className="writing-review">{candidate.review}</span><h3>{candidate.title}</h3><p className="writing-candidate-text">{candidate.text}</p><p>{candidate.citationCount ? candidate.citationCount + " respaldo" + (candidate.citationCount === 1 ? "" : "s") + " documental" + (candidate.citationCount === 1 ? "" : "es") : "Observación personal · sin respaldo documental"}</p><Warnings warnings={candidate.warnings} /><p className="writing-candidate-origin"><a href={candidate.href} target="_blank" rel="noreferrer">Abrir origen</a></p><button type="button" className="btn btn-secondary" disabled={disabled} onClick={() => void add(candidate.input)}>Incorporar al escrito</button></li>)}</ul>{!catalog.candidates.length && <p>{kind === "book" && !bookId ? "Seleccione uno de sus libros o un volumen de una colección compartida para consultar pasajes." : "No hay resultados disponibles para esta selección. Puede revisar los antecedentes y volver a buscar."}</p>}{catalog.nextAfter && <button type="button" className="writing-text-link" disabled={loading} onClick={() => setCursor(catalog.nextAfter!)}>Ver siguiente página de fuentes</button>}</>}
+    <div className="writing-source-kinds" role="tablist" aria-label="Origen del respaldo" onKeyDown={event => {
+      let index = kinds.indexOf(kind);
+      if (event.key === "ArrowRight") index = (index + 1) % kinds.length;
+      else if (event.key === "ArrowLeft") index = (index + kinds.length - 1) % kinds.length;
+      else if (event.key === "Home") index = 0;
+      else if (event.key === "End") index = kinds.length - 1;
+      else return;
+      event.preventDefault(); chooseKind(kinds[index]); (event.currentTarget.children[index] as HTMLButtonElement).focus();
+    }}>{([["fact", "Hechos"], ["note", "Notas de audiencia"], ["book", "Biblioteca"]] as const).map(([value, label]) => <button type="button" role="tab" id={sourceId + "-" + value} aria-controls={sourceId + "-panel"} aria-selected={kind === value} tabIndex={kind === value ? 0 : -1} key={value} onClick={() => chooseKind(value)}>{label}</button>)}</div>
+    <div role="tabpanel" id={sourceId + "-panel"} aria-labelledby={sourceId + "-" + kind} aria-busy={loading}>
+      <form className="writing-source-search" onSubmit={event => { event.preventDefault(); setCursor(""); setSearch(query.trim()); }}>
+        {kind === "book" && <label>Libro o sentencia<select className="select" value={bookId} onChange={event => { setBookId(event.target.value); setCursor(""); }}><option value="">Seleccione un volumen</option>{bookId && !books.some(book => book.id === bookId) && <option value={bookId}>Volumen seleccionado desde la biblioteca</option>}{books.map(book => <option key={book.id} value={book.id}>{book.title}{book.owned ? "" : " · colección compartida"}</option>)}</select></label>}
+        <label>Buscar en {kind === "fact" ? "los hechos" : kind === "note" ? "las notas" : "el volumen"}<input className="input" value={query} onChange={event => setQuery(event.target.value)} maxLength={100} placeholder={kind === "book" ? "Palabras del pasaje…" : "Texto o título…"} /></label>
+        <button className="btn btn-secondary" type="submit" disabled={loading || kind === "book" && !bookId}>Buscar fuentes</button>
+      </form>
+      {loading && <p role="status">Comprobando fuentes disponibles…</p>}
+      {error && <div className="writing-message writing-load-recovery" data-error="true" role="alert"><p>{error}</p><button type="button" className="btn btn-secondary" onClick={() => setAttempt(value => value + 1)}>Reintentar carga de fuentes</button>{kind === "book" && bookId && <button type="button" className="btn btn-secondary" onClick={() => { setBookId(""); setSearch(""); setQuery(""); setCursor(""); }}>Cambiar volumen</button>}</div>}
+      {catalog && <><p className="writing-help">{catalog.coverage.scope}</p><Warnings warnings={catalog.warnings} /><ul className="writing-candidates">{catalog.candidates.map((candidate, index) => <li key={JSON.stringify(candidate.input) + ":" + index} data-testid="writing-source-candidate"><span className="writing-review">{candidate.review}</span><h3>{candidate.title}</h3><p className="writing-candidate-text">{candidate.text}</p><p>{candidate.citationCount ? candidate.citationCount + " respaldo" + (candidate.citationCount === 1 ? "" : "s") + " documental" + (candidate.citationCount === 1 ? "" : "es") : "Observación personal · sin respaldo documental"}</p><Warnings warnings={candidate.warnings} /><p className="writing-candidate-origin"><a href={withCaseBookContext(candidate.href, causaId, draftId)} target="_blank" rel="noreferrer">Abrir origen</a></p><button type="button" className="btn btn-secondary" disabled={disabled} onClick={() => void add(candidate.input)}>Incorporar al escrito</button></li>)}</ul>{!catalog.candidates.length && <p>{kind === "book" && !bookId ? "Seleccione uno de sus libros o un volumen de una colección compartida para consultar pasajes." : "No hay resultados disponibles para esta selección. Puede revisar los antecedentes y volver a buscar."}</p>}{catalog.nextAfter && <button type="button" className="writing-text-link" disabled={loading} onClick={() => setCursor(catalog.nextAfter!)}>Ver siguiente página de fuentes</button>}</>}
+    </div>
   </div>;
 }
 
@@ -308,8 +368,8 @@ function BlockedWritingRecovery({ url, onRecovered, onNoAccess }: { url: string;
   }
   return <div className="writing-blocked-history"><p>Puede consultar el registro de versiones y recuperar una anterior que conserve todos sus respaldos autorizados. El texto de una versión sólo se muestra cuando supera de nuevo la comprobación.</p>{error && <p className="writing-message" data-error="true" role="alert">{error}</p>}{pending && <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void recover()}>Reintentar recuperación</button>}<HistoryPanel url={url} current={0} canWrite disabled={busy || pending} restore={recover} onPrivateError={privateError} /></div>;
 }
-function References({ references }: { references: WritingReferenceView[] }) {
-  return <ul className="writing-reference-list">{!references.length && <li><p>Este escrito aún no tiene respaldos incorporados. Puede añadirlos desde el cuaderno de fuentes.</p></li>}{references.map(reference => <li key={reference.id} data-testid="writing-reference"><h3>{reference.id} · {reference.source.title}</h3><p>{reference.source.kind === "fact" ? "Hecho del expediente" : reference.source.kind === "note" ? "Nota de audiencia" : "Pasaje de biblioteca"}</p><a href={reference.source.href} target="_blank" rel="noreferrer">Volver al origen</a><Warnings warnings={reference.source.warnings} />{reference.source.citations.map((citation, index) => <div key={citation.sourceKey + ":" + index}><blockquote>{citation.quote}</blockquote><p><a href={citation.href} target="_blank" rel="noreferrer">{citation.reference} · {citation.locator}</a></p><Warnings warnings={citation.warnings} /><details><summary>Datos de cotejo del pasaje</summary><p>Base: {citation.verificationBasis === "retained_text" ? "texto conservado; original no conservado" : "original conservado"}</p><p className="writing-help">SHA-256 del pasaje: {citation.quoteSha256}</p></details></div>)}</li>)}</ul>;
+function References({ causaId, draftId, references }: { causaId: string; draftId: string; references: WritingReferenceView[] }) {
+  return <ul className="writing-reference-list">{!references.length && <li><p>Este escrito aún no tiene respaldos incorporados. Puede añadirlos desde el cuaderno de fuentes.</p></li>}{references.map(reference => <li key={reference.id} data-testid="writing-reference"><h3>{reference.id} · {reference.source.title}</h3><p>{reference.source.kind === "fact" ? "Hecho del expediente" : reference.source.kind === "note" ? "Nota de audiencia" : "Pasaje de biblioteca"}</p><a href={withCaseBookContext(reference.source.href, causaId, draftId)} target="_blank" rel="noreferrer">Volver al origen</a><Warnings warnings={reference.source.warnings} />{reference.source.citations.map((citation, index) => <div key={citation.sourceKey + ":" + index}><blockquote>{citation.quote}</blockquote><p><a href={withCaseBookContext(citation.href, causaId, draftId)} target="_blank" rel="noreferrer">{citation.reference} · {citation.locator}</a></p><Warnings warnings={citation.warnings} /><details><summary>Datos de cotejo del pasaje</summary><p>Base: {citation.verificationBasis === "retained_text" ? "texto conservado; original no conservado" : "original conservado"}</p><p className="writing-help">SHA-256 del pasaje: {citation.quoteSha256}</p></details></div>)}</li>)}</ul>;
 }
 function HistoryPanel({ url, current, canWrite, disabled, restore, onPrivateError }: { url: string; current: number; canWrite: boolean; disabled: boolean; restore: (revision: number) => Promise<void>; onPrivateError: (error: ApiError) => boolean }) {
   const previewElement = useRef<HTMLElement>(null);

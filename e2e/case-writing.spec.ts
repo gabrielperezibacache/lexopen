@@ -146,6 +146,108 @@ test("escrito por causa: guardado, tres orígenes, historial y salida con respal
   await page.reload(); await expect(body).toHaveValue(ownText);
 });
 
+test("cuaderno de fuentes: recupera cargas fallidas y conserva libro y búsqueda al revisar referencias", async ({ page }) => {
+  test.setTimeout(90_000); await page.setViewportSize({ width: 1440, height: 1000 });
+  await loginAs(page, email); await prepare(page);
+  const draft = await createDraft(page, "Continuidad del cuaderno", "Texto propio sin incorporación automática.");
+  let allowList = false;
+  await page.route(url => url.pathname === base(), async route => {
+    if (route.request().method() === "GET" && !allowList) {
+      return route.fulfill({ status: 503, json: { error: "No se pudo cargar la lista temporalmente." } });
+    }
+    return route.continue();
+  });
+  await page.goto(`/causas/${causaId}/escritos?draft=${draft.id}&fuentes=book&libro=${bookId}`);
+  await expect(page.locator(".writing-message[role=alert]")).toContainText("No se pudo cargar la lista temporalmente.", { timeout: 15_000 });
+  allowList = true;
+  await page.getByRole("button", { name: "Reintentar carga de escritos", exact: true }).click();
+  const editor = page.getByTestId("writing-editor"), book = editor.getByRole("combobox", { name: "Libro o sentencia", exact: true }), search = editor.getByLabel("Buscar en el volumen", { exact: true });
+  await expect(editor.getByLabel("Texto del escrito", { exact: true })).toHaveValue(draft.body);
+  await expect(book).toHaveValue(bookId);
+  await expect(book.locator("option:checked")).toHaveText("Tratado ficticio de contratos");
+  await expect(editor.getByTestId("writing-source-candidate")).toHaveCount(1);
+  let failedSearch = false, releaseRetry!: () => void, retryStarted!: () => void;
+  const retryHeld = new Promise<void>(resolve => { releaseRetry = resolve; });
+  const retryReady = new Promise<void>(resolve => { retryStarted = resolve; });
+  await page.route(url => url.pathname === `/api/causas/${causaId}/writing-sources` && url.searchParams.get("q") === "buena fe", async route => {
+    if (!failedSearch) {
+      failedSearch = true;
+      return route.fulfill({ status: 503, json: { error: "No se pudieron consultar las fuentes temporalmente." } });
+    }
+    const response = await route.fetch(); retryStarted(); await retryHeld;
+    return route.fulfill({ response });
+  });
+  try {
+    await search.fill("buena fe");
+    await editor.getByRole("button", { name: "Buscar fuentes", exact: true }).click();
+    await expect(editor.locator(".writing-message[role=alert]")).toContainText("No se pudieron consultar las fuentes temporalmente.");
+    await editor.getByRole("button", { name: "Reintentar carga de fuentes", exact: true }).click();
+    await retryReady;
+    await expect(book).toHaveValue(bookId);
+    await expect(book.locator("option:checked")).toHaveText("Tratado ficticio de contratos");
+    await expect(search).toHaveValue("buena fe");
+    releaseRetry();
+    await expect(editor.getByTestId("writing-source-candidate")).toHaveCount(1);
+    const href = await editor.getByRole("link", { name: "Abrir origen", exact: true }).getAttribute("href");
+    const origin = new URL(href!, page.url());
+    expect(origin.pathname).toBe(`/biblioteca/${bookId}`);
+    expect(origin.searchParams.get("causa")).toBe(causaId);
+    expect(origin.searchParams.get("escrito")).toBe(draft.id);
+    expect(origin.searchParams.get("fragment")).toBeTruthy();
+    expect(origin.hash).toMatch(/^#fragment-/);
+    await editor.getByRole("tab", { name: "Referencias (0)", exact: true }).click();
+    await editor.getByRole("tab", { name: "Historial", exact: true }).click();
+    await editor.getByRole("tab", { name: "Incorporar fuentes", exact: true }).click();
+    await expect(book).toHaveValue(bookId);
+    await expect(search).toHaveValue("buena fe");
+    await expect(editor.getByTestId("writing-source-candidate")).toHaveCount(1);
+    const kinds = editor.getByRole("tablist", { name: "Origen del respaldo", exact: true });
+    await kinds.getByRole("tab", { name: "Biblioteca", exact: true }).focus();
+    await page.keyboard.press("Home");
+    await expect(kinds.getByRole("tab", { name: "Hechos", exact: true })).toBeFocused();
+    await expect(kinds.getByRole("tab", { name: "Hechos", exact: true })).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("End");
+    await expect(kinds.getByRole("tab", { name: "Biblioteca", exact: true })).toBeFocused();
+    await expect(kinds.getByRole("tab", { name: "Biblioteca", exact: true })).toHaveAttribute("aria-selected", "true");
+    expect((await current(page, draft.id)).body).toBe(draft.body);
+    await expect(editor.getByTestId("writing-source-candidate")).toHaveCount(1);
+    const ownText = "Texto propio que debe sobrevivir a la pérdida de un candidato no incorporado.";
+    await editor.getByLabel("Texto del escrito", { exact: true }).fill(ownText);
+    await editor.getByRole("tab", { name: "Referencias (0)", exact: true }).click();
+    const anotherOwner = await db.user.findUniqueOrThrow({ where: { email: "abogado@estudio.cl" }, select: { id: true } });
+    await db.libraryBook.update({ where: { id: bookId }, data: { ownerId: anotherOwner.id } });
+    try {
+      const rechecking = page.waitForResponse(response => new URL(response.url()).pathname === `/api/causas/${causaId}/writing-sources`);
+      const checkingDraft = page.waitForResponse(response => new URL(response.url()).pathname === `${base()}/${draft.id}` && response.request().method() === "GET");
+      await editor.getByRole("tab", { name: "Incorporar fuentes", exact: true }).click();
+      expect((await rechecking).status()).toBe(404);
+      expect((await checkingDraft).status()).toBe(200);
+      await expect(editor.getByLabel("Texto del escrito", { exact: true })).toHaveValue(ownText);
+      await expect(editor.locator(".writing-message[role=alert]")).toContainText("Libro no encontrado o sin acceso actual");
+      await expect(page.getByText(bookText, { exact: true })).toHaveCount(0);
+      await expect(page.getByText("Tratado ficticio de contratos", { exact: true })).toHaveCount(0);
+      await editor.getByRole("button", { name: "Cambiar volumen", exact: true }).click();
+      await expect(book).toHaveValue("");
+    } finally { await db.libraryBook.update({ where: { id: bookId }, data: { ownerId } }); }
+    await kinds.getByRole("tab", { name: "Hechos", exact: true }).click();
+    await kinds.getByRole("tab", { name: "Biblioteca", exact: true }).click();
+    const candidate = editor.getByTestId("writing-source-candidate");
+    await expect(candidate).toHaveCount(1);
+    await candidate.getByRole("button", { name: "Incorporar al escrito", exact: true }).click();
+    await expect(editor.getByLabel("Texto del escrito", { exact: true })).toHaveValue(new RegExp(bookText));
+    await editor.getByRole("tab", { name: "Referencias (1)", exact: true }).click();
+    await db.libraryBook.update({ where: { id: bookId }, data: { ownerId: anotherOwner.id } });
+    try {
+      const checkingDraft = page.waitForResponse(response => new URL(response.url()).pathname === `${base()}/${draft.id}` && response.request().method() === "GET");
+      await editor.getByRole("tab", { name: "Incorporar fuentes", exact: true }).click();
+      expect((await checkingDraft).status()).toBe(409);
+      await expect(page.getByRole("heading", { name: "Escrito protegido", exact: true })).toBeVisible();
+      await expect(page.getByLabel("Texto del escrito", { exact: true })).toHaveCount(0);
+      await expect(page.getByText(bookText, { exact: true })).toHaveCount(0);
+    } finally { await db.libraryBook.update({ where: { id: bookId }, data: { ownerId } }); }
+  } finally { releaseRetry(); }
+});
+
 test("guardado perdido y edición durante la solicitud: conserva texto y evita duplicados", async ({ page }) => {
   test.setTimeout(90_000); await loginAs(page, email);
   const draft = await createDraft(page, "Continuidad ante desconexión", "Texto inicial.");

@@ -245,6 +245,15 @@
 .book-collection-empty p { max-width: 45ch; margin: auto; font-size: .88rem; line-height: 1.9; color: var(--ink-soft); }
 .book-desk-heading { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-bottom: 2rem; }
 .book-desk-heading > svg { color: var(--copper-deep); flex-shrink: 0; }
+.book-desk-session { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1.2rem; padding-block: .85rem 1.25rem; margin-bottom: 1.2rem; border-bottom: 1px solid var(--line-strong); color: var(--ink-soft); }
+.book-desk-session strong { color: var(--sea); font-size: .9rem; font-weight: 600; }
+.book-desk-session[data-pending="true"] strong { color: var(--copper-deep); }
+.book-desk-session span { font-size: .82rem; line-height: 1.6; max-width: 70ch; }
+.book-preparation-fields { display: grid; gap: 1rem; min-width: 0; border: 0; padding: 0; margin: 0; }
+.book-preparation-fields:disabled, .book-saved-draft input:disabled, .book-saved-draft textarea:disabled { cursor: wait; }
+.book-protected-draft { margin-top: 2rem; padding-block: 1.5rem; border-top: 1px solid var(--line-strong); }
+.book-protected-draft h3 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.4rem; margin-bottom: .75rem; }
+.book-protected-draft p { max-width: 65ch; line-height: 1.7; margin-bottom: 1rem; }
 .book-desk-grid { display: grid; grid-template-columns: minmax(210px,.7fr) minmax(0,2fr); gap: 1.7rem; align-items: start; }
 .book-source-picker { padding: 1.5rem; background: var(--mist); border-radius: 12px; min-width: 0; }
 .book-source-picker h3 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.25rem; margin-bottom: .75rem; }

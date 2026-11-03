@@ -69,3 +69,7 @@ La revisión independiente final se cerró con PASS y sin P1 o P2 abiertos, tras
 - Detector mecánico ya ejecutado: `/private/tmp/lexopen-books-design-scan.json`. Sus tres advertencias corresponden a los bordes de las miniaturas geométricas de distribución, no a acentos en tarjetas de contenido; quedaron reconocidas en la revisión. No se repite el detector.
 
 Estos archivos temporales registran la evidencia local del cierre visual; no prueban publicación ni ejecución en producción.
+
+## Continuidad de la sesión
+
+La consulta desde una causa conserva un recorrido autorizado hacia expediente, audiencia y escritos. El lector permite elegir ese volumen en el escrito de origen sin compartir la colección ni insertar citas automáticamente. La mesa personal mantiene sus campos entre apartados, diferencia pendiente/guardando/guardado y protege reemplazos y salidas. Al regresar comprueba sus fuentes; un error de recarga oculta el material y ofrece recuperación sin desmontar la edición en memoria. Durante el guardado se bloquean los campos para conservar la correspondencia entre lo enviado y lo confirmado.

@@ -1,0 +1,95 @@
+{
+  "capturedAt": "2026-11-03T01:03:53.873512+00:00",
+  "baseRevision": "490d052228d8c8a77b90a03b4784eae0a9f16ec1",
+  "workingTreeChanges": true,
+  "demoData": true,
+  "capture": "Native Chromium screenshots, no compositing. Library allows native transitions after pointer removal and two compositor frames.",
+  "images": [
+    {
+      "file": "cause-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "d4b4dbc0eca99c21727ee4d5b56ee0b95b17aaa796d59f0a76913a2faef09430",
+      "test": "case-workflow.spec.ts"
+    },
+    {
+      "file": "cause-mobile.png",
+      "viewport": {
+        "width": 360,
+        "height": 900
+      },
+      "sha256": "2e95db669b5dea66897d49c5fc0d54ed7a179b0ef5314e0406dd775d535002f6",
+      "test": "case-workflow.spec.ts"
+    },
+    {
+      "file": "library-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "58f50ea0dcddfa1c3a9e33046e0274407841d55ba2f58217fce5b8aa83368d53",
+      "test": "case-workflow.spec.ts"
+    },
+    {
+      "file": "library-mobile.png",
+      "viewport": {
+        "width": 360,
+        "height": 900
+      },
+      "sha256": "28e1ac6d67fe0be78cd297bae647477e5a523a19fca06a5c008bc0530de07c58",
+      "test": "case-workflow.spec.ts"
+    },
+    {
+      "file": "writing-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "b8b88805d175f155ce6be618a88efc5a83435317b963887d8353867b112fe7a0",
+      "test": "case-workflow.spec.ts"
+    },
+    {
+      "file": "writing-mobile.png",
+      "viewport": {
+        "width": 360,
+        "height": 900
+      },
+      "sha256": "2baadd0bde49bc84c4e18e02017744247de07f70d81cce888a5f433427e88ec2",
+      "test": "case-workflow.spec.ts"
+    },
+    {
+      "file": "hearing-desktop.png",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "sha256": "233e9cfdd4aba70375966a8da5aa90eac1de19c99fc54fc8adcdf9ca5918ccbb",
+      "test": "hearing-workspace.spec.ts"
+    },
+    {
+      "file": "hearing-mobile.png",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      },
+      "sha256": "b33eb6e6eb12292448c87540f670a7f0c43a60b512f1e1f56b7325b4d0a141b0",
+      "test": "hearing-workspace.spec.ts"
+    }
+  ],
+  "sourceFiles": {
+    "src/components/causas/CaseWorkflowNav.tsx": "6f89d416c3fbb807dd816cd37a35f19e3bd026bd0f294868c6a85c7ae461f02e",
+    "src/components/causas/CaseWorkflowNav.css": "0aaeb8ab66ca3efa496c63100df748a39237d6da2b1b05ef1e69961d9571d61d",
+    "src/components/books/Bookshelf.tsx": "9cb987b941743eae564cb19299f78dd87d92904a22b5387b1c8839ef203c68a7",
+    "src/components/books/BookReader.tsx": "64c87c66d9b30924732f29e630908dd76d190af8bc1686fd0b6fdcfd2c7c72a2",
+    "src/components/books/WritingDesk.tsx": "d5f2ded9c4f37379a1864ad538bf18235823114aec2459bf43d1ccbf64714cfd",
+    "src/components/books/library.css": "0a051a72baccb32c9b42a0bb2c72f5aa3de46f50bbbef76f7c8f959ac0f748e6",
+    "src/components/hearings/HearingWorkbench.tsx": "08f1e15755a778128200e88dc7aeb6f9e2e97515549242a61e95932d253f4e7d",
+    "src/components/hearings/hearings.css": "0a9deb547f36f1e4a3fb0230c9a6f0cbca77cd747d6d737477458d8eec039548",
+    "src/components/writings/CaseWritingEditor.tsx": "eeb8b0fcfbaf87bc1c52aeb242eb5083e0cfac3ef434da785e0fa503c3567c55",
+    "src/components/writings/CaseWritingEditor.css": "c03a881558999d63c3f06581d635d435381f12ce8869ded04e2fc12e638ca387",
+    "src/lib/causas/workflow-links.ts": "2aff8f29240197e2993e3e74a0615cbab5bfaa7d75f3fee11a18177869596680",
+    "src/lib/causas/workflow-context.ts": "94d70bbdd94bdb79c7b69d0c69be5238cf812e1459a0b7f6d6d8344ad584d898"
+  }
+}
