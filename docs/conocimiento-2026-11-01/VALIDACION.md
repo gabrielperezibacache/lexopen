@@ -1,6 +1,6 @@
 # Validación: hechos, cronología, contradicciones y biblioteca
 
-Fecha: 1 de noviembre de 2026. [Descripción del incremento](../HECHOS-CRONOLOGIA-BIBLIOTECA-2026-11-01.md). Pruebas con usuarios, causas, colecciones y documentos ficticios en PostgreSQL y almacenamiento local separados del estudio. Las comprobaciones de esta entrega utilizan fuentes ya preparadas; no requieren TRIFOLIA ni envían el expediente a un modelo.
+Fecha: 1 de noviembre de 2026. [Descripción del incremento](../HECHOS-CRONOLOGIA-BIBLIOTECA-2026-11-01.md). Pruebas con usuarios, causas, colecciones y documentos ficticios en PostgreSQL y almacenamiento local separados del estudio. Las comprobaciones de esta entrega utilizan fuentes ya preparadas; no envían el expediente a un modelo.
 
 ## Resultados conservados
 

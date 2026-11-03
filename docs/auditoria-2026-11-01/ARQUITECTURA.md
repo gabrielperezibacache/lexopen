@@ -2,7 +2,7 @@
 
 Fecha: 2026-11-01. Base: snapshot remoto `/private/tmp/lexopen-audit-main-20261101`, commit `72400f9`, package `1.0.0`. Revisión de código y documentación; posteriormente se ejecutaron probes con mocks, sin servicios externos ni datos reales: ver `/private/tmp/lexopen-main-privacy-probe.md`. Sustituye el diagnóstico inicial del checkout local `d9adee3`/0.1.9 cuando difieran. No equivale a certificación de runtime ni a suite verde actual.
 
-Dirección confirmada por el usuario: reimplementar en LexOpen todas las capacidades funcionales identificadas de TRIFOLIA con implementación propia, local-first y proveedores de modelos intercambiables, incluida opción local. No es conexión, OAuth, dependencia operativa ni suscripción a TRIFOLIA. MCP y complemento Word serán propios de LexOpen; las fuentes oficiales externas son proveedores de datos.
+Dirección confirmada por el usuario: ampliar las capacidades jurídicas de LexOpen con almacenamiento local y proveedores de modelos intercambiables, incluida opción local. MCP y complemento Word serán propios de LexOpen; las fuentes oficiales externas son proveedores de datos.
 
 ## Estado real de main
 
@@ -54,25 +54,25 @@ Acción: capa común de fuentes/versiones/páginas/fragmentos + búsqueda híbri
 
 ### P2 — Dominio documental duplicado
 
-Documento se vincula con causa/cliente/OCR/Drive; SiteFile/FileVersion con espacio/carpeta/versiones. `schema.prisma:514-582`. Para integración TRIFOLIA, diseñar recurso documental común o vínculo normalizado, preservando IDs, originales, storageKeys y versiones. Los conectores Word, MCP y cronología deben operar sobre la misma identidad y ACL.
+Documento se vincula con causa/cliente/OCR/Drive; SiteFile/FileVersion con espacio/carpeta/versiones. `schema.prisma:514-582`. Para ampliar los servicios jurídicos, diseñar un recurso documental común o vínculo normalizado, preservando IDs, originales, storageKeys y versiones. Los conectores Word, MCP y cronología deben operar sobre la misma identidad y ACL.
 
 ### P2 — Workflows, calendario jurídico y tasas
 
-Workflows tienen disparadores automáticos reales, pero decisiones sólo mediante currentStep/último actor y JSON, sin historial por paso. Avance sin compare-and-swap (`api/workflows/route.ts:53-112`), start no comprueba active (`33-49`). Mejorar si se extienden aprobaciones; no inventar que esto forma parte de TRIFOLIA sin evidencia.
+Workflows tienen disparadores automáticos reales, pero decisiones sólo mediante currentStep/último actor y JSON, sin historial por paso. Avance sin compare-and-swap (`api/workflows/route.ts:53-112`), start no comprueba active (`33-49`). Mejorar si se extienden aprobaciones.
 
-Plazos mantiene aproximaciones de feriados/materias (`lib/plazos.ts:59-86,107-119`): separar ayuda operativa de cómputo jurídico validado. Retención default0.1375 persiste (`lib/billing.ts:4-5`, `schema:30`); verificar tasa vigente con SII y usar vigencias por fecha. Esto es deuda propia de LexOpen; el mapa SII de TRIFOLIA corresponde a cartografía de inmuebles/parcelas y es una función distinta de DTE o tasa de boleta.
+Plazos mantiene aproximaciones de feriados/materias (`lib/plazos.ts:59-86,107-119`): separar ayuda operativa de cómputo jurídico validado. Retención default0.1375 persiste (`lib/billing.ts:4-5`, `schema:30`); verificar tasa vigente con SII y usar vigencias por fecha. La cartografía inmobiliaria prevista es una función distinta de DTE o tasa de boleta y necesita su propia fuente y verificación.
 
 ### P2/P3 — UX y observabilidad residual
 
 SSE Inicio acumula eventos hasta que runAssistantTurn termina; `api/assistant/route.ts:55-60` espera y sólo después emite status/plan en86-92. Para progreso real se necesita callback/async generator. Mantener draft ante error, explicar qué fuentes se consultaron y qué acciones ya ocurrieron. Paginación actual es límite, no navegación cursor completa (`lib/api/list-limit.ts`). Docs PLAN* mezclan estados históricos «main sin Inicio», «versión0.1.9» con cabeceras actualizadas1.0: reescribir estado actual y preservar historia en sección separada.
 
-## Correspondencia técnica para capacidades TRIFOLIA confirmadas por investigación externa
+## Correspondencia técnica para ampliar los servicios jurídicos
 
-No se atribuyen CRM comercial, CLM o firmas a TRIFOLIA sin evidencia. La referencia proporcionada por investigadora es IA jurídica avanzada, Word, MCP, cronología, jurisprudencia y mapa SII de inmuebles/parcelas. El objetivo es paridad funcional mediante código propio LexOpen, sin conector o dependencia de la plataforma TRIFOLIA.
+Las siguientes extensiones surgieron de investigación pública y de la auditoría del repositorio: IA jurídica, Word, MCP, cronología, jurisprudencia y cartografía de inmuebles. La tabla distingue la base observada de las capacidades propuestas; no acredita implementación ni ensayos de esas ampliaciones.
 
 | Área | Reutilizar de LexOpen main | Extensión necesaria |
 | --- | --- | --- |
-| Asistente jurídico/Julia | Agente, fuentes de causa/carpeta, chat history, borradores, approve→minuta; Inicio operativo y tools | Unificar política, retrieval híbrido jurídico/documental, citas comprobables, cobertura y evaluaciones; evitar tercer chat |
+| Asistente jurídico | Agente, fuentes de causa/carpeta, chat history, borradores, approve→minuta; Inicio operativo y tools | Unificar política, retrieval híbrido jurídico/documental, citas comprobables, cobertura y evaluaciones; evitar tercer chat |
 | Cronología | Movimientos PJUD clasificados, minutas, plazos/Eventos y carpeta investigativa | Hechos extraídos de documentos por página, actores, precisión/incertidumbre temporal, contradicciones, evidencia asociada, revisión y exportación |
 | Jurisprudencia/investigación | Modelo Jurisprudencia, ingest, buscar/brief IA | Conectores oficiales/admitidos, procedencia, actualización, filtros, semántica, citas verificables y estado vigente; corpus demo no es colección oficial |
 | Word | AnyDoc importa DOCX a Markdown y mantiene original | Complemento Office, autenticación Host, selección/contexto, inserción revisable/control de cambios, exportación DOCX fiel y QA; importar DOCX no equivale a Word integrado |

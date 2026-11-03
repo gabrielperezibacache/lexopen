@@ -25,7 +25,10 @@ npm ci
 npx prisma migrate deploy
 # equivalente Host: npm run db:migrate / setup:production
 
-# 5. Arrancar
+# 5. Recompilar el servidor standalone y sus recursos
+npm run desktop:build
+
+# 6. Arrancar
 npm run web:host   # o su unit systemd / desktop host
 npm run prod:check
 ```

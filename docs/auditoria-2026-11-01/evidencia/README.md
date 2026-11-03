@@ -26,4 +26,4 @@ Los archivos con sufijo .ts.txt conservan los probes usados, sin incorporarlos a
 
 Para repetir, obtener los SHA indicados en carpetas temporales, instalar sus dependencias, generar su cliente Prisma y ajustar los paths de importación del probe al snapshot. Ejecutar los probes con node --import tsx; la configuración TypeScript debe resolver los alias del snapshot. No ejecutar un probe de fixture contra el data dir del Host ni reutilizar DATABASE_URL de una instalación real.
 
-Los resultados prueban comportamientos específicos del código, no que esos fallos hayan sucedido con datos reales. El inventario y la investigación de producto son de solo lectura. No se enviaron correos, Telegram o push, ni se usaron cuentas/credenciales TRIFOLIA, Google, OJV o IA remota.
+Los resultados prueban comportamientos específicos del código, no que esos fallos hayan sucedido con datos reales. El inventario y la investigación de producto son de solo lectura. No se enviaron correos, Telegram o push, ni se usaron cuentas/credenciales de Google, OJV o IA remota.

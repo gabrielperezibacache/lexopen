@@ -1,6 +1,6 @@
 # Transcripción en vivo y continuidad con la causa · 2 de noviembre de 2026
 
-La mesa de audiencia incorpora captura de audio y transcripción durante la sesión, con resultados por tramos. Un pasaje puede incorporarse al registro personal y convertirse, tras revisión, en un hecho propuesto, una nota o un borrador de escrito con referencias. El flujo utiliza los servicios de LexOpen y el transcriptor configurado por el estudio; no depende de TRIFOLIA.
+La mesa de audiencia incorpora captura de audio y transcripción durante la sesión, con resultados por tramos. Un pasaje puede incorporarse al registro personal y convertirse, tras revisión, en un hecho propuesto, una nota o un borrador de escrito con referencias. El flujo utiliza los servicios de LexOpen y el transcriptor configurado por el estudio.
 
 ## Uso
 

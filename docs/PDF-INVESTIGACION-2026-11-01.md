@@ -1,6 +1,6 @@
 # Páginas PDF e investigación jurídica propia
 
-Fecha: 1 de noviembre de 2026. Rama: `codex/pdf-legal-research`, sobre `codex/lexopen-own-core` a72100f261123dbe527d381f73e5d6cc689ec305 ([PR 207](https://github.com/gabrielperezibacache/lexopen/pull/207)). Este incremento continúa el [plan de desarrollo](PLAN-DESARROLLO-TRIFOLIA.md) y requiere las correcciones del núcleo del PR 207. No depende de TRIFOLIA ni de una cuenta de búsqueda comercial.
+Fecha: 1 de noviembre de 2026. Rama: `codex/pdf-legal-research`, sobre `codex/lexopen-own-core` a72100f261123dbe527d381f73e5d6cc689ec305 ([PR 207](https://github.com/gabrielperezibacache/lexopen/pull/207)). Este incremento continúa el [plan de desarrollo](PLAN-DESARROLLO-LEXOPEN.md) y requiere las correcciones del núcleo del PR 207. La investigación trabaja sobre las fuentes incorporadas en el Host.
 
 ## Flujos disponibles
 

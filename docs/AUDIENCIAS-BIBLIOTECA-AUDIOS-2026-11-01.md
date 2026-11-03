@@ -1,6 +1,6 @@
 # Sentencias, mesa de audiencia y audios de causas
 
-Esta entrega continúa la biblioteca personal de LexOpen. Permite incorporar sentencias y resoluciones con ficha propia, organizar una mesa privada para cada audiencia y gestionar grabaciones y transcripciones en la carpeta de su causa. No utiliza TRIFOLIA.
+Esta entrega continúa la biblioteca personal de LexOpen. Permite incorporar sentencias y resoluciones con ficha propia, organizar una mesa privada para cada audiencia y gestionar grabaciones y transcripciones en la carpeta de su causa.
 
 ## Uso
 

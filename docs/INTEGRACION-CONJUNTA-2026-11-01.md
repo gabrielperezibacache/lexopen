@@ -43,6 +43,6 @@ El ensayo de servidor compilado repite la combinación con autenticación y CSRF
 - [Regresión de preferencias con GET detenido](integracion-conjunta-2026-11-01/logs/preferences-final.log): aprobada en 9,3 segundos, sin reintentos.
 - Prueba unitaria de avisos: aislamiento entre causas, contenido mínimo, eventos inválidos y retirada de suscripciones. Los controles de permisos siguen en servidor.
 - Capturas conjuntas en [escritorio](integracion-conjunta-2026-11-01/capturas/integrated-legal-workspace-desktop.png) y [móvil](integracion-conjunta-2026-11-01/capturas/integrated-legal-workspace-mobile.png).
-- Sin coincidencias de TRIFOLIA en código de producto, dependencias o esquema; el navegador bloquea ese dominio durante el recorrido y registra cero intentos. Los conectores jurídicos propios y los proveedores configurables conservan sus políticas.
+- La prueba conserva las políticas de salida de red y verifica que los flujos usan únicamente los transportes autorizados. Los conectores jurídicos y los proveedores configurables mantienen sus políticas.
 
 Se ensayó exclusivamente con bases, cuentas y archivos ficticios. El primer pase tenía una expectativa de importe incorrecta en la prueba: el generador del PDF contiene 25000, no 250000. Se corrigió esa expectativa y se reforzó el cotejo de página, imagen, pasaje literal, huellas y advertencia OCR; no era un defecto del reconocimiento. No se acredita calidad jurídica ni precisión de reconocimiento de voz real. La integración en `main` no actualiza el Host ni migra datos del estudio.

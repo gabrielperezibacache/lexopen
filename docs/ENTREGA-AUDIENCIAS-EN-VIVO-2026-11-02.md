@@ -30,7 +30,7 @@ La mesa sigue siendo privada por profesional, dentro de una causa autorizada. Se
 
 ## Implementación y verificación
 
-La migración aditiva `20261102180000_hearing_live_session` añade estado de sesión, recibos de operaciones y metadatos opcionales a las notas existentes. No transforma su contenido anterior. La exportación es TXT, con identidad de causa, guion, registros y respaldos actualmente autorizados. No llama a IA, no inicia una grabación y no depende de TRIFOLIA.
+La migración aditiva `20261102180000_hearing_live_session` añade estado de sesión, recibos de operaciones y metadatos opcionales a las notas existentes. No transforma su contenido anterior. La exportación es TXT, con identidad de causa, guion, registros y respaldos actualmente autorizados. No llama a IA ni inicia una grabación.
 
 La revisión funcional independiente detectó tres puntos, corregidos en esta entrega:
 

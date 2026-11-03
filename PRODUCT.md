@@ -20,7 +20,7 @@ Aplicación Next.js con PostgreSQL y almacenamiento de originales en un Host del
 
 ## Capabilities and Constraints
 
-La biblioteca solicitada es privada por profesional, con colecciones compartibles. Admite incorporación de libros y documentos en PDF, EPUB y otros formatos, incluidos textos planos, para recuperar pasajes y ayudar a fundamentar escritos mediante IA y citas corroborables. La conservación del original es opcional al importar: se puede elegir sólo texto convertido con OCR cuando haga falta, conservando su procedencia y los permisos actuales. En ese caso se identifica que el cotejo corresponde al texto guardado y que el original no está disponible. La IA utiliza el proveedor configurado y la política existente del estudio. No depende de TRIFOLIA.
+La biblioteca solicitada es privada por profesional, con colecciones compartibles. Admite incorporación de libros y documentos en PDF, EPUB y otros formatos, incluidos textos planos, para recuperar pasajes y ayudar a fundamentar escritos mediante IA y citas corroborables. La conservación del original es opcional al importar: se puede elegir sólo texto convertido con OCR cuando haga falta, conservando su procedencia y los permisos actuales. En ese caso se identifica que el cotejo corresponde al texto guardado y que el original no está disponible. La IA utiliza el proveedor configurado y la política existente del estudio.
 
 ## Brand Commitments
 

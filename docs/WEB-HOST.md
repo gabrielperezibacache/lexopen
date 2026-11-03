@@ -142,16 +142,17 @@ Use esta lista antes de cargar información real del estudio:
 
 ## OCR local para PDFs escaneados
 
-El OCR es opcional. `pdf-inspector` detecta las páginas escaneadas y LexOpen usa el
-binding nativo de `pdfdown-ocr`, que requiere únicamente Tesseract y renderiza las
-páginas internamente:
+El lector de páginas físicas utiliza Poppler (`pdftoppm`) en el Host para mostrar
+el original conservado. El OCR de páginas escaneadas es opcional y requiere
+Tesseract; según la plataforma se utiliza el motor nativo o el procesamiento con
+Poppler. Instale las herramientas en el mismo equipo que ejecuta el Host:
 
 ```bash
 # Debian/Ubuntu
-sudo apt install tesseract-ocr tesseract-ocr-spa
+sudo apt install poppler-utils tesseract-ocr tesseract-ocr-spa
 
 # macOS con Homebrew (el Host busca /opt/homebrew/bin aunque no esté en PATH)
-brew install tesseract tesseract-lang
+brew install poppler tesseract tesseract-lang
 ```
 
 En Windows instale Tesseract y Poppler: el binding OCR nativo actual no publica
@@ -292,6 +293,10 @@ La tarea se ejecuta al iniciar Windows y reinicia el Host si el proceso termina.
 ## Operación y respaldos
 
 - Mantenga el Host encendido y con permisos de escritura sobre `STORAGE_PATH`.
+- Para actualizar manualmente el código, detenga el Host, descargue los cambios,
+  ejecute `npm ci` y `npm run desktop:build`, y vuelva a iniciar `npm run web:host`.
+  El arranque no recompila si ya existe un artefacto standalone. La actualización
+  integrada de Configuración sí incluye la compilación.
 - No ejecute `npm run db:seed`, `npm run setup` ni `npm run db:reset` con datos reales.
 - Para pasar de demo a producción: `npm run db:purge-demo -- --yes`, luego
   `LEXOPEN_BOOTSTRAP_TOKEN` y `/setup` (o el panel en Configuración).

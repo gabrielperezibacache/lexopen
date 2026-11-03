@@ -1,0 +1,98 @@
+{
+  "capturedAt": "2026-11-02T23:43:39.079Z",
+  "applicationRevision": "eb5ba04e65e812c153d58244352e47dc5f42cc14",
+  "source": "Screenshots taken directly from the running LexOpen application through Chromium. No compositing or image generation.",
+  "data": "Isolated demonstration database. All people, books, case events, documents and titles shown are illustrative, not actual clients or published legal authorities.",
+  "screenshots": [
+    {
+      "file": "causa.png",
+      "route": "/causas/[causa]",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "description": "Preparación de una causa, índice de fuentes y próximos pasos",
+      "sha256": "596639a26d5988220c1fd96913c93777545080ab1476748444fe08115d618c26"
+    },
+    {
+      "file": "biblioteca.png",
+      "route": "/biblioteca",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "description": "Biblioteca personal con seis volúmenes demostrativos y estantes personalizables",
+      "sha256": "be531cc8ef2e51fc39bbe337b9f51275fefbc05a6c18f89fc92a1e871def902a"
+    },
+    {
+      "file": "escrito.png",
+      "route": "/causas/[causa]/escritos",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "description": "Editor privado por causa con guardado, historial y referencias verificadas",
+      "sha256": "aba0caf9ecdc62e6e0500403984b7d3b2d3224bcd07240167666daf0a5838ee9"
+    },
+    {
+      "file": "lector-pdf.png",
+      "route": "/documentos/[id]/fuentes",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "description": "Lector de PDF con página física, texto extraído y localizadores",
+      "sha256": "025080cad77f214bd92ff1c07533e4467e9fe17d7a3c37b71910e9b0860027a1"
+    },
+    {
+      "file": "audiencia.png",
+      "route": "/causas/[causa]/audiencias",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "description": "Mesa de audiencia en vivo con lector, guion, control de sesión y registro",
+      "sha256": "5ce2ece45322a0fdf8cf64fcd97ea4b27ac61e9ce8b576aa9d9ee054a2d134a2"
+    },
+    {
+      "file": "cronologia.png",
+      "route": "/causas/[causa]",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "description": "Cronología con afirmaciones ligadas a fuentes, fechas y estado de revisión",
+      "sha256": "34f14c37e72049ebb1a8bd8c22c924f0f839b76c4a00ffefc39f4f09f91b58a7"
+    },
+    {
+      "file": "dashboard.png",
+      "route": "/dashboard",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "description": "Vista operativa del estudio y sus asuntos de demostración",
+      "sha256": "f1e691ef7a52a2760e4f0f1fbee2e01472d82c5f85ce4f5f265bc645d6b25e48"
+    },
+    {
+      "file": "movil.png",
+      "route": "/biblioteca",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "description": "La misma biblioteca adaptada a una pantalla móvil",
+      "sha256": "42714465dfcecd55c3160cf67a82d3292a0f037d925a4bf173d7eefa418e4ca2"
+    },
+    {
+      "file": "biblioteca-oscura.png",
+      "route": "/biblioteca",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "description": "Biblioteca personal en modo oscuro",
+      "sha256": "1ea1be3f5ba982886941f2e1a6d47f154793231de712b02a14a5e62050163e5d"
+    }
+  ]
+}

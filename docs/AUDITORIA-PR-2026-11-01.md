@@ -4,7 +4,7 @@ Fecha: 1 de noviembre de 2026, America/Santiago. Repositorio: [gabrielperezibaca
 
 **Seguimiento:** por instrucción posterior del usuario, la implementación continúa en `codex/lexopen-own-core`. Los hallazgos y resultados de este documento describen los snapshots originales; su corrección y validación se registran en [Implementación del núcleo y fuentes propias](IMPLEMENTACION-2026-11-01.md). No interpretar el fallo histórico de un test como resultado del código corregido.
 
-**Recomendación: corregir los bloqueantes de la base y de los PR 202 y 203 antes de integrarlos; después desarrollar las capacidades de TRIFOLIA como servicios propios de LexOpen.** La expansión necesita evidencia/documentos y permisos comunes, no otra capa independiente de chat. El [plan elaborado](PLAN-DESARROLLO-TRIFOLIA.md) descompone esa implementación sin dependencia operativa de TRIFOLIA.
+**Recomendación: corregir los bloqueantes de la base y de los PR 202 y 203 antes de integrarlos; después ampliar los servicios jurídicos de LexOpen.** La expansión necesita evidencia/documentos y permisos comunes. El [plan elaborado](PLAN-DESARROLLO-LEXOPEN.md) descompone esa implementación.
 
 ## 1 Cobertura de todos los PR
 
@@ -105,7 +105,7 @@ Las mejoras de agregados, consultas concurrentes, estados de carga y accesibilid
 | Crypto.randomUUID en Chromium | Incompatibilidad HTTP LAN reproducida en fixture |
 | Matcher 2FA de Next | Exclusión por prefetch reproducida; sin HTTP/BD |
 | E2E completo y prueba productiva de todos los módulos | No ejecutados en esta auditoría |
-| Word, MCP, fuentes TRIFOLIA y servicios con cuentas reales | No autenticados ni probados; referencia funcional pública únicamente |
+| Word, MCP y servicios externos con cuentas reales | No autenticados ni probados; investigación documental únicamente |
 
 [Evidencia conservada](auditoria-2026-11-01/evidencia/README.md). El PostgreSQL temporal de auditoría se detiene al finalizar. No se usó la base de una instalación real, no se ejecutó el benchmark riesgoso y no se modificaron secretos.
 
@@ -113,4 +113,4 @@ Las mejoras de agregados, consultas concurrentes, estados de carga y accesibilid
 
 La primera entrega debe hacer reproducible el build y cerrar privacidad, autorización, transacciones/undo, recuperación y upgrade. Después integrar las partes corregidas de202 y203 como una unidad comprobada. Un CI verde aislado y un merge sin conflicto no bastan.
 
-La siguiente inversión es una capa común de originales/versiones/páginas/fragmentos/citas, con permisos y jobs durables. De ella dependen investigación jurídica propia, cronología, contradicciones, biblioteca y redacción. Word y MCP serán adaptadores propios de esos servicios; cartografía SII se vinculará a inmuebles y documentos. El [plan de desarrollo](PLAN-DESARROLLO-TRIFOLIA.md) incluye fases, historias, calendario orientativo, dependencias y aceptación para cada capacidad pública identificada.
+La siguiente inversión es una capa común de originales/versiones/páginas/fragmentos/citas, con permisos y jobs durables. De ella dependen investigación jurídica propia, cronología, contradicciones, biblioteca y redacción. Word y MCP serán adaptadores propios de esos servicios; cartografía SII se vinculará a inmuebles y documentos. El [plan de desarrollo](PLAN-DESARROLLO-LEXOPEN.md) incluye fases, historias, calendario orientativo, dependencias y aceptación para cada capacidad pública identificada.

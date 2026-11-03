@@ -32,7 +32,7 @@ La migración `20261102150000_case_writing_editor` añade borradores, instantán
 
 Se admiten 100.000 caracteres por escrito, veinte incorporaciones, cien pasajes de respaldo y doscientos escritos por profesional y causa. Un hecho con más de veinte respaldos no se incorpora parcialmente. El catálogo consulta ventanas de cincuenta registros y presenta veinte resultados, con continuación; el selector muestra hasta cien libros autorizados. La búsqueda de pasajes en un volumen revisa hasta tres mil fragmentos y declara sus límites. No equivale a buscar en todo el expediente o toda la biblioteca a la vez.
 
-Esta entrega no migra automáticamente los borradores de biblioteca, las minutas o las conversaciones previas. No incorpora todavía edición enriquecida de Word, DOCX, comparación por bloques o una propuesta nueva de IA. El editor utiliza PostgreSQL, almacenamiento y verificadores de LexOpen; no llama a TRIFOLIA ni necesita un proveedor de IA para redactar, guardar o incorporar fuentes.
+Esta entrega no migra automáticamente los borradores de biblioteca, las minutas o las conversaciones previas. No incorpora todavía edición enriquecida de Word, DOCX, comparación por bloques o una propuesta nueva de IA. El editor utiliza PostgreSQL, almacenamiento y verificadores de LexOpen; permite redactar, guardar e incorporar fuentes sin un proveedor de IA.
 
 ## Diseño y verificación
 

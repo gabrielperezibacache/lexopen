@@ -1,6 +1,6 @@
 # Ampliación de fuentes oficiales de investigación
 
-Verificación: **1 de noviembre de 2026, 20:22–20:29 UTC**. Esta entrega amplía el importador propio de LexOpen; no utiliza cuentas, índices, API, MCP ni suscripciones de TRIFOLIA. Las consultas de investigación siguen trabajando sobre las copias incorporadas en el Host.
+Verificación: **1 de noviembre de 2026, 20:22–20:29 UTC**. Esta entrega amplía el importador propio de LexOpen. Las consultas de investigación siguen trabajando sobre las copias incorporadas en el Host.
 
 ## Fuentes admitidas y contrato
 
