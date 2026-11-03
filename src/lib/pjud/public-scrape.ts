@@ -6,7 +6,7 @@
  * NO depende de mcp-legal-chile (flujo MCP no comprobado en producción).
  *
  * Dos vías (como CausaMonitor):
- * 1) Invitado: home → accesoConsultaCausas() → tab RUT/ROL →
+ * 1) Invitado: home → accesoConsultaCausas() → menú Consulta Unificada → tab RUT/ROL →
  *    competencia/tribunal → #btnConConsultaJur → #verDetalleJuridica → modal.
  * 2) ClaveÚnica: vault local AES-GCM → login accounts.claveunica.gob.cl →
  *    Mis Causas → monitoreo (ver scrapeMisCausasWithClaveUnica).
@@ -324,37 +324,50 @@ async function maybeSolveCaptchaOnPage(page: PlaywrightPage, signal?: AbortSigna
   return true;
 }
 
-async function enterConsultaCausas(page: PlaywrightPage) {
+/** Follow the visible guest entry and the shell's observed Consulta Unificada menu. */
+export async function enterConsultaCausas(
+  page: PlaywrightPage,
+  opts: { formTimeoutMs?: number; signal?: AbortSignal } = {}
+) {
+  const timeout = opts.formTimeoutMs ?? 20_000;
+  const form = () => page.locator(
+    '#jurCompetencia, #rutJur, a[href="#BusJuridica"], a[href="#BusCausa"], a[href="#buscCausa"], a[href*="BusRol" i]'
+  ).filter({ visible: true }).first();
   await closeSweetAlerts(page);
   await closeBootstrapModals(page);
-  const acceso = page.locator(OJV.accesoConsulta);
-  if ((await acceso.count()) > 0) {
-    await Promise.all([
-      page
-        .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 45_000 })
-        .catch(() => undefined),
-      acceso.first().click(),
-    ]);
-  } else {
-    // Fallback: invoke the same guest session endpoint the button uses.
-    await page.evaluate(async () => {
-      await fetch("../includes/sesion-invitado.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "nombreAcceso=CC",
-        credentials: "include",
-      }).catch(() => undefined);
-    });
-    await page
-      .goto(`${OJV_HOME.replace("/home/index.php", "")}/consultaUnificada.php`, {
-        waitUntil: "domcontentloaded",
-        timeout: 30_000,
-      })
-      .catch(() => undefined);
+
+  if (!(await form().count())) {
+    const acceso = page.locator(OJV.accesoConsulta).filter({ visible: true }).first();
+    if (await acceso.count()) {
+      try {
+        await acceso.click({ timeout: 15_000 });
+        await page.waitForLoadState("domcontentloaded", { timeout: 30_000 });
+      } catch {
+        throw new PjudScrapeError("No se pudo completar el acceso invitado a OJV. No se inició una búsqueda de causas.");
+      }
+      await closeSweetAlerts(page);
+      await closeBootstrapModals(page);
+    }
+    if (!(await form().count())) {
+      const menu = page.getByRole("link", { name: /^Consulta Unificada$/i })
+        .filter({ visible: true }).first();
+      try {
+        await menu.waitFor({ state: "visible", timeout });
+        await menu.click({ timeout: 15_000 });
+        await page.waitForLoadState("domcontentloaded", { timeout: 30_000 });
+      } catch {
+        throw new PjudScrapeError("No se encontró o no se pudo abrir el acceso visible a Consulta Unificada en OJV. No se inició una búsqueda de causas.");
+      }
+    }
   }
-  await delay(800);
   await closeSweetAlerts(page);
-  await maybeSolveCaptchaOnPage(page);
+  await closeBootstrapModals(page);
+  await maybeSolveCaptchaOnPage(page, opts.signal);
+  try {
+    await form().waitFor({ state: "visible", timeout });
+  } catch {
+    throw new PjudScrapeError("OJV abrió Consulta Unificada pero no mostró el formulario de búsqueda. El portal puede requerir una validación o haber cambiado su estructura. No se inició una búsqueda de causas.");
+  }
 }
 
 async function waitConsultaLoader(page: PlaywrightPage) {
@@ -834,7 +847,7 @@ async function solveNewSession(signal?: AbortSignal): Promise<PjudSession> {
     await closeBootstrapModals(page);
     await maybeSolveCaptchaOnPage(page, signal);
     // Establish guest consulta session so cookies are meaningful.
-    await enterConsultaCausas(page);
+    await enterConsultaCausas(page, { signal });
     const cookies = await context.cookies();
     if (!cookies.length) {
       throw new PjudScrapeError("Sin cookie de sesión tras acceso invitado/CAPTCHA.");

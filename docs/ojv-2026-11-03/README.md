@@ -8,6 +8,7 @@ Base de la entrega: `main@5109ccf830bb6eaefbeee142224d9130ef0d9f9f`. Se mejoran 
 | --- | --- |
 | Consulta pública | Lectura separada del registro; identidad, fecha, proveedor, cuaderno y muestra parcial visibles. Campos conservados, resultados retirados al editar, errores recuperables, cancelación y registro explícito. |
 | Selección del expediente | RIT completo y tribunal concreto; no acepta números parecidos, ordinales distintos, filas ambiguas ni datos de un resultado anterior. Paginación con detección de repetición y límites. |
+| Entrada al portal | Usa el acceso invitado visible, abre el menú observado «Consulta Unificada» y espera el formulario. No utiliza endpoints ni enlaces internos inferidos; si el portal no muestra el formulario, informa el fallo antes de buscar. |
 | Historial | Se elimina la fabricación de movimientos a partir del listado de causas. Un historial vacío exige una señal explícita; un DOM no reconocido produce un error. |
 | Mis Causas | Permisos de la interfaz alineados con la API, carga recuperable, guardado diferenciado de acceso comprobado y resultados vacíos o parciales sin falsos avisos de éxito. |
 | ClaveÚnica | El apagado explícito del Host se comprueba antes de leer o transmitir credenciales. Hostname de autenticación HTTPS exacto; errores sin parámetros OIDC ni título de página autenticada. |
@@ -42,6 +43,6 @@ La revisión visual independiente finalizó con **disposition: ship**, sin corre
 
 ## Acceso real y límites
 
-Se consultó la [entrada oficial de OJV](https://oficinajudicialvirtual.pjud.cl/home/index.php) el 3 de noviembre de 2026. Una sesión nueva de Chromium cargó la página y activó su entrada pública, pero no obtuvo un formulario de consulta verificable en la lectura realizada. La lectura remota con Firecrawl falló por resolución DNS de su API; la comprobación de la entrada se contrastó mediante acceso web y navegador local.
+Se consultó la [entrada oficial de OJV](https://oficinajudicialvirtual.pjud.cl/home/index.php) el 3 de noviembre de 2026. Una sesión nueva de Chromium cargó la página, abrió `/indexN.php` como invitado y permitió pulsar el menú visible «Consulta Unificada», pero no obtuvo un formulario de consulta verificable en la lectura realizada. Esa navegación observada se incorporó al conector y se probó con fixtures locales. La lectura remota con Firecrawl falló por resolución DNS de su API; la comprobación de la entrada se contrastó mediante acceso web y navegador local.
 
 No se resolvió CAPTCHA, no se inició sesión, no se utilizaron credenciales del estudio ni se consultaron expedientes reales. Las pruebas no acreditan funcionamiento completo contra el portal vivo ni calidad de una extracción real. La consulta pública por RUT mantiene el año y los filtros disponibles; no certifica una cartera completa. La importación manual de PDFs conserva un bloqueo por proceso, apropiado para una única instancia Host.

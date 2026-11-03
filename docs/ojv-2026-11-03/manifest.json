@@ -1,6 +1,6 @@
 {
   "baseCommit": "5109ccf830bb6eaefbeee142224d9130ef0d9f9f",
-  "sourceState": "working tree on base commit; hashes bind validated implementation",
+  "sourceState": "branch implementation plus observed guest menu navigation; hashes bind validated sources",
   "checks": {
     "unitSuite": 0,
     "integrationSuite": 0,
@@ -16,7 +16,9 @@
     "visualVerdict": "ship",
     "backendIdentityFinding": "resolved",
     "liveOjvQuery": false,
-    "realCredentialsUsed": false
+    "realCredentialsUsed": false,
+    "entryMenuObserved": true,
+    "entryMenuFixture": true
   },
   "screenshots": [
     {
@@ -107,7 +109,7 @@
     },
     {
       "file": "src/lib/pjud/public-scrape.dom.test.ts",
-      "sha256": "06987fe8e258144dae8c2f4fd16bc75d51add9643d5840f33d9d6e1651919ba5"
+      "sha256": "5da1a7ebb17f5558cf18c214219d4d3c4b634ff5b65b38b2fb0a833fcca2c0b7"
     },
     {
       "file": ".github/workflows/ci.yml",
@@ -171,7 +173,7 @@
     },
     {
       "file": "src/lib/pjud/public-scrape.ts",
-      "sha256": "57ada6e95c7d1de6d5b79562836ccdc79d4a239d8c7afb1648382f08ba1cfe22"
+      "sha256": "d5c096abb81f48617aaa3689ab16c2ce95eb84bfa99da267242322ccf1ac5de6"
     },
     {
       "file": "src/lib/pjud/scrape-claveunica.test.ts",

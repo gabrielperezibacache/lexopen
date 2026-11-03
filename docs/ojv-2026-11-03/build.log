@@ -4,35 +4,25 @@
 
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 441ms
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 416ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
-Tip: Want to react to database changes in your app as they happen? Discover how with Pulse: https://pris.ly/tip-1-pulse
+Tip: Want real-time updates to your database without manual polling? Discover how with Pulse: https://pris.ly/tip-0-pulse
 
-┌─────────────────────────────────────────────────────────┐
-│  Update available 5.22.0 -> 8.0.0-rc.29                 │
-│                                                         │
-│  This is a major update - please follow the guide at    │
-│  https://pris.ly/d/major-version-upgrade                │
-│                                                         │
-│  Run the following to update                            │
-│    npm i --save-dev prisma@latest                       │
-│    npm i @prisma/client@latest                          │
-└─────────────────────────────────────────────────────────┘
 ▲ Next.js 16.3.0 (Turbopack)
 ✓ Running next.config.ts took 13ms
 
   Creating an optimized production build ...
-✓ Compiled successfully in 3.8s
+✓ Compiled successfully in 1517ms
   Running TypeScript ...
-  Finished TypeScript in 4.8s ...
+  Finished TypeScript in 4.2s ...
   Collecting page data using 13 workers ...
   Generating static pages using 13 workers (0/144) ...
   Generating static pages using 13 workers (36/144)
   Generating static pages using 13 workers (72/144)
   Generating static pages using 13 workers (108/144)
-✓ Generating static pages using 13 workers (144/144) in 154ms
+✓ Generating static pages using 13 workers (144/144) in 164ms
 Turbopack build encountered 4 warnings:
 ./src/lib/auth/rate-limit.ts:28:25
 Warning: Dynamic filesystem access causes tracing of the whole project
