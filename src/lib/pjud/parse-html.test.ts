@@ -7,6 +7,7 @@ import {
   parseSalaFromHtml,
   extractDocumentoHrefFromRowHtml,
   hasExplicitEmptyHistory,
+  parseVerDetalleJuridicaHtml,
 } from "@/lib/pjud/parse-html";
 
 const html = `
@@ -112,5 +113,67 @@ const movsLongDate = parseMovimientosFromHtml(`
 assert.equal(movsLongDate.length, 1);
 assert.equal(movsLongDate[0].fecha.toISOString().slice(0, 10), "2025-08-13");
 assert.equal(movsLongDate[0].titulo, "Resolución: se tiene por presentada");
+
+// Observed Civil table structure, with fictitious parties and movements.
+const civilListing = `<table id="dtaTableDetalle">
+<thead><tr><th></th><th>Rol</th><th>Fecha</th><th>Caratulado</th><th>Tribunal</th></tr></thead>
+<tbody><tr><td><a href="#" title="Detalle de la causa"><i class="fa fa-search"></i></a></td>
+<td>C-100-2024</td><td>12/08/2024</td><td>Entidad Uno / Entidad Dos</td><td>3º Juzgado Civil de Santiago</td></tr></tbody>
+</table>`;
+const civilIdentities = parseVerDetalleJuridicaHtml(civilListing);
+assert.equal(civilIdentities.length, 1);
+assert.equal(civilIdentities[0].rit, "C-100-2024");
+assert.equal(civilIdentities[0].tribunal, "3º Juzgado Civil de Santiago");
+assert.equal(civilIdentities[0].caratula, "Entidad Uno / Entidad Dos");
+assert.equal(civilIdentities[0].fecha, "2024-08-12");
+assert.equal(parseMisCausasFromHtml(civilListing).length, 1);
+
+const supremaListing = `<table id="dtaTableDetalleMisCauSup"><thead><tr><th></th><th>Rol</th><th>Caratulado</th><th>Fecha Ingreso</th><th>Estado Causa</th><th>Corte</th><th>Institución</th></tr></thead>
+<tbody><tr><td><a title="Detalle de la causa"></a></td><td>20-2024</td><td>Entidad Uno / Entidad Dos</td><td>12/08/2024</td><td>Tramitación</td><td>Corte Suprema</td><td>Institución ficticia</td></tr></tbody></table>`;
+const supremaIdentities = parseMisCausasFromHtml(supremaListing);
+assert.equal(supremaIdentities.length, 1);
+assert.equal(supremaIdentities[0].rit, "20-2024");
+assert.equal(supremaIdentities[0].tribunal, "Corte Suprema");
+assert.equal(supremaIdentities[0].caratula, "Entidad Uno / Entidad Dos");
+
+const civilHeaders = `<tr><th>Folio</th><th>Doc.</th><th>Anexo</th><th>Etapa</th><th>Trámite</th><th>Desc.Trámite</th><th>Fec.Trámite</th><th>Foja</th><th>Georref.</th></tr>`;
+const civilHistory = `<div class="modal in" id="modalDetalleCivil">
+<div id="historiaCiv" class="tab-pane active"><table><thead>${civilHeaders}</thead><tbody>
+<tr><td>124</td><td><a href="/documentos/fixture.pdf">PDF</a></td><td></td><td>Tramitación</td><td>Escrito</td><td>Demanda</td><td>12/08/2024</td><td>0</td><td></td></tr>
+<tr><td>123</td><td></td><td></td><td>Prueba</td><td>Resolución</td><td>Recibe causa a prueba</td><td>13/08/2024</td><td>0</td><td></td></tr>
+<tr><td>122</td><td></td><td></td><td>Tramitación</td><td>Resolución</td><td></td><td>14/08/2024</td><td>0</td><td></td></tr>
+</tbody></table></div>
+<div class="tab-pane" id="litigantesCiv"><table><tr><td>1</td><td>15/08/2024</td><td>Litigante que no es un movimiento</td></tr></table></div>
+<div class="tab-pane" id="notificacionesCiv"><table><tr><td>2</td><td>16/08/2024</td><td>Notificación oculta que no debe mezclarse</td></tr></table></div>
+<table><tr><th>Rol Corte</th><th>Descripción del Trámite</th><th>Fecha Trámite</th></tr>
+<tr><td>321-2024</td><td>Remisión exterior que no es historia civil</td><td>17/08/2024</td></tr></table>
+<table><tr><th>Fecha</th><th>Trámite</th></tr><tr><td>Sin movimientos</td></tr></table>
+</div>`;
+const parsedCivil = parseMovimientosFromHtml(civilHistory);
+assert.deepEqual(parsedCivil.map((row) => row.folio), ["124", "123", "122"]);
+assert.deepEqual(parsedCivil.map((row) => row.titulo), ["Demanda", "Recibe causa a prueba", "Resolución"]);
+assert.equal(parsedCivil[0].fecha.toISOString().slice(0, 10), "2024-08-12");
+assert.equal(parsedCivil[0].tramite, "Escrito");
+assert.equal(parsedCivil[0].etapa, "Tramitación");
+assert.equal(parsedCivil[1].etapa, "Prueba");
+assert.equal(parsedCivil[0].cuaderno, null, "the history panel does not establish its selected cuaderno");
+assert.equal(parsedCivil[0].documentoRef, "https://oficinajudicialvirtual.pjud.cl/documentos/fixture.pdf");
+assert.equal(hasExplicitEmptyHistory(civilHistory), false, "an empty table outside the active Civil history is not evidence about that history");
+assert.equal(hasExplicitEmptyHistory(`<div id="historiaCiv" class="tab-pane active"><table>${civilHeaders}<tr><td colspan="9">Ningún dato disponible en esta tabla</td></tr></table></div>`), true);
+
+const civilDateFixture = (date: string, description = "Actuación ficticia", extra = "") => `<div id="historiaCiv" class="tab-pane active"><table>${civilHeaders}
+<tr><td>7</td><td>${extra}</td><td></td><td>Tramitación</td><td>Resolución</td><td>${description}</td><td>${date}</td><td>0</td><td></td></tr></table></div>`;
+const pairedCivilDate = parseMovimientosFromHtml(civilDateFixture("04/03/2024 (01/03/2024)"));
+assert.equal(pairedCivilDate.length, 1);
+assert.equal(pairedCivilDate[0].fecha.toISOString().slice(0, 10), "2024-03-04");
+assert.match(pairedCivilDate[0].detalle || "", /04\/03\/2024 \(01\/03\/2024\)/, "the secondary date remains source text without an inferred meaning");
+assert.equal(parseMovimientosFromHtml(civilDateFixture("32/03/2024 (01/03/2024)")).length, 0, "an invalid primary date cannot borrow the parenthetical date");
+assert.equal(parseMovimientosFromHtml(civilDateFixture("sin fecha (01/03/2024)")).length, 0);
+assert.equal(parseMovimientosFromHtml(civilDateFixture("04/03/2024 (01/03/2024) texto adicional")).length, 0);
+assert.equal(parseMovimientosFromHtml(civilDateFixture("2024-03-04 texto adicional")).length, 0);
+assert.equal(parseMovimientosFromHtml(civilDateFixture("", "Actuación ficticia", "01/03/2024")).length, 0, "a known empty date column cannot borrow another cell's date");
+assert.equal(parseMovimientosFromHtml(civilDateFixture("32/03/2024", "Actuación ficticia", "01/03/2024")).length, 0);
+assert.equal(parseMovimientosFromHtml(civilDateFixture("04/03/2024", "NHL"))[0].titulo, "Resolución", "a short description falls back to the usable Trámite column");
+assert.equal(parseMovimientosFromHtml(`<table><tr><td>7</td><td>04/03/2024 (01/03/2024)</td><td>Actuación ficticia</td></tr></table>`).length, 0, "paired dates require an identified date column");
 
 console.log("pjud/parse-html.test.ts OK");

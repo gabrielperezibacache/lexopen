@@ -28,6 +28,21 @@ function visibleDocument(html: string) {
   return document;
 }
 
+/** The observed Civil history panel excludes the modal's separate court referrals. */
+function visibleHistoryDocument(html: string): HtmlNode {
+  const document = visibleDocument(html);
+  const findCivilHistory = (node: HtmlNode): HtmlNode | null => {
+    if (node.type === "tag" && node.attribs.id === "historiaCiv" && /\bactive\b/.test(node.attribs.class || "")) return node;
+    if (!("children" in node)) return null;
+    for (const child of node.children) {
+      const found = findCivilHistory(child);
+      if (found) return found;
+    }
+    return null;
+  };
+  return findCivilHistory(document) || document;
+}
+
 function nodeText(node: HtmlNode): string {
   if (node.type === "text") return node.data;
   if (excludedNode(node)) return "";
@@ -49,12 +64,12 @@ export function hasExplicitEmptyHistory(html: string): boolean {
     if (!("children" in node)) return false;
     if (node.type === "tag" && node.name === "table") {
       const text = nodeText(node).replace(/\s+/g, " ");
-      return /fecha/i.test(text) && /tr[aá]mite|actuaci[oó]n|resoluci[oó]n|descripci[oó]n/i.test(text) &&
+      return /fecha|fec[.\s]*tr[aá]mite/i.test(text) && /tr[aá]mite|actuaci[oó]n|resoluci[oó]n|descripci[oó]n/i.test(text) &&
         /sin (?:movimientos|registros)|no (?:hay|existen|se (?:han encontrado|encontraron)) (?:movimientos|registros)|ning[uú]n dato disponible/i.test(text);
     }
     return node.children.some(visit);
   };
-  return visit(visibleDocument(html));
+  return visit(visibleHistoryDocument(html));
 }
 
 function normalizeChileanDate(raw: string): string | null {
@@ -106,16 +121,42 @@ function cellLooksLikeDate(c: string) {
   );
 }
 
+function parseHistoryDate(raw: string, identifiedColumn: boolean): Date | null {
+  let primary = raw;
+  if (identifiedColumn) {
+    // Civil Fec. Trámite can show a second date. Preserve it in detalle only.
+    const paired = raw.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s*\(\d{1,2}\/\d{1,2}\/\d{4}\)$/);
+    if (paired) primary = paired[1];
+    if (/^\d{4}-\d{2}-\d{2}/.test(primary) &&
+      !/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$/.test(primary)) return null;
+  }
+  const normalized = normalizeChileanDate(primary);
+  if (!normalized) return null;
+  const date = parseLocalDateInput(normalized);
+  if (!date) return null;
+  if (identifiedColumn) {
+    const [year, month, day] = normalized.split("-").map(Number);
+    if (date.getFullYear() !== year || date.getMonth() + 1 !== month || date.getDate() !== day) return null;
+  }
+  return date;
+}
+
+function columnLabel(cell: string) {
+  return cell.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[._]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function dateColumnLabel(label: string) {
+  return /^(?:fecha|fec)(?: de[l]?| de la)?(?: tramite|actuacion|resolucion|ingreso|presentacion)?$/.test(label);
+}
+
 function isHeaderRow(cells: string[]) {
-  const joined = cells.join(" ").toLowerCase();
-  const looksLikeColumnHeader =
-    cells.length <= 6 &&
-    /^(folio|fecha|tr[aá]mite|etapa|descargar|documento|cuaderno)/i.test(
-      cells[0] || ""
-    );
-  const looksLikeHeaderSentence =
-    /fecha/.test(joined) && /tr[aá]mite|folio|historia/.test(joined);
-  return looksLikeColumnHeader || looksLikeHeaderSentence;
+  const labels = cells.map(columnLabel);
+  const recognized = labels.filter((label) => dateColumnLabel(label) ||
+    /^(?:folio|tramite|actuacion|resolucion|etapa|descargar|doc|documento|cuaderno|anexo|foja|georref|(?:desc|descripcion)(?: del?)?(?: tramite|actuacion|resolucion)?)$/.test(label));
+  return recognized.length >= 2 && (
+    labels.some(dateColumnLabel) || /^(?:folio|cuaderno)$/.test(labels[0] || "")
+  );
 }
 
 /** Absolute OJV download URL from a table row's anchors (href / onclick). */
@@ -177,7 +218,7 @@ export function extractDocumentoHrefFromRowHtml(rowHtml: string): string | null 
  * Rows without a parseable fecha are skipped (never invent "today").
  */
 export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] {
-  html = DomUtils.getOuterHTML(visibleDocument(html));
+  html = DomUtils.getOuterHTML(visibleHistoryDocument(html));
   const movimientos: PjudFetchedMovimiento[] = [];
   const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
@@ -185,6 +226,10 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
   let folioSeq = 0;
   let cuadernoColumn = -1;
   let tramiteColumn = -1;
+  let descripcionColumn = -1;
+  let fechaColumn = -1;
+  let etapaColumn = -1;
+  let folioColumn = -1;
   let tableAt = -1;
 
   while ((rowMatch = rowRe.exec(html)) !== null) {
@@ -193,6 +238,10 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
       tableAt = currentTable;
       cuadernoColumn = -1;
       tramiteColumn = -1;
+      descripcionColumn = -1;
+      fechaColumn = -1;
+      etapaColumn = -1;
+      folioColumn = -1;
     }
     const cells: string[] = [];
     let cellMatch: RegExpExecArray | null;
@@ -202,8 +251,13 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
     }
     if (cells.length < 2) continue;
     if (isHeaderRow(cells)) {
-      cuadernoColumn = cells.findIndex((cell) => /^cuaderno$/i.test(cell));
-      tramiteColumn = cells.findIndex((cell) => /^(?:tr[aá]mite|actuaci[oó]n|descripci[oó]n)$/i.test(cell));
+      const labels = cells.map(columnLabel);
+      cuadernoColumn = labels.findIndex((label) => label === "cuaderno");
+      tramiteColumn = labels.findIndex((label) => /^(?:tramite|actuacion|resolucion|descripcion)$/.test(label));
+      descripcionColumn = labels.findIndex((label) => /^(?:desc|descripcion)(?: del?)? (?:tramite|actuacion|resolucion)$/.test(label));
+      fechaColumn = labels.findIndex(dateColumnLabel);
+      etapaColumn = labels.findIndex((label) => label === "etapa");
+      folioColumn = labels.findIndex((label) => label === "folio");
       continue;
     }
 
@@ -216,23 +270,23 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
       continue;
     }
 
-    const fechaRaw = cells.find((c) => cellLooksLikeDate(c));
+    const fechaRaw = fechaColumn >= 0 ? cells[fechaColumn] : cells.find((c) => cellLooksLikeDate(c));
     if (!fechaRaw) continue;
-    const normalized = normalizeChileanDate(fechaRaw);
-    if (!normalized) continue;
-    const fecha = parseLocalDateInput(normalized);
+    const fecha = parseHistoryDate(fechaRaw, fechaColumn >= 0);
     if (!fecha) continue;
 
     const identifiedCuaderno = (cuadernoColumn >= 0 ? cells[cuadernoColumn] : null) ||
       cells.find((c) => /^(?:principal|apelaci[oó]n|incidente|exhorto)(?:\s+(?:n[°ºo.]?\s*)?\d+)?$/i.test(c)) || null;
-    const titulo = (tramiteColumn >= 0 ? cells[tramiteColumn] : null) ||
-      cells.find(
+    const identifiedTitle = [descripcionColumn, tramiteColumn]
+      .filter((column) => column >= 0).map((column) => cells[column])
+      .find((value) => value && value.length >= 4);
+    const titulo = identifiedTitle || (descripcionColumn < 0 && tramiteColumn < 0 ? cells.find(
         (c) =>
           c.length > 8 &&
           !/^\d+$/.test(c) &&
           c !== identifiedCuaderno &&
           !cellLooksLikeDate(c)
-      ) || cells[cells.length - 1];
+      ) || cells[cells.length - 1] : null);
     if (!titulo || titulo.length < 4) continue;
     if (/^(folio|fecha|trámite|tramite|etapa|descargar)$/i.test(titulo)) continue;
 
@@ -243,9 +297,8 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
       /receptor|c[eé]dula|notificaci[oó]n/i.test(titulo);
     const pendienteResolucion = Boolean(classified.pendienteResolucion);
     const cuaderno = identifiedCuaderno;
-    const folioCandidate = cells.find(
-      (c, idx) => idx === 0 && /^\d{1,5}$/.test(c)
-    );
+    const folioValue = cells[folioColumn >= 0 ? folioColumn : 0];
+    const folioCandidate = /^\d{1,5}$/.test(folioValue || "") ? folioValue : null;
     const folio = folioCandidate || String(folioSeq);
     const documentoRef = extractDocumentoHrefFromRowHtml(rowMatch[1]);
 
@@ -260,9 +313,9 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
       fuente: "pjud",
       cuaderno,
       folio,
-      etapa:
+      etapa: (etapaColumn >= 0 ? cells[etapaColumn] : null) ||
         cells.find((c) => /etapa|ingreso|traslado|audiencia/i.test(c)) || null,
-      tramite:
+      tramite: (tramiteColumn >= 0 ? cells[tramiteColumn] : null) ||
         cells.find((c) =>
           /prove[ií]do|resoluci[oó]n|escrito|c[eé]dula/i.test(c)
         ) || null,
@@ -326,7 +379,7 @@ export function parseCausasListFromHtml(html: string): Array<{
     items.push({
       rit,
       tribunal,
-      caratula: cells.find((c) => /\bvs\.?\b|\/|con\b/i.test(c)) || cells[0],
+      caratula: cells.find((c) => !cellLooksLikeDate(c) && /\bvs\.?\b|\/|con\b/i.test(c)) || cells[0],
       ruc: cells.find((c) => /\d{1,3}-\d{8,}-\d/.test(c)) || null,
       estado: cells.find((c) => /tramitaci|terminad|archiv/i.test(c)) || null,
     });
@@ -492,8 +545,8 @@ export function parseVerDetalleJuridicaHtml(html: string): VerDetalleRow[] {
       rit,
       tribunal,
       caratula:
-        dataCells.find((c) => /\bvs\.?\b|\/|con\b/i.test(c)) ||
-        dataCells.find((c) => c.length > 8 && c !== rit && c !== tribunal) ||
+        dataCells.find((c) => !cellLooksLikeDate(c) && /\bvs\.?\b|\/|con\b/i.test(c)) ||
+        dataCells.find((c) => c.length > 8 && c !== rit && c !== tribunal && !cellLooksLikeDate(c)) ||
         null,
       ruc: dataCells.find((c) => /\d{1,3}-\d{8,}-\d/.test(c)) || null,
       estado:

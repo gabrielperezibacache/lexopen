@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { readManuallyAuthenticatedMisCausas } from "@/lib/pjud/live-validation";
 import { redactedPjudValidationUrl, startClaveUnicaOidcFromOjv } from "@/lib/pjud/ojv-oidc";
-import { openClaveUnicaFromOjv } from "@/lib/pjud/public-scrape";
+import { applyMisCausasFiltros, clickMisCausasBuscar, collectMisCausasFromAuthenticatedOjv, openClaveUnicaFromOjv } from "@/lib/pjud/public-scrape";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -94,6 +94,70 @@ async function main() {
       assert.equal(await page.evaluate(() => "lexopenManualMisCausas" in window), false);
     }
 
+    // Current Mis Causas uses a hidden checkbox inside a visible switch label.
+    // Suprema precedes Civil in the DOM; only the active materia may be searched.
+    await page.setContent(`<style>
+      .tab-pane { display:none } .tab-pane.active { display:block }
+      label.switch { display:inline-block; width:60px; height:30px }
+      label.switch input { position:absolute; opacity:0; width:0; height:0 }
+      label.switch span { display:inline-block; width:60px; height:30px }
+    </style>
+    <button onclick="window.accepted=true">Acepto</button>
+    <a id="menuMisCausas" href="#" onclick="event.preventDefault()">Mis Causas</a>
+    <a href="#" onclick="event.preventDefault();showMateria('Sup')">Corte Suprema</a>
+    <a href="#" onclick="event.preventDefault();showMateria('Civ')">Civil</a>
+    <section id="tabSup" class="tab-pane active">
+      <label class="switch"><input type="checkbox" id="filtroMisCauSup" onchange="toggleFilter('Sup',this.checked)"><span>Filtro Suprema</span></label>
+      <button hidden id="btnConsultaMisCauSup" onclick="searchMateria('Sup')">Buscar</button>
+      <table id="dtaTableDetalleMisCauSup"><thead><tr><th></th><th>Rol</th><th>Caratulado</th><th>Fecha Ingreso</th><th>Estado Causa</th><th>Corte</th><th>Institución</th></tr></thead>
+      <tbody id="rowsSup"><tr><td></td><td>999-2020</td><td>PRIVATE_OLD_SUP</td><td>01/01/2020</td><td>Tramitación</td><td>Corte Suprema</td><td>Institución ficticia</td></tr></tbody></table>
+    </section>
+    <section id="tabCiv" class="tab-pane">
+      <label class="switch"><input type="checkbox" id="filtroMisCauCiv" onchange="toggleFilter('Civ',this.checked)"><span>Filtro Civil</span></label>
+      <button hidden id="btnConsultaMisCauCiv" onclick="searchMateria('Civ')">Buscar</button>
+      <table id="dtaTableDetalleMisCauCiv"><tbody id="rowsCiv"><tr><td>C-999-2020</td><td>3º Juzgado Civil de Santiago</td></tr></tbody></table>
+    </section>
+    <script>
+      window.searches=[];window.filterChanges=[];window.accepted=false;
+      function showMateria(materia){document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));document.querySelector('#tab'+materia).classList.add('active')}
+      function toggleFilter(materia,checked){window.filterChanges.push(materia);document.querySelector('#btnConsultaMisCau'+materia).hidden=!checked}
+      function searchMateria(materia){
+        window.searches.push(materia);
+        document.querySelector('#rows'+materia).innerHTML=materia==='Sup'
+          ? '<tr><td></td><td>20-2024</td><td>PRIVATE_SUP_A / PRIVATE_SUP_B</td><td>02/01/2024</td><td>Tramitación</td><td>Corte Suprema</td><td>Institución ficticia</td></tr>'
+          : '<tr><td></td><td>C-20-2024</td><td>3º Juzgado Civil de Santiago</td><td>PRIVATE_CIV</td></tr>';
+      }
+    </script>`);
+    assert.equal(await page.locator('#filtroMisCauSup').isVisible(), false);
+    const materias = await readManuallyAuthenticatedMisCausas(page);
+    assert.equal(materias.status, "listed");
+    assert.deepEqual(materias.materiasTried, ["Civil", "Corte Suprema"]);
+    assert.equal(materias.itemCount, 2, "only replacement rows from the searched materias count");
+    assert.doesNotMatch(JSON.stringify(materias), /PRIVATE|20-2024|Santiago|caratula|cookie/);
+    assert.deepEqual(await page.evaluate(() => ({
+      searches: (window as typeof window & { searches: string[] }).searches,
+      changes: (window as typeof window & { filterChanges: string[] }).filterChanges,
+      accepted: (window as typeof window & { accepted: boolean }).accepted,
+    })), { searches: ["Civ", "Sup"], changes: ["Civ", "Sup"], accepted: false });
+    await applyMisCausasFiltros(page);
+    assert.equal(await page.locator('#filtroMisCauSup').isChecked(), true, "an enabled filter must not be toggled off");
+    assert.deepEqual(await page.evaluate(() => (window as typeof window & { filterChanges: string[] }).filterChanges), ["Civ", "Sup"]);
+    await page.getByRole("link", { name: "Civil", exact: true }).click();
+    await applyMisCausasFiltros(page);
+    assert.equal(await clickMisCausasBuscar(page), true);
+    assert.deepEqual(await page.evaluate(() => (window as typeof window & { searches: string[] }).searches), ["Civ", "Sup", "Civ"], "automatic mode also searches the active visible materia");
+
+    await page.setContent(`<a id="menuMisCausas" href="#" onclick="event.preventDefault()">Mis Causas</a>
+      <button onclick="document.querySelector('#legacySearch').hidden=false">Filtros</button>
+      <button hidden id="legacySearch" onclick="document.querySelector('#legacyResults').innerHTML='<table><tr><td>C-1-2024</td><td>1º Juzgado Civil de Santiago</td></tr></table>'">Buscar</button>
+      <main id="legacyResults"></main>`);
+    assert.equal((await readManuallyAuthenticatedMisCausas(page)).itemCount, 1, "the legacy Filtros button remains supported");
+
+    await page.setContent(`<section class="tab-pane" style="display:none"><button onclick="window.wrongSearch=true">Buscar</button></section>
+      <section class="tab-pane active"><button style="display:none" onclick="window.wrongSearch=true">Buscar</button></section>`);
+    assert.equal(await clickMisCausasBuscar(page), false, "automatic mode also refuses hidden search buttons");
+    assert.equal(await page.evaluate(() => Boolean((window as typeof window & { wrongSearch?: boolean }).wrongSearch)), false);
+
     await page.setContent('<button onclick="window.accepted=true">Acepto</button>');
     assert.equal((await readManuallyAuthenticatedMisCausas(page)).status, "mis-causas-unavailable");
     assert.equal(await page.evaluate(() => Boolean((window as typeof window & { accepted?: boolean }).accepted)), false);
@@ -103,6 +167,30 @@ async function main() {
     const linkPopup = await openClaveUnicaFromOjv(page);
     assert.ok(linkPopup);
     await context.close();
+
+    // The official homepage now ends in /home/, including an OIDC return's query/hash.
+    // Automatic collection enters the shell; a manual probe must preserve its page.
+    const returnContext = await browser.newContext();
+    let shellVisits = 0;
+    await returnContext.route("**/*", async (route) => {
+      const isShell = new URL(route.request().url()).pathname === "/indexN.php";
+      if (isShell) shellVisits += 1;
+      await route.fulfill({ contentType: "text/html; charset=utf-8", body: isShell ? `
+        <a id="menuMisCausas" href="#" onclick="event.preventDefault()">Mis Causas</a>
+        <button onclick="document.querySelector('#results').innerHTML='<table><tr><td>C-1-2024</td><td>1º Juzgado Civil de Santiago</td></tr></table>'">Buscar</button><main id="results"></main>
+      ` : '<h1>Inicio OJV</h1>' });
+    });
+    const returnPage = await returnContext.newPage();
+    const homeReturn = "https://oficinajudicialvirtual.pjud.cl/home/?probe=PRIVATE#PRIVATE";
+    await returnPage.goto(homeReturn);
+    assert.equal((await collectMisCausasFromAuthenticatedOjv(returnPage)).items.length, 1);
+    assert.equal(new URL(returnPage.url()).pathname, "/indexN.php");
+    assert.equal(shellVisits, 1);
+    await returnPage.goto(homeReturn);
+    await assert.rejects(collectMisCausasFromAuthenticatedOjv(returnPage, { allowPrompts: false }), /Buscar visible/);
+    assert.equal(returnPage.url(), homeReturn, "manual mode preserves the selected homepage without entering a shell");
+    assert.equal(shellVisits, 1, "manual mode does not navigate through post-authentication URLs");
+    await returnContext.close();
     console.log("pjud/live-validation.dom.test.ts OK (offline browser fixtures)");
   } finally {
     await browser.close();

@@ -1,0 +1,35 @@
+{
+  "date": "2026-11-03",
+  "officialDirectory": "https://www.pjud.cl/",
+  "publicEntry": "https://oficinajudicialvirtual.pjud.cl/includes/sesion-consultaunificada.php",
+  "personalServicesEntry": "https://oficinajudicialvirtual.pjud.cl/home/",
+  "publicCase": {
+    "rit": "C-876-2022",
+    "tribunal": "3º Juzgado Civil de Santiago",
+    "officialReference": "https://www.pjud.cl/prensa-y-comunicaciones/noticias-del-poder-judicial/147149",
+    "listingIdentityMatched": true,
+    "detailOpened": true,
+    "selectedCuaderno": "1.0 - Principal",
+    "observedHistoryRows": 124,
+    "parsedMovementsFromTextCells": 124,
+    "uniqueParsedMovementIdentities": 124,
+    "allParsedRowsHaveTitleAndValidDate": true,
+    "otherCuadernosRead": false,
+    "pdfsDownloaded": false,
+    "rawRowsPublished": false
+  },
+  "manualLogin": {
+    "officialFormReached": true,
+    "serviceHeading": "PJUD",
+    "status": "authenticated-search-verified-in-browser",
+    "materia": "Corte Suprema",
+    "newResultElementsObserved": true,
+    "structuredCaseRowsObserved": true,
+    "allMateriasVerified": false,
+    "allStatesVerified": false,
+    "exactCaseCountPublished": false,
+    "credentialsSaved": false,
+    "privateRowsPublished": false
+  },
+  "automaticConnectorLiveRunVerified": false
+}

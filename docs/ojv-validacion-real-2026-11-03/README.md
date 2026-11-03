@@ -1,5 +1,7 @@
 # Validación contra la OJV real — 3 de noviembre de 2026
 
+**Actualización:** una [comprobación posterior mediante los accesos publicados por PJUD](../ojv-accesos-oficiales-2026-11-03/README.md) consiguió consultar el expediente público y abrir el formulario correcto de identificación. Los resultados siguientes describen la sesión anterior.
+
 Base: `main@3675d36ef8de118192f6676e480903d71c02c00a`. Esta comprobación distingue navegación real, resultados de expedientes y pruebas locales del conector.
 
 ## Resultado observado en Chrome
