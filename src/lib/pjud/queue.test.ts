@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { dueSyncWhere, pjudSyncConcurrency, processPendingSyncJobs, requeueFailedJobs, enqueueDueSyncJobs } from "@/lib/pjud/queue";
-import { clearFallidosMonitoreoAvisos } from "@/lib/pjud/sync";
+import { dueSyncWhere, pjudSyncConcurrency, processPendingSyncJobs, requeueFailedJobs, enqueueDueSyncJobs, reclaimStuckRunningJobs } from "@/lib/pjud/queue";
+import { clearFallidosMonitoreoAvisos, syncCausaPjud } from "@/lib/pjud/sync";
 import {
   isBackupableDocumentoRef,
   looksLikePdf,
@@ -26,6 +26,11 @@ async function emptySelectionDoesNotTouchDatabase() {
   assert.deepEqual(await processPendingSyncJobs({ jobIds: [] }), []);
   assert.deepEqual(await requeueFailedJobs({ causaIds: [] }), []);
   assert.deepEqual(await clearFallidosMonitoreoAvisos({ causaIds: [] }), { clearedCausas: 0, dismissedJobs: 0 });
+  assert.equal(await reclaimStuckRunningJobs({ jobIds: [] }), 0);
+  assert.equal(await reclaimStuckRunningJobs({ causaIds: [] }), 0);
+  await assert.rejects(processPendingSyncJobs({ fetchMovimientos: async () => { throw new Error("must not run"); } }), /trabajos explícitos/);
+  await assert.rejects(processPendingSyncJobs({ jobIds: ["fixture"], fetchMovimientos: JSON.parse('"not-a-function"') }), /función interna/);
+  await assert.rejects(syncCausaPjud("fixture", { fetchMovimientos: JSON.parse('"not-a-function"') }), /función interna/);
 }
 emptySelectionDoesNotTouchDatabase().catch((error) => { console.error(error); process.exitCode = 1; });
 

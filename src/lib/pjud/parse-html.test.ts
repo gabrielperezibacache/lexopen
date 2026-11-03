@@ -176,4 +176,45 @@ assert.equal(parseMovimientosFromHtml(civilDateFixture("32/03/2024", "Actuación
 assert.equal(parseMovimientosFromHtml(civilDateFixture("04/03/2024", "NHL"))[0].titulo, "Resolución", "a short description falls back to the usable Trámite column");
 assert.equal(parseMovimientosFromHtml(`<table><tr><td>7</td><td>04/03/2024 (01/03/2024)</td><td>Actuación ficticia</td></tr></table>`).length, 0, "paired dates require an identified date column");
 
+// OJV can hide an attachment cell independently of its column heading. A hidden
+// cell must not shift Fec. Trámite to Foja or disclose an invisible document.
+const responsiveHistory = civilDateFixture("04/03/2024", "Actuación visible",
+  '<a href="/documentos/INVISIBLE_SOURCE.pdf">INVISIBLE_SOURCE</a>');
+for (const attribute of ['aria-hidden="true"', 'style="display:none"', "hidden"]) {
+  const hiddenBody = responsiveHistory.replace("<td><a", `<td ${attribute}><a`);
+  const hiddenHeader = responsiveHistory.replace("<th>Doc.</th>", `<th ${attribute}>Doc.</th>`);
+  for (const html of [hiddenBody, hiddenHeader, hiddenBody.replace("<th>Doc.</th>", `<th ${attribute}>Doc.</th>`)]) {
+    const rows = parseMovimientosFromHtml(html);
+    assert.equal(rows.length, 1, "hiding an unrelated cell must preserve the known date column");
+    assert.equal(rows[0].fecha.toISOString().slice(0, 10), "2024-03-04");
+    assert.equal(rows[0].titulo, "Actuación visible");
+  }
+  const bodyRow = parseMovimientosFromHtml(hiddenBody)[0];
+  assert.equal(bodyRow.documentoRef, null, "invisible attachment links must not become downloads");
+  assert.doesNotMatch(bodyRow.detalle || "", /INVISIBLE_SOURCE/);
+}
+assert.equal(parseMovimientosFromHtml(responsiveHistory.replace("<td>04/03/2024</td>", '<td hidden>04/03/2024</td>')).length, 0,
+  "a hidden date must remain unavailable rather than borrowing a different cell");
+assert.equal(parseMovimientosFromHtml(responsiveHistory.replace("<table>", '<table aria-hidden="true">')).length, 0);
+assert.equal(parseMovimientosFromHtml(responsiveHistory.replace("<tr><td>7", '<tr hidden><td>7')).length, 0);
+assert.equal(parseMovimientosFromHtml(responsiveHistory.replace('class="tab-pane active"', 'class="tab-pane"')).length, 0,
+  "preserving cell positions must not retain inactive history panes");
+
+// The observed Civil table includes an obsolete commented-out td after Trámite.
+// Comments must disappear before the row/cell expressions inspect serialized HTML.
+const commentedCellHistory = civilDateFixture("04/03/2024", "Actuación visible ficticia")
+  .replace("<td>Resolución</td>", '<td>Resolución</td><!-- <td><a href="/documentos/COMMENT_ONLY.pdf">Columna antigua ficticia</a></td> -->');
+const parsedCommentedCell = parseMovimientosFromHtml(commentedCellHistory);
+assert.equal(parsedCommentedCell.length, 1, "a commented obsolete cell cannot shift the real date column");
+assert.equal(parsedCommentedCell[0].fecha.toISOString().slice(0, 10), "2024-03-04");
+assert.equal(parsedCommentedCell[0].titulo, "Actuación visible ficticia");
+assert.equal(parsedCommentedCell[0].documentoRef, null, "a download that exists only inside a comment must not be attached");
+assert.doesNotMatch(parsedCommentedCell[0].detalle || "", /Columna antigua|COMMENT_ONLY/);
+assert.equal(parseMovimientosFromHtml(commentedCellHistory.replace("<th>Anexo</th>", "<th>Anexo</th><!-- <th>Cabecera obsoleta</th> -->")).length, 1);
+
+const commentedGhostRows = '<!-- <table><tr><th>Fecha</th><th>Trámite</th></tr><tr><td>01/01/2026</td><td>Movimiento inexistente ficticio</td></tr></table> -->';
+assert.equal(parseMovimientosFromHtml(commentedGhostRows).length, 0, "fully commented tables and rows are never movements");
+assert.equal(parseMovimientosFromHtml(commentedCellHistory.replace("</table>", '<!-- <tr><td>99</td><td></td><td></td><td>Etapa</td><td>Resolución</td><td>Fila inexistente ficticia</td><td>01/01/2026</td><td>0</td><td></td></tr> --></table>')).length, 1);
+assert.equal(parseMovimientosFromHtml(civilDateFixture("04/03/2024", "Actuación visible ficticia", '<!-- <a href="/documentos/COMMENT_ONLY.pdf">PDF</a> -->'))[0].documentoRef, null);
+
 console.log("pjud/parse-html.test.ts OK");

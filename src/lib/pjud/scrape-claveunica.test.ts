@@ -113,7 +113,9 @@ env.CAPTCHA_SOLVER_API_KEY = "dummy";
 assert.equal(captchaSolverConfigured(), true);
 assert.equal(publicScrapeReady(), true);
 env.CAPTCHA_SOLVER_API_KEY = "";
-assert.equal(publicScrapeReady(), false);
+assert.equal(publicScrapeReady(), true, "a solver is required only when OJV presents a challenge");
+delete env.CAPTCHA_SOLVER_PROVIDER;
+assert.equal(publicScrapeReady(), true, "an enabled public channel may attempt access without a solver");
 
 async function main() {
   const prevCu = env.PJUD_CLAVEUNICA_SCRAPE;

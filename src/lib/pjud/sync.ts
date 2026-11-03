@@ -23,7 +23,10 @@ import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
 import { publicScrapeEnabled, publicScrapeReady, claveUnicaAutomationAllowed } from "@/lib/pjud/public-scrape";
 import { pjudWebhookConfigured } from "@/lib/pjud/webhook";
 import type { Prisma } from "@prisma/client";
-import { normalizePjudCuaderno, omitLegacyScrapeAliases, type PjudFetchedMovimiento } from "@/lib/pjud/types";
+import { normalizePjudCuaderno, omitLegacyScrapeAliases, type PjudCausaRef, type PjudFetchedMovimiento } from "@/lib/pjud/types";
+
+/** Process-local provider for an authenticated session; never accepted from JSON. */
+export type PjudMovimientosFetcher = (causa: PjudCausaRef) => Promise<PjudFetchResult>;
 
 export type SyncCausaResult = {
   causaId: string;
@@ -128,8 +131,13 @@ export async function syncCausaPjud(
     force?: boolean;
     trigger?: "manual" | "cron" | "retry" | "webhook" | "import";
     existingJobId?: string | null;
+    /** Internal session callback; the ordinary provider remains the default. */
+    fetchMovimientos?: PjudMovimientosFetcher;
   }
 ): Promise<SyncCausaResult> {
+  if (opts?.fetchMovimientos !== undefined && typeof opts.fetchMovimientos !== "function") {
+    throw new Error("El proveedor de sesión debe ser una función interna.");
+  }
   const trigger = opts?.trigger || "manual";
   const causa = await prisma.causa.findUnique({
     where: { id: causaId },
@@ -186,7 +194,7 @@ export async function syncCausaPjud(
 
   let fetchResult: PjudFetchResult;
   try {
-    fetchResult = await fetchPjudMovimientos({
+    fetchResult = await (opts?.fetchMovimientos ?? fetchPjudMovimientos)({
       id: causa.id,
       rit: causa.rit,
       ruc: causa.ruc,

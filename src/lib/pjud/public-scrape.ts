@@ -1,7 +1,7 @@
 /**
  * Scrape Oficina Judicial Virtual — paridad CausaMonitor.
  *
- * OPT-IN + ToS risk: requiere PJUD_PUBLIC_SCRAPE=1 y solver CAPTCHA.
+ * OPT-IN: requiere PJUD_PUBLIC_SCRAPE=1; solver sólo ante CAPTCHA visible.
  * Flujo DOM = portal OJV real (selectores de campo tipo consulta_causas_pjud).
  * NO depende de mcp-legal-chile (flujo MCP no comprobado en producción).
  *
@@ -91,7 +91,16 @@ export async function playwrightAvailable() {
 }
 
 export function publicScrapeReady() {
-  return publicScrapeEnabled() && captchaSolverConfigured();
+  // Configuration permits an attempt; a solver is needed only for a challenge.
+  return publicScrapeEnabled();
+}
+
+export function pjudCaptchaAutoSolveAllowed() {
+  return process.env.PJUD_CAPTCHA_AUTO_SOLVE?.trim() !== "0";
+}
+
+export function pjudDocumentDownloadsAllowed() {
+  return process.env.PJUD_DOC_DOWNLOADS?.trim() !== "0";
 }
 
 /**
@@ -111,12 +120,6 @@ export async function assertPublicScrapeRuntime() {
   if (!publicScrapeEnabled()) {
     throw new PjudScrapeError(
       "PJUD_PUBLIC_SCRAPE!=1: scrape público deshabilitado (kill switch)."
-    );
-  }
-  if (!captchaSolverConfigured()) {
-    throw new PjudScrapeError(
-      captchaConfigErrorMessage() ||
-        "Configure CAPTCHA_SOLVER_PROVIDER (+ API_KEY si aplica) para scrapear OJV."
     );
   }
   if (!(await playwrightAvailable())) {
@@ -271,9 +274,25 @@ async function launchBrowser() {
   return browser;
 }
 
+/** Validation may dismiss known case details, but must stop at other prompts. */
+export async function assertPjudPromptPolicy(page: PlaywrightPage) {
+  if (process.env.PJUD_AUTO_CONFIRM_PROMPTS?.trim() !== "0") return;
+  const blocked = await page.locator(`${OJV.sweetAlert}, .modal.in, .modal.show, .modal[style*="display: block"]`).evaluateAll((nodes) => nodes.some((node) => {
+    const rect = node.getBoundingClientRect();
+    if (!rect.width || !rect.height) return false;
+    for (let current: Element | null = node; current; current = current.parentElement) {
+      const style = getComputedStyle(current);
+      if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    }
+    return !(node.id.startsWith("modalDetalle") && node.querySelector("table.table-titulos"));
+  }));
+  if (blocked) throw new PjudScrapeError("OJV mostró un aviso que requiere intervención manual. La confirmación automática está deshabilitada.", 409);
+}
+
 async function closeSweetAlerts(page: PlaywrightPage) {
+  await assertPjudPromptPolicy(page);
   for (let i = 0; i < 3; i++) {
-    const visible = await page.locator(OJV.sweetAlert).count();
+    const visible = await page.locator(OJV.sweetAlert).filter({ visible: true }).count();
     if (!visible) return;
     await page.locator(OJV.sweetConfirm).first().click().catch(() => undefined);
     await delay(400);
@@ -281,6 +300,7 @@ async function closeSweetAlerts(page: PlaywrightPage) {
 }
 
 async function closeBootstrapModals(page: PlaywrightPage) {
+  await assertPjudPromptPolicy(page);
   await page.evaluate(() => {
     document.querySelectorAll('.modal.in, .modal.show, .modal[style*="display: block"]').forEach((m) => {
       const el = m as HTMLElement;
@@ -294,12 +314,33 @@ async function closeBootstrapModals(page: PlaywrightPage) {
   });
 }
 
-async function maybeSolveCaptchaOnPage(page: PlaywrightPage, signal?: AbortSignal) {
-  const captchaImage = page.locator(OJV.captchaImg);
-  if ((await captchaImage.count()) === 0) return false;
+export async function maybeSolveCaptchaOnPage(page: PlaywrightPage, signal?: AbortSignal) {
+  const captchaImages = page.locator(OJV.captchaImg);
+  const visibleIndex = await captchaImages.evaluateAll((nodes) => nodes.findIndex((node) => {
+    const rect = node.getBoundingClientRect();
+    if (!rect.width || !rect.height) return false;
+    for (let current: Element | null = node; current; current = current.parentElement) {
+      const style = getComputedStyle(current);
+      if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    }
+    return true;
+  }));
+  if (visibleIndex < 0) {
+    if ((await readConsultaFormState(page)).captchaVisible) {
+      throw new PjudScrapeError("OJV mostró un desafío CAPTCHA que requiere intervención manual.", 409);
+    }
+    return false;
+  }
+  if (!pjudCaptchaAutoSolveAllowed()) {
+    throw new PjudScrapeError("OJV mostró un CAPTCHA. La resolución automática está deshabilitada; requiere intervención manual.", 409);
+  }
+  if (!captchaSolverConfigured()) {
+    throw new PjudScrapeError(captchaConfigErrorMessage() || "OJV mostró un CAPTCHA y no hay un resolutor configurado.", 409);
+  }
   assertSolveBudget();
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-  const buffer = await captchaImage.first().screenshot();
+  const captchaImage = captchaImages.nth(visibleIndex);
+  const buffer = await captchaImage.screenshot();
   let answer: string;
   try {
     answer = await solveImageCaptcha(buffer.toString("base64"), signal);
@@ -320,7 +361,7 @@ async function maybeSolveCaptchaOnPage(page: PlaywrightPage, signal?: AbortSigna
       .catch(() => undefined),
     page.locator(OJV.submit).first().click().catch(() => undefined),
   ]);
-  if ((await captchaImage.count()) > 0) {
+  if ((await readConsultaFormState(page)).captchaVisible) {
     throw new PjudScrapeError(
       "PJUD rechazó el CAPTCHA (solver incorrecto o sesión bloqueada)."
     );
@@ -598,8 +639,11 @@ export async function clickBuscar(page: PlaywrightPage, responseTimeoutMs = 30_0
   // Observe content before submitting: an unchanged old result must never be read
   // as the response to the new RIT/tribunal filters.
   await page.evaluate(() => {
-    const state = window as typeof window & { lexopenConsulta?: { changed: boolean; observer: MutationObserver } };
+    const state = window as typeof window & { lexopenConsulta?: { changed: boolean; observer: MutationObserver; currentRit: boolean; previousRows: Element[]; previousRowTexts: string[] } };
     state.lexopenConsulta?.observer.disconnect();
+    const ritButton = document.querySelector("#btnConConsulta");
+    const currentRit = Boolean(ritButton && ritButton.getBoundingClientRect().height > 0 && document.querySelector("#dtaTableDetalle"));
+    const previousRows = [...document.querySelectorAll("#dtaTableDetalle tbody tr")];
     const results = "#dtaTableDetalle, #resultConsultaJuridica, #resultConsultaCausa, #resultConsultaRol, #verDetalleJuridica";
     const observer = new MutationObserver((mutations) => {
       if (mutations.some((mutation) => {
@@ -609,7 +653,7 @@ export async function clickBuscar(page: PlaywrightPage, responseTimeoutMs = 30_0
         );
       }) && state.lexopenConsulta) state.lexopenConsulta.changed = true;
     });
-    state.lexopenConsulta = { changed: false, observer };
+    state.lexopenConsulta = { changed: false, observer, currentRit, previousRows, previousRowTexts: previousRows.map(row => row.textContent || "") };
     observer.observe(document.body, { childList: true, characterData: true, subtree: true });
   });
 
@@ -674,11 +718,28 @@ export async function clickBuscar(page: PlaywrightPage, responseTimeoutMs = 30_0
   }
 
   try {
-    await page.waitForFunction(() =>
-      (window as typeof window & { lexopenConsulta?: { changed: boolean } }).lexopenConsulta?.changed,
-      undefined,
-      { timeout: responseTimeoutMs }
-    );
+    await page.waitForFunction(() => {
+      const state = (window as typeof window & { lexopenConsulta?: { changed: boolean; currentRit: boolean; previousRows: Element[]; previousRowTexts: string[] } }).lexopenConsulta;
+      if (!state?.changed) return false;
+      if (!state.currentRit) return true;
+      const button = document.querySelector("#btnConConsulta") as HTMLButtonElement | null;
+      if (!button || button.disabled || button.getAttribute("aria-busy") === "true") return false;
+      const table = document.querySelector("#dtaTableDetalle");
+      if (!table || !table.getBoundingClientRect().height || table.getAttribute("aria-busy") === "true") return false;
+      const processing = document.querySelector("#dtaTableDetalle_processing");
+      if (processing && processing.getBoundingClientRect().height > 0 && getComputedStyle(processing).display !== "none" && getComputedStyle(processing).visibility !== "hidden") return false;
+      return [...table.querySelectorAll("tbody tr")].some((row) => {
+        if (!row.getBoundingClientRect().height) return false;
+        const cells = [...row.querySelectorAll("td")];
+        const text = (row.textContent || "").replace(/\s+/g, " ").trim();
+        if (/\b(?:cargando|procesando|loading|processing)\b/i.test(text)) return false;
+        const data = cells.length >= 5 && Boolean(cells[1].textContent?.trim() && cells[4].textContent?.trim());
+        const empty = cells.length === 1 && (/no se (?:han encontrado|encontraron) (?:causas|resultados|registros)|no hay (?:causas|resultados|registros)|sin (?:causas|resultados|registros)|ning[uú]n dato disponible/i.test(text) || cells[0].classList.contains("dataTables_empty"));
+        if (!data && !empty) return false;
+        const previous = state.previousRows.indexOf(row);
+        return previous < 0 || state.previousRowTexts[previous] !== (row.textContent || "");
+      });
+    }, undefined, { timeout: responseTimeoutMs });
     await waitConsultaLoader(page);
   } catch {
     throw new PjudScrapeError("OJV no devolvió resultados nuevos para esta búsqueda. No se usarán resultados anteriores.");
@@ -735,28 +796,269 @@ export async function openExactCauseModal(
       (node as HTMLElement).getBoundingClientRect().height > 0 && !previous.includes(node.innerHTML)
     ), staleDetails, { timeout: 20_000 });
   }
-  await delay(800);
-
-  const hist = page.locator(OJV.modal).filter({ visible: true }).first()
-    .locator(OJV.historiaTab).filter({ visible: true });
-  if ((await hist.count()) > 0) {
-    await hist.first().click().catch(() => undefined);
-    await delay(1200);
-  }
-  // Espera filas de historia / table-titulos
-  await page
-    .waitForSelector(
-      '.modal.in table, .modal.show table, .modal.in table.table-titulos, .modal.show table.table-titulos',
-      { timeout: 12_000 }
-    )
-    .catch(() => undefined);
-  await delay(400);
+  const history = await findModalHistoryTab(page, "history");
+  if (history) await history.tab.click();
+  await waitForModalHistoryPanel(page, { label: "Historia", panelId: history?.panelId });
   return pickTribunalFromTexts(matches[0].cells);
 }
 
-async function modalInnerHtml(page: PlaywrightPage) {
-  const modal = page.locator(`:is(${OJV.modal}):visible`).first();
+export async function modalInnerHtml(page: PlaywrightPage) {
+  const modal = await visibleCauseDetailModal(page);
   return (await modal.count()) ? modal.innerHTML() : "";
+}
+
+/** Read the selected tab only; auxiliary tables outside it are another scope. */
+export async function modalActivePaneHtml(page: PlaywrightPage) {
+  const modal = await visibleCauseDetailModal(page);
+  if (!(await modal.count())) return "";
+  const panes = modal.locator(".tab-pane");
+  if (!(await panes.count())) return modal.innerHTML();
+  const active = modal.locator(".tab-pane.active").filter({ visible: true });
+  if (!(await active.count())) throw new PjudScrapeError("El detalle OJV tiene pestañas, pero no muestra una pestaña activa de historial.");
+  return active.last().innerHTML();
+}
+
+async function visibleCauseDetailModal(page: PlaywrightPage) {
+  const modals = page.locator(OJV.modal).filter({ visible: true });
+  const details = modals.and(page.locator('[id^="modalDetalle"]'));
+  const count = await details.count();
+  if (count > 1) throw new PjudScrapeError("OJV mostró varios detalles de causa simultáneos; no se seleccionará uno sin confirmar su identidad.");
+  return count === 1 ? details.first() : modals.first();
+}
+
+/** Document links can contain 'anexo' too; only existing tab destinations qualify. */
+async function findModalHistoryTab(page: PlaywrightPage, kind: "history" | "notifications" | "writings") {
+  const modal = await visibleCauseDetailModal(page);
+  const selector = kind === "history" ? OJV.historiaTab : kind === "notifications" ? OJV.receptorTab : OJV.escritosTab;
+  const tabs = modal.locator(selector).filter({ visible: true });
+  const resolution = await tabs.evaluateAll((nodes, options) => {
+    const candidates = nodes.map((node, index) => {
+      const owner = node.closest(".modal");
+      if (!owner || (options.modalId && owner.id !== options.modalId)) return null;
+      const label = (node.textContent || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+      const semantic = options.kind === "history" ? /^(?:historia|historial|movimientos)(?:\b|_)/i : options.kind === "notifications" ? /^(?:notificaciones?|receptor)(?:\b|_)/i : /^(?:escritos?)(?:\b|_)/i;
+      const navigation = Boolean(node.closest('.nav-tabs, .nav-pills, [role="tablist"]') || node.getAttribute("role") === "tab" || /^(?:tab|pill)$/.test(node.getAttribute("data-toggle") || node.getAttribute("data-bs-toggle") || ""));
+      let panelId: string | undefined;
+      for (const attribute of ["data-bs-target", "data-target", "href"]) {
+        const value = node.getAttribute(attribute) || "";
+        if (/^#[^\s#]+$/.test(value)) { panelId = value.slice(1); break; }
+      }
+      const target = panelId ? [...owner.querySelectorAll("[id]")].find((element) => element.id === panelId) : undefined;
+      const semanticId = Boolean(panelId && (options.kind === "history" ? /^(?:historia|historial|movimientos)/i : options.kind === "notifications" ? /^(?:notific|receptor)/i : /^escrito/i).test(panelId));
+      const meaningful = semantic.test(label) || semanticId;
+      const anexoTab = options.kind === "history" && navigation && /^anexo/i.test(panelId || "");
+      const panes = owner.querySelectorAll(".tab-pane").length;
+      const validTarget = target && (panes ? target.classList.contains("tab-pane") : target.matches("table") || Boolean(target.querySelector("table")));
+      return { index, panelId, valid: Boolean(validTarget && (meaningful || anexoTab)), invalidNavigation: navigation && meaningful && !validTarget, score: (navigation ? 100 : 0) + (semanticId ? 20 : 0) + (semantic.test(label) ? 10 : 0) };
+    }).filter((candidate) => candidate !== null);
+    return { candidates: candidates.filter((candidate) => candidate.valid).sort((a, b) => b.score - a.score), invalidNavigation: candidates.some((candidate) => candidate.invalidNavigation) };
+  }, { kind, modalId: await modal.getAttribute("id") });
+  const selected = resolution.candidates[0];
+  if (selected?.panelId) return { tab: tabs.nth(selected.index), panelId: selected.panelId };
+  if (resolution.invalidNavigation || (kind === "history" && (await tabs.count()) && (await modal.locator(".tab-pane").count()))) {
+    throw new PjudScrapeError("El detalle OJV no mostró una pestaña de historial con destino existente dentro de la causa. No se abrirán enlaces de documentos como pestañas.");
+  }
+  return undefined;
+}
+
+/** Opt-in structural diagnostics. Never return case cells, URLs, or raw HTML. */
+export async function readModalPanelDebugDiagnostics(page: PlaywrightPage, requestedPanelId?: string) {
+  if (process.env.LEXOPEN_PJUD_LIVE_VALIDATION !== "1" || process.env.PJUD_PANEL_DEBUG !== "1") return undefined;
+  const modal = await visibleCauseDetailModal(page);
+  const visibleModalCount = await page.locator(OJV.modal).filter({ visible: true }).count();
+  if (!visibleModalCount) return { visibleModalCount: 0 };
+  return modal.evaluate((node, requested) => {
+    const safe = {
+      id(value: string | undefined) {
+        return value && /^(?:modalDetalle|historia|notificaciones?|escritos?|receptor|anexo)[A-Za-z_-]{0,60}$/i.test(value) ? value : value ? "other" : null;
+      },
+      visible(element: Element) {
+        const rect = element.getBoundingClientRect();
+        if (!rect.width || !rect.height) return false;
+        for (let current: Element | null = element; current; current = current.parentElement) {
+          const style = getComputedStyle(current);
+          if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+        }
+        return true;
+      },
+      date(value: string) {
+        const raw = value.replace(/\s+/g, " ").trim();
+        const numeric = raw.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})(?:\s*\(\d{1,2}\/\d{1,2}\/\d{4}\))?$/);
+        const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$/);
+        const long = raw.toLowerCase().match(/^(\d{1,2}) de ([a-z]+) de (\d{4})$/);
+        const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+        const year = iso ? Number(iso[1]) : numeric ? Number(numeric[3].length === 2 ? `20${numeric[3]}` : numeric[3]) : long ? Number(long[3]) : NaN;
+        const month = iso ? Number(iso[2]) : numeric ? Number(numeric[2]) : long ? months.indexOf(long[2]) + 1 : NaN;
+        const day = Number(iso ? iso[3] : numeric ? numeric[1] : long?.[1]);
+        const date = new Date(Date.UTC(year, month - 1, day));
+        return year >= 100 && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+      },
+      header(value: string) {
+        const label = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[._]/g, " ").replace(/\s+/g, " ").trim();
+        const allowed = ["folio", "doc", "documento", "anexo", "etapa", "tramite", "desc tramite", "descripcion tramite", "descripcion del tramite", "fecha", "fec tramite", "fecha tramite", "fecha de tramite", "fecha ingreso", "fecha de ingreso", "fecha resolucion", "fecha de resolucion", "tipo escrito", "tipo notificacion", "solicitante", "foja", "georref", "cuaderno", "actuacion", "resolucion", "descripcion"];
+        return allowed.includes(label) ? label : "other";
+      },
+      excluded(elements: Element[]) {
+        return {
+          hidden: elements.filter((element) => element.hasAttribute("hidden")).length,
+          ariaHidden: elements.filter((element) => element.getAttribute("aria-hidden") === "true").length,
+          displayNone: elements.filter((element) => /display\s*:\s*none/i.test(element.getAttribute("style") || "")).length,
+          visibilityHidden: elements.filter((element) => /visibility\s*:\s*hidden/i.test(element.getAttribute("style") || "")).length,
+          inactivePane: elements.filter((element) => element.classList.contains("tab-pane") && !element.classList.contains("active")).length,
+        };
+      },
+    };
+    const panes = [...node.querySelectorAll(".tab-pane")];
+    const active = panes.filter((pane) => pane.classList.contains("active") && safe.visible(pane)).at(-1);
+    const target = requested ? [...node.querySelectorAll("[id]")].find((element) => element.id === requested) : undefined;
+    const jqueryValue = Number((window as typeof window & { jQuery?: { active?: number } }).jQuery?.active || 0);
+    const jqueryActive = Number.isFinite(jqueryValue) ? Math.max(0, Math.min(jqueryValue, 1_000_000)) : null;
+    const loadingText = /^(?:cargando|procesando|espere(?: un momento)?|loading|processing)(?:[.\s…]*)$/i;
+    const scopes = panes.length ? panes.slice(0, 8) : [target || node];
+    const panels = scopes.map((scope) => {
+      const rows = [...scope.querySelectorAll("tr")].filter((row) => row.querySelector("td") && !row.closest("table.table-titulos"));
+      const visibleRows = rows.filter((row) => safe.visible(row));
+      const loadingIndicators = [...scope.querySelectorAll('[aria-busy="true"], .dataTables_processing, .loadingConsulta, [id^="loadPre"], .spinner, .spinner-border, .fa-spinner')].filter((element) => safe.visible(element)).length;
+      return {
+        id: safe.id(scope.id),
+        active: scope.classList.contains("active"),
+        visible: safe.visible(scope),
+        tableCount: scope.querySelectorAll("table:not(.table-titulos)").length,
+        headerLabels: [...scope.querySelectorAll("th")].filter((cell) => !cell.closest("table.table-titulos")).slice(0, 24).map((cell) => safe.header(cell.textContent || "")),
+        rowCount: rows.length,
+        visibleRowCount: visibleRows.length,
+        rowsWithValidDate: visibleRows.filter((row) => [...row.querySelectorAll("td")].some((cell) => safe.date(cell.textContent || ""))).length,
+        ariaBusy: scope.getAttribute("aria-busy") === "true",
+        loadingIndicators,
+        loadingRows: visibleRows.filter((row) => loadingText.test((row.textContent || "").trim())).length,
+      };
+    });
+    const scope = active || target || node;
+    const scopeElements = [scope, ...scope.querySelectorAll("*")];
+    const scopeTables = [...scope.querySelectorAll("table")];
+    if (scope.matches("table")) scopeTables.unshift(scope as HTMLTableElement);
+    const titleTables = scopeTables.filter((table) => table.classList.contains("table-titulos"));
+    const clone = scope.cloneNode(true) as Element;
+    clone.querySelectorAll("table.table-titulos").forEach((table) => table.remove());
+    const visibleTableText = document.createElement("div");
+    for (const table of scopeTables.filter((table) => safe.visible(table) && !table.classList.contains("table-titulos"))) {
+      const rebuilt = document.createElement("table");
+      for (const row of [...table.querySelectorAll("tr")].filter((row) => row.closest("table") === table && safe.visible(row))) {
+        const rebuiltRow = document.createElement("tr");
+        for (const cell of [...row.children].filter((cell) => /^(?:TD|TH)$/.test(cell.tagName) && safe.visible(cell))) {
+          const rebuiltCell = document.createElement(cell.tagName.toLowerCase());
+          rebuiltCell.textContent = (cell as HTMLElement).innerText;
+          rebuiltRow.append(rebuiltCell);
+        }
+        rebuilt.append(rebuiltRow);
+      }
+      visibleTableText.append(rebuilt);
+    }
+    return {
+      visibleModalCount: 1,
+      modalId: safe.id(node.id),
+      modalVisible: safe.visible(node),
+      requestedPanelId: safe.id(requested),
+      requestedTargetPresent: Boolean(target),
+      requestedTargetVisible: Boolean(target && safe.visible(target)),
+      panelCount: panes.length,
+      activePanelId: safe.id(active?.id),
+      activeMatchesRequested: !requested || active?.id === requested,
+      jqueryActive,
+      panels,
+      scopeExcludedAttributes: safe.excluded(scopeElements),
+      tableExcludedAttributes: safe.excluded(scopeTables),
+      rowExcludedAttributes: safe.excluded([...scope.querySelectorAll("tr")]),
+      headerCellExcludedAttributes: safe.excluded([...scope.querySelectorAll("th")]),
+      dataCellExcludedAttributes: safe.excluded([...scope.querySelectorAll("td")]),
+      scopeRowCount: scope.querySelectorAll("tr").length,
+      snapshotRowCount: clone.querySelectorAll("tr").length,
+      removedTitleTableCount: titleTables.length,
+      removedTitleTableRowCount: titleTables.reduce((count, table) => count + table.querySelectorAll("tr").length, 0),
+      // Internal-only strings are consumed below and excluded from diagnostics.
+      parserScopeHtml: scope.tagName === "TABLE" ? scope.outerHTML : scope.innerHTML,
+      parserSnapshotHtml: clone.tagName === "TABLE" ? clone.outerHTML : clone.innerHTML,
+      parserVisibleTableTextHtml: visibleTableText.innerHTML,
+    };
+  }, requestedPanelId).then(({ parserScopeHtml, parserSnapshotHtml, parserVisibleTableTextHtml, ...diagnostics }) => ({
+    ...diagnostics,
+    visibleModalCount,
+    scopeParserCount: parseMovimientosFromHtml(parserScopeHtml).length,
+    snapshotParserCount: parseMovimientosFromHtml(parserSnapshotHtml).length,
+    snapshotExplicitEmpty: hasExplicitEmptyHistory(parserSnapshotHtml),
+    visibleTableTextParserCount: parseMovimientosFromHtml(parserVisibleTableTextHtml).length,
+  }));
+}
+
+/** A title table or loading placeholder is not a completed history response. */
+export async function waitForModalHistoryPanel(
+  page: PlaywrightPage,
+  options: { label: string; panelId?: string; optional?: boolean; timeoutMs?: number; emptyIdleMs?: number }
+): Promise<string> {
+  const deadline = Date.now() + (options.timeoutMs ?? 30_000);
+  let stableEmptyHtml = "";
+  let stableEmptySince = 0;
+  while (Date.now() < deadline) {
+    const modal = await visibleCauseDetailModal(page);
+    const snapshot = (await modal.count()) ? await modal.evaluate((node, panelId) => {
+      const visibility = { has(element: Element) {
+        const rect = element.getBoundingClientRect();
+        if (!rect.width || !rect.height) return false;
+        for (let current: Element | null = element; current; current = current.parentElement) {
+          const style = getComputedStyle(current);
+          if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+        }
+        return true;
+      } };
+      const panes = [...node.querySelectorAll(".tab-pane")];
+      const active = panes.filter((pane) => pane.classList.contains("active") && visibility.has(pane)).at(-1);
+      if (panes.length && (!active || (panelId && active.id !== panelId))) return null;
+      const legacyTarget = panelId ? [...node.querySelectorAll("[id]")].find((element) => element.id === panelId && visibility.has(element)) : undefined;
+      if (panelId && !panes.length && !legacyTarget) return null;
+      const scope = active || legacyTarget || node;
+      const loadingText = /^(?:cargando|procesando|espere(?: un momento)?|loading|processing)(?:[.\s…]*)$/i;
+      const busy = scope.getAttribute("aria-busy") === "true" ||
+        [...scope.querySelectorAll('[aria-busy="true"], .dataTables_processing, .loadingConsulta, [id^="loadPre"], .spinner, .spinner-border, .fa-spinner')]
+          .some((element) => visibility.has(element)) ||
+        [...scope.querySelectorAll("tr")].some((row) => visibility.has(row) && loadingText.test((row.textContent || "").trim())) ||
+        Number((window as typeof window & { jQuery?: { active?: number } }).jQuery?.active || 0) > 0;
+      if (busy) return null;
+      const tables = [...scope.querySelectorAll("table")];
+      if (scope.matches("table")) tables.unshift(scope as HTMLTableElement);
+      const emptyOptionalTable = tables.some((table) => {
+        if (table.classList.contains("table-titulos") || !visibility.has(table)) return false;
+        const headers = [...table.querySelectorAll("th")].map((cell) => cell.textContent || "").join(" ")
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        if (!/fecha|\bfec\b/.test(headers) || !/escrito|tramite|actuacion|resolucion|notific|tipo|solicitante|documento|\bdoc\b/.test(headers)) return false;
+        const rows = [...table.querySelectorAll("tr")].filter((row) => visibility.has(row) && row.querySelector("td"));
+        return rows.length === 0 || rows.every((row) => row.querySelectorAll("td").length === 1 &&
+          /sin (?:movimientos|registros|notificaciones|escritos)|no (?:hay|existen|se (?:han encontrado|encontraron)) (?:movimientos|registros|notificaciones|escritos)|ning[uú]n dato disponible/i.test(row.textContent || ""));
+      });
+      const clone = scope.cloneNode(true) as Element;
+      clone.querySelectorAll("table.table-titulos").forEach((table) => table.remove());
+      return { html: clone.tagName === "TABLE" ? clone.outerHTML : clone.innerHTML, emptyOptionalTable };
+    }, options.panelId) : null;
+    if (snapshot?.html) {
+      if (parseMovimientosFromHtml(snapshot.html).length || hasExplicitEmptyHistory(snapshot.html)) return snapshot.html;
+      // Optional preloaded tables can have only their recognized header. Idle
+      // means no rows recovered; it does not certify that the cause has none.
+      if (options.optional && snapshot.emptyOptionalTable) {
+        if (stableEmptyHtml !== snapshot.html) {
+          stableEmptyHtml = snapshot.html;
+          stableEmptySince = Date.now();
+        } else if (Date.now() - stableEmptySince >= (options.emptyIdleMs ?? 1_000)) return snapshot.html;
+      } else {
+        stableEmptyHtml = "";
+        stableEmptySince = 0;
+      }
+    } else {
+      stableEmptyHtml = "";
+      stableEmptySince = 0;
+    }
+    await delay(Math.min(100, Math.max(0, deadline - Date.now())));
+  }
+  const diagnostics = await readModalPanelDebugDiagnostics(page, options.panelId).catch(() => ({ diagnosticUnavailable: true }));
+  throw new PjudScrapeError(`La pestaña ${options.label} del detalle OJV no terminó de mostrar un historial reconocible. No se crearán movimientos desde la cabecera ni desde el listado.${diagnostics ? ` Diagnóstico estructural: ${JSON.stringify(diagnostics)}` : ""}`);
 }
 
 /** Merge scrape rows by externalId; prefer receptor / pendiente flags. */
@@ -791,18 +1093,19 @@ export function mergePjudMovimientos(
   );
 }
 
-async function scrapeModalTabs(
-  page: PlaywrightPage
+export async function scrapeModalTabs(
+  page: PlaywrightPage,
+  options: { panelTimeoutMs?: number; emptyIdleMs?: number } = {}
 ): Promise<PjudFetchedMovimiento[]> {
-  const historyHtml = await modalInnerHtml(page);
-  if (!historyHtml) throw new PjudScrapeError("El detalle OJV no está visible; no se extraerá el listado como historial.");
+  const history = await findModalHistoryTab(page, "history");
+  if (history) await history.tab.click();
+  const historyHtml = await waitForModalHistoryPanel(page, { label: "Historia", panelId: history?.panelId, timeoutMs: options.panelTimeoutMs });
   let movimientos = parseMovimientosFromHtml(historyHtml);
 
-  const receptor = page.locator(`:is(${OJV.modal}):visible`).first().locator(OJV.receptorTab).filter({ visible: true });
-  if ((await receptor.count()) > 0) {
-    await receptor.first().click().catch(() => undefined);
-    await delay(700);
-    const receptorHtml = await modalInnerHtml(page);
+  const receptor = await findModalHistoryTab(page, "notifications");
+  if (receptor) {
+    await receptor.tab.click();
+    const receptorHtml = await waitForModalHistoryPanel(page, { label: "Notificaciones", panelId: receptor.panelId, optional: true, timeoutMs: options.panelTimeoutMs, emptyIdleMs: options.emptyIdleMs });
     const receptorMovs = parseMovimientosFromHtml(receptorHtml).map((m) => ({
       ...m,
       esReceptor: true,
@@ -812,11 +1115,10 @@ async function scrapeModalTabs(
     movimientos = mergePjudMovimientos(movimientos, receptorMovs);
   }
 
-  const escritos = page.locator(`:is(${OJV.modal}):visible`).first().locator(OJV.escritosTab).filter({ visible: true });
-  if ((await escritos.count()) > 0) {
-    await escritos.first().click().catch(() => undefined);
-    await delay(700);
-    const escritosHtml = await modalInnerHtml(page);
+  const escritos = await findModalHistoryTab(page, "writings");
+  if (escritos) {
+    await escritos.tab.click();
+    const escritosHtml = await waitForModalHistoryPanel(page, { label: "Escritos", panelId: escritos.panelId, optional: true, timeoutMs: options.panelTimeoutMs, emptyIdleMs: options.emptyIdleMs });
     const escritoMovs = parseMovimientosFromHtml(escritosHtml).map((m) => {
       const pendiente =
         m.pendienteResolucion ||
@@ -839,11 +1141,12 @@ async function scrapeModalTabs(
  * Bare `fetch()` after scrape usually hits a login wall HTML page.
  * Downloads are strictly sequential with a delay between requests.
  */
-async function attachDocumentoBytesFromPage(
+export async function attachDocumentoBytesFromPage(
   page: PlaywrightPage,
   movimientos: PjudFetchedMovimiento[],
   opts?: { limit?: number; delayMs?: number }
 ): Promise<PjudFetchedMovimiento[]> {
+  if (!pjudDocumentDownloadsAllowed()) return movimientos;
   const {
     looksLikePdf,
     pjudDocDownloadDelayMs,
@@ -956,7 +1259,6 @@ export async function fillRolSearchFields(
 
 async function solveNewSession(signal?: AbortSignal): Promise<PjudSession> {
   await assertPublicScrapeRuntime();
-  assertSolveBudget();
   const browser = await launchBrowser();
   try {
     const context = await browser.newContext({
@@ -1025,7 +1327,10 @@ async function withConsultaPage<T>(
       waitUntil: "domcontentloaded",
       timeout: 45_000,
     });
-    if ((await page.locator(OJV.captchaImg).count()) > 0) {
+    if ((await readConsultaFormState(page)).captchaVisible) {
+      if (!pjudCaptchaAutoSolveAllowed()) {
+        throw new PjudScrapeError("OJV mostró un CAPTCHA. La resolución automática está deshabilitada; requiere intervención manual.", 409);
+      }
       invalidateSession();
       throw new PjudSessionExpiredError(
         "Sesión OJV expirada (CAPTCHA reapareció). Reintente."
@@ -1099,7 +1404,7 @@ async function scrapeCausaByRolOnce(
     return {
       movimientos,
       sala,
-      note: `Scrape OJV (CAPTCHA/sesión): ${movimientos.length ? `${movimientos.length} movimiento(s)` : "OJV informó un historial sin movimientos"}${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}. No oficial; verifique en ${OJV_CONSULTA_URL}`,
+      note: `Scrape OJV (sesión de consulta): ${movimientos.length ? `${movimientos.length} movimiento(s)` : "OJV informó un historial sin movimientos"}${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}. No oficial; verifique en ${OJV_CONSULTA_URL}`,
       portalUrl: OJV_CONSULTA_URL,
       resolvedTribunal,
     };
@@ -1116,12 +1421,6 @@ export async function scrapeCausaByRol(
   if (!publicScrapeEnabled()) {
     throw new PjudScrapeError(
       "PJUD_PUBLIC_SCRAPE!=1: scrape público deshabilitado (kill switch)."
-    );
-  }
-  if (!captchaSolverConfigured()) {
-    throw new PjudScrapeError(
-      captchaConfigErrorMessage() ||
-        "Configure CAPTCHA_SOLVER_PROVIDER (+ API_KEY si aplica) para scrapear OJV."
     );
   }
   if (!causa.rit || !parseRitParts(causa.rit) || isPlaceholderTribunal(causa.tribunal)) {
@@ -1158,7 +1457,7 @@ export async function scrapeCausasByRut(
 ): Promise<MisCausasItem[]> {
   if (!publicScrapeReady()) {
     throw new PjudScrapeError(
-      "Scrape público no listo (PJUD_PUBLIC_SCRAPE + CAPTCHA)."
+      "Scrape público deshabilitado. Active PJUD_PUBLIC_SCRAPE=1 para intentar la consulta OJV."
     );
   }
   const split = splitRut(rut);
@@ -1394,6 +1693,10 @@ export const MIS_CAUSAS_MATERIAS = [
 ] as const;
 
 async function dismissOjvPrompts(page: AnyPage) {
+  if (process.env.PJUD_AUTO_CONFIRM_PROMPTS === "0") {
+    await assertPjudPromptPolicy(page);
+    return;
+  }
   await closeSweetAlerts(page);
   await closeBootstrapModals(page);
   // Términos / “Acepto” en primer ingreso
@@ -1414,17 +1717,68 @@ async function dismissOjvPrompts(page: AnyPage) {
   }
 }
 
-type MisCausasReadOptions = { allowPrompts?: boolean; responseTimeoutMs?: number };
+export type MisCausasMateria = typeof MIS_CAUSAS_MATERIAS[number] | "Corte Apelaciones";
+export type MisCausasReadOptions = {
+  allowPrompts?: boolean;
+  responseTimeoutMs?: number;
+  materias?: readonly MisCausasMateria[];
+  signal?: AbortSignal;
+};
+
+function assertMisCausasReadActive(options: MisCausasReadOptions) {
+  if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+}
+
+async function waitForMisCausasMenuReady(page: AnyPage, options: MisCausasReadOptions) {
+  const materias = options.materias ?? MIS_CAUSAS_MATERIAS;
+  const names = new RegExp(`^(?:${materias.map(materia => materia.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})$`, "i");
+  let ready = page.getByRole("link", { name: names })
+    .or(page.getByRole("button", { name: names }))
+    .or(page.getByText(names, { exact: true }));
+  if (!options.materias) {
+    ready = ready.or(page.locator('label.switch:has(input[id^="filtroMisCau"]), [id^="btnConsultaMisCau"], table[id^="dtaTableDetalleMisCau"], #verDetalleJuridica'))
+      .or(page.getByRole("button", { name: /^(?:Buscar|Filtros)$/i }));
+  }
+  const deadline = Date.now() + 8_000;
+  do {
+    assertMisCausasReadActive(options);
+    await assertPjudPromptPolicy(page);
+    if (await ready.filter({ visible: true }).count()) return;
+    await sleep(100);
+  } while (Date.now() < deadline);
+  throw new PjudScrapeError("El menú de Mis Causas no terminó de cargar las materias seleccionadas.");
+}
 
 async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = {}): Promise<boolean> {
   if (options.allowPrompts === false) {
+    // Only close a recognized record detail; terms and notices remain untouched.
+    await assertPjudPromptPolicy(page);
+    const details = page.locator('.modal[id^="modalDetalle"]:has(table.table-titulos)').filter({ visible: true });
+    let closedDetail = false;
+    for (const detail of await details.all()) {
+      assertMisCausasReadActive(options);
+      const close = detail.locator('button[data-dismiss="modal"], a[data-dismiss="modal"], button[data-bs-dismiss="modal"], a[data-bs-dismiss="modal"], .modal-header .close')
+        .filter({ visible: true, hasNotText: /\b(?:Acepto|Aceptar|Continuar|Entendido|OK|De acuerdo|Confirmar)\b/i }).first();
+      if (!(await close.count())) throw new PjudScrapeError("Cierre el detalle abierto antes de continuar con Mis Causas.");
+      await close.click({ timeout: 8_000 });
+      await detail.waitFor({ state: "hidden", timeout: 8_000 });
+      closedDetail = true;
+    }
+    if (closedDetail) {
+      // Bootstrap can hide the record before its backdrop finishes fading out.
+      // Wait for the portal to remove it; never remove overlays ourselves.
+      await assertPjudPromptPolicy(page);
+      await page.locator(".modal-backdrop").filter({ visible: true }).first().waitFor({ state: "hidden", timeout: 8_000 });
+    }
+    assertMisCausasReadActive(options);
+    await assertPjudPromptPolicy(page);
     const visible = page.getByRole("link", { name: /^Mis Causas$/i })
       .or(page.getByRole("button", { name: /^Mis Causas$/i }))
       .or(page.locator(OJV.misCausasMenu)).filter({ visible: true }).first();
     if (!(await visible.count())) return false;
     await visible.click({ timeout: 8_000 });
     await page.waitForLoadState("domcontentloaded").catch(() => undefined);
-    await sleep(700);
+    await waitForMisCausasMenuReady(page, options);
     return true;
   }
   const candidates = [
@@ -1610,6 +1964,8 @@ export async function collectMisCausasFromAuthenticatedOjv(
   page: AnyPage,
   options: MisCausasReadOptions = {}
 ): Promise<{ items: MisCausasItem[]; openedMenu: boolean; materiasTried: string[] }> {
+  assertMisCausasReadActive(options);
+  if (options.allowPrompts === false) await assertPjudPromptPolicy(page);
   page = await ensureAuthenticatedOjvShell(page, options);
 
   const openedMenu = await openMisCausasMenu(page, options);
@@ -1645,7 +2001,9 @@ export async function collectMisCausasFromAuthenticatedOjv(
   try {
     if (options.allowPrompts !== false) await pushParsed();
 
-    for (const materia of MIS_CAUSAS_MATERIAS) {
+    for (const materia of options.materias ?? MIS_CAUSAS_MATERIAS) {
+      assertMisCausasReadActive(options);
+      if (options.allowPrompts === false) await assertPjudPromptPolicy(page);
       let tab = page
         .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
         .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
@@ -1673,6 +2031,7 @@ export async function collectMisCausasFromAuthenticatedOjv(
     }
 
     if (materiasTried.length === 0) {
+      if (options.materias) throw new PjudScrapeError("No se encontraron las materias seleccionadas en Mis Causas.");
       await applyMisCausasFiltros(page);
       await searchAndCollect();
     }
@@ -1741,13 +2100,6 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
   if (!publicScrapeEnabled()) {
     throw new PjudScrapeError(
       "Active también PJUD_PUBLIC_SCRAPE=1 en el .env del Host y reinicie.",
-      409
-    );
-  }
-  if (!captchaSolverConfigured()) {
-    throw new PjudScrapeError(
-      captchaConfigErrorMessage() ||
-        "CAPTCHA solver requerido para ClaveÚnica/OJV (CAPTCHA_SOLVER_PROVIDER + CAPTCHA_SOLVER_API_KEY).",
       409
     );
   }
@@ -1838,6 +2190,75 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
  * Preferible al guest lookup cuando la causa viene del vault ClaveÚnica:
  * trae cuadernos/trámites que la consulta pública a veces no expone.
  */
+/** Continue an identified OJV page without reading credentials or starting another login. */
+export async function readCausaDetailFromAuthenticatedOjv(
+  page: PlaywrightPage,
+  causa: PjudCausaRef,
+  options: MisCausasReadOptions = {}
+): Promise<ScrapeLookupResult> {
+  if (!causa.rit || !parseRitParts(causa.rit) || isPlaceholderTribunal(causa.tribunal)) {
+    throw new PjudScrapeError("Se requiere RIT válido y tribunal identificado para detalle ClaveÚnica.", 400);
+  }
+  assertMisCausasReadActive(options);
+  if (options.allowPrompts === false) await assertPjudPromptPolicy(page);
+  page = await ensureAuthenticatedOjvShell(page, options);
+  const menuOpened = await openMisCausasMenu(page, options);
+  if (!menuOpened && options.allowPrompts === false) {
+    throw new PjudScrapeError("No se encontró el menú de Mis Causas en la sesión identificada.");
+  }
+
+  let opened = false;
+  try {
+    for (const materia of options.materias ?? MIS_CAUSAS_MATERIAS) {
+      assertMisCausasReadActive(options);
+      if (options.allowPrompts === false) await assertPjudPromptPolicy(page);
+      let tab = page
+        .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
+        .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
+        .or(page.locator(`a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a`));
+      if (options.allowPrompts === false) tab = tab.filter({ visible: true });
+      tab = tab.first();
+      if ((await tab.count().catch(() => 0)) === 0) continue;
+      if (options.allowPrompts === false) {
+        await tab.click({ timeout: 8_000 });
+      } else {
+        await tab.click({ force: !(await tab.isVisible().catch(() => false)), timeout: 8_000 }).catch(() => undefined);
+      }
+      await sleep(400);
+      await applyMisCausasFiltros(page);
+      await clickMisCausasBuscar(page, options);
+      opened = await collectOjvResultPages(page, () => openMisCausasLupaForRit(page, { rit: causa.rit!, tribunal: causa.tribunal }));
+      if (opened) break;
+    }
+    if (!opened && !options.materias) {
+      await applyMisCausasFiltros(page);
+      await clickMisCausasBuscar(page, options);
+      opened = await collectOjvResultPages(page, () => openMisCausasLupaForRit(page, { rit: causa.rit!, tribunal: causa.tribunal }));
+    }
+    if (!opened) throw new PjudScrapeError("No se encontró un detalle exacto para el RIT/ROL y tribunal solicitados en Mis Causas.");
+
+    assertMisCausasReadActive(options);
+    const historyHtml = await modalInnerHtml(page);
+    let movimientos = await scrapeModalTabs(page);
+    // A manual session only reads movements. Its caller controls a separate PDF workflow.
+    if (options.allowPrompts !== false) movimientos = await attachDocumentoBytesFromPage(page, movimientos);
+    const sala = parseSalaFromHtml(await modalInnerHtml(page));
+    const withDocs = movimientos.filter((movement) => movement.documentoBytes).length;
+    if (movimientos.length === 0 && !hasExplicitEmptyHistory(historyHtml)) {
+      throw new PjudScrapeError("El detalle identificado no mostró un historial reconocible en Mis Causas.");
+    }
+    return {
+      movimientos,
+      sala,
+      note: `Scrape Mis Causas (sesión identificada): ${movimientos.length ? `${movimientos.length} movimiento(s)` : "OJV informó un historial sin movimientos"}${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}.`,
+      portalUrl: OJV_INDEX_N,
+      resolvedTribunal: causa.tribunal,
+    };
+  } finally {
+    if (options.allowPrompts === false) await clearManualMisCausasRows(page);
+  }
+}
+
 export async function scrapeCausaDetailWithClaveUnica(opts: {
   rut: string;
   password: string;
@@ -1856,12 +2277,6 @@ export async function scrapeCausaDetailWithClaveUnica(opts: {
   }
   if (!publicScrapeEnabled()) {
     throw new PjudScrapeError("PJUD_PUBLIC_SCRAPE!=1", 409);
-  }
-  if (!captchaSolverConfigured()) {
-    throw new PjudScrapeError(
-      captchaConfigErrorMessage() || "CAPTCHA solver requerido.",
-      409
-    );
   }
   if (!(await playwrightAvailable())) {
     throw new PjudScrapeError(
@@ -1911,66 +2326,7 @@ export async function scrapeCausaDetailWithClaveUnica(opts: {
     await page.waitForLoadState("domcontentloaded").catch(() => undefined);
     await dismissOjvPrompts(page);
 
-    page = await ensureAuthenticatedOjvShell(page);
-    await openMisCausasMenu(page);
-
-    let opened = false;
-    for (const materia of MIS_CAUSAS_MATERIAS) {
-      const tab = page
-        .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
-        .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
-        .or(
-          page.locator(
-            `a:has-text("${materia}"), button:has-text("${materia}"), li:has-text("${materia}") > a`
-          )
-        )
-        .first();
-      if ((await tab.count().catch(() => 0)) === 0) continue;
-      await tab
-        .click({
-          force: !(await tab.isVisible().catch(() => false)),
-          timeout: 8_000,
-        })
-        .catch(() => undefined);
-      await sleep(400);
-      await applyMisCausasFiltros(page);
-      await clickMisCausasBuscar(page);
-      if (await collectOjvResultPages(page, () => openMisCausasLupaForRit(page, { rit: opts.causa.rit!, tribunal: opts.causa.tribunal || "" }))) {
-        opened = true;
-        break;
-      }
-    }
-    if (!opened) {
-      await applyMisCausasFiltros(page);
-      await clickMisCausasBuscar(page);
-      opened = await collectOjvResultPages(page, () => openMisCausasLupaForRit(page, { rit: opts.causa.rit!, tribunal: opts.causa.tribunal || "" }));
-    }
-    if (!opened) {
-      throw new PjudScrapeError(
-        `ClaveÚnica: no se encontró la lupa/detalle para ${opts.causa.rit} en Mis Causas.`
-      );
-    }
-
-    const historyHtml = await modalInnerHtml(page as PlaywrightPage);
-    let movimientos = await scrapeModalTabs(page as PlaywrightPage);
-    movimientos = await attachDocumentoBytesFromPage(
-      page as PlaywrightPage,
-      movimientos
-    );
-    const html = await modalInnerHtml(page as PlaywrightPage);
-    const sala = parseSalaFromHtml(html);
-    const withDocs = movimientos.filter((m) => m.documentoBytes).length;
-    if (movimientos.length === 0 && !hasExplicitEmptyHistory(historyHtml)) {
-      throw new PjudScrapeError(
-        `ClaveÚnica: modal abierto para ${opts.causa.rit} pero sin movimientos parseables (historia/cuaderno).`
-      );
-    }
-    return {
-      movimientos,
-      sala,
-      note: `Scrape Mis Causas (ClaveÚnica): ${movimientos.length ? `${movimientos.length} movimiento(s)` : "OJV informó un historial sin movimientos"}${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}.`,
-      portalUrl: OJV_INDEX_N,
-    };
+    return await readCausaDetailFromAuthenticatedOjv(page, opts.causa, { signal: opts.signal });
   } finally {
     await browser.close();
   }

@@ -6,8 +6,10 @@ import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 /**
  * PDF backup: explicit PJUD_PDF_BACKUP=1|0, else on when public scrape is enabled
  * (docs are required for download + AI review of OJV anexos).
+ * The document-download kill switch takes precedence over every backup mode.
  */
 export function pdfBackupEnabled() {
+  if (process.env.PJUD_DOC_DOWNLOADS?.trim() === "0") return false;
   const raw = process.env.PJUD_PDF_BACKUP?.trim();
   if (raw === "0") return false;
   if (raw === "1") return true;
@@ -135,7 +137,7 @@ export async function backupMovimientoDocuments(
   opts?: {
     max?: number;
     delayMs?: number;
-    /** Manual import from ficha/timeline — always persist into LexOpen Documentos. */
+    /** Manual import bypasses backup preferences, but never the download kill switch. */
     force?: boolean;
     onProgress?: (info: {
       index: number;
@@ -145,7 +147,7 @@ export async function backupMovimientoDocuments(
     }) => void;
   }
 ) {
-  if (!opts?.force && !pdfBackupEnabled()) {
+  if (process.env.PJUD_DOC_DOWNLOADS?.trim() === "0" || (!opts?.force && !pdfBackupEnabled())) {
     return { enabled: false, saved: 0, skipped: 0, attempted: 0 };
   }
 
