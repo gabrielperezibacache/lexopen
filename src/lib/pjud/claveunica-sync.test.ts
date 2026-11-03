@@ -14,9 +14,10 @@ function overrideMethod(target: object, key: string, replacement: unknown) {
 function restoreMethods() { restorers.splice(0).reverse().forEach((restore) => restore()); }
 
 async function main() {
-  const envNames = ["PJUD_CLAVEUNICA_SCRAPE", "PJUD_SCRAPER_URL", "PJUD_SCRAPER_ALLOW_PRIVATE", "PJUD_SECRETS_KEY"] as const;
+  const envNames = ["PJUD_CLAVEUNICA_SCRAPE", "PJUD_PUBLIC_SCRAPE", "PJUD_SCRAPER_URL", "PJUD_SCRAPER_ALLOW_PRIVATE", "PJUD_SECRETS_KEY"] as const;
   const previousEnv = Object.fromEntries(envNames.map((name) => [name, process.env[name]]));
   process.env.PJUD_CLAVEUNICA_SCRAPE = "1";
+  process.env.PJUD_PUBLIC_SCRAPE = "1";
   process.env.PJUD_SCRAPER_URL = "http://127.0.0.1:8787";
   process.env.PJUD_SCRAPER_ALLOW_PRIVATE = "1";
   process.env.PJUD_SECRETS_KEY = "fictional-test-key-claveunica";
@@ -97,8 +98,32 @@ async function main() {
     failQueue = false; claimBeforeClear = false; fetches = 0; credentialReads = 0; whereCalls.length = 0; queueBatches.length = 0;
     causes = [item("C-1-2026")];
     process.env.PJUD_CLAVEUNICA_SCRAPE = "1";
+    process.env.PJUD_PUBLIC_SCRAPE = "1";
   };
   try {
+    const sessionSource = {
+      listMisCausas: async () => causes,
+      fetchMovimientos: async () => { throw new Error("fixture-unused-detail"); },
+    };
+    reset();
+    await assert.rejects(syncMisCausas({ sessionSource }), /mientras la sesión está abierta/);
+    assert.equal(settings.claveUnicaLastSyncStatus, null, "invalid session lifetime must fail before acquiring claim");
+    await assert.rejects(syncMisCausas({ sessionSource: JSON.parse('{"listMisCausas":[],"fetchMovimientos":{}}') }), /interna y ejecutable/);
+    assert.equal(credentialReads, 0);
+
+    reset();
+    const sessionImport = await syncMisCausas({ sessionSource, syncMovimientos: false });
+    assert.equal(sessionImport.created, 1);
+    assert.equal(credentialReads, 0, "session source must never read vault credentials");
+    assert.equal(fetches, 0, "session source must not contact the credential sidecar");
+    assert.deepEqual(sessionImport.enqueuedJobIds, []);
+
+    reset();
+    process.env.PJUD_PUBLIC_SCRAPE = "0";
+    await assert.rejects(syncMisCausas({ sessionSource, syncMovimientos: false }), /deshabilitada/);
+    assert.equal(created, 0, "public kill switch also protects session import");
+    assert.equal(fetches, 0);
+
     reset();
     process.env.PJUD_CLAVEUNICA_SCRAPE = "0";
     await assert.rejects(syncMisCausas({ syncMovimientos: false }), /deshabilitada/);

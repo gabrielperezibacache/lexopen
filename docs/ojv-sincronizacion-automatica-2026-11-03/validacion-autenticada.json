@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-11-03T22:37:23.222Z",
+  "mode": "real-authenticated-automatic-sync-after-manual-login",
+  "materia": "Corte Suprema",
+  "manualAuthentication": true,
+  "liveListAndDetailRead": true,
+  "claimImportQueuePersistenceVerified": true,
+  "freshDetailOnRepeat": true,
+  "idempotent": true,
+  "vaultUsed": false,
+  "credentialsSaved": false,
+  "pdfsDownloaded": false,
+  "privateIdentifiersPublished": false,
+  "exactPrivateCountsPublished": false,
+  "studyDatabaseUsed": false
+}

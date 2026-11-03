@@ -1,9 +1,7 @@
 import { parseLocalDateInput } from "@/lib/minutas";
 import { isPrivateOrLocalHostname } from "@/lib/net/safe-url";
 import { classifyMovimiento } from "@/lib/pjud/classify";
-import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import {
-  publicScrapeEnabled,
   publicScrapeReady,
   scrapeCausaByRol,
 } from "@/lib/pjud/public-scrape";
@@ -430,18 +428,6 @@ export async function fetchPjudMovimientos(
           throw scrapeError;
         }
       }
-    }
-  }
-
-  if (publicScrapeEnabled() && !captchaSolverConfigured() && !scraperSidecarConfigured()) {
-    if (!pjudProviderConfigured()) {
-      return {
-        provider: "none",
-        movimientos: [],
-        note:
-          "PJUD_PUBLIC_SCRAPE=1 pero falta CAPTCHA_SOLVER_PROVIDER/API_KEY (o PJUD_SCRAPER_URL local). Use nopecha (free) u otro BYOK.",
-        demo: false,
-      };
     }
   }
 

@@ -7,7 +7,7 @@ import { DomUtils, parseDocument } from "htmlparser2";
 type HtmlNode = ReturnType<typeof parseDocument>["children"][number];
 
 function excludedNode(node: HtmlNode): boolean {
-  if (node.type === "script" || node.type === "style") return true;
+  if (node.type === "script" || node.type === "style" || node.type === "comment") return true;
   return node.type === "tag" && (
     /^(noscript|template)$/.test(node.name) ||
     "hidden" in node.attribs ||
@@ -21,7 +21,17 @@ function visibleDocument(html: string) {
   const document = parseDocument(html);
   const clean = (node: HtmlNode) => {
     if (!("children" in node)) return;
-    node.children = node.children.filter((child) => !excludedNode(child));
+    node.children = node.children.filter((child) => {
+      if (!excludedNode(child)) return true;
+      // Responsive tables may hide a cell in only the header or body. Dropping
+      // it shifts every later column, including the verified date column.
+      // Retain only its position; invisible text and download links are removed.
+      if (child.type === "tag" && /^(td|th)$/.test(child.name)) {
+        child.children = [];
+        return true;
+      }
+      return false;
+    });
     node.children.forEach(clean);
   };
   clean(document);

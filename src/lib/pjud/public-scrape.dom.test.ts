@@ -1,13 +1,71 @@
 /** Offline browser fixtures only. No OJV navigation, credentials, or CAPTCHA. */
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { clickBuscar, collectOjvResultPages, enterConsultaCausas, fillRolSearchFields, openExactCauseModal, readConsultaFormState, selectTribunalOrCorte } from "@/lib/pjud/public-scrape";
+import { assertPjudPromptPolicy, assertPublicScrapeRuntime, attachDocumentoBytesFromPage, clickBuscar, collectOjvResultPages, enterConsultaCausas, fillRolSearchFields, maybeSolveCaptchaOnPage, modalActivePaneHtml, openExactCauseModal, publicScrapeReady, readConsultaFormState, readModalPanelDebugDiagnostics, scrapeModalTabs, selectTribunalOrCorte, waitForModalHistoryPanel } from "@/lib/pjud/public-scrape";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
     await page.route("**/*", (route) => route.abort());
+    const policyNames = ["PJUD_PUBLIC_SCRAPE", "PJUD_CAPTCHA_AUTO_SOLVE", "PJUD_AUTO_CONFIRM_PROMPTS", "PJUD_DOC_DOWNLOADS", "CAPTCHA_SOLVER_PROVIDER", "CAPTCHA_SOLVER_API_KEY"] as const;
+    const previousPolicies = Object.fromEntries(policyNames.map(name => [name, process.env[name]]));
+    const originalFetch = globalThis.fetch;
+    let solverRequests = 0;
+    try {
+      process.env.PJUD_PUBLIC_SCRAPE = "1";
+      process.env.PJUD_CAPTCHA_AUTO_SOLVE = "0";
+      process.env.PJUD_AUTO_CONFIRM_PROMPTS = "0";
+      process.env.PJUD_DOC_DOWNLOADS = "0";
+      delete process.env.CAPTCHA_SOLVER_PROVIDER;
+      delete process.env.CAPTCHA_SOLVER_API_KEY;
+      globalThis.fetch = async () => { solverRequests++; throw new Error("unexpected solver request"); };
+      assert.equal(publicScrapeReady(), true);
+      await assertPublicScrapeRuntime();
+      await page.setContent('<select id="competencia"><option value="3">Civil</option></select>');
+      await enterConsultaCausas(page, { formTimeoutMs: 100 });
+      for (const style of ["display:none", "opacity:0"]) {
+        await page.setContent(`<select id="competencia"><option>Civil</option></select><div style="${style}"><img id="captcha_image" width="80" height="30" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="></div>`);
+        await enterConsultaCausas(page, { formTimeoutMs: 100 });
+      }
+      process.env.CAPTCHA_SOLVER_PROVIDER = "2captcha";
+      process.env.CAPTCHA_SOLVER_API_KEY = "fictional-key-never-used";
+      await page.setContent('<select id="competencia"><option>Civil</option></select><img id="captcha_image" width="80" height="30" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==">');
+      await assert.rejects(() => maybeSolveCaptchaOnPage(page), /resolución automática está deshabilitada/);
+      assert.equal(solverRequests, 0, "validation never submits a solve or spends provider credits");
+      await page.setContent('<select id="competencia"><option>Civil</option></select><div class="sweet-alert showSweetAlert visible"><button class="confirm" onclick="window.accepted=true">Acepto</button></div>');
+      await assert.rejects(() => enterConsultaCausas(page, { formTimeoutMs: 100 }), /confirmación automática está deshabilitada/);
+      assert.equal(await page.evaluate(() => Boolean((window as typeof window & { accepted?: boolean }).accepted)), false);
+      await page.setContent('<div class="modal show" style="display:block"><button data-dismiss="modal" onclick="window.accepted=true">Continuar</button></div>');
+      await assert.rejects(() => assertPjudPromptPolicy(page), /intervención manual/);
+      assert.equal(await page.evaluate(() => Boolean((window as typeof window & { accepted?: boolean }).accepted)), false);
+      await page.setContent('<div id="modalDetalleCivil" class="modal show" style="display:block"><table class="table-titulos"><tr><td>Detalle de causa ficticia</td></tr></table></div>');
+      await assertPjudPromptPolicy(page);
+      let downloadRequests = 0;
+      const originalGet = page.request.get;
+      page.request.get = async () => { downloadRequests++; throw new Error("unexpected document download"); };
+      try {
+        const movements = [{ externalId: "fixture-movement", titulo: "Resolución ficticia", fecha: new Date("2026-01-01T12:00:00Z"), fuente: "pjud" as const, documentoRef: "https://oficinajudicialvirtual.pjud.cl/documento.php?fixture=1" }];
+        assert.equal(await attachDocumentoBytesFromPage(page, movements), movements);
+        assert.equal(downloadRequests, 0, "downloads off is checked before any document request");
+      } finally { page.request.get = originalGet; }
+
+      // A mocked solver response must not be rejected by an invisible old image.
+      process.env.PJUD_CAPTCHA_AUTO_SOLVE = "1";
+      process.env.CAPTCHA_SOLVER_PROVIDER = "solvecha";
+      process.env.CAPTCHA_SOLVER_API_KEY = "fictional-local-response-only";
+      globalThis.fetch = async () => { solverRequests++; return Response.json({ errorId: 0, taskId: "fixture", status: "ready", solution: { text: "ABC" } }); };
+      await page.route("https://captcha-finish-fixture.test/**", route => route.fulfill({ contentType: "text/html", body: '<img id="captcha_image" style="opacity:0" width="80" height="30" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==">' }));
+      await page.setContent('<form action="https://captcha-finish-fixture.test/done"><img id="captcha_image" width="80" height="30" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="><input id="captcha_response" name="captcha_response"><button type="submit">Ingresar</button></form>');
+      assert.equal(await maybeSolveCaptchaOnPage(page), true);
+      assert.equal(solverRequests, 1, "the only solver request is intercepted by the local mock");
+    } finally {
+      globalThis.fetch = originalFetch;
+      for (const name of policyNames) {
+        if (previousPolicies[name] === undefined) delete process.env[name];
+        else process.env[name] = previousPolicies[name];
+      }
+    }
     // Route fulfillment keeps the entire entry flow local, including navigation.
     await page.route("https://ojv-fixture.test/**", async (route) => {
       const shell = new URL(route.request().url()).pathname === "/indexN.php";
@@ -153,6 +211,143 @@ async function main() {
     assert.equal(await page.locator("#resultConsultaJuridica").innerText(), "C-2-2024", "submission must await the new response before parsing");
     await page.setContent(`<button id="btnBuscar">Buscar</button><div id="resultConsultaJuridica">C-1-2024</div>`);
     await assert.rejects(() => clickBuscar(page, 100), /No se usarán resultados anteriores/);
+
+    await page.setContent(`
+      <button id="btnConConsulta" onclick="this.disabled=true;document.querySelector('#dtaTableDetalle tbody').insertAdjacentHTML('beforeend','<tr id=spinner><td colspan=5>Procesando...</td></tr>');setTimeout(()=>{document.querySelector('#dtaTableDetalle tbody').innerHTML='<tr><td>Ver</td><td>C-42-2026</td><td>01/01/2026</td><td>Ejemplo ficticio</td><td>3º Juzgado Civil de Santiago</td></tr>';this.disabled=false},250)">Buscar</button>
+      <table id="dtaTableDetalle"><tbody><tr><td>Ver</td><td>C-9-2025</td><td>01/01/2025</td><td>Respuesta anterior ficticia</td><td>3º Juzgado Civil de Santiago</td></tr></tbody></table>
+    `);
+    await clickBuscar(page, 2_000);
+    assert.equal(await page.locator('#btnConConsulta').isEnabled(), true);
+    assert.equal(await page.locator('#dtaTableDetalle tbody tr').count(), 1);
+    assert.equal(await page.locator('#dtaTableDetalle tbody tr td').nth(1).innerText(), "C-42-2026", "a spinner must not release the lookup before its new rows arrive");
+    await page.setContent(`
+      <button id="btnConConsulta" onclick="document.querySelector('#status').textContent='Procesando';setTimeout(()=>document.querySelector('#status').textContent='Terminado',20)">Buscar</button>
+      <table id="dtaTableDetalle"><tbody><tr><td>Ver</td><td>C-9-2025</td><td>01/01/2025</td><td>Respuesta anterior ficticia</td><td>3º Juzgado Civil de Santiago</td></tr></tbody><tfoot><tr><td id="status" colspan="5"></td></tr></tfoot></table>
+    `);
+    await assert.rejects(() => clickBuscar(page, 150), /No se usarán resultados anteriores/, "changing only the spinner/status cannot validate old rows");
+    await page.setContent('<button id="btnConConsulta" onclick="document.querySelector(\'#dtaTableDetalle tbody\').innerHTML=\'<tr><td class=dataTables_empty>No se encontraron resultados</td></tr>\'">Buscar</button><table id="dtaTableDetalle"><tbody></tbody></table>');
+    await clickBuscar(page, 1_000);
+
+    await page.setContent(`
+      <style>.tab-pane{display:none}.tab-pane.active{display:block}</style>
+      <script>function fixtureTab(id){document.querySelectorAll('.tab-pane').forEach(node=>node.classList.toggle('active',node.id===id))}</script>
+      <div id="modalDocumentoFixture" class="modal in" style="display:block"><table><tr><th>Fecha</th><th>Trámite</th></tr><tr><td>01/02/2026</td><td>Contenido de otro modal ficticio</td></tr></table></div>
+      <div id="modalDetalleCivil" class="modal in" style="display:block">
+        <table class="table-titulos"><tr><td><a href="#modalAnexoDocumentalFixture" onclick="window.badAnexoClicked=true">Anexo del documento</a></td></tr></table>
+        <nav class="nav-tabs">
+        <a href="#historyFixture" onclick="event.preventDefault();fixtureTab('historyFixture')">Historia</a>
+        <a href="#notificationsFixture" onclick="event.preventDefault();fixtureTab('notificationsFixture')">Notificaciones</a>
+        <a href="#writingsFixture" onclick="event.preventDefault();fixtureTab('writingsFixture')">Escritos por Resolver</a>
+        </nav>
+        <div class="tab-pane active" id="historyFixture"><table><tr><th>Folio</th><th>Trámite</th><th>Fecha</th></tr><tr><td>1</td><td>Resolución propia ficticia</td><td>01/01/2026</td></tr></table></div>
+        <div class="tab-pane" id="notificationsFixture"><table><tr><th>Folio</th><th>Trámite</th><th>Fecha</th></tr><tr><td>2</td><td>Notificación propia ficticia</td><td>02/01/2026</td></tr></table></div>
+        <div class="tab-pane" id="writingsFixture"><table><tr><th>Folio</th><th>Trámite</th><th>Fecha</th></tr><tr><td>3</td><td>Escrito propio ficticio</td><td>03/01/2026</td></tr></table></div>
+        <table><tr><th>Rol Corte</th><th>Trámite</th><th>Fecha</th></tr><tr><td>9-2026</td><td>Remisión de otra corte ficticia</td><td>04/01/2026</td></tr></table>
+      </div>
+    `);
+    const scopedMovements = await scrapeModalTabs(page);
+    assert.equal(scopedMovements.length, 3);
+    assert.ok(scopedMovements.every(movement => !movement.titulo.includes("otra corte")), "auxiliary referrals outside the active tab are not movements");
+    assert.ok(scopedMovements.every(movement => !movement.titulo.includes("otro modal")), "a coexisting document modal is not the selected case detail");
+    assert.equal(await page.evaluate(() => Boolean((window as typeof window & { badAnexoClicked?: boolean }).badAnexoClicked)), false, "an earlier document Anexo link must not be mistaken for Historia");
+    await page.setContent('<div id="modalDetalleCivil" class="modal in" style="display:block"><nav class="nav-tabs"><a href="#historiaMissing">Historia</a></nav><div id="historiaCiv" class="tab-pane active"><table><tr><th>Fecha</th><th>Trámite</th></tr><tr><td>01/01/2026</td><td>Historia visible ficticia</td></tr></table></div></div>');
+    await assert.rejects(() => scrapeModalTabs(page), /destino existente/, "a declared but missing Historia target must not be replaced blindly by the currently active pane");
+    await page.setContent('<div class="modal in" style="display:block"><div class="tab-pane">Historial no seleccionado</div><table><tr><td>Auxiliar</td></tr></table></div>');
+    await assert.rejects(() => modalActivePaneHtml(page), /no muestra una pestaña activa/);
+    await page.setContent('<div class="modal in" style="display:block"><table><tr><td>Historial legado sin pestañas</td></tr></table></div>');
+    assert.match(await modalActivePaneHtml(page), /Historial legado/);
+
+    // The real portal opens the title table before its AJAX history completes.
+    // Every tab below is delayed, with only a header/loading state initially.
+    await page.setContent(`
+      <style>.tab-pane{display:none}.tab-pane.active{display:block}</style>
+      <table id="dtaTableDetalle"><tr><td><button onclick="openDelayedDetail()">Ver</button></td><td>C-7-2026</td><td>${tribunal}</td></tr></table>
+      <div id="modalDetalleDelayed" class="modal" style="display:none">
+        <table class="table-titulos"><tr><td>Fecha de ingreso</td><td>01/01/2026</td><td>Cabecera de causa ficticia</td></tr></table>
+        <a href="#historiaDelayed" onclick="event.preventDefault();selectDelayedHistory()">Historia</a>
+        <a href="#notificacionesDelayed" onclick="event.preventDefault();loadDelayedTab('notificacionesDelayed')">Notificaciones</a>
+        <a href="#escritosDelayed" onclick="event.preventDefault();loadDelayedTab('escritosDelayed')">Escritos</a>
+        <div id="historiaDelayed" class="tab-pane active" aria-busy="true"><table><tr><th>Folio</th><th>Trámite</th><th>Fecha</th></tr></table></div>
+        <div id="notificacionesDelayed" class="tab-pane"><table><tr><th>Doc.</th><th>Fecha</th><th>Tipo Notificación</th></tr></table></div>
+        <div id="escritosDelayed" class="tab-pane"><table><tr><th>Doc.</th><th>Fecha de Ingreso</th><th>Tipo Escrito</th><th>Solicitante</th></tr></table></div>
+      </div>
+      <script>
+        window.jQuery={active:0};
+        function selectDelayedHistory(){document.querySelectorAll('.tab-pane').forEach(node=>node.classList.toggle('active',node.id==='historiaDelayed'))}
+        function openDelayedDetail(){
+          const modal=document.querySelector('#modalDetalleDelayed');modal.style.display='block';modal.classList.add('in');window.jQuery.active++;
+          setTimeout(()=>{const pane=document.querySelector('#historiaDelayed');pane.innerHTML='<table><tr><th>Folio</th><th>Trámite</th><th>Fecha</th></tr><tr><td>1</td><td>Historia demorada ficticia</td><td>02/01/2026</td></tr></table>';pane.removeAttribute('aria-busy');window.jQuery.active--},2800);
+        }
+        function loadDelayedTab(id){
+          window.jQuery.active++;
+          setTimeout(()=>{
+            document.querySelectorAll('.tab-pane').forEach(node=>node.classList.toggle('active',node.id===id));
+            const pane=document.getElementById(id);pane.setAttribute('aria-busy','true');
+            setTimeout(()=>{pane.innerHTML='<table><tr><th>Folio</th><th>Trámite</th><th>Fecha</th></tr><tr><td>'+(id==='notificacionesDelayed'?'2':'3')+'</td><td>'+id+' respuesta ficticia</td><td>'+(id==='notificacionesDelayed'?'03':'04')+'/01/2026</td></tr></table>';pane.removeAttribute('aria-busy');window.jQuery.active--},1100);
+          },100);
+        }
+      </script>
+    `);
+    assert.equal(await openExactCauseModal(page, { rit: "C-7-2026", tribunal }), tribunal);
+    assert.match(await page.locator('#historiaDelayed').innerText(), /Historia demorada ficticia/, "the immediately visible title table must not release the detail reader");
+    const delayedMovements = await scrapeModalTabs(page, { panelTimeoutMs: 5_000 });
+    assert.equal(delayedMovements.length, 3, "each delayed tab contributes only its completed response");
+    assert.ok(delayedMovements.some(movement => movement.titulo.includes('notificacionesDelayed')));
+    assert.ok(delayedMovements.some(movement => movement.titulo.includes('escritosDelayed')));
+    assert.ok(delayedMovements.every(movement => !movement.titulo.includes('Cabecera')));
+
+    await page.setContent('<div class="modal in" style="display:block"><table class="table-titulos"><tr><td>Fecha ingreso</td><td>01/01/2026</td><td>Cabecera ficticia</td></tr></table><div class="tab-pane active"><table><tr><th>Fecha</th><th>Trámite</th></tr></table></div></div>');
+    await assert.rejects(() => scrapeModalTabs(page, { panelTimeoutMs: 150 }), /Historia.*no terminó/, "a primary history header alone is never an empty history");
+    await page.setContent('<div class="modal in" style="display:block"><div class="tab-pane active"><table><tr><th>Fecha</th><th>Trámite</th></tr><tr><td colspan="2">Sin movimientos</td></tr></table></div></div>');
+    assert.deepEqual(await scrapeModalTabs(page, { panelTimeoutMs: 150 }), [], "an explicit empty primary history is terminal");
+    await page.setContent(`
+      <style>.tab-pane{display:none}.tab-pane.active{display:block}</style>
+      <div class="modal in" style="display:block">
+        <a href="#emptyHistoryFixture" onclick="event.preventDefault();fixtureEmptyTab('emptyHistoryFixture')">Historia</a>
+        <a href="#emptyNotificacionesFixture" onclick="event.preventDefault();fixtureEmptyTab('emptyNotificacionesFixture')">Notificaciones</a>
+        <a href="#emptyEscritosFixture" onclick="event.preventDefault();fixtureEmptyTab('emptyEscritosFixture')">Escritos</a>
+        <div class="tab-pane active" id="emptyHistoryFixture"><table><tr><th>Fecha</th><th>Trámite</th></tr><tr><td>01/01/2026</td><td>Historia propia ficticia</td></tr></table></div>
+        <div class="tab-pane" id="emptyNotificacionesFixture"><table><tr><th>Fecha</th><th>Tipo Notificación</th></tr><tr><td colspan="2">No existen notificaciones</td></tr></table></div>
+        <div class="tab-pane" id="emptyEscritosFixture"><table><tr><th>Doc.</th><th>Anexo</th><th>Fecha de Ingreso</th><th>Tipo Escrito</th><th>Solicitante</th></tr></table></div>
+      </div>
+      <script>function fixtureEmptyTab(id){document.querySelectorAll('.tab-pane').forEach(node=>node.classList.toggle('active',node.id===id))}</script>
+    `);
+    assert.equal((await scrapeModalTabs(page, { panelTimeoutMs: 1_000, emptyIdleMs: 100 })).length, 1, "recognized optional empty tables do not block a verified primary history");
+    await page.locator('#emptyEscritosFixture').evaluate(node => node.setAttribute('aria-busy', 'true'));
+    await assert.rejects(() => waitForModalHistoryPanel(page, { label: 'Escritos', panelId: 'emptyEscritosFixture', optional: true, timeoutMs: 150, emptyIdleMs: 50 }), /Escritos.*no terminó/, "a loading optional table is not terminal");
+
+    const previousValidationFlag = process.env.LEXOPEN_PJUD_LIVE_VALIDATION;
+    const previousDebugFlag = process.env.PJUD_PANEL_DEBUG;
+    try {
+      await page.setContent('<div id="modalDetalleCivil" class="modal in" style="display:block"><div id="historiaCiv" class="tab-pane active"><table aria-hidden="true"><tr><th>Fecha</th><th>Trámite</th><th>PRIVATE_HEADER</th></tr><tr><td>05/02/2026</td><td>PRIVATE_CASE_CELL</td><td><a href="https://private-link.invalid/PRIVATE_URL">PRIVATE_PARTY</a></td></tr></table></div></div><script>window.jQuery={active:1}</script>');
+      for (const flags of [["0", "1"], ["1", "0"]]) {
+        process.env.LEXOPEN_PJUD_LIVE_VALIDATION = flags[0];
+        process.env.PJUD_PANEL_DEBUG = flags[1];
+        assert.equal(await readModalPanelDebugDiagnostics(page, 'historiaCiv'), undefined, "both validation and debug must be enabled");
+      }
+      process.env.LEXOPEN_PJUD_LIVE_VALIDATION = "1";
+      process.env.PJUD_PANEL_DEBUG = "1";
+      const diagnostics = await readModalPanelDebugDiagnostics(page, 'historiaCiv');
+      assert.ok(diagnostics && 'panels' in diagnostics && 'jqueryActive' in diagnostics);
+      assert.equal(diagnostics?.jqueryActive, 1);
+      assert.equal(diagnostics?.panels?.[0].rowCount, 1);
+      assert.equal(diagnostics?.panels?.[0].rowsWithValidDate, 1);
+      assert.deepEqual(diagnostics?.panels?.[0].headerLabels, ['fecha', 'tramite', 'other']);
+      assert.equal(diagnostics?.snapshotParserCount, 0);
+      assert.equal(diagnostics?.visibleTableTextParserCount, 1, "diagnostics distinguish parser exclusion attributes from visible table text without changing success");
+      assert.equal(diagnostics?.tableExcludedAttributes.ariaHidden, 1);
+      assert.ok(!/PRIVATE_|private-link|05\/02\/2026|<table|href=|parserScopeHtml|parserSnapshotHtml|parserVisibleTableTextHtml/.test(JSON.stringify(diagnostics)), "internal HTML is removed before returning diagnostics");
+      await assert.rejects(() => waitForModalHistoryPanel(page, { label: 'Historia', panelId: 'historiaCiv', timeoutMs: 150 }), (error: Error) => {
+        assert.match(error.message, /Diagnóstico estructural/);
+        assert.match(error.message, /"jqueryActive":1/);
+        assert.ok(!/PRIVATE_|private-link|05\/02\/2026|<table|href=/.test(error.message), "diagnostics contain no case cells, unknown headers, date values, URLs or HTML");
+        return true;
+      });
+    } finally {
+      if (previousValidationFlag === undefined) delete process.env.LEXOPEN_PJUD_LIVE_VALIDATION; else process.env.LEXOPEN_PJUD_LIVE_VALIDATION = previousValidationFlag;
+      if (previousDebugFlag === undefined) delete process.env.PJUD_PANEL_DEBUG; else process.env.PJUD_PANEL_DEBUG = previousDebugFlag;
+      await page.evaluate(() => { (window as typeof window & { jQuery?: { active?: number } }).jQuery = { active: 0 }; });
+    }
 
     // Current public form, observed through PJUD's published session entry.
     // The RIT, parties and history below are fictitious. Every request is local.

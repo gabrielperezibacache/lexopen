@@ -21,6 +21,13 @@ import { misCausasClaimableWhere } from "@/lib/pjud/mis-causas-sync-state";
 import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
 import type { PjudCausaRef, PjudFetchResult } from "@/lib/pjud/types";
 import { duplicateCausaWhere } from "@/lib/pjud/causa-origin";
+import type { PjudMovimientosFetcher } from "@/lib/pjud/sync";
+
+/** A live, process-owned session source; HTTP routes do not accept this option. */
+export type MisCausasSessionSource = {
+  listMisCausas: () => Promise<MisCausasItem[]>;
+  fetchMovimientos: PjudMovimientosFetcher;
+};
 
 export {
   isMisCausasSyncInFlight,
@@ -435,7 +442,18 @@ export async function syncMisCausas(opts?: {
   processJobsInline?: boolean;
   /** Claim adquirido por el Route Handler antes de responder 202. */
   claim?: { settingsId: string; claimedAt: Date };
+  /** Internal ephemeral session; no password, cookies, HTML or rows from a request. */
+  sessionSource?: MisCausasSessionSource;
 }) {
+  if (opts?.sessionSource !== undefined) {
+    if (!opts.sessionSource || typeof opts.sessionSource.listMisCausas !== "function" ||
+        typeof opts.sessionSource.fetchMovimientos !== "function") {
+      throw httpError("La fuente de sesión debe ser interna y ejecutable.", 400);
+    }
+    if (opts.syncMovimientos !== false && opts.processJobsInline !== true) {
+      throw httpError("Los movimientos de una sesión temporal deben procesarse mientras la sesión está abierta.", 400);
+    }
+  }
   const { settings } = await getOrCreateFirmSettings();
   let claimedAt = opts?.claim?.claimedAt ?? null;
   if (opts?.claim && (
@@ -470,7 +488,12 @@ export async function syncMisCausas(opts?: {
   const linked: string[] = [];
   let phase: "scrape" | "import" | "queue" = "scrape";
   try {
-    const items = await resolveMisCausasList();
+    if (opts?.sessionSource && (!claveUnicaAutomationAllowed(true) || !publicScrapeEnabled())) {
+      throw httpError("La consulta de la sesión OJV está deshabilitada en este servidor.", 409);
+    }
+    const items = opts?.sessionSource
+      ? await opts.sessionSource.listMisCausas()
+      : await resolveMisCausasList();
     phase = "import";
     const causaIdsForSync: string[] = [];
     const itemsWithIds: Array<MisCausasItem & { causaId: string }> = [];
@@ -531,6 +554,8 @@ export async function syncMisCausas(opts?: {
       inserted?: number;
     }> = [];
     let enqueued = 0;
+    let sessionUncovered = 0;
+    const enqueuedJobIds: string[] = [];
 
     if (opts?.syncMovimientos !== false && causaIdsForSync.length) {
       phase = "queue";
@@ -545,21 +570,47 @@ export async function syncMisCausas(opts?: {
           causaIds: batch,
           trigger: "manual",
           limit: batch.length,
+          ...(opts?.sessionSource ? { reclaimStuckRunning: false } : {}),
         }));
       }
       enqueued = jobs.length;
+      enqueuedJobIds.push(...jobs.map((job) => job.id));
       if (opts?.processJobsInline) {
-        const processed = await processPendingSyncJobs({
-          actorId: opts?.actorId,
-          limit: Math.min(jobs.length || 20, 40),
-          jobIds: jobs.map((j) => j.id),
-        });
+        const processed: Awaited<ReturnType<typeof processPendingSyncJobs>> = [];
+        // Every session-backed job must finish while its browser context exists.
+        const batches = opts?.sessionSource
+          ? Array.from({ length: Math.ceil(jobs.length / 40) }, (_, index) => jobs.slice(index * 40, (index + 1) * 40))
+          : [jobs];
+        for (const batch of batches) {
+          processed.push(...await processPendingSyncJobs({
+            actorId: opts?.actorId,
+            limit: Math.min(batch.length || 20, 40),
+            jobIds: batch.map((job) => job.id),
+            fetchMovimientos: opts?.sessionSource?.fetchMovimientos,
+            ...(opts?.sessionSource ? { concurrency: 1 } : {}),
+          }));
+        }
         syncResults = processed.map((r) => ({
           causaId: r.causaId,
           status: r.status,
           note: r.note,
           inserted: r.inserted,
         }));
+        if (opts?.sessionSource) {
+          // An active job may have prevented enqueueing, or another worker may
+          // have claimed a new job. Neither case was fetched by this session.
+          const covered = new Set(syncResults.map((result) => result.causaId));
+          for (const causaId of uniqueIds) {
+            if (covered.has(causaId)) continue;
+            sessionUncovered += 1;
+            syncResults.push({
+              causaId,
+              status: "failed",
+              inserted: 0,
+              note: "La causa ya tiene una actualización pendiente o en curso. Espere a que termine y vuelva a sincronizar con la sesión abierta.",
+            });
+          }
+        }
       }
     }
 
@@ -602,6 +653,11 @@ export async function syncMisCausas(opts?: {
         );
       }
     }
+    if (sessionUncovered) {
+      noteParts.push(
+        `${sessionUncovered} causa${sessionUncovered === 1 ? "" : "s"} con una actualización pendiente o en curso no se pudieron consultar en esta sesión; espere a que termine y vuelva a sincronizar`
+      );
+    }
 
     const finished = await prisma.firmSettings.updateMany({
       // Un proceso viejo no debe sobrescribir el estado de un claim nuevo ni
@@ -625,6 +681,7 @@ export async function syncMisCausas(opts?: {
       created: created.length,
       linked: linked.length,
       enqueued,
+      enqueuedJobIds,
       syncOk,
       syncFailed,
       inserted: insertedTotal,

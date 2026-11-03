@@ -12,6 +12,8 @@ La configuración del canal y su disponibilidad real son estados diferentes. Los
 
 La [nueva comprobación de accesos oficiales](ojv-accesos-oficiales-2026-11-03/README.md) consiguió consultar un expediente público real y buscar en Mis Causas tras el ingreso manual del profesional. Documenta el cuaderno y la materia verificados, sus límites y la diferencia con una ejecución del conector automático. La [primera comprobación](ojv-validacion-real-2026-11-03/README.md) conserva los fallos observados anteriormente.
 
+La [validación de sincronización automática](ojv-sincronizacion-automatica-2026-11-03/README.md) completó el conector, la cola y el guardado en una base temporal, tanto en la consulta pública real como en Mis Causas después del ingreso manual. La repetición de ambos recorridos confirmó que no se duplicaron movimientos, con el cuaderno y la materia documentados.
+
 ## Principio: host local, APIs externas OK
 
 **Local** = dónde corre LexOpen y dónde se guardan datos/secretos (self-hosted).
@@ -74,7 +76,7 @@ El FAQ de marketing de CM enfatiza que el monitoreo público no *exige* entregar
 
 Misma familia DOM que scrapers de campo `consulta_causas_pjud`:
 
-1. `home/index.php` → `accesoConsultaCausas()` (sesión invitado)
+1. Entrada pública oficial `includes/sesion-consultaunificada.php` → formulario de `indexN.php` como invitado
 2. Tab `#BusJuridica` (RUT) o tab ROL/RIT
 3. `#jurCompetencia` + `#jurTribunal` / `#corteJur`
 4. Buscar visible (no forzar `#btnConConsultaJur` oculto en otra pestaña) → espera loaders `#loadPreJuridica` / `#loadPreCausa`
@@ -101,7 +103,7 @@ corriendo: el sync cae a scrape in-process.
 
 1. `PJUD_SCRAPER_URL` (sidecar en su host / red privada)
 2. **Detalle autenticado Mis Causas / ClaveÚnica** (si hay opt-in y sesión OJV)
-3. Scrape invitado in-process (`PJUD_PUBLIC_SCRAPE=1` + CAPTCHA + Playwright/Chromium)
+3. Scrape invitado in-process (`PJUD_PUBLIC_SCRAPE=1` + Playwright/Chromium; solver sólo ante un CAPTCHA visible)
 4. `PJUD_API_URL` (partner API externa — permitida)
 5. Demo (`PJUD_ALLOW_DEMO`)
 6. CSV / webhook
@@ -114,6 +116,9 @@ El scrape invitado **falla** si el tribunal o el RIT no coinciden (no abre otra 
 | Variable | Efecto |
 |----------|--------|
 | `PJUD_PUBLIC_SCRAPE=1` | Habilita scrape OJV in-process |
+| `PJUD_CAPTCHA_AUTO_SOLVE=0` | Se detiene ante un CAPTCHA visible antes de capturarlo o usar un solver. Ausente conserva el comportamiento habitual. |
+| `PJUD_AUTO_CONFIRM_PROMPTS=0` | No confirma avisos del portal. El cierre de un detalle reconocido no acepta términos ni avisos. |
+| `PJUD_DOC_DOWNLOADS=0` | Impide descargas de documentos tanto en el scrape como en el respaldo posterior. Prevalece sobre `PJUD_PDF_BACKUP`. |
 | `CAPTCHA_SOLVER_PROVIDER` + `CAPTCHA_SOLVER_API_KEY` | Elegible: `nopecha` (free tier) \| `2captcha` \| `capsolver` \| `anticaptcha` \| `capmonster` \| `solvecha`. Key opcional solo en `nopecha`. |
 | `PJUD_SCRAPER_URL` | Microservicio local (`POST /causas/lookup`, `/mis-causas`, `/causas/buscar`). Típico: `http://127.0.0.1:8787` |
 | `PJUD_SCRAPER_ALLOW_PRIVATE=1` | Permite sidecar en localhost / red privada del Host |
@@ -127,7 +132,7 @@ El scrape invitado **falla** si el tribunal o el RIT no coinciden (no abre otra 
 | `PJUD_DOC_DOWNLOAD_MAX` | Máximo de PDFs por corrida de import/scrape. Default `20`, máx. `50`. |
 | `CRON_SECRET` | Autoriza crons (`x-cron-secret`) |
 
-Sin `PJUD_PUBLIC_SCRAPE=1` + CAPTCHA (o sidecar), LexOpen **no** scrapea OJV.
+Sin `PJUD_PUBLIC_SCRAPE=1` (o sidecar), LexOpen **no** scrapea OJV. La falta de solver no impide consultar un formulario que no muestre CAPTCHA; si aparece un desafío sin solución habilitada, se informa el fallo.
 ClaveÚnica además requiere opt-in en Mis Causas (o `PJUD_CLAVEUNICA_SCRAPE=1`).
 Si `PJUD_PUBLIC_SCRAPE=1` pero falta Playwright/Chromium, el scrape falla con error claro (no cae a demo en prod).
 
@@ -159,6 +164,14 @@ del sistema** (`channel: chrome`). `pjud:online` reporta `guestEntry` /
 `captchaLikely` en OJV y si `salas.pjud.cl` está restringido (en muchos hosts
 responde “acceso restringido”; entonces pegue HTML en `/api/pjud/salas` o use
 `demo: true` / `source: "live"` cuando el portal abra).
+
+### Validación de la sincronización completa
+
+`pjud:online` comprueba conectividad y formularios; no acredita importación, cola ni persistencia. El diagnóstico opt-in `npm run pjud:sync:validate -- public` ejecuta el conector real, registra la causa pública documentada, procesa sus trabajos y repite la consulta sin caché para comprobar que no se dupliquen movimientos. Requiere una base local nueva de pruebas, sin usuarios ni credenciales, y directorios temporales privados. Rechaza bases remotas o de producción, proveedores alternativos y descargas habilitadas.
+
+Después de una comprobación pública satisfactoria en esa misma base, `npm run pjud:sync:validate -- mis-causas` abre una ventana temporal para que el profesional entre personalmente en el formulario oficial PJUD. Al completar el ingreso, LexOpen continúa con la lectura de Mis Causas, importación y sincronización de una causa de Corte Suprema, y repite la lectura para comprobar persistencia e idempotencia. No copia la sesión del navegador habitual ni guarda credenciales. La ventana se cierra al terminar, cancelar o vencer su plazo; el límite total es de 30 minutos.
+
+El diagnóstico exige `LEXOPEN_PJUD_LIVE_VALIDATION=1`, `DATABASE_URL=E2E_DATABASE_URL` de una base local de pruebas, `PJUD_PUBLIC_SCRAPE=1`, `PJUD_CAUSAS_CACHE_TTL_MS=0` y los siguientes valores en `0`: `PJUD_ALLOW_DEMO`, `HERMES_ALLOW_DEMO`, `PJUD_CAPTCHA_AUTO_SOLVE`, `PJUD_AUTO_CONFIRM_PROMPTS`, `PJUD_DOC_DOWNLOADS` y `PJUD_PDF_BACKUP`. Las rutas `LEXOPEN_DATA_DIR` y `STORAGE_PATH` deben estar dentro de la misma carpeta temporal privada. Los informes se escriben con permisos restringidos en `LEXOPEN_DATA_DIR/reports`; los autenticados omiten identificadores y recuentos privados exactos. Es una herramienta local de comprobación, sin un botón de ingreso manual añadido a la interfaz ni un nuevo programador de sincronizaciones.
 
 Variables mínimas del web (también las imprime `pjud:host`):
 

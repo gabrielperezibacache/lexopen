@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-11-03T22:30:10.456Z",
+  "mode": "real-public-automatic-sync",
+  "identity": {
+    "rit": "C-876-2022",
+    "tribunal": "3º Juzgado Civil de Santiago"
+  },
+  "provider": "scrape",
+  "demo": false,
+  "firstPersistedMovements": 243,
+  "secondInserted": 0,
+  "durableJobsCompleted": true,
+  "idempotent": true,
+  "pdfsDownloaded": false,
+  "studyDatabaseUsed": false
+}
