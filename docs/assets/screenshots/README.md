@@ -4,6 +4,8 @@ Las nueve imágenes se capturaron directamente desde la aplicación con Chromium
 
 `manifest.json` registra fecha, revisión de la aplicación, ruta, dimensiones y SHA-256 de cada PNG. `demo-constancia.pdf` es el documento de ejemplo propio abierto en el lector. La captura de audiencia muestra el panel y sus fuentes; no acredita reconocimiento de voz de un proveedor.
 
+El README principal utiliza ahora la captura del panel independiente de la [entrega de Codex y audiencias](../../codex-audiencias-2026-11-02/README.md). Esa entrega conserva su propio manifiesto y las capturas nuevas de escritorio y móvil, también con datos ficticios.
+
 | Archivo | Superficie |
 | --- | --- |
 | `causa.png` | Preparación de la causa y continuidad de sus materiales. |

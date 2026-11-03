@@ -8,6 +8,7 @@ const LABEL_KEYS: Record<string, string> = {
   inicio: "nav.home",
   dashboard: "nav.panel",
   causas: "nav.cases",
+  audiencias: "nav.hearings",
   plazos: "nav.deadlines",
   calendario: "nav.calendar",
   tareas: "nav.tasks",
@@ -38,7 +39,7 @@ const DETAIL_LABELS: Record<string, string> = {
 };
 function detailLabel(part: string, parent?: string) {
   if (/^(?:c[a-z0-9]{20,}|[a-f0-9]{32,}|[a-f0-9-]{36})$/i.test(part)) {
-    return ({ causas: "Causa", clientes: "Cliente", sites: "Espacio", biblioteca: "Libro", fuentes: "Fuente", facturas: "Factura", minutas: "Minuta", isheets: "Tabla", archivos: "Archivo" } as Record<string, string>)[parent || ""] || "Detalle";
+    return ({ causas: "Causa", audiencias: "Audiencia en vivo", clientes: "Cliente", sites: "Espacio", biblioteca: "Libro", fuentes: "Fuente", facturas: "Factura", minutas: "Minuta", isheets: "Tabla", archivos: "Archivo" } as Record<string, string>)[parent || ""] || "Detalle";
   }
   return DETAIL_LABELS[part] || decodeURIComponent(part);
 }

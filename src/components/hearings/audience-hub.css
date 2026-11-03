@@ -1,0 +1,52 @@
+.audience-hub { min-width: 0; }
+.audience-hub-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1.25rem 2rem; margin-bottom: 1.5rem; }
+.audience-hub h1 { margin: 0; font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(2rem, 3vw, 3.35rem); line-height: 1.08; letter-spacing: -.035em; text-wrap: balance; }
+.audience-hub-heading p { max-width: 65ch; margin-top: .8rem; color: var(--ink-soft); line-height: 1.8; }
+.audience-hub-intro { display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: center; justify-content: space-between; border-block: 1px solid var(--line); padding-block: 1rem; margin-bottom: 2.5rem; }
+.audience-hub-intro p { display: flex; align-items: start; gap: .65rem; color: var(--ink-soft); line-height: 1.7; max-width: 65ch; }
+.audience-hub-intro svg { flex-shrink: 0; margin-top: .25rem; }
+.audience-hub-intro > a, .audience-hub-text-action { display: inline-flex; align-items: center; gap: .5rem; color: var(--sea); min-height: 44px; font-size: var(--text-sm); font-weight: 600; }
+.audience-hub-intro > a svg { margin: 0; }
+.audience-hub a:focus-visible, .audience-hub button:focus-visible { outline: 2px solid var(--sea); outline-offset: 4px; }
+.audience-hub a:hover, .audience-hub-text-action:hover { text-decoration: underline; text-underline-offset: .25rem; }
+.audience-hub-section-heading { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 1rem 2rem; margin-bottom: 1.4rem; }
+.audience-hub h2 { font-family: var(--font-fraunces), Georgia, serif; font-size: clamp(1.6rem, 2.4vw, 2.3rem); line-height: 1.2; letter-spacing: -.025em; margin: 0; text-wrap: balance; }
+.audience-hub-section-heading p { max-width: 65ch; color: var(--ink-soft); line-height: 1.7; margin-top: .7rem; }
+.audience-hub-create { padding: clamp(1.25rem, 3vw, 2.5rem); background: var(--surface-solid); border: 1px solid var(--line); border-radius: var(--radius-lg); margin-bottom: 2.5rem; }
+.audience-hub-create:not([hidden]) { animation: audience-hub-unfold 180ms cubic-bezier(.16, 1, .3, 1); }
+.audience-hub-create form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 1rem; }
+.audience-hub label { display: grid; min-width: 0; gap: .5rem; font-size: var(--text-sm); font-weight: 600; line-height: 1.7; }
+.audience-hub .input, .audience-hub .select { width: 100%; min-width: 0; min-height: 44px; font-weight: 400; }
+.audience-hub-close { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: var(--ink-soft); }
+.audience-hub-search { display: flex; align-items: center; gap: .7rem; padding-bottom: 1.25rem; }
+.audience-hub-search > svg { flex-shrink: 0; color: var(--sea); }
+.audience-hub-search .input { flex: 1; }
+.audience-hub-filters { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; border-bottom: 1px solid var(--line-strong); }
+.audience-hub-filters button { min-height: 44px; padding: .5rem .1rem .8rem; color: var(--ink-soft); border-bottom: 2px solid transparent; font-size: var(--text-sm); }
+.audience-hub-filters button[aria-pressed=true] { color: var(--sea); font-weight: 600; border-color: var(--sea); }
+.audience-hub-list { list-style: none; margin: 0 0 1.5rem; padding: 0; }
+.audience-hub-list > li { border-bottom: 1px solid var(--line); padding-block: 1.5rem; }
+.audience-hub-list article { min-width: 0; }
+.audience-hub-row-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem 2rem; }
+.audience-hub-row-title > div { min-width: 0; }
+.audience-hub h3 { font-family: var(--font-fraunces), Georgia, serif; font-size: var(--text-xl); line-height: 1.45; margin: .4rem 0 .75rem; overflow-wrap: anywhere; }
+.audience-hub-state { display: inline-block; font-size: var(--text-sm); line-height: 1.7; color: var(--ink-soft); }
+.audience-hub-state[data-state=live] { color: var(--sea); font-weight: 600; }
+.audience-hub-cause { display: flex; align-items: start; gap: .55rem; line-height: 1.7; color: var(--sea); }
+.audience-hub-cause svg { flex-shrink: 0; margin-top: .3rem; }
+.audience-hub-court { color: var(--ink-soft); font-size: var(--text-sm); line-height: 1.7; margin-top: .25rem; overflow-wrap: anywhere; }
+.audience-hub-row-meta { display: flex; flex-wrap: wrap; gap: .4rem 1.5rem; color: var(--muted); font-size: var(--text-sm); line-height: 1.7; margin-top: .85rem; }
+.audience-hub-row-meta > span { display: inline-flex; align-items: center; gap: .5rem; }
+.audience-hub-row-meta svg { flex-shrink: 0; }
+.audience-hub-help { color: var(--muted); max-width: 75ch; font-size: var(--text-sm); line-height: 1.8; margin-top: 1.25rem; }
+.audience-hub-help a { color: var(--sea); text-decoration: underline; text-underline-offset: .2rem; }
+.audience-hub-loading { padding-block: 1.5rem; color: var(--muted); line-height: 1.8; }
+.audience-hub-loading > div { width: 100%; height: 5rem; margin-top: 1rem; border-bottom: 1px solid var(--line); background: var(--mist); }
+.audience-hub-error { margin-block: 1.25rem; color: var(--danger); line-height: 1.8; }
+.audience-hub-error p { margin-bottom: .7rem; max-width: 75ch; }
+.audience-hub-empty { padding-block: 2rem; }
+.audience-hub-empty p { max-width: 65ch; color: var(--ink-soft); line-height: 1.8; margin-bottom: 1rem; }
+@keyframes audience-hub-unfold { from { clip-path: inset(0 0 5px); } to { clip-path: inset(0); } }
+@media (max-width: 1000px) { .audience-hub-create form { grid-template-columns: minmax(0, 1fr); } .audience-hub-create form > button { justify-self: start; } }
+@media (max-width: 600px) { .audience-hub-heading { align-items: start; } .audience-hub-intro { margin-bottom: 2rem; } .audience-hub-row-title { display: block; } .audience-hub-row-title > a { margin-bottom: 1rem; } .audience-hub-search { flex-wrap: wrap; gap: .75rem; } .audience-hub-search .input { flex-basis: calc(100% - 2rem); } .audience-hub-search > button { margin-left: 1.9rem; } .audience-hub-row-meta { display: grid; gap: .4rem; } }
+@media (prefers-reduced-motion: reduce) { .audience-hub-create:not([hidden]) { animation: none; } }

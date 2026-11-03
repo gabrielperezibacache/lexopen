@@ -53,3 +53,6 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
+        env:
+          CODEX_BIN: ${{ github.workspace }}/e2e/fixtures/codex-app-server.mjs
+          CODEX_DATA_DIR: /tmp/lexopen-codex-e2e

@@ -71,10 +71,17 @@ test("audiencia en vivo: guion guardado, tiempo con pausas, puntos tratados y re
   test.setTimeout(150_000); await loginAs(page, ownerEmail); await sharedBook(page);
   const workspace = await desk(page, "Audiencia preparatoria ficticia");
   await page.setViewportSize({ width: 1440, height: 1100 });
-  await page.goto(`/causas/${causaId}/audiencias?mesa=${workspace.id}`);
-  await page.getByRole("button", { name: "En vivo", exact: true }).click();
+  await page.goto(`/audiencias/${workspace.id}`);
+  await expect(page.getByRole("heading", { name: "Audiencia en vivo", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Herramientas de audiencia", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Todas mis audiencias", exact: true })).toHaveAttribute("href", "/audiencias");
+  await expect(page.getByRole("navigation", { name: "Recorrido de la causa", exact: true }).getByRole("link", { name: "Audiencias", exact: true })).toHaveAttribute("href", `/audiencias/${workspace.id}`);
+  await expect(page.locator(".hearing-session-clock time")).toContainText(/\d{2}:\d{2}/);
+  expect(new URL(page.url()).pathname).toBe(`/audiencias/${workspace.id}`);
+  expect(new URL(page.url()).searchParams.has("mesa")).toBe(false);
   const panel = page.getByTestId("hearing-live");
   await expect(panel).toBeVisible();
+  expect((await current(page, workspace.id)).phase).toBe("idle");
   await panel.getByText("Preparar el guion guardado", { exact: true }).click();
   await panel.getByRole("textbox", { name: "Apertura guardada", exact: true }).fill("Solicito tener presentes los antecedentes del pago.");
   await panel.getByRole("textbox", { name: "Petición de cierre guardada", exact: true }).fill("Solicito resolver sobre la exhibición de los originales.");
@@ -88,7 +95,9 @@ test("audiencia en vivo: guion guardado, tiempo con pausas, puntos tratados y re
   const paused = await current(page, workspace.id);
   expect(paused.phase).toBe("paused"); expect(paused.plan.noteIds).toHaveLength(2);
   expect(paused.plan.opening).toContain("antecedentes del pago");
-  await page.reload(); await page.getByRole("button", { name: "En vivo", exact: true }).click();
+  await page.reload();
+  await expect(panel).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/audiencias/${workspace.id}$`));
   await panel.getByText("Preparar el guion guardado", { exact: true }).click();
   await expect(panel.getByRole("textbox", { name: "Apertura guardada", exact: true })).toHaveValue(paused.plan.opening);
   expect((await current(page, workspace.id)).elapsedSeconds).toBe(paused.elapsedSeconds);
@@ -110,9 +119,18 @@ test("audiencia en vivo: guion guardado, tiempo con pausas, puntos tratados y re
   await page.locator(".hearing-fragment").getByRole("button", { name: "Registrar en vivo", exact: true }).click();
   for (const [mode, viewport] of [["desktop", { width: 1440, height: 1100 }], ["mobile", { width: 360, height: 900 }]] as const) {
     await page.setViewportSize(viewport); await page.emulateMedia({ reducedMotion: "reduce" });
-    const margin = mode === "mobile" ? 160 : 112;
+    const margin = mode === "mobile" ? 256 : 160;
     await panel.evaluate((element, offset) => window.scrollTo({ top: Math.max(0, scrollY + element.getBoundingClientRect().top - offset), behavior: "instant" }), margin);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    const tools = page.getByRole("navigation", { name: "Herramientas de audiencia", exact: true }).getByRole("button");
+    await expect(tools).toHaveCount(7);
+    for (const tool of await tools.all()) {
+      const bounds = await tool.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+      expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    }
     await capture(page, info.outputPath(`live-${mode}.png`));
     await panel.getByRole("button", { name: "Registrar lo ocurrido", exact: true }).click();
     await expect(panel.getByRole("textbox", { name: "Encabezado del registro", exact: true })).toBeFocused();
@@ -158,6 +176,10 @@ test("registro perdido, escrito de causa y fuente retirada: conserva privacidad 
   try {
     await loginAs(colleague, colleagueEmail);
     expect((await colleague.request.get(livePath(workspace.id))).status()).toBe(404);
+    await colleague.goto(`/audiencias/${workspace.id}`);
+    await expect(colleague.getByRole("heading", { name: "Página no encontrada", exact: true })).toBeVisible();
+    await expect(colleague.getByRole("heading", { name: "Audiencia en vivo", exact: true })).toHaveCount(0);
+    await expect(colleague.locator("body")).not.toContainText("Control ficticio de continuidad");
     const collection = (await json<{ collection: { revision: number } }>(await colleague.request.get(`/api/books/collections/${collectionId}`))).collection;
     await json(await colleague.request.patch(`/api/books/collections/${collectionId}`, { data: { revision: collection.revision, memberIds: [] } }));
     const revoked = await current(page, workspace.id);

@@ -10,7 +10,7 @@ import { CaseWorkflowNav } from "@/components/causas/CaseWorkflowNav";
 
 export const metadata = { title: "Mesa de audiencia · LexOpen" };
 
-export default async function HearingPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ mesa?: string; nota?: string }> }) {
+export default async function HearingPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ mesa?: string; nota?: string; vista?: string }> }) {
   const user = await actorFor(await requireStaff());
   const { id } = await params;
   const query = await searchParams;
@@ -18,5 +18,5 @@ export default async function HearingPage({ params, searchParams }: { params: Pr
   await assertCausaAccess(id, user).catch(() => notFound());
   const causa = await prisma.causa.findUnique({ where: { id }, select: { titulo: true, rit: true, tribunal: true } });
   if (!causa) notFound();
-  return <div className="space-y-6"><CaseWorkflowNav causaId={id} title={causa.titulo} current="hearing" /><header><Link className="text-sm text-[var(--sea)]" href={`/causas/${id}`}>Volver a la carpeta de la causa</Link><h1 className="display text-3xl mt-3">Mesa de audiencia</h1><p className="text-[var(--ink-soft)] mt-2 break-words">{causa.titulo} · {causa.rit || "Sin RIT"} · {causa.tribunal}</p></header><HearingWorkbench causaId={id} initialWorkspaceId={validId(query.mesa)} initialNoteId={validId(query.nota)} /><CaseAudioManager causaId={id} /></div>;
+  return <div className="space-y-6"><CaseWorkflowNav causaId={id} title={causa.titulo} current="hearing" /><header><Link className="text-sm text-[var(--sea)]" href={`/causas/${id}`}>Volver a la carpeta de la causa</Link><h1 className="display text-3xl mt-3">Mesa de audiencia</h1><p className="text-[var(--ink-soft)] mt-2 break-words">{causa.titulo} · {causa.rit || "Sin RIT"} · {causa.tribunal}</p></header><HearingWorkbench causaId={id} initialWorkspaceId={validId(query.mesa)} initialNoteId={validId(query.nota)} initialPanel={query.vista === "en-vivo" ? "live" : "reading"} /><CaseAudioManager causaId={id} /></div>;
 }

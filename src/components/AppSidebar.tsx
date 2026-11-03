@@ -26,6 +26,7 @@ import {
   Shield,
   Settings,
   ContactRound,
+  AudioLines,
   X,
   PanelLeftClose,
   PanelLeftOpen,
@@ -135,6 +136,7 @@ function SidebarChrome({
     () => [
       { href: "/inicio", label: t("nav.home"), icon: Home },
       { href: "/causas", label: t("nav.cases"), icon: Briefcase },
+      { href: "/audiencias", label: t("nav.hearings"), icon: AudioLines, roles: STAFF_ROLES },
       { href: "/plazos", label: t("nav.deadlines"), icon: CalendarClock },
       { href: "/calendario", label: t("nav.calendar"), icon: CalendarDays },
       { href: "/tareas", label: t("nav.tasks"), icon: ListTodo },

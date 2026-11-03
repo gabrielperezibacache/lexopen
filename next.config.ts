@@ -1,11 +1,20 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 import { buildSecurityHeaders } from "./src/lib/security/headers";
 
 // CSP is applied per-request from src/proxy.ts with a fresh nonce.
 const securityHeaders = buildSecurityHeaders({ includeCsp: false });
+// Runtime documents and personal credentials belong to the Host, never its package.
+const privateRuntimePaths = ["./storage/**", "./.env*", "./.codex/**"];
+for (const directory of [process.env.CODEX_DATA_DIR, process.env.LEXOPEN_DATA_DIR, process.env.STORAGE_PATH]) {
+  if (!directory) continue;
+  const relative = path.relative(process.cwd(), path.resolve(directory)).split(path.sep).join("/");
+  if (relative && relative !== ".." && !relative.startsWith("../")) privateRuntimePaths.push(`./${relative.replace(/[\\*?\[\]{}()!+@]/g, "\\$&")}/**`);
+}
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  outputFileTracingExcludes: { "/*": privateRuntimePaths },
   /* Hide the floating "N" Next.js Dev Tools badge in development.
      Compile/runtime errors still surface via the error overlay. */
   devIndicators: false,
@@ -30,7 +39,7 @@ const nextConfig: NextConfig = {
     ? {
         output: "standalone" as const,
         outputFileTracingExcludes: {
-          "*": ["./desktop/dist/**", "./desktop/node_modules/**"],
+          "/*": [...privateRuntimePaths, "./desktop/dist/**", "./desktop/node_modules/**"],
         },
         outputFileTracingIncludes: {
           "*": [

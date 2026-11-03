@@ -1,0 +1,12 @@
+{
+  "mode": "production-standalone",
+  "realAccountAuthorized": false,
+  "checks": [
+    "anonymous personal Codex denied",
+    "audience page served",
+    "private audience catalog",
+    "personal account page served",
+    "isolated Codex status without login",
+    "CSRF protection rejects connection"
+  ]
+}
