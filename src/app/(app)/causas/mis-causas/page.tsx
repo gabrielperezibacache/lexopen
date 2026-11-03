@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { validarRut } from "@/lib/chile";
 import { PageHeader } from "@/components/sites/SiteNav";
 import { apiMutation } from "@/lib/api-mutation";
+import "@/components/pjud/pjud-lookup.css";
 
 type Status = {
   enabled: boolean;
@@ -45,7 +46,9 @@ type SyncResult = {
 function formatWhen(value: string | null | undefined) {
   if (!value) return null;
   try {
-    return new Date(value).toLocaleString("es-CL", {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleString("es-CL", {
       dateStyle: "short",
       timeStyle: "short",
     });
@@ -71,269 +74,242 @@ function lastSyncLabel(status: string | null | undefined) {
   }
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function waitForPoll(signal: AbortSignal) {
+  return new Promise<boolean>(resolve => {
+    if (signal.aborted) { resolve(false); return; }
+    const finish = (proceed: boolean) => {
+      window.clearTimeout(timer);
+      signal.removeEventListener("abort", cancel);
+      resolve(proceed);
+    };
+    const cancel = () => finish(false);
+    const timer = window.setTimeout(() => finish(true), 3000);
+    signal.addEventListener("abort", cancel, { once: true });
+  });
 }
+
+type Operation = "save" | "sync" | "clear" | "toggle" | "messages";
+type Capabilities = { sync?: boolean; credentials?: boolean };
 
 export default function MisCausasPage() {
   const [status, setStatus] = useState<Status | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<Operation | null>(null);
+  const activeRequest = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"ok" | "warn" | "err">("ok");
   const [result, setResult] = useState<SyncResult | null>(null);
-  const [linkedCount, setLinkedCount] = useState(0);
+  const [linkedCount, setLinkedCount] = useState<number | null>(null);
   const [adminOnly, setAdminOnly] = useState(false);
   const [role, setRole] = useState<string | null>(null);
+  const [rutError, setRutError] = useState("");
+  const [credentialsRut, setCredentialsRut] = useState("");
+  const [credentialsPassword, setCredentialsPassword] = useState("");
 
-  async function load() {
-    const [res, meRes] = await Promise.all([
-      fetch("/api/pjud/mis-causas"),
-      fetch("/api/auth/me"),
-    ]);
-    const data = await res.json().catch(() => ({}));
-    const me = await meRes.json().catch(() => ({}));
-    if (me?.user?.role) setRole(me.user.role);
-    if (!res.ok) {
-      setMsgTone("err");
-      setMsg(data.error || "No se pudo cargar el estado de ClaveÚnica.");
-      return;
+  async function load(signal?: AbortSignal) {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const [res, meRes] = await Promise.all([
+        fetch("/api/pjud/mis-causas", { signal }),
+        fetch("/api/auth/me", { signal }),
+      ]);
+      const data = await res.json().catch(() => null);
+      const me = await meRes.json().catch(() => null);
+      if (signal?.aborted || !mounted.current) return;
+      if (me?.user?.role) setRole(me.user.role);
+      if (!res.ok || !data?.status) {
+        setLoadError(data?.error || "No se pudo cargar el estado de ClaveÚnica. Sus datos no se modificaron.");
+        return;
+      }
+      setStatus(data.status);
+      if (data.capabilities) setCapabilities(data.capabilities);
+      setLinkedCount(typeof data.causasCount === "number" ? data.causasCount : Array.isArray(data.causas) ? data.causas.length : null);
+    } catch {
+      if (!signal?.aborted && mounted.current) setLoadError("No se pudo conectar para comprobar el estado. Revise su conexión y vuelva a consultar.");
+    } finally {
+      if (!signal?.aborted && mounted.current) setLoading(false);
     }
-    setStatus(data.status || null);
-    setLinkedCount(
-      typeof data.causasCount === "number"
-        ? data.causasCount
-        : Array.isArray(data.causas)
-          ? data.causas.length
-          : 0
-    );
   }
 
   useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      void load();
-    });
+    mounted.current = true;
+    const controller = new AbortController();
+    queueMicrotask(() => { if (!controller.signal.aborted) void load(controller.signal); });
     return () => {
-      cancelled = true;
+      mounted.current = false;
+      controller.abort();
+      activeRequest.current?.abort();
+      activeRequest.current = null;
     };
   }, []);
 
-  async function saveCredentials(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setBusy(true);
+  function beginOperation(operation: Operation) {
+    if (activeRequest.current) return null;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setBusy(operation);
     setMsg("");
-    const fd = new FormData(e.currentTarget);
-    const rut = String(fd.get("rut") || "");
-    const password = String(fd.get("password") || "");
-    if (!validarRut(rut)) {
-      setBusy(false);
-      setMsgTone("err");
-      setMsg(
-        "El RUT no es válido. Revise el dígito verificador (el ejemplo 12.345.678-9 no sirve: use un RUT real)."
-      );
+    return controller;
+  }
+
+  function finishOperation(controller: AbortController) {
+    if (activeRequest.current === controller) {
+      activeRequest.current = null;
+      setBusy(null);
+    }
+  }
+
+  async function saveCredentials(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (activeRequest.current) return;
+    if (!validarRut(credentialsRut)) {
+      setRutError("El RUT no es válido. Revise su dígito verificador.");
+      event.currentTarget.querySelector<HTMLInputElement>('[name="rut"]')?.focus();
       return;
     }
-    const result = await apiMutation<{
-      error?: string;
-      enabled?: boolean;
-      rutMasked?: string | null;
-      hasPassword?: boolean;
-    }>("/api/pjud/claveunica", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "save",
-        rut,
-        password,
-      }),
+    const controller = beginOperation("save");
+    if (!controller) return;
+    setRutError("");
+    const response = await apiMutation<Status>("/api/pjud/claveunica", {
+      method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
+      body: JSON.stringify({ action: "save", rut: credentialsRut, password: credentialsPassword }),
     });
-    setBusy(false);
-    if (!result.ok) {
+    if (controller.signal.aborted) return;
+    finishOperation(controller);
+    if (!response.ok) {
       setMsgTone("err");
-      if (result.status === 403) {
-        setAdminOnly(true);
-        setMsg(
-          "Solo quien administra el estudio puede guardar o borrar la ClaveÚnica. Si ya está guardada, usted sí puede sincronizar."
-        );
-      } else {
-        setMsg(result.error || "No se pudieron guardar los datos de acceso.");
-      }
+      if (response.status === 403) setAdminOnly(true);
+      setMsg(response.status === 403 ? "Solo quien administra el estudio puede guardar o cambiar la ClaveÚnica." : response.error || "No se pudieron guardar los datos de acceso. Puede volver a intentarlo.");
       return;
     }
     setAdminOnly(false);
-    setStatus(result.data as Status);
+    setStatus(response.data);
+    setCredentialsPassword("");
     setMsgTone("ok");
-    setMsg(
-      "Listo: su ClaveÚnica quedó guardada de forma segura en este servidor. Ya puede sincronizar."
-    );
-    e.currentTarget.reset();
+    setMsg("Acceso guardado en este servidor. La contraseña se comprobará al sincronizar con OJV; guardarla no confirma que sea correcta.");
   }
 
-  async function clearCredentials() {
-    setBusy(true);
-    setMsg("");
-    const result = await apiMutation<Status>("/api/pjud/claveunica", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "clear" }),
+  async function credentialAction(action: "clear" | "enable" | "disable") {
+    const controller = beginOperation(action === "clear" ? "clear" : "toggle");
+    if (!controller) return;
+    const response = await apiMutation<Status>("/api/pjud/claveunica", {
+      method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
+      body: JSON.stringify({ action }),
     });
-    setBusy(false);
-    if (!result.ok) {
+    if (controller.signal.aborted) return;
+    finishOperation(controller);
+    if (!response.ok) {
       setMsgTone("err");
-      if (result.status === 403) {
-        setAdminOnly(true);
-        setMsg("Solo quien administra el estudio puede eliminar la ClaveÚnica.");
-      } else {
-        setMsg(result.error || "No se pudieron eliminar los datos.");
-      }
+      if (response.status === 403) setAdminOnly(true);
+      setMsg(response.status === 403 ? "Solo quien administra el estudio puede cambiar o eliminar el acceso." : response.error || "No se pudo confirmar el cambio. Vuelva a consultar el estado antes de intentarlo otra vez.");
       return;
     }
-    setStatus(result.data);
-    setResult(null);
+    setStatus(response.data);
     setMsgTone("ok");
-    setMsg("Se eliminaron el RUT y la contraseña de este estudio.");
+    setMsg(action === "clear" ? "Se eliminaron el RUT y la contraseña de este estudio. Las causas ya vinculadas se conservan." : action === "disable" ? "Conexión pausada. LexOpen no usará la ClaveÚnica hasta que la reanude." : "Conexión reanudada. Puede solicitar una sincronización si el canal está disponible.");
+    if (action === "clear") { setResult(null); setCredentialsPassword(""); }
   }
 
   async function clearErrors() {
-    setBusy(true);
-    setMsg("");
-    setResult(null);
-    const result = await apiMutation<{ ok?: boolean; status?: Status }>(
-      "/api/pjud/mis-causas",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "clear_errors" }),
-      }
-    );
-    setBusy(false);
-    if (!result.ok) {
-      setMsgTone("err");
-      setMsg(result.error || "No se pudieron limpiar los avisos.");
-      return;
-    }
-    if (result.data.status) setStatus(result.data.status);
+    const controller = beginOperation("messages");
+    if (!controller) return;
+    const response = await apiMutation<{ status?: Status }>("/api/pjud/mis-causas", {
+      method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
+      body: JSON.stringify({ action: "clear_errors" }),
+    });
+    if (controller.signal.aborted) return;
+    finishOperation(controller);
+    if (!response.ok) { setMsgTone("err"); setMsg(response.error || "No se pudieron limpiar los avisos. Puede reintentarlo."); return; }
+    if (response.data.status) setStatus(response.data.status);
     else await load();
-    setMsg("");
+    setMsgTone("ok");
+    setMsg("Avisos anteriores limpiados. No se inició una sincronización.");
   }
 
   async function syncMisCausas() {
-    setBusy(true);
-    setMsg("");
+    const controller = beginOperation("sync");
+    if (!controller) return;
     setResult(null);
     setMsgTone("ok");
-    setMsg(
-      "Sincronización iniciada. Puede tardar varios minutos (login ClaveÚnica + listado); no cierre esta página."
-    );
-    const result = await apiMutation<
-      SyncResult & {
-        status?: Status;
-        async?: boolean;
-        started?: boolean;
-      }
-    >("/api/pjud/mis-causas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    setMsg("Sincronización solicitada. OJV puede tardar varios minutos. Las causas recuperadas se incorporan al estudio y sus movimientos se actualizan por separado.");
+    const response = await apiMutation<SyncResult & { status?: Status; async?: boolean; started?: boolean }>("/api/pjud/mis-causas", {
+      method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
       body: JSON.stringify({ syncMovimientos: true }),
     });
-    if (!result.ok) {
-      setBusy(false);
+    if (controller.signal.aborted) return;
+    if (!response.ok) {
+      finishOperation(controller);
       setMsgTone("err");
-      setMsg(
-        result.error ||
-          "No se pudo sincronizar. Revise los pasos pendientes más abajo e intente de nuevo."
-      );
+      setMsg(response.error || "No se pudo confirmar la sincronización. Actualice el estado antes de volver a iniciarla.");
       await load();
       return;
     }
-    const data = result.data;
+    const data = response.data;
     if (data.status) setStatus(data.status);
-
-    // 202 async: poll until status leaves "running" (avoids Cloudflare 524).
     if (data.async) {
-      if (data.started === false) {
-        setMsg(
-          "Ya hay una sincronización en curso. Esperando el resultado…"
-        );
-      }
+      if (data.started === false) setMsg("Ya hay una sincronización en curso. Comprobando su resultado…");
       let finalStatus: Status | null = data.status || null;
-      for (let i = 0; i < 120; i++) {
-        await sleep(3000);
+      let obtainedFinalStatus = false;
+      for (let attempt = 0; attempt < 120; attempt++) {
+        if (!await waitForPoll(controller.signal)) return;
         try {
-          const res = await fetch("/api/pjud/mis-causas");
-          const body = await res.json().catch(() => ({}));
-          if (!res.ok) continue;
-          const st = (body as { status?: Status }).status || null;
-          if (st) {
-            setStatus(st);
-            finalStatus = st;
-          }
-          if (st?.lastSyncStatus && st.lastSyncStatus !== "running") {
-            break;
-          }
-        } catch {
-          /* keep polling */
-        }
+          const res = await fetch("/api/pjud/mis-causas", { signal: controller.signal });
+          const body = await res.json().catch(() => null);
+          if (controller.signal.aborted) return;
+          if (!res.ok || !body?.status) continue;
+          const nextStatus = body.status as Status;
+          setStatus(nextStatus);
+          finalStatus = nextStatus;
+          if (typeof body.causasCount === "number") setLinkedCount(body.causasCount);
+          if (nextStatus.lastSyncStatus && nextStatus.lastSyncStatus !== "running") { obtainedFinalStatus = true; break; }
+        } catch { if (controller.signal.aborted) return; }
       }
-      setBusy(false);
-      const note = finalStatus?.lastSyncNote || "";
-      const st = finalStatus?.lastSyncStatus;
-      if (st === "failed") {
+      finishOperation(controller);
+      if (!obtainedFinalStatus) {
+        setMsgTone("warn");
+        setMsg("No se pudo comprobar el resultado final. La sincronización puede seguir en el servidor. Actualice el estado antes de volver a iniciarla.");
+      } else if (finalStatus?.lastSyncStatus === "failed") {
         setMsgTone("err");
-        setMsg(note || "La sincronización falló.");
-      } else if (st === "partial") {
+        setMsg(finalStatus.lastSyncNote || "La sincronización falló. Revise el acceso y el canal de consulta antes de reintentar.");
+      } else if (finalStatus?.lastSyncStatus === "partial") {
         setMsgTone("warn");
-        setMsg(note || "Sincronización parcial.");
-      } else if (st === "running") {
-        setMsgTone("warn");
-        setMsg(
-          "La sincronización sigue en curso en el servidor. Recargue en unos minutos o revise el monitoreo."
-        );
-      } else {
+        setMsg(finalStatus.lastSyncNote || "La sincronización terminó con resultados parciales. Revise las causas y los movimientos pendientes en Cartera PJUD.");
+      } else if (finalStatus?.lastSyncStatus === "ok") {
         setMsgTone("ok");
-        setMsg(
-          note ||
-            "Sincronización terminada. Los movimientos se actualizan en segundo plano vía la cola de monitoreo."
-        );
+        setMsg(finalStatus.lastSyncNote || "Terminó la consulta de causas. Revise en Cartera PJUD el procesamiento de sus movimientos.");
+      } else {
+        setMsgTone("warn");
+        setMsg("El servidor respondió sin confirmar el resultado de la sincronización. Actualice el estado.");
       }
-      await load();
       return;
     }
-
-    setBusy(false);
+    finishOperation(controller);
     setResult(data);
-    setStatus(data.status || null);
     const failed = Number(data.syncFailed || 0);
     const listed = Number(data.listed || 0);
     const created = Number(data.created || 0);
     const linked = Number(data.linked || 0);
     const enqueued = Number(data.enqueued || 0);
     const inserted = Number(data.inserted || 0);
-    let summary = `Se encontraron ${listed} causa${listed === 1 ? "" : "s"}`;
-    if (created || linked) {
-      summary += ` (${created} nueva${created === 1 ? "" : "s"}, ${linked} ya estaban en LexOpen)`;
-    }
-    if (enqueued > 0 && failed === 0 && inserted === 0) {
-      summary += `. ${enqueued} puesta${enqueued === 1 ? "" : "s"} en cola para movimientos.`;
-      setMsgTone("ok");
-    } else if (failed > 0) {
-      summary += `. Algunas no pudieron actualizar sus movimientos (${failed}). Revise el monitoreo.`;
-      setMsgTone("warn");
-    } else if (inserted > 0) {
-      summary += `. Se agregaron ${inserted} movimiento${inserted === 1 ? "" : "s"} nuevo${inserted === 1 ? "" : "s"}.`;
-      setMsgTone("ok");
-    } else {
-      summary += ". Todo al día.";
-      setMsgTone("ok");
-    }
+    let summary = listed === 0 ? "OJV no devolvió causas en esta consulta. Esto no acredita que su cuenta no tenga causas." : `${listed === 1 ? "Se recuperó" : "Se recuperaron"} ${listed} causa${listed === 1 ? "" : "s"} (${created} nueva${created === 1 ? "" : "s"}, ${linked} ya vinculada${linked === 1 ? "" : "s"}).`;
+    if (failed > 0) summary += ` ${failed} ${failed === 1 ? "causa no pudo" : "causas no pudieron"} actualizar sus movimientos. Revise Cartera PJUD.`;
+    else if (enqueued > 0) summary += ` ${enqueued} quedaron en cola para recuperar sus movimientos.`;
+    else if (inserted > 0) summary += ` Se agregaron ${inserted} movimiento${inserted === 1 ? "" : "s"} nuevo${inserted === 1 ? "" : "s"}.`;
+    else if (listed > 0) summary += " No se informaron movimientos nuevos en esta respuesta.";
+    setMsgTone(failed > 0 || listed === 0 ? "warn" : "ok");
     setMsg(summary);
     await load();
   }
 
-  const canOperate = role === "admin" || role === "abogado";
+  const canOperate = capabilities?.sync ?? (role === "admin" || role === "socio");
+  const canManageCredentials = (capabilities?.credentials ?? role === "admin") && !adminOnly;
   const syncDisabled =
-    busy ||
+    Boolean(busy) ||
+    loading ||
     !canOperate ||
     !status?.hasPassword ||
     status?.readyToSync === false ||
@@ -343,29 +319,24 @@ export default function MisCausasPage() {
   const syncTitle = lastSyncLabel(status?.lastSyncStatus);
 
   return (
-    <div className="space-y-6">
+    <div className="pjud-cu space-y-6">
       <PageHeader
-        eyebrow="Poder Judicial"
         title="ClaveÚnica"
-        subtitle="Credenciales y sync de cartera OJV. Las causas quedan en Expediente; los movimientos, en Cartera PJUD."
+        subtitle="Consulte las causas de su cuenta OJV y decida cuándo incorporarlas al estudio. Las causas se abren en Expediente; sus movimientos se revisan en Cartera PJUD."
       />
 
+      {loadError && <div className="pjud-cu-message" data-tone="err" role="alert"><p>{loadError}</p><button type="button" className="btn btn-ghost" disabled={loading || Boolean(busy)} onClick={() => void load()}>Volver a consultar estado</button></div>}
       <section className="panel space-y-4 rounded-[var(--radius-lg)] p-5">
         <div
-          className={`rounded-[var(--radius-md)] border px-4 py-3 ${
-            ready
-              ? "border-emerald-200 bg-emerald-50/70 text-emerald-950"
-              : "border-amber-200 bg-amber-50/70 text-amber-950"
-          }`}
+          className="pjud-cu-message"
+          data-tone={ready ? "ok" : "warn"}
           role="status"
         >
           <p className="text-sm font-semibold">
-            {status?.readinessLabel ||
-              (ready ? "Listo para sincronizar" : "Aún no se puede sincronizar")}
+            {loading && !status ? "Consultando el estado de ClaveÚnica…" : !status ? "Estado sin comprobar" : status.readinessLabel || (ready ? "Listo para sincronizar" : "Aún no se puede sincronizar")}
           </p>
           <p className="mt-1 text-sm opacity-90">
-            {status?.readinessHint ||
-              "Complete los pasos de abajo para conectar su ClaveÚnica."}
+            {status?.readinessHint || (status ? "Revise el acceso guardado y el canal de consulta antes de sincronizar." : "Espere la respuesta del servidor o vuelva a consultar si la carga falla.")}
           </p>
           {status?.channelLabel && ready ? (
             <p className="mt-2 text-xs opacity-80">
@@ -374,18 +345,18 @@ export default function MisCausasPage() {
           ) : null}
         </div>
 
-        <ol className="grid gap-3 text-sm sm:grid-cols-3">
-          <li className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--sea)]">
+        <ol className="pjud-cu-steps grid gap-4 text-sm sm:grid-cols-3">
+          <li className="border-t border-[var(--line)] pt-3">
+            <div className="text-sm font-semibold text-[var(--sea)]">
               1. Guardar acceso
             </div>
             <p className="mt-2 text-[var(--ink-soft)]/80">
               Un administrador ingresa el RUT y la contraseña de ClaveÚnica. Quedan
-              cifrados en este Host.
+              cifrados en este servidor; guardarlos no comprueba el acceso.
             </p>
           </li>
-          <li className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--sea)]">
+          <li className="border-t border-[var(--line)] pt-3">
+            <div className="text-sm font-semibold text-[var(--sea)]">
               2. Sincronizar
             </div>
             <p className="mt-2 text-[var(--ink-soft)]/80">
@@ -393,8 +364,8 @@ export default function MisCausasPage() {
               incorpora o actualiza en el estudio.
             </p>
           </li>
-          <li className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--sea)]">
+          <li className="border-t border-[var(--line)] pt-3">
+            <div className="text-sm font-semibold text-[var(--sea)]">
               3. Seguir en el apartado
             </div>
             <p className="mt-2 text-[var(--ink-soft)]/80">
@@ -413,9 +384,9 @@ export default function MisCausasPage() {
       </section>
 
       {!canOperate && role === "asistente" && (
-        <p className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+        <p className="pjud-cu-message text-sm" data-tone="warn">
           Su perfil de asistente puede ver el estado, pero no guardar
-          credenciales ni sincronizar. Pida a un abogado o administrador.
+          credenciales ni sincronizar. Pida ayuda a quien supervisa el estudio.
         </p>
       )}
 
@@ -432,20 +403,20 @@ export default function MisCausasPage() {
               Acceso:{" "}
               {status?.hasPassword
                 ? `guardado${status.rutMasked ? ` (${status.rutMasked})` : ""}`
-                : "sin guardar"}
+                : status ? "sin guardar" : "sin comprobar"}
             </span>
             <span className="rounded-full border border-[var(--line)] px-3 py-1">
-              Conexión: {status?.enabled ? "activa" : "pausada"}
+              Conexión: {status ? status.enabled ? "activa" : "pausada" : "sin comprobar"}
             </span>
             <span className="rounded-full border border-[var(--line)] px-3 py-1">
-              CAPTCHA: {status?.captchaConfigured ? "configurado" : "pendiente"}
+              CAPTCHA: {status ? status.captchaConfigured ? "configurado" : "pendiente" : "sin comprobar"}
             </span>
           </div>
         </div>
 
         {(syncTitle || status?.lastSyncNote) && (
           <div className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 text-sm">
-            <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="pjud-cu-last-sync flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 {syncTitle && (
                   <p className="font-medium">
@@ -465,7 +436,7 @@ export default function MisCausasPage() {
                 <button
                   type="button"
                   className="btn btn-ghost shrink-0 text-xs"
-                  disabled={busy || !canOperate || status?.lastSyncStatus === "running"}
+                  disabled={Boolean(busy) || !canOperate || status?.lastSyncStatus === "running"}
                   onClick={clearErrors}
                 >
                   Limpiar avisos
@@ -477,7 +448,7 @@ export default function MisCausasPage() {
 
         {status?.blockers && status.blockers.length > 0 && (
           <div
-            className="rounded-[var(--radius-md)] border border-rose-200 bg-rose-50/70 px-4 py-3 text-sm text-rose-950"
+            className="pjud-cu-message text-sm" data-tone="err"
             role="status"
           >
             <p className="font-semibold">Qué falta para poder sincronizar</p>
@@ -486,7 +457,7 @@ export default function MisCausasPage() {
                 <li key={b}>{b}</li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-rose-900/80">
+            <p className="mt-3 text-sm">
               Si el servidor no puede consultar el PJUD, el detalle está en{" "}
               <Link href="/configuracion#pjud-log" className="underline">
                 Configuración → PJUD
@@ -497,9 +468,8 @@ export default function MisCausasPage() {
         )}
 
         {adminOnly && (
-          <p className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
-            Su usuario puede sincronizar, pero no cambiar el RUT ni la contraseña.
-            Pida a un administrador del estudio que guarde la ClaveÚnica.
+          <p className="pjud-cu-message text-sm" data-tone="warn">
+            El servidor no autorizó el cambio de credenciales. Pida a quien administra el estudio que revise sus permisos.
           </p>
         )}
 
@@ -512,6 +482,7 @@ export default function MisCausasPage() {
           </p>
           <form
             onSubmit={saveCredentials}
+            aria-busy={busy === "save"}
             className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
           >
             <label className="block text-sm sm:col-span-1">
@@ -520,9 +491,16 @@ export default function MisCausasPage() {
                 className="input"
                 name="rut"
                 required
-                placeholder="Ej. 12.345.678-5"
+                value={credentialsRut}
+                maxLength={20}
+                disabled={Boolean(busy) || loading || !canManageCredentials}
+                aria-invalid={Boolean(rutError)}
+                aria-describedby={rutError ? "cu-rut-error" : undefined}
+                onChange={event => { setCredentialsRut(event.target.value); setRutError(""); }}
+                placeholder="RUT con dígito verificador"
                 autoComplete="username"
               />
+              {rutError && <span id="cu-rut-error" className="pjud-lookup-field-error">{rutError}</span>}
             </label>
             <label className="block text-sm sm:col-span-1">
               <span className="mb-1 block text-[var(--muted)]">
@@ -533,23 +511,29 @@ export default function MisCausasPage() {
                 name="password"
                 type="password"
                 required
+                minLength={4}
+                maxLength={200}
+                value={credentialsPassword}
+                onChange={event => setCredentialsPassword(event.target.value)}
+                disabled={Boolean(busy) || loading || !canManageCredentials}
                 placeholder="Contraseña ClaveÚnica"
                 autoComplete="current-password"
               />
             </label>
             <div className="flex items-end">
-              <button className="btn btn-primary w-full" disabled={busy || !canOperate} type="submit">
-                Guardar de forma segura
+              <button className="btn btn-primary w-full" disabled={Boolean(busy) || loading || !canManageCredentials} type="submit">
+                {busy === "save" ? "Guardando acceso…" : "Guardar de forma segura"}
               </button>
             </div>
           </form>
           <p className="text-xs text-[var(--muted)]">
-            Al guardar, LexOpen podrá iniciar sesión automáticamente en su nombre
-            para listar causas. Puede pausar o borrar el acceso cuando quiera.
+            Al guardar, autoriza a LexOpen a iniciar sesión en su nombre para listar causas. Sólo un administrador puede cambiar, pausar o eliminar este acceso. Las credenciales son del estudio.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 border-t border-[var(--line)] pt-4">
+        {!canManageCredentials && role && <p className="text-sm text-[var(--muted)]">Sólo quien administra el estudio puede guardar o cambiar estas credenciales.</p>}
+        {!canOperate && role && role !== "asistente" && <p className="text-sm text-[var(--muted)]">La sincronización incorpora causas al estudio y requiere permiso de supervisión. Puede consultar el estado actual.</p>}
+        <div className="pjud-cu-actions flex flex-wrap gap-2 border-t border-[var(--line)] pt-4">
           <button
             type="button"
             className="btn btn-secondary"
@@ -561,44 +545,14 @@ export default function MisCausasPage() {
             }
             onClick={syncMisCausas}
           >
-            {busy ? "Sincronizando…" : "Sincronizar ahora"}
+            {busy === "sync" ? "Sincronizando…" : "Sincronizar ahora"}
           </button>
           {status?.hasPassword && (
             <button
               type="button"
               className="btn btn-ghost"
-              disabled={busy || !canOperate}
-              onClick={async () => {
-                setBusy(true);
-                setMsg("");
-                const result = await apiMutation<Status>("/api/pjud/claveunica", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    action: status.enabled ? "disable" : "enable",
-                  }),
-                });
-                setBusy(false);
-                if (!result.ok) {
-                  setMsgTone("err");
-                  if (result.status === 403) {
-                    setAdminOnly(true);
-                    setMsg(
-                      "Solo quien administra el estudio puede pausar o reanudar la conexión."
-                    );
-                  } else {
-                    setMsg(result.error || "No se pudo cambiar el estado.");
-                  }
-                  return;
-                }
-                setStatus(result.data);
-                setMsgTone("ok");
-                setMsg(
-                  status.enabled
-                    ? "Conexión pausada. LexOpen no usará la ClaveÚnica hasta que la reanude."
-                    : "Conexión reanudada. Ya puede sincronizar de nuevo."
-                );
-              }}
+              disabled={Boolean(busy) || loading || !canManageCredentials}
+              onClick={() => void credentialAction(status.enabled ? "disable" : "enable")}
             >
               {status.enabled ? "Pausar conexión" : "Reanudar conexión"}
             </button>
@@ -606,11 +560,12 @@ export default function MisCausasPage() {
           <button
             type="button"
             className="btn btn-ghost"
-            disabled={busy || !status?.hasPassword || !canOperate}
-            onClick={clearCredentials}
+            disabled={Boolean(busy) || loading || !status?.hasPassword || !canManageCredentials}
+            onClick={() => void credentialAction("clear")}
           >
             Eliminar acceso guardado
           </button>
+          <button type="button" className="btn btn-ghost" disabled={loading || Boolean(busy)} onClick={() => void load()}>{loading ? "Consultando estado…" : "Actualizar estado"}</button>
           <Link href="/causas?origen=claveunica" className="btn btn-ghost">
             Ver en Expediente
           </Link>
@@ -621,20 +576,15 @@ export default function MisCausasPage() {
 
         {msg && (
           <div
-            className={`flex flex-wrap items-start justify-between gap-2 rounded-[var(--radius-md)] border px-4 py-3 text-sm ${
-              msgTone === "err"
-                ? "border-rose-200 bg-rose-50 text-rose-900"
-                : msgTone === "warn"
-                  ? "border-amber-200 bg-amber-50 text-amber-950"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-950"
-            }`}
-            role="status"
+            className="pjud-cu-message flex flex-wrap items-start justify-between gap-2"
+            data-tone={msgTone}
+            role={msgTone === "err" ? "alert" : "status"}
             data-testid="claveunica-msg"
           >
             <p className="min-w-0 flex-1">{msg}</p>
             <button
               type="button"
-              className="shrink-0 text-xs underline-offset-2 hover:underline"
+              className="pjud-cu-dismiss shrink-0 text-sm underline-offset-2 hover:underline"
               onClick={() => setMsg("")}
             >
               Cerrar
@@ -649,9 +599,8 @@ export default function MisCausasPage() {
             Resultado de la sincronización ({result.listed})
           </h2>
           {result.syncFailed ? (
-            <p className="mt-1 text-sm text-amber-800">
-              {result.syncFailed} no pudieron actualizar sus movimientos. Puede
-              reintentar desde Cartera PJUD.
+            <p className="mt-1 text-sm text-[var(--warn)]">
+              {result.syncFailed} {result.syncFailed === 1 ? "causa no pudo" : "causas no pudieron"} actualizar sus movimientos. Puede reintentar desde Cartera PJUD.
             </p>
           ) : (
             <p className="mt-1 text-sm text-[var(--muted)]">
@@ -669,7 +618,7 @@ export default function MisCausasPage() {
             </Link>
           </p>
           <ul className="mt-4 space-y-2 text-sm">
-            {result.items.map((item) => (
+            {(result.items || []).map((item) => (
               <li
                 key={`${item.causaId || item.rit}-${item.tribunal}`}
                 className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3"
@@ -677,7 +626,7 @@ export default function MisCausasPage() {
                 {item.causaId ? (
                   <Link
                     href={`/causas/${item.causaId}?from=mis-causas`}
-                    className="font-medium text-[var(--sea)]"
+                    className="pjud-cu-case-link font-medium text-[var(--sea)]"
                   >
                     {item.rit}
                   </Link>
@@ -690,9 +639,9 @@ export default function MisCausasPage() {
                 </div>
               </li>
             ))}
-            {result.items.length === 0 && (
+            {(!result.items || result.items.length === 0) && (
               <li className="text-sm text-[var(--muted)]">
-                No aparecieron causas en esta sincronización.
+                No se recibieron causas en esta sincronización. Revise el acceso utilizado o vuelva a consultar más tarde; esto no acredita ausencia de causas.
               </li>
             )}
           </ul>
@@ -701,11 +650,10 @@ export default function MisCausasPage() {
 
       <section className="panel rounded-[var(--radius-lg)] p-5">
         <h2 className="text-lg font-semibold">
-          {linkedCount} causa{linkedCount === 1 ? "" : "s"} vinculada
-          {linkedCount === 1 ? "" : "s"} desde ClaveÚnica
+          {linkedCount === null ? "Causas vinculadas desde ClaveÚnica: sin comprobar" : `${linkedCount} ${linkedCount === 1 ? "causa vinculada" : "causas vinculadas"} desde ClaveÚnica`}
         </h2>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          No es un segundo expediente: abra el filtro de origen en Expediente.
+          Abra el filtro de origen en Expediente para revisar las causas ya incorporadas al estudio.
         </p>
         <Link href="/causas?origen=claveunica" className="btn btn-secondary mt-4">
           Ver en Expediente

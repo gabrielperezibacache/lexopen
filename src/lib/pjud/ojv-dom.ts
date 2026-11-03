@@ -14,8 +14,8 @@ export const OJV_BASE = "https://oficinajudicialvirtual.pjud.cl";
 export const OJV_HOME = `${OJV_BASE}/home/index.php`;
 /** Shell autenticado post ClaveÚnica (aparece referenciado desde el home). */
 export const OJV_INDEX_N = `${OJV_BASE}/indexN.php`;
-export const OJV_CONSULTA_URL =
-  "https://www.pjud.cl/consulta-unificada-de-causas";
+/** Entrada pública comprobada; la antigua consulta-unificada-de-causas devuelve 404. */
+export const OJV_CONSULTA_URL = OJV_HOME;
 
 export const OJV_POST_AUTH_URLS = [OJV_INDEX_N, OJV_HOME] as const;
 
@@ -103,13 +103,35 @@ export function tribunalMatchScore(optionLabel: string, wanted: string) {
   const b = normalizeTribunalLabel(wanted);
   if (!a || !b) return 0;
   if (a === b) return 1;
-  if (a.includes(b) || b.includes(a)) return 0.92;
   const ta = new Set(tribunalMatchTokens(optionLabel));
   const tb = tribunalMatchTokens(wanted);
   if (!tb.length) return 0;
+  const numbersA = [...ta].filter((t) => /^\d+$/.test(t));
+  const numbersB = tb.filter((t) => /^\d+$/.test(t));
+  if (numbersA.join("|") !== numbersB.join("|")) {
+    return 0;
+  }
+  const jurisdiction = (tokens: Iterable<string>) => {
+    const kinds = new Set<string>();
+    for (const token of tokens) {
+      if (/^(civil|familia|garantia|penal|cobranza|suprema)$/.test(token)) kinds.add(token);
+      if (/^apelacion(?:es)?$/.test(token)) kinds.add("apelaciones");
+      if (/^(laboral|trabajo)$/.test(token)) kinds.add("laboral");
+    }
+    return kinds;
+  };
+  const kindsA = jurisdiction(ta);
+  const kindsB = jurisdiction(tb);
+  if (kindsA.size && kindsB.size && (kindsA.size !== kindsB.size || ![...kindsA].every((kind) => kindsB.has(kind)))) return 0;
+  const placeTokens = (tokens: Iterable<string>) => [...tokens].filter((token) =>
+    !/^\d+$/.test(token) && !/^(juzgado|juz|corte|tribunal|letras|apelacion|apelaciones|civil|familia|garantia|penal|cobranza|trabajo|laboral|oral|juicio|policia|local|constitucional|suprema|competencia|comun|mixto|previsional)$/.test(token)
+  );
+  const placesA = placeTokens(ta);
+  const placesB = placeTokens(tb);
+  if (placesA.length && placesB.length && (placesA.length !== placesB.length || !placesA.every((place) => placesB.includes(place)))) return 0;
   let hit = 0;
   for (const t of tb) if (ta.has(t)) hit += 1;
-  const overlap = hit / tb.length;
+  const overlap = hit / Math.max(ta.size, tb.length);
   // Require city/comuna-ish token when possible
   return overlap;
 }
@@ -125,14 +147,20 @@ export function pickBestTribunalOption(
   wanted: string
 ): { value: string; label: string; score: number } | null {
   let best: { value: string; label: string; score: number } | null = null;
+  let ambiguous = false;
   for (const o of options) {
     if (!o.value || o.value === "0") continue;
     if (/seleccione/i.test(o.label)) continue;
     const score = tribunalMatchScore(o.label, wanted);
     if (score < 0.72) continue;
-    if (!best || score > best.score) best = { ...o, score };
+    if (!best || score > best.score) {
+      best = { ...o, score };
+      ambiguous = false;
+    } else if (score === best.score && o.value !== best.value) {
+      ambiguous = true;
+    }
   }
-  return best;
+  return ambiguous ? null : best;
 }
 
 /** Split Chilean RUT into cuerpo + DV. Accepts dotted/dashed forms. */
@@ -160,6 +188,31 @@ export function parseRitParts(rit: string): {
   const plain = raw.match(/^(\d{1,6})-(\d{4})$/);
   if (plain) return { tipo: null, numero: plain[1], era: plain[2] };
   return null;
+}
+
+/** Complete RIT/ROL tokens only; never match C-1-2024 inside C-11-2024. */
+export function extractRitsFromText(text: string): string[] {
+  return [...new Set(
+    Array.from(text.toUpperCase().matchAll(/(?:^|[^A-Z0-9-])([A-Z]{1,4}-\d{1,6}-\d{4}|\d{1,6}-\d{4})(?![A-Z0-9-])/g), (m) => m[1])
+  )];
+}
+
+export function ritLabelsMatch(candidate: string, wanted: string) {
+  const a = parseRitParts(candidate);
+  const b = parseRitParts(wanted);
+  return Boolean(a && b && a.tipo === b.tipo && Number(a.numero) === Number(b.numero) && a.era === b.era);
+}
+
+/** A detail link must belong to one exact RIT and a compatible real tribunal. */
+export function causeRowMatches(
+  cells: string[],
+  wanted: { rit: string; tribunal: string }
+) {
+  if (isPlaceholderTribunal(wanted.tribunal)) return false;
+  const rits = extractRitsFromText(cells.join(" "));
+  if (rits.length !== 1 || !ritLabelsMatch(rits[0], wanted.rit)) return false;
+  const tribunal = pickTribunalFromTexts(cells);
+  return Boolean(tribunal && tribunalLabelsMatch(tribunal, wanted.tribunal));
 }
 
 export function normalizeTribunalLabel(label: string) {

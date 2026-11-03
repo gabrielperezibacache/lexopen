@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireRole } from "@/lib/api";
 import { writeAuditStrict } from "@/lib/audit";
+import { privatePjudJson as json, privatePjudResponse } from "@/lib/pjud/private-response";
 import {
   clearClaveUnicaCredentials,
   getClaveUnicaStatus,
@@ -12,9 +13,9 @@ import {
 export async function GET() {
   try {
     await requireRole("admin");
-    return NextResponse.json(await getClaveUnicaStatus());
+    return json(await getClaveUnicaStatus());
   } catch (e) {
-    return handleRouteError(e);
+    return privatePjudResponse(handleRouteError(e));
   }
 }
 
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "save") {
       if (!body.rut || !body.password) {
-        return NextResponse.json(
+        return json(
           { error: "RUT y contraseña ClaveÚnica son requeridos" },
           { status: 400 }
         );
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
         entityType: "FirmSettings",
         after: { rutMasked: true },
       });
-      return NextResponse.json(await getClaveUnicaStatus());
+      return json(await getClaveUnicaStatus());
     }
 
     if (body.action === "clear") {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
         action: "pjud.claveunica.clear",
         entityType: "FirmSettings",
       });
-      return NextResponse.json(await getClaveUnicaStatus());
+      return json(await getClaveUnicaStatus());
     }
 
     await setClaveUnicaEnabled(body.action === "enable");
@@ -68,8 +69,8 @@ export async function POST(req: NextRequest) {
       action: `pjud.claveunica.${body.action}`,
       entityType: "FirmSettings",
     });
-    return NextResponse.json(await getClaveUnicaStatus());
+    return json(await getClaveUnicaStatus());
   } catch (e) {
-    return handleRouteError(e);
+    return privatePjudResponse(handleRouteError(e));
   }
 }

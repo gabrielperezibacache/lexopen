@@ -22,6 +22,8 @@ import { pdfBackupEnabled, backupMovimientoDocuments, ingestPjudDocumentBuffer }
 import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
 import { publicScrapeEnabled, publicScrapeReady, claveUnicaAutomationAllowed } from "@/lib/pjud/public-scrape";
 import { pjudWebhookConfigured } from "@/lib/pjud/webhook";
+import type { Prisma } from "@prisma/client";
+import { normalizePjudCuaderno, omitLegacyScrapeAliases, type PjudFetchedMovimiento } from "@/lib/pjud/types";
 
 export type SyncCausaResult = {
   causaId: string;
@@ -53,6 +55,70 @@ function nextSyncAtFrom(now = new Date(), failCount = 0) {
       ? 1
       : Math.min(8, 2 ** Math.min(Math.max(failCount - 1, 0), 3));
   return new Date(now.getTime() + base * factor);
+}
+
+/** Promote a compatible historical fingerprint in place, preserving its documents. */
+export async function persistFetchedPjudMovimientos(
+  tx: Pick<Prisma.TransactionClient, "$queryRaw" | "causaMovimiento">,
+  causaId: string,
+  movimientos: PjudFetchedMovimiento[]
+) {
+  const fetchedCount = movimientos.length;
+  movimientos = omitLegacyScrapeAliases(movimientos);
+  // Serialize promotion + insertion for this cause, including concurrent manual syncs.
+  await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${causaId} FOR UPDATE`;
+  const externalIds = [...new Set(movimientos.flatMap((movement) =>
+    [movement.externalId, ...(movement.legacyExternalId ? [movement.legacyExternalId] : [])]
+  ))];
+  const existing = externalIds.length ? await tx.causaMovimiento.findMany({
+    where: { causaId, externalId: { in: externalIds } },
+    select: { id: true, externalId: true, cuaderno: true },
+  }) : [];
+  const byExternalId = new Map(existing.filter((row) => row.externalId).map((row) => [row.externalId!, row]));
+  const pending: PjudFetchedMovimiento[] = [];
+  const seen = new Set<string>();
+  for (const movement of movimientos) {
+    if (seen.has(movement.externalId) || byExternalId.has(movement.externalId)) continue;
+    seen.add(movement.externalId);
+    const legacy = movement.legacyExternalId ? byExternalId.get(movement.legacyExternalId) : null;
+    const cuaderno = normalizePjudCuaderno(movement.cuaderno);
+    if (legacy && cuaderno && normalizePjudCuaderno(legacy.cuaderno) === cuaderno) {
+      await tx.causaMovimiento.update({
+        where: { id: legacy.id },
+        data: { externalId: movement.externalId },
+      });
+      byExternalId.delete(movement.legacyExternalId!);
+      byExternalId.set(movement.externalId, { ...legacy, externalId: movement.externalId });
+    } else {
+      pending.push(movement);
+    }
+  }
+  const created = pending.length ? await tx.causaMovimiento.createMany({
+    data: pending.map((m) => ({
+      causaId,
+      titulo: m.titulo,
+      detalle: m.detalle || null,
+      fuente: m.fuente,
+      tipo: m.tipo || "otro",
+      referencia: m.referencia || null,
+      externalId: m.externalId,
+      relevante: Boolean(m.relevante),
+      cuaderno: normalizePjudCuaderno(m.cuaderno) ? m.cuaderno!.trim() : null,
+      folio: m.folio || null,
+      etapa: m.etapa || null,
+      tramite: m.tramite || null,
+      esReceptor: Boolean(m.esReceptor),
+      pendienteResolucion: Boolean(m.pendienteResolucion),
+      documentoRef: m.documentoRef || null,
+      fecha: m.fecha,
+    })),
+    skipDuplicates: true,
+  }) : { count: 0 };
+  return {
+    inserted: created.count,
+    skipped: fetchedCount - created.count,
+    newRelevant: pending.filter((movement) => movement.relevante).map((movement) => movement.titulo),
+  };
 }
 
 export async function syncCausaPjud(
@@ -196,51 +262,18 @@ export async function syncCausaPjud(
     };
   }
 
+  // Use the same scoped set for persistence, PDF ingestion, and displayed metrics.
+  fetchResult = { ...fetchResult, movimientos: omitLegacyScrapeAliases(fetchResult.movimientos) };
   let inserted = 0;
   let skipped = 0;
   const newRelevant: string[] = [];
   const next = nextSyncAtFrom();
 
   await prisma.$transaction(async (tx) => {
-    const externalIds = fetchResult.movimientos.map((m) => m.externalId);
-    const existing = externalIds.length
-      ? await tx.causaMovimiento.findMany({
-          where: { causaId, externalId: { in: externalIds } },
-          select: { externalId: true },
-        })
-      : [];
-    const existingIds = new Set(
-      existing.map((row) => row.externalId).filter((id): id is string => Boolean(id))
-    );
-    const pending = fetchResult.movimientos.filter(
-      (movement) => !existingIds.has(movement.externalId)
-    );
-    const created = await tx.causaMovimiento.createMany({
-      data: pending.map((m) => ({
-        causaId,
-        titulo: m.titulo,
-        detalle: m.detalle || null,
-        fuente: m.fuente,
-        tipo: m.tipo || "otro",
-        referencia: m.referencia || null,
-        externalId: m.externalId,
-        relevante: Boolean(m.relevante),
-        cuaderno: m.cuaderno || "Principal",
-        folio: m.folio || null,
-        etapa: m.etapa || null,
-        tramite: m.tramite || null,
-        esReceptor: Boolean(m.esReceptor),
-        pendienteResolucion: Boolean(m.pendienteResolucion),
-        documentoRef: m.documentoRef || null,
-        fecha: m.fecha,
-      })),
-      skipDuplicates: true,
-    });
-    inserted = created.count;
-    skipped = fetchResult.movimientos.length - inserted;
-    for (const movement of pending) {
-      if (movement.relevante) newRelevant.push(movement.titulo);
-    }
+    const persisted = await persistFetchedPjudMovimientos(tx, causaId, fetchResult.movimientos);
+    inserted = persisted.inserted;
+    skipped = persisted.skipped;
+    newRelevant.push(...persisted.newRelevant);
 
     const status = fetchResult.demo ? "demo" : "ok";
     // No reactivar monitoreo si el estudio lo pausó mientras el job estaba en cola
@@ -341,7 +374,7 @@ export async function syncCausaPjud(
   const cuadernos = [
     ...new Set(
       fetchResult.movimientos
-        .map((m) => m.cuaderno || "Principal")
+        .map((m) => normalizePjudCuaderno(m.cuaderno) ? m.cuaderno!.trim() : null)
         .filter(Boolean) as string[]
     ),
   ];

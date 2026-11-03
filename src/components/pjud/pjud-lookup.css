@@ -1,0 +1,94 @@
+.pjud-lookup { padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-solid); scroll-margin-top: 7rem; min-width: 0; }
+.pjud-lookup-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1.25rem 2rem; margin-bottom: 1.75rem; }
+.pjud-lookup h2, .pjud-lookup h3 { font-family: var(--font-fraunces), Georgia, serif; color: var(--ink); }
+.pjud-lookup h2 { margin: 0 0 .5rem; font-size: clamp(1.5rem, 2vw, 1.85rem); line-height: 1.25; letter-spacing: -.02em; }
+.pjud-lookup h3 { margin: 0; font-size: 1.35rem; line-height: 1.3; }
+.pjud-lookup h4 { margin: 0 0 .4rem; font-size: 1rem; font-weight: 600; line-height: 1.5; }
+.pjud-lookup p { margin: 0; max-width: 72ch; color: var(--ink-soft); line-height: 1.7; }
+.pjud-lookup-header p { max-width: 65ch; }
+.pjud-lookup-modes { display: inline-flex; gap: .25rem; padding: .25rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md); }
+.pjud-lookup-modes button { min-height: 44px; padding: .55rem .85rem; border-radius: var(--radius-sm); color: var(--ink-soft); font-size: .875rem; font-weight: 600; transition: background var(--motion-fast) var(--motion-ease); }
+.pjud-lookup-modes button[aria-pressed="true"] { background: var(--sea-soft); color: var(--sea); }
+.pjud-lookup-modes button:hover { background: var(--mist); }
+.pjud-lookup-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; gap: 1.25rem 1.5rem; }
+.pjud-lookup-field { display: grid; min-width: 0; gap: .5rem; color: var(--ink); font-size: .875rem; font-weight: 600; }
+.pjud-lookup-required { font-weight: 400; color: var(--muted); }
+.pjud-lookup .input { font-size: 1rem; font-weight: 400; }
+.pjud-lookup .input::placeholder { color: var(--muted); opacity: 1; }
+.pjud-lookup-full { grid-column: 1 / -1; }
+.pjud-lookup-hint, .pjud-lookup .pjud-lookup-hint { color: var(--muted); font-size: .875rem; line-height: 1.65; font-weight: 400; }
+.pjud-lookup-field-error { color: var(--danger); font-size: .875rem; font-weight: 400; line-height: 1.65; }
+.pjud-lookup-catalogue { display: flex; flex-wrap: wrap; gap: 0 1rem; align-items: center; font-size: .875rem; }
+.pjud-lookup-catalogue:empty { display: none; }
+.pjud-lookup-actions { display: flex; flex-wrap: wrap; gap: .75rem 1rem; align-items: center; }
+.pjud-lookup-text-action { display: inline-flex; align-items: center; min-height: 44px; color: var(--sea); font-size: .875rem; text-decoration: underline; text-underline-offset: .25rem; cursor: pointer; }
+.pjud-lookup-channel, .pjud-lookup .pjud-lookup-channel { margin-bottom: 1.5rem; padding-block: 1rem; border-block: 1px solid var(--line); font-size: .875rem; }
+.pjud-lookup-message { margin-top: 1.5rem; padding-block: 1rem; border-block: 1px solid var(--line-strong); }
+.pjud-lookup-message[data-error="true"] p { color: var(--danger); }
+.pjud-lookup .pjud-lookup-progress { margin-top: 1.25rem; color: var(--ink-soft); font-size: .875rem; }
+.pjud-lookup-result { margin-top: 1.75rem; padding-top: 1.75rem; border-top: 1px solid var(--line-strong); min-width: 0; }
+.pjud-lookup-result-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 1.5rem; margin-bottom: 1.25rem; }
+.pjud-lookup-result-heading > span { color: var(--sea); font-size: .875rem; }
+.pjud-lookup-identity { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 1rem 1.5rem; margin: 0 0 1.25rem; }
+.pjud-lookup-identity div { min-width: 0; }
+.pjud-lookup-identity dt { color: var(--muted); font-size: .875rem; margin-bottom: .25rem; }
+.pjud-lookup-identity dd { color: var(--ink); font-size: 1rem; margin: 0; overflow-wrap: anywhere; }
+.pjud-lookup .pjud-lookup-advisory { color: var(--ink-soft); font-size: .875rem; padding: .85rem 1rem; background: var(--sea-soft); border-radius: var(--radius-sm); margin-bottom: 1.25rem; }
+.pjud-lookup .pjud-lookup-note { margin-bottom: 1.25rem; font-size: .875rem; overflow-wrap: anywhere; }
+.pjud-lookup-movements { list-style: none; padding: 0; margin: .75rem 0 0; }
+.pjud-lookup-movements li { display: grid; grid-template-columns: minmax(7.5rem, .7fr) minmax(0, 3fr); gap: .5rem 1.25rem; padding-block: 1rem; border-top: 1px solid var(--line); }
+.pjud-lookup-movements time { font-size: .875rem; color: var(--muted); }
+.pjud-lookup-movements p { font-weight: 500; overflow-wrap: anywhere; }
+.pjud-lookup-movements span { display: block; margin-top: .25rem; color: var(--muted); font-size: .875rem; overflow-wrap: anywhere; }
+.pjud-lookup .pjud-lookup-empty { padding-block: .75rem; }
+.pjud-lookup-register { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+.pjud-lookup-register p { font-size: .875rem; max-width: 62ch; }
+.pjud-lookup-manual { margin-top: 1.5rem; padding-top: .75rem; border-top: 1px solid var(--line); }
+.pjud-lookup-manual summary { min-height: 44px; padding-block: .6rem; cursor: pointer; color: var(--ink-soft); font-size: .875rem; width: fit-content; }
+.pjud-lookup-manual p { margin: .5rem 0 1rem; font-size: .875rem; }
+.pjud-lookup-rut-form { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; }
+.pjud-lookup-rut-form > label { flex: 1 1 18rem; max-width: 30rem; }
+.pjud-lookup-hits { list-style: none; margin: 0; padding: 0; }
+.pjud-lookup-hits li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem 1.5rem; padding-block: 1.25rem; border-top: 1px solid var(--line); }
+.pjud-lookup-hits li > div { min-width: 0; flex: 1 1 18rem; }
+.pjud-lookup-hits p { font-size: .875rem; overflow-wrap: anywhere; }
+.pjud-lookup-footer { margin-top: 1.5rem; }
+.pjud-lookup-footer p { font-size: .875rem; color: var(--muted); }
+.pjud-lookup :is(footer, .pjud-lookup-channel) a { display: inline-block; min-height: 44px; align-content: center; color: var(--sea); text-decoration: underline; text-underline-offset: .25rem; }
+.pjud-lookup :is(button, a, input, summary):focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
+.pjud-lookup button:disabled { cursor: not-allowed; opacity: .55; }
+@media (max-width: 600px) {
+  .pjud-lookup-form, .pjud-lookup-identity { grid-template-columns: minmax(0, 1fr); }
+  .pjud-lookup-header { gap: 1.25rem; }
+  .pjud-lookup-modes { width: 100%; }
+  .pjud-lookup-modes button { flex: 1; padding-inline: .5rem; }
+  .pjud-lookup-actions, .pjud-lookup-register { align-items: stretch; flex-direction: column; width: 100%; }
+  .pjud-lookup .btn { width: 100%; white-space: normal; }
+  .pjud-lookup-movements li { grid-template-columns: minmax(0, 1fr); }
+  .pjud-lookup-result-heading { align-items: flex-start; }
+  .pjud-lookup-hits li { align-items: stretch; }
+  .pjud-lookup-hits li > div { flex-basis: 100%; }
+}
+
+/* ClaveÚnica keeps its existing page structure and shares the judicial palette. */
+.pjud-cu { min-width: 0; }
+.pjud-cu .input { font-size: 1rem; }
+.pjud-cu .input::placeholder { color: var(--muted); opacity: 1; }
+.pjud-cu-message { padding: 1rem; border-radius: var(--radius-sm); background: var(--sea-soft); color: var(--ink-soft); }
+.pjud-cu-message p { line-height: 1.7; overflow-wrap: anywhere; }
+.pjud-cu-message[data-tone="warn"] { background: color-mix(in srgb, var(--warn) 10%, var(--surface-solid)); color: var(--ink-soft); }
+.pjud-cu-message[data-tone="err"] { background: color-mix(in srgb, var(--danger) 8%, var(--surface-solid)); color: var(--danger); }
+.pjud-cu-message .btn { margin-top: .75rem; }
+.pjud-cu-steps p { line-height: 1.8; color: var(--ink-soft); }
+.pjud-cu-dismiss { min-height: 44px; padding-inline: .5rem; color: inherit; text-decoration: underline; }
+.pjud-cu-case-link { display: inline-flex; min-height: 44px; align-items: center; }
+.pjud-cu :is(button, a, input):focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
+@media (max-width: 600px) {
+  .pjud-cu-actions { flex-direction: column; align-items: stretch; }
+  .pjud-cu-actions .btn { width: 100%; }
+}
+@media (max-width: 600px) {
+  .pjud-cu-last-sync { flex-direction: column; align-items: stretch; }
+  .pjud-cu-last-sync > div { flex: auto; }
+  .pjud-cu-last-sync .btn { width: fit-content; }
+}

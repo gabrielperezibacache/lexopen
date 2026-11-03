@@ -38,6 +38,9 @@ assert.equal(
   true
 );
 assert.equal(isClaveUnicaAccountsUrl("https://claveunica.gob.cl/"), false);
+assert.equal(isClaveUnicaAccountsUrl("https://example.test/?next=https://accounts.claveunica.gob.cl"), false);
+assert.equal(isClaveUnicaAccountsUrl("https://accounts.claveunica.gob.cl.example.test/login"), false);
+assert.equal(isClaveUnicaAccountsUrl("http://accounts.claveunica.gob.cl/accounts/login"), false);
 assert.equal(
   isClaveUnicaAccountsUrl("https://oficinajudicialvirtual.pjud.cl/"),
   false

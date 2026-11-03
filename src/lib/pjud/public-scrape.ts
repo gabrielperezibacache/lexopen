@@ -25,6 +25,7 @@ import {
 import {
   BROWSER_ARGS,
   BROWSER_UA,
+  causeRowMatches,
   inferCompetenciaFromTribunal,
   isPlaceholderTribunal,
   OJV,
@@ -34,10 +35,12 @@ import {
   OJV_POST_AUTH_URLS,
   parseRitParts,
   pickBestTribunalOption,
+  pickTribunalFromTexts,
   splitRut,
   type OjvCompetenciaValue,
 } from "@/lib/pjud/ojv-dom";
 import {
+  hasExplicitEmptyHistory,
   parseCausasListFromHtml,
   parseMisCausasFromHtml,
   parseMovimientosFromHtml,
@@ -47,7 +50,7 @@ import {
 import { createRequire } from "node:module";
 import path from "node:path";
 import type { MisCausasItem } from "@/lib/pjud/types";
-import { type PjudCausaRef, type PjudFetchedMovimiento } from "@/lib/pjud/types";
+import { omitLegacyScrapeAliases, type PjudCausaRef, type PjudFetchedMovimiento } from "@/lib/pjud/types";
 
 export type { MisCausasItem } from "@/lib/pjud/types";
 export { OJV_CONSULTA_URL as PJUD_CONSULTA_URL };
@@ -127,6 +130,8 @@ export class PjudScrapeError extends Error {
     this.status = status;
   }
 }
+
+class PjudSessionExpiredError extends PjudScrapeError {}
 
 const DAILY_SOLVE_BUDGET = Number(process.env.PJUD_CAUSAS_DAILY_SOLVE_BUDGET ?? 50);
 const SESSION_TTL_MS = Number(process.env.PJUD_SESSION_TTL_MS ?? 25 * 60_000);
@@ -273,11 +278,11 @@ async function closeSweetAlerts(page: PlaywrightPage) {
 
 async function closeBootstrapModals(page: PlaywrightPage) {
   await page.evaluate(() => {
-    document.querySelectorAll('.modal.in').forEach((m) => {
+    document.querySelectorAll('.modal.in, .modal.show, .modal[style*="display: block"]').forEach((m) => {
       const el = m as HTMLElement;
-      if ((el.style.display || "").includes("block") || el.classList.contains("in")) {
+      if ((el.style.display || "").includes("block") || el.classList.contains("in") || el.classList.contains("show")) {
         const btn = el.querySelector(
-          'button[data-dismiss="modal"], .close'
+          'button[data-dismiss="modal"], button[data-bs-dismiss="modal"], .close'
         ) as HTMLElement | null;
         btn?.click();
       }
@@ -362,25 +367,19 @@ async function waitConsultaLoader(page: PlaywrightPage) {
         if (!loaders.length) return true;
         return [...loaders].every((l) => (l as HTMLElement).innerHTML.trim() === "");
       },
+      undefined,
       { timeout: 60_000 }
     )
-    .catch(() => undefined);
+    .catch(() => { throw new PjudScrapeError("La consulta OJV no terminó de cargar. No se usarán resultados anteriores."); });
 }
 
 async function selectCompetencia(
   page: PlaywrightPage,
   value: OjvCompetenciaValue
 ) {
-  const sel = page.locator(OJV.competencia).first();
-  if ((await sel.count()) === 0) return;
-  await sel.selectOption(value).catch(() => undefined);
-  await page.evaluate((v) => {
-    const el = document.querySelector("#jurCompetencia") as HTMLSelectElement | null;
-    if (!el) return;
-    el.value = v;
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  }, value);
+  const sel = page.locator(`${OJV.competencia}:visible`).first();
+  if ((await sel.count()) === 0) throw new PjudScrapeError("No está disponible el selector de competencia OJV.");
+  await sel.selectOption(value);
   await delay(900);
 }
 
@@ -391,7 +390,7 @@ async function readTribunalSelectOptions(
   await page
     .waitForFunction(
       (sel) => {
-        const s = document.querySelector(sel);
+        const s = [...document.querySelectorAll(sel)].find((node) => (node as HTMLElement).getBoundingClientRect().height > 0);
         return Boolean(s && s.querySelectorAll("option").length > 1);
       },
       selector,
@@ -400,7 +399,7 @@ async function readTribunalSelectOptions(
     .catch(() => undefined);
   // OJV a veces rellena el select en 2 oleadas AJAX
   await delay(500);
-  return page.$$eval(`${selector} option`, (arr) =>
+  return page.locator(`${selector}:visible`).first().locator("option").evaluateAll((arr) =>
     arr.map((o) => ({
       value: (o as HTMLOptionElement).value,
       label: (o.textContent || "").trim(),
@@ -418,34 +417,27 @@ async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: string) {
   }
 
   if (competencia === "2") {
-    const corte = page.locator(OJV.corte).first();
-    await corte.waitFor({ state: "visible", timeout: 12_000 }).catch(() => undefined);
+    const corte = page.locator(`${OJV.corte}:visible`).first();
+    await corte.waitFor({ state: "visible", timeout: 12_000 });
     const options = await readTribunalSelectOptions(page, OJV.corte);
     const match = pickBestTribunalOption(options, tribunal);
-    if (match) await corte.selectOption(match.value).catch(() => undefined);
+    if (!match) throw new PjudScrapeError(`No se pudo identificar una única corte para «${tribunal}».`);
+    await corte.selectOption(match.value);
     return;
   }
 
   if (["3", "4", "5", "6"].includes(competencia)) {
     // Prefer visible select in active tab (ROL vs Jurídica).
     const trib = page
-      .locator(
-        `.tab-pane.active ${OJV.tribunal}, .tab-content > .active ${OJV.tribunal}, ${OJV.tribunal}`
-      )
+      .locator(`${OJV.tribunal}:visible`)
       .first();
-    await trib.waitFor({ state: "visible", timeout: 12_000 }).catch(() => undefined);
+    await trib.waitFor({ state: "visible", timeout: 12_000 });
     const options = await readTribunalSelectOptions(page, OJV.tribunal);
     const match = pickBestTribunalOption(options, tribunal);
     if (match) {
-      await trib.selectOption(match.value).catch(() => undefined);
+      await trib.selectOption(match.value);
       return;
     }
-    // Fallback: label exact / contains via Playwright
-    const byLabel = await trib
-      .selectOption({ label: tribunal })
-      .then(() => true)
-      .catch(() => false);
-    if (byLabel) return;
     // No usar "Todos": puede abrir otra causa y persistir movimientos ajenos.
     throw new Error(
       `No se encontró el tribunal «${tribunal}» en la Oficina Judicial Virtual. Revise el nombre o sincronice con ClaveÚnica.`
@@ -458,9 +450,26 @@ async function selectTribunalOrCorte(page: PlaywrightPage, tribunal: string) {
  * `#btnConConsultaJur` often stays in the DOM on inactive Bootstrap tabs
  * (not visible) after switching to ROL/RIT — Playwright then times out.
  */
-async function clickBuscar(page: PlaywrightPage) {
+export async function clickBuscar(page: PlaywrightPage, responseTimeoutMs = 30_000) {
   await closeSweetAlerts(page);
   await closeBootstrapModals(page);
+  // Observe content before submitting: an unchanged old result must never be read
+  // as the response to the new RIT/tribunal filters.
+  await page.evaluate(() => {
+    const state = window as typeof window & { lexopenConsulta?: { changed: boolean; observer: MutationObserver } };
+    state.lexopenConsulta?.observer.disconnect();
+    const results = "#resultConsultaJuridica, #resultConsultaCausa, #resultConsultaRol, #verDetalleJuridica";
+    const observer = new MutationObserver((mutations) => {
+      if (mutations.some((mutation) => {
+        const parent = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement;
+        return Boolean(parent?.closest(results)) || [...mutation.addedNodes].some((node) =>
+          node instanceof Element && (node.matches(results) || node.querySelector(results))
+        );
+      }) && state.lexopenConsulta) state.lexopenConsulta.changed = true;
+    });
+    state.lexopenConsulta = { changed: false, observer };
+    observer.observe(document.body, { childList: true, characterData: true, subtree: true });
+  });
 
   const viaDom = await page
     .evaluate(() => {
@@ -497,7 +506,7 @@ async function clickBuscar(page: PlaywrightPage) {
           const id = el.id || "";
           const isBuscar =
             /btnConConsulta|btnBuscar/i.test(id) || /^buscar$/i.test(label);
-          if (!isBuscar || !visible(el)) continue;
+          if (!isBuscar || !visible(el) || (el as HTMLButtonElement).disabled) continue;
           el.click();
           return id || label || "buscar";
         }
@@ -512,88 +521,78 @@ async function clickBuscar(page: PlaywrightPage) {
     if (await roleBtn.isVisible().catch(() => false)) {
       await roleBtn.click({ timeout: 10_000 });
     } else {
-      const any = page.locator(OJV.btnBuscarAny).first();
+      const any = page.locator(OJV.btnBuscarAny).filter({ visible: true }).first();
       if ((await any.count()) > 0) {
         await any.scrollIntoViewIfNeeded().catch(() => undefined);
-        // force: last resort when OJV marks the control "not visible" but present
-        await any.click({ force: true, timeout: 10_000 });
+        await any.click({ timeout: 10_000 });
       } else {
-        await page
-          .locator(OJV.submit)
-          .first()
-          .click({ force: true })
-          .catch(() => undefined);
+        throw new PjudScrapeError("No se encontró un botón Buscar visible en la consulta OJV.");
       }
     }
   }
 
-  await waitConsultaLoader(page);
+  try {
+    await page.waitForFunction(() =>
+      (window as typeof window & { lexopenConsulta?: { changed: boolean } }).lexopenConsulta?.changed,
+      undefined,
+      { timeout: responseTimeoutMs }
+    );
+    await waitConsultaLoader(page);
+  } catch {
+    throw new PjudScrapeError("OJV no devolvió resultados nuevos para esta búsqueda. No se usarán resultados anteriores.");
+  } finally {
+    await page.evaluate(() => {
+      const state = window as typeof window & { lexopenConsulta?: { observer: MutationObserver } };
+      state.lexopenConsulta?.observer.disconnect();
+      delete state.lexopenConsulta;
+    }).catch(() => undefined);
+  }
 }
 
-async function openFirstCauseModal(page: PlaywrightPage, rit?: string | null) {
-  const opened = await page.evaluate((wantRit) => {
-    const want = (wantRit || "").toUpperCase().replace(/\s+/g, "");
-    const rows = [
-      ...document.querySelectorAll(
-        "#verDetalleJuridica tr, #resultConsultaJuridica tr, table.table tr"
-      ),
-    ];
-    for (const tr of rows) {
-      if (tr.querySelector("nav") || tr.querySelector(".pagination")) continue;
-      const text = (tr.textContent || "").toUpperCase().replace(/\s+/g, "");
-      if (
-        want &&
-        !text.includes(want) &&
-        !text.includes(want.replace(/^[A-ZÁÉÍÓÚÑ]+-/, ""))
-      ) {
-        continue;
-      }
-      const link =
-        tr.querySelector<HTMLElement>("td a[onclick], td a") ||
-        tr.querySelector<HTMLElement>(
-          'a[title*="ver" i], a[title*="detalle" i], a[title*="lupa" i]'
-        );
-      if (link) {
-        link.click();
-        return true;
-      }
-      const icon = tr.querySelector(
-        'img[src*="lupa" i], .glyphicon-search, .fa-search, i.fa-search'
-      );
-      if (icon) {
-        const clickable =
-          (icon.closest("a, button") as HTMLElement | null) ||
-          (icon as HTMLElement);
-        clickable.click();
-        return true;
-      }
-    }
-    // Sin match de RIT: no abrir la primera fila (riesgo de causa equivocada).
-    return false;
-  }, rit || null);
-  if (!opened) {
-    if (rit?.trim()) {
-      throw new Error(
-        `No se encontró la causa «${rit}» en los resultados de la Oficina Judicial Virtual. No se abrirá otra fila para evitar mezclar expedientes.`
-      );
-    }
-    return false;
+export async function openExactCauseModal(
+  page: PlaywrightPage,
+  causa: { rit: string; tribunal: string },
+  selector = "#verDetalleJuridica tr, #resultConsultaJuridica tr"
+): Promise<string | null> {
+  const rows = page.locator(selector);
+  const snapshots = await rows.evaluateAll((nodes) => nodes.map((node) => {
+    const el = node as HTMLElement;
+    const visible = el.getBoundingClientRect().height > 0 && getComputedStyle(el).visibility !== "hidden" &&
+      (el.tagName === "TR" || !el.querySelector("tr, .card, .list-group-item"));
+    const cells = [...node.children].filter((child) => /^(TD|TH)$/.test(child.tagName));
+    return {
+      visible,
+      cells: (cells.length ? cells : [...node.children]).map((cell) => (cell.textContent || "").replace(/\s+/g, " ").trim()),
+    };
+  }));
+  const matches = snapshots.map((row, index) => ({ ...row, index }))
+    .filter((row) => row.visible && causeRowMatches(row.cells, causa));
+  if (matches.length > 1) {
+    throw new PjudScrapeError(`OJV devolvió varias filas para ${causa.rit} y «${causa.tribunal}». No se pudo confirmar un expediente único.`);
   }
-
-  await page
-    .waitForFunction(() => {
-      const mo = document.querySelector(
-        '.modal.in, .modal.show, .modal[style*="display: block"]'
-      );
-      if (!mo) return false;
-      const style = (mo as HTMLElement).style.display || "";
-      return (
-        style.includes("block") ||
-        mo.classList.contains("in") ||
-        mo.classList.contains("show")
-      );
-    }, { timeout: 20_000 })
-    .catch(() => undefined);
+  if (matches.length === 0) return null;
+  await closeBootstrapModals(page);
+  const existingModal = page.locator(`:is(${OJV.modal}):visible`).first();
+  if (await existingModal.count()) {
+    await existingModal.waitFor({ state: "hidden", timeout: 5_000 });
+  }
+  const staleDetails = (await page.locator(".modal").evaluateAll((nodes) => nodes.map((node) => node.innerHTML)))
+    .filter((html) => parseMovimientosFromHtml(html).length > 0 || hasExplicitEmptyHistory(html));
+  const row = rows.nth(matches[0].index);
+  const clicked = await row.evaluate((node) => {
+    const icon = node.querySelector('img[src*="lupa" i], .glyphicon-search, .fa-search');
+    const target = icon?.closest("a, button") || node.querySelector('a[title*="detalle" i], a[title*="ver" i], td a[onclick], td a, a[onclick], button');
+    if (!(target instanceof HTMLElement)) return false;
+    target.click();
+    return true;
+  });
+  if (!clicked) throw new PjudScrapeError(`La fila exacta de ${causa.rit} no tiene un enlace de detalle reconocible.`);
+  await page.locator(`:is(${OJV.modal}):visible`).first().waitFor({ state: "visible", timeout: 20_000 });
+  if (staleDetails.length) {
+    await page.waitForFunction((previous) => [...document.querySelectorAll(".modal")].some((node) =>
+      (node as HTMLElement).getBoundingClientRect().height > 0 && !previous.includes(node.innerHTML)
+    ), staleDetails, { timeout: 20_000 });
+  }
   await delay(800);
 
   const hist = page.locator(
@@ -611,16 +610,12 @@ async function openFirstCauseModal(page: PlaywrightPage, rit?: string | null) {
     )
     .catch(() => undefined);
   await delay(400);
-  return true;
+  return pickTribunalFromTexts(matches[0].cells);
 }
 
 async function modalInnerHtml(page: PlaywrightPage) {
-  return page.evaluate(() => {
-    const mo = document.querySelector(
-      '.modal.in, .modal.show, .modal[style*="display: block"]'
-    );
-    return mo ? mo.innerHTML : "";
-  });
+  const modal = page.locator(`:is(${OJV.modal}):visible`).first();
+  return (await modal.count()) ? modal.innerHTML() : "";
 }
 
 /** Merge scrape rows by externalId; prefer receptor / pendiente flags. */
@@ -629,7 +624,7 @@ export function mergePjudMovimientos(
   extra: PjudFetchedMovimiento[]
 ) {
   const map = new Map<string, PjudFetchedMovimiento>();
-  for (const m of [...base, ...extra]) {
+  for (const m of omitLegacyScrapeAliases([...base, ...extra])) {
     const prev = map.get(m.externalId);
     if (!prev) {
       map.set(m.externalId, m);
@@ -658,15 +653,15 @@ export function mergePjudMovimientos(
 async function scrapeModalTabs(
   page: PlaywrightPage
 ): Promise<PjudFetchedMovimiento[]> {
-  let movimientos = parseMovimientosFromHtml(
-    (await modalInnerHtml(page)) || (await page.content())
-  );
+  const historyHtml = await modalInnerHtml(page);
+  if (!historyHtml) throw new PjudScrapeError("El detalle OJV no está visible; no se extraerá el listado como historial.");
+  let movimientos = parseMovimientosFromHtml(historyHtml);
 
-  const receptor = page.locator(`${OJV.modal} ${OJV.receptorTab}`);
+  const receptor = page.locator(`:is(${OJV.modal}):visible`).first().locator(OJV.receptorTab).filter({ visible: true });
   if ((await receptor.count()) > 0) {
     await receptor.first().click().catch(() => undefined);
     await delay(700);
-    const receptorHtml = (await modalInnerHtml(page)) || (await page.content());
+    const receptorHtml = await modalInnerHtml(page);
     const receptorMovs = parseMovimientosFromHtml(receptorHtml).map((m) => ({
       ...m,
       esReceptor: true,
@@ -676,11 +671,11 @@ async function scrapeModalTabs(
     movimientos = mergePjudMovimientos(movimientos, receptorMovs);
   }
 
-  const escritos = page.locator(`${OJV.modal} ${OJV.escritosTab}`);
+  const escritos = page.locator(`:is(${OJV.modal}):visible`).first().locator(OJV.escritosTab).filter({ visible: true });
   if ((await escritos.count()) > 0) {
     await escritos.first().click().catch(() => undefined);
     await delay(700);
-    const escritosHtml = (await modalInnerHtml(page)) || (await page.content());
+    const escritosHtml = await modalInnerHtml(page);
     const escritoMovs = parseMovimientosFromHtml(escritosHtml).map((m) => {
       const pendiente =
         m.pendienteResolucion ||
@@ -727,43 +722,10 @@ async function attachDocumentoBytesFromPage(
     }
   };
 
-  const extraLinks = await page
-    .evaluate(() => {
-      const mo = document.querySelector(
-        '.modal.in, .modal.show, .modal[style*="display: block"]'
-      );
-      if (!mo) return [] as Array<{ href: string; hint: string }>;
-      return [...mo.querySelectorAll("a[href]")].map((a) => ({
-        href: (a as HTMLAnchorElement).href,
-        hint: ((a.textContent || "") + " " + (a.closest("tr")?.innerText || ""))
-          .replace(/\s+/g, " ")
-          .slice(0, 240),
-      }));
-    })
-    .catch(() => [] as Array<{ href: string; hint: string }>);
-
   for (const m of movimientos) {
-    let ref = m.documentoRef || null;
-    if (!ref || !/^https?:\/\//i.test(ref) || !isPjudHost(ref)) {
-      const folio = (m.folio || "").trim();
-      const hit = extraLinks.find((l) => {
-        if (!isPjudHost(l.href)) return false;
-        if (
-          !/\.pdf(\?|$)|documento|descarg|ebook|anexo|escrito/i.test(
-            `${l.href} ${l.hint}`
-          )
-        ) {
-          return false;
-        }
-        if (folio && l.hint.includes(folio)) return true;
-        const titleBit = m.titulo.slice(0, 24);
-        return (
-          titleBit.length > 6 &&
-          l.hint.toLowerCase().includes(titleBit.toLowerCase())
-        );
-      });
-      if (hit) ref = hit.href;
-    }
+    // The parser associates a download with its own table row. A global
+    // folio/title substring cannot distinguish folio 1 from 11 or cuadernos.
+    const ref = m.documentoRef || null;
 
     if (downloaded >= limit || !ref || !isPjudHost(ref)) {
       out.push({ ...m, documentoRef: ref || m.documentoRef });
@@ -812,44 +774,6 @@ async function attachDocumentoBytesFromPage(
   return out;
 }
 
-async function extractEbookRef(page: PlaywrightPage): Promise<string | null> {
-  return page.evaluate(() => {
-    const mo = document.querySelector(
-      '.modal.in, .modal.show, .modal[style*="display: block"]'
-    );
-    if (!mo) return null;
-    let form = mo.querySelector("#contenedorEbook form") as HTMLFormElement | null;
-    if (!form) {
-      const forms = [...mo.querySelectorAll("form")];
-      form =
-        (forms.find((f) =>
-          (f.getAttribute("action") || "").toLowerCase().includes("ebook")
-        ) as HTMLFormElement | undefined) || null;
-    }
-    if (!form) return null;
-    const action = form.getAttribute("action") || "";
-    if (!action) return null;
-    try {
-      return new URL(action, location.href).href;
-    } catch {
-      return action;
-    }
-  });
-}
-
-async function consultaHasResultRows(page: PlaywrightPage) {
-  return page.evaluate(() => {
-    const rows = document.querySelectorAll(
-      "#verDetalleJuridica tr, #resultConsultaJuridica tr"
-    );
-    for (const tr of rows) {
-      if (tr.querySelector("nav") || tr.querySelector(".pagination")) continue;
-      if ((tr.textContent || "").trim().length > 8) return true;
-    }
-    return false;
-  });
-}
-
 async function fillRolSearchFields(
   page: PlaywrightPage,
   ritParts: NonNullable<ReturnType<typeof parseRitParts>>,
@@ -873,19 +797,17 @@ async function fillRolSearchFields(
     ]);
   }
   for (const [sel, value] of fills) {
-    const field = page.locator(sel).first();
-    if ((await field.count()) === 0) continue;
-    const tag = await field
-      .evaluate((el) => el.tagName.toLowerCase())
-      .catch(() => "");
+    const field = page.locator(sel).filter({ visible: true }).first();
+    if ((await field.count()) === 0) throw new PjudScrapeError("El formulario RIT/ROL de OJV cambió o no está disponible.");
+    const tag = await field.evaluate((el) => el.tagName.toLowerCase());
     if (tag === "select") {
       await field
         .selectOption({ label: value })
         .catch(async () =>
-          field.selectOption({ value }).catch(() => undefined)
+          field.selectOption({ value })
         );
     } else {
-      await field.fill(value).catch(() => undefined);
+      await field.fill(value);
     }
   }
 }
@@ -963,7 +885,7 @@ async function withConsultaPage<T>(
     });
     if ((await page.locator(OJV.captchaImg).count()) > 0) {
       invalidateSession();
-      throw new PjudScrapeError(
+      throw new PjudSessionExpiredError(
         "Sesión OJV expirada (CAPTCHA reapareció). Reintente."
       );
     }
@@ -991,183 +913,51 @@ async function scrapeCausaByRolOnce(
   return withConsultaPage(session, async (page) => {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-    const ritParts = causa.rit ? parseRitParts(causa.rit) : null;
-    const inferred = inferCompetenciaFromTribunal(causa.tribunal || "");
-    const unknownTribunal = isPlaceholderTribunal(causa.tribunal);
-    const competencias: OjvCompetenciaValue[] = unknownTribunal
-      ? (["3", "4", "6", "5", "2", "1"] as OjvCompetenciaValue[])
-      : [inferred];
-    // RIT sin letra (18390-2025): probar tipos frecuentes si el primero falla.
-    const tipoTries: Array<string | null> = ritParts?.tipo
-      ? [ritParts.tipo]
-      : [null, "C", "F", "O", "T", "V", "E", "J"];
-
-    const rolTab = page.locator(OJV.tabBusRol);
-    let usedRolTab = false;
-    let foundRows = false;
-
-    if ((await rolTab.count()) > 0 && ritParts) {
-      await rolTab.first().click().catch(() => undefined);
-      await delay(400);
-      usedRolTab = true;
-
-      outer: for (const competencia of competencias) {
-        await selectCompetencia(page, competencia);
-        if (!unknownTribunal) {
-          await selectTribunalOrCorte(page, causa.tribunal || "");
-        }
-        for (const tipo of tipoTries) {
-          await fillRolSearchFields(page, ritParts, tipo);
-          await clickBuscar(page);
-          const noResults = await page.evaluate((needle) => {
-            const d = document.querySelector("#resultConsultaJuridica");
-            if (!d) return false;
-            return (d.textContent || "").includes(needle);
-          }, OJV.noResultsText);
-          if (noResults) continue;
-          if (await consultaHasResultRows(page)) {
-            foundRows = true;
-            break outer;
-          }
-        }
-      }
-    } else if (causa.ruc || causa.rit) {
-      const tab = page.locator(OJV.tabBusJuridica);
-      if ((await tab.count()) > 0) await tab.first().click();
-      await page.waitForSelector(OJV.rutJur, { timeout: 10_000 }).catch(() => undefined);
-      const rutSource = causa.ruc || "";
-      const split = splitRut(rutSource);
-      if (split) {
-        await page.fill(OJV.rutJur, split.cuerpo).catch(() => undefined);
-        await page.fill(OJV.dvJur, split.dv).catch(() => undefined);
-      }
-      if (ritParts) {
-        await page.fill(OJV.eraJur, ritParts.era).catch(() => undefined);
-      }
-      for (const competencia of competencias) {
-        await selectCompetencia(page, competencia);
-        if (!unknownTribunal) {
-          await selectTribunalOrCorte(page, causa.tribunal || "");
-        }
-        await clickBuscar(page);
-        const noResults = await page.evaluate((needle) => {
-          const d = document.querySelector("#resultConsultaJuridica");
-          if (!d) return false;
-          return (d.textContent || "").includes(needle);
-        }, OJV.noResultsText);
-        if (noResults) continue;
-        if (await consultaHasResultRows(page)) {
-          foundRows = true;
-          break;
-        }
-      }
-    } else {
-      await clickBuscar(page);
+    const ritParts = parseRitParts(causa.rit || "");
+    if (!ritParts || !causa.rit || isPlaceholderTribunal(causa.tribunal)) {
+      throw new PjudScrapeError("Se requiere RIT/ROL válido y tribunal identificado para confirmar el expediente.", 400);
     }
-
-    if (!foundRows) {
-      const noResults = await page.evaluate((needle) => {
-        const d = document.querySelector("#resultConsultaJuridica");
-        if (!d) return false;
-        return (d.textContent || "").includes(needle);
-      }, OJV.noResultsText);
-      if (noResults || !(await consultaHasResultRows(page))) {
-        throw new PjudScrapeError(
-          `Sin resultados OJV para ${causa.rit || causa.ruc}${
-            unknownTribunal ? " (tribunal desconocido; se probaron varias competencias)" : ""
-          }. Portal: ${OJV_CONSULTA_URL}`
-        );
-      }
+    const rolTab = page.locator(OJV.tabBusRol).filter({ visible: true }).first();
+    if ((await rolTab.count()) === 0) {
+      throw new PjudScrapeError("No se encontró la pestaña RIT/ROL de OJV. No se usará el RUC como RUT de litigante.");
     }
+    await rolTab.click();
+    await delay(400);
+    await selectTribunalOrCorte(page, causa.tribunal || "");
+    await fillRolSearchFields(page, ritParts);
+    await clickBuscar(page);
 
+    const identity = {
+      rit: causa.rit,
+      tribunal: causa.tribunal || "",
+    };
     let resolvedTribunal: string | null = null;
-    if (causa.rit) {
-      resolvedTribunal = await page.evaluate((rit) => {
-        const want = rit.toUpperCase().replace(/\s+/g, "");
-        const rows = document.querySelectorAll(
-          "#verDetalleJuridica tr, #resultConsultaJuridica tr"
-        );
-        for (const tr of rows) {
-          const text = (tr.textContent || "").toUpperCase().replace(/\s+/g, "");
-          if (
-            !text.includes(want) &&
-            !text.includes(want.replace(/^[A-ZÁÉÍÓÚÑ]+-/, ""))
-          ) {
-            continue;
-          }
-          const cells = [...tr.querySelectorAll("td")].map((td) =>
-            (td.textContent || "").replace(/\s+/g, " ").trim()
-          );
-          const trib = cells.find((c) =>
-            /juzgado|corte|tribunal|garant|familia|laboral|cobranza|civil|penal/i.test(
-              c
-            )
-          );
-          const link = tr.querySelector("td a");
-          if (link) (link as HTMLElement).click();
-          return trib || null;
-        }
-        return null;
-      }, causa.rit);
-      await delay(700);
+    await collectOjvResultPages(page, async () => {
+      resolvedTribunal = await openExactCauseModal(page, identity);
+      return Boolean(resolvedTribunal);
+    });
+    if (!resolvedTribunal) {
+      throw new PjudScrapeError(`No se encontró una fila exacta para ${causa.rit} y «${causa.tribunal}» en OJV. Revise RIT/ROL y tribunal.`, 404);
     }
-
-    const modalOk = await openFirstCauseModal(page, causa.rit);
-    let html = await page.content();
-    if (modalOk) {
-      const modalHtml = await modalInnerHtml(page);
-      if (modalHtml) html = modalHtml;
-    }
-
-    let movimientos = modalOk
-      ? await scrapeModalTabs(page)
-      : parseMovimientosFromHtml(html);
-    if (movimientos.length === 0) {
-      const list = parseVerDetalleJuridicaHtml(await page.content());
-      movimientos = list.map((row, idx) => ({
-        externalId: `scrape:list:${row.rit}:${idx}`,
-        titulo: row.caratula || row.rit,
-        detalle: [row.tribunal, row.estado, row.fecha].filter(Boolean).join(" · "),
-        fecha: row.fechaDate || new Date(),
-        referencia: row.rit,
-        tipo: "otro" as const,
-        relevante: false,
-        fuente: "pjud" as const,
-        cuaderno: "Principal",
-        folio: String(idx + 1),
-        etapa: null,
-        tramite: null,
-        esReceptor: false,
-        pendienteResolucion: false,
-        documentoRef: null,
-      }));
-    }
-
-    const ebook = modalOk ? await extractEbookRef(page) : null;
-    if (ebook && movimientos[0] && !movimientos[0].documentoRef) {
-      movimientos = movimientos.map((m, i) =>
-        i === 0 ? { ...m, documentoRef: ebook } : m
-      );
-    }
-
-    if (modalOk && movimientos.length > 0) {
+    const html = await modalInnerHtml(page);
+    if (!html) throw new PjudScrapeError("OJV no devolvió el detalle de la causa seleccionada.");
+    let movimientos = await scrapeModalTabs(page);
+    if (movimientos.length > 0) {
       movimientos = await attachDocumentoBytesFromPage(page, movimientos);
     }
 
     const sala = parseSalaFromHtml(html);
     const withDocs = movimientos.filter((m) => m.documentoBytes).length;
-    if (movimientos.length === 0) {
+    if (movimientos.length === 0 && !hasExplicitEmptyHistory(html)) {
       throw new PjudScrapeError(
-        `Sin movimientos parseables para ${causa.rit || causa.ruc}${usedRolTab ? " (tab ROL)" : ""}${
-          modalOk ? "" : " (no se abrió el detalle/modal)"
-        }. Portal: ${OJV_CONSULTA_URL}`
+        `El detalle de ${causa.rit} se abrió, pero no se reconoció su historial. No se crearán movimientos desde el listado. Portal: ${OJV_CONSULTA_URL}`
       );
     }
 
     return {
       movimientos,
       sala,
-      note: `Scrape OJV (CAPTCHA/sesión): ${movimientos.length} movimiento(s)${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}. No oficial; verifique en ${OJV_CONSULTA_URL}`,
+      note: `Scrape OJV (CAPTCHA/sesión): ${movimientos.length ? `${movimientos.length} movimiento(s)` : "OJV informó un historial sin movimientos"}${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}. No oficial; verifique en ${OJV_CONSULTA_URL}`,
       portalUrl: OJV_CONSULTA_URL,
       resolvedTribunal,
     };
@@ -1192,8 +982,8 @@ export async function scrapeCausaByRol(
         "Configure CAPTCHA_SOLVER_PROVIDER (+ API_KEY si aplica) para scrapear OJV."
     );
   }
-  if (!causa.rit && !causa.ruc) {
-    throw new PjudScrapeError("Se requiere RIT/ROL o RUC para scrapear la causa.");
+  if (!causa.rit || !parseRitParts(causa.rit) || isPlaceholderTribunal(causa.tribunal)) {
+    throw new PjudScrapeError("Se requiere RIT/ROL válido y tribunal identificado para confirmar el expediente.", 400);
   }
 
   const cacheKey = `rol:${(causa.tribunal || "").toLowerCase()}:${(causa.rit || causa.ruc || "").toLowerCase()}`;
@@ -1205,7 +995,7 @@ export async function scrapeCausaByRol(
     const session = await getValidSession(signal);
     result = await scrapeCausaByRolOnce(causa, session, signal);
   } catch (error) {
-    if (error instanceof PjudScrapeError) {
+    if (error instanceof PjudSessionExpiredError) {
       invalidateSession();
       const fresh = await getValidSession(signal);
       result = await scrapeCausaByRolOnce(causa, fresh, signal);
@@ -1253,41 +1043,18 @@ export async function scrapeCausasByRut(
       const competencias: OjvCompetenciaValue[] = ["3", "4", "6", "5", "2", "1"];
       for (const comp of competencias) {
         await selectCompetencia(page, comp);
-        if (["3", "4", "5", "6"].includes(comp)) {
-          // Leave tribunal at first real option if present (broad search).
-          const trib = page.locator(OJV.tribunal);
-          if ((await trib.count()) > 0) {
-            const first = await page.$$eval(`${OJV.tribunal} option`, (arr) => {
-              const hit = arr.find((o) => {
-                const v = (o as HTMLOptionElement).value;
-                const label = (o.textContent || "").toLowerCase();
-                return v && v !== "0" && !label.includes("seleccione");
-              });
-              return hit ? (hit as HTMLOptionElement).value : null;
-            });
-            // Do not force a single tribunal for RUT scan — some layouts allow "todos".
-            if (first) {
-              /* keep default selection from OJV after competencia change */
-            }
-          }
-        }
         await clickBuscar(page);
-        const html = await page.content();
-        if (html.includes(OJV.noResultsText)) continue;
-        const fromTable = parseVerDetalleJuridicaHtml(html);
-        if (fromTable.length) {
-          all.push(
-            ...fromTable.map((r) => ({
-              rit: r.rit,
-              tribunal: r.tribunal,
-              caratula: r.caratula,
-              ruc: r.ruc,
-              estado: r.estado,
-            }))
-          );
-        } else {
-          all.push(...parseCausasListFromHtml(html));
-        }
+        await collectOjvResultPages(page, async () => {
+          const results = page.locator(OJV.resultsHost).filter({ visible: true }).first();
+          if (!(await results.count())) throw new PjudScrapeError("OJV no mostró el listado de resultados. No se puede confirmar una búsqueda vacía.");
+          const html = await results.innerHTML();
+          const fromTable = parseVerDetalleJuridicaHtml(html);
+          const parsed = fromTable.length ? fromTable : parseCausasListFromHtml(html);
+          if (!parsed.length && !/no se han encontrado resultados|sin resultados|no se encontraron (?:causas|resultados)/i.test(await results.innerText())) {
+            throw new PjudScrapeError("OJV no devolvió filas reconocibles ni confirmó que la consulta esté vacía.");
+          }
+          all.push(...parsed);
+        });
       }
 
       // Dedupe
@@ -1298,9 +1065,6 @@ export async function scrapeCausasByRut(
         seen.add(key);
         return true;
       });
-      if (!unique.length) {
-        throw new PjudScrapeError(`Sin causas para RUT ${rut} en Consulta Unificada.`);
-      }
       return unique;
     });
 
@@ -1308,7 +1072,7 @@ export async function scrapeCausasByRut(
   try {
     items = await run(await getValidSession(signal));
   } catch (error) {
-    if (error instanceof PjudScrapeError) {
+    if (error instanceof PjudSessionExpiredError) {
       invalidateSession();
       items = await run(await getValidSession(signal));
     } else {
@@ -1398,10 +1162,9 @@ async function fillClaveUnicaLoginForm(page: AnyPage, rut: string, password: str
     if (!found) await sleep(400);
   }
   if (!found) {
-    const url = page.url();
-    const title = await page.title().catch(() => "");
+    const url = new URL(page.url());
     throw new PjudScrapeError(
-      `No se encontró el campo RUN visible de ClaveÚnica (url=${String(url).slice(0, 140)}, título=${String(title).slice(0, 80)}). El sitio puede haber cambiado o bloquear automatización.`
+      `No se encontró el campo RUN visible de ClaveÚnica (url=${url.origin}${url.pathname}). El sitio puede haber cambiado o bloquear automatización.`
     );
   }
 
@@ -1556,82 +1319,42 @@ async function clickMisCausasBuscar(page: AnyPage) {
   return true;
 }
 
-/** Abre la lupa/detalle de una fila Mis Causas que coincida con el RIT. */
-async function openMisCausasLupaForRit(page: AnyPage, rit: string): Promise<boolean> {
-  const clicked = await page.evaluate((wantRaw: string) => {
-    const want = wantRaw.toUpperCase().replace(/\s+/g, "");
-    const bare = want.replace(/^[A-ZÁÉÍÓÚÑ]+-/, "");
-    const nodes = [
-      ...document.querySelectorAll("tr, .card, .list-group-item, .panel"),
-    ];
-    for (const row of nodes) {
-      const text = (row.textContent || "").toUpperCase().replace(/\s+/g, "");
-      if (!text.includes(want) && !text.includes(bare)) continue;
-      const icon = row.querySelector(
-        'img[src*="lupa" i], .glyphicon-search, .fa-search, i.fa-search, a[title*="ver" i], a[title*="detalle" i], a[title*="lupa" i]'
-      );
-      if (icon) {
-        const el =
-          (icon.closest("a, button") as HTMLElement | null) ||
-          (icon as HTMLElement);
-        el.click();
-        return true;
-      }
-      const link = row.querySelector("td a, a[onclick]");
-      if (link) {
-        (link as HTMLElement).click();
-        return true;
-      }
-    }
-    return false;
-  }, rit);
-  if (!clicked) return false;
-  await sleep(1000);
-  await page
-    .waitForFunction(() => {
-      const mo = document.querySelector(
-        '.modal.in, .modal.show, .modal[style*="display: block"]'
-      );
-      return Boolean(mo);
-    }, { timeout: 20_000 })
-    .catch(() => undefined);
-  const hist = page.locator(`.modal.in, .modal.show`).locator(OJV.historiaTab);
-  if ((await hist.count()) > 0) {
-    await hist.first().click({ force: true }).catch(() => undefined);
-    await sleep(1200);
-  }
-  await page
-    .waitForSelector(".modal.in table, .modal.show table", { timeout: 12_000 })
-    .catch(() => undefined);
-  return true;
+/** Abre solamente una fila con RIT y tribunal confirmados en Mis Causas. */
+async function openMisCausasLupaForRit(
+  page: PlaywrightPage,
+  causa: { rit: string; tribunal: string }
+): Promise<boolean> {
+  return Boolean(await openExactCauseModal(page, causa, "tr, .card, .list-group-item"));
 }
 
-/** Walk Mis Causas pagination while new RITs appear (cap 25 pages). */
-async function collectMisCausasPages(
-  page: AnyPage,
-  pushParsed: () => Promise<void>,
-  knownCount: () => number
-) {
+/** Follow visible, enabled next controls; repeated pages and truncation are errors. */
+export async function collectOjvResultPages(
+  page: PlaywrightPage,
+  visitPage: () => Promise<boolean | void>
+): Promise<boolean> {
+  const seen = new Set<string>();
   for (let i = 0; i < 25; i++) {
-    await pushParsed();
-    const before = knownCount();
+    const signature = await page.locator("tr, .card, .list-group-item, .pagination, .dataTables_paginate").filter({ visible: true })
+      .allTextContents().then((texts) => texts.join("\n"));
+    if (seen.has(signature)) throw new PjudScrapeError("La paginación de OJV repitió una página. La consulta quedó incompleta; reintente.");
+    seen.add(signature);
+    if (await visitPage()) return true;
     const next = page
       .getByRole("link", { name: /^(Siguiente|Next|›|»)$/i })
-      .or(
-        page.locator(
-          '.pagination a[rel="next"], .pagination li:not(.disabled) a:has-text("›"), .pagination li:not(.disabled) a:has-text("Siguiente"), a.page-link:has-text("›")'
-        )
-      )
-      .first();
-    if (!(await next.isVisible().catch(() => false))) break;
-    await next.click({ timeout: 8_000 }).catch(() => undefined);
+      .or(page.getByRole("button", { name: /^(Siguiente|Next|›|»)$/i }))
+      .or(page.locator('.pagination a[rel="next"], [aria-label="Next" i], [aria-label="Siguiente" i], .paginate_button.next, a.page-link:has-text("›")'))
+      .filter({ visible: true }).first();
+    if (!(await next.count())) return false;
+    const disabled = await next.evaluate((el) => Boolean(
+      el.closest('.disabled, [aria-disabled="true"], [disabled]')
+    ));
+    if (disabled) return false;
+    if (i === 24) throw new PjudScrapeError("OJV superó el límite de 25 páginas. La consulta quedó incompleta; acote los filtros.");
+    await next.click({ timeout: 8_000 });
     await sleep(900);
-    await page
-      .waitForLoadState("networkidle", { timeout: 15_000 })
-      .catch(() => undefined);
-    await pushParsed();
-    if (knownCount() <= before) break;
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
   }
+  return false;
 }
 
 async function applyMisCausasFiltros(page: AnyPage) {
@@ -1744,13 +1467,13 @@ async function collectMisCausasFromAuthenticatedOjv(
 
     await applyMisCausasFiltros(page);
     await clickMisCausasBuscar(page);
-    await collectMisCausasPages(page, pushParsed, () => all.length);
+    await collectOjvResultPages(page, pushParsed);
   }
 
   if (materiasTried.length === 0) {
     await applyMisCausasFiltros(page);
     await clickMisCausasBuscar(page);
-    await collectMisCausasPages(page, pushParsed, () => all.length);
+    await collectOjvResultPages(page, pushParsed);
   }
 
   return { items: all, openedMenu, materiasTried };
@@ -1758,7 +1481,12 @@ async function collectMisCausasFromAuthenticatedOjv(
 
 /** True only for the OIDC login host — not the citizen marketing portal. */
 export function isClaveUnicaAccountsUrl(url: string): boolean {
-  return /accounts\.claveunica\.gob\.cl/i.test(url);
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname === "accounts.claveunica.gob.cl";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -1932,8 +1660,8 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
       await collectMisCausasFromAuthenticatedOjv(page);
 
     if (items.length === 0) {
-      const url = String(page.url()).slice(0, 160);
-      const title = await page.title().catch(() => "");
+      const location = new URL(page.url());
+      const url = `${location.origin}${location.pathname}`;
       const stillLogin = isClaveUnicaAccountsUrl(url);
       throw new PjudScrapeError(
         stillLogin
@@ -1943,7 +1671,7 @@ export async function scrapeMisCausasWithClaveUnica(opts: {
               openedMenu
                 ? `Menú Mis Causas abierto; materias probadas: ${materiasTried.join(", ") || "(ninguna visible)"}.`
                 : "No se encontró el menú «Mis Causas» (sesión incompleta o layout distinto).",
-              `url=${url}${title ? ` título=${title.slice(0, 60)}` : ""}.`,
+              `url=${url}.`,
               "En OJV: Mis Causas → materia (p. ej. Civil/Familia) → Filtros/Buscar.",
             ].join(" ")
       );
@@ -1966,8 +1694,8 @@ export async function scrapeCausaDetailWithClaveUnica(opts: {
   signal?: AbortSignal;
   optedIn?: boolean;
 }): Promise<ScrapeLookupResult> {
-  if (!opts.causa.rit) {
-    throw new PjudScrapeError("Se requiere RIT para detalle ClaveÚnica.");
+  if (!opts.causa.rit || !parseRitParts(opts.causa.rit) || isPlaceholderTribunal(opts.causa.tribunal)) {
+    throw new PjudScrapeError("Se requiere RIT válido y tribunal identificado para detalle ClaveÚnica.", 400);
   }
   if (!claveUnicaAutomationAllowed(opts.optedIn)) {
     throw new PjudScrapeError(
@@ -2056,7 +1784,7 @@ export async function scrapeCausaDetailWithClaveUnica(opts: {
       await sleep(400);
       await applyMisCausasFiltros(page);
       await clickMisCausasBuscar(page);
-      if (await openMisCausasLupaForRit(page, opts.causa.rit)) {
+      if (await collectOjvResultPages(page, () => openMisCausasLupaForRit(page, { rit: opts.causa.rit!, tribunal: opts.causa.tribunal || "" }))) {
         opened = true;
         break;
       }
@@ -2064,7 +1792,7 @@ export async function scrapeCausaDetailWithClaveUnica(opts: {
     if (!opened) {
       await applyMisCausasFiltros(page);
       await clickMisCausasBuscar(page);
-      opened = await openMisCausasLupaForRit(page, opts.causa.rit);
+      opened = await collectOjvResultPages(page, () => openMisCausasLupaForRit(page, { rit: opts.causa.rit!, tribunal: opts.causa.tribunal || "" }));
     }
     if (!opened) {
       throw new PjudScrapeError(
@@ -2072,21 +1800,16 @@ export async function scrapeCausaDetailWithClaveUnica(opts: {
       );
     }
 
+    const historyHtml = await modalInnerHtml(page as PlaywrightPage);
     let movimientos = await scrapeModalTabs(page as PlaywrightPage);
-    const ebook = await extractEbookRef(page as PlaywrightPage);
-    if (ebook && movimientos[0] && !movimientos[0].documentoRef) {
-      movimientos = movimientos.map((m, i) =>
-        i === 0 ? { ...m, documentoRef: ebook } : m
-      );
-    }
     movimientos = await attachDocumentoBytesFromPage(
       page as PlaywrightPage,
       movimientos
     );
-    const html = (await modalInnerHtml(page as PlaywrightPage)) || (await page.content());
+    const html = await modalInnerHtml(page as PlaywrightPage);
     const sala = parseSalaFromHtml(html);
     const withDocs = movimientos.filter((m) => m.documentoBytes).length;
-    if (movimientos.length === 0) {
+    if (movimientos.length === 0 && !hasExplicitEmptyHistory(historyHtml)) {
       throw new PjudScrapeError(
         `ClaveÚnica: modal abierto para ${opts.causa.rit} pero sin movimientos parseables (historia/cuaderno).`
       );
@@ -2094,7 +1817,7 @@ export async function scrapeCausaDetailWithClaveUnica(opts: {
     return {
       movimientos,
       sala,
-      note: `Scrape Mis Causas (ClaveÚnica): ${movimientos.length} movimiento(s)${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}.`,
+      note: `Scrape Mis Causas (ClaveÚnica): ${movimientos.length ? `${movimientos.length} movimiento(s)` : "OJV informó un historial sin movimientos"}${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}.`,
       portalUrl: OJV_INDEX_N,
     };
   } finally {

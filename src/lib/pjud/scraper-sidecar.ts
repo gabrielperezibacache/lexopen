@@ -17,14 +17,17 @@ import {
 } from "@/lib/net/safe-url";
 import {
   fingerprint,
+  scrapeMovimientoIdentity,
   type PjudCausaRef,
   type PjudFetchResult,
   type PjudFetchedMovimiento,
 } from "@/lib/pjud/types";
 import type { MisCausasItem } from "@/lib/pjud/public-scrape";
+import { ritLabelsMatch, tribunalLabelsMatch } from "@/lib/pjud/ojv-dom";
 
 const movementSchema = z.object({
   id: z.string().max(255).optional(),
+  legacyExternalId: z.string().regex(/^scrape:[a-f0-9]{24}$/).optional(),
   titulo: z.string().trim().min(1).max(2000),
   detalle: z.string().max(20_000).optional().nullable(),
   fecha: z.string().min(1).max(100),
@@ -183,10 +186,13 @@ function mapMovements(
           `${m.titulo} ${m.detalle || ""}`
         ));
     const pendienteResolucion = Boolean(classified.pendienteResolucion);
+    const reportedId = m.id ? (m.id.startsWith("scrape:") ? m.id : `scrape:${m.id}`) : `scrape:${fingerprint(m.titulo, fecha, m.referencia)}`;
+    const identity = scrapeMovimientoIdentity(m.titulo, fecha, m.folio, m.cuaderno);
+    if (m.legacyExternalId && (m.legacyExternalId !== identity.legacyExternalId || reportedId !== identity.externalId)) throw new Error("Identidad histórica de movimiento inconsistente");
+    const generated = Boolean(identity.legacyExternalId && (!m.id || reportedId === identity.externalId || reportedId === identity.legacyExternalId));
     return {
-      externalId: m.id
-        ? `scrape:${m.id}`
-        : `scrape:${fingerprint(m.titulo, fecha, m.referencia)}`,
+      externalId: generated ? identity.externalId : reportedId,
+      ...(generated ? { legacyExternalId: m.legacyExternalId || (reportedId === identity.externalId ? identity.legacyExternalId : reportedId) } : {}),
       titulo: m.titulo,
       detalle: m.detalle || null,
       fecha,
@@ -194,7 +200,7 @@ function mapMovements(
       tipo: classified.tipo,
       relevante: classified.relevante || esReceptor || pendienteResolucion,
       fuente: "pjud" as const,
-      cuaderno: m.cuaderno || "Principal",
+      cuaderno: m.cuaderno?.trim() || null,
       folio: m.folio || null,
       etapa: m.etapa || null,
       tramite: m.tramite || null,
@@ -206,7 +212,8 @@ function mapMovements(
 }
 
 export async function fetchFromScraperSidecar(
-  causa: PjudCausaRef
+  causa: PjudCausaRef,
+  signal?: AbortSignal
 ): Promise<PjudFetchResult | null> {
   const base = scraperBaseUrl();
   if (!base) return null;
@@ -220,7 +227,7 @@ export async function fetchFromScraperSidecar(
       tribunal: causa.tribunal,
     }),
     redirect: "error",
-    signal: AbortSignal.timeout(90_000),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(90_000)]) : AbortSignal.timeout(90_000),
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -235,12 +242,16 @@ export async function fetchFromScraperSidecar(
     .object({
       sala: z.string().max(200).optional().nullable(),
       note: z.string().max(2000).optional(),
-      movimientos: z.array(movementSchema).max(5000).optional(),
+      movimientos: z.array(movementSchema).max(5000),
+      identity: z.object({ rit: z.string().min(1).max(100), tribunal: z.string().min(1).max(255) }).optional(),
     })
     .passthrough()
     .parse(JSON.parse(text));
 
-  const movimientos = mapMovements(data.movimientos || []);
+  if (data.identity && (!causa.rit || !ritLabelsMatch(data.identity.rit, causa.rit) || !tribunalLabelsMatch(data.identity.tribunal, causa.tribunal))) {
+    throw new Error("El servicio devolvió una identidad distinta a la causa consultada");
+  }
+  const movimientos = mapMovements(data.movimientos);
   return {
     provider: "scrape-sidecar",
     movimientos,
@@ -289,7 +300,8 @@ export async function fetchMisCausasFromSidecar(opts: {
 }
 
 export async function buscarCausasByRutFromSidecar(
-  rut: string
+  rut: string,
+  signal?: AbortSignal
 ): Promise<MisCausasItem[] | null> {
   const base = scraperBaseUrl();
   if (!base) return null;
@@ -298,7 +310,7 @@ export async function buscarCausasByRutFromSidecar(
     headers: authHeaders(),
     body: JSON.stringify({ rut }),
     redirect: "error",
-    signal: AbortSignal.timeout(90_000),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(90_000)]) : AbortSignal.timeout(90_000),
   });
   if (!res.ok) {
     throw new Error(`Scraper buscar RUT HTTP ${res.status}`);

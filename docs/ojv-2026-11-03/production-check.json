@@ -1,0 +1,14 @@
+{
+  "mode": "production-loopback",
+  "liveOjvQuery": false,
+  "realCredentialsUsed": false,
+  "checks": [
+    "anonymous lookup denied",
+    "both compiled pages served",
+    "configuration reports OJV disabled without claiming availability",
+    "malformed JSON rejected",
+    "disabled OJV fails without external query",
+    "normal CSRF protection rejects registration",
+    "Mis Causas private metadata without credentials"
+  ]
+}

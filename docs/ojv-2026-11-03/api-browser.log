@@ -1,0 +1,14 @@
+
+Running 7 tests using 1 worker
+
+(node:66474) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/ojv-api.spec.ts:136:5 › catálogo real: permisos efectivos, preparación y respuestas privadas (75ms)
+  ✓  2 [chromium] › e2e/ojv-api.spec.ts:151:5 › JSON, tamaño, inyección e identidad inválidos no crean causas ni trabajos (64ms)
+  ✓  3 [chromium] › e2e/ojv-api.spec.ts:166:5 › cliente y capacidades revocadas no pueden registrar causas (27ms)
+  ✓  4 [chromium] › e2e/ojv-api.spec.ts:173:5 › identidad sin distinguir mayúsculas vincula y otro tribunal crea expediente propio (37ms)
+  ✓  5 [chromium] › e2e/ojv-api.spec.ts:187:5 › un expediente de equipo ajeno permanece reservado y no se reactiva (14ms)
+  ✓  6 [chromium] › e2e/ojv-api.spec.ts:196:5 › dos altas simultáneas de la misma identidad conservan una sola causa (27ms)
+  ✓  7 [chromium] › e2e/ojv-api.spec.ts:212:5 › Mis Causas inválido no reclama la sincronización y su metadata refleja permisos (246ms)
+
+  7 passed (1.1s)
