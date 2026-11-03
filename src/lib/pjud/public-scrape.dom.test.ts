@@ -1,7 +1,7 @@
 /** Offline browser fixtures only. No OJV navigation, credentials, or CAPTCHA. */
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { clickBuscar, collectOjvResultPages, enterConsultaCausas, openExactCauseModal } from "@/lib/pjud/public-scrape";
+import { clickBuscar, collectOjvResultPages, enterConsultaCausas, openExactCauseModal, readConsultaFormState } from "@/lib/pjud/public-scrape";
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
@@ -38,6 +38,80 @@ async function main() {
     await assert.rejects(() => enterConsultaCausas(page, { formTimeoutMs: 100 }), /no mostró el formulario de búsqueda/);
     await page.setContent(`<button class="dropbtn" style="display:none" onclick="accesoConsultaCausas()">Entrar</button>`);
     await assert.rejects(() => enterConsultaCausas(page, { formTimeoutMs: 100 }), /acceso visible a Consulta Unificada/);
+
+    await page.setContent(`<a href="#BusJuridica">Persona jurídica</a><a href="#BusCausa">ROL</a>`);
+    const tabsOnly = await readConsultaFormState(page);
+    assert.equal(tabsOnly.consultaTabsVisible, true);
+    assert.equal(tabsOnly.ready, false, "tabs alone do not verify a search form");
+    assert.deepEqual(tabsOnly.fields, []);
+    await assert.rejects(() => enterConsultaCausas(page, { mode: "manual", formTimeoutMs: 100 }), /acceso visible a Consulta Unificada/);
+
+    for (const badgeStyle of ["visibility:hidden", "opacity:0", "position:absolute;left:-10000px"]) {
+      await page.setContent(`
+        <a href="" onclick="event.preventDefault();document.querySelector('#breadcrumbs').textContent='Consulta Unificada'">Consulta Unificada</a>
+        <nav id="breadcrumbs"></nav><main id="contMain"></main>
+        <div class="grecaptcha-badge" style="${badgeStyle}">
+          <iframe title="fixture invisible badge" width="256" height="60" srcdoc="" src="https://captcha-fixture.test/recaptcha/api2/anchor?size=invisible"></iframe>
+        </div>
+      `);
+      const shellState = await readConsultaFormState(page);
+      assert.equal(shellState.captchaVisible, false, "an invisible badge is not a visible CAPTCHA challenge");
+      assert.equal(shellState.stage, "guest-shell");
+      assert.equal(shellState.ready, false);
+      await assert.rejects(() => enterConsultaCausas(page, { mode: "manual", formTimeoutMs: 100 }), /portal quedó en el menú sin campos de consulta/);
+      assert.equal(await page.locator("#breadcrumbs").innerText(), "Consulta Unificada");
+      assert.equal(await page.locator("#contMain").innerHTML(), "");
+    }
+    for (const captchaPath of ["anchor?size=normal", "bframe"]) {
+      await page.setContent(`<iframe title="fixture visible challenge" width="304" height="78" srcdoc="" src="https://captcha-fixture.test/recaptcha/api2/${captchaPath}"></iframe>`);
+      assert.equal((await readConsultaFormState(page)).captchaVisible, true, "a visible checkbox or challenge still requires manual intervention");
+      await assert.rejects(() => enterConsultaCausas(page, { mode: "manual", formTimeoutMs: 100 }), /captcha-required/);
+    }
+
+    await page.setContent(`
+      <a href="" onclick="consultaUnificada();return false">Consulta Unificada</a>
+      <main id="content"></main>
+      <script>
+        window.lateMenuClicks=0;
+        setTimeout(() => { window.consultaUnificada=() => {
+          window.lateMenuClicks++;
+          document.querySelector('#content').innerHTML='<select id="jurCompetencia"><option>Civil</option></select>';
+        }; }, 150);
+      </script>
+    `);
+    const entryErrors: string[] = [];
+    const onEntryError = (error: Error) => entryErrors.push(error.name);
+    page.on("pageerror", onEntryError);
+    await enterConsultaCausas(page, { mode: "manual", formTimeoutMs: 2_000 });
+    page.off("pageerror", onEntryError);
+    assert.equal(await page.evaluate(() => (window as typeof window & { lateMenuClicks?: number }).lateMenuClicks), 1, "wait for the observed handler, then click once");
+    assert.deepEqual(entryErrors, []);
+
+    await page.setContent(`
+      <select id="jurCompetencia"><option>Civil</option></select>
+      <div class="sweet-alert showSweetAlert visible" style="width:300px;height:100px">
+        <button class="confirm" onclick="window.termsAccepted=true">Acepto</button>
+      </div>
+      <img id="captcha_image" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" width="80" height="30" alt="captcha">
+    `);
+    await assert.rejects(() => enterConsultaCausas(page, { mode: "manual", formTimeoutMs: 100 }), /intervención manual/);
+    assert.equal(await page.evaluate(() => Boolean((window as typeof window & { termsAccepted?: boolean }).termsAccepted)), false, "manual entry never accepts a confirmation");
+    assert.equal((await readConsultaFormState(page)).captchaVisible, true);
+
+    // Automatic entry would attempt to screenshot this matched CAPTCHA image.
+    // Manual entry must not call the solver even when the form is already open.
+    await page.setContent(`<input id="rutJur" name="rutJur" value="fixture-private-value"><img id="captcha_image" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" style="display:none">`);
+    await enterConsultaCausas(page, { mode: "manual", formTimeoutMs: 100 });
+    const safeState = await readConsultaFormState(page);
+    assert.equal(safeState.stage, "ready");
+    assert.equal(safeState.fields[0].id, "rutJur");
+    assert.equal(JSON.stringify(safeState).includes("fixture-private-value"), false, "diagnostics exclude field values");
+
+    await page.setContent(`<input type="password" value="fixture-password">`);
+    const loginState = await readConsultaFormState(page);
+    assert.equal(loginState.stage, "login-required");
+    assert.equal(JSON.stringify(loginState).includes("fixture-password"), false);
+    await assert.rejects(() => enterConsultaCausas(page, { mode: "manual", formTimeoutMs: 100 }), /login-required/);
     const tribunal = "1º Juzgado Civil de Santiago";
     await page.setContent(`
       <table id="verDetalleJuridica"><tbody>

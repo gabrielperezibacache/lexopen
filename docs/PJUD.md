@@ -10,6 +10,8 @@ En **Causas → ClaveÚnica**, guardar acceso y sincronizar son acciones distint
 
 La configuración del canal y su disponibilidad real son estados diferentes. Los límites y comprobaciones de esta mejora están en la [entrega OJV del 3 de noviembre de 2026](ojv-2026-11-03/README.md), con capturas ficticias y pruebas reproducibles.
 
+La [validación posterior contra el portal real](ojv-validacion-real-2026-11-03/README.md) registra por separado la consulta pública vacía y el error 404 de la entrada de ClaveÚnica. No se ha certificado todavía la extracción de un expediente real ni el listado autenticado de Mis Causas.
+
 ## Principio: host local, APIs externas OK
 
 **Local** = dónde corre LexOpen y dónde se guardan datos/secretos (self-hosted).

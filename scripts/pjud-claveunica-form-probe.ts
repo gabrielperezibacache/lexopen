@@ -19,6 +19,12 @@ import {
   playwrightAvailable,
 } from "../src/lib/pjud/public-scrape";
 import { OJV_HOME } from "../src/lib/pjud/ojv-dom";
+import {
+  isClaveUnicaMarketingUrl,
+  pjudValidationErrorCode,
+  redactedPjudValidationUrl,
+  startClaveUnicaOidcFromOjv,
+} from "../src/lib/pjud/ojv-oidc";
 
 type ProbeResult = {
   playwright: boolean;
@@ -39,25 +45,12 @@ type ProbeResult = {
     fillOk: boolean;
     via: "ojv-oidc" | "none";
     pageUrl?: string;
-    title?: string;
     error?: string;
   };
 };
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-function isMarketingPortal(url: string) {
-  try {
-    const u = new URL(url);
-    return (
-      /claveunica\.gob\.cl$/i.test(u.hostname) &&
-      !/^accounts\./i.test(u.hostname)
-    );
-  } catch {
-    return false;
-  }
 }
 
 async function main() {
@@ -110,7 +103,7 @@ async function main() {
         result.loginUrls.push({
           url,
           status: null,
-          error: error instanceof Error ? error.message : String(error),
+          error: pjudValidationErrorCode(error),
         });
       }
     }
@@ -135,50 +128,22 @@ async function main() {
     } catch (error) {
       result.ojvHome = {
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: pjudValidationErrorCode(error),
       };
     }
 
     if (result.ojvHome.ok) {
       try {
         await page.waitForTimeout(1500);
-        const started = await page.evaluate(() => {
-          const w = window as unknown as { AutenticaCUnica?: () => void };
-          if (typeof w.AutenticaCUnica === "function") {
-            w.AutenticaCUnica();
-            return "AutenticaCUnica";
-          }
-          const form = document.querySelector(
-            "#cuform"
-          ) as HTMLFormElement | null;
-          if (form) {
-            form.submit();
-            return "cuform";
-          }
-          return null;
-        });
-        result.oidc.started = started;
-
-        const popupPromise = context
-          .waitForEvent("page", { timeout: 10_000 })
-          .catch(() => null);
-        const navPromise = page
-          .waitForURL(/accounts\.claveunica\.gob\.cl/i, { timeout: 45_000 })
-          .catch(() => undefined);
-
-        const popup = await popupPromise;
-        await navPromise;
-        const active = popup || page;
-        if (popup) {
-          await popup
-            .waitForLoadState("domcontentloaded")
-            .catch(() => undefined);
-        }
+        const oidc = await startClaveUnicaOidcFromOjv(page, { includeMarketing: true });
+        result.oidc.started = oidc.started;
+        const active = oidc.page || page;
+        await active.waitForLoadState("domcontentloaded").catch(() => undefined);
 
         const finalUrl = active.url();
-        result.oidc.finalUrl = finalUrl;
+        result.oidc.finalUrl = redactedPjudValidationUrl(finalUrl) ?? undefined;
         result.oidc.isAccounts = isClaveUnicaAccountsUrl(finalUrl);
-        result.oidc.isMarketing = isMarketingPortal(finalUrl);
+        result.oidc.isMarketing = isClaveUnicaMarketingUrl(finalUrl);
         result.oidc.opened = Boolean(result.oidc.isAccounts);
 
         if (result.oidc.isMarketing) {
@@ -209,12 +174,11 @@ async function main() {
             ...formOk,
             fillOk,
             via: "ojv-oidc",
-            pageUrl: finalUrl,
+            pageUrl: redactedPjudValidationUrl(finalUrl) ?? undefined,
           };
         }
       } catch (error) {
-        result.oidc.error =
-          error instanceof Error ? error.message : String(error);
+        result.oidc.error = pjudValidationErrorCode(error);
       }
     }
   } finally {
@@ -250,7 +214,6 @@ async function waitForLoginForm(page: {
   locator: (s: string) => {
     first: () => { isVisible: () => Promise<boolean> };
   };
-  title: () => Promise<string>;
 }) {
   const rutCandidates = [
     page.getByPlaceholder(/RUN|RUT/i).first(),
@@ -286,7 +249,6 @@ async function waitForLoginForm(page: {
     ok: rutVisible && passwordVisible,
     rutVisible,
     passwordVisible,
-    title: await page.title().catch(() => ""),
     error:
       rutVisible && passwordVisible
         ? undefined
@@ -295,6 +257,6 @@ async function waitForLoginForm(page: {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(`FAIL: ${pjudValidationErrorCode(error)}`);
   process.exit(1);
 });
