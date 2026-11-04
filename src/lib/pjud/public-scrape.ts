@@ -49,9 +49,13 @@ import {
   parseVerDetalleJuridicaHtml,
 } from "@/lib/pjud/parse-html";
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
+import { manualPjudInteractionActive } from "@/lib/pjud/manual-interaction-policy";
 import path from "node:path";
 import type { MisCausasItem } from "@/lib/pjud/types";
-import { omitLegacyScrapeAliases, type PjudCausaRef, type PjudFetchedMovimiento } from "@/lib/pjud/types";
+import { normalizePjudCuaderno, omitLegacyScrapeAliases, type PjudCausaRef, type PjudCuadernosCoverage, type PjudFetchedMovimiento } from "@/lib/pjud/types";
+import { PJUD_MAX_CAUSA_MOVIMIENTOS, PJUD_MAX_CUADERNOS } from "@/lib/pjud/cuadernos-limits";
+import { cuadernosCoverageNote, unknownCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
 import { isClaveUnicaAccountsUrl, startClaveUnicaOidcFromOjv, waitForOidcPageAfterTrigger } from "@/lib/pjud/ojv-oidc";
 import { clearManualMisCausasRows, snapshotManualMisCausasRows, waitForFreshManualMisCausasRows } from "@/lib/pjud/manual-mis-causas-response";
 
@@ -96,11 +100,11 @@ export function publicScrapeReady() {
 }
 
 export function pjudCaptchaAutoSolveAllowed() {
-  return process.env.PJUD_CAPTCHA_AUTO_SOLVE?.trim() !== "0";
+  return !manualPjudInteractionActive() && process.env.PJUD_CAPTCHA_AUTO_SOLVE?.trim() !== "0";
 }
 
 export function pjudDocumentDownloadsAllowed() {
-  return process.env.PJUD_DOC_DOWNLOADS?.trim() !== "0";
+  return !manualPjudInteractionActive() && process.env.PJUD_DOC_DOWNLOADS?.trim() !== "0";
 }
 
 /**
@@ -275,8 +279,8 @@ async function launchBrowser() {
 }
 
 /** Validation may dismiss known case details, but must stop at other prompts. */
-export async function assertPjudPromptPolicy(page: PlaywrightPage) {
-  if (process.env.PJUD_AUTO_CONFIRM_PROMPTS?.trim() !== "0") return;
+export async function assertPjudPromptPolicy(page: PlaywrightPage, forceManual = false) {
+  if (!forceManual && !manualPjudInteractionActive() && process.env.PJUD_AUTO_CONFIRM_PROMPTS?.trim() !== "0") return;
   const blocked = await page.locator(`${OJV.sweetAlert}, .modal.in, .modal.show, .modal[style*="display: block"]`).evaluateAll((nodes) => nodes.some((node) => {
     const rect = node.getBoundingClientRect();
     if (!rect.width || !rect.height) return false;
@@ -798,7 +802,11 @@ export async function openExactCauseModal(
   }
   const history = await findModalHistoryTab(page, "history");
   if (history) await history.tab.click();
-  await waitForModalHistoryPanel(page, { label: "Historia", panelId: history?.panelId });
+  // The all-cuaderno reader records a failed initial cuaderno and can continue
+  // with the others. A legacy detail without a selector still needs this guard.
+  if (!(await cuadernoSelector(page))?.options.length) {
+    await waitForModalHistoryPanel(page, { label: "Historia", panelId: history?.panelId });
+  }
   return pickTribunalFromTexts(matches[0].cells);
 }
 
@@ -1093,33 +1101,77 @@ export function mergePjudMovimientos(
   );
 }
 
+async function activeHistoryHasUnreadPages(page: PlaywrightPage) {
+  const modal = await visibleCauseDetailModal(page);
+  return modal.evaluate(node => {
+    const visible = { has(element: Element) {
+      if (!element.getBoundingClientRect().height) return false;
+      for (let parent: Element | null = element; parent; parent = parent.parentElement) {
+        const style = getComputedStyle(parent);
+        if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+      }
+      return true;
+    } };
+    const active = [...node.querySelectorAll(".tab-pane.active")].filter(pane => visible.has(pane)).at(-1);
+    const scope = active || node;
+    return [...scope.querySelectorAll('a, button, [role="button"]')].some(control => {
+      if (!visible.has(control) || control.closest('.disabled, [disabled], [aria-disabled="true"]')) return false;
+      const inPager = control.closest('.dataTables_paginate, .dt-paging, .pagination, nav[aria-label*="pagin" i], [role="navigation"][aria-label*="pagin" i]');
+      const rel = control.getAttribute("rel") || "";
+      const labels = [control.getAttribute("aria-label") || "", control.textContent || ""].map(label => label.trim().replace(/\s+/g, " "));
+      const direction = labels.some(label => /^(?:siguiente|anterior|next|previous|prev|›|»|‹|«|<|>)(?:\s+(?:p[aá]gina|page))?$/i.test(label)) ||
+        control.matches('.next, .previous, .prev') || /^(next|prev)$/i.test(rel);
+      return Boolean(direction && (inPager || /^(next|prev)$/i.test(rel)));
+    });
+  });
+}
+
 export async function scrapeModalTabs(
   page: PlaywrightPage,
-  options: { panelTimeoutMs?: number; emptyIdleMs?: number } = {}
+  options: { panelTimeoutMs?: number; emptyIdleMs?: number; cuaderno?: string; recoverPartial?: boolean; onIncomplete?: (panel: string) => void; deadlineAt?: number; limit?: number } = {}
 ): Promise<PjudFetchedMovimiento[]> {
+  const timeout = () => Math.max(1, Math.min(options.panelTimeoutMs ?? 30_000, (options.deadlineAt ?? Infinity) - Date.now()));
+  const parse = (html: string, panel: string) => {
+    let incomplete = false;
+    const rows = parseMovimientosFromHtml(html, { cuaderno: options.cuaderno, limit: options.limit, onIncompleteRow: () => { incomplete = true; } });
+    if (incomplete) options.onIncomplete?.(`${panel}: filas sin fecha o texto reconocible`);
+    return rows;
+  };
+  const checkPaging = async (panel: string) => {
+    if (options.onIncomplete && await activeHistoryHasUnreadPages(page)) options.onIncomplete(`${panel}: quedan páginas por leer`);
+  };
   const history = await findModalHistoryTab(page, "history");
   if (history) await history.tab.click();
-  const historyHtml = await waitForModalHistoryPanel(page, { label: "Historia", panelId: history?.panelId, timeoutMs: options.panelTimeoutMs });
-  let movimientos = parseMovimientosFromHtml(historyHtml);
+  const historyHtml = await waitForModalHistoryPanel(page, { label: "Historia", panelId: history?.panelId, timeoutMs: timeout() });
+  await checkPaging("Historia");
+  let movimientos = parse(historyHtml, "Historia");
 
-  const receptor = await findModalHistoryTab(page, "notifications");
-  if (receptor) {
-    await receptor.tab.click();
-    const receptorHtml = await waitForModalHistoryPanel(page, { label: "Notificaciones", panelId: receptor.panelId, optional: true, timeoutMs: options.panelTimeoutMs, emptyIdleMs: options.emptyIdleMs });
-    const receptorMovs = parseMovimientosFromHtml(receptorHtml).map((m) => ({
+  try {
+    const receptor = await findModalHistoryTab(page, "notifications");
+    if (receptor) {
+      await receptor.tab.click();
+      const receptorHtml = await waitForModalHistoryPanel(page, { label: "Notificaciones", panelId: receptor.panelId, optional: true, timeoutMs: timeout(), emptyIdleMs: options.emptyIdleMs });
+      await checkPaging("Notificaciones");
+      const receptorMovs = parse(receptorHtml, "Notificaciones").map((m) => ({
       ...m,
       esReceptor: true,
       relevante: true,
       tipo: m.tipo === "otro" ? "notificacion" : m.tipo,
-    }));
-    movimientos = mergePjudMovimientos(movimientos, receptorMovs);
+      }));
+      movimientos = mergePjudMovimientos(movimientos, receptorMovs);
+    }
+  } catch (error) {
+    if (!options.recoverPartial) throw error;
+    options.onIncomplete?.("Notificaciones");
   }
 
-  const escritos = await findModalHistoryTab(page, "writings");
-  if (escritos) {
-    await escritos.tab.click();
-    const escritosHtml = await waitForModalHistoryPanel(page, { label: "Escritos", panelId: escritos.panelId, optional: true, timeoutMs: options.panelTimeoutMs, emptyIdleMs: options.emptyIdleMs });
-    const escritoMovs = parseMovimientosFromHtml(escritosHtml).map((m) => {
+  try {
+    const escritos = await findModalHistoryTab(page, "writings");
+    if (escritos) {
+      await escritos.tab.click();
+      const escritosHtml = await waitForModalHistoryPanel(page, { label: "Escritos", panelId: escritos.panelId, optional: true, timeoutMs: timeout(), emptyIdleMs: options.emptyIdleMs });
+      await checkPaging("Escritos");
+      const escritoMovs = parse(escritosHtml, "Escritos").map((m) => {
       const pendiente =
         m.pendienteResolucion ||
         /por\s+resolver|pendiente/i.test(`${m.titulo} ${m.detalle || ""}`);
@@ -1129,11 +1181,222 @@ export async function scrapeModalTabs(
         pendienteResolucion: pendiente || m.pendienteResolucion,
         relevante: true,
       };
-    });
-    movimientos = mergePjudMovimientos(movimientos, escritoMovs);
+      });
+      movimientos = mergePjudMovimientos(movimientos, escritoMovs);
+    }
+  } catch (error) {
+    if (!options.recoverPartial) throw error;
+    options.onIncomplete?.("Escritos");
   }
 
   return movimientos;
+}
+
+type CuadernoOption = { key: string; label: string; cuaderno: string; value: string };
+const unsettledCuadernoSelections = new WeakMap<PlaywrightPage, string>();
+
+/** Public identity comes from the displayed cuaderno, never its session JWT. */
+export function pjudCuadernoIdentity(raw: string) {
+  const label = raw.trim().replace(/\s+/g, " ");
+  if (!label || label.length > 255 || /^[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}$/.test(label)) {
+    throw new PjudScrapeError("OJV no mostró una etiqueta de cuaderno reconocible.");
+  }
+  const formal = /^(\d+(?:\.\d+){0,5})\s*[-–—]\s*(.+)$/.exec(label);
+  const code = formal?.[1].split(".").map(part => part.replace(/^0+(?=\d)/, "")).join(".");
+  const key = code ? `cuaderno:${code}` : `cuaderno:label:${createHash("sha1").update(normalizePjudCuaderno(label) || label).digest("hex").slice(0, 24)}`;
+  // Principal was already stored under this canonical name by older readers.
+  // Other formal labels retain their subcuaderno number to avoid name collisions.
+  const cuaderno = formal && /^(?:1|1\.0)$/.test(code!) && /^principal$/i.test(formal[2]) ? "Principal" : label;
+  return { key, label, cuaderno };
+}
+
+async function cuadernoSelector(page: PlaywrightPage) {
+  const modal = await visibleCauseDetailModal(page);
+  const selects = modal.locator("select").filter({ visible: true });
+  const candidates = await selects.evaluateAll(nodes => nodes.map((node, index) => {
+    const select = node as HTMLSelectElement;
+    const label = select.id ? [...select.ownerDocument.querySelectorAll("label")].find(item => item.htmlFor === select.id)?.textContent || "" : "";
+    if (!/cuaderno/i.test(`${select.id} ${select.name} ${label} ${select.getAttribute("aria-label") || ""}`)) return null;
+    const options = [...select.options].filter(option => !option.disabled && Boolean(option.value.trim()) &&
+      !/^(?:seleccione(?:\s+(?:un|el))?(?:\s+cuaderno)?[.\s…]*|todos?(?:\s+los\s+cuadernos)?|--+|cuaderno)$/i.test((option.textContent || "").trim()));
+    return { index, total: options.length, selectedLabel: select.selectedOptions[0]?.textContent || "", options: options.slice(0, 100).map(option => ({ label: option.textContent || "", value: option.value })) };
+  }).filter(candidate => candidate !== null));
+  if (candidates.length > 1) throw new PjudScrapeError("OJV mostró varios selectores de cuaderno; no se atribuirán movimientos a una selección ambigua.");
+  const candidate = candidates[0];
+  if (!candidate) return undefined;
+  const options: CuadernoOption[] = candidate.options.map(option => ({ ...pjudCuadernoIdentity(option.label), value: option.value }));
+  if (new Set(options.map(option => option.key)).size !== options.length) {
+    throw new PjudScrapeError("OJV mostró cuadernos sin una identificación distinta. No se mezclarán sus historiales.");
+  }
+  return { locator: selects.nth(candidate.index), total: candidate.total, selectedLabel: candidate.selectedLabel.trim().replace(/\s+/g, " "), options };
+}
+
+export async function changeCuaderno(
+  page: PlaywrightPage,
+  target: CuadernoOption,
+  options: { timeoutMs: number; signal?: AbortSignal; allowPrompts?: boolean }
+) {
+  await assertPjudPromptPolicy(page, options.allowPrompts === false);
+  const current = await cuadernoSelector(page);
+  const selected = current?.options.find(option => option.key === target.key);
+  if (!current || !selected) throw new PjudScrapeError("El cuaderno dejó de estar disponible en el selector OJV.");
+  if (current.selectedLabel === selected.label && unsettledCuadernoSelections.get(page) !== selected.key) return selected;
+  const history = await findModalHistoryTab(page, "history");
+  if (history) await history.tab.click();
+  const modal = await visibleCauseDetailModal(page);
+  await modal.evaluate((node, panelId) => {
+    type State = { root: Element; rows: Element[]; texts: string[]; observer: MutationObserver; dataChanged: boolean; panelId?: string };
+    const host = window as typeof window & { lexopenCuadernoTransition?: State };
+    host.lexopenCuadernoTransition?.observer.disconnect();
+    const scope = panelId ? [...node.querySelectorAll("[id]")].find(item => item.id === panelId) || node : node;
+    const terminalRow = { has(row: Element) {
+      if (row.closest("table.table-titulos")) return false;
+      const cells = [...row.querySelectorAll("td")];
+      return cells.length >= 2 && cells.some(cell => /^(?:\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}(?:\s*\(\d{1,2}\/\d{1,2}\/\d{4}\))?|\d{4}-\d{2}-\d{2}(?:T[^\s]+)?|\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4})$/i.test((cell.textContent || "").trim())) ||
+        cells.length === 1 && /sin (?:movimientos|registros)|no (?:hay|existen|se (?:han encontrado|encontraron)) (?:movimientos|registros)|ning[uú]n dato disponible/i.test(row.textContent || "");
+    } };
+    const rows = [...scope.querySelectorAll("tr")].filter(row => terminalRow.has(row));
+    const state: State = { root: scope, rows, texts: rows.map(row => row.textContent || ""), observer: null as unknown as MutationObserver, dataChanged: false, panelId };
+    state.observer = new MutationObserver(records => {
+      if (records.some(record => {
+        const element = record.target instanceof Element ? record.target : record.target.parentElement;
+        const row = element?.closest("tr");
+        if (!row || !terminalRow.has(row)) return false;
+        const changedNodes = [...record.addedNodes, ...record.removedNodes];
+        const loadingOnly = changedNodes.length > 0 && changedNodes.every(item => item instanceof Element
+          ? item.matches('.spinner, .spinner-border, .fa-spinner, [aria-busy="true"], .dataTables_processing, .loadingConsulta')
+          : /^(?:cargando|procesando|loading|processing)[.\s…]*$/i.test(item.textContent || ""));
+        return !loadingOnly;
+      })) state.dataChanged = true;
+    });
+    state.observer.observe(scope, { childList: true, subtree: true, characterData: true });
+    host.lexopenCuadernoTransition = state;
+  }, history?.panelId);
+  let matchingRequest = false;
+  let matchingResponse = false;
+  let matchingFailure = false;
+  const response = (item: import("playwright").Response) => {
+    const request = item.request();
+    let payload = `${request.url()} ${request.postData() || ""}`;
+    try { payload = decodeURIComponent(payload); } catch { /* Compare the original encoded payload. */ }
+    let official = false;
+    try { const host = new URL(request.url()).hostname; official = host === "oficinajudicialvirtual.pjud.cl" || host === "ojv.pjud.cl"; } catch { /* Ignore non-HTTP resources. */ }
+    if (!official || !payload.includes(selected.value)) return;
+    matchingRequest = true;
+    if (!item.ok()) matchingFailure = true;
+    void item.finished().then(error => {
+      if (error) matchingFailure = true;
+      else matchingResponse = item.ok();
+    }).catch(() => { matchingFailure = true; });
+  };
+  page.on("response", response);
+  try {
+    // Resolve the option afresh: OJV replaces all JWT values after each change.
+    unsettledCuadernoSelections.set(page, selected.key);
+    await current.locator.selectOption({ value: selected.value });
+    const deadline = Date.now() + options.timeoutMs;
+    while (Date.now() < deadline) {
+      if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      await assertPjudPromptPolicy(page, options.allowPrompts === false);
+      if (matchingFailure) throw new PjudScrapeError("OJV no completó la respuesta del cuaderno seleccionado.");
+      const refreshed = await cuadernoSelector(page);
+      if (refreshed?.selectedLabel === selected.label) {
+        const detail = await visibleCauseDetailModal(page);
+        const fresh = await detail.evaluate(node => {
+          const state = (window as typeof window & { lexopenCuadernoTransition?: { root: Element; rows: Element[]; texts: string[]; dataChanged: boolean; panelId?: string } }).lexopenCuadernoTransition;
+          if (!state) return { replaced: false, changed: false };
+          const scope = state.panelId ? [...node.querySelectorAll("[id]")].find(item => item.id === state.panelId) : node;
+          if (!scope) return { replaced: false, changed: state.dataChanged };
+          const rows = [...scope.querySelectorAll("tr")].filter(row => {
+            if (row.closest("table.table-titulos")) return false;
+            const cells = [...row.querySelectorAll("td")];
+            return cells.length >= 2 && cells.some(cell => /^(?:\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}(?:\s*\(\d{1,2}\/\d{1,2}\/\d{4}\))?|\d{4}-\d{2}-\d{2}(?:T[^\s]+)?|\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4})$/i.test((cell.textContent || "").trim())) ||
+              cells.length === 1 && /sin (?:movimientos|registros)|no (?:hay|existen|se (?:han encontrado|encontraron)) (?:movimientos|registros)|ning[uú]n dato disponible/i.test(row.textContent || "");
+          });
+          return { replaced: rows.some(row => !state.rows.includes(row)), changed: state.dataChanged || rows.some(row => {
+            const index = state.rows.indexOf(row);
+            return index >= 0 && state.texts[index] !== (row.textContent || "");
+          }) };
+        });
+        if ((!matchingRequest || matchingResponse) && (fresh.replaced || (matchingResponse && fresh.changed))) {
+          unsettledCuadernoSelections.delete(page);
+          return selected;
+        }
+      }
+      await delay(Math.min(100, Math.max(0, deadline - Date.now())));
+    }
+    throw new PjudScrapeError("OJV no devolvió un historial nuevo para el cuaderno seleccionado. No se usarán las filas del cuaderno anterior.");
+  } finally {
+    page.off("response", response);
+    await page.evaluate(() => {
+      const host = window as typeof window & { lexopenCuadernoTransition?: { observer: MutationObserver } };
+      host.lexopenCuadernoTransition?.observer.disconnect();
+      delete host.lexopenCuadernoTransition;
+    }).catch(() => undefined);
+  }
+}
+
+/** Read every listed cuaderno in its own scope, retaining explicit partial results. */
+export async function scrapeAllCuadernos(
+  page: PlaywrightPage,
+  options: { panelTimeoutMs?: number; transitionTimeoutMs?: number; totalTimeoutMs?: number; emptyIdleMs?: number; allowPrompts?: boolean; signal?: AbortSignal; downloadDocuments?: boolean } = {}
+): Promise<{ movimientos: PjudFetchedMovimiento[]; cuadernos: PjudCuadernosCoverage }> {
+  const deadlineAt = Date.now() + (options.totalTimeoutMs ?? 120_000);
+  const first = await cuadernoSelector(page);
+  let remainingDocuments = 0;
+  if (options.downloadDocuments && options.allowPrompts !== false && pjudDocumentDownloadsAllowed()) {
+    remainingDocuments = (await import("@/lib/pjud/pdf-backup")).pjudDocDownloadMaxPerRun();
+  }
+  const download = async (rows: PjudFetchedMovimiento[]) => {
+    if (remainingDocuments <= 0) return rows;
+    const result = await attachDocumentoBytesFromPage(page, rows, { limit: remainingDocuments });
+    remainingDocuments -= result.filter(row => row.documentoBytes).length;
+    return result;
+  };
+  if (!first?.options.length) {
+    let incomplete = false;
+    const rows = await scrapeModalTabs(page, { ...options, deadlineAt, recoverPartial: true, onIncomplete: () => { incomplete = true; }, limit: PJUD_MAX_CAUSA_MOVIMIENTOS + 1 });
+    return {
+      movimientos: await download(rows.slice(0, PJUD_MAX_CAUSA_MOVIMIENTOS)),
+      cuadernos: incomplete || rows.length > PJUD_MAX_CAUSA_MOVIMIENTOS ? { status: "partial", total: null, read: 0, items: [] } : unknownCuadernosCoverage(),
+    };
+  }
+  const targets = first.options.slice(0, PJUD_MAX_CUADERNOS).map(({ key, label, cuaderno }) => ({ key, label, cuaderno }));
+  const items: PjudCuadernosCoverage["items"] = [];
+  let movimientos: PjudFetchedMovimiento[] = [];
+  let changedList = false;
+  for (const target of targets) {
+    if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    if (Date.now() >= deadlineAt || movimientos.length >= PJUD_MAX_CAUSA_MOVIMIENTOS) {
+      items.push({ key: target.key, label: target.label, status: "failed", count: 0, note: "Lectura pendiente: se alcanzó el límite de esta sincronización. Vuelva a sincronizar." });
+      continue;
+    }
+    const incomplete: string[] = [];
+    let rows: PjudFetchedMovimiento[] = [];
+    try {
+      await assertPjudPromptPolicy(page, options.allowPrompts === false);
+      const selected = await changeCuaderno(page, { ...target, value: "" }, { ...options, timeoutMs: Math.max(1, Math.min(options.transitionTimeoutMs ?? 30_000, deadlineAt - Date.now())) });
+      rows = await scrapeModalTabs(page, {
+        ...options, deadlineAt, cuaderno: selected.cuaderno,
+        recoverPartial: true, onIncomplete: panel => incomplete.push(panel), limit: PJUD_MAX_CAUSA_MOVIMIENTOS + 1,
+      });
+      const remaining = PJUD_MAX_CAUSA_MOVIMIENTOS - movimientos.length;
+      if (rows.length > remaining) incomplete.push("Límite de movimientos");
+      rows = await download(rows.slice(0, remaining));
+      movimientos = mergePjudMovimientos(movimientos, rows);
+      items.push({ key: target.key, label: selected.label, status: incomplete.length ? "failed" : "ok", count: rows.length,
+        ...(incomplete.length ? { note: `Lectura incompleta: ${incomplete.join(", ")}. Se conservaron los movimientos recuperados.` } : {}) });
+    } catch (error) {
+      if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
+      items.push({ key: target.key, label: target.label, status: "failed", count: rows.length, note: "No se pudo confirmar la lectura de este cuaderno. Los demás cuadernos recuperados se conservan; vuelva a sincronizar." });
+    }
+  }
+  const final = await cuadernoSelector(page).catch(() => undefined);
+  const initialKeys = new Set(targets.map(target => target.key));
+  if (!final || final.total !== first.total || final.options.some(target => !initialKeys.has(target.key))) changedList = true;
+  const read = items.filter(item => item.status === "ok").length;
+  const total = Math.max(first.total, final?.total || 0);
+  return { movimientos, cuadernos: { status: !changedList && first.total <= PJUD_MAX_CUADERNOS && read === first.total ? "complete" : "partial", total: total <= 100_000 ? total : null, read, items } };
 }
 
 /**
@@ -1350,12 +1613,14 @@ export type ScrapeLookupResult = {
   portalUrl: string;
   /** Tribunal label as seen on OJV listing (may refine local catalog name). */
   resolvedTribunal?: string | null;
+  cuadernos?: PjudCuadernosCoverage;
 };
 
 async function scrapeCausaByRolOnce(
   causa: PjudCausaRef,
   session: PjudSession,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options: { downloadDocuments?: boolean } = {}
 ): Promise<ScrapeLookupResult> {
   return withConsultaPage(session, async (page) => {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -1388,14 +1653,11 @@ async function scrapeCausaByRolOnce(
     }
     const html = await modalInnerHtml(page);
     if (!html) throw new PjudScrapeError("OJV no devolvió el detalle de la causa seleccionada.");
-    let movimientos = await scrapeModalTabs(page);
-    if (movimientos.length > 0) {
-      movimientos = await attachDocumentoBytesFromPage(page, movimientos);
-    }
+    const { movimientos, cuadernos } = await scrapeAllCuadernos(page, { signal, downloadDocuments: options.downloadDocuments !== false });
 
     const sala = parseSalaFromHtml(html);
     const withDocs = movimientos.filter((m) => m.documentoBytes).length;
-    if (movimientos.length === 0 && !hasExplicitEmptyHistory(html)) {
+    if (movimientos.length === 0 && cuadernos.status === "unknown" && !hasExplicitEmptyHistory(html)) {
       throw new PjudScrapeError(
         `El detalle de ${causa.rit} se abrió, pero no se reconoció su historial. No se crearán movimientos desde el listado. Portal: ${OJV_CONSULTA_URL}`
       );
@@ -1404,9 +1666,10 @@ async function scrapeCausaByRolOnce(
     return {
       movimientos,
       sala,
-      note: `Scrape OJV (sesión de consulta): ${movimientos.length ? `${movimientos.length} movimiento(s)` : "OJV informó un historial sin movimientos"}${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}. No oficial; verifique en ${OJV_CONSULTA_URL}`,
+      note: `Scrape OJV (sesión de consulta): ${movimientos.length ? `${movimientos.length} movimiento(s)` : cuadernos.status === "partial" ? "no se recuperaron movimientos verificables" : "OJV informó un historial sin movimientos"}${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}. ${cuadernosCoverageNote(cuadernos)} No oficial; verifique en ${OJV_CONSULTA_URL}`,
       portalUrl: OJV_CONSULTA_URL,
       resolvedTribunal,
+      cuadernos,
     };
   });
 }
@@ -1416,7 +1679,8 @@ async function scrapeCausaByRolOnce(
  */
 export async function scrapeCausaByRol(
   causa: PjudCausaRef,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options: { downloadDocuments?: boolean } = {}
 ): Promise<ScrapeLookupResult> {
   if (!publicScrapeEnabled()) {
     throw new PjudScrapeError(
@@ -1427,19 +1691,19 @@ export async function scrapeCausaByRol(
     throw new PjudScrapeError("Se requiere RIT/ROL válido y tribunal identificado para confirmar el expediente.", 400);
   }
 
-  const cacheKey = `rol:${(causa.tribunal || "").toLowerCase()}:${(causa.rit || causa.ruc || "").toLowerCase()}`;
+  const cacheKey = `rol:${options.downloadDocuments === false ? "metadata" : "documents"}:${(causa.tribunal || "").toLowerCase()}:${(causa.rit || causa.ruc || "").toLowerCase()}`;
   const cached = cacheGet<ScrapeLookupResult>(cacheKey);
   if (cached) return { ...cached, note: `${cached.note} · cache` };
 
   let result: ScrapeLookupResult;
   try {
     const session = await getValidSession(signal);
-    result = await scrapeCausaByRolOnce(causa, session, signal);
+    result = await scrapeCausaByRolOnce(causa, session, signal, options);
   } catch (error) {
     if (error instanceof PjudSessionExpiredError) {
       invalidateSession();
       const fresh = await getValidSession(signal);
-      result = await scrapeCausaByRolOnce(causa, fresh, signal);
+      result = await scrapeCausaByRolOnce(causa, fresh, signal, options);
     } else {
       throw error;
     }
@@ -1693,7 +1957,7 @@ export const MIS_CAUSAS_MATERIAS = [
 ] as const;
 
 async function dismissOjvPrompts(page: AnyPage) {
-  if (process.env.PJUD_AUTO_CONFIRM_PROMPTS === "0") {
+  if (manualPjudInteractionActive() || process.env.PJUD_AUTO_CONFIRM_PROMPTS === "0") {
     await assertPjudPromptPolicy(page);
     return;
   }
@@ -1742,7 +2006,7 @@ async function waitForMisCausasMenuReady(page: AnyPage, options: MisCausasReadOp
   const deadline = Date.now() + 8_000;
   do {
     assertMisCausasReadActive(options);
-    await assertPjudPromptPolicy(page);
+    await assertPjudPromptPolicy(page, true);
     if (await ready.filter({ visible: true }).count()) return;
     await sleep(100);
   } while (Date.now() < deadline);
@@ -1752,7 +2016,7 @@ async function waitForMisCausasMenuReady(page: AnyPage, options: MisCausasReadOp
 async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = {}): Promise<boolean> {
   if (options.allowPrompts === false) {
     // Only close a recognized record detail; terms and notices remain untouched.
-    await assertPjudPromptPolicy(page);
+    await assertPjudPromptPolicy(page, true);
     const details = page.locator('.modal[id^="modalDetalle"]:has(table.table-titulos)').filter({ visible: true });
     let closedDetail = false;
     for (const detail of await details.all()) {
@@ -1767,11 +2031,11 @@ async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = 
     if (closedDetail) {
       // Bootstrap can hide the record before its backdrop finishes fading out.
       // Wait for the portal to remove it; never remove overlays ourselves.
-      await assertPjudPromptPolicy(page);
+      await assertPjudPromptPolicy(page, true);
       await page.locator(".modal-backdrop").filter({ visible: true }).first().waitFor({ state: "hidden", timeout: 8_000 });
     }
     assertMisCausasReadActive(options);
-    await assertPjudPromptPolicy(page);
+    await assertPjudPromptPolicy(page, true);
     const visible = page.getByRole("link", { name: /^Mis Causas$/i })
       .or(page.getByRole("button", { name: /^Mis Causas$/i }))
       .or(page.locator(OJV.misCausasMenu)).filter({ visible: true }).first();
@@ -1965,7 +2229,7 @@ export async function collectMisCausasFromAuthenticatedOjv(
   options: MisCausasReadOptions = {}
 ): Promise<{ items: MisCausasItem[]; openedMenu: boolean; materiasTried: string[] }> {
   assertMisCausasReadActive(options);
-  if (options.allowPrompts === false) await assertPjudPromptPolicy(page);
+  if (options.allowPrompts === false) await assertPjudPromptPolicy(page, true);
   page = await ensureAuthenticatedOjvShell(page, options);
 
   const openedMenu = await openMisCausasMenu(page, options);
@@ -2003,7 +2267,7 @@ export async function collectMisCausasFromAuthenticatedOjv(
 
     for (const materia of options.materias ?? MIS_CAUSAS_MATERIAS) {
       assertMisCausasReadActive(options);
-      if (options.allowPrompts === false) await assertPjudPromptPolicy(page);
+      if (options.allowPrompts === false) await assertPjudPromptPolicy(page, true);
       let tab = page
         .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
         .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
@@ -2200,7 +2464,7 @@ export async function readCausaDetailFromAuthenticatedOjv(
     throw new PjudScrapeError("Se requiere RIT válido y tribunal identificado para detalle ClaveÚnica.", 400);
   }
   assertMisCausasReadActive(options);
-  if (options.allowPrompts === false) await assertPjudPromptPolicy(page);
+  if (options.allowPrompts === false) await assertPjudPromptPolicy(page, true);
   page = await ensureAuthenticatedOjvShell(page, options);
   const menuOpened = await openMisCausasMenu(page, options);
   if (!menuOpened && options.allowPrompts === false) {
@@ -2211,7 +2475,7 @@ export async function readCausaDetailFromAuthenticatedOjv(
   try {
     for (const materia of options.materias ?? MIS_CAUSAS_MATERIAS) {
       assertMisCausasReadActive(options);
-      if (options.allowPrompts === false) await assertPjudPromptPolicy(page);
+      if (options.allowPrompts === false) await assertPjudPromptPolicy(page, true);
       let tab = page
         .getByRole("link", { name: new RegExp(`^${materia}$`, "i") })
         .or(page.getByRole("button", { name: new RegExp(`^${materia}$`, "i") }))
@@ -2239,20 +2503,19 @@ export async function readCausaDetailFromAuthenticatedOjv(
 
     assertMisCausasReadActive(options);
     const historyHtml = await modalInnerHtml(page);
-    let movimientos = await scrapeModalTabs(page);
-    // A manual session only reads movements. Its caller controls a separate PDF workflow.
-    if (options.allowPrompts !== false) movimientos = await attachDocumentoBytesFromPage(page, movimientos);
+    const { movimientos, cuadernos } = await scrapeAllCuadernos(page, { signal: options.signal, allowPrompts: options.allowPrompts, downloadDocuments: options.allowPrompts !== false });
     const sala = parseSalaFromHtml(await modalInnerHtml(page));
     const withDocs = movimientos.filter((movement) => movement.documentoBytes).length;
-    if (movimientos.length === 0 && !hasExplicitEmptyHistory(historyHtml)) {
+    if (movimientos.length === 0 && cuadernos.status === "unknown" && !hasExplicitEmptyHistory(historyHtml)) {
       throw new PjudScrapeError("El detalle identificado no mostró un historial reconocible en Mis Causas.");
     }
     return {
       movimientos,
       sala,
-      note: `Scrape Mis Causas (sesión identificada): ${movimientos.length ? `${movimientos.length} movimiento(s)` : "OJV informó un historial sin movimientos"}${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}.`,
+      note: `Scrape Mis Causas (sesión identificada): ${movimientos.length ? `${movimientos.length} movimiento(s)` : cuadernos.status === "partial" ? "no se recuperaron movimientos verificables" : "OJV informó un historial sin movimientos"}${withDocs ? ` · ${withDocs} PDF` : ""}${sala ? ` · ${sala}` : ""}. ${cuadernosCoverageNote(cuadernos)}`,
       portalUrl: OJV_INDEX_N,
       resolvedTribunal: causa.tribunal,
+      cuadernos,
     };
   } finally {
     if (options.allowPrompts === false) await clearManualMisCausasRows(page);

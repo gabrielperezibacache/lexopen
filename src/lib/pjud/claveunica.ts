@@ -15,11 +15,12 @@ import {
   probeScraperSidecarHealth,
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
-import { enqueueDueSyncJobs, processPendingSyncJobs } from "@/lib/pjud/queue";
+import { enqueueDueSyncJobs, processPendingSyncJobs, PJUD_MANUAL_SESSION_TRIGGER } from "@/lib/pjud/queue";
 import { captchaSolverConfigured } from "@/lib/pjud/captcha-solver";
 import { misCausasClaimableWhere } from "@/lib/pjud/mis-causas-sync-state";
 import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
-import type { PjudCausaRef, PjudFetchResult } from "@/lib/pjud/types";
+import type { PjudCausaRef, PjudFetchResult, PjudCuadernosCoverage } from "@/lib/pjud/types";
+import { normalizeCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
 import { duplicateCausaWhere } from "@/lib/pjud/causa-origin";
 import type { PjudMovimientosFetcher } from "@/lib/pjud/sync";
 
@@ -27,6 +28,10 @@ import type { PjudMovimientosFetcher } from "@/lib/pjud/sync";
 export type MisCausasSessionSource = {
   listMisCausas: () => Promise<MisCausasItem[]>;
   fetchMovimientos: PjudMovimientosFetcher;
+  /** Revalidate the current actor/session before each durable mutation. */
+  assertActive?: () => Promise<void>;
+  /** Process-local policy; never accepted from request JSON. */
+  downloadDocuments?: boolean;
 };
 
 export {
@@ -389,6 +394,7 @@ export async function tryScrapeCausaDetailAuthenticated(
     note: scraped.note,
     demo: false,
     sala: scraped.sala,
+    cuadernos: normalizeCuadernosCoverage(scraped.cuadernos),
   };
 }
 
@@ -450,10 +456,15 @@ export async function syncMisCausas(opts?: {
         typeof opts.sessionSource.fetchMovimientos !== "function") {
       throw httpError("La fuente de sesión debe ser interna y ejecutable.", 400);
     }
+    if ((opts.sessionSource.assertActive !== undefined && typeof opts.sessionSource.assertActive !== "function") ||
+        (opts.sessionSource.downloadDocuments !== undefined && typeof opts.sessionSource.downloadDocuments !== "boolean")) {
+      throw httpError("La política de la sesión debe ser interna y válida.", 400);
+    }
     if (opts.syncMovimientos !== false && opts.processJobsInline !== true) {
       throw httpError("Los movimientos de una sesión temporal deben procesarse mientras la sesión está abierta.", 400);
     }
   }
+  await opts?.sessionSource?.assertActive?.();
   const { settings } = await getOrCreateFirmSettings();
   let claimedAt = opts?.claim?.claimedAt ?? null;
   if (opts?.claim && (
@@ -486,6 +497,7 @@ export async function syncMisCausas(opts?: {
   };
   const created: string[] = [];
   const linked: string[] = [];
+  const enqueuedJobIds: string[] = [];
   let phase: "scrape" | "import" | "queue" = "scrape";
   try {
     if (opts?.sessionSource && (!claveUnicaAutomationAllowed(true) || !publicScrapeEnabled())) {
@@ -499,7 +511,9 @@ export async function syncMisCausas(opts?: {
     const itemsWithIds: Array<MisCausasItem & { causaId: string }> = [];
 
     for (const item of items) {
+      await opts?.sessionSource?.assertActive?.();
       const existing = await findExistingCausa(item);
+      await opts?.sessionSource?.assertActive?.();
       let causaId = existing?.id;
       if (!causaId) {
         const createdCausa = await prisma.causa.create({
@@ -512,6 +526,7 @@ export async function syncMisCausas(opts?: {
               : item.tribunal,
             materia: "Por clasificar",
             caratula: item.caratula || null,
+            ...(opts?.sessionSource && opts.actorId ? { abogadoId: opts.actorId } : {}),
             estado: item.estado?.toLowerCase().includes("termin")
               ? "terminada"
               : "activa",
@@ -552,10 +567,10 @@ export async function syncMisCausas(opts?: {
       status: string;
       note?: string;
       inserted?: number;
+      cuadernosCoverage?: PjudCuadernosCoverage;
     }> = [];
     let enqueued = 0;
     let sessionUncovered = 0;
-    const enqueuedJobIds: string[] = [];
 
     if (opts?.syncMovimientos !== false && causaIdsForSync.length) {
       phase = "queue";
@@ -565,16 +580,17 @@ export async function syncMisCausas(opts?: {
       const jobs: Awaited<ReturnType<typeof enqueueDueSyncJobs>> = [];
       const uniqueIds = [...new Set(causaIdsForSync)];
       for (let offset = 0; offset < uniqueIds.length; offset += 100) {
+        await opts?.sessionSource?.assertActive?.();
         const batch = uniqueIds.slice(offset, offset + 100);
         jobs.push(...await enqueueDueSyncJobs({
           causaIds: batch,
-          trigger: "manual",
+          trigger: opts?.sessionSource ? PJUD_MANUAL_SESSION_TRIGGER : "manual",
           limit: batch.length,
           ...(opts?.sessionSource ? { reclaimStuckRunning: false } : {}),
+          onJobEnqueued: jobId => { enqueuedJobIds.push(jobId); },
         }));
       }
       enqueued = jobs.length;
-      enqueuedJobIds.push(...jobs.map((job) => job.id));
       if (opts?.processJobsInline) {
         const processed: Awaited<ReturnType<typeof processPendingSyncJobs>> = [];
         // Every session-backed job must finish while its browser context exists.
@@ -582,11 +598,14 @@ export async function syncMisCausas(opts?: {
           ? Array.from({ length: Math.ceil(jobs.length / 40) }, (_, index) => jobs.slice(index * 40, (index + 1) * 40))
           : [jobs];
         for (const batch of batches) {
+          await opts?.sessionSource?.assertActive?.();
           processed.push(...await processPendingSyncJobs({
             actorId: opts?.actorId,
             limit: Math.min(batch.length || 20, 40),
             jobIds: batch.map((job) => job.id),
             fetchMovimientos: opts?.sessionSource?.fetchMovimientos,
+            assertActive: opts?.sessionSource?.assertActive,
+            downloadDocuments: opts?.sessionSource?.downloadDocuments,
             ...(opts?.sessionSource ? { concurrency: 1 } : {}),
           }));
         }
@@ -595,6 +614,7 @@ export async function syncMisCausas(opts?: {
           status: r.status,
           note: r.note,
           inserted: r.inserted,
+          cuadernosCoverage: r.cuadernosCoverage,
         }));
         if (opts?.sessionSource) {
           // An active job may have prevented enqueueing, or another worker may
@@ -617,7 +637,8 @@ export async function syncMisCausas(opts?: {
     const syncFailed = syncResults.filter(
       (r) => r.status === "failed" || r.status === "error"
     ).length;
-    const syncOk = syncResults.length - syncFailed;
+    const syncPartial = syncResults.filter(r => r.status === "partial").length;
+    const syncOk = syncResults.length - syncFailed - syncPartial;
     const insertedTotal = syncResults.reduce(
       (sum, r) => sum + (r.inserted || 0),
       0
@@ -625,7 +646,7 @@ export async function syncMisCausas(opts?: {
     let lastSyncStatus: string = "ok";
     if (syncResults.length > 0 && syncFailed === syncResults.length) {
       lastSyncStatus = "failed";
-    } else if (syncFailed > 0) {
+    } else if (syncFailed > 0 || syncPartial > 0) {
       lastSyncStatus = "partial";
     }
     const noteParts = [
@@ -639,17 +660,17 @@ export async function syncMisCausas(opts?: {
       );
     }
     if (syncResults.length) {
-      if (syncFailed === 0) {
+      if (syncFailed === 0 && syncPartial === 0) {
         noteParts.push(
-          `movimientos al día (+${insertedTotal} nuevo${insertedTotal === 1 ? "" : "s"})`
+          `movimientos recuperados (+${insertedTotal} nuevo${insertedTotal === 1 ? "" : "s"})`
         );
-      } else if (syncOk === 0) {
+      } else if (syncFailed === syncResults.length) {
         noteParts.push(
           `no se pudieron actualizar los movimientos (${syncFailed} con error)`
         );
       } else {
         noteParts.push(
-          `${syncOk} actualizadas bien, ${syncFailed} con error (+${insertedTotal} movimientos nuevos)`
+          `${syncOk} actualizadas, ${syncPartial} con cuadernos pendientes, ${syncFailed} con error (+${insertedTotal} movimientos nuevos)`
         );
       }
     }
@@ -684,11 +705,24 @@ export async function syncMisCausas(opts?: {
       enqueuedJobIds,
       syncOk,
       syncFailed,
+      syncPartial,
       inserted: insertedTotal,
       items: itemsWithIds,
       syncResults,
     };
   } catch (error) {
+    if (opts?.sessionSource && enqueuedJobIds.length) {
+      // These pending jobs require this ephemeral browser. Never leave them for
+      // an unrelated cron/provider after cancellation, or take over running jobs.
+      await prisma.pjudSyncJob.updateMany({
+        where: { id: { in: enqueuedJobIds }, trigger: PJUD_MANUAL_SESSION_TRIGGER, status: "pending" },
+        data: {
+          status: "failed", finishedAt: new Date(),
+          note: "La actualización de esta sesión no se completó. Inicie sesión de nuevo para reintentar.",
+          lastError: "La actualización de esta sesión no se completó. Inicie sesión de nuevo para reintentar.",
+        },
+      });
+    }
     const imported = created.length + linked.length;
     let note = "No se pudo consultar Mis Causas. Vuelva a intentarlo.";
     if (phase === "scrape" && error instanceof Error && "status" in error) {

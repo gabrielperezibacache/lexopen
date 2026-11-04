@@ -5,6 +5,7 @@ import Link from "next/link";
 import { validarRut } from "@/lib/chile";
 import { PageHeader } from "@/components/sites/SiteNav";
 import { apiMutation } from "@/lib/api-mutation";
+import { PjudManualSessionPanel } from "@/components/pjud/PjudManualSessionPanel";
 import "@/components/pjud/pjud-lookup.css";
 
 type Status = {
@@ -321,9 +322,15 @@ export default function MisCausasPage() {
   return (
     <div className="pjud-cu space-y-6">
       <PageHeader
-        title="ClaveÚnica"
-        subtitle="Consulte las causas de su cuenta OJV y decida cuándo incorporarlas al estudio. Las causas se abren en Expediente; sus movimientos se revisan en Cartera PJUD."
+        title="Mis Causas en OJV"
+        subtitle="Ingrese con ClaveÚnica, revise las causas y elija cuáles incorporar a su cartera con sus cuadernos."
       />
+
+      <PjudManualSessionPanel />
+
+      <details className="pjud-cu-advanced">
+        <summary>Acceso guardado del estudio y sincronización programada</summary>
+        <div className="space-y-6">
 
       {loadError && <div className="pjud-cu-message" data-tone="err" role="alert"><p>{loadError}</p><button type="button" className="btn btn-ghost" disabled={loading || Boolean(busy)} onClick={() => void load()}>Volver a consultar estado</button></div>}
       <section className="panel space-y-4 rounded-[var(--radius-lg)] p-5">
@@ -659,6 +666,8 @@ export default function MisCausasPage() {
           Ver en Expediente
         </Link>
       </section>
+        </div>
+      </details>
     </div>
   );
 }

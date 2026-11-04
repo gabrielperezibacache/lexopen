@@ -308,6 +308,8 @@ model Causa {
   pjudNextSyncAt        DateTime?
   pjudLastSyncStatus    String?   // never | ok | partial | error | demo | disabled | failed
   pjudLastSyncNote      String?
+  /// Latest verified cuaderno coverage; null for records predating coverage tracking.
+  pjudCuadernosCoverage Json?
   pjudExternalKey       String?   // clave proveedor (RIT|tribunal)
   pjudFailCount         Int       @default(0)
   /// api | scrape | scrape-sidecar | claveunica | demo | import | webhook | none
@@ -445,7 +447,7 @@ model PjudSyncJob {
   id         String    @id @default(cuid())
   causaId    String
   causa      Causa     @relation(fields: [causaId], references: [id], onDelete: Cascade)
-  /// pending | running | ok | failed | dismissed
+  /// pending | running | ok | partial | failed | dismissed
   status     String    @default("pending")
   /// manual | cron | retry | webhook | import
   trigger    String    @default("manual")
@@ -454,6 +456,7 @@ model PjudSyncJob {
   note       String?
   inserted   Int       @default(0)
   skipped    Int       @default(0)
+  pjudCuadernosCoverage Json?
   createdAt  DateTime  @default(now())
   startedAt  DateTime?
   finishedAt DateTime?

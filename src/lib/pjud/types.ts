@@ -35,6 +35,20 @@ export type PjudCausaRef = {
   caratula: string | null;
 };
 
+/** Coverage of the cuadernos listed by OJV, without session values or URLs. */
+export type PjudCuadernosCoverage = {
+  status: "complete" | "partial" | "unknown";
+  total: number | null;
+  read: number;
+  items: Array<{
+    key: string;
+    label: string;
+    status: "ok" | "failed";
+    count: number;
+    note?: string;
+  }>;
+};
+
 export type PjudFetchResult = {
   provider: "api" | "demo" | "none" | "scrape" | "scrape-sidecar";
   movimientos: PjudFetchedMovimiento[];
@@ -42,6 +56,7 @@ export type PjudFetchResult = {
   demo: boolean;
   sala?: string | null;
   resolvedTribunal?: string | null;
+  cuadernos?: PjudCuadernosCoverage;
 };
 
 export type MisCausasItem = {

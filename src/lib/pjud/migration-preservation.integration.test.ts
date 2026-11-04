@@ -26,6 +26,18 @@ async function main() {
    assert.equal(archive.find(a=>a.sourceId==='running')?.snapshotJson.lastError,'trace');
    const moves=await tx.$queryRawUnsafe<{id:string}[]>('SELECT id FROM "CausaMovimiento"');assert.equal(moves.length,2);assert.ok(moves.some(m=>m.id==='unique'));
    const jobs=await tx.$queryRawUnsafe<{id:string}[]>('SELECT id FROM "PjudSyncJob"');assert.equal(jobs.length,1);
+   await tx.$executeRawUnsafe('CREATE TABLE "Causa" (id TEXT PRIMARY KEY,titulo TEXT)');
+   await tx.$executeRawUnsafe(`INSERT INTO "Causa" VALUES ('case','Expediente ficticio conservado')`);
+   await statements(tx,'prisma/migrations/20261103233000_pjud_cuadernos_coverage/migration.sql');
+   const migratedCauses=await tx.$queryRawUnsafe<{id:string;titulo:string;pjudCuadernosCoverage:unknown}[]>('SELECT * FROM "Causa"');
+   assert.equal(migratedCauses.length,1);
+   assert.equal(migratedCauses[0].titulo,'Expediente ficticio conservado');
+   assert.equal(migratedCauses[0].pjudCuadernosCoverage,null,'old causes must not be labelled as fully read');
+   const migratedJobs=await tx.$queryRawUnsafe<{id:string;pjudCuadernosCoverage:unknown}[]>('SELECT * FROM "PjudSyncJob"');
+   assert.equal(migratedJobs.length,jobs.length);
+   assert.equal(migratedJobs[0].id,jobs[0].id);
+   assert.equal(migratedJobs[0].pjudCuadernosCoverage,null,'old jobs retain unknown coverage');
+   assert.equal((await tx.$queryRawUnsafe<{id:string}[]>('SELECT id FROM "CausaMovimiento"')).length,moves.length);
    console.log('PJUD preservation OK: divergent movements and pending/running job snapshots survive historical dedupe');
   },{timeout:30_000});
  } finally {await db.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);await db.$disconnect();}

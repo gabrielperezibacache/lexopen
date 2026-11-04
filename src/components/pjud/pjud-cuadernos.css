@@ -1,0 +1,23 @@
+.pjud-cuadernos { min-width: 0; margin-block: 1.25rem; padding-block: 1rem; border-block: 1px solid var(--line); color: var(--ink-soft); }
+.pjud-cuadernos-heading { display: flex; align-items: flex-start; gap: .75rem; }
+.pjud-cuadernos-heading > svg { flex: none; margin-top: .15rem; color: var(--sea); }
+.pjud-cuadernos-heading h4 { margin: 0; font-size: 1rem; line-height: 1.5; font-weight: 600; color: var(--ink); }
+.pjud-cuadernos-heading p, .pjud-cuadernos .pjud-cuadernos-caption { margin: .25rem 0 0; font-size: .875rem; line-height: 1.65; color: var(--muted); overflow-wrap: anywhere; }
+.pjud-cuadernos[data-status="partial"] .pjud-cuadernos-heading > svg { color: var(--warn); }
+.pjud-cuadernos-list { margin: .75rem 0 0; padding: 0; list-style: none; }
+.pjud-cuadernos-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: .4rem 1rem; padding-block: .7rem; border-top: 1px solid var(--line); font-size: .875rem; line-height: 1.65; }
+.pjud-cuadernos-name { color: var(--ink); overflow-wrap: anywhere; }
+.pjud-cuadernos-count { color: var(--muted); }
+.pjud-cuadernos-state { display: inline-flex; align-items: center; gap: .35rem; color: var(--warn); }
+.pjud-cuadernos-state[data-complete="true"] { color: var(--sea); }
+.pjud-cuadernos-list li > p { grid-column: 1 / -1; margin: 0; font-size: .875rem; color: var(--muted); overflow-wrap: anywhere; }
+.pjud-cuadernos-compact { margin-block: .5rem 0; padding-block: .25rem; border: 0; max-width: 25rem; }
+.pjud-cuadernos-compact summary { display: flex; align-items: center; gap: .5rem; width: fit-content; min-height: 44px; cursor: pointer; color: var(--sea); font-size: .875rem; line-height: 1.5; text-decoration: underline; text-underline-offset: .25rem; }
+.pjud-cuadernos-compact summary:focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
+.pjud-cuadernos-compact[data-status="partial"] summary { color: var(--warn); }
+.pjud-cuadernos-compact[data-status="unknown"] summary { color: var(--muted); }
+.pjud-cuadernos-compact .pjud-cuadernos-list li { grid-template-columns: minmax(0, 1fr); gap: .2rem; }
+@media (max-width: 600px) {
+  .pjud-cuadernos-list li { grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .75rem; }
+  .pjud-cuadernos-name { grid-column: 1 / -1; }
+}

@@ -24,6 +24,8 @@ import {
 } from "@/lib/pjud/types";
 import type { MisCausasItem } from "@/lib/pjud/public-scrape";
 import { ritLabelsMatch, tribunalLabelsMatch } from "@/lib/pjud/ojv-dom";
+import { normalizeCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
+import { PJUD_MAX_CAUSA_MOVIMIENTOS, PJUD_MAX_TRANSPORT_BYTES } from "@/lib/pjud/cuadernos-limits";
 
 const movementSchema = z.object({
   id: z.string().max(255).optional(),
@@ -213,7 +215,8 @@ function mapMovements(
 
 export async function fetchFromScraperSidecar(
   causa: PjudCausaRef,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options: { downloadDocuments?: boolean } = {},
 ): Promise<PjudFetchResult | null> {
   const base = scraperBaseUrl();
   if (!base) return null;
@@ -225,6 +228,7 @@ export async function fetchFromScraperSidecar(
       rit: causa.rit,
       ruc: causa.ruc,
       tribunal: causa.tribunal,
+      ...(options.downloadDocuments === false ? { downloadDocuments: false } : {}),
     }),
     redirect: "error",
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(90_000)]) : AbortSignal.timeout(90_000),
@@ -235,14 +239,15 @@ export async function fetchFromScraperSidecar(
     throw new Error(`Scraper sidecar: ${detail}`);
   }
   const text = await res.text();
-  if (text.length > 5 * 1024 * 1024) {
+  if (Buffer.byteLength(text, "utf8") > PJUD_MAX_TRANSPORT_BYTES) {
     throw new Error("Respuesta del scraper supera el límite");
   }
   const data = z
     .object({
       sala: z.string().max(200).optional().nullable(),
       note: z.string().max(2000).optional(),
-      movimientos: z.array(movementSchema).max(5000),
+      movimientos: z.array(movementSchema).max(PJUD_MAX_CAUSA_MOVIMIENTOS),
+      cuadernos: z.unknown().optional(),
       identity: z.object({ rit: z.string().min(1).max(100), tribunal: z.string().min(1).max(255) }).optional(),
     })
     .passthrough()
@@ -260,6 +265,7 @@ export async function fetchFromScraperSidecar(
       `Scraper sidecar (${movimientos.length} ítems). Flujo CausaMonitor vía PJUD_SCRAPER_URL.`,
     demo: false,
     sala: data.sala || null,
+    cuadernos: normalizeCuadernosCoverage(data.cuadernos),
   };
 }
 

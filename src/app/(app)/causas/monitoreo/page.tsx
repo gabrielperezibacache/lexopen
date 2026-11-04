@@ -10,6 +10,7 @@ import {
 } from "@/lib/pjud/causa-origin";
 import { PjudQuickAddPanel } from "@/components/pjud/PjudQuickAddPanel";
 import { apiMutation } from "@/lib/api-mutation";
+import { PjudCuadernosCoverage } from "@/components/pjud/PjudCuadernosCoverage";
 
 type Item = {
   id: string;
@@ -28,6 +29,7 @@ type Item = {
   nextSyncAt: string | null;
   lastSyncStatus: string | null;
   lastSyncNote: string | null;
+  cuadernosCoverage?: unknown;
   failCount: number;
   failed: boolean;
   pjudFromMisCausas?: boolean;
@@ -55,6 +57,7 @@ type Fallido = {
   failCount: number;
   createdAt: string;
 };
+type Scheduler = { configured: boolean; intervalMinutes: number; runtime: "unverified"; note: string };
 
 const DOT: Record<Semaforo, string> = {
   verde: "bg-emerald-500",
@@ -75,6 +78,7 @@ export default function MonitoreoCausasPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [fallidos, setFallidos] = useState<Fallido[]>([]);
   const [resumen, setResumen] = useState<Record<string, number> | null>(null);
+  const [scheduler, setScheduler] = useState<Scheduler | null>(null);
   const [filter, setFilter] = useState<
     "todas" | Semaforo | "monitoreadas" | "fallidas"
   >("monitoreadas");
@@ -89,6 +93,7 @@ export default function MonitoreoCausasPage() {
     setItems(data.items || []);
     setFallidos(data.fallidos || []);
     setResumen(data.resumen || null);
+    setScheduler(data.scheduler || null);
   }
 
   useEffect(() => {
@@ -103,6 +108,7 @@ export default function MonitoreoCausasPage() {
         setItems(data.items || []);
         setFallidos(data.fallidos || []);
         setResumen(data.resumen || null);
+        setScheduler(data.scheduler || null);
       })
       .catch(() => undefined);
     return () => {
@@ -276,6 +282,7 @@ export default function MonitoreoCausasPage() {
       )}
 
       <PjudQuickAddPanel />
+      {scheduler && <p className="text-sm leading-7 text-[var(--muted)]" role="status">{scheduler.configured ? `Actualización automática: intervalo configurado de ${scheduler.intervalMinutes} minutos.` : "Actualización automática: pendiente de configurar en el Host."} {scheduler.note}{" "}<Link href="/configuracion#pjud" className="text-[var(--sea)] underline underline-offset-4">Revisar configuración</Link></p>}
 
       {resumen && (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-6 border-y border-[var(--line)] py-5 sm:grid-cols-3 xl:grid-cols-6">
@@ -285,7 +292,7 @@ export default function MonitoreoCausasPage() {
             { label: "Al día", value: resumen.verdes },
             { label: "Atenuar", value: resumen.amarillas },
             { label: "Críticas", value: resumen.rojas },
-            { label: "Fallidas", value: resumen.fallidas },
+            { label: "Con avisos", value: resumen.fallidas },
           ].map((s) => (
             <div key={s.label}>
               <dt className="text-sm text-[var(--muted)]">
@@ -301,7 +308,7 @@ export default function MonitoreoCausasPage() {
         <section className="rounded-[var(--radius-lg)] border border-rose-200 bg-rose-50/60 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-rose-800">
-              Fallidos ({fallidos.length})
+              Actualizaciones pendientes ({fallidos.length})
             </h2>
             <div className="flex flex-wrap gap-2">
               <button
@@ -364,7 +371,7 @@ export default function MonitoreoCausasPage() {
             [
               ["todas", "Todas"],
               ["monitoreadas", "Monitoreadas"],
-              ["fallidas", "Fallidas"],
+              ["fallidas", "Con avisos"],
               ["verde", "Al día"],
               ["amarillo", "Amarillas"],
               ["rojo", "Rojas"],
@@ -495,6 +502,7 @@ export default function MonitoreoCausasPage() {
                       : ""}
                   </div>
                   <div>Próximo: {fmtShort(i.nextSyncAt)}</div>
+                  <PjudCuadernosCoverage coverage={i.cuadernosCoverage} compact />
                   {i.lastSyncNote && (
                     <div
                       className="mt-1 max-w-[18rem] break-words text-[var(--copper-deep)]"

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { labelMovimientoTipo } from "@/lib/pjud/classify";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
 import { apiMutation } from "@/lib/api-mutation";
+import { PjudCuadernosCoverage } from "./PjudCuadernosCoverage";
 
 type Movimiento = {
   id: string;
@@ -32,6 +33,7 @@ type Props = {
   nextSyncAt?: string | Date | null;
   lastSyncStatus: string | null;
   lastSyncNote: string | null;
+  cuadernosCoverage?: unknown;
   failCount?: number;
   sala?: string | null;
   movimientos: Movimiento[];
@@ -52,6 +54,7 @@ const SEM_LABEL: Record<string, string> = {
   rojo: "Atención: inactiva",
   gris: "Sin datos",
 };
+const UNSCOPED_CUADERNO = "Sin cuaderno informado";
 
 type Tab = "historial" | "cuadernos" | "receptor" | "escritos";
 
@@ -160,6 +163,7 @@ export function PjudMonitorPanel({
   nextSyncAt,
   lastSyncStatus,
   lastSyncNote,
+  cuadernosCoverage,
   failCount = 0,
   sala,
   movimientos,
@@ -174,12 +178,14 @@ export function PjudMonitorPanel({
   const [cuadernoFilter, setCuadernoFilter] = useState<string>("todos");
 
   // ⚡ Bolt: Compute cuadernos, receptor, and escritos in a single O(N) pass to prevent redundant iterations.
-  const { cuadernos, receptor, escritos } = useMemo(() => {
+  const { cuadernos, receptor, escritos, unscopedCount } = useMemo(() => {
     const set = new Set<string>();
     const rec: typeof movimientos = [];
     const esc: typeof movimientos = [];
+    let unscopedCount = 0;
     for (const m of movimientos) {
-      const c = m.cuaderno || "Principal";
+      const c = m.cuaderno || UNSCOPED_CUADERNO;
+      if (!m.cuaderno) unscopedCount += 1;
       if (c) set.add(c);
       if (m.esReceptor) rec.push(m);
       if (
@@ -189,7 +195,7 @@ export function PjudMonitorPanel({
         esc.push(m);
       }
     }
-    return { cuadernos: [...set].sort(), receptor: rec, escritos: esc };
+    return { cuadernos: [...set].sort(), receptor: rec, escritos: esc, unscopedCount };
   }, [movimientos]);
 
   const visible = useMemo(() => {
@@ -197,7 +203,7 @@ export function PjudMonitorPanel({
     if (tab === "escritos") return escritos;
     if (tab === "cuadernos" && cuadernoFilter !== "todos") {
       return movimientos.filter(
-        (m) => (m.cuaderno || "Principal") === cuadernoFilter
+        (m) => (m.cuaderno || UNSCOPED_CUADERNO) === cuadernoFilter
       );
     }
     if (tab === "cuadernos") return movimientos;
@@ -237,11 +243,12 @@ export function PjudMonitorPanel({
     if (act === "sync" || act === "retry") {
       const bad =
         data.status === "failed" ||
+        data.status === "partial" ||
         data.status === "error" ||
         data.provider === "none";
       setMsgBad(bad);
       setMsg(
-        `${bad ? "⚠ " : ""}${data.demo ? "[DEMO] " : ""}+${data.inserted || 0} nuevos · ${data.skipped || 0} ya conocidos · receptor ${data.receptorCount || 0}. ${data.note || ""}`
+        `${data.status === "partial" ? "Lectura parcial · " : ""}${data.demo ? "[DEMO] " : ""}+${data.inserted || 0} nuevos · ${data.skipped || 0} ya conocidos · receptor ${data.receptorCount || 0}. ${data.note || ""}`
       );
     } else {
       setMsg(act === "enable" ? "Monitoreo activado." : "Monitoreo desactivado.");
@@ -252,6 +259,7 @@ export function PjudMonitorPanel({
   const failed =
     lastSyncStatus === "failed" ||
     lastSyncStatus === "error" ||
+    lastSyncStatus === "partial" ||
     failCount > 0;
   const hasNotices = Boolean(lastSyncNote || msg || failed);
 
@@ -261,9 +269,9 @@ export function PjudMonitorPanel({
         <div>
           <h2 className="text-lg font-semibold">Seguimiento judicial (PJUD)</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--ink-soft)]/75">
-            Experiencia de seguimiento: cuadernos, receptor, escritos y
-            sincronización con la Oficina Judicial Virtual. Configure ClaveÚnica
-            en Causas → ClaveÚnica si aún no lo ha hecho.
+            Revise los movimientos de cada cuaderno, las notificaciones y los escritos.
+            Para actualizar causas privadas, abra una conexión en{" "}
+            <Link href="/causas/mis-causas#ingreso-manual" className="text-[var(--sea)] underline">Mis Causas con ClaveÚnica</Link>.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-2 text-sm">
@@ -292,12 +300,12 @@ export function PjudMonitorPanel({
           Próximo sync: {fmtDateTime(nextSyncAt)}
         </span>
         <span className="rounded-full border border-[var(--line)] px-2 py-1">
-          {cuadernos.length} cuaderno(s) · {receptor.length} receptor ·{" "}
+          {cuadernos.filter(value => value !== UNSCOPED_CUADERNO).length} cuaderno(s) identificados · {receptor.length} receptor ·{" "}
           {escritos.length} escrito(s)
         </span>
         {failed && (
           <span className="rounded-full border border-rose-300 bg-rose-50 px-2 py-1 text-rose-700">
-            Fallido{failCount ? ` ×${failCount}` : ""}
+            {lastSyncStatus === "partial" ? "Lectura parcial" : "Con errores"}{failCount ? ` · ${failCount} intento(s)` : ""}
           </span>
         )}
       </div>
@@ -306,6 +314,9 @@ export function PjudMonitorPanel({
           {lastSyncNote}
         </p>
       )}
+
+      <PjudCuadernosCoverage coverage={cuadernosCoverage} />
+      {unscopedCount > 0 && <p className="text-sm text-[var(--muted)]">El historial conserva {unscopedCount} movimiento(s) sin cuaderno informado. Se muestran por separado y no se asignan a Principal sin una fuente que lo confirme.</p>}
 
       <div className="flex flex-wrap gap-2">
         <button

@@ -76,7 +76,10 @@ async function main() {
     process.env.PJUD_CLAVEUNICA_SCRAPE = "1";
 
     const first = await fixture();
-    const session = await createManualOjvSession({ optedIn: true, loginTimeoutMs: 2_000 }, { createOwnedContext: async () => first.owned });
+    process.env.PJUD_AUTO_CONFIRM_PROMPTS = "1";
+    process.env.PJUD_CAPTCHA_AUTO_SOLVE = "1";
+    process.env.PJUD_DOC_DOWNLOADS = "1";
+    const session = await createManualOjvSession({ optedIn: true, manualInteraction: true, loginTimeoutMs: 2_000 }, { createOwnedContext: async () => first.owned });
     try {
       assert.equal(session.status().phase, "waiting-login");
       assert.equal(session.status().pageUrl, "https://accounts.claveunica.gob.cl/accounts/login/");
@@ -134,6 +137,9 @@ async function main() {
       assert.equal(session.status().phase, "closed");
     } finally {
       process.env.PJUD_CLAVEUNICA_SCRAPE = "1";
+      process.env.PJUD_AUTO_CONFIRM_PROMPTS = "0";
+      process.env.PJUD_CAPTCHA_AUTO_SOLVE = "0";
+      process.env.PJUD_DOC_DOWNLOADS = "0";
       await session.close();
     }
 

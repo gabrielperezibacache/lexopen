@@ -3,6 +3,7 @@ import { scrapeMovimientoIdentity, type PjudFetchedMovimiento } from "@/lib/pjud
 import { parseLocalDateInput } from "@/lib/minutas";
 import { extractRitsFromText, normalizeTribunalLabel, pickTribunalFromTexts } from "@/lib/pjud/ojv-dom";
 import { DomUtils, parseDocument } from "htmlparser2";
+import { PJUD_MAX_CAUSA_MOVIMIENTOS } from "@/lib/pjud/cuadernos-limits";
 
 type HtmlNode = ReturnType<typeof parseDocument>["children"][number];
 
@@ -227,11 +228,18 @@ export function extractDocumentoHrefFromRowHtml(rowHtml: string): string | null 
  * Parse OJV/historiales HTML tables into movimientos.
  * Rows without a parseable fecha are skipped (never invent "today").
  */
-export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] {
+export function parseMovimientosFromHtml(
+  html: string,
+  options: { cuaderno?: string; limit?: number; onIncompleteRow?: () => void } = {}
+): PjudFetchedMovimiento[] {
+  const limit = Number.isFinite(options.limit)
+    ? Math.max(1, Math.min(Math.floor(options.limit!), PJUD_MAX_CAUSA_MOVIMIENTOS + 1)) : 500;
   html = DomUtils.getOuterHTML(visibleHistoryDocument(html));
   const movimientos: PjudFetchedMovimiento[] = [];
   const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+  const tableStarts = [...html.matchAll(/<table\b/gi)].map(match => match.index!);
+  let tableCursor = -1;
   let rowMatch: RegExpExecArray | null;
   let folioSeq = 0;
   let cuadernoColumn = -1;
@@ -243,7 +251,8 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
   let tableAt = -1;
 
   while ((rowMatch = rowRe.exec(html)) !== null) {
-    const currentTable = html.lastIndexOf("<table", rowMatch.index);
+    while (tableCursor + 1 < tableStarts.length && tableStarts[tableCursor + 1] < rowMatch.index) tableCursor += 1;
+    const currentTable = tableStarts[tableCursor] ?? -1;
     if (currentTable !== tableAt) {
       tableAt = currentTable;
       cuadernoColumn = -1;
@@ -281,12 +290,26 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
     }
 
     const fechaRaw = fechaColumn >= 0 ? cells[fechaColumn] : cells.find((c) => cellLooksLikeDate(c));
-    if (!fechaRaw) continue;
+    if (!fechaRaw) {
+      if (fechaColumn >= 0) options.onIncompleteRow?.();
+      continue;
+    }
     const fecha = parseHistoryDate(fechaRaw, fechaColumn >= 0);
-    if (!fecha) continue;
+    if (!fecha) {
+      if (fechaColumn >= 0) options.onIncompleteRow?.();
+      continue;
+    }
 
-    const identifiedCuaderno = (cuadernoColumn >= 0 ? cells[cuadernoColumn] : null) ||
+    const rowCuaderno = (cuadernoColumn >= 0 ? cells[cuadernoColumn] : null) ||
       cells.find((c) => /^(?:principal|apelaci[oó]n|incidente|exhorto)(?:\s+(?:n[°ºo.]?\s*)?\d+)?$/i.test(c)) || null;
+    if (options.cuaderno && cuadernoColumn >= 0 && rowCuaderno) {
+      const baseLabel = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/^\s*\d+(?:\.\d+)*\s*[-–—]\s*/, "").trim().replace(/\s+/g, " ").toLowerCase();
+      if (baseLabel(options.cuaderno) !== baseLabel(rowCuaderno)) {
+        throw new Error("El historial no corresponde al cuaderno seleccionado.");
+      }
+    }
+    const identifiedCuaderno = options.cuaderno || rowCuaderno;
     const identifiedTitle = [descripcionColumn, tramiteColumn]
       .filter((column) => column >= 0).map((column) => cells[column])
       .find((value) => value && value.length >= 4);
@@ -297,7 +320,10 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
           c !== identifiedCuaderno &&
           !cellLooksLikeDate(c)
       ) || cells[cells.length - 1] : null);
-    if (!titulo || titulo.length < 4) continue;
+    if (!titulo || titulo.length < 4) {
+      options.onIncompleteRow?.();
+      continue;
+    }
     if (/^(folio|fecha|trámite|tramite|etapa|descargar)$/i.test(titulo)) continue;
 
     folioSeq += 1;
@@ -333,9 +359,10 @@ export function parseMovimientosFromHtml(html: string): PjudFetchedMovimiento[] 
       pendienteResolucion,
       documentoRef,
     });
+    if (movimientos.length >= limit) break;
   }
 
-  return movimientos.slice(0, 500);
+  return movimientos;
 }
 
 /** Best-effort sala extraction from detail HTML. */

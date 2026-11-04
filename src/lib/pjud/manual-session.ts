@@ -17,6 +17,7 @@ import {
 } from "@/lib/pjud/public-scrape";
 import { isClaveUnicaAccountsUrl, isOjvSessionUrl, redactedPjudValidationUrl } from "@/lib/pjud/ojv-oidc";
 import type { MisCausasItem, PjudCausaRef } from "@/lib/pjud/types";
+import { withManualPjudInteraction } from "@/lib/pjud/manual-interaction-policy";
 
 type SessionPhase = "waiting-login" | "waiting-user-confirmation" | "authenticated" | "closed";
 type ErrorCode = "disabled" | "manual-policy-required" | "login-unavailable" | "not-authenticated" | "login-timeout" | "operation-timeout" | "session-closed" | "aborted" | "action-failed" | "cause-not-listed" | "invalid-materias" | "result-limit";
@@ -74,6 +75,8 @@ export class ManualOjvSessionError extends Error {
 
 export type ManualOjvSessionOptions = {
   optedIn: boolean;
+  /** Product UI owns its policy; validation CLI still requires the explicit environment switches. */
+  manualInteraction?: boolean;
   signal?: AbortSignal;
   loginTimeoutMs?: number;
   operationTimeoutMs?: number;
@@ -96,6 +99,8 @@ export type ManualOjvSession = {
   waitForAuthentication(): Promise<ManualOjvSessionStatus>;
   listMisCausas(options?: Pick<MisCausasReadOptions, "materias" | "responseTimeoutMs">): Promise<MisCausasItem[]>;
   fetchCausaDetail(causa: PjudCausaRef, options?: Pick<MisCausasReadOptions, "materias" | "responseTimeoutMs">): Promise<ScrapeLookupResult>;
+  /** Scope of the most recent list response; no case rows or account information. */
+  lastListMaterias?(): readonly string[];
   close(): Promise<void>;
 };
 
@@ -106,7 +111,7 @@ type SessionDependencies = { createOwnedContext?: () => Promise<OwnedContext> };
 function assertRuntime(options: ManualOjvSessionOptions) {
   if (options.signal?.aborted) throw new ManualOjvSessionError("aborted");
   if (!options.optedIn || !publicScrapeEnabled() || !claveUnicaAutomationAllowed(true)) throw new ManualOjvSessionError("disabled");
-  if (process.env.PJUD_AUTO_CONFIRM_PROMPTS !== "0" || process.env.PJUD_CAPTCHA_AUTO_SOLVE !== "0" || process.env.PJUD_DOC_DOWNLOADS !== "0") {
+  if (!options.manualInteraction && (process.env.PJUD_AUTO_CONFIRM_PROMPTS !== "0" || process.env.PJUD_CAPTCHA_AUTO_SOLVE !== "0" || process.env.PJUD_DOC_DOWNLOADS !== "0")) {
     throw new ManualOjvSessionError("manual-policy-required");
   }
 }
@@ -159,6 +164,7 @@ class OwnedManualSession implements ManualOjvSession {
   private phase: SessionPhase = "waiting-login";
   private authenticatedPage: Page | null = null;
   private listed: MisCausasItem[] = [];
+  private materiasTried: string[] = [];
   private readonly createdAt = new Date().toISOString();
   private authenticatedAt: string | null = null;
   private queue: Promise<void> = Promise.resolve();
@@ -171,6 +177,7 @@ class OwnedManualSession implements ManualOjvSession {
     this.phase = "closed";
     this.authenticatedPage = null;
     this.listed = [];
+    this.materiasTried = [];
   };
   private readonly contextClosed = () => { void this.close(); };
 
@@ -194,6 +201,7 @@ class OwnedManualSession implements ManualOjvSession {
   }
 
   loginOpened(page: Page) { this.loginPage = page; }
+  lastListMaterias() { return [...this.materiasTried]; }
 
   async close() {
     if (this.closing) return this.closing;
@@ -219,7 +227,7 @@ class OwnedManualSession implements ManualOjvSession {
       try {
         this.active();
         return await Promise.race([
-          work(),
+          withManualPjudInteraction(work),
           new Promise<never>((_, reject) => {
             timer = setTimeout(() => { void this.close(); reject(new ManualOjvSessionError(timeoutCode)); }, timeout);
           }),
@@ -247,7 +255,7 @@ class OwnedManualSession implements ManualOjvSession {
         for (const page of this.owned.context.pages()) {
           if (!(await identifiedPage(page))) continue;
           try {
-            await assertPjudPromptPolicy(page);
+            await assertPjudPromptPolicy(page, true);
           } catch {
             this.phase = "waiting-user-confirmation";
             continue;
@@ -268,9 +276,10 @@ class OwnedManualSession implements ManualOjvSession {
       this.phase = "waiting-login";
       this.authenticatedPage = null;
       this.listed = [];
+      this.materiasTried = [];
       throw new ManualOjvSessionError("not-authenticated");
     }
-    await assertPjudPromptPolicy(this.authenticatedPage);
+    await assertPjudPromptPolicy(this.authenticatedPage, true);
     return this.authenticatedPage;
   }
 
@@ -279,10 +288,12 @@ class OwnedManualSession implements ManualOjvSession {
       const page = await this.requireIdentifiedPage();
       const materias = checkedMaterias(options.materias);
       this.listed = [];
+      this.materiasTried = [];
       const result = await collectMisCausasFromAuthenticatedOjv(page, { ...options, materias, allowPrompts: false, signal: this.options.signal });
       if (!result.openedMenu) throw new ManualOjvSessionError("not-authenticated");
       if (result.items.length > 2000) throw new ManualOjvSessionError("result-limit");
       this.listed = result.items.map(item => ({ ...item }));
+      this.materiasTried = [...result.materiasTried];
       return result.items;
     }, boundedMs(this.options.operationTimeoutMs, 120_000), "operation-timeout", "list");
   }
@@ -298,7 +309,11 @@ class OwnedManualSession implements ManualOjvSession {
   }
 }
 
-export async function createManualOjvSession(options: ManualOjvSessionOptions, dependencies: SessionDependencies = {}): Promise<ManualOjvSession> {
+export function createManualOjvSession(options: ManualOjvSessionOptions, dependencies: SessionDependencies = {}): Promise<ManualOjvSession> {
+  return withManualPjudInteraction(() => createManualOjvSessionOwned(options, dependencies));
+}
+
+async function createManualOjvSessionOwned(options: ManualOjvSessionOptions, dependencies: SessionDependencies): Promise<ManualOjvSession> {
   assertRuntime(options);
   let owned: OwnedContext | undefined;
   let session: OwnedManualSession | undefined;
