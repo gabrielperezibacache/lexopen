@@ -1,3 +1,4 @@
+import { stopChild, assertHostStopped, readPostgresPid, embeddedDatabasePort } from "../desktop/host-runtime.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -50,34 +51,6 @@ function readEnvFile(file) {
   );
 }
 
-function killChild(child) {
-  if (!child || child.killed || child.exitCode !== null) return;
-  if (process.platform === "win32") {
-    spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
-      stdio: "ignore",
-      shell: true,
-    });
-    return;
-  }
-  child.kill("SIGTERM");
-}
-
-function stopChild(child) {
-  if (!child || child.exitCode !== null || child.killed) {
-    return Promise.resolve();
-  }
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      if (child.exitCode === null) child.kill("SIGKILL");
-      resolve();
-    }, 10_000);
-    child.once("exit", () => {
-      clearTimeout(timer);
-      resolve();
-    });
-    killChild(child);
-  });
-}
 
 async function waitForHost(url) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -111,6 +84,7 @@ let backupScheduler = null;
 let child = null;
 const expectedChildExits = new WeakSet();
 let shuttingDown = false;
+let selfUpdateBusy = false;
 
 async function shutdown(exitCode = 0) {
   if (shuttingDown) return;
@@ -120,13 +94,13 @@ async function shutdown(exitCode = 0) {
       console.warn("[web-host] No se pudo detener el scheduler de backups:", error);
     });
   }
-  await stopCurrentHost();
+  if (child) await stopCurrentHost();
   process.exit(exitCode);
 }
 
 function startHostProcess() {
   console.log("[web-host] Iniciando proceso del Host local");
-  const current = spawn(npm, ["run", "desktop:host"], {
+  const current = spawn(process.execPath, [path.join(root, "desktop", "host-runtime.mjs")], {
     cwd: root,
     env: {
       ...process.env,
@@ -135,8 +109,8 @@ function startHostProcess() {
       LEXOPEN_WEB_HOST: "1",
       LEXOPEN_DATA_DIR: dataDir,
     },
-    shell,
-    stdio: "inherit",
+    shell: false,
+    stdio: ["inherit", "inherit", "inherit", "ipc"],
   });
   child = current;
   current.once("exit", (code, signal) => {
@@ -145,17 +119,22 @@ function startHostProcess() {
     console.error(
       `[web-host] El proceso del Host terminó inesperadamente (code=${code}, signal=${signal || "none"}).`
     );
-    void shutdown(signal ? 1 : code ?? 1);
+    if (!selfUpdateBusy) void shutdown(signal ? 1 : code ?? 1);
   });
   return current;
 }
 
 async function stopCurrentHost() {
   const current = child;
-  if (!current) return;
-  child = null;
+  if (!current) throw new Error("No se conserva el proceso del Host; no se confirmó su parada para respaldar.");
+  const hostEnv = { ...process.env, ...readEnvFile(path.join(dataDir, ".env")) };
+  const port = Number(hostEnv.PORT || readConfig(dataDir).port || 3000);
+  if (!hostEnv.DATABASE_URL) throw new Error("Falta la identidad de PostgreSQL; no se realizará el respaldo.");
+  const pgPort = embeddedDatabasePort(hostEnv.DATABASE_URL), postgresPid = readPostgresPid(dataDir);
   expectedChildExits.add(current);
-  await stopChild(current);
+  await stopChild(current, { requireCleanExit: true });
+  await assertHostStopped({ dataDir, port, pgPort, child: current, postgresPid });
+  if (child === current) child = null;
 }
 
 process.once("SIGINT", () => void shutdown(0));
@@ -188,83 +167,68 @@ backupScheduler = createLocalBackupScheduler({
 const {
   applySelfUpdate,
   requestPath: selfUpdateRequestPath,
-  lockPath: selfUpdateLockPath,
   statusPath: selfUpdateStatusPath,
+  finalizeSelfUpdate,
+  releaseUpdateLock,
+  claimUpdateLock,
+  canRestartPreparedUpdate,
 } = await import("./web-self-update.mjs");
 
-let selfUpdateBusy = false;
+async function updateHealth() {
+  try {
+    const response = await fetch(`${initialUrl}/api/health`, { signal: AbortSignal.timeout(3000), redirect: "error", cache: "no-store" });
+    return response.ok ? await response.json() : { ok: false };
+  } catch { return { ok: false }; }
+}
+
+// A manually prepared update may be completed only by a healthy restart of its exact build.
+try {
+  const pending = JSON.parse(fs.readFileSync(selfUpdateStatusPath(dataDir), "utf8"));
+  if (pending.phase === "awaiting_restart") finalizeSelfUpdate(dataDir, pending.requestId, await updateHealth());
+} catch { /* No pending receipt on a normal first start. */ }
 
 async function maybeRunSelfUpdate() {
   if (selfUpdateBusy || shuttingDown) return;
   const reqFile = selfUpdateRequestPath(dataDir);
   if (!fs.existsSync(reqFile)) return;
+  let request;
+  try { request = JSON.parse(fs.readFileSync(reqFile, "utf8")); }
+  catch { console.error("[web-host] Solicitud de actualización inválida; no se borró ni ejecutó."); return; }
+  if (!request.requestId) { console.error("[web-host] Solicitud antigua sin identidad; revise el estado y vuelva a solicitar la actualización."); return; }
+  let previous;
+  try { previous = JSON.parse(fs.readFileSync(selfUpdateStatusPath(dataDir), "utf8")); } catch { /* A fresh request has no terminal receipt. */ }
+  if (previous?.requestId === request.requestId && ["done", "failed"].includes(previous.phase)) {
+    try { claimUpdateLock(dataDir, request.requestId); releaseUpdateLock(dataDir, request.requestId); }
+    catch { console.warn("[web-host] Se conserva el bloqueo de otro coordinador; no se repetirá la actualización terminada."); }
+    return;
+  }
   selfUpdateBusy = true;
-  console.log("[web-host] Solicitud de actualización in-app detectada");
   let hostStopped = false;
   try {
+    if (backupScheduler) await backupScheduler.stop();
     await stopCurrentHost();
     hostStopped = true;
-    applySelfUpdate({
-      dataDir,
-      branch: "main",
-      onPhase: (phase, extra) => {
-        console.log(
-          `[web-host] self-update ${phase}${extra?.message ? `: ${extra.message}` : ""}`
-        );
-      },
+    await applySelfUpdate({ dataDir, branch: "main", requestId: request.requestId, hostStopped: true,
+      onPhase: phase => console.log(`[web-host] self-update ${phase}`),
     });
   } catch (error) {
-    console.error(
-      "[web-host] Actualización in-app falló:",
-      error instanceof Error ? error.message : error
-    );
+    console.error("[web-host] Actualización no completada:", error.message);
   } finally {
-    try {
-      if (fs.existsSync(reqFile)) fs.unlinkSync(reqFile);
-    } catch {
-      // ignore
-    }
-    try {
-      const lock = selfUpdateLockPath(dataDir);
-      if (fs.existsSync(lock)) fs.unlinkSync(lock);
-    } catch {
-      // ignore
-    }
-    if (hostStopped && !shuttingDown) {
+    let status;
+    try { status = JSON.parse(fs.readFileSync(selfUpdateStatusPath(dataDir), "utf8")); } catch { status = null; }
+    // Failed dependency/build steps may leave new code with old generated files.
+    // Do not start migrations or claim a rollback in that state.
+    const restartSafe = canRestartPreparedUpdate(status, request.requestId);
+    if (hostStopped && !shuttingDown && restartSafe) {
       startHostProcess();
       const ok = await waitForHost(initialUrl);
-      if (!ok) {
-        console.error(
-          "[web-host] Health no disponible tras la actualización in-app."
-        );
-      } else {
-        // Mark done with restarting cleared for UI.
-        try {
-          const statusFile = selfUpdateStatusPath(dataDir);
-          if (fs.existsSync(statusFile)) {
-            const prev = JSON.parse(fs.readFileSync(statusFile, "utf8"));
-            fs.writeFileSync(
-              statusFile,
-              JSON.stringify(
-                {
-                  ...prev,
-                  phase: prev.phase === "failed" ? "failed" : "done",
-                  message:
-                    prev.phase === "failed"
-                      ? prev.message
-                      : "Actualización aplicada. Ya puede recargar el navegador.",
-                  updatedAt: new Date().toISOString(),
-                },
-                null,
-                2
-              )
-            );
-          }
-        } catch {
-          // ignore
-        }
-      }
+      if (status.phase === "awaiting_restart") finalizeSelfUpdate(dataDir, request.requestId, ok ? await updateHealth() : { ok: false });
+      if (!ok) console.error("[web-host] El Host no confirmó el arranque; consulte el recibo de actualización y el respaldo.");
+      else backupScheduler = createLocalBackupScheduler({ dataDir, env: { ...process.env, ...readEnvFile(path.join(dataDir, ".env")) }, baseUrl: initialUrl, getChild: () => child, stopHost: stopCurrentHost, startHost: startHostProcess, waitForHost });
+    } else if (hostStopped) {
+      console.error("[web-host] Host detenido para recuperación supervisada. No se ejecutaron migraciones ni una reversión automática.");
     }
+    releaseUpdateLock(dataDir, request.requestId);
     selfUpdateBusy = false;
   }
 }

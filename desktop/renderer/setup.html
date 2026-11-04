@@ -41,6 +41,12 @@
       </section>
 
       <section id="host-fields" class="fields">
+        <div>
+          <strong>Carpeta de datos</strong>
+          <p class="hint">Elija una carpeta vacía existente o los datos de una instalación anterior. No se moverán ni copiarán archivos automáticamente.</p>
+          <button id="choose-data-directory" type="button" class="secondary">Elegir carpeta existente…</button>
+          <p class="meta"><code id="selectedDataDirectory"></code></p>
+        </div>
         <label>
           Puerto local
           <input id="port" type="number" min="1024" max="65535" value="3000" />
@@ -57,6 +63,14 @@
           <input id="seedDemo" type="checkbox" />
           Cargar datos demo la primera vez
         </label>
+      </section>
+
+      <section class="fields" aria-label="Actualizaciones">
+        <label class="check"><input id="updateChecks" type="checkbox" checked />Comprobar actualizaciones automáticamente cada seis horas</label>
+        <label>Canal de actualizaciones
+          <select id="updateChannel"><option value="stable">Estable</option><option value="preview">Vista previa</option></select>
+        </label>
+        <p class="hint">La descarga y la instalación se confirman por separado. Las versiones de prueba pueden tener funciones pendientes de verificar.</p>
       </section>
 
       <section id="client-fields" class="fields hidden">
@@ -82,7 +96,7 @@
             Reintentar
           </button>
         </div>
-        <p id="error" class="error" hidden></p>
+        <p id="error" class="error" role="alert" hidden></p>
         <p class="meta">
           Datos del Host (se conservan al actualizar):
           <code id="dataDir"></code>

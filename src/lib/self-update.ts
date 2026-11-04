@@ -1,22 +1,26 @@
 /**
- * In-app Host self-update (admin): request file + status for web-host coordinator,
- * or direct spawn when LEXOPEN_WEB_HOST is not managing the process.
+ * In-app Host self-update (admin): owned request/status for the web-host coordinator.
+ * Unmanaged HTTP processes cannot safely stop, back up and verify themselves.
  */
 
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { getAppVersion } from "@/lib/app-version";
 import { httpError } from "@/lib/auth/access";
 
 export type SelfUpdatePhase =
   | "idle"
   | "queued"
+  | "preflight"
+  | "backing_up"
+  | "applying"
   | "pulling"
   | "installing"
   | "migrating"
   | "building"
   | "restarting"
+  | "awaiting_restart"
   | "done"
   | "failed";
 
@@ -33,6 +37,12 @@ export type SelfUpdateStatus = {
   message?: string | null;
   error?: string | null;
   webHostManaged: boolean;
+  requestId?: string | null;
+  recoveryRequired?: boolean;
+  backupDirectory?: string | null;
+  fromRevision?: string | null;
+  targetRevision?: string | null;
+  expectedBuildId?: string | null;
 };
 
 function resolveDataDir() {
@@ -98,6 +108,9 @@ export function getSelfUpdateCapability() {
       webHostManaged: process.env.LEXOPEN_WEB_HOST === "1",
     };
   }
+  if (process.env.LEXOPEN_WEB_HOST !== "1") {
+    return { available: false, reason: "Para actualizar desde la aplicación, inicie este clon mediante npm run web:host. Ese coordinador detiene, respalda y comprueba el reinicio del Host.", webHostManaged: false };
+  }
   return {
     available: true,
     reason: undefined,
@@ -132,6 +145,12 @@ export function readSelfUpdateStatus(): SelfUpdateStatus {
     updatedAt?: string | null;
     message?: string | null;
     error?: string | null;
+    requestId?: string;
+    recoveryRequired?: boolean;
+    backupDirectory?: string;
+    fromRevision?: string;
+    targetRevision?: string;
+    expectedBuildId?: string;
   }>(selfUpdateStatusPath());
   const request = readJsonFile<{ requestedAt?: string }>(selfUpdateRequestPath());
   const phase: SelfUpdatePhase =
@@ -139,7 +158,7 @@ export function readSelfUpdateStatus(): SelfUpdateStatus {
 
   return {
     phase,
-    ok: Boolean(stored?.ok),
+    ok: phase === "done" && Boolean(stored?.ok),
     available: capability.available,
     reason: capability.reason,
     currentVersion: getAppVersion(),
@@ -150,27 +169,39 @@ export function readSelfUpdateStatus(): SelfUpdateStatus {
     message: stored?.message ?? null,
     error: stored?.error ?? null,
     webHostManaged: capability.webHostManaged,
+    requestId: stored?.requestId || null,
+    recoveryRequired: Boolean(stored?.recoveryRequired),
+    backupDirectory: stored?.backupDirectory || null,
+    fromRevision: stored?.fromRevision || null,
+    targetRevision: stored?.targetRevision || null,
+    expectedBuildId: stored?.expectedBuildId || null,
   };
 }
 
-function acquireLock(): boolean {
+let ownedRequestId: string | undefined;
+function acquireLock(requestId: string): boolean {
   const lock = selfUpdateLockPath();
   try {
     fs.mkdirSync(path.dirname(lock), { recursive: true });
     const fd = fs.openSync(lock, "wx");
     fs.writeFileSync(
       fd,
-      JSON.stringify({ pid: process.pid, at: new Date().toISOString() })
+      JSON.stringify({ pid: process.pid, requestId, at: new Date().toISOString() })
     );
     fs.closeSync(fd);
+    ownedRequestId = requestId;
     return true;
   } catch {
-    // Stale lock (> 45 min) can be cleared.
+    // Age alone never authorizes deleting a live owner's lock or pending job.
     try {
-      const st = fs.statSync(lock);
-      if (Date.now() - st.mtimeMs > 45 * 60_000) {
+      const owner = readJsonFile<{ pid?: number; requestId?: string }>(lock);
+      let alive = true;
+      try { if (owner?.pid && Number.isSafeInteger(owner.pid) && owner.pid > 0) process.kill(owner.pid, 0); }
+      catch (error) { alive = (error as NodeJS.ErrnoException).code !== "ESRCH"; }
+      const pending = readJsonFile<{ requestId?: string }>(selfUpdateRequestPath());
+      if (owner?.requestId && !alive && pending?.requestId !== owner.requestId) {
         fs.unlinkSync(lock);
-        return acquireLock();
+        return acquireLock(requestId);
       }
     } catch {
       // ignore
@@ -179,9 +210,12 @@ function acquireLock(): boolean {
   }
 }
 
-export function releaseSelfUpdateLock() {
+export function releaseSelfUpdateLock(requestId = ownedRequestId) {
   try {
+    const owner = readJsonFile<{ pid?: number; requestId?: string }>(selfUpdateLockPath());
+    if (!requestId || requestId !== ownedRequestId || owner?.requestId !== requestId || owner.pid !== process.pid) return;
     fs.unlinkSync(selfUpdateLockPath());
+    ownedRequestId = undefined;
   } catch {
     // ignore
   }
@@ -197,23 +231,30 @@ export function requestSelfUpdate(opts: {
   }
 
   const current = readSelfUpdateStatus();
+  if (current.recoveryRequired) throw httpError("La actualización anterior requiere recuperación supervisada antes de volver a actualizar", 409);
   if (
     current.phase === "queued" ||
+    current.phase === "preflight" ||
+    current.phase === "backing_up" ||
+    current.phase === "applying" ||
     current.phase === "pulling" ||
     current.phase === "installing" ||
     current.phase === "migrating" ||
     current.phase === "building" ||
-    current.phase === "restarting"
+    current.phase === "restarting" ||
+    current.phase === "awaiting_restart"
   ) {
     throw httpError("Ya hay una actualización en curso.", 409);
   }
 
-  if (!acquireLock()) {
+  const requestId = randomUUID();
+  if (!acquireLock(requestId)) {
     throw httpError("Ya hay una actualización en curso.", 409);
   }
 
   const requestedAt = new Date().toISOString();
   const payload = {
+    requestId,
     requestedAt,
     actorId: opts.actorId,
     targetVersion: opts.targetVersion || null,
@@ -224,6 +265,7 @@ export function requestSelfUpdate(opts: {
   try {
     writeJsonFile(selfUpdateRequestPath(), payload);
     writeJsonFile(selfUpdateStatusPath(), {
+      requestId,
       phase: "queued",
       ok: false,
       fromVersion: getAppVersion(),
@@ -237,34 +279,9 @@ export function requestSelfUpdate(opts: {
       error: null,
     });
   } catch (error) {
-    releaseSelfUpdateLock();
+    releaseSelfUpdateLock(requestId);
     throw error;
   }
 
-  // When web-host is not coordinating, spawn the updater detached.
-  if (!capability.webHostManaged) {
-    spawnDirectUpdater();
-  }
-
   return readSelfUpdateStatus();
-}
-
-function spawnDirectUpdater() {
-  const script = path.join(process.cwd(), "scripts", "web-self-update.mjs");
-  const logFile = path.join(resolveDataDir(), "self-update.log");
-  const out = fs.openSync(logFile, "a");
-  const child = spawn(
-    process.execPath,
-    [script, "--apply", "--branch", "main", "--restart-after"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        LEXOPEN_SELF_UPDATE_PARENT_PID: String(process.pid),
-      },
-      detached: true,
-      stdio: ["ignore", out, out],
-    }
-  );
-  child.unref();
 }

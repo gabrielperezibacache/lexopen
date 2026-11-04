@@ -1,5 +1,8 @@
 appId: cl.perezibacache.lexopen
 productName: LexOpen
+executableName: lexopen
+artifactName: "${productName}-${version}-${os}-${arch}.${ext}"
+afterPack: scripts/after-pack.cjs
 copyright: Copyright © LexOpen contributors
 publish:
   provider: github
@@ -16,81 +19,47 @@ files:
   - config.cjs
   - external-url.cjs
   - media-permissions.cjs
+  - update-policy.cjs
   - host-runtime.mjs
   - renderer/**/*
   - package.json
   - node_modules/**/*
+  - "!**/.env*"
+  - "!**/{.tmp,.git,.codex,.agents,storage,pgdata,vault,obsidian-vault,backups,secrets,private}/**"
+  - "!**/*.{pem,key,p12,pfx,sqlite,sqlite3,db,dump,log}"
+  - "!node_modules/**/{test,tests,__tests__,fixtures,examples}/**"
 extraResources:
-  - from: ../.next/standalone
+  - from: .release/resources/app-standalone
     to: app-standalone
     filter:
       - "**/*"
       - "**/.*"
-  - from: ../.next/standalone/.next
-    to: app-standalone/.next
-    filter:
-      - "**/*"
-      - "**/.*"
-  - from: ../.next/standalone/node_modules
-    to: app-standalone/node_modules
-    filter:
-      - "**/*"
-  - from: ../.next/static
-    to: app-standalone/.next/static
-    filter:
-      - "**/*"
-      - "**/.*"
-  - from: ../public
-    to: app-standalone/public
-    filter:
-      - "**/*"
-  - from: ../prisma
+      - "**/.*/**/*"
+  - from: .release/resources/prisma
     to: prisma
     filter:
       - "**/*"
-  - from: ../src
-    to: app-standalone/src
-    filter:
-      - "**/*"
-  - from: ../tsconfig.json
-    to: app-standalone/tsconfig.json
-  - from: ../next-env.d.ts
-    to: app-standalone/next-env.d.ts
 asarUnpack:
-  - "node_modules/@prisma/**"
-  - "node_modules/prisma/**"
-  - "node_modules/@prisma/engines/**"
-  - "node_modules/tsx/**"
-  - "node_modules/esbuild/**"
-  - "node_modules/get-tsconfig/**"
-  - "node_modules/embedded-postgres/**"
-  - "node_modules/@embedded-postgres/**"
-  - "node_modules/pg/**"
-  - "node_modules/pg-connection-string/**"
-  - "node_modules/pg-int8/**"
-  - "node_modules/pg-pool/**"
-  - "node_modules/pg-protocol/**"
-  - "node_modules/pg-types/**"
-  - "node_modules/pgpass/**"
-  - "node_modules/postgres-array/**"
-  - "node_modules/postgres-bytea/**"
-  - "node_modules/postgres-date/**"
-  - "node_modules/postgres-interval/**"
-  - "node_modules/split2/**"
-  - "node_modules/xtend/**"
-  - "node_modules/async-exit-hook/**"
+  # Electron's Node mode needs the complete dependency graph on the filesystem.
+  - "node_modules/**/*"
+  - host-runtime.mjs
+  - config.cjs
+  - package.json
 mac:
   category: public.app-category.business
   target:
     - dmg
     - zip
   hardenedRuntime: true
-  gatekeeperAssess: true
+  # Unsigned preview packages are permitted; signed CI verifies Gatekeeper separately.
+  gatekeeperAssess: false
+  icon: build/icon.icns
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     NSMicrophoneUsageDescription: LexOpen usa el micrófono cuando usted inicia una captura para transcribir y conservar el audio de su audiencia.
 win:
+  icon: build/icon.ico
   target:
     - nsis
     - zip
@@ -102,8 +71,11 @@ nsis:
   deleteAppDataOnUninstall: false
   allowElevation: true
 linux:
+  maintainer: LexOpen contributors
   target:
     - AppImage
+    - deb
+  icon: build/icon.png
   category: Office
 extraMetadata:
   main: main.cjs

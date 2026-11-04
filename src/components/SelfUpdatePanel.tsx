@@ -13,15 +13,21 @@ type Status = {
   toVersion?: string | null;
   updateAvailable?: boolean;
   latestVersion?: string | null;
+  recoveryRequired?: boolean;
+  backupDirectory?: string | null;
 };
 
 const ACTIVE = new Set([
   "queued",
+  "preflight",
+  "backing_up",
+  "applying",
   "pulling",
   "installing",
   "migrating",
   "building",
   "restarting",
+  "awaiting_restart",
 ]);
 
 export function SelfUpdatePanel() {
@@ -30,9 +36,10 @@ export function SelfUpdatePanel() {
   const [msg, setMsg] = useState("");
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/self-update");
-    if (!res.ok) return;
-    setStatus(await res.json());
+    try {
+      const res = await fetch("/api/admin/self-update", { cache: "no-store" });
+      if (res.ok) setStatus(await res.json());
+    } catch { /* The coordinator may be restarting the local HTTP process. */ }
   }, []);
 
   useEffect(() => {
@@ -106,6 +113,7 @@ export function SelfUpdatePanel() {
           {status.error && (
             <p className="mt-2 text-xs text-rose-800">{status.error}</p>
           )}
+          {status.recoveryRequired && <p className="mt-2 text-sm text-rose-800" role="alert">El Host necesita una comprobación antes de otra actualización. Conserve el respaldo y consulte la guía de recuperación; no se revirtió la base automáticamente.</p>}
           {msg && <p className="mt-2 text-xs text-[var(--ink)]">{msg}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -113,7 +121,7 @@ export function SelfUpdatePanel() {
             <button
               type="button"
               className="btn btn-primary"
-              disabled={busy || updating}
+              disabled={busy || updating || status.recoveryRequired}
               onClick={start}
             >
               {updating

@@ -9,6 +9,7 @@ import { captureWritingSource, verifyWritingSource } from "./sources";
 import { writingAddSourceSchema, writingCreateSchema, writingRestoreSchema, writingSaveSchema, writingSourceInputSchema } from "./schemas";
 import { writingActor, writingChanged, writingMissing, writingTransaction, writingUnavailable, type WritingClient } from "./access";
 import type { WritingChange, WritingDraftList, WritingDraftView, WritingHistory, WritingMutationResult, WritingReference, WritingReferenceView, WritingRevisionView } from "./types";
+import type { StoredWritingSource } from "./source-types";
 
 type DraftRow = Prisma.CaseWritingDraftGetPayload<Record<string, never>>;
 type RevisionRow = Prisma.CaseWritingRevisionGetPayload<Record<string, never>>;
@@ -98,6 +99,26 @@ export async function createCaseWriting(causaId: string, raw: z.input<typeof wri
     }
     if (await tx.caseWritingDraft.count({ where: { ownerId: actor.id, causaId } }) >= WRITING_LIMITS.draftsPerOwnerCase) throw httpError("La causa admite hasta 200 escritos privados por profesional", 413);
     const row = await tx.caseWritingDraft.create({ data: { causaId, ownerId: actor.id, requestId: input.requestId, createInputSha256: hash, title: input.title, body: input.body } });
+    await snapshot(tx, row, "created"); await audit(tx, actor, row, "created");
+    return { draft: await view(row, actor, tx, canWrite), reused: false };
+  });
+}
+/** Internal promotion boundary: server-owned snapshots, reverified in the import transaction. */
+export async function createCaseWritingFromSnapshots(causaId: string, raw: z.input<typeof writingCreateSchema>, sources: StoredWritingSource[], user: CausaAccessUser, client: WritingClient = prisma): Promise<WritingMutationResult> {
+  const input = writingCreateSchema.parse(raw), hash = inputHash("created_from_snapshots", { input, fingerprints: sources.map(source => source.fingerprint) });
+  if (!sources.length || sources.length > WRITING_LIMITS.references) throw httpError("Seleccione entre una y veinte fuentes", 400);
+  return writingTransaction(client, async tx => {
+    const { actor, canWrite } = await writingActor(causaId, user, tx, true);
+    await assertCausaCapability(causaId, actor, "escrito.draft", tx);
+    const existing = await tx.caseWritingDraft.findUnique({ where: { ownerId_causaId_requestId: { ownerId: actor.id, causaId, requestId: input.requestId } } });
+    if (existing) {
+      if (existing.createInputSha256 !== hash) throw Object.assign(writingChanged(), { code: "writing_conflict" });
+      return { draft: await view(existing, actor, tx, canWrite), reused: true };
+    }
+    if (await tx.caseWritingDraft.count({ where: { ownerId: actor.id, causaId } }) >= WRITING_LIMITS.draftsPerOwnerCase) throw httpError("La causa admite hasta 200 escritos privados por profesional", 413);
+    const refs: WritingReference[] = [], cache = new Map<string, unknown>();
+    for (const source of sources) refs.push({ id: `R${refs.length + 1}`, source: await verifyWritingSource(causaId, source, actor, tx, cache) });
+    const row = await tx.caseWritingDraft.create({ data: { causaId, ownerId: actor.id, requestId: input.requestId, createInputSha256: hash, title: input.title, body: input.body, nextReferenceNumber: refs.length + 1, referencesJson: JSON.stringify(refs) } });
     await snapshot(tx, row, "created"); await audit(tx, actor, row, "created");
     return { draft: await view(row, actor, tx, canWrite), reused: false };
   });

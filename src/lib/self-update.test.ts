@@ -5,48 +5,50 @@ import path from "node:path";
 
 async function main() {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-self-update-"));
+  const previousDirectory = process.cwd();
+  const previousEnvironment = { ...process.env };
+  const fakeRoot = path.join(dataDir, "checkout");
+  fs.mkdirSync(path.join(fakeRoot, ".git"), { recursive: true });
+  fs.writeFileSync(path.join(fakeRoot, "package.json"), JSON.stringify({ version: "1.0.0" }));
+  process.chdir(fakeRoot);
   process.env.LEXOPEN_DATA_DIR = dataDir;
   delete process.env.LEXOPEN_SELF_UPDATE;
   delete process.env.LEXOPEN_PACKAGED;
   delete process.env.LEXOPEN_WEB_HOST;
-
-  const {
-    getSelfUpdateCapability,
-    readSelfUpdateStatus,
-    requestSelfUpdate,
-    selfUpdateRequestPath,
-    releaseSelfUpdateLock,
-  } = await import("./self-update");
-
-  const capability = getSelfUpdateCapability();
-  assert.equal(typeof capability.available, "boolean");
-
-  process.env.LEXOPEN_SELF_UPDATE = "0";
-  assert.equal(getSelfUpdateCapability().available, false);
-  delete process.env.LEXOPEN_SELF_UPDATE;
-
-  process.env.LEXOPEN_PACKAGED = "1";
-  assert.equal(getSelfUpdateCapability().available, false);
-  delete process.env.LEXOPEN_PACKAGED;
-
-  const status = readSelfUpdateStatus();
-  assert.equal(status.phase, "idle");
-  assert.equal(status.currentVersion.length > 0, true);
-
-  if (getSelfUpdateCapability().available) {
+  try {
+    const { getSelfUpdateCapability, readSelfUpdateStatus, requestSelfUpdate, selfUpdateRequestPath, selfUpdateLockPath, selfUpdateStatusPath, releaseSelfUpdateLock } = await import("./self-update");
+    assert.equal(getSelfUpdateCapability().available, false, "unmanaged processes cannot start a detached updater");
     process.env.LEXOPEN_WEB_HOST = "1";
-    const queued = requestSelfUpdate({ actorId: "test-admin" });
+    assert.equal(getSelfUpdateCapability().available, true);
+    process.env.LEXOPEN_SELF_UPDATE = "0";
+    assert.equal(getSelfUpdateCapability().available, false);
+    delete process.env.LEXOPEN_SELF_UPDATE;
+    process.env.LEXOPEN_PACKAGED = "1";
+    assert.equal(getSelfUpdateCapability().available, false);
+    delete process.env.LEXOPEN_PACKAGED;
+    assert.equal(readSelfUpdateStatus().phase, "idle");
+    const queued = requestSelfUpdate({ actorId: "fixture-admin" });
     assert.equal(queued.phase, "queued");
+    assert.ok(queued.requestId);
     assert.equal(fs.existsSync(selfUpdateRequestPath()), true);
-    releaseSelfUpdateLock();
+    assert.throws(() => requestSelfUpdate({ actorId: "fixture-admin" }), /en curso/);
+    releaseSelfUpdateLock("foreign-request");
+    assert.equal(fs.existsSync(selfUpdateLockPath()), true);
+    fs.writeFileSync(selfUpdateStatusPath(), JSON.stringify({ phase: "idle" }));
+    fs.utimesSync(selfUpdateLockPath(), new Date(0), new Date(0));
+    assert.throws(() => requestSelfUpdate({ actorId: "fixture-admin" }), /en curso/, "an old timestamp does not authorize deleting a live lock");
+    releaseSelfUpdateLock(queued.requestId!);
+    assert.equal(fs.existsSync(selfUpdateLockPath()), false);
     fs.unlinkSync(selfUpdateRequestPath());
+    fs.writeFileSync(selfUpdateStatusPath(), JSON.stringify({ phase: "failed", recoveryRequired: true, ok: true }));
+    assert.equal(readSelfUpdateStatus().ok, false);
+    assert.throws(() => requestSelfUpdate({ actorId: "fixture-admin" }), /recuperación/);
+    console.log("self-update capability/owned request/live-lock/recovery checks passed (temporary fixtures only)");
+  } finally {
+    process.chdir(previousDirectory);
+    for (const key of Object.keys(process.env)) if (!(key in previousEnvironment)) delete process.env[key];
+    Object.assign(process.env, previousEnvironment);
+    fs.rmSync(dataDir, { recursive: true, force: true });
   }
-
-  fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("self-update.test.ts OK");
 }
-
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main().catch(error => { console.error(error); process.exitCode = 1; });

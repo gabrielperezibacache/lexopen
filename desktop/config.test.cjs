@@ -274,7 +274,35 @@ assert.match(
   /DATABASE_URL=postgresql:\/\/lexopen:x@127\.0\.0\.1:1\/lexopen/
 );
 assert.match(fs.readFileSync(envPath(writeTmp), "utf8"), /FOO=1/);
+if (process.platform !== "win32") assert.equal(fs.statSync(envPath(writeTmp)).mode & 0o777, 0o600, "rewritten secrets stay private");
 fs.rmSync(writeTmp, { recursive: true, force: true });
+
+const { activeDataDir, validateExistingDataDirectory } = require("./config.cjs");
+const chosen = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-selected-data-")));
+assert.equal(validateExistingDataDirectory(chosen), fs.realpathSync(chosen));
+writeConfig({ hostDataDir: chosen, updateChannel: "preview", updateChecks: false }, tmp);
+assert.equal(activeDataDir(readConfig(tmp)), chosen);
+assert.equal(readConfig(tmp).updateChecks, false);
+assert.throws(() => validateExistingDataDirectory(path.join(chosen, "missing")), /ENOENT/);
+assert.throws(() => validateExistingDataDirectory(chosen, { installRoots: [chosen] }), /instalación/);
+fs.writeFileSync(path.join(chosen, "unrelated.txt"), "preserve fixture");
+assert.throws(() => validateExistingDataDirectory(chosen), /contiene archivos/);
+fs.unlinkSync(path.join(chosen, "unrelated.txt"));
+fs.mkdirSync(path.join(chosen, "pgdata"));
+fs.mkdirSync(path.join(chosen, "storage"));
+fs.writeFileSync(path.join(chosen, "pgdata", "PG_VERSION"), "17");
+fs.writeFileSync(envPath(chosen), `DATABASE_URL=postgresql://fixture:fixture@127.0.0.1:55440/fixture_e2e\nSTORAGE_PATH=${path.join(chosen, "storage")}\n`);
+const beforeSelection = fs.readFileSync(envPath(chosen), "utf8");
+assert.equal(validateExistingDataDirectory(chosen), chosen);
+assert.equal(fs.readFileSync(envPath(chosen), "utf8"), beforeSelection, "selection never rewrites existing services or secrets");
+fs.writeFileSync(path.join(chosen, "pgdata", "postmaster.pid"), String(process.pid));
+assert.throws(() => validateExistingDataDirectory(chosen), /Otro servicio/);
+assert.equal(validateExistingDataDirectory(chosen, { currentDataDir: chosen }), chosen);
+fs.writeFileSync(envPath(chosen), "DATABASE_URL=postgresql://fixture:fixture@remote.invalid/fixture_e2e\n");
+assert.throws(() => validateExistingDataDirectory(chosen), /base externa/);
+fs.writeFileSync(envPath(chosen), "STORAGE_PATH=/outside/fixture\n");
+assert.throws(() => validateExistingDataDirectory(chosen), /fuera/);
+fs.rmSync(chosen, { recursive: true, force: true });
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log("desktop/config.test.cjs OK");

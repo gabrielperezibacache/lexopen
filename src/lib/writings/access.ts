@@ -17,6 +17,6 @@ export async function writingTransaction<T>(client: WritingClient, action: (tx: 
   if (!("$transaction" in client)) return action(client);
   for (let attempt = 0; ; attempt++) {
     try { return await client.$transaction(action, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 }); }
-    catch (error) { if (attempt < 3 && error instanceof Prisma.PrismaClientKnownRequestError && ["P2034", "P2002"].includes(error.code)) continue; throw error; }
+    catch (error) { if (attempt < 3 && error instanceof Prisma.PrismaClientKnownRequestError && (["P2034", "P2002"].includes(error.code) || error.code === "P2010" && ["40001", "40P01"].includes(String(error.meta?.code)))) continue; throw error; }
   }
 }

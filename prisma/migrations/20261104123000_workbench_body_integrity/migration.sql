@@ -1,0 +1,1 @@
+ALTER TABLE "WorkbenchRun" ADD COLUMN "bodySha256" TEXT NOT NULL DEFAULT '';

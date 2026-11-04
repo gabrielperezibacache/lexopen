@@ -52,6 +52,7 @@ yarn-error.log*
 # desktop packaging
 /desktop/node_modules
 /desktop/dist
+/desktop/.release/
 /desktop/data
 /playwright-report/
 /test-results/

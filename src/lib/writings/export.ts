@@ -11,7 +11,7 @@ const md = (value: string) => value.replace(/\r\n?/g, "\n").replace(/&/g, "&amp;
   .replace(/^(\s*)([-=]+)(\s*)$/gm, (_match, before: string, marker: string, after: string) => `${before}\\${marker}${after}`)
   .replace(/^(\s*\d+)(\.)(?=\s)/gm, "$1\\$2");
 const block = (value: string) => value.replace(/\r\n?/g, "\n").split("\n").map(line => `> ${md(line)}`).join("\n");
-const label = { fact: "Hecho registrado", note: "Nota personal de audiencia", book: "Pasaje de biblioteca" };
+const label = { document: "Pasaje del expediente", fact: "Hecho registrado", note: "Nota personal de audiencia", book: "Pasaje de biblioteca" };
 function markdownProse(body: string, registered: Set<string>) {
   let out = "", after = 0;
   for (const match of body.matchAll(/\[\^(R[1-9][0-9]*)\]/g)) {

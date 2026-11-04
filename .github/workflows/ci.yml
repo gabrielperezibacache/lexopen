@@ -1,11 +1,44 @@
 name: CI
 
 on:
+  workflow_call:
   push:
     branches: [main, "cursor/**"]
   pull_request:
 
 jobs:
+  workbench-runtime:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: node scripts/workbench/build-image.mjs
+      - name: Real isolated document execution with fictitious inputs
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/workbench-output"
+          export LEXOPEN_WORKBENCH_IMAGE_ID="$(docker image inspect --format '{{.Id}}' lexopen-workbench-documents:1)"
+          node --import tsx scripts/workbench/docker-smoke.ts
+        env:
+          CI: "true"
+          LEXOPEN_WORKBENCH_TEST_DOCKER: "1"
+          LEXOPEN_WORKBENCH_ENABLED: "1"
+          LEXOPEN_WORKBENCH_TEST_OUTPUT: ${{ runner.temp }}/workbench-output
+      - name: Open generated DOCX using LibreOffice
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice-writer poppler-utils
+          libreoffice -env:UserInstallation=file:///tmp/lexopen-lo-ci --headless --convert-to pdf --outdir "$RUNNER_TEMP/workbench-output" "$RUNNER_TEMP"/workbench-output/*.docx
+          pdftotext "$RUNNER_TEMP"/workbench-output/*.pdf "$RUNNER_TEMP/workbench-output/opened.txt"
+          test -s "$RUNNER_TEMP/workbench-output/opened.txt"
+          rg 'análisis' "$RUNNER_TEMP/workbench-output/opened.txt"
   build:
     runs-on: ubuntu-latest
     services:
@@ -36,6 +69,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - run: npm ci --prefix desktop
       - run: npx prisma generate
       - name: Local PDF rendering and OCR
         run: sudo apt-get update && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa

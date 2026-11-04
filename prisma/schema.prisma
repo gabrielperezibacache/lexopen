@@ -95,6 +95,7 @@ model User {
   minutaAcciones  MinutaAccion[]   @relation("MinutaAccionUser")
   auditEvents     AuditEvent[]
   timeApprovals   TimeEntry[]      @relation("TimeApprover")
+  workbenchRuns   WorkbenchRun[]
   agentChats      AgentChat[]
   blogPosts       BlogPost[]       @relation("BlogAuthor")
   mailboxAccount  MailboxAccount?
@@ -343,6 +344,7 @@ model Causa {
   invoices        Invoice[]
   ledgerEntries   LedgerEntry[]
   etapaHistorial  EtapaHistorial[]
+  workbenchRuns   WorkbenchRun[]
   agentChats      AgentChat[]
   movimientos     CausaMovimiento[]
   pjudSyncJobs    PjudSyncJob[]
@@ -2194,4 +2196,73 @@ model CaseAudioPublication {
   audio CaseAudio @relation(fields:[audioId],references:[id],onDelete:Cascade)
   document Documento @relation(fields:[documentId],references:[id],onDelete:Cascade)
   @@index([audioId,createdAt])
+}
+
+
+/// Private, case-scoped assistant work. Inputs are explicit, retained source snapshots.
+model WorkbenchRun {
+  id String @id @default(cuid())
+  ownerId String
+  causaId String
+  requestId String
+  inputSha256 String
+  objective String @db.Text
+  status String @default("queued")
+  destinationJson String @db.Text
+  imageId String
+  body String @default("") @db.Text
+  bodySha256 String @default("")
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  cancelRequestedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  finishedAt DateTime?
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict)
+  causa Causa @relation(fields:[causaId],references:[id],onDelete:Restrict)
+  inputs WorkbenchInputSnapshot[]
+  events WorkbenchEvent[]
+  artifacts WorkbenchArtifact[]
+  importReceipt WorkbenchImportReceipt?
+  @@unique([ownerId,causaId,requestId])
+  @@index([ownerId,causaId,createdAt])
+  @@index([status,leaseExpiresAt])
+}
+model WorkbenchInputSnapshot {
+  id String @id @default(cuid())
+  runId String
+  ordinal Int
+  sourceJson String @db.Text
+  sourceSha256 String
+  run WorkbenchRun @relation(fields:[runId],references:[id],onDelete:Cascade)
+  @@unique([runId,ordinal])
+}
+model WorkbenchEvent {
+  id String @id @default(cuid())
+  runId String
+  kind String
+  message String
+  createdAt DateTime @default(now())
+  run WorkbenchRun @relation(fields:[runId],references:[id],onDelete:Cascade)
+  @@index([runId,createdAt])
+}
+model WorkbenchArtifact {
+  id String @id @default(cuid())
+  runId String
+  name String
+  mimeType String
+  sha256 String
+  size Int
+  data Bytes
+  createdAt DateTime @default(now())
+  run WorkbenchRun @relation(fields:[runId],references:[id],onDelete:Cascade)
+  @@unique([runId,name])
+}
+model WorkbenchImportReceipt {
+  id String @id @default(cuid())
+  runId String @unique
+  draftId String
+  artifactSha256 String
+  createdAt DateTime @default(now())
+  run WorkbenchRun @relation(fields:[runId],references:[id],onDelete:Cascade)
 }

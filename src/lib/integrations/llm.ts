@@ -10,6 +10,7 @@ import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
 import { getAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { canSome } from "@/lib/auth/permissions";
 import { askPersonalCodex } from "@/lib/integrations/codex-dispatch";
+import { sha256 } from "@/lib/evidence/fragments";
 
 export type LlmPreset =
   | "openai"
@@ -493,7 +494,10 @@ export async function askLlm(params: {
   userId?: string;
   utilityLabel?: string;
   timeoutMs?: number;
+  signal?: AbortSignal;
+  expectedDestination?: { provider: string; model: string; endpointHash: string };
 }) {
+  params.signal?.throwIfAborted();
   const config = await getLlmConfig();
   // This is the single egress boundary for Inicio, Agente, document/cliente
   // actions and connection tests. A classifier-only gate is insufficient.
@@ -520,6 +524,9 @@ export async function askLlm(params: {
 
   const personal = await askPersonalCodex({ ...params, messages }, localOnly);
   if (personal) return personal;
+  if (params.expectedDestination && (params.expectedDestination.provider !== config.preset || params.expectedDestination.model !== config.model || params.expectedDestination.endpointHash !== sha256(config.apiUrl))) {
+    return { source: "error" as const, content: "", requireApproval: true, provider: config.preset, model: config.model, note: "El destino de IA cambió; revise el proveedor antes de volver a enviar.", error: "llm_destination_changed", code: "llm_destination_changed" as const };
+  }
 
   let apiUrl: URL;
   try {
@@ -588,7 +595,7 @@ export async function askLlm(params: {
         temperature: 0.2,
         stream: false,
       }),
-      signal: AbortSignal.timeout(params.timeoutMs || 45_000),
+      signal: params.signal ? AbortSignal.any([params.signal, AbortSignal.timeout(params.timeoutMs || 45_000)]) : AbortSignal.timeout(params.timeoutMs || 45_000),
     });
 
     if (!res.ok) {

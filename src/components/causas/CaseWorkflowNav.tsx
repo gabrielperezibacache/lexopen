@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { BookOpen, FilePenLine, FolderOpen, MessagesSquare } from "lucide-react";
+import { BookOpen, FilePenLine, FolderOpen, MessagesSquare, PanelsTopLeft } from "lucide-react";
 import { caseLibraryHref } from "@/lib/causas/workflow-links";
 import "./CaseWorkflowNav.css";
 
-type Stage = "case" | "library" | "hearing" | "writing";
+type Stage = "case" | "library" | "hearing" | "writing" | "workbench";
 
 export function CaseWorkflowNav({ causaId, title, current, workspaceId }: { causaId: string; title: string; current: Stage; workspaceId?: string }) {
   const query = useSearchParams();
@@ -21,6 +21,7 @@ export function CaseWorkflowNav({ causaId, title, current, workspaceId }: { caus
     { stage: "library", label: "Biblioteca", href: caseLibraryHref(causaId, draftId), icon: BookOpen },
     { stage: "hearing", label: "Audiencias", href: selectedWorkspace ? `/audiencias/${encodeURIComponent(selectedWorkspace)}${context}` : `${base}/audiencias${context}`, icon: MessagesSquare },
     { stage: "writing", label: "Escritos", href: `${base}/escritos${draftId ? `?${new URLSearchParams({ draft: draftId })}` : ""}`, icon: FilePenLine },
+    { stage: "workbench", label: "Mesa del asistente", href: `${base}/mesa`, icon: PanelsTopLeft },
   ];
   return <nav className="case-workflow" aria-label="Recorrido de la causa" data-testid="case-workflow">
     <Link className="case-workflow-title" href={base + context} title={title}><FolderOpen size={19} aria-hidden="true" /><span>{title}</span></Link>
