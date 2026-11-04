@@ -85,6 +85,10 @@ LINKEDIN_SHARE_ENABLED=1
 
 El inicio de sesión y la publicación con una cuenta real requieren la aplicación y permisos correspondientes. Las pruebas de desarrollo usan identidades, firmas y proveedores ficticios.
 
+La [metadata OIDC pública de LinkedIn](https://www.linkedin.com/oauth/.well-known/openid-configuration), consultada directamente el **4 de noviembre de 2026**, declara el issuer exacto `https://www.linkedin.com/oauth`, firma `RS256` y las rutas de autorización, token, userinfo y JWKS utilizadas por el conector. La validación acepta únicamente ese issuer; rechaza el dominio sin `/oauth` y cualquier otro emisor. El ejemplo de la [guía de LinkedIn en Microsoft Learn](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2) conserva el dominio sin esa ruta; se utiliza el valor de la metadata publicada, sin ampliar la lista de emisores aceptados.
+
+El conector envía un nonce por intento y exige su correspondencia en el ID token, conforme a [OIDC Core, validación del ID token](https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation). La metadata y la guía públicas de LinkedIn consultadas no detallan ese eco; esta revisión no acredita su comportamiento con una cuenta real. Se conserva la comprobación sin relajar firma, audiencia, nonce o caducidad.
+
 ## Computadora del asistente
 
 **Computadora** conecta un escritorio opcional mediante un broker de LexOpen. Cada profesional y ámbito utiliza un gateway dedicado; un mismo endpoint no se comparte entre causas. El motor de escritorio es un contenedor, no una VM con kernel propio.

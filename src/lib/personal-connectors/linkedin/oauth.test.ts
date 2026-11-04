@@ -11,7 +11,7 @@ const config = linkedInConfig({ LINKEDIN_CLIENT_ID: "client-fixture", LINKEDIN_C
 const pair = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const jwk = { ...pair.publicKey.export({ format: "jwk" }), kid: "fixture", alg: "RS256", use: "sig" };
 function jwt(change: Record<string, unknown> = {}, header: Record<string, unknown> = {}) {
-  const parts = [{ alg: "RS256", kid: "fixture", ...header }, { iss: "https://www.linkedin.com", aud: "client-fixture", sub: "member-fixture", iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300, nonce: "nonce-fixture", ...change }].map(value => Buffer.from(JSON.stringify(value)).toString("base64url"));
+  const parts = [{ alg: "RS256", kid: "fixture", ...header }, { iss: "https://www.linkedin.com/oauth", aud: "client-fixture", sub: "member-fixture", iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300, nonce: "nonce-fixture", ...change }].map(value => Buffer.from(JSON.stringify(value)).toString("base64url"));
   return `${parts.join(".")}.${sign("RSA-SHA256", Buffer.from(parts.join(".")), pair.privateKey).toString("base64url")}`;
 }
 function stub(bodyFor: (url: string, init?: RequestInit) => unknown): Fetcher {
@@ -42,6 +42,11 @@ test("OIDC verifies signature, issuer, audience, expiry, nonce and algorithm", a
   for (const claims of [{ iss: "https://attacker.test" }, { aud: "other-client" }, { exp: 1 }, { nonce: "other-nonce" }, { sub: "member:invalid" }, { aud: ["client-fixture", "other"], azp: "other" }, { azp: "other-client" }, { nbf: "invalid-date" }, { aud: ["client-fixture", 3] }]) await assert.rejects(validateIdToken(jwt(claims), "client-fixture", digest("nonce-fixture"), fetcher));
   await assert.rejects(validateIdToken(jwt({}, { alg: "none" }), "client-fixture", digest("nonce-fixture"), fetcher));
   const token = jwt(); await assert.rejects(validateIdToken(token.slice(0, -6) + "aaaaaa", "client-fixture", digest("nonce-fixture"), fetcher));
+});
+test("OIDC accepts only the exact LinkedIn live discovery issuer, including its oauth path", async () => {
+  const fetcher = stub(() => ({ keys: [jwk] }));
+  assert.equal(await validateIdToken(jwt({ iss: "https://www.linkedin.com/oauth" }), "client-fixture", digest("nonce-fixture"), fetcher), "member-fixture");
+  for (const iss of ["https://www.linkedin.com", "https://www.linkedin.com/oauth/", "https://other.example.test/oauth"]) await assert.rejects(validateIdToken(jwt({ iss }), "client-fixture", digest("nonce-fixture"), fetcher));
 });
 test("OAuth exchanges only against official endpoints and records actual scopes", async () => {
   const calls: string[] = [];

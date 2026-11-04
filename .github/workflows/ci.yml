@@ -55,13 +55,25 @@ jobs:
         with:
           go-version-file: .tmp/kitties-upstream/go.mod
           cache: false
+      - name: Prepare dedicated gateway UID and restrict runtime egress
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v setfacl >/dev/null || ! command -v getfacl >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y acl
+          fi
+          sudo useradd --system --no-create-home --groups docker lexopen-kitties-ci
+          gateway_uid="$(id -u lexopen-kitties-ci)"
+          sudo iptables -I OUTPUT 1 -m owner --uid-owner "$gateway_uid" ! -d 127.0.0.0/8 -j REJECT
+          sudo ip6tables -I OUTPUT 1 -m owner --uid-owner "$gateway_uid" -j REJECT
       - name: Select owned runtime evidence directory
         shell: bash
         run: printf 'KITTIES_CI_OUTPUT=%s/altazor-computer-evidence\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - run: npm ci
       - run: npx prisma generate
       - run: npx prisma migrate deploy
-      - name: Archive public source and build real immutable desktop image
+      - name: Archive public source, build gateway and verify dedicated UID access
         shell: bash
         run: |
           set -euo pipefail
@@ -73,18 +85,18 @@ jobs:
           test ! -e "$source_dir/.git"
           printf '%s\n' 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3 > "$source_dir/.lexopen-source-commit"
           make -C "$source_dir" WEB=0 VERSION=lexopen-ci build
-          docker build --build-arg LUMEN_COMMIT=59d6ee5b18254c79041b4d4cfe78f0bc1aecd1b4 --iidfile "$RUNNER_TEMP/kitties-image-id" -t lexopen-kitty-ci:6aee950 "$source_dir/docker/kitty-desktop"
-          image_id="$(cat "$RUNNER_TEMP/kitties-image-id")"
-          test "$(docker image inspect --format '{{.Id}}' "$image_id")" = "$image_id"
-          printf 'KITTIES_CI_SOURCE=%s\nKITTIES_CI_IMAGE_ID=%s\n' "$source_dir" "$image_id" >> "$GITHUB_ENV"
-      - name: Restrict gateway process egress to loopback
+          node scripts/altazor/prepare-computer-ci.test.mjs
+          node scripts/altazor/prepare-computer-ci.mjs "$source_dir"
+          printf 'KITTIES_CI_SOURCE=%s\n' "$source_dir" >> "$GITHUB_ENV"
+      - name: Build real immutable desktop image after gateway permission preflight
         shell: bash
         run: |
           set -euo pipefail
-          sudo useradd --system --no-create-home --groups docker lexopen-kitties-ci
-          gateway_uid="$(id -u lexopen-kitties-ci)"
-          sudo iptables -I OUTPUT 1 -m owner --uid-owner "$gateway_uid" ! -d 127.0.0.0/8 -j REJECT
-          sudo ip6tables -I OUTPUT 1 -m owner --uid-owner "$gateway_uid" -j REJECT
+          source_dir="$KITTIES_CI_SOURCE"
+          docker build --build-arg LUMEN_COMMIT=59d6ee5b18254c79041b4d4cfe78f0bc1aecd1b4 --iidfile "$RUNNER_TEMP/kitties-image-id" -t lexopen-kitty-ci:6aee950 "$source_dir/docker/kitty-desktop"
+          image_id="$(cat "$RUNNER_TEMP/kitties-image-id")"
+          test "$(docker image inspect --format '{{.Id}}' "$image_id")" = "$image_id"
+          printf 'KITTIES_CI_IMAGE_ID=%s\n' "$image_id" >> "$GITHUB_ENV"
       - name: Actual desktop broker with selected fictitious data and local model fixture
         run: node --import tsx scripts/altazor/computer-smoke.ts
       - name: Retain safe fictitious runtime evidence

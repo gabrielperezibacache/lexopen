@@ -31,7 +31,7 @@ export async function validateIdToken(token: string, clientId: string, nonceHash
     const key = createPublicKey({ key: keys[0] as JsonWebKey, format: "jwk" });
     if (!verify("RSA-SHA256", Buffer.from(`${parts[0]}.${parts[1]}`), key, Buffer.from(parts[2], "base64url"))) throw failure();
     const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-    if (claims.iss !== "https://www.linkedin.com" || audiences.some(value => typeof value !== "string") || !audiences.includes(clientId) || (audiences.length > 1 && claims.azp !== clientId) || (claims.azp !== undefined && claims.azp !== clientId)) throw failure();
+    if (claims.iss !== "https://www.linkedin.com/oauth" || audiences.some(value => typeof value !== "string") || !audiences.includes(clientId) || (audiences.length > 1 && claims.azp !== clientId) || (claims.azp !== undefined && claims.azp !== clientId)) throw failure();
     if (typeof claims.exp !== "number" || !Number.isFinite(claims.exp) || claims.exp * 1000 <= now || typeof claims.iat !== "number" || !Number.isFinite(claims.iat) || claims.iat * 1000 > now + 60_000 || claims.iat >= claims.exp || (claims.nbf !== undefined && (typeof claims.nbf !== "number" || !Number.isFinite(claims.nbf) || claims.nbf * 1000 > now + 60_000))) throw failure();
     if (typeof claims.sub !== "string" || !/^[A-Za-z0-9_-]{1,200}$/.test(claims.sub) || typeof claims.nonce !== "string" || !constantEqual(digest(claims.nonce), nonceHash)) throw failure();
     return claims.sub;
