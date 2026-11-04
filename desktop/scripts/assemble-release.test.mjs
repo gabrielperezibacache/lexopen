@@ -13,7 +13,8 @@ async function fixture(version = "1.1.0-preview.1") {
     const [platform, arch] = target.split("-"), osname = platform === "darwin" ? "mac" : platform === "win32" ? "win" : "linux";
     const assets = platform === "darwin" ? ["dmg", "zip"] : platform === "win32" ? ["exe", "zip"] : ["AppImage", "deb"], entries = [];
     for (const ext of assets) {
-      const name = `LexOpen-${version}-${osname}-${arch}.${ext}`, bytes = Buffer.from(`Fictitious installer bytes: ${name}`);
+      const artifactArch = platform === "linux" && ext === "deb" ? "amd64" : arch;
+      const name = `LexOpen-${version}-${osname}-${artifactArch}.${ext}`, bytes = Buffer.from(`Fictitious installer bytes: ${name}`);
       await fs.writeFile(path.join(dir, name), bytes);
       entries.push({ url: name, size: bytes.length, sha512: crypto.createHash("sha512").update(bytes).digest("base64") });
     }

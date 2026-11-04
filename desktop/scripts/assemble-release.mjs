@@ -28,7 +28,8 @@ export async function assembleRelease({ input, output, version, revision }) {
   if (input === output || output.startsWith(input + path.sep) || input.startsWith(output + path.sep)) throw new Error("Release input and output must be separate");
   const channel = version.includes("-") ? "preview" : "latest", preview = channel === "preview";
   const files = await scan(input), byName = new Map(), feeds = [];
-  const expectedAssets = ["mac-x64.dmg", "mac-x64.zip", "mac-arm64.dmg", "mac-arm64.zip", "win-x64.exe", "win-x64.zip", "linux-x64.AppImage", "linux-x64.deb"].map(s => `LexOpen-${version}-${s}`);
+  // Debian names this same x64 architecture amd64; AppImage uses x64.
+  const expectedAssets = ["mac-x64.dmg", "mac-x64.zip", "mac-arm64.dmg", "mac-arm64.zip", "win-x64.exe", "win-x64.zip", "linux-x64.AppImage", "linux-amd64.deb"].map(s => `LexOpen-${version}-${s}`);
   const feedNames = [`${channel}.yml`, `${channel}-mac.yml`, `${channel}-linux.yml`];
   const reportNames = targets.flatMap(t => ["packaged", "smoke", "signature"].map(k => `lexopen-${k}-${t}.json`));
   for (const file of files) {
