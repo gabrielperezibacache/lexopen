@@ -1,0 +1,21 @@
+export type ConnectorState = "unconfigured" | "disconnected" | "connecting" | "connected" | "expired" | "verification_required" | "reconnect_required" | "error";
+export type PublicLinkedInAccount = {
+  provider: "linkedin";
+  state: ConnectorState;
+  connected: boolean;
+  canStartOAuth: boolean;
+  canVerify: boolean;
+  canPublish: boolean;
+  canRequestPublish: boolean;
+  availableModes: ["web"] | [];
+  nativeAvailable: false;
+  nativeReason: string;
+  grantedScopes: string[] | null;
+  identity: { name: string; email: string | null } | null;
+  expiresAt: string | null;
+  lastVerifiedAt: string | null;
+  reason: string | null;
+};
+export type ShareDraft = { id: string; title: string; body: string; sourceUrl: string | null; visibility: string; revision: number; updatedAt: string };
+export type SharePreview = { draft: ShareDraft; previewHash: string; author: string; commentary: string; visibility: string; canPublish: boolean; reason: string | null };
+export type PublicationReceipt = { id: string; draftId: string; draftRevision: number; status: string; externalUrl: string | null; errorCode: string | null };

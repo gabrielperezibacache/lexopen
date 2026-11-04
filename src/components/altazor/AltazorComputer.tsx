@@ -1,0 +1,111 @@
+"use client";
+
+import Image from "next/image";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { CircleAlert, Monitor, MousePointer2, RefreshCw, Square } from "lucide-react";
+import { apiMutation } from "@/lib/api-mutation";
+import { operationKey } from "@/lib/client-submission-key";
+import type { ComputerFile, ComputerSessionView, ComputerStatus } from "@/lib/altazor/computer/types";
+import styles from "./AltazorComputer.module.css";
+
+const api = "/api/altazor/computer";
+const stateLabel: Record<string, string> = { disabled: "Desactivado", unconfigured: "Sin configurar", configured: "Gateway configurado", error: "Requiere comprobación", creating: "Creación pendiente", starting: "Escritorio iniciándose", ready: "Escritorio disponible", unknown: "Creación sin confirmar", closed: "Escritorio detenido", expired: "Acceso vencido", stopped: "Escritorio detenido" };
+type ActionReply = { action: { id: string; status: string; result: { held?: boolean; cancelled?: boolean; stopped?: boolean } | null } };
+export function AltazorComputer({ causaId }: { causaId?: string | null }) { return <ComputerPanel key={causaId || "personal"} causaId={causaId} />; }
+
+function ComputerPanel({ causaId }: { causaId?: string | null }) {
+  const uid = useId(), tokenRef = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<ComputerStatus | null>(null), [view, setView] = useState<ComputerSessionView | null>(null), [selected, setSelected] = useState("");
+  const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const [text, setText] = useState(""), [files, setFiles] = useState<File[]>([]), [approved, setApproved] = useState(false), [messageKey, setMessageKey] = useState(""), [createKey, setCreateKey] = useState("");
+  const [frame, setFrame] = useState(0), [manualText, setManualText] = useState("");
+  const query = causaId ? `?causaId=${encodeURIComponent(causaId)}` : "";
+  const refresh = useCallback(async () => {
+    const response = await fetch(`${api}${query}`, { cache: "no-store" }), data = await response.json();
+    if (!response.ok) throw new Error(data.error || "No se pudo consultar el computador opcional.");
+    setStatus(data.computer);
+  }, [query]);
+  const loadSession = useCallback(async (id: string) => {
+    const response = await fetch(`${api}/sessions/${encodeURIComponent(id)}`, { cache: "no-store" }), data = await response.json();
+    if (!response.ok) {
+      if ([403, 404, 410].includes(response.status)) { setSelected(""); setView(null); }
+      throw new Error(data.error || "No se pudo consultar la sesión.");
+    }
+    setView(data);
+  }, []);
+  useEffect(() => { let active = true; queueMicrotask(() => { if (active) void refresh().catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "No se pudo consultar el computador."); }).finally(() => { if (active) setLoading(false); }); }); return () => { active = false; }; }, [refresh]);
+  useEffect(() => {
+    if (!selected) return;
+    let active = true;
+    const poll = () => { if (active) void loadSession(selected).catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "No se pudo consultar la sesión."); }); };
+    queueMicrotask(poll); const timer = setInterval(poll, 6000);
+    return () => { active = false; clearInterval(timer); };
+  }, [selected, loadSession]);
+  async function mutate<T>(url: string, body: unknown): Promise<T | null> {
+    setBusy(true); setError(""); setNotice("");
+    try { const result = await apiMutation<T>(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); if (!result.ok) { setError(result.error); return null; } return result.data; }
+    finally { setBusy(false); }
+  }
+  async function configure(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); const form = new FormData(event.currentTarget);
+    try {
+      const result = await mutate<{ computer: ComputerStatus }>(api, { action: "configure", causaId: causaId || null, endpoint: form.get("endpoint"), token: form.get("token"), provider: form.get("provider"), dedicated: form.get("dedicated") === "on" });
+      if (result) { setStatus(result.computer); setNotice("Gateway comprobado y reservado para este profesional y este espacio."); }
+    } finally { if (tokenRef.current) tokenRef.current.value = ""; }
+  }
+  async function verify() {
+    if (!status?.workspaceId) return;
+    const result = await mutate<{ computer: ComputerStatus }>(api, { action: "verify", workspaceId: status.workspaceId, confirmed: true });
+    if (result) { setStatus(result.computer); setNotice("El gateway respondió con un proveedor y contenedores disponibles."); }
+  }
+  async function start() {
+    if (!status?.workspaceId) return;
+    const requestId = createKey || operationKey(); setCreateKey(requestId);
+    const result = await mutate<{ session: { id: string } }>(`${api}/sessions`, { workspaceId: status.workspaceId, requestId, confirmed: true });
+    if (result) { setSelected(result.session.id); setView(null); setCreateKey(""); await refresh().catch(() => {}); }
+  }
+  async function action(body: Record<string, unknown>) {
+    if (!selected) return;
+    const result = await mutate<ActionReply>(`${api}/sessions/${encodeURIComponent(selected)}/actions`, { ...body, requestId: operationKey(), confirmed: true });
+    if (!result) return;
+    if (result.action.status !== "completed") { setNotice("El gateway no confirmó la acción. Compruebe el escritorio antes de repetirla."); return; }
+    if (body.action === "close" && result.action.result?.stopped) { setView(null); setSelected(""); await refresh().catch(() => {}); setNotice("Kitties confirmó que detuvo este escritorio. Sus archivos pueden permanecer en el gateway."); return; }
+    if (body.action === "cancel") setNotice(result.action.result?.cancelled ? "Kitties confirmó la cancelación de la tarea." : "Kitties no encontró una tarea cancelable en ese momento. Compruebe el chat.");
+    await loadSession(selected).catch(() => {}); setFrame(Date.now());
+  }
+  async function send() {
+    if (!selected || !approved) return;
+    const requestId = messageKey || operationKey(); setMessageKey(requestId);
+    setBusy(true); setError("");
+    try {
+      const uploads: ComputerFile[] = [];
+      for (const file of files) {
+        const bytes = new Uint8Array(await file.arrayBuffer()); let binary = "";
+        for (let index = 0; index < bytes.length; index += 16384) binary += String.fromCharCode(...bytes.subarray(index, index + 16384));
+        uploads.push({ name: file.name, mime: file.type, data: btoa(binary) });
+      }
+      const result = await apiMutation<ActionReply>(`${api}/sessions/${encodeURIComponent(selected)}/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, text, files: uploads, confirmed: true }) });
+      if (!result.ok) { setError(result.error); return; }
+      if (result.data.action.status !== "completed") { setNotice("La tarea quedó sin confirmación. Compruebe el chat antes de continuar; no se reenviará automáticamente."); return; }
+      setText(""); setFiles([]); setApproved(false); setMessageKey(""); setNotice("Kitties aceptó la tarea. El chat mostrará su progreso y resultado."); await loadSession(selected).catch(() => {});
+    } catch { setError("No se pudo confirmar el envío. Compruebe el chat antes de repetirlo."); }
+    finally { setBusy(false); }
+  }
+  const held = Boolean(view?.session.held), selectedSummary = status?.sessions.find(session => session.id === selected);
+  const selectedState = view?.session.state || selectedSummary?.state;
+  const canAct = Boolean(selected && view && selectedState === "ready"), canWork = canAct && Boolean(status?.policyAllowed);
+  return <section className={styles.root} aria-labelledby={`${uid}-title`}>
+    <header className={styles.header}><div><h2 id={`${uid}-title`}>Computador opcional</h2><p>Un escritorio en contenedor para trabajar con las tareas y archivos que usted elija.</p></div><Monitor size={24} aria-hidden="true" /></header>
+    {error && <p className={styles.error} role="alert">{error}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
+    <div className={styles.status} aria-busy={loading}><strong>{loading ? "Consultando configuración…" : status ? stateLabel[status.state] : "Estado no disponible"}</strong>{status?.version && <span>Kitties {status.version} · {status.provider}</span>}{status?.reason && <p>{status.reason}</p>}<p>Las credenciales de IA se configuran directamente en Kitties. ALTAZOR AI no entrega las de correo, LinkedIn o Codex al escritorio.</p>{status?.configured && <div className={styles.actions}><button type="button" disabled={busy} onClick={verify}><RefreshCw size={15} aria-hidden="true" />Comprobar gateway</button><button type="button" className={styles.primary} disabled={busy || !status.enabled || !status.policyAllowed} onClick={start}>Iniciar escritorio privado</button></div>}</div>
+    {status?.canConfigure && <details className={styles.setup}><summary>Configurar gateway local dedicado</summary><form onSubmit={configure}><label htmlFor={`${uid}-endpoint`}>Dirección local de esta instancia</label><input id={`${uid}-endpoint`} name="endpoint" type="url" required defaultValue="http://127.0.0.1:7488" disabled={busy} /><label htmlFor={`${uid}-provider`}>Nombre del proveedor ya configurado en Kitties</label><input id={`${uid}-provider`} name="provider" required maxLength={100} disabled={busy} /><label htmlFor={`${uid}-token`}>Autorización del gateway</label><input ref={tokenRef} id={`${uid}-token`} name="token" type="password" autoComplete="off" required minLength={16} maxLength={16000} disabled={busy} /><label className={styles.check}><input name="dedicated" type="checkbox" required disabled={busy} />Esta instancia y sus datos son exclusivos de este profesional y este espacio. Configuré el proveedor directamente en Kitties.</label><button type="submit" disabled={busy}>Comprobar y guardar autorización</button></form></details>}
+    {status?.sessions.length ? <div className={styles.sessions}><label htmlFor={`${uid}-session`}>Sesión de este espacio</label><select id={`${uid}-session`} value={selected} disabled={busy} onChange={event => { setSelected(event.target.value); setView(null); setText(""); setFiles([]); setApproved(false); setMessageKey(""); }}><option value="">Seleccione una sesión</option>{status.sessions.map(session => <option key={session.id} value={session.id}>{stateLabel[session.state] || session.state} · {new Date(session.createdAt).toLocaleString("es-CL")}</option>)}</select></div> : null}
+    {selected && <div className={styles.work}>
+      <div className={styles.toolbar}><strong>{stateLabel[selectedState || ""] || "Comprobando escritorio…"}</strong><div className={styles.actions}><button type="button" disabled={busy || !canWork} onClick={() => action({ action: "control", hold: !held })}><MousePointer2 size={15} aria-hidden="true" />{held ? "Devolver control" : "Tomar control"}</button><button type="button" disabled={busy || !canAct} onClick={() => action({ action: "cancel" })}>Cancelar tarea</button><button type="button" disabled={busy || selectedState === "expired" || selectedState === "closed"} onClick={() => action({ action: "close" })}><Square size={14} aria-hidden="true" />Detener escritorio</button></div></div>
+      {view && <p className={styles.expiry}>Acceso hasta {new Date(view.session.expiresAt).toLocaleTimeString("es-CL")}. Al vencer se bloquea el acceso desde ALTAZOR; el gateway puede conservar el escritorio y sus archivos.</p>}
+      {canAct ? <><div className={styles.screen}><Image key={`${selected}:${frame}`} unoptimized src={`${api}/sessions/${encodeURIComponent(selected)}/screenshot?frame=${frame}`} width={1280} height={800} alt="Captura del escritorio privado en contenedor" className={held ? styles.controllable : undefined} onClick={event => { if (!held || busy || !canWork) return; const image = event.currentTarget, rect = image.getBoundingClientRect(); void action({ action: "input", input: { action: "click", args: { x: Math.round((event.clientX - rect.left) * image.naturalWidth / rect.width), y: Math.round((event.clientY - rect.top) * image.naturalHeight / rect.height) } } }); }} /></div><div className={styles.actions}><button type="button" disabled={busy} onClick={() => setFrame(Date.now())}>Actualizar captura</button>{held && canWork && <><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "key", args: { keys: "Return" } } })}>Enter</button><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "key", args: { keys: "Tab" } } })}>Tab</button><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "scroll", args: { direction: "down", amount: 3 } } })}>Desplazar abajo</button></>}</div>{held && canWork && <form className={styles.manual} onSubmit={event => { event.preventDefault(); void action({ action: "input", input: { action: "type", args: { text: manualText } } }).then(() => setManualText("")); }}><label htmlFor={`${uid}-manual`}>Texto para escribir manualmente en el escritorio</label><input id={`${uid}-manual`} value={manualText} type="password" autoComplete="off" maxLength={2000} disabled={busy} onChange={event => setManualText(event.target.value)} /><button type="submit" disabled={busy || !manualText}>Escribir en escritorio</button><p>Se envía al teclado del contenedor, sin incorporarse al chat del modelo.</p></form>}</> : <p className={styles.waiting}><CircleAlert size={18} aria-hidden="true" />El escritorio todavía no está disponible. No se muestra una imagen de demostración.</p>}
+      <div className={styles.chat} aria-live="polite">{view?.turns.length ? view.turns.map(turn => <article key={turn.index}><strong>{turn.from === "user" ? "Usted" : turn.from === "assistant" ? "Kitties" : "Sistema"}{turn.working ? " · trabajando" : ""}{turn.needsHelp ? " · requiere su intervención" : ""}</strong><p>{turn.text}</p>{turn.steps.length > 0 && <small>{turn.steps.map(step => step.action).join(" · ")}</small>}</article>) : <p>Escriba una tarea y elija expresamente sus archivos. La conversación de ALTAZOR y los expedientes no se envían automáticamente.</p>}</div>
+      <form className={styles.composer} onSubmit={event => { event.preventDefault(); void send(); }}><label htmlFor={`${uid}-task`}>Tarea para este escritorio</label><textarea id={`${uid}-task`} rows={4} value={text} maxLength={16000} disabled={busy || !canWork || held} onChange={event => { setText(event.target.value); setApproved(false); setMessageKey(""); }} /><label htmlFor={`${uid}-files`}>Archivos elegidos para esta tarea</label><input key={files.length ? "selected" : "empty"} id={`${uid}-files`} type="file" multiple accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.png,.jpg,.jpeg,.gif,.webp" disabled={busy || !canWork || held} onChange={event => { const chosen = Array.from(event.target.files || []); if (chosen.length > 5 || chosen.reduce((total, file) => total + file.size, 0) > 20 * 1024 * 1024) { setError("Elija hasta cinco archivos y 20 MiB en total."); event.target.value = ""; setFiles([]); return; } setFiles(chosen); setApproved(false); setMessageKey(""); }} />{files.length > 0 && <ul>{files.map((file, index) => <li key={`${file.name}:${index}`}>{file.name} · {(file.size / 1024).toFixed(0)} KiB</li>)}</ul>}<label className={styles.check}><input type="checkbox" checked={approved} disabled={busy || !canWork || held} onChange={event => setApproved(event.target.checked)} />Autorizo enviar esta tarea y sólo estos archivos al gateway y a su proveedor configurado.</label><button type="submit" className={styles.primary} disabled={busy || !canWork || held || !approved || !text.trim()}>{busy ? "Enviando…" : "Enviar tarea al escritorio"}</button></form>
+    </div>}
+  </section>;
+}

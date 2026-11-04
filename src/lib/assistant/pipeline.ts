@@ -28,6 +28,14 @@ export type AssistantTurnInput = {
   user: PermissionSubject & { id: string; role: Role };
   chatId?: string | null;
   now?: Date;
+  scope?: ToolContext["scope"];
+  history?: ToolContext["history"];
+  context?: string;
+  validatedReferences?: ToolContext["validatedReferences"];
+  signal?: AbortSignal;
+  expectedDestination?: ToolContext["expectedDestination"];
+  authorizeContext?: () => Promise<void>;
+  planId?: string;
 };
 
 export type AssistantStreamEvent =
@@ -193,6 +201,8 @@ export async function executePlanSteps(
 ): Promise<Array<{ toolId: AssistantIntentId; result: ToolResult }>> {
   const results: Array<{ toolId: AssistantIntentId; result: ToolResult }> = [];
   for (const [index, step] of steps.entries()) {
+    ctx.signal?.throwIfAborted();
+    await ctx.authorizeContext?.();
     const tool = getTool(step.toolId);
     try {
       const result = await tool.execute(step.input, { ...ctx, commandKey: ctx.commandKey ? `${ctx.commandKey}:${index}` : undefined });
@@ -222,6 +232,8 @@ export async function executePlanSteps(
 export async function runAssistantTurn(
   input: AssistantTurnInput
 ): Promise<AssistantTurnResult> {
+  input.signal?.throwIfAborted();
+  await input.authorizeContext?.();
   const streamEvents: AssistantStreamEvent[] = [];
   streamEvents.push({ type: "status", message: "Analizando su solicitud…" });
 
@@ -229,8 +241,10 @@ export async function runAssistantTurn(
   const policy = await getAssistantFirmPolicy();
   const classification = await classifyIntents(normalized, {
     userId: input.user.id,
-    attachments: input.attachments,
+    attachments: input.scope ? undefined : input.attachments,
     assistantLlmMode: policy.assistantLlmMode,
+    signal: input.signal,
+    expectedDestination: input.expectedDestination,
   });
   const classificationMeta = {
     source: classification.source,
@@ -249,20 +263,31 @@ export async function runAssistantTurn(
     };
   }
 
-  const resolved = { causaId: await resolveCausaId(normalized, input.user) };
+  input.signal?.throwIfAborted();
+  const resolved = { causaId: input.scope ? input.scope.causaId || undefined : await resolveCausaId(normalized, input.user) };
   const ctx: ToolContext = {
     userId: input.user.id,
     role: input.user.role,
     capabilityGrants: input.user.capabilityGrants,
     capabilityRevokes: input.user.capabilityRevokes,
     chatId: input.chatId,
+    scope: input.scope, history: input.history, context: input.context, validatedReferences: input.validatedReferences,
+    signal: input.signal, expectedDestination: input.expectedDestination, authorizeContext: input.authorizeContext,
   };
 
   const steps: AssistantPlanStep[] = [];
-  for (const intent of classification.intents) {
+  for (const classified of classification.intents) {
+    input.signal?.throwIfAborted();
+    // Selected attachments/passages have their own identity and provenance;
+    // they are not Documento IDs. Route read-only analysis through the pinned
+    // conversational tool without altering any accompanying write intent.
+    const redirected = Boolean(input.scope && input.context?.trim() && ["documento.resumir", "documento.clasificar", "jurisprudencia.brief"].includes(classified.toolId));
+    const intent: (typeof classification.intents)[number] = redirected ? { ...classified, toolId: "respuesta.libre", slots: { texto: input.text } } : classified;
+    if (redirected && steps.some(step => step.toolId === "respuesta.libre")) continue;
     const tool = getTool(intent.toolId);
     if (!tool.roles.includes(input.user.role)) continue;
-    const toolInput = buildToolInput(intent.toolId, intent.slots, resolved);
+    if (input.scope && typeof intent.slots.causaId === "string" && intent.slots.causaId !== input.scope.causaId) throw new Error("La acción apunta a una causa distinta de esta conversación");
+    const toolInput = buildToolInput(intent.toolId, input.scope ? { ...intent.slots, causaId: input.scope.causaId || undefined, ...(intent.toolId === "respuesta.libre" ? { texto: input.text } : {}) } : intent.slots, resolved);
     const parsed = tool.inputSchema.safeParse(toolInput);
     if (!parsed.success) {
       streamEvents.push({
@@ -290,7 +315,7 @@ export async function runAssistantTurn(
 
   const needsConfirm = steps.some((s) => getTool(s.toolId).kind === "write");
   const plan: AssistantPlan = {
-    id: randomUUID(),
+    id: input.planId || randomUUID(),
     intents: classification.intents,
     steps,
     needsConfirm,

@@ -258,8 +258,9 @@ export async function proxy(req: NextRequest) {
     return pass();
   }
 
-  // Google OAuth callback stays public but must still pass pathname header
-  if (pathname === "/api/integrations/google/callback") {
+  // OAuth callbacks validate one-use state. Account activation remains session-bound.
+  if (pathname === "/api/integrations/google/callback" ||
+      req.method === "GET" && pathname === "/api/personal-connectors/linkedin/oauth/callback") {
     return pass();
   }
 

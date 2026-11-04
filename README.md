@@ -10,9 +10,9 @@
   <p><a href="#recorrido-visual">Recorrido visual</a> · <a href="#empezar">Empezar</a> · <a href="https://github.com/gabrielperezibacache/lexopen/releases">Descargas</a> · <a href="#desarrollo-y-pruebas">Desarrollo</a> · <a href="#documentación">Documentación</a></p>
 </div>
 
-![Demostración con datos ficticios: causa de LexOpen con Resumen, Expediente, Preparación, Audiencias y Escritos](docs/interfaz-2026-11-04/cause-desktop.png)
+![Interfaz real con datos ficticios: ALTAZOR AI en Mi jornada, con conversación, adjuntos y herramientas personales](docs/altazor-2026-11-04/inicio-desktop.png)
 
-> **Interfaz real, datos de demostración.** Las capturas usan personas, causas y documentos ficticios. La reorganización de navegación mostrada corresponde a `1.1.0-preview.2`; las descargas disponibles están en [Releases](https://github.com/gabrielperezibacache/lexopen/releases). La Mesa del asistente se muestra con proveedor, eventos y resultado simulados. [Capturas de esta interfaz y alcance](docs/interfaz-2026-11-04/README.md) · [Capturas de biblioteca y reproducción](docs/assets/screenshots/README.md).
+> **Interfaz real, datos de demostración.** Las capturas usan personas, causas y documentos ficticios. ALTAZOR corresponde al trabajo de `1.1.0-preview.3`; estas imágenes no acreditan una versión publicada ni instaladores firmados. La reorganización de navegación del resto del recorrido corresponde a `1.1.0-preview.2`. Consulte las descargas efectivamente disponibles en [Releases](https://github.com/gabrielperezibacache/lexopen/releases). La Mesa del asistente se muestra con proveedor, eventos y resultado simulados. [Guía de ALTAZOR y límites](docs/ALTAZOR.md) · [Capturas de navegación y alcance](docs/interfaz-2026-11-04/README.md) · [Capturas de biblioteca y reproducción](docs/assets/screenshots/README.md).
 
 LexOpen reúne expedientes, biblioteca, investigación, audiencias y escritos con el trabajo cotidiano del estudio: clientes, plazos, calendario, tareas, comunicaciones y honorarios. Cada profesional puede preparar su causa, volver a un pasaje conservado y llevarlo a una nota o escrito con su referencia.
 
@@ -20,13 +20,35 @@ La aplicación se ejecuta en un **Host del estudio**: un computador o servidor q
 
 ## Recorrido visual
 
+### Empiece con ALTAZOR AI
+
+**Mi jornada** abre una conversación privada para su espacio personal o una causa accesible. Escriba el encargo, adjunte documentos o elija pasajes de biblioteca y expediente. ALTAZOR muestra el destino de IA y solicita autorización para cada envío remoto; los cambios en las herramientas se presentan como un plan revisable antes de ejecutarse. Conversaciones, respuestas y estados quedan guardados para continuar después.
+
+**Memoria** reúne recuerdos y relaciones en un grafo y una lista accesible. Los estados Propuesto y Confirmado permanecen separados; sólo la memoria confirmada se incorpora al marcar su uso en una consulta. Cada recuerdo puede revisarse, editarse u olvidarse. Las referencias dependen del acceso vigente a sus respaldos.
+
+**Conexiones** lleva a Codex personal en Mi cuenta, al correo y a las integraciones existentes, según permisos. También permite preparar borradores privados para LinkedIn y revisar el estado de su autorización. El acceso web a LinkedIn necesita una aplicación registrada y un retorno HTTPS; no se ha conectado una cuenta real ni efectuado una publicación como parte de esta entrega. [Empezar, adjuntos, memoria y conexiones](docs/ALTAZOR.md).
+
+### Investigue, escriba y prepare su docencia
+
+**Academia** conserva trabajos privados con pregunta, destinatarios, fuentes, matriz de literatura y propuestas editables. Permite preparar síntesis, revisiones, bibliografía, textos, programas, rúbricas y propuestas de currículum a partir de su perfil. Los resultados pueden descargarse en Word o Markdown e incorporarse, tras revisión, como un escrito privado de una causa accesible.
+
+![Interfaz real con datos ficticios: Academia de ALTAZOR con un trabajo de investigación y sus herramientas](docs/altazor-2026-11-04/academia-desktop.png)
+
+**Descubrir** consulta Crossref y OpenAlex, explora relaciones bibliográficas y lee registros ORCID públicos. Envía sólo términos o identificadores autorizados. Los resultados son metadatos para revisar; no acreditan lectura ni cotejo del texto completo. Las alertas temáticas se actualizan manualmente y su RSS privado muestra el último resultado guardado. [Descubrimiento académico, formatos y comprobaciones](docs/altazor-discovery.md).
+
+### Una computadora opcional para el asistente
+
+**Computadora** permite encargar una tarea con archivos elegidos, observar el escritorio, tomar el control y cerrar la sesión cuando se ha preparado un entorno dedicado. Está desactivada por defecto y abrir ALTAZOR no instala ese entorno. El adaptador Kitties requiere configuración desde el Host local en loopback y un gateway separado por profesional y ámbito. Usa contenedores; no es una máquina virtual con kernel propio. La comprobación real de Docker requiere un resultado satisfactorio de su trabajo específico de CI; las pantallas y las pruebas simuladas no lo sustituyen. [Operación y pruebas de Computadora](src/lib/altazor/computer/README.md).
+
 ### Encuentre el siguiente paso
 
-**Mi jornada** es la entrada cotidiana. Siete áreas estables —Mi jornada, Causas, Agenda, Biblioteca, Clientes, Comunicaciones y Estudio— muestran sólo los destinos secundarios del área abierta. Búsqueda, avisos y cuenta permanecen a mano; el portal del cliente conserva su recorrido propio. [Guía de navegación y espacios de trabajo](docs/NAVEGACION-Y-ESPACIOS-DE-TRABAJO.md).
+La agenda y el trabajo reciente continúan disponibles en **Mi jornada**. Siete áreas estables —Mi jornada, Causas, Agenda, Biblioteca, Clientes, Comunicaciones y Estudio— muestran sólo los destinos secundarios del área abierta. Búsqueda, avisos y cuenta permanecen a mano; el portal del cliente conserva su recorrido propio. [Guía de navegación y espacios de trabajo](docs/NAVEGACION-Y-ESPACIOS-DE-TRABAJO.md).
 
 ### Prepare la causa
 
 La carpeta de la causa conecta antecedentes, documentos, hechos, cronología, contradicciones y próximos pasos. Bajo el título, **Resumen, Expediente, Preparación, Audiencias y Escritos** permiten continuar el trabajo; las acciones menos frecuentes se reúnen en **Más acciones**. Biblioteca y Mesa del asistente acompañan la preparación con fuentes.
+
+![Demostración con datos ficticios: causa de LexOpen con Resumen, Expediente, Preparación, Audiencias y Escritos](docs/interfaz-2026-11-04/cause-desktop.png)
 
 ### Una biblioteca propia
 
@@ -93,6 +115,8 @@ Elija un objetivo y sus fuentes, ejecute con el destino disponible y revise el r
 
 | Apartado | Trabajo disponible |
 | --- | --- |
+| **ALTAZOR AI** | Conversaciones privadas, adjuntos conservados, fuentes elegidas, planes revisables y memoria confirmada por ámbito. |
+| **Academia** | Trabajos privados, matriz de literatura, escritura, docencia, perfil, descubrimiento bibliográfico y exportación Word/Markdown. |
 | **Causas y clientes** | Fichas, RIT/RUC, tribunales, partes, etapas, documentos, trámites y revisión de conflictos. |
 | **Documentos y fuentes** | Incorporación, versiones, páginas PDF, extracción de texto, OCR local y cotejo literal de pasajes. |
 | **Biblioteca y resoluciones** | Libros personales, estantes, colecciones compartibles, ficha judicial y recuperación de pasajes. |
@@ -169,6 +193,9 @@ Las integraciones son opcionales y necesitan su configuración o credenciales:
 - **Google Workspace:** archivos elegidos de Drive, carpetas por causa, Calendar y funciones de correo admitidas.
 - **IA y transcripción:** proveedores configurables, con política de envío del estudio y opción de servicios locales.
 - **Codex personal:** cada profesional puede conectar su cuenta de ChatGPT/Codex desde **Mi cuenta**, elegir modelo y activar su uso en las próximas consultas de texto, sin API key. Requiere Codex CLI en el Host y respeta la política de sólo IA local. [Preparación, uso y límites verificados](docs/CODEX.md).
+- **LinkedIn personal:** borradores privados, previsualización y publicación con confirmación y recibo cuando la aplicación web y los permisos están habilitados. Las interacciones sociales siguen en LinkedIn; LexOpen no incorpora un feed, contactos ni mensajería social propios. No se ha probado una cuenta ni una publicación reales en esta entrega. [Configuración y alcance](docs/ALTAZOR.md#conexiones-y-linkedin).
+- **Descubrimiento académico:** metadatos de Crossref y OpenAlex, relaciones bibliográficas y registro público ORCID, con autorización expresa y revisión de las referencias. [Fuentes y límites](docs/altazor-discovery.md).
+- **Computadora opcional:** gateway Kitties dedicado por profesional y ámbito, configuración local expresa y escritorio en contenedor, con credenciales independientes. No se instala por defecto. [Preparación y evidencia exigida](src/lib/altazor/computer/README.md).
 - **PJUD / OJV:** consulta por RIT/ROL y tribunal, candidatos por RUT y Mis Causas con ClaveÚnica; lectura separada del registro y resultados parciales identificados. Importación CSV y seguimiento según el acceso y la configuración. Las consultas automatizadas son opt-in; no se presentan como un canal oficial. [Guía PJUD](docs/PJUD.md) · [Ingreso manual, cuadernos y verificación](docs/ojv-interfaz-2026-11-03/README.md).
 - **Obsidian y almacenamiento:** exportación Markdown y archivos locales o almacenamiento compatible con S3.
 
@@ -214,6 +241,9 @@ El [workflow de CI](.github/workflows/ci.yml) comprueba migraciones y diferencia
 
 | Guía | Contenido |
 | --- | --- |
+| [ALTAZOR AI](docs/ALTAZOR.md) | Conversación, adjuntos, memoria revisable, Academia, conexiones, LinkedIn y computadora opcional. |
+| [Descubrimiento académico](docs/altazor-discovery.md) | Crossref, OpenAlex, ORCID, bibliografía, alertas manuales y comprobaciones públicas. |
+| [Computadora de ALTAZOR](src/lib/altazor/computer/README.md) | Gateway dedicado, preparación del Host, límites del contenedor y comprobación real de ejecución. |
 | [Navegación y espacios de trabajo](docs/NAVEGACION-Y-ESPACIOS-DE-TRABAJO.md) | Áreas, recorrido de la causa, paneles, ajustes y continuidad del trabajo. |
 | [Galería de la interfaz](docs/interfaz-2026-11-04/README.md) | Capturas reales con datos ficticios, procedencia y alcance de la validación visual. |
 | [Host web](docs/WEB-HOST.md) | Instalación, red, configuración, respaldos y operación. |

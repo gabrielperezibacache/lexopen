@@ -69,13 +69,14 @@ function epubSegments(entries: Map<string, Buffer>) {
   }
   return segments;
 }
-export async function extractBook(name: string, bytes: Buffer): Promise<ExtractedBook> {
+export async function extractBook(name: string, bytes: Buffer, options: { signal?: AbortSignal } = {}): Promise<ExtractedBook> {
+  options.signal?.throwIfAborted();
   if (!bytes.length || bytes.length > BOOK_MAX_BYTES) throw httpError("Seleccione un archivo de hasta 25 MiB", 413);
   const extension = path.extname(name).toLowerCase().slice(1);
   if (!(BOOK_FORMATS as readonly string[]).includes(extension)) throw httpError("Formato no admitido. Use PDF, EPUB, Word, OpenDocument o texto", 415);
   let pdf: PdfPageExtraction | undefined, segments: { text: string; label: string; pageNumber?: number }[] = [], mimeType = "text/plain", locatorKind = "text-offset";
   if (extension === "pdf") {
-    pdf = await extractPdfPages(bytes); mimeType = "application/pdf"; locatorKind = "pdf-page";
+    pdf = await extractPdfPages(bytes, { signal: options.signal }); mimeType = "application/pdf"; locatorKind = "pdf-page";
     segments = pdf.pages.map(page => ({ text: page.text, label: `Página ${page.pageNumber}`, pageNumber: page.pageNumber }));
   } else if (extension === "epub") { segments = epubSegments(readBookZip(bytes)); mimeType = "application/epub+zip"; locatorKind = "epub-section"; }
   else if (["txt", "md", "csv", "json", "xml", "html", "htm"].includes(extension)) {
@@ -88,6 +89,7 @@ export async function extractBook(name: string, bytes: Buffer): Promise<Extracte
     catch { throw malformed(); }
     mimeType = ({ doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", odt: "application/vnd.oasis.opendocument.text", rtf: "application/rtf", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ods: "application/vnd.oasis.opendocument.spreadsheet", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", odp: "application/vnd.oasis.opendocument.presentation" } as Record<string, string>)[extension];
   }
+  options.signal?.throwIfAborted();
   const text = segments.map(segment => segment.text).join("\n\n");
   if (!text.trim()) throw httpError("No se encontró texto legible. Revise el original o importe una copia con texto", 422);
   if (text.length > MAX_TEXT) throw httpError("El texto extraído supera dos millones de caracteres; divida la obra en volúmenes", 413);

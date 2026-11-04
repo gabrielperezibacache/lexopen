@@ -86,8 +86,11 @@ export async function classifyIntents(
     assistantLlmMode?: AssistantLlmMode;
     /** Fuerza clasificación por reglas sin tocar el LLM, sin importar el modo. */
     forceLocal?: boolean;
+    signal?: AbortSignal;
+    expectedDestination?: { provider: string; model: string; endpointHash: string };
   }
 ): Promise<ClassifyResult> {
+  opts?.signal?.throwIfAborted();
   const prompt = classifyPrompt(input, opts?.attachments);
   if (opts?.assistantLlmMode === "local_only" || opts?.forceLocal) {
     const rules = ruleClassify(input);
@@ -107,7 +110,10 @@ export async function classifyIntents(
       userId: opts?.userId,
       utilityLabel: "assistant.classify",
       timeoutMs: 20_000,
+      signal: opts?.signal,
+      expectedDestination: opts?.expectedDestination,
     });
+    opts?.signal?.throwIfAborted();
     if (result.source === "llm" && result.content) {
       const parsed = llmIntentSchema.parse(
         JSON.parse(extractJsonBlock(result.content))
@@ -124,8 +130,10 @@ export async function classifyIntents(
       }
     }
   } catch {
+    opts?.signal?.throwIfAborted();
     // LLM no disponible / respuesta no usable → fallback a reglas.
   }
+  opts?.signal?.throwIfAborted();
   const rules = ruleClassify(input);
   return { ...rules, source: "rule", prompt };
 }

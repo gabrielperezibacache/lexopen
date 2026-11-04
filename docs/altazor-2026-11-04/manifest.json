@@ -1,0 +1,158 @@
+{
+  "version": "1.1.0-preview.3",
+  "captureDateUtc": "2026-11-04T20:44:26.832835+00:00",
+  "data": "Fictitious people, case, book, memories, conversation and academic project. No real user files.",
+  "model": "Explicit local HTTP fixture, not a real model response.",
+  "accounts": "No real Codex, LinkedIn or mail account connected. No publication sent.",
+  "computer": "Actual application disabled state; not a desktop execution screenshot.",
+  "capture": "Unedited viewport screenshots from Chromium; 1440x1000 and360x800.",
+  "sourceFileSha256": {
+    "src/components/altazor/AltazorHome.tsx": "e0595f0f59f6bf9f78d1b81aa011ef46e15f5c7589ac0172bc60e3b6806ac4a2",
+    "src/components/altazor/AltazorHome.css": "8e627784f114721d6cb40d784672ee83741cbfaa0401a1d2d45ad58d1fa161b2",
+    "src/components/altazor/AltazorMemory.tsx": "50dde001aa84a161589358abba3c50527dc42a0765c736c79408dbc92d32f607",
+    "src/components/altazor/AltazorMemory.module.css": "b9bfdacdb16405343b34f5997a6f13fbf02fca599dccee4f09b6645d8b69d0d9",
+    "src/components/altazor/AltazorConnectors.tsx": "997bad1c9b40bea1f79bc3d91cf87aee72198c288c9ac8e246e15c4bc391447f",
+    "src/components/altazor/AltazorConnectors.module.css": "2de0e4c189e35639dc81cd3a15c3bbf9d94190d8dbf0612c78d15a1b2be075db",
+    "src/components/altazor/AltazorAcademic.tsx": "b1e40bb345fa1507a2c79bc59eb9dd9320e3206ce9c53c3268b4652baf96416c",
+    "src/components/altazor/AltazorComputer.tsx": "88b6f3310d48a6c18cbc2317c655413892ad663bfea2d72e3cef48fbec254040",
+    "src/components/altazor/AltazorDiscovery.tsx": "29f8c285cacd1ff2cbf4893af141356c590624e9e271b73804e41e60b18231a8",
+    "src/app/(app)/inicio/page.tsx": "3d6a7d40fe41f4b5cf19c2859226dc16d5aa0e71823a73070d7d6661e403e311"
+  },
+  "files": [
+    {
+      "file": "academia-desktop.png",
+      "sha256": "fe4f34657b82d1ea0e2a8bbebf18fe20169ccd024731d5b83dd2cef2a5d95ed3",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "academia-mobile.png",
+      "sha256": "e5f3db279738d6be2d7b02731b25903cc5482772d20081e311ba5ed6a026793a",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "computer-desktop.png",
+      "sha256": "570e31b238295d351ed03d53644eaa97deccc2b646ed98b093dc5700df7ae0c9",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "computer-mobile.png",
+      "sha256": "29ba6126fcb5a3c1f7facdbd547e209e8a548a6349f5a1425deb8fb661fa8112",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "connectors-desktop.png",
+      "sha256": "c72f5b006a3048f0065bd57f3aac2c9a3dfb932c79292636444c3cb6bf98ffef",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "connectors-mobile.png",
+      "sha256": "410f5e89b2f995cffccf16d021a3d4db354e93044cbd7f69aa94e10658e1a0c8",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "discovery-desktop.png",
+      "sha256": "a8a88066168099520e13d6cabee286fce7807fe8e9e0610589f718fd4f41dfd0",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "discovery-mobile.png",
+      "sha256": "b371b13f4594060b6eaf8d07a9e6fc73df0dcd238de8e0bdcd1c236d60497042",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "inicio-desktop.png",
+      "sha256": "5c2e7ec64954b3b6bb8a99b1dcfebc4e35ed847df145f246463485fb54bde571",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "inicio-mobile.png",
+      "sha256": "8d9d4969bd9d19a860eca191e55be07bea4acf674a8903d51e43ee23b9c75b9c",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "inicio-nuevo-desktop.png",
+      "sha256": "16660e4bf8703fd89a5f55ec712cd2525b90bf131a9c54f96c07d291e219ce8d",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "inicio-nuevo-mobile.png",
+      "sha256": "c41a792fd1dcdd1053d9c11f3d5971f3f57b228b648ac793be05499b66e8cfca",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "matriz-desktop.png",
+      "sha256": "b081d44eb70d78889c3adb65ec3d25678cbeb64537819314f9a72e9a2ec49ab2",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "matriz-mobile.png",
+      "sha256": "d6ffbd4eca78475a1fcca6c52a3a7ffd38f5d39c4b323d67eb512af1f9185185",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "memory-desktop.png",
+      "sha256": "fbaccdd27e3154d42cd7683b115f6f29809faf500754e377f1c04dd5c84b662b",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "memory-mobile.png",
+      "sha256": "e8d7ce9470d90847c94125630f24d43cee753ace43e6c3f8b40e0e21ba41aa48",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    }
+  ],
+  "sourceBase": "54b3516fcd6416e872475ee161b5e187f893106f plus user-approved ALT-02 correction",
+  "review": {
+    "disposition": "SHIP",
+    "round": "additional round explicitly requested by the user",
+    "materialFindings": "ALT-01 through ALT-06 resolved",
+    "reviewer": "Independent general-purpose reviewer; specialized design profile unavailable."
+  }
+}

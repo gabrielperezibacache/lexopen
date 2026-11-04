@@ -46,6 +46,12 @@ function isAllowedExternalUrl(url, opts = {}) {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
   if (parsed.username || parsed.password) return false;
 
+  // Personal LinkedIn handoffs always use its canonical HTTPS surface.
+  // Do not inherit the broad subdomain rule used by configured app hosts.
+  if (parsed.hostname.toLowerCase() === "www.linkedin.com") {
+    return parsed.protocol === "https:" && (!parsed.port || parsed.port === "443");
+  }
+
   const host = parsed.hostname.toLowerCase();
   const allowed = collectAllowedHosts(opts.appUrls || []);
   for (const extra of opts.extraHosts || []) {

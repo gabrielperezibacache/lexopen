@@ -41,6 +41,7 @@ export async function assertToolInputAccess(
   id: string, input: Record<string, unknown>, ctx: ToolContext, write: boolean,
   db: Prisma.TransactionClient = prisma,
 ) {
+  ctx.signal?.throwIfAborted();
   const actor = { ...ctx, id: ctx.userId };
   const capability = toolCapability(id);
   let causaId = typeof input.causaId === "string" ? input.causaId : null;
@@ -87,6 +88,14 @@ export async function assertToolInputAccess(
     if (!site) throw httpError("Espacio no encontrado o sin acceso", 404);
     causaId = site.causaId;
   }
+  if (ctx.scope) {
+    if (ctx.scope.causaId) await assertCausaAccess(ctx.scope.causaId, actor, undefined, db);
+    // Global searches and legacy LLM tools have no pinned source/destination
+    // contract. ALTAZOR uses its selected-source answer path for those tasks.
+    if (["buscar", "causa.buscar", "documento.resumir", "documento.clasificar", "jurisprudencia.brief"].includes(id) || id === "documento.buscar" && !ctx.scope.causaId) throw httpError("Seleccione las fuentes de esta conversación para consultarlas con ALTAZOR", 409);
+    const bound = causaId !== null || ["causaId", "documentoId", "plazoId", "notaId", "minutaId", "taskId", "eventoId", "siteId"].some(field => typeof input[field] === "string");
+    if (bound && causaId !== ctx.scope.causaId) throw httpError("La acción pertenece a un ámbito distinto de esta conversación", 409);
+  }
   if (write && id.startsWith("tarea.") && input.assigneeId && input.assigneeId !== ctx.userId && !can(actor, "task.assign")) {
     throw httpError("Sin permiso para asignar tareas a otros", 403);
   }
@@ -118,7 +127,7 @@ function undoInput(payload: UndoPayload, current: unknown): Record<string, unkno
 }
 
 /** A committed deletion retains its original access boundary in its undo receipt. */
-async function authorizeCommittedResult(
+export async function authorizeCommittedResult(
   id: string, input: Record<string, unknown>, result: ToolResult | undefined,
   actor: ToolContext, tx: Prisma.TransactionClient,
 ) {

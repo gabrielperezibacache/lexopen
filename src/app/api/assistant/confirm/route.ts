@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
     assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, bodySchema);
+    if (body.planId.startsWith("altazor-")) return NextResponse.json({ error: "Confirme este plan desde su conversación de ALTAZOR" }, { status: 409 });
 
     const plan = await getPlan(body.planId, user.id);
     if (!plan) {
