@@ -5,6 +5,20 @@ import { spawnSync } from "node:child_process";
 import { copyResourceTree, parseTargetArgs, privateResourcePath, sha256, trackedPublicFiles, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
 
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), repo = path.dirname(desktop);
+export function copyTrackedRuntimeResources(sourceRepo, output, { stripped = [] } = {}) {
+  const app = path.join(output, "app-standalone");
+  const runtimeFiles = new Set(["tsconfig.json", "next-env.d.ts", "scripts/local-host-schedulers.mjs", "desktop/scripts/host-smoke-runner.mjs", "LICENSE"]);
+  for (const file of trackedPublicFiles(sourceRepo)) {
+    if (!(file.startsWith("src/") || file.startsWith("public/") || file.startsWith("prisma/") || runtimeFiles.has(file)) || privateResourcePath(file)) continue;
+    const source = path.join(sourceRepo, file), stat = fs.lstatSync(source);
+    if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(`Public source must be a regular file: ${file}`);
+    const destination = file === "desktop/scripts/host-smoke-runner.mjs" ? "scripts/host-smoke-runner.mjs" : file;
+    // Keep the repository-relative identity when copying one file: migration.sql
+    // is public only inside prisma/migrations/<id>, unlike an arbitrary SQL dump.
+    copyResourceTree(source, path.join(app, destination), { stripped, boundary: sourceRepo, relative: file });
+    if (file.startsWith("prisma/")) copyResourceTree(source, path.join(output, file), { stripped, boundary: sourceRepo, relative: file });
+  }
+}
 export function prepareReleaseResources(target) {
   const output = path.join(desktop, ".release", "resources");
   if (fs.existsSync(output) && fs.lstatSync(output).isSymbolicLink()) throw new Error("Release staging directory must not be a symlink");
@@ -20,16 +34,7 @@ export function prepareReleaseResources(target) {
   copyResourceTree(path.join(repo, ".next/standalone"), app, { stripped });
   copyResourceTree(path.join(repo, ".next/static"), path.join(app, ".next/static"), { stripped });
   // Only versioned/public application inputs enter these additional resource scopes.
-  const files = trackedPublicFiles(repo);
-  const runtimeFiles = new Set(["tsconfig.json", "next-env.d.ts", "scripts/local-host-schedulers.mjs", "desktop/scripts/host-smoke-runner.mjs", "LICENSE"]);
-  for (const file of files) {
-    if (!(file.startsWith("src/") || file.startsWith("public/") || file.startsWith("prisma/") || runtimeFiles.has(file)) || privateResourcePath(file)) continue;
-    const source = path.join(repo, file), stat = fs.lstatSync(source);
-    if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(`Public source must be a regular file: ${file}`);
-    const destination = file === "desktop/scripts/host-smoke-runner.mjs" ? "scripts/host-smoke-runner.mjs" : file;
-    copyResourceTree(source, path.join(app, destination), { stripped });
-    if (file.startsWith("prisma/")) copyResourceTree(source, path.join(output, file), { stripped });
-  }
+  copyTrackedRuntimeResources(repo, output, { stripped });
   for (const name of ["playwright", "playwright-core"]) copyResourceTree(path.join(repo, "node_modules", name), path.join(app, "node_modules", name), { stripped });
   copyResourceTree(cache, path.join(app, "playwright-browsers"), { stripped });
   const buildId = fs.readFileSync(path.join(repo, ".next/BUILD_ID"), "utf8").trim();

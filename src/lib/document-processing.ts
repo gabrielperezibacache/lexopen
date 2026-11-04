@@ -1,7 +1,7 @@
 import path from "node:path";
 import { toMarkdownBytes, formatFromExtension } from "@firecrawl/anydoc";
-import { classifyPdfAsync } from "@firecrawl/pdf-inspector";
 import { ocrPdfPages } from "@/lib/local-ocr";
+import { extractPdfPages } from "@/lib/evidence/pdf-pages";
 
 export const MAX_PROCESSING_BYTES = 25 * 1024 * 1024;
 
@@ -41,6 +41,9 @@ export async function processDocumentBytes(
 
   if (isPdf(name, bytes)) {
     try {
+      let classifyPdfAsync: typeof import("@firecrawl/pdf-inspector").classifyPdfAsync;
+      try { ({ classifyPdfAsync } = await import("@firecrawl/pdf-inspector")); }
+      catch { throw Object.assign(new Error("PDF classifier unavailable"), { code: "pdf_classifier_unavailable" }); }
       const classification = await classifyPdfAsync(bytes);
       const requiresOcr =
         classification.pdfType === "Scanned" ||
@@ -93,6 +96,18 @@ export async function processDocumentBytes(
       };
     } catch (error) {
       const code = errorCode(error);
+      if (code === "pdf_classifier_unavailable") {
+        // Some native targets have no published inspector binding. Physical page
+        // extraction can use the configured local Poppler tools instead.
+        try {
+          const physical = await extractPdfPages(bytes);
+          const markdown = physical.pages.filter(page => page.text).map(page => `## Página ${page.pageNumber}\n\n${page.text}`).join("\n\n") || null;
+          return { format: "pdf", status: physical.partial ? "needs_ocr" : markdown ? "completed" : "unsupported", markdown, metadata: { pdfType: "PhysicalPageExtraction", pageCount: physical.pageCount, pagesNeedingOcr: physical.pages.filter(page => page.status === "needs_ocr").map(page => page.pageNumber - 1), extractorVersion: physical.extractorVersion, partial: physical.partial } };
+        } catch (fallbackError) {
+          const fallbackCode = errorCode(fallbackError) || "pdf_engine_unavailable";
+          return { format: "pdf", status: fallbackCode === "pdf_engine_unavailable" ? "needs_ocr" : "failed", markdown: null, metadata: { errorCode: fallbackCode, ...(fallbackCode === "pdf_engine_unavailable" ? { hint: "Configure las herramientas locales de Poppler para leer y verificar las páginas de este PDF." } : {}) } };
+        }
+      }
       return {
         format: "pdf",
         status: code === "unsupported" ? "needs_ocr" : "failed",

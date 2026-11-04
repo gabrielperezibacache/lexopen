@@ -142,7 +142,7 @@ export function verifyReleaseResources(resources, nodeModules, target) {
   if (meta.platform !== target.platform || meta.arch !== target.arch || meta.buildId !== fs.readFileSync(path.join(app, ".next/BUILD_ID"), "utf8").trim()) throw new Error("Release identity does not match staged build/target");
   const browsers = path.join(app, "playwright-browsers");
   if (!fs.existsSync(browsers)) throw new Error("Missing isolated Playwright Chromium browser cache");
-  const chromium = allFiles(browsers).filter(file => ["chrome", "chrome.exe", "Chromium"].includes(path.basename(file)));
+  const chromium = allFiles(browsers).filter(file => ["chrome", "chrome.exe", "Chromium", "Google Chrome for Testing"].includes(path.basename(file)));
   if (!chromium.length) throw new Error("Missing bundled Chromium executable");
   for (const file of chromium) verifyBinary(file, target);
   const native = verifyNativeRuntime(resources, nodeModules, target);

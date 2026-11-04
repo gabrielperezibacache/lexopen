@@ -3,7 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { binaryIdentity, copyResourceTree, nativeTarget, parseTargetArgs, privateResourcePath, resourceFiles, sha256, verifyBinary, verifyNativeRuntime, verifyCanaryAbsent } from "./release-resources.mjs";
+import { spawnSync } from "node:child_process";
+import { binaryIdentity, copyResourceTree, nativeTarget, parseTargetArgs, privateResourcePath, resourceFiles, sha256, verifyBinary, verifyNativeRuntime, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
+import { copyTrackedRuntimeResources } from "./prepare-resources.mjs";
 
 for (const name of [".env", "host.env", "credentials.json", "database.sql", "pg-password-fixture", ".postgres-init-fixture/password", "node_modules/a/.env.production", ".tmp/session/case.txt", "storage/book.pdf", "pgdata/base/123", "secrets/key.txt", "a/client.p12", "node_modules/cache.sqlite", "x/private/data.json", ".next/cache/results.json"]) assert.equal(privateResourcePath(name), true, name);
 for (const name of ["src/lib/db.ts", "src/lib/pjud/private-response.ts", "prisma/migrations/1/migration.sql", "node_modules/.prisma/client/schema.prisma", "node_modules/@next/env/dist/index.js"]) assert.equal(privateResourcePath(name), false, name);
@@ -40,9 +42,57 @@ try {
   for (const name of ["postgres", "initdb", "pg_ctl"]) write(path.join(modules, "@embedded-postgres/darwin-arm64/bin", name), macho);
   for (const name of ["prisma/build/index.js", "tsx/dist/cli.mjs", "embedded-postgres/dist/index.js"]) write(path.join(modules, name), "fixture");
   assert.equal(verifyNativeRuntime(resources, modules, native).postgresPackage, "darwin-arm64");
+  // Exercise the production tracked-file staging path, not only directory copies.
+  const publicRepo = path.join(root, "public-repo"), migration = "prisma/migrations/20261104000000_fixture/migration.sql";
+  const publicInputs = {
+    [migration]: "CREATE TABLE public_fixture (id INTEGER PRIMARY KEY);",
+    "prisma/schema.prisma": "// public schema fixture",
+    "prisma/seed.ts": "// public seed fixture",
+    "src/lib/db.ts": "// public application fixture",
+    "tsconfig.json": "{}",
+    "scripts/local-host-schedulers.mjs": "// scheduler fixture",
+    "desktop/scripts/host-smoke-runner.mjs": "// smoke fixture",
+    "prisma/database.sql": "PRIVATE_DUMP_CANARY",
+    "prisma/migrations/20261104000000_fixture/dump.sql": "PRIVATE_DUMP_CANARY",
+  };
+  for (const [file, content] of Object.entries(publicInputs)) write(path.join(publicRepo, file), content);
+  const gitEnv = { ...process.env };
+  for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"]) delete gitEnv[key];
+  for (const args of [["-c", "init.templateDir=", "init", "--quiet"], ["add", "--", ...Object.keys(publicInputs)]]) {
+    const result = spawnSync("git", args, { cwd: publicRepo, env: gitEnv, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  copyTrackedRuntimeResources(publicRepo, resources);
+  for (const prefix of [resources, path.join(resources, "app-standalone")]) {
+    assert.equal(fs.readFileSync(path.join(prefix, migration), "utf8"), publicInputs[migration]);
+    assert.equal(fs.existsSync(path.join(prefix, "prisma/database.sql")), false);
+    assert.equal(fs.existsSync(path.join(prefix, "prisma/migrations/20261104000000_fixture/dump.sql")), false);
+  }
+  const app = path.join(resources, "app-standalone");
+  for (const [file, content] of Object.entries({ "server.js": "// server fixture", ".next/BUILD_ID": "fixture-build", "package.json": "{}", ".next/static/fixture.js": "// public static fixture" })) write(path.join(app, file), content);
+  write(path.join(app, "lexopen-release.json"), JSON.stringify({ version: "1.1.0-preview.1", sourceDirty: false, sourceRevision: "a".repeat(40), buildId: "fixture-build", platform: "darwin", arch: "arm64" }));
+  write(path.join(app, "playwright-browsers/chromium-fixture/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"), macho);
+  assert.equal(verifyReleaseResources(resources, modules, native).browserExecutables, 1);
+  verifyCanaryAbsent(resources, "PRIVATE_DUMP_CANARY");
   write(query, elf); assert.throws(() => verifyNativeRuntime(resources, modules, native), /does not match/); write(query, macho);
   fs.unlinkSync(path.join(modules, "@embedded-postgres/darwin-arm64/bin/initdb")); assert.throws(() => verifyNativeRuntime(resources, modules, native), /Missing PostgreSQL executable/);
   if (process.platform !== "win32") {
+    const framework = path.join(root, "browser-framework/Google Chrome for Testing Framework.framework"), frameworkCopy = path.join(root, "framework-copy");
+    const frameworkBinary = "Google Chrome for Testing Framework";
+    write(path.join(framework, "Versions/A", frameworkBinary), macho);
+    fs.chmodSync(path.join(framework, "Versions/A", frameworkBinary), 0o755);
+    write(path.join(framework, "Versions/A/Resources/Info.plist"), "public framework fixture");
+    fs.symlinkSync("A", path.join(framework, "Versions/Current"));
+    fs.symlinkSync(`Versions/Current/${frameworkBinary}`, path.join(framework, frameworkBinary));
+    fs.symlinkSync("Versions/Current/Resources", path.join(framework, "Resources"));
+    copyResourceTree(framework, frameworkCopy);
+    for (const file of [frameworkBinary, `Versions/Current/${frameworkBinary}`]) {
+      assert.equal(fs.lstatSync(path.join(frameworkCopy, file)).isSymbolicLink(), false);
+      verifyBinary(path.join(frameworkCopy, file), native);
+      assert.equal(fs.statSync(path.join(frameworkCopy, file)).mode & 0o777, 0o755);
+    }
+    assert.equal(fs.readFileSync(path.join(frameworkCopy, "Resources/Info.plist"), "utf8"), "public framework fixture");
+    assert.doesNotThrow(() => resourceFiles(frameworkCopy));
     fs.symlinkSync(".env", path.join(source, "secret-alias")); assert.throws(() => copyResourceTree(source, path.join(root, "secret-copy")), /Private/); fs.unlinkSync(path.join(source, "secret-alias"));
     fs.symlinkSync(source, path.join(root, "root-link")); assert.throws(() => copyResourceTree(path.join(root, "root-link"), path.join(root, "root-copy")), /input roots/);
     fs.symlinkSync("server.js", path.join(source, "internal")); copyResourceTree(source, path.join(root, "safe")); assert.equal(fs.lstatSync(path.join(root, "safe", "internal")).isSymbolicLink(), false);
@@ -57,4 +107,4 @@ assert.equal(metadata.sourceSha256, sha256(path.join(repo, "src/app/icon.svg")))
 const png = fs.readFileSync(path.join(repo, "desktop/build/icon.png")); assert.equal(png.readUInt32BE(16), 1024); assert.equal(png.readUInt32BE(20), 1024);
 const ico = fs.readFileSync(path.join(repo, "desktop/build/icon.ico")); assert.equal(ico.readUInt16LE(2), 1); assert.equal(ico.readUInt16LE(4), 6);
 const icns = fs.readFileSync(path.join(repo, "desktop/build/icon.icns")); assert.equal(icns.toString("ascii", 0, 4), "icns"); assert.equal(icns.readUInt32BE(4), icns.length);
-console.log("Desktop release resources: private canaries, safe links, native architecture, target guards and existing-brand icons passed.");
+console.log("Desktop release resources: tracked migrations, private dump exclusion, macOS Chromium/frameworks, native architecture, target guards and existing-brand icons passed.");

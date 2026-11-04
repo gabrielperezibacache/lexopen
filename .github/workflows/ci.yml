@@ -38,7 +38,7 @@ jobs:
           libreoffice -env:UserInstallation=file:///tmp/lexopen-lo-ci --headless --convert-to pdf --outdir "$RUNNER_TEMP/workbench-output" "$RUNNER_TEMP"/workbench-output/*.docx
           pdftotext "$RUNNER_TEMP"/workbench-output/*.pdf "$RUNNER_TEMP/workbench-output/opened.txt"
           test -s "$RUNNER_TEMP/workbench-output/opened.txt"
-          rg 'análisis' "$RUNNER_TEMP/workbench-output/opened.txt"
+          node -e 'if(!require("fs").readFileSync(process.argv[1],"utf8").includes("análisis"))process.exit(1)' "$RUNNER_TEMP/workbench-output/opened.txt"
   build:
     runs-on: ubuntu-latest
     services:

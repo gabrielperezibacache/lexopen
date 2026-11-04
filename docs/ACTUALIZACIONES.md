@@ -91,6 +91,8 @@ Después de una recuperación manual, conservar el recibo hasta comprobar instal
 
 Las dependencias JavaScript y ejecutables incluidos se actualizan mediante un nuevo paquete o las versiones fijadas de los lockfiles del clon. Un cambio mayor de PostgreSQL exige su propio procedimiento de migración y restauración; no se resuelve reemplazando un ejecutable.
 
+El adaptador nativo `pdfdown-ocr` es opcional y admite macOS y Linux; su ausencia no impide instalar LexOpen en Windows. Allí, el OCR local utiliza Tesseract y Poppler cuando el usuario los ha instalado y configurado (`OCR_TESSERACT_BIN` y `OCR_PDFTOPPM_BIN`). Si no están disponibles, el diagnóstico informa que el OCR está ausente; no descarga herramientas ni acredita procesamiento por detectar sólo una versión. La lectura de un PDF con texto y el OCR de páginas escaneadas son capacidades distintas.
+
 **LexOpen → Comprobar herramientas opcionales** consulta localmente las versiones de Poppler, Tesseract y Codex cuando están disponibles. Las comprobaciones:
 
 - Tienen tiempo y salida acotados, sin shell.

@@ -11,6 +11,8 @@ La serie `1.1.0-preview` prepara la distribución nativa de LexOpen. Las descarg
 
 Windows ARM y Linux ARM no forman parte de esta matriz. Los paquetes incluyen Electron/Node, PostgreSQL, Prisma, el servidor y Chromium nativos del destino. No requieren Node, Git o npm externos para arrancar. PDF/OCR, modelos, transcripción, Codex personal y Docker tienen requisitos propios: no se instalan silenciosamente junto al programa.
 
+En macOS Intel el inspector PDF utilizado no publica un binding nativo para esta arquitectura. LexOpen conserva el resto de la aplicación disponible y utiliza `pdfinfo`/`pdftotext` de Poppler para obtener páginas físicas; sin esas herramientas informa que falta el motor. El OCR en Windows usa el camino Tesseract/Poppler; la dependencia OCR exclusiva de macOS/Linux es opcional. No se inventan números de página ni se da una cita por verificada cuando falta la extracción.
+
 ## Primer uso y datos existentes
 
 1. Descargue el archivo correspondiente a su equipo y revise el estado de firma en `release-manifest.json`.
