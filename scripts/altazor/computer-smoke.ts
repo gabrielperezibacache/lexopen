@@ -11,10 +11,11 @@ import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { KITTIES_SOURCE_COMMIT } from "@/lib/altazor/computer/policy";
 import { cancelComputerTask, closeComputerSession, computerScreenshot, computerStatus, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerSession, sendComputerMessage } from "@/lib/altazor/computer/service";
-import { gatewayStartupSummary } from "./computer-smoke-diagnostics";
+import { gatewayRequestCategory, gatewayStartupSummary, runtimeFailureSummary } from "./computer-smoke-diagnostics";
 
 const gatewayUser = "lexopen-kitties-ci", provider = "fixture", responseText = "Respuesta sintética del proveedor local de CI.";
 let stage = "guard";
+let lastGatewayHttpStatus: number | null = null, lastGatewayOperation = "none";
 class SmokeError extends Error {}
 function check(value: unknown, message: string): asserts value { if (!value) throw new SmokeError(message); }
 function run(bin: string, args: string[], timeout = 30_000): Promise<string> {
@@ -107,22 +108,33 @@ async function main() {
       const logTail = await privateStartupTail(privateLogPath).catch(() => "");
       throw new SmokeError(`Gateway failed readiness (${gatewayStartupSummary({ exitCode: gateway?.exitCode, signalCode: gateway?.signalCode, logTail, spawnFailed: Boolean(fixtureError) })})`);
     }
-    globalThis.fetch = (async (raw, init) => { check(new URL(String(raw)).origin === endpoint, "Broker attempted a destination outside its exact dedicated gateway"); traffic++; return originalFetch(raw, init); }) as typeof fetch;
-    stage = "broker-owner-and-create";
+    globalThis.fetch = (async (raw, init) => {
+      const target = new URL(String(raw)); check(target.origin === endpoint, "Broker attempted a destination outside its exact dedicated gateway");
+      lastGatewayOperation = gatewayRequestCategory(init?.method || "GET", target.pathname); lastGatewayHttpStatus = null;
+      traffic++; const response = await originalFetch(raw, init); lastGatewayHttpStatus = response.status; return response;
+    }) as typeof fetch;
+    stage = "fixture-owners-create";
     const owner = await prisma.user.create({ data: { name: "Runtime fixture owner", email: `${randomUUID()}@runtime.invalid`, password: "not-a-login", role: "abogado" } }); userIds.push(owner.id);
     const outsider = await prisma.user.create({ data: { name: "Runtime fixture outsider", email: `${randomUUID()}@runtime.invalid`, password: "not-a-login", role: "abogado" } }); userIds.push(outsider.id);
     const cause = await prisma.causa.create({ data: { titulo: "Runtime fictitious case", tribunal: "Fictitious court", materia: "civil", acceso: "equipo", abogadoId: owner.id } }); causeIds.push(cause.id);
     const organization = await prisma.organization.create({ data: { name: "Disposable runtime fixture", settings: { create: { assistantLlmMode: "remote_allowed" } } } }); organizationId = organization.id;
+    stage = "broker-initial-status";
     check((await computerStatus(owner, cause.id)).state === "unconfigured", "No connection may be inferred before configuration");
+    stage = "broker-configure";
     const status = await configureComputer(owner, { causaId: cause.id, endpoint, token, provider, dedicated: true }); workspaceId = status.workspaceId!;
     check(!JSON.stringify(status).includes(token), "Gateway secret escaped public state");
+    stage = "broker-outsider-denial";
     await assert.rejects(configureComputer(outsider, { endpoint, token, provider, dedicated: true }), error => (error as { status?: number }).status === 409);
+    stage = "broker-session-create";
     const session = await createComputerSession(owner, workspaceId, `create-${randomUUID()}`); sessionId = session.id;
+    stage = "broker-session-poll";
     await until(() => readComputerSession(owner, session.id), view => view.session.state === "ready");
+    stage = "broker-kitty-inspect";
     const stored = await prisma.altazorComputerSession.findUniqueOrThrow({ where: { id: session.id } });
     check(stored.kittyId && stored.chatId, "Actual gateway identifiers missing");
-    const kittyReply = await originalFetch(`${endpoint}/v1/kitties/${encodeURIComponent(stored.kittyId)}`, { headers: { Authorization: `Bearer ${token}` } }).then(response => response.json());
+    const kittyReply = await originalFetch(`${endpoint}/v1/kitties/${encodeURIComponent(stored.kittyId)}`, { headers: { Authorization: `Bearer ${token}` } }).then(response => { lastGatewayOperation = "kitty_read"; lastGatewayHttpStatus = response.status; return response.json(); });
     check(kittyReply.kitty.desktop === true && kittyReply.kitty.provider === provider && !kittyReply.kitty.container.startsWith("demo-"), "Desktop must be a real configured container");
+    stage = "broker-container-inspect";
     const inspected = JSON.parse(await run("docker", ["inspect", kittyReply.kitty.container]))[0]; containerId = inspected.Id;
     check(/^[a-f0-9]{64}$/.test(containerId) && inspected.Image === imageId && inspected.State.Running, "The desktop must run the pre-verified immutable local image");
     check(!inspected.HostConfig.Privileged && inspected.HostConfig.PidMode !== "host" && inspected.HostConfig.IpcMode !== "host" && inspected.HostConfig.NetworkMode === network, "Desktop must not share privileged host namespaces");
@@ -200,4 +212,4 @@ async function main() {
     await run("sudo", ["-n", "rm", "-rf", "--", gatewayRoot]); await rm(root, { recursive: true, force: true }); await prisma.$disconnect();
   }
 }
-main().catch(error => { console.error(`ALTAZOR computer runtime FAILED at ${stage}: ${error instanceof SmokeError ? error.message : "runtime contract or database assertion failed"}. Raw gateway logs and credentials are intentionally not printed.`); process.exitCode = 1; });
+main().catch(error => { console.error(`ALTAZOR computer runtime FAILED at ${stage}: ${error instanceof SmokeError ? `${error.message}; ` : ""}${runtimeFailureSummary(error, lastGatewayHttpStatus, lastGatewayOperation)}. Raw gateway logs and credentials are intentionally not printed.`); process.exitCode = 1; });

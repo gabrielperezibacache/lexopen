@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { gatewayStartupCategory, gatewayStartupSummary } from "./computer-smoke-diagnostics";
+import { gatewayRequestCategory, gatewayStartupCategory, gatewayStartupSummary, runtimeFailureSummary } from "./computer-smoke-diagnostics";
 
 const secret = "fictitious-private-token-never-print", endpoint = "https://private-fixture.invalid/path";
 const updateError = `kitties: updates.gateway: "false" is not off, notify or auto\n${secret} ${endpoint}`;
@@ -15,4 +15,12 @@ assert.equal(gatewayStartupSummary({ exitCode: null, signalCode: "SIGTERM", logT
 const safe = gatewayStartupSummary({ exitCode: -1, signalCode: secret, logTail: `${secret} ${endpoint}\n${"x".repeat(40 * 1024)}` });
 assert.equal(safe, "exit=pending, signal=none, category=unknown_startup");
 assert.ok(!safe.includes(secret) && !safe.includes(endpoint));
+assert.equal(runtimeFailureSummary({ name: "ConnectorError", code: "kitty_contract", status: 502, message: secret }, 201, "kitty_create"), "category=kitty_contract, status=502, http=201, operation=kitty_create");
+assert.equal(runtimeFailureSummary({ code: "P2002", message: endpoint }, null, "none"), "category=P2002, status=none, http=none, operation=none");
+assert.equal(runtimeFailureSummary({ code: "ERR_ASSERTION", message: secret }, 200, "health"), "category=ERR_ASSERTION, status=none, http=200, operation=health");
+assert.equal(runtimeFailureSummary({ name: "ConnectorError", code: endpoint, status: secret, message: secret }, 999, endpoint), "category=unknown, status=none, http=none, operation=other");
+assert.equal(runtimeFailureSummary(new Error(secret), null, "none"), "category=unknown, status=none, http=none, operation=none");
+assert.equal(gatewayRequestCategory("POST", "/v1/kitties"), "kitty_create");
+assert.equal(gatewayRequestCategory("GET", "/v1/chats/fictitious-id"), "chat_read");
+assert.equal(gatewayRequestCategory("POST", `/private/${secret}`), "other");
 console.log("Computer smoke diagnostics PASS: bounded fixed categories and process status without private log reflection.");
