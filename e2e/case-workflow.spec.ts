@@ -39,7 +39,19 @@ test("recorrido de causa: biblioteca y lector conservan contexto, escrito recibe
   storageKey = (await db.libraryBook.findUniqueOrThrow({ where: { id: bookId }, select: { storageKey: true } })).storageKey;
   await page.goto(`/causas/${causaId}`);
   const nav = page.getByRole("navigation", { name: "Recorrido de la causa", exact: true });
-  await expect(nav.getByRole("link", { name: "Expediente", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Resumen", exact: true })).toHaveAttribute("aria-current", "location");
+  await page.setViewportSize({ width: 360, height: 900 });
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  const destinations = nav.locator("ol > li > a");
+  await expect(destinations).toHaveCount(5);
+  for (const destination of await destinations.all()) {
+    const bounds = await destination.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.y).toBeGreaterThanOrEqual(0);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(900);
+  }
+  await expect(page.getByRole("button", { name: "Sync Obsidian", exact: true })).toHaveCount(0);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   async function capture(surface: string, selector = "[data-testid=case-workflow]") {
     for (const [mode, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 360, height: 900 }]] as const) {
       await page.setViewportSize(viewport);

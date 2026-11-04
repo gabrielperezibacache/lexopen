@@ -1,4 +1,4 @@
-import { test, expect, type APIResponse, type Page } from "@playwright/test";
+import { test, expect, type APIResponse, type Locator, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
@@ -40,6 +40,21 @@ async function settleCapture(page: Page) {
   });
 }
 
+async function closeHearingPanel(workbench: Locator) {
+  const panel = workbench.locator("#hearing-context");
+  if (await panel.isVisible()) await panel.getByRole("button", { name: "Cerrar", exact: true }).click();
+}
+
+async function openHearingPanel(workbench: Locator, name: "Fuentes" | "Lectura" | "Notas" | "Conversación") {
+  // The mounted panel becomes a modal drawer on mobile. Close it before using
+  // its outside toolbar; changing tools must retain editors and selected quotes.
+  await closeHearingPanel(workbench);
+  const toolbar = workbench.getByRole("navigation", { name: "Herramientas de audiencia", exact: true });
+  if (name === "Conversación") await toolbar.getByText("Preparar y analizar", { exact: true }).click();
+  await toolbar.getByRole("button", { name, exact: true }).click();
+  await expect(workbench.locator("#hearing-context")).toBeVisible();
+}
+
 test.afterAll(async () => {
   try {
     const [sources, notes, turns, versions, documents] = await Promise.all([
@@ -69,6 +84,7 @@ test.afterAll(async () => {
 
 test("flujo conjunto: sentencia compartida, audio y transcripción citada en la misma audiencia, con revocación", async ({ page, browser, context }, testInfo) => {
   test.setTimeout(150_000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   let unexpectedBrowserRequests = 0;
   const hostOrigin = new URL(process.env.E2E_BASE_URL || "http://127.0.0.1:3100").origin;
   const restrictBrowserToHost = async (target: typeof context) => {
@@ -117,7 +133,10 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     await expect(sharedJudgment).toBeVisible(); await expect(sharedJudgment).toContainText(court);
     await sharedJudgment.getByRole("link", { name: `Abrir ${judgmentTitle}`, exact: true }).click();
     await expect(page.getByRole("heading", { name: judgmentTitle, exact: true })).toBeVisible();
-    await expect(page.locator(".book-reader-bibliography")).toContainText(`Rol ${caseNumber}`);
+    await page.locator(".book-reading-actions").getByRole("button", { name: "Ficha y descargas", exact: true }).click();
+    const readerTools = page.getByRole("dialog", { name: "Herramientas de lectura", exact: true });
+    await expect(readerTools.locator(".book-reader-information")).toContainText(`Rol ${caseNumber}`);
+    await readerTools.getByRole("button", { name: "Cerrar", exact: true }).click();
     await page.getByLabel("Página física del PDF", { exact: true }).selectOption("2");
     await expect(page.getByRole("img", { name: `Página física 2 de ${judgmentTitle}`, exact: true })).toBeVisible();
 
@@ -131,6 +150,7 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     await workbench.getByRole("button", { name: "Crear mesa", exact: true }).click();
     const workspace = await json<HearingWorkspaceSummary>(await creating, 201); workspaceIds.push(workspace.id);
     const desk = `${hearingBase}/${workspace.id}`;
+    await openHearingPanel(workbench, "Fuentes");
     await workbench.getByLabel("Añadir material accesible").selectOption(`book:${book.id}`);
     const attachingJudgment = page.waitForResponse(response => new URL(response.url()).pathname === `${desk}/sources` && response.request().method() === "POST");
     await workbench.getByRole("button", { name: "Añadir al dossier", exact: true }).click();
@@ -156,9 +176,13 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     await expect(workbench.getByText("Organizador de lectura guardado.", { exact: true })).toBeVisible();
     await workbench.locator(".hearing-fragment").getByRole("button", { name: "Conversar", exact: true }).click();
     await expect(workbench.locator(".hearing-chat-selection>li")).toHaveCount(1);
+    await openHearingPanel(workbench, "Lectura");
+    await expect(judgmentImage).toBeVisible();
     await workbench.locator(".hearing-fragment").getByRole("button", { name: "Anotar", exact: true }).click();
     await workbench.getByLabel("Título de la nota", { exact: true }).fill(judicialNoteTitle);
     await workbench.getByLabel("Su observación").fill(judicialObservation);
+    await workbench.getByLabel("Título de la nota", { exact: true }).evaluate(node => { (node as HTMLElement).dataset.retainedDraft = "joint-judicial-draft"; });
+    await closeHearingPanel(workbench);
 
     // A publication in the sibling audio tool must appear without reloading or losing this draft.
     await audioPanel.getByLabel("Añadir una grabación", { exact: false }).setInputFiles({ name: "audiencia-ficticia.wav", mimeType: "audio/wav", buffer: syntheticWav() });
@@ -179,15 +203,21 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     await audioPanel.getByRole("button", { name: "Guardar copia en Transcripciones", exact: true }).click();
     const publication = (await json<{ document: { id: string; nombre: string; ruta: string; causaId: string } }>(await publishing, 201)).document;
     expect(publication.causaId).toBe(causaId); expect(publication.ruta).toBe("Audiencias/Transcripciones");
+    await openHearingPanel(workbench, "Fuentes");
     await expect(workbench.getByLabel("Añadir material accesible").locator(`option[value="document:${publication.id}"]`)).toHaveCount(1);
+    await openHearingPanel(workbench, "Notas");
     await expect(workbench.getByLabel("Título de la nota", { exact: true })).toHaveValue(judicialNoteTitle);
+    await expect(workbench.getByLabel("Título de la nota", { exact: true })).toHaveAttribute("data-retained-draft", "joint-judicial-draft");
     await expect(workbench.getByLabel("Su observación")).toHaveValue(judicialObservation);
+    await openHearingPanel(workbench, "Conversación");
     await expect(workbench.locator(".hearing-chat-selection>li")).toHaveCount(1);
+    await openHearingPanel(workbench, "Notas");
     const savingJudicialNote = page.waitForResponse(response => new URL(response.url()).pathname === `${desk}/notes` && response.request().method() === "POST");
     await workbench.getByRole("button", { name: "Guardar nota", exact: true }).click();
     const judicialNote = await json<{ id: string }>(await savingJudicialNote);
     await expect(workbench.locator(".hearing-saved-note").getByRole("heading", { name: judicialNoteTitle, exact: true })).toBeVisible();
 
+    await openHearingPanel(workbench, "Fuentes");
     await workbench.getByLabel("Añadir material accesible").selectOption(`document:${publication.id}`);
     const attachingTranscript = page.waitForResponse(response => new URL(response.url()).pathname === `${desk}/sources` && response.request().method() === "POST");
     await workbench.getByRole("button", { name: "Añadir al dossier", exact: true }).click();
@@ -211,6 +241,7 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     await workbench.getByRole("button", { name: "Guardar nota", exact: true }).click();
     const transcriptNote = await json<{ id: string }>(await savingTranscriptNote);
     await expect(workbench.locator(".hearing-saved-note").getByRole("heading", { name: transcriptNoteTitle, exact: true })).toBeVisible();
+    await openHearingPanel(workbench, "Lectura");
     await transcriptFragment.getByRole("button", { name: "Conversar", exact: true }).click();
     await expect(workbench.locator(".hearing-chat-selection>li")).toHaveCount(2);
     await workbench.getByLabel("Forma de trabajo").selectOption("extractive");
@@ -241,6 +272,7 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     const verified = await json<{ text: string }>(await verifying); expect(verified.text).toContain(court); expect(verified.text).toContain(transcript);
     expect(verified.text).toContain("no acredita fidelidad al audio");
     await expect.poll(() => page.evaluate(() => (window as typeof window & { __jointCopiedText?: string }).__jointCopiedText || "")).toContain(`Rol ${caseNumber}`);
+    await closeHearingPanel(workbench);
     const downloading = page.waitForEvent("download");
     await workbench.getByRole("button", { name: "Exportar mesa", exact: true }).click();
     const download = await downloading; expect(download.suggestedFilename()).toBe("mesa-audiencia.txt");
@@ -250,15 +282,16 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     await page.reload();
     await expect(workbench.locator(".hearing-source-button")).toHaveCount(2);
     await expect(audioPanel.getByLabel("Transcripción de trabajo", { exact: true })).toHaveValue(transcript);
-    await workbench.locator(".hearing-tool-tabs").getByRole("button", { name: "Conversación", exact: true }).click();
+    await openHearingPanel(workbench, "Conversación");
     await expect(workbench.locator(".hearing-turn")).toContainText(question);
     for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 360, height: 800 }]] as const) {
       await page.setViewportSize(viewport);
-      if (name === "mobile") await workbench.locator(".hearing-mobile-tabs").getByRole("button", { name: "Conversación", exact: true }).click();
-      if (name === "desktop") {
-        await expect(judgmentImage).toBeVisible();
-        await expect.poll(() => judgmentImage.evaluate(node => { const image = node as HTMLImageElement; return image.complete && image.naturalWidth > 0; })).toBe(true);
-      }
+      await openHearingPanel(workbench, "Fuentes");
+      await workbench.locator(".hearing-source-button").filter({ hasText: judgmentTitle }).click();
+      await expect(judgmentImage).toBeVisible();
+      await expect.poll(() => judgmentImage.evaluate(node => { const image = node as HTMLImageElement; return image.complete && image.naturalWidth > 0; })).toBe(true);
+      await openHearingPanel(workbench, "Conversación");
+      await expect(judgmentImage).toBeHidden();
       await expect(workbench.locator(".hearing-turn")).toBeVisible();
       await expect(workbench.locator(".hearing-turn .hearing-citation")).toHaveCount(2);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -280,9 +313,12 @@ test("flujo conjunto: sentencia compartida, audio y transcripción citada en la 
     const revokedExport = await json<{ text: string }>(await page.request.get(`${desk}/export`));
     expect(revokedExport.text).not.toContain(judicialObservation); expect(revokedExport.text).not.toContain(question); expect(revokedExport.text).toContain(transcript);
     await page.reload();
-    await workbench.locator(".hearing-mobile-tabs").getByRole("button", { name: "Conversación", exact: true }).click();
+    await openHearingPanel(workbench, "Conversación");
     await expect(workbench.locator(".hearing-turn")).toHaveCount(0);
     await expect(workbench.getByText("Conversación no disponible: alguno de sus respaldos o notas cambió de acceso.", { exact: true })).toBeVisible();
+    await expect(workbench.getByText(judicialObservation, { exact: true })).toHaveCount(0);
+    await closeHearingPanel(workbench);
+    await expect(audioPanel.getByLabel("Transcripción de trabajo", { exact: true })).toBeVisible();
     await expect(audioPanel.getByLabel("Transcripción de trabajo", { exact: true })).toHaveValue(transcript);
     expect(unexpectedBrowserRequests).toBe(0);
   } finally { await otherContext.close(); }

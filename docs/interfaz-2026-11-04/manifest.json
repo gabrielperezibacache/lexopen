@@ -1,0 +1,144 @@
+{
+  "date": "2026-11-04",
+  "version": "1.1.0-preview.2",
+  "sourceBase": "0640d82498bcb19848c7b480458636277cfb5fc7",
+  "sourceState": "UI working tree before commit; source file hashes below",
+  "screenshots": [
+    {
+      "file": "jornada-desktop.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "191d43d16122e4f9a054782cf7e89facc22d7b74cccd689d04352291be566d5e",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "jornada-mobile.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "26c5a074970b57963a21ff977c40b6e52ff0c3d7045bf6d08ea04943d965ae17",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "mobile-menu.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "57b63188bba2b1543af0c6391d35c108e26e0c0b752fc40f597c1370dba722dd",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "cause-desktop.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "b5fb69f84ce4544d4670b612bbc2af823046415f24cd537bc0990ec5234b6db0",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "cause-mobile.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "a87acc09eb159d3b7735938d1404fae8dfaa43fc36f902d2728fc4961fa9a063",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "settings-desktop.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "fefaeba539fc823f8cf42c1e2f7626f02e86b9b46fb47753ea417e80a3c9fe78",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "settings-mobile.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "0975a09177b0b7ae4a5d4ded33faa227a76f65bdbd88058b796724b23e427be5",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "hearing-notes-desktop.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "f8052be858595c19d31d215566459e6d0e1194268a56f0b5bcb839dbc78d837f",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "hearing-notes-mobile.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "8be48a1d7fb63fd6c9fcf3fd18c937f5340367f8c4cea0191bca99174f45afc4",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "reader-desktop.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "bd69c4710d322d80ca70323142781c2219494bd7aa230554cbe0a271add699c1",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "reader-panel-mobile.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "bc56b41faf3932888645e91f98876a8b16621ca863d61fe45106941b1c585265",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "writing-desktop.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "99cb1003268d27b4fdb9f3fe182521f2149cc53587415a4193bed2a2deaa995b",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "writing-mobile.png",
+      "width": 360,
+      "height": 900,
+      "sha256": "f0eae5699ecf0d82a0cef13dde67f5ff4f9ad36cc1d567002e7481fce9be1bb2",
+      "fictitious": true,
+      "runtime": "local browser with real application and fictitious database"
+    },
+    {
+      "file": "workbench-desktop.png",
+      "width": 1440,
+      "height": 1167,
+      "sha256": "f080000c6194fe245f451a18bc23f2e3fe38dbe0c02d9a582276eadb166b5bba",
+      "fictitious": true,
+      "runtime": "real application UI with explicitly simulated provider, events and result; not Docker proof"
+    },
+    {
+      "file": "workbench-mobile.png",
+      "width": 360,
+      "height": 1730,
+      "sha256": "1bb4af1ff9cd8f3892cf863fad820402461df94fb361ec030ae2875066379c95",
+      "fictitious": true,
+      "runtime": "real application UI with explicitly simulated provider, events and result; not Docker proof"
+    }
+  ],
+  "sources": {
+    "src/components/AppShell.tsx": "cd448db1c0415a282442d684e7b953765e034a864dd733fda9edb28e2359fbfb",
+    "src/components/AppSidebar.tsx": "876a641b9c9b15b512103725be03f7ccceebd13b5ce36da981efb386f11f3df5",
+    "src/components/causas/CaseWorkflowNav.tsx": "b75ea8e3c9047fabe810010f4bf69c76b51b2b6e003fa3f3bff50370d98a88ec",
+    "src/components/CausaActions.tsx": "bfeb8fe5e3bfc8477341d699f3fb504edb072260d6b25e74a51bbef44949e58c",
+    "src/components/hearings/HearingWorkbench.tsx": "570f964b041697b52c013f786531b1e6a9892f14226c9c473b3d1e84849a7ad2",
+    "src/components/hearings/HearingLivePanel.tsx": "449edc546399381303cffca5c925c936c9f33d3c5f82fdbe85848abbfe840d46",
+    "src/components/hearings/HearingLiveAudioPanel.tsx": "5dd5a6eb38ab79b0ca02305a577f13bf4258cf08d72d6b23cbad34953bcf0526",
+    "src/components/books/BookReader.tsx": "94ea18388e1e63e0e0540bf8b14c6fd0fc81889af55832350ced5492fb2bee57",
+    "src/components/writings/CaseWritingEditor.tsx": "01216cbd5f5d79c526a49eb63088b94647c5a0b070fd1956d7e95e2603f4255a",
+    "src/components/workbench/CaseWorkbench.tsx": "7a796b059c7a2e2ea4cc198a5e9b10c29c5aeafa14f8f6c7dd6f95ecdb7a3cfc",
+    "src/components/config/ConfigSectionNav.tsx": "e2e2d07f491a7b2e04d0548d2ba325d5b36728e8d4cef4dc6d0f0e1b3e32f5c0",
+    "src/components/LlmSettingsForm.tsx": "e8c32757dd17d4b239e846a90a7f803d0ec44b7170e6ce1136e9fe2f319b13f7",
+    "src/components/ui/Sheet.tsx": "7bbb8c33c352517da7866cdf7efe239a96b1d489e62006bfb483a81debd089ec"
+  },
+  "scope": "Only fictitious seeded cases, synthetic documents and temporary local profiles. No OJV session or real client files used. Visual review: both material findings resolved; disposition ship. Does not certify production, physical microphone accuracy or accessibility conformance."
+}

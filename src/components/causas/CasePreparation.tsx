@@ -99,5 +99,5 @@ export function CasePreparationIndex({ canUseKnowledge }: { canUseKnowledge: boo
     ["#tramites", "Trámites"],
     ["#actividad", "Actividad"],
   ];
-  return <nav className="case-preparation-index" aria-label="Índice del expediente">{entries.map(([href, label]) => <a href={href} key={href}>{label}</a>)}</nav>;
+  return <details className="case-preparation-directory"><summary>Ir a una sección del expediente</summary><nav className="case-preparation-index" aria-label="Índice del expediente">{entries.map(([href, label]) => <a href={href} key={href}>{label}</a>)}</nav></details>;
 }

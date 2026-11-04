@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import type { ReactNode } from "react";
 import { requireRole } from "@/lib/auth/session";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { getI18n } from "@/lib/i18n/server";
@@ -12,6 +13,7 @@ import { PjudSettingsPanel } from "@/components/config/PjudSettingsPanel";
 import { PjudOpsLogPanel } from "@/components/config/PjudOpsLogPanel";
 import { RuntimeSettingsPanel } from "@/components/config/RuntimeSettingsPanel";
 import { ConfigSectionNav } from "@/components/config/ConfigSectionNav";
+import { CONFIG_CATEGORIES } from "@/components/config/config-sections";
 import { UsersAdminPanel } from "@/components/config/UsersAdminPanel";
 import { IntegrationsOverviewPanel } from "@/components/IntegrationsOverviewPanel";
 import { HostStatusPanel } from "@/components/HostStatusPanel";
@@ -23,7 +25,7 @@ import styles from "@/components/config/WorkspaceArea.module.css";
 
 export default async function ConfiguracionPage() {
   const me = await requireRole("admin");
-  const { dict } = await getI18n();
+  const { dict, locale } = await getI18n();
   const h = dict.hubs.configuracion;
   const [organization, hostStatus, users, groups] = await Promise.all([
     prisma.organization.findFirst({ include: { settings: true } }),
@@ -71,13 +73,10 @@ export default async function ConfiguracionPage() {
     failedJobs: hostStatus.pjud.failedJobs,
   });
 
-  return (
-    <div className={`${styles.area} space-y-6`}>
-      <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
-      <ConfigSectionNav />
-      <div id="idioma" className="scroll-mt-28"><LanguageSettingsPanel /></div>
-      <FirmSettingsForm organization={settingsOrganization} />
-      <UsersAdminPanel
+  const sections: Record<string, ReactNode> = {
+    idioma: <div id="idioma"><LanguageSettingsPanel /></div>,
+    estudio: <FirmSettingsForm organization={settingsOrganization} />,
+    usuarios: <UsersAdminPanel
         currentUserId={me.id}
         users={users.map((u) => ({
           id: u.id,
@@ -101,23 +100,40 @@ export default async function ConfiguracionPage() {
             user: { id: m.user.id, name: m.user.name },
           })),
         }))}
-      />
-      <div id="transcription-settings" className="scroll-mt-28"><TranscriptionSettings /></div>
-      <div id="llm-settings" className="scroll-mt-28">
-        <LlmSettingsForm />
-      </div>
-      <ObsidianSettingsForm />
-      <GoogleSettingsForm />
-      <PjudSettingsPanel />
-      <PjudOpsLogPanel
+      />,
+    "transcription-settings": <div id="transcription-settings"><TranscriptionSettings /></div>,
+    "llm-settings": <div id="llm-settings"><LlmSettingsForm /></div>,
+    "obsidian-settings": <ObsidianSettingsForm />,
+    "google-settings": <GoogleSettingsForm />,
+    "pjud-settings": <PjudSettingsPanel />,
+    "pjud-log": <PjudOpsLogPanel
         generatedAt={hostStatus.generatedAt}
         entries={pjudOpsLog}
-      />
-      <RuntimeSettingsPanel />
-      <NotifyAdminPanel />
-      <IntegrationsOverviewPanel />
-      <HostStatusPanel status={hostStatus} />
-      <PurgeDemoPanel />
+      />,
+    "runtime-settings": <RuntimeSettingsPanel />,
+    "notify-settings": <NotifyAdminPanel />,
+    "integraciones-overview": <IntegrationsOverviewPanel />,
+    "host-status": <HostStatusPanel status={hostStatus} />,
+    "purge-demo": <PurgeDemoPanel />,
+  };
+
+  return (
+    <div className={`${styles.area} space-y-6`} data-settings-workspace>
+      <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
+      <ConfigSectionNav />
+      <div className={styles.groups}>
+        {CONFIG_CATEGORIES.map(category => (
+          <section key={category.id} className={styles.group} aria-labelledby={`settings-${category.id}-title`}>
+            <header className={styles.groupHeader}>
+              <h2 id={`settings-${category.id}-title`}>{locale === "en" ? category.labelEn : category.label}</h2>
+              <p>{locale === "en" ? category.descriptionEn : category.description}</p>
+            </header>
+            <div className={styles.groupContent}>
+              {category.sections.map(section => <div key={section.id} data-config-section={section.id}>{sections[section.id]}</div>)}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
@@ -14,6 +14,12 @@ async function settleCapture(page: Page) {
   window.scrollTo({top:0,left:0,behavior:"instant"});
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
  });
+}
+async function openTool(workbench: Locator, name: string) {
+ const panel = workbench.locator("#hearing-context");
+ if (await panel.evaluate(node => node.matches(":modal"))) await panel.getByRole("button", { name: "Cerrar", exact: true }).click();
+ if (["Agenda", "Guion", "Conversación"].includes(name)) await workbench.getByText("Preparar y analizar", { exact: true }).click();
+ await workbench.locator(".hearing-workspace-actions").getByRole("button", { name, exact: true }).click();
 }
 test.afterAll(async () => {
  try {
@@ -40,7 +46,7 @@ test("mesa de audiencia: lectura, marcadores, notas, conversación con fuentes y
  const workbench=page.getByRole("region", {name:"Acompañante de audiencia"}); await expect(workbench.getByRole("heading", {name:"Dossier y herramientas"})).toBeVisible();
  await workbench.getByLabel("Crear otra mesa").fill("Audiencia ficticia E2E"); const created=page.waitForResponse(r=>new URL(r.url()).pathname===`/api/causas/${causaId}/hearings` && r.request().method()==="POST"); await workbench.getByRole("button",{name:"Crear mesa",exact:true}).click();
  const workspace=await(await created).json(); workspaceIds.push(workspace.id);
- await workbench.getByLabel("Añadir material accesible").selectOption(`book:${book.id}`); await workbench.getByRole("button",{name:"Añadir al dossier"}).click();
+ await openTool(workbench,"Fuentes"); await workbench.getByLabel("Añadir material accesible").selectOption(`book:${book.id}`); await workbench.getByRole("button",{name:"Añadir al dossier"}).click();
  await expect(workbench.getByRole("heading",{name:"Pasajes preparados"})).toBeVisible(); await expect(workbench.locator(".hearing-fragment")).toHaveCount(1);
  await workbench.getByRole("button",{name:"Guardar punto",exact:true}).click(); await expect(workbench.getByText("Organizador de lectura guardado.", {exact:true})).toBeVisible();
  await workbench.getByLabel("Estado de revisión de la fuente",{exact:true}).selectOption("reviewed"); await expect(workbench.locator(".hearing-source-button")).toContainText("Revisada");
@@ -52,7 +58,7 @@ test("mesa de audiencia: lectura, marcadores, notas, conversación con fuentes y
  const pendingBody="Mi edición local debe conservarse al cambiar de fuente o encontrar un conflicto.";
  await workbench.getByLabel("Su observación",{exact:true}).fill(pendingBody);
   await expect(workbench.locator(".hearing-status")).toHaveCount(0);
- await workbench.locator(".hearing-fragment").getByRole("button",{name:"Anotar",exact:true}).click();
+ await openTool(workbench,"Lectura"); await workbench.locator(".hearing-fragment").getByRole("button",{name:"Anotar",exact:true}).click();
  await expect(workbench.locator(".hearing-note-guard")).toContainText("antes de anotar otro pasaje");
  await expect(workbench.getByLabel("Su observación",{exact:true})).toHaveValue(pendingBody);
  for(const [name,viewport] of [["desktop",{width:1440,height:1000}],["mobile",{width:360,height:800}]] as const){await page.setViewportSize(viewport); await workbench.locator(".hearing-note-guard").scrollIntoViewIfNeeded(); await page.screenshot({path:testInfo.outputPath(`hearing-pending-${name}.png`)});}
@@ -77,15 +83,15 @@ test("mesa de audiencia: lectura, marcadores, notas, conversación con fuentes y
  await expect(savedNote).toContainText(pendingBody);
  await expect(workbench.getByText("Nota guardada en su mesa privada.",{exact:true})).toBeVisible();
  await expect(page).toHaveURL(new RegExp(`mesa=${workspace.id}`));
- await workbench.locator(".hearing-tool-tabs").getByRole("button",{name:"Agenda",exact:true}).click();
+ await openTool(workbench,"Agenda");
  const pendingAgenda="Agenda local: confirmar antecedentes y conservar esta preparación al actualizar el dossier.";
  await workbench.getByLabel("Agenda y asuntos por revisar",{exact:true}).fill(pendingAgenda);
  const savedPreparation=await db.hearingWorkspace.findUniqueOrThrow({where:{id:workspace.id}});
  const agendaFromOtherSession="Agenda modificada por otra sesión ficticia.";
  const newerPreparation=await page.request.patch(`/api/causas/${causaId}/hearings/${workspace.id}`,{data:{revision:savedPreparation.revision,title:savedPreparation.title,status:savedPreparation.status,scheduledFor:savedPreparation.scheduledFor?.toISOString()||null,agendaText:agendaFromOtherSession}}); expect(newerPreparation.ok()).toBe(true);
- await workbench.getByRole("button",{name:"Guardar punto",exact:true}).click();
+ await openTool(workbench,"Lectura"); await workbench.getByRole("button",{name:"Guardar punto",exact:true}).click();
  await expect(workbench.getByText("Organizador de lectura guardado.",{exact:true})).toBeVisible();
- await expect(workbench.getByLabel("Agenda y asuntos por revisar",{exact:true})).toHaveValue(pendingAgenda);
+ await openTool(workbench,"Agenda"); await expect(workbench.getByLabel("Agenda y asuntos por revisar",{exact:true})).toHaveValue(pendingAgenda);
  await workbench.getByText(/Comparar preparación guardada/).click();
  await expect(workbench.locator(".hearing-agenda")).toContainText(agendaFromOtherSession);
  await expect(workbench.getByRole("button",{name:"Guardar preparación",exact:true})).toBeDisabled();
@@ -100,14 +106,14 @@ test("mesa de audiencia: lectura, marcadores, notas, conversación con fuentes y
  await expect(page).toHaveURL(new RegExp(`mesa=${alternate.id}`));
  await page.reload(); await expect(workbench.getByLabel("Mesa privada",{exact:true})).toHaveValue(alternate.id);
  await workbench.getByLabel("Mesa privada",{exact:true}).selectOption(workspace.id);
- await expect(workbench.locator(".hearing-fragment")).toHaveCount(1);
+ await openTool(workbench,"Lectura"); await expect(workbench.locator(".hearing-fragment")).toHaveCount(1);
  await workbench.locator(".hearing-fragment").getByRole("button",{name:"Conversar",exact:true}).click(); await workbench.getByLabel("Qué quiere revisar").fill("¿Qué permite sostener el pasaje sobre la prueba del pago?"); await workbench.getByRole("button",{name:"Guardar pasajes",exact:true}).click(); await expect(workbench.locator(".hearing-turn")).toContainText("sin llamada a IA");
  const verify = page.waitForResponse(r=>new URL(r.url()).pathname===`/api/causas/${causaId}/hearings/${workspace.id}/verify`); await workbench.locator(".hearing-turn").getByRole("button",{name:"Corroborar y copiar",exact:true}).click(); expect((await verify).status()).toBe(200);
  const downloaded=page.waitForEvent("download"); await workbench.getByRole("button",{name:"Exportar mesa"}).click(); expect((await downloaded).suggestedFilename()).toBe("mesa-audiencia.txt");
- await workbench.locator(".hearing-tool-tabs").getByRole("button",{name:"Guion",exact:true}).click();
+ await openTool(workbench,"Guion");
  await workbench.getByLabel("Apertura del guion").fill("Solicito contrastar los antecedentes del pago.");
  await workbench.locator(".hearing-brief-form").getByRole("checkbox",{name:/Comprobar antecedentes del pago/}).check();
- await workbench.getByLabel("Petición de cierre").fill("Tener presentes los documentos que se cotejen.");
+ await workbench.locator(".hearing-brief-form").getByLabel("Petición de cierre").fill("Tener presentes los documentos que se cotejen.");
  const briefDownload=page.waitForEvent("download"); await workbench.getByRole("button",{name:"Corroborar y descargar guion",exact:true}).click();
  const briefFile=await briefDownload; expect(briefFile.suggestedFilename()).toBe("guion-intervencion.txt");
  const briefPath=await briefFile.path(); expect(briefPath).toBeTruthy(); const briefText=await readFile(briefPath!,"utf8");
@@ -115,14 +121,14 @@ test("mesa de audiencia: lectura, marcadores, notas, conversación con fuentes y
  await settleCapture(page); await page.screenshot({path:testInfo.outputPath("hearing-brief-desktop.png"),fullPage:true});
  await page.reload(); await expect(workbench.locator(".hearing-source-button")).toContainText("Revisada"); await expect(workbench.locator(".hearing-saved-note")).toContainText("Comprobar antecedentes del pago");
  const pdfResponse=await page.request.post("/api/books",{multipart:{requestId:randomUUID(),title:`PDF ficticio audiencia ${tag}`,preserveOriginal:"true",convertToText:"false",file:{name:"paginas-ficticias.pdf",mimeType:"application/pdf",buffer:await readFile("src/lib/evidence/pdf-fixtures/mixed-three-pages.pdf")}}}); expect(pdfResponse.status(),await pdfResponse.text()).toBe(201); const pdf=(await pdfResponse.json()).book; bookIds.push(pdf.id); keys.push((await db.libraryBook.findUniqueOrThrow({where:{id:pdf.id}})).storageKey);
- await page.reload(); await workbench.getByLabel("Añadir material accesible").selectOption(`book:${pdf.id}`); await workbench.getByRole("button",{name:"Añadir al dossier"}).click(); await workbench.getByLabel("Página física del PDF",{exact:true}).selectOption("2"); await expect(workbench.getByRole("img",{name:`Página 2 de PDF ficticio audiencia ${tag}`})).toBeVisible(); await workbench.getByRole("button",{name:"Guardar punto",exact:true}).click(); await expect(workbench.getByText("Organizador de lectura guardado.",{exact:true})).toBeVisible();
+ await page.reload(); await openTool(workbench,"Fuentes"); await workbench.getByLabel("Añadir material accesible").selectOption(`book:${pdf.id}`); await workbench.getByRole("button",{name:"Añadir al dossier"}).click(); await workbench.getByLabel("Página física del PDF",{exact:true}).selectOption("2"); await expect(workbench.getByRole("img",{name:`Página 2 de PDF ficticio audiencia ${tag}`})).toBeVisible(); await workbench.getByRole("button",{name:"Guardar punto",exact:true}).click(); await expect(workbench.getByText("Organizador de lectura guardado.",{exact:true})).toBeVisible();
  for(const [name,viewport] of [["desktop",{width:1440,height:1000}],["mobile",{width:360,height:800}]] as const){await page.setViewportSize(viewport); await expect(workbench.getByText("Preparando la mesa…",{exact:true})).toHaveCount(0); await expect(workbench.getByText("Abriendo el material autorizado…",{exact:true})).toHaveCount(0); const image=workbench.getByRole("img",{name:`Página 2 de PDF ficticio audiencia ${tag}`}); await expect(image).toBeVisible(); await expect.poll(() => image.evaluate(node => {const loaded=node as HTMLImageElement;return loaded.complete && loaded.naturalWidth>0;})).toBe(true); expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true); await settleCapture(page); await page.screenshot({path:testInfo.outputPath(`hearing-pdf-${name}.png`),fullPage:true});}
- await workbench.locator(".hearing-mobile-tabs").getByRole("button",{name:"Notas",exact:true}).click(); await expect(workbench.getByRole("heading",{name:"Cuaderno de audiencia"})).toBeVisible(); await settleCapture(page); await page.screenshot({path:testInfo.outputPath("hearing-notes-mobile.png"),fullPage:true});
- await workbench.locator(".hearing-mobile-tabs").getByRole("button",{name:"Guion",exact:true}).click(); await expect(workbench.getByRole("heading",{name:"Guion de intervención"})).toBeVisible();
+ await openTool(workbench,"Notas"); await expect(workbench.getByRole("heading",{name:"Cuaderno de audiencia"})).toBeVisible(); await settleCapture(page); await page.screenshot({path:testInfo.outputPath("hearing-notes-mobile.png"),fullPage:true});
+ await openTool(workbench,"Guion"); await expect(workbench.getByRole("heading",{name:"Guion de intervención"})).toBeVisible();
  await workbench.locator(".hearing-brief-form").getByRole("checkbox",{name:/Comprobar antecedentes del pago/}).check();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true); await settleCapture(page); await page.screenshot({path:testInfo.outputPath("hearing-brief-mobile.png"),fullPage:true});
  await page.setViewportSize({width:1440,height:1000});
- await workbench.getByRole("button",{name:`Retirar PDF ficticio audiencia ${tag} de esta mesa`,exact:true}).click();
+ await openTool(workbench,"Fuentes"); await workbench.getByRole("button",{name:`Retirar PDF ficticio audiencia ${tag} de esta mesa`,exact:true}).click();
  await expect(workbench.locator(".hearing-reader-heading")).toContainText(title);
  const context=await browser.newContext(); const other=await context.newPage();
  try {
@@ -138,6 +144,6 @@ test("mesa de audiencia: lectura, marcadores, notas, conversación con fuentes y
   const revoked=await page.request.get(`/api/causas/${causaId}/hearings/${workspace.id}`); expect(revoked.ok()).toBe(true); const result=await revoked.json(); expect(result.notes.find((n:{id:string})=>n.id===sharedNote.id)).toEqual({id:sharedNote.id,available:false}); expect(result.turns.find((t:{id:string})=>t.id===sharedTurn.id)).toEqual({id:sharedTurn.id,available:false});
   const exported=await page.request.get(`/api/causas/${causaId}/hearings/${workspace.id}/export`); expect(JSON.stringify(await exported.json())).not.toContain("Texto privado de la colección retirada");
   const blockedBrief=await page.request.post(`/api/causas/${causaId}/hearings/${workspace.id}/brief`,{data:{notes:[{id:sharedNote.id,revision:sharedNote.revision}]}}); expect(blockedBrief.status()).toBe(404); expect(await blockedBrief.text()).not.toContain("Texto privado de la colección retirada");
-  await page.reload(); await workbench.locator(".hearing-tool-tabs").getByRole("button",{name:"Conversación",exact:true}).click(); await expect(workbench.getByText("Consulta derivada que debe ocultarse",{exact:true})).toHaveCount(0);
+  await page.reload(); await openTool(workbench,"Conversación"); await expect(workbench.getByText("Consulta derivada que debe ocultarse",{exact:true})).toHaveCount(0);
  } finally {await context.close();}
 });

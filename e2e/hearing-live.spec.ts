@@ -90,6 +90,12 @@ test("audiencia en vivo: guion guardado, tiempo con pausas, puntos tratados y re
   await panel.getByRole("button", { name: "Iniciar audiencia", exact: true }).click();
   await expect.poll(async () => (await current(page, workspace.id)).phase).toBe("running");
   await expect.poll(async () => (await current(page, workspace.id)).elapsedSeconds).toBeGreaterThan(0);
+  const runningClock = panel.getByTestId("hearing-live-clock");
+  const priorTick = await runningClock.innerText();
+  await page.getByRole("button", { name: "Notas", exact: true }).click();
+  await expect(page.locator("#hearing-context")).toBeVisible();
+  await expect.poll(() => runningClock.innerText()).not.toBe(priorTick);
+  await page.locator("#hearing-context").getByRole("button", { name: "Cerrar", exact: true }).click();
   await panel.getByRole("button", { name: "Pausar tiempo", exact: true }).click();
   await expect.poll(async () => (await current(page, workspace.id)).phase).toBe("paused");
   const paused = await current(page, workspace.id);
@@ -103,6 +109,7 @@ test("audiencia en vivo: guion guardado, tiempo con pausas, puntos tratados y re
   expect((await current(page, workspace.id)).elapsedSeconds).toBe(paused.elapsedSeconds);
   await panel.getByTestId("live-cue").filter({ hasText: "Ordenar antecedentes del pago" }).getByRole("checkbox", { name: "Tratado", exact: true }).check();
   await expect.poll(async () => (await current(page, workspace.id)).plan.addressedNoteIds).toContain(workspace.noted.id);
+  await page.getByRole("button", { name: "Lectura", exact: true }).click();
   await page.locator(".hearing-fragment").getByRole("button", { name: "Registrar en vivo", exact: true }).click();
   await panel.getByRole("combobox", { name: "Tipo de registro", exact: true }).selectOption("decision");
   await panel.getByRole("textbox", { name: "Encabezado del registro", exact: true }).fill("Exhibición de comprobante");
@@ -116,6 +123,7 @@ test("audiencia en vivo: guion guardado, tiempo con pausas, puntos tratados y re
   const exported = await readFile((await (await downloading).path())!, "utf8");
   expect(exported).toContain(quote); expect(exported).toContain("Exhibición de comprobante"); expect(exported).toContain("C-2026-PRUEBA");
   await panel.getByText("Preparar el guion guardado", { exact: true }).click();
+  await page.getByRole("button", { name: "Lectura", exact: true }).click();
   await page.locator(".hearing-fragment").getByRole("button", { name: "Registrar en vivo", exact: true }).click();
   for (const [mode, viewport] of [["desktop", { width: 1440, height: 1100 }], ["mobile", { width: 360, height: 900 }]] as const) {
     await page.setViewportSize(viewport); await page.emulateMedia({ reducedMotion: "reduce" });
@@ -123,7 +131,8 @@ test("audiencia en vivo: guion guardado, tiempo con pausas, puntos tratados y re
     await panel.evaluate((element, offset) => window.scrollTo({ top: Math.max(0, scrollY + element.getBoundingClientRect().top - offset), behavior: "instant" }), margin);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     const tools = page.getByRole("navigation", { name: "Herramientas de audiencia", exact: true }).getByRole("button");
-    await expect(tools).toHaveCount(7);
+    await expect(tools).toHaveCount(4);
+    await expect(page.getByText("Preparar y analizar", { exact: true })).toBeVisible();
     for (const tool of await tools.all()) {
       const bounds = await tool.boundingBox();
       expect(bounds).not.toBeNull();
@@ -154,6 +163,7 @@ test("registro perdido, escrito de causa y fuente retirada: conserva privacidad 
   await page.goto(`/causas/${causaId}/audiencias?mesa=${workspace.id}`);
   await page.getByRole("button", { name: "En vivo", exact: true }).click();
   const panel = page.getByTestId("hearing-live"), body = "Objeción anotada por el profesional; material ficticio para comprobar la continuidad.";
+  await page.getByRole("button", { name: "Lectura", exact: true }).click();
   await page.locator(".hearing-fragment").getByRole("button", { name: "Registrar en vivo", exact: true }).click();
   await panel.getByRole("textbox", { name: "Encabezado del registro", exact: true }).fill("Revisión de antecedentes");
   await panel.getByRole("textbox", { name: "Registro de audiencia", exact: true }).fill(body);

@@ -47,9 +47,9 @@ export function RuntimeSettingsPanel() {
 
   if (!snap) {
     return (
-      <div className="panel rounded-3xl p-5 text-sm text-[var(--ink-soft)]/70">
+      <section id="runtime-settings" className="panel rounded-3xl p-5 text-sm text-[var(--ink-soft)]/70">
         {t("integrations.loadingEnv")}
-      </div>
+      </section>
     );
   }
 

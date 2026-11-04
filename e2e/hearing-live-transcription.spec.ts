@@ -9,6 +9,7 @@ import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import type { HearingLiveAudioView } from "../src/lib/audio/live-types";
 import type { HearingLiveMutation } from "../src/lib/hearings/live-types";
 import type { HearingPromotionResult } from "../src/lib/hearings/promotions-types";
+import type { HearingWorkspaceView } from "../src/lib/hearings/types";
 
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 if ([process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw new Error("Live transcription fixtures require local disposable storage");
@@ -17,6 +18,7 @@ const email = `speech-owner-${tag}@example.test`, colleagueEmail = `speech-colle
 const transcript = "Material ficticio: el compareciente manifestó que entregó el comprobante de pago el 12 de octubre de 2026. Esta salida simulada no acredita reconocimiento de voz.";
 let ownerId = "", colleagueId = "", causaId = "", provider: Server, providerCalls = 0, rejectProvider = false;
 let priorConfig: { enabled: boolean; configJson: string } | null = null;
+let continuityBookId = "", continuityBookStorageKey = "";
 const live = (workspaceId: string) => `/api/causas/${causaId}/hearings/${workspaceId}/live`;
 async function json<T>(response: Pick<APIResponse, "status" | "text" | "json">, status = 200): Promise<T> {
   expect(response.status(), (await response.text()).slice(0, 1000)).toBe(status); return response.json();
@@ -97,8 +99,10 @@ test.afterAll(async () => {
       await db.documento.deleteMany({ where: { causaId } });
       await db.causa.deleteMany({ where: { id: causaId } });
     }
+    if (continuityBookId) await db.libraryBook.deleteMany({ where: { id: continuityBookId } });
     for (const actorId of [ownerId, colleagueId].filter(Boolean)) { await db.auditEvent.deleteMany({ where: { actorId } }); await db.user.deleteMany({ where: { id: actorId } }); }
-    await Promise.all(recordings.map(row => rm(path.join(process.env.STORAGE_PATH || "storage", row.storageKey), { force: true })));
+    const storedKeys = [...recordings.map(row => row.storageKey), ...(continuityBookStorageKey ? [continuityBookStorageKey] : [])];
+    await Promise.all(storedKeys.map(key => rm(path.join(process.env.STORAGE_PATH || "storage", key), { force: true })));
     if (priorConfig) await db.integrationConfig.upsert({ where: { provider: "transcription" }, create: { provider: "transcription", ...priorConfig }, update: priorConfig });
     else await db.integrationConfig.deleteMany({ where: { provider: "transcription" } });
   } finally { if (provider) await new Promise<void>(resolve => provider.close(() => resolve())); await db.$disconnect(); }
@@ -111,13 +115,67 @@ test("captura nativa por tramos: transcripción, pasaje, hecho propuesto, nota y
   try {
     await loginAs(page, email);
     const desk = await createDesk(page, "Transcripción y revisión ficticias");
+    const reference = await json<{ book: { id: string } }>(await page.request.post("/api/books", { multipart: {
+      requestId: randomUUID(), title: "Fuente ficticia para continuidad de captura", author: "Material de prueba", preserveOriginal: "true",
+      file: { name: "continuidad-ficticia.txt", mimeType: "text/plain", buffer: Buffer.from("El comprobante ficticio es un antecedente que debe contrastarse con la declaración. Este texto no es una obra jurídica publicada.") },
+    } }), 201);
+    continuityBookId = reference.book.id;
+    continuityBookStorageKey = (await db.libraryBook.findUniqueOrThrow({ where: { id: continuityBookId }, select: { storageKey: true } })).storageKey;
     await openLive(page, desk.id);
     const audio = page.getByTestId("hearing-live-audio"), panel = page.getByTestId("hearing-live");
     expect(await page.evaluate(() => (window as unknown as { __lexopenSyntheticStreams: MediaStream[] }).__lexopenSyntheticStreams.length)).toBe(0);
     await startCapture(audio, "Declaración ficticia para revisión");
+    await expect(audio.locator(".hearing-live-capture-settings")).not.toHaveAttribute("open");
+    const sameCapture = await audio.elementHandle();
+    expect(sameCapture).not.toBeNull();
+    async function captureContinues() {
+      await expect.poll(() => sameCapture!.evaluate(node => node.isConnected)).toBe(true);
+      await expect(audio.getByLabel("Nombre de la captura", { exact: true })).toHaveValue("Declaración ficticia para revisión");
+      await expect.poll(() => page.evaluate(() => {
+        const streams = (window as unknown as { __lexopenSyntheticStreams: MediaStream[] }).__lexopenSyntheticStreams;
+        return streams.length === 1 && streams[0].getAudioTracks().every(track => track.readyState === "live");
+      })).toBe(true);
+    }
+    // Saving a personal note is independent of the microphone and keeps this desk mounted.
+    await page.getByRole("button", { name: "Notas", exact: true }).click();
+    await page.getByLabel("Título de la nota", { exact: true }).fill("Observación personal durante la captura");
+    await page.getByLabel("Su observación", { exact: true }).fill("Revisar el comprobante al terminar de escuchar. Nota personal sin cita literal.");
+    await page.getByRole("button", { name: "Guardar nota", exact: true }).click();
+    await expect(page.locator(".hearing-saved-note").getByRole("heading", { name: "Observación personal durante la captura", exact: true })).toBeVisible();
+    const savedDesk = await json<HearingWorkspaceView>(await page.request.get(`/api/causas/${causaId}/hearings/${desk.id}`));
+    expect(savedDesk.notes.some(note => note.available && note.title === "Observación personal durante la captura" && note.body.includes("Nota personal sin cita literal"))).toBe(true);
+    await captureContinues();
+    // Consulting another tool must keep the same native recorder and stream alive.
+    await page.getByRole("button", { name: "Fuentes", exact: true }).click();
+    await expect(page.locator("#hearing-context")).toBeVisible();
+    await page.getByLabel("Añadir material accesible").selectOption(`book:${continuityBookId}`);
+    await page.getByRole("button", { name: "Añadir al dossier", exact: true }).click();
+    const fragment = page.locator(".hearing-fragment").filter({ hasText: "El comprobante ficticio es un antecedente" });
+    await expect(fragment).toBeVisible();
+    await page.getByRole("button", { name: "Guardar punto", exact: true }).click();
+    await expect(page.getByText("Organizador de lectura guardado.", { exact: true })).toBeVisible();
+    // Removing a source remains protected even though adding/reading it is independent.
+    await page.getByRole("button", { name: "Fuentes", exact: true }).click();
+    await page.getByRole("button", { name: "Retirar Fuente ficticia para continuidad de captura de esta mesa", exact: true }).click();
+    await expect(audio.getByRole("alert")).toContainText("Detenga la captura");
+    const protectedDesk = await json<HearingWorkspaceView>(await page.request.get(`/api/causas/${causaId}/hearings/${desk.id}`));
+    expect(protectedDesk.sources.some(source => source.available && source.title === "Fuente ficticia para continuidad de captura")).toBe(true);
+    await captureContinues();
+    await page.getByRole("button", { name: "Lectura", exact: true }).click();
+    const verified = page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname === `/api/causas/${causaId}/hearings/${desk.id}/verify`);
+    await fragment.getByRole("button", { name: /^Corroborar y copiar/ }).click();
+    expect((await verified).status()).toBe(200);
+    await fragment.getByRole("button", { name: "Conversar", exact: true }).click();
+    await page.getByLabel("Qué quiere revisar", { exact: true }).fill("Contrastar el comprobante ficticio con lo escuchado");
+    await page.getByRole("button", { name: "Guardar pasajes", exact: true }).click();
+    await expect(page.locator(".hearing-turn")).toContainText("sin llamada a IA");
+    await captureContinues();
+    await expect(page.getByTestId("hearing-capture-status").getByRole("button", { name: "Detener captura", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "En vivo", exact: true }).click();
     for (const [name, viewport] of [["desktop", { width: 1440, height: 1100 }], ["mobile", { width: 360, height: 900 }]] as const) {
       await page.setViewportSize(viewport);
       await screenshot(page, audio, info.outputPath(`capture-active-${name}.png`), name === "mobile");
+      await captureContinues();
     }
     await page.setViewportSize({ width: 1440, height: 1100 });
     const first = audio.getByTestId("live-audio-clip").filter({ hasText: transcript }).first();

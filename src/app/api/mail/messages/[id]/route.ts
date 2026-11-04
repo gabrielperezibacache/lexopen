@@ -6,7 +6,7 @@ import {
   linkMailboxMessage,
 } from "@/lib/mail/apply";
 import { prisma } from "@/lib/db";
-import { publicMailboxMessage } from "@/lib/mail/types";
+import { publicMailboxMessages } from "@/lib/mail/access";
 import { z } from "zod";
 
 type Params = { params: Promise<{ id: string }> };
@@ -23,7 +23,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const message = await prisma.mailboxMessage.findFirst({
       where: { id, userId: user.id },
       include: {
-        causa: { select: { id: true, titulo: true, rit: true } },
         attachments: {
           select: {
             filename: true,
@@ -37,7 +36,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     if (!message) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
-    return NextResponse.json({ message: publicMailboxMessage(message) });
+    return NextResponse.json({ message: (await publicMailboxMessages([message], user))[0] });
   } catch (e) {
     return handleRouteError(e);
   }
@@ -51,17 +50,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = actionSchema.parse(await req.json());
     if (body.action === "discard") {
       const message = await discardMailboxMessage(user.id, id);
-      return NextResponse.json({ message: publicMailboxMessage(message) });
+      return NextResponse.json({ message: (await publicMailboxMessages([message], user))[0] });
     }
     if (body.action === "link") {
       if (!body.causaId) {
         return NextResponse.json({ error: "causaId requerido" }, { status: 400 });
       }
       const message = await linkMailboxMessage(user, id, body.causaId);
-      return NextResponse.json({ message: publicMailboxMessage(message) });
+      return NextResponse.json({ message: (await publicMailboxMessages([message], user))[0] });
     }
     const message = await applyMailboxMessage(user, id, body.causaId);
-    return NextResponse.json({ message: publicMailboxMessage(message) });
+    return NextResponse.json({ message: (await publicMailboxMessages([message], user))[0] });
   } catch (e) {
     return handleRouteError(e);
   }

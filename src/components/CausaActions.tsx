@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CausaManageActions } from "@/components/CausaManageActions";
 import { apiMutation } from "@/lib/api-mutation";
+import "./CausaActions.css";
 
 export function CausaActions({
   causaId,
@@ -54,53 +55,20 @@ export function CausaActions({
     );
   }
 
-  return (
-    <div className="flex w-full flex-col items-stretch gap-3 sm:items-end">
-      <CausaManageActions
-        causaId={causaId}
-        titulo={titulo}
-        estado={estado}
-        isAdmin={isAdmin}
-      />
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-        <Link
-          href={`/causas/${causaId}/minuta/nueva`}
-          className="btn btn-primary w-full sm:w-auto"
-        >
-          Nueva minuta
-        </Link>
-        <button
-          className="btn btn-ghost w-full sm:w-auto"
-          disabled={busy}
-          onClick={syncObsidian}
-          type="button"
-        >
-          {busy ? "Sincronizando…" : "Sync Obsidian"}
-        </button>
-        <Link
-          href={`/agente?causaId=${causaId}&utility=briefing&run=1`}
-          className="btn btn-secondary w-full sm:w-auto"
-        >
-          Briefing IA
-        </Link>
-        <Link
-          href={`/agente?causaId=${causaId}&utility=doc_qa`}
-          className="btn btn-ghost w-full sm:w-auto"
-        >
-          Preguntar a docs
-        </Link>
-        <Link
-          href={`/agente?causaId=${causaId}&utility=copilot`}
-          className="btn btn-ghost w-full sm:w-auto"
-        >
-          Abrir copiloto
-        </Link>
-      </div>
-      {msg && (
-        <p className="text-xs text-[var(--muted)]" role="status">
-          {msg}
-        </p>
-      )}
+  return <div className="case-actions">
+    <div className="case-actions-primary">
+      <Link href={`/causas/${causaId}/minuta/nueva`} className="btn btn-primary">Nueva minuta</Link>
+      <details className="case-more-actions">
+        <summary>Más acciones</summary>
+        <div className="case-actions-directory">
+          <CausaManageActions causaId={causaId} titulo={titulo} estado={estado} isAdmin={isAdmin} compact />
+          <button className="btn btn-ghost" disabled={busy} onClick={syncObsidian} type="button">{busy ? "Sincronizando…" : "Sync Obsidian"}</button>
+          <Link href={`/agente?causaId=${causaId}&utility=briefing&run=1`} className="btn btn-ghost">Briefing IA</Link>
+          <Link href={`/agente?causaId=${causaId}&utility=doc_qa`} className="btn btn-ghost">Preguntar a docs</Link>
+          <Link href={`/agente?causaId=${causaId}&utility=copilot`} className="btn btn-ghost">Abrir copiloto</Link>
+        </div>
+      </details>
     </div>
-  );
+    {msg && <p className="case-actions-status" role="status">{msg}</p>}
+  </div>;
 }

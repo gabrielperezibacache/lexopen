@@ -3,12 +3,21 @@
 .workbench-heading p { color: var(--ink-soft); max-width: 70ch; }
 .workbench-heading a, .workbench a:not(.btn) { color: var(--sea); text-decoration: underline; text-underline-offset: .2rem; }
 .workbench { min-width: 0; }
+.workbench [hidden] { display: none !important; }
+.workbench-stages { display: flex; gap: 1.5rem; border-block: 1px solid var(--line); margin-bottom: 1rem; }
+.workbench-stages button { min-height: 48px; color: var(--ink-soft); border-bottom: 2px solid transparent; padding: .5rem 0; }
+.workbench-stages button[aria-current="step"] { color: var(--sea); border-bottom-color: var(--sea); font-weight: 600; }
+.workbench-tools, .workbench-current { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: 1rem; }
+.workbench-current { position: sticky; top: 5rem; background: var(--surface-solid); z-index: 2; padding: .5rem .75rem; border-block: 1px solid var(--line); }
+.workbench-current > p { flex: 1; color: var(--sea); margin: 0; }
+.workbench-canvas { background: var(--surface-solid); min-width: 0; }
+.workbench-activity-link { min-height: 44px; color: var(--sea); text-decoration: underline; margin-top: 1rem; }
 .workbench p { line-height: 1.7; max-width: 72ch; }
 .workbench-toolbar { display: flex; align-items: start; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.5rem; }
 .workbench-toolbar p { margin: 0; }
 .workbench-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); background: var(--surface-solid); border: 1px solid var(--line); border-radius: var(--radius-lg); }
 .workbench-prepare, .workbench-result { min-width: 0; padding: clamp(1.1rem, 2.3vw, 2rem); }
-.workbench-result { border-left: 1px solid var(--line); }
+.workbench-result { min-width: 0; }
 .workbench h2 { font-family: var(--font-fraunces), Georgia, serif; font-weight: 500; font-size: 1.6rem; margin: 0 0 1.5rem; }
 .workbench h3 { font-family: var(--font-fraunces), Georgia, serif; font-weight: 500; font-size: 1.25rem; line-height: 1.5; overflow-wrap: anywhere; }
 .workbench-field { display: grid; gap: .5rem; margin-bottom: 1.5rem; font-weight: 600; }

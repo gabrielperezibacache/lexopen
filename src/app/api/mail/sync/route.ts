@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     if (cronOk) {
       const staff = await prisma.user.findMany({
         where: { role: { in: ["admin", "abogado", "asistente"] } },
-        select: { id: true, role: true },
+        select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true },
       });
       let total = 0;
       let users = 0;

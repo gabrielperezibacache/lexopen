@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Menu } from "lucide-react";
+import { Bell, Menu, Search, Command } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -12,6 +12,9 @@ import { GlobalSearch } from "@/components/shell/GlobalSearch";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { CommandPalette, type CommandItem } from "@/components/ui/CommandPalette";
 import { Sheet } from "@/components/ui/Sheet";
+import type { SessionUserSummary } from "@/components/auth/UserSwitcher";
+import { activeNavigationArea, activeNavigationEntry, navigationEntries, type NavigationModel } from "@/lib/navigation/catalog";
+import "@/components/shell/shell.css";
 
 const SIDEBAR_KEY = "lexopen_sidebar_collapsed";
 const SIDEBAR_EVENT = "lexopen-sidebar";
@@ -26,23 +29,25 @@ function subscribeSidebar(onStoreChange: () => void) {
   };
 }
 
-function getSidebarCollapsed() {
+function getSidebarCollapsed(key: string) {
   try {
-    return localStorage.getItem(SIDEBAR_KEY) === "1";
+    return localStorage.getItem(key) === "1";
   } catch {
     return false;
   }
 }
 
 export function AppShell({
-  role,
+  navigation,
+  user,
   unreadCount = 0,
   mailPendingCount = 0,
   showUpdateBanner = false,
   canSelfUpdate = false,
   children,
 }: {
-  role?: string | null;
+  navigation: NavigationModel;
+  user?: SessionUserSummary;
   unreadCount?: number;
   mailPendingCount?: number;
   showUpdateBanner?: boolean;
@@ -50,15 +55,21 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const shellRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const [menuPath, setMenuPath] = useState<string | null>(null);
   const mobileOpen = menuPath === pathname;
   const { t } = useI18n();
+  const sidebarKey = `${SIDEBAR_KEY}:${user?.id || navigation.mode}`;
   const collapsed = useSyncExternalStore(
     subscribeSidebar,
-    getSidebarCollapsed,
+    () => getSidebarCollapsed(sidebarKey),
     () => false
   );
   const [notifOpen, setNotifOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const currentArea = activeNavigationArea(navigation, pathname || "/");
+  const currentEntry = activeNavigationEntry(navigation, pathname || "/");
 
   function setMobileOpen(open: boolean) {
     setMenuPath(open ? pathname : null);
@@ -66,12 +77,22 @@ export function AppShell({
 
   function onCollapsedChange(next: boolean) {
     try {
-      localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
+      localStorage.setItem(sidebarKey, next ? "1" : "0");
     } catch {
       /* ignore */
     }
     window.dispatchEvent(new Event(SIDEBAR_EVENT));
   }
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const measure = () => shellRef.current?.style.setProperty("--shell-header-offset", `${header.getBoundingClientRect().height}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 768px)");
@@ -97,40 +118,20 @@ export function AppShell({
   }, [mobileOpen]);
 
   const commandItems = useMemo<CommandItem[]>(() => {
-    const groups: Array<[string, string, string]> = [
-      ["/inicio", t("nav.home"), t("nav.groups.work")],
-      ["/causas", t("nav.cases"), t("nav.groups.work")],
-      ["/plazos", t("nav.deadlines"), t("nav.groups.work")],
-      ["/calendario", t("nav.calendar"), t("nav.groups.work")],
-      ["/tareas", t("nav.tasks"), t("nav.groups.work")],
-      ["/clientes", t("nav.clients"), t("nav.groups.clients")],
-      ["/portal", t("nav.portal"), t("nav.groups.clients")],
-      ["/documentos", t("nav.documents"), t("nav.groups.documents")],
-      ["/minutas", t("nav.minutes"), t("nav.groups.documents")],
-      ["/jurisprudencia", t("nav.jurisprudence"), t("nav.groups.documents")],
-      ["/facturacion", t("nav.billing"), t("nav.groups.admin")],
-      ["/configuracion", t("nav.settings"), t("nav.groups.admin")],
-      ["/integraciones", t("nav.integrations"), t("nav.groups.admin")],
-      ["/auditoria", t("nav.audit"), t("nav.groups.admin")],
-      ["/buscar", t("nav.search"), t("nav.groups.documents")],
-      ["/notificaciones", t("nav.notifications"), t("nav.groups.admin")],
-    ];
-    return groups.map(([href, label, group]) => ({
-      id: href,
-      href,
-      label,
-      group,
+    return navigationEntries(navigation).map(entry => ({
+      id: entry.id, href: entry.href, label: t(entry.labelKey), keywords: entry.keywords,
+      group: entry.area ? t(navigation.areas.find(area => area.id === entry.area)?.labelKey || "nav.groups.portal") : t("nav.globalTools"),
     }));
-  }, [t]);
+  }, [navigation, t]);
 
   return (
-    <div className="flex min-h-screen w-full">
+    <div ref={shellRef} className="app-shell flex min-h-screen w-full">
       <a href="#main-content" className="skip-link" inert={mobileOpen}>
         {t("common.skipToContent")}
       </a>
       <AppSidebar
-        role={role}
-        unreadCount={unreadCount}
+        navigation={navigation}
+        user={user}
         mailPendingCount={mailPendingCount}
         mobileOpen={mobileOpen}
         onMobileOpenChange={setMobileOpen}
@@ -140,7 +141,8 @@ export function AppShell({
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col" inert={mobileOpen}>
         <header
-          className="shell-header sticky top-0 z-20 flex items-center gap-3 px-3 py-2.5 md:px-5"
+          ref={headerRef}
+          className="shell-header sticky top-0 z-20 flex items-center gap-2 px-3 py-2.5 md:gap-3 md:px-5"
           style={{ paddingTop: "max(0.625rem, env(safe-area-inset-top))" }}
         >
           <button
@@ -155,28 +157,27 @@ export function AppShell({
           </button>
 
           <div className="hidden min-w-0 flex-1 flex-col gap-1 md:flex">
-            <Breadcrumbs />
+            <Breadcrumbs navigation={navigation} />
             <GlobalSearch />
           </div>
 
           <div className="min-w-0 flex-1 md:hidden">
-            <div className="display truncate text-lg leading-none">LexOpen</div>
-            <div className="mt-0.5 truncate text-[10px] uppercase tracking-[0.14em] text-[var(--muted)]">
-              {t("brand.tagline")}
-            </div>
+            <div className="display truncate text-lg leading-tight">{t(currentArea?.labelKey || currentEntry?.labelKey || (navigation.mode === "portal" ? "nav.portal" : "brand.tagline"))}</div>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <div className="hidden md:block">
-              <ThemeToggle />
-            </div>
+            <button type="button" className="shell-quick-nav hidden md:inline-flex" onClick={() => setCommandOpen(true)} aria-label={t("common.commandPalette")}>
+              <Command size={15} aria-hidden="true" /><span>{t("common.commandPalette")}</span><kbd>⌘K</kbd>
+            </button>
+            <Link href="/buscar" className="shell-icon-button md:hidden" aria-label={t("common.searchGlobal")}><Search size={19} aria-hidden="true" /></Link>
+            <div className="hidden md:block"><ThemeToggle /></div>
             <button
               type="button"
               className="relative grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] text-[var(--ink)]"
-              aria-label={t("nav.notifications")}
+              aria-label={unreadCount > 0 ? `${t("nav.notifications")}: ${unreadCount}` : t("nav.notifications")}
               onClick={() => setNotifOpen(true)}
             >
-              <Bell size={18} />
+              <Bell size={18} aria-hidden="true" />
               {unreadCount > 0 && (
                 <span className="absolute -right-1 -top-1 min-w-[1.15rem] rounded-full bg-[var(--copper)] px-1 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
                   {unreadCount > 99 ? "99+" : unreadCount}
@@ -203,7 +204,7 @@ export function AppShell({
         </main>
       </div>
 
-      <CommandPalette items={commandItems} />
+      <CommandPalette items={commandItems} open={commandOpen} onOpenChange={setCommandOpen} />
 
       <Sheet
         open={notifOpen}

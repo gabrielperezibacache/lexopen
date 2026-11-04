@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiMutation } from "@/lib/api-mutation";
 
-type User = {
+export type SessionUserSummary = {
   id: string;
   name: string;
   email: string;
@@ -14,11 +14,13 @@ type User = {
   avatarColor?: string;
 };
 
-export function UserSwitcher() {
+export function UserSwitcher({ initialUser, compact = false }: { initialUser?: SessionUserSummary; compact?: boolean }) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const [user, setUser] = useState<SessionUserSummary | null>(initialUser || null);
+  const [users, setUsers] = useState<SessionUserSummary[]>([]);
+  const menuId = useId();
   const [demoSwitcher, setDemoSwitcher] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -51,9 +53,7 @@ export function UserSwitcher() {
         setUsers(data.users || []);
         setDemoSwitcher(Boolean(data.demoSwitcher));
       })
-      .catch(() => {
-        if (active) setUser(null);
-      });
+      .catch(() => { /* Keep the server-authenticated summary when the refresh is unavailable. */ });
     return () => {
       active = false;
     };
@@ -68,15 +68,20 @@ export function UserSwitcher() {
       }
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(false);
+        toggleRef.current?.focus();
+      }
     };
     document.addEventListener("mousedown", onPointer);
     document.addEventListener("touchstart", onPointer);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       document.removeEventListener("mousedown", onPointer);
       document.removeEventListener("touchstart", onPointer);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
 
@@ -109,11 +114,14 @@ export function UserSwitcher() {
   return (
     <div className="relative" ref={rootRef}>
       <button
+        ref={toggleRef}
         type="button"
-        className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-left"
+        className={`flex min-h-11 w-full items-center rounded-xl border border-white/10 bg-white/5 py-2 text-left ${compact ? "justify-center px-1" : "gap-3 px-3"}`}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-controls="user-switcher-menu"
+        aria-controls={menuId}
+        aria-label={compact ? `${user.name} · Mi cuenta` : undefined}
+        title={compact ? user.name : undefined}
       >
         <span
           className="grid h-8 w-8 place-items-center rounded-full text-xs font-bold text-white"
@@ -125,15 +133,15 @@ export function UserSwitcher() {
             .map((p) => p[0])
             .join("")}
         </span>
-        <span className="min-w-0 flex-1">
+        <span className={compact ? "sr-only" : "min-w-0 flex-1"}>
           <span className="block truncate text-sm font-medium text-white">{user.name}</span>
           <span className="block truncate text-[11px] text-white/50">{user.role}</span>
         </span>
       </button>
       {open && (
         <div
-          id="user-switcher-menu"
-          className="absolute bottom-[calc(100%+0.5rem)] left-0 right-0 z-20 max-h-72 overflow-auto rounded-xl border border-white/10 bg-[#0c1c24] p-2 shadow-xl"
+          id={menuId}
+          className={`absolute bottom-[calc(100%+0.5rem)] left-0 z-50 max-h-72 overflow-auto rounded-xl border border-white/10 bg-[#0c1c24] p-2 shadow-xl ${compact ? "w-60" : "right-0"}`}
         >
           {demoSwitcher && (
             <>

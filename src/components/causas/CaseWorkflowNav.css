@@ -14,7 +14,10 @@
 .case-workflow ol { display: flex; flex-wrap: wrap; gap: .25rem 1rem; padding: 0; margin: 0; list-style: none; }
 .case-workflow li a { display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; padding: .3rem .1rem; font-size: .85rem; border-bottom: 2px solid transparent; transition: color var(--motion-base) var(--motion-ease), border-color var(--motion-base) var(--motion-ease); }
 .case-workflow a:hover { color: var(--sea); }
-.case-workflow li a[aria-current="page"] { color: var(--sea); border-color: var(--sea); font-weight: 600; }
+.case-workflow li a[aria-current] { color: var(--sea); border-color: var(--sea); font-weight: 600; }
+.case-workflow-resources { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; flex-basis: 100%; border-top: 1px solid var(--line); padding-top: .35rem; }
+.case-workflow-resources a { display: inline-flex; align-items: center; min-height: 44px; gap: .5rem; color: var(--sea); font-size: .85rem; }
+.case-workflow-resources a[aria-current] { font-weight: 600; text-decoration: underline; text-underline-offset: .3rem; }
 .case-workflow a:focus-visible { outline: 2px solid var(--sea); outline-offset: 4px; border-radius: 2px; }
 @media (max-width: 600px) {
   .case-workflow { gap: .25rem; }

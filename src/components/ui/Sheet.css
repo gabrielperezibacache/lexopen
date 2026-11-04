@@ -1,0 +1,20 @@
+.lexopen-sheet { box-sizing: border-box; padding: 0; color: var(--ink); background: var(--surface-solid); border: 0; }
+.lexopen-sheet:not([open]) { display: none !important; }
+.lexopen-sheet[open] { display: flex; flex-direction: column; }
+.lexopen-sheet[data-presentation="overlay"] { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(28rem, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh; overflow: hidden; box-shadow: var(--shadow); }
+.lexopen-sheet[data-presentation="overlay"][data-side="left"] { inset: 0 auto 0 0; }
+.lexopen-sheet::backdrop { background: rgba(12, 28, 36, .48); }
+.lexopen-sheet[data-presentation="inline"] { position: static; inset: auto; margin: 0; width: 100%; max-width: none; max-height: none; min-width: 0; }
+.lexopen-sheet-heading { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding: 1rem; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.lexopen-sheet-heading h2 { flex: 1; min-width: 0; margin: 0; font-family: var(--font-fraunces), Georgia, serif; font-size: 1.25rem; line-height: 1.4; overflow-wrap: anywhere; }
+.lexopen-sheet .lexopen-sheet-close { min-width: 44px; min-height: 44px; padding: .5rem; }
+.lexopen-sheet-header-actions { width: 100%; display: flex; flex-wrap: wrap; gap: .5rem; }
+.lexopen-sheet-content { min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem; flex: 1; }
+.lexopen-sheet :where(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
+.context-workspace { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 1.5rem; min-width: 0; }
+.context-workspace > * { min-width: 0; }
+.context-workspace:has(> .context-panel[data-presentation="inline"][open]) { grid-template-columns: minmax(0, 1fr) minmax(19rem, 23rem); }
+.context-panel[data-presentation="inline"] { position: sticky; top: 6rem; max-height: calc(100dvh - 7rem); border-inline-start: 1px solid var(--line); }
+.context-panel-tools { display: flex; flex-wrap: wrap; gap: .25rem 1rem; border-bottom: 1px solid var(--line); padding-bottom: .75rem; margin-bottom: 1.25rem; }
+.context-panel-tools button { min-height: 44px; color: var(--ink-soft); padding: .4rem 0; border-bottom: 2px solid transparent; }
+.context-panel-tools button[aria-pressed="true"] { color: var(--sea); border-bottom-color: var(--sea); font-weight: 600; }

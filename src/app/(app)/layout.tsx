@@ -2,6 +2,7 @@ import { AppShell } from "@/components/AppShell";
 import { enforceAppAccess } from "@/lib/auth/access";
 import { isStaff } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db";
+import { buildNavigation } from "@/lib/navigation/catalog";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await enforceAppAccess();
@@ -23,7 +24,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const canSelfUpdate = user.role === "admin";
   return (
     <AppShell
-      role={user.role}
+      navigation={buildNavigation(user)}
+      user={{ id: user.id, name: user.name, email: user.email, role: user.role, avatarColor: user.avatarColor }}
       unreadCount={unreadCount}
       mailPendingCount={mailPendingCount}
       showUpdateBanner={showUpdateBanner}

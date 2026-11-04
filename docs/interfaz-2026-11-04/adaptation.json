@@ -1,0 +1,104 @@
+[
+  {
+    "route": "/inicio",
+    "physicalWidth": 768,
+    "cssWidth": 768,
+    "pixelDensity": 1,
+    "zoomEquivalent": 1,
+    "overflow": false
+  },
+  {
+    "route": "/causas",
+    "physicalWidth": 768,
+    "cssWidth": 768,
+    "pixelDensity": 1,
+    "zoomEquivalent": 1,
+    "overflow": false
+  },
+  {
+    "route": "/configuracion",
+    "physicalWidth": 768,
+    "cssWidth": 768,
+    "pixelDensity": 1,
+    "zoomEquivalent": 1,
+    "overflow": false
+  },
+  {
+    "route": "/biblioteca",
+    "physicalWidth": 768,
+    "cssWidth": 768,
+    "pixelDensity": 1,
+    "zoomEquivalent": 1,
+    "overflow": false
+  },
+  {
+    "route": "/inicio",
+    "physicalWidth": 1024,
+    "cssWidth": 1024,
+    "pixelDensity": 1,
+    "zoomEquivalent": 1,
+    "overflow": false
+  },
+  {
+    "route": "/causas",
+    "physicalWidth": 1024,
+    "cssWidth": 1024,
+    "pixelDensity": 1,
+    "zoomEquivalent": 1,
+    "overflow": false
+  },
+  {
+    "route": "/configuracion",
+    "physicalWidth": 1024,
+    "cssWidth": 1024,
+    "pixelDensity": 1,
+    "zoomEquivalent": 1,
+    "overflow": false
+  },
+  {
+    "route": "/biblioteca",
+    "physicalWidth": 1024,
+    "cssWidth": 1024,
+    "pixelDensity": 1,
+    "zoomEquivalent": 1,
+    "overflow": false
+  },
+  {
+    "route": "/inicio",
+    "physicalWidth": 1440,
+    "cssWidth": 720,
+    "pixelDensity": 2,
+    "zoomEquivalent": 2,
+    "overflow": false
+  },
+  {
+    "route": "/causas",
+    "physicalWidth": 1440,
+    "cssWidth": 720,
+    "pixelDensity": 2,
+    "zoomEquivalent": 2,
+    "overflow": false
+  },
+  {
+    "route": "/configuracion",
+    "physicalWidth": 1440,
+    "cssWidth": 720,
+    "pixelDensity": 2,
+    "zoomEquivalent": 2,
+    "overflow": false
+  },
+  {
+    "route": "/biblioteca",
+    "physicalWidth": 1440,
+    "cssWidth": 720,
+    "pixelDensity": 2,
+    "zoomEquivalent": 2,
+    "overflow": false
+  },
+  {
+    "panelResize": "768 modal ->1440 inline ->1024 modal",
+    "sameNode": true,
+    "escape": true,
+    "focusRestored": true
+  }
+]

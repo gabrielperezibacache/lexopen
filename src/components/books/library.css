@@ -285,6 +285,19 @@
 .book-draft-references { margin-top: 2rem; }
 
 .book-reader-back { display: inline-flex; align-items: center; gap: .55rem; color: var(--sea); font-size: .85rem; padding: .5rem 0; margin-bottom: 1.4rem; }
+.book-reading-heading { margin-bottom: 1rem; }
+.book-reading-heading > p { color: var(--ink-soft); line-height: 1.7; }
+.book-reading-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem; padding-block: .75rem; margin-bottom: 1rem; border-block: 1px solid var(--line); }
+.book-reading-actions .btn { min-height: 44px; }
+.book-reading-canvas, .book-reading-original { min-width: 0; }
+.book-reading-original { max-width: 900px; margin-inline: auto; }
+.book-reading-original .book-pdf-image { width: 100%; height: auto; }
+.book-reading-panel .book-reader-text { padding: 0; background: transparent; border-radius: 0; }
+.book-reading-panel .book-reader-text h2 { font-size: 1.25rem; }
+.book-reader-information p { font-size: 1rem; line-height: 1.75; overflow-wrap: anywhere; }
+.book-reader-information h3 { font-family: var(--font-fraunces), Georgia, serif; font-size: 1.25rem; margin-block: 1rem .75rem; }
+.book-reader-info-cover { display: grid; place-items: center; padding-block: 1rem; }
+.book-reading-panel .book-edit-panel { padding: 0; background: transparent; box-shadow: none; }
 .book-reader-header { display: grid; grid-template-columns: 230px minmax(0,1fr); gap: 2.5rem; align-items: center; padding: 2rem; background: var(--surface-solid); border-radius: 12px; box-shadow: 0 10px 34px rgba(24,31,28,.06); margin-bottom: 2rem; }
 .book-reader-cover { padding: 2rem 1.2rem; background: var(--wood-deep); background-image: var(--wood-asset); border-radius: 6px; }
 .book-reader-bibliography { min-width: 0; }

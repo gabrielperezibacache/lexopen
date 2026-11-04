@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { handleRouteError, requireStaff } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { listCausasForMail } from "@/lib/mail/ingest";
-import { publicMailboxAccount, publicMailboxMessage } from "@/lib/mail/types";
+import { publicMailboxAccount } from "@/lib/mail/types";
+import { publicMailboxMessages } from "@/lib/mail/access";
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,7 +15,6 @@ export async function GET(req: NextRequest) {
         ...(status ? { status } : {}),
       },
       include: {
-        causa: { select: { id: true, titulo: true, rit: true } },
         attachments: {
           select: {
             filename: true,
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       },
     });
     return NextResponse.json({
-      messages: messages.map(publicMailboxMessage),
+      messages: await publicMailboxMessages(messages, user),
       tablas: tablas.filter((c) => c.proximaTabla),
       causas: tablas,
       account: publicMailboxAccount(account),
