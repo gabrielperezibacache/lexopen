@@ -21,7 +21,8 @@ test("siete áreas, secundario contextual y navegación rápida comparten destin
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/biblioteca$/);
   await main.getByRole("link", { name: "Causas", exact: true }).click();
-  await expect(sidebar.getByTestId("secondary-navigation").getByRole("link", { name: "Mis causas · ClaveÚnica", exact: true })).toBeVisible();
+  await expect(sidebar.getByTestId("secondary-navigation").getByRole("link", { name: "Mis causas · ClaveÚnica", exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("causas-section-tabs").getByRole("link", { name: "ClaveÚnica", exact: true })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Miga de pan", exact: true })).toContainText("Expedientes");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 });
