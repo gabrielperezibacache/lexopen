@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
-import { chmod, lstat, mkdir, mkdtemp, readFile, realpath, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, open, readFile, realpath, readdir, rm, writeFile } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { KITTIES_SOURCE_COMMIT } from "@/lib/altazor/computer/policy";
 import { cancelComputerTask, closeComputerSession, computerScreenshot, computerStatus, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerSession, sendComputerMessage } from "@/lib/altazor/computer/service";
+import { gatewayStartupSummary } from "./computer-smoke-diagnostics";
 
 const gatewayUser = "lexopen-kitties-ci", provider = "fixture", responseText = "Respuesta sintética del proveedor local de CI.";
 let stage = "guard";
@@ -24,6 +25,11 @@ async function listen(server: Server) {
   const address = server.address(); check(address && typeof address !== "string", "Expected local fixture listener"); return address.port;
 }
 async function unusedPort() { const server = createServer(); const port = await listen(server); await new Promise<void>(accept => server.close(() => accept())); return port; }
+async function privateStartupTail(file: string) {
+  const handle = await open(file, "r");
+  try { const stat = await handle.stat(), size = Math.min(stat.size, 32 * 1024), bytes = Buffer.alloc(size); const result = await handle.read(bytes, 0, size, Math.max(0, stat.size - size)); return bytes.subarray(0, result.bytesRead).toString("utf8"); }
+  finally { await handle.close(); }
+}
 async function until<T>(read: () => Promise<T>, ready: (result: T) => boolean, timeout = 90_000) {
   const end = Date.now() + timeout;
   while (Date.now() < end) { const result = await read(); if (ready(result)) return result; await new Promise(accept => setTimeout(accept, 1500)); }
@@ -83,15 +89,24 @@ async function main() {
     await run("docker", ["network", "create", "--internal", "--label", `lexopen.computer-smoke=${network}`, network]); networkCreated = true;
     check(JSON.parse(await run("docker", ["network", "inspect", network]))[0].Internal === true, "Desktop network must prohibit external routing");
     const config = join(gatewayRoot, "kitties.yaml"), work = join(gatewayRoot, "work");
+    // The pinned YAML reader treats unquoted off as boolean false; this mode is a string.
     await writeFile(config, [
-      `data_dir: ${JSON.stringify(join(gatewayRoot, "data"))}`, "providers:", "  fixture:", "    kind: openai", "    model: fictitious-ci-model", `    base_url: http://127.0.0.1:${modelPort}/v1`, `    api_key: ${modelToken}`, "    tools: text", "    max_attempts: 1", "    prompt_cache: false", "default_provider: fixture", "kitties: []", "connectors: {}", "containers:", "  runtime: docker", `  image: ${imageId}`, `  network: ${network}`, `  workspace: ${JSON.stringify(work)}`, "  memory_mb: 2048", "  cpus: 2", "  auto_update: false", "  auto_off_minutes: 1", "updates:", "  gateway: off", "gateway:", `  listen: 127.0.0.1:${gatewayPort}`, `  token: ${token}`, "  local_token: false", "motita:", '  url: ""', "",
+      `data_dir: ${JSON.stringify(join(gatewayRoot, "data"))}`, "providers:", "  fixture:", "    kind: openai", "    model: fictitious-ci-model", `    base_url: http://127.0.0.1:${modelPort}/v1`, `    api_key: ${modelToken}`, "    tools: text", "    max_attempts: 1", "    prompt_cache: false", "default_provider: fixture", "kitties: []", "connectors: {}", "containers:", "  runtime: docker", `  image: ${imageId}`, `  network: ${network}`, `  workspace: ${JSON.stringify(work)}`, "  memory_mb: 2048", "  cpus: 2", "  auto_update: false", "  auto_off_minutes: 1", "updates:", '  gateway: "off"', "gateway:", `  listen: 127.0.0.1:${gatewayPort}`, `  token: ${token}`, "  local_token: false", "motita:", '  url: ""', "",
     ].join("\n"), { mode: 0o600 });
     await mkdir(join(gatewayRoot, "home"), { mode: 0o700 }); await mkdir(join(gatewayRoot, "tmp"), { mode: 0o700 });
     await run("sudo", ["-n", "chown", "-R", `${gatewayUser}:docker`, gatewayRoot]);
-    const log = createWriteStream(join(root, "gateway.private.log"), { mode: 0o600 });
+    for (const [flag, target, category] of [["-x", binary, "binary_executable"], ["-x", source, "source_traversable"], ["-r", config, "configuration_readable"]]) {
+      await run("sudo", ["-n", "-u", gatewayUser, "env", "-i", "PATH=/usr/local/bin:/usr/bin:/bin", "/usr/bin/test", flag, target]).catch(() => { throw new SmokeError(`Gateway UID permission preflight failed (${category})`); });
+    }
+    const privateLogPath = join(root, "gateway.private.log"), log = createWriteStream(privateLogPath, { mode: 0o600 });
     gateway = spawn("sudo", ["-n", "-u", gatewayUser, "env", "-i", "PATH=/usr/local/bin:/usr/bin:/bin", `HOME=${join(gatewayRoot, "home")}`, `TMPDIR=${join(gatewayRoot, "tmp")}`, "LANG=C.UTF-8", "TZ=UTC", binary, "-config", config, "gateway"], { cwd: source, env: { PATH: process.env.PATH, LANG: "C.UTF-8", NODE_ENV: "test" }, stdio: ["ignore", "pipe", "pipe"] });
     gateway.stdout!.pipe(log); gateway.stderr!.pipe(log); gateway.once("error", () => { fixtureError = "Gateway process failed to start"; });
-    await until(async () => { check(!fixtureError && gateway?.exitCode === null, "Gateway exited before readiness"); try { return await originalFetch(`${endpoint}/v1/health`, { signal: AbortSignal.timeout(1500) }).then(response => response.json()); } catch { return null; } }, result => result?.ok === true && result.containers === true);
+    try {
+      await until(async () => { check(!fixtureError && gateway?.exitCode === null && gateway?.signalCode === null, "Gateway exited before readiness"); try { return await originalFetch(`${endpoint}/v1/health`, { signal: AbortSignal.timeout(1500) }).then(response => response.json()); } catch { return null; } }, result => result?.ok === true && result.containers === true);
+    } catch {
+      const logTail = await privateStartupTail(privateLogPath).catch(() => "");
+      throw new SmokeError(`Gateway failed readiness (${gatewayStartupSummary({ exitCode: gateway?.exitCode, signalCode: gateway?.signalCode, logTail, spawnFailed: Boolean(fixtureError) })})`);
+    }
     globalThis.fetch = (async (raw, init) => { check(new URL(String(raw)).origin === endpoint, "Broker attempted a destination outside its exact dedicated gateway"); traffic++; return originalFetch(raw, init); }) as typeof fetch;
     stage = "broker-owner-and-create";
     const owner = await prisma.user.create({ data: { name: "Runtime fixture owner", email: `${randomUUID()}@runtime.invalid`, password: "not-a-login", role: "abogado" } }); userIds.push(owner.id);

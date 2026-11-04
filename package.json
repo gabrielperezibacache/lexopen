@@ -67,7 +67,7 @@
     "desktop:smoke": "node desktop/scripts/smoke-current-build.mjs",
     "workbench:build": "node scripts/workbench/build-image.mjs",
     "test:mail:integration": "node --import tsx src/lib/mail/access.integration.test.ts",
-    "test:altazor": "node --import tsx src/lib/altazor/conversations.test.ts && node --import tsx src/lib/altazor/memory.test.ts && node --import tsx src/lib/altazor/academic.test.ts && node --import tsx src/lib/altazor/share-origin.test.ts && node --import tsx src/lib/altazor/academic-discovery.test.ts && node --import tsx src/lib/personal-connectors/linkedin/oauth.test.ts && node --import tsx src/lib/altazor/computer/computer.test.ts",
+    "test:altazor": "node --import tsx src/lib/altazor/conversations.test.ts && node --import tsx src/lib/altazor/memory.test.ts && node --import tsx src/lib/altazor/academic.test.ts && node --import tsx src/lib/altazor/share-origin.test.ts && node --import tsx src/lib/altazor/academic-discovery.test.ts && node --import tsx src/lib/personal-connectors/linkedin/oauth.test.ts && node --import tsx src/lib/altazor/computer/computer.test.ts && node --import tsx scripts/altazor/computer-smoke-diagnostics.test.ts",
     "test:altazor:integration": "node --import tsx src/lib/altazor/conversations.integration.test.ts && node --import tsx src/lib/altazor/memory.integration.test.ts && node --import tsx src/lib/altazor/academic.integration.test.ts && node --import tsx src/lib/altazor/academic-discovery.integration.test.ts && node --import tsx src/lib/altazor/computer/computer.integration.test.ts"
   },
   "prisma": {
