@@ -127,7 +127,9 @@ Las páginas físicas de PDF y el OCR utilizan herramientas locales como Poppler
 
 **Otros equipos:** el Host escucha en loopback por defecto. El acceso por LAN o Tailscale requiere configurar la dirección pública o el enlace de red, además de los orígenes permitidos. Siga la [guía de acceso de clientes](docs/WEB-HOST.md#acceso-desde-los-clientes). La captura del navegador necesita HTTPS o loopback.
 
-**Desktop:** consulte [modos Host/Cliente, construcción y configuración](docs/DESKTOP.md). La disponibilidad del micrófono y del audio compartido también depende del navegador y del sistema operativo.
+**Desktop:** consulte los [instaladores preliminares para Windows, macOS y Linux](docs/INSTALADORES.md) y los [modos Host/Cliente](docs/DESKTOP.md). La disponibilidad del micrófono y del audio compartido también depende del navegador y del sistema operativo.
+
+**Mesa del asistente:** cada causa dispone de un espacio para preparar un objetivo con fuentes elegidas, generar documentos revisables y convertirlos en escritos con sus referencias. El ejecutor local se habilita expresamente; consulte [el recorrido y su preparación](docs/WORKBENCH.md).
 
 ### Actualizaciones y respaldos
 
@@ -136,11 +138,12 @@ El panel de actualización de **Configuración** ofrece el flujo integrado cuand
 ```bash
 git pull origin main
 npm ci
+npm ci --prefix desktop
 npm run desktop:build
 npm run web:host
 ```
 
-Conserve la carpeta de datos y sus respaldos. La recompilación actualiza el servidor y los recursos que ejecutará el Host; las migraciones se aplican al arrancar. Los comandos de seed o reinicialización se reservan para bases de desarrollo. Consulte [operación y respaldos](docs/WEB-HOST.md) y la [guía de actualización](docs/UPGRADE-1.0.md).
+Conserve la carpeta de datos y un respaldo consistente antes de actualizar. El flujo integrado sólo termina al verificar la versión, compilación y revisión esperadas después del reinicio; las dependencias se instalan desde sus locks. Los comandos de seed o reinicialización se reservan para bases de desarrollo. Consulte [actualizaciones y recuperación](docs/ACTUALIZACIONES.md) y [operación y respaldos](docs/WEB-HOST.md).
 
 <a id="-cómo-desinstalar"></a>
 
@@ -200,12 +203,15 @@ El [workflow de CI](.github/workflows/ci.yml) comprueba migraciones y diferencia
 | --- | --- |
 | [Host web](docs/WEB-HOST.md) | Instalación, red, configuración, respaldos y operación. |
 | [Desktop](docs/DESKTOP.md) | Aplicación de escritorio, modos Host y Cliente. |
+| [Instaladores](docs/INSTALADORES.md) | Matriz de plataformas, construcción, firma y comprobantes de distribución. |
+| [Actualizaciones](docs/ACTUALIZACIONES.md) | Canales, respaldos, dependencias y recuperación. |
+| [Mesa del asistente](docs/WORKBENCH.md) | Fuentes elegidas, ejecutor separado, documentos y revisión por causa. |
 | [Asistente](docs/ASISTENTE.md) | Inicio, herramientas operativas y permisos. |
 | [Codex personal](docs/CODEX.md) | Cuenta de ChatGPT/Codex por profesional, preparación del Host, modelos y política de envío. |
 | [Biblioteca](docs/BIBLIOTECA-PERSONAL-2026-11-01.md) | Archivos personales, colecciones, lectores y citas. |
 | [Audiencias en vivo](docs/ENTREGA-AUDIENCIAS-EN-VIVO-2026-11-02.md) | Guion, sesión, notas y continuidad con escritos. |
 | [Transcripción y conversiones](docs/ENTREGA-TRANSCRIPCION-EN-VIVO-2026-11-02.md) | Captura, recuperación, fuentes y destinos revisables. |
-| [Plan de desarrollo](docs/PLAN-MAESTRO-LEXOPEN-2026-11-02.md) | Prioridades, aceptación y evolución de los apartados. |
+| [Plan de mejora y distribución](docs/PLAN-MEJORA-DISTRIBUCION-2026-11-04.md) | Pasos por apartado, dependencias, prioridades y criterios de aceptación. |
 
 ## Contribuir y licencia
 

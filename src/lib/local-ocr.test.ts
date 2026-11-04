@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   extraOcrPathDirs,
   ocrInstallHint,
@@ -6,6 +7,14 @@ import {
   prependOcrPath,
   tesseractBinCandidates,
 } from "@/lib/local-ocr";
+
+// The native binding supports macOS/Linux only. Requiring it on every platform
+// prevents npm ci from reaching the existing Windows CLI fallback.
+const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+assert.equal(manifest.dependencies["@d0paminedriven/pdfdown-ocr"], undefined);
+assert.equal(typeof manifest.optionalDependencies["@d0paminedriven/pdfdown-ocr"], "string");
+const lock = JSON.parse(readFileSync(new URL("../../package-lock.json", import.meta.url), "utf8"));
+assert.equal(lock.packages["node_modules/@d0paminedriven/pdfdown-ocr"].optional, true);
 
 assert.ok(extraOcrPathDirs("darwin").includes("/opt/homebrew/bin"));
 assert.ok(extraOcrPathDirs("darwin").includes("/usr/local/bin"));

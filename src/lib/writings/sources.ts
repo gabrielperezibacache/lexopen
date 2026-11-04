@@ -8,7 +8,7 @@ import { searchBooksWithScope } from "@/lib/books/rag";
 import { formatBookReference, judicialMetadataNotice } from "@/lib/books/references";
 import type { BookCitation } from "@/lib/books/types";
 import { sha256 } from "@/lib/evidence/fragments";
-import { verifyStoredCitation, type StoredCitation } from "@/lib/knowledge/citations";
+import { resolveCitation, verifyStoredCitation, type StoredCitation } from "@/lib/knowledge/citations";
 import { checkedNote } from "@/lib/hearings/service";
 import { workspaceFor } from "@/lib/hearings/access";
 import { storedHearingCitation, verifyHearingCitation } from "@/lib/hearings/citations";
@@ -57,11 +57,17 @@ function finish(value: Omit<StoredWritingSource, "fingerprint">): StoredWritingS
 function safeHref(value: string) { return value.startsWith("/") && !value.startsWith("//") && !/[\r\n]/.test(value); }
 function validateStored(value: StoredWritingSource) {
   try {
-    if (!value || value.version !== 1 || !["fact", "note", "book"].includes(value.kind) || !writingSourceInputSchema.safeParse(value.input).success || value.input.kind !== value.kind || typeof value.originId !== "string" || typeof value.title !== "string" || value.title.length > 500 || typeof value.text !== "string" || value.text.length > 25_000 || typeof value.href !== "string" || !safeHref(value.href) || !Array.isArray(value.citations) || value.citations.length > limits.factCitations || value.citations.some(c => !c || !["knowledge", "book", "hearing"].includes(c.kind) || !c.snapshot || typeof c.quote !== "string" || c.quote.length > 10_000 || typeof c.href !== "string" || !safeHref(c.href) || !Array.isArray(c.warnings) || c.warnings.some(w => typeof w !== "string") || ![c.sourceKey, c.sourceSha256, c.textSha256, c.quoteSha256].every(hash => typeof hash === "string" && /^[a-f0-9]{64}$/.test(hash))) || !Array.isArray(value.warnings) || value.warnings.some(w => typeof w !== "string") || value.warnings.length > 40 || value.fingerprint !== fingerprint(value)) throw changed();
+    if (!value || value.version !== 1 || !["document", "fact", "note", "book"].includes(value.kind) || !writingSourceInputSchema.safeParse(value.input).success || value.input.kind !== value.kind || typeof value.originId !== "string" || typeof value.title !== "string" || value.title.length > 500 || typeof value.text !== "string" || value.text.length > 25_000 || typeof value.href !== "string" || !safeHref(value.href) || !Array.isArray(value.citations) || value.citations.length > limits.factCitations || value.citations.some(c => !c || !["knowledge", "book", "hearing"].includes(c.kind) || !c.snapshot || typeof c.quote !== "string" || c.quote.length > 10_000 || typeof c.href !== "string" || !safeHref(c.href) || !Array.isArray(c.warnings) || c.warnings.some(w => typeof w !== "string") || ![c.sourceKey, c.sourceSha256, c.textSha256, c.quoteSha256].every(hash => typeof hash === "string" && /^[a-f0-9]{64}$/.test(hash))) || !Array.isArray(value.warnings) || value.warnings.some(w => typeof w !== "string") || value.warnings.length > 40 || value.fingerprint !== fingerprint(value)) throw changed();
   } catch { throw changed(); }
 }
 function excerpt(value: string) { const end = Math.min(value.length, 1800); return value.slice(0, end < value.length && /[\uD800-\uDBFF]/.test(value[end - 1]) ? end - 1 : end); }
 async function capture(causaId: string, input: WritingSourceInput, actor: CausaAccessUser, client: WritingSourceClient, cache: Map<string, unknown>, checkRevision: boolean): Promise<StoredWritingSource> {
+  if (input.kind === "document") {
+    const value = await resolveCitation({ kind: "document", fragmentId: input.fragmentId, quote: input.quote }, actor, { causaId, client, cache });
+    if (value.versionId !== input.versionId) throw changed();
+    const citation = knowledgeCitation(value);
+    return finish({ version: 1, kind: "document", input, originId: value.documentId || value.siteFileId || value.resourceId!, revision: null, title: value.title, text: value.quote, href: value.href, citations: [citation], warnings: citation.warnings });
+  }
   if (input.kind === "fact") {
     const row = await client.caseFact.findFirst({ where: { id: input.factId, causaId }, include: { citations: { orderBy: { id: "asc" }, take: limits.factCitations + 1 } } });
     if (!row || !["accepted", "proposed"].includes(row.status)) throw missing();

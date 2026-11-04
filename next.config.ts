@@ -5,7 +5,7 @@ import { buildSecurityHeaders } from "./src/lib/security/headers";
 // CSP is applied per-request from src/proxy.ts with a fresh nonce.
 const securityHeaders = buildSecurityHeaders({ includeCsp: false });
 // Runtime documents and personal credentials belong to the Host, never its package.
-const privateRuntimePaths = ["./storage/**", "./.env*", "./.codex/**"];
+const privateRuntimePaths = ["./storage/**", "./.env*", "./.codex/**", "./.tmp/**", "./.git/**", "./.agents/**", "./.firecrawl/**", "./.lexopen-runtime/**", "./desktop/data/**", "./obsidian-vault/**"];
 for (const directory of [process.env.CODEX_DATA_DIR, process.env.LEXOPEN_DATA_DIR, process.env.STORAGE_PATH]) {
   if (!directory) continue;
   const relative = path.relative(process.cwd(), path.resolve(directory)).split(path.sep).join("/");
@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
     ? {
         output: "standalone" as const,
         outputFileTracingExcludes: {
-          "/*": [...privateRuntimePaths, "./desktop/dist/**", "./desktop/node_modules/**"],
+          "/*": [...privateRuntimePaths, "./desktop/dist/**", "./desktop/.release/**", "./desktop/node_modules/**"],
         },
         outputFileTracingIncludes: {
           "*": [

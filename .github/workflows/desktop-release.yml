@@ -1,0 +1,148 @@
+name: Desktop installers
+
+on:
+  pull_request:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  validation:
+    if: startsWith(github.ref, 'refs/tags/')
+    uses: ./.github/workflows/ci.yml
+  native:
+    name: Native ${{ matrix.platform }}-${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            platform: linux
+            arch: x64
+          - runner: windows-2022
+            platform: win32
+            arch: x64
+          - runner: macos-15-intel
+            platform: darwin
+            arch: x64
+          - runner: macos-15
+            platform: darwin
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      DATABASE_URL: postgresql://build_only:build_only@127.0.0.1:1/lexopen_build
+      SESSION_SECRET: fictitious-build-secret-not-for-runtime
+      NEXT_TELEMETRY_DISABLED: "1"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/desktop/.release/playwright-browsers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+      - name: Verify native runner and release version
+        shell: bash
+        run: |
+          node -e 'const p=require("./package.json"),d=require("./desktop/package.json");if(p.version!==d.version||process.platform!==process.env.TARGET_PLATFORM||process.arch!==process.env.TARGET_ARCH)process.exit(1);if(process.env.GITHUB_REF_TYPE==="tag"&&process.env.GITHUB_REF_NAME!=="v"+p.version)process.exit(1)'
+        env:
+          TARGET_PLATFORM: ${{ matrix.platform }}
+          TARGET_ARCH: ${{ matrix.arch }}
+      - run: npm ci --prefix desktop
+      - name: Diagnose native Windows PostgreSQL using owned fictitious clusters
+        if: runner.os == 'Windows'
+        timeout-minutes: 5
+        run: node desktop/scripts/native-pg-probe.mjs
+      - run: npm ci
+      - name: Install bundled native Chromium
+        if: runner.os != 'Linux'
+        run: npx --no-install playwright install chromium
+      - name: Install bundled Chromium and Linux system libraries
+        if: runner.os == 'Linux'
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Plant fictitious private canaries for resource exclusion checks
+        shell: bash
+        run: |
+          node -e 'const fs=require("fs"),c=require("crypto").randomBytes(32).toString("hex");for(const d of ["storage",".tmp","desktop/data"]){fs.mkdirSync(d,{recursive:true});fs.writeFileSync(d+"/release-private-canary.txt",c)}fs.appendFileSync(process.env.GITHUB_ENV,"LEXOPEN_RELEASE_CANARY="+c+"\n")'
+      - name: Build native installers and audit resources
+        run: npm run desktop:dist -- --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+      - name: Exercise packaged Host without external Node or npm
+        run: npm run desktop:smoke
+      - name: Record actual publisher signature status
+        run: node desktop/scripts/signature-report.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            desktop/dist/LexOpen-*.dmg
+            desktop/dist/LexOpen-*.zip
+            desktop/dist/LexOpen-*.exe
+            desktop/dist/LexOpen-*.AppImage
+            desktop/dist/LexOpen-*.deb
+            desktop/dist/LexOpen-*.blockmap
+            desktop/dist/preview.yml
+            desktop/dist/preview-mac.yml
+            desktop/dist/preview-linux.yml
+            desktop/dist/latest.yml
+            desktop/dist/latest-mac.yml
+            desktop/dist/latest-linux.yml
+            desktop/dist/lexopen-packaged-*.json
+            desktop/dist/lexopen-smoke-*.json
+            desktop/dist/lexopen-signature-*.json
+  assemble:
+    needs: native
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --prefix desktop --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: native-artifacts
+      - name: Assemble verified feeds, manifest and checksums
+        shell: bash
+        run: node desktop/scripts/assemble-release.mjs --input native-artifacts --output release --version "$(node -p 'require("./package.json").version')" --revision "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-release
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [validation, assemble]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-release
+          path: release
+      - name: Publish only after all native and application checks pass
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(node -p 'require("./package.json").version')"
+          node -e 'const fs=require("fs"),p=require("./package.json"),m=require("./release/release-manifest.json");if(m.version!==p.version||m.sourceRevision!==process.env.GITHUB_SHA)process.exit(1);fs.writeFileSync("/tmp/lexopen-release-notes.md",`LexOpen ${m.version}\n\nInstaladores nativos con comprobación de inicio, creación del primer administrador y persistencia tras reiniciar.\n\n${m.prerelease?"Versión preliminar: consulte release-manifest.json para el estado de firma. Los paquetes sin firma pueden mostrar avisos del sistema y no garantizan actualización automática en macOS.":"Versión estable con validación de firma del editor."}\n\nSHA256SUMS permite comprobar integridad; no sustituye la firma del editor. No incluye datos de expedientes.\n\nGuía: https://github.com/gabrielperezibacache/lexopen/blob/${process.env.GITHUB_REF_NAME}/docs/INSTALADORES.md\n`);'
+          FLAGS=()
+          if [[ "$VERSION" == *-* ]]; then FLAGS+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" release/* --verify-tag --title "LexOpen $VERSION" --notes-file /tmp/lexopen-release-notes.md "${FLAGS[@]}"

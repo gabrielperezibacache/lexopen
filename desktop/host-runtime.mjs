@@ -4,7 +4,7 @@
  * Datos/config del usuario viven en LEXOPEN_DATA_DIR (fuera del clon).
  */
 import { createRequire } from "module";
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import crypto from "crypto";
 import fs from "fs";
 import net from "net";
@@ -19,6 +19,7 @@ const {
   ensureHostEnv,
   readConfig,
   recognizeAppVersion,
+  readAppState,
   readPackageVersion,
   localAppUrl,
   pgDataDir,
@@ -69,9 +70,10 @@ async function assertPortAvailable(port, label, host = "127.0.0.1") {
 }
 
 function appVersion() {
+  const desktopPkg = path.join(__dirname, "package.json");
+  if (packagedHost() && fs.existsSync(desktopPkg)) return readPackageVersion(desktopPkg);
   const fromEnv = process.env.LEXOPEN_APP_VERSION;
   if (fromEnv) return fromEnv;
-  const desktopPkg = path.join(__dirname, "package.json");
   const rootPkg = path.join(repoRoot, "package.json");
   if (fs.existsSync(desktopPkg)) return readPackageVersion(desktopPkg);
   return readPackageVersion(rootPkg);
@@ -234,39 +236,253 @@ async function migrateLegacyPgPassword(pg, dataDir, databaseUrl) {
   return { databaseUrl: rewritten, rotated: true };
 }
 
-async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl) {
-  const modPath =
-    bundledModuleFile("embedded-postgres", "dist/index.js") ||
-    require.resolve("embedded-postgres");
-  const EmbeddedPostgres = (await import(pathToFileURL(modPath).href)).default;
+let postgresInitialization = Promise.resolve();
+const safeLifecycleFailure = Symbol("safeLifecycleFailure");
+const hostLifecyclePhases = new Set(["PG_INIT", "PG_START", "PG_STOP", "MIGRATION", "NEXT_START", "HEALTH"]);
+const postgresDiagnostics = new Set(["INVALID_LOCALE", "ACCESS_DENIED", "DLL_MISSING", "BINARY_LOOKUP", "UNKNOWN"]);
+
+/** Classify transient input without retaining or printing PostgreSQL output. */
+export function classifyPostgresDiagnostic(value) {
+  const code = typeof value?.code === "string" ? value.code : "";
+  const message = typeof value === "string" ? value : typeof value?.message === "string" ? value.message : "";
+  const text = message.slice(0, 16_384);
+  if (/invalid (?:locale|value.*lc_messages)|locale[^\r\n]{0,120}(?:not supported|not recognized|not found)|lc_messages[^\r\n]{0,120}(?:invalid|not supported)/i.test(text)) return "INVALID_LOCALE";
+  if (["EACCES", "EPERM"].includes(code) || /permission denied|access (?:is )?denied|acceso denegado|operation not permitted/i.test(text)) return "ACCESS_DENIED";
+  if (/0xc0000135|(?:dll|dynamic link library)[^\r\n]{0,120}(?:not found|missing|could not|failed)|(?:could not|cannot|failed to) load[^\r\n]{0,120}(?:library|module)|specified module could not be found/i.test(text)) return "DLL_MISSING";
+  if (["ENOENT", "MODULE_NOT_FOUND", "ERR_MODULE_NOT_FOUND"].includes(code) || /cannot find (?:module|package)|no (?:supported|compatible) (?:architecture|binary)|(?:could not|cannot|failed to) find[^\r\n]{0,120}(?:binar|executable)/i.test(text)) return "BINARY_LOOKUP";
+  return "UNKNOWN";
+}
+
+function lifecycleFailure(phase, diagnostic) {
+  if (!hostLifecyclePhases.has(phase)) throw new Error("Invalid Host lifecycle diagnostic phase");
+  diagnostic = postgresDiagnostics.has(diagnostic) ? diagnostic : "UNKNOWN";
+  const code = phase.startsWith("PG_") ? `${phase}_${diagnostic}` : phase;
+  const error = new Error(`No se completó el inicio del Host (${code}).`);
+  Object.assign(error, { code, phase, ...(phase.startsWith("PG_") ? { diagnostic } : {}) });
+  Object.defineProperty(error, safeLifecycleFailure, { value: true });
+  return error;
+}
+
+async function duringHostPhase(phase, work, diagnostic = () => "UNKNOWN") {
+  try { return await work(); }
+  catch (error) {
+    if (error?.[safeLifecycleFailure]) throw error;
+    const fromError = classifyPostgresDiagnostic(error);
+    throw lifecycleFailure(phase, fromError === "UNKNOWN" ? diagnostic() : fromError);
+  }
+}
+
+/** embedded-postgres writes its init password into os.tmpdir(); contain it. */
+export function withPrivatePostgresTemp(dataDir, work) {
+  const pending = postgresInitialization.then(async () => {
+    const temporary = fs.mkdtempSync(path.join(fs.realpathSync(dataDir), ".postgres-init-"));
+    fs.chmodSync(temporary, 0o700);
+    const keys = ["TMPDIR", "TMP", "TEMP"];
+    const previous = new Map(keys.map(key => [key, process.env[key]]));
+    const previousMask = process.umask(0o077);
+    for (const key of keys) process.env[key] = temporary;
+    try { return await work(); }
+    finally {
+      for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+      process.umask(previousMask);
+      fs.rmSync(temporary, { recursive: true, force: true });
+    }
+  });
+  postgresInitialization = pending.then(() => undefined, () => undefined);
+  return pending;
+}
+
+/** pg_ctl needs Windows OS facilities, never application/model/DB credentials. */
+export function windowsPostgresEnvironment(binaryDirectory, source = process.env) {
+  const env = {};
+  for (const key of ["SystemRoot", "WINDIR", "COMSPEC", "TEMP", "TMP", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA"]) {
+    const sourceKey = Object.keys(source).find(candidate => candidate.toLowerCase() === key.toLowerCase());
+    if (sourceKey && typeof source[sourceKey] === "string") env[key] = source[sourceKey];
+  }
+  const systemRoot = env.SystemRoot || env.WINDIR;
+  const directories = [binaryDirectory];
+  if (systemRoot) directories.push(path.win32.join(systemRoot, "System32"), systemRoot);
+  env.PATH = directories.join(";");
+  // Preserve the embedded-postgres LC_MESSAGES setting; initialization and
+  // database locale options remain those of the existing vendor implementation.
+  env.LC_MESSAGES = "en_US.UTF-8";
+  return env;
+}
+
+async function resolveWindowsPgCtl() {
+  const moduleFile = bundledModuleFile("@embedded-postgres/windows-x64", "dist/index.js") || require.resolve("@embedded-postgres/windows-x64");
+  const { pg_ctl: binary } = await import(pathToFileURL(moduleFile).href);
+  if (typeof binary !== "string" || !path.isAbsolute(binary) || !fs.existsSync(binary)) throw Object.assign(new Error("Bundled PostgreSQL controller unavailable"), { code: "ENOENT" });
+  return binary;
+}
+
+/** pg_ctl may leave descendants holding inherited handles: wait for EXIT, not CLOSE. */
+export function executePostgresControl(binary, args, options = {}, overrides = {}) {
+  return new Promise((resolve, reject) => {
+    let child, timer, forceTimer, finished = false, timedOut = false;
+    const failure = (code, unconfirmed = false) => Object.assign(new Error("PostgreSQL controller did not complete"), { code, ...(unconfirmed ? { controllerExitUnconfirmed: true } : {}) });
+    const finish = error => {
+      if (finished) return;
+      finished = true; clearTimeout(timer); clearTimeout(forceTimer);
+      if (error) reject(error); else resolve();
+    };
+    try {
+      child = (overrides.spawnProcess || spawn)(binary, args, { cwd: options.cwd, env: options.env, windowsHide: true, shell: false, stdio: "ignore" });
+    } catch (error) { finish(error); return; }
+    child.once("error", error => finish(error));
+    child.once("exit", code => finish(timedOut ? failure("ETIMEDOUT") : code === 0 ? undefined : failure("PG_CTL_EXIT")));
+    timer = setTimeout(() => {
+      timedOut = true;
+      try { child.kill("SIGTERM"); } catch { /* the observed exit still decides */ }
+      forceTimer = setTimeout(() => {
+        try { child.kill("SIGKILL"); } catch { /* fail closed if exit remains unobserved */ }
+        forceTimer = setTimeout(() => finish(failure("ETIMEDOUT", true)), overrides.killGraceMs || 1000);
+      }, overrides.killGraceMs || 1000);
+    }, options.timeout || 35_000);
+  });
+}
+
+/**
+ * PostgreSQL's official Windows pg_ctl starts its server with a restricted
+ * token, including when the desktop account belongs to Administrators.
+ * Each controller owns one explicit cluster; no shell or taskkill is used.
+ */
+export function createWindowsPostgresController({ dataDir, pgPort, pgCtl, execute = executePostgresControl, probes = {}, env = process.env }) {
+  if (!Number.isInteger(pgPort) || pgPort < 1024 || pgPort > 65535 || !path.isAbsolute(dataDir) || !path.isAbsolute(pgCtl)) throw lifecycleFailure("PG_START", "BINARY_LOOKUP");
+  const databaseDir = pgDataDir(dataDir), logFile = path.join(dataDir, "postgres-server.log");
+  const environment = windowsPostgresEnvironment(path.dirname(pgCtl), env);
+  let state = "stopped", operation = Promise.resolve(), logOffset = 0, unconfirmedController = false;
+  const serialized = work => {
+    const pending = operation.then(work);
+    operation = pending.then(() => undefined, () => undefined);
+    return pending;
+  };
+  const stopped = postgresPid => assertHostStopped({ dataDir, port: pgPort, pgPort, postgresPid }, probes);
+  const classifyLogTail = () => {
+    let fd;
+    try {
+      fd = fs.openSync(logFile, "r");
+      const size = fs.fstatSync(fd).size, bytes = Buffer.alloc(Math.min(Math.max(0, size - logOffset), 16_384));
+      fs.readSync(fd, bytes, 0, bytes.length, Math.max(0, size - bytes.length));
+      return classifyPostgresDiagnostic(bytes.toString("utf8"));
+    } catch { return "UNKNOWN"; }
+    finally { if (fd !== undefined) fs.closeSync(fd); }
+  };
+  const command = async (phase, args, timeout) => {
+    try {
+      await execute(pgCtl, args, { cwd: path.dirname(pgCtl), env: environment, shell: false, windowsHide: true, timeout });
+    } catch (error) {
+      const diagnostics = [classifyPostgresDiagnostic(error), classifyPostgresDiagnostic(error?.stderr), classifyPostgresDiagnostic(error?.stdout), classifyLogTail()];
+      const safeError = lifecycleFailure(phase, diagnostics.find(value => value !== "UNKNOWN") || "UNKNOWN");
+      if (error?.controllerExitUnconfirmed) { unconfirmedController = true; safeError.controllerExitUnconfirmed = true; }
+      throw safeError;
+    }
+  };
+  const stopOwned = async () => {
+    const postgresPid = readPostgresPid(dataDir);
+    // A failed launch can return before any daemon exists. A missing PID plus
+    // closed sockets is a proof, unlike swallowing a failed stop command.
+    if (!postgresPid) {
+      try {
+        await stopped();
+        if (!unconfirmedController) { state = "stopped"; return; }
+      } catch { /* a daemon may still be starting */ }
+    }
+    await command("PG_STOP", ["stop", "-D", databaseDir, "-m", "fast", "-w", "-t", "20"], 25_000);
+    await duringHostPhase("PG_STOP", () => stopped(postgresPid));
+    if (unconfirmedController) throw lifecycleFailure("PG_STOP", "UNKNOWN");
+    state = "stopped";
+  };
+  return {
+    start: () => serialized(() => duringHostPhase("PG_START", async () => {
+      if (state === "running") return;
+      if (state === "recovery") throw lifecycleFailure("PG_START", "UNKNOWN");
+      await duringHostPhase("PG_START", () => stopped());
+      let existingLog = false;
+      try {
+        const stat = fs.lstatSync(logFile);
+        if (!stat.isFile() || stat.isSymbolicLink()) throw lifecycleFailure("PG_START", "ACCESS_DENIED");
+        existingLog = true;
+      } catch (error) { if (error.code !== "ENOENT") throw error; }
+      const fd = fs.openSync(logFile, existingLog ? "a" : "ax", 0o600); logOffset = fs.fstatSync(fd).size; fs.closeSync(fd); fs.chmodSync(logFile, 0o600);
+      state = "starting";
+      try {
+        await command("PG_START", ["start", "-D", databaseDir, "-l", logFile, "-w", "-t", "30", "-o", `-p ${pgPort} -h 127.0.0.1`], 35_000);
+        state = "running";
+      } catch (error) {
+        // A timed-out pg_ctl can leave a live daemon. Stop this explicit cluster
+        // and prove it closed before allowing a retry; preserve its safe code.
+        try { await stopOwned(); }
+        catch { state = "recovery"; error.cleanupFailed = true; }
+        if (error.controllerExitUnconfirmed) { state = "recovery"; error.cleanupFailed = true; }
+        throw error;
+      }
+    })),
+    stop: () => serialized(() => duringHostPhase("PG_STOP", async () => {
+      if (state === "stopped") return;
+      try { await stopOwned(); }
+      catch (error) { state = "recovery"; throw error; }
+    })),
+  };
+}
+
+export async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl, overrides = {}) {
   const databaseDir = pgDataDir(dataDir);
   const alreadyInitialized = fs.existsSync(path.join(databaseDir, "PG_VERSION"));
+  const preparationPhase = alreadyInitialized ? "PG_START" : "PG_INIT";
+  const EmbeddedPostgres = await duringHostPhase(preparationPhase, async () => {
+    if (overrides.EmbeddedPostgres) return overrides.EmbeddedPostgres;
+    const modPath = bundledModuleFile("embedded-postgres", "dist/index.js") || require.resolve("embedded-postgres");
+    return (await import(pathToFileURL(modPath).href)).default;
+  });
   // Prefer password from DATABASE_URL. Brand-new clusters may briefly use
   // "lexopen" only when URL has no password; migrateLegacyPgPassword rotates it.
   const password =
     pgPasswordFromDatabaseUrl(databaseUrl || process.env.DATABASE_URL || "") ||
     "lexopen";
-  const pg = new EmbeddedPostgres({
+  let diagnostic = "UNKNOWN";
+  const classifyLog = value => {
+    const classified = classifyPostgresDiagnostic(value);
+    if (classified !== "UNKNOWN") diagnostic = classified;
+  };
+  const pg = await duringHostPhase(preparationPhase, () => new EmbeddedPostgres({
     databaseDir,
     user: "lexopen",
     password,
     port: pgPort,
     persistent: true,
-  });
+    // The dependency defaults to console.log/error. Keep only a fixed enum;
+    // logs can contain passwords, data paths or full connection strings.
+    onLog: classifyLog,
+    onError: classifyLog,
+  }));
   if (!alreadyInitialized) {
-    await pg.initialise();
+    await duringHostPhase("PG_INIT", () => withPrivatePostgresTemp(dataDir, () => pg.initialise()), () => diagnostic);
   }
-  await pg.start();
+  if ((overrides.platform || process.platform) === "win32") {
+    const pgCtl = await duringHostPhase("PG_START", () => overrides.pgCtl || resolveWindowsPgCtl());
+    Object.assign(pg, createWindowsPostgresController({ dataDir, pgPort, pgCtl, execute: overrides.executePgCtl, probes: overrides.pgCtlProbes, env: overrides.pgCtlEnv }));
+  }
+  diagnostic = "UNKNOWN";
+  await duringHostPhase("PG_START", () => pg.start(), () => diagnostic);
   try {
     await pg.createDatabase("lexopen");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!/already exists/i.test(msg)) {
-      console.warn("[lexopen-host] createDatabase:", msg);
+      console.warn("[lexopen-host] createDatabase: PG_START_UNKNOWN");
     }
   }
-  await migrateLegacyPgPassword(pg, dataDir, databaseUrl);
+  try { await duringHostPhase("PG_START", () => migrateLegacyPgPassword(pg, dataDir, databaseUrl), () => diagnostic); }
+  catch (error) {
+    try { await boundedStop(() => pg.stop(), "PostgreSQL", 30_000); } catch { error.cleanupFailed = true; }
+    throw error;
+  }
   return pg;
+}
+
+export function toolUsesShell(command, platform = process.platform) {
+  return platform === "win32" && /^(?:npm|npx)(?:\.cmd)?$/i.test(command);
 }
 
 function run(cmd, args, opts = {}) {
@@ -275,7 +491,7 @@ function run(cmd, args, opts = {}) {
       cwd: opts.cwd || repoRoot,
       env: { ...process.env, ...opts.env },
       stdio: "inherit",
-      shell: process.platform === "win32",
+      shell: opts.shell ?? toolUsesShell(cmd),
     });
     child.on("error", reject);
     child.on("exit", (code) => {
@@ -285,10 +501,19 @@ function run(cmd, args, opts = {}) {
   });
 }
 
+export function hostResourcesPath() {
+  const inferred = path.basename(__dirname) === "app.asar.unpacked" ? path.dirname(__dirname) : null;
+  return [process.resourcesPath, inferred, process.env.LEXOPEN_RESOURCES_PATH]
+    .filter(Boolean).find(directory => fs.existsSync(path.join(directory, "app.asar"))) || null;
+}
+
+function packagedHost() { return process.env.LEXOPEN_PACKAGED === "1" || Boolean(hostResourcesPath()); }
+
 function bundledModuleFile(name, file) {
+  const resources = hostResourcesPath();
   const candidates = [
-    process.resourcesPath
-      ? path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", name, file)
+    resources
+      ? path.join(resources, "app.asar.unpacked", "node_modules", name, file)
       : null,
     path.join(__dirname, "node_modules", name, file),
     path.join(repoRoot, "node_modules", name, file),
@@ -342,42 +567,80 @@ function runBundledTool(name, file, args, opts = {}) {
   return run(process.execPath, [entry, ...args], {
     ...opts,
     env: runtimeEnv(opts.env),
+    shell: false,
   });
 }
 
-function killChild(child) {
-  if (!child || child.killed) return;
+export function readPostgresPid(dataDir) {
   try {
-    if (process.platform === "win32") {
-      spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
-        stdio: "ignore",
-        shell: true,
-      });
-    } else {
-      child.kill("SIGTERM");
-    }
-  } catch {
-    try {
-      child.kill();
-    } catch {
-      /* ignore */
-    }
+    const pid = Number(fs.readFileSync(path.join(pgDataDir(dataDir), "postmaster.pid"), "utf8").split(/\r?\n/)[0]);
+    if (!Number.isSafeInteger(pid) || pid < 1) throw new Error("Identidad de PostgreSQL inválida.");
+    return pid;
+  } catch (error) { if (error.code === "ENOENT") return null; throw new Error("No se pudo comprobar la identidad de PostgreSQL antes del respaldo."); }
+}
+
+function processAlive(pid) {
+  if (!Number.isSafeInteger(pid) || pid < 1) return false;
+  try { process.kill(pid, 0); return true; }
+  catch (error) { return error.code !== "ESRCH"; }
+}
+
+async function portListening(port, host) {
+  return new Promise(resolve => {
+    const socket = net.createConnection({ port, host }); let settled = false;
+    const finish = value => { if (settled) return; settled = true; socket.destroy(); resolve(value); };
+    socket.setTimeout(700, () => finish(true)); // Unknown state is unsafe to copy.
+    socket.once("connect", () => finish(true));
+    socket.once("error", error => finish(!["ECONNREFUSED", "EHOSTUNREACH", "ENETUNREACH", "EAFNOSUPPORT"].includes(error.code)));
+  });
+}
+
+/** Read-only PID and TCP checks; no PostgreSQL credentials or protocol queries. */
+export async function assertHostStopped({ dataDir, port, pgPort, child, postgresPid }, probes = {}) {
+  const isAlive = probes.processAlive || processAlive, listening = probes.portListening || portListening;
+  if (child?.pid && isAlive(child.pid)) throw new Error("El proceso del Host sigue activo. No es seguro crear el respaldo.");
+  const pids = [postgresPid, readPostgresPid(dataDir)].filter(Boolean);
+  if (pids.some(pid => isAlive(pid))) throw new Error("PostgreSQL sigue activo. No se creará un respaldo de sus archivos en uso.");
+  for (const value of [...new Set([port, pgPort])]) {
+    if (!Number.isInteger(value) || value < 1024 || value > 65535) throw new Error("No se pudo comprobar el puerto del Host antes del respaldo.");
+    for (const host of ["127.0.0.1", "::1"]) if (await listening(value, host)) throw new Error("Un servicio del Host sigue escuchando. El respaldo y la actualización quedan bloqueados.");
   }
 }
 
-function stopChild(child) {
-  if (!child || child.exitCode !== null || child.killed) return Promise.resolve();
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      if (child.exitCode === null) child.kill("SIGKILL");
-      resolve();
-    }, 10_000);
-    child.once("exit", () => {
-      clearTimeout(timer);
-      resolve();
-    });
-    killChild(child);
+function signalChild(child, signal) {
+  if (signal === "SIGTERM" && child.connected && typeof child.send === "function") {
+    child.send({ type: "lexopen:stop" });
+  } else if (process.platform === "win32") {
+    const killer = spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", shell: false, windowsHide: true });
+    killer.on("error", () => {});
+  } else child.kill(signal);
+}
+
+/** A sent signal is not an exit. Resolve only after exit, or reject after both deadlines. */
+export function stopChild(child, { graceMs = 10_000, forceMs = 5_000, signalProcess = signalChild, requireCleanExit = false } = {}) {
+  if (!child) return Promise.resolve();
+  if (child.exitCode != null || child.signalCode != null) return requireCleanExit && child.exitCode !== 0 ? Promise.reject(new Error("El Host no confirmó una salida limpia.")) : Promise.resolve();
+  return new Promise((resolve, reject) => {
+    let forceTimer, finished = false;
+    const done = error => {
+      if (finished) return; finished = true; clearTimeout(graceTimer); clearTimeout(forceTimer);
+      child.removeListener("exit", exit); child.removeListener("error", fail);
+      if (error) reject(error); else resolve();
+    };
+    const exit = code => done(requireCleanExit && code !== 0 ? new Error("El Host no confirmó una salida limpia; no se hará el respaldo.") : undefined), fail = () => done(new Error("No se pudo detener y comprobar el proceso del Host."));
+    const graceTimer = setTimeout(() => {
+      try { signalProcess(child, "SIGKILL"); } catch { /* The exit deadline still decides. */ }
+      forceTimer = setTimeout(() => done(new Error("El proceso no confirmó su salida; no se realizará el respaldo.")), forceMs);
+    }, graceMs);
+    child.once("exit", exit); child.once("error", fail);
+    try { signalProcess(child, "SIGTERM"); } catch { fail(); }
   });
+}
+
+async function boundedStop(operation, label, timeoutMs = 15_000) {
+  let timer;
+  try { return await Promise.race([operation(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${label} no confirmó su parada dentro del límite.`)), timeoutMs); })]); }
+  finally { clearTimeout(timer); }
 }
 
 async function migrate() {
@@ -395,6 +658,7 @@ async function migrate() {
     await bundled;
     return;
   }
+  if (packagedHost()) throw new Error("Falta Prisma en el instalador de LexOpen. Reinstale una versión completa; no se descargará un runtime con npx.");
   await run("npx", ["prisma", "migrate", "deploy", "--schema", schema], {
     cwd: repoRoot,
     env: { DATABASE_URL: process.env.DATABASE_URL },
@@ -413,7 +677,10 @@ async function maybeSeed(seedDemo, dataDir) {
     env: { DATABASE_URL: process.env.DATABASE_URL },
   });
   if (bundled) await bundled;
-  else await run("npx", ["tsx", "prisma/seed.ts"]);
+  else {
+    if (packagedHost()) throw new Error("Falta TSX en el instalador de LexOpen; no se descargará un runtime con npx.");
+    await run("npx", ["tsx", "prisma/seed.ts"]);
+  }
   fs.writeFileSync(marker, new Date().toISOString(), "utf8");
 }
 
@@ -544,12 +811,12 @@ function startNextServer(port, bindHost = "127.0.0.1") {
   });
 }
 
-async function waitForHealth(url, attempts = 60) {
+async function waitForHealth(url, expected = {}, attempts = 60) {
   for (let i = 0; i < attempts; i++) {
     try {
       const res = await fetch(`${url}/api/health`, { redirect: "error" });
       const body = await res.json().catch(() => ({}));
-      if (res.ok && body.ok === true) {
+      if (res.ok && body.ok === true && body.db === "up" && (!expected.version || body.version === expected.version) && (!expected.buildId || body.buildId === expected.buildId)) {
         return { ok: true, needsSetup: Boolean(body.needsSetup) };
       }
     } catch {
@@ -560,13 +827,43 @@ async function waitForHealth(url, attempts = 60) {
   return { ok: false, needsSetup: false };
 }
 
-export async function startHost(options = {}) {
+export function previewAppVersion(version, dataDir) {
+  const previous = readAppState(dataDir);
+  return { changed: Boolean(version) && previous.lastAppVersion !== null && previous.lastAppVersion !== version, firstRun: !previous.lastAppVersion, previousVersion: previous.lastAppVersion, currentVersion: version };
+}
+
+export function readHostBuildIdentity(appRoot = repoRoot) {
+  const metadataFile = path.join(appRoot, "lexopen-release.json");
+  const metadata = fs.existsSync(metadataFile) ? JSON.parse(fs.readFileSync(metadataFile, "utf8")) : {};
+  const buildFile = [path.join(appRoot, ".next", "BUILD_ID"), path.join(appRoot, ".next", "standalone", ".next", "BUILD_ID")].find(file => fs.existsSync(file));
+  const buildId = buildFile ? fs.readFileSync(buildFile, "utf8").trim() : null;
+  if (buildId && !/^[\w.-]{1,256}$/.test(buildId)) throw new Error("La identidad de compilación de LexOpen no es válida.");
+  if (metadata.buildId && metadata.buildId !== buildId) throw new Error("Los recursos del instalador no corresponden a su compilación.");
+  let sourceRevision = typeof metadata.sourceRevision === "string" && /^[a-f0-9]{40,64}$/.test(metadata.sourceRevision) ? metadata.sourceRevision : null;
+  if (!sourceRevision && !packagedHost()) {
+    const revision = spawnSync("git", ["-C", appRoot, "rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], shell: false });
+    if (revision.status === 0 && /^[a-f0-9]{40,64}$/.test(revision.stdout.trim())) sourceRevision = revision.stdout.trim();
+  }
+  return { buildId, sourceRevision };
+}
+
+export function embeddedDatabasePort(databaseUrl) {
+  const url = new URL(databaseUrl);
+  if (!["postgres:", "postgresql:"].includes(url.protocol) || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) throw new Error("El Host embebido requiere una base PostgreSQL local; no se iniciarán migraciones contra otra máquina.");
+  const port = Number(url.port || 5432);
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("Puerto inválido para la base PostgreSQL embebida.");
+  return port;
+}
+
+/** Lifecycle overrides are an internal seam for offline startup/rollback tests. */
+export async function startHost(options = {}, overrides = {}) {
+  const lifecycle = { assertPortAvailable, startEmbeddedPostgres, migrate, maybeSeed, startNextServer, waitForHealth, stopChild, assertHostStopped, ...overrides };
   const dataDir = options.dataDir || defaultDataDir();
   process.env.LEXOPEN_DATA_DIR = dataDir;
 
   const cfg = readConfig(dataDir);
   const port = Number(options.port || process.env.PORT || cfg.port || 3000);
-  const pgPort = Number(options.pgPort || process.env.LEXOPEN_PG_PORT || cfg.pgPort || 54329);
+  let pgPort = Number(options.pgPort || process.env.LEXOPEN_PG_PORT || cfg.pgPort || 54329);
   validateHostPorts(port, pgPort);
   // seed solo si ya estaba guardado en config; no forzar en cada update
   const seedDemo = Boolean(
@@ -578,8 +875,8 @@ export async function startHost(options = {}) {
   const version = appVersion();
   process.env.LEXOPEN_APP_VERSION = version;
 
-  // Reconocer actualización de inmediato (app-state.json), sin tocar desktop-config/.env
-  const recognition = recognizeAppVersion(version, dataDir);
+  // Expose the candidate version for health, but commit it only after startup succeeds.
+  const recognition = previewAppVersion(version, dataDir);
   process.env.LEXOPEN_APP_VERSION = version;
   process.env.LEXOPEN_UPDATE_RECOGNIZED = recognition.changed ? "1" : "0";
   if (recognition.previousVersion) {
@@ -587,12 +884,12 @@ export async function startHost(options = {}) {
   }
   if (recognition.changed) {
     console.log(
-      `[lexopen-host] Actualización reconocida: ${recognition.previousVersion} → ${recognition.currentVersion}`
+      `[lexopen-host] Preparando actualización: ${recognition.previousVersion} → ${recognition.currentVersion}`
     );
   } else if (recognition.firstRun) {
-    console.log(`[lexopen-host] Primera ejecución · v${version}`);
+    console.log(`[lexopen-host] Preparando primera ejecución · v${version}`);
   } else {
-    console.log(`[lexopen-host] Versión activa v${version} (datos preservados)`);
+    console.log(`[lexopen-host] Preparando Host v${version} (datos preservados)`);
   }
 
   const host = ensureHostEnv(dataDir, { port, pgPort, seedDemo, publicUrl });
@@ -602,6 +899,14 @@ export async function startHost(options = {}) {
   // Strip CI/shell relaxations that would fail instrumentation in NODE_ENV=production.
   applyHostFailClosedEnv(process.env);
   ensureHostToolPath(process.env);
+  const identity = overrides.buildIdentity || readHostBuildIdentity(repoRoot);
+  process.env.LEXOPEN_BUILD_ID = identity.buildId || "";
+  process.env.LEXOPEN_SOURCE_REVISION = identity.sourceRevision || "";
+  if (packagedHost()) {
+    const browsers = path.join(repoRoot, "playwright-browsers");
+    if (!fs.existsSync(browsers)) throw new Error("Falta Chromium en los recursos del instalador de LexOpen.");
+    process.env.PLAYWRIGHT_BROWSERS_PATH = browsers;
+  }
   // Reafirmar tras cargar .env (el archivo no debe pisar la versión del binario)
   process.env.LEXOPEN_APP_VERSION = version;
   process.env.LEXOPEN_DATA_DIR = dataDir;
@@ -609,6 +914,9 @@ export async function startHost(options = {}) {
   process.env.PORT = String(host.port);
   process.env.HOSTNAME = host.bindHost || process.env.HOSTNAME || "127.0.0.1";
   process.env.STORAGE_PATH = host.storagePath || process.env.STORAGE_PATH;
+  pgPort = embeddedDatabasePort(host.databaseUrl);
+  host.pgPort = pgPort;
+  validateHostPorts(host.port, pgPort);
   process.env.LEXOPEN_UPDATE_RECOGNIZED = recognition.changed ? "1" : "0";
   if (host.envPreserved) {
     console.log(
@@ -629,28 +937,46 @@ export async function startHost(options = {}) {
 
   let pg = null;
   let child = null;
+  let nextStartupError = null, nextStartupFailure;
+  let unwatchNextStartup = () => {};
   try {
-    await assertPortAvailable(pgPort, "PostgreSQL");
-    pg = await startEmbeddedPostgres(dataDir, pgPort, host.databaseUrl);
-    await migrate();
-    await maybeSeed(seedDemo, dataDir);
-    await assertPortAvailable(host.port, "LexOpen", bindHost);
+    await duringHostPhase("PG_START", () => lifecycle.assertPortAvailable(pgPort, "PostgreSQL"));
+    pg = await duringHostPhase("PG_START", () => lifecycle.startEmbeddedPostgres(dataDir, pgPort, host.databaseUrl));
+    await duringHostPhase("MIGRATION", () => lifecycle.migrate());
+    await duringHostPhase("MIGRATION", () => lifecycle.maybeSeed(seedDemo, dataDir));
+    await duringHostPhase("NEXT_START", () => lifecycle.assertPortAvailable(host.port, "LexOpen", bindHost));
 
-    child = startNextServer(host.port, bindHost);
+    child = await duringHostPhase("NEXT_START", () => {
+      const started = lifecycle.startNextServer(host.port, bindHost);
+      // spawn errors are emitted asynchronously; observe them before awaiting
+      // anything so a failed launch remains NEXT_START rather than a timeout.
+      if (typeof started?.once === "function") {
+        nextStartupFailure = new Promise((_resolve, reject) => {
+          const failed = () => { nextStartupError = lifecycleFailure("NEXT_START"); reject(nextStartupError); };
+          started.once("error", failed);
+          unwatchNextStartup = () => started.removeListener("error", failed);
+        });
+        void nextStartupFailure.catch(() => undefined);
+      }
+      return started;
+    });
     const url = localAppUrl(host.port);
-    const health = await waitForHealth(url);
-    if (!health.ok) {
-      throw new Error("[lexopen-host] Health check falló; el servidor no está listo.");
-    }
+    const health = await duringHostPhase("HEALTH", async () => {
+      if (nextStartupError) throw nextStartupError;
+      const pending = lifecycle.waitForHealth(url, { version, buildId: identity.buildId });
+      const result = await (nextStartupFailure ? Promise.race([pending, nextStartupFailure]) : pending);
+      if (nextStartupError) throw nextStartupError;
+      if (!result?.ok) throw new Error("Host health unavailable");
+      return result;
+    });
+    unwatchNextStartup();
     const needsSetup = health.needsSetup;
     const bootstrapToken = needsSetup
       ? process.env.LEXOPEN_BOOTSTRAP_TOKEN || ""
       : null;
     const recoveryToken = process.env.LEXOPEN_RECOVERY_TOKEN || "";
     if (needsSetup && !bootstrapToken) {
-      throw new Error(
-        "[lexopen-host] No hay token de configuración inicial; revise el archivo .env del Host."
-      );
+      throw lifecycleFailure("HEALTH");
     }
     if (needsSetup) {
       console.log(
@@ -668,7 +994,9 @@ export async function startHost(options = {}) {
         "scripts",
         "local-host-schedulers.mjs"
       );
-      if (fs.existsSync(schedulersModule)) {
+      if (overrides.startSchedulers) {
+        hostSchedulers = await overrides.startSchedulers();
+      } else if (fs.existsSync(schedulersModule)) {
         const { startLocalHostSchedulers } = await import(
           pathToFileURL(schedulersModule).href
         );
@@ -694,21 +1022,18 @@ export async function startHost(options = {}) {
     const stop = async () => {
       if (stopPromise) return stopPromise;
       stopPromise = (async () => {
-        try {
-          hostSchedulers?.stop?.();
-        } catch (e) {
-          console.warn("[lexopen-host] schedulers.stop:", e);
-        }
-        await stopChild(child);
-        try {
-          await pg.stop();
-        } catch (e) {
-          console.warn("[lexopen-host] pg.stop:", e);
-        }
+        const errors = [], postgresPid = readPostgresPid(dataDir);
+        try { await boundedStop(() => Promise.resolve(hostSchedulers?.stop?.()), "El programador"); } catch (error) { errors.push(error); }
+        try { await lifecycle.stopChild(child); } catch (error) { errors.push(error); }
+        try { await boundedStop(() => pg.stop(), "PostgreSQL", process.platform === "win32" ? 30_000 : 15_000); } catch (error) { errors.push(error); }
+        try { await lifecycle.assertHostStopped({ dataDir, port: host.port, pgPort, child, postgresPid }); } catch (error) { errors.push(error); }
+        if (errors.length) throw new AggregateError(errors, "No se confirmó una parada completa del Host. El respaldo y la instalación quedan bloqueados.");
       })();
-      return stopPromise;
+      try { return await stopPromise; } catch (error) { stopPromise = null; throw error; }
     };
 
+    recognizeAppVersion(version, dataDir);
+    console.log(`[lexopen-host] Host verificado · versión aplicada v${version}`);
     return {
       url,
       publicUrl: host.publicUrl,
@@ -717,6 +1042,8 @@ export async function startHost(options = {}) {
       child,
       dataDir,
       version,
+      buildId: identity.buildId,
+      sourceRevision: identity.sourceRevision,
       needsSetup,
       bootstrapToken,
       recoveryToken,
@@ -724,7 +1051,9 @@ export async function startHost(options = {}) {
       previousVersion: recognition.previousVersion,
     };
   } catch (error) {
-    await stopChild(child);
+    unwatchNextStartup();
+    // A cleanup error must not replace the safe diagnostic of the failing step.
+    try { await lifecycle.stopChild(child); } catch { if (error) error.cleanupFailed = true; }
     if (pg) await pg.stop().catch(() => undefined);
     throw error;
   }
@@ -735,12 +1064,11 @@ const isMain =
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   let hostHandle;
-  const shutdown = () =>
-    Promise.resolve(hostHandle?.stop?.())
-      .catch((e) => console.warn("[lexopen-host] shutdown:", e))
-      .finally(() => process.exit(0));
+  const shutdown = () => Promise.resolve(hostHandle?.stop?.()).then(() => process.exit(0), error => { console.error("[lexopen-host] No se confirmó la parada:", error.message); process.exit(1); });
   process.once("SIGINT", () => void shutdown());
   process.once("SIGTERM", () => void shutdown());
+  process.on("message", message => { if (message?.type === "lexopen:stop") void shutdown(); });
+  if (process.connected) process.once("disconnect", () => void shutdown());
   startHost()
     .then((handle) => {
       hostHandle = handle;

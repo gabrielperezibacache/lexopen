@@ -13,6 +13,7 @@ import { redisRateLimitConfigured } from "@/lib/auth/redis-rate-limit";
 import { getPjudQueueStatus } from "@/lib/pjud/queue";
 import { getLlmConfig } from "@/lib/integrations/llm";
 import { log, newRequestId, setRequestId } from "@/lib/log";
+import { hostBuildDetails } from "@/lib/host-build";
 
 function desktopDetails() {
   return {
@@ -131,6 +132,7 @@ export async function GET(req: NextRequest) {
 
     // Detailed recon (OCR, desktop URL/version) only for staff or local desktop.
     if (staff || (desktopRuntime && localProbe)) {
+      Object.assign(publicBody, hostBuildDetails({ staff, desktopRuntime, localProbe }));
       const ocr = await getOcrCapability();
       publicBody.ocr = ocr;
       if (staff) {

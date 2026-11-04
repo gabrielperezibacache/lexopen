@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -13,32 +14,11 @@ function fail(message) {
 }
 
 function databaseForE2e() {
-  const value = process.env.E2E_DATABASE_URL;
-  if (!value) {
-    fail(
-      "Defina E2E_DATABASE_URL apuntando a una base PostgreSQL local " +
-        "dedicada, por ejemplo lexopen_e2e."
-    );
-  }
-  let url;
   try {
-    url = new URL(value);
-  } catch {
-    fail("E2E_DATABASE_URL no es una URL válida.");
+    return assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : "Base E2E inválida");
   }
-  if (!url || !["postgresql:", "postgres:"].includes(url.protocol)) {
-    fail("E2E_DATABASE_URL debe usar PostgreSQL.");
-  }
-  if (!["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
-    fail("E2E_DATABASE_URL solo puede apuntar a PostgreSQL local.");
-  }
-  if (!/(e2e|test)/i.test(url.pathname)) {
-    fail(
-      "La base E2E debe tener un nombre que incluya `e2e` o `test`; " +
-        "no se permite usar una base de producción."
-    );
-  }
-  return value;
 }
 
 function run(command, args, env) {

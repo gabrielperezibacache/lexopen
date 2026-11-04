@@ -15,6 +15,9 @@ const DEFAULTS = {
   pgPort: 54329,
   seedDemo: false,
   publicUrl: "",
+  hostDataDir: "",
+  updateChecks: true,
+  updateChannel: "stable",
 };
 
 /** Claves que el runtime puede crear si faltan, pero NUNCA pisar si ya existen. */
@@ -79,8 +82,57 @@ function defaultDataDir() {
 }
 
 function ensureDir(dir) {
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   return dir;
+}
+
+function activeDataDir(config = readConfig()) {
+  return config.hostDataDir ? path.resolve(config.hostDataDir) : config.dataDir || defaultDataDir();
+}
+
+/** Validate an explicitly selected existing directory; never moves or rewrites it. */
+function validateExistingDataDirectory(candidate, { installRoots = [], currentDataDir = "" } = {}) {
+  if (typeof candidate !== "string" || !path.isAbsolute(candidate)) throw new Error("Seleccione una carpeta de datos existente.");
+  const stat = fs.lstatSync(candidate);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("Elija una carpeta real, no un enlace ni un archivo.");
+  const resolved = fs.realpathSync(candidate);
+  const within = (parent, child) => child === parent || child.startsWith(parent + path.sep);
+  const canonical = value => { try { return fs.realpathSync(value); } catch { return path.resolve(value); } };
+  if (resolved === path.parse(resolved).root || resolved === canonical(os.homedir()) || installRoots.some(root => root && (within(canonical(root), resolved) || within(resolved, canonical(root))))) {
+    throw new Error("Elija una carpeta dedicada fuera de la instalación y de las carpetas generales del equipo.");
+  }
+  fs.accessSync(resolved, fs.constants.R_OK | fs.constants.W_OK);
+  const entries = fs.readdirSync(resolved);
+  const envFile = path.join(resolved, ".env");
+  if (entries.length && !fs.existsSync(envFile) && entries.some(name => name !== "desktop-config.json")) throw new Error("La carpeta contiene archivos que no identifican una instalación LexOpen. Elija una carpeta vacía o la carpeta de datos anterior.");
+  if (fs.existsSync(envFile)) {
+    if (fs.lstatSync(envFile).isSymbolicLink()) throw new Error("La configuración de la carpeta no puede ser un enlace a otra instalación.");
+    const { map } = parseEnvFile(fs.readFileSync(envFile, "utf8"));
+    const ownedRuntime = map.LEXOPEN_DESKTOP === "1" && map.LEXOPEN_DATA_DIR && canonical(map.LEXOPEN_DATA_DIR) === resolved;
+    const ownedDatabase = fs.existsSync(path.join(resolved, "pgdata", "PG_VERSION")) && fs.existsSync(path.join(resolved, "storage"));
+    if (!ownedRuntime && !ownedDatabase) throw new Error("La configuración no identifica los datos de un Host LexOpen embebido. No se conectó ni modificó otra base del equipo.");
+    for (const key of ["STORAGE_PATH", "OBSIDIAN_VAULT_PATH"]) {
+      if (map[key] && !within(resolved, path.resolve(resolved, map[key]))) throw new Error("Esta instalación usa archivos fuera de la carpeta elegida. Conserve su configuración anterior y prepare un respaldo completo antes de cambiar; LexOpen no moverá archivos automáticamente.");
+    }
+    if (map.DATABASE_URL) {
+      const database = new URL(map.DATABASE_URL);
+      if (!["postgres:", "postgresql:"].includes(database.protocol) || !["localhost", "127.0.0.1", "[::1]"].includes(database.hostname) || database.searchParams.has("host") || database.searchParams.has("hostaddr")) throw new Error("Esta carpeta utiliza una base externa. Su migración y respaldo requieren preparación manual; no se modificó la instalación.");
+    }
+  }
+  for (const name of ["pgdata", "storage", "obsidian-vault"]) {
+    const item = path.join(resolved, name);
+    if (fs.existsSync(item) && fs.lstatSync(item).isSymbolicLink()) throw new Error("Los datos de esta instalación incluyen enlaces externos. Prepare una recuperación supervisada; no se movió ningún archivo.");
+  }
+  const pidFile = path.join(resolved, "pgdata", "postmaster.pid");
+  if ((!currentDataDir || resolved !== canonical(currentDataDir)) && fs.existsSync(pidFile)) {
+    const pid = Number(fs.readFileSync(pidFile, "utf8").split(/\r?\n/)[0]);
+    if (Number.isInteger(pid) && pid > 0) {
+      let running = false;
+      try { process.kill(pid, 0); running = true; } catch (error) { if (error.code === "EPERM") running = true; }
+      if (running) throw new Error("Otro servicio está usando esta carpeta. Deténgalo antes de abrirla con LexOpen.");
+    }
+  }
+  return resolved;
 }
 
 function configPath(dataDir = defaultDataDir()) {
@@ -133,7 +185,9 @@ function readJsonSafe(file, fallback) {
 function replaceFileAtomic(file, contents) {
   ensureDir(path.dirname(file));
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, contents, "utf8");
+  const secret = path.basename(file) === ".env";
+  fs.writeFileSync(tmp, contents, { encoding: "utf8", ...(secret ? { mode: 0o600 } : {}) });
+  if (secret) fs.chmodSync(tmp, 0o600);
   try {
     fs.renameSync(tmp, file);
   } catch (e) {
@@ -155,6 +209,7 @@ function replaceFileAtomic(file, contents) {
       throw e;
     }
   }
+  if (secret) fs.chmodSync(file, 0o600);
 }
 
 function writeJsonAtomic(file, data) {
@@ -503,6 +558,8 @@ module.exports = {
   DEFAULTS,
   PRESERVE_IF_SET,
   defaultDataDir,
+  activeDataDir,
+  validateExistingDataDirectory,
   ensureDir,
   configPath,
   envPath,

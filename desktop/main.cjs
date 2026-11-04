@@ -11,7 +11,9 @@ const {
   writeConfig,
   normalizeRemoteUrl,
   localAppUrl,
-  defaultDataDir,
+  activeDataDir,
+  validateExistingDataDirectory,
+  parseEnvFile,
   readPackageVersion,
   readAppState,
 } = require("./config.cjs");
@@ -20,9 +22,12 @@ const {
   finalizeRestore,
   restoreDataDirectory,
   rollbackRestore,
+  defaultBackupDirectory,
+  validateBackupDirectory,
 } = require("./backup.cjs");
 const { isAllowedExternalUrl } = require("./external-url.cjs");
 const { attachMicrophoneGuards } = require("./media-permissions.cjs");
+const { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, assertUpdateVersion, friendlyUpdateError, withNetworkRetry, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools } = require("./update-policy.cjs");
 
 let mainWindow = null;
 let currentDesktopAppUrl = "";
@@ -38,12 +43,25 @@ let updatePromptActive = false;
 let clientWatchTimer = null;
 let booting = false;
 let quitting = false;
+let updateCheckTimer = null;
+let pendingDataDirectory = null;
+let maintenanceActive = false;
+
+function hostDataDirectory() { return activeDataDir(readConfig()); }
+
+function changeUpdatePreferences(partial) {
+  if (updateDownloadedInfo || updaterCheckPromise || updatePromptActive) {
+    void dialog.showMessageBox({ type: "info", message: "Termine la actualización pendiente antes de cambiar el canal." });
+    return;
+  }
+  writeConfig(partial);
+  configureAutoUpdater();
+  buildMenu();
+}
 
 function bundledVersion() {
-  return (
-    process.env.LEXOPEN_APP_VERSION ||
-    readPackageVersion(path.join(__dirname, "package.json"))
-  );
+  const version = readPackageVersion(path.join(__dirname, "package.json"));
+  return app.isPackaged ? version : process.env.LEXOPEN_APP_VERSION || version;
 }
 
 function sendStatus(partial) {
@@ -54,21 +72,17 @@ function sendStatus(partial) {
 }
 
 function configureAutoUpdater() {
-  if (updaterConfigured || !app.isPackaged) return;
+  if (!app.isPackaged) return;
+  applyUpdaterPolicy(autoUpdater, readConfig());
+  if (updaterConfigured) return;
   updaterConfigured = true;
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.allowPrerelease = false;
-  autoUpdater.allowDowngrade = false;
-  // Prefer signed updates when the platform supports verification.
-  if ("verifyUpdateCodeSignature" in autoUpdater) {
-    autoUpdater.verifyUpdateCodeSignature = true;
-  }
 
   autoUpdater.on("checking-for-update", () => {
     sendStatus({ phase: "checking-update", message: "Buscando actualizaciones…" });
   });
   autoUpdater.on("update-available", (info) => {
+    try { assertUpdateVersion(bundledVersion(), info.version, updatePreferences(readConfig()).channel); }
+    catch (error) { sendStatus({ phase: "update-error", message: error.message }); return; }
     sendStatus({
       phase: "update-available",
       message: `Actualización v${info.version} disponible`,
@@ -88,6 +102,8 @@ function configureAutoUpdater() {
     interactiveUpdateCheck = false;
   });
   autoUpdater.on("update-downloaded", (info) => {
+    try { assertUpdateVersion(bundledVersion(), info.version, updatePreferences(readConfig()).channel); }
+    catch (error) { sendStatus({ phase: "update-error", message: error.message }); return; }
     updateDownloadedInfo = info;
     sendStatus({
       phase: "update-downloaded",
@@ -97,16 +113,19 @@ function configureAutoUpdater() {
     void promptInstallUpdate(info);
   });
   autoUpdater.on("error", (error) => {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = friendlyUpdateError(error);
     sendStatus({ phase: "update-error", message });
-    if (interactiveUpdateCheck) {
-      void dialog.showErrorBox("Actualizaciones", message);
-    }
-    interactiveUpdateCheck = false;
+  });
+  autoUpdater.on("download-progress", (progress) => {
+    const percent = Math.max(0, Math.min(100, Number(progress.percent) || 0));
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setProgressBar(percent / 100);
+    sendStatus({ phase: "downloading-update", message: `Descargando actualización: ${Math.round(percent)} %`, progress: percent });
   });
 }
 
 async function checkForUpdates(interactive = false) {
+  if (quitting || shuttingDown || !interactive && !updatePreferences(readConfig()).enabled) return null;
+  if (updateDownloadedInfo) { if (interactive) await promptInstallUpdate(updateDownloadedInfo); return null; }
   if (!app.isPackaged) {
     if (interactive) {
       await dialog.showMessageBox({
@@ -120,10 +139,12 @@ async function checkForUpdates(interactive = false) {
   configureAutoUpdater();
   if (updaterCheckPromise) return updaterCheckPromise;
   interactiveUpdateCheck = interactive;
-  updaterCheckPromise = autoUpdater
-    .checkForUpdates()
+  updaterCheckPromise = withNetworkRetry(() => autoUpdater.checkForUpdates(), {
+    onRetry: () => sendStatus({ phase: "checking-update", message: "La conexión falló; volviendo a comprobar el canal…" }),
+  })
     .catch((error) => {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = friendlyUpdateError(error);
+      sendStatus({ phase: "update-error", message });
       if (interactive) {
         dialog.showErrorBox("Actualizaciones", message);
       }
@@ -132,6 +153,7 @@ async function checkForUpdates(interactive = false) {
     })
     .finally(() => {
       updaterCheckPromise = null;
+      interactiveUpdateCheck = false;
     });
   return updaterCheckPromise;
 }
@@ -152,39 +174,68 @@ async function promptDownloadUpdate(info) {
     });
     if (result.response === 0) {
       sendStatus({ phase: "downloading-update", message: "Descargando actualización…" });
-      await autoUpdater.downloadUpdate();
+      await withNetworkRetry(() => autoUpdater.downloadUpdate(), { onRetry: () => sendStatus({ phase: "downloading-update", message: "Se interrumpió la descarga; reintentando…" }) });
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = friendlyUpdateError(error);
     dialog.showErrorBox("Actualizaciones", message);
   } finally {
     updatePromptActive = false;
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setProgressBar(-1);
+    if (updateDownloadedInfo && !quitting) void promptInstallUpdate(updateDownloadedInfo);
   }
 }
 
 async function promptInstallUpdate(info) {
   if (updatePromptActive) return;
   updatePromptActive = true;
+  let ownsMaintenance = false;
   try {
     const result = await dialog.showMessageBox({
       type: "info",
       title: "Actualización descargada",
       message: `LexOpen ${info.version} está lista.`,
       detail:
-        "Se cerrará el Host de forma ordenada y la instalación conservará la carpeta de datos.",
+        "En modo Host se detendrá el servidor y se comprobará un respaldo consistente antes de instalar. Guarde su trabajo y detenga las grabaciones; sus clientes perderán conexión durante el reinicio.",
       buttons: ["Reiniciar e instalar", "Más tarde"],
       defaultId: 0,
       cancelId: 1,
     });
     if (result.response === 0) {
-      await stopHostForMaintenance();
-      autoUpdater.quitAndInstall(false, true);
+      if (maintenanceActive) throw new Error("Ya hay un respaldo o una operación de mantenimiento en curso.");
+      maintenanceActive = true;
+      ownsMaintenance = true;
+      assertUpdateVersion(bundledVersion(), info.version, updatePreferences(readConfig()).channel);
+      const cfg = readConfig();
+      await installPreparedUpdate({
+        mode: cfg.mode,
+        stopHost: async () => { if (!hostHandle) throw new Error("Inicie el Host antes de preparar el respaldo de actualización."); await stopHostForMaintenance(); },
+        backupHost: async () => {
+          const dataDir = hostDataDirectory();
+          validateExistingDataDirectory(dataDir);
+          const destination = path.join(defaultBackupDirectory(dataDir), `pre-update-${Date.now()}-${require("node:crypto").randomUUID()}`);
+          await createDataBackup(dataDir, destination, { appVersion: bundledVersion(), backupMode: "pre-update" });
+          const checked = await validateBackupDirectory(destination);
+          await verifyBackupContents(dataDir, destination);
+          sendStatus({ backupCreated: true, message: "Respaldo comprobado. Preparando la instalación…" });
+          return checked.manifest;
+        },
+        install: async () => {
+          if (clientWatchTimer) clearInterval(clientWatchTimer);
+          quitting = true;
+          try { autoUpdater.quitAndInstall(false, true); }
+          catch (error) { quitting = false; throw error; }
+        },
+        restartHost: () => restartHostAfterMaintenance(cfg),
+        status: phase => sendStatus({ phase, message: phase === "backing-up" ? "Creando y comprobando el respaldo del Host…" : "Preparando actualización…" }),
+      });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     dialog.showErrorBox("Actualizaciones", message);
   } finally {
     updatePromptActive = false;
+    if (ownsMaintenance) maintenanceActive = false;
   }
 }
 
@@ -369,9 +420,10 @@ async function startHostMode(cfg) {
   sendStatus({ phase: "starting-host", message: "Arrancando servidor local…" });
   const { startHost } = await import("./host-runtime.mjs");
   hostHandle = await startHost({
-    dataDir: defaultDataDir(),
+    dataDir: hostDataDirectory(),
     port: cfg.port,
     pgPort: cfg.pgPort,
+    publicUrl: cfg.publicUrl,
   });
   // Setup token goes into an httpOnly cookie — never the address bar / status IPC.
   if (hostHandle.needsSetup && hostHandle.bootstrapToken) {
@@ -425,6 +477,7 @@ async function chooseDirectory(title, buttonLabel, defaultPath) {
 }
 
 async function createHostBackup() {
+  if (maintenanceActive) return dialog.showErrorBox("LexOpen", "Hay otra operación de mantenimiento en curso.");
   if (!hostHandle) {
     dialog.showErrorBox("LexOpen", "El respaldo requiere un Host activo.");
     return;
@@ -433,16 +486,18 @@ async function createHostBackup() {
     "Elegir destino del respaldo",
     "Crear respaldo aquí",
     path.join(
-      path.dirname(defaultDataDir()),
+      path.dirname(hostDataDirectory()),
       `LexOpen-backup-${new Date().toISOString().replace(/[:.]/g, "-")}`
     )
   );
   if (!destination) return;
+  if (maintenanceActive) return;
+  maintenanceActive = true;
 
   const cfg = readConfig();
   try {
     await stopHostForMaintenance();
-    const manifest = await createDataBackup(defaultDataDir(), destination, {
+    const manifest = await createDataBackup(hostDataDirectory(), destination, {
       appVersion: bundledVersion(),
     });
     await restartHostAfterMaintenance(cfg);
@@ -462,10 +517,11 @@ async function createHostBackup() {
       "No se pudo crear el respaldo",
       error instanceof Error ? error.message : String(error)
     );
-  }
+  } finally { maintenanceActive = false; }
 }
 
 async function restoreHostBackup() {
+  if (maintenanceActive) return dialog.showErrorBox("LexOpen", "Hay otra operación de mantenimiento en curso.");
   if (!hostHandle) {
     dialog.showErrorBox("LexOpen", "La restauración requiere un Host activo.");
     return;
@@ -473,7 +529,7 @@ async function restoreHostBackup() {
   const backupDir = await chooseDirectory(
     "Elegir respaldo LexOpen",
     "Usar este respaldo",
-    path.dirname(defaultDataDir())
+    path.dirname(hostDataDirectory())
   );
   if (!backupDir) return;
   const confirmation = await dialog.showMessageBox({
@@ -487,12 +543,14 @@ async function restoreHostBackup() {
     cancelId: 0,
   });
   if (confirmation.response !== 1) return;
+  if (maintenanceActive) return;
+  maintenanceActive = true;
 
   const cfg = readConfig();
   let replacement = null;
   try {
     await stopHostForMaintenance();
-    replacement = await restoreDataDirectory(defaultDataDir(), backupDir);
+    replacement = await restoreDataDirectory(hostDataDirectory(), backupDir);
     await restartHostAfterMaintenance(cfg);
     try {
       await finalizeRestore(replacement.rollback);
@@ -512,7 +570,7 @@ async function restoreHostBackup() {
     try {
       if (hostHandle?.stop) await stopHostForMaintenance();
       if (replacement) {
-        await rollbackRestore(defaultDataDir(), replacement.rollback);
+        await rollbackRestore(hostDataDirectory(), replacement.rollback);
       }
       await restartHostAfterMaintenance(cfg);
     } catch (rollbackError) {
@@ -522,7 +580,7 @@ async function restoreHostBackup() {
       "No se pudo restaurar el respaldo",
       error instanceof Error ? error.message : String(error)
     );
-  }
+  } finally { maintenanceActive = false; }
 }
 
 function buildMenu() {
@@ -544,7 +602,7 @@ function buildMenu() {
           },
           {
             label: "Abrir carpeta de datos",
-            click: () => shell.openPath(defaultDataDir()),
+            click: () => shell.openPath(hostDataDirectory()),
           },
           {
             label: "Crear respaldo…",
@@ -557,6 +615,25 @@ function buildMenu() {
           {
             label: "Buscar actualizaciones…",
             click: () => void checkForUpdates(true),
+          },
+          {
+            label: "Actualizaciones",
+            submenu: [
+              { label: "Comprobar automáticamente cada seis horas", type: "checkbox", checked: updatePreferences(readConfig()).enabled, click: item => changeUpdatePreferences({ updateChecks: item.checked }) },
+              { label: "Canal estable", type: "radio", checked: updatePreferences(readConfig()).channel === "stable", click: () => changeUpdatePreferences({ updateChannel: "stable" }) },
+              { label: "Canal Vista previa", type: "radio", checked: updatePreferences(readConfig()).channel === "preview", click: () => changeUpdatePreferences({ updateChannel: "preview" }) },
+              { type: "separator" },
+              { label: "Descargar instalador oficial…", click: () => void shell.openExternal(RELEASES_URL) },
+            ],
+          },
+          {
+            label: "Comprobar herramientas opcionales…",
+            click: () => void (async () => {
+              const envFile = path.join(hostDataDirectory(), ".env");
+              const configured = fs.existsSync(envFile) ? parseEnvFile(fs.readFileSync(envFile, "utf8")).map : {};
+              const results = await diagnoseOptionalTools({ env: { ...process.env, OCR_PDFTOPPM_BIN: configured.OCR_PDFTOPPM_BIN || process.env.OCR_PDFTOPPM_BIN, OCR_TESSERACT_BIN: configured.OCR_TESSERACT_BIN || process.env.OCR_TESSERACT_BIN, CODEX_BIN: configured.CODEX_BIN || process.env.CODEX_BIN } });
+              await dialog.showMessageBox({ type: "info", title: "Herramientas opcionales", message: "Diagnóstico local; no se instaló ni actualizó ninguna herramienta.", detail: results.map(row => `${row.name}: ${row.message}\n${row.help}`).join("\n\n") + "\n\nChromium/OJV se comprueba desde la configuración PJUD del Host. El entorno aislado requiere su preparación expresa; no se instala Docker automáticamente." });
+            })().catch(() => dialog.showErrorBox("Herramientas opcionales", "No se pudo completar el diagnóstico. Revise la configuración del Host.")),
           },
           {
             label: "Recuperar contraseña admin…",
@@ -581,7 +658,7 @@ function buildMenu() {
           {
             label: "Versión y estado",
             click: () => {
-              const state = readAppState(defaultDataDir());
+              const state = readAppState(hostDataDirectory());
               dialog.showMessageBox({
                 type: "info",
                 title: "LexOpen",
@@ -589,7 +666,9 @@ function buildMenu() {
                 detail: [
                   `Última aplicada: ${state.lastAppVersion || "—"}`,
                   `Reconocida: ${state.updateRecognizedAt || "—"}`,
-                  `Datos: ${defaultDataDir()}`,
+                  `Datos: ${hostDataDirectory()}`,
+                  `Actualizaciones: ${updatePreferences(readConfig()).channel === "preview" ? "Vista previa" : "Estable"}`,
+                  lastStatus.message || "",
                   "Las actualizaciones no borran .env, pgdata ni storage.",
                 ].join("\n"),
               });
@@ -687,13 +766,30 @@ ipcMain.handle("desktop:get-state", async () => {
   return {
     config: cfg,
     status: lastStatus,
-    dataDir: defaultDataDir(),
-    appState: readAppState(defaultDataDir()),
+    dataDir: hostDataDirectory(),
+    appState: readAppState(hostDataDirectory()),
     version: bundledVersion(),
   };
 });
 
-ipcMain.handle("desktop:save-setup", async (_e, payload) => {
+ipcMain.handle("desktop:choose-data-directory", async event => {
+  if (event.sender !== mainWindow?.webContents || !event.sender.getURL().startsWith("file:")) return { ok: false, error: "Abra el asistente de configuración para elegir una carpeta." };
+  const result = await dialog.showOpenDialog(mainWindow, { title: "Elegir carpeta de datos existente", buttonLabel: "Usar esta carpeta", defaultPath: hostDataDirectory(), properties: ["openDirectory"] });
+  if (result.canceled || !result.filePaths[0]) return { ok: true, cancelled: true };
+  try {
+    const dataDir = validateExistingDataDirectory(result.filePaths[0], { installRoots: [app.getAppPath(), process.resourcesPath].filter(Boolean), currentDataDir: hostDataDirectory() });
+    pendingDataDirectory = dataDir;
+    const previous = readConfig(dataDir);
+    const envFile = path.join(dataDir, ".env");
+    const env = fs.existsSync(envFile) ? parseEnvFile(fs.readFileSync(envFile, "utf8")).map : {};
+    const pgPort = env.DATABASE_URL ? Number(new URL(env.DATABASE_URL).port || 5432) : previous.pgPort;
+    return { ok: true, dataDir, port: Number(env.PORT) || previous.port, pgPort, publicUrl: env.NEXT_PUBLIC_APP_URL || previous.publicUrl };
+  } catch (error) { return { ok: false, error: error.message }; }
+});
+
+ipcMain.handle("desktop:save-setup", async (event, payload) => {
+  if (event.sender !== mainWindow?.webContents || !event.sender.getURL().startsWith("file:")) return { ok: false, error: "Abra el asistente de configuración para guardar estos cambios." };
+  if (maintenanceActive || booting) return { ok: false, error: "Espere a que termine el arranque o mantenimiento del Host." };
   const mode = payload?.mode === "client" ? "client" : "host";
   const remoteUrl = normalizeRemoteUrl(payload?.remoteUrl || "");
   const port = Number(payload?.port) || 3000;
@@ -705,7 +801,12 @@ ipcMain.handle("desktop:save-setup", async (_e, payload) => {
     return { ok: false, error: "Indique la URL del PC principal (Tailscale)." };
   }
 
-  writeConfig({ mode, remoteUrl, port, pgPort, seedDemo, publicUrl });
+  if (![port, pgPort].every(value => Number.isInteger(value) && value >= 1024 && value <= 65535)) return { ok: false, error: "Los puertos deben estar entre 1024 y 65535." };
+  const chosen = pendingDataDirectory || hostDataDirectory();
+  try { if (pendingDataDirectory) validateExistingDataDirectory(chosen, { installRoots: [app.getAppPath(), process.resourcesPath].filter(Boolean), currentDataDir: hostDataDirectory() }); }
+  catch (error) { return { ok: false, error: error.message }; }
+  writeConfig({ mode, remoteUrl, port, pgPort, seedDemo, publicUrl, ...(mode === "host" && pendingDataDirectory ? { hostDataDir: chosen } : {}), updateChecks: payload?.updateChecks !== false, updateChannel: payload?.updateChannel === "preview" ? "preview" : "stable" });
+  pendingDataDirectory = null;
   await stopHostIfRunning();
 
   if (mode === "client") {
@@ -778,7 +879,9 @@ app.whenReady().then(() => {
     process.env.LEXOPEN_PRISMA_ROOT = path.join(process.resourcesPath, "prisma");
   }
   configureAutoUpdater();
-  setTimeout(() => void checkForUpdates(false), 8000);
+  setTimeout(() => void checkForUpdates(false), 8000).unref();
+  updateCheckTimer = setInterval(() => void checkForUpdates(false), CHECK_INTERVAL_MS);
+  updateCheckTimer.unref();
   void boot();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) void boot();
@@ -790,6 +893,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", (event) => {
+  if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (shuttingDown || quitting) return;
   if (!hostHandle?.stop && !clientWatchTimer) return;
   event.preventDefault();

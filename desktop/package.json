@@ -1,19 +1,19 @@
 {
   "name": "lexopen-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0-preview.1",
   "private": true,
   "author": "LexOpen contributors",
-  "description": "LexOpen Desktop \u2014 host local del estudio + cliente remoto (Tailscale)",
+  "description": "LexOpen Desktop — host local del estudio + cliente remoto (Tailscale)",
   "main": "main.cjs",
   "scripts": {
     "dev": "electron .",
     "start": "electron .",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder --mac --win --publish never",
+    "dist": "electron-builder --publish never",
     "dist:mac": "electron-builder --mac --publish never",
     "dist:win": "electron-builder --win --publish never",
     "dist:linux": "electron-builder --linux --publish never",
-    "test": "node config.test.cjs && node external-url.test.cjs && node backup.test.cjs && node host-runtime.test.mjs && node renderer.test.cjs && node media-permissions.test.cjs"
+    "test": "node config.test.cjs && node external-url.test.cjs && node backup.test.cjs && node host-runtime.test.mjs && node renderer.test.cjs && node media-permissions.test.cjs && node update-policy.test.cjs && node main-updater.test.cjs && node scripts/release-resources.test.mjs && node scripts/assemble-release.test.mjs && node scripts/native-pg-probe.test.mjs"
   },
   "dependencies": {
     "@prisma/debug": "^5.22.0",
@@ -28,7 +28,9 @@
   },
   "devDependencies": {
     "electron": "^43.3.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "26.15.3",
+    "@electron/asar": "3.4.1",
+    "js-yaml": "4.3.1"
   },
   "optionalDependencies": {
     "@embedded-postgres/darwin-arm64": "17.5.0-beta.15",
@@ -39,5 +41,10 @@
     "@esbuild/darwin-x64": "0.25.12",
     "@esbuild/linux-x64": "0.25.12",
     "@esbuild/win32-x64": "0.25.12"
+  },
+  "homepage": "https://github.com/gabrielperezibacache/lexopen",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gabrielperezibacache/lexopen.git"
   }
 }

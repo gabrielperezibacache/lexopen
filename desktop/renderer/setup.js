@@ -7,6 +7,8 @@
   const clientFields = document.getElementById("client-fields");
   const continueBtn = document.getElementById("continue");
   const retryBtn = document.getElementById("retry");
+  const chooseDataBtn = document.getElementById("choose-data-directory");
+  let selectedPgPort = 54329;
 
   function selectedMode() {
     return document.querySelector('input[name="mode"]:checked')?.value || "host";
@@ -21,6 +23,7 @@
   function setBusy(busy) {
     continueBtn.disabled = busy;
     if (retryBtn) retryBtn.disabled = busy;
+    if (chooseDataBtn) chooseDataBtn.disabled = busy;
   }
 
   function showError(msg) {
@@ -40,6 +43,7 @@
     }
     const state = await window.lexopenDesktop.getState();
     dataDirEl.textContent = state.dataDir || "";
+    document.getElementById("selectedDataDirectory").textContent = state.dataDir || "";
     if (versionEl) versionEl.textContent = state.version ? `v${state.version}` : "";
     if (state.status?.message) statusEl.textContent = state.status.message;
     if (state.status?.phase === "error") showError(state.status.message);
@@ -51,6 +55,9 @@
     if (cfg.publicUrl) document.getElementById("publicUrl").value = cfg.publicUrl;
     if (cfg.remoteUrl) document.getElementById("remoteUrl").value = cfg.remoteUrl;
     if (cfg.seedDemo) document.getElementById("seedDemo").checked = true;
+    selectedPgPort = cfg.pgPort || 54329;
+    document.getElementById("updateChecks").checked = cfg.updateChecks !== false;
+    document.getElementById("updateChannel").value = cfg.updateChannel === "preview" ? "preview" : "stable";
     syncModeUi();
     window.lexopenDesktop.onStatus((s) => {
       if (s?.message) statusEl.textContent = s.message;
@@ -76,6 +83,9 @@
       publicUrl: document.getElementById("publicUrl").value.trim(),
       remoteUrl: document.getElementById("remoteUrl").value.trim(),
       seedDemo: document.getElementById("seedDemo").checked,
+      pgPort: selectedPgPort,
+      updateChecks: document.getElementById("updateChecks").checked,
+      updateChannel: document.getElementById("updateChannel").value,
     };
     const res = await window.lexopenDesktop.saveSetup(payload);
     setBusy(false);
@@ -87,6 +97,22 @@
     statusEl.textContent = res.updateRecognized
       ? `Actualización reconocida · v${res.version}`
       : "Listo — cargando LexOpen…";
+  });
+
+  chooseDataBtn.addEventListener("click", async () => {
+    setBusy(true); showError("");
+    try {
+      const result = await window.lexopenDesktop.chooseDataDirectory();
+      if (!result?.ok) { showError(result?.error || "No se pudo usar la carpeta."); return; }
+      if (result.cancelled) return;
+      dataDirEl.textContent = result.dataDir;
+      document.getElementById("selectedDataDirectory").textContent = result.dataDir;
+      if (result.port) document.getElementById("port").value = result.port;
+      selectedPgPort = result.pgPort || 54329;
+      document.getElementById("publicUrl").value = result.publicUrl || "";
+      statusEl.textContent = "Carpeta elegida. Continuar abrirá esos datos; no se ha movido ningún archivo.";
+    } catch { showError("No se pudo elegir la carpeta. Vuelva a intentarlo."); }
+    finally { setBusy(false); }
   });
 
   if (retryBtn) {

@@ -119,7 +119,8 @@ label {
 }
 
 input[type="number"],
-input[type="url"] {
+input[type="url"],
+select {
   font: inherit;
   font-weight: 400;
   padding: 10px 12px;

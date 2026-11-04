@@ -5,6 +5,7 @@ import type { HearingCitationStored } from "@/lib/hearings/types";
 
 export type WritingSourceClient = PrismaClient | Prisma.TransactionClient;
 export type WritingSourceInput =
+  | { kind: "document"; fragmentId: string; versionId: string; quote: string }
   | { kind: "fact"; factId: string; revision: number }
   | { kind: "note"; workspaceId: string; noteId: string; revision: number }
   | { kind: "book"; bookId: string; fragmentId: string; quote: string };

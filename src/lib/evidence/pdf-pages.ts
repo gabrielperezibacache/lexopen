@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { pdftoppmBinCandidates, prependOcrPath, tesseractBinCandidates } from "@/lib/local-ocr";
 
 const execFile = promisify(execFileCallback);
-export const PDF_PAGE_EXTRACTOR_VERSION = "lexopen-pdf-pages-1";
+export const PDF_PAGE_EXTRACTOR_VERSION = "lexopen-pdf-pages-2";
 export const PDF_MAX_BYTES = 25 * 1024 * 1024;
 export const PDF_MAX_PHYSICAL_PAGES = 500;
 const MAX_TEXT = 2_000_000;
@@ -31,6 +31,8 @@ export type PdfPageOptions = {
   language?: string;
   rendererBin?: string;
   tesseractBin?: string;
+  pdfinfoBin?: string;
+  pdftotextBin?: string;
   signal?: AbortSignal;
   expectedSourceSha256?: string;
 };
@@ -155,6 +157,87 @@ async function inspectNative(bytes: Buffer, maxPages: number, maxText: number, t
   } finally { nativeActive--; }
 }
 
+// Poppler is already an optional local rendering/OCR prerequisite. Its parser,
+// never textual separators, supplies the physical page count and ordinals.
+async function inspectPoppler(bytes: Buffer, maxPages: number, maxText: number, timeout: number, options: PdfPageOptions): Promise<NativeResult> {
+  notCancelled(options.signal);
+  if (nativeActive >= 2) throw failure("El motor PDF está ocupado; vuelva a intentar", 429, "pdf_busy");
+  nativeActive++;
+  const started = Date.now();
+  let root: string | undefined;
+  const remaining = () => {
+    notCancelled(options.signal);
+    const value = timeout - (Date.now() - started);
+    if (value <= 0) throw failure("El PDF agotó el tiempo de extracción", 504, "pdf_timeout");
+    return value;
+  };
+  const candidates = (name: "pdfinfo" | "pdftotext", configured?: string) => configured ? [configured] : [
+    process.env[name === "pdfinfo" ? "OCR_PDFINFO_BIN" : "OCR_PDFTOTEXT_BIN"],
+    ...pdftoppmBinCandidates().map(bin => path.join(path.dirname(bin), process.platform === "win32" ? `${name}.exe` : name)),
+  ].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
+  const resolve = async (bins: string[]) => {
+    prependOcrPath();
+    for (const bin of bins) {
+      try {
+        await execFile(bin, ["-v"], { timeout: Math.min(2_000, remaining()), maxBuffer: 128 * 1024, windowsHide: true, signal: options.signal, killSignal: "SIGKILL" });
+        return bin;
+      } catch { remaining(); }
+    }
+    throw failure("El motor PDF nativo no está disponible y faltan las herramientas locales Poppler (pdfinfo/pdftotext). Instale Poppler o configure OCR_PDFINFO_BIN y OCR_PDFTOTEXT_BIN en el Host", 503, "pdf_engine_unavailable");
+  };
+  try {
+    const infoBin = await resolve(candidates("pdfinfo", options.pdfinfoBin));
+    const textBin = maxPages ? await resolve(candidates("pdftotext", options.pdftotextBin)) : null;
+    root = await fs.mkdtemp(path.join(os.tmpdir(), `lexopen-pdf-poppler-${process.pid}-`));
+    await fs.chmod(root, 0o700);
+    const input = path.join(root, "original.pdf");
+    await fs.writeFile(input, bytes, { mode: 0o600 });
+    const commandOptions = () => ({ timeout: remaining(), maxBuffer: MAX_IMAGE_BYTES, encoding: "utf8" as const, windowsHide: true, signal: options.signal, killSignal: "SIGKILL" as const, env: { ...process.env, LC_ALL: "C", LANG: "C" } });
+    const info = await execFile(infoBin, [input], commandOptions());
+    const pageCount = Number(/^Pages:\s+(\d+)\s*$/m.exec(info.stdout)?.[1]);
+    if (!Number.isSafeInteger(pageCount) || pageCount < 1) throw failure("No se pudo verificar el número de páginas físicas del PDF", 422, "invalid_pdf");
+    if (pageCount > PDF_MAX_PHYSICAL_PAGES) throw failure(`El PDF supera el límite de ${PDF_MAX_PHYSICAL_PAGES} páginas físicas`, 413, "pdf_page_limit");
+    const pages: NativePage[] = [];
+    let textRemaining = maxText;
+    for (let pageNumber = 1; pageNumber <= Math.min(pageCount, maxPages); pageNumber++) {
+      try {
+        const result = await execFile(textBin!, ["-f", String(pageNumber), "-l", String(pageNumber), "-enc", "UTF-8", "-nopgbrk", input, "-"], commandOptions());
+        const text = result.stdout.replace(/\u0000/g, "\uFFFD").trim();
+        if (text.length > textRemaining) pages.push({ pageNumber, text: "", hasImages: false, needsOcr: false, reason: "text_limit" });
+        else {
+          textRemaining -= text.length;
+          // No text does not prove an empty page: retain the ordinal for OCR.
+          pages.push({ pageNumber, text, hasImages: false, needsOcr: !text, reason: text ? undefined : "text_unavailable" });
+        }
+      } catch (error) {
+        remaining();
+        if ((error as { code?: string }).code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") pages.push({ pageNumber, text: "", hasImages: false, needsOcr: false, reason: "text_limit" });
+        else throw error;
+      }
+    }
+    return { pageCount, pages };
+  } catch (error) {
+    notCancelled(options.signal);
+    if (error && typeof error === "object" && "status" in error) throw error;
+    const timedOut = Boolean((error as { killed?: boolean }).killed || (error as { code?: string }).code === "ETIMEDOUT");
+    throw failure(timedOut ? "El PDF agotó el tiempo de extracción" : "No se pudo leer el PDF con Poppler; compruebe que no esté dañado o cifrado", timedOut ? 504 : 422, timedOut ? "pdf_timeout" : "invalid_pdf");
+  } finally {
+    nativeActive--;
+    if (root) await fs.rm(root, { recursive: true, force: true });
+  }
+}
+
+async function inspectPdf(bytes: Buffer, maxPages: number, maxText: number, timeout: number, options: PdfPageOptions): Promise<NativeResult> {
+  const started = Date.now();
+  try { return await inspectNative(bytes, maxPages, maxText, timeout, options.signal); }
+  catch (error) {
+    if ((error as { code?: string }).code !== "pdf_engine_unavailable") throw error;
+    const remaining = timeout - (Date.now() - started);
+    if (remaining <= 0) throw failure("El PDF agotó el tiempo de extracción", 504, "pdf_timeout");
+    return inspectPoppler(bytes, maxPages, maxText, remaining, options);
+  }
+}
+
 async function resolveBin(candidates: string[], versionArgs: string[]) {
   prependOcrPath();
   for (const bin of candidates) {
@@ -192,7 +275,7 @@ export async function renderPdfPage(bytes: Buffer, pageNumber: number, options: 
   bounded(pageNumber, 1, 1, PDF_MAX_PHYSICAL_PAGES, "Número de página");
   const timeout = bounded(options.timeoutMs, 30_000, 1, 120_000, "Tiempo de renderizado");
   const started = Date.now();
-  const metadata = await inspectNative(bytes, 0, 0, timeout, options.signal);
+  const metadata = await inspectPdf(bytes, 0, 0, timeout, options);
   if (pageNumber > metadata.pageCount) throw failure("La página solicitada no existe en este PDF", 404, "pdf_page_not_found");
   const bin = await renderer(options);
   const root = await fs.mkdtemp(path.join(os.tmpdir(), `lexopen-pdf-page-${process.pid}-`));
@@ -218,7 +301,7 @@ export async function extractPdfPages(bytes: Buffer, options: PdfPageOptions = {
   const maxText = bounded(options.maxTextCharacters, MAX_TEXT, 64, MAX_TEXT, "Límite de texto");
   const timeout = bounded(options.timeoutMs, 120_000, 1, 120_000, "Tiempo de extracción");
   const started = Date.now();
-  const native = await inspectNative(bytes, maxPages, maxText, timeout, options.signal);
+  const native = await inspectPdf(bytes, maxPages, maxText, timeout, options);
   const nativeByNumber = new Map(native.pages.map(page => [page.pageNumber, page]));
   const pages: PdfEvidencePage[] = [];
   let remainingText = maxText;

@@ -1,7 +1,8 @@
 # LexOpen Desktop — PC principal + acceso remoto (Tailscale)
 
-La instalación soportada es **clonar este repositorio** (como en el
-[README](../README.md#-empezar-guía-sencilla)), no un `.dmg` / `.exe`.
+La distribución preliminar ofrece paquetes nativos para cuatro destinos; consulte
+[instaladores y límites de verificación](INSTALADORES.md). También puede clonar el
+repositorio como indica el [README](../README.md#-empezar-guía-sencilla).
 LexOpen Desktop es el shell Electron opcional sobre el mismo Host local:
 un solo PC guarda los datos y el resto se conecta por Tailscale o el navegador.
 
@@ -32,7 +33,7 @@ No se sincronizan copias locales: **siempre** se trabaja contra la instalación 
 
 ## Requisitos
 
-- **Host:** macOS 12+, Windows 10/11 o Linux; Node.js 22 (ver [`.nvmrc`](../.nvmrc)); Git; ~2 GB libres.
+- **Host desde código:** Node.js 22.12 o posterior, Git y espacio para dependencias, base y archivos. El paquete de escritorio incluye su propio Node y PostgreSQL; consulte la matriz y las puertas de validación en [instaladores](INSTALADORES.md).
 - **Cliente:** red Tailscale al Host (o LAN si están en la misma oficina) y un navegador. Electron en los clientes es opcional.
 - **Tailscale:** cuenta del estudio; todos los PCs en el mismo tailnet. [tailscale.com](https://tailscale.com)
 
@@ -95,7 +96,7 @@ Solo cambia el código del clon. Los datos viven fuera del repo.
 Flujo operativo:
 
 1. Detenga el **Host**. En su clon: `git pull origin main`, `npm ci` y `npm run desktop:build`. Descargar código no recompila un artefacto standalone ya existente.
-2. Arrancar de nuevo (`npm run web:host` o `npm run desktop:dev`) → log `Actualización reconocida: x → y` → `prisma migrate deploy` → listo.
+2. Arrancar de nuevo (`npm run web:host` o `npm run desktop:dev`). Las migraciones y la salud deben superar sus comprobaciones antes de registrar la versión aplicada; un fallo conserva el estado anterior y requiere recuperación.
 3. Clientes: si usan Desktop, recarga automática; si usan navegador, F5.
 
 Datos del Host:
@@ -127,9 +128,10 @@ alertas de plazos contra su propio endpoint cuando el `.env` del directorio de
 datos define `CRON_SECRET` y los intervalos (`PJUD_*_INTERVAL_MINUTES`,
 `PLAZOS_ALERTAS_INTERVAL_MINUTES`). Detalle en [`WEB-HOST.md`](./WEB-HOST.md).
 
-El canal soportado de distribución es el clon Git. No se publican instaladores
-`.dmg` / `.exe` / `.AppImage`; los binarios de Releases anteriores fueron
-retirados para no confundirlos con el flujo de instalación.
+Los instaladores actuales se construyen desde un checkout público limpio en su
+plataforma y arquitectura reales. Consulte [descargas, firma y pruebas](INSTALADORES.md)
+y el [funcionamiento del actualizador](ACTUALIZACIONES.md). No reutilice binarios de
+versiones antiguas que no incluyan los informes de esta distribución.
 
 ## Seguridad
 
@@ -144,8 +146,8 @@ retirados para no confundirlos con el flujo de instalación.
 - Recuperación: use **LexOpen → Recuperar contraseña admin…** solo con acceso físico
   al Host. El token local no debe compartirse; al restablecer se invalidan las sesiones.
 
-## Limitaciones actuales (v0.1 desktop)
+## Limitaciones actuales
 
 - Un solo Host activo (no multi-maestro).
-- La instalación soportada es el clon Git + Node 22; no se distribuye un instalador.
+- La publicación estable exige firma/notarización y pruebas de instalación y actualización en equipos nuevos; la serie preliminar distingue esos límites de la prueba automatizada del Host.
 - Durante `npm run desktop:dev` no se consulta el canal de actualizaciones empaquetado.

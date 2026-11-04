@@ -1,0 +1,11 @@
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+const target = `${process.platform}-${process.arch}`;
+const dist = path.resolve("desktop/dist");
+const report = JSON.parse(fs.readFileSync(path.join(dist, `lexopen-packaged-${target}.json`), "utf8"));
+if (report.platform !== process.platform || report.arch !== process.arch || typeof report.appDirectory !== "string") throw new Error("Native packaged report required");
+const app = path.resolve(dist, report.appDirectory), relative = path.relative(dist, app);
+if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Application path escapes build output");
+const result = spawnSync(process.execPath, ["desktop/scripts/smoke-packaged-host.mjs", "--app", app, "--platform", process.platform, "--arch", process.arch], { stdio: "inherit", shell: false });
+if (result.error || result.status !== 0) process.exitCode = 1;

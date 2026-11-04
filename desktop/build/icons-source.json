@@ -1,0 +1,22 @@
+{
+  "source": "src/app/icon.svg",
+  "sourceSha256": "cac8ea8a8ed69f2fabf9eb5866bcb3ada090ea06b1da4d90978133c1527b2a15",
+  "png": 1024,
+  "ico": [
+    16,
+    32,
+    48,
+    64,
+    128,
+    256
+  ],
+  "icns": [
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024
+  ]
+}

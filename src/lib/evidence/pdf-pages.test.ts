@@ -107,9 +107,45 @@ async function main() {
   assert.equal(missing.pages[0].status,"completed");
   assert.equal(missing.pages[1].reason,"pdf_renderer_unavailable");
   assert.equal(missing.partial,true);
-  const leftovers=(await fs.readdir(os.tmpdir())).filter(n=>n.startsWith(`lexopen-pdf-page-${process.pid}-`)||n.startsWith(`lexopen-pdf-extract-${process.pid}-`));
+  // A new empty cwd makes the child parser's optional native package unavailable
+  // without mocking Poppler: these assertions exercise the real local CLI.
+  const cwd = process.cwd();
+  const fallbackRoot = await fs.mkdtemp(path.join(os.tmpdir(), "lexopen-pdf-fallback-test-"));
+  let popplerFallback = false;
+  try {
+    process.chdir(fallbackRoot);
+    await assert.rejects(extractPdfPages(bytes, { ocr: false, pdfinfoBin: "lexopen-fixture-missing-pdfinfo", pdftotextBin: "lexopen-fixture-missing-pdftotext" }),
+      (error: unknown) => status(503)(error) && (error as { code?: string }).code === "pdf_engine_unavailable" && /Poppler/.test(String(error)));
+    try {
+      const fallback = await extractPdfPages(bytes, { ocr: false, expectedSourceSha256: digest(bytes) });
+      assert.equal(fallback.pageCount, 3);
+      assert.deepEqual(fallback.pages.map(p => p.pageNumber), [1,2,3]);
+      assert.match(fallback.pages[0].text, /Página uno: decisión, año y número 42\./);
+      assert.equal(fallback.pages[0].text.includes("ESCANEADO"), false);
+      assert.equal(fallback.sourceSha256, digest(bytes));
+      assert.deepEqual(fallback.pages.slice(1).map(p => [p.status,p.reason,p.text]), [["needs_ocr","ocr_disabled",""],["needs_ocr","ocr_disabled",""]]);
+      for (const page of fallback.pages) assert.equal(page.textSha256, digest(page.text));
+      const boundedFallback = await extractPdfPages(bytes, { ocr: false, maxPages: 1 });
+      assert.deepEqual(boundedFallback.pages.slice(1).map(p => p.reason), ["page_limit","page_limit"]);
+      assert.equal((await extractPdfPages(bytes, { ocr: false, maxTextCharacters: 64 })).pages[0].reason, "text_limit");
+      await assert.rejects(extractPdfPages(blankPdf(501), { ocr: false }), status(413));
+      await assert.rejects(renderPdfPage(bytes, 4), status(404));
+      await assert.rejects(extractPdfPages(bytes, { signal: abort.signal }), status(499));
+      // Missing text extraction is explicit even when pdfinfo itself is present.
+      await assert.rejects(extractPdfPages(bytes, { pdftotextBin: "lexopen-fixture-missing-pdftotext" }), status(503));
+      popplerFallback = true;
+    } catch (error) {
+      if (!status(503)(error) || (error as { code?: string }).code !== "pdf_engine_unavailable") throw error;
+      console.log("Poppler fallback CLI test skipped: local pdfinfo/pdftotext unavailable");
+    }
+  } finally {
+    process.chdir(cwd);
+    await fs.rm(fallbackRoot, { recursive: true, force: true });
+  }
+  if(process.env.LEXOPEN_PDF_REQUIRE_TOOLS==="1") assert.ok(popplerFallback, "This validation requires real local pdfinfo and pdftotext");
+  const leftovers=(await fs.readdir(os.tmpdir())).filter(n=>n.startsWith(`lexopen-pdf-page-${process.pid}-`)||n.startsWith(`lexopen-pdf-extract-${process.pid}-`)||n.startsWith(`lexopen-pdf-poppler-${process.pid}-`));
   assert.deepEqual(leftovers,[]);
-  console.log(`PDF pages OK: physical ordinals, Unicode/native, scanned OCR, empty page, hashes, bounded parsing/render, cancellation, concurrency and cleanup. Render=${rendered}, OCR=${ocrComplete}`);
+  console.log(`PDF pages OK: physical ordinals, Unicode/native, scanned OCR, empty page, hashes, bounded parsing/render, cancellation, concurrency and cleanup. Render=${rendered}, OCR=${ocrComplete}, PopplerFallback=${popplerFallback}`);
   } finally {
     if (configuredOcr === undefined) delete process.env.OCR_ENABLED;
     else process.env.OCR_ENABLED = configuredOcr;

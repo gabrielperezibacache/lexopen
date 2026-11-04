@@ -1,0 +1,22 @@
+{
+  "fixtureOnly": true,
+  "dockerExecutedLocally": false,
+  "browserTests": {
+    "passed": 2,
+    "executionEvents": "simulated"
+  },
+  "images": [
+    {
+      "name": "docx-ficticio-preview.png",
+      "sha256": "22bf16a1fee0fe6b115021d4c72a7be96c475dc4432accd7967a670437567507"
+    },
+    {
+      "name": "workbench-desktop.png",
+      "sha256": "4867e17c5b21812fb9fb4479f11ad7eaed4d4ec20c9e1a6e78d291bb63ad1067"
+    },
+    {
+      "name": "workbench-mobile.png",
+      "sha256": "46504b5627b4b956510ab9aa4da41b064f905cda23e822fea99da3427eba38e5"
+    }
+  ]
+}
