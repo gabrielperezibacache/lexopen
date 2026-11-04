@@ -42,4 +42,4 @@ El nuevo puente de ingreso desde el botón de la interfaz hasta una cuenta priva
 
 Los trabajos de una sesión temporal no los continúa el cron con otro proveedor. Una lectura parcial o fallida requiere recuperar el ingreso; tras un resultado correcto, futuras actualizaciones dependen de los canales y la configuración del Host. Mostrar un intervalo configurado no acredita que el programador esté ejecutándose ni mantiene acceso privado permanente.
 
-Esta entrega no registra publicación, despliegue ni integración en `main`. [Guía operativa PJUD](../PJUD.md).
+La implementación y sus comprobaciones de GitHub se siguen en el [PR 228](https://github.com/gabrielperezibacache/lexopen/pull/228); allí se puede comprobar su estado de integración. Esta evidencia no acredita un despliegue. [Guía operativa PJUD](../PJUD.md).
