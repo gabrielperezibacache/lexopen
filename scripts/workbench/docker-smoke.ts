@@ -7,9 +7,12 @@ import { createHash } from "node:crypto";
 import { assertPlainDocx, dockerConfig, executeDocumentRecipe, runDockerCommand, runtimeCapabilities } from "../../src/lib/workbench/runtime";
 if (process.env.CI !== "true" || process.env.LEXOPEN_WORKBENCH_TEST_DOCKER !== "1") throw Error("This real Docker probe requires CI=true and the explicit fictitious-test flag");
 async function main() {
-  const config = dockerConfig(); assert.equal((await runtimeCapabilities(config)).available, true);
+  const config = dockerConfig(), preflight = { timeoutMs: 10_000, maxAttempts: 2 };
+  const capabilities = await runtimeCapabilities(config, runDockerCommand, preflight);
+  console.log(JSON.stringify({ preflight: capabilities }));
+  assert.equal(capabilities.available, true);
   const sourceSha256 = createHash("sha256").update("Fictitious source only").digest("hex"), control = new AbortController();
-  const artifacts = await executeDocumentRecipe({ version: 1, title: "Borrador ficticio de validación", body: "Texto de prueba con acentos: análisis, información y revisión.\n\n[^R1]", sources: [{ marker: "R1", title: "Documento ficticio", quote: "Un pasaje de prueba que no pertenece a ningún expediente real.", href: "/documentos/fictitious/fuentes", versionId: "version-fictitious", sourceSha256 }] }, control.signal, { config });
+  const artifacts = await executeDocumentRecipe({ version: 1, title: "Borrador ficticio de validación", body: "Texto de prueba con acentos: análisis, información y revisión.\n\n[^R1]", sources: [{ marker: "R1", title: "Documento ficticio", quote: "Un pasaje de prueba que no pertenece a ningún expediente real.", href: "/documentos/fictitious/fuentes", versionId: "version-fictitious", sourceSha256 }] }, control.signal, { config, preflight });
   assert.equal(artifacts.length, 2); assertPlainDocx(artifacts.find(artifact => artifact.name.endsWith(".docx"))!.data);
   assert.match(artifacts.find(artifact => artifact.name.endsWith(".md"))!.data.toString("utf8"), /análisis/);
   // A separate controlled probe verifies the actual Linux namespace and security settings.

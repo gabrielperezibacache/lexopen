@@ -31,7 +31,7 @@ export function prepareReleaseResources(target) {
   if (dirty.status !== 0) throw new Error("Cannot verify source state");
   fs.rmSync(output, { recursive: true, force: true }); fs.mkdirSync(output, { recursive: true });
   const app = path.join(output, "app-standalone"), stripped = [];
-  copyResourceTree(path.join(repo, ".next/standalone"), app, { stripped });
+  copyResourceTree(path.join(repo, ".next/standalone"), app, { stripped, nextNodeModulesRoot: path.join(repo, "node_modules") });
   copyResourceTree(path.join(repo, ".next/static"), path.join(app, ".next/static"), { stripped });
   // Only versioned/public application inputs enter these additional resource scopes.
   copyTrackedRuntimeResources(repo, output, { stripped });

@@ -29,6 +29,23 @@ try {
   const stripped = []; copyResourceTree(source, destination, { stripped });
   assert.deepEqual(resourceFiles(destination), ["server.js"]); assert.equal(stripped.length, 2);
   assert(!fs.readFileSync(path.join(destination, "server.js"), "utf8").includes("PRIVATE_CANARY"));
+  const standalone = path.join(root, "next-standalone"), checkoutModules = path.join(root, "public-checkout/node_modules");
+  const nextAlias = path.join(standalone, ".next/node_modules/@aws-sdk/client-s3-ecbef8e33fd0b8f0"), publicPackage = path.join(checkoutModules, "@aws-sdk/client-s3");
+  fs.mkdirSync(publicPackage, { recursive: true }); fs.writeFileSync(path.join(publicPackage, "index.js"), "public dependency fixture");
+  fs.mkdirSync(path.dirname(nextAlias), { recursive: true }); fs.symlinkSync(publicPackage, nextAlias, "junction");
+  const nextOptions = { nextNodeModulesRoot: checkoutModules };
+  assert.throws(() => copyResourceTree(standalone, path.join(root, "next-unscoped")), /External resource/);
+  copyResourceTree(standalone, path.join(root, "next-safe"), nextOptions);
+  assert.equal(fs.readFileSync(path.join(root, "next-safe/.next/node_modules/@aws-sdk/client-s3-ecbef8e33fd0b8f0/index.js"), "utf8"), "public dependency fixture");
+  assert.equal(fs.lstatSync(path.join(root, "next-safe/.next/node_modules/@aws-sdk/client-s3-ecbef8e33fd0b8f0")).isSymbolicLink(), false);
+  const ordinaryAlias = path.join(standalone, "ordinary-alias"); fs.symlinkSync(publicPackage, ordinaryAlias, "junction");
+  assert.throws(() => copyResourceTree(standalone, path.join(root, "next-wrong-prefix"), nextOptions), /External resource/); fs.unlinkSync(ordinaryAlias);
+  fs.unlinkSync(nextAlias); const outsidePackage = path.join(root, "outside-package"); fs.mkdirSync(outsidePackage); fs.symlinkSync(outsidePackage, nextAlias, "junction");
+  assert.throws(() => copyResourceTree(standalone, path.join(root, "next-outside"), nextOptions), /target=outside-checkout-node_modules/); fs.unlinkSync(nextAlias);
+  const privatePackage = path.join(checkoutModules, ".env.production"); fs.mkdirSync(privatePackage); fs.symlinkSync(privatePackage, nextAlias, "junction");
+  assert.throws(() => copyResourceTree(standalone, path.join(root, "next-private-alias"), nextOptions), /Private resource symlink/); fs.unlinkSync(nextAlias);
+  fs.symlinkSync(publicPackage, nextAlias, "junction"); fs.symlinkSync(publicPackage, path.join(publicPackage, "loop"), "junction");
+  assert.throws(() => copyResourceTree(standalone, path.join(root, "next-cycle"), nextOptions), /Cyclic resource/); fs.unlinkSync(path.join(publicPackage, "loop"));
   verifyCanaryAbsent(destination, "PRIVATE_CANARY_VALUE");
   fs.writeFileSync(path.join(destination, "canary.js"), Buffer.concat([Buffer.alloc(65_530), Buffer.from("PRIVATE_CANARY_VALUE")])); assert.throws(() => verifyCanaryAbsent(destination, "PRIVATE_CANARY_VALUE"), /canary/); fs.unlinkSync(path.join(destination, "canary.js"));
   fs.writeFileSync(path.join(source, "binary"), macho); fs.chmodSync(path.join(source, "binary"), 0o755);
@@ -40,8 +57,17 @@ try {
   const write = (file, content) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, content); };
   write(query, macho); write(path.join(modules, "@prisma/engines/schema-engine-darwin-arm64"), macho);
   for (const name of ["postgres", "initdb", "pg_ctl"]) write(path.join(modules, "@embedded-postgres/darwin-arm64/bin", name), macho);
+  const pgRoot = path.join(modules, "@embedded-postgres/darwin-arm64");
+  const pgSqlAssets = ["native/share/postgresql/system_views.sql", "native/share/postgresql/extension/amcheck--1.0--1.1.sql"];
+  for (const name of pgSqlAssets) write(path.join(pgRoot, name), "-- public PostgreSQL distribution fixture\nSELECT 1;");
   for (const name of ["prisma/build/index.js", "tsx/dist/cli.mjs", "embedded-postgres/dist/index.js"]) write(path.join(modules, name), "fixture");
   assert.equal(verifyNativeRuntime(resources, modules, native).postgresPackage, "darwin-arm64");
+  write(path.join(pgRoot, "vault/database.sql"), "PRIVATE_DUMP_CANARY");
+  assert.throws(() => verifyNativeRuntime(resources, modules, native), /Private native resource/);
+  fs.rmSync(path.join(pgRoot, "vault"), { recursive: true });
+  write(path.join(pgRoot, ".env"), "PRIVATE_ENV_CANARY");
+  assert.throws(() => verifyNativeRuntime(resources, modules, native), /Private native resource/);
+  fs.unlinkSync(path.join(pgRoot, ".env"));
   // Exercise the production tracked-file staging path, not only directory copies.
   const publicRepo = path.join(root, "public-repo"), migration = "prisma/migrations/20261104000000_fixture/migration.sql";
   const publicInputs = {
@@ -73,6 +99,9 @@ try {
   write(path.join(app, "lexopen-release.json"), JSON.stringify({ version: "1.1.0-preview.1", sourceDirty: false, sourceRevision: "a".repeat(40), buildId: "fixture-build", platform: "darwin", arch: "arm64" }));
   write(path.join(app, "playwright-browsers/chromium-fixture/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"), macho);
   assert.equal(verifyReleaseResources(resources, modules, native).browserExecutables, 1);
+  write(path.join(resources, pgSqlAssets[0]), "PRIVATE_DUMP_CANARY");
+  assert.throws(() => verifyReleaseResources(resources, modules, native), /Private native resource/);
+  fs.rmSync(path.join(resources, "native"), { recursive: true });
   verifyCanaryAbsent(resources, "PRIVATE_DUMP_CANARY");
   write(query, elf); assert.throws(() => verifyNativeRuntime(resources, modules, native), /does not match/); write(query, macho);
   fs.unlinkSync(path.join(modules, "@embedded-postgres/darwin-arm64/bin/initdb")); assert.throws(() => verifyNativeRuntime(resources, modules, native), /Missing PostgreSQL executable/);
@@ -107,4 +136,4 @@ assert.equal(metadata.sourceSha256, sha256(path.join(repo, "src/app/icon.svg")))
 const png = fs.readFileSync(path.join(repo, "desktop/build/icon.png")); assert.equal(png.readUInt32BE(16), 1024); assert.equal(png.readUInt32BE(20), 1024);
 const ico = fs.readFileSync(path.join(repo, "desktop/build/icon.ico")); assert.equal(ico.readUInt16LE(2), 1); assert.equal(ico.readUInt16LE(4), 6);
 const icns = fs.readFileSync(path.join(repo, "desktop/build/icon.icns")); assert.equal(icns.toString("ascii", 0, 4), "icns"); assert.equal(icns.readUInt32BE(4), icns.length);
-console.log("Desktop release resources: tracked migrations, private dump exclusion, macOS Chromium/frameworks, native architecture, target guards and existing-brand icons passed.");
+console.log("Desktop release resources: scoped Next aliases, tracked migrations, private dump exclusion, macOS Chromium/frameworks, native architecture, target guards and existing-brand icons passed.");

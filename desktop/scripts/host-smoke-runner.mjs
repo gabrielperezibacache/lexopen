@@ -49,6 +49,9 @@ try {
   assert.match(health.sourceRevision, /^[a-f0-9]{40}$/);
   assert.equal(health.needsSetup, true);
   const requireBundled = createRequire(path.join(resources, "app-standalone", "package.json"));
+  const { toMarkdownBytes, formatFromExtension } = requireBundled("@firecrawl/anydoc");
+  const extracted = await toMarkdownBytes(Buffer.from("nombre,detalle\nLexOpen,instalación ficticia\n", "utf8"), formatFromExtension(".csv"));
+  assert.match(extracted, /LexOpen/);
   const browser = await requireBundled("playwright").chromium.launch({ headless: true, timeout: 30000 });
   try {
     const page = await browser.newPage();
@@ -83,5 +86,5 @@ try {
   const nextValues = await envValues();
   for (const [key, hash] of Object.entries(secretHashes)) assert.equal(digest(nextValues[key]), hash, `${key} must survive restart`);
   await stop();
-  console.log(`LEXOPEN_DESKTOP_SMOKE ${JSON.stringify({ platform: process.platform, arch: process.arch, version: health.version, buildId: health.buildId, sourceRevision: health.sourceRevision, standaloneHealthy: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, externalNodeUsed: false, demoSeedUsed: false })}`);
+  console.log(`LEXOPEN_DESKTOP_SMOKE ${JSON.stringify({ platform: process.platform, arch: process.arch, version: health.version, buildId: health.buildId, sourceRevision: health.sourceRevision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, externalNodeUsed: false, demoSeedUsed: false })}`);
 } finally { await stop(); }

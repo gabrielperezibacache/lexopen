@@ -46,7 +46,7 @@ export async function assembleRelease({ input, output, version, revision }) {
     const packaged = await read("packaged"), smoke = await read("smoke"), signature = await read("signature");
     for (const report of [packaged, smoke, signature]) if (report.version !== version || report.platform !== platform || report.arch !== arch) throw new Error(`Report identity mismatch: ${target}`);
     if (packaged.sourceRevision !== revision || smoke.sourceRevision !== revision || packaged.sourceDirty !== false || !packaged.buildId || packaged.buildId !== smoke.buildId) throw new Error(`Unverified source/build: ${target}`);
-    for (const key of ["standaloneHealthy", "bundledChromiumLaunched", "firstAdministratorCreated", "restartPreservedDatabase", "restartPreservedFiles", "restartPreservedSecrets"]) if (smoke[key] !== true) throw new Error(`Incomplete Host smoke: ${target}/${key}`);
+    for (const key of ["standaloneHealthy", "bundledDocumentConversion", "bundledChromiumLaunched", "firstAdministratorCreated", "restartPreservedDatabase", "restartPreservedFiles", "restartPreservedSecrets"]) if (smoke[key] !== true) throw new Error(`Incomplete Host smoke: ${target}/${key}`);
     if (smoke.externalNodeUsed !== false || smoke.demoSeedUsed !== false) throw new Error(`Non-self-contained Host smoke: ${target}`);
     if (!preview && platform !== "linux" && (signature.publisherAuthenticated !== true || platform === "darwin" && signature.notarized !== true)) throw new Error(`Stable release requires publisher authentication: ${target}`);
     signatures.push(signature);

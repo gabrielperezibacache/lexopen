@@ -60,21 +60,38 @@ export function verifyBinary(file, target) {
   return info;
 }
 function contained(root, file) { const relative = path.relative(root, file); return relative === "" || relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative); }
-/** Materialize only internal links. Missing, external and cyclic links fail closed. */
-export function copyResourceTree(source, destination, { stripped = [], boundary = source, relative = "", ancestors = new Set() } = {}) {
+/** Materialize internal links, plus explicitly scoped Next-generated dependency aliases. */
+export function copyResourceTree(source, destination, { stripped = [], boundary = source, relative = "", ancestors = new Set(), nextNodeModulesRoot } = {}) {
   if (privateResourcePath(relative || path.basename(source))) { stripped.push(relative || path.basename(source)); return; }
   const stat = fs.lstatSync(source);
   if (stat.isSymbolicLink()) {
     if (!relative) throw new Error("Release input roots must not be symlinks");
-    const real = fs.realpathSync(source);
-    if (!contained(fs.realpathSync(boundary), real)) throw new Error(`External resource symlink rejected: ${relative}`);
-    if (privateResourcePath(path.relative(fs.realpathSync(boundary), real))) throw new Error(`Private resource symlink rejected: ${relative}`);
+    let real;
+    try { real = fs.realpathSync(source); }
+    catch { throw new Error(`Unresolvable resource symlink rejected (target=missing-or-cyclic): ${relative}`); }
+    let realBoundary = fs.realpathSync(boundary), modulesBoundary;
+    if (nextNodeModulesRoot) {
+      const modulesStat = fs.lstatSync(nextNodeModulesRoot);
+      if (modulesStat.isSymbolicLink() || !modulesStat.isDirectory() || path.basename(nextNodeModulesRoot) !== "node_modules") throw new Error("Next dependency alias root must be a real node_modules directory");
+      modulesBoundary = fs.realpathSync(nextNodeModulesRoot);
+    }
+    if (!contained(realBoundary, real)) {
+      // Next 16 on Windows externalizes packages as generated junctions here.
+      // This exception never applies to arbitrary source links or outside roots.
+      const generatedAlias = /^\.next\/node_modules\/(?:@[^/]+\/)?[^/]+$/.test(relative.replaceAll("\\", "/"));
+      if (!modulesBoundary || !generatedAlias) throw new Error(`External resource symlink rejected: ${relative}`);
+      if (real === modulesBoundary || !contained(modulesBoundary, real)) throw new Error(`External Next dependency alias rejected (target=outside-checkout-node_modules): ${relative}`);
+      realBoundary = modulesBoundary;
+    }
+    const realRelative = path.relative(realBoundary, real);
+    const publicRelative = realBoundary === modulesBoundary ? `node_modules/${realRelative}` : realRelative;
+    if (privateResourcePath(publicRelative)) throw new Error(`Private resource symlink rejected: ${relative}`);
     if (ancestors.has(real)) throw new Error(`Cyclic resource symlink rejected: ${relative}`);
-    return copyResourceTree(real, destination, { stripped, boundary, relative, ancestors: new Set([...ancestors, real]) });
+    return copyResourceTree(real, destination, { stripped, boundary: realBoundary, relative, ancestors: new Set([...ancestors, real]), nextNodeModulesRoot });
   }
   if (stat.isDirectory()) {
     fs.mkdirSync(destination, { recursive: true });
-    for (const name of fs.readdirSync(source).sort()) copyResourceTree(path.join(source, name), path.join(destination, name), { stripped, boundary, relative: relative ? `${relative}/${name}` : name, ancestors });
+    for (const name of fs.readdirSync(source).sort()) copyResourceTree(path.join(source, name), path.join(destination, name), { stripped, boundary, relative: relative ? `${relative}/${name}` : name, ancestors, nextNodeModulesRoot });
   } else if (stat.isFile()) {
     fs.mkdirSync(path.dirname(destination), { recursive: true }); fs.copyFileSync(source, destination); fs.chmodSync(destination, stat.mode & 0o777);
   } else throw new Error(`Unsupported resource file type: ${relative}`);
@@ -91,13 +108,14 @@ export function resourceFiles(root, prefix = "") {
   }
   return result;
 }
-function allFiles(root) {
+function allFiles(root, { publicPrefix = "" } = {}) {
   const boundary = fs.realpathSync(root), files = [];
+  const privatePath = relative => privateResourcePath(publicPrefix ? `${publicPrefix}/${relative}` : relative);
   const visit = (file, relative, ancestors) => {
-    if (privateResourcePath(relative)) throw new Error(`Private native resource rejected: ${relative}`);
+    if (privatePath(relative)) throw new Error(`Private native resource rejected: ${relative}`);
     const real = fs.realpathSync(file), stat = fs.statSync(file);
     if (!contained(boundary, real)) throw new Error(`External native resource symlink rejected: ${relative}`);
-    if (privateResourcePath(path.relative(boundary, real))) throw new Error(`Private native resource symlink rejected: ${relative}`);
+    if (privatePath(path.relative(boundary, real))) throw new Error(`Private native resource symlink rejected: ${relative}`);
     if (stat.isDirectory()) {
       if (ancestors.has(real)) throw new Error(`Cyclic native resource symlink rejected: ${relative}`);
       for (const name of fs.readdirSync(file).sort()) visit(path.join(file, name), relative ? `${relative}/${name}` : name, new Set([...ancestors, real]));
@@ -121,7 +139,10 @@ export function verifyNativeRuntime(resources, nodeModules, target) {
   const packageName = `${target.platform === "win32" ? "windows" : target.platform}-${target.arch}`;
   const pgRoot = path.join(nodeModules, "@embedded-postgres", packageName);
   if (!fs.existsSync(pgRoot)) throw new Error(`Missing native embedded PostgreSQL package: ${packageName}`);
-  const pgFiles = allFiles(pgRoot);
+  // This subtree is the verified public dependency, whose PostgreSQL distribution
+  // includes SQL for bootstrap and extension upgrades. Keep that package context
+  // for both visible paths and internal link targets; other scans stay unchanged.
+  const pgFiles = allFiles(pgRoot, { publicPrefix: `node_modules/@embedded-postgres/${packageName}` });
   for (const name of ["postgres", "initdb", "pg_ctl"]) {
     const matches = pgFiles.filter(file => path.basename(file) === `${name}${target.platform === "win32" ? ".exe" : ""}`);
     if (!matches.length) throw new Error(`Missing PostgreSQL executable: ${name}`);
