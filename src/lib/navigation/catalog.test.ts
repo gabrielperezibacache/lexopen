@@ -49,6 +49,15 @@ for (const [path, area, destination] of [
 }
 assert.equal(activeNavigationEntry(staff, "/causas-distintas"), undefined, "match full route segments");
 assert.deepEqual(secondaryNavigation(staff, "/buscar"), []);
+for (const path of ["/causas", "/causas/monitoreo/", "/causas/mis-causas?alta=1#estado"]) {
+  assert.equal(secondaryNavigation(staff, path).some(entry => ["monitoreo", "mis-causas"].includes(entry.id)), false, "Case section tabs own these destinations on their three routes");
+}
+for (const path of ["/causas/nueva", "/causas/a-case", "/documentos", "/minutas"]) {
+  assert.ok(secondaryNavigation(staff, path).some(entry => entry.id === "monitoreo"));
+  assert.ok(secondaryNavigation(staff, path).some(entry => entry.id === "mis-causas"));
+}
+assert.ok(navigationEntries(staff).some(entry => entry.id === "monitoreo"), "Quick navigation retains the monitoring destination");
+assert.ok(navigationEntries(staff).some(entry => entry.id === "mis-causas"), "Quick navigation retains the ClaveÚnica destination");
 assert.deepEqual(navigationBreadcrumbs(staff, "/inicio"), [{ href: "/inicio", labelKey: "nav.home" }], "no repeated home crumb");
 assert.equal(navigationBreadcrumbs(staff, "/causas/a-case/escritos").at(-1)?.labelKey, "nav.details.writings");
 assert.equal(navigationBreadcrumbs(staff, "/causas/a-case/mesa").at(-1)?.labelKey, "nav.details.workbench");

@@ -104,7 +104,9 @@ export function activeNavigationArea(model: NavigationModel, pathname: string): 
 }
 export function secondaryNavigation(model: NavigationModel, pathname: string): NavigationEntry[] {
   const area = activeNavigationArea(model, pathname);
-  return area ? model.entries.filter(entry => entry.area === area.id) : [];
+  const path = cleanPath(pathname);
+  const hasCaseSectionTabs = ["/causas", "/causas/monitoreo", "/causas/mis-causas"].includes(path);
+  return area ? model.entries.filter(entry => entry.area === area.id && !(hasCaseSectionTabs && ["monitoreo", "mis-causas"].includes(entry.id))) : [];
 }
 
 export type NavigationCrumb = { href: string; labelKey: string };
