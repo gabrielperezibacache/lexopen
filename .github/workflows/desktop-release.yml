@@ -59,8 +59,12 @@ jobs:
         env:
           TARGET_PLATFORM: ${{ matrix.platform }}
           TARGET_ARCH: ${{ matrix.arch }}
-      - run: npm ci
       - run: npm ci --prefix desktop
+      - name: Diagnose native Windows PostgreSQL using owned fictitious clusters
+        if: runner.os == 'Windows'
+        timeout-minutes: 5
+        run: node desktop/scripts/native-pg-probe.mjs
+      - run: npm ci
       - name: Install bundled native Chromium
         if: runner.os != 'Linux'
         run: npx --no-install playwright install chromium

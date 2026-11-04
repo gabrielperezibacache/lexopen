@@ -237,6 +237,41 @@ async function migrateLegacyPgPassword(pg, dataDir, databaseUrl) {
 }
 
 let postgresInitialization = Promise.resolve();
+const safeLifecycleFailure = Symbol("safeLifecycleFailure");
+const hostLifecyclePhases = new Set(["PG_INIT", "PG_START", "MIGRATION", "NEXT_START", "HEALTH"]);
+const postgresDiagnostics = new Set(["INVALID_LOCALE", "ACCESS_DENIED", "DLL_MISSING", "BINARY_LOOKUP", "UNKNOWN"]);
+
+/** Classify transient input without retaining or printing PostgreSQL output. */
+export function classifyPostgresDiagnostic(value) {
+  const code = typeof value?.code === "string" ? value.code : "";
+  const message = typeof value === "string" ? value : typeof value?.message === "string" ? value.message : "";
+  const text = message.slice(0, 16_384);
+  if (/invalid (?:locale|value.*lc_messages)|locale[^\r\n]{0,120}(?:not supported|not recognized|not found)|lc_messages[^\r\n]{0,120}(?:invalid|not supported)/i.test(text)) return "INVALID_LOCALE";
+  if (["EACCES", "EPERM"].includes(code) || /permission denied|access (?:is )?denied|acceso denegado|operation not permitted/i.test(text)) return "ACCESS_DENIED";
+  if (/0xc0000135|(?:dll|dynamic link library)[^\r\n]{0,120}(?:not found|missing|could not|failed)|(?:could not|cannot|failed to) load[^\r\n]{0,120}(?:library|module)|specified module could not be found/i.test(text)) return "DLL_MISSING";
+  if (["ENOENT", "MODULE_NOT_FOUND", "ERR_MODULE_NOT_FOUND"].includes(code) || /cannot find (?:module|package)|no (?:supported|compatible) (?:architecture|binary)|(?:could not|cannot|failed to) find[^\r\n]{0,120}(?:binar|executable)/i.test(text)) return "BINARY_LOOKUP";
+  return "UNKNOWN";
+}
+
+function lifecycleFailure(phase, diagnostic) {
+  if (!hostLifecyclePhases.has(phase)) throw new Error("Invalid Host lifecycle diagnostic phase");
+  diagnostic = postgresDiagnostics.has(diagnostic) ? diagnostic : "UNKNOWN";
+  const code = phase.startsWith("PG_") ? `${phase}_${diagnostic}` : phase;
+  const error = new Error(`No se completó el inicio del Host (${code}).`);
+  Object.assign(error, { code, phase, ...(phase.startsWith("PG_") ? { diagnostic } : {}) });
+  Object.defineProperty(error, safeLifecycleFailure, { value: true });
+  return error;
+}
+
+async function duringHostPhase(phase, work, diagnostic = () => "UNKNOWN") {
+  try { return await work(); }
+  catch (error) {
+    if (error?.[safeLifecycleFailure]) throw error;
+    const fromError = classifyPostgresDiagnostic(error);
+    throw lifecycleFailure(phase, fromError === "UNKNOWN" ? diagnostic() : fromError);
+  }
+}
+
 /** embedded-postgres writes its init password into os.tmpdir(); contain it. */
 export function withPrivatePostgresTemp(dataDir, work) {
   const pending = postgresInitialization.then(async () => {
@@ -257,38 +292,50 @@ export function withPrivatePostgresTemp(dataDir, work) {
   return pending;
 }
 
-async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl) {
-  const modPath =
-    bundledModuleFile("embedded-postgres", "dist/index.js") ||
-    require.resolve("embedded-postgres");
-  const EmbeddedPostgres = (await import(pathToFileURL(modPath).href)).default;
+export async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl, overrides = {}) {
   const databaseDir = pgDataDir(dataDir);
   const alreadyInitialized = fs.existsSync(path.join(databaseDir, "PG_VERSION"));
+  const preparationPhase = alreadyInitialized ? "PG_START" : "PG_INIT";
+  const EmbeddedPostgres = await duringHostPhase(preparationPhase, async () => {
+    if (overrides.EmbeddedPostgres) return overrides.EmbeddedPostgres;
+    const modPath = bundledModuleFile("embedded-postgres", "dist/index.js") || require.resolve("embedded-postgres");
+    return (await import(pathToFileURL(modPath).href)).default;
+  });
   // Prefer password from DATABASE_URL. Brand-new clusters may briefly use
   // "lexopen" only when URL has no password; migrateLegacyPgPassword rotates it.
   const password =
     pgPasswordFromDatabaseUrl(databaseUrl || process.env.DATABASE_URL || "") ||
     "lexopen";
-  const pg = new EmbeddedPostgres({
+  let diagnostic = "UNKNOWN";
+  const classifyLog = value => {
+    const classified = classifyPostgresDiagnostic(value);
+    if (classified !== "UNKNOWN") diagnostic = classified;
+  };
+  const pg = await duringHostPhase(preparationPhase, () => new EmbeddedPostgres({
     databaseDir,
     user: "lexopen",
     password,
     port: pgPort,
     persistent: true,
-  });
+    // The dependency defaults to console.log/error. Keep only a fixed enum;
+    // logs can contain passwords, data paths or full connection strings.
+    onLog: classifyLog,
+    onError: classifyLog,
+  }));
   if (!alreadyInitialized) {
-    await withPrivatePostgresTemp(dataDir, () => pg.initialise());
+    await duringHostPhase("PG_INIT", () => withPrivatePostgresTemp(dataDir, () => pg.initialise()), () => diagnostic);
   }
-  await pg.start();
+  diagnostic = "UNKNOWN";
+  await duringHostPhase("PG_START", () => pg.start(), () => diagnostic);
   try {
     await pg.createDatabase("lexopen");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (!/already exists/i.test(msg)) {
-      console.warn("[lexopen-host] createDatabase:", msg);
+      console.warn("[lexopen-host] createDatabase: PG_START_UNKNOWN");
     }
   }
-  await migrateLegacyPgPassword(pg, dataDir, databaseUrl);
+  await duringHostPhase("PG_START", () => migrateLegacyPgPassword(pg, dataDir, databaseUrl), () => diagnostic);
   return pg;
 }
 
@@ -748,28 +795,46 @@ export async function startHost(options = {}, overrides = {}) {
 
   let pg = null;
   let child = null;
+  let nextStartupError = null, nextStartupFailure;
+  let unwatchNextStartup = () => {};
   try {
-    await lifecycle.assertPortAvailable(pgPort, "PostgreSQL");
-    pg = await lifecycle.startEmbeddedPostgres(dataDir, pgPort, host.databaseUrl);
-    await lifecycle.migrate();
-    await lifecycle.maybeSeed(seedDemo, dataDir);
-    await lifecycle.assertPortAvailable(host.port, "LexOpen", bindHost);
+    await duringHostPhase("PG_START", () => lifecycle.assertPortAvailable(pgPort, "PostgreSQL"));
+    pg = await duringHostPhase("PG_START", () => lifecycle.startEmbeddedPostgres(dataDir, pgPort, host.databaseUrl));
+    await duringHostPhase("MIGRATION", () => lifecycle.migrate());
+    await duringHostPhase("MIGRATION", () => lifecycle.maybeSeed(seedDemo, dataDir));
+    await duringHostPhase("NEXT_START", () => lifecycle.assertPortAvailable(host.port, "LexOpen", bindHost));
 
-    child = lifecycle.startNextServer(host.port, bindHost);
+    child = await duringHostPhase("NEXT_START", () => {
+      const started = lifecycle.startNextServer(host.port, bindHost);
+      // spawn errors are emitted asynchronously; observe them before awaiting
+      // anything so a failed launch remains NEXT_START rather than a timeout.
+      if (typeof started?.once === "function") {
+        nextStartupFailure = new Promise((_resolve, reject) => {
+          const failed = () => { nextStartupError = lifecycleFailure("NEXT_START"); reject(nextStartupError); };
+          started.once("error", failed);
+          unwatchNextStartup = () => started.removeListener("error", failed);
+        });
+        void nextStartupFailure.catch(() => undefined);
+      }
+      return started;
+    });
     const url = localAppUrl(host.port);
-    const health = await lifecycle.waitForHealth(url, { version, buildId: identity.buildId });
-    if (!health.ok) {
-      throw new Error("[lexopen-host] Health check falló; el servidor no está listo.");
-    }
+    const health = await duringHostPhase("HEALTH", async () => {
+      if (nextStartupError) throw nextStartupError;
+      const pending = lifecycle.waitForHealth(url, { version, buildId: identity.buildId });
+      const result = await (nextStartupFailure ? Promise.race([pending, nextStartupFailure]) : pending);
+      if (nextStartupError) throw nextStartupError;
+      if (!result?.ok) throw new Error("Host health unavailable");
+      return result;
+    });
+    unwatchNextStartup();
     const needsSetup = health.needsSetup;
     const bootstrapToken = needsSetup
       ? process.env.LEXOPEN_BOOTSTRAP_TOKEN || ""
       : null;
     const recoveryToken = process.env.LEXOPEN_RECOVERY_TOKEN || "";
     if (needsSetup && !bootstrapToken) {
-      throw new Error(
-        "[lexopen-host] No hay token de configuración inicial; revise el archivo .env del Host."
-      );
+      throw lifecycleFailure("HEALTH");
     }
     if (needsSetup) {
       console.log(
@@ -844,7 +909,9 @@ export async function startHost(options = {}, overrides = {}) {
       previousVersion: recognition.previousVersion,
     };
   } catch (error) {
-    await lifecycle.stopChild(child);
+    unwatchNextStartup();
+    // A cleanup error must not replace the safe diagnostic of the failing step.
+    try { await lifecycle.stopChild(child); } catch { if (error) error.cleanupFailed = true; }
     if (pg) await pg.stop().catch(() => undefined);
     throw error;
   }

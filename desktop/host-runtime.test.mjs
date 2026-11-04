@@ -19,6 +19,8 @@ import {
   embeddedDatabasePort,
   toolUsesShell,
   startHost,
+  startEmbeddedPostgres,
+  classifyPostgresDiagnostic,
   withPrivatePostgresTemp,
   stopChild,
   assertHostStopped,
@@ -183,6 +185,37 @@ assert.equal(fs.existsSync(initializationDirectory), false, "a failed init must 
 assert.deepEqual([process.env.TMPDIR, process.env.TMP, process.env.TEMP], originalTemporary); assert.equal(process.umask(), originalMask);
 assert.equal(await withPrivatePostgresTemp(tmp, async () => 42), 42, "a failed initialization must release its temporary environment scope");
 
+for (const [value, expected] of [
+  ["initdb: error: invalid locale name en_US.UTF-8", "INVALID_LOCALE"],
+  ["FATAL: access is denied", "ACCESS_DENIED"],
+  [Object.assign(new Error("fixture"), { code: "EACCES" }), "ACCESS_DENIED"],
+  ["VCRUNTIME140.dll missing", "DLL_MISSING"],
+  ["The specified module could not be found", "DLL_MISSING"],
+  [Object.assign(new Error("fixture"), { code: "ERR_MODULE_NOT_FOUND" }), "BINARY_LOOKUP"],
+  ["Cannot find package @embedded-postgres/windows-x64", "BINARY_LOOKUP"],
+  ["database locale is en_US.UTF-8", "UNKNOWN"],
+  [undefined, "UNKNOWN"],
+]) assert.equal(classifyPostgresDiagnostic(value), expected);
+
+// Neither onLog nor onError forwards raw dependency text to the console.
+const diagnosticFixture = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-pg-diagnostic-"));
+const privateFixture = "FICTITIOUS_SECRET:/private/fixture-only-data";
+const consoleOutput = [], originalLog = console.log, originalWarn = console.warn, originalError = console.error;
+try {
+  console.log = console.warn = console.error = (...args) => { consoleOutput.push(args.join(" ")); };
+  class FakePostgres {
+    constructor(options) { this.options = options; }
+    async initialise() { this.options.onLog(privateFixture); this.options.onError(new Error(privateFixture)); }
+    async start() { this.options.onLog(privateFixture); }
+    async createDatabase() {}
+  }
+  await startEmbeddedPostgres(diagnosticFixture, 55449, "postgresql://lexopen:fixture@127.0.0.1:55449/lexopen", { EmbeddedPostgres: FakePostgres });
+  assert.deepEqual(consoleOutput, [], "PostgreSQL output must only update in-memory diagnostic enums");
+} finally {
+  console.log = originalLog; console.warn = originalWarn; console.error = originalError;
+  fs.rmSync(diagnosticFixture, { recursive: true, force: true });
+}
+
 const identityRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-build-identity-"));
 fs.mkdirSync(path.join(identityRoot, ".next"));
 fs.writeFileSync(path.join(identityRoot, ".next", "BUILD_ID"), "fixture-build");
@@ -197,7 +230,8 @@ assert.equal(previewAppVersion("2.0.0", pristine).firstRun, true);
 assert.equal(fs.existsSync(pristine), false, "version preview must never create or write the Host data directory");
 const originalEnvironment = { ...process.env };
 try {
-  for (const failure of ["migration", "health", null, "stop"]) {
+  const failureCodes = { "pg-init": "PG_INIT_INVALID_LOCALE", "pg-start": "PG_START_DLL_MISSING", "pg-undefined": "PG_START_UNKNOWN", migration: "MIGRATION", "next-start": "NEXT_START", "next-async": "NEXT_START", health: "HEALTH", "health-undefined": "HEALTH" };
+  for (const failure of [...Object.keys(failureCodes), null, "stop"]) {
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-startup-version-"));
     const state = { lastAppVersion: "1.0.0", lastAppliedAt: "fixture-original" };
     fs.writeFileSync(path.join(dataDir, "app-state.json"), JSON.stringify(state));
@@ -206,23 +240,50 @@ try {
     const lifecycle = {
       buildIdentity: { buildId: "fixture-build", sourceRevision: "a".repeat(40) },
       assertPortAvailable: async () => undefined,
-      startEmbeddedPostgres: async () => ({ stop: async () => { databaseStops++; if (failure === "stop") throw new Error("fixture PostgreSQL stop failed"); } }),
-      migrate: async () => { if (failure === "migration") throw new Error("fixture migration failure"); },
+      startEmbeddedPostgres: async (directory, pgPort, databaseUrl) => {
+        if (failure === "pg-undefined") return Promise.reject(undefined);
+        if (failure === "pg-init" || failure === "pg-start") {
+          class FakePostgres {
+            constructor(options) { this.options = options; }
+            async initialise() {
+              if (failure === "pg-init") { this.options.onLog(`invalid locale name ${privateFixture}`); return Promise.reject(undefined); }
+            }
+            async start() { this.options.onError(`VCRUNTIME140.dll missing ${privateFixture}`); return Promise.reject(undefined); }
+          }
+          return startEmbeddedPostgres(directory, pgPort, databaseUrl, { EmbeddedPostgres: FakePostgres });
+        }
+        return { stop: async () => { databaseStops++; if (failure === "stop") throw new Error("fixture PostgreSQL stop failed"); } };
+      },
+      migrate: async () => { if (failure === "migration") return Promise.reject(undefined); },
       maybeSeed: async () => undefined,
-      startNextServer: () => ({ fixture: true }),
+      startNextServer: () => {
+        if (failure === "next-start") throw new Error(privateFixture);
+        if (failure === "next-async") {
+          const started = new EventEmitter();
+          queueMicrotask(() => started.emit("error", new Error(privateFixture)));
+          return started;
+        }
+        return { fixture: true };
+      },
       waitForHealth: async (_url, identity) => {
         assert.equal(identity.buildId, "fixture-build");
         assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dataDir, "app-state.json"), "utf8")), state, "health must precede the durable version commit");
+        if (failure === "health-undefined") return Promise.reject(undefined);
         return { ok: failure !== "health", needsSetup: false };
       },
       stopChild: async child => { if (child) serverStops++; },
       assertHostStopped: async () => undefined,
       startSchedulers: async () => ({ stop() {} }),
     };
-    if (failure === "migration" || failure === "health") {
-      await assert.rejects(startHost({ dataDir, port: 3149, pgPort: 55449 }, lifecycle));
+    if (failureCodes[failure]) {
+      await assert.rejects(startHost({ dataDir, port: 3149, pgPort: 55449 }, lifecycle), error => {
+        assert.equal(error.code, failureCodes[failure], "the exact safe stage must reach the caller, even for undefined rejections");
+        assert(!`${error}\n${JSON.stringify(error)}`.includes(privateFixture));
+        assert.equal(error.cause, undefined, "raw dependency errors must never be retained in a cause chain");
+        return true;
+      });
       assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dataDir, "app-state.json"), "utf8")), state, "failed migration/health must never mark a new version applied");
-      assert.equal(databaseStops, 1); assert.equal(serverStops, failure === "health" ? 1 : 0);
+      assert.equal(databaseStops, failure.startsWith("pg-") ? 0 : 1); assert.equal(serverStops, failure.startsWith("health") || failure === "next-async" ? 1 : 0);
     } else {
       const handle = await startHost({ dataDir, port: 3149, pgPort: 55449 }, lifecycle);
       assert.equal(JSON.parse(fs.readFileSync(path.join(dataDir, "app-state.json"), "utf8")).lastAppVersion, "2.0.0");
