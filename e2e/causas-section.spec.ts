@@ -29,8 +29,12 @@ test("un abogado ve un menú Causas con tres pestañas y sin ítems duplicados",
 
   await page.getByTestId("causas-section-tabs").getByRole("link", { name: "ClaveÚnica" }).click();
   await expect(page).toHaveURL(/\/causas\/mis-causas/);
-  await expect(page.getByRole("heading", { name: "ClaveÚnica", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Mis Causas en OJV", exact: true })).toBeVisible();
+  await expect(page.getByTestId("causas-section-tabs").getByRole("link", { name: "ClaveÚnica", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("region", { name: "Su cuenta judicial, su cartera", exact: true })).toBeVisible();
+  await page.getByText("Acceso guardado del estudio y sincronización programada", { exact: true }).click();
   await expect(page.getByRole("link", { name: "Ver en Expediente" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ver en Expediente" }).first()).toHaveAttribute("href", "/causas?origen=claveunica");
 
   await page.goto("/causas/nueva");
   await expect(page.getByTestId("causas-section-tabs")).toHaveCount(0);
@@ -40,7 +44,9 @@ test("un abogado ve un menú Causas con tres pestañas y sin ítems duplicados",
 test("un asistente no opera ClaveÚnica", async ({ page }) => {
   await loginAs(page, "asistente@estudio.cl");
   await page.goto("/causas/mis-causas");
-  await expect(page.getByRole("heading", { name: "ClaveÚnica", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Mis Causas en OJV", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Su cuenta judicial, su cartera", exact: true }).getByRole("button", { name: "Ingresar con ClaveÚnica", exact: true })).toBeDisabled();
+  await page.getByText("Acceso guardado del estudio y sincronización programada", { exact: true }).click();
   await expect(
     page.getByText("no guardar credenciales ni sincronizar")
   ).toBeVisible();
@@ -68,8 +74,9 @@ test("avisos del canal PJUD van al log de Configuración, no a Cartera", async (
 
   await page.goto("/causas/mis-causas");
   await expect(
-    page.getByRole("heading", { name: "ClaveÚnica", exact: true })
+    page.getByRole("heading", { name: "Mis Causas en OJV", exact: true })
   ).toBeVisible();
+  await expect(page.getByRole("region", { name: "Su cuenta judicial, su cartera", exact: true })).toBeVisible();
   await expect(page.getByText("Aviso del Host")).toHaveCount(0);
 
   await page.goto("/configuracion#pjud-log");
