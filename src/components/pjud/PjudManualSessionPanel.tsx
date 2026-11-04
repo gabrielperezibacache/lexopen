@@ -129,7 +129,7 @@ export function PjudManualSessionPanel() {
     };
   }, []);
 
-  async function act(action: "start" | "list" | "import" | "close") {
+  async function act(action: "start" | "list" | "import" | "focus" | "close") {
     if (pending.current) return;
     if (action === "import" && (!selected.size || selected.size > (data?.capabilities.importLimit ?? 20))) return;
     const controller = new AbortController();
@@ -163,6 +163,7 @@ export function PjudManualSessionPanel() {
   const connectionOpen = Boolean(session && session.phase !== "closed");
   const canResume = Boolean(connectionOpen && !session?.authenticated && (session?.phase === "error" || session?.phase === "completed"));
   const backgroundBusy = session?.phase === "opening" || session?.phase === "listing" || session?.phase === "importing";
+  const canShowWindow = connectionOpen && !backgroundBusy;
   const canRead = Boolean(session?.authenticated && !backgroundBusy && session.phase !== "closed");
   const limit = data?.capabilities.importLimit ?? 20;
   const pageSize = Math.max(1, Math.min(limit, 20));
@@ -234,12 +235,13 @@ export function PjudManualSessionPanel() {
         <div className="pjud-manual-connection-copy"><h3>{phaseLabel(session)}</h3>
           {!connectionOpen && <p>La contraseña se escribe sólo en ClaveÚnica. Esta conexión temporal permite revisar las causas antes de incorporarlas al estudio.</p>}
           {session?.phase === "opening" && <p>Se está preparando una ventana del navegador en este equipo. Espere a que aparezca el formulario con el encabezado PJUD.</p>}
-          {awaitingUser && <p>Continúe en la ventana oficial con el encabezado PJUD. Complete allí su identificación y cualquier confirmación del portal. LexOpen detectará su regreso a la OJV.</p>}
+          {awaitingUser && <p>Continúe en la ventana temporal abierta por LexOpen, distinta de su navegador habitual, con el encabezado PJUD. Complete allí su identificación y cualquier confirmación del portal. El ingreso dispone de hasta 15 minutos. LexOpen detectará su regreso a la OJV.</p>}
           {canRead && <p>Conexión temporal{expires && !Number.isNaN(expires.getTime()) ? ` hasta las ${expires.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Santiago" })}` : ""}. Puede importar varios grupos mientras esté abierta.</p>}
           {session?.error && <p className="pjud-manual-error" role="alert">{session.error}</p>}
         </div>
         <div className="pjud-manual-actions">
           {(!connectionOpen || canResume) && <button className="btn btn-primary" type="button" disabled={!canStart || Boolean(busy) || loading} onClick={() => void act("start")}><LogIn size={18} aria-hidden="true" />{busy === "start" ? "Preparando ingreso…" : canResume ? "Reanudar ingreso con ClaveÚnica" : "Ingresar con ClaveÚnica"}</button>}
+          {canShowWindow && <button className="btn btn-secondary" type="button" disabled={!canStart || Boolean(busy) || loading} onClick={() => void act("focus")}><ExternalLink size={18} aria-hidden="true" />{busy === "focus" ? "Mostrando ventana…" : "Mostrar ventana oficial"}</button>}
           {connectionOpen && <button className="btn btn-ghost" type="button" disabled={Boolean(busy)} onClick={() => void act("close")}><X size={17} aria-hidden="true" />{session?.phase === "importing" ? "Detener y cerrar conexión" : "Cerrar conexión"}</button>}
         </div>
       </div>

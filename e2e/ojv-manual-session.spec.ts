@@ -62,6 +62,10 @@ test("ingreso manual, selección explícita e importación con cobertura complet
   await panel.getByRole("button", { name: "Ingresar con ClaveÚnica", exact: true }).click();
   await expect(panel.getByRole("heading", { name: "Complete su ingreso en la ventana oficial" })).toBeVisible();
   expect(payloads).toEqual([{ action: "start" }]);
+  await expect(panel.getByText(/ventana temporal abierta por LexOpen, distinta de su navegador habitual/)).toBeVisible();
+  await panel.getByRole("button", { name: "Mostrar ventana oficial", exact: true }).click();
+  await expect(panel.getByRole("heading", { name: "Complete su ingreso en la ventana oficial" })).toBeVisible();
+  expect(payloads.at(-1)).toEqual({ action: "focus", sessionId: "opaque-session-fixture" });
   current = session();
   await expect(panel.getByRole("button", { name: "Consultar Mis Causas", exact: true })).toBeVisible();
   await panel.getByLabel("Materia", { exact: true }).selectOption("Civil");
@@ -73,6 +77,9 @@ test("ingreso manual, selección explícita e importación con cobertura complet
   await panel.getByLabel("Filtrar el listado").fill("revisión 3");
   await expect(panel.getByRole("list", { name: "Causas seleccionadas" }).getByText("C-100-2024", { exact: true })).toBeVisible();
   await expect(panel.getByRole("list", { name: "Causas seleccionadas" }).getByText("C-101-2024", { exact: true })).toBeVisible();
+  await panel.getByRole("button", { name: "Mostrar ventana oficial", exact: true }).click();
+  await expect(panel.getByLabel("Filtrar el listado")).toHaveValue("revisión 3");
+  await expect(panel.getByRole("list", { name: "Causas seleccionadas" }).locator("li")).toHaveCount(2);
   await panel.getByLabel("Filtrar el listado").fill("");
   await page.setViewportSize({ width: 1440, height: 1050 });
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -83,12 +90,17 @@ test("ingreso manual, selección explícita e importación con cobertura complet
   await page.screenshot({ path: info.outputPath("ojv-manual-selection-mobile.png"), fullPage: true });
   await panel.getByRole("button", { name: "Importar 2 causas seleccionadas", exact: true }).click();
   await expect(panel.getByRole("heading", { name: "Recuperando los cuadernos de sus causas" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Mostrar ventana oficial", exact: true })).toHaveCount(0);
   await expect(panel.getByRole("heading", { name: "Resultado de la importación" })).toBeVisible();
   await expect(panel.getByRole("heading", { name: "Resultado de la importación" })).toBeFocused();
   expect(payloads.find(body => body.action === "import")).toEqual({ action: "import", sessionId: "opaque-session-fixture", candidateIds: ["opaque-fixture-0", "opaque-fixture-1"] });
   const reports = panel.locator(".pjud-manual-result .pjud-cuadernos");
   await expect(reports.nth(0)).toHaveAttribute("data-status", "complete");
   await expect(reports.nth(1)).toHaveAttribute("data-status", "partial");
+  await panel.getByRole("button", { name: "Mostrar ventana oficial", exact: true }).click();
+  await expect(panel.getByText("Importación terminada", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "Resultado de la importación" })).toBeVisible();
+  expect(payloads.filter(body => body.action === "start")).toHaveLength(1);
   await reports.nth(1).locator("summary").click();
   await expect(reports.nth(1).getByText("Lectura incompleta", { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 1050 });
@@ -159,6 +171,34 @@ test("al perder autorización desaparecen el listado privado y la selección", a
   await expect(panel.getByRole("list", { name: "Causas seleccionadas" })).toHaveCount(0);
 });
 
+test("un fallo al mostrar la ventana conserva la selección y el recibo sin reiniciar el ingreso", async ({ page }) => {
+  const current = session({ phase: "completed", listedAt: "2026-11-03T18:00:00Z", materiasTried: ["Civil"], candidates: candidates(),
+    result: { created: 1, linked: 0, syncOk: 1, syncFailed: 0, syncPartial: 0, inserted: 14, items: [
+      { causaId: "fictitious-cause-a", rit: "C-100-2024", tribunal: "1º Juzgado Civil de Santiago", status: "ok", cuadernosCoverage: coverage },
+    ] } });
+  const payloads: Record<string, unknown>[] = [];
+  await page.route("**/api/pjud/manual-session", async route => {
+    if (route.request().method() === "POST") {
+      payloads.push(route.request().postDataJSON());
+      await route.fulfill({ status: 503, json: { error: "La ventana temporal no pudo activarse en esta prueba ficticia." } });
+    } else await route.fulfill({ json: { capabilities, session: current } });
+  });
+  const panel = await openPanel(page);
+  await panel.getByRole("button", { name: "Continuar con otras causas de este listado", exact: true }).click();
+  await panel.locator(".pjud-manual-case-list input").first().check();
+  await panel.getByLabel("Filtrar el listado").fill("revisión 2");
+  await panel.getByRole("button", { name: "Mostrar ventana oficial", exact: true }).click();
+  await expect(panel.getByRole("alert")).toContainText("La ventana temporal no pudo activarse");
+  await expect(panel.getByLabel("Filtrar el listado")).toHaveValue("revisión 2");
+  await expect(panel.getByRole("list", { name: "Causas seleccionadas" }).getByText("C-100-2024", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Recibo de la importación anterior", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("list", { name: "Pasos de incorporación" }).locator('[aria-current="step"]')).toContainText("Revisar las causas");
+  await panel.getByText("Recibo de la importación anterior", { exact: true }).click();
+  await expect(panel.getByRole("heading", { name: "Resultado de la importación" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Ingresar con ClaveÚnica", exact: true })).toHaveCount(0);
+  expect(payloads).toEqual([{ action: "focus", sessionId: "opaque-session-fixture" }]);
+});
+
 test("cambiar de sección conserva una importación aceptada y cierra la conexión de sólo lectura", async ({ page }) => {
   let closes = 0;
   let current = session({ phase: "importing", progress: { completed: 0, total: 1 } });
@@ -168,6 +208,7 @@ test("cambiar de sección conserva una importación aceptada y cierra la conexi�
   });
   const panel = await openPanel(page);
   await expect(panel.getByRole("heading", { name: "Recuperando los cuadernos de sus causas" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Mostrar ventana oficial", exact: true })).toHaveCount(0);
   await panel.getByRole("link", { name: "Consultar por RIT/ROL", exact: true }).click();
   await expect(page).toHaveURL(/\/causas\/monitoreo/);
   expect(closes).toBe(0);

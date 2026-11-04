@@ -50,6 +50,8 @@ Consultar el listado no incorpora causas. La selección se conserva al filtrar y
 
 El resultado de la importación ocupa el lugar inmediato del listado, anuncia sus recuentos y recibe foco una sola vez cuando termina la operación iniciada desde esta pantalla. Continuar con otras causas devuelve el recorrido a Revisar y conserva el resultado anterior como un recibo desplegable. No se repite el desplazamiento con la consulta periódica de estado.
 
+Mostrar ventana oficial activa la pestaña temporal que abrió LexOpen y explica que es distinta del navegador habitual del profesional. La acción conserva selección, recibo y plazo; no acredita autenticación. Se ofrece cuando la conexión está abierta y fuera de apertura, lectura e importación. Sigue la jerarquía y los controles existentes, sin introducir un sistema visual nuevo.
+
 La consulta RIT/ROL, el resultado manual, la cartera y el expediente comparten la cobertura por cuaderno: completo sólo cuando se leyeron todos los enumerados, parcial cuando quedan fallos o límites, y sin comprobar cuando no se pudo enumerar. Cada fila conserva su cuaderno y los legados sin atribución se muestran separados; no se convierten en Principal. Las claves visibles son estables y no contienen valores de sesión del portal.
 
 A 360 píxeles, controles y filas se reorganizan en una columna y las acciones mantienen una altura de 44 píxeles. Los indicadores de actividad y cambios de paso respetan movimiento reducido. Se conservan los tamaños auxiliares de pjud-lookup.css; las advertencias mecánicas de rampa tipográfica se evaluaron como continuidad del patrón, sin silenciar reglas.

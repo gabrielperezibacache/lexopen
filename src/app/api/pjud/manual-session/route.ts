@@ -47,6 +47,11 @@ export async function POST(request: NextRequest) {
     if (!capabilities.allowed) throw new ManualOjvUiError(capabilities.reason!, 403);
     if (!capabilities.available) throw new ManualOjvUiError(capabilities.reason!, 503);
     await writeAuditStrict({ actorId: user.id, action: `pjud.manual.${body.action}`, entityType: "manual_ojv_session", after: { stage: "requested", ...(body.action === "import" ? { selected: body.candidateIds.length } : {}) } });
+    if (body.action === "focus") {
+      // A development reload can retain an older manager and its live browser.
+      if (typeof manualOjvSessions.focus !== "function") throw new ManualOjvUiError("Vuelva a abrir LexOpen y cree una nueva conexión para mostrar la ventana oficial.", 503);
+      return json({ capabilities, session: await manualOjvSessions.focus(owner, body.sessionId) });
+    }
     const pending = body.action === "start" ? await manualOjvSessions.start(owner)
       : body.action === "list" ? await manualOjvSessions.list(owner, body.sessionId, body.materias)
         : await manualOjvSessions.import(owner, body.sessionId, body.candidateIds);

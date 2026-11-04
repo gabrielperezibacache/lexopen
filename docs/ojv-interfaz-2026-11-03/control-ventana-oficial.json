@@ -1,0 +1,15 @@
+{
+  "checkedAt": "2026-11-04T01:41:47Z",
+  "mode": "real-lexopen-interface-official-window-focus",
+  "localUiOpenedOfficialForm": true,
+  "focusActionWithoutUiError": true,
+  "waitingStateRetained": true,
+  "newLoginStartedByFocus": false,
+  "authenticationVerified": false,
+  "privateCaseListVerified": false,
+  "privateCaseImportVerified": false,
+  "credentialsStored": false,
+  "documentsDownloaded": false,
+  "studyDatabaseUsed": false,
+  "privateIdentifiersPublished": false
+}

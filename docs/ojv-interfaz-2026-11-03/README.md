@@ -6,6 +6,8 @@ Entrega del 3 de noviembre de 2026. Amplía las pantallas existentes de Mis Caus
 
 En **Causas → ClaveÚnica**, el profesional abre el formulario oficial desde el Host local, completa personalmente el ingreso y vuelve a LexOpen para consultar Mis Causas. Puede filtrar por materia, buscar, revisar y elegir hasta veinte causas por grupo. Consultar el listado no incorpora causas. La importación comprueba de nuevo la selección, crea o vincula expedientes y consulta los cuadernos disponibles.
 
+**Mostrar ventana oficial** activa la pestaña temporal abierta por LexOpen para distinguirla de la OJV del navegador habitual. Conserva la selección, el recibo y el plazo de la conexión; activar la pestaña no acredita un ingreso ni abre otra sesión. La acción no se ofrece durante apertura, consulta o importación. El ingreso inicial dispone de hasta quince minutos y la conexión completa de hasta treinta desde su apertura.
+
 El resultado aparece antes del listado y recibe foco una sola vez al terminar la importación iniciada desde esa pantalla. **Continuar con otras causas** vuelve al paso de revisión y conserva el recibo anterior en un desplegable. El acceso guardado del estudio sigue en un apartado separado.
 
 La consulta pública y la importación manual muestran cuántos cuadernos se leyeron, cuáles están incompletos y qué movimientos corresponden a cada uno. La cartera y el expediente conservan la cobertura de la última consulta. Los movimientos históricos sin cuaderno conocido permanecen separados. Una lectura parcial conserva lo recuperado y pide reintento.
@@ -35,6 +37,10 @@ Las seis imágenes proceden de la interfaz local con respuestas ficticias interc
 **Backend y conservación.** Pasaron las pruebas de cobertura, transporte acotado, pertenencia de la sesión, solicitudes, permisos, cierre y vencimiento; las cuatro suites de navegador del conector usan fixtures locales. Las comprobaciones con PostgreSQL desechable cubren persistencia de cobertura, conservación histórica, migración e idempotencia, además de la reserva de trabajos `manual-session` frente al cron y a reintentos ordinarios. Los límites de 10.000 movimientos, 100 cuadernos y 20 MiB mantienen un resultado parcial explícito.
 
 **Comprobaciones generales.** La suite general, lint, tipos y compilación de producción pasaron. La revisión visual independiente terminó con **disposition: ship** tras resolver la llegada al resultado con foco único, la vuelta al paso de revisión con recibo anterior y el registro durable de estas decisiones en el [brief de la superficie](../../.impeccable/surfaces/src-components-pjud-pjudquickaddpanel-tsx.md). No se reemplazó el sistema visual global.
+
+**Identificación de la ventana temporal.** En un intento posterior desde la interfaz se abrió el formulario oficial y se detectó inicialmente el ingreso, pero la comprobación previa a consultar Mis Causas dejó de reconocer una página identificada. El listado no se confirmó y no se importaron causas. La causa de esa transición no está determinada; este intento no se presenta como una validación privada completa. Se añadió **Mostrar ventana oficial** para activar la pestaña del contexto propio, manteniendo la selección, el resultado y el vencimiento. Diez pruebas dirigidas de ingreso manual y navegación pasaron con respuestas ficticias, incluidos el enfoque durante la espera, la conservación del estado y un fallo recuperable al activar la ventana. Las capturas de selección y resultado se actualizaron con esos mismos datos ficticios.
+
+El [control real del botón de ventana](control-ventana-oficial.json) abrió el formulario oficial desde LexOpen y aceptó la activación sin error, conservando el estado de espera y sin iniciar otra conexión. Esta comprobación no acredita autenticación, consulta ni importación privadas.
 
 ## Límites de esta entrega
 

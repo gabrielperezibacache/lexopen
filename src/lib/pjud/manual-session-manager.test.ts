@@ -16,11 +16,12 @@ const pause = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check: () => boolean) { const end = Date.now() + 2_000; while (!check()) { assert(Date.now() < end, "fixture deadline"); await pause(5); } }
 
 function fixture() {
-  let closed = false, authenticated = true, factoryCalls = 0, closeCalls = 0, listCalls = 0, detailCalls = 0, syncCalls = 0, allowed = true;
+  let closed = false, authenticated = true, factoryCalls = 0, closeCalls = 0, listCalls = 0, detailCalls = 0, syncCalls = 0, focusCalls = 0, allowed = true;
   let current = fixtures.map(row => ({ ...row }));
   const browser: ManualOjvSession = {
     status: () => ({ phase: closed ? "closed" : authenticated ? "authenticated" : "waiting-login", authenticated: !closed && authenticated, channel: "chromium", createdAt: new Date().toISOString(), authenticatedAt: new Date().toISOString(), pageUrl: "https://oficinajudicialvirtual.pjud.cl/indexN.php" }),
     waitForAuthentication: async () => { authenticated = true; return browser.status(); },
+    showOfficialWindow: async () => { focusCalls++; },
     listMisCausas: async () => { listCalls++; return current.map(row => ({ ...row })); },
     fetchCausaDetail: async () => { detailCalls++; return { movimientos: [], sala: null, note: "Fictitious detail", portalUrl: "https://oficinajudicialvirtual.pjud.cl/indexN.php", cuadernos: coverage }; },
     close: async () => { closed = true; closeCalls++; },
@@ -51,7 +52,7 @@ function fixture() {
     runtimeAllowed: () => true,
     monitorMs: 10,
   } satisfies Partial<ConstructorParameters<typeof ManualOjvSessionManager>[0]>;
-  return { browser, deps, current: (value: MisCausasItem[]) => { current = value; }, expireAuthentication: () => { authenticated = false; }, revoke: () => { allowed = false; }, factoryCalls: () => factoryCalls, closeCalls: () => closeCalls, listCalls: () => listCalls, detailCalls: () => detailCalls, syncCalls: () => syncCalls };
+  return { browser, deps, current: (value: MisCausasItem[]) => { current = value; }, expireAuthentication: () => { authenticated = false; }, revoke: () => { allowed = false; }, factoryCalls: () => factoryCalls, closeCalls: () => closeCalls, listCalls: () => listCalls, detailCalls: () => detailCalls, syncCalls: () => syncCalls, focusCalls: () => focusCalls };
 }
 
 async function main() {
@@ -85,20 +86,29 @@ async function main() {
     assert.equal((await manager.status(owner))?.phase, "ready");
     assert.doesNotMatch(JSON.stringify(await manager.status(owner)), /PRIVATE_COOKIE|fingerprint|pageUrl|password/);
     await assert.rejects(manager.status(other, start.session.id), statusError(404));
+    await assert.rejects(manager.focus(other, start.session.id), statusError(404));
+    await assert.rejects(manager.focus({ ...owner, fingerprint: "different-authentication" }, start.session.id), statusError(404));
+    assert.equal(f.focusCalls(), 0, "another owner must never activate this session's window");
     await assert.rejects(manager.start(other), statusError(409));
     const both = await Promise.allSettled([manager.list(owner, start.session.id, ["Civil"]), manager.list(owner, start.session.id, ["Civil"])]);
     assert.equal(both.filter(result => result.status === "fulfilled").length, 1, "only one operation can reserve a shared page");
     const listing = both.find(result => result.status === "fulfilled")! as PromiseFulfilledResult<Awaited<ReturnType<typeof manager.list>>>;
+    await assert.rejects(manager.focus(owner, start.session.id), statusError(409));
     await listing.value.run();
     const listed = (await manager.status(owner))!;
     assert(listed.listedAt); assert.equal(listed.candidates.length, 2);
     const originalId = listed.candidates[0].id;
+    assert.deepEqual(await manager.focus(owner, start.session.id), listed, "focus preserves candidates, result, phase and expiration");
+    assert.equal(f.focusCalls(), 1);
     listed.candidates[0].rit = "MUTATED";
     assert.equal((await manager.status(owner))!.candidates[0].rit, fixtures[0].rit, "HTTP views must not mutate the server allowlist");
     await assert.rejects(manager.import(owner, start.session.id, ["unseen-client-id"]), statusError(400));
     await assert.rejects(manager.import(owner, start.session.id, [originalId, originalId]), statusError(400));
     assert.equal(f.syncCalls(), 0);
-    const imported = await manager.import(owner, start.session.id, [originalId]); await imported.run();
+    const imported = await manager.import(owner, start.session.id, [originalId]);
+    await assert.rejects(manager.focus(owner, start.session.id), statusError(409));
+    assert.equal(f.focusCalls(), 1, "listing and import reservations block focus");
+    await imported.run();
     const done = (await manager.status(owner))!;
     assert.equal(done.phase, "completed"); assert.equal(done.result?.created, 1); assert.deepEqual(done.result?.items[0].cuadernosCoverage, coverage);
     assert.equal(f.detailCalls(), 1); assert.equal(f.listCalls(), 2, "import must refresh the OJV list rather than trust an old candidate");
@@ -142,6 +152,41 @@ async function main() {
     await delayed.close(owner, start.session.id); release(opening.browser); await run;
     assert.equal(opening.closeCalls(), 1, "a browser that completes launch after cancellation must also close");
   } finally { await delayed.dispose(); }
+
+  const waiting = fixture(); waiting.expireAuthentication(); let releaseAuthentication!: () => void;
+  waiting.browser.waitForAuthentication = () => new Promise(resolve => { releaseAuthentication = () => resolve({ ...waiting.browser.status(), phase: "authenticated", authenticated: true }); });
+  const waitingManager = new ManualOjvSessionManager(waiting.deps);
+  try {
+    const start = await waitingManager.start(owner); const running = start.run(); await until(() => Boolean(releaseAuthentication));
+    const before = await waitingManager.status(owner);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const shown = await Promise.race([waitingManager.focus(owner, start.session.id), new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error("focus was blocked by authentication")), 1_000); })]);
+      assert.deepEqual(shown, before, "showing a pending login neither authenticates nor extends its lifetime");
+    } finally { if (timeout) clearTimeout(timeout); }
+    assert.equal(waiting.focusCalls(), 1); assert.equal(waiting.factoryCalls(), 1);
+    releaseAuthentication(); await running;
+  } finally { await waitingManager.dispose(); }
+
+  const legacy = fixture(); delete legacy.browser.showOfficialWindow;
+  const legacyManager = new ManualOjvSessionManager(legacy.deps);
+  try {
+    const start = await legacyManager.start(owner); await start.run();
+    const before = await legacyManager.status(owner);
+    await assert.rejects(legacyManager.focus(owner, start.session.id), error => error instanceof ManualOjvUiError && error.status === 503 && /Vuelva a abrir LexOpen/.test(error.message));
+    assert.deepEqual(await legacyManager.status(owner), before, "an old session remains intact after an unsupported focus request");
+    assert.equal(legacy.closeCalls(), 0);
+  } finally { await legacyManager.dispose(); }
+
+  const focusFailure = fixture(); focusFailure.browser.showOfficialWindow = async () => { throw new Error("PRIVATE_UNSAFE_BROWSER_URL_AND_TOKEN"); };
+  const failureManager = new ManualOjvSessionManager(focusFailure.deps);
+  try {
+    const start = await failureManager.start(owner); await start.run();
+    await assert.rejects(failureManager.focus(owner, start.session.id), error => error instanceof ManualOjvUiError && error.status === 409 && !/PRIVATE/.test(error.message));
+    assert.equal(focusFailure.closeCalls(), 0, "a focus failure must not discard a usable login");
+    focusFailure.revoke();
+    await assert.rejects(failureManager.focus(owner, start.session.id), statusError(403));
+  } finally { await failureManager.dispose(); }
   console.log("Manual OJV manager: owner isolation, fresh allowlists, serial operations, repeat batches, revocation, expiry, cancellation and per-operation policy passed (fixtures only).");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
