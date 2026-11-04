@@ -48,13 +48,14 @@ export class KittiesGateway {
     const result = await this.json("/v1/chats", "POST", { title: "ALTAZOR AI · espacio privado", members: [kitty.name] });
     return this.validateChat(result.chat, kitty.id).id;
   }
-  private validateChat(value: unknown, kittyId: string) {
+  private validateChat(value: unknown, kittyId: string, allowNullTurns = false, expectedId?: string) {
     const chat = value as { id?: unknown; members?: unknown; turns?: unknown } | null;
-    if (!chat || typeof chat.id !== "string" || !Array.isArray(chat.members) || chat.members.length !== 1 || chat.members[0] !== kittyId || !Array.isArray(chat.turns)) throw new ConnectorError("chat_contract", "El chat del gateway no coincide con este escritorio privado.", 502);
-    safeId(chat.id); return chat as { id: string; members: string[]; turns: Record<string, unknown>[] };
+    if (!chat || typeof chat.id !== "string" || expectedId !== undefined && chat.id !== expectedId || !Array.isArray(chat.members) || chat.members.length !== 1 || chat.members[0] !== kittyId || !(Array.isArray(chat.turns) || allowNullTurns && chat.turns === null)) throw new ConnectorError("chat_contract", "El chat del gateway no coincide con este escritorio privado.", 502);
+    // The pinned upstream GET copies an empty Turn slice into nil, serialized as null.
+    safeId(chat.id); return { id: chat.id, members: chat.members, turns: chat.turns === null ? [] : chat.turns } as { id: string; members: string[]; turns: Record<string, unknown>[] };
   }
   async chat(id: string, kittyId: string): Promise<{ working: boolean; turns: ComputerTurn[] }> {
-    const result = await this.json(`/v1/chats/${safeId(id)}`), chat = this.validateChat(result.chat, kittyId);
+    const result = await this.json(`/v1/chats/${safeId(id)}`), chat = this.validateChat(result.chat, kittyId, true, id);
     return { working: chat.turns.some(turn => turn.working === true), turns: chat.turns.slice(-80).map((turn, index) => ({ index: Math.max(0, chat.turns.length - 80) + index, from: turn.from === "user" ? "user" : turn.from === "system" ? "system" : "assistant", text: typeof turn.text === "string" ? turn.text.slice(0, 24000) : "", working: turn.working === true, needsHelp: turn.needs_help === true, steps: Array.isArray(turn.steps) ? turn.steps.slice(-60).map(step => ({ action: typeof step.action === "string" ? step.action.slice(0, 80) : "acción", at: typeof step.at === "string" ? step.at.slice(0, 60) : "" })) : [] })) };
   }
   async send(chatId: string, text: string, files: ComputerFile[]) { await this.json(`/v1/chats/${safeId(chatId)}/messages`, "POST", { text, files }); return { accepted: true }; }

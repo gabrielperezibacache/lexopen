@@ -98,6 +98,22 @@ test("chat projection refuses other members and excludes tool arguments, artifac
   const foreign = new KittiesGateway("http://127.0.0.1:7488", token, fake(() => ({ chat: { id: "chat-fixture", members: ["foreign-kitty"], turns: [] } })));
   await assert.rejects(foreign.chat("chat-fixture", kitty.id));
 });
+test("pinned GET null turns means an empty owned chat, never missing or foreign chat data", async () => {
+  // Upstream Create initializes [] but Get copies it with append([]Turn(nil), empty...).
+  const empty = new KittiesGateway("http://127.0.0.1:7488", token, fake(() => ({ chat: { id: "chat-fixture", members: [kitty.id], turns: null } })));
+  assert.deepEqual(await empty.chat("chat-fixture", kitty.id), { working: false, turns: [] });
+  await assert.rejects(empty.createChat(kitty), error => (error as { code?: string }).code === "chat_contract");
+  const wrongId = new KittiesGateway("http://127.0.0.1:7488", token, fake(() => ({ chat: { id: "other-chat", members: [kitty.id], turns: null } })));
+  await assert.rejects(wrongId.chat("chat-fixture", kitty.id), error => (error as { code?: string }).code === "chat_contract");
+  for (const turns of [undefined, {}, "", 0, false]) {
+    const malformed = new KittiesGateway("http://127.0.0.1:7488", token, fake(() => ({ chat: { id: "chat-fixture", members: [kitty.id], ...(turns === undefined ? {} : { turns }) } })));
+    await assert.rejects(malformed.chat("chat-fixture", kitty.id), error => (error as { code?: string }).code === "chat_contract");
+  }
+  for (const members of [[], ["foreign-kitty"], [kitty.id, "foreign-kitty"]]) {
+    const foreign = new KittiesGateway("http://127.0.0.1:7488", token, fake(() => ({ chat: { id: "chat-fixture", members, turns: null } })));
+    await assert.rejects(foreign.chat("chat-fixture", kitty.id), error => (error as { code?: string }).code === "chat_contract");
+  }
+});
 test("mutation transport never retries an ambiguous request", async () => {
   let calls = 0;
   const client = new KittiesGateway("http://127.0.0.1:7488", token, (async () => { calls++; throw new Error("fixture interrupted after request"); }) as typeof fetch);

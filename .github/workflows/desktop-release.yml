@@ -103,6 +103,7 @@ jobs:
             desktop/dist/lexopen-smoke-*.json
             desktop/dist/lexopen-signature-*.json
   assemble:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: native
     runs-on: ubuntu-22.04
     steps:
@@ -126,16 +127,25 @@ jobs:
           retention-days: 14
   publish:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [validation, assemble]
+    needs: [validation, native]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --prefix desktop --ignore-scripts
       - uses: actions/download-artifact@v4
         with:
-          name: verified-release
-          path: release
+          pattern: desktop-*
+          path: native-artifacts
+      - name: Assemble verified feeds, manifest and checksums
+        shell: bash
+        run: node desktop/scripts/assemble-release.mjs --input native-artifacts --output release --version "$(node -p 'require("./package.json").version')" --revision "$GITHUB_SHA"
       - name: Publish only after all native and application checks pass
         shell: bash
         env:
