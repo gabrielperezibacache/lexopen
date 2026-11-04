@@ -20,12 +20,13 @@ import type { MisCausasItem, PjudCausaRef } from "@/lib/pjud/types";
 import { withManualPjudInteraction } from "@/lib/pjud/manual-interaction-policy";
 
 type SessionPhase = "waiting-login" | "waiting-user-confirmation" | "authenticated" | "closed";
-type ErrorCode = "disabled" | "manual-policy-required" | "login-unavailable" | "not-authenticated" | "login-timeout" | "operation-timeout" | "session-closed" | "aborted" | "action-failed" | "cause-not-listed" | "invalid-materias" | "result-limit";
+type ErrorCode = "disabled" | "manual-policy-required" | "login-unavailable" | "window-unavailable" | "not-authenticated" | "login-timeout" | "operation-timeout" | "session-closed" | "aborted" | "action-failed" | "cause-not-listed" | "invalid-materias" | "result-limit";
 
 const messages: Record<ErrorCode, string> = {
   disabled: "La consulta OJV de esta sesión está deshabilitada.",
   "manual-policy-required": "La validación requiere confirmaciones y CAPTCHA manuales, con las descargas de documentos desactivadas.",
   "login-unavailable": "No se pudo abrir el formulario oficial de ClaveÚnica para esta sesión temporal.",
+  "window-unavailable": "No se pudo activar la ventana oficial de esta conexión. Vuelva a intentarlo o abra una nueva conexión.",
   "not-authenticated": "Complete el ingreso manual y regrese a Mis Causas antes de continuar.",
   "login-timeout": "Terminó el tiempo disponible para completar el ingreso manual.",
   "operation-timeout": "La lectura OJV no terminó dentro del tiempo disponible.",
@@ -96,6 +97,8 @@ export type ManualOjvSessionStatus = {
 
 export type ManualOjvSession = {
   status(): ManualOjvSessionStatus;
+  /** Optional for an already open session created before a Host development reload. */
+  showOfficialWindow?(): Promise<void>;
   waitForAuthentication(): Promise<ManualOjvSessionStatus>;
   listMisCausas(options?: Pick<MisCausasReadOptions, "materias" | "responseTimeoutMs">): Promise<MisCausasItem[]>;
   fetchCausaDetail(causa: PjudCausaRef, options?: Pick<MisCausasReadOptions, "materias" | "responseTimeoutMs">): Promise<ScrapeLookupResult>;
@@ -221,6 +224,22 @@ class OwnedManualSession implements ManualOjvSession {
     if (this.phase === "closed") throw new ManualOjvSessionError("session-closed");
   }
 
+  /** Focusing must not wait behind a pending manual login in the read queue. */
+  async showOfficialWindow() {
+    this.active();
+    const pages = this.owned.context.pages();
+    const official = (page: Page) => !page.isClosed() && (isOjvSessionUrl(page.url()) || isClaveUnicaAccountsUrl(page.url()));
+    const authenticated = this.authenticatedPage && pages.includes(this.authenticatedPage) && official(this.authenticatedPage) && await identifiedPage(this.authenticatedPage) ? this.authenticatedPage : null;
+    this.active();
+    const preferred = authenticated || (pages.includes(this.loginPage) && official(this.loginPage) ? this.loginPage : null);
+    const page = preferred || [...pages].reverse().find(official);
+    if (!page) throw new ManualOjvSessionError("window-unavailable");
+    try { await page.bringToFront(); }
+    catch { throw new ManualOjvSessionError("window-unavailable"); }
+    this.active();
+    if (!official(page)) throw new ManualOjvSessionError("window-unavailable");
+  }
+
   private async serial<T>(work: () => Promise<T>, timeout: number, timeoutCode: "login-timeout" | "operation-timeout", operation?: SessionReadOperation): Promise<T> {
     const pending = this.queue.then(async () => {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -338,6 +357,7 @@ async function createManualOjvSessionOwned(options: ManualOjvSessionOptions, dep
     }
     if (!formReady) throw new ManualOjvSessionError("login-unavailable");
     assertRuntime(options);
+    await session.showOfficialWindow();
     return session;
   } catch (error) {
     if (session) await session.close();

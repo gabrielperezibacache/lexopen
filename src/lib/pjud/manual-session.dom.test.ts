@@ -1,6 +1,6 @@
 /** Owned browser fixtures only. Every request is fulfilled locally; no credentials or OJV traffic. */
 import assert from "node:assert/strict";
-import { chromium } from "playwright";
+import { chromium, type Page } from "playwright";
 import { createManualOjvSession, ManualOjvSessionError } from "@/lib/pjud/manual-session";
 import { OJV_INDEX_N } from "@/lib/pjud/ojv-dom";
 import type { PjudCausaRef } from "@/lib/pjud/types";
@@ -38,8 +38,13 @@ async function fixture(emptyLogin = false, menuDelayMs = 0) {
   const context = await browser.newContext();
   let accountsVisits = 0;
   let documentRequests = 0;
+  const focusedPages: Page[] = [];
   const scriptErrors: string[] = [];
-  context.on("page", page => page.on("pageerror", error => scriptErrors.push(error.message)));
+  context.on("page", page => {
+    page.on("pageerror", error => scriptErrors.push(error.message));
+    const show = page.bringToFront.bind(page);
+    page.bringToFront = async () => { focusedPages.push(page); await show(); };
+  });
   await context.route("**/*", async route => {
     const url = new URL(route.request().url());
     if (url.pathname.endsWith(".pdf")) documentRequests += 1;
@@ -49,7 +54,7 @@ async function fixture(emptyLogin = false, menuDelayMs = 0) {
       ? emptyLogin ? '<h1>PJUD</h1>' : '<h1>PJUD</h1><input name="run"><input type="password" placeholder="Ingresa tu ClaveÚnica">'
       : '<h1>OJV</h1><script>function AutenticaCUnica(){location.href="https://accounts.claveunica.gob.cl/accounts/login/?next=PRIVATE_OIDC#PRIVATE"}</script>' });
   });
-  return { browser, context, owned: { browser, context, channel: "chromium" as const }, accountsVisits: () => accountsVisits, documentRequests: () => documentRequests, scriptErrors: () => scriptErrors };
+  return { browser, context, owned: { browser, context, channel: "chromium" as const }, accountsVisits: () => accountsVisits, documentRequests: () => documentRequests, scriptErrors: () => scriptErrors, focusedPages: () => [...focusedPages] };
 }
 
 async function main() {
@@ -154,6 +159,53 @@ async function main() {
     } finally {
       await delayed.close();
     }
+
+    const focusFixture = await fixture();
+    const focusSession = await createManualOjvSession({ optedIn: true, loginTimeoutMs: 5_000 }, { createOwnedContext: async () => focusFixture.owned });
+    try {
+      const page = focusFixture.context.pages()[0];
+      assert.deepEqual(focusFixture.focusedPages(), [page], "the ready official form is activated when its owned session opens");
+      const waiting = focusSession.waitForAuthentication();
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([focusSession.showOfficialWindow!(), new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error("focus queued behind authentication")), 1_500); })]);
+      } finally { if (timeout) clearTimeout(timeout); }
+      assert.equal(focusSession.status().phase, "waiting-login");
+      assert.equal(focusSession.status().authenticated, false, "activating an official tab is not authentication");
+      assert.equal(focusFixture.accountsVisits(), 1, "focus must not open another login or navigate");
+      await page.goto(OJV_INDEX_N); await waiting;
+      const items = await focusSession.listMisCausas({ materias: ["Corte Suprema"], responseTimeoutMs: 500 });
+      const before = focusSession.status(); await focusSession.showOfficialWindow!();
+      assert.deepEqual(focusSession.status(), before, "focus preserves the authenticated session and its creation time");
+      assert.equal((await focusSession.fetchCausaDetail(cause)).movimientos.length, 1, "focus preserves the checked cause allowlist");
+      assert.equal(items.length, 1); assert.equal(focusFixture.documentRequests(), 0);
+      // An unrelated page is never activated, even when it is the newest tab.
+      const unrelated = await focusFixture.context.newPage(); await unrelated.goto("https://unrelated.invalid");
+      await focusSession.showOfficialWindow!();
+      assert.equal(focusFixture.focusedPages().at(-1), page);
+      await page.goto("https://unrelated.invalid");
+      const focused = focusFixture.focusedPages().length;
+      await assert.rejects(focusSession.showOfficialWindow!(), error => error instanceof ManualOjvSessionError && error.code === "window-unavailable");
+      assert.equal(focusFixture.focusedPages().length, focused, "a context without an official page must not fall back to another site");
+    } finally { await focusSession.close(); }
+    await assert.rejects(focusSession.showOfficialWindow!(), error => error instanceof ManualOjvSessionError && error.code === "session-closed");
+
+    const returningFixture = await fixture();
+    const returningSession = await createManualOjvSession({ optedIn: true }, { createOwnedContext: async () => returningFixture.owned });
+    try {
+      const login = returningFixture.context.pages()[0];
+      const callback = await returningFixture.context.newPage(); await callback.goto(OJV_INDEX_N);
+      await returningSession.waitForAuthentication();
+      await returningSession.listMisCausas({ materias: ["Corte Suprema"], responseTimeoutMs: 500 });
+      await returningSession.showOfficialWindow!();
+      assert.equal(returningFixture.focusedPages().at(-1), callback, "the identified callback wins while it remains authenticated");
+      await callback.locator('a[href="#infousuario"]').evaluate(node => { node.textContent = "Invitado"; });
+      const before = returningSession.status();
+      await returningSession.showOfficialWindow!();
+      assert.equal(returningFixture.focusedPages().at(-1), login, "an old OJV guest page must not obscure the owned login form");
+      assert.deepEqual(returningSession.status(), before, "choosing a visible window never changes authentication or its lifetime");
+      assert.equal(returningFixture.accountsVisits(), 1); assert.equal(returningFixture.documentRequests(), 0);
+    } finally { await returningSession.close(); }
 
     const timeoutFixture = await fixture();
     const timed = await createManualOjvSession({ optedIn: true, loginTimeoutMs: 100 }, { createOwnedContext: async () => timeoutFixture.owned });

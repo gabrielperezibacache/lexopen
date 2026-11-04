@@ -154,6 +154,22 @@ export class ManualOjvSessionManager {
     return this.snapshot(record);
   }
 
+  async focus(owner: ManualOjvOwner, id: string) {
+    const record = await this.owned(owner, id);
+    if (!record || record.view.phase === "closed" || !record.browser) throw new ManualOjvUiError("La conexión temporal no tiene una ventana disponible. Abra una nueva conexión.");
+    if (record.operation || ["listing", "importing"].includes(record.view.phase)) throw new ManualOjvUiError("Espere a que termine la consulta o importación antes de mostrar la ventana oficial.");
+    const browser = this.browser(record);
+    if (browser.status().phase === "closed") { await this.closeRecord(record); throw new ManualOjvUiError("La ventana temporal fue cerrada. Abra una nueva conexión."); }
+    if (typeof browser.showOfficialWindow !== "function") throw new ManualOjvUiError("Vuelva a abrir LexOpen y cree una nueva conexión para mostrar la ventana oficial.", 503);
+    try { await browser.showOfficialWindow(); }
+    catch (error) {
+      await this.active(record);
+      throw new ManualOjvUiError(error instanceof ManualOjvSessionError ? error.message : "No se pudo activar la ventana oficial de esta conexión. Vuelva a intentarlo.");
+    }
+    await this.active(record);
+    return this.snapshot(record);
+  }
+
   async start(owner: ManualOjvOwner): Promise<ManualOjvPendingAction> {
     if (this.deps.now() >= owner.authExpiresAt || !this.deps.runtimeAllowed()) throw new ManualOjvUiError("El ingreso manual requiere una sesión vigente en el Host local.", 403);
     await this.deps.authorize(owner);
