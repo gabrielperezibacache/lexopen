@@ -1,0 +1,11 @@
+{
+  "asset": "companion-states.png",
+  "sha256": "d1f5be6b95f947ac96a091ae8bfb3117c05a2f1a83eeda0698cc4309db7d4af9",
+  "kind": "original generated raster artwork",
+  "generator": "built-in image generation and reference-image edit",
+  "transparent": true,
+  "layout": "2 x 2; ready, reading, thinking, finished",
+  "date": "2026-11-04",
+  "contains_application_data": false,
+  "prompt": "Original editorial ink-and-gouache marine otter companion for ALTAZOR AI, warm natural brown and cream fur, forest green book and cream paper, four matching states in a square two-by-two sprite sheet: attentive, reading, thinking, holding a finished document. Transparent alpha background, contained silhouettes, no text, labels, grid, logo or watermark. Reference edit preserves the same poses, identity and spacing and cleans stray colored edge pixels."
+}

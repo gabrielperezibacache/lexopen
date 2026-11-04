@@ -1,4 +1,4 @@
-import { InicioWorkbench } from "@/components/inicio/InicioWorkbench";
+import { AltazorHome } from "@/components/altazor/AltazorHome";
 import type {
   InicioActivityCard,
   InicioCausaCard,
@@ -214,15 +214,16 @@ async function InicioStream({
 
   return (
     <>
+      <div>
+        <AltazorHome initialData={initialData} />
+      </div>
       <p
-        className="mt-2 max-w-3xl text-sm text-[var(--ink-soft)]/80 sm:text-base"
+        className="mt-6 max-w-3xl text-sm text-[var(--ink-soft)]/80 sm:text-base"
         data-testid="inicio-status-line"
       >
         {statusLine}
       </p>
-      <div className="mt-6">
-        <InicioWorkbench initialData={initialData} />
-      </div>
+
     </>
   );
 }
@@ -233,7 +234,7 @@ export default async function InicioPage() {
   const greeting = chileGreeting(user.name);
 
   return (
-    <div className="space-y-6">
+    <div className="inicio-altazor-page space-y-4">
       <header>
         <h1 className={pageTitleClass}>{greeting}</h1>
       </header>

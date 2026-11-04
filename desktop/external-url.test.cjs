@@ -40,3 +40,10 @@ assert.equal(
 );
 
 console.log("desktop/external-url.test.cjs OK");
+
+assert.equal(isAllowedExternalUrl("https://www.linkedin.com/oauth/v2/authorization?client_id=fixture"), true);
+assert.equal(isAllowedExternalUrl("https://www.linkedin.com/feed/"), true);
+assert.equal(isAllowedExternalUrl("http://www.linkedin.com/feed/"), false);
+assert.equal(isAllowedExternalUrl("https://www.linkedin.com:444/feed/"), false);
+assert.equal(isAllowedExternalUrl("https://www.linkedin.com.evil.test/"), false);
+assert.equal(isAllowedExternalUrl("https://evil.linkedin.com/"), false);

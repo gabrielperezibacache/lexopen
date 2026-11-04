@@ -11,6 +11,87 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
+  altazor-computer-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lexopen
+          POSTGRES_PASSWORD: fictitious-ci-only
+          POSTGRES_DB: lexopen_computer_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lexopen -d lexopen_computer_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://lexopen:fictitious-ci-only@127.0.0.1:5432/lexopen_computer_e2e
+      E2E_DATABASE_URL: postgresql://lexopen:fictitious-ci-only@127.0.0.1:5432/lexopen_computer_e2e
+      SESSION_SECRET: fictitious-computer-runtime-ci-encryption-secret-2026
+      ALTAZOR_COMPUTER_ENABLED: "1"
+      LEXOPEN_ALTAZOR_TEST_DOCKER: "1"
+      KITTIES_CI_OUTPUT: ${{ runner.temp }}/altazor-computer-evidence
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read pinned public Kitties source without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          repository: madkoding/kitties
+          ref: 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3
+          path: .tmp/kitties-upstream
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .tmp/kitties-upstream/go.mod
+          cache: false
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - name: Archive public source and build real immutable desktop image
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream="$GITHUB_WORKSPACE/.tmp/kitties-upstream"
+          source_dir="$RUNNER_TEMP/kitties-source"
+          test "$(git -C "$upstream" rev-parse HEAD)" = 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3
+          mkdir "$source_dir"
+          git -C "$upstream" archive HEAD | tar -xf - -C "$source_dir"
+          test ! -e "$source_dir/.git"
+          printf '%s\n' 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3 > "$source_dir/.lexopen-source-commit"
+          make -C "$source_dir" WEB=0 VERSION=lexopen-ci build
+          docker build --build-arg LUMEN_COMMIT=59d6ee5b18254c79041b4d4cfe78f0bc1aecd1b4 --iidfile "$RUNNER_TEMP/kitties-image-id" -t lexopen-kitty-ci:6aee950 "$source_dir/docker/kitty-desktop"
+          image_id="$(cat "$RUNNER_TEMP/kitties-image-id")"
+          test "$(docker image inspect --format '{{.Id}}' "$image_id")" = "$image_id"
+          printf 'KITTIES_CI_SOURCE=%s\nKITTIES_CI_IMAGE_ID=%s\n' "$source_dir" "$image_id" >> "$GITHUB_ENV"
+      - name: Restrict gateway process egress to loopback
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo useradd --system --no-create-home --groups docker lexopen-kitties-ci
+          gateway_uid="$(id -u lexopen-kitties-ci)"
+          sudo iptables -I OUTPUT 1 -m owner --uid-owner "$gateway_uid" ! -d 127.0.0.0/8 -j REJECT
+          sudo ip6tables -I OUTPUT 1 -m owner --uid-owner "$gateway_uid" -j REJECT
+      - name: Actual desktop broker with selected fictitious data and local model fixture
+        run: node --import tsx scripts/altazor/computer-smoke.ts
+      - name: Retain safe fictitious runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: altazor-computer-runtime-evidence
+          path: ${{ runner.temp }}/altazor-computer-evidence/
+          if-no-files-found: error
+          retention-days: 7
   workbench-runtime:
     runs-on: ubuntu-22.04
     timeout-minutes: 15

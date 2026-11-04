@@ -1,0 +1,35 @@
+.root { color: var(--ink); min-width: 0; }
+.header { display: flex; justify-content: space-between; align-items: start; gap: 1.5rem; margin-bottom: 1.5rem; }
+.header h2 { font-size: 1.25rem; font-weight: 650; margin: 0 0 .4rem; }
+.header p, .status p, .expiry, .manual p, .waiting, .chat > p { font-size: var(--text-sm); color: var(--muted); line-height: 1.7; max-width: 70ch; }
+.header svg { color: var(--sea); flex: 0 0 auto; }
+.status { padding: 1.25rem 0; border-block: 1px solid var(--line); }
+.status > strong, .status > span { display: block; }
+.status > span { font-size: var(--text-sm); color: var(--muted); margin-top: .35rem; }
+.status p { margin: .75rem 0 0; }
+.actions { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-top: 1rem; }
+.root button { font: inherit; font-size: .82rem; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; border: 1px solid var(--line-strong); border-radius: 10px; padding: .65rem .9rem; background: var(--surface-solid); color: var(--ink); cursor: pointer; transition: background 150ms ease; }
+.root button:hover:not(:disabled) { background: var(--mist); border-color: var(--sea); }
+.root button:disabled { opacity: .5; cursor: not-allowed; }
+.root .primary { background: var(--ink); color: var(--surface-solid); border-color: var(--ink); }
+.root .primary:hover:not(:disabled) { background: var(--ink-soft); }
+.root button:focus-visible, .root input:focus-visible, .root textarea:focus-visible, .root select:focus-visible, .root summary:focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
+.error, .notice { font-size: var(--text-sm); line-height: 1.7; padding: .85rem 0; border-block: 1px solid var(--line); overflow-wrap: anywhere; }
+.error { color: var(--danger); }.notice { color: var(--sea); }
+.setup { margin-top: 1.5rem; }.setup summary { cursor: pointer; font-size: var(--text-sm); font-weight: 600; padding: .5rem 0; }
+.setup form, .composer, .manual { display: grid; gap: .65rem; margin-top: 1rem; }
+.root label { font-size: var(--text-sm); font-weight: 600; margin-top: .5rem; }
+.root input, .root textarea, .root select { min-width: 0; width: 100%; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-solid); color: var(--ink); padding: .8rem .9rem; font: inherit; font-size: var(--text-sm); line-height: 1.6; }
+.root textarea { resize: vertical; }.root input[type="file"] { padding: .65rem; }
+.root .check { display: flex; align-items: start; gap: .7rem; font-weight: 400; line-height: 1.65; margin-block: .5rem; }
+.root .check input { width: 18px; height: 18px; flex: 0 0 auto; margin-top: .2rem; accent-color: var(--sea); }
+.sessions { display: grid; gap: .65rem; margin-block: 1.5rem; }
+.work { border-top: 1px solid var(--line); padding-top: 1.5rem; }
+.toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem; }.toolbar .actions { margin: 0; }
+.expiry { margin-block: 1rem; }.screen { background: var(--mist); border-radius: 12px; overflow: hidden; }.screen img { display: block; width: 100%; height: auto; min-height: 180px; object-fit: contain; }.controllable { cursor: crosshair; }
+.waiting { display: flex; align-items: start; gap: .6rem; padding: 1rem 0; }.waiting svg { flex: 0 0 auto; margin-top: .2rem; }
+.manual { padding-block: 1rem; border-bottom: 1px solid var(--line); }.manual p { margin: 0; }
+.chat { margin-top: 1.75rem; max-height: 440px; overflow: auto; }.chat article { padding: 1rem 0; border-bottom: 1px solid var(--line); }.chat strong { font-size: var(--text-sm); }.chat article p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-sm); line-height: 1.8; margin: .5rem 0 0; }.chat small { display: block; color: var(--muted); margin-top: .5rem; overflow-wrap: anywhere; }
+.composer { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }.composer ul { margin: 0; padding-left: 1.25rem; font-size: var(--text-sm); line-height: 1.8; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .toolbar { align-items: start; }.toolbar .actions { width: 100%; }.screen img { min-height: 100px; }.root button { max-width: 100%; }.header { gap: .75rem; } }
+@media (prefers-reduced-motion: reduce) { .root button { transition: none; } }

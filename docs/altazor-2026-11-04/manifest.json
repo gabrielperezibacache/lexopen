@@ -1,0 +1,136 @@
+{
+  "version": "1.1.0-preview.3",
+  "captureDateUtc": "2026-11-04T20:36:20.187732+00:00",
+  "data": "Fictitious people, case, book, memories, conversation and academic project. No real user files.",
+  "model": "Explicit local HTTP fixture, not a real model response.",
+  "accounts": "No real Codex, LinkedIn or mail account connected. No publication sent.",
+  "computer": "Actual application disabled state; not a desktop execution screenshot.",
+  "capture": "Unedited viewport screenshots from Chromium; 1440x1000 and360x800.",
+  "sourceUiBase": "75eda3382b30faaa580b77dd585a239115ddd027",
+  "sourceFileSha256": {
+    "src/components/altazor/AltazorHome.tsx": "826e9fcab72b765df0fde6c2a5bcc0d397f50b90dcf5b63de1f45cda381e7839",
+    "src/components/altazor/AltazorHome.css": "37dfc095393684473ee80f798bd6d65a5c627b0e75a827605e25203ba4f361c9",
+    "src/components/altazor/AltazorMemory.tsx": "50dde001aa84a161589358abba3c50527dc42a0765c736c79408dbc92d32f607",
+    "src/components/altazor/AltazorMemory.module.css": "b9bfdacdb16405343b34f5997a6f13fbf02fca599dccee4f09b6645d8b69d0d9",
+    "src/components/altazor/AltazorConnectors.tsx": "997bad1c9b40bea1f79bc3d91cf87aee72198c288c9ac8e246e15c4bc391447f",
+    "src/components/altazor/AltazorConnectors.module.css": "2de0e4c189e35639dc81cd3a15c3bbf9d94190d8dbf0612c78d15a1b2be075db",
+    "src/components/altazor/AltazorAcademic.tsx": "b1e40bb345fa1507a2c79bc59eb9dd9320e3206ce9c53c3268b4652baf96416c",
+    "src/components/altazor/AltazorComputer.tsx": "88b6f3310d48a6c18cbc2317c655413892ad663bfea2d72e3cef48fbec254040",
+    "src/components/altazor/AltazorDiscovery.tsx": "29f8c285cacd1ff2cbf4893af141356c590624e9e271b73804e41e60b18231a8",
+    "src/app/(app)/inicio/page.tsx": "3d6a7d40fe41f4b5cf19c2859226dc16d5aa0e71823a73070d7d6661e403e311"
+  },
+  "files": [
+    {
+      "file": "academia-desktop.png",
+      "sha256": "480c43e37cfb8774b9726c693fc4f2eead2542c0a0a58f14376b6404ebd5bd59",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "academia-mobile.png",
+      "sha256": "e5f3db279738d6be2d7b02731b25903cc5482772d20081e311ba5ed6a026793a",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "computer-desktop.png",
+      "sha256": "570e31b238295d351ed03d53644eaa97deccc2b646ed98b093dc5700df7ae0c9",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "computer-mobile.png",
+      "sha256": "29ba6126fcb5a3c1f7facdbd547e209e8a548a6349f5a1425deb8fb661fa8112",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "connectors-desktop.png",
+      "sha256": "e8508302b5ccefb28d5cc800f97a47e935c5dd8ce58b2dd530922d4d33f4087e",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "connectors-mobile.png",
+      "sha256": "410f5e89b2f995cffccf16d021a3d4db354e93044cbd7f69aa94e10658e1a0c8",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "discovery-desktop.png",
+      "sha256": "4b686de820f61262da8a9fa473f5beb343589962a29cbb188ce6b56b3e113d22",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "discovery-mobile.png",
+      "sha256": "b371b13f4594060b6eaf8d07a9e6fc73df0dcd238de8e0bdcd1c236d60497042",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "inicio-desktop.png",
+      "sha256": "5c2e7ec64954b3b6bb8a99b1dcfebc4e35ed847df145f246463485fb54bde571",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "inicio-mobile.png",
+      "sha256": "8d9d4969bd9d19a860eca191e55be07bea4acf674a8903d51e43ee23b9c75b9c",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "matriz-desktop.png",
+      "sha256": "5e1221294fd86439b5e4b57a970b9553b0f8ed94578fd8b35af6556b531f96bd",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "matriz-mobile.png",
+      "sha256": "d6ffbd4eca78475a1fcca6c52a3a7ffd38f5d39c4b323d67eb512af1f9185185",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "file": "memory-desktop.png",
+      "sha256": "fbaccdd27e3154d42cd7683b115f6f29809faf500754e377f1c04dd5c84b662b",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "memory-mobile.png",
+      "sha256": "fcd50f91c8782d46170ea969bcdc85507e2491c902f97042d0b356a135c35318",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    }
+  ]
+}

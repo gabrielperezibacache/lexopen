@@ -49,6 +49,21 @@ model FirmSettings {
 }
 
 model User {
+  altazorAcademicSearches AltazorAcademicSearch[]
+  altazorBibliographyEntries AltazorBibliographyEntry[]
+  computerWorkspaces AltazorComputerWorkspace[]
+  computerSessions AltazorComputerSession[]
+  computerActions AltazorComputerAction[]
+  altazorConversations AltazorConversation[]
+  altazorTurns AltazorTurn[]
+  altazorAttachments AltazorAttachment[]
+  altazorMemorySpaces AltazorMemorySpace[]
+  personalConnectorAccounts PersonalConnectorAccount[]
+  personalOAuthAttempts PersonalOAuthAttempt[]
+  externalShareDrafts ExternalShareDraft[]
+  externalPublicationAttempts ExternalPublicationAttempt[]
+  academicWorkspaces AltazorAcademicWorkspace[]
+  academicProfile AltazorAcademicProfile?
   id        String   @id @default(cuid())
   email     String   @unique
   name      String
@@ -277,6 +292,9 @@ model Cliente {
 }
 
 model Causa {
+  computerWorkspaces AltazorComputerWorkspace[]
+  altazorConversations AltazorConversation[]
+  altazorMemorySpaces AltazorMemorySpace[]
   id            String    @id @default(cuid())
   titulo        String
   rit           String?
@@ -2265,4 +2283,381 @@ model WorkbenchImportReceipt {
   artifactSha256 String
   createdAt DateTime @default(now())
   run WorkbenchRun @relation(fields:[runId],references:[id],onDelete:Cascade)
+}
+
+model AltazorConversation {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  requestId String
+  scopeKey String
+  causaId String?
+  causa Causa? @relation(fields: [causaId], references: [id], onDelete: Restrict)
+  title String
+  status String @default("active")
+  revision Int @default(1)
+  nextOrdinal Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  turns AltazorTurn[]
+  attachments AltazorAttachment[]
+  @@unique([ownerId, requestId])
+  @@index([ownerId, status, updatedAt])
+}
+model AltazorTurn {
+  id String @id @default(cuid())
+  conversationId String
+  conversation AltazorConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  requestId String
+  ordinal Int
+  inputSha256 String
+  userText String @db.Text
+  assistantText String @default("") @db.Text
+  status String @default("queued")
+  planId String? @unique
+  contextJson String @default("{}") @db.Text
+  resultsJson String @default("[]") @db.Text
+  destinationJson String @default("{}") @db.Text
+  errorCode String?
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  cancelRequestedAt DateTime?
+  createdAt DateTime @default(now())
+  startedAt DateTime?
+  finishedAt DateTime?
+  updatedAt DateTime @updatedAt
+  @@unique([conversationId, requestId])
+  @@unique([conversationId, ordinal])
+  @@index([ownerId, createdAt])
+  @@index([status, leaseExpiresAt])
+}
+model AltazorAttachment {
+  id String @id @default(cuid())
+  conversationId String
+  conversation AltazorConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  requestId String
+  inputSha256 String
+  sourceName String
+  mimeType String
+  byteSize Int
+  originalData Bytes?
+  sourceSha256 String
+  textSha256 String?
+  extractorVersion String?
+  extractedText String @default("") @db.Text
+  extractionJson String @default("{}") @db.Text
+  status String @default("processing")
+  errorCode String?
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([conversationId, requestId])
+  @@index([ownerId, conversationId, status])
+}
+
+model AltazorMemorySpace {
+  id String @id @default(cuid())
+  ownerId String
+  causaId String?
+  scopeKey String
+  revision Int @default(1)
+  epoch Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  causa Causa? @relation(fields:[causaId],references:[id],onDelete:Restrict)
+  nodes AltazorMemoryNode[]
+  edges AltazorMemoryEdge[]
+  supports AltazorMemorySupport[]
+  @@unique([ownerId,scopeKey])
+}
+model AltazorMemoryNode {
+  id String @id @default(cuid())
+  spaceId String
+  kind String
+  label String
+  body String @default("") @db.Text
+  fingerprint String
+  status String @default("proposed")
+  revision Int @default(1)
+  confirmedAt DateTime?
+  forgottenAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  space AltazorMemorySpace @relation(fields:[spaceId],references:[id],onDelete:Cascade)
+  supports AltazorMemorySupport[]
+  outgoing AltazorMemoryEdge[] @relation("MemoryFrom")
+  incoming AltazorMemoryEdge[] @relation("MemoryTo")
+  @@unique([spaceId,id])
+  @@unique([spaceId,fingerprint])
+  @@index([spaceId,status,updatedAt])
+}
+model AltazorMemoryEdge {
+  id String @id @default(cuid())
+  spaceId String
+  fromId String
+  toId String
+  relation String
+  body String @default("") @db.Text
+  fingerprint String
+  status String @default("proposed")
+  revision Int @default(1)
+  confirmedAt DateTime?
+  forgottenAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  space AltazorMemorySpace @relation(fields:[spaceId],references:[id],onDelete:Cascade)
+  from AltazorMemoryNode @relation("MemoryFrom",fields:[spaceId,fromId],references:[spaceId,id],onDelete:Cascade)
+  to AltazorMemoryNode @relation("MemoryTo",fields:[spaceId,toId],references:[spaceId,id],onDelete:Cascade)
+  supports AltazorMemorySupport[]
+  @@unique([spaceId,id])
+  @@unique([spaceId,fingerprint])
+  @@index([spaceId,status,updatedAt])
+}
+model AltazorMemorySupport {
+  id String @id @default(cuid())
+  spaceId String
+  nodeId String?
+  edgeId String?
+  kind String
+  sourceKey String
+  snapshotJson String @db.Text
+  snapshotSha256 String
+  createdAt DateTime @default(now())
+  space AltazorMemorySpace @relation(fields:[spaceId],references:[id],onDelete:Cascade)
+  node AltazorMemoryNode? @relation(fields:[spaceId,nodeId],references:[spaceId,id],onDelete:Cascade)
+  edge AltazorMemoryEdge? @relation(fields:[spaceId,edgeId],references:[spaceId,id],onDelete:Cascade)
+  @@index([spaceId,nodeId])
+  @@index([spaceId,edgeId])
+}
+
+model PersonalConnectorAccount {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  provider String
+  clientId String
+  externalSubject String
+  status String @default("connected")
+  grantedScopesJson String?
+  credentialsEnc String?
+  expiresAt DateTime?
+  name String
+  pictureUrl String?
+  email String?
+  lastVerifiedAt DateTime?
+  lastErrorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  publications ExternalPublicationAttempt[]
+  @@unique([ownerId,provider])
+  @@unique([provider,clientId,externalSubject])
+}
+model PersonalOAuthAttempt {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  provider String
+  stateHash String @unique
+  sessionHash String
+  sessionVersion Int
+  nonceHash String
+  requestedScopesJson String
+  redirectUri String
+  clientId String
+  phase String @default("pending")
+  resultEnc String?
+  errorCode String?
+  expiresAt DateTime
+  consumedAt DateTime?
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([ownerId,provider,expiresAt])
+}
+model ExternalShareDraft {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  originJson String @default("{}") @db.Text
+  requestId String
+  title String
+  body String @db.Text
+  sourceUrl String?
+  visibility String @default("CONNECTIONS")
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  publications ExternalPublicationAttempt[]
+  @@unique([ownerId,requestId])
+  @@index([ownerId,updatedAt])
+}
+model ExternalPublicationAttempt {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  accountId String
+  account PersonalConnectorAccount @relation(fields:[accountId],references:[id],onDelete:Restrict)
+  draftId String
+  draft ExternalShareDraft @relation(fields:[draftId],references:[id],onDelete:Restrict)
+  draftRevision Int
+  requestId String
+  inputHash String
+  status String @default("sending")
+  externalUrn String?
+  externalUrl String?
+  errorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([ownerId,requestId])
+  @@unique([draftId,draftRevision])
+  @@index([ownerId,createdAt])
+}
+
+/// Private academic work; social interaction remains in the selected external service.
+model AltazorAcademicWorkspace {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  requestId String
+  title String
+  kind String
+  briefJson String @default("{}") @db.Text
+  matrixJson String @default("{}") @db.Text
+  sourcesJson String @default("[]") @db.Text
+  revision Int @default(1)
+  archivedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  artifacts AltazorAcademicArtifact[]
+  @@unique([ownerId,requestId])
+  @@index([ownerId,archivedAt,updatedAt])
+}
+model AltazorAcademicArtifact {
+  id String @id @default(cuid())
+  workspaceId String
+  workspace AltazorAcademicWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  requestId String
+  inputSha256 String
+  mode String
+  title String
+  body String @default("") @db.Text
+  sourceSnapshotsJson String @default("[]") @db.Text
+  destinationJson String @default("{}") @db.Text
+  status String @default("prepared")
+  revision Int @default(1)
+  bodySha256 String @default("")
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  cancelRequestedAt DateTime?
+  errorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([workspaceId,requestId])
+  @@index([workspaceId,createdAt])
+}
+model AltazorAcademicProfile {
+  ownerId String @id
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  profileJson String @default("{}") @db.Text
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AltazorComputerWorkspace {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict)
+  causaId String?
+  causa Causa? @relation(fields:[causaId],references:[id],onDelete:Restrict)
+  scopeKey String
+  endpoint String @unique
+  credentialEnc String?
+  providerName String
+  enabled Boolean @default(false)
+  dedicatedDeclaredAt DateTime
+  gatewayVersion String?
+  lastVerifiedAt DateTime?
+  lastErrorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sessions AltazorComputerSession[]
+  @@unique([ownerId,scopeKey])
+}
+model AltazorComputerSession {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict)
+  workspaceId String
+  workspace AltazorComputerWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Restrict)
+  requestId String
+  kittyName String @unique
+  kittyId String?
+  chatId String?
+  state String @default("creating")
+  held Boolean @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  actions AltazorComputerAction[]
+  @@unique([ownerId,requestId])
+  @@index([ownerId,workspaceId,expiresAt])
+}
+model AltazorComputerAction {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict)
+  sessionId String
+  session AltazorComputerSession @relation(fields:[sessionId],references:[id],onDelete:Restrict)
+  requestId String
+  kind String
+  inputHash String
+  status String @default("sending")
+  resultJson String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([ownerId,requestId])
+  @@index([sessionId,createdAt])
+}
+
+model AltazorAcademicSearch {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  requestId String
+  name String
+  query String
+  providersJson String @default("[\"crossref\",\"openalex\"]") @db.Text
+  status String @default("active")
+  revision Int @default(1)
+  resultsJson String @default("[]") @db.Text
+  seenKeysJson String @default("[]") @db.Text
+  newKeysJson String @default("[]") @db.Text
+  checkedAt DateTime?
+  errorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([ownerId, requestId])
+  @@index([ownerId, status, updatedAt])
+}
+model AltazorBibliographyEntry {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  requestId String
+  identifierKey String
+  metadataJson String @db.Text
+  source String
+  sourceUrl String?
+  checkedAt DateTime?
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([ownerId, requestId])
+  @@unique([ownerId, identifierKey])
+  @@index([ownerId, updatedAt])
 }

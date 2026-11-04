@@ -16,7 +16,7 @@ export async function GET() {
   try {
     const user = await requireStaff();
     const records = await prisma.assistantPlanRecord.findMany({
-      where: { ownerId: user.id, expiresAt: { gt: new Date() }, status: { in: ["pending", "partial", "running"] } },
+      where: { ownerId: user.id, id: { not: { startsWith: "altazor-" } }, expiresAt: { gt: new Date() }, status: { in: ["pending", "partial", "running"] } },
       orderBy: { createdAt: "desc" }, take: 20,
     });
     const ctx: ToolContext = { userId: user.id, role: user.role as Role, capabilityGrants: user.capabilityGrants, capabilityRevokes: user.capabilityRevokes };

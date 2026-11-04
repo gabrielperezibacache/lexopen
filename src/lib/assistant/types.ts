@@ -50,6 +50,15 @@ export type ToolContext = {
   capabilityGrants?: string | null;
   capabilityRevokes?: string | null;
   chatId?: string | null;
+  /** Server-built scope/context. Never populated from model slots. */
+  scope?: { causaId: string | null };
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
+  context?: string;
+  /** Derived exclusively from currently verified source snapshots, never text. */
+  validatedReferences?: Array<{ marker: string; quote: string }>;
+  signal?: AbortSignal;
+  expectedDestination?: { provider: string; model: string; endpointHash: string };
+  authorizeContext?: () => Promise<void>;
   /** Stable server-generated plan-step key; never taken from tool slots. */
   commandKey?: string;
 };

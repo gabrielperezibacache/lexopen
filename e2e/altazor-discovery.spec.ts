@@ -1,0 +1,57 @@
+/** Fictitious search response for UI; saved query/RIS import/export use real APIs. */
+import { expect, test, type Page } from "@playwright/test";
+import { PrismaClient } from "@prisma/client";
+import { hash } from "bcryptjs";
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
+import { loginAs } from "./helpers";
+const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
+if (new URL(process.env.DATABASE_URL!).toString() !== url) throw Error("Use the explicitly disposable fixture");
+const db = new PrismaClient({ datasources: { db: { url } } }), tag = randomUUID(), email = `discovery-${tag}@example.test`;
+let ownerId = "";
+test.beforeAll(async () => { ownerId = (await db.user.create({ data: { name: "Investigadora ficticia", email, password: await hash("lexopen", 10), role: "abogado" } })).id; });
+test.afterAll(async () => { try { if (ownerId) { await db.altazorAcademicSearch.deleteMany({ where: { ownerId } }); await db.altazorBibliographyEntry.deleteMany({ where: { ownerId } }); await db.auditEvent.deleteMany({ where: { actorId: ownerId } }); await db.user.deleteMany({ where: { id: ownerId } }); } } finally { await db.$disconnect(); } });
+async function openDiscovery(page: Page) { await page.goto("/inicio"); await page.getByRole("button", { name: "Academia", exact: true }).click(); await page.getByRole("button", { name: "Descubrir", exact: true }).click(); await expect(page.getByRole("heading", { name: "Descubrir y citar", exact: true })).toBeVisible(); }
+test("Descubrimiento académico: consentimiento, bibliografía persistente y lectura móvil con datos ficticios", async ({ page }, info) => {
+  await page.addInitScript(() => { Object.defineProperty(globalThis.crypto, "randomUUID", { value: undefined, configurable: true }); });
+  await loginAs(page, email); let searches = 0;
+  await page.route("**/api/altazor/academic/discovery", async route => {
+    if (route.request().method() !== "POST") return route.continue(); searches++;
+    expect(route.request().postDataJSON()).toMatchObject({ query: "educación jurídica ficticia", allowExternal: true });
+    const metadata = { title: "Investigación enteramente ficticia sobre educación jurídica", authors: [{ family: "Prueba", given: "Ana", name: "" }], year: 2024, containerTitle: "Revista ficticia", volume: "1", issue: "2", pages: "10-20", publisher: "", doi: "10.5555/fictitious-browser-search", openalexId: "W1", type: "article", warnings: [] };
+    await route.fulfill({ json: { query: "educación jurídica ficticia", results: [{ key: "doi:10.5555/fictitious-browser-search", metadata, provider: "crossref", sourceUrl: "https://api.crossref.org/works/10.5555%2Ffictitious-browser-search", landingUrl: "https://doi.org/10.5555/fictitious-browser-search", checkedAt: "2026-11-04T12:00:00.000Z", openAccess: null, citedByCount: 0 }], warnings: [], checkedAt: "2026-11-04T12:00:00.000Z" } });
+  });
+  await openDiscovery(page);
+  await page.getByLabel("Tema o referencia bibliográfica", { exact: true }).fill("educación jurídica ficticia");
+  await expect(page.getByRole("button", { name: "Buscar obras", exact: true })).toBeDisabled(); expect(searches).toBe(0);
+  await page.getByRole("checkbox", { name: /Autorizo enviar sólo los términos/ }).check();
+  await page.getByRole("button", { name: "Buscar obras", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Investigación enteramente ficticia sobre educación jurídica" })).toBeVisible(); expect(searches).toBe(1);
+  await page.getByText("Búsquedas temáticas y alertas", { exact: false }).click();
+  await page.getByLabel("Nombre de esta búsqueda", { exact: true }).fill("Tema académico ficticio conservado");
+  await page.getByRole("button", { name: "Guardar búsqueda", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Tema académico ficticio conservado", exact: true })).toBeVisible();
+  await page.getByText("Mi bibliografía", { exact: false }).click();
+  await page.getByText("Incorporar por DOI, desde mis libros o importar una bibliografía", { exact: true }).click();
+  await page.getByLabel("Formato de importación bibliográfica", { exact: true }).selectOption("ris");
+  const title = "Referencia ficticia incorporada por el profesional", content = `TY  - JOUR\nTI  - ${title}\nAU  - Ficticia, Ana\nPY  - 2024\nJO  - Revista de pruebas\nDO  - 10.5555/fictitious-browser-import\nER  - \n`;
+  await page.getByLabel("Contenido de la bibliografía", { exact: true }).fill(content);
+  await page.getByRole("button", { name: "Importar referencias", exact: true }).click();
+  await expect(page.locator("p").filter({ hasText: title }).first()).toBeVisible();
+  await page.getByLabel("Estilo bibliográfico", { exact: true }).selectOption("ris");
+  await expect(page.locator("p").filter({ hasText: /TY  - JOUR/ }).first()).toBeVisible();
+  const pending = page.waitForEvent("download"); await page.getByRole("link", { name: "Descargar bibliografía", exact: true }).click(); const download = await pending, destination = info.outputPath("bibliografia-ficticia.ris"); await download.saveAs(destination);
+  const exported = await readFile(destination, "utf8"); expect(exported).toContain(title); expect(exported).toContain("DO  - 10.5555/fictitious-browser-import");
+  await page.reload(); await openDiscovery(page);
+  await page.getByText("Búsquedas temáticas y alertas", { exact: false }).click(); await expect(page.getByRole("heading", { name: "Tema académico ficticio conservado", exact: true })).toBeVisible();
+  await page.getByText("Mi bibliografía", { exact: false }).click(); await expect(page.locator("p").filter({ hasText: title }).first()).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole("heading", { name: "Descubrir y citar", exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("altazor-discovery-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.getByRole("heading", { name: "Descubrir y citar", exact: true }).scrollIntoViewIfNeeded();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await expect(page.getByLabel("Estilo bibliográfico", { exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath("altazor-discovery-mobile.png"), fullPage: true });
+});
