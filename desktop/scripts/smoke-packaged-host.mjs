@@ -75,7 +75,11 @@ try {
   if (line) report = JSON.parse(line.slice("LEXOPEN_DESKTOP_SMOKE ".length));
   if (timedOut || result.code !== 0 || !report) {
     // Never print data-dir .env, bootstrap tokens or raw server logs.
-    throw new Error(`Packaged Host smoke failed (${timedOut ? "timeout" : result.code ?? result.signal}); no completion report.`);
+    const failureLine = output.split(/\r?\n/).findLast(value => value.startsWith("LEXOPEN_DESKTOP_SMOKE_FAILURE "));
+    const failure = failureLine ? JSON.parse(failureLine.slice("LEXOPEN_DESKTOP_SMOKE_FAILURE ".length)) : {};
+    const phase = /^[a-z-]{1,40}$/.test(failure.phase) ? failure.phase : "startup";
+    const code = /^[A-Z0-9_]{1,64}$/.test(failure.code) ? failure.code : "UNKNOWN";
+    throw new Error(`Packaged Host smoke failed (${timedOut ? "timeout" : result.code ?? result.signal}; phase=${phase}; code=${code}); no completion report.`);
   }
   assert.equal(report.platform, platform); assert.equal(report.arch, arch);
 } finally {

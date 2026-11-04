@@ -13,6 +13,8 @@ import type { WorkbenchRunView } from "../src/lib/workbench/service";
 import { loginAs } from "./helpers";
 const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (new URL(process.env.DATABASE_URL!).toString() !== url || [process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw Error("Use the disposable local fixture environment");
+const storageRoot = process.env.STORAGE_PATH;
+if (!storageRoot || !path.isAbsolute(storageRoot)) throw Error("Set explicit fictitious STORAGE_PATH before running the browser fixture");
 const db = new PrismaClient({ datasources: { db: { url } } }), tag = randomUUID(), email = `workbench-${tag}@example.test`, prefix = `workbench-browser/${tag}`;
 let ownerId = "", causaId = "";
 const quote = "El comprobante ficticio registra un pago de cien pesos. No contiene personas ni antecedentes reales.";
@@ -27,8 +29,7 @@ test.afterAll(async () => {
   try {
     if (causaId) { await db.workbenchRun.deleteMany({ where: { causaId } }); await db.documento.deleteMany({ where: { causaId } }); await db.causa.deleteMany({ where: { id: causaId } }); }
     if (ownerId) { await db.auditEvent.deleteMany({ where: { actorId: ownerId } }); await db.user.deleteMany({ where: { id: ownerId } }); }
-    if (!process.env.STORAGE_PATH) throw Error("Refusing cleanup without explicit fictitious storage");
-    await rm(path.join(process.env.STORAGE_PATH, prefix), { recursive: true, force: true });
+    await rm(path.join(storageRoot, prefix), { recursive: true, force: true });
   } finally { await db.$disconnect(); }
 });
 test("Mesa: preflight real desactivado y permisos de la causa", async ({ page }) => {

@@ -3,7 +3,7 @@ const path = require("node:path");
 const asar = require("@electron/asar");
 
 module.exports = async function afterPack(context) {
-  const { nativeTarget, privateResourcePath, verifyBinary, verifyReleaseResources, verifyCanaryAbsent } = await import("./release-resources.mjs");
+  const { nativeTarget, privateResourcePath, copyStagedReleaseResources, verifyBinary, verifyReleaseResources, verifyCanaryAbsent } = await import("./release-resources.mjs");
   const architecture = { 1: "x64", 3: "arm64" }[context.arch];
   const target = nativeTarget(context.electronPlatformName, architecture);
   const appDirectory = target.platform === "darwin" ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`) : context.appOutDir;
@@ -11,6 +11,8 @@ module.exports = async function afterPack(context) {
   const executable = target.platform === "darwin" ? path.join(appDirectory, "Contents", "MacOS", "lexopen") : path.join(appDirectory, target.platform === "win32" ? "lexopen.exe" : "lexopen");
   verifyBinary(executable, target);
   for (const entry of asar.listPackage(path.join(resources, "app.asar"))) if (privateResourcePath(entry)) throw new Error(`Private file in application archive: ${entry}`);
+  const desktop = path.resolve(__dirname, "..");
+  copyStagedReleaseResources(path.join(desktop, ".release", "resources"), resources, path.join(desktop, "node_modules"), target);
   const verified = verifyReleaseResources(resources, path.join(resources, "app.asar.unpacked", "node_modules"), target);
   const appPackage = JSON.parse(asar.extractFile(path.join(resources, "app.asar"), "package.json").toString("utf8"));
   if (appPackage.version !== verified.version) throw new Error("Desktop and staged application versions differ");

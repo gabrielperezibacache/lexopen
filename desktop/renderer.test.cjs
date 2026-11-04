@@ -34,10 +34,8 @@ assert.match(main, /rendererPath\("setup\.css"\)/);
 assert.match(main, /rendererPath\("setup\.js"\)/);
 assert.match(main, /backgroundColor:\s*"#f7f2e8"/);
 
-assert.match(builder, /from: \.release\/resources\/app-standalone/);
-assert.match(builder, /from: \.release\/resources\/prisma/);
 assert.match(builder, /afterPack: scripts\/after-pack\.cjs/);
-assert.match(builder, /"\*\*\/\.\*"/);
+assert.doesNotMatch(builder, /^extraResources:/m);
 
 console.log("desktop/renderer.test.cjs OK");
 require("./media-permissions.test.cjs");

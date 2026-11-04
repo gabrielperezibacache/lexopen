@@ -30,6 +30,7 @@ const digest = value => crypto.createHash("sha256").update(value).digest("hex");
 let active;
 let stopPromise = Promise.resolve();
 let interrupted = false;
+let phase = "start-host";
 const stop = () => { const handle = active; active = null; if (handle) stopPromise = stopPromise.then(() => handle.stop()); return stopPromise; };
 process.once("SIGTERM", () => { interrupted = true; void stop().finally(() => { process.exitCode = 1; }); });
 process.once("SIGINT", () => { interrupted = true; void stop().finally(() => { process.exitCode = 1; }); });
@@ -40,6 +41,7 @@ const start = async () => {
 };
 try {
   active = await start();
+  phase = "initial-health";
   assert(active.needsSetup, "A clean package must require its first real administrator");
   const health = await fetch(`${active.url}/api/health`).then(response => response.json());
   assert.equal(health.ok, true);
@@ -49,16 +51,22 @@ try {
   assert.match(health.sourceRevision, /^[a-f0-9]{40}$/);
   assert.equal(health.needsSetup, true);
   const requireBundled = createRequire(path.join(resources, "app-standalone", "package.json"));
+  phase = "document-conversion";
   const { toMarkdownBytes, formatFromExtension } = requireBundled("@firecrawl/anydoc");
   const extracted = await toMarkdownBytes(Buffer.from("nombre,detalle\nLexOpen,instalación ficticia\n", "utf8"), formatFromExtension(".csv"));
   assert.match(extracted, /LexOpen/);
-  const browser = await requireBundled("playwright").chromium.launch({ headless: true, timeout: 30000 });
+  const { chromium } = requireBundled("playwright");
+  phase = "full-chromium";
+  // Exercise the full browser used by manual OJV sessions, including its macOS
+  // frameworks, rather than Playwright's separate headless-shell download.
+  const browser = await chromium.launch({ executablePath: chromium.executablePath(), headless: true, timeout: 30000 });
   try {
     const page = await browser.newPage();
     await page.route("**/*", route => route.abort());
     await page.setContent("<!doctype html><title>LexOpen packaged browser</title><h1>Fictitious installation check</h1>");
     assert.equal(await page.title(), "LexOpen packaged browser");
   } finally { await browser.close(); }
+  phase = "first-administrator";
   const page = await fetch(`${active.url}/setup`);
   assert.equal(page.status, 200);
   const cookies = page.headers.getSetCookie?.() || [page.headers.get("set-cookie") || ""];
@@ -76,8 +84,11 @@ try {
   const sentinel = path.join(dataDir, "storage", "fixture de instalación & revisión.txt");
   await fs.writeFile(sentinel, "LexOpen installer persistence fixture — información ficticia\n", { mode: 0o600 });
   const sentinelHash = digest(await fs.readFile(sentinel));
+  phase = "first-shutdown";
   await stop();
+  phase = "restart-host";
   active = await start();
+  phase = "verify-persistence";
   assert.equal(active.needsSetup, false);
   const again = await fetch(`${active.url}/api/health`).then(response => response.json());
   assert.equal(again.ok, true); assert.equal(again.version, health.version); assert.equal(again.buildId, health.buildId);
@@ -85,6 +96,11 @@ try {
   assert.equal(digest(await fs.readFile(sentinel)), sentinelHash);
   const nextValues = await envValues();
   for (const [key, hash] of Object.entries(secretHashes)) assert.equal(digest(nextValues[key]), hash, `${key} must survive restart`);
-  await stop();
+  phase = "final-shutdown"; await stop();
   console.log(`LEXOPEN_DESKTOP_SMOKE ${JSON.stringify({ platform: process.platform, arch: process.arch, version: health.version, buildId: health.buildId, sourceRevision: health.sourceRevision, standaloneHealthy: true, bundledDocumentConversion: true, bundledChromiumLaunched: true, firstAdministratorCreated: true, restartPreservedDatabase: true, restartPreservedFiles: true, restartPreservedSecrets: true, externalNodeUsed: false, demoSeedUsed: false })}`);
+} catch (error) {
+  const code = typeof error?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(error.code) ? error.code : "UNCLASSIFIED";
+  // Report fixed phase and bounded error code only, never raw server logs/tokens.
+  console.error(`LEXOPEN_DESKTOP_SMOKE_FAILURE ${JSON.stringify({ phase, code })}`);
+  throw new Error(`Packaged Host probe failed during ${phase} (${code})`);
 } finally { await stop(); }

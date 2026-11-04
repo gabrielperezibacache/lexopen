@@ -28,17 +28,8 @@ files:
   - "!**/{.tmp,.git,.codex,.agents,storage,pgdata,vault,obsidian-vault,backups,secrets,private}/**"
   - "!**/*.{pem,key,p12,pfx,sqlite,sqlite3,db,dump,log}"
   - "!node_modules/**/{test,tests,__tests__,fixtures,examples}/**"
-extraResources:
-  - from: .release/resources/app-standalone
-    to: app-standalone
-    filter:
-      - "**/*"
-      - "**/.*"
-      - "**/.*/**/*"
-  - from: .release/resources/prisma
-    to: prisma
-    filter:
-      - "**/*"
+# afterPack copies both audited resource trees intact, including hidden dependencies.
+# extraResources applies dependency filters that omit standalone/.prisma/client.
 asarUnpack:
   # Electron's Node mode needs the complete dependency graph on the filesystem.
   - "node_modules/**/*"

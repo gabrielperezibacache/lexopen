@@ -169,6 +169,46 @@ export function verifyReleaseResources(resources, nodeModules, target) {
   const native = verifyNativeRuntime(resources, nodeModules, target);
   return { version: meta.version, sourceDirty: meta.sourceDirty, files: files.length, buildId: meta.buildId, sourceRevision: meta.sourceRevision, native, browserExecutables: chromium.length };
 }
+function regularDirectory(root, label) {
+  const stat = fs.lstatSync(root);
+  if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error(`${label} must be a real directory`);
+  return fs.realpathSync(root);
+}
+function contentHash(file) {
+  const hash = crypto.createHash("sha256"), fd = fs.openSync(file, "r"), chunk = Buffer.alloc(262_144);
+  try {
+    for (;;) { const count = fs.readSync(fd, chunk, 0, chunk.length, null); if (!count) break; hash.update(chunk.subarray(0, count)); }
+  } finally { fs.closeSync(fd); }
+  return hash.digest("hex");
+}
+/** Copy the complete audited runtime without electron-builder dependency filters. */
+export function copyStagedReleaseResources(stage, resources, sourceNodeModules, target) {
+  const sourceRoot = regularDirectory(stage, "Release staging"), destinationRoot = regularDirectory(resources, "Packaged resources");
+  if (contained(sourceRoot, destinationRoot) || contained(destinationRoot, sourceRoot)) throw new Error("Staged and packaged resource directories must be separate");
+  // Reject private or linked staging entries before changing the package.
+  const scopes = ["app-standalone", "prisma"], expected = resourceFiles(stage).sort();
+  if (expected.some(file => !scopes.some(scope => file.startsWith(`${scope}/`)))) throw new Error("Unexpected staged resource scope");
+  verifyReleaseResources(stage, sourceNodeModules, target);
+  for (const scope of scopes) {
+    regularDirectory(path.join(stage, scope), "Staged runtime scope");
+    const destination = path.join(resources, scope);
+    let stat;
+    try { stat = fs.lstatSync(destination); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+    if (stat && (stat.isSymbolicLink() || !stat.isDirectory())) throw new Error("Packaged runtime scope must be a real directory");
+  }
+  for (const scope of scopes) {
+    const destination = path.join(resources, scope);
+    fs.rmSync(destination, { recursive: true, force: true });
+    copyResourceTree(path.join(stage, scope), destination, { boundary: stage, relative: scope });
+  }
+  const actual = scopes.flatMap(scope => resourceFiles(path.join(resources, scope), scope)).sort();
+  if (actual.length !== expected.length || actual.some((file, i) => file !== expected[i])) throw new Error("Packaged runtime file inventory differs from staging");
+  for (const file of expected) {
+    const source = path.join(stage, file), destination = path.join(resources, file), sourceStat = fs.statSync(source), destinationStat = fs.statSync(destination);
+    if (sourceStat.size !== destinationStat.size || contentHash(source) !== contentHash(destination) || process.platform !== "win32" && (sourceStat.mode & 0o777) !== (destinationStat.mode & 0o777)) throw new Error(`Packaged runtime differs from staging: ${file}`);
+  }
+  return { copiedFiles: actual.length };
+}
 export function sha256(file) { return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex"); }
 export function verifyCanaryAbsent(root, canary) {
   if (!canary) return;

@@ -57,13 +57,14 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U lexopen"
+          --health-cmd "pg_isready -U lexopen -d lexopen_e2e"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
       DATABASE_URL: postgresql://lexopen:lexopen@localhost:5432/lexopen_e2e
       E2E_DATABASE_URL: postgresql://lexopen:lexopen@localhost:5432/lexopen_e2e
+      STORAGE_PATH: ${{ github.workspace }}/.tmp/ci-test-storage
       SESSION_SECRET: ci-session-secret-16plus
       HERMES_ALLOW_DEMO: "1"
       LEXOPEN_RELAX_CSRF: "1"
