@@ -36,7 +36,7 @@ try {
 const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
 try {
   Object.defineProperty(globalThis, "crypto", { configurable: true, value: undefined });
-  assert.match(operationKey(), /^op-[a-f0-9]{32}$/, "plain HTTP LAN does not require randomUUID or WebCrypto");
+  assert.throws(() => operationKey(), /A secure random number generator is required\./, "fails securely when crypto is unavailable");
 } finally {
   if (descriptor) Object.defineProperty(globalThis, "crypto", descriptor);
   else Reflect.deleteProperty(globalThis, "crypto");
