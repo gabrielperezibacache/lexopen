@@ -18,6 +18,32 @@
 .hearing-workbench[data-independent=true] .hearing-workspace-title { margin-top: 1.25rem; }
 .hearing-session-audio > div { margin-block: 1rem 1.5rem; }
 .hearing-session-page :where(a,summary):focus-visible { outline: 2px solid var(--sea); outline-offset: 4px; }
+.hearing-workspace-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1rem; margin-bottom: 1.5rem; padding-block: .5rem; border-block: 1px solid var(--line); }
+.hearing-workspace-actions > button, .hearing-more-tools summary, .hearing-more-tools button { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: .4rem .2rem; color: var(--ink-soft); font-size: 1rem; }
+.hearing-workspace-actions > button { border-bottom: 2px solid transparent; }
+.hearing-workspace-actions > button[aria-pressed=true] { border-color: var(--sea); color: var(--sea); font-weight: 600; }
+.hearing-more-tools { margin-inline-start: auto; }
+.hearing-more-tools summary { display: list-item; cursor: pointer; }
+.hearing-more-tools[open] { flex-basis: 100%; }
+.hearing-more-tools > div { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; padding-bottom: .5rem; }
+.hearing-workspace-layout { --hearing-reading-bg: var(--surface-solid); }
+.hearing-workspace-layout > .hearing-live-host { padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-solid); }
+.hearing-workspace-layout:has(> .context-panel[data-presentation=inline][open]) { grid-template-columns: minmax(0, 1fr) minmax(21rem, 1fr); }
+.hearing-context-panel[data-presentation=inline] { top: calc(var(--shell-header-offset, 5rem) + 1rem); max-height: calc(100dvh - var(--shell-header-offset, 5rem) - 2rem); }
+.hearing-context-panel :is(.hearing-reading,.hearing-dossier,.hearing-tools) { padding: 0; border: 0; min-height: 0; }
+.hearing-context-panel [hidden] { display: none !important; }
+.hearing-context-panel .hearing-tools > div { max-width: none; }
+.hearing-context-panel .hearing-reader-toolbar > label { flex-basis: 100%; }
+.hearing-capture-status { display: flex; flex-wrap: wrap; gap: .65rem 1rem; align-items: center; padding-block: .75rem; width: 100%; border-block: 1px solid var(--line); margin-bottom: 1rem; }
+.hearing-capture-status p { display: inline-flex; align-items: center; gap: .5rem; color: var(--sea); margin: 0; font-weight: 600; }
+.hearing-capture-status .hearing-capture-message { flex-basis: 100%; color: var(--ink-soft); font-size: 1rem; line-height: 1.7; overflow-wrap: anywhere; }
+.hearing-context-panel .hearing-capture-status { margin: 0; border: 0; }
+@media(max-width:760px) {
+  .hearing-workspace-actions { gap: .25rem .85rem; }
+  .hearing-workspace-actions > button { flex: 1 0 35%; justify-content: center; }
+  .hearing-more-tools { width: 100%; margin: 0; }
+  .hearing-workspace-layout > .hearing-live-host { padding: 1rem; }
+}
 @media (max-width: 760px) {
   .hearing-workbench[data-independent=true] > .hearing-mobile-tabs { top: 4rem; flex-wrap: wrap; overflow-x: visible; }
   .hearing-workbench[data-independent=true] > .hearing-mobile-tabs button { flex-shrink: 0; }

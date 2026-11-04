@@ -2,29 +2,44 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { BookOpen, FilePenLine, FolderOpen, MessagesSquare, PanelsTopLeft } from "lucide-react";
+import { useSyncExternalStore } from "react";
+import { BookOpen, FilePenLine, FolderOpen, ListChecks, MessagesSquare, PanelsTopLeft } from "lucide-react";
 import { caseLibraryHref } from "@/lib/causas/workflow-links";
 import "./CaseWorkflowNav.css";
 
 type Stage = "case" | "library" | "hearing" | "writing" | "workbench";
+function subscribeHash(changed: () => void) { window.addEventListener("hashchange", changed); window.addEventListener("popstate", changed); return () => { window.removeEventListener("hashchange", changed); window.removeEventListener("popstate", changed); }; }
+const currentHash = () => window.location.hash;
+const serverHash = () => "";
+const identifier = (value: string | null | undefined) => value && /^[a-zA-Z0-9_-]{1,100}$/.test(value) ? value : undefined;
 
 export function CaseWorkflowNav({ causaId, title, current, workspaceId }: { causaId: string; title: string; current: Stage; workspaceId?: string }) {
-  const query = useSearchParams();
-  const requestedDraft = query.get(current === "writing" ? "draft" : "escrito");
-  const draftId = requestedDraft && /^[a-zA-Z0-9_-]{1,100}$/.test(requestedDraft) ? requestedDraft : undefined;
+  const query = useSearchParams(), hash = useSyncExternalStore(subscribeHash, currentHash, serverHash);
+  const draftId = identifier(query.get("draft") || query.get("escrito"));
+  const selectedWorkspace = identifier(workspaceId || query.get("mesa"));
   const base = `/causas/${encodeURIComponent(causaId)}`;
-  const context = draftId ? `?${new URLSearchParams({ escrito: draftId })}` : "";
-  const requestedWorkspace = workspaceId || (current === "hearing" ? query.get("mesa") : undefined);
-  const selectedWorkspace = requestedWorkspace && /^[a-zA-Z0-9_-]{1,100}$/.test(requestedWorkspace) ? requestedWorkspace : undefined;
+  const context = new URLSearchParams();
+  if (draftId) context.set("escrito", draftId);
+  if (selectedWorkspace) context.set("mesa", selectedWorkspace);
+  const suffix = context.size ? `?${context}` : "";
+  const hearingSuffix = draftId ? `?${new URLSearchParams({ escrito: draftId })}` : "";
+  const writingContext = new URLSearchParams();
+  if (draftId) writingContext.set("draft", draftId);
+  if (selectedWorkspace) writingContext.set("mesa", selectedWorkspace);
+  const active = current === "hearing" || current === "writing" ? current : current !== "case" ? "prepare" : ["#documentos", "#tramites", "#actividad"].includes(hash) ? "file" : ["#preparacion", "#conocimiento", "#audios", "#minutas"].includes(hash) ? "prepare" : "overview";
   const steps = [
-    { stage: "case", label: "Expediente", href: base + context, icon: FolderOpen },
-    { stage: "library", label: "Biblioteca", href: caseLibraryHref(causaId, draftId), icon: BookOpen },
-    { stage: "hearing", label: "Audiencias", href: selectedWorkspace ? `/audiencias/${encodeURIComponent(selectedWorkspace)}${context}` : `${base}/audiencias${context}`, icon: MessagesSquare },
-    { stage: "writing", label: "Escritos", href: `${base}/escritos${draftId ? `?${new URLSearchParams({ draft: draftId })}` : ""}`, icon: FilePenLine },
-    { stage: "workbench", label: "Mesa del asistente", href: `${base}/mesa`, icon: PanelsTopLeft },
+    { stage: "overview", label: "Resumen", href: `${base}${suffix}#ficha`, icon: PanelsTopLeft },
+    { stage: "file", label: "Expediente", href: `${base}${suffix}#documentos`, icon: FolderOpen },
+    { stage: "prepare", label: "Preparación", href: `${base}${suffix}#preparacion`, icon: ListChecks },
+    { stage: "hearing", label: "Audiencias", href: selectedWorkspace ? `/audiencias/${encodeURIComponent(selectedWorkspace)}${hearingSuffix}` : `${base}/audiencias${suffix}`, icon: MessagesSquare },
+    { stage: "writing", label: "Escritos", href: `${base}/escritos${writingContext.size ? `?${writingContext}` : ""}`, icon: FilePenLine },
   ];
   return <nav className="case-workflow" aria-label="Recorrido de la causa" data-testid="case-workflow">
-    <Link className="case-workflow-title" href={base + context} title={title}><FolderOpen size={19} aria-hidden="true" /><span>{title}</span></Link>
-    <ol>{steps.map(({ stage, label, href, icon: Icon }) => <li key={stage}><Link href={href} aria-current={current === stage ? "page" : undefined}><Icon size={17} aria-hidden="true" /><span>{label}</span></Link></li>)}</ol>
+    {current !== "case" && <Link className="case-workflow-title" href={base + suffix} title={title}><FolderOpen size={19} aria-hidden="true" /><span>{title}</span></Link>}
+    <ol>{steps.map(({ stage, label, href, icon: Icon }) => <li key={stage}>{current === "case" && ["overview", "file", "prepare"].includes(stage) ? <a href={href} aria-current={active === stage ? "location" : undefined}><Icon size={17} aria-hidden="true" /><span>{label}</span></a> : <Link href={href} aria-current={active === stage ? "page" : undefined}><Icon size={17} aria-hidden="true" /><span>{label}</span></Link>}</li>)}</ol>
+    <div className="case-workflow-resources" aria-label="Fuentes y asistente de la causa">
+      <Link href={caseLibraryHref(causaId, draftId)} aria-current={current === "library" ? "page" : undefined}><BookOpen size={17} aria-hidden="true" />Biblioteca</Link>
+      <Link href={`${base}/mesa${suffix}`} aria-current={current === "workbench" ? "page" : undefined}><PanelsTopLeft size={17} aria-hidden="true" />Mesa del asistente</Link>
+    </div>
   </nav>;
 }

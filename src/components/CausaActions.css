@@ -1,0 +1,9 @@
+.case-actions { min-width: 0; }
+.case-actions-primary { display: flex; flex-wrap: wrap; align-items: start; gap: .75rem; }
+.case-more-actions { min-width: 0; }
+.case-more-actions > summary { display: list-item; min-height: 44px; padding: .65rem 1.1rem; color: var(--sea); cursor: pointer; font-size: 1rem; line-height: 1.5; }
+.case-more-actions[open] { flex-basis: 100%; }
+.case-actions-directory { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding-block: 1rem; border-block: 1px solid var(--line); }
+.case-actions-directory > div { flex-basis: 100%; }
+.case-actions-status { margin-top: 1rem; font-size: 1rem; line-height: 1.7; color: var(--ink-soft); }
+.case-more-actions > summary:focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }

@@ -7,12 +7,12 @@
     <a href="https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml"><img src="https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml/badge.svg" alt="Estado de las comprobaciones automáticas"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/licencia-AGPL--3.0--or--later-1f6f78" alt="Licencia AGPL-3.0-or-later"></a>
   </p>
-  <p><a href="#recorrido-visual">Recorrido visual</a> · <a href="#empezar">Empezar</a> · <a href="#desarrollo-y-pruebas">Desarrollo</a> · <a href="#documentación">Documentación</a></p>
+  <p><a href="#recorrido-visual">Recorrido visual</a> · <a href="#empezar">Empezar</a> · <a href="https://github.com/gabrielperezibacache/lexopen/releases">Descargas</a> · <a href="#desarrollo-y-pruebas">Desarrollo</a> · <a href="#documentación">Documentación</a></p>
 </div>
 
-![Preparación de una causa en LexOpen: antecedentes, documentos y herramientas vinculadas](docs/assets/screenshots/causa.png)
+![Demostración con datos ficticios: causa de LexOpen con Resumen, Expediente, Preparación, Audiencias y Escritos](docs/interfaz-2026-11-04/cause-desktop.png)
 
-> **Interfaz real, datos de demostración.** Todas las capturas proceden de una instancia de LexOpen con información ficticia. Las personas, causas, títulos y documentos de ejemplo no representan expedientes ni una biblioteca jurídica real. [Procedencia y reproducción de las capturas](docs/assets/screenshots/README.md).
+> **Interfaz real, datos de demostración.** Las capturas usan personas, causas y documentos ficticios. La reorganización de navegación mostrada corresponde a `1.1.0-preview.2`; las descargas disponibles están en [Releases](https://github.com/gabrielperezibacache/lexopen/releases). La Mesa del asistente se muestra con proveedor, eventos y resultado simulados. [Capturas de esta interfaz y alcance](docs/interfaz-2026-11-04/README.md) · [Capturas de biblioteca y reproducción](docs/assets/screenshots/README.md).
 
 LexOpen reúne expedientes, biblioteca, investigación, audiencias y escritos con el trabajo cotidiano del estudio: clientes, plazos, calendario, tareas, comunicaciones y honorarios. Cada profesional puede preparar su causa, volver a un pasaje conservado y llevarlo a una nota o escrito con su referencia.
 
@@ -20,23 +20,27 @@ La aplicación se ejecuta en un **Host del estudio**: un computador o servidor q
 
 ## Recorrido visual
 
+### Encuentre el siguiente paso
+
+**Mi jornada** es la entrada cotidiana. Siete áreas estables —Mi jornada, Causas, Agenda, Biblioteca, Clientes, Comunicaciones y Estudio— muestran sólo los destinos secundarios del área abierta. Búsqueda, avisos y cuenta permanecen a mano; el portal del cliente conserva su recorrido propio. [Guía de navegación y espacios de trabajo](docs/NAVEGACION-Y-ESPACIOS-DE-TRABAJO.md).
+
 ### Prepare la causa
 
-La carpeta de la causa conecta antecedentes, documentos, hechos, cronología, contradicciones y próximos pasos. La preparación permite seleccionar material y volver a sus fuentes, distinguiendo lo que está revisado de lo que todavía requiere contraste.
+La carpeta de la causa conecta antecedentes, documentos, hechos, cronología, contradicciones y próximos pasos. Bajo el título, **Resumen, Expediente, Preparación, Audiencias y Escritos** permiten continuar el trabajo; las acciones menos frecuentes se reúnen en **Más acciones**. Biblioteca y Mesa del asistente acompañan la preparación con fuentes.
 
 ### Una biblioteca propia
 
 Incorpore libros y documentos en PDF, EPUB, DOC/DOCX, ODT, RTF o texto, entre otros formatos. Organice estantes, elija encuadernaciones y personalice su biblioteca con seis distribuciones. La colección personal es privada y las colecciones pueden compartirse con personas elegidas.
 
-![Biblioteca personal de LexOpen con libros en tres dimensiones y estantes personalizados](docs/assets/screenshots/biblioteca.png)
+![Demostración con datos ficticios: biblioteca personal de LexOpen con libros en tres dimensiones y estantes personalizados](docs/assets/screenshots/biblioteca.png)
 
 La importación permite conservar el original o retener sólo el texto convertido, con OCR cuando sea necesario y esté disponible. Las citas identifican qué material se conserva y con qué texto se realizó el cotejo. Las sentencias y resoluciones pueden tener ficha de tribunal, rol y fecha.
 
 ### Lea y vuelva al pasaje
 
-El lector combina páginas físicas de PDF, texto preparado, versiones y pasajes citables. Las referencias permiten regresar a su ubicación; las extracciones parciales y el OCR mantienen sus advertencias.
+El lector da el espacio principal a la página física del PDF conservado o al texto disponible. **Pasajes y citas**, **Ficha y descargas** y la personalización del ejemplar se abren en un panel contextual. Las referencias permiten regresar a su ubicación; las extracciones parciales y el OCR mantienen sus advertencias.
 
-![Página física del PDF demostrativo conservado y abierto en LexOpen](docs/assets/screenshots/lector-pdf.png)
+![Demostración con datos ficticios: original PDF conservado y panel de pasajes en el lector de LexOpen](docs/interfaz-2026-11-04/reader-desktop.png)
 
 La investigación reúne material incorporado al Host y fuentes oficiales admitidas por los importadores. La biblioteca recupera pasajes mediante búsqueda léxica BM25; el análisis con IA utiliza el proveedor configurado y las fuentes elegidas.
 
@@ -44,35 +48,44 @@ La investigación reúne material incorporado al Host y fuentes oficiales admiti
 
 Prepare un guion guardado, ordene sus puntos, tome notas y conserve registros durante la sesión. El panel en vivo ofrece control de tiempo, acceso al lector y conversión revisable a hechos propuestos, notas y borradores.
 
-**Audiencias en vivo** (`/audiencias`) reúne sus mesas privadas vinculadas a cada causa. Abra una mesa para entrar directamente al panel independiente, con fuentes, lectura, notas, conversación, guion y agenda, además de enlaces al expediente y a sus escritos. Abrir el panel no inicia el reloj ni activa el micrófono.
+**Audiencias en vivo** (`/audiencias`) reúne sus mesas privadas vinculadas a cada causa. En la mesa puede consultar fuentes, lectura y notas, preparar el guion y conversar con pasajes elegidos. El reloj y el capturador permanecen montados al consultar las herramientas; abrir la mesa no inicia el reloj ni activa el micrófono.
 
-![Panel independiente de audiencia de LexOpen con herramientas en vivo, lectura y transcripción](docs/codex-audiencias-2026-11-02/live-desktop.png)
+![Demostración con datos ficticios: mesa de audiencia con reloj, configuración de captura y cuaderno de notas abierto](docs/interfaz-2026-11-04/hearing-notes-desktop.png)
 
 La captura de audio requiere una acción y autorización explícitas. La transcripción aparece por tramos de unos quince segundos, después del procesamiento, y conserva originales privados. Se pueden escuchar, elegir pasajes y reintentar fallos. La recuperación temporal al navegar no activa el micrófono ni envía audio automáticamente. [Funcionamiento y límites de la transcripción](docs/ENTREGA-TRANSCRIPCION-EN-VIVO-2026-11-02.md).
 
 ### Escriba con memoria y respaldo
 
-El editor conserva borradores privados por causa, guardado automático e historial. Puede incorporar hechos, notas de audiencia y pasajes de biblioteca, con referencias que se vuelven a comprobar al consultar o exportar. Los escritos se descargan en Markdown o TXT.
+El editor conserva borradores privados por causa, guardado automático e historial. La hoja ocupa el espacio principal; **Incorporar fuentes**, referencias, historial y exportación comparten un panel contextual. Puede incorporar hechos, notas de audiencia y pasajes de biblioteca, con referencias que se vuelven a comprobar al consultar o exportar. Los escritos se descargan en Markdown o TXT.
 
-![Editor de escritos de LexOpen con el borrador, sus fuentes y el estado del guardado](docs/assets/screenshots/escrito.png)
+![Demostración con datos ficticios: editor de escritos con hoja de trabajo, fuentes y estado de guardado](docs/interfaz-2026-11-04/writing-desktop.png)
 
 <details>
-<summary><strong>Panel de trabajo, cronología y uso desde el móvil</strong></summary>
+<summary><strong>Mi jornada y uso desde el móvil</strong></summary>
 
-Plazos, eventos y tareas acompañan el trabajo de cada causa. La interfaz adapta la navegación y las herramientas de lectura a pantallas pequeñas.
+Plazos, eventos y tareas acompañan el trabajo de cada causa. En móvil, el menú conserva las siete áreas y la búsqueda tiene acceso propio en la cabecera. Los paneles de lectura, escritura y audiencia se abren como diálogo, con cierre y retorno de foco.
 
-![Panel de trabajo de LexOpen con información de demostración](docs/assets/screenshots/dashboard.png)
+![Demostración con datos ficticios: Mi jornada en escritorio](docs/interfaz-2026-11-04/jornada-desktop.png)
 
-![Cronología de una causa con hechos y sus referencias](docs/assets/screenshots/cronologia.png)
+<p align="center"><img src="docs/interfaz-2026-11-04/mobile-menu.png" width="360" alt="Demostración con datos ficticios: menú móvil de LexOpen"></p>
 
-<p align="center"><img src="docs/assets/screenshots/movil.png" width="360" alt="LexOpen en una pantalla móvil"></p>
+[Ver la galería completa de escritorio y móvil](docs/interfaz-2026-11-04/README.md).
+
+</details>
+
+<details>
+<summary><strong>Mesa del asistente: preparar, ejecutar y revisar</strong></summary>
+
+Elija un objetivo y sus fuentes, ejecute con el destino disponible y revise el resultado antes de incorporarlo al escrito. Los trabajos guardados se pueden volver a abrir por su enlace. [Preparación del ejecutor y límites](docs/WORKBENCH.md).
+
+![Demostración con datos ficticios: Mesa del asistente con proveedor, eventos y resultado simulados; esta captura no prueba una ejecución de Docker](docs/interfaz-2026-11-04/workbench-desktop.png)
 
 </details>
 
 <details>
 <summary><strong>Biblioteca en modo oscuro</strong></summary>
 
-![Biblioteca de LexOpen en modo oscuro](docs/assets/screenshots/biblioteca-oscura.png)
+![Demostración con datos ficticios: biblioteca de LexOpen en modo oscuro](docs/assets/screenshots/biblioteca-oscura.png)
 
 </details>
 
@@ -195,12 +208,14 @@ npm run e2e:install
 E2E_DATABASE_URL=postgresql://lexopen:lexopen@127.0.0.1:5432/lexopen_e2e npm run e2e
 ```
 
-El [workflow de CI](.github/workflows/ci.yml) comprueba migraciones y diferencias de esquema, pruebas unitarias y de integración, lint, compilación y recorridos Chromium. Las capturas del README se pueden reproducir con el [procedimiento de capturas](docs/assets/screenshots/README.md).
+El [workflow de CI](.github/workflows/ci.yml) comprueba migraciones y diferencias de esquema, pruebas unitarias y de integración, lint, compilación y recorridos Chromium. La [galería de esta interfaz](docs/interfaz-2026-11-04/README.md) documenta la procedencia y el alcance de las imágenes; el [procedimiento de capturas anteriores](docs/assets/screenshots/README.md) conserva sus instrucciones de reproducción.
 
 ## Documentación
 
 | Guía | Contenido |
 | --- | --- |
+| [Navegación y espacios de trabajo](docs/NAVEGACION-Y-ESPACIOS-DE-TRABAJO.md) | Áreas, recorrido de la causa, paneles, ajustes y continuidad del trabajo. |
+| [Galería de la interfaz](docs/interfaz-2026-11-04/README.md) | Capturas reales con datos ficticios, procedencia y alcance de la validación visual. |
 | [Host web](docs/WEB-HOST.md) | Instalación, red, configuración, respaldos y operación. |
 | [Desktop](docs/DESKTOP.md) | Aplicación de escritorio, modos Host y Cliente. |
 | [Instaladores](docs/INSTALADORES.md) | Matriz de plataformas, construcción, firma y comprobantes de distribución. |

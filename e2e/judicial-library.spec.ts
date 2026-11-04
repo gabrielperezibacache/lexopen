@@ -36,9 +36,9 @@ async function saveSettings(page: Page) {
   await page.getByRole("button", { name: "Guardar ficha", exact: true }).click();
   const response = await pending; expect(response.status(), await response.text()).toBe(200);
   const result = (await response.json()).book;
-  await expect(page.getByRole("heading", { name: "Una edición a tu manera", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Una edición a tu manera", exact: true })).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Personalizar este libro", exact: true })).toBeVisible();
-  await expect(page.locator(".book-reader-bibliography")).toContainText(result.sourceType === "book" ? result.author : result.judicial.caseNumber);
+  await expect(page.locator(".book-reader-information")).toContainText(result.sourceType === "book" ? result.author : result.judicial.caseNumber);
   return result;
 }
 
@@ -73,7 +73,8 @@ test("sentencias: ficha manual, TXT privado, cita corroborada y reclasificación
   const shelfBook = page.locator(`[data-book-id="${bookId}"]`); await expect(shelfBook).toBeVisible(); await expect(shelfBook).toContainText(court);
   await shelfBook.getByRole("link", { name: `Abrir ${title}`, exact: true }).click();
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
-  await expect(page.locator(".book-reader-bibliography")).toContainText(`Sentencia. Rol J-${tag}. 29/02/2024`);
+  await page.locator(".book-reading-actions").getByRole("button", { name: "Ficha y descargas", exact: true }).click();
+  await expect(page.locator(".book-reader-information")).toContainText(`Sentencia. Rol J-${tag}. 29/02/2024`);
   await expect(page.getByRole("link", { name: "Abrir enlace de procedencia declarado", exact: true })).toHaveAttribute("href", officialUrl);
   await expect(page.getByTestId("book-retained-text-notice")).toBeVisible();
   await expect(page.getByLabel("Página física del PDF", { exact: true })).toHaveCount(0);
@@ -87,17 +88,19 @@ test("sentencias: ficha manual, TXT privado, cita corroborada y reclasificación
   expect(citation.sourceType).toBe("judgment"); expect(citation.judicial.caseNumber).toBe(`J-${tag}`); expect(citation.verificationBasis).toBe("retained_text"); expect(citation.pageNumber).toBeNull();
   await expect.poll(() => page.evaluate(() => (window as typeof window & { __judicialCopiedText?: string }).__judicialCopiedText || "")).toContain(`Rol J-${tag}. 29/02/2024`);
   const copied = await page.evaluate(() => (window as typeof window & { __judicialCopiedText?: string }).__judicialCopiedText || ""); expect(copied).toContain("Cotejada con texto conservado; original no conservado."); expect(copied).toContain(court);
+  await page.locator("dialog.context-panel").getByRole("button", { name: "Cerrar", exact: true }).click();
   for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 360, height: 800 }]] as const) {
     await page.setViewportSize(viewport); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.evaluate(async () => { (document.activeElement as HTMLElement | null)?.blur(); window.scrollTo({ top: 0, left: 0, behavior: "instant" }); await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); }); await page.screenshot({ path: testInfo.outputPath(`judicial-reader-${name}.png`), fullPage: true });
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator(".book-reading-actions").getByRole("button", { name: "Ficha y descargas", exact: true }).click();
   await page.getByRole("button", { name: "Personalizar este libro", exact: true }).click();
   await page.getByLabel("Tipo de fuente", { exact: true }).selectOption("ruling");
   await page.getByLabel("Rol o número de causa", { exact: true }).fill(`R-${tag}`);
   await page.getByLabel("Fecha de la resolución", { exact: true }).fill("2026-10-31");
   const ruling = await saveSettings(page); expect(ruling.sourceType).toBe("ruling");
-  await expect(page.locator(".book-reader-bibliography")).toContainText(`Resolución. Rol R-${tag}. 31/10/2026`);
+  await expect(page.locator(".book-reader-information")).toContainText(`Resolución. Rol R-${tag}. 31/10/2026`);
   await page.getByRole("button", { name: "Personalizar este libro", exact: true }).click();
   await page.getByLabel("Tipo de fuente", { exact: true }).selectOption("book");
   await page.getByLabel("Autor", { exact: true }).fill("Autora ficticia de prueba");

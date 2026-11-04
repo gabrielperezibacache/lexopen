@@ -10,6 +10,7 @@ import type { HearingLivePlanInput } from "@/lib/hearings/live-schemas";
 import type { HearingQuote } from "@/lib/hearings/citations";
 import type { HearingNoteView } from "@/lib/hearings/types";
 import { HearingLiveAudioPanel } from "./HearingLiveAudioPanel";
+import type { HearingCaptureState } from "./HearingLiveAudioPanel";
 import { HearingLivePromotion } from "./HearingLivePromotion";
 import "./hearing-live.css";
 
@@ -49,13 +50,15 @@ async function mutateLive(url: string, method: string, payload: unknown) {
 }
 
 /** Extends the established reading desk: a saved intervention sequence beside its sources. */
-export function HearingLivePanel({ causaId, workspaceId, active, quote, clearQuote, onChooseQuote, readSource, onUpdated, onAccessLost, onBusy, showPanel, registerGuard }: {
+export function HearingLivePanel({ causaId, workspaceId, active, quote, clearQuote, onChooseQuote, readSource, onUpdated, onAccessLost, onBusy, showPanel, registerGuard, onCaptureState, registerStopCapture }: {
   causaId: string; workspaceId: string; active: boolean; quote: QuoteSelection | null;
   clearQuote: () => void; readSource: (sourceId: string) => void;
   onChooseQuote: (selection: QuoteSelection) => void;
   onUpdated: (value: HearingLiveView) => void; onAccessLost: (message: string) => void;
   onBusy: (value: boolean) => void; showPanel: () => void;
   registerGuard: (guard: (() => Promise<boolean>) | null) => void;
+  onCaptureState?: (state: HearingCaptureState | null) => void;
+  registerStopCapture?: (stop: (() => void) | null) => void;
 }) {
   const url = `/api/causas/${causaId}/hearings/${workspaceId}/live`;
   const pendingKey = `${causaId}:${workspaceId}`;
@@ -235,7 +238,7 @@ export function HearingLivePanel({ causaId, workspaceId, active, quote, clearQuo
       <button type="button" className="btn btn-secondary" disabled={!live.canWrite || pendingAction} onClick={focusRecord}>Registrar lo ocurrido</button>
     </div></div>
     <p className="hearing-live-help">Control manual del tiempo de trabajo. No calcula plazos procesales ni inicia una grabación.</p>
-    <HearingLiveAudioPanel causaId={causaId} workspaceId={workspaceId} active={active} canWrite={live.canWrite} onBusy={setAudioBusy} registerGuard={registerAudioGuard} onAccessLost={message => accessFailure(Object.assign(new Error(message), { status: 403 }))} onChanged={() => void refresh()} onCitationUnavailable={clipId => { if (transcriptOrigin.current?.clipId !== clipId) return; transcriptOrigin.current = null; entryRef.current = { title: "", body: "" }; setEntryTitle(""); setEntryBody(""); pendingEntries.delete(pendingKey); clearQuote(); setError("El tramo seleccionado dejó de estar disponible. Se retiró su texto y su cita del registro pendiente."); }} onSelection={(selection, text, clipId) => { if (entryRef.current.title.trim() || entryRef.current.body.trim() || structural.current) { setError("Guarde o descarte la anotación pendiente antes de usar otro pasaje de audio."); focusRecord(); return false; } transcriptOrigin.current = { clipId, sourceId: selection.quote.sourceId }; onChooseQuote(selection); const title = `Pasaje transcrito · ${selection.label}`.slice(0,150); entryRef.current = { title, body: text.slice(0,8000) }; setEntryTitle(title); setEntryBody(entryRef.current.body); kindRef.current = "observation"; setKind("observation"); rememberEntry({ ...entryRef.current, kind: "observation", unconfirmed: false }); setMessage("Pasaje incorporado al formulario. Revise las palabras escuchando el tramo antes de guardar su registro."); requestAnimationFrame(focusRecord); return true; }} />
+    <HearingLiveAudioPanel causaId={causaId} workspaceId={workspaceId} active={live.canWrite} canWrite={live.canWrite} onCaptureState={onCaptureState} registerStopCapture={registerStopCapture} onBusy={setAudioBusy} registerGuard={registerAudioGuard} onAccessLost={message => accessFailure(Object.assign(new Error(message), { status: 403 }))} onChanged={() => void refresh()} onCitationUnavailable={clipId => { if (transcriptOrigin.current?.clipId !== clipId) return; transcriptOrigin.current = null; entryRef.current = { title: "", body: "" }; setEntryTitle(""); setEntryBody(""); pendingEntries.delete(pendingKey); clearQuote(); setError("El tramo seleccionado dejó de estar disponible. Se retiró su texto y su cita del registro pendiente."); }} onSelection={(selection, text, clipId) => { if (entryRef.current.title.trim() || entryRef.current.body.trim() || structural.current) { setError("Guarde o descarte la anotación pendiente antes de usar otro pasaje de audio."); focusRecord(); return false; } transcriptOrigin.current = { clipId, sourceId: selection.quote.sourceId }; onChooseQuote(selection); const title = `Pasaje transcrito · ${selection.label}`.slice(0,150); entryRef.current = { title, body: text.slice(0,8000) }; setEntryTitle(title); setEntryBody(entryRef.current.body); kindRef.current = "observation"; setKind("observation"); rememberEntry({ ...entryRef.current, kind: "observation", unconfirmed: false }); setMessage("Pasaje incorporado al formulario. Revise las palabras escuchando el tramo antes de guardar su registro."); requestAnimationFrame(focusRecord); return true; }} />
     <p className="hearing-live-save" data-state={saveState} role="status" aria-live="polite">{saveState === "saved" && <Check size={16} aria-hidden="true" />}{saveLabel[saveState]}</p>
     {stale && <p role="status" className="hearing-live-warning">Sin actualización del servidor. {connectionError} El tiempo mostrado se detiene; la sesión guardada puede seguir en marcha. <button type="button" className="hearing-copy-link" onClick={() => void refresh()}>Comprobar conexión</button></p>}
     {error && <div className="hearing-live-warning" role="alert"><p>{error}</p><div className="hearing-live-actions">{saveState === "conflict" ? <><button type="button" className="btn btn-secondary" onClick={() => downloadLocal(`Apertura\n${plan.opening}\n\nCierre\n${plan.closing}\n\nRegistro sin guardar\n${entryTitle}\n${entryBody}\n\nCopia local sin nueva corroboración de fuentes.`, "audiencia-copia-local.txt")}>Conservar copia local</button><button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void refresh(true)}>Descartar cambios del guion y cargar actual</button></> : <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => { if (structural.current) void command("", {}); else void flush(); }}>Reintentar guardado</button>}</div></div>}

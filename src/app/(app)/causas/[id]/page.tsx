@@ -205,15 +205,9 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
       <PageHeader
         title={causa.titulo}
         subtitle={<>{causa.caratula || h.noCaratula} · {causa.rit || h.noRit}</>}
-        actions={
-        <CausaActions
-          causaId={causa.id}
-          titulo={causa.titulo}
-          estado={causa.estado}
-          isAdmin={user.role === "admin"}
-        />
-        }
       />
+      {canUseKnowledge && <CaseWorkflowNav causaId={causa.id} title={causa.titulo} current="case" />}
+      <CausaActions causaId={causa.id} titulo={causa.titulo} estado={causa.estado} isAdmin={user.role === "admin"} />
           <div className="flex flex-wrap gap-2">
             <StatusBadge estado={causa.estado} />
             <span className="badge badge-sea">{labelMateria(causa.materia)}</span>
@@ -244,7 +238,6 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
           </div>
 
 
-      {canUseKnowledge && <CaseWorkflowNav causaId={causa.id} title={causa.titulo} current="case" />}
       <CasePreparationIndex canUseKnowledge={canUseKnowledge} />
       {proximosPlazos.length > 0 && (
         <section className="panel rounded-[var(--radius-lg)] px-5 py-4">

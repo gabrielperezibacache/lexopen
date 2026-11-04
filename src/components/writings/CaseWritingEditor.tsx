@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { BookOpen, Check, Download, FileText, History, Plus, Save } from "lucide-react";
+import { ContextPanel } from "@/components/ui/ContextPanel";
 import { apiMutation } from "@/lib/api-mutation";
 import { newUiId } from "@/lib/ui-id";
 import { withCaseBookContext } from "@/lib/causas/workflow-links";
@@ -10,8 +11,7 @@ import type { WritingSourceCatalog, WritingSourceInput } from "@/lib/writings/so
 import "./CaseWritingEditor.css";
 
 type SaveState = "saved" | "pending" | "saving" | "offline" | "error" | "conflict";
-type Panel = "sources" | "references" | "history";
-type MobilePane = "write" | Panel;
+type Panel = "sources" | "references" | "history" | "export";
 type Fields = { title: string; body: string };
 type FailedSave = Fields & { requestId: string; expectedRevision: number };
 type ErrorBody = { code?: string };
@@ -133,7 +133,7 @@ function WritingSession({ causaId, initial, initialSources, initialBookId, onSav
   const url = "/api/causas/" + causaId + "/writings/" + initial.id;
   const [draft, setDraft] = useState(initial), [fields, setFields] = useState<Fields>({ title: initial.title, body: initial.body });
   const [state, setState] = useState<SaveState>("saved"), [error, setError] = useState(""), [notice, setNotice] = useState(""), [panel, setPanel] = useState<Panel>("sources");
-  const [mobilePane, setMobilePane] = useState<MobilePane>("write"), [sourceVisit, setSourceVisit] = useState(0), mobileTools = useRef<HTMLElement>(null);
+  const [panelOpen, setPanelOpen] = useState(Boolean(initialBookId)), [sourceVisit, setSourceVisit] = useState(0), [historyVisit, setHistoryVisit] = useState(0);
   const [actionBusy, setActionBusy] = useState(false), [pendingAction, setPendingAction] = useState(false);
   const draftRef = useRef(initial), fieldsRef = useRef(fields), stateRef = useRef<SaveState>("saved"), failedSave = useRef<FailedSave | null>(null);
   const flight = useRef<Promise<boolean> | null>(null), mounted = useRef(true), frozen = useRef(false), actionFlight = useRef(false);
@@ -235,8 +235,7 @@ function WritingSession({ causaId, initial, initialSources, initialBookId, onSav
     }
     structural.current = null; setPendingAction(false); frozen.current = false;
     publish(result.data.draft); fieldsRef.current = { title: result.data.draft.title, body: result.data.draft.body }; setFields(fieldsRef.current);
-    setSaveState("saved"); setNotice(action.success); setMobilePane("write");
-    if (window.matchMedia("(max-width: 1120px)").matches) requestAnimationFrame(() => mobileTools.current?.scrollIntoView({ block: "start", behavior: "instant" }));
+    setSaveState("saved"); setNotice(action.success); setPanelOpen(false);
   }
   async function download(format: "markdown" | "text") {
     if (!await flush()) return;
@@ -250,39 +249,41 @@ function WritingSession({ causaId, initial, initialSources, initialBookId, onSav
     finally { if (mounted.current) setActionBusy(false); }
   }
   const operating = actionBusy || pendingAction, locked = operating || !draft.canWrite;
+  const panelId = `writing-tools-${draft.id}`;
+  const panelTitles: Record<Panel, string> = { sources: "Fuentes para el escrito", references: "Respaldos incorporados", history: "Historial del escrito", export: "Exportar el escrito" };
   function choosePanel(value: Panel) {
-    setPanel(value); setMobilePane(value);
+    setPanel(value); setPanelOpen(true);
     if (value === "sources") setSourceVisit(visit => visit + 1);
+    if (value === "history") setHistoryVisit(visit => visit + 1);
   }
-  function chooseMobilePane(value: MobilePane) {
-    if (value === "write") setMobilePane(value);
-    else choosePanel(value);
-  }
-  return <div className="writing-layout" data-testid="writing-editor" data-mobile-pane={mobilePane}>
-    <nav className="writing-mobile-tools" ref={mobileTools} aria-label="Herramientas del escrito">
-      <div className="writing-mobile-tabs" role="tablist" aria-label="Vista del escrito" onKeyDown={event => { const order: MobilePane[] = ["write", "sources", "references", "history"]; let index = order.indexOf(mobilePane); if (event.key === "ArrowRight") index = (index + 1) % 4; else if (event.key === "ArrowLeft") index = (index + 3) % 4; else if (event.key === "Home") index = 0; else if (event.key === "End") index = 3; else return; event.preventDefault(); const selected = order[index]; chooseMobilePane(selected); (event.currentTarget.children[index] as HTMLButtonElement).focus(); }}>
-        {([["write", "Escribir"], ["sources", "Fuentes"], ["references", "Referencias"], ["history", "Historial"]] as const).map(([value, label]) => <button type="button" role="tab" key={value} aria-selected={mobilePane === value} tabIndex={mobilePane === value ? 0 : -1} onClick={() => chooseMobilePane(value)}>{label}</button>)}
-      </div>
-      <p className="writing-mobile-state" data-state={state} role="status" aria-live="polite">{labels[state]} · versión {draft.revision}</p>
-    </nav>
+  const feedback = <>
     {error && <div className="writing-message writing-session-message" data-error="true" role="alert"><p>{error}</p>{state === "conflict" ? <div className="writing-actions"><button type="button" className="btn btn-secondary" onClick={() => fileDownload(new Blob([fieldsRef.current.title + "\n\n" + fieldsRef.current.body + "\n\nCopia local sin nueva corroboración de respaldos."], { type: "text/plain;charset=utf-8" }), "lexopen-copia-local.txt")}>Conservar copia local</button><button type="button" className="btn btn-secondary" onClick={reloadServer}>Descartar cambios locales y cargar actual</button></div> : <div className="writing-actions"><button type="button" className="btn btn-secondary" disabled={actionBusy} onClick={() => { if (structural.current) void commit(); else void flush(); }}>Reintentar guardado</button></div>}</div>}
-    {notice && <p className="writing-message writing-session-message" role="status">{notice}</p>}
-    <div className="writing-paper">
-      <div className="writing-paper-meta"><span><FileText size={18} aria-hidden="true" />Escrito privado · versión {draft.revision}</span><span className="writing-status" data-state={state} role="status" aria-live="polite">{state === "saved" && <Check size={16} aria-hidden="true" />}{labels[state]}</span></div>
-      <div className="writing-actions writing-actions-top">{draft.canWrite && <button type="button" className="btn btn-primary" disabled={locked || state === "conflict" || state === "saved"} onClick={() => void flush()}><Save size={16} aria-hidden="true" />Guardar ahora</button>}<button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("markdown")}><Download size={16} aria-hidden="true" />Descargar Markdown</button><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("text")}>Descargar TXT</button></div>
-      <label className="writing-title-label" htmlFor="writing-title">Título del escrito</label>
-      <input id="writing-title" className="writing-title" value={fields.title} onChange={event => edit({ title: event.target.value })} maxLength={200} disabled={locked} />
-      <label className="writing-body-label" htmlFor="writing-body">Texto del escrito</label>
-      <textarea id="writing-body" className="writing-body" value={fields.body} onChange={event => edit({ body: event.target.value })} maxLength={100_000} rows={20} disabled={locked} placeholder="Empiece a redactar. Puede incorporar un hecho, una nota o un pasaje desde el cuaderno de fuentes…" spellCheck />
-      <p className="writing-help">El texto se guarda automáticamente al dejar de escribir. Los marcadores [^R1] enlazan los respaldos incorporados; conserve esos marcadores junto a la afirmación correspondiente. La redacción y sus conclusiones requieren revisión profesional.</p>
-      <p className="writing-help">{fields.body.length.toLocaleString("es-CL")} de 100.000 caracteres · último guardado: {dateLabel(draft.updatedAt)}</p>
+    {!error && notice && <p className="writing-message writing-session-message" role="status">{notice}</p>}
+  </>;
+  return <div data-testid="writing-editor" className="writing-session">
+    <nav className="writing-toolstrip" aria-label="Herramientas del escrito">
+      <button type="button" className="btn btn-secondary" aria-controls={panelId} aria-expanded={panelOpen && panel === "sources"} onClick={() => choosePanel("sources")}><BookOpen size={16} aria-hidden="true" />Incorporar fuentes</button>
+      <button type="button" className="btn btn-ghost" aria-controls={panelId} aria-expanded={panelOpen && panel === "references"} onClick={() => choosePanel("references")}>Referencias ({draft.references.length})</button>
+      <details className="writing-more-tools"><summary>Otras herramientas</summary><div><button type="button" aria-controls={panelId} onClick={() => choosePanel("history")}><History size={16} aria-hidden="true" />Historial</button><button type="button" aria-controls={panelId} onClick={() => choosePanel("export")}><Download size={16} aria-hidden="true" />Exportar</button></div></details>
+    </nav>
+    {!panelOpen && feedback}
+    <div className="context-workspace writing-layout">
+      <div className="writing-paper">
+        <div className="writing-paper-meta"><span><FileText size={18} aria-hidden="true" />Escrito privado · versión {draft.revision}</span><span className="writing-status" data-state={state} role="status" aria-live="polite">{state === "saved" && <Check size={16} aria-hidden="true" />}{labels[state]}</span></div>
+        {draft.canWrite && <div className="writing-actions writing-actions-top"><button type="button" className="btn btn-primary" disabled={locked || state === "conflict" || state === "saved"} onClick={() => void flush()}><Save size={16} aria-hidden="true" />Guardar ahora</button></div>}
+        <label className="writing-title-label" htmlFor="writing-title">Título del escrito</label><input id="writing-title" className="writing-title" value={fields.title} onChange={event => edit({ title: event.target.value })} maxLength={200} disabled={locked} />
+        <label className="writing-body-label" htmlFor="writing-body">Texto del escrito</label><textarea id="writing-body" className="writing-body" value={fields.body} onChange={event => edit({ body: event.target.value })} maxLength={100_000} rows={20} disabled={locked} placeholder="Empiece a redactar. Puede incorporar un hecho, una nota o un pasaje desde el cuaderno de fuentes…" spellCheck />
+        <p className="writing-help">El texto se guarda automáticamente al dejar de escribir. Los marcadores [^R1] enlazan los respaldos incorporados; consérvelos junto a la afirmación correspondiente. Las conclusiones requieren revisión profesional.</p><p className="writing-help">{fields.body.length.toLocaleString("es-CL")} de 100.000 caracteres · último guardado: {dateLabel(draft.updatedAt)}</p>
+      </div>
+      <ContextPanel id={panelId} title={panelTitles[panel]} open={panelOpen} onClose={() => setPanelOpen(false)} className="writing-companion" headerActions={<p className="writing-panel-status" data-state={state} role="status" aria-live="polite">{labels[state]} · versión {draft.revision}</p>}>
+        {panelOpen && feedback}
+        <div className="context-panel-tools" aria-label="Cuaderno del escrito">{([["sources","Añadir"],["references","Respaldos"],["history","Versiones"],["export","Descargar"]] as const).map(([value,label]) => <button key={value} type="button" aria-pressed={panel === value} onClick={() => choosePanel(value)}>{label}</button>)}</div>
+        <div hidden={panel !== "sources"}><SourcePicker causaId={causaId} draftId={draft.id} active={panelOpen && panel === "sources"} visit={sourceVisit} initialKind={initialSources} initialBookId={initialBookId} disabled={locked || state === "conflict"} add={async source => { await commit("/sources", { source }, "Fuente incorporada al final del escrito. Sus citas quedan vinculadas a esta versión."); }} onCatalogError={catalogFailure} /></div>
+        <div hidden={panel !== "references"} className="writing-companion-panel"><p>Los pasajes vinculados a esta versión vuelven a comprobarse al abrir o exportar el escrito.</p><References causaId={causaId} draftId={draft.id} references={draft.references} /><Warnings warnings={draft.warnings} /></div>
+        <div hidden={panel !== "history"}><HistoryPanel url={url} visit={historyVisit} active={panelOpen && panel === "history"} current={draft.revision} canWrite={draft.canWrite} disabled={operating || state === "conflict"} restore={revision => commit("/restore", { targetRevision: revision }, "Versión recuperada como un nuevo guardado. El historial anterior se conserva.")} onPrivateError={privateFailure} /></div>
+        <section hidden={panel !== "export"}><p>Se comprueban los respaldos y el acceso antes de preparar la descarga. Los cambios pendientes se guardan primero.</p><div className="writing-actions"><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("markdown")}><Download size={16} aria-hidden="true" />Descargar Markdown</button><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("text")}>Descargar TXT</button></div></section>
+      </ContextPanel>
     </div>
-    <aside className="writing-companion" aria-label="Cuaderno del escrito">
-      <div className="writing-companion-tabs" role="tablist" aria-label="Cuaderno del escrito" onKeyDown={event => { const order: Panel[] = ["sources", "references", "history"]; let index = order.indexOf(panel); if (event.key === "ArrowRight") index = (index + 1) % 3; else if (event.key === "ArrowLeft") index = (index + 2) % 3; else if (event.key === "Home") index = 0; else if (event.key === "End") index = 2; else return; event.preventDefault(); choosePanel(order[index]); (event.currentTarget.children[index] as HTMLButtonElement).focus(); }}><button type="button" role="tab" tabIndex={panel === "sources" ? 0 : -1} aria-selected={panel === "sources"} onClick={() => choosePanel("sources")}><BookOpen size={16} aria-hidden="true" />Incorporar fuentes</button><button type="button" role="tab" tabIndex={panel === "references" ? 0 : -1} aria-selected={panel === "references"} onClick={() => choosePanel("references")}>Referencias ({draft.references.length})</button><button type="button" role="tab" tabIndex={panel === "history" ? 0 : -1} aria-selected={panel === "history"} onClick={() => choosePanel("history")}><History size={16} aria-hidden="true" />Historial</button></div>
-      <div hidden={panel !== "sources"}><SourcePicker causaId={causaId} draftId={draft.id} active={panel === "sources"} visit={sourceVisit} initialKind={initialSources} initialBookId={initialBookId} disabled={locked || state === "conflict"} add={async source => { await commit("/sources", { source }, "Fuente incorporada al final del escrito. Sus citas quedan vinculadas a esta versión."); }} onCatalogError={catalogFailure} /></div>
-      {panel === "references" && <div className="writing-companion-panel"><h2>Respaldos incorporados</h2><p>Son los pasajes vinculados a esta versión. Al abrir o exportar el escrito se comprueban otra vez su integridad y su acceso.</p><References causaId={causaId} draftId={draft.id} references={draft.references} /><Warnings warnings={draft.warnings} /></div>}
-      {panel === "history" && <HistoryPanel url={url} current={draft.revision} canWrite={draft.canWrite} disabled={operating || state === "conflict"} restore={revision => commit("/restore", { targetRevision: revision }, "Versión recuperada como un nuevo guardado. El historial anterior se conserva.")} onPrivateError={privateFailure} />}
-    </aside>
   </div>;
 }
 
@@ -371,16 +372,26 @@ function BlockedWritingRecovery({ url, onRecovered, onNoAccess }: { url: string;
 function References({ causaId, draftId, references }: { causaId: string; draftId: string; references: WritingReferenceView[] }) {
   return <ul className="writing-reference-list">{!references.length && <li><p>Este escrito aún no tiene respaldos incorporados. Puede añadirlos desde el cuaderno de fuentes.</p></li>}{references.map(reference => <li key={reference.id} data-testid="writing-reference"><h3>{reference.id} · {reference.source.title}</h3><p>{reference.source.kind === "document" ? "Pasaje del expediente" : reference.source.kind === "fact" ? "Hecho del expediente" : reference.source.kind === "note" ? "Nota de audiencia" : "Pasaje de biblioteca"}</p><a href={withCaseBookContext(reference.source.href, causaId, draftId)} target="_blank" rel="noreferrer">Volver al origen</a><Warnings warnings={reference.source.warnings} />{reference.source.citations.map((citation, index) => <div key={citation.sourceKey + ":" + index}><blockquote>{citation.quote}</blockquote><p><a href={withCaseBookContext(citation.href, causaId, draftId)} target="_blank" rel="noreferrer">{citation.reference} · {citation.locator}</a></p><Warnings warnings={citation.warnings} /><details><summary>Datos de cotejo del pasaje</summary><p>Base: {citation.verificationBasis === "retained_text" ? "texto conservado; original no conservado" : "original conservado"}</p><p className="writing-help">SHA-256 del pasaje: {citation.quoteSha256}</p></details></div>)}</li>)}</ul>;
 }
-function HistoryPanel({ url, current, canWrite, disabled, restore, onPrivateError }: { url: string; current: number; canWrite: boolean; disabled: boolean; restore: (revision: number) => Promise<void>; onPrivateError: (error: ApiError) => boolean }) {
-  const previewElement = useRef<HTMLElement>(null);
+function HistoryPanel({ url, active = true, visit = 0, current, canWrite, disabled, restore, onPrivateError }: { url: string; active?: boolean; visit?: number; current: number; canWrite: boolean; disabled: boolean; restore: (revision: number) => Promise<void>; onPrivateError: (error: ApiError) => boolean }) {
+  const previewElement = useRef<HTMLElement>(null), chosenRevision = useRef<number | undefined>(undefined);
+  const [validated, setValidated] = useState("");
   const [history, setHistory] = useState<WritingHistory>(), [before, setBefore] = useState<number>(), [preview, setPreview] = useState<WritingRevisionView>(), [error, setError] = useState(""), [loading, setLoading] = useState(false);
+  const checkKey = JSON.stringify([url, current, before, visit]), ready = validated === checkKey;
   useEffect(() => {
+    if (!active) return;
     const control = new AbortController();
-    getJson<WritingHistory>(url + "/history" + (before ? "?before=" + before : ""), control.signal).then(value => { if (!control.signal.aborted) setHistory(value); }).catch((reason: ApiError) => { if (!control.signal.aborted) { setError(reason.message); if ([401, 403, 404].includes(reason.status || 0)) onPrivateError(reason); } });
+    void (async () => {
+      try {
+        const value = await getJson<WritingHistory>(url + "/history" + (before ? "?before=" + before : ""), control.signal);
+        const revision = chosenRevision.current;
+        const checkedPreview = revision === undefined ? undefined : await getJson<WritingRevisionView>(url + "/history/" + revision, control.signal);
+        if (!control.signal.aborted) { setHistory(value); setPreview(checkedPreview); setError(""); setValidated(checkKey); }
+      } catch (reason) { if (!control.signal.aborted) { const failure = reason as ApiError; setError(failure.message); if ([401,403,404].includes(failure.status || 0)) onPrivateError(failure); } }
+    })();
     return () => control.abort();
-  }, [url, current, before, onPrivateError]);
+  }, [url, active, before, checkKey, onPrivateError]);
   async function open(revision: number) {
-    setPreview(undefined); setError(""); setLoading(true);
+    chosenRevision.current = revision; setPreview(undefined); setError(""); setLoading(true);
     try { setPreview(await getJson<WritingRevisionView>(url + "/history/" + revision)); requestAnimationFrame(() => previewElement.current?.scrollIntoView({ block: "start", behavior: "instant" })); }
     catch (reason) { const failure = reason as ApiError; setError(failure.message); if ([401, 403, 404].includes(failure.status || 0)) onPrivateError(failure); }
     finally { setLoading(false); }
@@ -391,15 +402,15 @@ function HistoryPanel({ url, current, canWrite, disabled, restore, onPrivateErro
     <p>Cada guardado confirmado conserva el texto y sus referencias. Abra una versión para revisarla antes de recuperarla como un nuevo guardado.</p>
     {error && <p className="writing-message" data-error="true" role="alert">{error}</p>}
     {loading && <p role="status">Comprobando la versión y sus fuentes…</p>}
-    {preview && <article className="writing-history-preview" ref={previewElement}>
+    {ready && preview && <article className="writing-history-preview" ref={previewElement}>
       <h3>Vista previa · versión {preview.revision}</h3>
       <p>{preview.title}</p>
       <pre>{preview.body || "Sin texto guardado."}</pre>
       <Warnings warnings={preview.warnings} />
       <p>{preview.references.length} referencias conservadas en esta versión.</p>
-      {canWrite && preview.canRestore && preview.revision !== current && <button type="button" className="btn btn-primary" disabled={disabled || loading} onClick={async () => { await restore(preview.revision); setPreview(undefined); }}>Recuperar como nueva versión</button>}
+      {canWrite && preview.canRestore && preview.revision !== current && <button type="button" className="btn btn-primary" disabled={disabled || loading} onClick={async () => { await restore(preview.revision); chosenRevision.current = undefined; setPreview(undefined); }}>Recuperar como nueva versión</button>}
     </article>}
-    <ol className="writing-history-list">{history?.revisions.map(item => <li key={item.revision} data-testid="writing-history-entry">
+    <ol className="writing-history-list">{ready && history?.revisions.map(item => <li key={item.revision} data-testid="writing-history-entry">
       {!item.available ? <p>Versión {item.revision} no disponible.</p> : <button type="button" disabled={loading || disabled} aria-pressed={preview?.revision === item.revision} onClick={() => void open(item.revision)}>
         Versión {item.revision}{item.revision === current ? " · actual" : ""}
         <time dateTime={item.createdAt}>{dateLabel(item.createdAt)}</time>
@@ -407,8 +418,8 @@ function HistoryPanel({ url, current, canWrite, disabled, restore, onPrivateErro
         <span className="writing-history-action">{preview?.revision === item.revision ? "Versión abierta" : "Ver versión"}<FileText size={16} aria-hidden="true" /></span>
       </button>}
     </li>)}</ol>
-    {!history && !error && <p role="status">Abriendo historial…</p>}
-    {history?.nextBefore && <button type="button" className="writing-text-link" disabled={loading} onClick={() => { setBefore(history.nextBefore!); setPreview(undefined); }}>Ver versiones anteriores</button>}
-    {before && <button type="button" className="writing-text-link" onClick={() => { setBefore(undefined); setPreview(undefined); }}>Volver a las recientes</button>}
+    {!ready && !error && <p role="status">Comprobando el historial y sus fuentes…</p>}
+    {ready && history?.nextBefore && <button type="button" className="writing-text-link" disabled={loading} onClick={() => { chosenRevision.current = undefined; setBefore(history.nextBefore!); setPreview(undefined); }}>Ver versiones anteriores</button>}
+    {before && <button type="button" className="writing-text-link" onClick={() => { chosenRevision.current = undefined; setBefore(undefined); setPreview(undefined); }}>Volver a las recientes</button>}
   </div>;
 }

@@ -39,7 +39,8 @@ export function LlmSettingsForm() {
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    fetch("/api/integrations/llm")
+    const controller = new AbortController();
+    fetch("/api/integrations/llm", { signal: controller.signal })
       .then(async (r) => {
         if (!r.ok) {
           const data = await r.json().catch(() => ({}));
@@ -48,6 +49,7 @@ export function LlmSettingsForm() {
         return r.json();
       })
       .then((data) => {
+        if (controller.signal.aborted) return;
         setEnabled(Boolean(data.enabled));
         if (data.config) setConfig({ ...data.config });
         if (data.presets) setPresets(data.presets);
@@ -55,6 +57,7 @@ export function LlmSettingsForm() {
         setLoaded(true);
       })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         setLoadError(
           err instanceof Error
             ? err.message
@@ -62,6 +65,7 @@ export function LlmSettingsForm() {
         );
         setLoaded(true);
       });
+    return () => controller.abort();
   }, []);
 
   function onPresetChange(preset: PresetKey) {

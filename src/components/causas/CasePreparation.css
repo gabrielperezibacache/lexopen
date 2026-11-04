@@ -15,6 +15,8 @@
   text-underline-offset: .4rem;
 }
 .case-preparation-index a:hover { color: var(--ink); text-decoration-line: underline; }
+.case-preparation-directory > summary { display: list-item; min-height: 44px; padding-block: .65rem; color: var(--ink-soft); cursor: pointer; font-size: 1rem; }
+.case-preparation-directory > summary:focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
 .case-preparation {
   display: grid;
   grid-template-columns: minmax(15rem, .75fr) minmax(0, 1.5fr);

@@ -3,83 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import { navigationBreadcrumbs, type NavigationModel } from "@/lib/navigation/catalog";
 
-const LABEL_KEYS: Record<string, string> = {
-  inicio: "nav.home",
-  dashboard: "nav.panel",
-  causas: "nav.cases",
-  audiencias: "nav.hearings",
-  plazos: "nav.deadlines",
-  calendario: "nav.calendar",
-  tareas: "nav.tasks",
-  clientes: "nav.clients",
-  portal: "nav.portal",
-  documentos: "nav.documents",
-  minutas: "nav.minutes",
-  jurisprudencia: "nav.jurisprudence",
-  facturacion: "nav.billing",
-  configuracion: "nav.settings",
-  integraciones: "nav.integrations",
-  auditoria: "nav.audit",
-  correo: "nav.mailbox",
-  buscar: "nav.search",
-  notificaciones: "nav.notifications",
-  sites: "nav.sites",
-  mensajes: "nav.messages",
-  flujos: "nav.workflows",
-  personas: "nav.people",
-  agente: "nav.assistant",
-  cuenta: "nav.account",
-};
-const DETAIL_LABELS: Record<string, string> = {
-  biblioteca: "Biblioteca", audiencias: "Audiencias", editar: "Editar", nueva: "Nueva",
-  "mis-causas": "Mis causas", monitoreo: "Monitoreo", archivos: "Archivos", personas: "Personas",
-  horas: "Horas", gastos: "Gastos", tarifas: "Tarifas", uf: "UF", facturas: "Facturas",
-  "cuenta-corriente": "Cuenta corriente", isheets: "Tablas", wiki: "Wiki", blog: "Blog", qa: "Preguntas",
-};
-function detailLabel(part: string, parent?: string) {
-  if (/^(?:c[a-z0-9]{20,}|[a-f0-9]{32,}|[a-f0-9-]{36})$/i.test(part)) {
-    return ({ causas: "Causa", audiencias: "Audiencia en vivo", clientes: "Cliente", sites: "Espacio", biblioteca: "Libro", fuentes: "Fuente", facturas: "Factura", minutas: "Minuta", isheets: "Tabla", archivos: "Archivo" } as Record<string, string>)[parent || ""] || "Detalle";
-  }
-  return DETAIL_LABELS[part] || decodeURIComponent(part);
-}
-
-export function Breadcrumbs() {
+export function Breadcrumbs({ navigation }: { navigation: NavigationModel }) {
   const pathname = usePathname() || "/";
   const { t } = useI18n();
-  const parts = pathname.split("/").filter(Boolean);
-  if (parts.length === 0) return null;
-
-  const crumbs = parts.map((part, index) => {
-    const href = "/" + parts.slice(0, index + 1).join("/");
-    const key = LABEL_KEYS[part];
-    const label = parts[0] === "jurisprudencia" && parts[1] === "fuentes" && index === 2 ? "Fuente jurídica" : key ? t(key) : part === "fuentes" ? "Fuentes" : detailLabel(part, parts[index - 1]);
-    return { href, label, last: index === parts.length - 1 };
-  }).filter((_, index) => !(parts[0] === "documentos" && parts[2] === "fuentes" && index === 1) && !(parts[0] === "jurisprudencia" && parts[1] === "fuentes" && index === 1));
-
-  return (
-    <nav aria-label={t("common.breadcrumbs")} className="min-w-0">
-      <ol className="flex flex-wrap items-center gap-1 text-xs text-[var(--muted)]">
-        <li>
-          <Link href="/inicio" className="hover:text-[var(--sea)]">
-            {t("nav.home")}
-          </Link>
-        </li>
-        {crumbs.map((c) => (
-          <li key={c.href} className="flex min-w-0 items-center gap-1">
-            <span aria-hidden="true">/</span>
-            {c.last ? (
-              <span className="truncate font-medium text-[var(--ink)]" aria-current="page">
-                {c.label}
-              </span>
-            ) : (
-              <Link href={c.href} className="truncate hover:text-[var(--sea)]">
-                {c.label}
-              </Link>
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
+  const crumbs = navigationBreadcrumbs(navigation, pathname);
+  if (!crumbs.length) return null;
+  return <nav aria-label={t("common.breadcrumbs")} className="min-w-0">
+    <ol className="flex flex-wrap items-center gap-1 text-xs text-[var(--muted)]">
+      {crumbs.map((crumb, index) => <li key={crumb.href} className="flex min-w-0 items-center gap-1">
+        {index > 0 && <span aria-hidden="true">/</span>}
+        {index === crumbs.length - 1
+          ? <span className="truncate font-medium text-[var(--ink)]" aria-current="page">{t(crumb.labelKey)}</span>
+          : <Link href={crumb.href} className="truncate hover:text-[var(--sea)]">{t(crumb.labelKey)}</Link>}
+      </li>)}
+    </ol>
+  </nav>;
 }
