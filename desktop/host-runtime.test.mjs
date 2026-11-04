@@ -23,6 +23,7 @@ import {
   classifyPostgresDiagnostic,
   createWindowsPostgresController,
   windowsPostgresEnvironment,
+  executePostgresControl,
   withPrivatePostgresTemp,
   stopChild,
   assertHostStopped,
@@ -225,6 +226,29 @@ assert.equal(winChildEnv.LC_MESSAGES, "en_US.UTF-8");
 assert.equal(winChildEnv.PATH, "C:\\LexOpen & revisión\\bin;C:\\Windows\\System32;C:\\Windows");
 assert(!JSON.stringify(winChildEnv).includes(privateFixture));
 assert(!winChildEnv.PATH.includes("external-tools"));
+
+// A live descendant must not hold a controller's completion open via pipes.
+const inheritedHandleFixture = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-control-pipes-"));
+const releaseDescendant = path.join(inheritedHandleFixture, "release"), descendantDone = path.join(inheritedHandleFixture, "done");
+const descendantSource = `const fs=require('node:fs');setInterval(()=>{if(fs.existsSync(${JSON.stringify(releaseDescendant)})){fs.writeFileSync(${JSON.stringify(descendantDone)},'done');process.exit(0)}},20);setTimeout(()=>process.exit(0),5000);`;
+const parentSource = `const {spawn}=require('node:child_process');const child=spawn(process.execPath,['-e',${JSON.stringify(descendantSource)}],{stdio:'inherit',detached:true});child.unref();`;
+try {
+  await executePostgresControl(process.execPath, ["-e", parentSource], { env: process.env, timeout: 2000 });
+  assert.equal(fs.existsSync(descendantDone), false, "completion must follow parent EXIT while its descendant is still waiting");
+} finally {
+  fs.writeFileSync(releaseDescendant, "release");
+  for (let attempt = 0; attempt < 150 && !fs.existsSync(descendantDone); attempt++) await new Promise(resolve => setTimeout(resolve, 20));
+  fs.rmSync(inheritedHandleFixture, { recursive: true, force: true });
+}
+const controllerProcess = new EventEmitter();
+let killed = false, exitObserved = false;
+controllerProcess.kill = () => { killed = true; setTimeout(() => { exitObserved = true; controllerProcess.emit("exit", null, "SIGTERM"); }, 5); };
+await assert.rejects(executePostgresControl("fixture", [], { timeout: 5 }, { killGraceMs: 50, spawnProcess: (_binary, _args, options) => {
+  assert.equal(options.stdio, "ignore"); assert.equal(options.shell, false); return controllerProcess;
+} }), error => error.code === "ETIMEDOUT" && exitObserved);
+assert.equal(killed, true);
+const unconfirmedProcess = new EventEmitter(); unconfirmedProcess.kill = () => {};
+await assert.rejects(executePostgresControl("fixture", [], { timeout: 5 }, { killGraceMs: 5, spawnProcess: () => unconfirmedProcess }), error => error.code === "ETIMEDOUT" && error.controllerExitUnconfirmed === true);
 
 function windowsControllerFixture() {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-pgctl-á & revisión-"));

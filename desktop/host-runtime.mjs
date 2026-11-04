@@ -4,16 +4,13 @@
  * Datos/config del usuario viven en LEXOPEN_DATA_DIR (fuera del clon).
  */
 import { createRequire } from "module";
-import { execFile as execFileCallback, spawn, spawnSync } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import crypto from "crypto";
 import fs from "fs";
 import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 import { pathToFileURL } from "url";
-import { promisify } from "util";
-
-const execFile = promisify(execFileCallback);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(path.join(__dirname, "package.json"));
@@ -319,16 +316,42 @@ async function resolveWindowsPgCtl() {
   return binary;
 }
 
+/** pg_ctl may leave descendants holding inherited handles: wait for EXIT, not CLOSE. */
+export function executePostgresControl(binary, args, options = {}, overrides = {}) {
+  return new Promise((resolve, reject) => {
+    let child, timer, forceTimer, finished = false, timedOut = false;
+    const failure = (code, unconfirmed = false) => Object.assign(new Error("PostgreSQL controller did not complete"), { code, ...(unconfirmed ? { controllerExitUnconfirmed: true } : {}) });
+    const finish = error => {
+      if (finished) return;
+      finished = true; clearTimeout(timer); clearTimeout(forceTimer);
+      if (error) reject(error); else resolve();
+    };
+    try {
+      child = (overrides.spawnProcess || spawn)(binary, args, { cwd: options.cwd, env: options.env, windowsHide: true, shell: false, stdio: "ignore" });
+    } catch (error) { finish(error); return; }
+    child.once("error", error => finish(error));
+    child.once("exit", code => finish(timedOut ? failure("ETIMEDOUT") : code === 0 ? undefined : failure("PG_CTL_EXIT")));
+    timer = setTimeout(() => {
+      timedOut = true;
+      try { child.kill("SIGTERM"); } catch { /* the observed exit still decides */ }
+      forceTimer = setTimeout(() => {
+        try { child.kill("SIGKILL"); } catch { /* fail closed if exit remains unobserved */ }
+        forceTimer = setTimeout(() => finish(failure("ETIMEDOUT", true)), overrides.killGraceMs || 1000);
+      }, overrides.killGraceMs || 1000);
+    }, options.timeout || 35_000);
+  });
+}
+
 /**
  * PostgreSQL's official Windows pg_ctl starts its server with a restricted
  * token, including when the desktop account belongs to Administrators.
  * Each controller owns one explicit cluster; no shell or taskkill is used.
  */
-export function createWindowsPostgresController({ dataDir, pgPort, pgCtl, execute = execFile, probes = {}, env = process.env }) {
+export function createWindowsPostgresController({ dataDir, pgPort, pgCtl, execute = executePostgresControl, probes = {}, env = process.env }) {
   if (!Number.isInteger(pgPort) || pgPort < 1024 || pgPort > 65535 || !path.isAbsolute(dataDir) || !path.isAbsolute(pgCtl)) throw lifecycleFailure("PG_START", "BINARY_LOOKUP");
   const databaseDir = pgDataDir(dataDir), logFile = path.join(dataDir, "postgres-server.log");
   const environment = windowsPostgresEnvironment(path.dirname(pgCtl), env);
-  let state = "stopped", operation = Promise.resolve(), logOffset = 0;
+  let state = "stopped", operation = Promise.resolve(), logOffset = 0, unconfirmedController = false;
   const serialized = work => {
     const pending = operation.then(work);
     operation = pending.then(() => undefined, () => undefined);
@@ -347,10 +370,12 @@ export function createWindowsPostgresController({ dataDir, pgPort, pgCtl, execut
   };
   const command = async (phase, args, timeout) => {
     try {
-      await execute(pgCtl, args, { cwd: path.dirname(pgCtl), env: environment, shell: false, windowsHide: true, timeout, maxBuffer: 128 * 1024, encoding: "utf8" });
+      await execute(pgCtl, args, { cwd: path.dirname(pgCtl), env: environment, shell: false, windowsHide: true, timeout });
     } catch (error) {
       const diagnostics = [classifyPostgresDiagnostic(error), classifyPostgresDiagnostic(error?.stderr), classifyPostgresDiagnostic(error?.stdout), classifyLogTail()];
-      throw lifecycleFailure(phase, diagnostics.find(value => value !== "UNKNOWN") || "UNKNOWN");
+      const safeError = lifecycleFailure(phase, diagnostics.find(value => value !== "UNKNOWN") || "UNKNOWN");
+      if (error?.controllerExitUnconfirmed) { unconfirmedController = true; safeError.controllerExitUnconfirmed = true; }
+      throw safeError;
     }
   };
   const stopOwned = async () => {
@@ -358,10 +383,14 @@ export function createWindowsPostgresController({ dataDir, pgPort, pgCtl, execut
     // A failed launch can return before any daemon exists. A missing PID plus
     // closed sockets is a proof, unlike swallowing a failed stop command.
     if (!postgresPid) {
-      try { await stopped(); state = "stopped"; return; } catch { /* a daemon may still be starting */ }
+      try {
+        await stopped();
+        if (!unconfirmedController) { state = "stopped"; return; }
+      } catch { /* a daemon may still be starting */ }
     }
     await command("PG_STOP", ["stop", "-D", databaseDir, "-m", "fast", "-w", "-t", "20"], 25_000);
     await duringHostPhase("PG_STOP", () => stopped(postgresPid));
+    if (unconfirmedController) throw lifecycleFailure("PG_STOP", "UNKNOWN");
     state = "stopped";
   };
   return {
@@ -385,6 +414,7 @@ export function createWindowsPostgresController({ dataDir, pgPort, pgCtl, execut
         // and prove it closed before allowing a retry; preserve its safe code.
         try { await stopOwned(); }
         catch { state = "recovery"; error.cleanupFailed = true; }
+        if (error.controllerExitUnconfirmed) { state = "recovery"; error.cleanupFailed = true; }
         throw error;
       }
     })),
