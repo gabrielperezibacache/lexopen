@@ -4,13 +4,16 @@
  * Datos/config del usuario viven en LEXOPEN_DATA_DIR (fuera del clon).
  */
 import { createRequire } from "module";
-import { spawn, spawnSync } from "child_process";
+import { execFile as execFileCallback, spawn, spawnSync } from "child_process";
 import crypto from "crypto";
 import fs from "fs";
 import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 import { pathToFileURL } from "url";
+import { promisify } from "util";
+
+const execFile = promisify(execFileCallback);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(path.join(__dirname, "package.json"));
@@ -238,7 +241,7 @@ async function migrateLegacyPgPassword(pg, dataDir, databaseUrl) {
 
 let postgresInitialization = Promise.resolve();
 const safeLifecycleFailure = Symbol("safeLifecycleFailure");
-const hostLifecyclePhases = new Set(["PG_INIT", "PG_START", "MIGRATION", "NEXT_START", "HEALTH"]);
+const hostLifecyclePhases = new Set(["PG_INIT", "PG_START", "PG_STOP", "MIGRATION", "NEXT_START", "HEALTH"]);
 const postgresDiagnostics = new Set(["INVALID_LOCALE", "ACCESS_DENIED", "DLL_MISSING", "BINARY_LOOKUP", "UNKNOWN"]);
 
 /** Classify transient input without retaining or printing PostgreSQL output. */
@@ -292,6 +295,107 @@ export function withPrivatePostgresTemp(dataDir, work) {
   return pending;
 }
 
+/** pg_ctl needs Windows OS facilities, never application/model/DB credentials. */
+export function windowsPostgresEnvironment(binaryDirectory, source = process.env) {
+  const env = {};
+  for (const key of ["SystemRoot", "WINDIR", "COMSPEC", "TEMP", "TMP", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA"]) {
+    const sourceKey = Object.keys(source).find(candidate => candidate.toLowerCase() === key.toLowerCase());
+    if (sourceKey && typeof source[sourceKey] === "string") env[key] = source[sourceKey];
+  }
+  const systemRoot = env.SystemRoot || env.WINDIR;
+  const directories = [binaryDirectory];
+  if (systemRoot) directories.push(path.win32.join(systemRoot, "System32"), systemRoot);
+  env.PATH = directories.join(";");
+  // Preserve the embedded-postgres LC_MESSAGES setting; initialization and
+  // database locale options remain those of the existing vendor implementation.
+  env.LC_MESSAGES = "en_US.UTF-8";
+  return env;
+}
+
+async function resolveWindowsPgCtl() {
+  const moduleFile = bundledModuleFile("@embedded-postgres/windows-x64", "dist/index.js") || require.resolve("@embedded-postgres/windows-x64");
+  const { pg_ctl: binary } = await import(pathToFileURL(moduleFile).href);
+  if (typeof binary !== "string" || !path.isAbsolute(binary) || !fs.existsSync(binary)) throw Object.assign(new Error("Bundled PostgreSQL controller unavailable"), { code: "ENOENT" });
+  return binary;
+}
+
+/**
+ * PostgreSQL's official Windows pg_ctl starts its server with a restricted
+ * token, including when the desktop account belongs to Administrators.
+ * Each controller owns one explicit cluster; no shell or taskkill is used.
+ */
+export function createWindowsPostgresController({ dataDir, pgPort, pgCtl, execute = execFile, probes = {}, env = process.env }) {
+  if (!Number.isInteger(pgPort) || pgPort < 1024 || pgPort > 65535 || !path.isAbsolute(dataDir) || !path.isAbsolute(pgCtl)) throw lifecycleFailure("PG_START", "BINARY_LOOKUP");
+  const databaseDir = pgDataDir(dataDir), logFile = path.join(dataDir, "postgres-server.log");
+  const environment = windowsPostgresEnvironment(path.dirname(pgCtl), env);
+  let state = "stopped", operation = Promise.resolve(), logOffset = 0;
+  const serialized = work => {
+    const pending = operation.then(work);
+    operation = pending.then(() => undefined, () => undefined);
+    return pending;
+  };
+  const stopped = postgresPid => assertHostStopped({ dataDir, port: pgPort, pgPort, postgresPid }, probes);
+  const classifyLogTail = () => {
+    let fd;
+    try {
+      fd = fs.openSync(logFile, "r");
+      const size = fs.fstatSync(fd).size, bytes = Buffer.alloc(Math.min(Math.max(0, size - logOffset), 16_384));
+      fs.readSync(fd, bytes, 0, bytes.length, Math.max(0, size - bytes.length));
+      return classifyPostgresDiagnostic(bytes.toString("utf8"));
+    } catch { return "UNKNOWN"; }
+    finally { if (fd !== undefined) fs.closeSync(fd); }
+  };
+  const command = async (phase, args, timeout) => {
+    try {
+      await execute(pgCtl, args, { cwd: path.dirname(pgCtl), env: environment, shell: false, windowsHide: true, timeout, maxBuffer: 128 * 1024, encoding: "utf8" });
+    } catch (error) {
+      const diagnostics = [classifyPostgresDiagnostic(error), classifyPostgresDiagnostic(error?.stderr), classifyPostgresDiagnostic(error?.stdout), classifyLogTail()];
+      throw lifecycleFailure(phase, diagnostics.find(value => value !== "UNKNOWN") || "UNKNOWN");
+    }
+  };
+  const stopOwned = async () => {
+    const postgresPid = readPostgresPid(dataDir);
+    // A failed launch can return before any daemon exists. A missing PID plus
+    // closed sockets is a proof, unlike swallowing a failed stop command.
+    if (!postgresPid) {
+      try { await stopped(); state = "stopped"; return; } catch { /* a daemon may still be starting */ }
+    }
+    await command("PG_STOP", ["stop", "-D", databaseDir, "-m", "fast", "-w", "-t", "20"], 25_000);
+    await duringHostPhase("PG_STOP", () => stopped(postgresPid));
+    state = "stopped";
+  };
+  return {
+    start: () => serialized(() => duringHostPhase("PG_START", async () => {
+      if (state === "running") return;
+      if (state === "recovery") throw lifecycleFailure("PG_START", "UNKNOWN");
+      await duringHostPhase("PG_START", () => stopped());
+      let existingLog = false;
+      try {
+        const stat = fs.lstatSync(logFile);
+        if (!stat.isFile() || stat.isSymbolicLink()) throw lifecycleFailure("PG_START", "ACCESS_DENIED");
+        existingLog = true;
+      } catch (error) { if (error.code !== "ENOENT") throw error; }
+      const fd = fs.openSync(logFile, existingLog ? "a" : "ax", 0o600); logOffset = fs.fstatSync(fd).size; fs.closeSync(fd); fs.chmodSync(logFile, 0o600);
+      state = "starting";
+      try {
+        await command("PG_START", ["start", "-D", databaseDir, "-l", logFile, "-w", "-t", "30", "-o", `-p ${pgPort} -h 127.0.0.1`], 35_000);
+        state = "running";
+      } catch (error) {
+        // A timed-out pg_ctl can leave a live daemon. Stop this explicit cluster
+        // and prove it closed before allowing a retry; preserve its safe code.
+        try { await stopOwned(); }
+        catch { state = "recovery"; error.cleanupFailed = true; }
+        throw error;
+      }
+    })),
+    stop: () => serialized(() => duringHostPhase("PG_STOP", async () => {
+      if (state === "stopped") return;
+      try { await stopOwned(); }
+      catch (error) { state = "recovery"; throw error; }
+    })),
+  };
+}
+
 export async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl, overrides = {}) {
   const databaseDir = pgDataDir(dataDir);
   const alreadyInitialized = fs.existsSync(path.join(databaseDir, "PG_VERSION"));
@@ -325,6 +429,10 @@ export async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl, overri
   if (!alreadyInitialized) {
     await duringHostPhase("PG_INIT", () => withPrivatePostgresTemp(dataDir, () => pg.initialise()), () => diagnostic);
   }
+  if ((overrides.platform || process.platform) === "win32") {
+    const pgCtl = await duringHostPhase("PG_START", () => overrides.pgCtl || resolveWindowsPgCtl());
+    Object.assign(pg, createWindowsPostgresController({ dataDir, pgPort, pgCtl, execute: overrides.executePgCtl, probes: overrides.pgCtlProbes, env: overrides.pgCtlEnv }));
+  }
   diagnostic = "UNKNOWN";
   await duringHostPhase("PG_START", () => pg.start(), () => diagnostic);
   try {
@@ -335,7 +443,11 @@ export async function startEmbeddedPostgres(dataDir, pgPort, databaseUrl, overri
       console.warn("[lexopen-host] createDatabase: PG_START_UNKNOWN");
     }
   }
-  await duringHostPhase("PG_START", () => migrateLegacyPgPassword(pg, dataDir, databaseUrl), () => diagnostic);
+  try { await duringHostPhase("PG_START", () => migrateLegacyPgPassword(pg, dataDir, databaseUrl), () => diagnostic); }
+  catch (error) {
+    try { await boundedStop(() => pg.stop(), "PostgreSQL", 30_000); } catch { error.cleanupFailed = true; }
+    throw error;
+  }
   return pg;
 }
 
@@ -883,7 +995,7 @@ export async function startHost(options = {}, overrides = {}) {
         const errors = [], postgresPid = readPostgresPid(dataDir);
         try { await boundedStop(() => Promise.resolve(hostSchedulers?.stop?.()), "El programador"); } catch (error) { errors.push(error); }
         try { await lifecycle.stopChild(child); } catch (error) { errors.push(error); }
-        try { await boundedStop(() => pg.stop(), "PostgreSQL"); } catch (error) { errors.push(error); }
+        try { await boundedStop(() => pg.stop(), "PostgreSQL", process.platform === "win32" ? 30_000 : 15_000); } catch (error) { errors.push(error); }
         try { await lifecycle.assertHostStopped({ dataDir, port: host.port, pgPort, child, postgresPid }); } catch (error) { errors.push(error); }
         if (errors.length) throw new AggregateError(errors, "No se confirmó una parada completa del Host. El respaldo y la instalación quedan bloqueados.");
       })();

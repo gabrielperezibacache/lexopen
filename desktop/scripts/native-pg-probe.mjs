@@ -22,6 +22,7 @@ export function classifyPgDiagnostic(text = "", exitCode = null) {
   if (status === 0xc0000142) return "WINDOWS_DLL_INITIALIZATION_FAILED";
   if (status === 0xc0000135) return "WINDOWS_DLL_NOT_FOUND";
   if (status === 0xc0000005) return "WINDOWS_ACCESS_VIOLATION";
+  if (/execution of postgresql by a user with administrative permissions is not permitted|must be started under an unprivileged user id/i.test(text)) return "ADMINISTRATIVE_PERMISSIONS";
   if (/invalid.*locale|locale.*(?:invalid|not supported|not recognized)|could not (?:set|find).*locale/i.test(text)) return "LOCALE_UNSUPPORTED";
   if (/systemroot|windir|environment variable/i.test(text)) return "WINDOWS_ENVIRONMENT";
   if (/\.dll.*(?:not found|missing)|(?:not found|missing).*\.dll/i.test(text)) return "WINDOWS_DLL_NOT_FOUND";
@@ -41,6 +42,9 @@ export function redactPgDiagnostic(text, { password, roots = [] } = {}) {
     }
   }
   return value.replace(/(postgres(?:ql)?:\/\/)[^@\s]+@/gi, "$1<redacted>@").replace(/((?:password|token|secret)\s*[=:]\s*)[^\s,;]+/gi, "$1<redacted>").slice(-1200);
+}
+export function pgProbeResult(result, output, redaction) {
+  return { ...result, ...(!result.ok ? { diagnosticTail: redactPgDiagnostic(output, redaction) } : {}) };
 }
 function osEnvironment(source = process.env) {
   const env = {};
@@ -122,6 +126,7 @@ async function worker({ root, nonce, originalTemp, mode, pathCase, port }) {
       fs.rmSync(pwfile, { force: true }); output = init.output; exitCode = init.exitCode; diagnostic = init.diagnostic; timedOut = init.timedOut;
       if (init.timedOut || init.exitCode !== 0) throw new Error("DIRECT_INIT_FAILED");
       phase = "direct-start";
+      output = ""; exitCode = null; diagnostic = "NO_DIAGNOSTIC";
       postgres = spawn(binary.postgres, ["-D", data, "-p", String(port), "-h", "127.0.0.1"], { env: settings.env, shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
       const collect = chunk => { output = (output + chunk.toString("utf8")).slice(-65_536); };
       postgres.stdout.on("data", collect); postgres.stderr.on("data", collect);
@@ -144,8 +149,7 @@ async function worker({ root, nonce, originalTemp, mode, pathCase, port }) {
     await stopOwnedCluster(binary.pg_ctl, data, env, root);
     if (postgres && postgres.exitCode === null && !postgres.signalCode) postgres.kill();
   }
-  const result = { mode, pathCase, ok, phase, exitCode, diagnostic, timedOut };
-  if (!ok && !["READY", "INITIALIZED"].includes(diagnostic) && /UNCLASSIFIED|NO_DIAGNOSTIC/.test(diagnostic) && output) result.diagnosticTail = redactPgDiagnostic(output, { password, roots: [root, path.dirname(desktop), originalTemp] });
+  const result = pgProbeResult({ mode, pathCase, ok, phase, exitCode, diagnostic, timedOut }, output, { password, roots: [root, path.dirname(desktop), originalTemp] });
   process.stdout.write(`LEXOPEN_PG_PROBE_WORKER ${JSON.stringify(result)}\n`);
   process.exit(ok ? 0 : 1);
 }

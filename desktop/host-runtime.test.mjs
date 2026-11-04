@@ -21,6 +21,8 @@ import {
   startHost,
   startEmbeddedPostgres,
   classifyPostgresDiagnostic,
+  createWindowsPostgresController,
+  windowsPostgresEnvironment,
   withPrivatePostgresTemp,
   stopChild,
   assertHostStopped,
@@ -215,6 +217,100 @@ try {
   console.log = originalLog; console.warn = originalWarn; console.error = originalError;
   fs.rmSync(diagnosticFixture, { recursive: true, force: true });
 }
+
+const winOsEnv = { SystemRoot: "C:\\Windows", ComSpec: "C:\\Windows\\System32\\cmd.exe", TEMP: "C:\\Temp", PATH: "C:\\external-tools", DATABASE_URL: privateFixture, PGPASSWORD: privateFixture, OPENAI_API_KEY: privateFixture, NODE_OPTIONS: privateFixture };
+const winChildEnv = windowsPostgresEnvironment("C:\\LexOpen & revisión\\bin", winOsEnv);
+assert.equal(winChildEnv.COMSPEC, winOsEnv.ComSpec);
+assert.equal(winChildEnv.LC_MESSAGES, "en_US.UTF-8");
+assert.equal(winChildEnv.PATH, "C:\\LexOpen & revisión\\bin;C:\\Windows\\System32;C:\\Windows");
+assert(!JSON.stringify(winChildEnv).includes(privateFixture));
+assert(!winChildEnv.PATH.includes("external-tools"));
+
+function windowsControllerFixture() {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-pgctl-á & revisión-"));
+  const databaseDir = path.join(dataDir, "pgdata"), pgCtl = path.join(dataDir, "bin & á", "pg_ctl.exe"), calls = [];
+  fs.mkdirSync(databaseDir); fs.mkdirSync(path.dirname(pgCtl)); fs.writeFileSync(pgCtl, "fictitious executable, never run");
+  let live = false;
+  const behavior = { failStart: false, failStop: false, stopLeavesLive: false };
+  const execute = async (binary, args, options) => {
+    calls.push({ binary, args, options });
+    assert.equal(binary, pgCtl); assert.equal(options.shell, false); assert.equal(options.windowsHide, true);
+    assert(!JSON.stringify(options.env).includes(privateFixture));
+    assert.equal(args[args.indexOf("-D") + 1], databaseDir);
+    assert(["start", "stop"].includes(args[0]), "never invoke a shell or taskkill");
+    if (args[0] === "start") {
+      live = true; fs.writeFileSync(path.join(databaseDir, "postmaster.pid"), "987654\n");
+      assert.equal(args[args.indexOf("-o") + 1], "-p 55449 -h 127.0.0.1");
+      assert.equal(args[args.indexOf("-l") + 1], path.join(dataDir, "postgres-server.log"));
+      if (behavior.failStart) throw Object.assign(new Error(privateFixture), { stderr: `Access is denied ${privateFixture}` });
+    } else {
+      if (behavior.failStop) throw new Error(privateFixture);
+      if (!behavior.stopLeavesLive) { live = false; fs.rmSync(path.join(databaseDir, "postmaster.pid"), { force: true }); }
+    }
+    return { stdout: "", stderr: "" };
+  };
+  const probes = { processAlive: () => live, portListening: async () => live };
+  const controller = createWindowsPostgresController({ dataDir, pgPort: 55449, pgCtl, execute, probes, env: winOsEnv });
+  return { dataDir, pgCtl, execute, probes, behavior, calls, controller, cleanup: () => fs.rmSync(dataDir, { recursive: true, force: true }) };
+}
+
+const winNormal = windowsControllerFixture();
+try {
+  await winNormal.controller.stop(); assert.equal(winNormal.calls.length, 0);
+  await Promise.all([winNormal.controller.start(), winNormal.controller.start()]); assert.equal(winNormal.calls.length, 1);
+  assert.equal(winNormal.calls[0].args[winNormal.calls[0].args.indexOf("-t") + 1], "30");
+  if (process.platform !== "win32") assert.equal(fs.statSync(path.join(winNormal.dataDir, "postgres-server.log")).mode & 0o777, 0o600);
+  await Promise.all([winNormal.controller.stop(), winNormal.controller.stop()]); assert.equal(winNormal.calls.length, 2);
+  assert.deepEqual(winNormal.calls[1].args.slice(-5), ["-m", "fast", "-w", "-t", "20"]);
+  await winNormal.controller.start(); await winNormal.controller.stop(); assert.equal(winNormal.calls.length, 4);
+} finally { winNormal.cleanup(); }
+
+const winPartial = windowsControllerFixture();
+try {
+  winPartial.behavior.failStart = true;
+  await assert.rejects(winPartial.controller.start(), error => error.code === "PG_START_ACCESS_DENIED" && !String(error).includes(privateFixture));
+  assert.deepEqual(winPartial.calls.map(call => call.args[0]), ["start", "stop"], "failed startup must clean a daemon left by pg_ctl");
+  winPartial.behavior.failStart = false;
+  await winPartial.controller.start();
+  winPartial.behavior.failStop = true;
+  await assert.rejects(winPartial.controller.stop(), error => error.code === "PG_STOP_UNKNOWN");
+  const callsAfterStopFailure = winPartial.calls.length;
+  await assert.rejects(winPartial.controller.start(), error => error.code === "PG_START_UNKNOWN");
+  assert.equal(winPartial.calls.length, callsAfterStopFailure, "failed stop cannot be reported as running or allow a new start");
+  winPartial.behavior.failStop = false; await winPartial.controller.stop();
+} finally { winPartial.cleanup(); }
+
+const winFalseStop = windowsControllerFixture();
+try {
+  await winFalseStop.controller.start(); winFalseStop.behavior.stopLeavesLive = true;
+  await assert.rejects(winFalseStop.controller.stop(), error => error.code === "PG_STOP_UNKNOWN");
+  winFalseStop.behavior.stopLeavesLive = false; await winFalseStop.controller.stop();
+} finally { winFalseStop.cleanup(); }
+
+const winAbsent = windowsControllerFixture();
+try {
+  let attempts = 0;
+  const absent = createWindowsPostgresController({ dataDir: winAbsent.dataDir, pgPort: 55449, pgCtl: winAbsent.pgCtl, probes: winAbsent.probes, execute: async () => { attempts++; throw Object.assign(new Error(privateFixture), { code: "ENOENT" }); } });
+  await assert.rejects(absent.start(), error => error.code === "PG_START_BINARY_LOOKUP" && !error.cleanupFailed);
+  await assert.rejects(absent.start(), error => error.code === "PG_START_BINARY_LOOKUP");
+  assert.equal(attempts, 2, "a proven absent daemon must allow an explicit retry");
+} finally { winAbsent.cleanup(); }
+
+const winVendor = windowsControllerFixture();
+try {
+  let initialized = 0, created = 0;
+  class FakeWindowsPostgres {
+    async initialise() { initialized++; }
+    async start() { throw new Error("must use official pg_ctl rather than direct postgres"); }
+    async stop() { throw new Error("must use official pg_ctl rather than taskkill"); }
+    async createDatabase(name) { assert.equal(name, "lexopen"); created++; }
+    getPgClient() { return "vendor client preserved"; }
+  }
+  const pg = await startEmbeddedPostgres(winVendor.dataDir, 55449, "postgresql://lexopen:fixture@127.0.0.1:55449/lexopen", { EmbeddedPostgres: FakeWindowsPostgres, platform: "win32", pgCtl: winVendor.pgCtl, executePgCtl: winVendor.execute, pgCtlProbes: winVendor.probes, pgCtlEnv: winOsEnv });
+  assert.equal(initialized, 1); assert.equal(created, 1); assert.equal(pg.getPgClient(), "vendor client preserved");
+  await pg.stop();
+} finally { winVendor.cleanup(); }
+assert.throws(() => createWindowsPostgresController({ dataDir: "relative", pgPort: "55449 & command", pgCtl: "relative" }), error => error.code === "PG_START_BINARY_LOOKUP");
 
 const identityRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lexopen-build-identity-"));
 fs.mkdirSync(path.join(identityRoot, ".next"));

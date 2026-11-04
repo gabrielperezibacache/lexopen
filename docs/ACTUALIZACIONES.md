@@ -1,5 +1,7 @@
 # Actualizar LexOpen y sus dependencias
 
+En Windows, el Host inicia y detiene PostgreSQL mediante `pg_ctl`, con espera de disponibilidad y cierre, registro privado y entorno limitado a las funciones del sistema. Esta utilidad aplica el inicio con permisos restringidos previsto por [PostgreSQL](https://github.com/postgres/postgres/blob/REL_17_STABLE/src/bin/pg_ctl/pg_ctl.c), en lugar de ejecutar directamente el servidor bajo una cuenta elevada. La instalación no crea cuentas del sistema ni necesita un servicio privilegiado nuevo.
+
 La aplicación de escritorio empaquetada y el Host ejecutado desde un clon tienen actualizadores distintos. Ambos conservan la carpeta de datos. Descargar código o un instalador no acredita que el Host haya reiniciado con la versión nueva.
 
 Esta entrega incorpora comprobaciones, preparación y recibos. Las pruebas descritas al final usan datos ficticios y un actualizador simulado; no acreditan una actualización firmada real en todos los sistemas.
