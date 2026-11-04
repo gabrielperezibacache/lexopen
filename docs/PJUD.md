@@ -14,7 +14,7 @@ La [nueva comprobación de accesos oficiales](ojv-accesos-oficiales-2026-11-03/R
 
 La [validación de sincronización automática](ojv-sincronizacion-automatica-2026-11-03/README.md) completó el conector, la cola y el guardado en una base temporal, tanto en la consulta pública real como en Mis Causas después del ingreso manual. La repetición de ambos recorridos confirmó que no se duplicaron movimientos, con el cuaderno y la materia documentados.
 
-La [ampliación de interfaz y cuadernos](ojv-interfaz-2026-11-03/README.md) documenta el nuevo recorrido manual, sus capturas ficticias, una lectura pública real de tres cuadernos y la importación desde la interfaz pública en una base aislada: 510 movimientos y una repetición sin nuevos duplicados. El nuevo puente de ingreso privado desde la interfaz todavía requiere su comprobación; las validaciones anteriores del conector no la sustituyen.
+La [ampliación de interfaz y cuadernos](ojv-interfaz-2026-11-03/README.md) documenta el nuevo recorrido manual, sus capturas ficticias, una lectura pública real de tres cuadernos y la importación desde la interfaz pública en una base aislada: 510 movimientos y una repetición sin nuevos duplicados. Documente localmente cualquier comprobación con una cuenta privada y mantenga sus resultados fuera del repositorio público.
 
 ## Ingreso manual desde la interfaz
 
