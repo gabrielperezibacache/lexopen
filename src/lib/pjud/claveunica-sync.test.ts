@@ -29,6 +29,9 @@ async function main() {
   let failCreateAt = 0;
   let replaceClaim = false;
   let failQueue = false;
+  let jobCreateCount = 0;
+  let failJobCreateAt = 0;
+  const createdJobs: Array<{ id: string; causaId: string; trigger: string; status: string }> = [];
   let claimBeforeClear = false;
   const whereCalls: unknown[] = [];
   const queueBatches: string[][] = [];
@@ -80,12 +83,20 @@ async function main() {
     queueBatches.push(where.id.in);
     return where.id.in.map((id) => ({ id }));
   });
-  overrideMethod(prisma.pjudSyncJob, "updateMany", async () => {
+  overrideMethod(prisma.pjudSyncJob, "updateMany", async ({ where, data }: { where: { id?: { in: string[] } }; data: { status?: string } }) => {
     if (failQueue) throw new Error("fixture-queue-failure");
+    if (where.id && data.status === "failed") {
+      for (const job of createdJobs) if (where.id.in.includes(job.id)) job.status = "failed";
+    }
     return { count: 0 };
   });
   overrideMethod(prisma.pjudSyncJob, "findMany", async () => []);
-  overrideMethod(prisma.pjudSyncJob, "create", async ({ data }: { data: { causaId: string } }) => ({ id: `fixture-job-${data.causaId}`, causaId: data.causaId }));
+  overrideMethod(prisma.pjudSyncJob, "create", async ({ data }: { data: { causaId: string; trigger: string; status: string } }) => {
+    if (++jobCreateCount === failJobCreateAt) throw new Error("fixture-second-job-create-failure");
+    const job = { id: `fixture-job-${data.causaId}`, ...data };
+    createdJobs.push(job);
+    return job;
+  });
   overrideMethod(globalThis, "fetch", async (input: string | URL | Request) => {
     fetches += 1;
     const url = String(input);
@@ -96,6 +107,7 @@ async function main() {
   const reset = () => {
     settings = fixture(); created = 0; failCreateAt = 0; replaceClaim = false;
     failQueue = false; claimBeforeClear = false; fetches = 0; credentialReads = 0; whereCalls.length = 0; queueBatches.length = 0;
+    jobCreateCount = 0; failJobCreateAt = 0; createdJobs.length = 0;
     causes = [item("C-1-2026")];
     process.env.PJUD_CLAVEUNICA_SCRAPE = "1";
     process.env.PJUD_PUBLIC_SCRAPE = "1";
@@ -117,6 +129,14 @@ async function main() {
     assert.equal(credentialReads, 0, "session source must never read vault credentials");
     assert.equal(fetches, 0, "session source must not contact the credential sidecar");
     assert.deepEqual(sessionImport.enqueuedJobIds, []);
+
+    reset(); causes.push(item("C-2-2026")); failJobCreateAt = 2;
+    await assert.rejects(syncMisCausas({ sessionSource, processJobsInline: true }), /second-job-create-failure/);
+    assert.equal(createdJobs.length, 1);
+    assert.equal(createdJobs[0].trigger, "manual-session", "the first insert must already carry the session reservation");
+    assert.equal(createdJobs[0].status, "failed", "a partially created batch must clean each ID observed before rejection");
+    assert.equal(fetches, 0);
+    assert.equal(credentialReads, 0);
 
     reset();
     process.env.PJUD_PUBLIC_SCRAPE = "0";

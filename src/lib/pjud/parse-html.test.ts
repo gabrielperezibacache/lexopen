@@ -217,4 +217,12 @@ assert.equal(parseMovimientosFromHtml(commentedGhostRows).length, 0, "fully comm
 assert.equal(parseMovimientosFromHtml(commentedCellHistory.replace("</table>", '<!-- <tr><td>99</td><td></td><td></td><td>Etapa</td><td>Resolución</td><td>Fila inexistente ficticia</td><td>01/01/2026</td><td>0</td><td></td></tr> --></table>')).length, 1);
 assert.equal(parseMovimientosFromHtml(civilDateFixture("04/03/2024", "Actuación visible ficticia", '<!-- <a href="/documentos/COMMENT_ONLY.pdf">PDF</a> -->'))[0].documentoRef, null);
 
+const contextual = parseMovimientosFromHtml(civilDateFixture("04/03/2024", "Actuación verificada"), { cuaderno: "Principal" });
+assert.equal(contextual[0].cuaderno, "Principal");
+assert.match(contextual[0].externalId, /^scrape:v2:/);
+assert.throws(() => parseMovimientosFromHtml('<table><tr><th>Folio</th><th>Fecha</th><th>Cuaderno</th><th>Trámite</th></tr><tr><td>1</td><td>04/03/2024</td><td>Principal</td><td>Actuación ficticia</td></tr></table>', { cuaderno: "1.1 - Incidente" }), /no corresponde/, "an explicit contradictory cuaderno cannot be relabelled");
+let incompleteRows = 0;
+parseMovimientosFromHtml(civilDateFixture("32/03/2024", "Actuación ficticia"), { cuaderno: "Principal", onIncompleteRow: () => { incompleteRows++; } });
+assert.equal(incompleteRows, 1, "coverage can flag an unparseable dated column without copying its cell text");
+
 console.log("pjud/parse-html.test.ts OK");

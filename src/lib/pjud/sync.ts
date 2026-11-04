@@ -23,7 +23,8 @@ import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
 import { publicScrapeEnabled, publicScrapeReady, claveUnicaAutomationAllowed } from "@/lib/pjud/public-scrape";
 import { pjudWebhookConfigured } from "@/lib/pjud/webhook";
 import type { Prisma } from "@prisma/client";
-import { normalizePjudCuaderno, omitLegacyScrapeAliases, type PjudCausaRef, type PjudFetchedMovimiento } from "@/lib/pjud/types";
+import { normalizePjudCuaderno, omitLegacyScrapeAliases, type PjudCausaRef, type PjudFetchedMovimiento, type PjudCuadernosCoverage } from "@/lib/pjud/types";
+import { cuadernosCoverageNote, normalizeCuadernosCoverage, unknownCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
 
 /** Process-local provider for an authenticated session; never accepted from JSON. */
 export type PjudMovimientosFetcher = (causa: PjudCausaRef) => Promise<PjudFetchResult>;
@@ -42,6 +43,7 @@ export type SyncCausaResult = {
   diasSinMovimiento: number | null;
   semaforo: Semaforo;
   cuadernos?: string[];
+  cuadernosCoverage?: PjudCuadernosCoverage;
   receptorCount?: number;
   escritosPendientes?: number;
 };
@@ -129,10 +131,13 @@ export async function syncCausaPjud(
   opts?: {
     actorId?: string | null;
     force?: boolean;
-    trigger?: "manual" | "cron" | "retry" | "webhook" | "import";
+    trigger?: "manual" | "manual-session" | "cron" | "retry" | "webhook" | "import";
     existingJobId?: string | null;
     /** Internal session callback; the ordinary provider remains the default. */
     fetchMovimientos?: PjudMovimientosFetcher;
+    /** Internal session guards; HTTP handlers must never accept these options. */
+    assertActive?: () => Promise<void>;
+    downloadDocuments?: boolean;
   }
 ): Promise<SyncCausaResult> {
   if (opts?.fetchMovimientos !== undefined && typeof opts.fetchMovimientos !== "function") {
@@ -194,6 +199,7 @@ export async function syncCausaPjud(
 
   let fetchResult: PjudFetchResult;
   try {
+    await opts?.assertActive?.();
     fetchResult = await (opts?.fetchMovimientos ?? fetchPjudMovimientos)({
       id: causa.id,
       rit: causa.rit,
@@ -202,6 +208,7 @@ export async function syncCausaPjud(
       titulo: causa.titulo,
       caratula: causa.caratula,
     });
+    await opts?.assertActive?.();
   } catch (e) {
     const note = e instanceof Error ? e.message : "Error de sync";
     const failCountAfter = (causa.pjudFailCount || 0) + 1;
@@ -214,6 +221,7 @@ export async function syncCausaPjud(
           pjudNextSyncAt: next,
           pjudLastSyncStatus: "failed",
           pjudLastSyncNote: note,
+          pjudCuadernosCoverage: unknownCuadernosCoverage() as Prisma.InputJsonValue,
           pjudFailCount: { increment: 1 },
           pjudExternalKey: externalKey(causa.rit, causa.tribunal),
         },
@@ -224,6 +232,7 @@ export async function syncCausaPjud(
           status: "failed",
           lastError: note,
           note,
+          pjudCuadernosCoverage: unknownCuadernosCoverage() as Prisma.InputJsonValue,
           finishedAt: new Date(),
         },
       }),
@@ -242,6 +251,7 @@ export async function syncCausaPjud(
           pjudNextSyncAt: next,
           pjudLastSyncStatus: "error",
           pjudLastSyncNote: fetchResult.note,
+          pjudCuadernosCoverage: unknownCuadernosCoverage() as Prisma.InputJsonValue,
           pjudFailCount: { increment: 1 },
           pjudExternalKey: externalKey(causa.rit, causa.tribunal),
         },
@@ -252,6 +262,7 @@ export async function syncCausaPjud(
           status: "failed",
           lastError: fetchResult.note,
           note: fetchResult.note,
+          pjudCuadernosCoverage: unknownCuadernosCoverage() as Prisma.InputJsonValue,
           finishedAt: new Date(),
         },
       }),
@@ -264,6 +275,7 @@ export async function syncCausaPjud(
       demo: false,
       note: fetchResult.note,
       status: "error",
+      cuadernosCoverage: unknownCuadernosCoverage(),
       jobId: job.id,
       ...baseMeta(),
       nextSyncAt: next.toISOString(),
@@ -272,10 +284,15 @@ export async function syncCausaPjud(
 
   // Use the same scoped set for persistence, PDF ingestion, and displayed metrics.
   fetchResult = { ...fetchResult, movimientos: omitLegacyScrapeAliases(fetchResult.movimientos) };
+  const cuadernosCoverage = normalizeCuadernosCoverage(fetchResult.cuadernos);
+  const partial = !fetchResult.demo && cuadernosCoverage.status === "partial";
+  const coverageNote = cuadernosCoverageNote(cuadernosCoverage);
+  if (!fetchResult.note.includes(coverageNote)) fetchResult.note = `${fetchResult.note} ${coverageNote}`;
+  const syncStatus = fetchResult.demo ? "demo" : partial ? "partial" : "ok";
   let inserted = 0;
   let skipped = 0;
   const newRelevant: string[] = [];
-  const next = nextSyncAtFrom();
+  const next = nextSyncAtFrom(new Date(), partial ? causa.pjudFailCount + 1 : 0);
 
   await prisma.$transaction(async (tx) => {
     const persisted = await persistFetchedPjudMovimientos(tx, causaId, fetchResult.movimientos);
@@ -283,7 +300,6 @@ export async function syncCausaPjud(
     skipped = persisted.skipped;
     newRelevant.push(...persisted.newRelevant);
 
-    const status = fetchResult.demo ? "demo" : "ok";
     // No reactivar monitoreo si el estudio lo pausó mientras el job estaba en cola
     // (force=true en worker no debe encender pjudMonitoreoActivo de nuevo).
     await tx.causa.update({
@@ -291,9 +307,10 @@ export async function syncCausaPjud(
       data: {
         pjudLastSyncAt: new Date(),
         pjudNextSyncAt: next,
-        pjudLastSyncStatus: status,
+        pjudLastSyncStatus: syncStatus,
         pjudLastSyncNote: fetchResult.note,
-        pjudFailCount: 0,
+        pjudFailCount: partial ? { increment: 1 } : 0,
+        pjudCuadernosCoverage: cuadernosCoverage as Prisma.InputJsonValue,
         pjudExternalKey: externalKey(causa.rit, causa.tribunal),
         pjudSource: fetchResult.provider,
         ...(fetchResult.sala ? { sala: fetchResult.sala } : {}),
@@ -308,13 +325,24 @@ export async function syncCausaPjud(
     await tx.pjudSyncJob.update({
       where: { id: job.id },
       data: {
-        status: "ok",
+        status: partial ? "partial" : "ok",
         inserted,
         skipped,
         note: fetchResult.note,
+        lastError: partial ? fetchResult.note : null,
+        pjudCuadernosCoverage: cuadernosCoverage as Prisma.InputJsonValue,
         finishedAt: new Date(),
       },
     });
+
+    if (!fetchResult.demo && cuadernosCoverage.status === "complete") {
+      // Preserve the historical coverage, but stop presenting an older partial
+      // attempt as pending after this job has read every available cuaderno.
+      await tx.pjudSyncJob.updateMany({
+        where: { causaId, id: { not: job.id }, status: "partial", createdAt: { lte: job.createdAt } },
+        data: { status: "dismissed", note: "Una sincronización posterior completó los cuadernos pendientes." },
+      });
+    }
 
     if (inserted > 0) {
       await tx.activity.create({
@@ -346,6 +374,7 @@ export async function syncCausaPjud(
   let pdfBackedUp = 0;
   // Prefer bytes captured with OJV session cookies during scrape.
   for (const m of fetchResult.movimientos) {
+    if (opts?.downloadDocuments === false) break;
     if (!m.documentoBytes?.byteLength) continue;
     const mov = await prisma.causaMovimiento.findFirst({
       where: { causaId, externalId: m.externalId },
@@ -365,7 +394,7 @@ export async function syncCausaPjud(
       /* best-effort */
     }
   }
-  if (pdfBackupEnabled()) {
+  if (opts?.downloadDocuments !== false && pdfBackupEnabled()) {
     try {
       const backup = await backupMovimientoDocuments(causaId);
       pdfBackedUp += backup.saved;
@@ -405,13 +434,14 @@ export async function syncCausaPjud(
     note: noteExtras.length
       ? `${fetchResult.note} · ${noteExtras.join(" · ")}`
       : fetchResult.note,
-    status: fetchResult.demo ? "demo" : "ok",
+    status: syncStatus,
     jobId: job.id,
     lastMovimientoAt: latest?.fecha.toISOString() || null,
     nextSyncAt: next.toISOString(),
     diasSinMovimiento: dias,
     semaforo: semaforoPorDiasSinMovimiento(dias),
     cuadernos,
+    cuadernosCoverage,
     receptorCount,
     escritosPendientes,
   };
@@ -446,7 +476,8 @@ export async function clearCausaPjudSyncMessages(causaId: string) {
 
   const failedStatus =
     causa.pjudLastSyncStatus === "failed" ||
-    causa.pjudLastSyncStatus === "error";
+    causa.pjudLastSyncStatus === "error" ||
+    causa.pjudLastSyncStatus === "partial";
 
   return prisma.causa.update({
     where: { id: causaId },
@@ -479,7 +510,7 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
     ? { id: { in: opts.causaIds.slice(0, limit) } }
     : {
         OR: [
-          { pjudLastSyncStatus: { in: ["failed", "error"] } },
+          { pjudLastSyncStatus: { in: ["failed", "error", "partial"] } },
           { pjudFailCount: { gt: 0 } },
         ],
       };
@@ -501,7 +532,8 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
   for (const causa of causas) {
     const failedStatus =
       causa.pjudLastSyncStatus === "failed" ||
-      causa.pjudLastSyncStatus === "error";
+      causa.pjudLastSyncStatus === "error" ||
+      causa.pjudLastSyncStatus === "partial";
 
     if (failedStatus) {
       if (causa.pjudMonitoreoActivo) {
@@ -555,7 +587,7 @@ export async function clearFallidosMonitoreoAvisos(opts?: {
   }
 
   const jobWhere = {
-    status: "failed" as const,
+    status: { in: ["failed", "partial"] },
     causaId: { in: causas.map(causa => causa.id) },
   };
 
@@ -591,7 +623,7 @@ export async function listCarteraMonitoreo(user?: CausaAccessUser) {
       _count: {
         select: {
           movimientos: true,
-          pjudSyncJobs: { where: { status: "failed" } },
+          pjudSyncJobs: { where: { status: { in: ["failed", "partial"] } } },
         },
       },
     },
@@ -604,6 +636,7 @@ export async function listCarteraMonitoreo(user?: CausaAccessUser) {
     const failed =
       c.pjudLastSyncStatus === "failed" ||
       c.pjudLastSyncStatus === "error" ||
+      c.pjudLastSyncStatus === "partial" ||
       c.pjudFailCount > 0;
     return {
       id: c.id,
@@ -624,6 +657,7 @@ export async function listCarteraMonitoreo(user?: CausaAccessUser) {
       nextSyncAt: c.pjudNextSyncAt,
       lastSyncStatus: c.pjudLastSyncStatus,
       lastSyncNote: c.pjudLastSyncNote,
+      cuadernosCoverage: normalizeCuadernosCoverage(c.pjudCuadernosCoverage),
       failCount: c.pjudFailCount,
       failed,
       failedJobs: c._count.pjudSyncJobs,
@@ -650,7 +684,7 @@ export async function listCarteraMonitoreo(user?: CausaAccessUser) {
 
 export async function listFallidosMonitoreo(limit = 50, user?: CausaAccessUser) {
   const jobs = await prisma.pjudSyncJob.findMany({
-    where: { status: "failed", ...(user ? { causa: causaAccessWhere(user) } : {}) },
+    where: { status: { in: ["failed", "partial"] }, ...(user ? { causa: causaAccessWhere(user) } : {}) },
     include: {
       causa: {
         select: {
@@ -678,6 +712,8 @@ export async function listFallidosMonitoreo(limit = 50, user?: CausaAccessUser) 
     monitoreoActivo: job.causa.pjudMonitoreoActivo,
     failCount: job.causa.pjudFailCount,
     lastError: job.lastError || job.causa.pjudLastSyncNote,
+    status: job.status,
+    cuadernosCoverage: normalizeCuadernosCoverage(job.pjudCuadernosCoverage),
     trigger: job.trigger,
     createdAt: job.createdAt,
     finishedAt: job.finishedAt,

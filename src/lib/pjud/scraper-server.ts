@@ -12,6 +12,7 @@
 
 import { timingSafeEqual, createHmac } from "node:crypto";
 import http from "node:http";
+import { boundPjudLookupTransport } from "@/lib/pjud/cuadernos-transport";
 import { URL } from "node:url";
 import {
   publicScrapeEnabled,
@@ -165,13 +166,14 @@ export function createScraperServer() {
           tribunal,
           titulo: rit || ruc || "causa",
           caratula: null,
-        }, controller.signal);
-        return send(res, 200, {
+        }, controller.signal, { downloadDocuments: body.downloadDocuments !== false });
+        return send(res, 200, boundPjudLookupTransport({
           identity: { rit, tribunal: result.resolvedTribunal || tribunal },
           sala: result.sala,
           note: result.note,
           movimientos: result.movimientos.map(serializeMovimiento),
-        });
+          cuadernos: result.cuadernos,
+        }));
       }
 
       if (req.method === "POST" && path === "/mis-causas") {

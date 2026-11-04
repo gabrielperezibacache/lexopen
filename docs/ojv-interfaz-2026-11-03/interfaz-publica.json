@@ -1,0 +1,42 @@
+{
+  "checkedAt": "2026-11-04T00:02:42.936Z",
+  "mode": "real-public-through-lexopen-interface",
+  "identity": {
+    "rit": "C-876-2022",
+    "tribunal": "3º Juzgado Civil de Santiago"
+  },
+  "uiPreviewReadOnly": true,
+  "explicitPortfolioImport": true,
+  "allCuadernosPersisted": true,
+  "cuadernos": {
+    "status": "complete",
+    "total": 3,
+    "read": 3,
+    "items": [
+      {
+        "key": "cuaderno:1.0",
+        "label": "1.0 - Principal",
+        "status": "ok",
+        "count": 243
+      },
+      {
+        "key": "cuaderno:1.1",
+        "label": "1.1 - Excepciones Dilatorias",
+        "status": "ok",
+        "count": 24
+      },
+      {
+        "key": "cuaderno:2.0",
+        "label": "2.0 - Cumplimiento incidental",
+        "status": "ok",
+        "count": 243
+      }
+    ]
+  },
+  "persistedMovements": 510,
+  "repeatInserted": 0,
+  "durableJobsCompleted": true,
+  "cacheDisabled": true,
+  "documentsDownloaded": false,
+  "studyDatabaseUsed": false
+}

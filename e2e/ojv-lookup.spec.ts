@@ -22,6 +22,11 @@ const preview = {
   sala: "Sala de prueba",
   note: "Datos ficticios de consulta para esta prueba.",
   coverage: { scope: "returned-records", complete: false, note: "La lista puede ser parcial." },
+  cuadernos: { status: "partial", total: 3, read: 2, items: [
+    { key: "cuaderno:1.0", label: "1.0 - Principal", status: "ok", count: 1 },
+    { key: "cuaderno:1.1", label: "1.1 - Apremio ficticio", status: "ok", count: 1 },
+    { key: "cuaderno:2.0", label: "2.0 - Cuaderno ficticio pendiente", status: "failed", count: 0, note: "La fuente ficticia no respondió para este cuaderno." },
+  ] },
   sample: [
     { titulo: "Resolución ficticia de prueba", fecha: "2026-11-02", cuaderno: "Principal", esReceptor: false },
     { titulo: "Notificación ficticia de prueba", fecha: "2026-10-30", cuaderno: "Apremio", esReceptor: true },
@@ -60,7 +65,10 @@ test.beforeAll(async ({ browser }) => {
     await context.close();
   }
 });
-test.beforeEach(async ({ context }) => { await context.addCookies(sessionCookies); });
+test.beforeEach(async ({ context, page }) => {
+  await context.addCookies(sessionCookies);
+  await page.route("**/api/pjud/manual-session", route => route.fulfill({ json: { capabilities: { available: false, allowed: true, hostLocal: true, reason: "Ingreso manual no habilitado en esta prueba ficticia del acceso guardado.", importLimit: 20 }, session: null } }));
+});
 
 test("la consulta es de sólo lectura y el registro se confirma por separado", async ({ page }, info) => {
   const payloads: Payload[] = [];
@@ -277,6 +285,7 @@ test("ClaveÚnica distingue carga fallida de acceso ausente y recupera permisos 
       : { status: cuReadyStatus, causasCount: 3, causas: [], capabilities: { sync: true, credentials: false } } });
   });
   await page.goto("/causas/mis-causas");
+  await page.getByText("Acceso guardado del estudio y sincronización programada", { exact: true }).click();
   const surface = page.locator(".pjud-cu");
   await expect(surface.getByRole("alert")).toContainText("No se pudo comprobar el estado de prueba.");
   await expect(surface.getByText("Estado sin comprobar", { exact: true })).toBeVisible();
@@ -316,6 +325,7 @@ test("ClaveÚnica guarda sólo datos ficticios, limpia contraseña y distingue v
     } });
   });
   await page.goto("/causas/mis-causas");
+  await page.getByText("Acceso guardado del estudio y sincronización programada", { exact: true }).click();
   const surface = page.locator(".pjud-cu");
   await expect(surface.getByRole("button", { name: "Guardar de forma segura", exact: true })).toBeEnabled();
   await surface.getByRole("textbox", { name: "RUT", exact: true }).fill("11.111.111-1");
@@ -364,6 +374,7 @@ test("ClaveÚnica respeta permisos efectivos y deja de consultar al abandonar un
     } });
   });
   await page.goto("/causas/mis-causas");
+  await page.getByText("Acceso guardado del estudio y sincronización programada", { exact: true }).click();
   const surface = page.locator(".pjud-cu");
   await expect(surface.getByRole("button", { name: "Sincronizar ahora", exact: true })).toBeEnabled();
   await expect(surface.getByRole("button", { name: "Guardar de forma segura", exact: true })).toBeDisabled();

@@ -13,6 +13,9 @@ export function isActiveJobUniqueViolation(error: unknown): boolean {
 }
 
 const DEFAULT_BATCH = 40;
+/** Durable reservation: these jobs are usable only by their in-memory session provider. */
+export const PJUD_MANUAL_SESSION_TRIGGER = "manual-session" as const;
+export const PJUD_MANUAL_SESSION_JOB_TTL_MS = 30 * 60_000;
 /**
  * Concurrency del worker de sync — CausaMonitor API usa worker.concurrency=5
  * (`GET https://api.causamonitor.com/api/health`).
@@ -55,6 +58,7 @@ export async function reclaimStuckRunningJobs(opts?: { olderThanMs?: number; job
   const result = await prisma.pjudSyncJob.updateMany({
     where: {
       status: "running",
+      trigger: { not: PJUD_MANUAL_SESSION_TRIGGER },
       ...(opts?.jobIds ? { id: { in: opts.jobIds } } : {}),
       ...(opts?.causaIds ? { causaId: { in: opts.causaIds } } : {}),
       OR: [{ startedAt: { lt: cutoff } }, { startedAt: null, createdAt: { lt: cutoff } }],
@@ -67,6 +71,24 @@ export async function reclaimStuckRunningJobs(opts?: { olderThanMs?: number; job
     },
   });
   return result.count;
+}
+
+/** An expired browser reservation fails in place; it must never become a generic pending job. */
+export async function expireManualSessionSyncJobs(opts?: { jobIds?: string[]; causaIds?: string[]; now?: Date }) {
+  if (opts?.jobIds?.length === 0 || opts?.causaIds?.length === 0) return 0;
+  const now = opts?.now ?? new Date();
+  const note = "La sesión temporal terminó antes de completar la actualización. Inicie sesión de nuevo para reintentar.";
+  const expired = await prisma.pjudSyncJob.updateMany({
+    where: {
+      trigger: PJUD_MANUAL_SESSION_TRIGGER,
+      status: { in: ["pending", "running"] },
+      createdAt: { lte: new Date(now.getTime() - PJUD_MANUAL_SESSION_JOB_TTL_MS) },
+      ...(opts?.jobIds ? { id: { in: opts.jobIds } } : {}),
+      ...(opts?.causaIds ? { causaId: { in: opts.causaIds } } : {}),
+    },
+    data: { status: "failed", note, lastError: note, finishedAt: now },
+  });
+  return expired.count;
 }
 
 async function causaIdsWithActiveJobs(causaIds: string[]) {
@@ -82,23 +104,50 @@ async function causaIdsWithActiveJobs(causaIds: string[]) {
   return new Set(active.map((j) => j.causaId));
 }
 
+async function causaIdsAwaitingManualRecovery(causaIds?: string[]) {
+  if (causaIds?.length === 0) return new Set<string>();
+  // A failed/cancelled browser attempt must not silently acquire a different
+  // provider on the next cron. An explicit successful refresh clears this hold.
+  // Dismissing the warning alone does not prove that the source was recovered.
+  const held = await prisma.$queryRaw<Array<{ causaId: string }>>(Prisma.sql`
+    SELECT "causaId" FROM (
+      SELECT DISTINCT ON ("causaId") "causaId", "trigger", "status"
+      FROM "PjudSyncJob"
+      WHERE ("trigger" = ${PJUD_MANUAL_SESSION_TRIGGER} OR "status" = 'ok')
+      ${causaIds ? Prisma.sql`AND "causaId" IN (${Prisma.join(causaIds)})` : Prisma.empty}
+      ORDER BY "causaId", "createdAt" DESC, "id" DESC
+    ) AS latest
+    WHERE "trigger" = ${PJUD_MANUAL_SESSION_TRIGGER} AND "status" <> 'ok'
+  `);
+  return new Set(held.map(job => job.causaId));
+}
+
 export async function enqueueDueSyncJobs(opts?: {
   causaIds?: string[];
-  trigger?: "cron" | "manual" | "retry";
+  trigger?: "cron" | "manual" | "retry" | typeof PJUD_MANUAL_SESSION_TRIGGER;
   limit?: number;
   /** Ephemeral providers must not take over jobs owned by another session. */
   reclaimStuckRunning?: boolean;
+  /** Internal synchronous observer, notified after every successful individual insert. */
+  onJobEnqueued?: (jobId: string) => void;
 }) {
   if (opts?.causaIds !== undefined && opts.causaIds.length === 0) return [];
   const trigger = opts?.trigger || "cron";
   const limit = Math.min(Math.max(opts?.limit || DEFAULT_BATCH, 1), 200);
 
+  await expireManualSessionSyncJobs({ causaIds: opts?.causaIds });
   if (opts?.reclaimStuckRunning !== false) {
     await reclaimStuckRunningJobs({ causaIds: opts?.causaIds });
   }
 
+  const awaitingRecovery = trigger === "cron"
+    ? await causaIdsAwaitingManualRecovery(opts?.causaIds)
+    : new Set<string>();
   const causas = await prisma.causa.findMany({
-    where: dueSyncWhere({ causaIds: opts?.causaIds }),
+    where: {
+      ...dueSyncWhere({ causaIds: opts?.causaIds }),
+      ...(awaitingRecovery.size ? { NOT: { id: { in: [...awaitingRecovery] } } } : {}),
+    },
     select: { id: true },
     orderBy: [{ pjudNextSyncAt: "asc" }, { updatedAt: "asc" }],
     take: limit * 2, // over-fetch to allow dedupe
@@ -108,7 +157,7 @@ export async function enqueueDueSyncJobs(opts?: {
   const jobsData = [];
   for (const c of causas) {
     if (jobsData.length >= limit) break;
-    if (busy.has(c.id)) continue;
+    if (busy.has(c.id) || awaitingRecovery.has(c.id)) continue;
     jobsData.push({
       causaId: c.id,
       status: "pending",
@@ -126,6 +175,7 @@ export async function enqueueDueSyncJobs(opts?: {
   for (const data of jobsData) {
     try {
       const job = await prisma.pjudSyncJob.create({ data });
+      opts?.onJobEnqueued?.(job.id);
       jobs.push(job);
     } catch (error) {
       if (isActiveJobUniqueViolation(error)) continue;
@@ -142,6 +192,8 @@ export async function processPendingSyncJobs(opts?: {
   jobIds?: string[];
   /** Internal provider held only for this call; requires explicit job IDs. */
   fetchMovimientos?: PjudMovimientosFetcher;
+  assertActive?: () => Promise<void>;
+  downloadDocuments?: boolean;
 }) {
   // An explicitly empty selection must never expand to the entire queue.
   if (opts?.jobIds !== undefined && opts.jobIds.length === 0) return [];
@@ -150,11 +202,14 @@ export async function processPendingSyncJobs(opts?: {
     throw new Error("El proveedor de sesión requiere una función interna y trabajos explícitos.");
   }
   const limit = Math.min(Math.max(opts?.limit || DEFAULT_BATCH, 1), 100);
+  await expireManualSessionSyncJobs({ jobIds: opts?.jobIds });
   await reclaimStuckRunningJobs({ jobIds: opts?.jobIds });
 
   const pending = await prisma.pjudSyncJob.findMany({
     where: {
       status: "pending",
+      // A cron, retry or explicit ordinary drain cannot use an ephemeral browser's reservation.
+      ...(!opts?.fetchMovimientos ? { trigger: { not: PJUD_MANUAL_SESSION_TRIGGER } } : {}),
       ...(opts?.jobIds?.length ? { id: { in: opts.jobIds } } : {}),
     },
     orderBy: { createdAt: "asc" },
@@ -165,8 +220,12 @@ export async function processPendingSyncJobs(opts?: {
   // A Page-backed provider has a single mutable navigation context.
   const concurrency = opts?.fetchMovimientos ? 1 : opts?.concurrency ?? pjudSyncConcurrency();
   await mapWithConcurrency(pending, concurrency, async (job) => {
+    await opts?.assertActive?.();
     const claimed = await prisma.pjudSyncJob.updateMany({
-      where: { id: job.id, status: "pending" },
+      where: {
+        id: job.id, status: "pending",
+        ...(!opts?.fetchMovimientos ? { trigger: { not: PJUD_MANUAL_SESSION_TRIGGER } } : {}),
+      },
       data: {
         status: "running",
         attempts: { increment: 1 },
@@ -178,9 +237,11 @@ export async function processPendingSyncJobs(opts?: {
       const result = await syncCausaPjud(job.causaId, {
         actorId: opts?.actorId,
         force: true,
-        trigger: (job.trigger as "cron" | "manual" | "retry") || "cron",
+        trigger: (job.trigger as "cron" | "manual" | "retry" | typeof PJUD_MANUAL_SESSION_TRIGGER) || "cron",
         existingJobId: job.id,
         fetchMovimientos: opts?.fetchMovimientos,
+        assertActive: opts?.assertActive,
+        downloadDocuments: opts?.downloadDocuments,
       });
       results.push(result);
     } catch (error) {
@@ -239,11 +300,12 @@ export async function requeueFailedJobs(opts?: {
   limit?: number;
 }) {
   if (opts?.causaIds !== undefined && opts.causaIds.length === 0) return [];
-  await reclaimStuckRunningJobs();
+  await reclaimStuckRunningJobs({ causaIds: opts?.causaIds });
 
   const failed = await prisma.pjudSyncJob.findMany({
     where: {
-      status: "failed",
+      status: { in: ["failed", "partial"] },
+      trigger: { not: PJUD_MANUAL_SESSION_TRIGGER },
       ...(opts?.causaIds?.length ? { causaId: { in: opts.causaIds } } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -270,7 +332,7 @@ export async function requeueFailedJobs(opts?: {
   // Descartar el failed histórico para que la lista de fallidos no quede zombie
   // tras un reintento (el nuevo job pending/ok es la fuente de verdad).
   await prisma.pjudSyncJob.updateMany({
-    where: { id: { in: dismissIds }, status: "failed" },
+    where: { id: { in: dismissIds }, status: { in: ["failed", "partial"] } },
     data: {
       status: "dismissed",
       note: "Reencolado: fallido anterior descartado",
@@ -296,11 +358,12 @@ export async function requeueFailedJobs(opts?: {
  */
 export async function getPjudQueueStatus(user?: CausaAccessUser) {
   const scope = user ? { causa: causaAccessWhere(user) } : {};
-  const [waiting, active, completed, failed, okToday] = await Promise.all([
+  const [waiting, active, completed, failed, partial, okToday] = await Promise.all([
     prisma.pjudSyncJob.count({ where: { ...scope, status: "pending" } }),
     prisma.pjudSyncJob.count({ where: { ...scope, status: "running" } }),
     prisma.pjudSyncJob.count({ where: { ...scope, status: "ok" } }),
     prisma.pjudSyncJob.count({ where: { ...scope, status: "failed" } }),
+    prisma.pjudSyncJob.count({ where: { ...scope, status: "partial" } }),
     prisma.pjudSyncJob.count({
       where: {
         ...scope,
@@ -315,6 +378,7 @@ export async function getPjudQueueStatus(user?: CausaAccessUser) {
     active,
     completed,
     failed,
+    partial,
     delayed: 0,
     // LexOpen aliases (Host status UI)
     pending: waiting,

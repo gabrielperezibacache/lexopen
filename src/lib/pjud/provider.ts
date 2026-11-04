@@ -17,6 +17,8 @@ import {
   type PjudFetchedMovimiento,
 } from "@/lib/pjud/types";
 import { z } from "zod";
+import { normalizeCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
+import { PJUD_MAX_CAUSA_MOVIMIENTOS, PJUD_MAX_TRANSPORT_BYTES } from "@/lib/pjud/cuadernos-limits";
 
 export type { PjudCausaRef, PjudFetchResult, PjudFetchedMovimiento };
 
@@ -61,7 +63,7 @@ function mapPartnerMovement(
     tipo: classified.tipo,
     relevante: classified.relevante || esReceptor || pendienteResolucion,
     fuente,
-    cuaderno: m.cuaderno || "Principal",
+    cuaderno: m.cuaderno?.trim() || null,
     folio: m.folio || null,
     etapa: m.etapa || null,
     tramite: m.tramite || null,
@@ -118,13 +120,14 @@ async function fetchFromPartnerApi(causa: PjudCausaRef): Promise<PjudFetchResult
   }
 
   const responseText = await res.text();
-  if (responseText.length > 5 * 1024 * 1024) {
+  if (Buffer.byteLength(responseText, "utf8") > PJUD_MAX_TRANSPORT_BYTES) {
     throw new Error("La respuesta PJUD supera el límite permitido");
   }
   const data = z
     .object({
       sala: z.string().max(200).optional().nullable(),
-      movimientos: z.array(partnerMovementSchema).max(5000).optional(),
+      movimientos: z.array(partnerMovementSchema).max(PJUD_MAX_CAUSA_MOVIMIENTOS).optional(),
+      cuadernos: z.unknown().optional(),
     })
     .passthrough()
     .parse(JSON.parse(responseText));
@@ -139,6 +142,7 @@ async function fetchFromPartnerApi(causa: PjudCausaRef): Promise<PjudFetchResult
     note: `Sincronizado vía proveedor PJUD (${movimientos.length} ítems).`,
     demo: false,
     sala: data.sala || null,
+    cuadernos: normalizeCuadernosCoverage(data.cuadernos),
   };
 }
 
@@ -390,7 +394,7 @@ export async function fetchPjudMovimientos(
         "@/lib/pjud/claveunica"
       );
       const fromCu = await tryScrapeCausaDetailAuthenticated(causa);
-      if (fromCu && fromCu.movimientos.length > 0) return fromCu;
+      if (fromCu && (fromCu.movimientos.length > 0 || fromCu.cuadernos?.status === "complete")) return fromCu;
     } catch (error) {
       claveUnicaError =
         error instanceof Error ? error : new Error(String(error));
@@ -408,6 +412,7 @@ export async function fetchPjudMovimientos(
         demo: false,
         sala: scraped.sala,
         resolvedTribunal: scraped.resolvedTribunal || null,
+        cuadernos: normalizeCuadernosCoverage(scraped.cuadernos),
       };
     } catch (error) {
       scrapeError = error instanceof Error ? error : new Error(String(error));

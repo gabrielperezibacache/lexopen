@@ -6,13 +6,46 @@ En **Causas → Cartera PJUD → Consultar en OJV**, escriba el RIT/ROL completo
 
 **Agregar a mi cartera** es una acción independiente: crea o vincula el expediente existente, activa monitoreo y solicita sincronización. **Registrar sin consulta previa** conserva la alternativa de guardar los datos sin consultar la OJV. Revise la cartera antes de repetir un registro cuya respuesta se haya perdido. La búsqueda por RUT devuelve candidatos del alcance disponible en el formulario; actualmente está limitada por año y filtros, y no representa toda la cartera de una persona.
 
-En **Causas → ClaveÚnica**, guardar acceso y sincronizar son acciones distintas. Guardar las credenciales no prueba que la OJV las acepte. Los permisos efectivos del profesional controlan las acciones; las respuestas privadas no se almacenan en caché. Un fallo inicial ofrece reintento, una lista vacía no se presenta como «todo al día» y las sincronizaciones parciales conservan su advertencia. El seguimiento de un trabajo en curso se detiene al salir de la página.
+En **Causas → ClaveÚnica**, el ingreso manual permite entrar personalmente en la página oficial, consultar Mis Causas y elegir qué incorporar al estudio. Consultar el listado no registra causas. El acceso guardado del estudio permanece en un apartado desplegable separado: guardar esas credenciales y sincronizar siguen siendo acciones distintas, y guardarlas no prueba que la OJV las acepte. Los permisos efectivos del profesional controlan ambas vías; las respuestas privadas no se almacenan en caché. Un fallo inicial ofrece reintento, una lista vacía no se presenta como «todo al día» y las sincronizaciones parciales conservan su advertencia.
 
 La configuración del canal y su disponibilidad real son estados diferentes. Los límites y comprobaciones de esta mejora están en la [entrega OJV del 3 de noviembre de 2026](ojv-2026-11-03/README.md), con capturas ficticias y pruebas reproducibles.
 
 La [nueva comprobación de accesos oficiales](ojv-accesos-oficiales-2026-11-03/README.md) consiguió consultar un expediente público real y buscar en Mis Causas tras el ingreso manual del profesional. Documenta el cuaderno y la materia verificados, sus límites y la diferencia con una ejecución del conector automático. La [primera comprobación](ojv-validacion-real-2026-11-03/README.md) conserva los fallos observados anteriormente.
 
 La [validación de sincronización automática](ojv-sincronizacion-automatica-2026-11-03/README.md) completó el conector, la cola y el guardado en una base temporal, tanto en la consulta pública real como en Mis Causas después del ingreso manual. La repetición de ambos recorridos confirmó que no se duplicaron movimientos, con el cuaderno y la materia documentados.
+
+La [ampliación de interfaz y cuadernos](ojv-interfaz-2026-11-03/README.md) documenta el nuevo recorrido manual, sus capturas ficticias, una lectura pública real de tres cuadernos y la importación desde la interfaz pública en una base aislada: 510 movimientos y una repetición sin nuevos duplicados. El nuevo puente de ingreso privado desde la interfaz todavía requiere su comprobación; las validaciones anteriores del conector no la sustituyen.
+
+## Ingreso manual desde la interfaz
+
+Esta vía requiere abrir LexOpen desde el propio **Host**, mediante `localhost`, `127.0.0.1` o `::1`. Para el Host web active `PJUD_MANUAL_SESSION=1`; Desktop en modo Host también la habilita. Requiere `PJUD_PUBLIC_SCRAPE=1`, Playwright/Chromium y un navegador con ventana visible. En Linux necesita `DISPLAY` o `WAYLAND_DISPLAY`. `PJUD_CLAVEUNICA_SCRAPE=0` impide el ingreso manual aunque los demás requisitos estén presentes. Acceder desde otro equipo por LAN o Tailscale no habilita esta ventana local.
+
+1. Pulse **Ingresar con ClaveÚnica** y complete personalmente la identificación y las confirmaciones del portal en la ventana oficial.
+2. En LexOpen, consulte **Mis Causas**, para todas las materias disponibles o una materia concreta. Revise el listado, busque y seleccione hasta **20 causas por grupo**. La selección se conserva al filtrar o cambiar de página.
+3. Pulse **Importar**. LexOpen vuelve a comprobar la selección en OJV, crea o vincula las causas elegidas y consulta sus cuadernos. El resultado distingue causas creadas o vinculadas, lecturas completas, parciales y fallidas.
+4. **Continuar con otras causas** vuelve al paso de revisión y conserva el recibo anterior en un desplegable. Puede importar varios grupos mientras siga vigente la conexión.
+
+Sólo hay una ventana manual activa por Host. La conexión dura como máximo **30 minutos** y pertenece al profesional y a su sesión concreta de LexOpen: se comprueban la identidad, la huella de la cookie, la versión y el vencimiento de sesión, los permisos vigentes de Mis Causas y la política de doble factor. Otra sesión de LexOpen no puede utilizar su conexión; las pestañas que comparten la misma sesión pueden consultar su estado.
+
+La contraseña se escribe sólo en el formulario oficial. En esta vía no se envían contraseñas ni cookies OJV a la interfaz ni se guardan en el vault; el contexto temporal del navegador queda en el Host. La interfaz recibe identificadores opacos de las causas verificadas, estados y resultados. `GET /api/pjud/manual-session` consulta el estado; `POST` acepta únicamente `start`, `list`, `import` y `close`, con permisos, protección CSRF y límites por profesional.
+
+Cerrar la conexión, vencer el plazo, perder autorización o reiniciar el Host impide seguir usando esa sesión temporal. Al salir de la página se detiene la consulta de estado y se cierra una conexión de lectura; una importación ya aceptada continúa en el Host dentro de su plazo. **Detener y cerrar conexión** puede dejar causas ya guardadas: revíselas antes de reintentar. La importación manual no descarga anexos PDF.
+
+## Cobertura por cuaderno y recuperación
+
+La consulta pública y el detalle autenticado intentan leer todos los cuadernos que OJV enumera. La consulta por RIT/ROL, el resultado de importación, la cartera y el expediente muestran esa cobertura:
+
+| Estado | Qué permite afirmar |
+| --- | --- |
+| **Todos los cuadernos consultados** | Se leyeron todos los cuadernos enumerados en esa consulta. No certifica la integridad jurídica del expediente. |
+| **Hay cuadernos pendientes** | Hubo fallos, filas incompletas, un cambio de listado o un límite. Los movimientos recuperados se conservan; hay que volver a sincronizar. |
+| **Cuadernos sin comprobar** | El proveedor o la respuesta no permitió enumerarlos de forma verificable. |
+
+La cobertura queda como JSON en la causa y en cada trabajo de sincronización (`pjudCuadernosCoverage`), con clave estable, etiqueta, estado y cantidad por cuaderno. Las claves se derivan del código o etiqueta del cuaderno; nunca de los JWT o valores temporales del selector OJV. Los movimientos anteriores sin atribución se conservan en un grupo separado y no se asignan a Principal por suposición. Una repetición usa la identidad de movimiento y cuaderno para evitar duplicados; una coincidencia histórica inequívoca conserva su fila, notas y documento.
+
+Los límites son **10.000 movimientos por causa, 100 cuadernos y 20 MiB por respuesta transportada**. Si no puede completarse la lectura dentro de esos límites o la paginación del portal no puede comprobarse, la lectura queda parcial. No se representa como éxito completo un historial truncado o una página repetida.
+
+Los trabajos pendientes de una conexión temporal se reservan con `trigger: manual-session`. El cron y el reintento ordinario no los procesan con otro proveedor ni los reclaman como trabajos comunes. Al vencer la reserva de treinta minutos quedan fallidos y necesitan un nuevo ingreso para recuperarse; un parcial o fallo de esta vía tampoco se convierte silenciosamente en actualización automática. Una lectura explícita posterior satisfactoria libera esa retención. Después de un resultado correcto, futuras actualizaciones pueden programarse según los canales y la configuración del Host. La conexión temporal no mantiene acceso privado permanente ni acredita un servicio de lectura las veinticuatro horas.
 
 ## Principio: host local, APIs externas OK
 
@@ -123,6 +156,7 @@ El scrape invitado **falla** si el tribunal o el RIT no coinciden (no abre otra 
 | `PJUD_SCRAPER_URL` | Microservicio local (`POST /causas/lookup`, `/mis-causas`, `/causas/buscar`). Típico: `http://127.0.0.1:8787` |
 | `PJUD_SCRAPER_ALLOW_PRIVATE=1` | Permite sidecar en localhost / red privada del Host |
 | `PJUD_CLAVEUNICA_SCRAPE` | Ausente: opt-in al guardar credenciales en Mis Causas. `=1` permite. `=0` bloquea. |
+| `PJUD_MANUAL_SESSION=1` | Opt-in para ingreso personal en el Host web local. Desktop en modo Host también lo habilita; requiere scrape público activo y navegador visible. `PJUD_CLAVEUNICA_SCRAPE=0` lo bloquea. |
 | `PJUD_SECRETS_KEY` | Vault AES-256-GCM local para password ClaveÚnica (fallback: `SESSION_SECRET`) |
 | `PJUD_CAUSAS_DAILY_SOLVE_BUDGET` | Tope diario de CAPTCHA (default 50) |
 | `PJUD_SYNC_CONCURRENCY` | Parallelismo del worker de cola (default **5**, como CM) |
@@ -171,7 +205,7 @@ responde “acceso restringido”; entonces pegue HTML en `/api/pjud/salas` o us
 
 Después de una comprobación pública satisfactoria en esa misma base, `npm run pjud:sync:validate -- mis-causas` abre una ventana temporal para que el profesional entre personalmente en el formulario oficial PJUD. Al completar el ingreso, LexOpen continúa con la lectura de Mis Causas, importación y sincronización de una causa de Corte Suprema, y repite la lectura para comprobar persistencia e idempotencia. No copia la sesión del navegador habitual ni guarda credenciales. La ventana se cierra al terminar, cancelar o vencer su plazo; el límite total es de 30 minutos.
 
-El diagnóstico exige `LEXOPEN_PJUD_LIVE_VALIDATION=1`, `DATABASE_URL=E2E_DATABASE_URL` de una base local de pruebas, `PJUD_PUBLIC_SCRAPE=1`, `PJUD_CAUSAS_CACHE_TTL_MS=0` y los siguientes valores en `0`: `PJUD_ALLOW_DEMO`, `HERMES_ALLOW_DEMO`, `PJUD_CAPTCHA_AUTO_SOLVE`, `PJUD_AUTO_CONFIRM_PROMPTS`, `PJUD_DOC_DOWNLOADS` y `PJUD_PDF_BACKUP`. Las rutas `LEXOPEN_DATA_DIR` y `STORAGE_PATH` deben estar dentro de la misma carpeta temporal privada. Los informes se escriben con permisos restringidos en `LEXOPEN_DATA_DIR/reports`; los autenticados omiten identificadores y recuentos privados exactos. Es una herramienta local de comprobación, sin un botón de ingreso manual añadido a la interfaz ni un nuevo programador de sincronizaciones.
+El diagnóstico exige `LEXOPEN_PJUD_LIVE_VALIDATION=1`, `DATABASE_URL=E2E_DATABASE_URL` de una base local de pruebas, `PJUD_PUBLIC_SCRAPE=1`, `PJUD_CAUSAS_CACHE_TTL_MS=0` y los siguientes valores en `0`: `PJUD_ALLOW_DEMO`, `HERMES_ALLOW_DEMO`, `PJUD_CAPTCHA_AUTO_SOLVE`, `PJUD_AUTO_CONFIRM_PROMPTS`, `PJUD_DOC_DOWNLOADS` y `PJUD_PDF_BACKUP`. Las rutas `LEXOPEN_DATA_DIR` y `STORAGE_PATH` deben estar dentro de la misma carpeta temporal privada. Los informes se escriben con permisos restringidos en `LEXOPEN_DATA_DIR/reports`; los autenticados omiten identificadores y recuentos privados exactos. Es una herramienta local de comprobación independiente del nuevo ingreso manual de la interfaz; no crea un programador de sincronizaciones.
 
 Variables mínimas del web (también las imprime `pjud:host`):
 
@@ -233,7 +267,7 @@ El sidecar se ejecuta en el mismo Host: `npm run pjud:chromium` (una vez) y
 - `POST /api/causas/monitoreo` encola causas con `pjudMonitoreoActivo` y `pjudNextSyncAt` null/`<= now` (dedupe si ya hay pending/running), reclama jobs stuck en `running`, luego procesa `PjudSyncJob` pending → running → ok/failed con concurrency `PJUD_SYNC_CONCURRENCY`.
 - `GET /api/pjud/queue` → stats estilo CM (`waiting`/`active`/`completed`/`failed`/`delayed`).
 - Fallos aplican **backoff** exponencial sobre el intervalo base (`pjudFailCount`).
-- Retry fallidos: `action: retry-fallidos` re-encola solo esos jobs.
+- Retry fallidos: `action: retry-fallidos` re-encola fallidos y parciales ordinarios; los de `manual-session` requieren recuperar el ingreso manual como se explica arriba.
 - Host local (`scripts/web-host.mjs`): programe con `PJUD_SYNC_INTERVAL_MINUTES=240`,
   `PJUD_MIS_CAUSAS_INTERVAL_MINUTES` y `PJUD_DIGEST_INTERVAL_MINUTES` (p. ej. digest
   cercano a las 08:00 del Host) más `CRON_SECRET`.

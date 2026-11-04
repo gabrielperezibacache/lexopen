@@ -25,6 +25,7 @@ import {
   serializeCausasCsv,
 } from "@/lib/pjud/import-csv";
 import { addCausaByRol } from "@/lib/pjud/lookup";
+import { getPjudSchedulerConfiguration } from "@/lib/pjud/scheduler-status";
 
 export async function GET(req: NextRequest) {
   try {
@@ -75,6 +76,7 @@ export async function GET(req: NextRequest) {
       fallidos,
       resumen,
       queue,
+      scheduler: getPjudSchedulerConfiguration(),
       provider: await providerStatusPublicAsync(),
     });
   } catch (e) {

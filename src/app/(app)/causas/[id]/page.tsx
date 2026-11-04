@@ -589,6 +589,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
         nextSyncAt={causa.pjudNextSyncAt}
         lastSyncStatus={causa.pjudLastSyncStatus}
         lastSyncNote={causa.pjudLastSyncNote}
+        cuadernosCoverage={causa.pjudCuadernosCoverage}
         failCount={causa.pjudFailCount}
         sala={causa.sala}
         diasSinMovimiento={diasSinMovimiento}

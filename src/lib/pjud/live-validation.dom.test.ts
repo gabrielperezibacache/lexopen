@@ -33,7 +33,7 @@ async function main() {
     const context = await browser.newContext();
     await context.route("**/*", (route) => route.fulfill({ contentType: "text/html", body: `
       <button onclick="window.accepted=true">Acepto</button>
-      <div class="sweet-alert showSweetAlert visible"><button class="confirm" onclick="window.confirmed=true">Continuar</button></div>
+      <div class="sweet-alert showSweetAlert visible" style="display:none"><button class="confirm" onclick="window.confirmed=true">Continuar</button></div>
       <a id="menuMisCausas" href="#" onclick="event.preventDefault();window.menuOpened=true">Mis Causas</a>
       <button id="btnBuscar" onclick="window.searched=true;document.querySelector('#results').innerHTML='<table id=verDetalleJuridica><tr><td><a>ver</a></td><td>C-1-2024</td><td>1º Juzgado Civil de Santiago</td><td></td><td>PRIVATE_CASE_TITLE</td><td>01/01/2024</td><td>Tramitación</td></tr></table>'">Buscar</button>
       <main id="results"></main>
@@ -52,6 +52,21 @@ async function main() {
       return { accepted: Boolean(w.accepted), confirmed: Boolean(w.confirmed), menuOpened: Boolean(w.menuOpened), searched: Boolean(w.searched) };
     });
     assert.deepEqual(actions, { accepted: false, confirmed: false, menuOpened: true, searched: true });
+
+    await page.locator('.sweet-alert').evaluate(node => {
+      (node as HTMLElement).style.display = "block";
+      const state = window as typeof window & { accepted: boolean; confirmed: boolean; menuOpened: boolean; searched: boolean };
+      state.accepted = false; state.confirmed = false; state.menuOpened = false; state.searched = false;
+    });
+    const blocked = await readManuallyAuthenticatedMisCausas(page);
+    assert.equal(blocked.status, "failed", "a visible notice must block manual collection rather than be accepted or ignored");
+    assert.equal(blocked.itemCount, null);
+    assert.equal(blocked.openedMenu, false);
+    assert.equal(await page.locator('.sweet-alert').isVisible(), true);
+    assert.deepEqual(await page.evaluate(() => {
+      const state = window as typeof window & { accepted: boolean; confirmed: boolean; menuOpened: boolean; searched: boolean };
+      return { accepted: state.accepted, confirmed: state.confirmed, menuOpened: state.menuOpened, searched: state.searched };
+    }), { accepted: false, confirmed: false, menuOpened: false, searched: false }, "the blocked response must not click confirmation, menu or search controls");
 
     await page.setContent('<a id="menuMisCausas" href="#" onclick="event.preventDefault()">Mis Causas</a><button onclick="document.querySelector(\'#resultConsultaCausa\').innerHTML=\'<table><tr><td>No se encontraron resultados</td></tr></table>\'">Buscar</button><div id="resultConsultaCausa"></div>');
     const empty = await readManuallyAuthenticatedMisCausas(page);

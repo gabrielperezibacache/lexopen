@@ -10,6 +10,7 @@ import { isPlaceholderTribunal, parseRitParts } from "@/lib/pjud/ojv-dom";
 import { syncCausaPjud } from "@/lib/pjud/sync";
 import { duplicateCausaWhere, type CausaOrigin } from "@/lib/pjud/causa-origin";
 import type { MisCausasItem, PjudFetchResult } from "@/lib/pjud/types";
+import { cuadernosCoverageNote, normalizeCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
 
 export type LookupCreateResult = {
   causaId: string; created: boolean;
@@ -109,7 +110,7 @@ export async function previewRolLookup(opts: { rit: string; tribunal: string; ru
   let result: PjudFetchResult | null = null;
   opts.signal?.throwIfAborted();
   if (scraperSidecarConfigured()) {
-    try { result = await fetchFromScraperSidecar(causaRef, opts.signal); }
+    try { result = await fetchFromScraperSidecar(causaRef, opts.signal, { downloadDocuments: false }); }
     catch { opts.signal?.throwIfAborted(); }
   }
   if (!result) {
@@ -117,15 +118,17 @@ export async function previewRolLookup(opts: { rit: string; tribunal: string; ru
       ? "El servicio de consulta OJV no pudo responder. Revise la conexión o registre la causa sin consultar."
       : lookupReadiness().note, 503);
     try {
-      const scraped = await scrapeCausaByRol(causaRef, opts.signal);
+      const scraped = await scrapeCausaByRol(causaRef, opts.signal, { downloadDocuments: false });
       result = { ...scraped, provider: "scrape", demo: false };
     } catch { opts.signal?.throwIfAborted(); throw httpError("No se pudo confirmar y leer esta causa en OJV. Revise el RIT/ROL y el tribunal, o vuelva a intentar si el portal no responde.", 502); }
   }
+  const cuadernos = normalizeCuadernosCoverage(result.cuadernos);
   return {
     identity, queriedAt, provider: result.provider, count: result.movimientos.length, sala: result.sala || null,
     note: result.movimientos.length ? "Consulta de lectura; aún no se ha registrado ni sincronizado la causa."
       : "La consulta no devolvió movimientos. Esto no confirma que el expediente carezca de actuaciones.",
-    coverage: { scope: "returned-records" as const, complete: false as const, note: "La consulta muestra los movimientos recuperados y hasta cinco de ejemplo; no certifica una historia completa de la causa." },
+    coverage: { scope: "available-cuadernos" as const, status: cuadernos.status, complete: cuadernos.status === "complete", note: cuadernosCoverageNote(cuadernos) },
+    cuadernos,
     sample: result.movimientos.slice(0, 5).map(m => ({ titulo: m.titulo, fecha: m.fecha.toISOString().slice(0, 10), cuaderno: m.cuaderno, esReceptor: m.esReceptor })),
   };
 }

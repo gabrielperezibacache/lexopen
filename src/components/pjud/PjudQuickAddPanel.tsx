@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
 import { validarRit, validarRut } from "@/lib/chile";
+import { PjudCuadernosCoverage } from "./PjudCuadernosCoverage";
 import "./pjud-lookup.css";
 
 type Mode = "rol" | "rut";
@@ -20,6 +21,7 @@ type Preview = {
   queriedAt?: string;
   status?: string;
   coverage?: { scope?: string; complete?: boolean; note?: string };
+  cuadernos?: unknown;
   advisory?: string;
 };
 type RutResult = { causas?: CausaHit[]; count?: number; queriedAt?: string; note?: string };
@@ -300,7 +302,7 @@ export function PjudQuickAddPanel() {
           </form>
 
           {rolError && <div className="pjud-lookup-message" role="alert" data-error="true"><p>{rolError}</p><button type="button" className="pjud-lookup-text-action" disabled={Boolean(busy) || unavailable} onClick={() => void consultRol()}>Volver a consultar</button></div>}
-          {busy === "preview" && <p className="pjud-lookup-progress" role="status">Estamos consultando la OJV. La respuesta puede tardar; puede cancelar o corregir los criterios.</p>}
+          {busy === "preview" && <p className="pjud-lookup-progress" role="status">Estamos consultando la OJV y recorriendo sus cuadernos disponibles. La respuesta puede tardar; puede cancelar o corregir los criterios.</p>}
 
           {preview && identity && <section className="pjud-lookup-result" aria-labelledby="pjud-result-title" aria-live="polite">
             <div className="pjud-lookup-result-heading"><h3 id="pjud-result-title">Resultado de la consulta</h3><span>Sin guardar en cartera</span></div>
@@ -313,6 +315,7 @@ export function PjudQuickAddPanel() {
             </dl>
             <p className="pjud-lookup-advisory">{preview.advisory || "Verifique que el RIT/ROL y el tribunal correspondan a la causa. Esta consulta muestra los datos recibidos y no acredita que el expediente esté completo."}{preview.coverage?.note && <span> {preview.coverage.note}</span>}</p>
             {preview.note && <p className="pjud-lookup-note">{preview.note}</p>}
+            <PjudCuadernosCoverage coverage={preview.cuadernos} />
             <h4>{typeof preview.count === "number" ? `${preview.count} ${preview.count === 1 ? "movimiento recuperado" : "movimientos recuperados"}` : "Movimientos recuperados"}</h4>
             {sample.length > 0 ? <>
               <p className="pjud-lookup-hint">Muestra de {sample.length} {sample.length === 1 ? "movimiento" : "movimientos"} devueltos por el proveedor.</p>
@@ -322,7 +325,7 @@ export function PjudQuickAddPanel() {
               </li>)}</ol>
             </> : <p className="pjud-lookup-empty">No se recibieron movimientos para estos criterios. Esto no confirma que la causa no exista. Revise el RIT/ROL y el tribunal o vuelva a consultar más tarde.</p>}
             <div className="pjud-lookup-register">
-              <div><h4>Incorporar a su cartera</h4><p>{canCreate ? "Crea o vincula la causa, activa su monitoreo y solicita una sincronización. Revise la identidad antes de continuar." : "Su cuenta puede consultar, pero no tiene permiso para registrar causas en la cartera."}</p></div>
+              <div><h4>Incorporar a su cartera</h4><p>{canCreate ? "Crea o vincula la causa, activa su monitoreo y sincroniza sus cuadernos disponibles. Las lecturas pendientes permanecerán identificadas. Revise la identidad antes de continuar." : "Su cuenta puede consultar, pero no tiene permiso para registrar causas en la cartera."}</p></div>
               <button type="button" className="btn btn-primary" disabled={Boolean(busy) || !canCreate} onClick={() => void registerCausa(true)}>{adding ? "Agregando causa…" : "Agregar a mi cartera"}</button>
             </div>
           </section>}
@@ -351,7 +354,7 @@ export function PjudQuickAddPanel() {
       )}
       {notice && <p className="pjud-lookup-progress" role="status">{notice}</p>}
       {adding && <p className="pjud-lookup-progress" role="status">Confirmando el registro de la causa. Espere antes de iniciar otra acción.</p>}
-      <footer className="pjud-lookup-footer"><p>Para consultar las causas asociadas a su cuenta judicial, use <Link href="/causas/mis-causas">ClaveÚnica</Link>.</p></footer>
+      <footer className="pjud-lookup-footer"><p>Para revisar e importar las causas de su cuenta judicial, use <Link href="/causas/mis-causas#ingreso-manual">Ingresar con ClaveÚnica</Link>.</p></footer>
     </section>
   );
 }
