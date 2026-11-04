@@ -1,0 +1,198 @@
+{
+  "data": "fictitious",
+  "model": "explicit local fixture; no real model or external account",
+  "results": [
+    {
+      "name": "inicio-nuevo-desktop",
+      "fit": true,
+      "composerFirstView": true,
+      "attachFirstView": true,
+      "sendFirstView": true,
+      "url": "/inicio",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "name": "inicio-desktop",
+      "fit": true,
+      "composerFirstView": true,
+      "attachFirstView": true,
+      "sendFirstView": true,
+      "url": "/inicio",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "name": "memory-desktop",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "name": "connectors-desktop",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "name": "computer-desktop",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "name": "academia-desktop",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "name": "matriz-desktop",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "name": "discovery-desktop",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "name": "inicio-nuevo-mobile",
+      "fit": true,
+      "composerFirstView": true,
+      "attachFirstView": true,
+      "sendFirstView": true,
+      "url": "/inicio",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "name": "inicio-mobile",
+      "fit": true,
+      "composerFirstView": true,
+      "attachFirstView": true,
+      "sendFirstView": true,
+      "url": "/inicio",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "name": "memory-mobile",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "name": "connectors-mobile",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "name": "computer-mobile",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "name": "academia-mobile",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "name": "matriz-mobile",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "name": "discovery-mobile",
+      "fit": true,
+      "composerFirstView": null,
+      "attachFirstView": null,
+      "sendFirstView": null,
+      "url": "/inicio",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    }
+  ]
+}

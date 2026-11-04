@@ -1,15 +1,14 @@
 {
   "version": "1.1.0-preview.3",
-  "captureDateUtc": "2026-11-04T20:36:20.187732+00:00",
+  "captureDateUtc": "2026-11-04T20:44:26.832835+00:00",
   "data": "Fictitious people, case, book, memories, conversation and academic project. No real user files.",
   "model": "Explicit local HTTP fixture, not a real model response.",
   "accounts": "No real Codex, LinkedIn or mail account connected. No publication sent.",
   "computer": "Actual application disabled state; not a desktop execution screenshot.",
   "capture": "Unedited viewport screenshots from Chromium; 1440x1000 and360x800.",
-  "sourceUiBase": "75eda3382b30faaa580b77dd585a239115ddd027",
   "sourceFileSha256": {
-    "src/components/altazor/AltazorHome.tsx": "826e9fcab72b765df0fde6c2a5bcc0d397f50b90dcf5b63de1f45cda381e7839",
-    "src/components/altazor/AltazorHome.css": "37dfc095393684473ee80f798bd6d65a5c627b0e75a827605e25203ba4f361c9",
+    "src/components/altazor/AltazorHome.tsx": "e0595f0f59f6bf9f78d1b81aa011ef46e15f5c7589ac0172bc60e3b6806ac4a2",
+    "src/components/altazor/AltazorHome.css": "8e627784f114721d6cb40d784672ee83741cbfaa0401a1d2d45ad58d1fa161b2",
     "src/components/altazor/AltazorMemory.tsx": "50dde001aa84a161589358abba3c50527dc42a0765c736c79408dbc92d32f607",
     "src/components/altazor/AltazorMemory.module.css": "b9bfdacdb16405343b34f5997a6f13fbf02fca599dccee4f09b6645d8b69d0d9",
     "src/components/altazor/AltazorConnectors.tsx": "997bad1c9b40bea1f79bc3d91cf87aee72198c288c9ac8e246e15c4bc391447f",
@@ -22,7 +21,7 @@
   "files": [
     {
       "file": "academia-desktop.png",
-      "sha256": "480c43e37cfb8774b9726c693fc4f2eead2542c0a0a58f14376b6404ebd5bd59",
+      "sha256": "fe4f34657b82d1ea0e2a8bbebf18fe20169ccd024731d5b83dd2cef2a5d95ed3",
       "viewport": {
         "width": 1440,
         "height": 1000
@@ -54,7 +53,7 @@
     },
     {
       "file": "connectors-desktop.png",
-      "sha256": "e8508302b5ccefb28d5cc800f97a47e935c5dd8ce58b2dd530922d4d33f4087e",
+      "sha256": "c72f5b006a3048f0065bd57f3aac2c9a3dfb932c79292636444c3cb6bf98ffef",
       "viewport": {
         "width": 1440,
         "height": 1000
@@ -70,7 +69,7 @@
     },
     {
       "file": "discovery-desktop.png",
-      "sha256": "4b686de820f61262da8a9fa473f5beb343589962a29cbb188ce6b56b3e113d22",
+      "sha256": "a8a88066168099520e13d6cabee286fce7807fe8e9e0610589f718fd4f41dfd0",
       "viewport": {
         "width": 1440,
         "height": 1000
@@ -101,8 +100,24 @@
       }
     },
     {
+      "file": "inicio-nuevo-desktop.png",
+      "sha256": "16660e4bf8703fd89a5f55ec712cd2525b90bf131a9c54f96c07d291e219ce8d",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "inicio-nuevo-mobile.png",
+      "sha256": "c41a792fd1dcdd1053d9c11f3d5971f3f57b228b648ac793be05499b66e8cfca",
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
       "file": "matriz-desktop.png",
-      "sha256": "5e1221294fd86439b5e4b57a970b9553b0f8ed94578fd8b35af6556b531f96bd",
+      "sha256": "b081d44eb70d78889c3adb65ec3d25678cbeb64537819314f9a72e9a2ec49ab2",
       "viewport": {
         "width": 1440,
         "height": 1000
@@ -126,11 +141,18 @@
     },
     {
       "file": "memory-mobile.png",
-      "sha256": "fcd50f91c8782d46170ea969bcdc85507e2491c902f97042d0b356a135c35318",
+      "sha256": "e8d7ce9470d90847c94125630f24d43cee753ace43e6c3f8b40e0e21ba41aa48",
       "viewport": {
         "width": 360,
         "height": 800
       }
     }
-  ]
+  ],
+  "sourceBase": "54b3516fcd6416e872475ee161b5e187f893106f plus user-approved ALT-02 correction",
+  "review": {
+    "disposition": "SHIP",
+    "round": "additional round explicitly requested by the user",
+    "materialFindings": "ALT-01 through ALT-06 resolved",
+    "reviewer": "Independent general-purpose reviewer; specialized design profile unavailable."
+  }
 }

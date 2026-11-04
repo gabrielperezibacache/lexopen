@@ -8,6 +8,7 @@ Las imágenes son capturas sin retoques del área visible: escritorio de 1440 ×
 
 | Apartado | Escritorio | Móvil |
 | --- | --- | --- |
+| Conversación nueva | [Inicio nuevo](inicio-nuevo-desktop.png) | [Inicio nuevo](inicio-nuevo-mobile.png) |
 | Mensaje, adjuntos y ámbito | [Inicio](inicio-desktop.png) | [Inicio](inicio-mobile.png) |
 | Recuerdos y relaciones | [Memoria](memory-desktop.png) | [Memoria](memory-mobile.png) |
 | Herramientas y LinkedIn | [Conexiones](connectors-desktop.png) | [Conexiones](connectors-mobile.png) |
@@ -18,17 +19,19 @@ Las imágenes son capturas sin retoques del área visible: escritorio de 1440 ×
 
 [Funcionamiento y límites de ALTAZOR](../ALTAZOR.md).
 
-## Revisión visual actual
+## Revisión visual final
 
-Dictamen independiente: **FIX**. Cinco hallazgos resueltos; ajuste inicial de conversación nueva en móvil todavía parcial.
+Dictamen independiente: **SHIP**. Los seis hallazgos materiales están resueltos después de la ronda adicional solicitada por el usuario. La revisión visual no acredita cuentas reales, ejecución de una computadora ni conformidad WCAG completa.
 
-| Hallazgo | Estado |
+| Hallazgo | Estado final |
 | --- | --- |
 | ALT-01: cinco herramientas legibles en móvil | Resuelto |
-| ALT-02: editor y botones completos en el primer encuadre | Parcial: correcto en conversación recuperada; conversación nueva con selector y destino largo requiere desplazar el borde inferior a 360 × 800. El informe registra también desbordamiento horizontal en Conversación. |
+| ALT-02: editor, Adjuntar y Enviar completos al entrar en conversación nueva y recuperada, sin desbordamiento del documento | Resuelto |
 | ALT-03: cuatro apartados académicos visibles | Resuelto |
 | ALT-04: títulos y relaciones del grafo sin colisión | Resuelto |
 | ALT-05: accesos a Codex, correo y conexiones del estudio | Resuelto |
 | ALT-06: estados finales de configuración visibles | Resuelto |
 
-La revisión se realizó mediante un agente general independiente, sin un perfil especializado de diseño disponible. Este estado no se presenta como aprobación visual completa.
+Las dieciséis capturas y [su informe](capture-report.json) corresponden al mismo lote final; los dieciséis registros conservan el contenido dentro del ancho disponible. Editor y botones están completos en el primer encuadre de ambos estados de conversación a 1440 × 1000 y 360 × 800. Se corrigió el ancho del selector de archivos oculto y se eliminó la repetición del ámbito de trabajo; no se oculta el desbordamiento del documento.
+
+La revisión se realizó mediante un agente general independiente, en sustitución del perfil especializado de diseño no disponible. Los recorridos funcionales de navegador se verifican por separado.

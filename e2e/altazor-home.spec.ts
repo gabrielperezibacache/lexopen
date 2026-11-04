@@ -27,6 +27,20 @@ async function fixture() {
 }
 async function readChat(page: Page, id: string) { return json<Conversation>(await page.request.get(`/api/altazor/conversations/${id}`)); }
 function chatId(page: Page) { const id = new URL(page.url()).searchParams.get("conversacion"); expect(id).toBeTruthy(); return id!; }
+async function composerViewport(page: Page, phase: "new" | "recovered") {
+  await expect(page.locator(".altazor-send-settings:visible").filter({hasText:"fictitious-altazor-browser"})).toBeVisible();
+  await page.evaluate(async()=>{await document.fonts.ready;});
+  for(const viewport of [{width:1440,height:1000},{width:360,height:800}]){
+    await page.setViewportSize(viewport);await page.evaluate(()=>window.scrollTo(0,0));expect(await page.evaluate(()=>window.scrollY)).toBe(0);
+    const composer=page.getByTestId("inicio-composer"),attach=page.getByRole("button",{name:"Adjuntar",exact:true}),submit=page.getByTestId("inicio-send");
+    const geometry={phase,viewport,document:await page.evaluate(()=>({width:document.documentElement.scrollWidth,innerWidth,scrollY})),composer:await composer.boundingBox(),attach:await attach.boundingBox(),submit:await submit.boundingBox()};
+    await test.info().attach(`${phase}-${viewport.width}-geometry`,{body:JSON.stringify(geometry),contentType:"application/json"});
+    await expect.soft(composer,`${phase} ${viewport.width}: editor íntegro antes de desplazarse`).toBeInViewport({ratio:1});
+    await expect.soft(attach,`${phase} ${viewport.width}: Adjuntar íntegro antes de desplazarse`).toBeInViewport({ratio:1});
+    await expect.soft(submit,`${phase} ${viewport.width}: Enviar íntegro antes de desplazarse`).toBeInViewport({ratio:1});
+  }
+  await page.setViewportSize({width:1440,height:1000});
+}
 async function send(page: Page, text: string) {
   const previous = new URL(page.url()).searchParams.get("conversacion"), before = previous ? (await readChat(page,previous)).turns.length : 0;
   await page.getByTestId("inicio-composer").fill(text);
@@ -74,10 +88,10 @@ test.afterAll(async () => {
 test("ALTAZOR conserva conversación, adjuntos y fuentes; errores y paneles preservan el borrador",async({page})=>{
   test.setTimeout(120_000);const {user,email}=await fixture();await page.setViewportSize({width:1440,height:1000});await loginAs(page,email);
   await expect(page.getByTestId("altazor-home")).toBeVisible();await expect(page.getByLabel("Mensaje para ALTAZOR")).toBeVisible();
-  for(const viewport of [{width:1440,height:1000},{width:360,height:800}]){await page.setViewportSize(viewport);await page.evaluate(()=>window.scrollTo(0,0));expect(await page.evaluate(()=>window.scrollY)).toBe(0);await expect.soft(page.getByTestId("inicio-composer")).toBeInViewport({ratio:1});await expect.soft(page.getByRole("button",{name:"Adjuntar",exact:true})).toBeInViewport({ratio:1});await expect.soft(page.getByTestId("inicio-send")).toBeInViewport({ratio:1});}
-  await page.setViewportSize({width:1440,height:1000});
+  await composerViewport(page,"new");
   const first=await send(page,"Analiza el primer antecedente enteramente ficticio"),id=first.conversation.id;
   expect(first.turns.map(turn=>turn.ordinal)).toEqual([1]);await page.reload();await expect(page.locator(".altazor-turns")).toContainText(first.turns[0].assistantText);
+  await composerViewport(page,"recovered");
   const bytes=Buffer.from("El comprobante ficticio registra treinta unidades y exige una revisión prudente."),filename="antecedente-ficticio.txt";
   await page.locator('.altazor-composer input[type="file"]').setInputFiles({name:filename,mimeType:"text/plain",buffer:bytes});
   await expect(page.locator(".altazor-attachments")).toContainText(filename);
@@ -99,7 +113,7 @@ test("ALTAZOR conserva conversación, adjuntos y fuentes; errores y paneles pres
   expect((await readChat(page,id)).turns.map(turn=>turn.ordinal)).toEqual([1,2,3]);await page.reload();await expect(page.locator(".altazor-user-message")).toHaveCount(3);
   const draft="Borrador ficticio todavía sin enviar";await page.getByTestId("inicio-composer").fill(draft);await page.getByRole("button",{name:"Memoria",exact:true}).click();await expect(page.getByTestId("altazor-memory")).toBeVisible();await page.getByRole("button",{name:"Conversación",exact:true}).click();await expect(page.getByTestId("inicio-composer")).toHaveValue(draft);
   let failedRequestId="";await page.route(`**/api/altazor/conversations/${id}/turns`,async route=>{if(route.request().method()==="POST"){failedRequestId=route.request().postDataJSON().requestId;return route.fulfill({status:503,json:{error:"Fallo ficticio de envío; el borrador debe conservarse"}});}return route.continue();});
-  await page.getByTestId("inicio-send").click();await expect(page.getByRole("alert")).toContainText("Fallo ficticio");await expect(page.getByTestId("inicio-composer")).toHaveValue(draft);expect((await readChat(page,id)).turns).toHaveLength(3);
+  await page.getByTestId("inicio-send").click();await expect(page.getByTestId("altazor-home").getByRole("alert").filter({hasText:"Fallo ficticio"})).toBeVisible();await expect(page.getByTestId("inicio-composer")).toHaveValue(draft);expect((await readChat(page,id)).turns).toHaveLength(3);
   await page.unroute(`**/api/altazor/conversations/${id}/turns`);const retry=page.waitForRequest(request=>new URL(request.url()).pathname===`/api/altazor/conversations/${id}/turns`&&request.method()==="POST");await send(page,draft);expect((await retry).postDataJSON().requestId).toBe(failedRequestId);
   await page.getByRole("button",{name:`Retirar archivo ${filename}`,exact:true}).click();await expect(page.locator(".altazor-attachments")).toHaveCount(0);
   const withdrawn=await readChat(page,id);expect(withdrawn.attachments).toHaveLength(0);expect(withdrawn.turns[1].status).toBe("blocked");expect(withdrawn.turns[1].assistantText).toBe("");expect(withdrawn.turns[2].status).toBe("blocked");

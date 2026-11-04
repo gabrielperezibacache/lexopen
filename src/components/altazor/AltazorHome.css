@@ -12,7 +12,7 @@
 .altazor-tabs>button[aria-current],.altazor-subtabs>button[aria-current] { color:var(--sea); background:var(--sea-soft); font-weight:600; }
 .altazor-tabs>button:hover,.altazor-subtabs>button:hover { background:var(--mist); }
 .altazor-conversation { background:var(--surface-solid); padding:clamp(1rem,3vw,2rem); border-radius:1rem; box-shadow:0 12px 36px rgba(12,28,36,.06); }
-.altazor-chat-toolbar>div:first-child { min-width:0; }
+.altazor-chat-toolbar>div:first-child { min-width:0; flex:1 1 260px; }
 .altazor-chat-toolbar,.altazor-section-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1.4rem; min-width:0; }
 .altazor-chat-toolbar h3 { margin-top:.4rem; font-size:1rem; overflow-wrap:anywhere; max-width:60ch; }
 .altazor-scope { color:var(--muted); font-size:1rem; }
@@ -26,11 +26,11 @@
 .altazor-conversation-list button[aria-current],.altazor-academic-results button[aria-current] { background:var(--sea-soft); }
 .altazor-home label { color:var(--ink); font-size:1rem; }
 .altazor-home label:not(.altazor-check) { display:grid; gap:.45rem; }
-.altazor-home input:not([type=checkbox]):not([type=radio]),.altazor-home textarea,.altazor-home select { width:100%; min-width:0; background:var(--surface-solid); color:var(--ink); border:1px solid var(--line-strong); border-radius:.5rem; padding:.7rem .8rem; font:inherit; }
+.altazor-home input:not([type=checkbox]):not([type=radio]):not([type=file]),.altazor-home textarea,.altazor-home select { width:100%; min-width:0; background:var(--surface-solid); color:var(--ink); border:1px solid var(--line-strong); border-radius:.5rem; padding:.7rem .8rem; font:inherit; }
 .altazor-home textarea { resize:vertical; line-height:1.65; }
 .altazor-home input[type=checkbox],.altazor-home input[type=radio] { width:18px; height:18px; accent-color:var(--sea); flex-shrink:0; margin-top:.2rem; }
 .altazor-home button:disabled { opacity:.55; cursor:not-allowed; }
-.altazor-context-label { max-width:520px; margin-bottom:1rem; }
+.altazor-context-label { width:100%; max-width:520px; margin:0; }
 .altazor-welcome { padding:2.5rem 0 1.75rem; }
 .altazor-welcome>p { font-family:var(--font-fraunces),Georgia,serif; font-size:clamp(1.6rem,2.4vw,2.3rem); margin-bottom:1.5rem; }
 .altazor-prompts { display:flex; flex-wrap:wrap; gap:.65rem; }
@@ -157,7 +157,7 @@
  .altazor-composer-footer>span { display:none; }
  .altazor-composer-footer>.btn:last-child { margin-left:auto; }
  .altazor-send-settings { padding:.35rem; }
- .altazor-context-label { margin-bottom:.5rem; }
+ .altazor-context-label { margin:0; }
  .altazor-attachments>li { flex-wrap:wrap; }
  .altazor-attachments label { flex-basis:100%; }
  .altazor-matrix-dimensions { grid-template-columns:minmax(0,1fr); }

@@ -36,7 +36,7 @@ jobs:
       SESSION_SECRET: fictitious-computer-runtime-ci-encryption-secret-2026
       ALTAZOR_COMPUTER_ENABLED: "1"
       LEXOPEN_ALTAZOR_TEST_DOCKER: "1"
-      KITTIES_CI_OUTPUT: ${{ runner.temp }}/altazor-computer-evidence
+      KITTIES_CI_OUTPUT: ${{ github.workspace }}/.tmp/altazor-computer-evidence
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: altazor-computer-runtime-evidence
-          path: ${{ runner.temp }}/altazor-computer-evidence/
+          path: ${{ env.KITTIES_CI_OUTPUT }}/
           if-no-files-found: error
           retention-days: 7
   workbench-runtime:
