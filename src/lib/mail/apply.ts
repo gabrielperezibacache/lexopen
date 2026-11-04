@@ -1,10 +1,10 @@
-import type { User } from "@prisma/client";
+import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { assertCausaMailAccess } from "@/lib/mail/access";
 import { fileMailboxMessageToCausa } from "@/lib/mail/file-to-folders";
 
 export async function applyMailboxMessage(
-  user: Pick<User, "id" | "role">,
+  user: CausaAccessUser,
   messageId: string,
   causaId?: string
 ) {
@@ -23,12 +23,12 @@ export async function applyMailboxMessage(
     err.status = 400;
     throw err;
   }
-  await assertCausaMailAccess(user, targetCausaId);
+  await assertCausaMailAccess(user, targetCausaId, { write: true });
   return fileMailboxMessageToCausa(user, message.id, targetCausaId);
 }
 
 export async function linkMailboxMessage(
-  user: Pick<User, "id" | "role">,
+  user: CausaAccessUser,
   messageId: string,
   causaId: string
 ) {

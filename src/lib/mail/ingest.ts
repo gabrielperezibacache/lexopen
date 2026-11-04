@@ -1,9 +1,9 @@
-import type { User } from "@prisma/client";
+import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
 import { fetchImapMessages } from "@/lib/mail/imap";
 import { parseMailContent } from "@/lib/mail/parse";
-import { causaMailWhere } from "@/lib/mail/access";
+import { causaMailWhere, currentMailActor } from "@/lib/mail/access";
 import { messageIsFromPjud } from "@/lib/mail/pjud-sender";
 import { parseMimeBuffer, type ParsedMailAttachment } from "@/lib/mail/mime";
 import { fetchGmailPjudMessages } from "@/lib/mail/gmail";
@@ -58,7 +58,7 @@ async function stashAttachments(
 }
 
 export async function persistInboundMessage(
-  user: Pick<User, "id" | "role">,
+  user: CausaAccessUser,
   accountId: string,
   raw: InboundMail,
   opts?: { requirePjudSender?: boolean }
@@ -76,6 +76,8 @@ export async function persistInboundMessage(
     return { created: false, skipped: "not_pjud" as const, message: null };
   }
 
+  const actor = await currentMailActor(user);
+
   const subject = mime.subject || raw.subject;
   const bodyText = mime.bodyText || subject;
   const parsed = parseMailContent(subject, bodyText);
@@ -91,7 +93,7 @@ export async function persistInboundMessage(
   let causaId: string | undefined;
   if (parsed.rit) {
     const match = await prisma.causa.findFirst({
-      where: { rit: parsed.rit, ...causaMailWhere(user) },
+      where: { AND: [{ rit: parsed.rit }, causaMailWhere(actor)] },
       select: { id: true },
     });
     causaId = match?.id;
@@ -127,7 +129,7 @@ export async function persistInboundMessage(
 }
 
 export async function ingestPasteMail(
-  user: Pick<User, "id" | "role">,
+  user: CausaAccessUser,
   input: { subject: string; body: string; fromAddress?: string }
 ) {
   const account = await ensureMailboxAccount(user.id);
@@ -179,7 +181,7 @@ async function saveProviderCursor(
 }
 
 async function ingestFetched(
-  user: Pick<User, "id" | "role">,
+  user: CausaAccessUser,
   accountId: string,
   fetched: ProviderFetchResult
 ) {
@@ -191,7 +193,7 @@ async function ingestFetched(
   return inserted;
 }
 
-export async function ingestImapMail(user: Pick<User, "id" | "role">) {
+export async function ingestImapMail(user: CausaAccessUser) {
   const account = await prisma.mailboxAccount.findUnique({
     where: { userId: user.id },
   });
@@ -219,7 +221,7 @@ export async function ingestImapMail(user: Pick<User, "id" | "role">) {
   return { inserted, protocol: "imap" as const, skipped: false as const };
 }
 
-export async function ingestGmailMail(user: Pick<User, "id" | "role">) {
+export async function ingestGmailMail(user: CausaAccessUser) {
   const account = await prisma.mailboxAccount.findUnique({
     where: { userId: user.id },
   });
@@ -237,7 +239,7 @@ export async function ingestGmailMail(user: Pick<User, "id" | "role">) {
   return { inserted, protocol: "gmail" as const, skipped: false as const };
 }
 
-export async function ingestMicrosoftMail(user: Pick<User, "id" | "role">) {
+export async function ingestMicrosoftMail(user: CausaAccessUser) {
   const account = await prisma.mailboxAccount.findUnique({
     where: { userId: user.id },
   });
@@ -256,7 +258,7 @@ export async function ingestMicrosoftMail(user: Pick<User, "id" | "role">) {
 }
 
 export async function syncMailboxForUser(
-  user: Pick<User, "id" | "role">,
+  user: CausaAccessUser,
   opts?: { fromCron?: boolean }
 ) {
   const account = await prisma.mailboxAccount.findUnique({
@@ -345,9 +347,10 @@ export async function disconnectMailboxAccount(userId: string) {
   });
 }
 
-export async function listCausasForMail(user: Pick<User, "id" | "role">) {
+export async function listCausasForMail(user: CausaAccessUser) {
+  const actor = await currentMailActor(user);
   return prisma.causa.findMany({
-    where: causaMailWhere(user),
+    where: causaMailWhere(actor),
     select: { id: true, titulo: true, rit: true, tribunal: true, proximaTabla: true },
     orderBy: { updatedAt: "desc" },
     take: 40,

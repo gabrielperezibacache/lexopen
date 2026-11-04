@@ -19,8 +19,8 @@ assert.equal(negotiateLocale("en-US,en;q=0.9"), "en");
 assert.equal(negotiateLocale("es-CL,es;q=0.9,en;q=0.8"), "es");
 assert.equal(negotiateLocale(null), "es");
 
-assert.equal(translate(es, "nav.home"), "Inicio");
-assert.equal(translate(en, "nav.home"), "Home");
+assert.equal(translate(es, "nav.home"), "Mi jornada");
+assert.equal(translate(en, "nav.home"), "My day");
 assert.equal(translate(es, "missing.key", "fallback"), "fallback");
 
 const esDict = getDictionary("es");

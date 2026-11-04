@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import type { User } from "@prisma/client";
+import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { writeAuditStrict } from "@/lib/audit";
 import { getObject, newStorageKey, putObject } from "@/lib/storage";
@@ -9,6 +9,7 @@ import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { pushDocumentoToDrive } from "@/lib/integrations/google";
 import { parseMailContent, type ParsedMail } from "@/lib/mail/parse";
 import type { ParsedMailAttachment } from "@/lib/mail/mime";
+import { assertCausaMailAccess } from "@/lib/mail/access";
 
 const MAX_ATTACHMENT = 20 * 1024 * 1024;
 const SITE_FOLDER_NAME = "Correo PJUD";
@@ -158,7 +159,7 @@ async function loadStashedAttachments(
 }
 
 export async function fileMailboxMessageToCausa(
-  user: Pick<User, "id" | "role">,
+  user: CausaAccessUser,
   messageId: string,
   causaId: string,
   extraAttachments?: ParsedMailAttachment[]
@@ -172,6 +173,9 @@ export async function fileMailboxMessageToCausa(
     err.status = 404;
     throw err;
   }
+
+  // Ingest calls this service directly as well as through the manual apply route.
+  await assertCausaMailAccess(user, causaId, { write: true });
 
   const parsed = parseJson<ParsedMail>(
     message.parsedJson,
