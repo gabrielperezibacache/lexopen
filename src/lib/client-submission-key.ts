@@ -1,8 +1,11 @@
 /** Idempotency identifiers are request identities, never authentication tokens. */
 export function operationKey(): string {
   const bytes = new Uint8Array(16);
-  if (typeof globalThis.crypto?.getRandomValues === "function") globalThis.crypto.getRandomValues(bytes);
-  else for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    throw new Error("A secure random number generator is required.");
+  }
   return `op-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
