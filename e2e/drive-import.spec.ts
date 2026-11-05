@@ -46,7 +46,8 @@ test("Drive elegido: lista paginada, revisión, exportación, conflicto y recupe
   await panel.getByRole("radio", { name: `Seleccionar ${name}`, exact: true }).check();
   await expect(panel.getByRole("heading", { name: "Revisar la copia elegida", exact: true })).toBeVisible();
   await expect(panel.getByText(/Se conservará una exportación PDF/)).toBeVisible();
-  await expect(panel.getByText(/Se copiará sólo este archivo/)).toBeVisible();
+  await expect(panel.getByText("Esta copia conserva los permisos de la causa. La actualización automática puede guardar revisiones nuevas por separado.", { exact: true })).toBeVisible();
+  expect(selections).toEqual([]); // Revisar o paginar no copia archivos antes de la confirmación.
   for (const [label, viewport] of [["desktop", { width: 1366, height: 900 }], ["mobile", { width: 360, height: 800 }]] as const) {
     await page.setViewportSize(viewport); await panel.screenshot({ path: testInfo.outputPath(`drive-selection-${label}.png`) });
     const layout = await page.evaluate(() => ({ viewport: window.innerWidth, width: document.documentElement.scrollWidth, overflowing: [...document.querySelectorAll("main *")].filter(element => element.getBoundingClientRect().right > window.innerWidth + 1).slice(0, 12).map(element => ({ tag: element.tagName, className: element.className, text: element.textContent?.slice(0, 60), right: element.getBoundingClientRect().right })) }));
