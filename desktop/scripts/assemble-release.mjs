@@ -6,7 +6,10 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 const require = createRequire(new URL("../package.json", import.meta.url));
 const yaml = require("js-yaml");
+const desktopProfile = require("./altazor-desktop-profile.json");
+const { maximumArchiveBytes, toolpackName, toolpackReceiptName } = require("./altazor-toolpack.cjs");
 const targets = ["darwin-x64", "darwin-arm64", "win32-x64", "linux-x64"];
+const toolpackArchitectures = ["amd64", "arm64"];
 async function hashes(file) {
   const sha256 = crypto.createHash("sha256"), sha512 = crypto.createHash("sha512"); let size = 0;
   for await (const chunk of createReadStream(file)) { size += chunk.length; sha256.update(chunk); sha512.update(chunk); }
@@ -22,7 +25,24 @@ async function scan(dir, found = []) {
   }
   return found;
 }
-export async function assembleRelease({ input, output, version, revision }) {
+async function verifyToolpack({ architecture, archive, receipt, byName, digests, version, revision }) {
+  const reportFile = byName.get(receipt), digest = digests.get(archive);
+  const report = JSON.parse(await fs.readFile(reportFile, "utf8"));
+  if (report.version !== version || report.architecture !== architecture || report.name !== archive ||
+    report.sourceRevision !== revision || report.sourceCommit !== desktopProfile.sourceCommit || report.profile !== desktopProfile.id ||
+    typeof report.imageId !== "string" || !/^sha256:[a-f0-9]{64}$/.test(report.imageId) ||
+    report.size !== digest.size || report.sha256 !== digest.sha256) throw new Error(`Unverified desktop toolpack: ${architecture}`);
+  const file = await fs.open(byName.get(archive), "r");
+  try {
+    const header = Buffer.alloc(3);
+    if ((await file.read(header, 0, 3, 0)).bytesRead !== 3 || header.toString("hex") !== "1f8b08") {
+      throw new Error(`Expected a gzip desktop toolpack: ${architecture}`);
+    }
+  } finally { await file.close(); }
+  return { architecture, archive, receipt, imageId: report.imageId };
+}
+
+export async function assembleRelease({ input, output, version, revision, withToolpacks = false, consumeInput = false }) {
   if (!/^\d+\.\d+\.\d+(?:-preview\.\d+)?$/.test(version) || !/^[a-f0-9]{40}$/.test(revision)) throw new Error("Exact release version and Git revision required");
   input = path.resolve(input); output = path.resolve(output);
   if (input === output || output.startsWith(input + path.sep) || input.startsWith(output + path.sep)) throw new Error("Release input and output must be separate");
@@ -30,16 +50,24 @@ export async function assembleRelease({ input, output, version, revision }) {
   const files = await scan(input), byName = new Map(), feeds = [];
   // Native formats name the same CPU differently: Debian amd64, AppImage x86_64.
   const expectedAssets = ["mac-x64.dmg", "mac-x64.zip", "mac-arm64.dmg", "mac-arm64.zip", "win-x64.exe", "win-x64.zip", "linux-x86_64.AppImage", "linux-amd64.deb"].map(s => `LexOpen-${version}-${s}`);
+  const toolpacks = withToolpacks ? toolpackArchitectures.map(architecture => ({ architecture, archive: toolpackName(version, architecture), receipt: toolpackReceiptName(architecture) })) : [];
+  const expectedToolpacks = toolpacks.flatMap(({ archive, receipt }) => [archive, receipt]);
   const feedNames = [`${channel}.yml`, `${channel}-mac.yml`, `${channel}-linux.yml`];
   const reportNames = targets.flatMap(t => ["packaged", "smoke", "signature"].map(k => `lexopen-${k}-${t}.json`));
   for (const file of files) {
     const name = path.basename(file);
     if (feedNames.includes(name)) { feeds.push({ name, file }); continue; }
-    if (!expectedAssets.includes(name) && !expectedAssets.some(a => name === `${a}.blockmap`) && !reportNames.includes(name)) throw new Error(`Unexpected release input: ${name}`);
+    if (!expectedAssets.includes(name) && !expectedAssets.some(a => name === `${a}.blockmap`) && !reportNames.includes(name) && !expectedToolpacks.includes(name)) throw new Error(`Unexpected release input: ${name}`);
     if (byName.has(name)) throw new Error(`Duplicate release input: ${name}`);
     byName.set(name, file);
   }
   for (const name of [...expectedAssets, ...reportNames]) if (!byName.has(name)) throw new Error(`Missing native release input: ${name}`);
+  for (const name of expectedToolpacks) if (!byName.has(name)) throw new Error(`Missing desktop toolpack input: ${name}`);
+  for (const { architecture, archive, receipt } of toolpacks) {
+    const { size } = await fs.stat(byName.get(archive));
+    if (size < 3 || size > maximumArchiveBytes) throw new Error(`Invalid desktop toolpack size: ${archive}`);
+    if ((await fs.stat(byName.get(receipt))).size > 16 * 1024) throw new Error(`Oversized desktop toolpack receipt: ${architecture}`);
+  }
   const signatures = [];
   for (const target of targets) {
     const [platform, arch] = target.split("-");
@@ -54,6 +82,8 @@ export async function assembleRelease({ input, output, version, revision }) {
   }
   const digests = new Map();
   for (const [name, file] of byName) digests.set(name, await hashes(file));
+  const verifiedToolpacks = [];
+  for (const toolpack of toolpacks) verifiedToolpacks.push(await verifyToolpack({ ...toolpack, byName, digests, version, revision }));
   const mergedFeeds = new Map();
   for (const { name, file } of feeds) {
     const info = yaml.load(await fs.readFile(file, "utf8"), { schema: yaml.JSON_SCHEMA });
@@ -74,8 +104,14 @@ export async function assembleRelease({ input, output, version, revision }) {
   for (const arch of ["x64", "arm64"]) if (!mac.some(e => e.url === `LexOpen-${version}-mac-${arch}.zip`)) throw new Error(`Missing macOS update architecture: ${arch}`);
   if (!mergedFeeds.get(`${channel}.yml`).some(e => e.url.endsWith(".exe")) || !mergedFeeds.get(`${channel}-linux.yml`).some(e => e.url.endsWith(".AppImage"))) throw new Error("Missing installable update target");
   await fs.mkdir(output); // Never overwrite or erase an existing destination.
-  const manifest = { format: 1, version, channel, prerelease: preview, sourceRevision: revision, signatures, files: [] };
-  for (const [name, file] of byName) { await fs.copyFile(file, path.join(output, name)); manifest.files.push({ name, ...digests.get(name) }); }
+  const manifest = { format: 1, version, channel, prerelease: preview, sourceRevision: revision, signatures, files: [], ...(withToolpacks ? { toolpacks: verifiedToolpacks } : {}) };
+  for (const [name, file] of byName) {
+    const destination = path.join(output, name);
+    // Release CI owns the downloaded copies and can move them after verification to avoid doubling disk usage.
+    if (consumeInput) await fs.rename(file, destination);
+    else await fs.copyFile(file, destination);
+    manifest.files.push({ name, ...digests.get(name) });
+  }
   for (const [name, entries] of mergedFeeds) {
     entries.sort((a, b) => a.url.localeCompare(b.url));
     const primary = entries.find(e => e.url.endsWith("-x64.zip")) || entries.find(e => e.url.endsWith(".exe") || e.url.endsWith(".AppImage")) || entries[0];
@@ -90,7 +126,7 @@ export async function assembleRelease({ input, output, version, revision }) {
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2), option = key => args[args.indexOf(key) + 1];
-  if (!["--input", "--output", "--version", "--revision"].every(k => args.includes(k))) throw new Error("Use --input --output --version --revision");
-  const manifest = await assembleRelease({ input: option("--input"), output: option("--output"), version: option("--version"), revision: option("--revision") });
+  if (!["--input", "--output", "--version", "--revision"].every(k => args.includes(k))) throw new Error("Use --input --output --version --revision [--with-toolpacks] [--consume-input]");
+  const manifest = await assembleRelease({ input: option("--input"), output: option("--output"), version: option("--version"), revision: option("--revision"), withToolpacks: args.includes("--with-toolpacks"), consumeInput: args.includes("--consume-input") });
   console.log(JSON.stringify({ version: manifest.version, files: manifest.files.length, targets: targets.length, channel: manifest.channel }));
 }

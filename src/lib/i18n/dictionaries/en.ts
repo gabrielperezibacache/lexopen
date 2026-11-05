@@ -58,6 +58,7 @@ export const en: Dictionary = {
     pendingItems: "pending",
     shortcuts: "Work shortcuts",
     caseFiles: "Case files",
+    myMatters: "My Matters",
     caseDocuments: "Matter documents",
     ownedLibrary: "My books and judgments",
     officialResearch: "Official research",

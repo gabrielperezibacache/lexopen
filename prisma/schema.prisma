@@ -364,6 +364,7 @@ model Causa {
 
   partes          Parte[]
   documentos      Documento[]
+  documentFolders CaseDocumentFolder[]
   driveImports    DriveDocumentImport[]
   plazos          Plazo[]
   tramites        Tramite[]
@@ -675,6 +676,7 @@ model Documento {
   minutas Minuta[]
   evidenceResource DocumentResource?
   driveImport DriveDocumentImport?
+  archivePlacement CaseDocumentPlacement?
   caseAudioSource CaseAudio? @relation("CaseAudioSourceDocument")
   caseAudioPublications CaseAudio[] @relation("CaseAudioTranscriptDocument")
   audioPublication CaseAudioPublication?
@@ -683,6 +685,30 @@ model Documento {
   @@index([clienteId])
   @@index([updatedAt])
   @@index([extractionStatus, extractionNextAttemptAt])
+}
+
+/// Virtual folders are scoped to a case. Filing does not revise the original.
+model CaseDocumentFolder {
+  id        String @id @default(cuid())
+  causaId   String
+  name      String
+  parentId  String?
+  createdAt DateTime @default(now())
+  causa     Causa @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  parent    CaseDocumentFolder? @relation("CaseDocumentFolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  CaseDocumentFolder[] @relation("CaseDocumentFolderTree")
+  documents CaseDocumentPlacement[]
+
+  @@index([causaId, parentId])
+}
+
+model CaseDocumentPlacement {
+  documentoId String @id
+  folderId    String
+  documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  folder      CaseDocumentFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@index([folderId])
 }
 
 model Plazo {

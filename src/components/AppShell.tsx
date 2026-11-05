@@ -172,7 +172,7 @@ export function AppShell({
             >
               <Bell size={18} aria-hidden="true" />
               {unreadCount > 0 && (
-                <span className="absolute -right-1 -top-1 min-w-[1.15rem] rounded-full bg-[var(--copper)] px-1 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
+                <span className="absolute -right-1 -top-1 min-w-[1.15rem] rounded-full bg-[var(--brand-iris)] px-1 py-0.5 text-center text-[10px] font-semibold leading-none text-[var(--brand-night)]">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}

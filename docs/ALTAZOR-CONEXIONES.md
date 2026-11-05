@@ -86,7 +86,7 @@ Los valores admiten hasta 2.000 bytes UTF-8. LexOpen no los incorpora al chat, g
 
 ### Instancias y almacenamiento
 
-Prepare un gateway Kitties independiente, con directorios nuevos, para cada profesional y ámbito. Las bibliotecas y ajustes globales del gateway no tienen el aislamiento entre usuarios de LexOpen: no reutilice esa instancia o sus datos para otra persona o causa. LexOpen reserva el endpoint y rechaza escritorios ajenos.
+Prepare un gateway de escritorio independiente, con directorios nuevos, para cada profesional y ámbito. Las bibliotecas y ajustes globales del gateway no tienen el aislamiento entre usuarios de LexOpen: no reutilice esa instancia o sus datos para otra persona o causa. LexOpen reserva el endpoint y rechaza escritorios ajenos.
 
 El escritorio utiliza contenedores, no una VM con kernel propio. No monte carpetas de expedientes, PostgreSQL, credenciales, configuración de Codex ni el directorio personal del Host. Entregue sólo los archivos elegidos para la tarea. Configure por separado el proveedor de IA del gateway.
 
@@ -100,34 +100,13 @@ Proteja directorios y respaldos del gateway con una cuenta de sistema dedicada y
 
 ### Construir el gateway reforzado
 
-El contrato se fija en el commit público **`6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3`** de `madkoding/kitties`. La selección de conexiones necesita el refuerzo incluido en LexOpen; activar `approvals: ask` en una compilación sin ese refuerzo no lo sustituye.
+La construcción del servicio usa una revisión fija, identificada en el [flujo de comprobación del escritorio](../.github/workflows/ci.yml). Ese flujo prepara una copia limpia, verifica la revisión, aplica el refuerzo de LexOpen y ejecuta sus pruebas antes de compilar. Si ya hay un paquete publicado para tu versión y arquitectura, sigue la [preparación del escritorio](ESCRITORIO-ALTAZOR.md).
 
-Desde la raíz de LexOpen, use directorios nuevos de construcción, sin configuración ni credenciales del usuario. Estos comandos preparan el ejecutable; no configuran cuentas ni arrancan el servicio:
-
-```bash
-ALTAZOR_CHECKOUT=/ruta/nueva/kitties-checkout
-ALTAZOR_SOURCE=/ruta/nueva/kitties-source
-git clone --no-checkout https://github.com/madkoding/kitties.git "$ALTAZOR_CHECKOUT"
-git -C "$ALTAZOR_CHECKOUT" checkout --detach 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3
-mkdir "$ALTAZOR_SOURCE"
-git -C "$ALTAZOR_CHECKOUT" archive HEAD | tar -xf - -C "$ALTAZOR_SOURCE"
-printf '%s\n' 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3 > "$ALTAZOR_SOURCE/.lexopen-source-commit"
-node scripts/altazor/harden-connectors.mjs "$ALTAZOR_SOURCE"
-(cd "$ALTAZOR_SOURCE" && go test ./internal/chat -run '^TestLexOpen' -count=1)
-make -C "$ALTAZOR_SOURCE" WEB=0 VERSION=lexopen-connector-gate-v1 build
-```
-
-Use la versión de Go requerida por el `go.mod` fijado y las herramientas de construcción del proyecto. El parche comprueba huellas antes de escribir, desactiva los cambios de permisos solicitados por el modelo y exige confirmación nueva por operación. Reaplicarlo a una fuente modificada falla: extraiga otra copia limpia en lugar de eliminar las comprobaciones. No lo ejecute sobre datos del gateway.
+Para compilar manualmente, reproduce esos pasos en directorios nuevos, sin archivos ni credenciales del usuario. El refuerzo valida las huellas de la revisión, desactiva los cambios de permisos solicitados por el modelo y exige confirmación por operación. No lo apliques sobre los datos de una instalación existente.
 
 La respuesta de salud de la compilación reforzada debe incluir `lexopen_connector_gate: "v1"` y `lexopen_connector_platform` con su sistema real. LexOpen exige esa capacidad antes de habilitar conexiones; un gateway sin el refuerzo puede seguir ofreciendo el escritorio sin conectores. El indicador es una capacidad del ejecutable administrado localmente, no una certificación externa.
 
-Prepare la imagen de escritorio y una configuración nueva siguiendo [Computadora: operación y prueba real](../src/lib/altazor/computer/README.md). Utilice un runtime disponible, directorios dedicados, listener en `127.0.0.1` o `::1`, puerto propio y token independiente. Para arrancar el gateway preparado:
-
-```bash
-"$ALTAZOR_SOURCE/dist/kitties" -config /ruta/privada/gateway.yaml gateway
-```
-
-El gateway puede imprimir su token al iniciar: no publique la salida sin revisar. Configure aplicaciones OAuth, permisos y proveedor únicamente en ese entorno. Las restricciones de red de una prueba aislada no constituyen la configuración productiva de sus cuentas.
+Prepara la imagen y una configuración nueva siguiendo la [guía del escritorio](ESCRITORIO-ALTAZOR.md). Usa un motor local disponible, directorios dedicados, una dirección local, puerto propio y autorización independiente. Revisa los registros del servicio antes de compartirlos: su salida puede contener datos de acceso.
 
 ### Habilitarlo en LexOpen
 
@@ -168,4 +147,4 @@ Las pruebas Go comprueban el refuerzo del contrato fijado. El job separado `alta
 | Autorización de secreto vencida o cambiada | Tome el control, seleccione el campo y prepare otra. Revise versión y acceso a la causa. |
 | No se puede descifrar | Revise la configuración segura original o sustituya el valor; no hay recuperación de texto sin la clave. |
 
-Fuentes del contrato fijado: [catálogo](https://github.com/madkoding/kitties/blob/6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3/internal/connector/catalog.go), [OAuth](https://github.com/madkoding/kitties/blob/6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3/internal/oauth/oauth.go), [ajustes](https://github.com/madkoding/kitties/blob/6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3/internal/orchestrator/settings.go) y [entrada manual por stdin](https://github.com/madkoding/kitties/blob/6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3/internal/orchestrator/control.go). Código de LexOpen: [catálogo](../src/lib/altazor/connectors/catalog.ts), [refuerzo](../scripts/altazor/harden-connectors.mjs), [Secretos](../src/lib/altazor/secrets/service.ts) y [flujo integrado](../src/lib/altazor/secrets/computer-secrets.integration.test.ts).
+Código de LexOpen: [catálogo](../src/lib/altazor/connectors/catalog.ts), [refuerzo](../scripts/altazor/harden-connectors.mjs), [Secretos](../src/lib/altazor/secrets/service.ts) y [flujo integrado](../src/lib/altazor/secrets/computer-secrets.integration.test.ts).

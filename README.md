@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/assets/lexopen-logo.svg" width="76" alt="LexOpen">
+  <img src="docs/assets/lexopen-logo.png" width="176" alt="LexOpen: un lector grabado con un libro abierto">
   <h1>LexOpen</h1>
   <p><strong>Tu estudio, con sus fuentes a la vista.</strong></p>
   <p>Causas, biblioteca, investigación, audiencias y escritos. ALTAZOR te acompaña en cada apartado.</p>
@@ -10,13 +10,13 @@
   <p><a href="#trabajar-con-lexopen">Recorrido</a> · <a href="#altazor-tu-asistente">ALTAZOR</a> · <a href="#académico">Académico</a> · <a href="#sincronización">Sincronización</a> · <a href="#instalar">Instalar</a></p>
 </div>
 
-![Inicio real de LexOpen en MIDNIGHT: Altazor AI, Tu asistente, y una conversación limpia](docs/conversation-first-2026-11-05/inicio-escritorio.jpg)
+![Inicio de LexOpen en MIDNIGHT: conversación con Altazor AI y acceso a su escritorio debajo del mensaje](docs/puesto-altazor-2026-11-05/inicio-escritorio.jpg)
 
 LexOpen es una aplicación abierta para profesionales y estudios jurídicos. Reúne el expediente y sus documentos con el trabajo diario del estudio, y conserva el vínculo entre una afirmación, su cita y el pasaje que la respalda. Puedes organizar causas de cualquier país manualmente o activar la conexión con el Poder Judicial de Chile.
 
 **Código actual: `1.1.0-preview.6`.** Descarga únicamente los paquetes efectivamente publicados en [GitHub Releases](https://github.com/gabrielperezibacache/lexopen/releases). Los instaladores anteriores no incorporan necesariamente las funciones del código actual.
 
-Las imágenes de esta portada son **capturas reales de la aplicación con datos ficticios**. No acreditan cuentas de Google u OJV conectadas. [Galería, procedencia y alcance de las pruebas](docs/conversation-first-2026-11-05/README.md).
+La nueva identidad reúne un grabado clásico, fondos índigo y texto plateado. Las imágenes son **capturas reales de LexOpen con datos ficticios**. [Ver la portada, el ingreso, Altazor y Mis Causas en escritorio y móvil](docs/puesto-altazor-2026-11-05/README.md).
 
 ## Trabajar con LexOpen
 
@@ -38,12 +38,18 @@ Inicio y el acompañante lateral comparten **la misma conversación**. Escribe u
 - **Memoria con relaciones:** recuerdos confirmados y un grafo consultable; puedes corregir o retirar lo que conservas. También recupera intercambios anteriores relevantes del mismo ámbito. Una conversación antigua no se presenta como una cita verificada ni una inferencia del modelo se convierte por sí sola en un recuerdo confirmado.
 - **Herramientas del estudio:** consulta de causas y biblioteca; tareas, agenda, notas, audiencias y preparación de escritos. Guardar una respuesta con fuentes como escrito requiere confirmación y una causa accesible.
 - **Trabajo en segundo plano:** los mensajes enviados quedan guardados y el Host puede continuarlos sin su pestaña. No se repiten automáticamente operaciones interrumpidas o de resultado incierto. Un encargo que esperó más de un día pide revisión.
-- **Computadora separada:** sesiones con los archivos elegidos, vista del escritorio, control manual y resultados revisables. Requiere preparar el servicio de escritorio y su proveedor; no toma el navegador habitual del profesional.
+- **Escritorio:** debajo del mensaje puedes ver si el escritorio está abierto, trabajando o esperando tu confirmación. La vista de Inicio es de lectura y se pausa durante el control manual. El escritorio separado acepta los archivos que elijas, incluidos PDF, Office, ODT, EPUB y audio compatible. [Herramientas y preparación](docs/ESCRITORIO-ALTAZOR.md).
 - **Conexiones y Secretos:** catálogo de servicios, permisos por operación y Secretos cifrados. El servicio de escritorio tiene sus propios requisitos de protección de credenciales. La escritura de un secreto en el escritorio usa una autorización breve y de un solo uso; no pulsa Enter ni envía el formulario.
 
 ![El mismo acompañante de ALTAZOR abierto sobre la biblioteca; borrador y datos ficticios](docs/conversation-first-2026-11-05/acompanante-biblioteca.jpg)
 
 La continuidad de ejecución requiere que el Host y los servicios necesarios estén disponibles. La elección de modelo, el acceso a servicios externos y el uso de la computadora tienen configuración y requisitos propios. [Guía de ALTAZOR](docs/ALTAZOR.md) · [Conexiones y Secretos](docs/ALTAZOR-CONEXIONES.md) · [Cuenta personal de Codex](docs/CODEX.md).
+
+## IA local
+
+En **Configuración → Conexiones e IA**, el equipo principal puede comprobar Ollama, descargar y verificar un perfil ligero y probarlo antes de usarlo. Qwen3 0.6B, Qwen3 1.7B y Gemma 3 1B tienen descargas de aproximadamente 523 MB, 1,36 GB y 806 MB. Son perfiles para clasificación, extracción y borradores breves. Las citas siguen remitiendo a los pasajes comprobados.
+
+El tamaño de descarga y la RAM son medidas distintas. Qwen3 0.6B alcanzó 1,35 GB de memoria residente en una prueba breve de llama.cpp en CPU de un Mac M4 Max. [Configuración, medición y herramientas locales](docs/IA-LOCAL.md).
 
 ## Una biblioteca propia
 
@@ -78,6 +84,12 @@ Las instalaciones nuevas empiezan en gestión manual. Cambiar la modalidad conse
 
 [Ver configuración](docs/conversation-first-2026-11-05/configuracion-causas.jpg) · [Causa manual de ejemplo](docs/conversation-first-2026-11-05/nueva-causa-manual.jpg) · [Vista PJUD](docs/conversation-first-2026-11-05/pjud-escritorio.jpg).
 
+### Mis Causas
+
+Desde Causas, abre **Mis Causas** para entrar al expediente documental. Allí puedes crear carpetas, mover documentos dentro de la causa y volver al original o consultar a Altazor sobre un archivo. El orden del expediente no cambia la procedencia, las versiones ni los pasajes que respaldan citas existentes.
+
+El expediente reúne cargas manuales y copias importadas de OJV o Drive. Puedes trabajar con archivos locales y, si hay una cuenta y carpeta del estudio autorizadas, conservar también el original en Drive. Los documentos de una carpeta vinculada se incorporan explícitamente o mediante la sincronización que hayas activado.
+
 ## Sincronización
 
 ### Google Drive
@@ -109,6 +121,8 @@ Descarga una versión publicada en [Releases](https://github.com/gabrielpereziba
 | Linux | x64 | `.AppImage`, `.deb` |
 
 Son versiones preliminares. El manifiesto de cada publicación informa revisión, integridad y estado de firma; comprobar un paquete en CI no sustituye instalar y actualizar la aplicación gráfica en cada equipo. OCR, modelos, transcripción y computadora de ALTAZOR tienen requisitos independientes. [Instaladores](docs/INSTALADORES.md) · [Desktop](docs/DESKTOP.md).
+
+En el primer arranque del Host, **Comprobar escritorio** indica si el motor y el perfil de herramientas están disponibles. El perfil reúne LibreOffice, OCR en español e inglés, PDF, EPUB, bibliografía, audio y búsqueda de archivos. [Preparación del escritorio](docs/ESCRITORIO-ALTAZOR.md) · [Plan del puesto de trabajo](docs/PLAN-PUESTO-DE-TRABAJO-ALTAZOR.md).
 
 <details>
 <summary><strong>Preparar un Host desde el código</strong></summary>
@@ -168,7 +182,7 @@ npm run test:integration
 npm run build
 ```
 
-[Auditoría de 64 rutas](docs/AUDITORIA-INTERFAZ-2026-11-05.md) · [Plan por apartado](docs/PLAN-DESARROLLO-2026-11-05.md) · [Sistema gráfico y procedencia](docs/REFERENCIAS-GRAFICAS-2026-11-05.md) · [Simplificación y modalidades de causas](docs/INTERFAZ-CONVERSACION-2026-11-05.md) · [Validación y capturas de esta revisión](docs/conversation-first-2026-11-05/README.md).
+[Auditoría de 64 rutas](docs/AUDITORIA-INTERFAZ-2026-11-05.md) · [Plan por apartado](docs/PLAN-DESARROLLO-2026-11-05.md) · [Sistema gráfico y procedencia](docs/REFERENCIAS-GRAFICAS-2026-11-05.md) · [Simplificación y modalidades de causas](docs/INTERFAZ-CONVERSACION-2026-11-05.md) · [Capturas de la identidad actual](docs/puesto-altazor-2026-11-05/README.md) · [Galería anterior de flujos](docs/conversation-first-2026-11-05/README.md).
 
 ## Licencia
 

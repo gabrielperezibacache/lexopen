@@ -149,7 +149,7 @@ export function PjudSettingsPanel() {
             hint="Variable CAPTCHA_SOLVER_FALLBACK"
           />
           {pjud.captchaSnippet && (
-            <pre className="mt-3 overflow-x-auto rounded-xl bg-[#0c1c24] p-3 text-xs text-white/85">
+            <pre className="mt-3 overflow-x-auto rounded-xl bg-[var(--brand-night)] p-3 text-xs text-white/85">
               {pjud.captchaSnippet}
             </pre>
           )}

@@ -23,7 +23,7 @@ export function PjudOpsLogPanel({
   return (
     <div
       id="pjud-log"
-      className="min-w-0 rounded-2xl border border-[var(--line)] bg-[#0c1c24] p-4 text-sm text-white/90"
+      className="min-w-0 rounded-2xl border border-[var(--line)] bg-[var(--brand-night)] p-4 text-sm text-white/90"
       data-testid="pjud-ops-log"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">

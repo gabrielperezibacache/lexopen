@@ -30,6 +30,8 @@ type Props = {
   /** Associate uploads with a CRM client folder. */
   lockedClienteId?: string | null;
   compact?: boolean;
+  allowDriveCopy?: boolean;
+  destinationFolder?: { id: string; name: string };
   onComplete?: () => void;
 };
 
@@ -80,6 +82,8 @@ export function DocumentoIngestForm({
   causas = [],
   lockedCausaId = null,
   lockedClienteId = null,
+  allowDriveCopy = true,
+  destinationFolder,
   onComplete,
 }: Props) {
   const router = useRouter();
@@ -145,7 +149,16 @@ export function DocumentoIngestForm({
     }
     const body = result.data;
 
-    if (pushDrive && body.id && resolvedCausaId) {
+    if (destinationFolder && body.id && resolvedCausaId) {
+      const placement = await apiMutation(`/api/causas/${encodeURIComponent(resolvedCausaId)}/expediente`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "move-documents", documentIds: [body.id], folderId: destinationFolder.id }),
+      });
+      if (!placement.ok) return { warning: `Guardado en la raíz del expediente. ${placement.error}` };
+    }
+
+    if (allowDriveCopy && pushDrive && body.id && resolvedCausaId) {
       const driveResult = await apiMutation<{
         error?: string;
         status?: string;
@@ -231,6 +244,7 @@ export function DocumentoIngestForm({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Incorporar al expediente</h2>
+          {destinationFolder && <p className="mt-1 break-all text-sm text-[var(--muted)]">Carpeta de destino · {destinationFolder.name}</p>}
         </div>
         <div className="flex gap-2">
           <button
@@ -321,14 +335,14 @@ export function DocumentoIngestForm({
           />
           Privilegio
         </label>
-      <label className="flex min-h-11 items-center gap-3 text-sm leading-relaxed sm:col-span-2">
+      {allowDriveCopy && <label className="flex min-h-11 items-center gap-3 text-sm leading-relaxed sm:col-span-2">
         <input
           type="checkbox"
           checked={pushDrive}
           onChange={(e) => setPushDrive(e.target.checked)}
         />
-        Guardar una copia del texto en Google Drive de la causa
-      </label>
+        Guardar también una copia en Google Drive de la causa
+      </label>}
         </fieldset>
       </details>}
 

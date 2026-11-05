@@ -2,9 +2,10 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
     />
     <title>LexOpen — Configuración</title>
     <!--SETUP_CSS-->
@@ -12,7 +13,7 @@
   <body>
     <main class="shell">
       <header>
-        <p class="eyebrow">LexOpen Desktop</p>
+        <img class="brand-mark" src="<!--SETUP_BRAND-->" alt="LexOpen" width="104" height="104" />
         <h1>Servidor del estudio o acceso remoto</h1>
         <p class="lede">
           Un PC principal guarda usuarios y datos. El resto se conecta por
@@ -41,7 +42,7 @@
       </section>
 
       <section id="host-fields" class="fields">
-        <div>
+        <div class="data-directory">
           <strong>Carpeta de datos</strong>
           <p class="hint">Elija una carpeta vacía existente o los datos de una instalación anterior. No se moverán ni copiarán archivos automáticamente.</p>
           <button id="choose-data-directory" type="button" class="secondary">Elegir carpeta existente…</button>
@@ -63,6 +64,16 @@
           <input id="seedDemo" type="checkbox" />
           Cargar datos demo la primera vez
         </label>
+        <details class="desktop-preparation">
+          <summary>Escritorio de Altazor</summary>
+          <p class="hint">Comprueba si este equipo puede abrir el escritorio con sus herramientas de oficina, PDF, OCR y audio.</p>
+          <div class="actions">
+            <button id="check-altazor-desktop" type="button" class="secondary">Comprobar escritorio</button>
+            <button id="load-altazor-toolpack" type="button" class="secondary">Cargar paquete oficial…</button>
+            <button id="desktop-guide" type="button" class="secondary">Guía de preparación</button>
+          </div>
+          <p id="altazor-desktop-status" class="hint" role="status" hidden></p>
+        </details>
       </section>
 
       <section class="fields" aria-label="Actualizaciones">

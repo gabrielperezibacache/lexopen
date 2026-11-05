@@ -39,3 +39,5 @@ assert.doesNotMatch(builder, /^extraResources:/m);
 
 console.log("desktop/renderer.test.cjs OK");
 require("./media-permissions.test.cjs");
+require("./altazor-desktop-profile.test.cjs");
+require("./altazor-toolpack.test.cjs");

@@ -1,18 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowRight,
-  BookOpen,
-  Bot,
-  Building2,
-  FolderSync,
-  Sheet,
-  Shield,
-} from "lucide-react";
+import { ArrowRight, BookOpen, Bot, Building2, FolderSync, Sheet, Shield } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
-import { FolioSymbol } from "@/components/ui/FolioSymbol";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import "./welcome.css";
 
 const moduleIcons = [Building2, Shield, Sheet, BookOpen, FolderSync, Bot];
 
@@ -20,92 +13,81 @@ export default function LandingPage() {
   const { dict, t } = useI18n();
 
   return (
-    <div className="relative overflow-hidden">
-      <div className="hero-glow pointer-events-none absolute -right-24 top-0 h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(196,122,58,0.28),transparent_70%)]" />
-      <div className="pointer-events-none absolute -left-20 top-40 h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(31,111,120,0.22),transparent_70%)]" />
-
-      <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="folio-brand grid h-11 w-11 shrink-0 place-items-center rounded-xl">
-            <FolioSymbol className="h-8 w-8" />
-          </span>
-          <div className="min-w-0">
-            <div className="display text-2xl leading-none">LexOpen</div>
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--ink-soft)]/70">
-              {t("brand.openPlatform")}
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+    <div className="lexopen-welcome">
+      <header className="edition-header edition-width">
+        <Link href="/" className="edition-wordmark">
+          <Image src="/icons/lexopen-reader-192.png" width={40} height={40} alt="" />
+          <span className="display">LexOpen</span>
+        </Link>
+        <nav className="edition-nav" aria-label={t("login.access")}>
           <LanguageSwitcher variant="compact" />
           <Link href="/login" className="btn btn-ghost">
             {t("landing.signIn")}
           </Link>
-          <Link href="/login" className="btn btn-primary">
-            {t("landing.enterFirm")} <ArrowRight size={16} />
+          <Link href="/login" className="btn btn-primary edition-firm-link">
+            {t("landing.enterFirm")} <ArrowRight size={16} aria-hidden="true" />
           </Link>
-        </div>
+        </nav>
       </header>
 
-      <section className="relative mx-auto grid max-w-6xl gap-10 px-6 pb-20 pt-10 md:grid-cols-[1.15fr_0.85fr] md:items-end md:pt-16">
-        <div className="fade-up">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--sea)]">
-            {t("landing.eyebrow")}
-          </p>
-          <h1 className="display text-5xl leading-[1.05] text-[var(--ink)] md:text-6xl lg:text-7xl">
-            LexOpen
-          </h1>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-[var(--ink-soft)]/85">
-            {t("landing.lead")}
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/login" className="btn btn-primary">
-              {t("landing.openPlatform")}
-            </Link>
-            <Link href="/login?next=/inicio" className="btn btn-secondary">
-              {t("landing.seeDemo")}
-            </Link>
-          </div>
-        </div>
-
-        <div className="fade-up-delay relative min-h-[340px] overflow-hidden rounded-[2rem] border border-[var(--line)] bg-[linear-gradient(160deg,#0c1c24_0%,#1a3d3f_55%,#2a4d3a_100%)] p-6 text-white shadow-[var(--shadow)]">
-          <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:28px_28px]" />
-          <div className="relative">
-            <div className="text-xs uppercase tracking-[0.18em] text-white/50">
-              {t("landing.matterLabel")}
-            </div>
-            <div className="display mt-3 text-3xl">Andes · C-4521-2025</div>
-            <p className="mt-2 text-sm text-white/70">{t("landing.matterMeta")}</p>
-            <div className="mt-8 space-y-3">
-              {dict.landing.bullets.map((item) => (
-                <div
-                  key={item}
-                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm"
-                >
-                  {item}
-                </div>
-              ))}
+      <main className="edition-width">
+        <section className="edition-hero" aria-labelledby="edition-title">
+          <div className="edition-intro">
+            <h1 id="edition-title" className="display">{t("login.storyTitle")}</h1>
+            <p>{t("login.storyBody")}</p>
+            <div className="edition-actions">
+              <Link href="/login" className="btn btn-primary">
+                {t("landing.openPlatform")} <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+              <Link href="/login?next=/inicio" className="btn btn-ghost">
+                {t("landing.seeDemo")}
+              </Link>
             </div>
           </div>
-        </div>
-      </section>
+          <Image
+            src="/icons/icon-512.png"
+            width={512}
+            height={512}
+            sizes="(max-width: 640px) 272px, (max-width: 880px) 352px, 512px"
+            alt=""
+            loading="eager"
+            fetchPriority="high"
+            className="edition-engraving edition-hero-art"
+          />
+        </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="fade-up-delay-2 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          {dict.landing.modules.map((mod, i) => {
-            const Icon = moduleIcons[i] || Building2;
-            return (
-              <article key={mod.title} className="panel rounded-3xl p-4">
-                <Icon className="text-[var(--copper)]" size={20} />
-                <h2 className="mt-3 text-base font-semibold">{mod.title}</h2>
-                <p className="mt-1 text-xs leading-relaxed text-[var(--ink-soft)]/80">
-                  {mod.text}
-                </p>
-              </article>
-            );
-          })}
-        </div>
-      </section>
+        <section className="edition-index" aria-labelledby="edition-index-title">
+          <div className="edition-index-copy">
+            <h2 id="edition-index-title" className="display">{t("brand.openPlatform")}</h2>
+            <p>{t("landing.lead")}</p>
+          </div>
+          <ul className="edition-modules">
+            {dict.landing.modules.map((mod, i) => {
+              const Icon = moduleIcons[i] || Building2;
+              return (
+                <li key={mod.title}>
+                  <Icon size={20} aria-hidden="true" />
+                  <div>
+                    <h3>{mod.title}</h3>
+                    <p>{mod.text}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
+        <section className="edition-matter" aria-labelledby="edition-matter-title">
+          <div>
+            <h2 id="edition-matter-title" className="display">{t("landing.matterLabel")}</h2>
+            <p className="edition-matter-name">Andes · C-4521-2025</p>
+            <p>{t("landing.matterMeta")}</p>
+          </div>
+          <ul>
+            {dict.landing.bullets.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </section>
+      </main>
     </div>
   );
 }

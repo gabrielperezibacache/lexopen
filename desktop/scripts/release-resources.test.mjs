@@ -150,7 +150,11 @@ try {
 } finally { fs.rmSync(root, { recursive: true }); }
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const metadata = JSON.parse(fs.readFileSync(path.join(repo, "desktop/build/icons-source.json"), "utf8"));
-assert.equal(metadata.sourceSha256, sha256(path.join(repo, "src/app/icon.svg")));
+assert.equal(metadata.source, "docs/assets/lexopen-lockup.png");
+assert.equal(metadata.sourceSha256, sha256(path.join(repo, metadata.source)));
+assert.equal(metadata.reader, "docs/assets/lexopen-engraving.png");
+assert.equal(metadata.readerSha256, sha256(path.join(repo, metadata.reader)));
+assert.equal(sha256(path.join(repo, "src/app/favicon.ico")), sha256(path.join(repo, "desktop/build/icon.ico")));
 const png = fs.readFileSync(path.join(repo, "desktop/build/icon.png")); assert.equal(png.readUInt32BE(16), 1024); assert.equal(png.readUInt32BE(20), 1024);
 const ico = fs.readFileSync(path.join(repo, "desktop/build/icon.ico")); assert.equal(ico.readUInt16LE(2), 1); assert.equal(ico.readUInt16LE(4), 6);
 const icns = fs.readFileSync(path.join(repo, "desktop/build/icon.icns")); assert.equal(icns.toString("ascii", 0, 4), "icns"); assert.equal(icns.readUInt32BE(4), icns.length);

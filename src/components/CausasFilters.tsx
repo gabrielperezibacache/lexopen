@@ -8,11 +8,11 @@ import { MATERIAS, ESTADOS_CAUSA } from "@/lib/chile";
 import type { CaseManagementMode } from "@/lib/causas/management-mode";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
-function FiltersInner({ defaultEstado, mode }: { defaultEstado: string; mode: CaseManagementMode }) {
+function FiltersInner({ defaultEstado, mode, basePath }: { defaultEstado: string; mode: CaseManagementMode; basePath?: string }) {
   const router = useRouter(), sp = useSearchParams(), id = useId();
   const { t, locale } = useI18n(), tr = (es: string, en: string) => locale === "en" ? en : es;
   const [expanded, setExpanded] = useState(false);
-  const connected = mode === "pjud_cl", base = connected ? "/pjud" : "/causas";
+  const connected = mode === "pjud_cl", base = basePath || (connected ? "/pjud" : "/causas");
   const estadoValue = sp.get("estado") || defaultEstado || "activa";
   const activeFilters = Number(Boolean(sp.get("materia"))) + Number(estadoValue !== "activa") + (connected ? Number(Boolean(sp.get("origen"))) + Number(Boolean(sp.get("monitoreo"))) : 0);
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -44,6 +44,6 @@ function FiltersInner({ defaultEstado, mode }: { defaultEstado: string; mode: Ca
   </form>;
 }
 
-export function CausasFilters({ defaultEstado = "activa", mode = "manual" }: { defaultEstado?: string; mode?: CaseManagementMode }) {
-  return <Suspense fallback={<div className="h-12" />}><FiltersInner defaultEstado={defaultEstado} mode={mode} /></Suspense>;
+export function CausasFilters({ defaultEstado = "activa", mode = "manual", basePath }: { defaultEstado?: string; mode?: CaseManagementMode; basePath?: string }) {
+  return <Suspense fallback={<div className="h-12" />}><FiltersInner defaultEstado={defaultEstado} mode={mode} basePath={basePath} /></Suspense>;
 }

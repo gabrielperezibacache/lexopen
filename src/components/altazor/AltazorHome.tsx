@@ -8,6 +8,7 @@ import { AltazorMark } from "./AltazorMark";
 import { AltazorMemory } from "./AltazorMemory";
 import { AltazorConnections } from "./AltazorConnections";
 import { AltazorComputer } from "./AltazorComputer";
+import { AltazorDesktopActivity } from "./AltazorDesktopActivity";
 import { useAltazorCompanion } from "./AltazorCompanionProvider";
 import type { ConversationData } from "./useAltazorCompanionState";
 import { withCsrfHeaders } from "@/lib/client-csrf";
@@ -17,9 +18,10 @@ async function request<T>(url: string, body?: unknown, method = "POST"): Promise
   const response = await fetch(url, { method: body === undefined ? "GET" : method, headers: body === undefined ? undefined : withCsrfHeaders({ "Content-Type": "application/json" }), body: body === undefined ? undefined : JSON.stringify(body), cache: "no-store" });
   const data = await response.json(); if (!response.ok) throw Object.assign(new Error(data.error || "No se pudo completar la acción. Tu trabajo se conserva."), { status: response.status }); return data;
 }
-export function AltazorHome() {
+export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivity?: boolean }) {
   const { libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, chooseConversation, send, upload, turnAction, running, preference, preferenceSaving, savePreference } = useAltazorCompanion();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [desktopSelection, setDesktopSelection] = useState<{ causaId: string | null; id: string | null } | null>(null);
   const historyRef = useRef<HTMLElement>(null), followLatest = useRef(true);
   const lastTurn = data?.turns.at(-1);
   useEffect(() => { followLatest.current = true; }, [activeId]);
@@ -54,11 +56,15 @@ export function AltazorHome() {
         {data?.attachments.length ? <details className="altazor-attachment-archive" open={attachmentIds.length ? true : undefined}><summary>Archivos de la conversación <span>{data.attachments.length}</span></summary><ul className="altazor-attachments">{data.attachments.map(file => <li key={file.id}><span>{file.sourceName}{file.status !== "ready" && <small>{file.status === "processing" ? "Preparando…" : "Revisar archivo"}</small>}</span>{attachmentIds.includes(file.id) ? <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`No adjuntar ${file.sourceName}`} onClick={() => setAttachmentIds(previous => previous.filter(id => id !== file.id))}><X size={16} /></button> : <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`Adjuntar de nuevo ${file.sourceName}`} onClick={() => setAttachmentIds(previous => [...previous,file.id])}><Paperclip size={16} /></button>}<details className="altazor-attachment-options"><summary aria-label={`Opciones de ${file.sourceName}`}><Ellipsis size={18} /></summary><div><a href={`/api/altazor/conversations/${activeId}/attachments/${file.id}/original`}>Descargar original</a><button type="button" disabled={busy||uploading} onClick={()=>{setBusy(true);setError("");void request<{book:{id:string;title:string}}>(`/api/altazor/conversations/${activeId}/attachments/${file.id}/library`,{}).then(result=>setLibraryNotice(result.book)).catch(reason=>setError(reason.message)).finally(()=>setBusy(false));}}>Guardar en biblioteca</button><button type="button" disabled={busy} aria-label={`Retirar archivo ${file.sourceName}`} onClick={() => { void request(`/api/altazor/conversations/${activeId}/attachments/${file.id}`,{},"DELETE").then(() => { setAttachmentIds(previous => previous.filter(id => id !== file.id)); return reload(activeId); }).catch(reason => setError(reason.message)); }}>Retirar de la conversación</button></div></details></li>)}</ul></details> : null}
 
       </section>
+      {showDesktopActivity && pane === "chat" && <AltazorDesktopActivity key={currentCase ?? "personal"} causaId={currentCase} onOpen={id => {
+        setDesktopSelection({ causaId: currentCase, id });
+        choosePane("computer");
+      }} />}
     </div>
     <Sheet open={historyOpen} onClose={() => setHistoryOpen(false)} title="Conversaciones"><ul className="altazor-conversation-list">{conversations.map(conversation => <li key={conversation.id}><button type="button" aria-current={activeId === conversation.id ? "true" : undefined} disabled={busy || uploading} onClick={() => { chooseConversation(conversation.id); setHistoryOpen(false); }}>{conversation.title}</button></li>)}{conversations.length === 0 && <li>Tus conversaciones aparecerán aquí.</li>}</ul><Link className="btn btn-ghost" href="/agente/archivo" onClick={() => setHistoryOpen(false)}>Archivo de conversaciones anteriores</Link></Sheet>
     {visited.includes("memory") && <div hidden={pane !== "memory"}><AltazorMemory causaId={currentCase} /></div>}
     {visited.includes("connectors") && <div hidden={pane !== "connectors"}><AltazorConnections causaId={currentCase} /></div>}
-    {visited.includes("computer") && <div hidden={pane !== "computer"}><AltazorComputer causaId={currentCase} /></div>}
+    {visited.includes("computer") && <div hidden={pane !== "computer"}><AltazorComputer causaId={currentCase} active={pane === "computer"} preferredSessionId={desktopSelection?.causaId === currentCase ? desktopSelection.id : null} /></div>}
 
   </div>;
 }

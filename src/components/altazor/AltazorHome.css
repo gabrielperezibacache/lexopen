@@ -171,13 +171,13 @@
 }
 @media(prefers-reduced-motion:reduce) { .altazor-header .altazor-companion { animation:none; } }
 
-.altazor-case-context { display:block; margin-top:.3rem; color:var(--muted); font-size:.875rem; }
+.altazor-case-context { display:block; margin-top:.3rem; color:var(--muted); font-size:var(--text-sm); }
 .altazor-clarification { display:grid; gap:.5rem; padding:1rem 0; line-height:1.7; color:var(--ink); }
 .altazor-clarification strong { color:var(--sea); }
 .altazor-connection-notice { padding:.5rem; color:var(--ink-soft); line-height:1.6; }
 .altazor-connection-notice button { color:var(--sea); text-decoration:underline; min-height:44px; }
 .altazor-attachment-archive { margin-top:.75rem; }
-.altazor-attachment-archive>summary { display:flex; gap:.6rem; align-items:center; color:var(--ink-soft); font-size:.875rem; }
+.altazor-attachment-archive>summary { display:flex; gap:.6rem; align-items:center; color:var(--ink-soft); font-size:var(--text-sm); }
 .altazor-attachment-archive>summary span { color:var(--muted); }
 .altazor-attachments { margin-top:.25rem; gap:.25rem; }
 .altazor-attachments>li>span { flex:1; min-width:0; overflow-wrap:anywhere; }

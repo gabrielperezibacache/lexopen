@@ -56,6 +56,7 @@ export const es = {
     pendingItems: "pendientes",
     shortcuts: "Accesos de trabajo",
     caseFiles: "Expedientes",
+    myMatters: "Mis Causas",
     caseDocuments: "Documentos de causas",
     ownedLibrary: "Mis libros y sentencias",
     officialResearch: "Investigación oficial",

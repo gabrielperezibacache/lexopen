@@ -1,6 +1,6 @@
 /**
  * Block SSRF to localhost / private / link-local / metadata hosts.
- * Shared by Hermes and other outbound HTTP integrations.
+ * Shared by the study AI and other outbound HTTP integrations.
  */
 
 /** DNS-rebinding helper zones that can point at private addresses. */

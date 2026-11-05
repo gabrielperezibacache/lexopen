@@ -1,7 +1,10 @@
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { allDayEventDates } from "@/lib/chile-time";
+import { writeAuditStrict } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { canSeeConfidential } from "@/lib/auth/rbac";
+import { canSeeConfidential, isStaff } from "@/lib/auth/rbac";
+import { httpError } from "@/lib/auth/access";
+import { assertCausaCapability, documentReadWhere } from "@/lib/auth/causa-access";
 import { getObject } from "@/lib/storage";
 import {
   driveFolderUrl,
@@ -455,6 +458,7 @@ export async function uploadFileToDrive(opts: {
   convertToGoogleDoc?: boolean;
   folderId?: string | null;
   existingFileId?: string | null;
+  reservedFileId?: string;
   accessToken: string;
 }): Promise<DriveFileResult> {
   const bytes =
@@ -499,6 +503,7 @@ export async function uploadFileToDrive(opts: {
       ? "application/vnd.google-apps.document"
       : opts.contentMimeType || "application/octet-stream",
   };
+  if (opts.reservedFileId) metadata.id = opts.reservedFileId;
   if (opts.folderId && isRealDriveFolderId(opts.folderId)) {
     metadata.parents = [opts.folderId];
   }
@@ -520,7 +525,7 @@ export async function uploadFileToDrive(opts: {
   const body = Buffer.concat([metaPart, contentHeader, bytes, closing]);
 
   const res = await googleFetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true",
     {
       method: "POST",
       headers: {
@@ -528,9 +533,12 @@ export async function uploadFileToDrive(opts: {
         "Content-Type": `multipart/related; boundary=${boundary}`,
       },
       body: new Uint8Array(body),
+      ...(opts.reservedFileId ? { signal: AbortSignal.timeout(60_000) } : {}),
     }
   );
 
+  // The caller verifies the reserved object independently before linking it.
+  if (opts.reservedFileId && res.status === 409) return { id: opts.reservedFileId, name: opts.name };
   if (!res.ok) {
     const detail = await readGoogleError(res);
     console.error("Google Drive upload failed", res.status, detail);
@@ -541,6 +549,47 @@ export async function uploadFileToDrive(opts: {
   }
 
   return (await res.json()) as DriveFileResult;
+}
+
+/** A reservation is durable before any bytes leave LexOpen. Retries share the same Drive ID. */
+async function reserveDriveOriginal(input: {
+  documentoId: string; storageKey: string; folderId: string; sourceSha256: string; actorId: string; accessToken: string;
+}) {
+  const inputHash = createHash("sha256").update(JSON.stringify([input.documentoId, input.storageKey, input.folderId, input.sourceSha256])).digest("hex");
+  const key = `drive-original:${inputHash}`;
+  let receipt = await prisma.commandExecution.findUnique({ where: { key } });
+  if (!receipt) {
+    const response = await googleFetch("https://www.googleapis.com/drive/v3/files/generateIds?count=1&space=drive&type=files", {
+      headers: { Authorization: `Bearer ${input.accessToken}` }, signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) throw httpError("Drive no pudo reservar un lugar para la copia", 502);
+    const { ids } = await response.json() as { ids?: string[] };
+    const fileId = ids?.[0];
+    if (typeof fileId !== "string" || !/^[A-Za-z0-9_-]{10,180}$/.test(fileId)) throw httpError("Drive devolvió una reserva inválida", 502);
+    await prisma.commandExecution.createMany({
+      data: [{ key, ownerId: input.actorId, inputHash, status: "reserved", resultJson: JSON.stringify({ fileId }) }],
+      skipDuplicates: true,
+    });
+    receipt = await prisma.commandExecution.findUniqueOrThrow({ where: { key } });
+  }
+  const result = JSON.parse(receipt.resultJson || "{}") as { fileId?: string };
+  if (receipt.inputHash !== inputHash || !result.fileId || !/^[A-Za-z0-9_-]{10,180}$/.test(result.fileId)) {
+    throw httpError("Revisa la copia anterior en Drive antes de continuar", 409);
+  }
+  return { receiptId: receipt.id, fileId: result.fileId };
+}
+
+async function verifiedDriveOriginal(input: { fileId: string; folderId: string; sourceSha256: string; accessToken: string }) {
+  const response = await googleFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(input.fileId)}?fields=id,name,parents,trashed,sha256Checksum&supportsAllDrives=true`, {
+    headers: { Authorization: `Bearer ${input.accessToken}` }, signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw httpError("Drive aún no confirma la copia. Puedes volver a consultar el mismo archivo.", 502);
+  const file = await response.json() as { id: string; name: string; parents?: string[]; trashed?: boolean; sha256Checksum?: string };
+  if (file.id !== input.fileId || file.trashed !== false || file.parents?.length !== 1 ||
+      file.parents[0] !== input.folderId || file.sha256Checksum !== input.sourceSha256) {
+    throw httpError("La copia de Drive no coincide con el original o con la carpeta elegida", 409);
+  }
+  return { id: file.id, name: file.name };
 }
 
 /** @deprecated Prefer uploadFileToDrive. Kept for call-site clarity. */
@@ -874,7 +923,7 @@ export async function deleteGoogleCalendarEvent(googleEventId: string) {
 /** Sube un documento a Drive (binario original o Markdown → Google Doc). */
 export async function pushDocumentoToDrive(
   documentoId: string,
-  opts?: { role?: string }
+  opts?: { role?: string; scopedCopy?: { folderId: string; actorId: string } }
 ) {
   const doc = await prisma.documento.findUnique({
     where: { id: documentoId },
@@ -891,6 +940,32 @@ export async function pushDocumentoToDrive(
 
   const folderId = doc.causa?.googleDriveFolderId || null;
   const realFolder = isRealDriveFolderId(folderId) ? folderId : null;
+  const scopedCopy = opts?.scopedCopy;
+  async function confirmStudyDestination() {
+    if (!scopedCopy) return;
+    const actor = await prisma.user.findUnique({
+      where: { id: scopedCopy.actorId },
+      select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true },
+    });
+    if (!actor || !isStaff(actor.role) || !doc?.causaId) throw httpError("Documento no encontrado", 404);
+    const current = await prisma.documento.findFirst({
+      where: { AND: [{ id: documentoId, causaId: doc.causaId }, documentReadWhere(actor)] },
+      select: { storageKey: true, confidencial: true, privilegio: true, googleDriveId: true, causa: {
+        select: { googleDriveFolderId: true, driveSyncSubscription: { select: { account: true } } },
+      } },
+    });
+    if (!current) throw httpError("Documento no encontrado", 404);
+    await assertCausaCapability(doc.causaId, actor, "causa.write");
+    if (current.confidencial || current.privilegio) throw httpError("El archivo está marcado como reservado", 403);
+    if (!/^[A-Za-z0-9_-]{10,180}$/.test(scopedCopy.folderId) || !realFolder || realFolder !== scopedCopy.folderId ||
+      current.causa?.googleDriveFolderId !== scopedCopy.folderId ||
+      (current.causa.driveSyncSubscription && current.causa.driveSyncSubscription.account !== "study")) {
+      throw httpError("La carpeta del Drive del estudio cambió. Vuelve a abrir el expediente.", 409);
+    }
+    if (current.googleDriveId) throw httpError("Ya hay una copia registrada en Drive. Actualiza el expediente.", 409);
+    if (!current.storageKey || current.storageKey !== doc.storageKey) throw httpError("El original ya no está disponible. Actualiza el expediente.", 409);
+  }
+  await confirmStudyDestination();
 
   if (folderId && isPlaceholderDriveFolderId(folderId)) {
     return {
@@ -931,9 +1006,46 @@ export async function pushDocumentoToDrive(
       : null;
 
   // Prefer original binary from storage when not plain text.
-  if (doc.storageKey && !isTextMime(mime)) {
+  if (doc.storageKey && (scopedCopy || !isTextMime(mime))) {
     const stored = await getObject(doc.storageKey);
     if (stored && stored.length > 0) {
+      if (scopedCopy) {
+        const sourceSha256 = createHash("sha256").update(stored).digest("hex");
+        const { receiptId, fileId } = await reserveDriveOriginal({
+          documentoId, storageKey: doc.storageKey, folderId: scopedCopy.folderId,
+          sourceSha256, actorId: scopedCopy.actorId, accessToken: config.accessToken!,
+        });
+        await confirmStudyDestination();
+        await uploadFileToDrive({
+          name: doc.nombre, content: stored, contentMimeType: mime || "application/octet-stream",
+          folderId: scopedCopy.folderId, accessToken: config.accessToken!, reservedFileId: fileId,
+        });
+        const file = await verifiedDriveOriginal({ fileId, folderId: scopedCopy.folderId, sourceSha256, accessToken: config.accessToken! });
+        await prisma.$transaction(async tx => {
+          const changed = await tx.documento.updateMany({
+            where: {
+              id: doc.id, storageKey: doc.storageKey, updatedAt: doc.updatedAt,
+              causaId: doc.causaId, googleDriveId: null, confidencial: false, privilegio: false,
+              causa: { googleDriveFolderId: scopedCopy.folderId, OR: [{ driveSyncSubscription: null }, { driveSyncSubscription: { account: "study" } }] },
+            },
+            data: { googleDriveId: fileId, updatedAt: doc.updatedAt },
+          });
+          if (!changed.count) {
+            const current = await tx.documento.findUnique({ where: { id: doc.id }, select: { googleDriveId: true } });
+            if (current?.googleDriveId !== fileId) throw httpError("El expediente cambió durante la copia. Recarga para verificar el vínculo con Drive.", 409);
+          } else {
+            await writeAuditStrict({
+              actorId: scopedCopy.actorId, action: "document.archive.copy-drive", entityType: "Documento", entityId: doc.id,
+              after: { fileId, folderId: scopedCopy.folderId, sourceSha256 },
+            }, tx);
+          }
+          await tx.commandExecution.update({ where: { id: receiptId }, data: { status: "completed" } });
+        });
+        return {
+          status: "uploaded" as const, file, folderId: scopedCopy.folderId, updated: false, kind: "binary" as const,
+          message: "Copia verificada en Drive. El original se conserva en LexOpen.",
+        };
+      }
       const file = await uploadFileToDrive({
         name: doc.nombre,
         content: stored,
@@ -959,6 +1071,7 @@ export async function pushDocumentoToDrive(
       };
     }
   }
+  if (scopedCopy) throw httpError("El original ya no está disponible. Actualiza el expediente.", 409);
 
   let content = (doc.contenido || "").trim();
   let uploadName = doc.nombre;

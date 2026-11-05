@@ -44,7 +44,7 @@ Primera versión estable del Host local LexOpen para práctica chilena.
 
 ### Límites (sin sorpresas)
 - Facturación interna ≠ DTE/SII; portal ≠ expediente RO completo; PJUD opt-in; sin multi-Host/HA.
-- Auditoría best-effort residual en wiki/blog/Hermes/webhook (mutaciones del asistente usan `writeAuditStrict`).
+- Auditoría best-effort residual en wiki, blog, copiloto y webhook (mutaciones del asistente usan `writeAuditStrict`).
 
 ### Upgrade
 Desde `0.1.9`: respaldo → `npm ci` → `prisma migrate deploy` → `prod:check`. Ver `docs/UPGRADE-1.0.md`.
@@ -71,7 +71,7 @@ Corte IA definitivo: multi-turno cliente, acciones conectadas en UI, auditoría 
 ### Nuevo
 - Brief IA en `/jurisprudencia` (`JurisprudenciaBrief`)
 - Resumen procesal y sugerencia de plazos con IA en ficha de causa
-- Helper `buildChatHistoryForLlm` compartido Hermes / chat cliente
+- Helper `buildChatHistoryForLlm` compartido entre el copiloto y el chat de cliente
 
 ### Mejoras
 - Chat carpeta cliente: replay de historial multi-turno al LLM
@@ -93,9 +93,9 @@ Corte de repaso: ops schedulers, docs migrate, auditoría estricta, i18n dashboa
 ### Mejoras
 - `UF_SYNC_INTERVAL_MINUTES` en `prod:check` y `.env.example`
 - Documentación `db push` vs `migrate deploy`
-- `writeAuditStrict` en wiki, blog, isheets, webhook PJUD, self-update, Hermes minuta
+- `writeAuditStrict` en wiki, blog, isheets, webhook PJUD, self-update, minutas del copiloto
 - i18n dashboard, loading, error e integraciones
-- Agente: POST Hermes vía `apiMutation`
+- Agente: envío al copiloto mediante `apiMutation`
 
 ## 0.1.6 — 2026-08-17
 

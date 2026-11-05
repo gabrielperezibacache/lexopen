@@ -15,7 +15,7 @@ export default async function InicioPage() {
   const user = await requireStaff();
   return <div className="inicio-altazor-page">
     <h1 className="sr-only">ALTAZOR</h1>
-    {canSome(user, "assistant.use") ? <AltazorHome /> : <div className="flex flex-wrap gap-3"><Link className="btn btn-primary" href="/causas">Abrir causas</Link><Link className="btn btn-outline" href="/calendario">Ver agenda</Link></div>}
+    {canSome(user, "assistant.use") ? <AltazorHome showDesktopActivity /> : <div className="flex flex-wrap gap-3"><Link className="btn btn-primary" href="/causas">Abrir causas</Link><Link className="btn btn-outline" href="/calendario">Ver agenda</Link></div>}
     <Suspense fallback={null}><UrgentDeadlines user={user} /></Suspense>
   </div>;
 }

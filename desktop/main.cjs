@@ -26,6 +26,9 @@ const {
   validateBackupDirectory,
 } = require("./backup.cjs");
 const { isAllowedExternalUrl } = require("./external-url.cjs");
+const { pathToFileURL } = require("node:url");
+const { diagnoseDesktopProfile } = require("./altazor-desktop-profile.cjs");
+const { lookupDesktopToolpack, loadVerifiedDesktopToolpack } = require("./altazor-toolpack.cjs");
 const { attachMicrophoneGuards } = require("./media-permissions.cjs");
 const { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, assertUpdateVersion, friendlyUpdateError, withNetworkRetry, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools } = require("./update-policy.cjs");
 
@@ -46,6 +49,7 @@ let quitting = false;
 let updateCheckTimer = null;
 let pendingDataDirectory = null;
 let maintenanceActive = false;
+let desktopToolpackActive = false;
 
 function hostDataDirectory() { return activeDataDir(readConfig()); }
 
@@ -322,25 +326,36 @@ function rendererPath(...parts) {
   return path.join(__dirname, "renderer", ...parts);
 }
 
+function setupShellPath() {
+  return path.join(app.getPath("temp"), "lexopen-desktop", "setup.html");
+}
+
+function fromSetupShell(event) {
+  const contents = mainWindow?.webContents;
+  return contents && event.sender === contents && event.senderFrame === contents.mainFrame &&
+    event.senderFrame?.url === pathToFileURL(setupShellPath()).href;
+}
+
 /**
  * Packaged Chromium treats each file:// URL as its own origin, so CSP `'self'`
  * blocks sibling setup.css / setup.js inside the asar (macOS installers show
- * a white page of unstyled HTML). Inline both into the HTML before loading.
+ * a white page of unstyled HTML). Inline both and the packaged mark before loading.
  */
 async function loadSetupShell(win) {
   currentDesktopAppUrl = "";
   const css = fs.readFileSync(rendererPath("setup.css"), "utf8");
   const js = fs.readFileSync(rendererPath("setup.js"), "utf8");
+  const brand = fs.readFileSync(rendererPath("lexopen-brand.png")).toString("base64");
   const html = fs
     .readFileSync(rendererPath("setup.html"), "utf8")
+    .replace("<!--SETUP_BRAND-->", `data:image/png;base64,${brand}`)
     .replace("<!--SETUP_CSS-->", `<style>\n${css}\n</style>`)
     .replace("<!--SETUP_JS-->", `<script>\n${js}\n</script>`);
   if (!html.includes("<style>") || !html.includes("<script>")) {
     throw new Error("No se pudieron incrustar los estilos del asistente.");
   }
-  const tmpDir = path.join(app.getPath("temp"), "lexopen-desktop");
-  fs.mkdirSync(tmpDir, { recursive: true });
-  const tmp = path.join(tmpDir, "setup.html");
+  const tmp = setupShellPath();
+  fs.mkdirSync(path.dirname(tmp), { recursive: true });
   fs.writeFileSync(tmp, html, "utf8");
   await win.loadFile(tmp);
 }
@@ -770,6 +785,30 @@ ipcMain.handle("desktop:get-state", async () => {
     appState: readAppState(hostDataDirectory()),
     version: bundledVersion(),
   };
+});
+
+ipcMain.handle("desktop:check-altazor-desktop", async event => {
+  if (!fromSetupShell(event)) return { state: "unavailable" };
+  return diagnoseDesktopProfile();
+});
+
+ipcMain.handle("desktop:load-altazor-toolpack", async event => {
+  if (!fromSetupShell(event) || desktopToolpackActive || maintenanceActive || booting) return { state: "unavailable" };
+  desktopToolpackActive = true;
+  try {
+    const verified = await lookupDesktopToolpack(bundledVersion());
+    if (verified.state !== "package-verified") return { state: verified.state };
+    if (!fromSetupShell(event)) return { state: "unavailable" };
+    const chosen = await dialog.showOpenDialog(mainWindow, {
+      title: `Elige ${verified.asset.name}`,
+      defaultPath: path.join(app.getPath("downloads"), verified.asset.name),
+      filters: [{ name: "Paquete de herramientas", extensions: ["gz"] }],
+      properties: ["openFile"],
+    });
+    if (chosen.canceled || !chosen.filePaths[0]) return { state: "package-cancelled" };
+    if (!fromSetupShell(event)) return { state: "unavailable" };
+    return await loadVerifiedDesktopToolpack(chosen.filePaths[0], verified);
+  } finally { desktopToolpackActive = false; }
 });
 
 ipcMain.handle("desktop:choose-data-directory", async event => {

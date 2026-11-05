@@ -81,10 +81,10 @@ hash maps, `_count`, CausaDetail concurrent queries, facturación KPIs vía
 | --- | --- | --- | --- | --- | --- |
 | R1 | Redirect literal `/dashboard`→`/inicio` | PLAN §6 dice redirect; código mantiene **ambas** rutas (Inicio + Panel). No es bug si es intencional — **aclarar en Fase 4** copy PLAN/README. | P2 | S | Bajo |
 | R2 | Versión `0.1.9` vs narrativa 1.0 | package/badge README aún 0.1.9 en todas las ramas (correcto hasta Fase 4). | P3 | S | Bajo (Fase 4) |
-| R3 | `/agente` vs `/inicio` | Dos superficies IA: Hermes copiloto vs intent-engine. Docs deben nombrar roles (consola vs turno). README ya mejorado; WEB-HOST aún sesgado a Hermes. | P2 | S | Bajo |
+| R3 | `/agente` vs `/inicio` | Dos superficies IA: Consola del copiloto y asistente por turnos. La documentación debe explicar el papel de cada superficie. WEB-HOST aún prioriza la consola. | P2 | S | Bajo |
 | R4 | i18n residual | Sub-hubs `/facturacion/*`, altas PJUD, algunos strings ES hardcode; `WikiHistoryPanel` aún `confirm()`. | P2 | M | Bajo |
 | R5 | Electron tokens | `desktop/renderer/setup.css` ≠ `globals.css` exacto. | P3 | S | Bajo |
-| R6 | Auditoría best-effort | wiki/blog/Hermes/webhook PJUD no `writeAuditStrict` (decisión §5bis). | P3 | — | Aceptado |
+| R6 | Auditoría best-effort | wiki, blog, copiloto y webhook PJUD no `writeAuditStrict` (decisión §5bis). | P3 | — | Aceptado |
 | R7 | Portal modelo | members + `isClientVisible` + tag cliente ≠ RO estricto. | P3 | — | Aceptado |
 | R8 | E2E suite completa | `inicio-assistant` OK históricamente; suite legacy no re-corrida post-rebase. **Re-correr CI** tras push. | P1 | M | Medio |
 | R9 | PR #195 Solvecha | Puede tocar captcha PJUD solapado con stack; coordinar orden de merge. | P2 | S | Medio si paralelo |

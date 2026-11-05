@@ -92,7 +92,7 @@ function IntegracionesInner() {
       .then((r) => r.json())
       .then((d) =>
         setLlmInfo(
-          `${d.config?.preset || "custom"} · ${d.config?.apiUrl || "—"} · modelo ${
+          `${d.presets?.[d.config?.preset]?.label || "Proveedor del estudio"} · ${d.config?.apiUrl || "—"} · modelo ${
             d.config?.model || "—"
           } · ${d.enabled ? "habilitado" : "deshabilitado"}`
         )
@@ -180,8 +180,8 @@ function IntegracionesInner() {
         <section className="panel rounded-3xl p-5">
           <h2 className="text-lg font-semibold">Copiloto IA</h2>
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-soft)]/80">
-            API compatible con OpenAI Chat Completions: OpenAI, Azure, Groq, Ollama,
-            Hermes Agent u otro endpoint. Utilidades con fuentes del estudio.
+            API compatible con OpenAI Chat Completions: OpenAI, Azure, Groq, Ollama
+            u otro servicio compatible. Utilidades con fuentes del estudio.
             Configure proveedor y API key en Configuración.
           </p>
           <p className="mt-4 text-xs text-[var(--ink-soft)]/65">{llmInfo || "Cargando…"}</p>
@@ -415,7 +415,7 @@ LLM_API_URL=https://api.openai.com/v1
 LLM_API_KEY=
 LLM_MODEL=gpt-4o-mini
 LLM_ALLOW_DEMO=0
-# Compat Hermes Agent
+# Compatibilidad con configuración anterior
 HERMES_API_URL=http://localhost:8642/v1
 HERMES_API_KEY=
 OBSIDIAN_VAULT_PATH=./obsidian-vault

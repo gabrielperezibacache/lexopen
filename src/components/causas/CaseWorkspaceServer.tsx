@@ -470,6 +470,9 @@ export async function CaseWorkspaceServer({ params, mode }: CaseWorkspaceParams 
             <h2 className="text-lg font-semibold">Documentos del expediente</h2>
             <div className="flex flex-wrap items-center gap-3">
               {connected && <CausaDocumentImportButton causaId={causa.id} />}
+              <Link href={`/causas/${encodeURIComponent(causa.id)}/expediente`} className="btn btn-secondary">
+                Organizar expediente
+              </Link>
               <Link
                 href={`/agente?causaId=${causa.id}&utility=doc_qa`}
                 className="text-sm text-[var(--sea)]"

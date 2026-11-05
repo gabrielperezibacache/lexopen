@@ -21,7 +21,7 @@
 
 LexOpen `0.1.9` ya es un **Host local usable** para práctica chilena: causas,
 CRM, sites tipo HighQ, plazos, documentos con OCR local, minutas, facturación
-interna (sin DTE), correo PJUD, monitoreo PJUD opt-in, copiloto Hermes/LLM y
+interna (sin DTE), correo PJUD, monitoreo PJUD opt-in, copiloto de IA y
 shell Electron opcional. La capa de seguridad del Host (CSRF, boot fail-closed,
 auditoría estricta en mutaciones sensibles, 2FA TOTP, ACL portal) está
 **avanzada para un piloto**, no «lista sin checklist».
@@ -59,7 +59,7 @@ Leyenda de estado: **completo** (usable en piloto con tests/contratos útiles) �
 | **Plazos** | completo (ayuda operativa) | `/plazos`, `lib/plazos.ts`, cron alertas | No es cómputo oficial de tribunal (documentado) | Fechas locales corregidas en auditoría | Unit + integración alertas |
 | **Calendario** | parcial → completo en núcleo Fase 1 | `/calendario` mes/semana/agenda + Evento DnD; Google push/pull/ICS | Conflictos API informativos | Pull requiere OAuth real | Unit week + calendar-pull map; e2e indirecto |
 | **Documentos** | parcial → completo en ingest | `/documentos`, cola OCR, ingest carpeta, Drive push | OCR depende de binarios Host; cola local | Badge Drive stub en prod fail-closed | Unit ingest/processing/OCR |
-| **Minutas** | completo (núcleo) | Wizard, plantillas, approve-to-minuta desde Hermes | Drive upload exige carpeta real | Copy stub claro en UI | Contract API + render |
+| **Minutas** | completo (núcleo) | Wizard, plantillas, aprobación para crear minutas desde el copiloto | Drive upload exige carpeta real | Copy stub claro en UI | Contract API + render |
 | **Tareas** | parcial | `/tareas` + tareas por site | Página global delgada vs panel site | UX desigual entre hub y site | Smoke; sin e2e flujo crear |
 | **Facturación** | parcial | Hub + horas/gastos/facturas/tarifas/UF/CC; export CSV/XML | **No DTE/SII**; strings ES hardcode en hub; ledger optimizado | Inconsistente con i18n del resto | Unit billing/export; smoke subrutas |
 | **Correo (PJUD)** | parcial | `/correo` + `MailboxPanel`, IMAP/demo, apply/link | Conector externo opcional; parser RIT | e2e: no inventa demo sin flags | Suite `lib/mail/*` + e2e correo |
@@ -112,7 +112,7 @@ traiga en `1` (salvo `LEXOPEN_KEEP_*_DEMO=1` para demos).
 3. **Portal cliente:** members + `isClientVisible` + tag `cliente` en archivos;
    no es RO absoluto ni expediente completo.
 4. **Auditoría:** `writeAuditStrict` en mutaciones sensibles; wiki/blog/iSheet,
-   Hermes y webhook PJUD siguen best-effort en parte del camino.
+   El copiloto y el webhook PJUD conservan auditoría de mejor esfuerzo en algunas operaciones.
 5. **Facturación:** documentos internos ≠ DTE SII; export CSV/XML a facturador
    externo.
 6. **PJUD:** scrape opt-in; quien activa asume ToS/riesgo (LICENSE + PJUD.md).
@@ -179,7 +179,7 @@ como «Panel» de KPIs (no se eliminan features).
 
 | Tema | Decisión |
 | --- | --- |
-| Alcance Fase 1 | **Brief original completo** (Inicio + intent engine + tools + Evento). No el sketch ligero «embeber Hermes en dashboard» de la §6 borrador. |
+| Alcance Fase 1 | **Brief original completo** (Inicio + intent engine + tools + Evento). No el sketch ligero «incrustar el copiloto en Inicio» de la §6 borrador. |
 | Portal | Mantener modelo actual (members + `isClientVisible` + tag cliente). |
 | Auditoría | Documentar gaps best-effort; **no** forzar `writeAuditStrict` en todo antes de 1.0. Mutaciones del asistente sí usan `writeAuditStrict`. |
 | Redis | Store archivo OK para un solo proceso Host. |
@@ -233,7 +233,7 @@ confirmación humana en escrituras, status del Host (sin LLM) y agenda unificada
 
 - Fases 2–4 de producto (UI global, hardening Redis obligatorio, tag 1.0).
 - Bypass de confirmación humana en escrituras.
-- Nuevo proveedor LLM; reescribir `context-pack` / Hermes.
+- Nuevo proveedor LLM; reescribir `context-pack` o el adaptador del copiloto.
 
 **Riesgos**
 
@@ -317,7 +317,7 @@ paleta agentes unificada; hubs principales con tokens/i18n. → **cumplido** (de
   datos muestra (saludo sync primero; medir en Host real con Lighthouse).
 - Tests assistant ampliados (greeting/conflicts/plan-store) + list-limit/log;
   CI: `prisma migrate diff` drift tras `migrate deploy`.
-- Auditoría: **no** se forzó `writeAuditStrict` en wiki/blog/Hermes/webhook;
+- Auditoría: **no** se forzó `writeAuditStrict` en wiki, blog, copiloto y webhook;
   README documenta el residual best-effort.
 
 **Residual / no hecho (aceptado)**
@@ -361,7 +361,7 @@ como paso de aceptación.
 Fase 0 (este doc) ──► aprobación Gabriel
         │
         ▼
-Fase 1 Inicio/asistente ──► reutiliza lib/ai + hermes (bloquea UX «wow» 1.0)
+Fase 1 Inicio/asistente ──► reutiliza lib/ai + adaptador del copiloto (bloquea UX «wow» 1.0)
         │
         ├─► Fase 2 UI (puede solaparse tras aterrizar Inicio)
         │
@@ -407,6 +407,6 @@ Fase 4 docs/release
 - [x] docs/WEB-HOST.md, docs/AUDITORIA-2026-09-06.md (+ DESKTOP.md / PJUD.md)
 - [x] prisma/schema.prisma (modelos Organization→Mailbox*)
 - [x] globals.css, ui.tsx, AppShell, AppSidebar, tokens `--ink-soft`
-- [x] Módulos de dominio listados + `lib/ai/*`, hermes, plazos, google, document-*,
+- [x] Módulos de dominio listados + `lib/ai/*`, copiloto, plazos, google, document-*,
       minutas, causas, pjud, search, security/RBAC/CSRF/audit, i18n, copiloto
 - [x] Scratch `.jules` / `.Jules` eliminado y documentado como prohibido

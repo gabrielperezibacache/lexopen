@@ -5,7 +5,7 @@ import { httpError } from "@/lib/auth/access";
 import { assertCausaAccess, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { sha256 } from "@/lib/evidence/fragments";
 import { canonicalJson } from "@/lib/command-execution";
-import { getLlmConfig } from "@/lib/integrations/llm";
+import { getLlmConfig, llmEndpointHash } from "@/lib/integrations/llm";
 import { personalCodexPreference } from "@/lib/integrations/codex-preference";
 import { getAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { executePlanSteps, runAssistantTurn } from "@/lib/assistant/pipeline";
@@ -25,7 +25,7 @@ export async function altazorDestination(userId: string): Promise<AltazorDestina
   const [config, personal, policy] = await Promise.all([getLlmConfig(), personalCodexPreference(userId), getAssistantFirmPolicy()]);
   let remote = true, endpoint = "Proveedor sin configurar";
   try { const url = new URL(config.apiUrl); remote = !["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname); endpoint = url.origin + url.pathname; } catch { /* Unavailable is explicit. */ }
-  const value = { provider: personal.enabled ? "codex" : config.preset, model: personal.enabled ? personal.model || "" : config.model, endpoint: personal.enabled ? "OpenAI · Codex personal" : endpoint, endpointHash: sha256(personal.enabled ? "codex" : config.apiUrl), remote: personal.enabled || remote, permitted: Boolean(personal.enabled ? personal.model : config.model) && (policy.assistantLlmMode !== "local_only" || !personal.enabled && !remote) };
+  const value = { provider: personal.enabled ? "codex" : config.preset, model: personal.enabled ? personal.model || "" : config.model, endpoint: personal.enabled ? "OpenAI · Codex personal" : endpoint, endpointHash: personal.enabled ? sha256("codex") : llmEndpointHash(config), remote: personal.enabled || remote, permitted: Boolean(personal.enabled ? personal.model : config.model) && (policy.assistantLlmMode !== "local_only" || !personal.enabled && !remote) };
   return { ...value, key: sha256(canonicalJson(value)) };
 }
 export function checkAltazorDestination(current: AltazorDestination, expected: string, allowRemote: boolean) {

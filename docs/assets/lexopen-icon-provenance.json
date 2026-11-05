@@ -1,0 +1,20 @@
+{
+  "tool": "ImageGen integrado",
+  "createdOn": "2026-11-05",
+  "description": "Lector clásico grabado sobre índigo oscuro, con variante compacta y logotipo LexOpen de una línea.",
+  "originals": [
+    {
+      "path": "lexopen-engraving.png",
+      "sha256": "8a7205c711fca238f2785e7008df8d88fa8a5e4142153ff876142211d5905972"
+    },
+    {
+      "path": "lexopen-lockup.png",
+      "sha256": "9d7cc33909da56c074813cb18d0383c159e9175206e4964da0cc8fb0496e8064"
+    }
+  ],
+  "prompts": [
+    "Use case: logo-brand. Asset: one square app icon for LexOpen, a legal and academic workspace. Subject: a single original, anonymous classical scholar in left-facing profile, shoulder bust, reading an open folio; the folio is integrated into the lower silhouette. Style: luminous silver-white intaglio engraving, dense sculptural crosshatching in the face and drapery, sharp blacks, like an antique engraved frontispiece reimagined as a contemporary digital mark. Behind the bust, a restrained fan of very fine straight radial rays in muted periwinkle and a single small electric ultramarine flare; no border, ring, or lettering. Background is a uniform near-black midnight indigo #0d1022 all the way to the edges, no transparency. Composition: unmistakable light silhouette at small size, subject fills about 69% of the square, head and folio centered inside the safe circle with ample edge space. Rich engraved detail should disappear gracefully at favicon size. No other figures, no symbols of another brand, no helmet or wings, no typography, no words, no initials, no frame, no photographic rendering, no gradients that compete with the face. One finished image, square.",
+    "Use case: precise-object-edit. Remove every radial line behind the engraved reader, including the bright blue flare. Fill those areas with the same plain near-black midnight-indigo background, uniform to the edges. Keep the man, open book, pose, framing, silhouette, linework, contrast and exact silver intaglio detail unchanged. Keep the square composition. No border, text, marks or new elements. Only edit the background.",
+    "Use case: logo-brand. Edit this single square emblem into a complete app logo. Keep the exact same silver-engraved classical male reader and his open folio, same pose, style and plain near-black indigo field. Reduce the figure about 10% and raise it slightly only to make an even margin for a single wordmark below it. At the bottom center add the exact word “LexOpen” — capital L, lowercase e x, capital O, lowercase p e n — on one line in sharply drawn, moderately condensed editorial serif lettering, bright warm-white, normal letter spacing, sized to read clearly. The wordmark should be approximately half the canvas width, generous side and bottom margin, with breathing room above it. No lines, rays, star, border, additional text, or decorative elements. Do not put lettering over the book or figure. One square image."
+  ]
+}

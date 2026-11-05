@@ -13,6 +13,7 @@ import { KITTIES_SOURCE_COMMIT } from "@/lib/altazor/computer/policy";
 import { cancelComputerTask, closeComputerSession, computerScreenshot, computerStatus, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerSession, sendComputerMessage, prepareComputerSecret, typeComputerSecret } from "@/lib/altazor/computer/service";
 import { createSecret, deleteSecret } from "@/lib/altazor/secrets/service";
 import { gatewayRequestCategory, gatewayStartupSummary, runtimeFailureSummary } from "./computer-smoke-diagnostics";
+import desktopProfile from "../../desktop/altazor-desktop-profile.json";
 
 const gatewayUser = "lexopen-kitties-ci", provider = "fixture", responseText = "Respuesta sintética del proveedor local de CI.";
 let stage = "guard";
@@ -57,6 +58,10 @@ async function main() {
   check(!(await lstat(join(source, ".git")).catch(() => null)), "Build source must not contain Git credentials or metadata");
   const imageId = process.env.KITTIES_CI_IMAGE_ID || ""; check(/^sha256:[a-f0-9]{64}$/.test(imageId), "A verified local immutable image ID is required");
   check(await run("docker", ["image", "inspect", "--format", "{{.Id}}", imageId]) === imageId, "The image ID must exist before gateway startup");
+  const sourceRevision = process.env.GITHUB_SHA || "";
+  const architecture = process.env.ALTAZOR_TOOLPACK_ARCH || "";
+  check(/^[a-f0-9]{40}$/.test(sourceRevision) && ["amd64", "arm64"].includes(architecture), "Release revision and supported native architecture required");
+  check(await run("docker", ["image", "inspect", "--format", "{{.Os}}/{{.Architecture}}", imageId]) === `linux/${architecture}`, "The image must match the native runner architecture");
   const uid = await run("id", ["-u", gatewayUser]); check(/^\d+$/.test(uid) && uid !== "0", "A dedicated unprivileged gateway UID is required");
   await run("sudo", ["-n", "iptables", "-C", "OUTPUT", "-m", "owner", "--uid-owner", uid, "!", "-d", "127.0.0.0/8", "-j", "REJECT"]);
   await run("sudo", ["-n", "ip6tables", "-C", "OUTPUT", "-m", "owner", "--uid-owner", uid, "-j", "REJECT"]);
@@ -146,6 +151,12 @@ async function main() {
     check(ports.every(port => port.HostIp === "127.0.0.1"), "Desktop ports must bind only to loopback");
     const runtimeEnv = JSON.stringify(inspected.Config.Env);
     for (const secret of [token, modelToken, process.env.SESSION_SECRET!, process.env.DATABASE_URL!]) check(!runtimeEnv.includes(secret), "LexOpen/gateway/model credentials must not enter the desktop environment");
+    stage = "desktop-toolchain";
+    check(inspected.Config.Labels?.["org.lexopen.altazor.desktop-profile"] === desktopProfile.id &&
+      inspected.Config.Labels?.["org.lexopen.altazor.desktop-source"] === KITTIES_SOURCE_COMMIT, "Expected the pinned LexOpen desktop tool profile");
+    const toolchain = JSON.parse(await run("docker", ["exec", containerId, "lexopen-desktop-check"], 150_000));
+    check(toolchain.ok === true && Array.isArray(toolchain.checks) && toolchain.checks.length === 9,
+      "Document, OCR, bibliography, search and audio tests must run inside the actual desktop");
     stage = "screenshot-and-manual-control";
     const png = await until(async () => { try { return await computerScreenshot(owner, session.id); } catch { return null; } }, bytes => Boolean(bytes && bytes.length > 1024));
     check(png && png.subarray(0, 8).toString("hex") === "89504e470d0a1a0a" && png.readUInt32BE(16) >= 640 && png.readUInt32BE(20) >= 480, "Actual screenshot must have PNG bytes and desktop dimensions");
@@ -202,7 +213,7 @@ async function main() {
     check(JSON.parse(await run("docker", ["inspect", containerId]))[0].State.Running === false, "Actual container must be stopped");
     const output = resolve(process.env.KITTIES_CI_OUTPUT!); check(output.startsWith(runnerTemp + sep), "Evidence output must remain in disposable CI directory");
     await mkdir(output, { recursive: true }); await writeFile(join(output, "desktop.png"), png);
-    await writeFile(join(output, "summary.json"), JSON.stringify({ result: "passed", sourceCommit: KITTIES_SOURCE_COMMIT, imageId, runtime: "real-docker-container", model: "synthetic-local-http-fixture", noPersonalAccounts: true, externalRuntimeEgress: "gateway UID firewall + internal Docker network", screenshot: { sha256: createHash("sha256").update(png).digest("hex"), width: png.readUInt32BE(16), height: png.readUInt32BE(20) }, checks: ["owner and case ACL", "TTL", "local_only", "immutable image", "one selected workspace mount", "no host socket or credentials", "actual screenshot and manual control", "one-use Secretos keyboard input and replay without network", "selected bytes in container", "actual gateway chat with synthetic model", "replay without resend", "cancel pending task", "stop actual container"] }, null, 2));
+    await writeFile(join(output, "summary.json"), JSON.stringify({ result: "passed", sourceCommit: KITTIES_SOURCE_COMMIT, sourceRevision, imageId, architecture, runtime: "real-docker-container", model: "synthetic-local-http-fixture", noPersonalAccounts: true, externalRuntimeEgress: "gateway UID firewall + internal Docker network", toolchain, screenshot: { sha256: createHash("sha256").update(png).digest("hex"), width: png.readUInt32BE(16), height: png.readUInt32BE(20) }, checks: ["owner and case ACL", "TTL", "local_only", "immutable image", "one selected workspace mount", "no host socket or credentials", "actual screenshot and manual control", "one-use Secretos keyboard input and replay without network", "selected bytes in container", "actual gateway chat with synthetic model", "replay without resend", "cancel pending task", "stop actual container"] }, null, 2));
     console.log("ALTAZOR computer runtime PASS: actual isolated Docker desktop, screenshot/input/uploads, owner/ACL/TTL/privacy, chat/cancel/stop; local synthetic model only, no personal account or autonomous model claim.");
   } finally {
     globalThis.fetch = originalFetch;

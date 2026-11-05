@@ -20,7 +20,7 @@ export async function GET() {
     ]);
     const config = await getLlmConfig();
     return NextResponse.json({
-      enabled: llmRow?.enabled ?? hermesRow?.enabled ?? true,
+      enabled: config.localProfile ? true : llmRow?.enabled ?? hermesRow?.enabled ?? true,
       config: publicLlmConfig(config),
       presets: LLM_PRESET_CATALOG,
       envHints: {

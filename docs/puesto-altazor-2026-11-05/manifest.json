@@ -1,0 +1,82 @@
+{
+  "capturedOn": "2026-11-05",
+  "fixtureOnly": true,
+  "browser": "Chrome",
+  "theme": "MIDNIGHT",
+  "sourceVersion": "1.1.0-preview.6",
+  "externalAccountsValidated": false,
+  "images": [
+    {
+      "path": "expediente-escritorio.jpg",
+      "route": "/causas/[id]/expediente",
+      "width": 1440,
+      "height": 1000,
+      "size": 94445,
+      "sha256": "67c4c40457452165c67e8f30218626458fd6227a5a8ade265e60dab53c146869"
+    },
+    {
+      "path": "expediente-movil.jpg",
+      "route": "/causas/[id]/expediente",
+      "width": 360,
+      "height": 800,
+      "size": 36170,
+      "sha256": "6a6a0e0276c4411f0d200bbbb1fb6b795e85487854d3a2705235ff86555b23eb"
+    },
+    {
+      "path": "ingreso-escritorio.jpg",
+      "route": "/login",
+      "width": 1440,
+      "height": 1000,
+      "size": 48356,
+      "sha256": "54810ce02b5bc202ae76633a235ce231058a38b5892a0ecf387faf4541bd5e5b"
+    },
+    {
+      "path": "ingreso-movil.jpg",
+      "route": "/login",
+      "width": 360,
+      "height": 800,
+      "size": 14823,
+      "sha256": "7b1ce14387a8c0cd51dcc225956612d072e971a6a8cb71cdf99e917354ed310e"
+    },
+    {
+      "path": "inicio-escritorio.jpg",
+      "route": "/inicio",
+      "width": 1440,
+      "height": 1000,
+      "size": 50179,
+      "sha256": "f1aabf6bdaeb20154c664be351e90acedf97962d451a1fae95b3d03f49c186a7"
+    },
+    {
+      "path": "inicio-movil.jpg",
+      "route": "/inicio",
+      "width": 360,
+      "height": 800,
+      "size": 21366,
+      "sha256": "1bf43c89c61030528f9b5b31431e6d039a4bd0cf3bb47d1122e4b4d624560831"
+    },
+    {
+      "path": "mis-causas-escritorio.jpg",
+      "route": "/mis-causas",
+      "width": 1440,
+      "height": 1000,
+      "size": 93678,
+      "sha256": "ff8715b381a166a6ce3208455b27e741079241c919ff1c2189a522496c702374"
+    },
+    {
+      "path": "portada-escritorio.jpg",
+      "route": "/",
+      "width": 1440,
+      "height": 1000,
+      "size": 103164,
+      "sha256": "c7e4423480148106078f347398d405e552899bf05c8c1dfa59cc1845886cf44d"
+    },
+    {
+      "path": "portada-movil.jpg",
+      "route": "/",
+      "width": 360,
+      "height": 800,
+      "size": 33404,
+      "sha256": "6199a5d2387f5ac29bc1c524fc3eaf1d507242036090d9d033e578600c0ecfac"
+    }
+  ]
+}

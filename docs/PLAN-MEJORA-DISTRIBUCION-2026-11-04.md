@@ -217,18 +217,11 @@ Antes de aumentar corpus o cambiar ranking/modelo, comparar contra la línea bas
 
 ## 7. Asistente con computadora y entorno propio — P0 para su habilitación
 
-### Referencias investigadas y adaptación propia
+### Diseño del entorno de trabajo
 
-La revisión de fuentes públicas del 4 de noviembre identifica dos referencias con alcances distintos. Sus descripciones no acreditan ejecución ni compatibilidad en LexOpen:
+El encargo separa objetivo, archivos de entrada, progreso y revisión. La persona puede tomar el control del escritorio y revisar el resultado antes de incorporarlo al expediente. Los expedientes permanecen en LexOpen hasta que la persona elige qué archivos entregar para una tarea.
 
-| Referencia | Capacidad documentada | Decisión para LexOpen |
-| --- | --- | --- |
-| [Dots](https://learn.chatgpt.com/docs/dots) y [guía de administración](https://learn.chatgpt.com/docs/enterprise/dots-admin-guide) | Computadora y navegador en la nube, tareas y toma de control; acceso local sujeto a configuración | Adoptar el flujo objetivo-entradas-progreso-revisión. La documentación consultada no establece una API pública para embeber o controlar Dots; no inventar ese conector ni exportar el expediente a un servicio remoto por defecto |
-| [Kitties · referencia facilitada](https://madkoding.github.io/kitties/es/#download), [arquitectura](https://github.com/madkoding/kitties/blob/main/docs/ARCHITECTURE.md), [API](https://github.com/madkoding/kitties/blob/main/docs/API.md) y [Desktop](https://github.com/madkoding/kitties/blob/main/docs/DESKTOP.es.md) | Gateway, orquestador, proveedor de modelo y entorno Docker/Podman por asistente, con escritorio, navegador y herramientas; API de conversaciones, eventos, cancelación, archivos, artefactos y aprobaciones | Adaptador local opcional detrás del broker LexOpen. Fijar versión y comprobar contrato, licencias, límites y aislamiento. No usar una demostración simulada como prueba de computadora operativa |
-
-El código público de [contenedores](https://github.com/madkoding/kitties/blob/main/internal/container/container.go) y [gateway](https://github.com/madkoding/kitties/blob/main/internal/gateway/gateway.go) muestra puntos que requieren revisión en el ensayo: workspace montado desde el Host, límites de recursos configurables, visor en loopback y un bearer para la API. La biblioteca de artefactos documentada se comparte por flota; no equivale a los permisos por causa/propietario de LexOpen. Hay diferencias entre documentos acerca de límites y puertos, por lo que prevalece el contrato de la versión fijada y probada, con límites propios conservadores. El token nunca llega al navegador ni al contenido de un documento.
-
-No depender de Kitties para conservar datos, citas, trabajos o artefactos. El adaptador puede sustituirse; el orquestador de LexOpen sigue resolviendo autorización, políticas, revisión e incorporación. Una flota compartida no se habilita si no se demuestra aislamiento de entradas, herramientas, conversaciones y artefactos entre usuarios/causas; el primer ensayo debe preferir una frontera dedicada por ejecución o por propietario y causa.
+El escritorio funciona con un gateway dedicado, un proveedor de IA configurado por separado y un contenedor por sesión. El código fijado admite un espacio de trabajo montado desde el Host, límites de recursos configurables, visor local y autorización para su API. Su biblioteca de artefactos se comparte dentro de cada instancia. LexOpen delimita el acceso por propietario y causa, exige una instancia por ámbito y conserva por separado datos, citas y recibos. La validación debe usar contenedores reales y la revisión fijada. [Contrato y preparación del escritorio](ALTAZOR-CONEXIONES.md#construir-el-gateway-reforzado).
 
 ### 7.1 Objetivo y límite de la primera versión
 
