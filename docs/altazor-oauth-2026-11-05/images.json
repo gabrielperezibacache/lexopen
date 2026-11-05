@@ -2,6 +2,15 @@
   "date": "2026-11-05",
   "files": [
     {
+      "file": "consulta-escritorios-real.jpg",
+      "bytes": 78251,
+      "sha256": "225ad194ad0dc0e52bbc92518915ea76ac6aeadf1bbd3a885bd85e1eeb241862",
+      "source": "complete application with real dedicated gateway and container",
+      "data": "fictitious",
+      "services": "real isolated runtime",
+      "realAccountsValidated": false
+    },
+    {
       "file": "escritorio-detenido.jpg",
       "bytes": 76223,
       "sha256": "ba8a910f19e2c1b422021ccbfa765189943ae5ad51b1504e1b5bdff08315adb1",

@@ -64,12 +64,26 @@ async function testPromptAlwaysReturned() {
   assert.equal(typeof result.prompt, "string");
   assert.ok(result.prompt.length > 0, "prompt disponible para auditoría opt-in");
 }
+async function testExplicitAltazorDesktopReadWinsBeforeModel() {
+  let calls = 0;
+  const wrongModel: typeof askLlm = async () => { calls++; return { source: "llm", content: JSON.stringify({ intents: [{ toolId: "buscar", confidence: 1, slots: { q: "incorrect context tool" } }] }), requireApproval: false, provider: "custom", model: "fictitious-misrouter" }; };
+  const input = normalizeAssistantInput("Solo muéstrame los escritorios de ALTAZOR de este espacio.", NOW);
+  const result = await classifyIntents(input, { altazorContext: true, askLlm: wrongModel, assistantLlmMode: "remote_allowed" });
+  assert.equal(result.source, "rule"); assert.deepEqual(result.intents.map(item => item.toolId), ["escritorio.listar"]); assert.equal(calls, 0);
+  const generic = await classifyIntents(input, { askLlm: wrongModel, assistantLlmMode: "remote_allowed" });
+  assert.equal(generic.source, "llm"); assert.equal(calls, 1, "la prioridad se limita al contexto ALTAZOR declarado por el servidor");
+  for (const text of ["No muestres los escritorios", "Muéstrame los escritorios y crea una nota", "¿Muéstrame los escritorios o crea uno?"]) {
+    const normal = await classifyIntents(normalizeAssistantInput(text, NOW), { altazorContext: true, askLlm: wrongModel, assistantLlmMode: "remote_allowed" });
+    assert.equal(normal.source, "llm", "las peticiones negadas o compuestas no adelantan una lectura");
+  }
+}
 
 async function main() {
   await testLocalOnlyNeverCallsLlm();
   await testForceLocalNeverCallsLlm();
   await testRemoteAllowedStillCallsLlm();
   await testPromptAlwaysReturned();
+  await testExplicitAltazorDesktopReadWinsBeforeModel();
   console.log("assistant/classify.test.ts OK");
 }
 

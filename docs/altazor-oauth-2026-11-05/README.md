@@ -23,3 +23,7 @@ Esta captura adicional pertenece a la aplicación completa, con PostgreSQL dedic
 ![La aplicación real confirma la detención del escritorio de prueba](escritorio-detenido.jpg)
 
 El guardado y la recarga de una credencial ficticia en Secretos se comprobaron también en esta aplicación completa: la lista devolvió sólo metadatos. Las pruebas de escritura de un solo uso y sus carreras siguen siendo comprobaciones automatizadas con gateway ficticio.
+
+También se comprobó la consulta «Muéstrame los escritorios de ALTAZOR de este espacio» y su enlace a Computadora. Esta lectura clara se resuelve por una regla local antes de la clasificación del modelo; conserva las comprobaciones de propietario y ámbito. La captura muestra el estado correcto después de detener el único escritorio de prueba. La tarjeta y su enlace se verificaron en temas claro y oscuro.
+
+![Consulta nativa corregida y enlace al escritorio, con usuario y datos ficticios](consulta-escritorios-real.jpg)

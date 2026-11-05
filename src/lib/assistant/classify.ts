@@ -9,7 +9,7 @@ import { z } from "zod";
 import { askLlm as defaultAskLlm } from "@/lib/integrations/llm";
 import { ASSISTANT_TOOL_IDS, isAssistantToolId } from "./types";
 import type { AssistantIntent } from "./types";
-import { ruleClassify } from "./classify-rules";
+import { explicitDesktopListing, ruleClassify } from "./classify-rules";
 import type { NormalizedAssistantInput } from "./normalize";
 import type { AssistantLlmMode } from "./firm-policy";
 
@@ -87,12 +87,16 @@ export async function classifyIntents(
     assistantLlmMode?: AssistantLlmMode;
     /** Fuerza clasificación por reglas sin tocar el LLM, sin importar el modo. */
     forceLocal?: boolean;
+    /** Server-built ALTAZOR context allows precise local reads before model routing. */
+    altazorContext?: boolean;
     signal?: AbortSignal;
     expectedDestination?: { provider: string; model: string; endpointHash: string };
   }
 ): Promise<ClassifyResult> {
   opts?.signal?.throwIfAborted();
   const prompt = classifyPrompt(input, opts?.attachments);
+  const desktopRead = opts?.altazorContext ? explicitDesktopListing(input) : undefined;
+  if (desktopRead) return { intents: [desktopRead], source: "rule", prompt };
   if (opts?.assistantLlmMode === "local_only" || opts?.forceLocal) {
     const rules = ruleClassify(input);
     return { ...rules, source: "rule", prompt };
