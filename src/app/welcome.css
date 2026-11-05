@@ -182,12 +182,6 @@
   font-weight: 600;
 }
 
-@media (max-width: 880px) {
-  .edition-nav .edition-firm-link {
-    display: none;
-  }
-}
-
 @media (max-width: 640px) {
   .edition-width {
     width: calc(100% - 2rem);

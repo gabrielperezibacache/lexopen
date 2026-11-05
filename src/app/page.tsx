@@ -2,12 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, BookOpen, Bot, Building2, FolderSync, Sheet, Shield } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, FilePenLine, FolderOpen, GraduationCap, Mic } from "lucide-react";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import "./welcome.css";
 
-const moduleIcons = [Building2, Shield, Sheet, BookOpen, FolderSync, Bot];
+const moduleIcons = [FolderOpen, BookOpen, Mic, FilePenLine, GraduationCap, Bot];
 
 export default function LandingPage() {
   const { dict, t } = useI18n();
@@ -23,9 +23,6 @@ export default function LandingPage() {
           <LanguageSwitcher variant="compact" />
           <Link href="/login" className="btn btn-ghost">
             {t("landing.signIn")}
-          </Link>
-          <Link href="/login" className="btn btn-primary edition-firm-link">
-            {t("landing.enterFirm")} <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </nav>
       </header>
@@ -63,7 +60,7 @@ export default function LandingPage() {
           </div>
           <ul className="edition-modules">
             {dict.landing.modules.map((mod, i) => {
-              const Icon = moduleIcons[i] || Building2;
+              const Icon = moduleIcons[i] || FolderOpen;
               return (
                 <li key={mod.title}>
                   <Icon size={20} aria-hidden="true" />
