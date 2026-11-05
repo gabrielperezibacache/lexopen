@@ -1,0 +1,34 @@
+.footer {
+  border-top: 1px solid var(--line);
+  padding-block: .75rem;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: .625rem;
+  min-height: 44px;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.link:hover span {
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--sea);
+  outline-offset: 3px;
+}
+
+.logo {
+  flex: none;
+  filter: brightness(0);
+}
+
+:global(html.dark) .logo,
+:global(.lexopen-welcome) .logo {
+  filter: none;
+}

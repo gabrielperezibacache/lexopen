@@ -3,7 +3,7 @@ import Image from "next/image";
 
 /** LexOpen's geometric folio family. Decorative; meaning stays in the adjacent text. */
 export function FolioSymbol({ variant = "mark", ...props }: SVGProps<SVGSVGElement> & { variant?: "mark" | "collection" | "evidence" }) {
-  if (variant === "mark") return <Image src="/icons/lexopen-reader-192.png" alt="" aria-hidden="true" width={192} height={192} unoptimized className={props.className} />;
+  if (variant === "mark") return <Image src="/icons/lexopen-reader-transparent-192.png" alt="" aria-hidden="true" width={192} height={192} unoptimized className={props.className} />;
   return (
     <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" {...props}>
       {variant === "collection" ? <>
