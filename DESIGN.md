@@ -56,6 +56,17 @@ typography:
     fontFamily: "var(--font-editorial), var(--font-sora), sans-serif"
     fontSize: "1.75rem"
     fontWeight: 500
+  brand:
+    fontFamily: "var(--font-fraunces), Georgia, serif"
+    fontSize: "1.65rem"
+    fontWeight: 500
+    lineHeight: 1.15
+    letterSpacing: "-0.03em"
+  brand-caption:
+    fontFamily: "var(--font-sora), sans-serif"
+    fontSize: "0.8125rem"
+    fontWeight: 400
+    letterSpacing: "0"
   display:
     fontFamily: "var(--font-fraunces), Georgia, serif"
     fontSize: "clamp(2rem, 3vw, 3.35rem)"
@@ -160,15 +171,15 @@ components:
 
 **Creative North Star: "MIDNIGHT editorial; un acompañante, una tarea"**
 
-LexOpen conserva cobre, verde mar, papel y tinta, con MIDNIGHT como dirección visual preferida. Barlow Condensed identifica los apartados de trabajo; Sora sostiene controles y prosa de interfaz; Fraunces conserva el carácter de libros y lectura prolongada. El chungungo grabado de ALTAZOR aporta una identidad propia y discreta. La referencia editorial de HERMES informa la relación entre títulos altos, filetes y figura grabada; sus ilustraciones y fuentes comerciales no forman parte de LexOpen.
+LexOpen conserva cobre, verde mar, papel y tinta, con MIDNIGHT como dirección visual preferida. Barlow Condensed identifica los apartados de trabajo; Sora sostiene controles y prosa de interfaz; Fraunces conserva el carácter de libros y lectura prolongada y toda la firma «Altazor AI». El chungungo grabado de ALTAZOR aporta una identidad propia y discreta. La referencia editorial de HERMES informa la relación entre títulos altos, filetes y figura grabada; sus ilustraciones y fuentes comerciales no forman parte de LexOpen.
 
-La interfaz organiza una tarea principal y muestra las opciones secundarias cuando hacen falta. Inicio y el acompañante lateral comparten una conversación persistente; Académico dispone de su propio espacio. La biblioteca conserva sus seis composiciones de encuadernaciones clásicas en tres dimensiones. El cuero y la madera pertenecen a libros y estantes; lectura, escritura y formularios mantienen texto HTML y superficies legibles.
+La interfaz organiza una tarea principal y muestra las opciones secundarias cuando hacen falta. Inicio y el acompañante lateral comparten una conversación persistente, con historial antes del campo de mensaje y Adjuntar y Enviar en su pie. Académico dispone de su propio espacio. La biblioteca conserva sus seis composiciones de encuadernaciones clásicas en tres dimensiones, con búsqueda antes de los estantes y filtros en un acceso secundario. El cuero y la madera pertenecen a libros y estantes; lectura, escritura y formularios mantienen texto HTML y superficies legibles.
 
-La autoridad de implementación está en `src/app/globals.css`, el layout raíz, `AppShell`, `AppSidebar`, `Sheet` y los estilos de cada superficie. La [dirección gráfica](docs/REFERENCIAS-GRAFICAS-2026-11-05.md) registra referencias y procedencia. Las capturas de `docs/midnight-2026-11-05/` muestran el código local a 1440 y 360 px, además del acompañante a 800 px; sus datos y configuración de conexión son ficticios y no acreditan cuentas externas, una release publicada ni conformidad completa de accesibilidad.
+La autoridad de implementación está en `src/app/globals.css`, el layout raíz, `AppShell`, `AppSidebar`, `Sheet` y los estilos de cada superficie. La [dirección gráfica](docs/REFERENCIAS-GRAFICAS-2026-11-05.md) registra referencias y procedencia. Las capturas de `docs/midnight-2026-11-05/` conservan la revisión gráfica MIDNIGHT a 1440 y 360 px, además del acompañante a 800 px; sus datos y configuración de conexión son ficticios y no acreditan cuentas externas, una release publicada ni conformidad completa de accesibilidad. [Conversación primero](docs/INTERFAZ-CONVERSACION-2026-11-05.md) describe la limpieza posterior de los recorridos.
 
 **Key Characteristics:**
 
-- Títulos condensados, controles Sora y lectura Fraunces.
+- Títulos operativos condensados, firma Altazor AI y lectura Fraunces, controles Sora.
 - Noche, papel y superficies opacas; cobre para acción y verde mar para orientación.
 - Un único ALTAZOR persistente entre Inicio y el acompañante.
 - Una tarea visible, opciones progresivas y estados expresados en texto.
@@ -214,8 +225,9 @@ La condensada identifica el apartado sin ocupar la página; la serif distingue c
 
 ### Hierarchy
 
-- **Workspace** sigue `typography.workspace` en Inicio, Académico y Sincronización. Los títulos operativos usan una escala condensada; Académico y Sincronización tienen una reducción local a dos rem en móvil.
-- **Companion** identifica ALTAZOR y el encabezado de su panel. La marca del encabezado de Inicio tiene una reducción local en móvil; el nombre permanece legible como texto.
+- **Workspace** sigue `typography.workspace` en Académico y Archivos conectados. Los títulos operativos usan una escala condensada; ambos tienen una reducción local a dos rem en móvil. Inicio conserva su H1 ALTAZOR sólo para tecnologías de asistencia.
+- **Companion** identifica el encabezado funcional ALTAZOR de la hoja con Barlow Condensed a 1.75 rem; la firma del acompañante tiene sus propios roles.
+- **Brand** muestra todo «Altazor AI» en una línea de Fraunces a 1.65 rem y peso 500, con el mismo tamaño, peso, color y línea base y un espacio natural entre palabras. **Brand caption** sitúa «Tu asistente» debajo en Sora a 0.8125 rem. En móvil, la firma de Inicio baja a 1.4 rem; el lanzador usa 1.15 rem y una leyenda de 0.75 rem. El nombre permanece como un único texto HTML.
 - **Display** encabeza biblioteca y lector; **Headline** identifica importación, personalización, pasajes y mesa de escritura; **Title** rotula estantes sin competir con la cabecera.
 - **Body** usa la base de un rem y el tamaño raíz fijo del navegador. El contenido de ALTAZOR conserva medidas de 65–75 caracteres; las instrucciones académicas y los pasajes limitan su medida a 72 caracteres cuando corresponde.
 - **Label** diferencia campos mediante peso seminegrita. Los pasos **Chrome micro / label** registran microtexto existente de marca y contadores; no constituyen una pauta para reducir instrucciones, permisos o lectura funcional.
@@ -225,9 +237,11 @@ La condensada identifica el apartado sin ocupar la página; la serif distingue c
 
 ## Layout
 
-El marco usa una barra lateral de escritorio expandida (252 px) o contraída (76 px), cabecera adherida y contenido flexible con ancho mínimo cero. Por debajo de 768 px la navegación pasa a un panel móvil; la búsqueda conserva su acceso en la cabecera. El catálogo autorizado presenta hasta ocho áreas: Mi jornada, Causas, Agenda, Biblioteca, Académico, Clientes, Comunicaciones y Estudio. Sólo aparecen los destinos secundarios del área abierta. El portal del cliente conserva su recorrido propio.
+El marco usa una barra lateral de escritorio expandida (252 px) o contraída (76 px), cabecera adherida y contenido flexible con ancho mínimo cero. Por debajo de 768 px la navegación pasa a un panel móvil; la búsqueda conserva su acceso en la cabecera. El catálogo autorizado presenta hasta ocho áreas: Mi jornada, Causas, Agenda, Biblioteca, Académico, Clientes, Comunicaciones y Estudio. Causas abre `/causas` en Gestión manual o `/pjud` en Poder Judicial de Chile; los destinos judiciales aparecen sólo en esta segunda modalidad. Sólo aparecen los destinos secundarios del área abierta. El portal del cliente conserva su recorrido propio.
 
-Inicio limita su contenido a 1120 px y pone el encargo antes del historial. «Mi asistente» reúne Memoria, Conexiones, Computadora y preferencias. Académico ocupa una superficie propia de hasta 1160 px: elección de propósito, trabajo guardado y pasos Objetivo, Fuentes y Preparar. Bibliografía, matriz, docencia y perfil se abren dentro de ese espacio. Sincronización reúne la cuenta judicial, consulta por RIT/ROL y documentos; «Mi Google Drive» aparece antes de las herramientas judiciales y se distingue de «Google Drive del estudio».
+Inicio limita su contenido a 880 px y pone el historial antes del campo de mensaje, con desplazamiento contenido y seguimiento del último intercambio mientras el usuario permanece al final. El vacío presenta una única pregunta, «¿En qué trabajamos hoy?», junto al campo; el pie reúne Adjuntar y Enviar. Conversaciones abre el historial guardado; «Mi asistente» reúne Memoria, Conexiones, Computadora y las preferencias por usuario de memoria y segundo plano. Los avisos de plazos fatales próximos se muestran cuando existen; agenda y trabajo reciente mantienen sus rutas propias. Académico ocupa una superficie propia de hasta 1160 px: elección de propósito, trabajo guardado y pasos Objetivo, Fuentes y Preparar. Bibliografía, matriz, docencia y perfil se abren dentro de ese espacio. Archivos conectados (`/sincronizacion`) reúne sólo Drive personal, Drive del estudio y carpetas de causas, con conexiones y administración separadas.
+
+Configuración → Gestión de causas (`#case-management-settings`) presenta dos opciones de radio y Guardar modalidad. Gestión manual admite expedientes de cualquier país, referencias y tribunal u órgano libres; PJUD añade consulta por RIT/ROL, ClaveÚnica y seguimiento de Chile sobre los mismos expedientes autorizados. El cambio conserva datos y conexiones y pausa las colas judiciales al elegir manual. Las instalaciones nuevas comienzan en manual; la migración mantiene PJUD cuando había ClaveÚnica habilitada o causas con seguimiento activo.
 
 Lectura, escritos y audiencia mantienen el trabajo principal y un acompañante contextual. Por encima de 1120 px, `ContextPanel` puede situarse en una columna lateral de 19–23 rem; en compacto usa el mismo árbol de `Sheet` como diálogo. Cambiar de ancho conserva editores y capturadores montados. El acompañante de ALTAZOR usa una hoja superpuesta de hasta 800 px con desplazamiento interno y acceso a la conversación completa.
 
@@ -235,22 +249,22 @@ La preparación de causa usa índice, pasos y filas separadas por filetes; en co
 
 ### Biblioteca personal
 
-Nombre personal, propiedad y acciones preceden a Mis libros, Mesa de escritura y Colecciones. Búsqueda y filtros preceden a los estantes. Importación y personalización se abren dentro del flujo; la mesa separa fuentes y papel de trabajo. Las seis distribuciones usan la misma colección privada y sus permisos.
+Nombre personal, propiedad y acciones preceden a Mis libros, Sentencias y resoluciones, Mesa de escritura y Colecciones. La búsqueda precede a los estantes; Filtrar revela estante y propiedad. Importación y personalización se abren dentro del flujo; la mesa separa fuentes y papel de trabajo. Las seis distribuciones usan la misma colección privada y sus permisos, sin un panel lateral decorativo de propiedad.
 
 | Variante | Composición construida |
 | --- | --- |
-| La mesa de estudio (`mesa`) | Ex libris a la izquierda; estantes a la derecha. |
-| La gran biblioteca (`estantes`) | Estantes a todo el ancho sin ex libris lateral. |
-| El gabinete (`gabinete`) | Rail de propiedad estrecho y lomos de mayor densidad. |
+| La mesa de estudio (`mesa`) | Estantes en una composición continua a todo el ancho. |
+| La gran biblioteca (`estantes`) | Estantes a todo el ancho con separación amplia entre volúmenes. |
+| El gabinete (`gabinete`) | Lomos de mayor densidad a todo el ancho. |
 | La galería (`galeria`) | Cubiertas grandes sobre papel, sin panel de madera ni canto de estante. |
 | El archivo (`archivo`) | Madera profunda y filas densas; en cubiertas, uno de cada cinco volúmenes ocupa dos columnas y muestra su frente. |
-| El salón de lectura (`salon`) | Franja de ex libris y dos grupos de estantes sobre papel, con cantos de madera. |
+| El salón de lectura (`salon`) | Dos grupos de estantes sobre papel, con cantos de madera. |
 
 La biblioteca se adapta a 1120, 800 y 480 px. A 800 px apila composición, mesa y colecciones; el selector ofrece dos opciones por fila. A 480 px muestra dos cubiertas por fila en la vista habitual, tres lomos en gabinete y vista de lomos, y una cubierta grande en galería; archivo conserva su retícula compacta. La ficha del lector y su barra de página se apilan. Las variantes preservan títulos completos, búsqueda, selección y permisos. Su composición se registra en `.impeccable/surfaces/biblioteca.md`.
 
 ### Adaptación y densidad
 
-Académico apila sus recorridos a 700 px; Sincronización, conexiones y formularios de OAuth reorganizan sus acciones a 600 px. Las tablas operativas comunes pasan a registros de dos columnas por debajo de 640 px preservando encabezados accesibles. La matriz de literatura conserva desplazamiento dentro de su propio contenedor. La audiencia mantiene densidad operativa, reloj y capturador visibles mientras se consultan fuentes. Los puntos de adaptación del sidecar describen estos patrones, no una retícula única obligatoria para toda pantalla.
+Académico apila sus recorridos a 700 px; Archivos conectados, conexiones y formularios de OAuth reorganizan sus acciones a 600 px. Las tablas operativas comunes pasan a registros de dos columnas por debajo de 640 px preservando encabezados accesibles. La matriz de literatura conserva desplazamiento dentro de su propio contenedor. La audiencia mantiene densidad operativa, reloj y capturador visibles mientras se consultan fuentes. Los puntos de adaptación del sidecar describen estos patrones, no una retícula única obligatoria para toda pantalla.
 
 ## Elevation & Depth
 
@@ -286,21 +300,21 @@ Conversación, importación, lector y escritura utilizan superficies sólidas y 
 
 ### Inputs / Fields
 
-Campos con etiquetas visibles, fondo sólido, trazo tenue y foco de verde mar. El error mantiene el estado inválido y peligro. En móvil los campos funcionales usan al menos 16 px. Las casillas conservan su indicador pequeño dentro de una etiqueta pulsable de al menos 44 px, incluidos los permisos de envío y memoria de ALTAZOR. La selección permanece explícita antes de enviar contenido o conectar una cuenta.
+Campos con etiquetas visibles, fondo sólido, trazo tenue y foco de verde mar. El error mantiene el estado inválido y peligro. En móvil los campos funcionales usan al menos 16 px. Las casillas de configuración e importación conservan su indicador pequeño dentro de una etiqueta pulsable de al menos 44 px. El mensaje de ALTAZOR mantiene etiqueta accesible y sólo Adjuntar y Enviar en su pie; la conexión de una cuenta conserva su autorización explícita.
 
 Biblioteca distingue conversión a TXT y conservación del original. La configuración inicial conserva el original y deja la conversión opcional desactivada. El aviso de archivo voluminoso comienza en 10 MiB, configurable entre 1 y 25 MiB. Conservar sólo texto activa la conversión y muestra sus consecuencias antes de importar. El recibo distingue bytes conservados, reducción efectiva y conversión sin reducción.
 
 ### Navigation
 
-El catálogo común sostiene lateral, móvil, acceso rápido y rutas de navegación. El destino activo combina fondo, filete de cobre y `aria-current`; los apartados locales usan verde mar y subrayado. Académico tiene un acceso propio. Sincronización concentra los accesos de ClaveÚnica, RIT/ROL y carpetas; el panel separa la conexión personal de la conexión del estudio. Búsqueda y operaciones secundarias conservan etiquetas y foco de teclado.
+El catálogo común sostiene lateral, móvil, acceso rápido y rutas de navegación. El destino activo combina fondo, filete de cobre y `aria-current`; los apartados locales usan verde mar y subrayado. La cabecera global reúne búsqueda y notificaciones; el menú móvil conserva su acceso de navegación. Apariencia e idioma se encuentran en el menú de cuenta junto a «Mi cuenta». Académico tiene un acceso propio. Causas resuelve su destino principal según la modalidad; PJUD concentra ClaveÚnica, RIT/ROL y seguimiento de Chile, mientras Archivos conectados reúne Drive personal y del estudio. Búsqueda y operaciones secundarias conservan etiquetas y foco de teclado.
 
 ### ALTAZOR persistente y acompañante
 
-Un único proveedor por usuario conserva conversación, borrador, fuentes elegidas y solicitudes entre Inicio y otras rutas. Fuera de Inicio, el botón «ALTAZOR» abre una hoja con la misma conversación y un acceso a su versión completa; al volver a Inicio desaparece ese lanzador. La hoja conserva cabecera, cierre visible, foco, Escape y desplazamiento contenido. Cerrar el acompañante no se presenta como una confirmación de guardado.
+Un único proveedor por usuario conserva conversación, borrador y solicitudes entre Inicio y otras rutas. Fuera de Inicio, el lanzador «Altazor AI» abre una hoja con la misma conversación y un acceso a su versión completa; al volver a Inicio desaparece ese lanzador. La hoja conserva cabecera funcional ALTAZOR, cierre visible, foco, Escape y desplazamiento contenido. Cerrar el acompañante no se presenta como una confirmación de guardado.
 
-`AltazorMark` usa `public/altazor/companion-engraving-v2.png`: chungungo atento, leyendo, pensando o presentando un manuscrito. Su [registro de procedencia](public/altazor/engraving-provenance.json) conserva el recurso de origen y la generación. El nombre y los estados siguen siendo HTML; la marca tiene nombre accesible cuando corresponde y las repeticiones decorativas se ocultan a las tecnologías de asistencia.
+`AltazorMark` usa `public/altazor/companion-engraving-v2.png`: chungungo atento, leyendo, pensando o presentando un manuscrito. La mascota mide 48 px en Inicio y 44 px en el lanzador; ambos colocan la firma «Altazor AI» en una línea a su lado y «Tu asistente» debajo. Su [registro de procedencia](public/altazor/engraving-provenance.json) conserva el recurso de origen y la generación. El nombre y los estados siguen siendo HTML; la marca tiene nombre accesible cuando corresponde y las repeticiones decorativas se ocultan a las tecnologías de asistencia.
 
-El encargo precede al historial. Adjuntos, fuentes, destino de IA, permiso de envío y memoria confirmada se expresan junto al trabajo. Plan, confirmación, ejecución, interrupción y resultado mantienen estados distintos. Memoria conserva grafo y lista accesible sobre los mismos recuerdos, con Propuesto y Confirmado legibles.
+El historial precede al campo de mensaje. El ámbito se reconoce mediante RIT/ROL, enlaces, documentos o la causa abierta; las ambigüedades piden aclaración y los permisos se comprueban de nuevo. Enviar utiliza la conexión configurada y autorizada. Los pasajes pertinentes se recuperan automáticamente de fuentes accesibles y se verifican antes de usarlos; las referencias aparecen junto a la respuesta. Los archivos de la conversación y sus operaciones se agrupan bajo el campo. Plan, confirmación, ejecución, interrupción y resultado mantienen estados distintos. Memoria conserva grafo y lista accesible sobre los mismos recuerdos, con Propuesto y Confirmado legibles. Su preferencia por usuario en «Mi asistente» habilita recuerdos confirmados y recuperación de intercambios del mismo propietario y ámbito, con respaldos y permisos vigentes.
 
 ### Académico
 

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { BookOpen, FilePenLine, FolderOpen, ListChecks, MessagesSquare, PanelsTopLeft } from "lucide-react";
 import { caseLibraryHref } from "@/lib/causas/workflow-links";
+import type { CaseManagementMode } from "@/lib/causas/management-mode";
 import "./CaseWorkflowNav.css";
 
 type Stage = "case" | "library" | "hearing" | "writing" | "workbench";
@@ -13,11 +14,12 @@ const currentHash = () => window.location.hash;
 const serverHash = () => "";
 const identifier = (value: string | null | undefined) => value && /^[a-zA-Z0-9_-]{1,100}$/.test(value) ? value : undefined;
 
-export function CaseWorkflowNav({ causaId, title, current, workspaceId }: { causaId: string; title: string; current: Stage; workspaceId?: string }) {
+export function CaseWorkflowNav({ causaId, title, current, workspaceId, mode = "manual" }: { causaId: string; title: string; current: Stage; workspaceId?: string; mode?: CaseManagementMode }) {
   const query = useSearchParams(), hash = useSyncExternalStore(subscribeHash, currentHash, serverHash);
   const draftId = identifier(query.get("draft") || query.get("escrito"));
   const selectedWorkspace = identifier(workspaceId || query.get("mesa"));
   const base = `/causas/${encodeURIComponent(causaId)}`;
+  const overview = mode === "pjud_cl" ? `/pjud/${encodeURIComponent(causaId)}` : base;
   const context = new URLSearchParams();
   if (draftId) context.set("escrito", draftId);
   if (selectedWorkspace) context.set("mesa", selectedWorkspace);
@@ -28,9 +30,9 @@ export function CaseWorkflowNav({ causaId, title, current, workspaceId }: { caus
   if (selectedWorkspace) writingContext.set("mesa", selectedWorkspace);
   const active = current === "hearing" || current === "writing" ? current : current !== "case" ? "prepare" : ["#documentos", "#tramites", "#actividad"].includes(hash) ? "file" : ["#preparacion", "#conocimiento", "#audios", "#minutas"].includes(hash) ? "prepare" : "overview";
   const steps = [
-    { stage: "overview", label: "Resumen", href: `${base}${suffix}#ficha`, icon: PanelsTopLeft },
-    { stage: "file", label: "Expediente", href: `${base}${suffix}#documentos`, icon: FolderOpen },
-    { stage: "prepare", label: "Preparación", href: `${base}${suffix}#preparacion`, icon: ListChecks },
+    { stage: "overview", label: "Resumen", href: `${overview}${suffix}#ficha`, icon: PanelsTopLeft },
+    { stage: "file", label: "Expediente", href: `${overview}${suffix}#documentos`, icon: FolderOpen },
+    { stage: "prepare", label: "Preparación", href: `${overview}${suffix}#preparacion`, icon: ListChecks },
     { stage: "hearing", label: "Audiencias", href: selectedWorkspace ? `/audiencias/${encodeURIComponent(selectedWorkspace)}${hearingSuffix}` : `${base}/audiencias${suffix}`, icon: MessagesSquare },
     { stage: "writing", label: "Escritos", href: `${base}/escritos${writingContext.size ? `?${writingContext}` : ""}`, icon: FilePenLine },
   ];

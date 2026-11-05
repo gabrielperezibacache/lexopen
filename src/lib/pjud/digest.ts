@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled, getCaseManagementMode } from "@/lib/causas/management-mode";
 import { prisma } from "@/lib/db";
 import {
   diasEntre,
@@ -279,6 +280,7 @@ async function staffRecipients() {
 }
 
 export async function runPjudDigest(opts?: { dryRun?: boolean }) {
+  await assertPjudManagementEnabled();
   const built = await buildPjudDigest();
   const appUrl = (
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -290,6 +292,7 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
   const sent: string[] = [];
   const emailFailed: string[] = [];
   const notified: string[] = [];
+  let paused = false;
 
   // Route unassigned causas to admins (or first staff).
   if (built.unassigned.length) {
@@ -313,6 +316,7 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
 
   if (!opts?.dryRun) {
     for (const [userId, bucket] of built.byAbogado) {
+      if (await getCaseManagementMode() !== "pjud_cl") { paused = true; break; }
       if (!bucket.items.length) continue;
       const subject = `LexOpen PJUD · ${bucket.items.length} causa(s) con novedades`;
       if (canEmail) {
@@ -328,6 +332,7 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
           emailFailed.push(bucket.email);
         }
       }
+      if (await getCaseManagementMode() !== "pjud_cl") { paused = true; break; }
       await emitNotification({
         tipo: "pjud.digest",
         userId,
@@ -342,6 +347,10 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
       notified.push(userId);
     }
 
+    // Keep the original window when a configuration change interrupts delivery.
+    // Existing notification dedupe keys remain valid when the batch resumes.
+    paused ||= await getCaseManagementMode() !== "pjud_cl";
+
     const status =
       canEmail && sent.length
         ? emailFailed.length
@@ -349,22 +358,26 @@ export async function runPjudDigest(opts?: { dryRun?: boolean }) {
           : "emailed"
         : "in-app";
 
-    await prisma.firmSettings.update({
-      where: { id: built.settingsId },
-      data: {
-        pjudDigestLastAt: new Date(),
-        pjudDigestLastStatus: status,
-        pjudDigestLastNote: `Digest: ${built.items.length} causas · email ${sent.length}${
-          emailFailed.length ? ` (falló ${emailFailed.length})` : ""
-        } · in-app ${notified.length}${
-          canEmail ? "" : " (Gmail no conectado)"
-        } · sin abogado ${built.unassigned.length}`,
-      },
-    });
+    if (!paused) {
+      const completed = await prisma.firmSettings.updateMany({
+        where: { id: built.settingsId, caseManagementMode: "pjud_cl" },
+        data: {
+          pjudDigestLastAt: new Date(),
+          pjudDigestLastStatus: status,
+          pjudDigestLastNote: `Digest: ${built.items.length} causas · email ${sent.length}${
+            emailFailed.length ? ` (falló ${emailFailed.length})` : ""
+          } · in-app ${notified.length}${
+            canEmail ? "" : " (Gmail no conectado)"
+          } · sin abogado ${built.unassigned.length}`,
+        },
+      });
+      paused = completed.count === 0;
+    }
   }
 
   return {
     dryRun: Boolean(opts?.dryRun),
+    paused,
     causas: built.items.length,
     emailed: sent.length,
     emailFailed: emailFailed.length,

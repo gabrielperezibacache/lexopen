@@ -180,7 +180,7 @@ export function labelPjudSyncStatus(status: string | null | undefined): string {
     case "error":
       return "Fallido";
     case "never":
-      return "Sin sync";
+      return "Pendiente de primera consulta";
     case "disabled":
       return "Pausado";
     case "running":

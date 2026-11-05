@@ -37,7 +37,7 @@ export function ModuleHeader({
   subtitle,
   actions,
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   subtitle?: string;
   actions?: ReactNode;

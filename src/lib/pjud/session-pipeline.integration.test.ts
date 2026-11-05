@@ -64,7 +64,7 @@ async function main() {
     process.env.PJUD_PDF_BACKUP = "0";
     process.env.PJUD_ALLOW_DEMO = "0";
     globalThis.fetch = async () => { networkCalls += 1; throw new Error("Network is forbidden in the pipeline fixture"); };
-    const org = await prisma.organization.create({ data: { name: `Synthetic session ${tag}`, settings: { create: {} } } });
+    const org = await prisma.organization.create({ data: { name: `Synthetic session ${tag}`, settings: { create: { caseManagementMode: "pjud_cl" } } } });
     orgId = org.id;
     const unrelated = await prisma.causa.create({ data: { titulo: `Unrelated fixture ${tag}`, tribunal: "Tribunal ficticio", materia: "Fixture" } });
     causaIds.push(unrelated.id);

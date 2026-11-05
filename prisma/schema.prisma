@@ -30,6 +30,8 @@ model FirmSettings {
   defaultRetencionPct Float @default(0.1375)
   ivaPct          Float   @default(0.19)
   hermesAllowDemo Boolean @default(false)
+  /// manual: gestión de expedientes de cualquier país | pjud_cl: seguimiento OJV de Chile.
+  caseManagementMode String @default("manual")
   /// ClaveÚnica del estudio (AES-GCM) — flujo CausaMonitor / OJV Mis Causas
   claveUnicaRut            String?
   claveUnicaPasswordEnc    String?

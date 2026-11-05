@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { normalizarRut } from "@/lib/chile";
+import { normalizarRut, validarRut } from "@/lib/chile";
 import { causaAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 
 export type ConflictHit = {
@@ -83,9 +83,17 @@ export function namesLikelyMatch(a: string, b: string): boolean {
   return shared === 1 && ta.size >= 2 && tb.length >= 2;
 }
 
+/** Compare complete identifiers; only genuine Chilean RUTs have formatting aliases. */
+export function partyIdentifiersMatch(left: string | null | undefined, right: string | null | undefined) {
+  if (!left?.trim() || !right?.trim()) return false;
+  const strictRut = (value: string) => /^(?:\d{7,8}|\d{1,2}\.\d{3}\.\d{3})[-\u2010-\u2015\u2212]?[\dK]$/i.test(value.trim()) && validarRut(value);
+  if (strictRut(left) && strictRut(right)) return normalizarRut(left) === normalizarRut(right);
+  return left.trim().normalize("NFKC").toUpperCase() === right.trim().normalize("NFKC").toUpperCase();
+}
+
 const RECENT_CLOSED_MS = 3 * 365.25 * 24 * 60 * 60 * 1000;
 
-/** Busca conflictos de partes/RUT en causas activas y cerradas recientes. */
+/** Busca conflictos por nombre o identificación en causas activas y cerradas recientes. */
 export async function checkConflicts(opts: {
   partes: Array<{ nombre: string; rut?: string | null }>;
   excludeCausaId?: string;
@@ -112,7 +120,7 @@ export async function checkConflicts(opts: {
 
   for (const parte of opts.partes) {
     const nombre = parte.nombre.trim();
-    const rut = parte.rut ? normalizarRut(parte.rut) : null;
+    const identifier = parte.rut?.trim() || null;
     for (const c of causas) {
       const isActive = c.estado === "activa" || c.estado === "suspensa";
       const source: ConflictHit["source"] = isActive
@@ -120,17 +128,17 @@ export async function checkConflicts(opts: {
         : "recent_closed";
 
       for (const p of c.partes) {
-        const sameRut = Boolean(rut && p.rut && normalizarRut(p.rut) === rut);
+        const sameIdentifier = partyIdentifiersMatch(identifier, p.rut);
         const sameName = namesLikelyMatch(nombre, p.nombre);
-        if (sameRut || sameName) {
+        if (sameIdentifier || sameName) {
           const severity: ConflictHit["severity"] =
-            sameRut && isActive ? "blocked" : "warning";
+            sameIdentifier && isActive ? "blocked" : "warning";
           hits.push({
             causaId: c.id,
             titulo: c.titulo,
             rit: c.rit,
-            match: sameRut
-              ? `RUT ${rut} ya figura en ${c.rit || c.titulo}${
+            match: sameIdentifier
+              ? `Identificación ${identifier} ya figura en ${c.rit || c.titulo}${
                   isActive ? "" : " (causa cerrada reciente)"
                 }`
               : `Nombre similar «${p.nombre}» en ${c.rit || c.titulo}${
@@ -142,12 +150,12 @@ export async function checkConflicts(opts: {
         }
       }
 
-      if (rut && c.cliente?.rut && normalizarRut(c.cliente.rut) === rut) {
+      if (partyIdentifiersMatch(identifier, c.cliente?.rut)) {
         hits.push({
           causaId: c.id,
           titulo: c.titulo,
           rit: c.rit,
-          match: `Cliente con RUT ${rut} en causa ${c.rit || c.titulo}`,
+          match: `Cliente con identificación ${identifier} en causa ${c.rit || c.titulo}`,
           severity: "warning",
           source: "cliente",
         });

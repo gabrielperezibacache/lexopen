@@ -4,14 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/sites/SiteNav";
-import {
-  ESTADOS_CAUSA,
-  ETAPAS,
-  MATERIAS,
-  TRIBUNALES_CHILE,
-  validarRit,
-  validarRuc,
-} from "@/lib/chile";
+import { ESTADOS_CAUSA, ETAPAS } from "@/lib/chile";
 import { apiMutation } from "@/lib/api-mutation";
 
 type Option = { id: string; label: string };
@@ -49,19 +42,8 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
     setLoading(true);
     setError("");
     const fd = new FormData(e.currentTarget);
-    const rit = String(fd.get("rit") || "").trim();
-    const ruc = String(fd.get("ruc") || "").trim();
-    if (rit && !validarRit(rit)) {
-      setError("RIT inválido. Use formatos como C-1234-2026.");
-      setLoading(false);
-      return;
-    }
-    if (ruc && !validarRuc(ruc)) {
-      setError("RUC inválido.");
-      setLoading(false);
-      return;
-    }
-
+    const rit = String(fd.get("rit") || "");
+    const ruc = String(fd.get("ruc") || "");
     const payload = {
       titulo: String(fd.get("titulo") || "").trim(),
       rit: rit || null,
@@ -116,63 +98,50 @@ export function CausaEditForm({ causa, clientes, abogados }: Props) {
             className="input"
             name="titulo"
             required
+            maxLength={500}
             defaultValue={causa.titulo}
           />
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="rit" className="mb-2 block text-sm font-medium">RIT</label>
+            <label htmlFor="rit" className="mb-2 block text-sm font-medium">Referencia</label>
             <input
               id="rit"
               className="input"
               name="rit"
               defaultValue={causa.rit || ""}
-              placeholder="C-1234-2026"
+              maxLength={80}
+              placeholder="Número o referencia del expediente"
             />
           </div>
           <div>
-            <label htmlFor="ruc" className="mb-2 block text-sm font-medium">RUC</label>
+            <label htmlFor="ruc" className="mb-2 block text-sm font-medium">Identificador adicional</label>
             <input
               id="ruc"
               className="input"
               name="ruc"
               defaultValue={causa.ruc || ""}
-              placeholder="2500123456-7"
+              maxLength={80}
+              placeholder="Opcional"
             />
           </div>
         </div>
         <div>
-          <label htmlFor="tribunal" className="mb-2 block text-sm font-medium">Tribunal</label>
+          <label htmlFor="tribunal" className="mb-2 block text-sm font-medium">Tribunal u órgano</label>
           <input
             id="tribunal"
             className="input"
             name="tribunal"
             required
-            list="tribunales-chile-edit"
+            maxLength={300}
             defaultValue={causa.tribunal}
             autoComplete="off"
           />
-          <datalist id="tribunales-chile-edit">
-            {TRIBUNALES_CHILE.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label htmlFor="materia" className="mb-2 block text-sm font-medium">Materia</label>
-            <select
-              id="materia"
-              className="select"
-              name="materia"
-              defaultValue={causa.materia}
-            >
-              {MATERIAS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
+            <input id="materia" className="input" name="materia" required minLength={2} maxLength={120} defaultValue={causa.materia} />
           </div>
           <div>
             <label htmlFor="etapa" className="mb-2 block text-sm font-medium">Etapa</label>

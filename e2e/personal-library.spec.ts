@@ -68,8 +68,9 @@ test("biblioteca personal: libros propios, seis distribuciones, pasajes, escrito
     }
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole("checkbox", { name: `Usar ${textBook.title} para fundamentar`, exact: true }).check();
+  await expect(page.getByTestId("library-book").getByRole("checkbox")).toHaveCount(0);
   await page.getByRole("button", { name: "Mesa de escritura", exact: false }).first().click();
+  await page.locator(".book-source-choice").filter({ hasText: textBook.title }).getByRole("checkbox").check();
   await page.getByLabel("Qué necesitas fundamentar", { exact: true }).fill("buena fe contrato");
   await page.getByRole("button", { name: "Buscar pasajes", exact: true }).click();
   await expect(page.locator(".book-search-results")).toContainText("material ficticio");

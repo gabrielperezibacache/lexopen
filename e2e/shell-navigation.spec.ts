@@ -13,7 +13,8 @@ test("ocho áreas, secundario contextual y navegación rápida comparten destino
   await expect(secondary.getByRole("link", { name: "Plazos", exact: true })).toBeVisible();
   await expect(secondary.getByRole("link", { name: "Panel de audiencias", exact: true })).toBeVisible();
   await expect(secondary.getByRole("link", { name: "Configuración", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Ir a un apartado", exact: true }).click();
+  await page.getByRole("link", { name: "Búsqueda global", exact: true }).focus();
+  await page.keyboard.press("Control+k");
   const dialog = page.getByRole("dialog", { name: "Ir a un apartado", exact: true });
   await dialog.getByRole("textbox", { name: "Ir a un apartado", exact: true }).fill("biblioteca");
   await page.keyboard.press("ArrowDown");
@@ -23,8 +24,11 @@ test("ocho áreas, secundario contextual y navegación rápida comparten destino
   await main.getByRole("link", { name: "Causas", exact: true }).click();
   await expect(sidebar.getByTestId("secondary-navigation").getByRole("link", { name: "Sincronización", exact: true })).toBeVisible();
   await expect(sidebar.getByTestId("secondary-navigation").getByRole("link", { name: "Mis causas · ClaveÚnica", exact: true })).toHaveCount(0);
-  await expect(page.getByTestId("causas-section-tabs").getByRole("link", { name: "ClaveÚnica", exact: true })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Miga de pan", exact: true })).toContainText("Expedientes");
+  await expect(page).toHaveURL(/\/pjud$/);
+  await expect(page.getByRole("heading", { name: "PJUD · Chile", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ingresar con ClaveÚnica", exact: true })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: "Causas manuales", exact: true })).toHaveAttribute("href", "/causas");
+  await expect(page.getByRole("navigation", { name: "Miga de pan", exact: true })).toContainText("PJUD · Chile");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 });
 
@@ -52,10 +56,11 @@ test("portal y paleta de cliente no ofrecen destinos internos", async ({ page })
   await expect(sidebar.getByRole("link", { name: "Causas", exact: true })).toHaveCount(0);
   await expect(sidebar.getByRole("link", { name: "Académico", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Conversar con ALTAZOR", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Ir a un apartado", exact: true }).click();
+  await page.getByRole("link", { name: "Búsqueda global", exact: true }).focus();
+  await page.keyboard.press("Control+k");
   const dialog = page.getByRole("dialog", { name: "Ir a un apartado", exact: true });
   await expect(dialog.getByRole("button", { name: /Configuración|Honorarios|Mis libros|Expedientes/ })).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: /Mi cuenta/ })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Ir a un apartado", exact: true })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Búsqueda global", exact: true })).toBeFocused();
 });

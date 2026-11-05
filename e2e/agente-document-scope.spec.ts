@@ -12,7 +12,8 @@ test("los accesos anteriores preparan ALTAZOR sin enviar y conservan el archivo 
   await expect(page).toHaveURL(/\/inicio\?/);
   await expect(page.getByTestId("inicio-composer")).not.toHaveValue("");
   await expect(page.locator(".altazor-user-message")).toHaveCount(0);
-  await expect(page.locator("summary").filter({ hasText: "Elegir fuentes para este mensaje" })).toBeVisible();
+  await expect(page.locator("summary").filter({ hasText: "Elegir fuentes para este mensaje" })).toHaveCount(0);
+  await expect(page.locator(".altazor-case-context")).toBeVisible();
   const chatsResponse = await page.request.get("/api/integrations/hermes?chats=1");
   expect(chatsResponse.ok()).toBeTruthy();
   const chats = await chatsResponse.json() as Array<{ id: string; causaId: string | null }>;

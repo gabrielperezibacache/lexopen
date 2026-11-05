@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled, getCaseManagementMode } from "@/lib/causas/management-mode";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { writeAuditStrict } from "@/lib/audit";
 import { causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
@@ -20,6 +21,7 @@ export const maxDuration = 300;
 export async function GET() {
   try {
     const user = await requireStaff();
+    await assertPjudManagementEnabled();
     const [status, causasCount] = await Promise.all([
       getClaveUnicaStatus(),
       prisma.causa.count({ where: { AND: [scopedcausaAccessWhere(user), { pjudFromMisCausas: true }] } }),
@@ -60,6 +62,8 @@ export async function POST(req: NextRequest) {
       actorId = user.id;
     }
 
+    if (cron && await getCaseManagementMode() !== "pjud_cl") return json({ ok: true, paused: true });
+    await assertPjudManagementEnabled();
     const body = await parseMisCausasRequest(req);
 
     if (body?.action === "clear_errors") {
@@ -119,6 +123,7 @@ export async function POST(req: NextRequest) {
             });
           }
         } catch (error) {
+          if (await getCaseManagementMode() !== "pjud_cl") return;
           console.error(
             "[pjud/mis-causas] background sync failed:",
             error instanceof Error ? error.message : error

@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
 import { fetchPjudMovimientos } from "@/lib/pjud/provider";
@@ -143,6 +144,7 @@ async function runImport(causaId: string) {
   job.maxPerRun = max;
 
   try {
+    await assertPjudManagementEnabled();
     const causa = await prisma.causa.findUnique({
       where: { id: causaId },
       select: {
@@ -173,7 +175,8 @@ async function runImport(causaId: string) {
         tribunal: causa.tribunal,
         titulo: causa.titulo,
         caratula: causa.caratula,
-      });
+      }, { assertActive: assertPjudManagementEnabled });
+      await assertPjudManagementEnabled();
 
       // Persist OJV http refs onto local movimientos so phase 2 / UI can import them.
       for (const m of fetchResult.movimientos) {

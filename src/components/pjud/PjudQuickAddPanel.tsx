@@ -212,7 +212,7 @@ export function PjudQuickAddPanel() {
       return;
     }
     setNotice(result.data.note || "La causa quedó registrada en su cartera.");
-    if (result.data.causaId) router.push(`/causas/${encodeURIComponent(result.data.causaId)}`);
+    if (result.data.causaId) router.push(`/pjud/${encodeURIComponent(result.data.causaId)}`);
   }
 
   async function consultRut(event: FormEvent<HTMLFormElement>) {

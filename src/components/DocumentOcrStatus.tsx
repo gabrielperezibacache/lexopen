@@ -27,12 +27,10 @@ export function DocumentOcrStatus() {
     };
   }, []);
 
-  if (!status || !status.enabled) return null;
+  if (!status || !status.enabled || status.available) return null;
   return (
-    <details className="border-y border-[var(--line)] py-3 text-sm text-[var(--ink-soft)]">
-      <summary className="cursor-pointer font-medium">{status.available ? "Lectura de documentos escaneados disponible" : "Los documentos escaneados necesitan revisión"}</summary>
-      <p className="mt-2">{status.available ? "Podemos reconocer el texto de archivos escaneados. Revisa los pasajes junto al original antes de citarlos." : "El reconocimiento de texto no está disponible en este momento. Puedes conservar y consultar los originales; su preparación quedará pendiente."}</p>
-      <details className="mt-2"><summary className="cursor-pointer">Información para configurar el reconocimiento</summary><p className="mt-2">OCR local · {status.provider}{status.version ? ` · ${status.version}` : ""}</p>{status.reason && <p>{status.reason}</p>}{status.hint && <p>{status.hint}</p>}</details>
-    </details>
+    <p role="status" className="text-sm text-[var(--ink-soft)]">
+      El texto de los documentos escaneados quedará pendiente hasta activar el reconocimiento en <a href="/configuracion" className="underline underline-offset-4">Configuración</a>.
+    </p>
   );
 }

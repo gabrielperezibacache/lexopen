@@ -21,7 +21,7 @@ test("un abogado agenda una audiencia desde Inicio y aparece en el calendario", 
 }) => {
   await loginAs(page, email);
   await expect(page).toHaveURL(/\/inicio$/);
-  await expect(page.getByTestId("inicio-status-line")).toBeVisible();
+  await expect(page.getByTestId("inicio-composer")).toBeVisible();
 
   const composer = page.getByTestId("inicio-composer");
   const eventTitle = `prueba e2e ${randomUUID()}`;

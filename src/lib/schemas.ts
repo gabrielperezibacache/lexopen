@@ -10,43 +10,45 @@ export const passwordChangeSchema = z.object({
   newPassword: z.string().min(12).max(256),
 });
 
+const caseIdentifierSchema = z.string().max(80).regex(/^[^\p{Cc}\p{Zl}\p{Zp}]*$/u, "La referencia o identificación debe estar en una sola línea sin caracteres de control");
+
 export const causaCreateSchema = z.object({
-  titulo: z.string().min(3),
-  rit: z.string().optional().nullable(),
-  ruc: z.string().optional().nullable(),
-  tribunal: z.string().min(2),
-  materia: z.string().min(2),
-  procedimiento: z.string().optional().nullable(),
-  estado: z.string().optional(),
-  etapa: z.string().optional(),
-  caratula: z.string().optional().nullable(),
-  resumen: z.string().optional().nullable(),
-  clienteId: z.string().optional().nullable(),
-  abogadoId: z.string().optional().nullable(),
-  sala: z.string().optional().nullable(),
-  cuaderno: z.string().optional().nullable(),
-  fechaNotificacion: z.string().optional().nullable(),
-  abogadoContraparte: z.string().optional().nullable(),
+  titulo: z.string().min(3).max(500),
+  rit: caseIdentifierSchema.optional().nullable(),
+  ruc: caseIdentifierSchema.optional().nullable(),
+  tribunal: z.string().min(2).max(300),
+  materia: z.string().min(2).max(120),
+  procedimiento: z.string().max(200).optional().nullable(),
+  estado: z.string().min(2).max(40).optional(),
+  etapa: z.string().min(2).max(40).optional(),
+  caratula: z.string().max(500).optional().nullable(),
+  resumen: z.string().max(20000).optional().nullable(),
+  clienteId: z.string().max(100).optional().nullable(),
+  abogadoId: z.string().max(100).optional().nullable(),
+  sala: z.string().max(120).optional().nullable(),
+  cuaderno: z.string().max(120).optional().nullable(),
+  fechaNotificacion: z.string().max(40).optional().nullable(),
+  abogadoContraparte: z.string().max(300).optional().nullable(),
   partes: z
     .array(
       z.object({
-        nombre: z.string().min(2),
+        nombre: z.string().min(2).max(300),
         rut: z.string().optional().nullable(),
-        rol: z.string().min(2),
-        domicilio: z.string().optional().nullable(),
+        rol: z.string().min(2).max(80),
+        domicilio: z.string().max(1000).optional().nullable(),
       })
     )
     .optional(),
   conflictOverride: z.boolean().optional(),
-  conflictNotes: z.string().optional().nullable(),
+  conflictNotes: z.string().max(20000).optional().nullable(),
 });
 
 /** Partial update for ficha fields (no Drive — use Google integration routes). */
 export const causaUpdateSchema = z
   .object({
     titulo: z.string().min(3).max(500).optional(),
-    rit: z.string().max(80).optional().nullable(),
-    ruc: z.string().max(80).optional().nullable(),
+    rit: caseIdentifierSchema.optional().nullable(),
+    ruc: caseIdentifierSchema.optional().nullable(),
     tribunal: z.string().min(2).max(300).optional(),
     materia: z.string().min(2).max(120).optional(),
     procedimiento: z.string().max(200).optional().nullable(),

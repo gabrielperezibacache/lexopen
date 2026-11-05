@@ -6,6 +6,7 @@ import type { MisCausasItem } from "@/lib/pjud/types";
 import { syncMisCausas } from "@/lib/pjud/claveunica";
 import { manualMisCausasAllowed } from "@/lib/pjud/mis-causas-access";
 import { MANUAL_OJV_MATERIAS, type ManualOjvCandidate, type ManualOjvImportResult, type ManualOjvMateria, type ManualOjvUiSession } from "@/lib/pjud/manual-session-contract";
+import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 
 export const MANUAL_OJV_IMPORT_LIMIT = 20;
 const LIFETIME_MS = 30 * 60_000;
@@ -40,6 +41,7 @@ export function manualOjvRuntimeEnabled(env: Readonly<Record<string, string | un
 }
 
 async function authorize(owner: ManualOjvOwner) {
+  await assertPjudManagementEnabled();
   const { prisma } = await import("@/lib/db");
   const { mustEnrollTwoFactor } = await import("@/lib/auth/two-factor-policy");
   const [user, settings] = await Promise.all([

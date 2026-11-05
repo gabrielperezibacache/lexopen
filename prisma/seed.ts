@@ -26,6 +26,7 @@ async function main() {
           emisorDireccion: "Av. Apoquindo 3000, Las Condes",
           // Demo/e2e: no forzar enrolamiento 2FA (producción sigue default true).
           require2faPrivileged: false,
+          caseManagementMode: "pjud_cl",
         },
       },
     },

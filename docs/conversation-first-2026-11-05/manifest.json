@@ -1,0 +1,114 @@
+{
+  "capturedOn": "2026-11-05",
+  "fixtureOnly": true,
+  "browser": "Chrome",
+  "theme": "MIDNIGHT",
+  "sourceVersion": "1.1.0-preview.6",
+  "externalAccountsValidated": false,
+  "images": [
+    {
+      "path": "academico-escritorio.jpg",
+      "route": "/academico",
+      "width": 1440,
+      "height": 1000,
+      "size": 78065,
+      "sha256": "417eaffdfd63c8cd56a4aeb753ac95020ba60053a941ae8490dcfffe3ae5cb2a"
+    },
+    {
+      "path": "acompanante-biblioteca.jpg",
+      "route": "/biblioteca",
+      "width": 1440,
+      "height": 1000,
+      "size": 67819,
+      "sha256": "5c93f88a953d1a83eb4afa0f9376d0c6d2dc147f2ce43c6be198e9dc9496441d"
+    },
+    {
+      "path": "altazor-identidad.jpg",
+      "route": "/inicio",
+      "width": 196,
+      "height": 65,
+      "size": 3181,
+      "sha256": "bc65e272502553534a988952ed1b6466833135f33bbf60a01c4c934d01855284"
+    },
+    {
+      "path": "biblioteca-escritorio.jpg",
+      "route": "/biblioteca",
+      "width": 1440,
+      "height": 1000,
+      "size": 113624,
+      "sha256": "221adf756473a2514fc2a8c777f66b136639e886e43b27bf855353d90eea8919"
+    },
+    {
+      "path": "causas-manuales.jpg",
+      "route": "/causas",
+      "width": 1440,
+      "height": 1000,
+      "size": 76647,
+      "sha256": "3b262233f8fe8a249f59159685878da2c09212409a2d11180306e2e7c633a32a"
+    },
+    {
+      "path": "configuracion-causas.jpg",
+      "route": "/configuracion#case-management-settings",
+      "width": 1440,
+      "height": 1000,
+      "size": 116311,
+      "sha256": "35db8f7eed92015935b8b1d50f6487a3f88ef2f9ffa0dd819bb337543a438a1e"
+    },
+    {
+      "path": "inicio-escritorio.jpg",
+      "route": "/inicio",
+      "width": 1440,
+      "height": 1000,
+      "size": 43158,
+      "sha256": "7b0b78c800e9d102792071e2865db39a90c641f21352b311d4f18e7e32adaa59"
+    },
+    {
+      "path": "inicio-movil.jpg",
+      "route": "/inicio",
+      "width": 360,
+      "height": 800,
+      "size": 15855,
+      "sha256": "d74ebe17ee2a8730cfaddf787d39c9edd7fd2e67926fd092b1e6a8b4590bc5d0"
+    },
+    {
+      "path": "nueva-causa-manual.jpg",
+      "route": "/causas/nueva",
+      "width": 1440,
+      "height": 1000,
+      "size": 78691,
+      "sha256": "3b292de2717ed10776fd9b45e1217e787e8fe8b62ee9d34c63c28c8611cb19e8"
+    },
+    {
+      "path": "pjud-escritorio.jpg",
+      "route": "/pjud",
+      "width": 1440,
+      "height": 1000,
+      "size": 83113,
+      "sha256": "73d05eb483632e8c8afd7a332b3680e9170a018a6314d5d2708c6f8f2433ab0b"
+    },
+    {
+      "path": "pjud-movil.jpg",
+      "route": "/pjud",
+      "width": 360,
+      "height": 800,
+      "size": 31419,
+      "sha256": "8314c364660377847c12b53241b8a01843d765bd99301771d70854462b1334a5"
+    },
+    {
+      "path": "sincronizacion-escritorio.jpg",
+      "route": "/sincronizacion",
+      "width": 1440,
+      "height": 1000,
+      "size": 84804,
+      "sha256": "89ba351d836463c5174d9f11fd5a40a2ac0ce1b1cf73ee3486b30a9b39cedeb4"
+    },
+    {
+      "path": "sincronizacion-movil.jpg",
+      "route": "/sincronizacion",
+      "width": 360,
+      "height": 800,
+      "size": 35464,
+      "sha256": "e62a38c05a4d11f6bc0365751ad8a4b36906da412edd649cfa5ee5912b459d75"
+    }
+  ]
+}

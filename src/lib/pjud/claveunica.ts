@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled, getCaseManagementMode } from "@/lib/causas/management-mode";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
 import { normalizarRut, validarRut } from "@/lib/chile";
@@ -89,12 +90,13 @@ async function getOrCreateFirmSettings() {
 
 export async function getClaveUnicaStatus() {
   const { settings } = await getOrCreateFirmSettings();
-  const scrapeFlag = claveUnicaAutomationAllowed(settings.claveUnicaEnabled);
+  const modeEnabled = await getCaseManagementMode() === "pjud_cl";
+  const scrapeFlag = modeEnabled && claveUnicaAutomationAllowed(settings.claveUnicaEnabled);
   const sidecar = scraperSidecarConfigured();
-  const sidecarHealth = sidecar ? await probeScraperSidecarHealth() : null;
+  const sidecarHealth = sidecar && modeEnabled ? await probeScraperSidecarHealth() : null;
   const publicScrape = publicScrapeEnabled();
   const captcha = captchaSolverConfigured();
-  const blockers: string[] = [];
+  const blockers: string[] = modeEnabled ? [] : ["El seguimiento judicial está pausado en la modalidad de gestión manual."];
   const hostNotices: string[] = [];
   if (!settings.claveUnicaEnabled) {
     blockers.push(
@@ -170,7 +172,7 @@ export async function getClaveUnicaStatus() {
       : "Sin canal de consulta";
 
   return {
-    enabled: settings.claveUnicaEnabled,
+    enabled: settings.claveUnicaEnabled && modeEnabled,
     rutMasked: maskRut(settings.claveUnicaRut),
     hasPassword: Boolean(settings.claveUnicaPasswordEnc),
     encryption: "aes-256-gcm",
@@ -299,6 +301,7 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
 
   let sidecarError: Error | null = null;
   if (scraperSidecarConfigured()) {
+    await assertPjudManagementEnabled();
     const health = await probeScraperSidecarHealth();
     if (!health.reachable) {
       sidecarError = new Error(health.error || "sidecar no responde");
@@ -307,6 +310,7 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
         "sidecar arriba pero scrapeReady=false (CAPTCHA / PJUD_PUBLIC_SCRAPE en el worker)"
       );
     } else {
+      await assertPjudManagementEnabled();
       try {
         const fromSidecar = await fetchMisCausasFromSidecar({
           rut: settings.claveUnicaRut,
@@ -319,6 +323,7 @@ async function resolveMisCausasList(): Promise<MisCausasItem[]> {
     }
   }
 
+  await assertPjudManagementEnabled();
   try {
     return await scrapeMisCausasWithClaveUnica({
       rut: settings.claveUnicaRut,
@@ -375,6 +380,7 @@ function humanizeClaveUnicaSyncError(error: unknown, sidecarError: Error): strin
 export async function tryScrapeCausaDetailAuthenticated(
   causa: PjudCausaRef
 ): Promise<PjudFetchResult | null> {
+  if (await getCaseManagementMode() !== "pjud_cl") return null;
   const { settings } = await getOrCreateFirmSettings();
   if (!settings.claveUnicaEnabled) return null;
   if (!settings.claveUnicaRut || !settings.claveUnicaPasswordEnc) return null;
@@ -386,6 +392,7 @@ export async function tryScrapeCausaDetailAuthenticated(
   });
   if (!password) return null;
 
+  await assertPjudManagementEnabled();
   const scraped = await scrapeCausaDetailWithClaveUnica({
     rut: settings.claveUnicaRut,
     password,
@@ -423,6 +430,7 @@ export async function claimMisCausasSync(opts?: {
   note?: string;
   now?: Date;
 }): Promise<{ alreadyRunning: boolean; settingsId: string; claimedAt: Date | null }> {
+  await assertPjudManagementEnabled();
   const { settings } = await getOrCreateFirmSettings();
   const now = opts?.now ?? new Date();
   // Compare-and-swap: solo un caller gana el slot (evita TOCTOU).
@@ -469,6 +477,7 @@ export async function syncMisCausas(opts?: {
       throw httpError("Los movimientos de una sesión temporal deben procesarse mientras la sesión está abierta.", 400);
     }
   }
+  await assertPjudManagementEnabled();
   await opts?.sessionSource?.assertActive?.();
   const actor = opts?.actorId ? await prisma.user.findUnique({ where: { id: opts.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } }) : null;
   if (opts?.actorId && (!actor || (opts.sessionSource && !manualMisCausasAllowed(actor)))) throw httpError("No tiene permiso para importar causas.", 403);
@@ -513,14 +522,17 @@ export async function syncMisCausas(opts?: {
     const items = opts?.sessionSource
       ? await opts.sessionSource.listMisCausas()
       : await resolveMisCausasList();
+    await assertPjudManagementEnabled();
     phase = "import";
     const causaIdsForSync: string[] = [];
     const itemsWithIds: Array<MisCausasItem & { causaId: string }> = [];
 
     for (const item of items) {
-      await opts?.sessionSource?.assertActive?.();
+      await assertPjudManagementEnabled();
+  await opts?.sessionSource?.assertActive?.();
       const existing = await findExistingCausa(item, actor);
-      await opts?.sessionSource?.assertActive?.();
+      await assertPjudManagementEnabled();
+  await opts?.sessionSource?.assertActive?.();
       let causaId = existing?.id;
       if (!causaId) {
         const createdCausa = await prisma.causa.create({
@@ -593,7 +605,8 @@ export async function syncMisCausas(opts?: {
       const jobs: Awaited<ReturnType<typeof enqueueDueSyncJobs>> = [];
       const uniqueIds = [...new Set(causaIdsForSync)];
       for (let offset = 0; offset < uniqueIds.length; offset += 100) {
-        await opts?.sessionSource?.assertActive?.();
+        await assertPjudManagementEnabled();
+  await opts?.sessionSource?.assertActive?.();
         const batch = uniqueIds.slice(offset, offset + 100);
         jobs.push(...await enqueueDueSyncJobs({
           causaIds: batch,
@@ -611,7 +624,8 @@ export async function syncMisCausas(opts?: {
           ? Array.from({ length: Math.ceil(jobs.length / 40) }, (_, index) => jobs.slice(index * 40, (index + 1) * 40))
           : [jobs];
         for (const batch of batches) {
-          await opts?.sessionSource?.assertActive?.();
+          await assertPjudManagementEnabled();
+  await opts?.sessionSource?.assertActive?.();
           processed.push(...await processPendingSyncJobs({
             actorId: opts?.actorId,
             limit: Math.min(batch.length || 20, 40),

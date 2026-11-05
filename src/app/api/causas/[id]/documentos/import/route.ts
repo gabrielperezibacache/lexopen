@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { writeAuditStrict } from "@/lib/audit";
 import { assertCausaCapability as mutateCausa, assertCausaAccess as readCausa, causaAccessWhere as scopedcausaAccessWhere } from "@/lib/auth/causa-access";
@@ -13,6 +14,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const user = await requireStaff();
+    await assertPjudManagementEnabled();
     const { id } = await params;
     await readCausa(id, user);
     const causa = await prisma.causa.findFirst({
@@ -32,6 +34,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     assertCsrf(req);
     const user = await requireStaff();
+    await assertPjudManagementEnabled();
     const { id } = await params;
     await mutateCausa(id, user, "causa.write");
     const causa = await prisma.causa.findFirst({

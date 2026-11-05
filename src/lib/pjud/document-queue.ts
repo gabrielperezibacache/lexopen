@@ -1,12 +1,14 @@
 /** Durable original-download receipts. Browser contexts and cookies never enter this queue. */
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
+import { getCaseManagementMode } from "@/lib/causas/management-mode";
 import { assertCausaCapability } from "@/lib/auth/causa-access";
 import { fetchSafeOutbound } from "@/lib/net/safe-url";
 import { pjudDocumentRefHash } from "./document-identity";
 import { ingestPjudDocumentBuffer, isBackupableDocumentoRef, pjudDocDownloadMaxPerRun, readPjudDocumentResponse } from "./pdf-backup";
 
 export async function enqueuePjudDocumentJobs(causaId: string, options: { actorId?: string | null; waitingLogin?: boolean } = {}) {
+  if (await getCaseManagementMode() !== "pjud_cl") return { created: 0 };
   const cause = await prisma.causa.findUniqueOrThrow({ where: { id: causaId }, select: { pjudMonitoreoActivo: true, pjudDocumentDownloadsEnabled: true, pjudDocumentDownloadOwnerId: true } });
   if (!cause.pjudMonitoreoActivo || !cause.pjudDocumentDownloadsEnabled || !cause.pjudDocumentDownloadOwnerId) return { created: 0 };
   const owner = await prisma.user.findUniqueOrThrow({ where: { id: cause.pjudDocumentDownloadOwnerId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
@@ -38,11 +40,13 @@ export async function pjudDocumentProgress(causaId: string) {
 /** Scheduler entrypoint; authenticated-only files remain waiting until the next manual OJV login. */
 export async function processPendingPjudDocumentJobs(options: { limit?: number; causaId?: string; now?: Date; fetch?: typeof fetchSafeOutbound; enqueue?: Parameters<typeof ingestPjudDocumentBuffer>[0]["enqueue"] } = {}) {
   if (process.env.PJUD_DOC_DOWNLOADS?.trim() === "0") return [];
+  if (await getCaseManagementMode() !== "pjud_cl") return [];
   const now = options.now || new Date();
   await prisma.pjudDocumentJob.updateMany({ where: { actorId: null, status: { in: ["pending", "failed", "running"] }, ...(options.causaId ? { causaId: options.causaId } : {}) }, data: { status: "waiting_login", lastErrorCode: "owner_required", lastError: "Un profesional debe autorizar las descargas de esta causa.", leaseToken: null, leaseExpiresAt: null } });
   const jobs = await prisma.pjudDocumentJob.findMany({ where: { actorId: { not: null }, ...(options.causaId ? { causaId: options.causaId } : {}), causa: { pjudMonitoreoActivo: true, pjudDocumentDownloadsEnabled: true }, OR: [{ status: { in: ["pending", "failed"] }, nextAttemptAt: { lte: now } }, { status: "running", leaseExpiresAt: { lte: now } }] }, orderBy: [{ nextAttemptAt: "asc" }, { id: "asc" }], take: Math.min(Math.max(options.limit || pjudDocDownloadMaxPerRun(), 1), 50) });
   const receipts = [];
   for (const job of jobs) {
+    if (await getCaseManagementMode() !== "pjud_cl") break;
     const leaseToken = randomUUID();
     const claim = await prisma.pjudDocumentJob.updateMany({ where: { id: job.id, sourceRefHash: job.sourceRefHash, OR: [{ status: { in: ["pending", "failed"] }, nextAttemptAt: { lte: now } }, { status: "running", leaseExpiresAt: { lte: now } }] }, data: { status: "running", leaseToken, leaseExpiresAt: new Date(Date.now() + 90_000), attempts: { increment: 1 } } });
     if (!claim.count) continue;
@@ -58,6 +62,7 @@ export async function processPendingPjudDocumentJobs(options: { limit?: number; 
       const ref = movement.documentoRef || "";
       if (movement.causaId !== job.causaId || pjudDocumentRefHash(job.causaId, movement.id, ref) !== job.sourceRefHash) { lastErrorCode = "source_changed"; throw new Error("source changed"); }
       if (!isBackupableDocumentoRef(ref)) { status = "waiting_login"; lastErrorCode = "login_required"; throw new Error("login required"); }
+      if (await getCaseManagementMode() !== "pjud_cl") { status = "paused"; lastErrorCode = "management_mode_paused"; throw new Error("management paused"); }
       const response = await (options.fetch || fetchSafeOutbound)(ref, { allowHttp: process.env.NODE_ENV !== "production", signal: AbortSignal.timeout(45_000), headers: { Accept: "application/pdf,*/*" } });
       if ([401, 403].includes(response.status) || /text\/html/i.test(response.headers.get("content-type") || "")) { await response.body?.cancel(); status = "waiting_login"; lastErrorCode = "login_required"; throw new Error("login required"); }
       if (!response.ok) { await response.body?.cancel(); throw new Error("download failed"); }

@@ -53,3 +53,33 @@ test("el portal cliente no puede mensajear fuera de ACL", async ({ page }) => {
   });
   expect(clientSend.status()).toBe(403);
 });
+
+test("la bandeja conserva el borrador al cerrarlo sin enviar automáticamente", async ({ page }) => {
+  await loginAs(page, "socio@estudio.cl");
+  const peopleResponse = await page.request.get("/api/people");
+  expect(peopleResponse.ok()).toBeTruthy();
+  const people = await peopleResponse.json() as { users: Array<{ id: string; email?: string }> };
+  const receiver = people.users.find(person => person.email === "asistente@estudio.cl");
+  expect(receiver?.id).toBeTruthy();
+  let messagesSent = 0;
+  page.on("request", request => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/messages") messagesSent++;
+  });
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/mensajes");
+  const composer = page.locator("#message-composer");
+  await expect(composer).toBeHidden();
+  await page.getByRole("button", { name: "Nuevo mensaje", exact: true }).click();
+  await composer.getByRole("combobox", { name: "Destinatario", exact: true }).selectOption(receiver!.id);
+  await composer.getByRole("textbox", { name: "Asunto", exact: true }).fill("Borrador ficticio para continuar");
+  await composer.getByRole("textbox", { name: "Mensaje", exact: true }).fill("Texto de prueba que todavía no se debe enviar.");
+  await page.getByRole("button", { name: "Cerrar borrador", exact: true }).click();
+  await expect(composer).toBeHidden();
+  expect(messagesSent).toBe(0);
+  await page.getByRole("button", { name: "Continuar borrador", exact: true }).click();
+  await expect(composer.getByRole("combobox", { name: "Destinatario", exact: true })).toHaveValue(receiver!.id);
+  await expect(composer.getByRole("textbox", { name: "Asunto", exact: true })).toHaveValue("Borrador ficticio para continuar");
+  await expect(composer.getByRole("textbox", { name: "Mensaje", exact: true })).toHaveValue("Texto de prueba que todavía no se debe enviar.");
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(messagesSent).toBe(0);
+});

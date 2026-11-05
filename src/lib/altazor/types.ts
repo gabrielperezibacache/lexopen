@@ -12,6 +12,7 @@ export type AltazorContext = {
   refs: AltazorSourceSnapshot[];
   historyTurnIds: string[];
   memoryDependencies: unknown[];
+  recalledTurns?: { id: string; conversationId: string; fingerprint: string }[];
 };
 export type AltazorExecutionContext = { context: string; history: LlmHistoryMessage[]; snapshot: AltazorContext };
 export type AltazorServiceOptions = {

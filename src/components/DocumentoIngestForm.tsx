@@ -80,7 +80,6 @@ export function DocumentoIngestForm({
   causas = [],
   lockedCausaId = null,
   lockedClienteId = null,
-  compact = false,
   onComplete,
 }: Props) {
   const router = useRouter();
@@ -175,7 +174,7 @@ export function DocumentoIngestForm({
     e.preventDefault();
     setError("");
     if (!rows.some((r) => r.status === "pending" || r.status === "error")) {
-      setError("Seleccione archivos o una carpeta investigativa");
+      setError("Elige archivos o una carpeta para incorporar.");
       return;
     }
     setBusy(true);
@@ -197,7 +196,7 @@ export function DocumentoIngestForm({
               ? {
                   ...r,
                   status: "ok",
-                  message: result.warning || "Listo · en cola de extracción",
+                  message: result.warning || "Guardado · preparando texto",
                 }
               : r
           )
@@ -232,21 +231,14 @@ export function DocumentoIngestForm({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Incorporar al expediente</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[var(--muted)]">
-            Añade archivos o una carpeta completa. Conservamos sus subcarpetas y
-            preparamos el texto disponible para consultar y citar.
-          </p>
         </div>
         <div className="flex gap-2">
           <button
             type="button"
-            className={`btn ${mode === "files" ? "btn-secondary" : "btn-ghost"}`}
+            className={`btn ${rows.length === 0 ? "btn-primary" : "btn-ghost"}`}
             aria-pressed={mode === "files"}
-            onClick={() => {
-              setMode("files");
-              setRows([]);
-              fileRef.current?.click();
-            }}
+            disabled={busy}
+            onClick={() => fileRef.current?.click()}
           >
             <Files size={16} aria-hidden="true" /> Archivos
           </button>
@@ -254,11 +246,8 @@ export function DocumentoIngestForm({
             type="button"
             className={`btn ${mode === "folder" ? "btn-secondary" : "btn-ghost"}`}
             aria-pressed={mode === "folder"}
-            onClick={() => {
-              setMode("folder");
-              setRows([]);
-              folderRef.current?.click();
-            }}
+            disabled={busy}
+            onClick={() => folderRef.current?.click()}
           >
             <FolderOpen size={16} aria-hidden="true" /> Carpeta
           </button>
@@ -287,8 +276,19 @@ export function DocumentoIngestForm({
         }}
       />
 
-      <div className={`grid grid-cols-2 gap-3 ${compact ? "" : "lg:grid-cols-4"}`}>
-        <div className="col-span-2 sm:col-span-1">
+      {!lockedCausaId && rows.length > 0 && (
+        <label className="block max-w-lg text-sm font-medium" htmlFor={`${fieldId}-causa`}>
+          Causa
+          <select id={`${fieldId}-causa`} className="select mt-2 w-full" value={causaId} disabled={busy} onChange={event => setCausaId(event.target.value)}>
+            <option value="">Sin causa</option>
+            {causas.map(causa => <option key={causa.id} value={causa.id}>{causa.label}</option>)}
+          </select>
+        </label>
+      )}
+      {rows.length > 0 && <details className="text-sm">
+        <summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Opciones de importación{confidencial ? " · Confidencial" : ""}{privilegio ? " · Privilegio" : ""}{pushDrive ? " · Copia en Drive" : ""}</summary>
+        <fieldset disabled={busy} className="grid min-w-0 gap-3 pt-2 sm:grid-cols-2">
+        <div className="sm:col-span-2">
           <label htmlFor={`${fieldId}-tipo`} className="mb-2 block text-sm font-medium">Tipo</label>
           <select
             id={`${fieldId}-tipo`}
@@ -305,24 +305,6 @@ export function DocumentoIngestForm({
             <option value="otro">Otro</option>
           </select>
         </div>
-        {!lockedCausaId && (
-          <div className="col-span-2 sm:col-span-1">
-            <label htmlFor={`${fieldId}-causa`} className="mb-2 block text-sm font-medium">Causa</label>
-            <select
-              id={`${fieldId}-causa`}
-              className="select"
-              value={causaId}
-              onChange={(e) => setCausaId(e.target.value)}
-            >
-              <option value="">Sin causa</option>
-              {causas.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
         <label className="flex min-h-11 items-center gap-3 self-end rounded-[var(--radius-md)] border border-[var(--line)] px-3 py-3 text-sm">
           <input
             type="checkbox"
@@ -339,16 +321,16 @@ export function DocumentoIngestForm({
           />
           Privilegio
         </label>
-      </div>
-
-      <label className="flex min-h-11 items-center gap-3 text-sm leading-relaxed">
+      <label className="flex min-h-11 items-center gap-3 text-sm leading-relaxed sm:col-span-2">
         <input
           type="checkbox"
           checked={pushDrive}
           onChange={(e) => setPushDrive(e.target.checked)}
         />
-        Guardar también una copia del texto en la carpeta de Google Drive de la causa
+        Guardar una copia del texto en Google Drive de la causa
       </label>
+        </fieldset>
+      </details>}
 
       {rows.length > 0 && (
         <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--line)]">
@@ -410,12 +392,7 @@ export function DocumentoIngestForm({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {rows.length === 0 && (
-          <p className="mr-auto text-sm text-[var(--muted)]">
-            Elija <strong>Archivos</strong> o <strong>Carpeta</strong> para preparar la carga.
-          </p>
-        )}
+      {rows.length > 0 && <div className="flex flex-wrap items-center justify-end gap-2">
         <button className="btn btn-primary" disabled={busy || rows.length === 0} type="submit">
           {busy
             ? `Incorporando… (${okCount}/${validCount})`
@@ -423,8 +400,8 @@ export function DocumentoIngestForm({
               ? `Incorporar ${pendingOrErrCount || validCount}`
               : "Incorporar"}
         </button>
-      </div>
-      {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+      </div>}
+      {error && <p role="alert" className="text-sm text-[var(--danger)]">{error}</p>}
     </form>
   );
 }

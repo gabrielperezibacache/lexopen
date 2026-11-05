@@ -13,7 +13,7 @@ import { PjudSettingsPanel } from "@/components/config/PjudSettingsPanel";
 import { PjudOpsLogPanel } from "@/components/config/PjudOpsLogPanel";
 import { RuntimeSettingsPanel } from "@/components/config/RuntimeSettingsPanel";
 import { ConfigSectionNav } from "@/components/config/ConfigSectionNav";
-import { CONFIG_CATEGORIES } from "@/components/config/config-sections";
+import { configCategoriesForMode } from "@/components/config/config-sections";
 import { UsersAdminPanel } from "@/components/config/UsersAdminPanel";
 import { IntegrationsOverviewPanel } from "@/components/IntegrationsOverviewPanel";
 import { HostStatusPanel } from "@/components/HostStatusPanel";
@@ -22,6 +22,8 @@ import { PurgeDemoPanel } from "@/components/PurgeDemoPanel";
 import { getHostStatus } from "@/lib/host-status";
 import { buildPjudOpsLog } from "@/lib/pjud/ops-log";
 import styles from "@/components/config/WorkspaceArea.module.css";
+import { CaseManagementSettings } from "@/components/config/CaseManagementSettings";
+import { getCaseManagementMode } from "@/lib/causas/management-mode";
 
 export default async function ConfiguracionPage() {
   const me = await requireRole("admin");
@@ -47,6 +49,7 @@ export default async function ConfiguracionPage() {
     (await prisma.organization.create({ data: {}, include: { settings: true } }));
 
   const settings = settingsOrganization.settings;
+  const caseManagementMode = await getCaseManagementMode();
   const pjudOpsLog = buildPjudOpsLog({
     generatedAt: hostStatus.generatedAt,
     honesty: hostStatus.pjud.honesty,
@@ -76,6 +79,7 @@ export default async function ConfiguracionPage() {
   const sections: Record<string, ReactNode> = {
     idioma: <div id="idioma"><LanguageSettingsPanel /></div>,
     estudio: <FirmSettingsForm organization={settingsOrganization} />,
+    "case-management-settings": <CaseManagementSettings initialMode={caseManagementMode} />,
     usuarios: <UsersAdminPanel
         currentUserId={me.id}
         users={users.map((u) => ({
@@ -120,9 +124,9 @@ export default async function ConfiguracionPage() {
   return (
     <div className={`${styles.area} space-y-6`} data-settings-workspace>
       <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
-      <ConfigSectionNav />
+      <ConfigSectionNav mode={caseManagementMode} />
       <div className={styles.groups}>
-        {CONFIG_CATEGORIES.map(category => (
+        {configCategoriesForMode(caseManagementMode).map(category => (
           <section key={category.id} className={styles.group} aria-labelledby={`settings-${category.id}-title`}>
             <header className={styles.groupHeader}>
               <h2 id={`settings-${category.id}-title`}>{locale === "en" ? category.labelEn : category.label}</h2>

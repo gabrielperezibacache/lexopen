@@ -64,7 +64,6 @@ export default async function DocumentosPage() {
       <PageHeader
         eyebrow={h.eyebrow}
         title={h.title}
-        subtitle={h.subtitle}
         actions={
           <Link className="btn btn-secondary" href="/agente?utility=doc_qa">
             Consultar con ALTAZOR
@@ -72,8 +71,11 @@ export default async function DocumentosPage() {
         }
       />
 
-      <DocumentOcrStatus />
-      <DocumentoIngestForm causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))} />
+      <details className="group">
+        <summary className="btn btn-primary w-fit cursor-pointer">Añadir archivos</summary>
+        <div className="mt-4"><DocumentoIngestForm causas={causas.map((c) => ({ id: c.id, label: c.rit || c.titulo }))} /></div>
+      </details>
+      {documentos.some(documento => documento.extractionStatus === "needs_ocr") && <DocumentOcrStatus />}
 
       {documentos.length === 0 ? (
         <EmptyState
@@ -89,10 +91,7 @@ export default async function DocumentosPage() {
             <thead className="border-b border-[var(--line)] text-[var(--muted)]">
               <tr role="row">
                 <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Documento</th>
-                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Tipo</th>
                 <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Causa</th>
-                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Autor</th>
-                <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Procesamiento</th>
                 <th role="columnheader" scope="col" className="px-4 py-3 font-medium">Actualizado</th>
               </tr>
             </thead>
@@ -100,7 +99,11 @@ export default async function DocumentosPage() {
               {documentos.map((d) => (
                 <tr role="row" key={d.id} className="table-row">
                   <td role="cell" data-label="Documento" className="data-table-primary px-4 py-3">
-                    <div className="font-medium">{d.nombre}</div>
+                    <Link href={`/documentos/${d.id}/fuentes`} className="font-medium text-[var(--sea)]">{d.nombre}</Link>
+                    {["pending", "processing"].includes(d.extractionStatus || "") && <p className="mt-1 text-xs text-[var(--ink-soft)]">Preparando texto…</p>}
+                    {["needs_ocr", "failed", "unsupported"].includes(d.extractionStatus || "") && <p className="mt-1 text-xs text-[var(--danger)]">{d.extractionStatus === "needs_ocr" ? "Texto pendiente de reconocer" : d.extractionStatus === "unsupported" ? "Formato pendiente de preparación" : "No se pudo preparar el texto"}</p>}
+                    <details className="mt-2 text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Detalles y descargas</summary>
+                    <p className="text-xs text-[var(--ink-soft)]">{d.tipo} · {d.autor?.name || "Sin autor indicado"}</p>
                     {d.driveImport && <details className="mt-1 text-xs text-[var(--ink-soft)]"><summary className="cursor-pointer">Procedencia: Google Drive</summary><p>Importada el {formatDate(d.driveImport.importedAt)}. Esta copia conserva la revisión {d.driveImport.driveVersion} del archivo.</p><Link className="underline" href="/sincronizacion">Revisar actualizaciones de mis archivos</Link><details className="mt-2"><summary className="cursor-pointer">Identidad del archivo conservado</summary><p className="break-all">SHA-256: {d.driveImport.sourceSha256}</p></details></details>}
                     {d.ruta && (
                       <div className="text-xs text-[var(--muted)]">{d.ruta}/</div>
@@ -112,7 +115,6 @@ export default async function DocumentosPage() {
                       >
                         Descargar
                       </a>
-                      <Link href={`/documentos/${d.id}/fuentes`} className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline">Ver fuentes</Link>
                       {d.causaId && (
                         <Link
                           href={`/agente?causaId=${d.causaId}&utility=doc_qa&documentoId=${d.id}`}
@@ -129,8 +131,10 @@ export default async function DocumentosPage() {
                       />
                     </div>
                     {(d.obsidianPath || d.googleDriveId) && <details className="mt-2 text-xs text-[var(--muted)]"><summary className="cursor-pointer">Ubicaciones vinculadas</summary>{d.obsidianPath && <p className="break-all">Obsidian: {d.obsidianPath}</p>}{d.googleDriveId && <p className="break-all">{isRealDriveFolderId(d.googleDriveId) ? `Google Drive: ${d.googleDriveId}` : "La ubicación de Google Drive todavía necesita configurarse."}</p>}</details>}
+                    {d.extractionStatus === "completed" && d.hasMarkdown && <a className="inline-flex min-h-11 items-center text-[var(--sea)]" href={`/api/documentos/${d.id}/markdown`}>Descargar texto preparado</a>}
+                    {["needs_ocr", "unsupported", "failed"].includes(d.extractionStatus || "") && <DocumentProcessingAction documentId={d.id} />}
+                    </details>
                   </td>
-                  <td role="cell" data-label="Tipo" className="px-4 py-3">{d.tipo}</td>
                   <td role="cell" data-label="Causa" className="px-4 py-3">
                     {d.causa ? (
                       <Link href={`/causas/${d.causa.id}`} className="text-[var(--sea)]">
@@ -138,36 +142,6 @@ export default async function DocumentosPage() {
                       </Link>
                     ) : (
                       "—"
-                    )}
-                  </td>
-                  <td role="cell" data-label="Autor" className="px-4 py-3">{d.autor?.name || "—"}</td>
-                  <td role="cell" data-label="Procesamiento" className="px-4 py-3 text-xs">
-                    {d.extractionStatus === "pending" || d.extractionStatus === "processing" ? (
-                      <span className="text-[var(--muted)]">Procesando…</span>
-                    ) : d.extractionStatus === "completed" && d.hasMarkdown ? (
-                      <a
-                        href={`/api/documentos/${d.id}/markdown`}
-                        className="text-[var(--sea)]"
-                      >
-                        Descargar texto preparado
-                      </a>
-                    ) : d.extractionStatus === "needs_ocr" ? (
-                      <span className="text-[var(--copper)]">
-                        Texto pendiente de reconocer{" "}
-                        <DocumentProcessingAction documentId={d.id} />
-                      </span>
-                    ) : d.extractionStatus === "unsupported" ? (
-                      <span className="text-[var(--muted)]">
-                        Formato no soportado{" "}
-                        <DocumentProcessingAction documentId={d.id} />
-                      </span>
-                    ) : d.extractionStatus === "failed" ? (
-                      <span className="text-red-700">
-                        Error de extracción{" "}
-                        <DocumentProcessingAction documentId={d.id} />
-                      </span>
-                    ) : (
-                      "No procesado"
                     )}
                   </td>
                   <td role="cell" data-label="Actualizado" className="px-4 py-3">{formatDate(d.updatedAt)}</td>
