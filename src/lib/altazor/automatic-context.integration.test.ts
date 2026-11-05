@@ -11,7 +11,7 @@ import { importBook } from "@/lib/books/service";
 import { sha256 } from "@/lib/evidence/fragments";
 import { automaticAltazorSources } from "./automatic-context";
 import { prepareAltazorConversation } from "./prepare-conversation";
-import { createAltazorConversation, createAltazorTurn, executeAltazorTurn, readAltazorConversation } from "./conversations";
+import { createAltazorConversation, createAltazorTurn, executeAltazorTurn, patchAltazorConversation, readAltazorConversation } from "./conversations";
 import type { AltazorDestination, AltazorServiceOptions } from "./types";
 
 const status = (value: number) => (error: unknown) => (error as { status?: number }).status === value;
@@ -52,13 +52,25 @@ async function main() {
     const dottedWithCourt = await prepare({ text: "Resume el ROL 12.345-2026 del Tribunal ROL ficticio." });
     assert.ok("conversation" in dottedWithCourt); assert.equal(dottedWithCourt.conversation!.causaId, dotted.id, "aliases are one identifier and the court disambiguates it");
     await assert.rejects(prepare({ routeCausaId: hidden.id, text: "Resume esta causa" }), status(404));
-    const selected = await prepare({ text: "Prepara C-7821-2026 del Primer Tribunal Ficticio", routeCausaId: duplicate.id });
+    const [selected, concurrent] = await Promise.all([
+      prepare({ text: "Prepara C-7821-2026 del Primer Tribunal Ficticio", routeCausaId: duplicate.id }),
+      prepare({ text: "Resume esta causa", routeCausaId: first.id }),
+    ]);
     assert.ok("conversation" in selected); assert.equal(selected.conversation!.causaId, first.id, "unambiguous text takes precedence over page context");
+    assert.ok("conversation" in concurrent); assert.equal(concurrent.conversation!.id, selected.conversation!.id, "concurrent preparations converge within a scope");
+    assert.equal(await db.altazorConversation.count({ where: { ownerId: owner.id, causaId: first.id } }), 1);
+    const alternate = (await createAltazorConversation({ requestId: randomUUID(), title: "Conversación explícita", causaId: first.id }, owner, db)).conversation;
+    assert.notEqual(alternate.id, selected.conversation!.id, "the explicit creation API keeps separate conversations");
+    await patchAltazorConversation(alternate.id, { status: "archived", expectedRevision: alternate.revision }, owner, db);
     const personal = (await createAltazorConversation({ requestId: randomUUID(), title: "Conversación personal" }, owner, db)).conversation;
+    const personalCount = await db.altazorConversation.count({ where: { ownerId: owner.id, causaId: null } });
+    const personalPrepared = await prepare({ text: "Hola" });
+    assert.ok("conversation" in personalPrepared); assert.equal(personalPrepared.conversation!.id, personal.id);
+    assert.equal(await db.altazorConversation.count({ where: { ownerId: owner.id, causaId: null } }), personalCount);
     assert.ok("clarify" in await prepare({ conversationId: personal.id, routeCausaId: first.id, hasPendingAttachments: true, text: "Resume esta causa" }));
     assert.equal((await db.altazorConversation.findUniqueOrThrow({ where: { id: personal.id } })).causaId, null, "scope and pending originals are never moved");
     const routed = await prepare({ conversationId: personal.id, routeCausaId: first.id, text: "Resume esta causa" });
-    assert.ok("conversation" in routed); assert.equal(routed.conversation!.causaId, first.id); assert.notEqual(routed.conversation!.id, personal.id);
+    assert.ok("conversation" in routed); assert.equal(routed.conversation!.id, selected.conversation!.id, "route switch resumes the active case conversation and skips archived ones");
     await assert.rejects(prepareAltazorConversation({ requestId: randomUUID(), conversationId: personal.id, text: "Hola" }, stranger, db), status(404));
     const documentText = "Nebulosa conserva la comprobación ficticia del pago y sus antecedentes.";
     const doc = await db.documento.create({ data: { nombre: "nebula.txt", contenido: documentText, extractedMarkdown: documentText, extractionStatus: "completed", causaId: first.id, autorId: owner.id } });
@@ -91,17 +103,25 @@ async function main() {
       const queued = await createAltazorTurn(chatId, { requestId: randomUUID(), text, automaticSources, useMemory: true, expectedRevision: conversation.revision, destinationKey: destination.key }, owner, db, opts);
       const result = await executeAltazorTurn(chatId, queued.turnId, owner, db, opts); assert.equal(result.turns.at(-1)?.status, "completed"); return queued.turnId;
     }
-    const old = await turn(personal.id, "Guarda la pauta Nebulosa", { ...options, execute: async input => { assert.ok(input.validatedReferences?.length); return answer("Acordamos utilizar la pauta Nebulosa [R1]."); } }, true);
+    const old = await turn(personal.id, "Guarda la pauta NÉBÚLÓSA", { ...options, execute: async input => { assert.ok(input.validatedReferences?.length); return answer("Acordamos utilizar la pauta NÉBÚLÓSA [R1]."); } }, true);
     for (let index = 0; index < 7; index++) await turn(personal.id, `Intercambio auxiliar ${index}`);
+    const priorTurn = await db.altazorTurn.findUniqueOrThrow({ where: { id: old } });
+    const archiveFixture = (await createAltazorConversation({ requestId: randomUUID(), title: "Intercambios auxiliares" }, owner, db)).conversation.id;
+    const outsiderChat = (await createAltazorConversation({ requestId: randomUUID(), title: "Conversación ajena" }, stranger, db)).conversation.id;
+    const historicalTurn = { inputSha256: sha256("auxiliar"), status: "completed", contextJson: JSON.stringify({ version: 1, attachmentIds: [], refs: [], historyTurnIds: [], memoryDependencies: [] }), createdAt: new Date(priorTurn.createdAt.getTime() + 1) };
+    await db.altazorTurn.createMany({ data: Array.from({ length: 101 }, (_, index) => ({ ...historicalTurn, conversationId: archiveFixture, ownerId: owner.id, requestId: randomUUID(), ordinal: index + 1, userText: "Intercambio auxiliar", assistantText: "Contexto auxiliar" })) });
+    await db.altazorTurn.create({ data: { ...historicalTurn, conversationId: outsiderChat, ownerId: stranger.id, requestId: randomUUID(), ordinal: 1, userText: "Nebulosa", assistantText: "NO_RECORDAR_OTRO_USUARIO" } });
     const foreignScope = (await createAltazorConversation({ requestId: randomUUID(), title: "Otro ámbito", causaId: duplicate.id }, owner, db)).conversation.id;
     await turn(foreignScope, "Pauta Nebulosa DATO_PRIVADO_OTRO_AMBITO", { ...options, execute: async () => answer("NO_RECORDAR_OTRA_CAUSA") });
     const newChat = (await createAltazorConversation({ requestId: randomUUID(), title: "Continuación personal" }, owner, db)).conversation.id;
-    const recalled = await turn(newChat, "¿Qué acordamos para la pauta Nebulosa?", { ...options, execute: async input => {
-      assert.match(input.context || "", /Acordamos utilizar la pauta Nebulosa/);
-      assert.ok(!input.context?.includes("NO_RECORDAR_OTRA_CAUSA")); assert.ok(!input.context?.includes("DATO_PRIVADO_OTRO_AMBITO"));
-      assert.ok(!input.context?.includes("[R1]"), "historical reference numbers are not promoted to current verified citations");
+    let recalledContext = "";
+    const recalled = await turn(newChat, "¿Puedes recordar Nebulosa?", { ...options, execute: async input => {
+      recalledContext = input.context || "";
       return answer("Recuerdo ficticio disponible");
     } });
+    assert.match(recalledContext, /Acordamos utilizar la pauta NÉBÚLÓSA/);
+    assert.doesNotMatch(recalledContext, /NO_RECORDAR_OTRA_CAUSA|DATO_PRIVADO_OTRO_AMBITO|NO_RECORDAR_OTRO_USUARIO/);
+    assert.ok(!recalledContext.includes("[R1]"), "historical reference numbers are not promoted to current verified citations");
     const snapshot = JSON.parse((await db.altazorTurn.findUniqueOrThrow({ where: { id: recalled } })).contextJson);
     assert.ok(snapshot.recalledTurns.some((reference: { id: string }) => reference.id === old)); assert.ok(snapshot.recalledTurns.length <= 2);
     await db.libraryBook.update({ where: { id: book.id }, data: { deletedAt: new Date() } });

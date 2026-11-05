@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { CircleAlert, Monitor, MousePointer2, RefreshCw, Square } from "lucide-react";
+import { CircleAlert, ExternalLink, Monitor, MousePointer2, RefreshCw, Square } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
 import { operationKey } from "@/lib/client-submission-key";
 import { AltazorSecretUse } from "./AltazorSecretUse";
@@ -143,7 +143,12 @@ function ComputerPanel({ causaId, active = true, preferredSessionId }: PanelProp
     <div className={styles.status} aria-busy={loading}>
       <strong>{loading ? "Consultando escritorio…" : status ? stateLabel[status.state] : "Estado no disponible"}</strong>
       {status?.reason && <p>{status.reason}</p>}
-      {status && !status.configured && <p><a href="https://github.com/gabrielperezibacache/lexopen/blob/main/docs/ESCRITORIO-ALTAZOR.md" target="_blank" rel="noreferrer">Guía de preparación para el equipo principal</a></p>}
+      {status && !status.configured && (
+        <p><a className={styles.preparationLink} href="https://github.com/gabrielperezibacache/lexopen/blob/main/docs/ESCRITORIO-ALTAZOR.md" target="_blank" rel="noreferrer">
+          Guía de preparación para el equipo principal<ExternalLink size={15} aria-hidden="true" />
+          <span className="sr-only"> (abre en otra pestaña)</span>
+        </a></p>
+      )}
       {status?.configured && <div className={styles.actions}>
         <button type="button" className={styles.primary} disabled={busy || !status.enabled || !status.policyAllowed || needsStop} onClick={start}>Iniciar escritorio privado</button>
         <button type="button" disabled={busy} onClick={verify}><RefreshCw size={15} aria-hidden="true" />Comprobar conexión</button>

@@ -2,7 +2,7 @@
 
 ## Consulta pública y Mis Causas
 
-El administrador habilita este apartado en **Configuración → Gestión de causas → Poder Judicial de Chile**. En **Causas → PJUD · Chile → Consultar por RIT/ROL**, escriba el identificador completo y el tribunal concreto. **Consultar movimientos** sólo lee: no crea una causa ni activa monitoreo. El resultado identifica la consulta, su fecha, el canal utilizado y una muestra con cuadernos. El número indica movimientos recuperados, sin certificar que la historia esté completa. Cambiar los criterios retira el resultado anterior.
+El administrador habilita este apartado en **Configuración → Gestión de causas → Poder Judicial de Chile**. En **Mis Causas → Herramientas PJUD → Consultar por RIT/ROL**, escriba el identificador completo y el tribunal concreto. **Consultar movimientos** lee el expediente sin registrarlo ni activar monitoreo. El resultado identifica la consulta, su fecha, el canal utilizado y una muestra con cuadernos. El número indica movimientos recuperados, sin certificar que la historia esté completa. Cambiar los criterios retira el resultado anterior.
 
 **Agregar a mi cartera** es una acción independiente: crea o vincula el expediente existente, activa monitoreo y solicita sincronización. **Registrar sin consulta previa** conserva la alternativa de guardar los datos sin consultar la OJV. Revise la cartera antes de repetir un registro cuya respuesta se haya perdido. La búsqueda por RUT devuelve candidatos del alcance disponible en el formulario; actualmente está limitada por año y filtros, y no representa toda la cartera de una persona.
 
@@ -276,8 +276,7 @@ El sidecar se ejecuta en el mismo Host: `npm run pjud:chromium` (una vez) y
 
 ## Correo PJUD (solo `pjud.cl` → carpetas)
 
-Bandeja en `/correo`. Cada profesional conecta **su** Gmail, Outlook/Hotmail o IMAP.
-LexOpen **no** reutiliza el token Google del estudio (`gmail.send` / Drive / Calendar).
+Cada profesional conecta su Gmail, Outlook/Hotmail o buzón IMAP en **Configuración → Configurar correo**. El enlace también aparece en **Mi cuenta** para el equipo del estudio. Los avisos y su archivo se gestionan desde la bandeja en `/correo`. La conexión del buzón es independiente de la cuenta de Google del estudio.
 
 | Proveedor | Cómo |
 |-----------|------|

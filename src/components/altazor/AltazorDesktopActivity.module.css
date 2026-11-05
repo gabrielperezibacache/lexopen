@@ -12,7 +12,8 @@
 .heading h2 { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
 .heading p { margin: .16rem 0 0; font-size: .8125rem; line-height: 1.45; color: var(--ink-soft); }
 .header button { flex-shrink: 0; min-height: 44px; }
-.screen { background: var(--night, var(--surface)); border-top: 1px solid var(--line); }
+.screen { position: relative; background: var(--night, var(--surface)); border-top: 1px solid var(--line); }
+.live { position: absolute; inset-block-start: .55rem; inset-inline-start: .55rem; border-radius: .35rem; background: var(--surface-solid); color: var(--ink); font-size: var(--text-sm); padding: .2rem .5rem; }
 .screen img { display: block; width: 100%; height: auto; max-height: 32rem; object-fit: contain; }
 
 @media (max-width: 480px) {

@@ -24,7 +24,7 @@ export const prepareConversationSchema = z.object({
 /** Scope is inferred only from identifiers the user supplied or an authorized page. */
 export async function prepareAltazorConversation(raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
   const input = prepareConversationSchema.parse(raw), actor = await altazorActor(user, client);
-  const current = input.conversationId ? (await conversationFor(input.conversationId, actor, client, true)).conversation : null;
+  const current = input.conversationId ? (await conversationFor(input.conversationId, actor, client)).conversation : null;
   for (const id of [input.causaId, input.routeCausaId]) if (id) await assertCausaAccess(id, actor, { auditOverride: false }, client);
   let documentCase: string | undefined;
   if (input.documentoId) {
@@ -68,7 +68,7 @@ export async function prepareAltazorConversation(raw: unknown, user: CausaAccess
   }
   if (mentioned && explicitIds[0] && mentioned !== explicitIds[0]) return { clarify: "El RIT y el documento o enlace corresponden a causas distintas. Dime cuál quieres utilizar." };
   const causaId = mentioned || explicitIds[0] || input.routeCausaId || current?.causaId || null;
-  if (current && current.causaId === causaId) return { conversation: { id: current.id, title: current.title, causaId: current.causaId, scopeKey: current.scopeKey, status: current.status, revision: current.revision }, reused: true };
+  if (current?.status === "active" && current.causaId === causaId) return { conversation: { id: current.id, title: current.title, causaId: current.causaId, scopeKey: current.scopeKey, status: current.status, revision: current.revision }, reused: true };
   if (current && input.hasPendingAttachments) return { clarify: "Tienes adjuntos pendientes en la conversación anterior. Envíalos allí o retíralos antes de trabajar en otra causa." };
-  return createAltazorConversation({ requestId: input.requestId, title: input.title || input.text.slice(0, 160) || "Nueva conversación", causaId }, actor, client);
+  return createAltazorConversation({ requestId: input.requestId, title: input.title || input.text.slice(0, 160) || "Nueva conversación", causaId }, actor, client, { reuseActive: true });
 }

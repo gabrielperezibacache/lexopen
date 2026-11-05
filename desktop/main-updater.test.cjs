@@ -12,30 +12,38 @@ async function main() {
   fs.writeFileSync(path.join(dataDir, ".env"), `STORAGE_PATH=${path.join(dataDir, "storage")}\n`);
   const cfg = { ...realConfig.DEFAULTS, dataDir, hostDataDir: dataDir, mode: null };
   const events = [], intervals = [], status = [], dialogs = [], handlers = new Map();
-  const packageCalls = [], chosenPackage = path.join(tmp, "chosen-toolpack.tar.gz");
+  const packageCalls = [];
+  let completePreparation;
   const updater = new EventEmitter(); let checks = 0;
   Object.assign(updater, { verifyUpdateCodeSignature: false, checkForUpdates: async () => { checks++; return {}; }, quitAndInstall: () => events.push("install") });
   const app = new EventEmitter(); Object.assign(app, { isPackaged: true, whenReady: () => Promise.resolve(), getPath: () => tmp, getAppPath: () => path.join(tmp, "app"), quit() {}, exit() {} });
-  let window;
+  const windows = [];
   class Window extends EventEmitter {
-    constructor() { super(); this.webContents = new EventEmitter(); Object.assign(this.webContents, { setWindowOpenHandler() {}, send: (_name, value) => status.push(value), getURL: () => "file:///fixture/setup.html", mainFrame: { url: pathToFileURL(path.join(tmp, "lexopen-desktop", "setup.html")).href } }); window = this; }
+    constructor() { super(); this.webContents = new EventEmitter(); Object.assign(this.webContents, { setWindowOpenHandler() {}, send: (_name, value) => status.push(value), getURL: () => "file:///fixture/setup.html", mainFrame: { url: pathToFileURL(path.join(tmp, "lexopen-desktop", "setup.html")).href } }); windows.push(this); }
     isDestroyed() { return false; }
     loadFile() { return Promise.resolve(); }
+    loadURL() { return Promise.resolve(); }
     setProgressBar(value) { this.progress = value; }
-    static getAllWindows() { return window ? [window] : []; }
+    static getAllWindows() { return windows; }
   }
-  const sandbox = { console, __dirname, process: { env: { LEXOPEN_APP_VERSION: "0.0.1-untrusted" }, resourcesPath: path.join(tmp, "resources"), platform: "linux", pid: process.pid }, URL, Date, AbortSignal,
+  const sandbox = { console, __dirname, process: { env: { LEXOPEN_APP_VERSION: "0.0.1-untrusted" }, resourcesPath: path.join(tmp, "resources"), platform: "linux", pid: process.pid }, URL, Date, AbortSignal, AbortController,
     setTimeout: () => ({ unref() {} }), setInterval: (callback, ms) => { intervals.push({ callback, ms }); return { unref() {} }; }, clearInterval() {},
     fixtureHost: { stop: async () => events.push("stop") },
     require: name => {
-      if (name === "electron") return { app, BrowserWindow: Window, ipcMain: { handle: (name, handler) => handlers.set(name, handler) }, shell: { openPath() {}, openExternal() {} }, Menu: { buildFromTemplate: value => value, setApplicationMenu() {} }, dialog: { showOpenDialog: async () => ({ canceled: false, filePaths: [chosenPackage] }), showMessageBox: async options => { dialogs.push(options); return { response: 0 }; }, showErrorBox: (_title, message) => { throw new Error(message); } } };
+      if (name === "electron") return { app, BrowserWindow: Window, ipcMain: { handle: (name, handler) => handlers.set(name, handler) }, shell: { openPath() {}, openExternal() {} }, Menu: { buildFromTemplate: value => value, setApplicationMenu() {} }, dialog: { showOpenDialog: async () => assert.fail("Automatic preparation must not show a file chooser"), showMessageBox: async options => { dialogs.push(options); return { response: 0 }; }, showErrorBox: (_title, message) => { throw new Error(message); } } };
       if (name === "electron-updater") return { autoUpdater: updater };
       if (name === "./config.cjs") return { ...realConfig, readConfig: () => ({ ...cfg }), writeConfig: value => Object.assign(cfg, value), readPackageVersion: () => "1.0.0", readAppState: () => ({}) };
       if (name === "./backup.cjs") return { ...realBackup, createDataBackup: async (...args) => { events.push("backup"); return realBackup.createDataBackup(...args); } };
       if (name === "./media-permissions.cjs") return { attachMicrophoneGuards() {} };
       if (name === "./altazor-toolpack.cjs") return {
-        lookupDesktopToolpack: async version => { packageCalls.push(version); return { state: "package-verified", asset: { name: "chosen-toolpack.tar.gz" } }; },
-        loadVerifiedDesktopToolpack: async file => { packageCalls.push(file); return { state: "package-loaded" }; },
+        prepareDesktopToolpack: (version, { resourceRoot, progress, signal }) => {
+          packageCalls.push([version, resourceRoot]);
+          progress({ state: "package-downloading", percent: 50 });
+          return new Promise(resolve => {
+            completePreparation = resolve;
+            signal.addEventListener("abort", () => resolve({ state: "package-cancelled" }), { once: true });
+          });
+        },
       };
       return require(name);
     },
@@ -49,12 +57,27 @@ async function main() {
     assert.equal(setup.includes(`src="data:image/png;base64,${brand.toString("base64")}"`), true);
     assert.match(setup, /default-src 'none'; img-src data:;/);
     assert.equal(vm.runInContext("bundledVersion()", context), "1.0.0", "packaged identity ignores untrusted environment overrides");
-    const loadToolpack = handlers.get("desktop:load-altazor-toolpack");
+    const prepare = handlers.get("desktop:prepare-altazor-desktop");
+    const window = windows[0];
     const sender = window.webContents, senderFrame = sender.mainFrame;
-    assert.equal((await loadToolpack({ sender, senderFrame: { url: senderFrame.url } })).state, "unavailable");
+    const setupEvent = { sender, senderFrame };
+    assert.equal((await prepare({ sender, senderFrame: { url: senderFrame.url } })).state, "unavailable");
     assert.deepEqual(packageCalls, []);
-    assert.equal((await loadToolpack({ sender, senderFrame }, "ignored-file-from-renderer")).state, "package-loaded");
-    assert.deepEqual(packageCalls, ["1.0.0", chosenPackage]);
+    assert.equal((await prepare(setupEvent, "ignored-file-from-renderer")).state, "package-downloading");
+    assert.equal((await prepare(setupEvent, true)).busy, true);
+    assert.deepEqual(packageCalls, [["1.0.0", path.join(tmp, "resources")]]);
+    assert.match((await handlers.get("desktop:get-state")(setupEvent)).desktopPreparation.message, /50 %/);
+    completePreparation({ state: "package-loaded" });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal((await prepare(setupEvent, false)).state, "package-loaded");
+    assert.equal(packageCalls.length, 1);
+    vm.runInContext("desktopPreparation = null; startHostMode = async () => 'http://127.0.0.1:3000'", context);
+    const setupResult = await handlers.get("desktop:save-setup")(setupEvent, { mode: "host" });
+    assert.equal(setupResult.ok, true);
+    assert.equal((await handlers.get("desktop:get-state")(setupEvent)).desktopPreparation.busy, true, "Host startup must finish while desktop preparation is still running");
+    assert.equal(packageCalls.length, 2);
+    completePreparation({ state: "package-loaded" });
+    await new Promise(resolve => setImmediate(resolve));
     assert.equal(updater.verifyUpdateCodeSignature, true);
     assert.equal(updater.allowDowngrade, false);
     assert.equal(intervals.some(timer => timer.ms === 6 * 60 * 60 * 1000), true);
@@ -65,7 +88,9 @@ async function main() {
     assert.equal(window.progress, 0.425); assert.equal(status.at(-1).progress, 42.5);
     cfg.mode = "host";
     vm.runInContext("hostHandle = fixtureHost", context);
+    assert.equal((await prepare(setupEvent, true)).busy, true);
     await vm.runInContext("promptInstallUpdate({version:'1.0.1'})", context);
+    assert.equal((await handlers.get("desktop:get-state")(setupEvent)).desktopPreparation.state, "package-cancelled");
     assert.deepEqual(events, ["stop", "backup", "install"]);
     const backupRoot = realBackup.defaultBackupDirectory(dataDir);
     assert.equal(fs.readdirSync(backupRoot).length, 1);

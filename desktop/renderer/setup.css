@@ -142,8 +142,7 @@ h1 {
   font-weight: 600;
 }
 
-.desktop-preparation .actions,
-.desktop-preparation [role="status"] {
+.desktop-preparation .actions {
   margin-top: 10px;
 }
 

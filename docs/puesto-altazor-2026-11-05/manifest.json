@@ -43,16 +43,16 @@
       "route": "/inicio",
       "width": 1440,
       "height": 1000,
-      "size": 50179,
-      "sha256": "f1aabf6bdaeb20154c664be351e90acedf97962d451a1fae95b3d03f49c186a7"
+      "size": 109153,
+      "sha256": "6ba3f343984f009ca42813efe58f7faf648ec42514f4e208eb8d2ea81dd64e1a"
     },
     {
       "path": "inicio-movil.jpg",
       "route": "/inicio",
       "width": 360,
       "height": 800,
-      "size": 21366,
-      "sha256": "1bf43c89c61030528f9b5b31431e6d039a4bd0cf3bb47d1122e4b4d624560831"
+      "size": 49043,
+      "sha256": "6fd4a222226dbeac6ae0b3e4f8b1449c5b6b5e2bb5b26c20db0378f42023db71"
     },
     {
       "path": "mis-causas-escritorio.jpg",

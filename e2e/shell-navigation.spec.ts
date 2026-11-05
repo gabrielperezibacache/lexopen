@@ -24,6 +24,9 @@ test("ocho áreas, secundario contextual y navegación rápida comparten destino
   await main.getByRole("link", { name: "Causas", exact: true }).click();
   await expect(sidebar.getByTestId("secondary-navigation").getByRole("link", { name: "Sincronización", exact: true })).toBeVisible();
   await expect(sidebar.getByTestId("secondary-navigation").getByRole("link", { name: "Mis causas · ClaveÚnica", exact: true })).toHaveCount(0);
+  await expect(page).toHaveURL(/\/mis-causas$/);
+  await expect(page.getByRole("heading", { name: "Mis Causas", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Herramientas PJUD", exact: true }).click();
   await expect(page).toHaveURL(/\/pjud$/);
   await expect(page.getByRole("heading", { name: "PJUD · Chile", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Ingresar con ClaveÚnica", exact: true })).toBeVisible();
@@ -40,6 +43,7 @@ test("móvil conserva las ocho áreas y ofrece búsqueda sin abrir el menú", as
   await trigger.click();
   const drawer = page.getByRole("dialog", { name: "Menú", exact: true });
   await expect(drawer.getByTestId("primary-navigation").locator("a")).toHaveCount(8);
+  await expect(drawer.getByTestId("primary-navigation").getByRole("link", { name: "Causas", exact: true })).toHaveAttribute("href", "/mis-causas");
   expect(await drawer.evaluate(el => el.contains(document.activeElement))).toBeTruthy();
   await page.keyboard.press("Escape");
   await expect(drawer).not.toBeVisible();

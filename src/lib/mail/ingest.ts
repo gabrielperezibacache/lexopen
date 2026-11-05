@@ -2,9 +2,9 @@ import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
 import { fetchImapMessages } from "@/lib/mail/imap";
-import { parseMailContent } from "@/lib/mail/parse";
+import { parseExactMailMatter, parseMailContent } from "@/lib/mail/parse";
 import { causaMailWhere, currentMailActor } from "@/lib/mail/access";
-import { messageIsFromPjud } from "@/lib/mail/pjud-sender";
+import { isPjudMailboxAddress, messageIsFromPjud } from "@/lib/mail/pjud-sender";
 import { parseMimeBuffer, type ParsedMailAttachment } from "@/lib/mail/mime";
 import { fetchGmailPjudMessages } from "@/lib/mail/gmail";
 import { fetchMicrosoftPjudMessages } from "@/lib/mail/microsoft";
@@ -12,9 +12,10 @@ import { encryptOauthToken } from "@/lib/mail/oauth";
 import {
   attachmentSha256,
   fileMailboxMessageToCausa,
+  findExactMailMatter,
   isArchivableAttachment,
 } from "@/lib/mail/file-to-folders";
-import { newStorageKey, putObject } from "@/lib/storage";
+import { putObject } from "@/lib/storage";
 import type { InboundMail, MailboxProtocol, ProviderFetchResult } from "@/lib/mail/types";
 
 export async function ensureMailboxAccount(userId: string) {
@@ -29,20 +30,17 @@ async function stashAttachments(
   messageId: string,
   attachments: ParsedMailAttachment[]
 ) {
-  const stored: ParsedMailAttachment[] = [];
   for (const att of attachments) {
     if (!isArchivableAttachment(att)) continue;
     const sha = attachmentSha256(att.content);
     const existing = await prisma.mailboxAttachment.findUnique({
       where: { messageId_sha256: { messageId, sha256: sha } },
     });
-    if (existing) {
-      stored.push(att);
-      continue;
-    }
-    const key = newStorageKey(`correo/inbox/${messageId}`, att.filename);
+    if (existing) continue;
+    const key = `correo/inbox/${messageId}/${sha}`;
     await putObject({ key, body: att.content, contentType: att.mimeType });
-    await prisma.mailboxAttachment.create({
+    await prisma.mailboxAttachment.createMany({
+      skipDuplicates: true,
       data: {
         messageId,
         filename: att.filename,
@@ -52,9 +50,7 @@ async function stashAttachments(
         storageKey: key,
       },
     });
-    stored.push(att);
   }
-  return stored;
 }
 
 export async function persistInboundMessage(
@@ -76,7 +72,7 @@ export async function persistInboundMessage(
     return { created: false, skipped: "not_pjud" as const, message: null };
   }
 
-  const actor = await currentMailActor(user);
+  await currentMailActor(user);
 
   const subject = mime.subject || raw.subject;
   const bodyText = mime.bodyText || subject;
@@ -88,22 +84,15 @@ export async function persistInboundMessage(
         },
       })
     : null;
-  if (existing) return { created: false, skipped: "duplicate" as const, message: existing };
-
-  let causaId: string | undefined;
-  if (parsed.rit) {
-    const match = await prisma.causa.findFirst({
-      where: { AND: [{ rit: parsed.rit }, causaMailWhere(actor)] },
-      select: { id: true },
-    });
-    causaId = match?.id;
+  if (existing && (existing.status !== "nuevo" || existing.accountId !== accountId || existing.subject !== subject || existing.bodyText !== bodyText || existing.fromAddress !== (fromAddress || null))) {
+    return { created: false, skipped: "duplicate" as const, message: existing };
   }
-
-  const message = await prisma.mailboxMessage.create({
+  const [inserted] = existing ? [] : await prisma.mailboxMessage.createManyAndReturn({
+    skipDuplicates: true,
     data: {
       userId: user.id,
       accountId,
-      externalId: raw.externalId,
+      externalId: raw.externalId || null,
       kind: parsed.kind,
       subject,
       fromAddress,
@@ -112,20 +101,28 @@ export async function persistInboundMessage(
       parsedJson: JSON.stringify(parsed),
       rit: parsed.rit,
       tribunal: parsed.tribunal,
-      causaId,
-      status: causaId ? "vinculado" : "nuevo",
+      status: "nuevo",
     },
   });
-
-  const stored = await stashAttachments(message.id, mime.attachments);
-  if (causaId) {
+  const message = inserted || existing;
+  if (!message) {
+    const duplicate = await prisma.mailboxMessage.findUniqueOrThrow({ where: { userId_externalId: { userId: user.id, externalId: raw.externalId } } });
+    return { created: false, skipped: "duplicate" as const, message: duplicate };
+  }
+  await stashAttachments(message.id, mime.attachments);
+  const identity = raw.externalId && opts?.requirePjudSender !== false && isPjudMailboxAddress(fromAddress) && parsed.kind !== "otro"
+    ? parseExactMailMatter(subject, bodyText) : null;
+  let filed = message;
+  if (identity) {
     try {
-      await fileMailboxMessageToCausa(user, message.id, causaId, stored);
-    } catch (e) {
-      console.error("mail.auto-file", e);
+      const causaId = await findExactMailMatter(identity);
+      if (causaId) filed = await fileMailboxMessageToCausa(user, message.id, causaId, { identity });
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      if (status !== 403 && status !== 404 && status !== 409) console.error("mail.auto-file: inbox item retained for review");
     }
   }
-  return { created: true, skipped: null, message };
+  return { created: Boolean(inserted), skipped: inserted ? null : "duplicate" as const, message: filed };
 }
 
 export async function ingestPasteMail(

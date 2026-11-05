@@ -43,6 +43,10 @@ test("las causas manuales admiten referencias internacionales en ambos modos y P
   const numericIdentifier = fictitiousInvalidRut();
   await db.firmSettings.update({ where: { id: setting!.id }, data: { caseManagementMode: "manual" } });
   await loginAs(page, "abogado@estudio.cl");
+  const cases = page.getByTestId("desktop-sidebar").getByTestId("primary-navigation").getByRole("link", { name: "Causas", exact: true });
+  await cases.click();
+  await expect(page).toHaveURL(/\/mis-causas$/);
+  await expect(page.getByRole("link", { name: "Herramientas PJUD", exact: true })).toHaveCount(0);
 
   async function createManualCase(suffix: string, identifiers: [string, string]) {
     await page.goto("/causas/nueva");
@@ -107,6 +111,10 @@ test("las causas manuales admiten referencias internacionales en ambos modos y P
   expect(controlCharacter.status()).toBe(400);
 
   await db.firmSettings.update({ where: { id: setting!.id }, data: { caseManagementMode: "pjud_cl" } });
+  await page.reload();
+  await cases.click();
+  await expect(page).toHaveURL(/\/mis-causas$/);
+  await expect(page.getByRole("link", { name: "Herramientas PJUD", exact: true })).toHaveAttribute("href", "/pjud");
   await expectNoNumericAlias();
   const finalReference = `Dossier #${tag}/C`;
   await editManualCase(manual.id, revisedReference, finalReference, `Nuevo identificador europeo ${tag}`);

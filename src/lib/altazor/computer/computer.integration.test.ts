@@ -62,11 +62,13 @@ async function main() {
     const beforeReplay = network; assert.equal((await createComputerSession(owner, configured.workspaceId, `start-${tag}`)).id, first.id); assert.equal(network, beforeReplay);
     const beforeDenied = network; await assert.rejects(readComputerSession(outsider, first.id), hasStatus(404)); await assert.rejects(computerScreenshot(outsider, first.id), hasStatus(404)); assert.equal(network, beforeDenied);
     await assert.rejects(readComputerActivity(outsider, cause.id), hasStatus(404));
+    await assert.rejects(readComputerActivity(outsider, null, first.id), hasStatus(404));
     assert.equal((await readComputerActivity(owner)).sessionId, null, "the personal chat cannot discover the case desktop");
     assert.equal(network, beforeDenied, "unauthorized or unrelated activity never contacts the gateway");
     const beforePreviewWrites = mutations;
     const healthBeforePreview = await prisma.altazorComputerWorkspace.findUniqueOrThrow({ where: { id: configured.workspaceId }, select: { updatedAt: true, lastVerifiedAt: true } });
     assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "ready", sessionId: first.id, monitor: true });
+    assert.deepEqual(await readComputerActivity(owner, null, first.id), { state: "ready", sessionId: first.id, monitor: true, causaId: cause.id });
     assert.deepEqual(await computerScreenshot(owner, first.id, true), fixtureFrame);
     assert.equal(mutations, beforePreviewWrites, "watching a desktop does not operate it");
     assert.deepEqual(await prisma.altazorComputerWorkspace.findUniqueOrThrow({ where: { id: configured.workspaceId }, select: { updatedAt: true, lastVerifiedAt: true } }), healthBeforePreview);
@@ -75,6 +77,7 @@ async function main() {
     await controlComputer(owner, first.id, `hold-${tag}`, true);
     const beforePaused = network;
     assert.equal((await readComputerActivity(owner, cause.id)).state, "paused");
+    assert.equal((await readComputerActivity(owner, null, first.id)).state, "paused");
     await assert.rejects(computerScreenshot(owner, first.id, true), hasStatus(409));
     assert.equal(network, beforePaused, "the passive view cannot capture the manual control session");
     await inputComputer(owner, first.id, `type-${tag}`, { action: "type", args: { text: "fictitious manually typed text" } });
@@ -94,12 +97,15 @@ async function main() {
     const beforeRevoked = network;
     await prisma.causa.update({ where: { id: cause.id }, data: { abogadoId: outsider.id } });
     await assert.rejects(readComputerActivity(owner, cause.id), hasStatus(404));
+    await assert.rejects(readComputerActivity(owner, null, first.id), hasStatus(404));
     await assert.rejects(computerScreenshot(owner, first.id, true), hasStatus(404));
     await assert.rejects(readComputerSession(owner, first.id), hasStatus(404)); await assert.rejects(controlComputer(owner, first.id, `revoked-${tag}`, true), hasStatus(404)); assert.equal(network, beforeRevoked);
     await prisma.causa.update({ where: { id: cause.id }, data: { abogadoId: owner.id } });
     await closeComputerSession(owner, first.id, `close-${tag}`);
+    assert.deepEqual(await readComputerActivity(owner, null, first.id), { state: "idle", sessionId: null, monitor: true, causaId: cause.id });
     const next = await createComputerSession(owner, configured.workspaceId, `second-${tag}`);
     await prisma.altazorComputerSession.update({ where: { id: next.id }, data: { expiresAt: new Date(0) } }); const beforeExpired = network;
+    assert.deepEqual(await readComputerActivity(owner, null, next.id), { state: "expired", sessionId: next.id, monitor: true, causaId: cause.id });
     await assert.rejects(readComputerSession(owner, next.id), hasStatus(410)); await assert.rejects(sendComputerMessage(owner, next.id, { ...message, requestId: `expired-${tag}` }), hasStatus(410)); assert.equal(network, beforeExpired);
     // LinkedIn pending results are fictitious encrypted grants: no OAuth network is called.
     const actor = { id: owner.id, sessionVersion: owner.sessionVersion, sessionHash: digest(`session-${tag}`) }, state = randomToken(), attemptId = randomUUID();

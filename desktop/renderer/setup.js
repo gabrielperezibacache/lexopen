@@ -8,8 +8,7 @@
   const continueBtn = document.getElementById("continue");
   const retryBtn = document.getElementById("retry");
   const chooseDataBtn = document.getElementById("choose-data-directory");
-  const checkDesktopBtn = document.getElementById("check-altazor-desktop");
-  const loadToolpackBtn = document.getElementById("load-altazor-toolpack");
+  const prepareDesktopBtn = document.getElementById("prepare-altazor-desktop");
   const desktopStatusEl = document.getElementById("altazor-desktop-status");
   let selectedPgPort = 54329;
 
@@ -36,7 +35,10 @@
   }
 
   document.querySelectorAll('input[name="mode"]').forEach((el) => {
-    el.addEventListener("change", syncModeUi);
+    el.addEventListener("change", () => {
+      syncModeUi();
+      if (selectedMode() === "host") void prepareDesktop();
+    });
   });
 
   async function hydrate() {
@@ -44,7 +46,9 @@
       statusEl.textContent = "API desktop no disponible.";
       return;
     }
+    window.lexopenDesktop.onAltazorPreparation(renderDesktopPreparation);
     const state = await window.lexopenDesktop.getState();
+    renderDesktopPreparation(state.desktopPreparation);
     dataDirEl.textContent = state.dataDir || "";
     document.getElementById("selectedDataDirectory").textContent = state.dataDir || "";
     if (versionEl) versionEl.textContent = state.version ? `v${state.version}` : "";
@@ -62,6 +66,7 @@
     document.getElementById("updateChecks").checked = cfg.updateChecks !== false;
     document.getElementById("updateChannel").value = cfg.updateChannel === "preview" ? "preview" : "stable";
     syncModeUi();
+    if (cfg.mode === "host") void prepareDesktop();
     window.lexopenDesktop.onStatus((s) => {
       if (s?.message) statusEl.textContent = s.message;
       if (s?.phase === "error") showError(s.message);
@@ -118,40 +123,25 @@
     finally { setBusy(false); }
   });
 
-  async function prepareDesktop(action, progress) {
-    const descriptions = {
-      "engine-missing": "Instala Docker para preparar el escritorio. Puedes continuar con LexOpen mientras tanto.",
-      "engine-unavailable": "Abre Docker y vuelve a comprobar el escritorio.",
-      "linux-engine-required": "El escritorio necesita que Docker use contenedores Linux.",
-      "profile-pending": "Docker está listo. Carga el paquete oficial de tu versión o sigue la guía de preparación.",
-      "profile-detected": "Herramientas detectadas en este equipo. Vincula el escritorio dedicado desde Mi asistente en LexOpen.",
-      "package-unavailable": "Esta versión todavía no ofrece un paquete oficial para este equipo. Consulta la guía de preparación.",
-      "package-check-failed": "No se pudo comprobar el paquete oficial. Revisa tu conexión y vuelve a intentarlo.",
-      "package-cancelled": "Selección cancelada.",
-      "package-mismatch": "El archivo no coincide con el tamaño y la huella oficiales. Descarga el paquete de tu versión.",
-      "package-read-failed": "No se pudo leer o preparar el archivo. Revisa los permisos y el espacio disponible.",
-      "package-load-unconfirmed": "Docker no confirmó la carga. Pulsa Comprobar escritorio para ver su estado.",
-      "package-loaded": "Herramientas cargadas. Vincula el escritorio dedicado desde Mi asistente en LexOpen.",
-    };
-    const failure = "No se pudo comprobar el escritorio. Vuelve a intentarlo desde esta pantalla.";
-    checkDesktopBtn.disabled = true;
-    loadToolpackBtn.disabled = true;
+  function renderDesktopPreparation(status) {
+    if (!status) return;
     desktopStatusEl.hidden = false;
-    desktopStatusEl.textContent = progress;
-    try {
-      const result = await action();
-      desktopStatusEl.textContent = descriptions[result.state] || failure;
-    } catch { desktopStatusEl.textContent = failure; }
-    finally { checkDesktopBtn.disabled = loadToolpackBtn.disabled = false; }
+    desktopStatusEl.textContent = status.message;
+    const ready = ["package-loaded", "profile-detected"].includes(status.state);
+    prepareDesktopBtn.disabled = Boolean(status.busy);
+    prepareDesktopBtn.textContent = status.busy ? "Preparando…" : ready ? "Comprobar de nuevo" : "Volver a intentar";
   }
 
-  checkDesktopBtn.addEventListener("click", () => {
-    void prepareDesktop(() => window.lexopenDesktop.checkAltazorDesktop(), "Comprobando el escritorio…");
-  });
+  async function prepareDesktop(retry = false) {
+    renderDesktopPreparation({ busy: true, message: "Comprobando el escritorio…" });
+    try {
+      renderDesktopPreparation(await window.lexopenDesktop.prepareAltazorDesktop(retry));
+    } catch {
+      renderDesktopPreparation({ message: "No se pudo preparar el escritorio. Vuelve a intentar." });
+    }
+  }
 
-  loadToolpackBtn.addEventListener("click", () => {
-    void prepareDesktop(() => window.lexopenDesktop.loadAltazorToolpack(), "Comprobando la versión oficial y preparando la carga…");
-  });
+  prepareDesktopBtn.addEventListener("click", () => void prepareDesktop(true));
 
   document.getElementById("desktop-guide").addEventListener("click", () => {
     void window.lexopenDesktop.openExternal("https://github.com/gabrielperezibacache/lexopen/blob/main/docs/ESCRITORIO-ALTAZOR.md");

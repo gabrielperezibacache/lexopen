@@ -7,6 +7,16 @@
 .status > strong, .status > span { display: block; }
 .status > span { font-size: var(--text-sm); color: var(--muted); margin-top: .35rem; }
 .status p { margin: .75rem 0 0; }
+.preparationLink {
+  color: var(--sea);
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}
+.preparationLink svg {
+  display: inline-block;
+  margin-inline-start: .35em;
+  vertical-align: -.16em;
+}
 .actions { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-top: 1rem; }
 .root button { font: inherit; font-size: .82rem; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; border: 1px solid var(--line-strong); border-radius: 10px; padding: .65rem .9rem; background: var(--surface-solid); color: var(--ink); cursor: pointer; transition: background 150ms ease; }
 .root button:hover:not(:disabled) { background: var(--mist); border-color: var(--sea); }

@@ -47,11 +47,11 @@ async function composerViewport(page: Page, phase: "new" | "recovered") {
 async function openTools(page: Page) {
   const tools=page.locator(".altazor-tools"); if(await tools.getAttribute("open")===null)await tools.locator(":scope > summary").click();
 }
-async function send(page: Page, text: string) {
+async function send(page: Page, text: string, reusedTurns = 0) {
   const previous = new URL(page.url()).searchParams.get("conversacion"), before = previous ? (await readChat(page,previous)).turns.length : 0;
   await page.getByTestId("inicio-composer").fill(text);
   await page.getByTestId("inicio-send").click();
-  await expect.poll(async () => { const id = new URL(page.url()).searchParams.get("conversacion"); if (!id) return "pending"; const data = await readChat(page,id); return data.turns.length === (id === previous ? before + 1 : 1) ? data.turns.at(-1)?.status : "pending"; }, { timeout: 25_000 }).toBe("completed");
+  await expect.poll(async () => { const id = new URL(page.url()).searchParams.get("conversacion"); if (!id) return "pending"; const data = await readChat(page,id); return data.turns.length === (id === previous ? before + 1 : reusedTurns + 1) ? data.turns.at(-1)?.status : "pending"; }, { timeout: 25_000 }).toBe("completed");
   await expect(page.getByTestId("inicio-composer")).toHaveValue("");
   return readChat(page,chatId(page));
 }
@@ -162,11 +162,31 @@ test("Inicio recibe otra consulta en la misma ruta y conserva el chat anterior s
   await page.evaluate(()=>history.pushState(null,"","/inicio"));await expect.poll(()=>new URL(page.url()).searchParams.get("conversacion")).toBe(id);
   await send(page,pending);expect((await readChat(page,id)).turns).toHaveLength(2);
   await db.causa.update({where:{id:firstCase},data:{rit:"C-78123-2036"}});
+  const privateNoticeText="Detalle privado ficticio que no debe aparecer en la conversación";
+  const deadline=await db.plazo.create({data:{causaId:firstCase,responsableId:owner.user.id,titulo:privateNoticeText,fechaLimite:new Date("2099-05-03T00:00:00Z"),esFatal:true}});
+  await db.notification.create({data:{userId:owner.user.id,tipo:"plazo.fatal",title:privateNoticeText,body:privateNoticeText,entityType:"plazo",entityId:deadline.id}});
+  await page.reload();
+  const timeline=page.getByRole("region",{name:"Historial con Altazor"});
+  await expect(timeline.getByText("Aviso de plazo fatal",{exact:true})).toBeVisible();
+  await expect(timeline.getByRole("link",{name:"Ver plazos del mes"})).toHaveAttribute("href","/plazos?mes=2099-05");
+  await expect(timeline).not.toContainText(privateNoticeText);
   const inferred=await send(page,"Analiza la causa C-78123-2036");expect(inferred.conversation.causaId).toBe(firstCase);
-  await page.getByRole("button",{name:"Conversaciones",exact:true}).click();
-  await page.getByRole("dialog",{name:"Conversaciones",exact:true}).getByRole("button",{name:"Respuesta ficticia del espacio personal",exact:true}).click();
+  await expect(timeline).toContainText("Respuesta ficticia del espacio personal");
+  await expect(timeline).toContainText("Analiza la causa C-78123-2036");
+  await expect(timeline.locator(".altazor-turns > li").filter({hasText:/Borrador personal pendiente|Aviso de plazo fatal|Analiza la causa C-78123-2036/})).toHaveText([
+    /Borrador personal pendiente/,/Aviso de plazo fatal/,/Analiza la causa C-78123-2036/,
+  ]);
+  await expect(page.getByRole("button",{name:"Conversaciones",exact:true})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Nuevo chat",exact:true})).toHaveCount(0);
+  const nextDraft="Continúa en el ámbito personal";
+  await page.getByTestId("inicio-composer").fill(nextDraft);
+  await page.getByRole("button",{name:"Quitar el contexto de la causa",exact:true}).click();
+  await expect(page.getByTestId("inicio-composer")).toHaveValue(nextDraft);
+  await expect(timeline).toContainText("Analiza la causa C-78123-2036");
+  const continued=await send(page,nextDraft,2);
+  expect(continued.conversation.id).toBe(id);
   await expect(page.getByTestId("inicio-composer")).toHaveValue("");
-  expect((await readChat(page,id)).turns).toHaveLength(2);
+  expect((await readChat(page,id)).turns).toHaveLength(3);
 
 });
 

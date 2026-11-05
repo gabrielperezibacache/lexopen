@@ -29,7 +29,11 @@ for (const role of ROLES) {
   }
 }
 for (const subject of [null, undefined, { role: "" }, { role: "unknown" }]) assert.equal(navigationEntries(buildNavigation(subject)).length, 0);
-assert.equal(navigationEntries(buildNavigation({ role: "socio", capabilityGrants: "host.admin,audit.read" })).some(entry => entry.id === "configuracion" || entry.id === "auditoria"), false, "navigation must not grant a role-gated page");
+const delegated = navigationEntries(buildNavigation({ role: "socio", capabilityGrants: "host.admin,audit.read" }));
+assert.ok(delegated.some(entry => entry.id === "configuracion"), "delegated Host administrators can find firm settings");
+assert.equal(delegated.some(entry => entry.id === "auditoria"), false, "audit remains role-gated in navigation");
+assert.equal(navigationEntries(buildNavigation({ role: "admin", capabilityRevokes: "host.admin" })).some(entry => entry.id === "configuracion"), false, "revoked Host administration hides firm settings");
+assert.equal(navigationEntries(buildNavigation({ role: "cliente", capabilityGrants: "host.admin" })).some(entry => entry.id === "configuracion"), false, "portal access never exposes firm settings");
 assert.equal(navigationEntries(buildNavigation({ role: "abogado", capabilityRevokes: "assistant.use" })).some(entry => entry.id === "agente"), false);
 assert.equal(buildNavigation({ role: "abogado", capabilityRevokes: "assistant.use" }).areas.some(area => area.id === "academico"), false);
 assert.ok(buildNavigation({ role: "contabilidad" }).shortcuts.some(entry => entry.id === "facturacion"));
@@ -57,9 +61,9 @@ assert.deepEqual(secondaryNavigation(staff, "/buscar"), []);
 for (const path of ["/causas", "/causas/monitoreo/", "/causas/mis-causas?alta=1#estado"]) {
   assert.equal(secondaryNavigation(staff, path).some(entry => ["monitoreo", "mis-causas"].includes(entry.id)), false, "Case section tabs own these destinations on their three routes");
 }
-for (const path of ["/causas/nueva", "/causas/a-case", "/documentos", "/minutas"]) {
+for (const path of ["/mis-causas", "/causas/nueva", "/causas/a-case", "/documentos", "/minutas"]) {
   assert.ok(secondaryNavigation(staff, path).some(entry => entry.id === "sincronizacion"));
-  assert.equal(secondaryNavigation(staff, path).some(entry => ["monitoreo", "mis-causas"].includes(entry.id)), false);
+  assert.equal(secondaryNavigation(staff, path).some(entry => ["pjud", "monitoreo", "mis-causas"].includes(entry.id)), false, "judicial tools do not replace the general case navigation");
 }
 assert.ok(navigationEntries(staff).some(entry => entry.id === "monitoreo"), "Quick navigation retains the monitoring destination");
 assert.ok(navigationEntries(staff).some(entry => entry.id === "mis-causas"), "Quick navigation retains the ClaveÚnica destination");
@@ -72,8 +76,8 @@ assert.deepEqual(navigationBreadcrumbs(buildNavigation({ role: "externo" }), "/p
 assert.ok(navigationBreadcrumbs(staff, "/documentos/a-document/fuentes/a-source").every(crumb => !crumb.href.endsWith("/fuentes")), "no intermediate source list without a page");
 assert.equal(navigationBreadcrumbs(staff, "/causas/%E0%A4%A").at(-1)?.labelKey, "nav.details.case", "opaque identifiers are never exposed or decoded");
 const manual = buildNavigation({ role: "socio" }, { caseManagementMode: "manual" });
-assert.equal(manual.areas.find(area => area.id === "causas")?.href,"/causas");
-assert.equal(staff.areas.find(area => area.id === "causas")?.href,"/pjud");
+assert.equal(manual.areas.find(area => area.id === "causas")?.href, "/mis-causas");
+assert.equal(staff.areas.find(area => area.id === "causas")?.href, "/mis-causas");
 assert.equal(navigationEntries(manual).some(entry => ["pjud","monitoreo","mis-causas"].includes(entry.id)),false,"manual mode hides Chile-only destinations");
 assert.ok(navigationEntries(staff).some(entry => entry.id === "causas"),"the connected mode retains access to manual files");
 assert.equal(activeNavigationEntry(staff,"/pjud/a-case")?.id,"pjud");

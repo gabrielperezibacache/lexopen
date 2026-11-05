@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type AltazorTurn, type PrismaClient } from "@prisma/client";
+import { Prisma, type AltazorTurn, type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
 import { assertCausaAccess, type CausaAccessUser } from "@/lib/auth/causa-access";
@@ -40,15 +40,22 @@ export async function listAltazorConversations(user: CausaAccessUser, client: Pr
   const rows = await client.altazorConversation.findMany({ where: conversationAccessWhere(actor), orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: ALTAZOR_LIMITS.conversations });
   return { conversations: rows.map(summary), destination: await (options.destination || altazorDestination)(actor.id), limits: ALTAZOR_LIMITS };
 }
-export async function createAltazorConversation(raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+export async function createAltazorConversation(raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma, options: { reuseActive?: boolean } = {}) {
   const input = createConversationSchema.parse(raw);
   return altazorTransaction(client, async tx => {
     const actor = await altazorActor(user, tx);
     if (input.causaId) await assertCausaAccess(input.causaId, actor, undefined, tx);
+    const scopeKey = altazorScopeKey(input.causaId);
     const prior = await tx.altazorConversation.findUnique({ where: { ownerId_requestId: { ownerId: actor.id, requestId: input.requestId } } });
-    if (prior) { if (prior.scopeKey !== altazorScopeKey(input.causaId)) throw httpError("La clave ya corresponde a otra conversación", 409); return { conversation: summary(prior), reused: true }; }
-    if (await tx.altazorConversation.count({ where: { ownerId: actor.id } }) >= ALTAZOR_LIMITS.conversations) throw httpError("Se alcanzó el límite de conversaciones", 413);
-    return { conversation: summary(await tx.altazorConversation.create({ data: { ownerId: actor.id, requestId: input.requestId, scopeKey: altazorScopeKey(input.causaId), causaId: input.causaId, title: input.title } })), reused: false };
+    if (prior && (prior.scopeKey !== scopeKey || prior.causaId !== input.causaId)) throw httpError("La clave ya corresponde a otra conversación", 409);
+    if (prior && (!options.reuseActive || prior.status === "active")) return { conversation: summary(prior), reused: true };
+    if (options.reuseActive) {
+      const active = await tx.altazorConversation.findFirst({ where: { ownerId: actor.id, causaId: input.causaId, scopeKey, status: "active" }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }] });
+      if (active) return { conversation: summary(active), reused: true };
+      if (prior) throw httpError("La conversación está archivada. Vuelva a preparar el mensaje", 409);
+    }
+    if (!options.reuseActive && await tx.altazorConversation.count({ where: { ownerId: actor.id } }) >= ALTAZOR_LIMITS.conversations) throw httpError("Se alcanzó el límite de conversaciones", 413);
+    return { conversation: summary(await tx.altazorConversation.create({ data: { ownerId: actor.id, requestId: input.requestId, scopeKey, causaId: input.causaId, title: input.title } })), reused: false };
   });
 }
 export async function patchAltazorConversation(id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
@@ -121,23 +128,34 @@ async function verifiedContext(row: AltazorTurn, user: CausaAccessUser, client: 
   validated.add(row.id);
   return blocks.join("\n\n").slice(0, ALTAZOR_LIMITS.contextCharacters);
 }
+/** Use the same source revalidation and redaction in both history views. */
+export async function visibleAltazorTurn(row: AltazorTurn, actor: Awaited<ReturnType<typeof altazorActor>>, conversation: { id: string; causaId: string | null }, client: AltazorClient, options: AltazorServiceOptions, validated: Set<string>) {
+  let available = true;
+  try { await verifiedContext(row, actor, client, options, new Set(), validated); } catch { available = false; }
+  let plan: { id: string; steps: { toolId: string; preview: string }[]; needsConfirm: boolean } | null = null;
+  if (available && row.planId && ["awaiting_confirmation", "partial"].includes(row.status)) {
+    try {
+      const stored = await getPlan(row.planId, actor.id);
+      if (stored) {
+        const ctx = { ...actor, userId: actor.id, chatId: conversation.id, nativeTurnId: row.id, scope: { causaId: conversation.causaId } };
+        plan = { id: stored.id, needsConfirm: stored.needsConfirm, steps: await Promise.all(stored.steps.map(async step => ({ toolId: step.toolId, preview: await getTool(step.toolId).preview(step.input, ctx) }))) };
+      }
+    } catch { available = false; }
+  }
+  const snapshot = available ? parseContext(row) : null;
+  const expiredLease = row.status === "running" && row.leaseExpiresAt && row.leaseExpiresAt < new Date();
+  const status = expiredLease ? "interrupted" : row.status;
+  const errorCode = expiredLease ? "host_interrupted" : row.errorCode;
+  const results: { toolId: string; result: ToolResult }[] = available ? JSON.parse(row.resultsJson) : [];
+  return { id: row.id, requestId: row.requestId, ordinal: row.ordinal, available, status: available ? status : "blocked", userText: available ? row.userText : "Contenido no disponible: cambió el acceso a una fuente.", assistantText: available ? row.assistantText : "", results, plan, sourceRefs: snapshot?.refs || [], attachmentIds: snapshot?.attachmentIds || [], errorCode: available ? errorCode : "context_unavailable", createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() || null };
+}
+
 export async function readAltazorConversation(id: string, user: CausaAccessUser, client: PrismaClient = prisma, query: { beforeOrdinal?: number } = {}, options: AltazorServiceOptions = {}) {
   const { actor, conversation } = await conversationFor(id, user, client);
   await client.altazorTurn.updateMany({ where: { conversationId: id, ownerId: actor.id, status: "running", leaseExpiresAt: { lt: new Date() } }, data: { status: "interrupted", errorCode: "host_interrupted", leaseToken: null, leaseExpiresAt: null, finishedAt: new Date() } });
   const rows = await client.altazorTurn.findMany({ where: { conversationId: id, ownerId: actor.id, ...(query.beforeOrdinal ? { ordinal: { lt: query.beforeOrdinal } } : {}) }, orderBy: { ordinal: "desc" }, take: ALTAZOR_LIMITS.turnsPerPage + 1 });
   const visible = rows.slice(0, ALTAZOR_LIMITS.turnsPerPage).reverse(), turns = [], validated = new Set<string>();
-  for (const row of visible) {
-    let available = true;
-    try { await verifiedContext(row, actor, client, options, new Set(), validated); } catch { available = false; }
-    let plan: { id: string; steps: { toolId: string; preview: string }[]; needsConfirm: boolean } | null = null;
-    if (available && row.planId && ["awaiting_confirmation", "partial"].includes(row.status)) {
-      const stored = await getPlan(row.planId, actor.id);
-      if (stored) {
-        try { const ctx = { ...actor, userId: actor.id, chatId: conversation.id, nativeTurnId: row.id, scope: { causaId: conversation.causaId } }; plan = { id: stored.id, needsConfirm: stored.needsConfirm, steps: await Promise.all(stored.steps.map(async step => ({ toolId: step.toolId, preview: await getTool(step.toolId).preview(step.input, ctx) }))) }; } catch { available = false; plan = null; }
-      }
-    }
-    turns.push({ id: row.id, requestId: row.requestId, ordinal: row.ordinal, status: available ? row.status : "blocked", userText: available ? row.userText : "Contenido no disponible: cambió el acceso a una fuente.", assistantText: available ? row.assistantText : "", results: available ? JSON.parse(row.resultsJson) : [], plan, sourceRefs: available ? parseContext(row).refs : [], attachmentIds: available ? parseContext(row).attachmentIds : [], errorCode: available ? row.errorCode : "context_unavailable", createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() || null });
-  }
+  for (const row of visible) turns.push(await visibleAltazorTurn(row, actor, conversation, client, options, validated));
   return { conversation: summary(conversation), turns, attachments: await listAltazorAttachments(id, actor, client), destination: await (options.destination || altazorDestination)(actor.id), hasMore: rows.length > ALTAZOR_LIMITS.turnsPerPage, beforeOrdinal: visible[0]?.ordinal || null };
 }
 export async function createAltazorTurn(id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma, options: AltazorServiceOptions = {}) {
@@ -167,6 +185,32 @@ export async function createAltazorTurn(id: string, raw: unknown, user: CausaAcc
   });
 }
 
+async function recallCandidateIds(client: PrismaClient, scope: { ownerId: string; scopeKey: string; causaId: string | null }, before: Date, historyTurnIds: string[], terms: string[]) {
+  const boundedTerms = terms.filter(term => term.length <= 64);
+  if (!boundedTerms.length) return [];
+  // Filter inside PostgreSQL before taking the candidate window. Both owners
+  // and the exact scope must match even for archived dialogue. Prisma stores
+  // createdAt as a timestamp without time zone using UTC.
+  const requested = Prisma.sql`ARRAY[${Prisma.join(boundedTerms)}]::text[]`;
+  const rows = await client.$queryRaw<{ id: string }[]>`
+    SELECT turn.id
+      FROM "AltazorTurn" turn
+      JOIN "AltazorConversation" conversation ON conversation.id = turn."conversationId"
+      CROSS JOIN LATERAL (
+        SELECT regexp_split_to_array(lower(public.unaccent(turn."userText" || ' ' || turn."assistantText")), '[^[:alnum:]]+') AS words
+      ) AS dialogue
+     WHERE turn."ownerId" = ${scope.ownerId} AND conversation."ownerId" = ${scope.ownerId}
+       AND conversation."causaId" IS NOT DISTINCT FROM ${scope.causaId}::text
+       AND conversation."scopeKey" = ${scope.scopeKey}
+       AND turn.status = 'completed' AND turn."createdAt" < (${before}::timestamptz AT TIME ZONE 'UTC')
+       ${historyTurnIds.length ? Prisma.sql`AND turn.id NOT IN (${Prisma.join(historyTurnIds)})` : Prisma.empty}
+       AND dialogue.words && ${requested}
+     ORDER BY (SELECT count(*) FROM unnest(${requested}) AS term(word) WHERE term.word = ANY(dialogue.words)) DESC,
+              turn."createdAt" DESC, turn.id DESC
+     LIMIT 100`;
+  return rows.map(row => row.id);
+}
+
 async function executionContext(row: AltazorTurn, user: CausaAccessUser, client: PrismaClient, options: AltazorServiceOptions, frozen = false): Promise<AltazorExecutionContext> {
   const { conversation } = await conversationFor(row.conversationId, user, client, true), snapshot = parseContext(row);
   const history: AltazorExecutionContext["history"] = [], historyTurnIds: string[] = [];
@@ -184,10 +228,11 @@ async function executionContext(row: AltazorTurn, user: CausaAccessUser, client:
     memoryContext = memory.context; memoryDependencies = memory.dependencies;
   }
   const recalledTurns: NonNullable<AltazorContext["recalledTurns"]> = [], recalledMessages: { title: string; question: string; answer: string }[] = [];
-  if (stored.useMemory && automaticContextTerms(row.userText).length) {
-    const candidates = frozen
-      ? await client.altazorTurn.findMany({ where: { id: { in: (snapshot.recalledTurns || []).map(turn => turn.id) }, ownerId: user.id, status: "completed", createdAt: { lt: row.createdAt }, conversation: { ownerId: user.id, causaId: conversation.causaId, scopeKey: conversation.scopeKey } }, include: { conversation: { select: { title: true } } } })
-      : await client.altazorTurn.findMany({ where: { ownerId: user.id, status: "completed", id: { notIn: historyTurnIds }, createdAt: { lt: row.createdAt }, conversation: { ownerId: user.id, causaId: conversation.causaId, scopeKey: conversation.scopeKey } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 100, include: { conversation: { select: { title: true } } } });
+  const terms = stored.useMemory ? automaticContextTerms(row.userText) : [];
+  if (terms.length) {
+    const scope = { ownerId: user.id, causaId: conversation.causaId, scopeKey: conversation.scopeKey };
+    const ids = frozen ? (snapshot.recalledTurns || []).map(turn => turn.id) : await recallCandidateIds(client, scope, row.createdAt, historyTurnIds, terms);
+    const candidates = ids.length ? await client.altazorTurn.findMany({ where: { id: { in: ids }, ownerId: user.id, status: "completed", createdAt: { lt: row.createdAt }, conversation: scope }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], include: { conversation: { select: { title: true } } } }) : [];
     const ranked = frozen ? (snapshot.recalledTurns || []).map(reference => candidates.find(turn => turn.id === reference.id)).filter((turn): turn is typeof candidates[number] => Boolean(turn)) : rankConversationRecall(candidates, row.userText);
     for (const candidate of ranked) {
       if (recalledTurns.length === 2) break;

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { binaryIdentity, copyResourceTree, copyStagedReleaseResources, nativeTarget, parseTargetArgs, privateResourcePath, resourceFiles, sha256, verifyBinary, verifyNativeRuntime, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
+import { binaryIdentity, copyResourceTree, copyStagedReleaseResources, nativeTarget, parseTargetArgs, privateResourcePath, resourceFiles, sha256, verifyBinary, verifyDesktopSourceResource, verifyNativeRuntime, verifyReleaseResources, verifyCanaryAbsent } from "./release-resources.mjs";
 import { copyTrackedRuntimeResources } from "./prepare-resources.mjs";
 
 for (const name of [".env", "host.env", "credentials.json", "database.sql", "pg-password-fixture", ".postgres-init-fixture/password", "node_modules/a/.env.production", ".tmp/session/case.txt", "storage/book.pdf", "pgdata/base/123", "secrets/key.txt", "a/client.p12", "node_modules/cache.sqlite", "x/private/data.json", ".next/cache/results.json"]) assert.equal(privateResourcePath(name), true, name);
@@ -99,6 +99,19 @@ try {
   write(path.join(app, "lexopen-release.json"), JSON.stringify({ version: "1.1.0-preview.1", sourceDirty: false, sourceRevision: "a".repeat(40), buildId: "fixture-build", platform: "darwin", arch: "arm64" }));
   write(path.join(app, "playwright-browsers/chromium-fixture/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"), macho);
   assert.equal(verifyReleaseResources(resources, modules, native).browserExecutables, 1);
+  const sourceBundle = path.join(resources, "altazor-desktop-source"), context = path.join(sourceBundle, "context.tar.gz");
+  const profile = JSON.parse(fs.readFileSync(new URL("../altazor-desktop-profile.json", import.meta.url), "utf8"));
+  const archiveBytes = Buffer.from("fictitious source context fixture");
+  write(context, archiveBytes);
+  const manifest = { format: 1, profile: profile.id, sourceCommit: profile.sourceCommit, lumenCommit: profile.windowManagerCommit, file: "context.tar.gz", size: archiveBytes.length, sha256: sha256(context) };
+  write(path.join(sourceBundle, "manifest.json"), JSON.stringify(manifest));
+  assert.equal(verifyReleaseResources(resources, modules, native).altazorDesktopSourceSha256, manifest.sha256);
+  write(context, Buffer.alloc(archiveBytes.length));
+  assert.throws(() => verifyDesktopSourceResource(sourceBundle), /does not match/);
+  write(context, archiveBytes);
+  write(path.join(sourceBundle, "third-file.txt"), "unexpected");
+  assert.throws(() => verifyDesktopSourceResource(sourceBundle), /source inventory/);
+  fs.unlinkSync(path.join(sourceBundle, "third-file.txt"));
   write(path.join(app, "node_modules/next/dist/server/fixture.js"), "// complete Next dependency fixture");
   write(path.join(app, "node_modules/next/dist/fixture/entry.js"), "// directory/file ordering fixture");
   write(path.join(app, "node_modules/next/dist/fixture.js"), "// sibling file ordering fixture");

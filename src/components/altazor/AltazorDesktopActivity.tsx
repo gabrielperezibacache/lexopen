@@ -22,8 +22,9 @@ const stateLabel: Record<ComputerActivityState, string> = {
 };
 const frameStates: ReadonlySet<ComputerActivityState> = new Set(["ready", "working", "approval"]);
 
-export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | null; onOpen: (sessionId: string | null) => void }) {
+export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | null; onOpen: (sessionId: string | null, sessionCaseId: string | null) => void }) {
   const heading = useId(), container = useRef<HTMLElement>(null);
+  const sessionPin = useRef<{ id: string; causaId: string | null } | null>(null);
   const [activity, setActivity] = useState<ComputerActivity | null>(null);
   const [frame, setFrame] = useState<{ url: string; sessionId: string } | null>(null);
 
@@ -51,18 +52,29 @@ export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | 
       let delay = 25_000;
       try {
         const query = causaId ? `?${new URLSearchParams({ causaId })}` : "";
-        const response = await fetch(`${endpoint}/activity${query}`, { cache: "no-store", signal });
-        if (!response.ok) throw new Error("activity_unavailable");
-        const next: ComputerActivity = await response.json();
+        const pin = sessionPin.current;
+        const preserveSession = pin && pin.causaId !== causaId;
+        const pinQuery = preserveSession ? `?${new URLSearchParams({ sessionId: pin.id })}` : query;
+        let response = await fetch(`${endpoint}/activity${pinQuery}`, { cache: "no-store", signal });
+        let next: ComputerActivity | null = response.ok ? await response.json() : null;
+        if (preserveSession && (response.status === 404 || next?.state === "idle")) {
+          sessionPin.current = null;
+          replaceFrame(null);
+          response = await fetch(`${endpoint}/activity${query}`, { cache: "no-store", signal });
+          next = response.ok ? await response.json() : null;
+        }
+        if (!next) throw new Error("activity_unavailable");
         if (signal.aborted) return;
+        sessionPin.current = next.sessionId && next.state !== "expired" ? { id: next.sessionId, causaId: next.causaId ?? (preserveSession ? pin.causaId : causaId) } : null;
         setActivity(next);
         if (!next.monitor) { pause(); return; }
-        delay = next.state === "working" || next.state === "starting" ? 5_000 : next.sessionId ? 9_000 : 25_000;
+        delay = frameStates.has(next.state) ? 1_000 : next.state === "starting" ? 2_000 : next.sessionId ? 5_000 : 15_000;
         if (!next.sessionId || !frameStates.has(next.state)) { replaceFrame(null); return; }
         const image = await fetch(`${endpoint}/sessions/${encodeURIComponent(next.sessionId)}/screenshot?passive=1`, { cache: "no-store", signal });
         if (!image.ok || !image.headers.get("content-type")?.startsWith("image/png")) {
           replaceFrame(null);
-          if (image.status === 409) delay = 5_000;
+          delay = 5_000;
+          if (image.status === 409) setActivity({ state: "paused", sessionId: next.sessionId, monitor: true });
           else setActivity({ state: "unavailable", sessionId: next.sessionId, monitor: true });
           return;
         }
@@ -88,16 +100,18 @@ export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | 
 
   const label = activity ? stateLabel[activity.state] : "Consultando escritorio…";
   const needsPreparation = activity?.state === "unconfigured" || activity?.state === "disabled";
+  const visibleFrame = frame && activity && frame.sessionId === activity.sessionId && frameStates.has(activity.state) ? frame : null;
   return <section className={styles.activity} aria-labelledby={heading} ref={container}>
     <header className={styles.header}>
       <Monitor aria-hidden="true" size={20} />
       <div className={styles.heading}><h2 id={heading}>Escritorio de Altazor</h2><p role="status">{label}</p></div>
-      <button type="button" className="btn btn-ghost" onClick={() => onOpen(activity?.sessionId ?? null)}>
+      <button type="button" className="btn btn-ghost" onClick={() => onOpen(activity?.sessionId ?? null, activity?.causaId === undefined ? causaId : activity.causaId)}>
         {needsPreparation ? "Preparar escritorio" : "Abrir escritorio"}<ArrowUpRight size={16} aria-hidden="true" />
       </button>
     </header>
-    {frame && activity && frame.sessionId === activity.sessionId && frameStates.has(activity.state) && <div className={styles.screen}>
-      <Image src={frame.url} unoptimized width={1280} height={800} alt="Vista actual del escritorio privado de Altazor" />
+    {visibleFrame && <div className={styles.screen}>
+      <span className={styles.live}>Vista en directo</span>
+      <Image src={visibleFrame.url} unoptimized width={1280} height={800} alt="Vista actual del escritorio privado de Altazor" />
     </div>}
   </section>;
 }

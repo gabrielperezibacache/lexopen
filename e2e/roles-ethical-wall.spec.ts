@@ -2,10 +2,10 @@ import { expect, test } from "@playwright/test";
 import { loginAs } from "./helpers";
 
 /**
- * Smoke de roles 1.1: personas muestra presets nuevos y pendientes unificados.
+ * Smoke de roles 1.1: personas muestra presets nuevos y tareas unificadas.
  * El muro ético profundo se cubre en unit/contract (causa-access / permissions).
  */
-test("personas expone roles de estudio y pendientes unificados", async ({
+test("personas expone roles de estudio y tareas unificadas", async ({
   page,
 }) => {
   await loginAs(page, "socio@estudio.cl");
@@ -26,7 +26,7 @@ test("personas expone roles de estudio y pendientes unificados", async ({
 
   await page.goto("/tareas");
   await expect(
-    page.getByRole("heading", { name: /Pendientes|To-dos/i })
+    page.getByRole("heading", { name: /^(Tareas|Tasks)$/i })
   ).toBeVisible();
-  await expect(page.getByText(/Bandeja|Vencidas|Hoy/i).first()).toBeVisible();
+  await expect(page.getByRole("group", { name: "Filtros de tareas" })).toBeVisible();
 });

@@ -19,11 +19,43 @@
 .navigation { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem 1.5rem; border-bottom:1px solid var(--line); margin-bottom:2rem; }
 .navigation > button { min-height:44px; padding:.6rem 0; border-bottom:2px solid transparent; font-size:var(--text-sm); }
 .navigation > button[aria-current="page"] { border-color:var(--sea); color:var(--sea); }
-.navigation details { margin-inline-start:auto; }
-.navigation details[open] { flex-basis:100%; order:3; }
-.navigation details > div { display:flex; flex-wrap:wrap; gap:.75rem 1.5rem; padding:.5rem 0 1rem; font-size:var(--text-sm); }
 .projectHeading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; }
 .projectHeading h2 { margin:0; }
+.guide {
+  margin-bottom: 1.75rem;
+  padding-block: 1rem;
+  border-block: 1px solid var(--line);
+}
+.guide ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem 2rem;
+  list-style: decimal;
+  padding-inline-start: 1.4rem;
+}
+.guide li::marker { color: var(--sea); font-weight: 600; }
+.guide li strong { font-size: var(--text-sm); }
+.guide li span {
+  display: block;
+  margin-top: .25rem;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+.discoveryHint {
+  margin-block: -.5rem 1.25rem;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.matrixShortcut {
+  min-height: 44px;
+  color: var(--sea);
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}
+@media (max-width: 700px) {
+  .guide ol { grid-template-columns: minmax(0, 1fr); }
+}
 .start { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.9fr); gap:3rem; padding-bottom:2.5rem; }
 .journeys { display:grid; }
 .journeys button { display:flex; align-items:center; gap:1rem; text-align:start; padding:1.15rem .65rem; border-bottom:1px solid var(--line); transition:background-color 160ms ease-out; }
@@ -139,3 +171,35 @@
   .root :global(.altazor-matrix-dimensions) > div { flex-wrap:wrap; }
 }
 @media(prefers-reduced-motion:reduce) { .root * { transition:none!important; scroll-behavior:auto!important; } }
+
+.review { display:grid; gap:1.5rem; }
+.reviewHeader { display:grid; grid-template-columns:minmax(0, 1fr) minmax(14rem, .5fr); align-items:start; gap:1rem 2rem; }
+.reviewHeader h2 { margin-bottom:.4rem; }
+.reviewHeader p,.reviewMethod,.reviewState { color:var(--ink-soft); }
+.reviewSelect { display:grid; gap:.45rem; min-width:0; }
+.reviewSelect select { text-overflow:ellipsis; }
+.reviewLead { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; padding:1rem; border-inline-start:2px solid var(--sea); background:var(--surface-solid); }
+.reviewLead > div { flex:1 1 16rem; }
+.reviewLead > svg,.reviewGroup h3 > svg,.reviewState > svg { flex-shrink:0; color:var(--sea); }
+.reviewEmpty,.reviewGroup { border-top:1px solid var(--line); padding-block:1.3rem; }
+.reviewEmpty :global(.btn) { margin-top:.8rem; }
+.reviewGroup h3 { display:flex; align-items:center; gap:.6rem; }
+.reviewCounts { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.85rem; margin-block:1rem; }
+.reviewCounts > div { display:grid; gap:.4rem; border-inline-start:1px solid var(--line); padding-inline-start:.85rem; }
+.reviewCounts dt { color:var(--ink-soft); font-size:var(--text-sm); }
+.reviewCounts dd { font-family:var(--font-fraunces),Georgia,serif; font-size:var(--text-xl); font-variant-numeric:tabular-nums; }
+.reviewGap { margin-block:1rem; }
+.reviewGap summary { color:var(--sea); }
+.reviewGap ul { list-style:disc; margin:.5rem 0 0 1.25rem; }
+.reviewActions { display:flex; flex-wrap:wrap; align-items:center; gap:.65rem; margin-block-start:1rem; }
+.reviewManuscripts { list-style:none; margin-block:1rem 0; padding:0; }
+.reviewManuscripts > li { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.85rem; padding-block:1rem; border-block-start:1px solid var(--line); }
+.reviewManuscripts > li > div { flex:1 1 16rem; min-width:0; overflow-wrap:anywhere; }
+.reviewManuscripts > li > div > strong { display:block; margin-block:.3rem; }
+.reviewState { display:flex; align-items:center; gap:.4rem; font-size:var(--text-sm); }
+
+@media (max-width: 650px) {
+  .reviewHeader { grid-template-columns:minmax(0, 1fr); }
+  .reviewCounts { gap:.5rem; }
+  .reviewCounts > div { padding-inline-start:.45rem; }
+}

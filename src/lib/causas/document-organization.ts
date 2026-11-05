@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { createHash } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { writeAuditStrict } from "@/lib/audit";
 import { httpError } from "@/lib/auth/access";
 import { assertCausaCapability, documentReadWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
@@ -20,6 +22,24 @@ export const organizeCaseDocumentsSchema = z.discriminatedUnion("action", [
 export const MAX_CASE_DOCUMENT_FOLDERS = 500;
 const MAX_FOLDER_DEPTH = 8;
 export type OrganizationAction = z.infer<typeof organizeCaseDocumentsSchema>;
+
+/** Called inside the authorized mail transaction before placing its new documents. */
+export async function ensureCaseMailFolder(tx: Prisma.TransactionClient, causaId: string) {
+  const id = `mail-folder-${createHash("sha256").update(causaId).digest("hex").slice(0, 40)}`;
+  const folders = await tx.caseDocumentFolder.findMany({ where: { causaId }, select: { id: true, name: true, parentId: true } });
+  if (folders.some(folder => folder.id === id)) return id;
+  if (folders.length >= MAX_CASE_DOCUMENT_FOLDERS) throw httpError("Este expediente alcanzó el límite de carpetas", 409);
+  const sameName = new Intl.Collator("es", { sensitivity: "accent" });
+  let name = "Correo PJUD";
+  for (let suffix = 2; folders.some(folder => folder.parentId === null && sameName.compare(folder.name, name) === 0); suffix += 1) {
+    name = `Correo PJUD (${suffix})`;
+  }
+  const created = await tx.caseDocumentFolder.createMany({ data: { id, causaId, name }, skipDuplicates: true });
+  if (!created.count && !await tx.caseDocumentFolder.findFirst({ where: { id, causaId }, select: { id: true } })) {
+    throw httpError("No se pudo comprobar la carpeta del correo en este expediente", 409);
+  }
+  return id;
+}
 
 /** Filing is scoped to one case and never changes a document or evidence version. */
 export async function organizeCaseDocuments(causaId: string, user: CausaAccessUser, input: OrganizationAction) {

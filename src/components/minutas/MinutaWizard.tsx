@@ -95,7 +95,7 @@ export function MinutaWizard({
   const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
 
   const steps = useMemo(
-    () => ["Contexto", "Qué ocurrió", "Próximos pasos", "Publicar"],
+    () => ["Contexto", "Resumen", "Próximos pasos", "Guardar"],
     []
   );
   const plantillasTipo = plantillas.filter((p) => p.tipo === tipo);
@@ -270,7 +270,7 @@ export function MinutaWizard({
     <div className="space-y-6">
       <div className="panel rounded-[var(--radius-lg)] px-5 py-4">
         <div className="text-sm text-[var(--muted)]">
-          Causa · {causaRit || "Sin RIT"}
+          {causaRit ? `Causa · ${causaRit}` : "Causa"}
         </div>
         <div className="mt-1 font-semibold">{causaTitulo}</div>
         <ol className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Pasos de la minuta">
@@ -296,7 +296,12 @@ export function MinutaWizard({
         </ol>
       </div>
 
-      <MinutaBorradorAi causaId={causaId} onApply={applyMinutaDraft} />
+      {step < 2 && (
+        <details className="border-b border-[var(--line)]">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium text-[var(--sea)]">Preparar un borrador con IA</summary>
+          <MinutaBorradorAi causaId={causaId} onApply={applyMinutaDraft} />
+        </details>
+      )}
 
       {step === 0 && (
         <section className="panel space-y-5 rounded-[var(--radius-lg)] p-5">
@@ -431,7 +436,7 @@ export function MinutaWizard({
       {step === 1 && (
         <section className="panel space-y-5 rounded-[var(--radius-lg)] p-5">
           <div>
-            <h2 className="text-lg font-semibold">Información clave</h2>
+            <h2 className="text-lg font-semibold">Qué ocurrió</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
               Escriba lo que otro abogado necesita saber mañana para seguir sin
               perder el hilo.
@@ -663,7 +668,7 @@ export function MinutaWizard({
       {step === 3 && (
         <section className="panel space-y-5 rounded-[var(--radius-lg)] p-5">
           <div>
-            <h2 className="text-lg font-semibold">Publicar y notificar</h2>
+            <h2 className="text-lg font-semibold">Revisa antes de guardar</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
               Se guarda la minuta en la causa, se registra la actividad y se
               prepara el aviso al equipo.
@@ -781,7 +786,7 @@ export function MinutaWizard({
             disabled={!canNext() || pending}
             onClick={submit}
           >
-            {pending ? "Guardando…" : "Generar minuta"}
+            {pending ? "Guardando…" : "Guardar minuta"}
           </button>
         )}
       </div>

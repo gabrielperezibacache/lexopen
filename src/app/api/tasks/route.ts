@@ -5,7 +5,7 @@ import { publicUserSelect } from "@/lib/auth/public-user";
 import { causaAccessWhere } from "@/lib/auth/causa-access";
 import { activeDelegadorIds } from "@/lib/auth/delegacion";
 import { createTask, updateTasks } from "@/lib/tasks/service";
-import { taskAccessWhere } from "@/lib/auth/causa-access";
+import { taskWorkspaceAccessWhere } from "@/lib/tasks/workspace";
 import type { Prisma } from "@prisma/client";
 
 const OPEN_STATUSES = ["todo", "in_progress", "blocked", "waiting_client"];
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
     const tasks = await prisma.task.findMany({
       where: {
         AND: [
-          taskAccessWhere(user),
+          taskWorkspaceAccessWhere(user),
           status ? { status } : {},
           open === "1" ? { status: { in: OPEN_STATUSES } } : {},
           siteId ? { siteId } : {},

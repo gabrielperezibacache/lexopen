@@ -14,6 +14,7 @@ module.exports = async function afterPack(context) {
   const desktop = path.resolve(__dirname, "..");
   copyStagedReleaseResources(path.join(desktop, ".release", "resources"), resources, path.join(desktop, "node_modules"), target);
   const verified = verifyReleaseResources(resources, path.join(resources, "app.asar.unpacked", "node_modules"), target);
+  if (!verified.altazorDesktopSourceSha256) throw new Error("Missing verified Altazor desktop source");
   const appArchive = path.join(resources, "app.asar");
   const appPackage = JSON.parse(asar.extractFile(appArchive, "package.json").toString("utf8"));
   for (const file of ["altazor-desktop-profile.cjs", "altazor-desktop-profile.json", "altazor-toolpack.cjs"]) {
@@ -24,6 +25,7 @@ module.exports = async function afterPack(context) {
   if (appPackage.version !== verified.version) throw new Error("Desktop and staged application versions differ");
   verifyCanaryAbsent(path.join(resources, "app-standalone"), process.env.LEXOPEN_RELEASE_CANARY);
   verifyCanaryAbsent(path.join(resources, "app.asar"), process.env.LEXOPEN_RELEASE_CANARY);
+  verifyCanaryAbsent(path.join(resources, "altazor-desktop-source"), process.env.LEXOPEN_RELEASE_CANARY);
   for (const file of ["host-runtime.mjs", "config.cjs", "package.json"]) if (!fs.existsSync(path.join(resources, "app.asar.unpacked", file))) throw new Error(`Missing unpacked Host runtime: ${file}`);
   const dist = context.outDir;
   const report = { format: 1, platform: target.platform, arch: target.arch, appDirectory: path.relative(dist, appDirectory).split(path.sep).join("/"), ...verified };

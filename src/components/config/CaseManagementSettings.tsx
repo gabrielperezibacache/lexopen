@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { withCsrfHeaders } from "@/lib/client-csrf";
@@ -22,8 +23,11 @@ export function CaseManagementSettings({ initialMode }: { initialMode: CaseManag
       <label><input type="radio" name="case-management-mode" value="manual" checked={mode === "manual"} onChange={() => setMode("manual")} /><span><strong>Gestión manual</strong><small>Organiza expedientes de cualquier país.</small></span></label>
       <label><input type="radio" name="case-management-mode" value="pjud_cl" checked={mode === "pjud_cl"} onChange={() => setMode("pjud_cl")} /><span><strong>Poder Judicial de Chile</strong><small>Consulta OJV, ClaveÚnica y seguimiento automático.</small></span></label>
     </fieldset>
-    <p id="case-management-description">Cambiar la modalidad conserva tus causas, documentos y conexiones. En gestión manual se pausa la actualización judicial.</p>
-    <button type="button" className="btn btn-primary" disabled={busy || mode === saved} onClick={() => void save()}>{busy ? "Guardando…" : "Guardar modalidad"}</button>
+    <p id="case-management-description">Mis Causas reúne tus expedientes. Activa la integración para consultar y actualizar causas en Chile. Al desactivarla, se pausa la actualización judicial.</p>
+    <div className="flex flex-wrap items-center gap-2">
+      <button type="button" className="btn btn-primary" disabled={busy || mode === saved} onClick={() => void save()}>{busy ? "Guardando…" : "Guardar modalidad"}</button>
+      {saved === "pjud_cl" && <Link href="/pjud" className="btn btn-ghost">Abrir herramientas PJUD</Link>}
+    </div>
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
   </section>;
 }

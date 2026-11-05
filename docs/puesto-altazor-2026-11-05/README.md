@@ -8,7 +8,7 @@ Las imágenes de esta carpeta muestran la interfaz real con una base aislada y d
 | --- | --- | --- |
 | Portada | [Ver](portada-escritorio.jpg) | [Ver](portada-movil.jpg) |
 | Ingreso | [Ver](ingreso-escritorio.jpg) | [Ver](ingreso-movil.jpg) |
-| Inicio y escritorio de Altazor | [Ver](inicio-escritorio.jpg) | [Ver](inicio-movil.jpg) |
+| Chat, avisos y escritorio de Altazor | [Ver](inicio-escritorio.jpg) | [Ver](inicio-movil.jpg) |
 | Mis Causas | [Ver](mis-causas-escritorio.jpg) | |
 | Carpeta del expediente | [Ver](expediente-escritorio.jpg) | [Ver](expediente-movil.jpg) |
 

@@ -37,13 +37,13 @@ La navegación organiza **Inicio, Causas, Agenda, Biblioteca, Académico, Client
 
 ## ALTAZOR, tu asistente
 
-Inicio y el acompañante lateral comparten **la misma conversación**. Escribe un encargo, adjunta archivos y continúa al cambiar de apartado. No hay que escoger un espacio, marcar la memoria ni configurar cada mensaje. ALTAZOR reconoce la causa cuando puede identificarla y recupera fuentes pertinentes con acceso verificado. «Conversaciones» abre el historial; «Mi asistente» reúne memoria, conexiones y computadora.
+Inicio y el acompañante lateral comparten **un solo hilo** con tus encargos, respuestas y avisos. Escribe, adjunta archivos y continúa al cambiar de apartado. Altazor reconoce la causa cuando puede identificarla y recupera intercambios pertinentes y fuentes con acceso vigente. «Mi asistente» reúne memoria, conexiones y computadora.
 
 - **Continuidad privada:** conversaciones y preferencias por usuario; contexto personal o de una causa reconocida por su referencia, enlace o expediente abierto. Si la identificación es ambigua, lo pregunta en la conversación. Los enlaces del antiguo Copiloto preparan un borrador revisable y su historial se conserva como archivo privado.
 - **Memoria con relaciones:** recuerdos confirmados y un grafo consultable; puedes corregir o retirar lo que conservas. También recupera intercambios anteriores relevantes del mismo ámbito. Una conversación antigua no se presenta como una cita verificada ni una inferencia del modelo se convierte por sí sola en un recuerdo confirmado.
 - **Herramientas del estudio:** consulta de causas y biblioteca; tareas, agenda, notas, audiencias y preparación de escritos. Guardar una respuesta con fuentes como escrito requiere confirmación y una causa accesible.
 - **Trabajo en segundo plano:** los mensajes enviados quedan guardados y el Host puede continuarlos sin su pestaña. No se repiten automáticamente operaciones interrumpidas o de resultado incierto. Un encargo que esperó más de un día pide revisión.
-- **Escritorio:** debajo del mensaje puedes ver si el escritorio está abierto, trabajando o esperando tu confirmación. La vista de Inicio es de lectura y se pausa durante el control manual. El escritorio separado acepta los archivos que elijas, incluidos PDF, Office, ODT, EPUB y audio compatible. [Herramientas y preparación](docs/ESCRITORIO-ALTAZOR.md).
+- **Escritorio:** debajo del chat puedes ver la pantalla del escritorio cuando está abierto, junto con el estado de su trabajo. La vista de Inicio es de lectura y se pausa durante el control manual. El escritorio separado acepta los archivos que elijas, incluidos PDF, Office, ODT, EPUB y audio compatible. [Herramientas y preparación](docs/ESCRITORIO-ALTAZOR.md).
 - **Conexiones y Secretos:** catálogo de servicios, permisos por operación y Secretos cifrados. El servicio de escritorio tiene sus propios requisitos de protección de credenciales. La escritura de un secreto en el escritorio usa una autorización breve y de un solo uso; no pulsa Enter ni envía el formulario.
 
 ![El mismo acompañante de ALTAZOR abierto sobre la biblioteca; borrador y datos ficticios](docs/conversation-first-2026-11-05/acompanante-biblioteca.jpg)
@@ -74,16 +74,18 @@ Los proyectos conservan su selección de fuentes. El editor tiene guardado autom
 
 Desde la conversación puedes crear el proyecto y preparar el encargo con sus fuentes; **la generación se ejecuta en Académico**. Los borradores para interacción profesional se preparan para LinkedIn, con revisión del contenido y confirmación del envío; no hay una red social interna.
 
+**Mesa de revisión** muestra pasajes sin acceso, lecturas de la matriz sin respaldo vinculado y secciones del manuscrito sin referencias a pasajes conservados. Desde los hallazgos puedes abrir las fuentes, la matriz o la propuesta para cotejar el argumento.
+
 ![Apartado Académico real, con un proyecto y material ficticio de demostración](docs/conversation-first-2026-11-05/academico-escritorio.jpg)
 
 ## Causas manuales o conectadas
 
-En **Configuración → Gestión de causas**, el administrador elige la modalidad del estudio:
+**Causas** abre siempre **Mis Causas**. Desde **Configuración → Gestión de causas**, el administrador decide si activa la integración judicial para el estudio.
 
 | Modalidad | Recorrido |
 | --- | --- |
 | **Gestión manual** | Causas de cualquier país, con referencia, órgano y materia libres. Añade resoluciones, documentos y carpetas; prepara hechos, audiencias y escritos con sus fuentes. |
-| **Poder Judicial de Chile** | Un apartado PJUD para consulta por RIT/ROL, ingreso manual con ClaveÚnica, importación y seguimiento judicial. Mantiene también el acceso a Causas manuales. |
+| **Poder Judicial de Chile** | Añade herramientas para consultar por RIT/ROL, ingresar con ClaveÚnica, importar y seguir causas. Los expedientes siguen reuniéndose en Mis Causas. |
 
 Las instalaciones nuevas empiezan en gestión manual. Cambiar la modalidad conserva causas, archivos, preferencias y conexiones. Al desactivar PJUD se pausan las consultas y descargas judiciales pendientes; el trabajo manual y Drive siguen disponibles. Reactivarlo permite retomar la cola, con un nuevo ingreso personal cuando la sesión oficial haya vencido.
 
@@ -91,9 +93,13 @@ Las instalaciones nuevas empiezan en gestión manual. Cambiar la modalidad conse
 
 ### Mis Causas
 
-Desde Causas, abre **Mis Causas** para entrar al expediente documental. Allí puedes crear carpetas, mover documentos dentro de la causa y volver al original o consultar a Altazor sobre un archivo. El orden del expediente no cambia la procedencia, las versiones ni los pasajes que respaldan citas existentes.
+Desde **Mis Causas**, abre el expediente documental de una causa. Allí puedes crear carpetas, mover documentos dentro de la causa y volver al original o consultar a Altazor sobre un archivo. El orden del expediente conserva la procedencia, las versiones y los pasajes que respaldan citas existentes.
 
 El expediente reúne cargas manuales y copias importadas de OJV o Drive. Puedes trabajar con archivos locales y, si hay una cuenta y carpeta del estudio autorizadas, conservar también el original en Drive. Los documentos de una carpeta vinculada se incorporan explícitamente o mediante la sincronización que hayas activado.
+
+### Tareas y minutas
+
+En **Tareas** puedes asignar encargos al equipo autorizado, escribir cómo resolverlos y destacar una causa para que sus pendientes suban de prioridad. El Excel reúne encargos pendientes, responsables, vencimientos, prioridades e instrucciones para compartirlo con el equipo. **Minutas** abre la selección de la causa, con acceso a los borradores recientes y las plantillas.
 
 ## Sincronización
 
@@ -107,13 +113,15 @@ La cuenta personal y la cuenta de Google del estudio son conexiones distintas. L
 
 ### OJV y ClaveÚnica
 
-Con la modalidad **Poder Judicial de Chile** activa, abre **Causas → PJUD · Chile**. Consulta por **RIT/ROL y tribunal**, o ingresa personalmente con ClaveÚnica en la ventana oficial y elige las causas que deseas incorporar. La contraseña se escribe únicamente en el portal oficial.
+Activa **Poder Judicial de Chile** desde **Configuración → Gestión de causas**. Quienes tienen acceso pueden abrir las herramientas judiciales desde **Mis Causas** y consultar por **RIT/ROL y tribunal**, o ingresar personalmente con ClaveÚnica en la ventana oficial y elegir las causas que desean incorporar. La contraseña se escribe únicamente en el portal oficial.
 
 Por causa puedes elegir seguimiento, frecuencia y descarga de documentos nuevos. La cola recorre los cuadernos disponibles, conserva originales y separa el estado de movimientos del de descargas. Si vence el ingreso judicial, los documentos pendientes esperan un nuevo inicio manual; no hay una sesión autenticada permanente ni se eluden desafíos del portal.
 
 ![Archivos conectados: Google Drive y carpetas de causas, sin cuentas reales conectadas](docs/conversation-first-2026-11-05/sincronizacion-escritorio.jpg)
 
 Los trabajos automáticos necesitan un Host disponible. OJV depende del acceso oficial, sus desafíos y la disponibilidad de cada documento. Los archivos inaccesibles y los resultados parciales se identifican. [Ingreso judicial y operación](docs/PJUD.md).
+
+Conecta tu buzón en **Configuración → Configurar correo** o desde **Mi cuenta**. Si el correo judicial identifica un RIT o ROL y su tribunal sin ambigüedad, y tienes permiso para escribir en la causa, LexOpen archiva sus adjuntos en la carpeta **Correo PJUD** del expediente. Las coincidencias dudosas quedan en la bandeja para revisión. Altazor reúne los avisos de correo y los vencimientos registrados en el mismo chat.
 
 ## Instalar
 

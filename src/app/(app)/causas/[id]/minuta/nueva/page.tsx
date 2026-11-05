@@ -10,7 +10,7 @@ import { notFound } from "next/navigation";
 
 type Params = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tipo?: string }>;
+  searchParams: Promise<{ tipo?: string; desde?: string }>;
 };
 
 export default async function NuevaMinutaPage({ params, searchParams }: Params) {
@@ -26,12 +26,12 @@ export default async function NuevaMinutaPage({ params, searchParams }: Params) 
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <Link href={`/causas/${causa.id}`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
-        ← Volver a la causa
+      <Link href={sp.desde === "minutas" ? "/minutas?nueva=1#nueva-minuta" : `/causas/${causa.id}`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] underline underline-offset-4">
+        {sp.desde === "minutas" ? "Volver a elegir causa" : "Volver a la causa"}
       </Link>
       <PageHeader
         title="Nueva minuta"
-        subtitle="Registra lo ocurrido tras una audiencia, reunión o llamada para que el equipo pueda continuar la tramitación."
+        subtitle="Completa el contexto y el resumen. Si quedaron compromisos, añádelos antes de guardar."
       />
       <MinutaWizard
         causaId={causa.id}

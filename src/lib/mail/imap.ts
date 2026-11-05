@@ -14,8 +14,28 @@ export type ImapFetchOpts = {
 
 export { IMAP_PRESETS };
 
+export function normalizeImapHost(host: string) {
+  return host.trim().toLowerCase().replace(/\.$/, "");
+}
+
+function normalizeMailboxIdentity(email: string) {
+  const trimmed = email.trim();
+  const at = trimmed.lastIndexOf("@");
+  return trimmed.slice(0, at + 1) + trimmed.slice(at + 1).toLowerCase();
+}
+
+export function sameImapDestination(
+  existing: { protocol: string; email: string | null; imapHost: string | null; imapPort: number; imapTls: boolean },
+  next: Pick<ImapFetchOpts, "host" | "port" | "tls" | "user">
+) {
+  return existing.protocol === "imap" && Boolean(existing.email && existing.imapHost &&
+    normalizeMailboxIdentity(existing.email) === normalizeMailboxIdentity(next.user) &&
+    normalizeImapHost(existing.imapHost) === normalizeImapHost(next.host) &&
+    existing.imapPort === next.port && existing.imapTls === next.tls);
+}
+
 export function assertImapHostAllowed(host: string) {
-  const trimmed = host.trim().toLowerCase();
+  const trimmed = normalizeImapHost(host);
   if (!trimmed) {
     throw Object.assign(new Error("Host IMAP requerido"), { status: 400 });
   }

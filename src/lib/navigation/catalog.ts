@@ -26,7 +26,7 @@ export type NavigationModel = {
 
 const AREAS: readonly NavigationArea[] = [
   { id: "jornada", labelKey: "nav.areas.jornada", href: "/inicio", icon: "home" },
-  { id: "causas", labelKey: "nav.areas.causas", href: "/causas", icon: "cases" },
+  { id: "causas", labelKey: "nav.areas.causas", href: "/mis-causas", icon: "cases" },
   { id: "agenda", labelKey: "nav.areas.agenda", href: "/calendario", icon: "calendar" },
   { id: "biblioteca", labelKey: "nav.areas.biblioteca", href: "/biblioteca", icon: "library" },
   { id: "academico", labelKey: "nav.academic", href: "/academico", icon: "research" },
@@ -35,7 +35,7 @@ const AREAS: readonly NavigationArea[] = [
   { id: "estudio", labelKey: "nav.areas.estudio", href: "/dashboard", icon: "studio" },
 ];
 
-type CatalogEntry = NavigationEntry & { access: "staff" | "signed-in" | "admin"; capability?: "assistant.use" };
+type CatalogEntry = NavigationEntry & { access: "staff" | "signed-in" | "admin"; capability?: "assistant.use" | "host.admin" };
 const ENTRIES: readonly CatalogEntry[] = [
   { id: "inicio", href: "/inicio", labelKey: "nav.home", icon: "home", area: "jornada", access: "staff" },
   { id: "causas", href: "/causas", labelKey: "nav.caseFiles", icon: "cases", area: "causas", access: "staff", keywords: "expediente cartera RIT ROL" },
@@ -62,8 +62,7 @@ const ENTRIES: readonly CatalogEntry[] = [
   { id: "personas", href: "/personas", labelKey: "nav.team", icon: "people", area: "estudio", groupKey: "nav.secondary.collaboration", access: "staff" },
   { id: "sites", href: "/sites", labelKey: "nav.sites", icon: "spaces", area: "estudio", groupKey: "nav.secondary.collaboration", access: "signed-in" },
   { id: "flujos", href: "/flujos", labelKey: "nav.workflows", icon: "workflows", area: "estudio", groupKey: "nav.secondary.collaboration", access: "staff" },
-  // These pages use requireRole("admin"), not the broader host.admin/audit.read capabilities.
-  { id: "configuracion", href: "/configuracion", labelKey: "nav.settings", icon: "settings", area: "estudio", groupKey: "nav.secondary.administration", access: "admin" },
+  { id: "configuracion", href: "/configuracion", labelKey: "nav.settings", icon: "settings", area: "estudio", groupKey: "nav.secondary.administration", access: "staff", capability: "host.admin" },
   { id: "integraciones", href: "/integraciones", labelKey: "nav.integrations", icon: "integrations", area: "estudio", groupKey: "nav.secondary.administration", access: "staff" },
   { id: "auditoria", href: "/auditoria", labelKey: "nav.audit", icon: "audit", area: "estudio", groupKey: "nav.secondary.administration", access: "admin" },
   { id: "buscar", href: "/buscar", labelKey: "nav.search", icon: "search", access: "signed-in" },
@@ -88,7 +87,7 @@ export function buildNavigation(subject: PermissionSubject | null | undefined, o
   if (portal) return { mode: "portal", areas: [], entries: allowed.filter(entry => entry.area), utilities, shortcuts: [] };
   return {
     mode: "staff",
-    areas: AREAS.filter(area => allowed.some(entry => entry.area === area.id)).map(area => area.id === "causas" && pjudEnabled ? { ...area, href: "/pjud" } : { ...area }),
+    areas: AREAS.filter(area => allowed.some(entry => entry.area === area.id)).map(area => ({ ...area })),
     entries: allowed.filter(entry => entry.area),
     utilities,
     shortcuts: canSome(subject, "billing.manage") ? allowed.filter(entry => entry.id === "facturacion") : [],
@@ -113,7 +112,7 @@ export function activeNavigationArea(model: NavigationModel, pathname: string): 
 }
 export function secondaryNavigation(model: NavigationModel, pathname: string): NavigationEntry[] {
   const area = activeNavigationArea(model, pathname);
-  return area ? model.entries.filter(entry => entry.area === area.id && entry.href !== area.href && !["monitoreo", "mis-causas"].includes(entry.id)) : [];
+  return area ? model.entries.filter(entry => entry.area === area.id && entry.href !== area.href && !["pjud", "monitoreo", "mis-causas"].includes(entry.id)) : [];
 }
 
 export type NavigationCrumb = { href: string; labelKey: string };
@@ -131,6 +130,10 @@ export function navigationBreadcrumbs(model: NavigationModel, pathname: string):
   const entries = navigationEntries(model);
   const home = model.mode === "portal" ? "/portal" : "/inicio";
   const crumbs: NavigationCrumb[] = [{ href: home, labelKey: model.mode === "portal" ? "nav.portal" : "nav.home" }];
+  if (path === "/configuracion/correo" && model.mode === "staff") {
+    const settings = entries.find(entry => entry.id === "configuracion");
+    return [...crumbs, settings ? { href: settings.href, labelKey: settings.labelKey } : { href: "/cuenta", labelKey: "nav.account" }, { href: path, labelKey: "mailbox.settingsTitle" }];
+  }
   if (isCaseArchive(path) && model.mode === "staff") return [...crumbs, { href: "/mis-causas", labelKey: "nav.myMatters" }, { href: path, labelKey: "nav.caseFiles" }];
   for (let index = 0; index < parts.length; index++) {
     const href = "/" + parts.slice(0, index + 1).join("/");
