@@ -81,6 +81,7 @@ export default function LandingPage() {
         <section className="edition-altazor" aria-labelledby="edition-altazor-title">
           <div className="edition-altazor-copy">
             <h2 id="edition-altazor-title" className="display">{t("landing.altazor.title")}</h2>
+            <p className="edition-altazor-tagline">{t("landing.altazor.tagline")}</p>
             <p>{t("landing.altazor.lead")}</p>
             <dl>
               {dict.landing.altazor.capabilities.map(({ title, text }) => (

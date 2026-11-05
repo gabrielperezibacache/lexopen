@@ -207,6 +207,12 @@
   line-height: 1.65;
 }
 
+.edition-altazor-copy > .edition-altazor-tagline {
+  margin-block: .75rem 0;
+  color: var(--sea);
+  font-weight: 600;
+}
+
 .edition-altazor-copy dl > div {
   padding-block: .85rem;
   border-top: 1px solid var(--line);

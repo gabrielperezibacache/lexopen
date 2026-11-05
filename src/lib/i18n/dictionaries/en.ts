@@ -355,6 +355,7 @@ export const en: Dictionary = {
     openPlatform: "Open platform",
     altazor: {
       title: "What is Altazor AI?",
+      tagline: "It’s your favorite Chungungo (because we love how curious Chungungos are)",
       lead: "Altazor AI is your personal assistant for legal and academic work. Assign a task as you would to a colleague and pick up the conversation when you need it.",
       capabilities: [
         { title: "Case files and case theory", text: "Review the files you have access to, organize facts, and compare hypotheses against the case documents." },

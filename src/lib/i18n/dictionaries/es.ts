@@ -353,6 +353,7 @@ export const es = {
     openPlatform: "Abrir plataforma",
     altazor: {
       title: "¿Qué es Altazor AI?",
+      tagline: "Es tu Chungungo favorito (porque amamos la curiosidad de los Chungungos)",
       lead: "Altazor AI es tu asistente personal para el trabajo jurídico y académico. Dale un encargo como a alguien de tu estudio y retoma la conversación cuando lo necesites.",
       capabilities: [
         { title: "Expedientes y teoría del caso", text: "Revisa las carpetas a las que tienes acceso, ordena los hechos y contrasta hipótesis con los documentos del expediente." },
