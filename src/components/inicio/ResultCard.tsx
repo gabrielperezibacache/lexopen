@@ -130,7 +130,7 @@ export function ResultCard({ item, onUndone }: { item: AssistantResultItem; onUn
       data-testid="assistant-result-card"
       className={`rounded-2xl border px-3 py-2 text-sm ${
         item.ok
-          ? "border-[var(--line)] bg-white/70"
+          ? "border-[var(--line)] bg-[var(--surface-solid)] text-[var(--ink)]"
           : "border-red-200 bg-red-50 text-red-800"
       }`}
     >

@@ -250,6 +250,7 @@ export async function runAssistantTurn(
     assistantLlmMode: policy.assistantLlmMode,
     signal: input.signal,
     expectedDestination: input.expectedDestination,
+    altazorContext: Boolean(input.chatId && input.scope && Object.prototype.hasOwnProperty.call(input.scope, "causaId")),
   });
   const classificationMeta = {
     source: classification.source,

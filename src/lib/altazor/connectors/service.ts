@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { altazorActor, altazorScopeKey } from "@/lib/altazor/access";
 import { assertCausaAccess, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { normalizeAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
-import { ConnectorError, unseal } from "@/lib/personal-connectors/core";
+import { ConnectorError, digest, unseal } from "@/lib/personal-connectors/core";
 import { assertComputerEnabled } from "../computer/policy";
 import { assertComputerPolicy } from "../computer/privacy";
 import { computerOperationHash } from "../computer/operation-hash";
@@ -47,8 +47,9 @@ export async function connectorInventory(user: Actor, workspaceId: string) {
 }
 function receipt(row: { id: string; status: string; createdAt: Date }) { return { id: row.id, status: row.status === "sending" && Date.now() - row.createdAt.getTime() > 60_000 ? "unknown" : row.status }; }
 
-async function mutation(user: Actor, workspaceId: string, requestId: string, kind: string, input: unknown, run: (client: KittiesGateway) => Promise<Record<string, unknown>>, cleanup = false, preflight?: (client: KittiesGateway) => Promise<void>) {
+async function mutation(user: Actor, workspaceId: string, requestId: string, kind: string, input: unknown, run: (client: KittiesGateway) => Promise<Record<string, unknown>>, cleanup = false, preflight?: (client: KittiesGateway) => Promise<void>, expectedWorkspace?: AltazorComputerWorkspace) {
   const { actor, workspace } = await access(user, workspaceId);
+  if (expectedWorkspace && (workspace.id !== expectedWorkspace.id || workspace.ownerId !== expectedWorkspace.ownerId || workspace.scopeKey !== expectedWorkspace.scopeKey || workspace.causaId !== expectedWorkspace.causaId || workspace.endpoint !== expectedWorkspace.endpoint || workspace.credentialEnc !== expectedWorkspace.credentialEnc || workspace.providerName !== expectedWorkspace.providerName)) throw new ConnectorError("workspace_changed", "El destino autorizado cambió. Inicie una conexión nueva antes de enviar credenciales.", 409);
   if (!cleanup) await policy();
   const inputHash = computerOperationHash(actor.id, workspaceId, `connector:${kind}`, input);
   const previous = await prisma.altazorConnectorOperation.findUnique({ where: { ownerId_requestId: { ownerId: actor.id, requestId } } });
@@ -62,8 +63,14 @@ async function mutation(user: Actor, workspaceId: string, requestId: string, kin
     await current(user, workspace, tx); if (!cleanup) await policy(tx);
     const locked = await tx.altazorComputerWorkspace.updateMany({ where: { id: workspaceId, ownerId: actor.id, credentialEnc: workspace.credentialEnc, enabled: true }, data: { updatedAt: workspace.updatedAt } });
     if (!locked.count) throw new ConnectorError("workspace_changed", "La configuración cambió. Actualice el espacio.", 409);
-    if (await tx.altazorComputerSession.count({ where: { workspaceId, ownerId: actor.id, state: { in: ["creating", "starting", "ready", "unknown"] }, expiresAt: { gt: new Date() } } })) throw new ConnectorError("sessions_active", "Cierre el escritorio activo antes de cambiar una conexión.", 409);
+    if (await tx.altazorComputerSession.count({ where: { workspaceId, ownerId: actor.id, state: { in: ["creating", "starting", "ready", "unknown"] } } })) throw new ConnectorError("sessions_active", "Detenga expresamente el escritorio antes de cambiar una conexión, aunque haya vencido su acceso.", 409);
     if (await tx.altazorConnectorOperation.count({ where: { workspaceId, ownerId: actor.id, status: { in: ["sending", "unknown"] } } })) throw new ConnectorError("connector_operation_pending", "Revise la operación anterior antes de cambiar conexiones.", 409);
+    // Changing a native connection in advanced settings invalidates its old OAuth
+    // proof before the external write, including when its outcome is uncertain.
+    const name = input && typeof input === "object" && "name" in input ? String(input.name) : "";
+    if (["configure", "remove"].includes(kind)) for (const provider of ["google", "github"]) {
+      if (name === `altazor-${provider}-${digest(`${actor.id}:${workspaceId}`).slice(0, 16)}`) await tx.personalConnectorAccount.updateMany({ where: { ownerId: actor.id, provider: `altazor-desktop:${workspaceId}:${provider}` }, data: { status: "reconnect_required", lastVerifiedAt: null, credentialsEnc: null } });
+    }
     return tx.altazorConnectorOperation.create({ data: { ownerId: actor.id, workspaceId, requestId, kind, inputHash } });
   });
   try {
@@ -77,7 +84,7 @@ async function mutation(user: Actor, workspaceId: string, requestId: string, kin
     throw error;
   }
 }
-export async function configureConnector(user: Actor, workspaceId: string, requestId: string, name: string, value: ConnectorConfiguration) {
+export async function configureConnector(user: Actor, workspaceId: string, requestId: string, name: string, value: ConnectorConfiguration, expectedWorkspace?: AltazorComputerWorkspace) {
   connectorNameSchema.parse(name); const config = validateConnectorConfiguration(value);
   return mutation(user, workspaceId, requestId, "configure", { name, config }, async client => {
     await client.setConnector(name, config); return {};
@@ -88,7 +95,7 @@ export async function configureConnector(user: Actor, workspaceId: string, reque
     if (Object.keys(config.settings).some(name => !available.fields.some(field => field.name === name))) throw new ConnectorError("connector_fields_unavailable", "El gateway no ofrece todos los campos de esta configuración.", 409);
     const old = before.connections.find(row => row.name === name);
     if (old && old.kind !== config.kind) throw new ConnectorError("connector_kind_changed", "Quite la conexión existente antes de cambiar su servicio.", 409);
-  });
+  }, expectedWorkspace);
 }
 export async function removeConnector(user: Actor, workspaceId: string, requestId: string, name: string) {
   connectorNameSchema.parse(name);

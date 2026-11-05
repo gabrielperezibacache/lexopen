@@ -163,6 +163,13 @@ const RULES: Rule[] = [
 
 const COMPOUND_HINT = /\by\b|;|\n/;
 
+/** A complete, affirmative read command; never infer a write or an extra action. */
+export function explicitDesktopListing(normalized: NormalizedAssistantInput): AssistantIntent | undefined {
+  const text = normalizeSearch(normalized.text).replace(/^[¿¡\s]+|[?!\.\s]+$/g, "");
+  const match = /^(?:(?:por favor[,\s]+|solo\s*|solamente\s+|unicamente\s+|puedes\s+|podrias\s+))*(?:muestrame|muestra|mostrar|ensename|ensena|lista|listar|consulta|consultar|ver|quiero ver|deseo ver)\s+(?:(?:los|mis)\s+)?(?:escritorios|computadores)((?:\s+(?:activos|abiertos|disponibles)|\s+de\s+(?:altazor(?:\s+ai)?|lexopen)|\s+(?:de|en)\s+(?:este\s+(?:espacio|ambito)|esta\s+causa|mi\s+(?:espacio|cuenta)))*)(?:,?\s+por favor)?$/.exec(text);
+  return match ? { toolId: "escritorio.listar", confidence: 1, slots: {} } : undefined;
+}
+
 function buildDefaultSlots(
   toolId: AssistantIntentId,
   normalized: NormalizedAssistantInput
@@ -194,8 +201,9 @@ export function ruleClassify(
   normalized: NormalizedAssistantInput
 ): RuleClassifyResult {
   const flat = normalizeSearch(normalized.text);
+  const desktopRead = explicitDesktopListing(normalized);
+  if (desktopRead) return { intents: [desktopRead] };
   if (/\b(encarga|encargar|delega|delegar|envia|enviar)\b[^.]{0,100}\b(escritorio|computador)\b/.test(flat)) return { intents: [{ toolId: "escritorio.encargar", confidence: 0.95, slots: { texto: normalized.text } }] };
-  if (/\b(lista|listar|muestra|mostrar|consulta|consultar)\b[^.]{0,70}\b(escritorios|computadores)\b/.test(flat)) return { intents: [{ toolId: "escritorio.listar", confidence: 0.95, slots: {} }] };
   const matched: AssistantIntent[] = [];
 
   for (const rule of RULES) {

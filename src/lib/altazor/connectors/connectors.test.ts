@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { CONNECTOR_CATALOG } from "./catalog";
 import { normalizeConnectorNames, projectConnectorSettings, validateConnectorConfiguration } from "./policy";
 import { KittiesGateway } from "../computer/gateway";
+import { connectorFieldPresentation } from "./presentation";
 
 const endpoint = "http://127.0.0.1:55444", token = "fictitious-gateway-authorization-for-tests";
 const catalog = CONNECTOR_CATALOG.map(kind => ({ name: kind.id, fields: kind.fieldNames.map(name => ({ name, label: name, secret: /token|secret|password/.test(name), required: false })) }));
@@ -41,6 +42,20 @@ test("only pinned configuration fields are accepted and Host programs are blocke
   assert.throws(() => validateConnectorConfiguration({ kind: "shell", settings: { command: "/bin/echo" } }));
   assert.throws(() => validateConnectorConfiguration({ kind: "github", settings: { token: "x".repeat(6001) } }));
   assert.throws(() => validateConnectorConfiguration({ kind: "github", settings: { token: "x" }, rawProxy: "/exec" }));
+});
+test("Google accepts a temporary read-only token without an OAuth app and projects metadata only", () => {
+  const value = validateConnectorConfiguration({ kind: "google-workspace", settings: { token: "fictitious-google-token-never-projected" } });
+  assert.equal(value.kind, "google-workspace");
+  const projected = projectConnectorSettings({ connector_catalog: catalog, connectors: [{ name: "google-lectura", kind: "google-workspace", signed_in: false, needs_sign_in: false, settings: { token: value.settings.token }, secrets_set: ["token"], token_set: true, auth: "token" }] });
+  const connection = projected.connections[0];
+  assert.equal(connection.configured, true); assert.equal(connection.needsSignIn, false); assert.equal(connection.ownAppConfigured, false); assert.equal(connection.signedIn, false); assert.equal(connection.auth, "token"); assert.deepEqual(connection.secretFields, ["token"]);
+  assert.equal(JSON.stringify(projected).includes(value.settings.token), false);
+  const field = projected.catalog.find(kind => kind.id === "google-workspace")?.fields.find(field => field.name === "token");
+  assert.equal(field?.secret, true);
+  assert.match(connectorFieldPresentation("google-workspace", field!).help!, /drive.metadata.readonly/);
+  assert.equal(connectorFieldPresentation("google-workspace", field!).help!.includes("gmail.metadata"), false);
+  const oldCatalog = catalog.map(kind => kind.name === "google-workspace" ? { ...kind, fields: kind.fields.filter(field => field.name !== "token") } : kind);
+  assert.equal(projectConnectorSettings({ connector_catalog: oldCatalog, connectors: [] }).catalog.find(kind => kind.id === "google-workspace")?.fields.some(field => field.name === "token"), false);
 });
 test("connector methods use official fixed paths and project every settings response", async () => {
   const seen: string[] = [];

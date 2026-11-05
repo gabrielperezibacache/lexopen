@@ -413,6 +413,7 @@ export const CONNECTOR_CATALOG = [
     "platform": "gateway",
     "oauth": "google",
     "fieldNames": [
+      "token",
       "client_id",
       "client_secret"
     ],

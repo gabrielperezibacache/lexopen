@@ -6,7 +6,7 @@ import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { digest, seal } from "@/lib/personal-connectors/core";
 import { runAssistantTurn } from "../pipeline";
 import { authorizeCommittedResult } from "../secure-tool";
-import { cancelAltazorTurn, confirmAltazorTurn, readAltazorConversation } from "@/lib/altazor/conversations";
+import { cancelAltazorTurn, confirmAltazorTurn, readAltazorConversation, patchAltazorConversation, createAltazorTurn, executeAltazorTurn } from "@/lib/altazor/conversations";
 import { storePlan } from "../plan-store";
 import { escritorioEncargarTool, escritorioListarTool } from "./escritorio";
 import type { ToolContext } from "../types";
@@ -83,6 +83,18 @@ async function main() {
     await cancelAltazorTurn(conversation.id,cancelledTurn.id,owner,prisma);
     const cancelled=await readAltazorConversation(conversation.id,owner,prisma,{},options);assert.equal(cancelled.turns[1].status,"cancelled");assert.equal(cancelled.turns[1].plan,null);assert.equal(cancelled.turns[0].status,"completed");
     await assert.rejects(confirmAltazorTurn(conversation.id,cancelledTurn.id,true,owner,prisma,options),denied);assert.equal(payloads.length,1);
+    await patchAltazorConversation(conversation.id,{status:"archived",expectedRevision:cancelled.conversation.revision},owner,prisma);
+    const archived=await readAltazorConversation(conversation.id,owner,prisma,{},options);
+    assert.equal(archived.conversation.status,"archived");assert.equal(archived.turns[0].status,"completed");assert.equal(archived.turns[0].errorCode,null);assert.equal(archived.turns[0].results[0].result.card?.id,sessions[0].id);
+    assert.equal(archived.turns[1].status,"cancelled");assert.equal(archived.turns[1].userText,text);
+    const beforeArchivedActions=network;
+    await assert.rejects(Promise.resolve(escritorioEncargarTool.preview(input,ctx)),denied);
+    await assert.rejects(escritorioEncargarTool.execute(input,authorized),denied);
+    await assert.rejects(escritorioListarTool.execute({},ctx),denied);
+    await assert.rejects(createAltazorTurn(conversation.id,{requestId:`archived-${prefix}`,expectedRevision:archived.conversation.revision,text,destinationKey:"a".repeat(64)},owner,prisma,options),denied);
+    await assert.rejects(executeAltazorTurn(conversation.id,nativeTurn.id,owner,prisma,options),denied);
+    await assert.rejects(confirmAltazorTurn(conversation.id,nativeTurn.id,true,owner,prisma,options),denied);
+    assert.equal(network,beforeArchivedActions);assert.equal(payloads.length,1);
     await prisma.user.update({where:{id:owner.id},data:{capabilityRevokes:"assistant.use"}});
     const beforeDenied=network;await assert.rejects(escritorioEncargarTool.execute(input,authorized),denied);assert.equal(network,beforeDenied);
     await prisma.user.update({where:{id:owner.id},data:{capabilityRevokes:""}});
@@ -94,7 +106,7 @@ async function main() {
     await prisma.assistantPlanRecord.update({where:{id:planId},data:{expiresAt:new Date(0)}});
     await authorizeCommittedResult("escritorio.encargar",input,result,ctx,prisma);
     const historical=await readAltazorConversation(conversation.id,owner,prisma,{},options);assert.equal(historical.turns[0].status,"completed");assert.equal(historical.turns[0].results[0].result.card?.id,sessions[0].id);assert.equal(historical.turns[1].status,"cancelled");assert.equal(historical.turns[1].userText,text);
-    console.log("Desktop orchestration integration PASS: native conversation reader exposes the complete pending preview; real confirmAltazorTurn sends once and renders the desktop result card; current scope/ACL, changed-input denial, no context/file/secret transfer, dependent history, cancellation and historical cards after desktop/plan expiry.");
+    console.log("Desktop orchestration integration PASS: native reader exposes the complete preview and confirmed result; archived history remains readable while new plans, preview, execution and confirmation are denied; current ACL, one send, no context/file/secret transfer, cancellation and historical cards after desktop/plan expiry.");
   } finally {
     globalThis.fetch=beforeFetch;
     await prisma.altazorComputerAction.deleteMany({where:{ownerId:{in:userIds}}});await prisma.altazorComputerSession.deleteMany({where:{ownerId:{in:userIds}}});await prisma.altazorComputerWorkspace.deleteMany({where:{id:{in:workspaceIds}}});

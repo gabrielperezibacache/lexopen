@@ -10,11 +10,11 @@ import { normalizeConnectorNames } from "@/lib/altazor/connectors/policy";
 import type { ToolContext } from "../types";
 
 type Client = Prisma.TransactionClient;
-export async function desktopScope(ctx: ToolContext, db: Client = prisma) {
+export async function desktopScope(ctx: ToolContext, db: Client = prisma, historical = false) {
   ctx.signal?.throwIfAborted();
   if (!ctx.scope || !ctx.chatId || !Object.prototype.hasOwnProperty.call(ctx.scope, "causaId")) throw httpError("Use esta herramienta desde una conversación de ALTAZOR con su ámbito seleccionado.", 409);
   const actor = await altazorActor({ ...ctx, id: ctx.userId }, db), causaId = ctx.scope.causaId;
-  const conversation = await db.altazorConversation.findFirst({ where: { id: ctx.chatId, ownerId: actor.id, causaId, scopeKey: altazorScopeKey(causaId), status: "active" }, select: { id: true } });
+  const conversation = await db.altazorConversation.findFirst({ where: { id: ctx.chatId, ownerId: actor.id, causaId, scopeKey: altazorScopeKey(causaId), status: historical ? { in: ["active", "archived"] } : "active" }, select: { id: true } });
   if (!conversation) throw httpError("La conversación no pertenece a este ámbito actual.", 404);
   if (causaId) await assertCausaAccess(causaId, actor, { auditOverride: false }, db);
   return { actor, causaId, scopeKey: altazorScopeKey(causaId), conversationId: conversation.id };
@@ -26,7 +26,7 @@ export function desktopConnectorNames(value: string) {
   const names = normalizeConnectorNames(raw.length ? raw : ["-"]); return names[0] === "-" ? [] : names;
 }
 export async function desktopSession(ctx: ToolContext, sessionId: string, live: boolean, db: Client = prisma) {
-  const scope = await desktopScope(ctx, db);
+  const scope = await desktopScope(ctx, db, !live);
   const session = await db.altazorComputerSession.findFirst({ where: { id: sessionId, ownerId: scope.actor.id }, select: {
     id: true, state: true, expiresAt: true, held: true, updatedAt: true, connectorNamesJson: true, kittyId: true, chatId: true,
     workspace: { select: { id: true, ownerId: true, causaId: true, scopeKey: true, enabled: true, providerName: true } },
@@ -50,7 +50,7 @@ export async function listDesktopSessions(ctx: ToolContext, db: Client = prisma)
 }
 /** Called by the planner and history reader as well as direct tool entry points. */
 export async function assertDesktopToolInputAccess(id: string, input: Record<string, unknown>, ctx: ToolContext, write: boolean, db: Client = prisma) {
-  if (id === "escritorio.listar") { await desktopScope(ctx, db); return; }
+  if (id === "escritorio.listar") { await desktopScope(ctx, db, !write); return; }
   if (typeof input.sessionId !== "string" || !input.sessionId) throw httpError("Seleccione un escritorio existente para el encargo.", 409);
   await desktopSession(ctx, input.sessionId, write, db);
 }

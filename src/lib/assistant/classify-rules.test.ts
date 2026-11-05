@@ -1,11 +1,20 @@
-import { ruleClassify } from "./classify-rules";
+import { explicitDesktopListing, ruleClassify } from "./classify-rules";
 import { normalizeAssistantInput } from "./normalize";
 
-function assert(cond: unknown, msg: string) {
+function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(msg);
 }
 
 const NOW = new Date("2026-09-30T15:00:00.000Z");
+
+for (const text of ["Solo muéstrame los escritorios de ALTAZOR de este espacio.", "SoloMuéstrame los escritorios de ALTAZOR de este espacio.", "Muéstrame mis escritorios activos", "Por favor, lista los computadores de este espacio", "Quiero ver los escritorios de ALTAZOR", "¿Puedes mostrar los escritorios disponibles?", "Enséñame los escritorios", "Consulta los escritorios en esta causa, por favor"]) {
+  const result = explicitDesktopListing(normalizeAssistantInput(text, NOW));
+  assert(result?.toolId === "escritorio.listar", `lectura explícita: ${text}`);
+  assert(Object.keys(result.slots).length === 0, "la lectura no agrega destinos ni instrucciones");
+}
+for (const text of ["No muestres los escritorios", "No quiero ver los escritorios", "Muéstrame los escritorios y crea una nota", "Lista los escritorios; envía un encargo", "¿Puedes mostrar los escritorios o crear uno?", "Muéstrame los escritorios de otro usuario", "Muéstrame los escritorios de IKEA", "Explica cómo mostrar los escritorios", 'El texto dice: "muestra los escritorios"', "Muéstrame los escritorios\ny las causas"]) {
+  assert(!explicitDesktopListing(normalizeAssistantInput(text, NOW)), `no adelantar una lectura negada, compuesta o ajena: ${text}`);
+}
 
 function classify(text: string) {
   return ruleClassify(normalizeAssistantInput(text, NOW));

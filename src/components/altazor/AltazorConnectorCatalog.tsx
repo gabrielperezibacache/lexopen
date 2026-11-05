@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarDays, CheckCircle2, Code2, CreditCard, FileBox, Globe, Home, Link2, MessageSquare, Music2, Paintbrush, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
@@ -9,6 +9,7 @@ import { CONNECTOR_CATALOG } from "@/lib/altazor/connectors/catalog";
 import { connectorFieldPresentation } from "@/lib/altazor/connectors/presentation";
 import type { ConnectorCatalogEntry, ConnectorConnection, ConnectorInventory } from "@/lib/altazor/connectors/types";
 import type { ComputerStatus } from "@/lib/altazor/computer/types";
+import { EasyConnectorOAuth } from "./EasyConnectorOAuth";
 import styles from "./AltazorConnectorCatalog.module.css";
 
 const categories = [
@@ -18,6 +19,7 @@ type Inventory = ConnectorInventory & { operations?: { id: string; kind: string;
 type MutationReply = { inventory?: Inventory; operation?: { status: string }; oauth?: { url: string; redirect: string }; test?: { ok: boolean; tested: boolean } };
 const api = "/api/altazor/connectors";
 const withoutRuntime: ConnectorCatalogEntry[] = CONNECTOR_CATALOG.map(entry => ({ ...entry, fields: [], available: false, oauthReady: false }));
+function AdvancedOptions({ enabled, children }: { enabled: boolean; children: ReactNode }) { return enabled ? <details className={styles.setup}><summary>Opciones avanzadas</summary>{children}</details> : <>{children}</>; }
 
 export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }) {
   const uid = useId(), formRef = useRef<HTMLFormElement>(null), requestKey = useRef(operationKey());
@@ -36,11 +38,13 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
     const result = await response.json(); if (!response.ok) throw new Error(result.error || "No se pudieron comprobar las conexiones.");
     setInventory(result.connectors);
   }, [causaId]);
-  useEffect(() => { let active = true; queueMicrotask(() => { if (active) void load().catch(cause => { if (active) setError(cause.message); }).finally(() => { if (active) setLoading(false); }); }); return () => { active = false; }; }, [load]);
+  useEffect(() => { let active = true; queueMicrotask(() => { if (active) { const params = new URLSearchParams(location.search), provider = params.get("oauthProvider"); if (params.has("oauthAttempt") && ["google", "github"].includes(provider || "")) setSelected(provider === "google" ? "google-workspace" : "github"); void load().catch(cause => { if (active) setError(cause.message); }).finally(() => { if (active) setLoading(false); }); } }); return () => { active = false; }; }, [load]);
   const catalog = inventory?.catalog || withoutRuntime;
   const entry = catalog.find(item => item.id === selected);
+  const easyProvider = entry?.id === "google-workspace" ? "google" : entry?.id === "github" ? "github" : null;
+  const activeSession = Boolean(computer?.sessions.some(session => session.requiresStop || ["creating", "starting", "ready", "unknown"].includes(session.state)));
   const filtered = catalog.filter(item => (category === "all" || item.category === category) && `${item.label} ${item.description}`.toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es").trim()));
-  const canConfigure = Boolean(computer?.configured && inventory && computer.policyAllowed && !computer.sessions.some(session => ["creating", "starting", "ready", "unknown"].includes(session.state)));
+  const canConfigure = Boolean(computer?.configured && inventory && computer.policyAllowed && !activeSession);
   function select(item: ConnectorCatalogEntry, existing: ConnectorConnection | null = null) {
     setSelected(item.id); setConnection(existing); setName(existing?.name || item.id); setAuthUrl(""); setNotice(""); setError(""); setRemoveConfirmed(false); requestKey.current = operationKey(); formRef.current?.reset();
   }
@@ -67,6 +71,7 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
   async function test() { if (!connection) return; const result = await mutate(`/${encodeURIComponent(connection.name)}/test`, {}); if (result) { setNotice(result.test?.ok && result.test.tested ? "El servicio confirmó la prueba de acceso." : result.test?.tested ? "La prueba no confirmó el acceso. Revise las credenciales y permisos." : "Este servicio no ofrece prueba automática. Compruebe su configuración antes de usarlo."); await load().catch(() => {}); } }
   async function oauth() { if (!connection) return; const result = await mutate(`/${encodeURIComponent(connection.name)}/oauth`, { requestId: requestKey.current }); if (result?.oauth?.url) { setAuthUrl(result.oauth.url); requestKey.current = operationKey(); setNotice("Continúe en la página oficial y vuelva aquí para comprobar el acceso."); } }
   async function remove() { if (!connection || !removeConfirmed) return; const result = await mutate(`/${encodeURIComponent(connection.name)}`, { requestId: requestKey.current }, "DELETE"); if (result?.operation?.status === "completed") { setConnection(null); setRemoveConfirmed(false); requestKey.current = operationKey(); setNotice("Se retiró la conexión del gateway. Puede revocar también el permiso en la aplicación de origen."); } }
+  async function disconnectEasy(connectionName: string, requestId: string) { const result = await mutate(`/${encodeURIComponent(connectionName)}`, { requestId }, "DELETE"); if (result?.operation?.status !== "completed") return false; setConnection(previous => previous?.name === connectionName ? null : previous); return true; }
   return <section className={styles.catalog} aria-labelledby={`${uid}-heading`} data-testid="altazor-connector-catalog">
     <header className={styles.heading}><div><h2 id={`${uid}-heading`}>Su mesa de conexiones</h2><p>Elija las aplicaciones de su trabajo y decida cuándo puede usarlas ALTAZOR.</p></div><Link2 size={25} aria-hidden="true" /></header>
     <div className={styles.boundary}><ShieldCheck size={22} aria-hidden="true" /><div><p>Las cuentas se conectan al escritorio privado de este espacio. Cada sesión recibe sólo las aplicaciones que usted elija; sus acciones requieren una decisión de uso.</p><p>Sus accesos de <Link href="/cuenta#codex">ChatGPT / Codex</Link>, <Link href="/correo">Correo</Link> y <Link href="/integraciones">Google del estudio</Link> se administran en sus apartados.</p></div></div>
@@ -75,7 +80,10 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
     {inventory?.operations?.map(operation => <div key={operation.id} className={styles.pending}><p>Hay un cambio de conexión sin confirmar. Revise el estado de la aplicación; reconocerlo aquí no repite ni confirma su resultado.</p><button type="button" disabled={busy} onClick={async () => { const result = await mutate(`/operations/${encodeURIComponent(operation.id)}`, {}); if (result) { await load().catch(() => {}); setNotice("Revisión registrada. La operación anterior no se reenvió."); } }}>Revisé el estado; continuar sin repetir</button></div>)}
     {entry ? <div className={styles.detail}>
       <button type="button" disabled={busy} onClick={() => { setSelected(""); setConnection(null); setAuthUrl(""); }}><ArrowLeft size={16} aria-hidden="true" />Todas las aplicaciones</button>
-      <div className={styles.detailHeading}><h3>{entry.label}</h3><p>{entry.description}</p></div>
+      <div className={styles.detailHeading}><h3>{entry.label}</h3><p>{easyProvider ? "Ingreso personal con permisos de lectura." : entry.description}</p></div>
+      {easyProvider && <EasyConnectorOAuth key={`${computer?.workspaceId || "unavailable"}:${easyProvider}`} provider={easyProvider} workspaceId={computer?.workspaceId || null} causaId={causaId} hasActiveSession={activeSession} busy={busy} onBusyChange={setBusy} onDisconnect={disconnectEasy} />}
+      <AdvancedOptions enabled={Boolean(easyProvider)}>
+      {entry.fields.some(field => field.name === "token") && ["github", "google-workspace"].includes(entry.id) && <div className={styles.setup}><h4>Probar con permisos de lectura</h4>{entry.id === "google-workspace" ? <><p>En OAuth Playground, elija acceso Online y autorice únicamente <code>https://www.googleapis.com/auth/drive.metadata.readonly</code>. Inicie sesión personalmente, intercambie el código y pegue sólo el access token en el campo reservado de abajo. No necesita completar los campos de una aplicación OAuth para esta modalidad.</p><a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener noreferrer">Abrir OAuth Playground de Google <ArrowUpRight size={15} aria-hidden="true" /></a></> : <><p>Cree personalmente un token fine-grained con caducidad de un día, acceso sólo al repositorio que elija y permiso Contents de lectura. Péguelo en el campo reservado de abajo. No necesita completar los campos de una aplicación OAuth para esta modalidad.</p><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">Crear token limitado en GitHub <ArrowUpRight size={15} aria-hidden="true" /></a></>}<p>Guarde la conexión y pulse Probar acceso. Un inicio de sesión en el navegador no configura por sí solo este conector. Introduzca las credenciales únicamente en el proveedor o en el formulario reservado; no las envíe al chat.</p></div>}
       {entry.id === "slack" && <div className={styles.setup}><h4>Elija cómo conectar Slack</h4><ul><li><strong>Webhook:</strong> pegue su dirección para el canal al que enviará mensajes.</li><li><strong>Bot:</strong> introduzca el token del bot y el canal de destino.</li><li><strong>Inicio de sesión:</strong> registre su propia aplicación Slack, introduzca su identificador y secreto, y elija un canal. Después de guardar podrá iniciar sesión.</li></ul><p>Complete sólo los campos de la modalidad elegida. Los campos individuales se marcan según lo declarado por el servicio.</p></div>}
       {entry.platform === "macos-host" && <p className={styles.setup}>Requiere un gateway instalado en macOS, la aplicación correspondiente y sus permisos del sistema.</p>}
       {entry.blockedReason && <p className={styles.setup}>{entry.blockedReason}</p>}
@@ -87,6 +95,7 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
         <button className={styles.primary} type="submit" disabled={busy || !canConfigure}>Guardar conexión</button>
       </form> : !entry.blockedReason && <p>Los campos de configuración aparecerán cuando su gateway dedicado confirme esta integración.</p>}
       {connection && <div className={styles.connectionActions}><div className={styles.actions}><button type="button" disabled={busy || !canConfigure} onClick={test}>Probar acceso</button>{entry.oauth && <button type="button" disabled={busy || !canConfigure || !(entry.oauthReady || connection.ownAppConfigured)} onClick={oauth}>Iniciar sesión en {entry.label}</button>}</div>{entry.oauth && !(entry.oauthReady || connection.ownAppConfigured) && <p>Para iniciar sesión, registre una aplicación en este servicio y guarde su identificador de cliente y su secreto. Las cuentas personales no autorizan el acceso automáticamente.</p>}{authUrl && <a href={authUrl} target="_blank" rel="noopener noreferrer">Continuar en la página oficial <ArrowUpRight size={15} aria-hidden="true" /></a>}<label className={styles.check}><input type="checkbox" disabled={busy || !canConfigure} checked={removeConfirmed} onChange={event => { setRemoveConfirmed(event.target.checked); requestKey.current = operationKey(); }} />Deseo retirar esta conexión del escritorio.</label><button type="button" disabled={busy || !canConfigure || !removeConfirmed} onClick={remove}>Retirar conexión</button></div>}
+      </AdvancedOptions>
     </div> : <>
       <div className={styles.search}><Search size={18} aria-hidden="true" /><label className="sr-only" htmlFor={`${uid}-search`}>Buscar aplicaciones</label><input id={`${uid}-search`} value={query} type="search" placeholder="Buscar correo, GitHub, calendario…" onChange={event => setQuery(event.target.value)} /></div>
       <nav className={styles.categories} aria-label="Categorías de aplicaciones">{categories.filter(item => item.id === "all" || catalog.some(entry => entry.category === item.id)).map(item => <button type="button" key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</nav>

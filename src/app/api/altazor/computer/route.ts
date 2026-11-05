@@ -12,7 +12,11 @@ const schema = z.discriminatedUnion("action", [
 ]);
 export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
-  try { const actor = await computerActor(request), causaId = request.nextUrl.searchParams.get("causaId"); if (causaId && causaId.length > 100) throw new ConnectorError("scope_invalid", "Ámbito inválido."); return NextResponse.json({ computer: await computerStatus(actor, causaId, localSetupAllowed(request)) }, { headers: privateHeaders }); }
+  try {
+    const actor = await computerActor(request), causaId = request.nextUrl.searchParams.get("causaId"), sessionId = request.nextUrl.searchParams.get("sessionId");
+    if (causaId && causaId.length > 100 || sessionId !== null && !/^[A-Za-z0-9_-]{1,100}$/.test(sessionId)) throw new ConnectorError("scope_invalid", "Ámbito o sesión inválidos.");
+    return NextResponse.json({ computer: await computerStatus(actor, causaId, localSetupAllowed(request), sessionId) }, { headers: privateHeaders });
+  }
   catch (error) { return computerFailure(error); }
 }
 export async function POST(request: NextRequest) {
