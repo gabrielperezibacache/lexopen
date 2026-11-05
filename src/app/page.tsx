@@ -70,17 +70,6 @@ export default function LandingPage() {
             })}
           </ul>
         </section>
-
-        <section className="edition-matter" aria-labelledby="edition-matter-title">
-          <div>
-            <h2 id="edition-matter-title" className="display">{t("landing.matterLabel")}</h2>
-            <p className="edition-matter-name">Andes · C-4521-2025</p>
-            <p>{t("landing.matterMeta")}</p>
-          </div>
-          <ul>
-            {dict.landing.bullets.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        </section>
       </main>
     </div>
   );

@@ -45,6 +45,5 @@ for (const k of enKeys) {
 }
 
 assert.equal(esDict.landing.modules.length, enDict.landing.modules.length);
-assert.equal(esDict.landing.bullets.length, enDict.landing.bullets.length);
 
 console.log("i18n/i18n.test.ts OK");

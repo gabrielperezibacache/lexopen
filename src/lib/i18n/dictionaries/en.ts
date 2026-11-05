@@ -341,14 +341,6 @@ export const en: Dictionary = {
     lead:
       "Keep your documents, deadlines and sources together, from case file to final draft. Manage matters manually or connect them to the Chilean judiciary.",
     openPlatform: "Open platform",
-    matterLabel: "Matter workspace",
-    matterMeta: "Demonstration case file",
-    bullets: [
-      "Case documents and version history",
-      "Timeline, deadlines and facts",
-      "Hearing notes and drafts",
-      "Sources you can review from the case file",
-    ],
     modulesTitle: "HighQ modules + Chile layer",
     modules: [
       { title: "Matters", text: "Case files, documents and deadlines" },

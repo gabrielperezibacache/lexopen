@@ -109,8 +109,7 @@
   width: min(100%, 32rem);
 }
 
-.edition-index,
-.edition-matter {
+.edition-index {
   display: grid;
   grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
   gap: clamp(1.5rem, 5vw, 4.5rem);
@@ -118,14 +117,12 @@
   border-top: 1px solid var(--line);
 }
 
-.edition-index h2,
-.edition-matter h2 {
+.edition-index h2 {
   font-size: clamp(1.75rem, 3vw, 2.25rem);
   line-height: 1.13;
 }
 
-.edition-index-copy p,
-.edition-matter p {
+.edition-index-copy p {
   margin-top: .75rem;
   color: var(--ink-soft);
   line-height: 1.7;
@@ -161,24 +158,6 @@
   line-height: 1.55;
 }
 
-.edition-matter ul {
-  display: grid;
-  align-content: start;
-  list-style: disc outside;
-  gap: .625rem;
-  padding-inline-start: 1.125rem;
-  color: var(--ink-soft);
-}
-
-.edition-matter ul li::marker {
-  color: var(--sea);
-}
-
-.edition-matter .edition-matter-name {
-  color: var(--ink);
-  font-weight: 600;
-}
-
 @media (max-width: 640px) {
   .edition-width {
     width: calc(100% - 2rem);
@@ -208,7 +187,7 @@
     padding-inline: .625rem;
   }
 
-  .edition-hero, .edition-index, .edition-matter {
+  .edition-hero, .edition-index {
     grid-template-columns: minmax(0, 1fr);
   }
 

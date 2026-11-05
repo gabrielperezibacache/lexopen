@@ -339,14 +339,6 @@ export const es = {
     lead:
       "Del expediente al escrito, conserva tus documentos, plazos y fuentes en un mismo lugar. Organiza causas manualmente o conéctalas con el Poder Judicial de Chile.",
     openPlatform: "Abrir plataforma",
-    matterLabel: "Espacio de causa",
-    matterMeta: "Expediente de demostración",
-    bullets: [
-      "Documentos y versiones del expediente",
-      "Cronología, plazos y hechos de la causa",
-      "Notas de audiencia y borradores de escritos",
-      "Fuentes consultables desde el expediente",
-    ],
     modulesTitle: "Módulos HighQ + capa Chile",
     modules: [
       { title: "Causas", text: "Expedientes, documentos y plazos" },
