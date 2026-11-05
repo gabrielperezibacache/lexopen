@@ -63,9 +63,12 @@ def verify():
         run("pandoc", str(markdown), "--citeproc", "--bibliography", str(bibliography),
             "--metadata", "title=Informe", "-o", str(book_path))
         book = epub.read_epub(str(book_path))
-        chapters = " ".join(BeautifulSoup(chapter.get_content(), "html.parser").get_text()
+        chapters = " ".join(BeautifulSoup(chapter.get_content(), "html.parser").get_text(" ", strip=True)
                             for chapter in book.get_items_of_type(ITEM_DOCUMENT))
-        assert paragraph in chapters and "Lecturas de prueba" in chapters
+        chapter_text = " ".join(chapters.split())
+        assert paragraph in chapter_text, "EPUB did not preserve the synthetic paragraph"
+        # Citation styles can capitalize titles, such as "Lecturas de Prueba".
+        assert "lecturas de prueba" in chapter_text.casefold(), "EPUB omitted the bibliography"
         assert paragraph in run("rg", "--fixed-strings", paragraph, str(markdown))
 
         with wave.open(str(root / "fixture.wav"), "wb") as recording:
