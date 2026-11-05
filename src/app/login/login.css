@@ -78,6 +78,17 @@
   display: none;
 }
 
+.login-recovery-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-self: end;
+  color: var(--sea);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: .22em;
+}
+
 .login-error {
   border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
   border-radius: var(--radius-sm);

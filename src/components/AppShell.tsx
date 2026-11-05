@@ -5,6 +5,7 @@ import { Bell, Menu, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
+import { StudioCredit } from "@/components/StudioCredit";
 import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { Breadcrumbs } from "@/components/shell/Breadcrumbs";
@@ -195,6 +196,7 @@ export function AppShell({
         >
           {children}
         </main>
+        <StudioCredit className="mx-4 max-lg:mb-20 sm:mx-6 md:mx-8" />
       </div>
 
       <CommandPalette items={commandItems} open={commandOpen} onOpenChange={setCommandOpen} />

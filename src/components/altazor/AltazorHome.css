@@ -3,12 +3,7 @@
 .altazor-header { display:flex; align-items:center; gap:1rem; min-width:0; }
 .altazor-identity-row .altazor-tools { margin-bottom:0; }
 .altazor-identity-row .altazor-tools[open] { flex-basis:100%; order:2; }
-.altazor-brand { display:inline-flex; align-items:center; gap:.75rem; flex-shrink:0; }
-.altazor-companion { display:inline-block; flex-shrink:0; background-image:url('/altazor/companion-engraving-v2.png'); background-repeat:no-repeat; background-size:200% 200%; }
 .altazor-header .altazor-companion { animation:altazor-arrive .75s cubic-bezier(.16,1,.3,1) both; }
-.altazor-wordmark { display:grid; gap:.22rem; color:var(--ink); line-height:1.15; }
-.altazor-wordmark strong { font-family:var(--font-fraunces),Georgia,serif; font-size:1.65rem; font-weight:500; letter-spacing:-.03em; white-space:nowrap; }
-.altazor-wordmark small { font-family:var(--font-sora),sans-serif; font-size:.8125rem; font-weight:400; letter-spacing:0; color:var(--ink-soft); }
 .altazor-header h2 { font-family:var(--font-fraunces),Georgia,serif; font-size:1.6rem; line-height:1.2; margin-bottom:.45rem; }
 .altazor-header p,.altazor-section-heading p { max-width:65ch; color:var(--ink-soft); line-height:1.65; }
 .altazor-tabs,.altazor-subtabs { display:flex; min-width:0; align-items:stretch; gap:.3rem; overflow-x:auto; border-bottom:1px solid var(--line); padding-bottom:.5rem; margin-bottom:1.75rem; scrollbar-width:thin; }

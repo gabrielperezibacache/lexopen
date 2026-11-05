@@ -7,6 +7,7 @@ export const es = {
   brand: {
     tagline: "Estudio · Chile",
     openPlatform: "Plataforma jurídica abierta",
+    developedBy: "Desarrollado por el Estudio Jurídico Pérez Ibacache",
   },
   common: {
     menu: "Menú",
@@ -325,20 +326,42 @@ export const es = {
     library: "Biblioteca",
     title: "Iniciar sesión",
     subtitleProd: "Ingrese con las credenciales del estudio.",
+    demoSubtitle: "Explora LexOpen con una cuenta y expedientes ficticios.",
     email: "Email",
     password: "Contraseña",
     submit: "Entrar",
     preparing: "Preparando acceso…",
     submitting: "Entrando…",
     error: "No se pudo iniciar sesión",
+    recoveryLink: "Recupera tu contraseña",
+  },
+  recovery: {
+    helpTitle: "Recupera tu contraseña",
+    teamTitle: "Cuenta del estudio",
+    teamBody: "Pide a quien administra las cuentas de tu estudio que restablezca tu contraseña.",
+    administratorTitle: "Cuenta de administrador",
+    administratorBody: "En el equipo principal, abre el menú de LexOpen y elige «Recuperar contraseña admin…».",
+    manualTokenLink: "Tengo un token de recuperación",
+    backToLogin: "Volver a iniciar sesión",
   },
   landing: {
     signIn: "Iniciar sesión",
     enterFirm: "Entrar al estudio",
     eyebrow: "Chile · Operación legal",
     lead:
-      "Del expediente al escrito, conserva tus documentos, plazos y fuentes en un mismo lugar. Organiza causas manualmente o conéctalas con el Poder Judicial de Chile.",
+      "Organiza tus causas en un solo lugar. Reúne en cada expediente los documentos, plazos y fuentes que necesitas para preparar tus escritos.",
     openPlatform: "Abrir plataforma",
+    altazor: {
+      title: "¿Qué es Altazor AI?",
+      lead: "Altazor AI es tu asistente personal para el trabajo jurídico y académico. Dale un encargo como a alguien de tu estudio y retoma la conversación cuando lo necesites.",
+      capabilities: [
+        { title: "Expedientes y teoría del caso", text: "Revisa las carpetas a las que tienes acceso, ordena los hechos y contrasta hipótesis con los documentos del expediente." },
+        { title: "Escritos e investigación", text: "Prepara borradores y materiales académicos, organiza la bibliografía y vuelve a los pasajes de origen para comprobar las citas." },
+        { title: "Su propio escritorio de trabajo", text: "Cuando el estudio lo habilita, Altazor trabaja en un escritorio separado con sus propias aplicaciones. Asígnale archivos para revisar o convertir, sigue su actividad y revisa el resultado." },
+      ],
+      imageAlt: "Inicio de Altazor AI con el campo de mensaje y el botón para adjuntar archivos",
+      caption: "La conversación de Altazor en LexOpen",
+    },
     modulesTitle: "Módulos HighQ + capa Chile",
     modules: [
       { title: "Causas", text: "Expedientes, documentos y plazos" },

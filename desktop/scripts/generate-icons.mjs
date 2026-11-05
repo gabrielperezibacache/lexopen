@@ -37,7 +37,7 @@ const compactLogo = await sharp(transparentLogo)
   .resize(152, 152)
   .extend({ top: 20, bottom: 20, left: 20, right: 20, background: "transparent" })
   .png().toBuffer();
-fs.writeFileSync(path.join(pwa, "lexopen-reader-192.png"), compactLogo);
+fs.writeFileSync(path.join(pwa, "lexopen-reader-transparent-192.png"), compactLogo);
 // Keep the figure inside the maskable safe circle and extend the midnight field to every edge.
 const maskable = await sharp(reader).resize(448, 448).extend({ top: 32, bottom: 32, left: 32, right: 32, background: "#0d1022" }).png().toBuffer();
 fs.writeFileSync(path.join(pwa, "icon-maskable-512.png"), maskable);

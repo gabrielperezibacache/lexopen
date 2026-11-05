@@ -1,8 +1,44 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { FolioSymbol } from "@/components/ui/FolioSymbol";
+import "../welcome.css";
+
+function RecoveryContent() {
+  const searchParams = useSearchParams();
+  const { t } = useI18n();
+
+  if (searchParams.get("ayuda") !== "1") return <RecoveryForm />;
+
+  return (
+    <section className="panel space-y-5 rounded-3xl p-6" aria-labelledby="recovery-title">
+      <h1 id="recovery-title" className="display text-3xl">
+        {t("recovery.helpTitle")}
+      </h1>
+      <div>
+        <h2 className="font-medium">{t("recovery.teamTitle")}</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]">
+          {t("recovery.teamBody")}
+        </p>
+      </div>
+      <div>
+        <h2 className="font-medium">{t("recovery.administratorTitle")}</h2>
+        <p className="mt-1 text-sm text-[var(--ink-soft)]">
+          {t("recovery.administratorBody")}
+        </p>
+        <Link href="/recovery" className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] underline underline-offset-4">
+          {t("recovery.manualTokenLink")}
+        </Link>
+      </div>
+      <Link href="/login" className="btn btn-primary w-full">
+        {t("recovery.backToLogin")}
+      </Link>
+    </section>
+  );
+}
 
 function RecoveryForm() {
   const [error, setError] = useState("");
@@ -131,24 +167,16 @@ function RecoveryForm() {
 
 export default function RecoveryPage() {
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute -right-24 top-0 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(196,122,58,0.22),transparent_70%)]" />
-      <div className="relative mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
-        <Link href="/" className="mb-8 flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-[linear-gradient(135deg,#c47a3a,#9a5a28)] text-white">
-            <FolioSymbol className="h-8 w-8" />
-          </span>
-          <div>
-            <div className="display text-2xl">LexOpen</div>
-            <div className="text-xs uppercase tracking-[0.16em] text-[var(--ink-soft)]/65">
-              Recuperación local
-            </div>
-          </div>
+    <main className="lexopen-welcome">
+      <div className="mx-auto flex min-h-[100svh] max-w-md flex-col justify-center px-4 py-10">
+        <Link href="/" className="edition-wordmark mb-6 w-fit">
+          <FolioSymbol className="h-10 w-10" />
+          <span className="display">LexOpen</span>
         </Link>
-        <Suspense fallback={<div className="panel h-[420px] animate-pulse rounded-3xl" />}>
-          <RecoveryForm />
+        <Suspense fallback={<div className="panel h-[420px] rounded-3xl" aria-hidden="true" />}>
+          <RecoveryContent />
         </Suspense>
       </div>
-    </div>
+    </main>
   );
 }
