@@ -138,7 +138,11 @@ export function ResultCard({ item, onUndone }: { item: AssistantResultItem; onUn
       <CardBody card={item.card} />
       {item.ok && (link || item.undoToken) && (
         <div className="mt-2 flex flex-wrap gap-2">
-          {link && (
+          {link && item.card?.type === "escritorio" ? (
+            // A document navigation reopens the exact private scope/session even
+            // when the card is already on /inicio and React retains its panels.
+            <a href={link.href} className="inline-flex min-h-11 items-center rounded-full border border-[var(--line)] px-3 py-2 text-xs text-[var(--sea)]">{link.label}</a>
+          ) : link && (
             <Link href={link.href} className="rounded-full border border-[var(--line)] px-3 py-1 text-xs text-[var(--sea)]">
               {link.label}
             </Link>

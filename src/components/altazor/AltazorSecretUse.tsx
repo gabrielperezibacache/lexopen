@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import Link from "next/link";
 import { KeyRound } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
 import { operationKey } from "@/lib/client-submission-key";
@@ -43,6 +42,6 @@ export function AltazorSecretUse({ sessionId, onBusyChange }: { sessionId: strin
       <label htmlFor={`${uid}-origin`}>Origen HTTPS que ve en la página<input id={`${uid}-origin`} value={origin} placeholder="https://portal.ejemplo.cl" type="url" disabled={busy} onChange={event => { setOrigin(event.target.value); setConfirmed(false); setKey(operationKey()); }} /></label>
       <div className={styles.fields}><label htmlFor={`${uid}-label`}>Nombre del campo seleccionado<input id={`${uid}-label`} value={fieldLabel} maxLength={120} placeholder="Contraseña" disabled={busy} onChange={event => { setFieldLabel(event.target.value); setConfirmed(false); setKey(operationKey()); }} /></label><label htmlFor={`${uid}-field`}>Tipo de campo<select id={`${uid}-field`} value={field} disabled={busy} onChange={event => { setField(event.target.value as SecretTarget["field"]); setConfirmed(false); setKey(operationKey()); }}><option value="password">Contraseña oculta</option><option value="token">Token</option><option value="text">Texto visible</option></select></label></div>
       <label className={styles.check}><input type="checkbox" checked={confirmed} disabled={busy} onChange={event => setConfirmed(event.target.checked)} />Tomé el control y seleccioné el campo de la página.</label><button type="button" disabled={busy || !confirmed || !selected || !origin || !fieldLabel.trim()} onClick={() => act("prepare")}>Revisar uso del secreto</button>
-    </> : <p>Agregue una credencial en <Link href="/inicio?altazor=connectors&conexion=secretos">Conexiones → Secretos</Link> para usarla aquí.</p>}
+    </> : <p>Agregue una credencial en <a href="/inicio?altazor=connectors&conexion=secretos">Conexiones → Secretos</a> para usarla aquí.</p>}
   </div></details>;
 }
