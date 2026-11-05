@@ -12,6 +12,18 @@
       "sha256": "9d7cc33909da56c074813cb18d0383c159e9175206e4964da0cc8fb0496e8064"
     }
   ],
+  "transparentVariants": [
+    {
+      "path": "../../public/icons/lexopen-logo.png",
+      "sha256": "5c233117f372fc3841efaf8d30ac2f4f5eab74f85e5c737b3f7cb83c74e67c56",
+      "edit": "Retirar sólo el fondo índigo con transparencia alfa y conservar el grabado, las proporciones y el texto plateado LexOpen."
+    },
+    {
+      "path": "../../public/icons/lexopen-logo-ink.png",
+      "sha256": "7819d6ead1c2d299befe95fa08da5425ada9017c56c40f2095c2679c02e10768",
+      "edit": "Cambiar el texto LexOpen a tinta grafito para fondos claros y conservar el grabado y la transparencia alfa."
+    }
+  ],
   "prompts": [
     "Use case: logo-brand. Asset: one square app icon for LexOpen, a legal and academic workspace. Subject: a single original, anonymous classical scholar in left-facing profile, shoulder bust, reading an open folio; the folio is integrated into the lower silhouette. Style: luminous silver-white intaglio engraving, dense sculptural crosshatching in the face and drapery, sharp blacks, like an antique engraved frontispiece reimagined as a contemporary digital mark. Behind the bust, a restrained fan of very fine straight radial rays in muted periwinkle and a single small electric ultramarine flare; no border, ring, or lettering. Background is a uniform near-black midnight indigo #0d1022 all the way to the edges, no transparency. Composition: unmistakable light silhouette at small size, subject fills about 69% of the square, head and folio centered inside the safe circle with ample edge space. Rich engraved detail should disappear gracefully at favicon size. No other figures, no symbols of another brand, no helmet or wings, no typography, no words, no initials, no frame, no photographic rendering, no gradients that compete with the face. One finished image, square.",
     "Use case: precise-object-edit. Remove every radial line behind the engraved reader, including the bright blue flare. Fill those areas with the same plain near-black midnight-indigo background, uniform to the edges. Keep the man, open book, pose, framing, silhouette, linework, contrast and exact silver intaglio detail unchanged. Keep the square composition. No border, text, marks or new elements. Only edit the background.",

@@ -27,16 +27,16 @@
       "route": "/login",
       "width": 1440,
       "height": 1000,
-      "size": 48356,
-      "sha256": "54810ce02b5bc202ae76633a235ce231058a38b5892a0ecf387faf4541bd5e5b"
+      "size": 55051,
+      "sha256": "6fbbcc922ad9ae4d301f0636dff69f205be6c9de0c01e2c6fa1c144a2f4575d0"
     },
     {
       "path": "ingreso-movil.jpg",
       "route": "/login",
       "width": 360,
       "height": 800,
-      "size": 14823,
-      "sha256": "7b1ce14387a8c0cd51dcc225956612d072e971a6a8cb71cdf99e917354ed310e"
+      "size": 17793,
+      "sha256": "a33a149972c5f54ad2f42dd4ea3535bdaa9d8e62ea3ed72d39ff3eab6282180b"
     },
     {
       "path": "inicio-escritorio.jpg",
@@ -67,16 +67,16 @@
       "route": "/",
       "width": 1440,
       "height": 1000,
-      "size": 99315,
-      "sha256": "17677d5c57610862aec92078779d532f2c71c747d4e0fe415e9cd533a1547b50"
+      "size": 115846,
+      "sha256": "460c00a340619c9a02cab8684c3bccb2f6a711d5dea03ec704c46d50d0353306"
     },
     {
       "path": "portada-movil.jpg",
       "route": "/",
       "width": 360,
       "height": 800,
-      "size": 33404,
-      "sha256": "6199a5d2387f5ac29bc1c524fc3eaf1d507242036090d9d033e578600c0ecfac"
+      "size": 39088,
+      "sha256": "9f0a984fcf5ac3cefdba159eeca9b4e95c5a0c750606d627a5953b608505c3d8"
     }
   ]
 }

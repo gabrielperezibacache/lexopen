@@ -36,15 +36,12 @@ export default function LandingPage() {
               <Link href="/login" className="btn btn-primary">
                 {t("landing.openPlatform")} <ArrowRight size={16} aria-hidden="true" />
               </Link>
-              <Link href="/login?next=/inicio" className="btn btn-ghost">
-                {t("landing.seeDemo")}
-              </Link>
             </div>
           </div>
           <Image
-            src="/icons/icon-512.png"
-            width={512}
-            height={512}
+            src="/icons/lexopen-logo.png"
+            width={1254}
+            height={1254}
             sizes="(max-width: 640px) 272px, (max-width: 880px) 352px, 512px"
             alt=""
             loading="eager"

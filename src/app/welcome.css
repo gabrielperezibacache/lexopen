@@ -102,9 +102,6 @@
 .edition-engraving {
   display: block;
   height: auto;
-  mask-image: linear-gradient(to right, transparent, black 7%, black 93%, transparent),
-    linear-gradient(to bottom, transparent, black 7%, black 93%, transparent);
-  mask-composite: intersect;
 }
 
 .edition-hero-art {

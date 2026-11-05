@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useMemo, useState, useSyncExternalStore, Suspense } from "react";
+import { FormEvent, useState, useSyncExternalStore, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import "../welcome.css";
 import "./login.css";
@@ -11,8 +11,6 @@ import { resolvePostLoginPath } from "@/lib/auth/home-path";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
-/** Demo shortcuts are build-time stripped from production client bundles. */
-const SHOW_DEMO_LOGIN = process.env.NODE_ENV !== "production";
 const subscribeHydration = () => () => {};
 const hydratedSnapshot = () => true;
 const serverSnapshot = () => false;
@@ -24,7 +22,6 @@ function LoginForm() {
   const next = sp.get("next") || "/inicio";
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [email, setEmail] = useState(SHOW_DEMO_LOGIN ? "socio@estudio.cl" : "");
   const [needsTotp, setNeedsTotp] = useState(false);
   const { t } = useI18n();
 
@@ -32,16 +29,6 @@ function LoginForm() {
     router.push(safeAppPath(resolvePostLoginPath(role, next)));
     router.refresh();
   }
-
-  const demoUsers = useMemo(
-    () => [
-      { email: "socio@estudio.cl", label: t("login.roles.admin") },
-      { email: "abogado@estudio.cl", label: t("login.roles.lawyer") },
-      { email: "asistente@estudio.cl", label: t("login.roles.assistant") },
-      { email: "cliente@andes.cl", label: t("login.roles.client") },
-    ],
-    [t]
-  );
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -97,9 +84,9 @@ function LoginForm() {
         <aside className="login-story">
           <Link href="/" className="login-engraving-link" aria-label="LexOpen">
             <Image
-              src="/icons/icon-512.png"
-              width={512}
-              height={512}
+              src="/icons/lexopen-logo.png"
+              width={1254}
+              height={1254}
               sizes="(max-width: 767px) 1px, 320px"
               alt=""
               className="edition-engraving login-engraving"
@@ -128,7 +115,7 @@ function LoginForm() {
             <div>
               <h1 className="display text-3xl">{t("login.title")}</h1>
               <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-                {SHOW_DEMO_LOGIN ? t("login.subtitle") : t("login.subtitleProd")}
+                {t("login.subtitleProd")}
               </p>
             </div>
             <label className="block text-sm">
@@ -138,27 +125,24 @@ function LoginForm() {
                 name="email"
                 type="email"
                 required={!needsTotp}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 autoComplete="username"
                 disabled={!hydrated || needsTotp}
               />
             </label>
             {!needsTotp ? (
-              <label className="block text-sm">
+              <label key="password" className="block text-sm">
                 <span className="mb-1 block text-[var(--muted)]">{t("login.password")}</span>
                 <input
                   className="input"
                   name="password"
                   type="password"
                   required
-                  defaultValue={SHOW_DEMO_LOGIN ? "lexopen" : ""}
                   autoComplete="current-password"
                   disabled={!hydrated}
                 />
               </label>
             ) : (
-              <label className="block text-sm">
+              <label key="totp" className="block text-sm">
                 <span className="mb-1 block text-[var(--muted)]">
                   Código 2FA o respaldo
                 </span>
@@ -198,27 +182,6 @@ function LoginForm() {
               </button>
             )}
           </form>
-
-          {SHOW_DEMO_LOGIN && (
-            <div className="login-demo">
-              <p className="text-sm text-[var(--muted)]">
-                {t("login.demoUsers")}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {demoUsers.map((u) => (
-                  <button
-                    key={u.email}
-                    type="button"
-                    disabled={!hydrated}
-                    className="btn btn-ghost"
-                    onClick={() => setEmail(u.email)}
-                  >
-                    {u.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </main>

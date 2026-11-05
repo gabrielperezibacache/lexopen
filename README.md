@@ -1,5 +1,8 @@
 <div align="center">
-  <img src="docs/assets/lexopen-logo.png" width="176" alt="LexOpen: un lector grabado con un libro abierto">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/lexopen-logo.png">
+    <img src="public/icons/lexopen-logo-ink.png" width="176" alt="LexOpen: un lector grabado con un libro abierto">
+  </picture>
   <h1>LexOpen</h1>
   <p><strong>Tu estudio, con sus fuentes a la vista.</strong></p>
   <p>Causas, biblioteca, investigación, audiencias y escritos. ALTAZOR te acompaña en cada apartado.</p>
@@ -17,6 +20,8 @@ LexOpen es una aplicación abierta para profesionales y estudios jurídicos. Re�
 **Código actual: `1.1.0-preview.6`.** Descarga únicamente los paquetes efectivamente publicados en [GitHub Releases](https://github.com/gabrielperezibacache/lexopen/releases). Los instaladores anteriores no incorporan necesariamente las funciones del código actual.
 
 La nueva identidad reúne un grabado clásico, fondos índigo y texto plateado. Las imágenes son **capturas reales de LexOpen con datos ficticios**. [Ver la portada, el ingreso, Altazor y Mis Causas en escritorio y móvil](docs/puesto-altazor-2026-11-05/README.md).
+
+Logotipo en PNG transparente para [fondos oscuros](public/icons/lexopen-logo.png) y [fondos claros](public/icons/lexopen-logo-ink.png).
 
 ## Trabajar con LexOpen
 

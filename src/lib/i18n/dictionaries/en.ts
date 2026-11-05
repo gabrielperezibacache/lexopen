@@ -326,7 +326,6 @@ export const en: Dictionary = {
     storyBody: "Cases, your library and working tools together in your legal workspace.",
     library: "Library",
     title: "Sign in",
-    subtitle: "Use a demo user or your firm credentials.",
     subtitleProd: "Sign in with your firm credentials.",
     email: "Email",
     password: "Password",
@@ -334,17 +333,6 @@ export const en: Dictionary = {
     preparing: "Preparing sign in…",
     submitting: "Signing in…",
     error: "Could not sign in",
-    demoUsers: "Demo users · password lexopen",
-    roles: {
-      admin: "Host admin",
-      socio: "Partner",
-      lawyer: "Lawyer",
-      procurador: "Court clerk",
-      assistant: "Paralegal",
-      contabilidad: "Accounting",
-      externo: "External",
-      client: "Client (portal)",
-    },
   },
   landing: {
     signIn: "Sign in",
@@ -353,7 +341,6 @@ export const en: Dictionary = {
     lead:
       "Keep your documents, deadlines and sources together, from case file to final draft. Manage matters manually or connect them to the Chilean judiciary.",
     openPlatform: "Open platform",
-    seeDemo: "View firm demo",
     matterLabel: "Matter workspace",
     matterMeta: "Demonstration case file",
     bullets: [

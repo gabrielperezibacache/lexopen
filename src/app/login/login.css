@@ -87,12 +87,6 @@
   font-size: var(--text-sm);
 }
 
-.login-demo {
-  margin-top: 1.5rem;
-  border-top: 1px solid var(--line);
-  padding-top: 1.125rem;
-}
-
 .login-loading {
   width: min(100%, 29rem);
   min-height: 12rem;

@@ -324,7 +324,6 @@ export const es = {
     storyBody: "Causas, biblioteca y herramientas de trabajo reunidas en tu espacio jurídico.",
     library: "Biblioteca",
     title: "Iniciar sesión",
-    subtitle: "Use un usuario demo o sus credenciales del estudio.",
     subtitleProd: "Ingrese con las credenciales del estudio.",
     email: "Email",
     password: "Contraseña",
@@ -332,17 +331,6 @@ export const es = {
     preparing: "Preparando acceso…",
     submitting: "Entrando…",
     error: "No se pudo iniciar sesión",
-    demoUsers: "Usuarios demo · contraseña lexopen",
-    roles: {
-      admin: "Admin del Host",
-      socio: "Socio/a",
-      lawyer: "Abogado/a",
-      procurador: "Procurador/a",
-      assistant: "Asistente",
-      contabilidad: "Contabilidad",
-      externo: "Externo",
-      client: "Cliente (portal)",
-    },
   },
   landing: {
     signIn: "Iniciar sesión",
@@ -351,7 +339,6 @@ export const es = {
     lead:
       "Del expediente al escrito, conserva tus documentos, plazos y fuentes en un mismo lugar. Organiza causas manualmente o conéctalas con el Poder Judicial de Chile.",
     openPlatform: "Abrir plataforma",
-    seeDemo: "Ver demo del estudio",
     matterLabel: "Espacio de causa",
     matterMeta: "Expediente de demostración",
     bullets: [
