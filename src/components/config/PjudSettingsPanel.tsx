@@ -61,9 +61,8 @@ export function PjudSettingsPanel() {
         <div>
           <h2 className="text-lg font-semibold">Seguimiento judicial (PJUD)</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-            Vista técnica del servidor (solo lectura). Para guardar ClaveÚnica y
-            sincronizar causas use Causas → ClaveÚnica. Los avisos del canal PJUD
-            (servicio auxiliar, CAPTCHA) están en el{" "}
+            Estado de la integración judicial. Abre ClaveÚnica para conectar tu
+            cuenta judicial e importar causas. Los avisos del canal están en el{" "}
             <a href="#pjud-log" className="text-[var(--sea)]">
               Log PJUD
             </a>

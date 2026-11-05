@@ -23,19 +23,24 @@ function localEngineCandidates(platform, userDirectory, userId) {
   return hosts;
 }
 
-function dockerDesktopRoot(platform = process.platform, env = process.env) {
+function dockerDesktopRoot(platform = process.platform, env = process.env, binary) {
   if (platform === "darwin") return "/Applications/Docker.app/Contents/Resources";
-  if (platform === "win32") return path.win32.join(env.ProgramFiles || "C:\\Program Files", "Docker", "Docker", "resources");
+  if (platform === "win32") {
+    const userInstall = env.LOCALAPPDATA && path.win32.join(env.LOCALAPPDATA, "Programs", "DockerDesktop", "resources");
+    if (userInstall && binary === path.win32.join(userInstall, "bin", "docker.exe")) return userInstall;
+    return path.win32.join(env.ProgramFiles || "C:\\Program Files", "Docker", "Docker", "resources");
+  }
   return null;
 }
 
-async function localDesktopEngine({ env = process.env, execute = runFile, platform = process.platform, userDirectory = os.homedir(), userId = process.getuid?.() } = {}) {
-  const options = { env: desktopCliEnvironment(env), timeout: 2500, maxBuffer: 16 * 1024, windowsHide: true, shell: false };
+async function localDesktopEngine({ env = process.env, execute = runFile, platform = process.platform, userDirectory = os.homedir(), userId = process.getuid?.(), signal } = {}) {
+  const options = { env: desktopCliEnvironment(env), timeout: 2500, maxBuffer: 16 * 1024, windowsHide: true, shell: false, signal };
   const binaries = ["docker"];
   const desktop = dockerDesktopRoot(platform, env);
   if (desktop) {
     const join = platform === "win32" ? path.win32.join : path.join;
     binaries.push(join(desktop, "bin", platform === "win32" ? "docker.exe" : "docker"));
+    if (platform === "win32" && env.LOCALAPPDATA) binaries.push(join(env.LOCALAPPDATA, "Programs", "DockerDesktop", "resources", "bin", "docker.exe"));
   }
   let state = "engine-missing";
   for (const binary of binaries) {
@@ -45,6 +50,7 @@ async function localDesktopEngine({ env = process.env, execute = runFile, platfo
         if (result.stdout.trim() === "linux") return { state: "engine-ready", host, binary };
         state = "linux-engine-required";
       } catch (error) {
+        if (signal?.aborted) return { state: "package-cancelled" };
         if (error.code === "ENOENT") break;
         if (state === "engine-missing") state = "engine-unavailable";
       }
@@ -59,14 +65,14 @@ async function diagnoseDesktopProfile(options = {}) {
   return { state: await desktopProfilePresent(engine, options) ? "profile-detected" : "profile-pending" };
 }
 
-async function desktopProfilePresent(engine, { execute = runFile, env = process.env, architecture } = {}) {
+async function desktopProfilePresent(engine, { execute = runFile, env = process.env, architecture, reference = profile.tag, expectedId = reference === profile.tag ? undefined : reference, signal } = {}) {
   try {
     const format = '{{.Id}} {{index .Config.Labels "org.lexopen.altazor.desktop-profile"}} {{index .Config.Labels "org.lexopen.altazor.desktop-source"}} {{.Architecture}}';
-    const result = await execute(engine.binary, ["--host", engine.host, "image", "inspect", "--format", format, profile.tag], {
-      env: desktopCliEnvironment(env), timeout: 2500, maxBuffer: 16 * 1024, windowsHide: true, shell: false,
+    const result = await execute(engine.binary, ["--host", engine.host, "image", "inspect", "--format", format, reference], {
+      env: desktopCliEnvironment(env), timeout: 2500, maxBuffer: 16 * 1024, windowsHide: true, shell: false, signal,
     });
     const [id, label, source, arch] = result.stdout.trim().split(/\s+/);
-    return /^sha256:[a-f0-9]{64}$/.test(id) && label === profile.id && source === profile.sourceCommit &&
+    return /^sha256:[a-f0-9]{64}$/.test(id) && (!expectedId || id === expectedId) && label === profile.id && source === profile.sourceCommit &&
       (!architecture || arch === architecture);
   } catch { return false; }
 }

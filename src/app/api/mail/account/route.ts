@@ -6,7 +6,7 @@ import {
   encryptMailboxPassword,
   ensureMailboxAccount,
 } from "@/lib/mail/ingest";
-import { assertImapHostAllowed, probeImapConnection } from "@/lib/mail/imap";
+import { assertImapHostAllowed, normalizeImapHost, probeImapConnection, sameImapDestination } from "@/lib/mail/imap";
 import { publicMailboxAccount } from "@/lib/mail/types";
 import { decryptSecret } from "@/lib/pjud/secret";
 import { z } from "zod";
@@ -48,34 +48,33 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    assertImapHostAllowed(body.imapHost);
+    const destination = {
+      host: normalizeImapHost(body.imapHost),
+      port: body.imapPort ?? 993,
+      tls: body.imapTls ?? true,
+      user: body.email,
+    };
+    assertImapHostAllowed(destination.host);
     const existing = await ensureMailboxAccount(user.id);
-    const password =
-      body.password ||
-      decryptSecret(existing.passwordEnc, { strict: true }) ||
-      "";
+    const sameDestination = sameImapDestination(existing, destination);
+    const password = body.password || (sameDestination ? decryptSecret(existing.passwordEnc, { strict: true }) : null);
     if (!password) {
       return NextResponse.json(
         { error: "Indique la contraseña o contraseña de aplicación" },
         { status: 400 }
       );
     }
-    await probeImapConnection({
-      host: body.imapHost,
-      port: body.imapPort ?? 993,
-      tls: body.imapTls ?? true,
-      user: body.email,
-      password,
-    });
+    await probeImapConnection({ ...destination, password });
     const updated = await prisma.mailboxAccount.update({
       where: { id: existing.id },
       data: {
         protocol: "imap",
         status: "connected",
-        email: body.email,
-        imapHost: body.imapHost,
-        imapPort: body.imapPort ?? 993,
-        imapTls: body.imapTls ?? true,
+        email: destination.user,
+        imapHost: destination.host,
+        imapPort: destination.port,
+        imapTls: destination.tls,
+        ...(!sameDestination ? { imapUidValidity: null, imapLastUid: null } : {}),
         passwordEnc: encryptMailboxPassword(password),
         oauthAccessEnc: null,
         oauthRefreshEnc: null,

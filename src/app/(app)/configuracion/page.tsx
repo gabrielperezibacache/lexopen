@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import Link from "next/link";
+import { Mail } from "lucide-react";
 import type { ReactNode } from "react";
 import { requireRole } from "@/lib/auth/session";
 import { ModuleHeader } from "@/components/ui/PageHeader";
@@ -24,10 +26,11 @@ import { buildPjudOpsLog } from "@/lib/pjud/ops-log";
 import styles from "@/components/config/WorkspaceArea.module.css";
 import { CaseManagementSettings } from "@/components/config/CaseManagementSettings";
 import { getCaseManagementMode } from "@/lib/causas/management-mode";
+import { MAIL_SETTINGS_PATH } from "@/lib/mail/settings-location";
 
 export default async function ConfiguracionPage() {
   const me = await requireRole("admin");
-  const { dict, locale } = await getI18n();
+  const { dict, locale, t } = await getI18n();
   const h = dict.hubs.configuracion;
   const [organization, hostStatus, users, groups] = await Promise.all([
     prisma.organization.findFirst({ include: { settings: true } }),
@@ -123,7 +126,12 @@ export default async function ConfiguracionPage() {
 
   return (
     <div className={`${styles.area} space-y-6`} data-settings-workspace>
-      <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
+      <ModuleHeader
+        eyebrow={h.eyebrow}
+        title={h.title}
+        subtitle={h.subtitle}
+        actions={<Link className="btn btn-secondary" href={MAIL_SETTINGS_PATH}><Mail size={16} aria-hidden="true" /> {t("mailbox.openSettings")}</Link>}
+      />
       <ConfigSectionNav mode={caseManagementMode} />
       <div className={styles.groups}>
         {configCategoriesForMode(caseManagementMode).map(category => (

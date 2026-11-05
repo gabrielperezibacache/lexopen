@@ -1,164 +1,172 @@
 import { MinutaPlantillasManager } from "@/components/minutas/MinutaPlantillasManager";
-import { formatDateTime, StatusBadge } from "@/components/ui";
+import { formatDateTime } from "@/components/ui";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { minutaConfidentialWhere } from "@/lib/api";
-import { causaAccessWhere as scopedcausaAccessWhere, requiredCausaWhere as scopedrequiredCausaWhere } from "@/lib/auth/causa-access";
+import { causaAccessWhere, requiredCausaWhere } from "@/lib/auth/causa-access";
+import { can, canSome } from "@/lib/auth/permissions";
 import { requireStaff } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
 import { ACCIONES_ABIERTAS, labelTipoMinuta } from "@/lib/minutas";
-import { ClipboardPen } from "lucide-react";
+import { ChevronRight, Plus, Search } from "lucide-react";
 import Link from "next/link";
 
-export default async function MinutasPage() {
+type MinutasSearch = { nueva?: string | string[]; q?: string | string[] };
+
+export default async function MinutasPage({ searchParams }: { searchParams: Promise<MinutasSearch> }) {
   const user = await requireStaff();
-  const { dict } = await getI18n();
-  const h = dict.hubs.minutas;
-  const [minutas, causas, accionesAbiertasTotal, plantillas] = await Promise.all([
+  const { dict, locale } = await getI18n();
+  const tr = (es: string, en: string) => locale === "en" ? en : es;
+  const query = await searchParams;
+  const canCreate = canSome(user, "causa.write");
+  const choosingCase = canCreate && query.nueva === "1";
+  const search = typeof query.q === "string" ? query.q.trim().slice(0, 160) : "";
+  const canManageTemplates = user.role === "admin" || user.role === "abogado";
+  const now = new Date();
+
+  const [minutas, candidates, plantillas] = await Promise.all([
     prisma.minuta.findMany({
-      where: { AND: [scopedrequiredCausaWhere(user), minutaConfidentialWhere(user)] },
+      where: { AND: [requiredCausaWhere(user), minutaConfidentialWhere(user)] },
       include: {
-        causa: { select: { id: true, titulo: true, rit: true } },
+        causa: { select: { titulo: true, rit: true } },
         autor: { select: { name: true } },
-        // ⚡ Bolt: Fetches the count from the database rather than loading the whole array into memory.
-        _count: {
-          select: {
-            acciones: {
-              where: { estado: { in: [...ACCIONES_ABIERTAS] } },
-            },
-          },
-        },
+        _count: { select: { acciones: { where: { estado: { in: [...ACCIONES_ABIERTAS] } } } } },
       },
-      orderBy: { fecha: "desc" },
+      orderBy: [{ fecha: "desc" }, { id: "desc" }],
       take: 40,
     }),
-    prisma.causa.findMany({
-      where: { AND: [scopedcausaAccessWhere(user), { estado: "activa" }] },
-      select: { id: true, titulo: true, rit: true },
-      orderBy: { updatedAt: "desc" },
-      take: 8,
-    }),
-    prisma.minutaAccion.count({
-      where: {
-        estado: { in: [...ACCIONES_ABIERTAS] },
-        minuta: minutaConfidentialWhere(user),
+    choosingCase ? prisma.causa.findMany({
+      where: { AND: [
+        causaAccessWhere(user),
+        { estado: "activa" },
+        search ? { OR: [
+          { titulo: { contains: search, mode: "insensitive" } },
+          { rit: { contains: search, mode: "insensitive" } },
+          { ruc: { contains: search, mode: "insensitive" } },
+        ] } : {},
+      ] },
+      select: {
+        id: true, titulo: true, rit: true, ruc: true, abogadoId: true,
+        miembros: {
+          where: { userId: user.id, desde: { lte: now }, OR: [{ hasta: null }, { hasta: { gt: now } }] },
+          select: { rol: true },
+          take: 1,
+        },
       },
-    }),
-    prisma.minutaPlantilla.findMany({
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: 30,
+    }) : [],
+    canManageTemplates ? prisma.minutaPlantilla.findMany({
       orderBy: [{ tipo: "asc" }, { nombre: "asc" }],
       take: 50,
-    }),
+    }) : [],
   ]);
 
-  const pendientes = accionesAbiertasTotal;
+  const causas = candidates.filter(causa => can(user, "causa.write", {
+    causaRol: causa.miembros[0]?.rol ?? (causa.abogadoId === user.id ? "responsable" : null),
+  }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
-        eyebrow={h.eyebrow}
-        title={h.title}
-        subtitle={h.subtitle}
-        actions={
-          <>
-            <Link className="btn btn-secondary" href="/agente?utility=draft">
-              Borrador con IA
-            </Link>
-            <div className="inline-flex items-center gap-3 px-2 text-sm">
-              <span className="text-[var(--muted)]">Acciones abiertas</span>
-              <span className="display text-2xl tabular-nums">{pendientes}</span>
-            </div>
-          </>
-        }
+        title={dict.hubs.minutas.title}
+        subtitle={tr(
+          "Registra lo que ocurrió en una audiencia, reunión o llamada y deja los próximos pasos en el expediente.",
+          "Record what happened at a hearing, meeting, or call and keep the next steps in its case file.",
+        )}
+        actions={canCreate && !choosingCase ? (
+          <Link className="btn btn-primary" href="/minutas?nueva=1#nueva-minuta">
+            <Plus size={16} aria-hidden="true" /> {tr("Nueva minuta", "New minute")}
+          </Link>
+        ) : undefined}
       />
 
-      <section className="panel rounded-[var(--radius-lg)] p-5">
-        <h2 className="text-lg font-semibold">Registrar ahora</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Elija la causa y genere la minuta en cuatro pasos.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {causas.map((c) => (
-            <div
-              key={c.id}
-              className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] px-4 py-3 transition hover:border-[var(--sea)]/40"
-            >
-              <Link href={`/causas/${c.id}/minuta/nueva`} className="block">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <ClipboardPen size={14} className="text-[var(--copper)]" />
-                  {c.rit || "Sin RIT"}
-                </div>
-                <div className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">
-                  {c.titulo}
-                </div>
-              </Link>
-              <Link
-                href={`/agente?causaId=${c.id}&utility=draft`}
-                className="mt-2 inline-block text-xs text-[var(--sea)]"
-              >
-                Borrador con IA
-              </Link>
+      {choosingCase && (
+        <section id="nueva-minuta" aria-labelledby="nueva-minuta-titulo" className="panel scroll-mt-24 rounded-[var(--radius-lg)] p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 id="nueva-minuta-titulo" className="text-lg font-semibold">{tr("Elige una causa", "Choose a matter")}</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">{tr("La minuta se guardará en su expediente.", "The minute will be saved in its case file.")}</p>
             </div>
-          ))}
+            <Link href="/minutas" className="btn btn-ghost">{tr("Cancelar", "Cancel")}</Link>
+          </div>
+          <form action="/minutas#nueva-minuta" className="mt-4 flex flex-wrap items-end gap-2">
+            <input type="hidden" name="nueva" value="1" />
+            <label className="min-w-0 flex-1 basis-48 text-sm font-medium">
+              <span className="mb-1 block">{tr("Buscar causa", "Find matter")}</span>
+              <input className="input" type="search" name="q" defaultValue={search} maxLength={160} placeholder={tr("Título o referencia", "Title or reference")} />
+            </label>
+            <button type="submit" className="btn btn-secondary">
+              <Search size={16} aria-hidden="true" /> {tr("Buscar", "Search")}
+            </button>
+          </form>
+          {causas.length > 0 ? (
+            <ul className="mt-3 divide-y divide-[var(--line)]">
+              {causas.map(causa => (
+                <li key={causa.id}>
+                  <Link className="flex min-h-11 items-center justify-between gap-3 py-3 hover:text-[var(--sea)]" href={`/causas/${causa.id}/minuta/nueva?desde=minutas`}>
+                    <span className="min-w-0 break-words text-sm font-medium">
+                      {causa.titulo}
+                      {(causa.rit || causa.ruc) && <span className="mt-0.5 block text-xs text-[var(--muted)]">{causa.rit || causa.ruc}</span>}
+                    </span>
+                    <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-[var(--sea)]" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-[var(--muted)]">{tr(
+              "No encontramos causas activas donde puedas registrar una minuta. Prueba otra búsqueda o revisa tus causas.",
+              "No active matters where you can record a minute were found. Try a different search or review your matters.",
+            )} <Link className="text-[var(--sea)] underline underline-offset-4" href="/mis-causas">{dict.nav.myMatters}</Link></p>
+          )}
+        </section>
+      )}
+
+      <section aria-labelledby="minutas-recientes">
+        <div className="mb-3">
+          <h2 id="minutas-recientes" className="text-lg font-semibold">{tr("Minutas recientes", "Recent minutes")}</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">{tr("Abre una minuta para revisar lo registrado y sus acciones pendientes.", "Open a minute to review the record and its pending actions.")}</p>
         </div>
-        {causas.length === 0 && (
-          <p className="mt-4 text-sm text-[var(--muted)]">
-            No hay causas activas.{" "}
-            <Link href="/causas/nueva" className="text-[var(--sea)]">
-              Cree una causa
-            </Link>{" "}
-            para registrar el primer traspaso.
-          </p>
+        {minutas.length === 0 ? (
+          <EmptyState title={tr("Todavía no hay minutas", "No minutes yet")} description={tr(
+            "Cuando registres una minuta, podrás volver a ella desde aquí.",
+            "After you record a minute, you can return to it here.",
+          )} />
+        ) : (
+          <ul className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
+            {minutas.map(minuta => (
+              <li key={minuta.id}>
+                <Link href={`/causas/${minuta.causaId}/minutas/${minuta.id}`} className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-2 py-4 hover:bg-[var(--mist)] sm:px-3">
+                  <div className="min-w-0 flex-1 basis-64">
+                    <p className="text-xs font-medium text-[var(--sea)]">{labelTipoMinuta(minuta.tipo)}</p>
+                    <p className="mt-0.5 break-words font-semibold">{minuta.titulo}</p>
+                    <p className="mt-1 break-words text-sm text-[var(--muted)]">
+                      {minuta.causa.rit || minuta.causa.titulo} · {minuta.autor?.name || tr("Sin autor", "No author")} · {formatDateTime(minuta.fecha)}
+                    </p>
+                  </div>
+                  {minuta._count.acciones > 0 && (
+                    <span className="text-xs text-[var(--muted)]">{tr(
+                      minuta._count.acciones === 1 ? "1 acción pendiente" : `${minuta._count.acciones} acciones pendientes`,
+                      minuta._count.acciones === 1 ? "1 pending action" : `${minuta._count.acciones} pending actions`,
+                    )}</span>
+                  )}
+                  <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-[var(--sea)]" />
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
-      {(user.role === "admin" || user.role === "abogado") && (
-        <MinutaPlantillasManager plantillas={plantillas} />
-      )}
-
-      {minutas.length === 0 ? (
-        <EmptyState
-          title="Sin minutas"
-          description="Aún no hay minutas. Genere la primera tras una audiencia, reunión o llamada."
-        />
-      ) : (
-      <section className="panel overflow-hidden rounded-[var(--radius-lg)]">
-        <div className="border-b border-[var(--line)] px-5 py-4">
-          <h2 className="text-lg font-semibold">Recientes</h2>
-        </div>
-        <div className="divide-y divide-[var(--line)]">
-          {minutas.map((m) => (
-            <Link
-              key={m.id}
-              href={`/causas/${m.causaId}/minutas/${m.id}`}
-              className="flex min-w-0 flex-wrap items-center justify-between gap-4 px-5 py-5 transition-colors hover:bg-[var(--mist)]"
-            >
-              <div className="min-w-0 flex-1 basis-64">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="badge badge-sea">
-                    {labelTipoMinuta(m.tipo)}
-                  </span>
-                  <span className="break-words font-semibold">{m.titulo}</span>
-                </div>
-                <div className="mt-1 text-sm text-[var(--muted)]">
-                  {m.causa.rit || m.causa.titulo} ·{" "}
-                  {m.autor?.name || "Sin autor"} · {formatDateTime(m.fecha)}
-                </div>
-              </div>
-              <div className="text-sm sm:text-right">
-                {m._count.acciones > 0 ? (
-                  <StatusBadge estado="pendiente" />
-                ) : (
-                  <StatusBadge estado="cumplido" />
-                )}
-                <div className="mt-1 text-xs text-[var(--muted)]">
-                  {m._count.acciones} acción(es) abierta(s)
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {canManageTemplates && (
+        <details className="border-t border-[var(--line)]">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-[var(--sea)]">
+            {tr("Administrar plantillas", "Manage templates")}
+          </summary>
+          <MinutaPlantillasManager plantillas={plantillas} />
+        </details>
       )}
     </div>
   );

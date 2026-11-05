@@ -4,8 +4,12 @@ contextBridge.exposeInMainWorld("lexopenDesktop", {
   getState: () => ipcRenderer.invoke("desktop:get-state"),
   saveSetup: (payload) => ipcRenderer.invoke("desktop:save-setup", payload),
   chooseDataDirectory: () => ipcRenderer.invoke("desktop:choose-data-directory"),
-  checkAltazorDesktop: () => ipcRenderer.invoke("desktop:check-altazor-desktop"),
-  loadAltazorToolpack: () => ipcRenderer.invoke("desktop:load-altazor-toolpack"),
+  prepareAltazorDesktop: (retry) => ipcRenderer.invoke("desktop:prepare-altazor-desktop", retry === true),
+  onAltazorPreparation: (cb) => {
+    const handler = (_e, status) => cb(status);
+    ipcRenderer.on("desktop:altazor-preparation", handler);
+    return () => ipcRenderer.removeListener("desktop:altazor-preparation", handler);
+  },
   openExternal: (url) => ipcRenderer.invoke("desktop:open-external", url),
   retry: () => ipcRenderer.invoke("desktop:retry"),
   onStatus: (cb) => {

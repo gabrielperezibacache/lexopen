@@ -23,8 +23,10 @@ const PAGE_SIZE = 50;
 /** Both workspaces read the same accessible matters; the connected view adds PJUD tools. */
 export async function CaseListServer({ mode, searchParams, organizer = false }: { mode: CaseManagementMode; searchParams: Promise<CaseListSearchParams>; organizer?: boolean }) {
   const user = await requireStaff();
-  if (mode === "pjud_cl" && await getCaseManagementMode() !== "pjud_cl") return <PjudManagementNotice canConfigure={isAdmin(user)} />;
-  const connected = mode === "pjud_cl", base = organizer ? "/mis-causas" : connected ? "/pjud" : "/causas";
+  const connected = mode === "pjud_cl";
+  const pjudActive = (connected || organizer) && await getCaseManagementMode() === "pjud_cl";
+  if (connected && !pjudActive) return <PjudManagementNotice canConfigure={isAdmin(user)} />;
+  const base = organizer ? "/mis-causas" : connected ? "/pjud" : "/causas";
   const { t, locale } = await getI18n(), tr = (es: string, en: string) => locale === "en" ? en : es;
   const sp = await searchParams;
   const q = sp.q?.trim(), materia = sp.materia?.trim();
@@ -51,7 +53,13 @@ export async function CaseListServer({ mode, searchParams, organizer = false }: 
   return <div className="space-y-6" data-testid={organizer ? "case-organizer" : connected ? "pjud-workspace" : "manual-cases-workspace"}>
     <PageHeader title={organizer ? t("nav.myMatters") : connected ? "PJUD · Chile" : tr("Causas", "Matters")}
       subtitle={organizer ? tr("Organiza los expedientes y consulta sus documentos con Altazor AI.", "Organize your case files and consult their documents with Altazor AI.") : undefined}
-      actions={connected ? <><Link className="btn btn-secondary" href="/causas/monitoreo#alta-rol">{tr("Consultar por RIT/ROL", "Search by RIT/ROL")}</Link><Link className="btn btn-primary" href="/causas/mis-causas">{tr("Ingresar con ClaveÚnica", "Sign in with ClaveÚnica")}</Link></> : <Link className="btn btn-primary" href="/causas/nueva"><Plus size={16} aria-hidden="true" />{t("causas.newCase")}</Link>} />
+      actions={connected ? <>
+        <Link className="btn btn-secondary" href="/causas/monitoreo#alta-rol">{tr("Consultar por RIT/ROL", "Search by RIT/ROL")}</Link>
+        <Link className="btn btn-primary" href="/causas/mis-causas">{tr("Ingresar con ClaveÚnica", "Sign in with ClaveÚnica")}</Link>
+      </> : <>
+        {organizer && pjudActive && <Link className="btn btn-ghost" href="/pjud">{tr("Herramientas PJUD", "PJUD tools")}</Link>}
+        <Link className="btn btn-primary" href="/causas/nueva"><Plus size={16} aria-hidden="true" />{t("causas.newCase")}</Link>
+      </>} />
     <CausasFilters defaultEstado={estado} mode={mode} basePath={base} />
     {total > 0 && <p className="text-sm text-[var(--muted)]">{tr(`${from}–${to} de ${total} causas`, `${from}–${to} of ${total} matters`)}</p>}
     <div className="panel overflow-hidden rounded-[var(--radius-lg)]"><div className="overflow-x-auto"><table role="table" className="data-table min-w-full text-left text-sm">

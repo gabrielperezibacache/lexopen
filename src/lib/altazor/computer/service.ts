@@ -44,14 +44,18 @@ async function lockWorkspace(expected: AltazorComputerWorkspace, user: CausaAcce
   const locked = await tx.altazorComputerWorkspace.updateMany({ where: { id: expected.id, ownerId: expected.ownerId, enabled: true, credentialEnc: expected.credentialEnc, providerName: expected.providerName }, data: { updatedAt: expected.updatedAt } });
   if (!locked.count) throw new ConnectorError("workspace_changed", "La configuración cambió. Compruebe el gateway nuevamente.", 409);
 }
-async function sessionFor(id: string, user: CausaAccessUser, cleanup = false) {
+async function ownedComputerSession(id: string, user: CausaAccessUser) {
   const actor = await altazorActor(user), session = await prisma.altazorComputerSession.findFirst({ where: { id, ownerId: actor.id } });
   if (!session) throw new ConnectorError("session_not_found", "Sesión no encontrada o sin acceso actual.", 404);
   const access = await workspaceFor(session.workspaceId, actor);
+  return { ...access, session };
+}
+async function sessionFor(id: string, user: CausaAccessUser, cleanup = false) {
+  const access = await ownedComputerSession(id, user);
   // Cleanup only reaches this path from the explicit cancel/close action kinds.
   // It retains current ownership, workspace and case access, even for receipt replay.
-  if (!cleanup) assertSessionLive(session);
-  return { ...access, session };
+  if (!cleanup) assertSessionLive(access.session);
+  return access;
 }
 function gateway(workspace: AltazorComputerWorkspace) {
   const credential = unseal<{ token: string }>(workspace.credentialEnc!, credentialContext(workspace));
@@ -193,13 +197,26 @@ async function passiveControlHeld(session: AltazorComputerSession) {
 }
 
 /** Passive display only. Never creates a session, takes control or sends a message. */
-export async function readComputerActivity(user: CausaAccessUser, causaId?: string | null): Promise<ComputerActivity> {
-  const status = await computerStatus(user, causaId);
-  const reply = (state: ComputerActivityState, sessionId: string | null = null, monitor = false): ComputerActivity => ({ state, sessionId, monitor });
-  if (!status.enabled) return reply("disabled");
-  if (!status.policyAllowed) return reply("restricted");
-  if (!status.configured) return reply("unconfigured");
-  const candidate = status.sessions.find(session => session.requiresStop);
+export async function readComputerActivity(user: CausaAccessUser, causaId?: string | null, requestedSessionId?: string | null): Promise<ComputerActivity> {
+  let pinnedCausaId: string | null | undefined;
+  const reply = (state: ComputerActivityState, sessionId: string | null = null, monitor = false): ComputerActivity => ({
+    state, sessionId, monitor, ...(pinnedCausaId === undefined ? {} : { causaId: pinnedCausaId }),
+  });
+  let candidate: ComputerSessionSummary | undefined;
+  if (requestedSessionId) {
+    if (!computerEnabled()) return reply("disabled");
+    if (!computerPolicyAllowed(await computerPolicy())) return reply("restricted");
+    const { session, workspace } = await ownedComputerSession(requestedSessionId, user);
+    pinnedCausaId = workspace.causaId;
+    const selected = summary(session);
+    if (selected.requiresStop) candidate = selected;
+  } else {
+    const status = await computerStatus(user, causaId);
+    if (!status.enabled) return reply("disabled");
+    if (!status.policyAllowed) return reply("restricted");
+    if (!status.configured) return reply("unconfigured");
+    candidate = status.sessions.find(session => session.requiresStop);
+  }
   if (!candidate) return reply("idle", null, true);
   if (candidate.state === "expired") return reply("expired", candidate.id, true);
   if (candidate.state === "creating") return reply("starting", candidate.id, true);

@@ -44,6 +44,12 @@ npm ci
 npm run desktop:install
 ```
 
+Antes de crear los instaladores, prepara la receta del escritorio con el repositorio fuente en la revisión indicada en `desktop/altazor-desktop-profile.json`. Usa un directorio de salida nuevo. El flujo de GitHub prepara este recurso una vez y lo utiliza para probar el escritorio y construir los instaladores de esa publicación.
+
+```sh
+python3 scripts/altazor/prepare-desktop-source.py /ruta/al/checkout-fijado desktop/.release/altazor-desktop-source
+```
+
 Instale Chromium en un caché nuevo y exclusivo de construcción, **no** en el perfil habitual:
 
 ```sh

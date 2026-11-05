@@ -27,8 +27,7 @@ const {
 } = require("./backup.cjs");
 const { isAllowedExternalUrl } = require("./external-url.cjs");
 const { pathToFileURL } = require("node:url");
-const { diagnoseDesktopProfile } = require("./altazor-desktop-profile.cjs");
-const { lookupDesktopToolpack, loadVerifiedDesktopToolpack } = require("./altazor-toolpack.cjs");
+const { prepareDesktopToolpack } = require("./altazor-toolpack.cjs");
 const { attachMicrophoneGuards } = require("./media-permissions.cjs");
 const { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, assertUpdateVersion, friendlyUpdateError, withNetworkRetry, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools } = require("./update-policy.cjs");
 
@@ -49,7 +48,33 @@ let quitting = false;
 let updateCheckTimer = null;
 let pendingDataDirectory = null;
 let maintenanceActive = false;
-let desktopToolpackActive = false;
+let desktopPreparation = null;
+let desktopPreparationTask = null;
+let desktopPreparationAbort = null;
+
+const desktopPreparationMessages = {
+  "engine-missing": "Instala Docker en el equipo principal y vuelve a intentar. Puedes seguir usando LexOpen.",
+  "engine-unavailable": "Abre Docker en el equipo principal y vuelve a intentar.",
+  "linux-engine-required": "Cambia Docker al modo de contenedores Linux y vuelve a intentar.",
+  "engine-architecture-unsupported": "Esta arquitectura del motor de Docker aún no es compatible con el escritorio.",
+  "profile-detected": "Herramientas listas. Vincula tu escritorio dedicado desde Mi asistente.",
+  "package-unavailable": "Esta versión todavía no ofrece herramientas para este equipo. Consulta la guía de preparación.",
+  "package-check-failed": "No pudimos comprobar el paquete oficial. Revisa tu conexión y vuelve a intentar.",
+  "package-cancelled": "Preparación interrumpida. Puedes volver a intentar.",
+  "package-checking": "Comprobando Docker y las herramientas de Altazor…",
+  "package-downloading": "Descargando herramientas verificadas…",
+  "package-loading": "Instalando las herramientas de Altazor…",
+  "package-mismatch": "El paquete descargado no coincide con la versión oficial. Vuelve a intentar.",
+  "package-download-failed": "No pudimos descargar el paquete. Revisa tu conexión y el espacio disponible.",
+  "package-read-failed": "No pudimos preparar el archivo. Revisa el espacio disponible.",
+  "package-load-unconfirmed": "Docker no confirmó la instalación. Abre Docker y vuelve a intentar.",
+  "package-loaded": "Herramientas instaladas. Vincula tu escritorio dedicado desde Mi asistente.",
+  "source-mismatch": "No pudimos verificar los archivos de preparación de este instalador. Reinstala LexOpen desde la publicación oficial.",
+  "source-building": "Preparando las herramientas en Docker. Puedes seguir usando LexOpen mientras termina.",
+  "source-build-failed": "Docker no terminó de preparar las herramientas. Revisa tu conexión y el espacio disponible y vuelve a intentar.",
+  "unavailable": "La preparación del escritorio no está disponible en este momento.",
+};
+const desktopPreparationInProgress = new Set(["package-checking", "package-downloading", "package-loading", "source-building"]);
 
 function hostDataDirectory() { return activeDataDir(readConfig()); }
 
@@ -226,6 +251,8 @@ async function promptInstallUpdate(info) {
         },
         install: async () => {
           if (clientWatchTimer) clearInterval(clientWatchTimer);
+          desktopPreparationAbort?.abort();
+          await desktopPreparationTask;
           quitting = true;
           try { autoUpdater.quitAndInstall(false, true); }
           catch (error) { quitting = false; throw error; }
@@ -334,6 +361,28 @@ function fromSetupShell(event) {
   const contents = mainWindow?.webContents;
   return contents && event.sender === contents && event.senderFrame === contents.mainFrame &&
     event.senderFrame?.url === pathToFileURL(setupShellPath()).href;
+}
+
+function publishDesktopPreparation(progress) {
+  const { state, percent } = progress;
+  const message = desktopPreparationMessages[state] || desktopPreparationMessages.unavailable;
+  desktopPreparation = { state, message: Number.isInteger(percent) ? `${message} ${percent} %` : message, busy: desktopPreparationInProgress.has(state) };
+  const contents = mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents;
+  if (contents && fromSetupShell({ sender: contents, senderFrame: contents.mainFrame })) contents.send("desktop:altazor-preparation", desktopPreparation);
+}
+
+function startDesktopPreparation(retry = false) {
+  if (desktopPreparationTask || (desktopPreparation && !retry)) return desktopPreparation;
+  const controller = new AbortController();
+  desktopPreparationAbort = controller;
+  desktopPreparationTask = prepareDesktopToolpack(bundledVersion(), {
+    resourceRoot: process.resourcesPath,
+    progress: publishDesktopPreparation,
+    signal: controller.signal,
+  }).then(result => publishDesktopPreparation(controller.signal.aborted ? { state: "package-cancelled" } : result))
+    .catch(() => publishDesktopPreparation({ state: controller.signal.aborted ? "package-cancelled" : "unavailable" }))
+    .finally(() => { desktopPreparationTask = null; desktopPreparationAbort = null; });
+  return desktopPreparation;
 }
 
 /**
@@ -683,6 +732,7 @@ function buildMenu() {
                   `Reconocida: ${state.updateRecognizedAt || "—"}`,
                   `Datos: ${hostDataDirectory()}`,
                   `Actualizaciones: ${updatePreferences(readConfig()).channel === "preview" ? "Vista previa" : "Estable"}`,
+                  ...(desktopPreparation ? [`Escritorio de Altazor: ${desktopPreparation.message}`] : []),
                   lastStatus.message || "",
                   "Las actualizaciones no borran .env, pgdata ni storage.",
                 ].join("\n"),
@@ -762,6 +812,7 @@ async function boot() {
     }
 
     try {
+      if (app.isPackaged) startDesktopPreparation();
       const url = await startHostMode(cfg);
       loadAppUrl(url, hostHandle?.version);
     } catch (e) {
@@ -776,7 +827,7 @@ async function boot() {
   }
 }
 
-ipcMain.handle("desktop:get-state", async () => {
+ipcMain.handle("desktop:get-state", async event => {
   const cfg = readConfig();
   return {
     config: cfg,
@@ -784,31 +835,13 @@ ipcMain.handle("desktop:get-state", async () => {
     dataDir: hostDataDirectory(),
     appState: readAppState(hostDataDirectory()),
     version: bundledVersion(),
+    ...(event && fromSetupShell(event) ? { desktopPreparation } : {}),
   };
 });
 
-ipcMain.handle("desktop:check-altazor-desktop", async event => {
-  if (!fromSetupShell(event)) return { state: "unavailable" };
-  return diagnoseDesktopProfile();
-});
-
-ipcMain.handle("desktop:load-altazor-toolpack", async event => {
-  if (!fromSetupShell(event) || desktopToolpackActive || maintenanceActive || booting) return { state: "unavailable" };
-  desktopToolpackActive = true;
-  try {
-    const verified = await lookupDesktopToolpack(bundledVersion());
-    if (verified.state !== "package-verified") return { state: verified.state };
-    if (!fromSetupShell(event)) return { state: "unavailable" };
-    const chosen = await dialog.showOpenDialog(mainWindow, {
-      title: `Elige ${verified.asset.name}`,
-      defaultPath: path.join(app.getPath("downloads"), verified.asset.name),
-      filters: [{ name: "Paquete de herramientas", extensions: ["gz"] }],
-      properties: ["openFile"],
-    });
-    if (chosen.canceled || !chosen.filePaths[0]) return { state: "package-cancelled" };
-    if (!fromSetupShell(event)) return { state: "unavailable" };
-    return await loadVerifiedDesktopToolpack(chosen.filePaths[0], verified);
-  } finally { desktopToolpackActive = false; }
+ipcMain.handle("desktop:prepare-altazor-desktop", async (event, retry) => {
+  if (!fromSetupShell(event) || maintenanceActive || quitting) return { state: "unavailable", message: desktopPreparationMessages.unavailable };
+  return startDesktopPreparation(retry === true);
 });
 
 ipcMain.handle("desktop:choose-data-directory", async event => {
@@ -849,6 +882,7 @@ ipcMain.handle("desktop:save-setup", async (event, payload) => {
   await stopHostIfRunning();
 
   if (mode === "client") {
+    desktopPreparationAbort?.abort();
     sendStatus({ phase: "probing", message: "Comprobando servidor…" });
     const probe = await probeRemote(remoteUrl);
     if (!probe.ok) {
@@ -872,6 +906,7 @@ ipcMain.handle("desktop:save-setup", async (event, payload) => {
   }
 
   try {
+    if (fromSetupShell(event)) startDesktopPreparation();
     const cfg = readConfig();
     const url = await startHostMode(cfg);
     loadAppUrl(url, hostHandle?.version);
@@ -933,13 +968,13 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", (event) => {
   if (updateCheckTimer) clearInterval(updateCheckTimer);
+  desktopPreparationAbort?.abort();
   if (shuttingDown || quitting) return;
-  if (!hostHandle?.stop && !clientWatchTimer) return;
+  if (!hostHandle?.stop && !clientWatchTimer && !desktopPreparationTask) return;
   event.preventDefault();
   shuttingDown = true;
   quitting = true;
   if (clientWatchTimer) clearInterval(clientWatchTimer);
-  stopHostIfRunning()
-    .catch(() => undefined)
+  Promise.allSettled([stopHostIfRunning(), desktopPreparationTask])
     .finally(() => app.exit(0));
 });

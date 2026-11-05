@@ -773,6 +773,8 @@ model Task {
   id          String    @id @default(cuid())
   title       String
   description String?
+  instructions String?
+  considerations String?
   status      String    @default("todo") // todo | in_progress | blocked | waiting_client | done | cancelled
   priority    String    @default("medium") // low | medium | high | urgent
   dueDate     DateTime?

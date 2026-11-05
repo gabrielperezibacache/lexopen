@@ -112,12 +112,30 @@ jobs:
           node scripts/altazor/prepare-computer-ci.test.mjs
           node scripts/altazor/prepare-computer-ci.mjs "$source_dir"
           printf 'KITTIES_CI_SOURCE=%s\n' "$source_dir" >> "$GITHUB_ENV"
-      - name: Build real immutable desktop image after gateway permission preflight
+      - name: Retrieve the same desktop source archive bundled by native installers
+        if: ${{ inputs.package_altazor && startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/download-artifact@v4
+        with:
+          name: altazor-desktop-source-context
+          path: ${{ runner.temp }}/altazor-desktop-source
+      - name: Prepare desktop source for non-release runtime checks
+        if: ${{ !(inputs.package_altazor && startsWith(github.ref, 'refs/tags/v')) }}
+        run: python3 scripts/altazor/prepare-desktop-source.py .tmp/kitties-upstream "$RUNNER_TEMP/altazor-desktop-source"
+      - name: Build real immutable desktop image through the native installer preparation code
         shell: bash
         run: |
           set -euo pipefail
-          LEXOPEN_DESKTOP_IMAGE_ID_FILE="$RUNNER_TEMP/kitties-image-id" node scripts/altazor/build-desktop-image.mjs "$KITTIES_CI_SOURCE"
-          image_id="$(cat "$RUNNER_TEMP/kitties-image-id")"
+          node --input-type=commonjs - <<'NODE'
+          const { prepareDesktopToolpack } = require('./desktop/altazor-toolpack.cjs');
+          const { version } = require('./desktop/package.json');
+          prepareDesktopToolpack(version, {
+            resourceRoot: process.env.RUNNER_TEMP,
+            fetcher: async () => new Response(null, { status: 404 }),
+            progress: ({ state }) => console.log(state),
+          }).then(({ state }) => { if (state !== 'package-loaded') { console.error(state); process.exitCode = 1; } });
+          NODE
+          profile_tag="$(node -p 'require("./desktop/altazor-desktop-profile.json").tag')"
+          image_id="$(docker image inspect --format '{{.Id}}' "$profile_tag")"
           test "$(docker image inspect --format '{{.Id}}' "$image_id")" = "$image_id"
           printf 'KITTIES_CI_IMAGE_ID=%s\n' "$image_id" >> "$GITHUB_ENV"
       - name: Actual desktop broker with selected fictitious data and local model fixture

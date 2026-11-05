@@ -1,357 +1,387 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { StatusBadge, formatDate } from "@/components/ui";
+import { Download, Plus } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
-import { apiMutation } from "@/lib/api-mutation";
+import { Badge } from "@/components/ui/Badge";
 import { Dialog } from "@/components/ui/Dialog";
-import { Plus } from "lucide-react";
+import { apiMutation } from "@/lib/api-mutation";
+import { civilDateKey, formatCivilDate } from "@/lib/chile-time";
+import type { TaskWorkspaceFilters } from "@/lib/tasks/workspace";
 
-type Task = {
+type UserOption = { id: string; name: string };
+type CaseOption = { id: string; titulo: string; rit: string | null };
+type SiteOption = { id: string; name: string; causaId: string | null };
+
+export type TaskWorkItem = {
   id: string;
   title: string;
+  description: string | null;
+  instructions: string | null;
+  considerations: string | null;
   status: string;
   priority: string;
   dueDate: string | null;
-  siteId: string | null;
-  assigneeId: string | null;
-  causaId?: string | null;
-  origen?: string | null;
+  updatedAt: string;
+  origen: string;
+  causa: CaseOption | null;
   site: { id: string; name: string } | null;
-  causa?: { id: string; titulo: string; rit?: string | null } | null;
-  assignee: { id: string; name: string } | null;
+  assignee: UserOption | null;
+  canEdit: boolean;
 };
 
-type SiteOpt = { id: string; name: string };
-type UserOpt = { id: string; name: string };
-
-const STATUS_LABEL: Record<string, string> = {
-  todo: "Por hacer",
-  in_progress: "En curso",
-  blocked: "Bloqueada",
-  waiting_client: "Espera cliente",
-  done: "Hecha",
-  cancelled: "Cancelada",
+const statuses: Record<string, string> = {
+  todo: "Por hacer", in_progress: "En curso", blocked: "Bloqueada",
+  waiting_client: "En espera del cliente", done: "Hecha", cancelled: "Cancelada",
 };
-
-const ORIGEN_LABEL: Record<string, string> = {
-  manual: "Manual",
-  minuta: "Minuta",
-  tramite: "Trámite",
-  pjud: "PJUD",
-  checklist: "Checklist",
-  asistente: "Asistente",
-  voz: "Voz",
-  intake: "Intake",
-  aprobacion: "Aprobación",
+const priorities: Record<string, string> = { urgent: "Urgente", high: "Alta", medium: "Media", low: "Baja" };
+const origins: Record<string, string> = {
+  manual: "Manual", minuta: "Minuta", tramite: "Trámite", pjud: "PJUD", checklist: "Lista de control",
+  asistente: "Asistente", voz: "Voz", intake: "Ingreso", aprobacion: "Aprobación",
 };
+const filterOptions = { pending: "Pendientes", closed: "Cerradas", all: "Todas", ...statuses };
 
-export function GlobalTasksPanel({
-  initialTasks,
-  sites,
-  users,
-  currentUserId,
-}: {
-  initialTasks: Task[];
-  sites: SiteOpt[];
-  users: UserOpt[];
+function caseLabel(cause: CaseOption) {
+  return cause.rit ? `${cause.rit} · ${cause.titulo}` : cause.titulo;
+}
+
+function taskParams(filters: TaskWorkspaceFilters) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value && !(key === "status" && value === "pending")) params.set(key, value);
+  }
+  return params;
+}
+
+function TaskEditor({ task, cases, sites, initialCaseId, currentUserId, onClose, onSaved }: {
+  task: TaskWorkItem | null;
+  cases: CaseOption[];
+  sites: SiteOption[];
+  initialCaseId: string;
   currentUserId: string;
+  onClose: () => void;
+  onSaved: (notice: string) => void;
 }) {
   const router = useRouter();
-  const [tasks, setTasks] = useState(initialTasks);
-  const [status, setStatus] = useState("");
+  const [causaId, setCausaId] = useState(initialCaseId);
   const [siteId, setSiteId] = useState("");
-  const [assigneeId, setAssigneeId] = useState("");
-  const [origen, setOrigen] = useState("");
-  const [bucket, setBucket] = useState<"all" | "vencidas" | "hoy" | "semana">("all");
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [assignee, setAssignee] = useState(task?.assignee?.id || "");
+  const [eligibility, setEligibility] = useState<{ url: string; users: UserOption[]; assignOthers: boolean; error: string } | null>(null);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const search = task ? new URLSearchParams({ taskId: task.id }) : new URLSearchParams({ causaId, siteId });
+  const optionsUrl = `/api/tasks/assignees?${search}`;
+  const result = eligibility?.url === optionsUrl ? eligibility : null;
+  const oldDate = task?.dueDate ? civilDateKey(new Date(task.dueDate)) : "";
 
-  const filtered = useMemo(() => {
-    const startToday = new Date();
-    startToday.setHours(0, 0, 0, 0);
-    const endToday = new Date(startToday);
-    endToday.setDate(endToday.getDate() + 1);
-    const endWeek = new Date(startToday);
-    endWeek.setDate(endWeek.getDate() + 7);
-
-    return tasks.filter((t) => {
-      if (status && t.status !== status) return false;
-      if (siteId && t.siteId !== siteId) return false;
-      if (origen && t.origen !== origen) return false;
-      if (assigneeId === "me" && t.assigneeId !== currentUserId) return false;
-      if (assigneeId && assigneeId !== "me" && t.assigneeId !== assigneeId) return false;
-      if (bucket !== "all") {
-        if (!t.dueDate) return false;
-        const due = new Date(t.dueDate);
-        if (bucket === "vencidas" && !(due < startToday && t.status !== "done" && t.status !== "cancelled")) {
-          return false;
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const reply = await fetch(optionsUrl, { signal: controller.signal, cache: "no-store" });
+        const data = await reply.json();
+        if (controller.signal.aborted) return;
+        if (!reply.ok) {
+          setEligibility({ url: optionsUrl, users: [], assignOthers: false, error: data.error || "No se pudieron consultar los responsables." });
+          return;
         }
-        if (bucket === "hoy" && !(due >= startToday && due < endToday)) return false;
-        if (bucket === "semana" && !(due >= startToday && due < endWeek)) return false;
+        setEligibility({ url: optionsUrl, users: data.users, assignOthers: data.assignOthers, error: "" });
+      } catch {
+        if (!controller.signal.aborted) setEligibility({ url: optionsUrl, users: [], assignOthers: false, error: "No se pudieron consultar los responsables." });
       }
-      return true;
-    });
-  }, [tasks, status, siteId, assigneeId, origen, bucket, currentUserId]);
+    })();
+    return () => controller.abort();
+  }, [optionsUrl]);
 
-  async function reload() {
-    const params = new URLSearchParams();
-    if (status) params.set("status", status);
-    if (siteId) params.set("siteId", siteId);
-    if (origen) params.set("origen", origen);
-    if (assigneeId === "me") params.set("mine", "1");
-    else if (assigneeId) params.set("assigneeId", assigneeId);
-    const res = await fetch(`/api/tasks?${params.toString()}`);
-    if (res.ok) setTasks(await res.json());
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    const fields = new FormData(event.currentTarget);
+    const text = (field: string) => String(fields.get(field) || "").trim();
+    const dueDate = text("dueDate");
+    const chosenAssignee = fields.get("assigneeId");
+    const data = {
+      title: text("title"), description: text("description") || null,
+      instructions: text("instructions") || null, considerations: text("considerations") || null,
+      priority: text("priority"), status: text("status"),
+      ...(!task || dueDate !== oldDate ? { dueDate: dueDate || null } : {}),
+      ...(chosenAssignee !== null ? { assigneeId: chosenAssignee || null } : {}),
+      ...(task ? { id: task.id, expectedUpdatedAt: task.updatedAt } : { causaId: causaId || null, siteId: siteId || null }),
+    };
+    setSaving(true);
+    setError("");
+    const response = await apiMutation("/api/tasks", {
+      method: task ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    setSaving(false);
+    if (!response.ok) {
+      setError(response.error);
+      return;
+    }
+    onSaved(task ? "Tarea actualizada." : "Tarea creada.");
     router.refresh();
   }
 
-  async function createTask(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setBusy(true);
-    const form = e.currentTarget;
-    const fd = new FormData(form);
-    const result = await apiMutation("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: fd.get("title"),
-        description: fd.get("description"),
-        priority: fd.get("priority"),
-        dueDate: fd.get("dueDate") || null,
-        siteId: fd.get("siteId") || null,
-        assigneeId: fd.get("assigneeId") || null,
-      }),
-    });
-    setBusy(false);
-    if (!result.ok) return;
-    setOpen(false);
-    form.reset();
-    await reload();
+  const allowed = result?.users || [];
+  const selected = allowed.some(person => person.id === assignee) || assignee === task?.assignee?.id ? assignee : "";
+  return (
+    <form onSubmit={save} className="space-y-5">
+      {error && <p role="alert" className="text-sm text-[var(--danger)]">{error}</p>}
+      <label className="block space-y-2 text-sm font-medium">
+        <span>Título</span>
+        <input className="input" name="title" required maxLength={300} defaultValue={task?.title} />
+      </label>
+      <label className="block space-y-2 text-sm font-medium">
+        <span>Descripción</span>
+        <textarea className="textarea" name="description" rows={3} maxLength={20000} defaultValue={task?.description ?? ""} />
+      </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Cómo hacerlo</span>
+          <textarea className="textarea" name="instructions" rows={3} maxLength={20000} defaultValue={task?.instructions ?? ""} />
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Consideraciones</span>
+          <textarea className="textarea" name="considerations" rows={3} maxLength={20000} defaultValue={task?.considerations ?? ""} />
+        </label>
+      </div>
+      {!task && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block space-y-2 text-sm font-medium">
+            <span>Causa</span>
+            <select className="select" value={causaId} onChange={event => { setCausaId(event.target.value); setSiteId(""); setAssignee(""); }}>
+              <option value="">Sin causa</option>
+              {cases.map(item => <option key={item.id} value={item.id}>{caseLabel(item)}</option>)}
+            </select>
+          </label>
+          <label className="block space-y-2 text-sm font-medium">
+            <span>Espacio</span>
+            <select className="select" value={siteId} onChange={event => { setSiteId(event.target.value); setAssignee(""); }}>
+              <option value="">Sin espacio</option>
+              {sites.filter(site => !causaId || !site.causaId || site.causaId === causaId).map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+            </select>
+          </label>
+        </div>
+      )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Responsable</span>
+          <select className="select" name="assigneeId" value={selected} disabled={!result || Boolean(result.error)} onChange={event => setAssignee(event.target.value)}>
+            <option value="" disabled={Boolean(task?.assignee && !result?.assignOthers)}>Sin asignar</option>
+            {task?.assignee && !allowed.some(person => person.id === task.assignee?.id) && (
+              <option value={task.assignee.id} disabled>{task.assignee.name} · actual</option>
+            )}
+            {allowed.map(person => <option key={person.id} value={person.id}>{person.id === currentUserId ? `${person.name} (yo)` : person.name}</option>)}
+          </select>
+          {!result && <span className="block text-xs text-[var(--muted)]" role="status">Consultando responsables…</span>}
+          {result?.error && <span className="block text-xs text-[var(--danger)]" role="alert">{result.error}</span>}
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Fecha límite</span>
+          <input className="input" type="date" name="dueDate" defaultValue={oldDate} />
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Prioridad</span>
+          <select className="select" name="priority" defaultValue={task?.priority || "medium"}>
+            {Object.entries(priorities).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label className="block space-y-2 text-sm font-medium">
+          <span>Estado</span>
+          <select className="select" name="status" defaultValue={task?.status || "todo"}>
+            {Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--line)] pt-4">
+        <button className="btn btn-ghost" type="button" onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? "Guardando…" : task ? "Guardar cambios" : "Crear tarea"}</button>
+      </div>
+    </form>
+  );
+}
+
+export function GlobalTasksPanel({ tasks, filters, causes, sites, users, currentUserId, truncated }: {
+  tasks: TaskWorkItem[];
+  filters: TaskWorkspaceFilters;
+  causes: CaseOption[];
+  sites: SiteOption[];
+  users: UserOption[];
+  currentUserId: string;
+  truncated: boolean;
+}) {
+  const router = useRouter();
+  const [filtering, startFiltering] = useTransition();
+  const [editor, setEditor] = useState<TaskWorkItem | "new" | null>(null);
+  const [busyTask, setBusyTask] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState({ error: "", notice: "" });
+  const currentCase = causes.find(cause => cause.id === filters.prioritizedCausaId);
+  const exportParams = taskParams({ ...filters, status: "pending" });
+
+  function changeFilter(key: keyof TaskWorkspaceFilters, value: string) {
+    const params = taskParams({ ...filters, [key]: value || null });
+    startFiltering(() => router.replace(params.size ? `/tareas?${params}` : "/tareas", { scroll: false }));
   }
 
-  async function setTaskStatus(id: string, next: string) {
-    const result = await apiMutation<Task>("/api/tasks", {
+  async function setStatus(task: TaskWorkItem, status: string) {
+    if (busyTask) return;
+    setFeedback({ error: "", notice: "" });
+    setBusyTask(task.id);
+    const response = await apiMutation("/api/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status: next }),
+      body: JSON.stringify({ id: task.id, status, expectedUpdatedAt: task.updatedAt }),
     });
-    if (!result.ok) return;
-    const updated = result.data;
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
+    setBusyTask(null);
+    if (!response.ok) {
+      setFeedback({ error: response.error, notice: "" });
+      return;
+    }
+    setFeedback({ error: "", notice: status === "done" ? "Tarea marcada como hecha." : "Tarea reabierta." });
+    router.refresh();
   }
 
   return (
-    <div className="space-y-4">
-      <div className="panel grid items-end gap-4 rounded-[var(--radius-lg)] p-4 sm:grid-cols-2 xl:grid-cols-3">
-        <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--muted)]">Estado</span>
-          <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">Todos</option>
-            <option value="todo">Por hacer</option>
-            <option value="in_progress">En curso</option>
-            <option value="blocked">Bloqueada</option>
-            <option value="waiting_client">Espera cliente</option>
-            <option value="done">Hecha</option>
-            <option value="cancelled">Cancelada</option>
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--muted)]">Bandeja</span>
-          <select
-            className="select"
-            value={bucket}
-            onChange={(e) => setBucket(e.target.value as typeof bucket)}
-          >
-            <option value="all">Todas</option>
-            <option value="vencidas">Vencidas</option>
-            <option value="hoy">Hoy</option>
-            <option value="semana">Esta semana</option>
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--muted)]">Origen</span>
-          <select className="select" value={origen} onChange={(e) => setOrigen(e.target.value)}>
-            <option value="">Todos</option>
-            {Object.entries(ORIGEN_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--muted)]">Espacio</span>
-          <select className="select" value={siteId} onChange={(e) => setSiteId(e.target.value)}>
-            <option value="">Todos</option>
-            {sites.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-xs text-[var(--muted)]">Asignado</span>
-          <select
-            className="select"
-            value={assigneeId}
-            onChange={(e) => setAssigneeId(e.target.value)}
-          >
-            <option value="">Todos</option>
-            <option value="me">Yo</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="btn btn-primary sm:justify-self-end" type="button" onClick={() => setOpen(true)}>
-          <Plus size={16} aria-hidden="true" /> Nueva tarea
-        </button>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-prose text-sm text-[var(--muted)]">
+          {currentCase ? `Primero las tareas de ${caseLabel(currentCase)}. Luego, por prioridad y fecha límite.` : "Ordenadas por prioridad y fecha límite."}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a className="btn btn-secondary" href={`/api/tasks/export?${exportParams}`} download><Download size={16} aria-hidden="true" /> Excel de pendientes</a>
+          <button className="btn btn-primary" type="button" onClick={() => setEditor("new")}><Plus size={16} aria-hidden="true" /> Nueva tarea</button>
+        </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState
-          title="Sin tareas con estos filtros"
-          description="Cree una tarea global o ábrala desde un espacio concreto."
-          action={
-            <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>
-              Nueva tarea
-            </button>
-          }
-        />
+      <fieldset disabled={filtering} className="panel space-y-4 rounded-[var(--radius-lg)] p-4" aria-label="Filtros de tareas">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <label className="min-w-0 space-y-2 text-sm">
+            <span className="block font-medium">Causa</span>
+            <select className="select" value={filters.causaId || ""} onChange={event => changeFilter("causaId", event.target.value)}>
+              <option value="">Todas las causas</option>
+              {causes.map(cause => <option key={cause.id} value={cause.id}>{caseLabel(cause)}</option>)}
+            </select>
+          </label>
+          <label className="min-w-0 space-y-2 text-sm">
+            <span className="block font-medium">Priorizar causa</span>
+            <select className="select" value={filters.prioritizedCausaId || ""} onChange={event => changeFilter("prioritizedCausaId", event.target.value)}>
+              <option value="">Sin preferencia</option>
+              {causes.map(cause => <option key={cause.id} value={cause.id}>{caseLabel(cause)}</option>)}
+            </select>
+          </label>
+          <label className="min-w-0 space-y-2 text-sm">
+            <span className="block font-medium">Responsable</span>
+            <select className="select" value={filters.assigneeId || ""} onChange={event => changeFilter("assigneeId", event.target.value)}>
+              <option value="">Todos</option>
+              <option value="me">Mis tareas</option>
+              <option value="none">Sin asignar</option>
+              {users.filter(user => user.id !== currentUserId).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
+            </select>
+          </label>
+          <label className="min-w-0 space-y-2 text-sm">
+            <span className="block font-medium">Estado</span>
+            <select className="select" value={filters.status || "pending"} onChange={event => changeFilter("status", event.target.value)}>
+              {Object.entries(filterOptions).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+        </div>
+        <details open={Boolean(filters.bucket || filters.priority || filters.siteId || filters.origen) || undefined} className="border-t border-[var(--line)] pt-2">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">Más filtros</summary>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <label className="min-w-0 space-y-2 text-sm">
+              <span className="block font-medium">Vencimiento</span>
+              <select className="select" value={filters.bucket || ""} onChange={event => changeFilter("bucket", event.target.value)}>
+                <option value="">Cualquier fecha</option><option value="vencidas">Vencidas</option><option value="hoy">Hoy</option><option value="semana">Próximos 7 días</option>
+              </select>
+            </label>
+            <label className="min-w-0 space-y-2 text-sm">
+              <span className="block font-medium">Prioridad</span>
+              <select className="select" value={filters.priority || ""} onChange={event => changeFilter("priority", event.target.value)}>
+                <option value="">Todas</option>
+                {Object.entries(priorities).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <label className="min-w-0 space-y-2 text-sm">
+              <span className="block font-medium">Espacio</span>
+              <select className="select" value={filters.siteId || ""} onChange={event => changeFilter("siteId", event.target.value)}>
+                <option value="">Todos</option>
+                {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+              </select>
+            </label>
+            <label className="min-w-0 space-y-2 text-sm">
+              <span className="block font-medium">Origen</span>
+              <select className="select" value={filters.origen || ""} onChange={event => changeFilter("origen", event.target.value)}>
+                <option value="">Todos</option>
+                {Object.entries(origins).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+          </div>
+        </details>
+      </fieldset>
+
+      {filtering && <p className="text-sm text-[var(--muted)]" role="status">Actualizando tareas…</p>}
+      {feedback.error && <p className="text-sm text-[var(--danger)]" role="alert">{feedback.error}</p>}
+      {feedback.notice && <p className="text-sm text-[var(--sea)]" role="status">{feedback.notice}</p>}
+      {truncated && <p className="text-sm text-[var(--muted)]">Se muestran las primeras 200 tareas. Acote los filtros para ver las demás.</p>}
+      {!tasks.length ? (
+        <EmptyState title="Sin tareas con estos filtros" description="Cambie los filtros o cree una tarea para empezar." />
       ) : (
-        <div className="panel divide-y divide-[var(--line)] overflow-hidden rounded-[var(--radius-lg)]">
-          {filtered.map((t) => (
-            <div
-              key={t.id}
-              className="flex min-w-0 flex-col justify-between gap-4 px-5 py-5 lg:flex-row lg:items-center"
-            >
+        <ul className="panel divide-y divide-[var(--line)] rounded-[var(--radius-lg)]" aria-label="Tareas por prioridad">
+          {tasks.map(task => (
+            <li key={task.id} className="flex min-w-0 flex-col justify-between gap-4 px-4 py-5 sm:px-5 lg:flex-row lg:items-start">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="break-words font-semibold">{t.title}</h2>
-                  <StatusBadge
-                    estado={
-                      t.status === "done"
-                        ? "cumplido"
-                        : t.priority === "urgent"
-                          ? "vencido"
-                          : "pendiente"
-                    }
-                  />
-                  <span className="badge badge-ink">{STATUS_LABEL[t.status] || t.status}</span>
+                  <h2 className="break-words font-semibold">{task.title}</h2>
+                  <Badge tone={task.priority === "urgent" ? "danger" : task.priority === "high" ? "warn" : "ink"}>{priorities[task.priority] || task.priority}</Badge>
+                  <Badge tone={task.status === "done" ? "ok" : "ink"}>{statuses[task.status] || task.status}</Badge>
                 </div>
                 <p className="mt-2 break-words text-sm leading-relaxed text-[var(--muted)]">
-                  {t.assignee?.name || "Sin asignar"} · {formatDate(t.dueDate)}
-                  {t.origen ? ` · ${ORIGEN_LABEL[t.origen] || t.origen}` : ""}
+                  {task.assignee?.name || "Sin asignar"}{task.dueDate ? ` · ${formatCivilDate(task.dueDate)}` : ""}
                   {" · "}
-                  {t.causa ? (
-                    <Link href={`/causas/${t.causa.id}`} className="text-[var(--sea)]">
-                      {t.causa.rit || t.causa.titulo}
-                    </Link>
-                  ) : t.site ? (
-                    <Link href={`/sites/${t.site.id}/tareas`} className="text-[var(--sea)]">
-                      {t.site.name}
-                    </Link>
-                  ) : (
-                    "Sin causa"
-                  )}
+                  {task.causa ? <Link href={`/causas/${task.causa.id}`} className="text-[var(--sea)] hover:underline">{caseLabel(task.causa)}</Link>
+                    : task.site ? <Link href={`/sites/${task.site.id}/tareas`} className="text-[var(--sea)] hover:underline">{task.site.name}</Link> : "Sin causa"}
+                  {task.origen !== "manual" ? ` · ${origins[task.origen] || task.origen}` : ""}
                 </p>
-              </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                {t.status !== "in_progress" && t.status !== "done" && (
-                  <button
-                    className="btn btn-ghost"
-                    type="button"
-                    onClick={() => setTaskStatus(t.id, "in_progress")}
-                  >
-                    En curso
-                  </button>
-                )}
-                {t.status !== "done" ? (
-                  <button
-                    className="btn btn-ghost"
-                    type="button"
-                    onClick={() => setTaskStatus(t.id, "done")}
-                  >
-                    Marcar hecha
-                  </button>
-                ) : (
-                  <button
-                    className="btn btn-ghost"
-                    type="button"
-                    onClick={() => setTaskStatus(t.id, "todo")}
-                  >
-                    Reabrir
-                  </button>
+                {task.description && <p className="mt-2 break-words whitespace-pre-wrap text-sm">{task.description}</p>}
+                {(task.instructions || task.considerations) && (
+                  <details className="mt-2 text-sm">
+                    <summary className="min-h-11 cursor-pointer py-3 font-medium">Instrucciones y consideraciones</summary>
+                    <dl className="space-y-2">
+                      {task.instructions && <div><dt className="font-medium">Cómo hacerlo</dt><dd className="break-words whitespace-pre-wrap text-[var(--muted)]">{task.instructions}</dd></div>}
+                      {task.considerations && <div><dt className="font-medium">Consideraciones</dt><dd className="break-words whitespace-pre-wrap text-[var(--muted)]">{task.considerations}</dd></div>}
+                    </dl>
+                  </details>
                 )}
               </div>
-            </div>
+              {task.canEdit && (
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button className="btn btn-ghost" type="button" onClick={() => setEditor(task)}>Editar</button>
+                  <button className="btn btn-ghost" type="button" disabled={busyTask !== null} onClick={() => void setStatus(task, task.status === "done" || task.status === "cancelled" ? "todo" : "done")}>
+                    {busyTask === task.id ? "Guardando…" : task.status === "done" || task.status === "cancelled" ? "Reabrir" : "Marcar hecha"}
+                  </button>
+                </div>
+              )}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
-      <Dialog open={open} onClose={() => setOpen(false)} title="Nueva tarea">
-        {open && (
-          <form onSubmit={createTask} className="space-y-4">
-            <label className="block space-y-2 text-sm font-medium">
-              <span>Título</span>
-            <input className="input" name="title" required placeholder="Título" />
-            </label>
-            <label className="block space-y-2 text-sm font-medium">
-              <span>Descripción</span>
-            <textarea className="textarea" name="description" placeholder="Descripción" />
-            </label>
-            <label className="block space-y-2 text-sm font-medium">
-              <span>Espacio</span>
-            <select className="select" name="siteId" defaultValue="">
-              <option value="">Sin espacio</option>
-              {sites.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            </label>
-            <label className="block space-y-2 text-sm font-medium">
-              <span>Asignado</span>
-            <select className="select" name="assigneeId" defaultValue="">
-              <option value="">Sin asignar</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
-            </label>
-            <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block space-y-2 text-sm font-medium">
-              <span>Prioridad</span>
-            <select className="select" name="priority" defaultValue="medium">
-              <option value="low">Baja</option>
-              <option value="medium">Media</option>
-              <option value="high">Alta</option>
-              <option value="urgent">Urgente</option>
-            </select>
-            </label>
-            <label className="block space-y-2 text-sm font-medium">
-              <span>Fecha límite</span>
-            <input className="input" type="date" name="dueDate" />
-            </label>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-[var(--line)] pt-4">
-              <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
-                Cancelar
-              </button>
-              <button className="btn btn-primary" disabled={busy} type="submit">
-                {busy ? "…" : "Crear"}
-              </button>
-            </div>
-          </form>
+      <Dialog open={editor !== null} title={editor === "new" ? "Nueva tarea" : "Editar tarea"} onClose={() => setEditor(null)} className="w-[min(42rem,calc(100vw-1.5rem))]">
+        {editor && (
+          <TaskEditor
+            key={editor === "new" ? "new" : editor.id}
+            task={editor === "new" ? null : editor}
+            cases={causes}
+            sites={sites}
+            initialCaseId={editor === "new" ? filters.causaId || "" : ""}
+            currentUserId={currentUserId}
+            onClose={() => setEditor(null)}
+            onSaved={notice => { setEditor(null); setFeedback({ error: "", notice }); }}
+          />
         )}
       </Dialog>
     </div>

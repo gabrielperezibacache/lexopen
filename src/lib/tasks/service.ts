@@ -1,6 +1,6 @@
 import { writeAuditStrict } from "@/lib/audit";
 import { httpError } from "@/lib/auth/access";
-import { assertCausaAccess, plazoAccessWhere, siteAccessWhere, taskAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
+import { assertCausaAccess, plazoAccessWhere, siteAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { activeDelegadorIds } from "@/lib/auth/delegacion";
 import { can } from "@/lib/auth/permissions";
 import { isStaff } from "@/lib/auth/rbac";
@@ -9,11 +9,13 @@ import { emitNotification } from "@/lib/notify/emit";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { syncSourcesFromTask } from "./sync-mirrors";
+import { taskWorkspaceAccessWhere } from "./workspace";
 
 const nullableId = z.string().min(1).max(100).nullable();
 const date = z.string().max(100).refine((s) => Number.isFinite(new Date(s).getTime()), "Fecha inválida").nullable();
 export const taskChangesSchema = z.object({
   title: z.string().trim().min(1).max(300).optional(), description: z.string().max(20000).nullable().optional(),
+  instructions: z.string().max(20000).nullable().optional(), considerations: z.string().max(20000).nullable().optional(),
   status: z.enum(["todo", "in_progress", "blocked", "waiting_client", "done", "cancelled"]).optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(), dueDate: date.optional(), remindAt: date.optional(),
   assigneeId: nullableId.optional(), causaId: nullableId.optional(), clienteId: nullableId.optional(), siteId: nullableId.optional(),
@@ -23,6 +25,14 @@ export const taskChangesSchema = z.object({
   origen: z.enum(["manual", "minuta", "pjud", "checklist", "tramite", "asistente", "voz", "intake", "aprobacion"]).optional(),
 });
 type Changes = z.infer<typeof taskChangesSchema>;
+type TaskOwner = { assigneeId: string | null; creatorId: string | null };
+
+export function taskMutationPermissions(user: CausaAccessUser, task: TaskOwner, delegatedFrom: string[]) {
+  const own = task.assigneeId === user.id || task.creatorId === user.id;
+  const delegated = task.assigneeId !== null && delegatedFrom.includes(task.assigneeId);
+  const edit = own || delegated || can(user, "task.assign");
+  return { edit, assignOthers: edit && (delegated || can(user, "task.assign", { own })) };
+}
 
 async function references(data: Pick<Changes, "causaId" | "siteId" | "parentId" | "plazoId" | "eventoId" | "clienteId" | "assigneeId">, user: CausaAccessUser, tx: Prisma.TransactionClient) {
   let cause = data.causaId || null;
@@ -34,7 +44,7 @@ async function references(data: Pick<Changes, "causaId" | "siteId" | "parentId" 
   }
   if (cause) await assertCausaAccess(cause, user, undefined, tx);
   if (data.parentId) {
-    const parent = await tx.task.findFirst({ where: { id: data.parentId, ...taskAccessWhere(user) }, select: { causaId: true } });
+    const parent = await tx.task.findFirst({ where: { id: data.parentId, ...taskWorkspaceAccessWhere(user) }, select: { causaId: true } });
     if (!parent) throw httpError("Tarea padre no encontrada", 404);
     if (cause && parent.causaId && cause !== parent.causaId) throw httpError("Referencias de expediente incompatibles", 400);
     cause ||= parent.causaId;
@@ -86,17 +96,28 @@ export async function createTask(user: CausaAccessUser, input: unknown, client?:
 /** One command path for single, bulk, site and delegation mutations. */
 export async function updateTasks(user: CausaAccessUser, ids: string[], input: unknown, siteId?: string, client?: Prisma.TransactionClient) {
   const changes = taskChangesSchema.parse(input);
+  const { expectedUpdatedAt } = z.object({ expectedUpdatedAt: z.string().datetime().optional() }).parse(input);
   const uniqueIds = [...new Set(z.array(z.string().min(1).max(100)).min(1).max(100).parse(ids))];
   const delegators = await activeDelegadorIds(user.id, "task.assign", client);
   return transaction(async (tx) => {
-    const rows = await tx.task.findMany({ where: { id: { in: uniqueIds }, ...taskAccessWhere(user), ...(siteId ? { siteId } : {}) } });
+    const rows = await tx.task.findMany({ where: { id: { in: uniqueIds }, ...taskWorkspaceAccessWhere(user), ...(siteId ? { siteId } : {}) } });
     if (rows.length !== uniqueIds.length) throw httpError("Tarea no encontrada", 404);
     const result = [];
     for (const before of rows) {
-      const own = before.assigneeId === user.id || before.creatorId === user.id;
-      const delegated = Boolean(before.assigneeId && delegators.includes(before.assigneeId));
-      if (!own && !delegated && !can(user, "task.assign")) throw httpError("No puede modificar esta tarea", 403);
-      if (changes.assigneeId !== undefined && changes.assigneeId !== before.assigneeId && changes.assigneeId !== user.id && !delegated && !can(user, "task.assign", { own })) throw httpError("No puede reasignar esta tarea", 403);
+      const permissions = taskMutationPermissions(user, before, delegators);
+      if (!permissions.edit) throw httpError("No puede modificar esta tarea", 403);
+      if (expectedUpdatedAt && new Date(expectedUpdatedAt).getTime() !== before.updatedAt.getTime()) {
+        throw httpError("Esta tarea cambió. Recargue la lista antes de guardar sus cambios.", 409);
+      }
+      if (changes.assigneeId !== undefined && changes.assigneeId !== before.assigneeId) {
+        if (changes.assigneeId !== user.id && !permissions.assignOthers) throw httpError("No puede reasignar esta tarea", 403);
+        if (changes.assigneeId) {
+          const target = await tx.user.findUnique({ where: { id: changes.assigneeId } });
+          if (!target || !isStaff(target.role)) throw httpError("El asignado debe ser un usuario del estudio", 400);
+          const visible = await tx.task.findFirst({ where: { id: before.id, ...taskWorkspaceAccessWhere(target) }, select: { id: true } });
+          if (!visible) throw httpError("El asignado no tiene acceso a esta tarea", 403);
+        }
+      }
       if (changes.parentId === before.id) throw httpError("Una tarea no puede ser su propia subtarea", 400);
       const merged = { ...before, ...changes };
       const causaId = await references(merged, user, tx);
@@ -118,7 +139,7 @@ export async function updateTasks(user: CausaAccessUser, ids: string[], input: u
         const interval = Number(/INTERVAL=(\d+)/.exec(before.rrule)?.[1] || 1);
         if (before.rrule.startsWith("FREQ=MONTHLY")) dueDate.setMonth(dueDate.getMonth() + interval);
         else dueDate.setDate(dueDate.getDate() + interval * (before.rrule.startsWith("FREQ=WEEKLY") ? 7 : 1));
-        await tx.task.create({ data: { title: before.title, description: before.description, priority: before.priority, dueDate, causaId, siteId: before.siteId, clienteId: before.clienteId, assigneeId: before.assigneeId, creatorId: user.id, origen: "manual", rrule: before.rrule } });
+        await tx.task.create({ data: { title: before.title, description: before.description, instructions: before.instructions, considerations: before.considerations, priority: before.priority, dueDate, causaId, siteId: before.siteId, clienteId: before.clienteId, assigneeId: before.assigneeId, creatorId: user.id, origen: "manual", rrule: before.rrule } });
       }
       result.push(task);
     }

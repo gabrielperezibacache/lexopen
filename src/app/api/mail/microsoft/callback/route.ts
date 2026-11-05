@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireStaff } from "@/lib/api";
 import { connectMailboxOauth } from "@/lib/mail/ingest";
 import { exchangeMicrosoftMailboxCode } from "@/lib/mail/oauth";
+import { MAIL_SETTINGS_PATH } from "@/lib/mail/settings-location";
 import {
   MICROSOFT_OAUTH_COOKIE,
   MICROSOFT_OAUTH_PATH,
@@ -12,7 +13,7 @@ import {
 
 function redirectTo(req: NextRequest, query: string) {
   return clearOauthStateCookie(
-    NextResponse.redirect(new URL(`/correo?${query}`, req.url)),
+    NextResponse.redirect(new URL(`${MAIL_SETTINGS_PATH}?${query}`, req.url)),
     MICROSOFT_OAUTH_COOKIE,
     MICROSOFT_OAUTH_PATH
   );

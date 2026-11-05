@@ -19,6 +19,7 @@ test.afterAll(async () => {
 });
 test("la plantilla se crea con campos normales y rechaza un formato avanzado inválido", async ({ page }, info) => {
   await loginAs(page, email); await page.goto("/minutas");
+  await page.getByText("Administrar plantillas", { exact: true }).click();
   const form = page.getByRole("region", { name: "Plantillas de minutas" });
   await form.getByRole("combobox", { name: "Tipo", exact: true }).selectOption("audiencia");
   await form.getByRole("textbox", { name: "Nombre", exact: true }).fill(name);

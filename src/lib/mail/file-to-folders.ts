@@ -1,14 +1,17 @@
 import { createHash } from "crypto";
+import type { Prisma } from "@prisma/client";
+import { httpError } from "@/lib/auth/access";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { writeAuditStrict } from "@/lib/audit";
+import { serializable } from "@/lib/command-execution";
+import { ensureCaseMailFolder } from "@/lib/causas/document-organization";
 import { getObject, newStorageKey, putObject } from "@/lib/storage";
 import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 import { looksLikePdf } from "@/lib/pjud/pdf-backup";
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { pushDocumentoToDrive } from "@/lib/integrations/google";
-import { parseMailContent, type ParsedMail } from "@/lib/mail/parse";
-import type { ParsedMailAttachment } from "@/lib/mail/mime";
+import { mailCourtKey, parseMailContent, type ExactMailMatter, type ParsedMail } from "@/lib/mail/parse";
 import { assertCausaMailAccess } from "@/lib/mail/access";
 
 const MAX_ATTACHMENT = 20 * 1024 * 1024;
@@ -40,14 +43,27 @@ function parseJson<T>(raw: string | null | undefined, fallback: T): T {
 }
 
 function parseTablaDate(raw: string): Date | undefined {
-  const m = raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-  if (!m) return undefined;
-  const day = Number(m[1]);
-  const month = Number(m[2]);
-  let year = Number(m[3]);
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const local = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})$/);
+  if (!iso && !local) return undefined;
+  const day = Number(iso?.[3] || local?.[1]);
+  const month = Number(iso?.[2] || local?.[2]);
+  let year = Number(iso?.[1] || local?.[3]);
   if (year < 100) year += 2000;
   const d = new Date(year, month - 1, day);
-  return Number.isNaN(d.getTime()) ? undefined : d;
+  return d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day ? d : undefined;
+}
+
+export async function findExactMailMatter(identity: ExactMailMatter, client: Pick<Prisma.TransactionClient, "causa"> = prisma) {
+  // Check uniqueness before applying ACLs. An inaccessible duplicate is still ambiguous.
+  const candidates = await client.causa.findMany({
+    where: { rit: { equals: identity.rit, mode: "insensitive" } },
+    select: { id: true, tribunal: true },
+    take: 51,
+  });
+  if (candidates.length === 51) return null;
+  const matches = candidates.filter(candidate => mailCourtKey(candidate.tribunal) === identity.courtKey);
+  return matches.length === 1 ? matches[0]!.id : null;
 }
 
 export async function ingestCausaDocumentBuffer(opts: {
@@ -91,35 +107,35 @@ export async function ingestCausaDocumentBuffer(opts: {
 }
 
 async function copyDocumentoToSiteFolder(opts: {
+  tx: Prisma.TransactionClient;
   causaId: string;
   actorId: string;
   filename: string;
   mimeType: string;
-  bytes: Buffer;
+  storageKey: string;
+  sizeBytes: number;
 }) {
-  const site = await prisma.site.findUnique({
+  const site = await opts.tx.site.findUnique({
     where: { causaId: opts.causaId },
     select: { id: true },
   });
   if (!site) return null;
-  let folder = await prisma.folder.findFirst({
+  let folder = await opts.tx.folder.findFirst({
     where: { siteId: site.id, name: SITE_FOLDER_NAME, parentId: null },
     select: { id: true },
   });
   if (!folder) {
-    folder = await prisma.folder.create({
+    folder = await opts.tx.folder.create({
       data: { name: SITE_FOLDER_NAME, siteId: site.id },
       select: { id: true },
     });
   }
-  const key = newStorageKey(`sites/${site.id}/correo-pjud`, opts.filename);
-  await putObject({ key, body: opts.bytes, contentType: opts.mimeType });
-  const file = await prisma.siteFile.create({
+  const file = await opts.tx.siteFile.create({
     data: {
       name: opts.filename,
       mimeType: opts.mimeType,
-      storageKey: key,
-      sizeBytes: opts.bytes.byteLength,
+      storageKey: opts.storageKey,
+      sizeBytes: opts.sizeBytes,
       siteId: site.id,
       folderId: folder.id,
       metadataJson: JSON.stringify({ source: "correo-pjud" }),
@@ -136,169 +152,121 @@ async function copyDocumentoToSiteFolder(opts: {
   return file.id;
 }
 
-async function loadStashedAttachments(
-  rows: Array<{
-    filename: string;
-    mimeType: string | null;
-    storageKey: string | null;
-    documentoId: string | null;
-  }>
-): Promise<ParsedMailAttachment[]> {
-  const out: ParsedMailAttachment[] = [];
-  for (const row of rows) {
-    if (!row.storageKey || row.documentoId) continue;
-    const bytes = await getObject(row.storageKey);
-    if (!bytes) continue;
-    out.push({
-      filename: row.filename,
-      mimeType: row.mimeType || "application/octet-stream",
-      content: bytes,
-    });
-  }
-  return out;
-}
-
 export async function fileMailboxMessageToCausa(
   user: CausaAccessUser,
   messageId: string,
   causaId: string,
-  extraAttachments?: ParsedMailAttachment[]
+  options?: { identity?: ExactMailMatter }
 ) {
-  const message = await prisma.mailboxMessage.findFirst({
-    where: { id: messageId, userId: user.id },
-    include: { attachments: true },
-  });
-  if (!message) {
-    const err = new Error("Mensaje no encontrado") as Error & { status: number };
-    err.status = 404;
-    throw err;
-  }
-
-  // Ingest calls this service directly as well as through the manual apply route.
+  const owned = { id: messageId, userId: user.id };
+  const initial = await prisma.mailboxMessage.findFirst({ where: owned, include: { attachments: true } });
+  if (!initial) throw httpError("Mensaje no encontrado", 404);
   await assertCausaMailAccess(user, causaId, { write: true });
+  if (initial.status === "aplicado" && initial.causaId === causaId) return initial;
 
-  const parsed = parseJson<ParsedMail>(
-    message.parsedJson,
-    parseMailContent(message.subject, message.bodyText)
-  );
-  const updates: { proximaTabla?: Date; proximaTablaNota?: string } = {};
-  if (parsed.kind === "tablas" && parsed.tablaFecha) {
-    const d = parseTablaDate(parsed.tablaFecha);
-    if (d) {
-      updates.proximaTabla = d;
-      updates.proximaTablaNota =
-        parsed.tablaNota || parsed.tablaSala || "Desde correo PJUD";
+  // Verify the stashed originals before opening the transaction. File and site
+  // records can reference the same immutable bytes, without duplicating blobs.
+  const originals = new Map<string, { storageKey: string; bytes: Buffer; mimeType: string }>();
+  for (const attachment of initial.attachments) {
+    if (attachment.documentoId || !attachment.storageKey) continue;
+    const bytes = await getObject(attachment.storageKey);
+    if (!bytes || bytes.byteLength !== attachment.sizeBytes || attachmentSha256(bytes) !== attachment.sha256 ||
+        !isArchivableAttachment({ content: bytes, mimeType: attachment.mimeType })) {
+      throw httpError("No se pudo comprobar el archivo original del correo", 409);
     }
-  }
-  if (Object.keys(updates).length > 0) {
-    await prisma.causa.update({ where: { id: causaId }, data: updates });
-  }
-
-  const existingMov = parsed.kind === "resolucion"
-    ? await prisma.causaMovimiento.findFirst({
-        where: {
-          causaId,
-          externalId: message.externalId || message.id,
-        },
-        select: { id: true },
-      })
-    : null;
-
-  let movimientoId = existingMov?.id;
-  if (parsed.kind === "resolucion" && parsed.resolucion && !movimientoId) {
-    const mov = await prisma.causaMovimiento.create({
-      data: {
-        causaId,
-        titulo: parsed.resolucion.slice(0, 200),
-        detalle: message.bodyText.slice(0, 4000),
-        fuente: "import",
-        tipo: "resolucion",
-        referencia: message.externalId || message.id,
-        externalId: message.externalId || message.id,
-      },
-    });
-    movimientoId = mov.id;
-  } else if (
-    !movimientoId &&
-    (extraAttachments?.length ||
-      message.attachments.some((a) => a.storageKey && !a.documentoId))
-  ) {
-    const mov = await prisma.causaMovimiento.create({
-      data: {
-        causaId,
-        titulo: message.subject.slice(0, 200),
-        detalle: message.bodyText.slice(0, 4000),
-        fuente: "import",
-        tipo: parsed.kind === "tablas" ? "audiencia" : "notificacion",
-        referencia: message.externalId || message.id,
-        externalId: message.externalId || message.id,
-      },
-    });
-    movimientoId = mov.id;
+    const mimeType = looksLikePdf(bytes) ? "application/pdf" : attachment.mimeType || "application/octet-stream";
+    originals.set(attachment.id, { storageKey: attachment.storageKey, bytes, mimeType });
   }
 
-  const pending = extraAttachments?.length
-    ? extraAttachments
-    : await loadStashedAttachments(message.attachments);
-  for (const att of pending) {
-    if (!isArchivableAttachment(att)) continue;
-    const sha = attachmentSha256(att.content);
-    const already = message.attachments.find((a) => a.sha256 === sha);
-    if (already?.documentoId) continue;
-    const doc = await ingestCausaDocumentBuffer({
-      causaId,
-      bytes: att.content,
-      filename: att.filename,
-      mimeHint: att.mimeType,
-      movimientoId: movimientoId || null,
-    });
-    if (!doc) continue;
-    const siteFileId = await copyDocumentoToSiteFolder({
-      causaId,
-      actorId: user.id,
-      filename: att.filename,
-      mimeType: doc.mimeType || att.mimeType,
-      bytes: att.content,
-    });
-    const causa = await prisma.causa.findUnique({
-      where: { id: causaId },
-      select: { googleDriveFolderId: true },
-    });
-    if (isRealDriveFolderId(causa?.googleDriveFolderId)) {
-      await pushDocumentoToDrive(doc.id, { role: user.role }).catch(() => undefined);
+  const result = await serializable(async tx => {
+    const message = await tx.mailboxMessage.findFirst({ where: owned, include: { attachments: true } });
+    if (!message) throw httpError("Mensaje no encontrado", 404);
+    await assertCausaMailAccess(user, causaId, { write: true }, tx);
+    if (message.status === "aplicado") {
+      if (message.causaId !== causaId) throw httpError("Este correo ya está archivado en otro expediente", 409);
+      return { message, documents: [], drive: false };
     }
-    if (already) {
-      await prisma.mailboxAttachment.update({
-        where: { id: already.id },
-        data: { documentoId: doc.id, siteFileId },
+    if (options?.identity && (message.status !== "nuevo" || await findExactMailMatter(options.identity, tx) !== causaId)) {
+      return { message, documents: [], drive: false };
+    }
+    const parsed = parseJson<ParsedMail>(message.parsedJson, parseMailContent(message.subject, message.bodyText));
+    // The sender address is a routing hint. Only explicit filing can change the case calendar.
+    const fechaTabla = !options?.identity && parsed.kind === "tablas" && parsed.tablaFecha ? parseTablaDate(parsed.tablaFecha) : undefined;
+    if (fechaTabla) {
+      await tx.causa.update({
+        where: { id: causaId },
+        data: { proximaTabla: fechaTabla, proximaTablaNota: parsed.tablaNota || parsed.tablaSala || "Desde correo PJUD" },
       });
-    } else {
-      await prisma.mailboxAttachment.create({
+    }
+
+    const pending = message.attachments.filter(attachment => attachment.storageKey && !attachment.documentoId);
+    let movimientoId: string | undefined;
+    if (parsed.kind !== "otro" || pending.length) {
+      const externalId = message.externalId || message.id;
+      await tx.causaMovimiento.createMany({ skipDuplicates: true, data: {
+        causaId,
+        titulo: (parsed.kind === "resolucion" ? parsed.resolucion || message.subject : message.subject).slice(0, 200),
+        detalle: message.bodyText.slice(0, 4000),
+        fecha: message.receivedAt,
+        fuente: "import",
+        tipo: parsed.kind === "resolucion" ? "resolucion" : parsed.kind === "tablas" ? "audiencia" : "notificacion",
+        referencia: externalId,
+        externalId,
+      } });
+      movimientoId = (await tx.causaMovimiento.findUniqueOrThrow({
+        where: { causaId_externalId: { causaId, externalId } }, select: { id: true },
+      })).id;
+    }
+
+    const folderId = pending.length ? await ensureCaseMailFolder(tx, causaId) : null;
+    const documents = [];
+    for (const attachment of pending) {
+      const original = originals.get(attachment.id);
+      if (!original || original.storageKey !== attachment.storageKey) {
+        throw httpError("Los adjuntos cambiaron. Vuelve a intentar el archivo del correo", 409);
+      }
+      const doc = await tx.documento.create({
         data: {
-          messageId: message.id,
-          filename: att.filename,
-          mimeType: att.mimeType,
-          sha256: sha,
-          sizeBytes: att.content.byteLength,
-          documentoId: doc.id,
-          siteFileId,
+          nombre: attachment.filename,
+          tipo: "notificacion",
+          mimeType: original.mimeType,
+          storageKey: original.storageKey,
+          causaId,
+          ruta: "correo/pjud",
+          extractionStatus: "pending",
+          ...(folderId ? { archivePlacement: { create: { folderId } } } : {}),
         },
+        select: { id: true, nombre: true },
       });
+      const siteFileId = await copyDocumentoToSiteFolder({
+        tx, causaId, actorId: user.id, filename: attachment.filename, mimeType: original.mimeType,
+        storageKey: original.storageKey, sizeBytes: original.bytes.byteLength,
+      });
+      await tx.mailboxAttachment.update({ where: { id: attachment.id }, data: { documentoId: doc.id, siteFileId } });
+      if (movimientoId) await tx.causaMovimiento.updateMany({
+        where: { id: movimientoId, documentoRef: null }, data: { documentoRef: `doc:${doc.id}` },
+      });
+      documents.push({ id: doc.id, name: doc.nombre, bytes: original.bytes });
+    }
+    const cause = documents.length ? await tx.causa.findUnique({ where: { id: causaId }, select: { googleDriveFolderId: true } }) : null;
+    const updated = await tx.mailboxMessage.update({ where: { id: message.id }, data: { status: "aplicado", causaId } });
+    await writeAuditStrict({
+      actorId: user.id,
+      action: "mail.apply",
+      entityType: "MailboxMessage",
+      entityId: message.id,
+      after: { causaId, kind: message.kind, automatic: Boolean(options?.identity), documentIds: documents.map(doc => doc.id) },
+    }, tx);
+    return { message: updated, documents, drive: isRealDriveFolderId(cause?.googleDriveFolderId) };
+  });
+
+  for (const document of result.documents) {
+    enqueueDocumentProcessing(document);
+    if (result.drive) {
+      await assertCausaMailAccess(user, causaId, { write: true })
+        .then(() => pushDocumentoToDrive(document.id, { role: user.role }))
+        .catch(() => undefined);
     }
   }
-
-  const updated = await prisma.mailboxMessage.update({
-    where: { id: message.id },
-    data: { status: "aplicado", causaId },
-  });
-
-  await writeAuditStrict({
-    actorId: user.id,
-    action: "mail.apply",
-    entityType: "MailboxMessage",
-    entityId: message.id,
-    after: { causaId, kind: message.kind },
-  });
-
-  return updated;
+  return result.message;
 }

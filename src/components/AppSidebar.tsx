@@ -46,7 +46,10 @@ function SidebarChrome({ navigation, user, mailPendingCount, onNavigate, onClose
   const { t } = useI18n();
   const activeArea = activeNavigationArea(navigation, pathname);
   const activeEntry = activeNavigationEntry(navigation, pathname);
-  const secondary = secondaryNavigation(navigation, pathname);
+  const secondary = secondaryNavigation(navigation, pathname).filter(entry => !showClose || entry.id !== "configuracion");
+  const settingsShortcut = !collapsed && secondary.some(entry => entry.id === "configuracion")
+    ? undefined
+    : navigation.entries.find(entry => entry.id === "configuracion");
 
   function entryLink(entry: NavigationEntry, compact = false) {
     const Icon = ICONS[entry.icon];
@@ -105,6 +108,7 @@ function SidebarChrome({ navigation, user, mailPendingCount, onNavigate, onClose
 
     <div className={cn("shell-sidebar-footer border-t border-white/10", collapsed && "shell-sidebar-footer-compact")}
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+      {settingsShortcut && entryLink(settingsShortcut, collapsed)}
       <UserSwitcher initialUser={user} compact={collapsed} />
     </div>
   </>;

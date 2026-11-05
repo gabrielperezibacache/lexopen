@@ -39,7 +39,7 @@ test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", asyn
     await page.emulateMedia({ colorScheme: "dark" });
     await loginAs(page, "socio@estudio.cl");
     await page.getByTestId("desktop-sidebar").getByRole("link", { name: "Causas", exact: true }).click();
-    await page.getByTestId("desktop-sidebar").getByRole("link", { name: "Mis Causas", exact: true }).click();
+    await expect(page).toHaveURL(/\/mis-causas$/);
     await expect(page.getByRole("heading", { name: "Mis Causas", exact: true })).toBeVisible();
     await page.getByRole("link", { name: title, exact: true }).click();
     const archive = page.getByTestId("case-archive");

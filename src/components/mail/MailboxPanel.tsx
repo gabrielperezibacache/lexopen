@@ -6,7 +6,6 @@ import { apiMutation } from "@/lib/api-mutation";
 import { formatDate } from "@/components/ui";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { mailKindLabel } from "@/lib/mail/labels";
-import { IMAP_PRESETS, type PublicMailboxAccount } from "@/lib/mail/types";
 
 type MailAttachment = {
   filename: string;
@@ -36,44 +35,26 @@ type CausaOption = {
   proximaTabla?: string | null;
 };
 
-const EMPTY_ACCOUNT: PublicMailboxAccount = {
-  protocol: "imap",
-  status: "disconnected",
-  email: null,
-  imapHost: null,
-  imapPort: 993,
-  imapTls: true,
-  hasPassword: false,
-  hasOauth: false,
-  lastSyncAt: null,
-  lastError: null,
-  googleConfigured: false,
-  microsoftConfigured: false,
-  presets: IMAP_PRESETS,
-};
-
 export function MailboxPanel() {
   const { t, locale } = useI18n();
   const searchParams = useSearchParams();
+  const requestedId = searchParams.get("id");
   const [messages, setMessages] = useState<MailMessage[]>([]);
   const [causas, setCausas] = useState<CausaOption[]>([]);
-  const [account, setAccount] = useState<PublicMailboxAccount>(EMPTY_ACCOUNT);
-  const [selectedId, setSelectedId] = useState<string | null>(
-    searchParams.get("id")
-  );
-  const [causaPick, setCausaPick] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [selection, setSelection] = useState({ requestedId, id: requestedId });
+  const [pickedCase, setPickedCase] = useState<string | null>(null);
+  const [detail, setDetail] = useState<{ id: string; message: MailMessage | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [pasteSubject, setPasteSubject] = useState("");
   const [pasteBody, setPasteBody] = useState("");
-  const [imapPreset, setImapPreset] = useState("gmail");
-  const [imapEmail, setImapEmail] = useState("");
-  const [imapPassword, setImapPassword] = useState("");
-  const [imapHost, setImapHost] = useState("imap.gmail.com");
-  const [imapPort, setImapPort] = useState("993");
-
+  if (selection.requestedId !== requestedId) {
+    setSelection({ requestedId, id: requestedId });
+    setPickedCase(null);
+  }
+  const selectedId = selection.id;
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
     setError("");
@@ -86,12 +67,7 @@ export function MailboxPanel() {
     }
     setMessages(data.messages || []);
     if (Array.isArray(data.causas)) setCausas(data.causas);
-    if (data.account) {
-      setAccount({ ...EMPTY_ACCOUNT, ...data.account });
-      if (data.account.email) setImapEmail(data.account.email);
-      if (data.account.imapHost) setImapHost(data.account.imapHost);
-      if (data.account.imapPort) setImapPort(String(data.account.imapPort));
-    }
+    setConnected(data.account?.status === "connected");
     setLoading(false);
   }, [t]);
 
@@ -100,27 +76,34 @@ export function MailboxPanel() {
     void load();
   }, [load]);
 
-  const oauthFlash = useMemo(() => {
-    const gmail = searchParams.get("gmail");
-    const microsoft = searchParams.get("microsoft");
-    if (gmail === "connected" || microsoft === "connected") {
-      return { notice: t("mailbox.oauthConnected"), error: "" };
-    }
-    if (gmail || microsoft) {
-      return { notice: "", error: t("mailbox.oauthError") };
-    }
-    return { notice: "", error: "" };
-  }, [searchParams, t]);
-
-  const flashNotice = notice || oauthFlash.notice;
-  const flashError = error || oauthFlash.error;
-
-  const selected = useMemo(
+  const listed = useMemo(
     () => messages.find((m) => m.id === selectedId) || null,
     [messages, selectedId]
   );
+  const remote = detail?.id === selectedId ? detail : null;
+  const selected = listed || remote?.message || null;
+  const causaPick = pickedCase ?? selected?.causaId ?? "";
 
-  const connected = account.status === "connected";
+  useEffect(() => {
+    if (!selectedId || loading || listed) return;
+    const controller = new AbortController();
+    async function loadDetail(id: string) {
+      let message: MailMessage | null = null;
+      try {
+        const res = await fetch(`/api/mail/messages/${encodeURIComponent(id)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { message?: MailMessage };
+          if (data.message?.id === id) message = data.message;
+        }
+      } catch { /* The detail remains unavailable. */ }
+      if (!controller.signal.aborted) setDetail({ id, message });
+    }
+    void loadDetail(selectedId);
+    return () => controller.abort();
+  }, [loading, listed, messages, selectedId]);
 
   async function sync() {
     setBusy(true);
@@ -134,69 +117,11 @@ export function MailboxPanel() {
     await load({ silent: true });
   }
 
-  async function startOauth(provider: "google" | "microsoft") {
-    setBusy(true);
-    setError("");
-    const result = await apiMutation<{ authUrl?: string }>(
-      `/api/mail/${provider}/start`,
-      { method: "POST" }
-    );
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    if (result.data.authUrl) {
-      window.location.href = result.data.authUrl;
-    }
-  }
-
-  async function saveImap() {
-    setBusy(true);
-    setError("");
-    const result = await apiMutation("/api/mail/account", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "save-imap",
-        email: imapEmail,
-        password: imapPassword || undefined,
-        imapHost,
-        imapPort: Number(imapPort) || 993,
-        imapTls: true,
-      }),
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    setImapPassword("");
-    setNotice(t("mailbox.imapSaved"));
-    await load({ silent: true });
-  }
-
-  async function disconnect() {
-    setBusy(true);
-    setError("");
-    const result = await apiMutation("/api/mail/account", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "disconnect" }),
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    await load({ silent: true });
-  }
-
   async function runAction(action: "apply" | "link" | "discard") {
     if (!selected) return;
     setBusy(true);
     setError("");
-    const result = await apiMutation(`/api/mail/messages/${selected.id}`, {
+    const result = await apiMutation<{ message?: MailMessage }>(`/api/mail/messages/${encodeURIComponent(selected.id)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -209,6 +134,7 @@ export function MailboxPanel() {
       setError(result.error);
       return;
     }
+    if (result.data.message?.id === selected.id) setDetail({ id: selected.id, message: result.data.message });
     await load({ silent: true });
   }
 
@@ -233,130 +159,8 @@ export function MailboxPanel() {
     await load({ silent: true });
   }
 
-  function applyPreset(id: string) {
-    setImapPreset(id);
-    const preset = account.presets.find((p) => p.id === id);
-    if (preset?.host) {
-      setImapHost(preset.host);
-      setImapPort(String(preset.port));
-    }
-  }
-
   return (
     <div className="space-y-6">
-      <section
-        className="panel space-y-4 rounded-[var(--radius-lg)] p-5"
-        data-testid="mailbox-connect"
-      >
-        <div>
-          <h2 className="text-lg font-semibold">{t("mailbox.connectTitle")}</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            {t("mailbox.connectHint")}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="btn btn-primary text-sm"
-            disabled={busy}
-            data-testid="mailbox-connect-gmail"
-            onClick={() => void startOauth("google")}
-          >
-            {t("mailbox.connectGmail")}
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary text-sm"
-            disabled={busy}
-            data-testid="mailbox-connect-microsoft"
-            onClick={() => void startOauth("microsoft")}
-          >
-            {t("mailbox.connectMicrosoft")}
-          </button>
-          {connected && (
-            <button
-              type="button"
-              className="btn btn-ghost text-sm"
-              disabled={busy}
-              onClick={() => void disconnect()}
-            >
-              {t("mailbox.disconnect")}
-            </button>
-          )}
-        </div>
-        <p className="break-words rounded-[var(--radius-md)] bg-[var(--mist)] px-4 py-3 text-sm leading-relaxed text-[var(--ink-soft)]" data-testid="mailbox-status" role="status">
-          {account.email || t("mailbox.notConnected")} ·{" "}
-          {account.status === "connected"
-            ? t("mailbox.statusConnected")
-            : account.status === "error"
-              ? t("mailbox.statusError")
-              : t("mailbox.statusDisconnected")}
-          {account.lastSyncAt
-            ? ` · ${t("mailbox.lastSync")} ${formatDate(account.lastSyncAt)}`
-            : ""}
-        </p>
-        {account.lastError && (
-          <p className="text-sm text-[var(--danger)]">{account.lastError}</p>
-        )}
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            <span className="font-medium">{t("mailbox.imapPreset")}</span>
-            <select
-              className="select mt-2"
-              value={imapPreset}
-              onChange={(e) => applyPreset(e.target.value)}
-              data-testid="mailbox-imap-preset"
-            >
-              {account.presets.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium">{t("mailbox.imapEmail")}</span>
-            <input
-              className="input mt-2"
-              value={imapEmail}
-              onChange={(e) => setImapEmail(e.target.value)}
-              data-testid="mailbox-imap-email"
-              autoComplete="username"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium">{t("mailbox.imapHost")}</span>
-            <input
-              className="input mt-2"
-              value={imapHost}
-              onChange={(e) => setImapHost(e.target.value)}
-              data-testid="mailbox-imap-host"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium">{t("mailbox.imapPassword")}</span>
-            <input
-              type="password"
-              className="input mt-2"
-              value={imapPassword}
-              onChange={(e) => setImapPassword(e.target.value)}
-              data-testid="mailbox-imap-password"
-              autoComplete="current-password"
-            />
-          </label>
-        </div>
-        <button
-          type="button"
-          className="btn btn-secondary text-sm"
-          disabled={busy}
-          data-testid="mailbox-imap-save"
-          onClick={() => void saveImap()}
-        >
-          {t("mailbox.imapSave")}
-        </button>
-      </section>
-
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <section className="panel min-w-0 space-y-4 rounded-[var(--radius-lg)] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -370,14 +174,9 @@ export function MailboxPanel() {
               {busy ? t("common.loading") : t("mailbox.sync")}
             </button>
           </div>
-          {flashNotice && (
-            <p className="text-sm text-[var(--sea)]" role="status">
-              {flashNotice}
-            </p>
-          )}
-          {flashError && (
+          {error && (
             <p className="text-sm text-[var(--danger)]" role="alert" data-testid="mailbox-error">
-              {flashError}
+              {error}
             </p>
           )}
           {loading ? (
@@ -399,8 +198,8 @@ export function MailboxPanel() {
                     }`}
                     aria-pressed={selectedId === m.id}
                     onClick={() => {
-                      setSelectedId(m.id);
-                      setCausaPick(m.causaId || "");
+                      setSelection({ requestedId, id: m.id });
+                      setPickedCase(null);
                     }}
                   >
                     <div className="break-words font-semibold">{m.subject}</div>
@@ -420,7 +219,9 @@ export function MailboxPanel() {
 
         <section className="panel min-w-0 space-y-5 rounded-[var(--radius-lg)] p-5">
           {!selected ? (
-            <p className="grid min-h-60 place-items-center text-center text-sm leading-relaxed text-[var(--muted)]">{t("mailbox.selectHint")}</p>
+            <p className="grid min-h-60 place-items-center text-center text-sm leading-relaxed text-[var(--muted)]" role={selectedId ? "status" : undefined}>
+              {!selectedId ? t("mailbox.selectHint") : remote ? (locale === "en" ? "This message could not be opened." : "No se pudo abrir este correo.") : t("common.loading")}
+            </p>
           ) : (
             <>
               <div>
@@ -448,7 +249,7 @@ export function MailboxPanel() {
                 <select
                   className="select mt-2"
                   value={causaPick}
-                  onChange={(e) => setCausaPick(e.target.value)}
+                  onChange={(e) => setPickedCase(e.target.value)}
                 >
                   <option value="">{t("mailbox.pickCausa")}</option>
                   {causas.map((c) => (

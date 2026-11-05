@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const profile = require("./altazor-desktop-profile.json");
-const { diagnoseDesktopProfile } = require("./altazor-desktop-profile.cjs");
+const { diagnoseDesktopProfile, dockerDesktopRoot, localDesktopEngine } = require("./altazor-desktop-profile.cjs");
 
 test("the installer checks only a local Linux engine and omits Host credentials", async () => {
   const calls = [];
@@ -40,4 +40,17 @@ test("the check distinguishes a missing CLI, inaccessible daemon, and Windows co
   const stopped = await diagnoseDesktopProfile({ platform, async execute() { throw new Error("fixture"); } });
   const windows = await diagnoseDesktopProfile({ platform, async execute() { return { stdout: "windows" }; } });
   assert.deepEqual([missing.state, stopped.state, windows.state], ["engine-missing", "engine-unavailable", "linux-engine-required"]);
+});
+
+test("detects a Windows Docker Desktop per-user install even when absent from PATH", async () => {
+  const env = { LOCALAPPDATA: "C:\\Users\\Fixture\\AppData\\Local" };
+  const root = `${env.LOCALAPPDATA}\\Programs\\DockerDesktop\\resources`;
+  const binary = `${root}\\bin\\docker.exe`;
+  const result = await localDesktopEngine({ platform: "win32", env, async execute(file, args) {
+    if (file !== binary) throw Object.assign(new Error("Fixture"), { code: "ENOENT" });
+    assert.equal(args[1], "npipe:////./pipe/dockerDesktopLinuxEngine");
+    return { stdout: "linux" };
+  } });
+  assert.equal(result.binary, binary);
+  assert.equal(dockerDesktopRoot("win32", env, result.binary), root);
 });

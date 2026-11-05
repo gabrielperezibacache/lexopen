@@ -44,7 +44,7 @@ async function main() {
       // No options.execute or destination stub: use the complete production path.
       const result = await executeAltazorTurn(created.conversation.id, queued.turnId, owner);
       const turn = result.turns[0]; assert.equal(turn.status, "completed", `native ${causaId ? "case" : "personal"} query must complete`); assert.equal(turn.errorCode, null); assert.equal(turn.results[0].toolId, "escritorio.listar"); assert.equal(turn.results[0].result.ok, true);
-      const card = turn.results[0].result.card; assert.equal(card.causaId, causaId); assert.equal(card.type, "escritorio");
+      const card = turn.results[0].result.card; assert.ok(card); assert.equal(card.causaId, causaId); assert.equal(card.type, "escritorio");
       assert.deepEqual((card.sessions as { id: string }[]).map(session => session.id), causaId ? [activeId] : []);
       const row = await prisma.altazorTurn.findUniqueOrThrow({ where: { id: queued.turnId } }); assert.ok(row.planId); plans.push(row.planId);
       const plan = JSON.parse((await prisma.assistantPlanRecord.findUniqueOrThrow({ where: { id: row.planId } })).planJson);

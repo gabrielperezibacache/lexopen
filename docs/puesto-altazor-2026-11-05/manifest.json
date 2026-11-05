@@ -43,16 +43,24 @@
       "route": "/inicio",
       "width": 1440,
       "height": 1000,
-      "size": 50179,
-      "sha256": "f1aabf6bdaeb20154c664be351e90acedf97962d451a1fae95b3d03f49c186a7"
+      "size": 108390,
+      "sha256": "1c23a4abe98ff7d02f4006ac5da8ad58d6bf94463d8cbc65b7aa4d630ced876e"
     },
     {
       "path": "inicio-movil.jpg",
       "route": "/inicio",
       "width": 360,
       "height": 800,
-      "size": 21366,
-      "sha256": "1bf43c89c61030528f9b5b31431e6d039a4bd0cf3bb47d1122e4b4d624560831"
+      "size": 48877,
+      "sha256": "d9a6b658c5672fb2dbfdaea2bbb97bd6e7a2549488368c83851294787652bac9"
+    },
+    {
+      "path": "mesa-revision-escritorio.jpg",
+      "route": "/academico",
+      "width": 1440,
+      "height": 1000,
+      "size": 177783,
+      "sha256": "531e818cf7a7d870c4854145469bc6774ffc4db5464ba861220027c147504755"
     },
     {
       "path": "mis-causas-escritorio.jpg",

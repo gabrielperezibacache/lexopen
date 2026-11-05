@@ -32,7 +32,7 @@ En cada causa, elige la cuenta antes de vincular la carpeta o importar. No se ut
 
 ## Oficina Judicial Virtual
 
-Activa **Poder Judicial de Chile** en **Configuración → Gestión de causas**. Después, en **Causas → PJUD · Chile** puedes:
+Activa **Poder Judicial de Chile** en **Configuración → Gestión de causas**. Después, en **Mis Causas → Herramientas PJUD** puedes:
 
 - Consultar públicamente por **RIT/ROL y tribunal**.
 - Abrir el ingreso manual de **ClaveÚnica**, revisar Mis Causas y seleccionar las que deseas incorporar.

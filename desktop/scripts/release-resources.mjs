@@ -167,7 +167,9 @@ export function verifyReleaseResources(resources, nodeModules, target) {
   if (!chromium.length) throw new Error("Missing bundled Chromium executable");
   for (const file of chromium) verifyBinary(file, target);
   const native = verifyNativeRuntime(resources, nodeModules, target);
-  return { version: meta.version, sourceDirty: meta.sourceDirty, files: files.length, buildId: meta.buildId, sourceRevision: meta.sourceRevision, native, browserExecutables: chromium.length };
+  const desktopSource = path.join(resources, "altazor-desktop-source");
+  const source = fs.existsSync(desktopSource) ? verifyDesktopSourceResource(desktopSource) : null;
+  return { version: meta.version, sourceDirty: meta.sourceDirty, files: files.length, buildId: meta.buildId, sourceRevision: meta.sourceRevision, native, browserExecutables: chromium.length, ...(source ? { altazorDesktopSourceSha256: source.sha256 } : {}) };
 }
 function regularDirectory(root, label) {
   const stat = fs.lstatSync(root);
@@ -181,12 +183,31 @@ function contentHash(file) {
   } finally { fs.closeSync(fd); }
   return hash.digest("hex");
 }
+export function verifyDesktopSourceResource(directory) {
+  const source = regularDirectory(directory, "Altazor desktop source");
+  const manifestFile = path.join(source, "manifest.json"), archive = path.join(source, "context.tar.gz");
+  const files = resourceFiles(source).sort();
+  if (files.length !== 2 || files[0] !== "context.tar.gz" || files[1] !== "manifest.json" || fs.statSync(manifestFile).size > 16 * 1024) {
+    throw new Error("Invalid Altazor desktop source inventory");
+  }
+  const profile = JSON.parse(fs.readFileSync(new URL("../altazor-desktop-profile.json", import.meta.url), "utf8"));
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
+  if (manifest.format !== 1 || manifest.profile !== profile.id || manifest.sourceCommit !== profile.sourceCommit ||
+      manifest.lumenCommit !== profile.windowManagerCommit || manifest.file !== "context.tar.gz" ||
+      !Number.isSafeInteger(manifest.size) || manifest.size <= 0 || manifest.size > 20 * 1024 * 1024 ||
+      manifest.size !== fs.statSync(archive).size || manifest.sha256 !== contentHash(archive)) {
+    throw new Error("Altazor desktop source does not match its manifest and pinned profile");
+  }
+  return manifest;
+}
 /** Copy the complete audited runtime without electron-builder dependency filters. */
 export function copyStagedReleaseResources(stage, resources, sourceNodeModules, target) {
   const sourceRoot = regularDirectory(stage, "Release staging"), destinationRoot = regularDirectory(resources, "Packaged resources");
   if (contained(sourceRoot, destinationRoot) || contained(destinationRoot, sourceRoot)) throw new Error("Staged and packaged resource directories must be separate");
   // Reject private or linked staging entries before changing the package.
-  const scopes = ["app-standalone", "prisma"], expected = resourceFiles(stage).sort();
+  const scopes = ["app-standalone", "prisma"];
+  if (fs.existsSync(path.join(stage, "altazor-desktop-source"))) scopes.push("altazor-desktop-source");
+  const expected = resourceFiles(stage).sort();
   if (expected.some(file => !scopes.some(scope => file.startsWith(`${scope}/`)))) throw new Error("Unexpected staged resource scope");
   verifyReleaseResources(stage, sourceNodeModules, target);
   for (const scope of scopes) {

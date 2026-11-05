@@ -1,8 +1,8 @@
 # Preparar el escritorio de Altazor
 
-En el asistente de instalación del equipo principal, abre **Escritorio de Altazor** y pulsa **Comprobar escritorio**. El resultado distingue si falta Docker, si el motor está detenido o si falta el perfil de herramientas. Puedes terminar la instalación de LexOpen y preparar el escritorio después.
+Al preparar el equipo principal, LexOpen comprueba el motor Docker local e inicia la preparación de las herramientas de Altazor si puede usarlo. El asistente muestra el avance y permite reintentar. Si falta Docker, está detenido o usa contenedores Windows, el estado indica qué debes resolver. Puedes iniciar LexOpen mientras se preparan las herramientas.
 
-Cuando tu versión ofrezca un paquete de herramientas, descárgalo desde **Releases** y pulsa **Cargar paquete oficial** en el asistente. LexOpen identifica la arquitectura del motor, consulta la publicación exacta de su versión y comprueba el tamaño y la huella SHA-256 del archivo antes de cargarlo. El diálogo indica qué archivo elegir. [Descargas oficiales](https://github.com/gabrielperezibacache/lexopen/releases).
+LexOpen identifica la arquitectura del motor y comprueba la huella SHA-256 antes de cargar un paquete oficial de su versión. Cuando no hay un paquete publicado, utiliza la receta verificada incluida en el instalador para construir el perfil local. Esa primera preparación necesita conexión y espacio para las herramientas. La receta comprueba la conversión de documentos, la lectura de PDF, el OCR y el audio antes de marcar el perfil como listo.
 
 Cuando las herramientas estén disponibles, abre **Mi asistente → Computadora** y vincula el escritorio que el administrador preparó para tu espacio. El diagnóstico del instalador comprueba el motor y la imagen local. La conexión se verifica por separado en LexOpen.
 
@@ -29,7 +29,7 @@ La transcripción necesita un proveedor configurado en LexOpen. La búsqueda de 
    El programa construye la imagen y prueba las herramientas con documentos sintéticos sin red como usuario del escritorio. Al terminar imprime el identificador `sha256:…` de la imagen y registra el perfil local para que lo detecte el asistente. Los paquetes Debian de la imagen quedan inventariados en `/usr/share/lexopen-desktop/packages.tsv`.
 3. Configura la instancia dedicada al profesional y al espacio con ese identificador en `containers.image`, actualizaciones automáticas de imagen desactivadas y su carpeta propia. La [guía de operación](../src/lib/altazor/computer/README.md) describe el proveedor de IA y la conexión al Host local. Vincula y comprueba el escritorio desde la aplicación.
 
-El instalador base incluye el Host y Chromium. En esta versión, el administrador construye el perfil con los pasos anteriores. El motor de contenedores y el proveedor dedicado conservan su preparación propia. El Host puede arrancar mientras se prepara el escritorio.
+El instalador incluye el Host, Chromium y la receta del perfil. Los pasos manuales anteriores sirven también para diagnóstico y para instalaciones sin el asistente de Desktop. El motor de contenedores y el servicio dedicado de cada profesional conservan su preparación propia. Comprueba la conexión en **Mi asistente → Computadora** antes de enviar archivos o encargos.
 
 ## Comprobar los paquetes de escritorio
 

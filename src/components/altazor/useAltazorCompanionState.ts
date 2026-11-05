@@ -6,7 +6,7 @@ import type { AltazorDestination } from "@/lib/altazor/types";
 import { prepareAssistantSubmission } from "@/lib/altazor/client-send-policy";
 export type Conversation = { id: string; title: string; causaId: string | null; scopeKey: string; revision: number; status: string };
 type Attachment = { id: string; sourceName: string; byteSize: number; status: string };
-type Turn = { id: string; ordinal: number; status: string; userText: string; assistantText: string; available?: boolean; attachmentIds: string[]; sourceRefs: { title: string; href: string }[]; results: { toolId: string; result: { ok: boolean; message: string; card?: Record<string, unknown> | null; undoToken?: string | null } }[]; plan: { id: string; steps: { toolId: string; preview: string }[] } | null; errorCode: string | null; createdAt: string };
+export type Turn = { id: string; ordinal: number; status: string; userText: string; assistantText: string; available?: boolean; attachmentIds: string[]; sourceRefs: { title: string; href: string }[]; results: { toolId: string; result: { ok: boolean; message: string; card?: Record<string, unknown> | null; undoToken?: string | null } }[]; plan: { id: string; steps: { toolId: string; preview: string }[] } | null; errorCode: string | null; createdAt: string };
 export type ConversationData = { conversation: Conversation; turns: Turn[]; attachments: Attachment[]; destination: AltazorDestination; hasMore: boolean; beforeOrdinal: number | null };
 export type Pane = "chat" | "memory" | "connectors" | "computer";
 type CompanionPreference = { activeConversationId: string | null; selectionUnavailable: boolean; memoryEnabled: boolean; backgroundEnabled: boolean; revision: number };
@@ -50,7 +50,7 @@ export function useAltazorCompanionState() {
     const resourcesUrl = `/api/altazor/resources${requestedCase ? `?causaId=${encodeURIComponent(requestedCase)}` : ""}`;
     Promise.all([fetch("/api/altazor/conversations", { signal: controller.signal, cache: "no-store" }).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error); return result; }), fetch(resourcesUrl, { signal: controller.signal, cache: "no-store" }).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error || "No se pudo comprobar el ámbito solicitado."); return result; }), fetch("/api/altazor/companion", { signal: controller.signal, cache: "no-store" }).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error); return result; })]).then(([result, resources, saved]) => {
       if (controller.signal.aborted) return; setLinkedDocumentId(params.get("documentoId") || ""); setConversations(result.conversations); setDestination(result.destination); setCausas(resources.causas || []); setPreference(saved);
-      if (saved.selectionUnavailable) setError("La conversación anterior ya no está disponible. Elige otra o comienza una nueva.");
+      if (saved.selectionUnavailable) setError("El contexto anterior ya no está disponible. Puedes seguir escribiendo aquí.");
       const selectedPane = params.get("altazor");
       if (["chat", "memory", "connectors", "computer"].includes(selectedPane || "")) { setPane(selectedPane as Pane); setVisited(["chat", selectedPane as Pane]); }
       if (requestedCase && (resources.causas || []).some((causa: {id:string}) => causa.id === requestedCase)) setScope(requestedCase);
@@ -87,13 +87,24 @@ export function useAltazorCompanionState() {
     window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn);
   }, [text]);
   function choosePane(next: Pane) { setPane(next); setVisited(previous => previous.includes(next) ? previous : [...previous, next]); }
-  function chooseConversation(id: string) {
-    void savePreference({ activeConversationId: id || null });
+  function chooseConversation(id: string, remember = true) {
+    if (remember) void savePreference({ activeConversationId: id || null });
     setLinkedDocumentId(""); setClarification(""); setScope(""); drafts.current.set(activeId || "new", text); liveId.current = id; setActiveId(id); setData(null); setText(drafts.current.get(id || "new") || ""); setAttachmentIds([]); setError(""); turnRequest.current = createSubmissionKeys();
     if(!id)conversationRequest.current=createSubmissionKeys();reflectConversationLocation(id);choosePane("chat");
   }
+  function leaveCaseContext() {
+    if (busy || uploading || attachmentIds.length) return;
+    chooseConversation("");
+    setText(text);
+    if (location.pathname === "/inicio") {
+      const url = new URL(location.href);
+      url.searchParams.delete("causaId");
+      url.searchParams.delete("documentoId");
+      history.replaceState(null, "", url.pathname + url.search);
+    }
+  }
   async function ensureConversation(forSend = false) {
-    if (liveId.current && !forSend) return liveId.current;
+    if (liveId.current && !forSend && data?.conversation.status !== "archived") return liveId.current;
     const payload = {
       text,
       title: text.trim().slice(0,160) || "Nueva conversación",
@@ -146,11 +157,11 @@ export function useAltazorCompanionState() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo preparar el archivo"); if (liveId.current) await reload(liveId.current).catch(() => {}); }
     finally { setUploading(false); if (input.current) input.current.value = ""; }
   }
-  async function turnAction(turn: Turn, action: "confirm" | "reject" | "execute" | "cancel") {
-    if (!activeId) return; if (action !== "cancel") setBusy(true); setError("");
+  async function turnAction(turn: Turn, action: "confirm" | "reject" | "execute" | "cancel", conversationId = activeId) {
+    if (!conversationId) return; if (action !== "cancel") setBusy(true); setError("");
     try {
-      await request(`/api/altazor/conversations/${activeId}/turns/${turn.id}/${action === "reject" ? "confirm" : action}`, action === "confirm" || action === "reject" ? { confirm: action === "confirm" } : {});
-      await reload(activeId);
+      await request(`/api/altazor/conversations/${encodeURIComponent(conversationId)}/turns/${encodeURIComponent(turn.id)}/${action === "reject" ? "confirm" : action}`, action === "confirm" || action === "reject" ? { confirm: action === "confirm" } : {});
+      if (liveId.current === conversationId) await reload(conversationId);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo actualizar la solicitud"); }
     finally { if (action !== "cancel") setBusy(false); }
   }
@@ -166,7 +177,7 @@ export function useAltazorCompanionState() {
     void Promise.all([read<{causas:{id:string;titulo:string;rit:string|null}[]}>(`/api/altazor/resources${requestedCase?`?causaId=${encodeURIComponent(requestedCase)}`:""}`),requestedConversation?read<ConversationData>(`/api/altazor/conversations/${encodeURIComponent(requestedConversation)}`):Promise.resolve(null)]).then(([resources,selected])=>{
       if(selected&&requestedCase&&selected.conversation.causaId!==requestedCase)throw Error("La conversación no pertenece a la causa solicitada. Tu borrador se conserva.");
       if(controller.signal.aborted)return;setCausas(resources.causas || []);
-      if(selected&&requestedConversation!==liveId.current)chooseConversation(selected.conversation.id);
+      if(selected&&requestedConversation!==liveId.current)chooseConversation(selected.conversation.id, selected.conversation.status === "active");
       if(!selected&&(intent||requestedCase&&(liveId.current||scope!==requestedCase))){chooseConversation("");setScope(requestedCase||"");setText("");}
       if (intent) {
         setLinkedDocumentId(params.get("documentoId") || ""); setText(intent.slice(0,8000)); choosePane("chat");
@@ -176,5 +187,5 @@ export function useAltazorCompanionState() {
     }).catch(reason=>{if(!controller.signal.aborted)setError(reason.message);});
     return()=>controller.abort();
   }
-  return { linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, chooseConversation, send, upload, turnAction, running, preference, preferenceSaving, savePreference,synchronizeLocation };
+  return { linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, preference, preferenceSaving, savePreference,synchronizeLocation };
 }

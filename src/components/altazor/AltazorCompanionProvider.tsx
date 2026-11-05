@@ -5,10 +5,11 @@ import Link from "next/link";
 import { Sheet } from "@/components/ui/Sheet";
 import { AltazorMark } from "./AltazorMark";
 import { AltazorHome } from "./AltazorHome";
+import { useAltazorUpdates } from "./AltazorUpdates";
 import { useAltazorCompanionState } from "./useAltazorCompanionState";
 import "./AltazorCompanion.css";
 
-type CompanionState = ReturnType<typeof useAltazorCompanionState>;
+type CompanionState = ReturnType<typeof useAltazorCompanionState> & { updates: ReturnType<typeof useAltazorUpdates> };
 const Context = createContext<CompanionState | null>(null);
 export function useAltazorCompanion() {
   const state = useContext(Context);
@@ -21,9 +22,9 @@ export function AltazorCompanionProvider({ userId, children }: { userId: string;
   return <UserCompanion key={userId}>{children}</UserCompanion>;
 }
 function UserCompanion({ children }: { children: ReactNode }) {
-  const state = useAltazorCompanionState(), pathname = usePathname();
+  const state = useAltazorCompanionState(), updates = useAltazorUpdates(), pathname = usePathname();
   const atHome = pathname === "/inicio";
-  return <Context.Provider value={state}><Suspense fallback={null}><CompanionLocationObserver /></Suspense>{children}{!atHome && <CompanionPanel key={pathname} />}</Context.Provider>;
+  return <Context.Provider value={{ ...state, updates }}><Suspense fallback={null}><CompanionLocationObserver /></Suspense>{children}{!atHome && <CompanionPanel key={pathname} />}</Context.Provider>;
 }
 /** Observe query changes without making the conversation UI depend on a prerendered URL. */
 function CompanionLocationObserver(){
