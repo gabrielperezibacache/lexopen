@@ -9,6 +9,7 @@ export const en: Dictionary = {
   brand: {
     tagline: "Firm · Chile",
     openPlatform: "Open legal platform",
+    developedBy: "Developed by Estudio Jurídico Pérez Ibacache",
   },
   common: {
     menu: "Menu",
@@ -327,20 +328,43 @@ export const en: Dictionary = {
     library: "Library",
     title: "Sign in",
     subtitleProd: "Sign in with your firm credentials.",
+    demoSubtitle: "Explore LexOpen with a fictitious account and case files.",
     email: "Email",
     password: "Password",
     submit: "Sign in",
     preparing: "Preparing sign in…",
     submitting: "Signing in…",
     error: "Could not sign in",
+    recoveryLink: "Recover your password",
+  },
+  recovery: {
+    helpTitle: "Recover your password",
+    teamTitle: "Firm account",
+    teamBody: "Ask your firm’s account administrator to reset your password.",
+    administratorTitle: "Administrator account",
+    administratorBody: "On the host computer, open the LexOpen menu and choose ‘Recuperar contraseña admin…’.",
+    manualTokenLink: "I have a recovery token",
+    backToLogin: "Back to sign in",
   },
   landing: {
     signIn: "Sign in",
     enterFirm: "Enter the firm",
     eyebrow: "Chile · Legal operations",
     lead:
-      "Keep your documents, deadlines and sources together, from case file to final draft. Manage matters manually or connect them to the Chilean judiciary.",
+      "Organize your matters in one place. Keep the documents, deadlines and sources you need to prepare your filings in each case file.",
     openPlatform: "Open platform",
+    altazor: {
+      title: "What is Altazor AI?",
+      tagline: "It’s your favorite Chungungo (because we love how curious Chungungos are)",
+      lead: "Altazor AI is your personal assistant for legal and academic work. Assign a task as you would to a colleague and pick up the conversation when you need it.",
+      capabilities: [
+        { title: "Case files and case theory", text: "Review the files you have access to, organize facts, and compare hypotheses against the case documents." },
+        { title: "Drafting and research", text: "Prepare drafts and academic materials, organize bibliographies, and return to the original passages to check citations." },
+        { title: "A desktop of its own", text: "When your firm enables it, Altazor works in a separate desktop with its own applications. Assign files to review or convert, follow its activity, and review the result." },
+      ],
+      imageAlt: "Altazor AI home with a message field and a button for attaching files",
+      caption: "Altazor’s conversation in LexOpen",
+    },
     modulesTitle: "HighQ modules + Chile layer",
     modules: [
       { title: "Matters", text: "Case files, documents and deadlines" },

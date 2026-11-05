@@ -2,12 +2,19 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, BookOpen, Bot, FilePenLine, FolderOpen, GraduationCap, Mic } from "lucide-react";
+import { ArrowRight, BookOpen, FilePenLine, FolderOpen, GraduationCap, Mic } from "lucide-react";
+import { AltazorMark } from "@/components/altazor/AltazorMark";
+import { StudioCredit } from "@/components/StudioCredit";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import { DEMO_ACCESS_ENABLED } from "@/lib/auth/demo-access";
 import "./welcome.css";
 
-const moduleIcons = [FolderOpen, BookOpen, Mic, FilePenLine, GraduationCap, Bot];
+function AltazorFeatureIcon() {
+  return <span className="edition-module-mascot" aria-hidden="true"><AltazorMark size={34} /></span>;
+}
+
+const moduleIcons = [FolderOpen, BookOpen, Mic, FilePenLine, GraduationCap, AltazorFeatureIcon];
 
 export default function LandingPage() {
   const { dict, t } = useI18n();
@@ -16,7 +23,7 @@ export default function LandingPage() {
     <div className="lexopen-welcome">
       <header className="edition-header edition-width">
         <Link href="/" className="edition-wordmark">
-          <Image src="/icons/lexopen-reader-192.png" width={40} height={40} alt="" />
+          <Image src="/icons/lexopen-reader-transparent-192.png" width={40} height={40} alt="" unoptimized />
           <span className="display">LexOpen</span>
         </Link>
         <nav className="edition-nav" aria-label={t("login.access")}>
@@ -36,6 +43,7 @@ export default function LandingPage() {
               <Link href="/login" className="btn btn-primary">
                 {t("landing.openPlatform")} <ArrowRight size={16} aria-hidden="true" />
               </Link>
+              {DEMO_ACCESS_ENABLED && <Link href="/login?demo=1" className="edition-demo-link">Demo</Link>}
             </div>
           </div>
           <Image
@@ -70,7 +78,35 @@ export default function LandingPage() {
             })}
           </ul>
         </section>
+        <section className="edition-altazor" aria-labelledby="edition-altazor-title">
+          <div className="edition-altazor-copy">
+            <h2 id="edition-altazor-title" className="display">{t("landing.altazor.title")}</h2>
+            <p className="edition-altazor-tagline">{t("landing.altazor.tagline")}</p>
+            <p>{t("landing.altazor.lead")}</p>
+            <dl>
+              {dict.landing.altazor.capabilities.map(({ title, text }) => (
+                <div key={title}>
+                  <dt>{title}</dt>
+                  <dd>{text}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          <figure className="edition-altazor-figure">
+            <AltazorMark size={176} state="reading" />
+            <Image
+              src="/altazor/conversacion-lexopen.webp"
+              width={920}
+              height={390}
+              sizes="(max-width: 760px) calc(100vw - 2rem), 560px"
+              alt={t("landing.altazor.imageAlt")}
+              className="edition-altazor-preview"
+            />
+            <figcaption>{t("landing.altazor.caption")}</figcaption>
+          </figure>
+        </section>
       </main>
+      <StudioCredit className="edition-width" />
     </div>
   );
 }

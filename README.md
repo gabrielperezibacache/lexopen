@@ -178,6 +178,8 @@ npm run db:seed
 npm run dev
 ```
 
+Para mostrar el acceso **Demo** en la portada, define `NEXT_PUBLIC_LEXOPEN_DEMO=1` únicamente en una instalación de desarrollo con la base ficticia creada por `db:seed`.
+
 El seed es para desarrollo y pruebas. Las suites de integración exigen `E2E_DATABASE_URL` desechable, coincidente con `DATABASE_URL`; nunca deben apuntar al Host del estudio.
 
 ```bash

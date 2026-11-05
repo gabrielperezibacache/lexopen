@@ -99,6 +99,26 @@
   margin-top: 1.75rem;
 }
 
+.edition-demo-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.edition-demo-link:hover {
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}
+
+.edition-demo-link:focus-visible {
+  outline: 2px solid var(--sea);
+  outline-offset: 2px;
+}
+
 .edition-engraving {
   display: block;
   height: auto;
@@ -147,6 +167,15 @@
   color: var(--sea);
 }
 
+.edition-module-mascot {
+  display: inline-flex;
+  flex: 0 0 20px;
+  min-width: 0;
+  justify-content: center;
+  align-self: flex-start;
+  margin-top: -.35rem;
+}
+
 .edition-modules h3 {
   font-weight: 600;
   font-size: var(--text-sm);
@@ -156,6 +185,74 @@
   color: var(--muted);
   font-size: var(--text-sm);
   line-height: 1.55;
+}
+
+.edition-altazor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(1.5rem, 5vw, 4.5rem);
+  padding-block: clamp(2.5rem, 6vw, 5rem);
+  border-top: 1px solid var(--line);
+}
+
+.edition-altazor h2 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.1;
+}
+
+.edition-altazor-copy > p {
+  margin-block: 1rem 1.5rem;
+  color: var(--ink-soft);
+  line-height: 1.65;
+}
+
+.edition-altazor-copy > .edition-altazor-tagline {
+  margin-block: .75rem 0;
+  color: var(--sea);
+  font-weight: 600;
+}
+
+.edition-altazor-copy dl > div {
+  padding-block: .85rem;
+  border-top: 1px solid var(--line);
+}
+
+.edition-altazor-copy dt {
+  font-weight: 600;
+}
+
+.edition-altazor-copy dd {
+  margin-top: .25rem;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.edition-altazor-figure {
+  display: grid;
+  justify-items: center;
+  gap: .75rem;
+  min-width: 0;
+}
+
+.edition-altazor-preview {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.edition-altazor-figure figcaption {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .edition-altazor {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 640px) {

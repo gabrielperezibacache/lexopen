@@ -8,6 +8,7 @@ import "../welcome.css";
 import "./login.css";
 import { safeAppPath } from "@/lib/auth/safe-next";
 import { resolvePostLoginPath } from "@/lib/auth/home-path";
+import { DEMO_ACCESS_ENABLED, DEMO_ACCOUNT } from "@/lib/auth/demo-access";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useI18n } from "@/components/i18n/I18nProvider";
 
@@ -16,10 +17,14 @@ const hydratedSnapshot = () => true;
 const serverSnapshot = () => false;
 
 function LoginForm() {
+  const sp = useSearchParams();
+  const demo = DEMO_ACCESS_ENABLED && sp.get("demo") === "1";
+  return <LoginCredentials key={demo ? "demo" : "standard"} demo={demo} next={sp.get("next") || "/inicio"} />;
+}
+
+function LoginCredentials({ demo, next }: { demo: boolean; next: string }) {
   const hydrated = useSyncExternalStore(subscribeHydration, hydratedSnapshot, serverSnapshot);
   const router = useRouter();
-  const sp = useSearchParams();
-  const next = sp.get("next") || "/inicio";
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [needsTotp, setNeedsTotp] = useState(false);
@@ -105,7 +110,7 @@ function LoginForm() {
         <div className="login-access">
           <div className="login-toolbar">
             <Link href="/" className="edition-wordmark login-brand-mobile">
-              <Image src="/icons/lexopen-reader-192.png" width={40} height={40} alt="" />
+              <Image src="/icons/lexopen-reader-transparent-192.png" width={40} height={40} alt="" unoptimized />
               <span className="display">LexOpen</span>
             </Link>
             <LanguageSwitcher variant="compact" />
@@ -115,7 +120,7 @@ function LoginForm() {
             <div>
               <h1 className="display text-3xl">{t("login.title")}</h1>
               <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-                {t("login.subtitleProd")}
+                {demo ? t("login.demoSubtitle") : t("login.subtitleProd")}
               </p>
             </div>
             <label className="block text-sm">
@@ -124,23 +129,30 @@ function LoginForm() {
                 className="input"
                 name="email"
                 type="email"
+                defaultValue={demo ? DEMO_ACCOUNT?.email : undefined}
                 required={!needsTotp}
                 autoComplete="username"
                 disabled={!hydrated || needsTotp}
               />
             </label>
             {!needsTotp ? (
-              <label key="password" className="block text-sm">
-                <span className="mb-1 block text-[var(--muted)]">{t("login.password")}</span>
-                <input
-                  className="input"
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  disabled={!hydrated}
-                />
-              </label>
+              <div key="password" className="grid">
+                <label className="block text-sm">
+                  <span className="mb-1 block text-[var(--muted)]">{t("login.password")}</span>
+                  <input
+                    className="input"
+                    name="password"
+                    type="password"
+                    defaultValue={demo ? DEMO_ACCOUNT?.password : undefined}
+                    required
+                    autoComplete="current-password"
+                    disabled={!hydrated}
+                  />
+                </label>
+                <Link href="/recovery?ayuda=1" className="login-recovery-link">
+                  {t("login.recoveryLink")}
+                </Link>
+              </div>
             ) : (
               <label key="totp" className="block text-sm">
                 <span className="mb-1 block text-[var(--muted)]">
