@@ -16,9 +16,16 @@ export function localSetupAllowed(request: { url: string; headers: Headers; meth
   const bind = env.LEXOPEN_BIND || env.HOSTNAME;
   if (!["127.0.0.1", "::1"].includes(bind || "")) return false;
   try {
-    const url = new URL(request.url), origin = new URL(request.headers.get("origin") || (request.method === "GET" ? url.origin : ""));
+    const url = new URL(request.url);
+    // Next can canonicalize request.url to localhost while the browser uses
+    // 127.0.0.1. Validate the actual Host independently, never forwarded-host.
+    const presented = request.headers.get("host");
+    const publicUrl = presented ? new URL(`${url.protocol}//${presented}`) : new URL(url.origin);
+    const loopback = (value: URL) => ["127.0.0.1", "[::1]", "localhost"].includes(value.hostname) && !value.username && !value.password && value.pathname === "/" && !value.search && !value.hash;
+    if (!loopback(new URL(url.origin)) || !loopback(publicUrl) || publicUrl.port !== url.port) return false;
+    const origin = new URL(request.headers.get("origin") || (request.method === "GET" ? publicUrl.origin : ""));
     const forwarded = [request.headers.get("x-forwarded-for"), request.headers.get("x-real-ip")].filter(Boolean).flatMap(value => value!.split(","));
-    return ["127.0.0.1", "[::1]", "localhost"].includes(url.hostname) && origin.origin === url.origin && forwarded.every(value => ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(value.trim()));
+    return origin.origin === publicUrl.origin && forwarded.every(value => ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(value.trim()));
   } catch { return false; }
 }
 export function computerEnabled(env: Readonly<Record<string, string | undefined>> = process.env) { return env.ALTAZOR_COMPUTER_ENABLED === "1"; }

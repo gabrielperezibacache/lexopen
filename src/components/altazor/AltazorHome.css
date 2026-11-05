@@ -50,6 +50,7 @@
 .altazor-plan { padding-block:1rem; margin-top:1rem; border-top:1px solid var(--line); }
 .altazor-plan h4 { font-weight:600; }
 .altazor-plan ol { list-style:decimal; padding:1rem 0 1rem 1.5rem; line-height:1.75; }
+.altazor-plan li { white-space:pre-wrap; overflow-wrap:anywhere; }
 .altazor-plan .btn { margin:.3rem .5rem .3rem 0; }
 .altazor-running { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; padding:1rem 0; }
 .altazor-composer { margin-top:.5rem; min-width:0; border:1px solid var(--line-strong); border-radius:.85rem; background:var(--surface-solid); padding:.7rem; }

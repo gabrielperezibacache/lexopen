@@ -11,7 +11,7 @@ import type { AltazorDestination } from "@/lib/altazor/types";
 import { AltazorMark } from "./AltazorMark";
 import { AltazorSources, type AltazorSelectedSource } from "./AltazorSources";
 import { AltazorMemory } from "./AltazorMemory";
-import { AltazorConnectors } from "./AltazorConnectors";
+import { AltazorConnections } from "./AltazorConnections";
 import { AltazorAcademic } from "./AltazorAcademic";
 import { AltazorComputer } from "./AltazorComputer";
 import "./AltazorHome.css";
@@ -152,7 +152,7 @@ export function AltazorHome({ initialData }: { initialData: InicioInitialData })
       </section>
     </div>
     {visited.includes("memory") && <div hidden={pane !== "memory"}><AltazorMemory causaId={currentCase} /></div>}
-    {visited.includes("connectors") && <div hidden={pane !== "connectors"}><AltazorConnectors /></div>}
+    {visited.includes("connectors") && <div hidden={pane !== "connectors"}><AltazorConnections causaId={currentCase} /></div>}
     {visited.includes("academic") && <div hidden={pane !== "academic"}><AltazorAcademic /></div>}
     {visited.includes("computer") && <div hidden={pane !== "computer"}><AltazorComputer causaId={currentCase} /></div>}
     <details className="altazor-day"><summary>Mi jornada · agenda y trabajo reciente</summary><div className="altazor-day-grid"><HoyCard eventos={initialData.hoy.eventos} plazos={initialData.hoy.plazos} /><PlazosCard plazos={initialData.plazosProximos} /><CausasCard items={initialData.causasRecientes} /><ActividadCard items={initialData.actividad} /></div></details>

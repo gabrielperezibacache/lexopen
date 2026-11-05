@@ -10,7 +10,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { KITTIES_SOURCE_COMMIT } from "@/lib/altazor/computer/policy";
-import { cancelComputerTask, closeComputerSession, computerScreenshot, computerStatus, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerSession, sendComputerMessage } from "@/lib/altazor/computer/service";
+import { cancelComputerTask, closeComputerSession, computerScreenshot, computerStatus, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerSession, sendComputerMessage, prepareComputerSecret, typeComputerSecret } from "@/lib/altazor/computer/service";
+import { createSecret, deleteSecret } from "@/lib/altazor/secrets/service";
 import { gatewayRequestCategory, gatewayStartupSummary, runtimeFailureSummary } from "./computer-smoke-diagnostics";
 
 const gatewayUser = "lexopen-kitties-ci", provider = "fixture", responseText = "Respuesta sintética del proveedor local de CI.";
@@ -155,6 +156,19 @@ async function main() {
     check((await controlComputer(owner, session.id, `hold-${randomUUID()}`, true)).status === "completed", "Actual control takeover was not confirmed");
     await inputComputer(owner, session.id, `click-${randomUUID()}`, { action: "click", args: { x: 5, y: 5 } });
     await inputComputer(owner, session.id, `type-${randomUUID()}`, { action: "type", args: { text: "inert fictitious CI input" } });
+    stage = "one-use-secret-keyboard-bridge";
+    const fakeSecret = `inert-${randomUUID()}`;
+    const savedSecret = await createSecret(owner, { requestId: `secret-${randomUUID()}`, name: "Fictitious keyboard credential", provider: "Fictitious runtime only", kind: "password", value: fakeSecret });
+    const target = { sessionId: session.id, origin: "https://fixture.invalid", field: "password" as const, fieldLabel: "Declared synthetic target, not a DOM assertion" };
+    const grant = await prepareComputerSecret(owner, session.id, { requestId: `grant-${randomUUID()}`, secretId: savedSecret.secret.id, revision: savedSecret.secret.revision, target, confirmed: true });
+    check((await typeComputerSecret(owner, session.id, { grantId: grant.id, target, confirmed: true })).state === "used", "Actual gateway did not confirm one-use keyboard input");
+    const typedTraffic = traffic;
+    check((await typeComputerSecret(owner, session.id, { grantId: grant.id, target, confirmed: true })).state === "used" && traffic === typedTraffic, "Redeeming a used grant must not contact the gateway again");
+    check((await readComputerSession(owner, session.id)).session.held, "Credential typing must leave the actual desktop under human control");
+    check(!lastProviderPayload.includes(fakeSecret), "Keyboard secret must not enter the model request");
+    const actions = await prisma.altazorComputerAction.findMany({ where: { sessionId: session.id } });
+    check(!JSON.stringify(actions).includes(fakeSecret), "Keyboard secret must not enter action receipts");
+    await deleteSecret(owner, savedSecret.secret.id, { requestId: `delete-secret-${randomUUID()}`, revision: savedSecret.secret.revision, confirmed: true });
     await controlComputer(owner, session.id, `release-${randomUUID()}`, false);
     stage = "selected-upload-and-actual-chat";
     const file = Buffer.from(`Selected fictitious upload ${randomUUID()}\n`), text = `Read only this fictitious selected file ${randomUUID()}`;
@@ -188,7 +202,7 @@ async function main() {
     check(JSON.parse(await run("docker", ["inspect", containerId]))[0].State.Running === false, "Actual container must be stopped");
     const output = resolve(process.env.KITTIES_CI_OUTPUT!); check(output.startsWith(runnerTemp + sep), "Evidence output must remain in disposable CI directory");
     await mkdir(output, { recursive: true }); await writeFile(join(output, "desktop.png"), png);
-    await writeFile(join(output, "summary.json"), JSON.stringify({ result: "passed", sourceCommit: KITTIES_SOURCE_COMMIT, imageId, runtime: "real-docker-container", model: "synthetic-local-http-fixture", noPersonalAccounts: true, externalRuntimeEgress: "gateway UID firewall + internal Docker network", screenshot: { sha256: createHash("sha256").update(png).digest("hex"), width: png.readUInt32BE(16), height: png.readUInt32BE(20) }, checks: ["owner and case ACL", "TTL", "local_only", "immutable image", "one selected workspace mount", "no host socket or credentials", "actual screenshot and manual control", "selected bytes in container", "actual gateway chat with synthetic model", "replay without resend", "cancel pending task", "stop actual container"] }, null, 2));
+    await writeFile(join(output, "summary.json"), JSON.stringify({ result: "passed", sourceCommit: KITTIES_SOURCE_COMMIT, imageId, runtime: "real-docker-container", model: "synthetic-local-http-fixture", noPersonalAccounts: true, externalRuntimeEgress: "gateway UID firewall + internal Docker network", screenshot: { sha256: createHash("sha256").update(png).digest("hex"), width: png.readUInt32BE(16), height: png.readUInt32BE(20) }, checks: ["owner and case ACL", "TTL", "local_only", "immutable image", "one selected workspace mount", "no host socket or credentials", "actual screenshot and manual control", "one-use Secretos keyboard input and replay without network", "selected bytes in container", "actual gateway chat with synthetic model", "replay without resend", "cancel pending task", "stop actual container"] }, null, 2));
     console.log("ALTAZOR computer runtime PASS: actual isolated Docker desktop, screenshot/input/uploads, owner/ACL/TTL/privacy, chat/cancel/stop; local synthetic model only, no personal account or autonomous model claim.");
   } finally {
     globalThis.fetch = originalFetch;
@@ -204,6 +218,7 @@ async function main() {
     // A creation may have failed before inspection: clean only our uniquely generated kitty name.
     if (sessionId && !containerId) { const row = await prisma.altazorComputerSession.findUnique({ where: { id: sessionId } }); if (row) { const ids = await run("docker", ["ps", "-aq", "--filter", `label=kitties.name=${row.kittyName}`]).catch(() => ""); for (const id of ids.split(/\s+/).filter(id => /^[a-f0-9]{12,64}$/.test(id))) await run("docker", ["rm", "-f", id]).catch(() => {}); } }
     if (networkCreated) await run("docker", ["network", "rm", network]).catch(() => {});
+    await prisma.altazorSecret.deleteMany({ where: { ownerId: { in: userIds } } }); await prisma.altazorSecretReceipt.deleteMany({ where: { ownerId: { in: userIds } } });
     await prisma.altazorComputerAction.deleteMany({ where: { ownerId: { in: userIds } } }); await prisma.altazorComputerSession.deleteMany({ where: { ownerId: { in: userIds } } });
     if (workspaceId) await prisma.altazorComputerWorkspace.deleteMany({ where: { id: workspaceId, ownerId: { in: userIds } } });
     await prisma.causa.deleteMany({ where: { id: { in: causeIds } } }); await prisma.auditEvent.deleteMany({ where: { actorId: { in: userIds } } }); await prisma.user.deleteMany({ where: { id: { in: userIds } } });

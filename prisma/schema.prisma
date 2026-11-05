@@ -49,6 +49,9 @@ model FirmSettings {
 }
 
 model User {
+  altazorSecrets AltazorSecret[]
+  altazorSecretReceipts AltazorSecretReceipt[]
+  altazorSecretGrants AltazorSecretGrant[]
   altazorAcademicSearches AltazorAcademicSearch[]
   altazorBibliographyEntries AltazorBibliographyEntry[]
   computerWorkspaces AltazorComputerWorkspace[]
@@ -2589,6 +2592,8 @@ model AltazorComputerWorkspace {
   @@unique([ownerId,scopeKey])
 }
 model AltazorComputerSession {
+  secretGrants AltazorSecretGrant[]
+  connectorNamesJson String @default("[]")
   id String @id @default(cuid())
   ownerId String
   owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict)
@@ -2660,4 +2665,68 @@ model AltazorBibliographyEntry {
   @@unique([ownerId, requestId])
   @@unique([ownerId, identifierKey])
   @@index([ownerId, updatedAt])
+}
+
+/// Private write-only vault. Plaintext must never enter conversation or audit records.
+model AltazorSecret {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name String
+  provider String
+  username String?
+  kind String
+  ciphertext String @db.Text
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  grants AltazorSecretGrant[]
+  @@index([ownerId, updatedAt])
+}
+/// Keyed fingerprints only; deliberately no input, plaintext or cached value.
+model AltazorSecretReceipt {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  requestId String
+  kind String
+  inputHash String
+  resourceId String
+  createdAt DateTime @default(now())
+  @@unique([ownerId, requestId])
+}
+model AltazorSecretGrant {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  secretId String
+  secret AltazorSecret @relation(fields: [secretId], references: [id], onDelete: Cascade)
+  secretRevision Int
+  sessionId String
+  session AltazorComputerSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  targetJson String @db.Text
+  targetHash String
+  sessionHash String
+  state String @default("pending")
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([ownerId, sessionId, state])
+  @@index([secretId, secretRevision, state])
+}
+
+/// HMAC receipt for a connector mutation; never store settings, tokens or gateway responses.
+model AltazorConnectorOperation {
+  id String @id @default(cuid())
+  ownerId String
+  workspaceId String
+  requestId String
+  kind String
+  inputHash String
+  status String @default("sending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([ownerId, requestId])
+  @@index([workspaceId, status])
 }
