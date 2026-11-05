@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, requireStaff, requireCapability } from "@/lib/api";
@@ -20,7 +21,7 @@ const schema = z.discriminatedUnion("action", [
 function failure(error: unknown) { const response = handleRouteError(error); for (const [key, value] of Object.entries(headers)) response.headers.set(key, value); return response; }
 export async function GET() {
   try {
-    const user = await requireStaff(); await requireCapability("causa.read");
+    const user = await requireStaff(); await requireCapability("causa.read"); await assertPjudManagementEnabled();
     const fromDb = await prisma.tribunal.findMany({ where: { activo: true }, select: { nombre: true }, orderBy: { nombre: "asc" }, take: 2000 });
     const names = new Map<string, string>();
     for (const entry of [...fromDb.map(row => row.nombre), ...TRIBUNALES_CHILE]) {
@@ -32,7 +33,7 @@ export async function GET() {
 }
 export async function POST(req: NextRequest) {
   try {
-    assertCsrf(req); const user = await requireStaff(); await requireCapability("causa.read");
+    assertCsrf(req); const user = await requireStaff(); await requireCapability("causa.read"); await assertPjudManagementEnabled();
     const body = await parseKnowledgeBody(req, schema, 8192);
     const limited = await rateLimitAsync(`pjud:lookup:${user.id}`, 12, 60_000);
     if (!limited.ok) throw httpError("Ha realizado varias consultas seguidas. Espere un minuto antes de volver a consultar la OJV.",429);

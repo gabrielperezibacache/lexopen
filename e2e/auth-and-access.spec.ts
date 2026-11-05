@@ -8,11 +8,10 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   await loginAs(page, "socio@estudio.cl");
 
   await expect(page).toHaveURL(/\/(inicio|dashboard)$/);
-  await expect(page.getByTestId("inicio-status-line")).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: /María/i })
-  ).toBeVisible();
   await expect(page.getByTestId("inicio-composer")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /María.*Mi cuenta/i })
+  ).toBeVisible();
 
   const hostStatusResponse = await page.request.get("/api/admin/host-status");
   expect(hostStatusResponse.ok()).toBeTruthy();
@@ -41,7 +40,7 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   await page.goto("/causas");
   await expect(page).toHaveURL(/\/causas$/);
   await expect(
-    page.getByRole("heading", { name: "Causas judiciales" })
+    page.getByRole("heading", { name: "Causas", exact: true })
   ).toBeVisible();
   await expect(page.getByText("C-4521-2025")).toBeVisible();
   const causeRow = page.locator("tr").filter({ hasText: "C-4521-2025" }).first();
@@ -51,6 +50,7 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
     .getAttribute("href");
   expect(causeHref).toBeTruthy();
   await page.goto(causeHref!);
+  await page.getByText("Registrar movimientos manualmente", { exact: true }).click();
   const exportHref = await page
     .getByRole("link", { name: "Exportar movimientos" })
     .getAttribute("href");

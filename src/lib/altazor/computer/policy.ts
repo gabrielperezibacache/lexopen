@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { ConnectorError } from "@/lib/personal-connectors/core";
+import { identifyAudio } from "@/lib/audio/ingest";
+import { readBookZip } from "@/lib/books/formats";
 import type { ComputerFile } from "./types";
 
 export const KITTIES_SOURCE_COMMIT = "6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3";
@@ -54,10 +56,20 @@ export function inspectSelectedFiles(files: ComputerFile[]) {
     else if (prefix.toString("ascii").startsWith("RIFF") && prefix.subarray(8).toString("ascii") === "WEBP") mime = "image/webp";
     else if (prefix.toString("ascii").startsWith("%PDF-")) mime = "application/pdf";
     else if (hex.startsWith("504b0304") && /\.(docx|xlsx|pptx)$/i.test(name)) mime = "application/octet-stream";
+    else if (/\.(epub|odt)$/i.test(name)) {
+      const epub = /\.epub$/i.test(name), archive = readBookZip(bytes);
+      const expected = epub ? "application/epub+zip" : "application/vnd.oasis.opendocument.text";
+      if (archive.get("mimetype")?.toString("ascii").trim() !== expected || !archive.has(epub ? "META-INF/container.xml" : "content.xml") || archive.has("META-INF/encryption.xml")) {
+        throw new ConnectorError("file_type", "El archivo debe ser un EPUB u ODT válido y sin cifrar.", 415);
+      }
+      mime = expected;
+    } else if (/\.(mp3|wav|m4a|ogg|webm|flac)$/i.test(name)) {
+      mime = identifyAudio(name, bytes).mimeType;
+    }
     else {
       try { const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); if (!text.includes("\0")) mime = "text/plain"; } catch { /* Non-text files need a recognised signature. */ }
     }
-    if (!mime) throw new ConnectorError("file_type", "Use PDF, Office moderno, texto o una imagen PNG, JPEG, GIF o WebP.", 400);
+    if (!mime) throw new ConnectorError("file_type", "Usa PDF, Word, Excel, PowerPoint, ODT, EPUB, texto, imagen o audio compatible.", 400);
     if (mime.startsWith("image/") && bytes.length > COMPUTER_LIMITS.imageBytes) throw new ConnectorError("image_limit", "Cada imagen admite hasta 5 MiB.", 413);
     return { name, mime, data: file.data };
   });

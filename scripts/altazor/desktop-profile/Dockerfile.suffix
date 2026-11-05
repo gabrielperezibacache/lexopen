@@ -1,0 +1,20 @@
+
+# LexOpen desktop tools layered onto the pinned Debian desktop.
+USER root
+ARG LEXOPEN_DESKTOP_PROFILE
+ARG LEXOPEN_DESKTOP_SOURCE
+LABEL org.lexopen.altazor.desktop-profile="${LEXOPEN_DESKTOP_PROFILE}" \
+      org.lexopen.altazor.desktop-source="${LEXOPEN_DESKTOP_SOURCE}"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libreoffice-draw libreoffice-l10n-es hunspell-es fonts-liberation \
+        poppler-utils qpdf pandoc ffmpeg ripgrep zip unzip \
+        python3-docx python3-openpyxl python3-pypdf python3-ebooklib python3-bs4 \
+    && mkdir -p /usr/share/lexopen-desktop \
+    && dpkg-query -W -f='${Package}\t${Version}\n' > /usr/share/lexopen-desktop/packages.tsv \
+    && rm -rf /var/lib/apt/lists/* /etc/sudoers.d/kitty
+
+COPY --chmod=0555 .lexopen-desktop-profile/check.py /usr/local/bin/lexopen-desktop-check
+COPY --chmod=0555 .lexopen-desktop-profile/managed-install.sh /usr/local/bin/kitty-install
+USER kitty
+RUN --network=none lexopen-desktop-check

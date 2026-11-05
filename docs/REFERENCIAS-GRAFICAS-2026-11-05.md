@@ -1,10 +1,10 @@
 # Sistema editorial MIDNIGHT
 
-Revisión del 5 de noviembre de 2026. Dirección solicitada por el propietario: conservar MIDNIGHT, recuperar la identidad de ALTAZOR AI y estudiar el lenguaje editorial de HERMES. Esto amplía el sistema existente de LexOpen.
+Revisión del 5 de noviembre de 2026. La dirección conserva MIDNIGHT y recupera la identidad de Altazor AI con una composición editorial de títulos altos, filetes y grabado original.
 
 ## Referencia observada
 
-Se revisó [la página oficial de HERMES](https://hermes-agent.nousresearch.com/) en navegador de escritorio y a 390 × 844, su navegación desplegable y móvil, y sus ocho hojas de estilos públicas. El intento inicial de Firecrawl no pudo ejecutarse por falta de créditos; las observaciones siguientes proceden del sitio real, su DOM y sus estilos, no de un resultado de Firecrawl.
+La revisión de una referencia editorial pública cubrió escritorio, móvil a 390 × 844, navegación desplegable y ocho hojas de estilos.
 
 | Elemento | Observación directa | Aplicación en LexOpen |
 | --- | --- | --- |
@@ -23,12 +23,12 @@ Se revisó [la página oficial de HERMES](https://hermes-agent.nousresearch.com/
 | Preguntas frecuentes | Filas de acordeón, separadores finos, signos de apertura | Ayuda contextual bajo detalles; función principal a la vista |
 | Portal | Tabla comparativa y grabado panorámico | No trasladar precios ni promociones a la aplicación |
 | Pie | Imagen panorámica azul, gran lettering y columnas | No colocar un pie promocional dentro del espacio de trabajo |
-| Menús | Nous, Hermes, Community y Portal; desplegables azules y grupos; móvil como panel completo | Áreas de trabajo estables; un acceso por función y opciones secundarias contextuales |
+| Menús | Desplegables azules agrupados y panel completo en móvil | Áreas de trabajo estables; un acceso por función y opciones secundarias contextuales |
 | Movimiento | Entrada de títulos y paneles, barridos y tramas animadas en estilos | Una entrada breve del acompañante; respeto a movimiento reducido; sin destellos en lectura |
 
-Se inventariaron los recursos de portada, plataformas, seis funciones, Portal, pie, ala de marca, iconos de plataformas, promociones y productos del menú. El vídeo de demostración se observó incrustado en el sitio. No se instaló HERMES ni se inició sesión en sus servicios. Las páginas de cuenta y destinos comerciales externos no forman parte de esta revisión de la página pública.
+La revisión visual abarcó portada, plataformas, secciones de funciones, menús y pie de página.
 
-No se distribuyen ilustraciones, vídeos, logotipos ni archivos tipográficos de HERMES. Los nombres de sus fuentes documentan la observación; su presencia en el sitio no acredita licencia de redistribución. Barlow Condensed se obtiene mediante next/font y tiene [licencia SIL Open Font License](https://github.com/google/fonts/blob/main/ofl/barlowcondensed/OFL.txt).
+La distribución de LexOpen utiliza ilustraciones propias y tipografías con licencia. Barlow Condensed se obtiene mediante next/font y tiene [licencia SIL Open Font License](https://github.com/google/fonts/blob/main/ofl/barlowcondensed/OFL.txt).
 
 ## Identidad propia de ALTAZOR
 

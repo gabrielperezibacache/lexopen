@@ -6,7 +6,7 @@ LexOpen 1.0 separa dos superficies de IA para el staff del estudio:
 | --- | --- | --- |
 | **Inicio** | `/inicio` | Home post-login del staff: saludo Chile-time, status del Host (plazos fatales, audiencias, movimientos), composer con tools tipados y **confirmación humana** en escrituras. |
 | **Panel** | `/dashboard` | KPIs y métricas del estudio (no es el home). **No** redirige a `/inicio`. |
-| **Agente / Hermes** | `/agente` | Consola completa del copiloto (context pack, utilidades, alcance documental, approve→minuta). Reutiliza `lib/ai/*` y `/api/integrations/hermes`. |
+| **Agente** | `/agente` | Consola completa del copiloto (context pack, utilidades, alcance documental, approve→minuta). Reutiliza `lib/ai/*` y `/api/integrations/hermes`. |
 | **Portal** | `/portal` | Clientes: sin asistente staff. |
 
 ## Pipeline de Inicio (`src/lib/assistant/`)
@@ -65,9 +65,9 @@ por lo que una carpeta antigua o una selección explícita no queda desplazada p
 archivos recientes de otras carpetas. Cuando el alcance excede el límite, la
 respuesta anuncia su cobertura parcial; no implica lectura de todo el expediente.
 
-## Relación con Hermes / LLM
+## Conexión con la IA del estudio
 
-- Inicio **no** reescribe el pipeline Hermes: reutiliza `lib/integrations/llm.ts`, plazos, search, chat-history y dominio existente.
+- Inicio reutiliza `lib/integrations/llm.ts`, plazos, search, chat-history y dominio existente.
 - `/agente` sigue siendo la consola rica para briefing, doc QA y utilidades ancladas.
 - En producción, demos `LLM_ALLOW_DEMO` / `HERMES_ALLOW_DEMO` hard-fail al boot salvo `LEXOPEN_KEEP_*_DEMO=1` (ver `docs/WEB-HOST.md`).
 

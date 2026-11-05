@@ -32,7 +32,7 @@ En cada causa, elige la cuenta antes de vincular la carpeta o importar. No se ut
 
 ## Oficina Judicial Virtual
 
-Desde Sincronización puedes:
+Activa **Poder Judicial de Chile** en **Configuración → Gestión de causas**. Después, en **Causas → PJUD · Chile** puedes:
 
 - Consultar públicamente por **RIT/ROL y tribunal**.
 - Abrir el ingreso manual de **ClaveÚnica**, revisar Mis Causas y seleccionar las que deseas incorporar.
@@ -43,6 +43,8 @@ Introduce tu contraseña y códigos únicamente en la página oficial. LexOpen u
 La cola de descargas y el seguimiento de movimientos tienen estados separados. Los documentos privados que necesitan un ingreso vigente esperan en «requiere ClaveÚnica». Cuando vuelves a identificarte y autorizas las causas, se retoman los pendientes disponibles; los originales guardados y los recibos de documentos retirados se conservan.
 
 Una sesión temporal dura hasta 30 minutos y puede vencer antes por decisión del portal. Un desafío, una caída o la falta de acceso a un documento no se presenta como sincronización completa. Las descargas tienen límites durante la lectura, no después de consumir el archivo entero. Los accesos autenticados entre dominios oficiales usan sólo las cookies pertinentes de la ventana aislada, sin guardarlas ni seguir redirecciones.
+
+Volver a **Gestión manual** pausa el trabajo judicial pendiente y conserva expedientes, originales y configuración. Google Drive tiene su propio ciclo y permanece disponible.
 
 ## Cuándo se actualiza
 

@@ -18,7 +18,7 @@ type RunList = { runs: ({ id: string; available: false } | { id: string; availab
 type Stage = "prepare" | "execute" | "review";
 type Tool = "sources" | "saved_sources" | "history" | "events";
 const labels: Record<string, string> = { queued: "Preparado", running: "En ejecución", awaiting_review: "Listo para revisar", imported: "Incorporado al escrito", cancelled: "Cancelado", interrupted: "Interrumpido", failed: "No completado", blocked: "Requiere revisar las fuentes" };
-const providerNames: Record<string, string> = { local_recipe: "Cuaderno local sin IA", codex: "Codex personal", openai: "OpenAI", ollama: "Ollama", azure: "Azure OpenAI", groq: "Groq", hermes: "Hermes", custom: "Proveedor del estudio" };
+const providerNames: Record<string, string> = { local_recipe: "Cuaderno local sin IA", codex: "Codex personal", openai: "OpenAI", ollama: "Ollama", azure: "Azure OpenAI", groq: "Groq", hermes: "Proveedor local compatible", custom: "Proveedor del estudio" };
 const providerLabel = (value: string) => providerNames[value] || "Proveedor configurado";
 const dateLabel = (date: string) => new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeStyle: "short" }).format(new Date(date));
 async function get<T>(url: string, signal?: AbortSignal): Promise<T> { const response = await fetch(url, { cache: "no-store", signal }), data = await response.json(); if (!response.ok) throw Error(data.error || "No se pudo abrir la Mesa"); return data; }

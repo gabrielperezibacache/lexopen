@@ -8,12 +8,14 @@ import { apiMutation } from "@/lib/api-mutation";
 export function DocumentDriveAction({
   documentId,
   googleDriveId,
+  studyFolderId,
   disabled,
   hasText = true,
   hasBinary = false,
 }: {
   documentId: string;
   googleDriveId?: string | null;
+  studyFolderId?: string;
   disabled?: boolean;
   /** True when there is contenido/extractedMarkdown. */
   hasText?: boolean;
@@ -41,7 +43,7 @@ export function DocumentDriveAction({
       }>("/api/integrations/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "push-documento", documentoId: documentId }),
+        body: JSON.stringify({ action: "push-documento", documentoId: documentId, ...(studyFolderId ? { studyFolderId } : {}) }),
       });
       if (!result.ok) {
         setError(result.error || "No se pudo subir a Drive");

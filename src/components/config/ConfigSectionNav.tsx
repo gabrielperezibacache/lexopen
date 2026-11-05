@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/components/i18n/I18nProvider";
-import { CONFIG_CATEGORIES, CONFIG_SECTIONS, configCategoryForSection, configSectionFromHash } from "./config-sections";
+import { configCategoriesForMode, configCategoryForSection, configSectionFromHash } from "./config-sections";
 import styles from "./WorkspaceArea.module.css";
 
-export function ConfigSectionNav() {
+export function ConfigSectionNav({ mode = "pjud_cl" }: { mode?: "manual" | "pjud_cl" }) {
   const { locale } = useI18n();
+  const router = useRouter();
   const english = locale === "en";
   const [active, setActive] = useState("estudio");
   const navRef = useRef<HTMLElement>(null);
-  const category = configCategoryForSection(active);
+  const categories = configCategoriesForMode(mode), category = configCategoryForSection(active, mode);
 
   useEffect(() => {
     const nav = navRef.current;
@@ -31,7 +33,7 @@ export function ConfigSectionNav() {
         return;
       }
       const edge = nav.getBoundingClientRect().bottom + 20;
-      const targets = CONFIG_SECTIONS.flatMap(section => {
+      const targets = configCategoriesForMode(mode).flatMap(category => category.sections).flatMap(section => {
         const element = document.getElementById(section.id);
         return element ? [{ id: section.id, top: element.getBoundingClientRect().top }] : [];
       });
@@ -40,7 +42,7 @@ export function ConfigSectionNav() {
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(inspect); };
     const syncHash = () => {
-      const section = configSectionFromHash(window.location.hash);
+      const section = configSectionFromHash(window.location.hash, mode);
       pendingHash = section?.id;
       if (section) setActive(section.id);
       schedule();
@@ -71,21 +73,21 @@ export function ConfigSectionNav() {
       window.removeEventListener("resize", measure);
       workspace.style.removeProperty("--settings-nav-height");
     };
-  }, []);
+  }, [mode]);
 
   return (
     <nav ref={navRef} className={styles.sectionNav} aria-label={english ? "Settings sections" : "Secciones de configuración"}>
       <label className={styles.mobileCategory} htmlFor="settings-category">
         <span>{english ? "Settings category" : "Categoría de configuración"}</span>
         <select id="settings-category" className="select" value={category.id} onChange={event => {
-          const selected = CONFIG_CATEGORIES.find(item => item.id === event.target.value);
-          if (selected) window.location.hash = selected.sections[0].id;
+          const selected = categories.find(item => item.id === event.target.value);
+          if (selected) { setActive(selected.sections[0].id); router.push(`#${selected.sections[0].id}`); }
         }}>
-          {CONFIG_CATEGORIES.map(item => <option key={item.id} value={item.id}>{english ? item.labelEn : item.label}</option>)}
+          {categories.map(item => <option key={item.id} value={item.id}>{english ? item.labelEn : item.label}</option>)}
         </select>
       </label>
       <div className={styles.categoryLinks} role="group" aria-label={english ? "Categories" : "Categorías"}>
-        {CONFIG_CATEGORIES.map(item => (
+        {categories.map(item => (
           <a key={item.id} href={`#${item.sections[0].id}`} className={styles.categoryLink} data-active={item.id === category.id ? "true" : undefined}>
             {english ? item.labelEn : item.label}
           </a>

@@ -38,7 +38,7 @@ function CompanionPanel() {
   const params=new URLSearchParams();if(state.activeId)params.set("conversacion",state.activeId);else if(state.scope)params.set("causaId",state.scope);
   const homeHref=`/inicio${params.size?`?${params}`:""}`;
   return <>
-    <button type="button" className="altazor-companion-launcher" onClick={() => setOpen(true)} aria-label="Conversar con ALTAZOR" aria-haspopup="dialog" aria-expanded={open}><AltazorMark size={38} state={running ? "thinking" : "ready"} /><span>ALTAZOR<small>{running ? "Trabajando…" : "Tu asistente"}</small></span></button>
+    <button type="button" className="altazor-companion-launcher" onClick={() => setOpen(true)} aria-label="Conversar con ALTAZOR" aria-haspopup="dialog" aria-expanded={open}><AltazorMark size={44} state={running ? "thinking" : "ready"} label /></button>
     <Sheet open={open} onClose={() => setOpen(false)} title="ALTAZOR" className="altazor-companion-sheet" headerActions={<Link href={homeHref} className="btn btn-ghost">Abrir conversación completa</Link>}>{open && <AltazorHome />}</Sheet>
   </>;
 }

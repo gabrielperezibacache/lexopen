@@ -12,8 +12,6 @@ import {
 import { cn } from "@/lib/chile";
 import { FolioSymbol } from "@/components/ui/FolioSymbol";
 import { UserSwitcher, type SessionUserSummary } from "@/components/auth/UserSwitcher";
-import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import {
   activeNavigationArea, activeNavigationEntry, secondaryNavigation,
@@ -49,8 +47,6 @@ function SidebarChrome({ navigation, user, mailPendingCount, onNavigate, onClose
   const activeArea = activeNavigationArea(navigation, pathname);
   const activeEntry = activeNavigationEntry(navigation, pathname);
   const secondary = secondaryNavigation(navigation, pathname);
-  const assistant = navigation.utilities.find(item => item.id === "agente");
-  const shortcutEntries = activeArea?.id === "jornada" ? navigation.shortcuts : [];
 
   function entryLink(entry: NavigationEntry, compact = false) {
     const Icon = ICONS[entry.icon];
@@ -98,21 +94,17 @@ function SidebarChrome({ navigation, user, mailPendingCount, onNavigate, onClose
           </Link>;
         })}
       </nav>
-      {secondary.length > 1 && !collapsed && <nav aria-label={t(activeArea!.labelKey)} data-testid="secondary-navigation" className="shell-secondary-nav">
+      {secondary.length > 0 && !collapsed && <nav aria-label={t(activeArea!.labelKey)} data-testid="secondary-navigation" className="shell-secondary-nav">
         {secondary.map((entry, index) => <div key={entry.id}>
           {entry.groupKey && entry.groupKey !== secondary[index - 1]?.groupKey && <p className="shell-nav-group">{t(entry.groupKey)}</p>}
           {entryLink(entry)}
         </div>)}
       </nav>}
-      {shortcutEntries.length > 0 && !collapsed && <nav aria-label={t("nav.shortcuts")} className="shell-secondary-nav">
-        <p className="shell-nav-group">{t("nav.shortcuts")}</p>{shortcutEntries.map(entry => entryLink(entry))}
-      </nav>}
+
     </div>
 
     <div className={cn("shell-sidebar-footer border-t border-white/10", collapsed && "shell-sidebar-footer-compact")}
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
-      {assistant && entryLink(assistant, collapsed)}
-      {!collapsed && <div className="flex items-center gap-2"><LanguageSwitcher variant="dark" className="min-w-0 flex-1 px-2" /><ThemeToggle variant="dark" /></div>}
       <UserSwitcher initialUser={user} compact={collapsed} />
     </div>
   </>;

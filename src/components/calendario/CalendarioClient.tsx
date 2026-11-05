@@ -143,7 +143,7 @@ export function CalendarioClient({
             className="btn btn-ghost"
             href={`/api/calendario/ics?desde=${currentYm}-01`}
           >
-            Exportar .ics
+            Exportar calendario
           </a>
           {!formOpen && (
             <button type="button" className="btn btn-primary" onClick={openCreate}>
@@ -162,7 +162,7 @@ export function CalendarioClient({
         />
       )}
 
-      {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+      {error && <p role="alert" className="text-sm text-[var(--danger)]">{error}</p>}
 
       <div className="space-y-2">
         {eventos.map((e) => (
@@ -171,10 +171,9 @@ export function CalendarioClient({
             className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-3 py-2 text-sm"
           >
             <div className="min-w-0">
-              <div className="font-medium break-words">
-                {e.tipo === "audiencia" ? "Audiencia · " : ""}
-                {e.titulo}
-              </div>
+              <button type="button" className="min-h-11 break-words text-left font-medium text-[var(--sea)]" disabled={busyId === e.id} aria-label={`Editar ${e.titulo}`} onClick={() => openEdit(e)}>
+                {e.tipo === "audiencia" ? "Audiencia · " : ""}{e.titulo}
+              </button>
               <div className="text-xs text-[var(--ink-soft)]/65">
                 {formatDateTime(e.inicio)}
                 {e.causaLabel ? (
@@ -189,7 +188,9 @@ export function CalendarioClient({
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <details className="text-sm">
+              <summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Opciones</summary>
+              <div className="flex flex-wrap items-center gap-2 py-2">
               <input
                 type="date"
                 className="input h-9 w-auto py-1 text-xs"
@@ -205,9 +206,6 @@ export function CalendarioClient({
               >
                 Mover
               </button>
-              <button type="button" className="btn btn-ghost" onClick={() => openEdit(e)}>
-                Editar
-              </button>
               <button
                 type="button"
                 className="btn btn-ghost"
@@ -216,12 +214,13 @@ export function CalendarioClient({
               >
                 {t("common.delete")}
               </button>
-            </div>
+              </div>
+            </details>
           </div>
         ))}
         {eventos.length === 0 && (
           <p className="text-sm text-[var(--ink-soft)]/65">
-            Sin eventos este mes. Cree uno arriba o pídaselo al asistente en{" "}
+            Sin eventos este mes. Puedes pedirle uno a ALTAZOR en{" "}
             <Link href="/inicio" className="text-[var(--sea)]">
               Inicio
             </Link>

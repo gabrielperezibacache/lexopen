@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { fetchSafeOutbound, isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
 import { putObject } from "@/lib/storage";
 import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
+import { assertPjudManagementEnabled, getCaseManagementMode } from "@/lib/causas/management-mode";
 
 /**
  * PDF backup: explicit PJUD_PDF_BACKUP=1|0, else on when public scrape is enabled
@@ -88,6 +89,7 @@ export async function ingestPjudDocumentBuffer(opts: {
   if (buf.byteLength < 100 || buf.byteLength > 20 * 1024 * 1024) {
     return null;
   }
+  if (await getCaseManagementMode() !== "pjud_cl") return null;
   if (
     /^\s*<(!DOCTYPE|html|head|body)/i.test(buf.subarray(0, 200).toString("utf8"))
   ) {
@@ -128,6 +130,7 @@ export async function ingestPjudDocumentBuffer(opts: {
   const key = `pjud/${encodeURIComponent(opts.causaId)}/${encodeURIComponent(opts.movimientoId)}/${sourceSha256}`;
   await putObject({ key, body: buf, contentType: mime });
   const result = await prisma.$transaction(async tx => {
+    await assertPjudManagementEnabled(tx);
     await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${opts.causaId} FOR UPDATE`;
     const movement = await tx.causaMovimiento.findUniqueOrThrow({ where: { id: opts.movimientoId } });
     if (movement.causaId !== opts.causaId) throw new Error("Documento fuera del expediente");
@@ -180,6 +183,7 @@ export async function backupMovimientoDocuments(
   if (process.env.PJUD_DOC_DOWNLOADS?.trim() === "0" || (!opts?.force && !pdfBackupEnabled())) {
     return { enabled: false, saved: 0, skipped: 0, attempted: 0 };
   }
+  if (await getCaseManagementMode() !== "pjud_cl") return { enabled: false, saved: 0, skipped: 0, attempted: 0 };
 
   const max = opts?.max ?? pjudDocDownloadMaxPerRun();
   const delayMs = opts?.delayMs ?? pjudDocDownloadDelayMs();
@@ -191,6 +195,7 @@ export async function backupMovimientoDocuments(
   let attempted = 0;
 
   for (let i = 0; i < pending.length; i += 1) {
+    if (await getCaseManagementMode() !== "pjud_cl") break;
     const mov = pending[i];
     const ref = mov.documentoRef?.trim();
     if (!isBackupableDocumentoRef(ref)) {
@@ -208,6 +213,7 @@ export async function backupMovimientoDocuments(
         : mov.titulo.slice(0, 80) || mov.id;
 
     try {
+      await assertPjudManagementEnabled();
       const parsed = new URL(ref!);
       const res = await fetchSafeOutbound(ref!, {
         allowHttp: process.env.NODE_ENV !== "production",

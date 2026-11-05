@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { operationKey, createSubmissionKeys } from "@/lib/client-submission-key";
 import { withCsrfHeaders } from "@/lib/client-csrf";
 import type { AltazorDestination } from "@/lib/altazor/types";
-import type { AltazorSelectedSource } from "./AltazorSources";
-type Conversation = { id: string; title: string; causaId: string | null; scopeKey: string; revision: number; status: string };
+import { prepareAssistantSubmission } from "@/lib/altazor/client-send-policy";
+export type Conversation = { id: string; title: string; causaId: string | null; scopeKey: string; revision: number; status: string };
 type Attachment = { id: string; sourceName: string; byteSize: number; status: string };
 type Turn = { id: string; ordinal: number; status: string; userText: string; assistantText: string; available?: boolean; attachmentIds: string[]; sourceRefs: { title: string; href: string }[]; results: { toolId: string; result: { ok: boolean; message: string; card?: Record<string, unknown> | null; undoToken?: string | null } }[]; plan: { id: string; steps: { toolId: string; preview: string }[] } | null; errorCode: string | null; createdAt: string };
 export type ConversationData = { conversation: Conversation; turns: Turn[]; attachments: Attachment[]; destination: AltazorDestination; hasMore: boolean; beforeOrdinal: number | null };
@@ -21,17 +21,23 @@ function reflectConversationLocation(id:string){
 }
 export function useAltazorCompanionState() {
   const [linkedDocumentId, setLinkedDocumentId] = useState("");
+  const [clarification, setClarification] = useState("");
+  const routeCausaId = useRef("");
   const [libraryNotice,setLibraryNotice]=useState<{id:string;title:string}|null>(null);
   const [initialFailed, setInitialFailed] = useState(false);
-  const [pane, setPane] = useState<Pane>("chat"), [visited, setVisited] = useState<Pane[]>(["chat"]), [conversations, setConversations] = useState<Conversation[]>([]), [activeId, setActiveId] = useState(""), [data, setData] = useState<ConversationData | null>(null), [destination, setDestination] = useState<AltazorDestination | null>(null), [causas, setCausas] = useState<{ id: string; titulo: string; rit: string | null }[]>([]), [scope, setScope] = useState(""), [text, setText] = useState(""), [sources, setSources] = useState<AltazorSelectedSource[]>([]), [attachmentIds, setAttachmentIds] = useState<string[]>([]), [allowRemote, setAllowRemote] = useState(false), [useMemory, setUseMemory] = useState(true), [busy, setBusy] = useState(false), [uploading, setUploading] = useState(false), [error, setError] = useState(""), [loading, setLoading] = useState(true);
+  const [pane, setPane] = useState<Pane>("chat"), [visited, setVisited] = useState<Pane[]>(["chat"]), [conversations, setConversations] = useState<Conversation[]>([]), [activeId, setActiveId] = useState(""), [data, setData] = useState<ConversationData | null>(null), [destination, setDestination] = useState<AltazorDestination | null>(null), [causas, setCausas] = useState<{ id: string; titulo: string; rit: string | null }[]>([]), [scope, setScope] = useState(""), [text, setText] = useState(""), [attachmentIds, setAttachmentIds] = useState<string[]>([]), [busy, setBusy] = useState(false), [uploading, setUploading] = useState(false), [error, setError] = useState(""), [loading, setLoading] = useState(true);
   const [preference, setPreference] = useState<CompanionPreference>({ activeConversationId: null, memoryEnabled: true, backgroundEnabled: true, revision: 0, selectionUnavailable: false });
   const preferenceWrites = useRef<Promise<unknown>>(Promise.resolve());
+  const [preferenceSaving, setPreferenceSaving] = useState(false);
+  const preferencePending = useRef(0);
   function savePreference(changes: Partial<Pick<CompanionPreference, "activeConversationId" | "memoryEnabled" | "backgroundEnabled">>) {
+    preferencePending.current++; setPreferenceSaving(true);
+    setPreference(previous => ({ ...previous, ...changes }));
     preferenceWrites.current = preferenceWrites.current.catch(() => {}).then(async () => {
       const current = await request<CompanionPreference>("/api/altazor/companion");
       const next = await request<CompanionPreference>("/api/altazor/companion", { ...changes, expectedRevision: current.revision }, "PATCH");
       setPreference(next); return next;
-    }).catch(reason => setError(reason instanceof Error ? reason.message : "No se pudo guardar la preferencia"));
+    }).catch(async reason => { setError(reason instanceof Error ? reason.message : "No se pudo guardar la preferencia"); await request<CompanionPreference>("/api/altazor/companion").then(setPreference).catch(() => {}); }).finally(() => { preferencePending.current--; if (!preferencePending.current) setPreferenceSaving(false); });
     return preferenceWrites.current;
   }
   const conversationRequest = useRef(createSubmissionKeys()), turnRequest = useRef(createSubmissionKeys()), input = useRef<HTMLInputElement>(null), textarea = useRef<HTMLTextAreaElement>(null), drafts = useRef(new Map<string, string>()), liveId = useRef("");
@@ -43,7 +49,7 @@ export function useAltazorCompanionState() {
     const params = new URLSearchParams(location.pathname==="/inicio"?location.search:""), requestedCase = params.get("causaId");
     const resourcesUrl = `/api/altazor/resources${requestedCase ? `?causaId=${encodeURIComponent(requestedCase)}` : ""}`;
     Promise.all([fetch("/api/altazor/conversations", { signal: controller.signal, cache: "no-store" }).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error); return result; }), fetch(resourcesUrl, { signal: controller.signal, cache: "no-store" }).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error || "No se pudo comprobar el ámbito solicitado."); return result; }), fetch("/api/altazor/companion", { signal: controller.signal, cache: "no-store" }).then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error); return result; })]).then(([result, resources, saved]) => {
-      if (controller.signal.aborted) return; setLinkedDocumentId(params.get("documentoId") || ""); setConversations(result.conversations); setDestination(result.destination); setCausas(resources.causas || []); setPreference(saved); setUseMemory(saved.memoryEnabled);
+      if (controller.signal.aborted) return; setLinkedDocumentId(params.get("documentoId") || ""); setConversations(result.conversations); setDestination(result.destination); setCausas(resources.causas || []); setPreference(saved);
       if (saved.selectionUnavailable) setError("La conversación anterior ya no está disponible. Elige otra o comienza una nueva.");
       const selectedPane = params.get("altazor");
       if (["chat", "memory", "connectors", "computer"].includes(selectedPane || "")) { setPane(selectedPane as Pane); setVisited(["chat", selectedPane as Pane]); }
@@ -59,7 +65,7 @@ export function useAltazorCompanionState() {
       if (liveId.current === id) { setData(result); setDestination(result.destination); }
       return result;
     } catch (reason) {
-      if (liveId.current === id) { setData(null); setSources([]); setAttachmentIds([]); setError(reason instanceof Error ? reason.message : "No se pudo revalidar la conversación. Tu mensaje pendiente se conserva."); }
+      if (liveId.current === id) { setData(null); setAttachmentIds([]); setError(reason instanceof Error ? reason.message : "No se pudo revalidar la conversación. Tu mensaje pendiente se conserva."); }
       throw reason;
     }
   }, []);
@@ -83,25 +89,45 @@ export function useAltazorCompanionState() {
   function choosePane(next: Pane) { setPane(next); setVisited(previous => previous.includes(next) ? previous : [...previous, next]); }
   function chooseConversation(id: string) {
     void savePreference({ activeConversationId: id || null });
-    setLinkedDocumentId(""); drafts.current.set(activeId || "new", text); liveId.current = id; setActiveId(id); setData(null); setText(drafts.current.get(id || "new") || ""); setSources([]); setAttachmentIds([]); setAllowRemote(false); setError(""); turnRequest.current = createSubmissionKeys();
+    setLinkedDocumentId(""); setClarification(""); setScope(""); drafts.current.set(activeId || "new", text); liveId.current = id; setActiveId(id); setData(null); setText(drafts.current.get(id || "new") || ""); setAttachmentIds([]); setError(""); turnRequest.current = createSubmissionKeys();
     if(!id)conversationRequest.current=createSubmissionKeys();reflectConversationLocation(id);choosePane("chat");
   }
-  async function ensureConversation() {
-    if (liveId.current) { reflectConversationLocation(liveId.current);return liveId.current; }
-    const result = await request<{ conversation: Conversation }>("/api/altazor/conversations", { requestId: conversationRequest.current.forPayload({ title: text.trim().slice(0,160) || "Nueva conversación", causaId: scope || null }), title: text.trim().slice(0,160) || "Nueva conversación", causaId: scope || null });
-    void savePreference({ activeConversationId: result.conversation.id });
-    liveId.current = result.conversation.id; setActiveId(result.conversation.id); await reload(result.conversation.id); await loadList();
+  async function ensureConversation(forSend = false) {
+    if (liveId.current && !forSend) return liveId.current;
+    const payload = {
+      text,
+      title: text.trim().slice(0,160) || "Nueva conversación",
+      conversationId: liveId.current || undefined,
+      causaId: !liveId.current ? scope || undefined : undefined,
+      routeCausaId: routeCausaId.current || undefined,
+      documentoId: linkedDocumentId || undefined,
+      hasPendingAttachments: attachmentIds.length > 0,
+    };
+    const result = await request<{ conversation?: Conversation; reused?: boolean; clarify?: string }>("/api/altazor/conversations/prepare", { ...payload, requestId: conversationRequest.current.forPayload(payload) });
+    if (result.clarify) { setClarification(result.clarify); return null; }
+    if (!result.conversation) throw new Error("No se pudo recuperar la conversación. Tu mensaje se conserva.");
+    if (result.conversation.id !== liveId.current) {
+      drafts.current.set(liveId.current || "new", text);
+      liveId.current = result.conversation.id;
+      setActiveId(result.conversation.id); setData(null); setScope(result.conversation.causaId || "");
+      setAttachmentIds([]); turnRequest.current = createSubmissionKeys();
+      void savePreference({ activeConversationId: result.conversation.id });
+    }
+    await reload(result.conversation.id); await loadList();
     reflectConversationLocation(result.conversation.id);
     return result.conversation.id;
   }
   async function send() {
-    if (!text.trim() || busy || uploading) return; setBusy(true); setError("");
+    if (!text.trim() || busy || uploading || running || loading || preferenceSaving) return; setBusy(true); setError(""); setClarification("");
     try {
-      const id = await ensureConversation(), current = await reload(id);
-      const payload = { text, attachmentIds, sources: sources.map(source => source.input), destinationKey: current.destination.key, allowRemote, useMemory };
+      const expectedDestination = destination?.key, draftOrigin = liveId.current || "new", submittedText = text;
+      const id = await ensureConversation(true); if (!id) return;
+      const current = await reload(id);
+      const payload = { text, attachmentIds, automaticSources: true, documentoId: linkedDocumentId || undefined, ...prepareAssistantSubmission(current.destination, expectedDestination), useMemory: preference.memoryEnabled };
       const result = await request<{ turnId: string }>(`/api/altazor/conversations/${id}/turns`, { ...payload, requestId: turnRequest.current.forPayload(payload), expectedRevision: current.conversation.revision });
       turnRequest.current.complete(payload);
-      setText(current => current === text ? "" : current); drafts.current.delete(id); drafts.current.delete("new"); setAttachmentIds([]); setAllowRemote(false); turnRequest.current = createSubmissionKeys(); await reload(id);
+      if (drafts.current.get(draftOrigin) === submittedText) drafts.current.delete(draftOrigin);
+      setText(current => current === text ? "" : current); drafts.current.delete(id); drafts.current.delete("new"); setAttachmentIds([]); setLinkedDocumentId(""); turnRequest.current = createSubmissionKeys(); await reload(id);
       const completed = await request<ConversationData>(`/api/altazor/conversations/${id}/turns/${result.turnId}/execute`, {}); if (liveId.current === id) setData(completed); await loadList();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo completar el mensaje. Revisa su estado antes de reintentar."); if (liveId.current) await reload(liveId.current).catch(() => {}); }
     finally { setBusy(false); }
@@ -109,7 +135,7 @@ export function useAltazorCompanionState() {
   async function upload(files: FileList | null) {
     if (!files?.length || uploading || busy) return; setUploading(true); setError("");
     try {
-      const id = await ensureConversation();
+      const id = await ensureConversation(); if (!id) return;
       for (const file of Array.from(files)) {
         const form = new FormData(); form.append("file", file); form.append("requestId", operationKey());
         const response = await fetch(`/api/altazor/conversations/${id}/attachments`, { method: "POST", headers: withCsrfHeaders(), body: form }), result = await response.json();
@@ -129,6 +155,8 @@ export function useAltazorCompanionState() {
     finally { if (action !== "cancel") setBusy(false); }
   }
   function synchronizeLocation(pathname:string,search:string) {
+    const match = pathname.match(/^\/(?:causas|pjud)\/([^/]+)(?:\/|$)/);
+    routeCausaId.current = match && !["nueva", "monitoreo", "mis-causas"].includes(match[1]) ? match[1] : "";
     if (loading||pathname!=="/inicio") return;
     const params = new URLSearchParams(search), intent = params.get("intencion"), requestedCase = params.get("causaId"), requestedConversation = params.get("conversacion"), selectedPane = params.get("altazor");
     if (!intent && !requestedConversation && !selectedPane&&!requestedCase) { if(liveId.current)reflectConversationLocation(liveId.current);return; }
@@ -148,5 +176,5 @@ export function useAltazorCompanionState() {
     }).catch(reason=>{if(!controller.signal.aborted)setError(reason.message);});
     return()=>controller.abort();
   }
-  return { linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, setScope, text, setText, sources, setSources, attachmentIds, setAttachmentIds, allowRemote, setAllowRemote, useMemory, setUseMemory, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, chooseConversation, send, upload, turnAction, running, preference, savePreference,synchronizeLocation };
+  return { linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, chooseConversation, send, upload, turnAction, running, preference, preferenceSaving, savePreference,synchronizeLocation };
 }

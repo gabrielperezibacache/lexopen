@@ -39,6 +39,7 @@ test("espacios: hub, creación vinculada y enlace desde causa", async ({ page })
   expect(created.id).toBeTruthy();
 
   await page.goto(`/causas/${causa.id}`);
+  await page.getByText("Equipo y gestión de la causa", { exact: true }).click();
   await expect(page.getByRole("link", { name: "Abrir espacio" })).toBeVisible();
   await page.getByRole("link", { name: "Abrir espacio" }).click();
   await expect(page).toHaveURL(new RegExp(`/sites/${created.id}$`), { timeout: 15_000 });

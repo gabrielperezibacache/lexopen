@@ -1,5 +1,5 @@
 /**
- * Compat layer: Hermes Agent → adaptador LLM multi-proveedor.
+ * Compat layer: Adaptador de compatibilidad para la IA del estudio.
  * Preferir `@/lib/integrations/llm` en código nuevo.
  */
 import {

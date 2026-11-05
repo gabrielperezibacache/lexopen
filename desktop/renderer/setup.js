@@ -8,6 +8,9 @@
   const continueBtn = document.getElementById("continue");
   const retryBtn = document.getElementById("retry");
   const chooseDataBtn = document.getElementById("choose-data-directory");
+  const checkDesktopBtn = document.getElementById("check-altazor-desktop");
+  const loadToolpackBtn = document.getElementById("load-altazor-toolpack");
+  const desktopStatusEl = document.getElementById("altazor-desktop-status");
   let selectedPgPort = 54329;
 
   function selectedMode() {
@@ -113,6 +116,45 @@
       statusEl.textContent = "Carpeta elegida. Continuar abrirá esos datos; no se ha movido ningún archivo.";
     } catch { showError("No se pudo elegir la carpeta. Vuelva a intentarlo."); }
     finally { setBusy(false); }
+  });
+
+  async function prepareDesktop(action, progress) {
+    const descriptions = {
+      "engine-missing": "Instala Docker para preparar el escritorio. Puedes continuar con LexOpen mientras tanto.",
+      "engine-unavailable": "Abre Docker y vuelve a comprobar el escritorio.",
+      "linux-engine-required": "El escritorio necesita que Docker use contenedores Linux.",
+      "profile-pending": "Docker está listo. Carga el paquete oficial de tu versión o sigue la guía de preparación.",
+      "profile-detected": "Herramientas detectadas en este equipo. Vincula el escritorio dedicado desde Mi asistente en LexOpen.",
+      "package-unavailable": "Esta versión todavía no ofrece un paquete oficial para este equipo. Consulta la guía de preparación.",
+      "package-check-failed": "No se pudo comprobar el paquete oficial. Revisa tu conexión y vuelve a intentarlo.",
+      "package-cancelled": "Selección cancelada.",
+      "package-mismatch": "El archivo no coincide con el tamaño y la huella oficiales. Descarga el paquete de tu versión.",
+      "package-read-failed": "No se pudo leer o preparar el archivo. Revisa los permisos y el espacio disponible.",
+      "package-load-unconfirmed": "Docker no confirmó la carga. Pulsa Comprobar escritorio para ver su estado.",
+      "package-loaded": "Herramientas cargadas. Vincula el escritorio dedicado desde Mi asistente en LexOpen.",
+    };
+    const failure = "No se pudo comprobar el escritorio. Vuelve a intentarlo desde esta pantalla.";
+    checkDesktopBtn.disabled = true;
+    loadToolpackBtn.disabled = true;
+    desktopStatusEl.hidden = false;
+    desktopStatusEl.textContent = progress;
+    try {
+      const result = await action();
+      desktopStatusEl.textContent = descriptions[result.state] || failure;
+    } catch { desktopStatusEl.textContent = failure; }
+    finally { checkDesktopBtn.disabled = loadToolpackBtn.disabled = false; }
+  }
+
+  checkDesktopBtn.addEventListener("click", () => {
+    void prepareDesktop(() => window.lexopenDesktop.checkAltazorDesktop(), "Comprobando el escritorio…");
+  });
+
+  loadToolpackBtn.addEventListener("click", () => {
+    void prepareDesktop(() => window.lexopenDesktop.loadAltazorToolpack(), "Comprobando la versión oficial y preparando la carga…");
+  });
+
+  document.getElementById("desktop-guide").addEventListener("click", () => {
+    void window.lexopenDesktop.openExternal("https://github.com/gabrielperezibacache/lexopen/blob/main/docs/ESCRITORIO-ALTAZOR.md");
   });
 
   if (retryBtn) {

@@ -8,6 +8,7 @@ export const CONFIG_CATEGORIES = [
     descriptionEn: "Firm details, AI policies and the people who work here.",
     sections: [
       { id: "estudio", label: "Estudio", labelEn: "Firm" },
+      { id: "case-management-settings", label: "Gestión de causas", labelEn: "Case management" },
       { id: "usuarios", label: "Usuarios", labelEn: "Users" },
     ],
   },
@@ -54,13 +55,17 @@ export const CONFIG_CATEGORIES = [
 ] as const;
 
 export const CONFIG_SECTIONS: readonly ConfigSection[] = CONFIG_CATEGORIES.flatMap<ConfigSection>(category => [...category.sections]);
-
-export function configSectionFromHash(hash: string) {
-  let id;
-  try { id = decodeURIComponent(hash.replace(/^#/, "")); } catch { return undefined; }
-  return CONFIG_SECTIONS.find(section => section.id === id);
+export function configCategoriesForMode(mode: "manual" | "pjud_cl") {
+  return CONFIG_CATEGORIES.map(category => ({ ...category, sections: category.sections.filter(section => mode === "pjud_cl" || !["pjud-settings", "pjud-log"].includes(section.id)) }));
 }
 
-export function configCategoryForSection(id: string) {
-  return CONFIG_CATEGORIES.find(category => category.sections.some(section => section.id === id)) || CONFIG_CATEGORIES[0];
+export function configSectionFromHash(hash: string, mode: "manual" | "pjud_cl" = "pjud_cl") {
+  let id;
+  try { id = decodeURIComponent(hash.replace(/^#/, "")); } catch { return undefined; }
+  return configCategoriesForMode(mode).flatMap(category => category.sections).find(section => section.id === id);
+}
+
+export function configCategoryForSection(id: string, mode: "manual" | "pjud_cl" = "pjud_cl") {
+  const categories = configCategoriesForMode(mode);
+  return categories.find(category => category.sections.some(section => section.id === id)) || categories[0];
 }

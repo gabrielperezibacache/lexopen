@@ -5,11 +5,12 @@ import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { attemptContext, digest, randomToken, seal } from "@/lib/personal-connectors/core";
 import { completeLinkedInOAuth, publicLinkedInAccount, receiveLinkedInCallback } from "@/lib/personal-connectors/linkedin/account";
-import { closeComputerSession, computerScreenshot, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerSession, sendComputerMessage } from "./service";
+import { closeComputerSession, computerScreenshot, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerActivity, readComputerSession, sendComputerMessage } from "./service";
 
 type KittyFixture = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
 type TurnFixture = { from: string; text: string; working?: boolean };
 const hasStatus = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
+const fixtureFrame = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7ioAAAAASUVORK5CYII=", "base64");
 async function main() {
   const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL); assert.equal(url, new URL(process.env.DATABASE_URL!).toString());
   const tag = randomUUID(), users: string[] = [], causes: string[] = [], workspaces: string[] = [];
@@ -41,7 +42,8 @@ async function main() {
       chat.turns.push({ from: "user", text: String(body.text) }, { from: "fixture-kitty", text: "Resultado completamente ficticio" });
       result = { turns: chat.turns };
       if (loseNextMessage) { loseNextMessage = false; throw new Error("Synthetic response lost after acceptance"); }
-    } else if (path.endsWith("/control")) result = { held: body.hold === true };
+    } else if (path.endsWith("/screenshot")) return new Response(new Uint8Array(fixtureFrame), { headers: { "Content-Type": "image/png" } });
+    else if (path.endsWith("/control")) result = { held: body.hold === true };
     else if (path.endsWith("/input")) result = { ok: true };
     else if (path.endsWith("/cancel")) result = { cancelled: false };
     else if (path.endsWith("/stop")) { const kitty = fleet.find(kitty => kitty.id === path.split("/")[3]); assert.ok(kitty); kitty.status = "stopped"; result = { kitty }; }
@@ -59,9 +61,22 @@ async function main() {
     const first = await createComputerSession(owner, configured.workspaceId, `start-${tag}`); assert.equal(first.state, "ready"); assert.equal(kittyCreates, 1);
     const beforeReplay = network; assert.equal((await createComputerSession(owner, configured.workspaceId, `start-${tag}`)).id, first.id); assert.equal(network, beforeReplay);
     const beforeDenied = network; await assert.rejects(readComputerSession(outsider, first.id), hasStatus(404)); await assert.rejects(computerScreenshot(outsider, first.id), hasStatus(404)); assert.equal(network, beforeDenied);
+    await assert.rejects(readComputerActivity(outsider, cause.id), hasStatus(404));
+    assert.equal((await readComputerActivity(owner)).sessionId, null, "the personal chat cannot discover the case desktop");
+    assert.equal(network, beforeDenied, "unauthorized or unrelated activity never contacts the gateway");
+    const beforePreviewWrites = mutations;
+    const healthBeforePreview = await prisma.altazorComputerWorkspace.findUniqueOrThrow({ where: { id: configured.workspaceId }, select: { updatedAt: true, lastVerifiedAt: true } });
+    assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "ready", sessionId: first.id, monitor: true });
+    assert.deepEqual(await computerScreenshot(owner, first.id, true), fixtureFrame);
+    assert.equal(mutations, beforePreviewWrites, "watching a desktop does not operate it");
+    assert.deepEqual(await prisma.altazorComputerWorkspace.findUniqueOrThrow({ where: { id: configured.workspaceId }, select: { updatedAt: true, lastVerifiedAt: true } }), healthBeforePreview);
     const manualBefore = mutations;
     await assert.rejects(inputComputer(owner, first.id, `unheld-${tag}`, { action: "type", args: { text: "fictitious manually typed text" } }), hasStatus(409)); assert.equal(mutations, manualBefore);
     await controlComputer(owner, first.id, `hold-${tag}`, true);
+    const beforePaused = network;
+    assert.equal((await readComputerActivity(owner, cause.id)).state, "paused");
+    await assert.rejects(computerScreenshot(owner, first.id, true), hasStatus(409));
+    assert.equal(network, beforePaused, "the passive view cannot capture the manual control session");
     await inputComputer(owner, first.id, `type-${tag}`, { action: "type", args: { text: "fictitious manually typed text" } });
     const inputReceipt = await prisma.altazorComputerAction.findUniqueOrThrow({ where: { ownerId_requestId: { ownerId: owner.id, requestId: `type-${tag}` } } });
     assert.equal(JSON.stringify(inputReceipt).includes("fictitious manually typed text"), false);
@@ -78,6 +93,8 @@ async function main() {
     await assert.rejects(sendComputerMessage(owner, first.id, { ...ambiguous, requestId: `must-not-resend-${tag}` }), hasStatus(409)); assert.equal(sends, 2);
     const beforeRevoked = network;
     await prisma.causa.update({ where: { id: cause.id }, data: { abogadoId: outsider.id } });
+    await assert.rejects(readComputerActivity(owner, cause.id), hasStatus(404));
+    await assert.rejects(computerScreenshot(owner, first.id, true), hasStatus(404));
     await assert.rejects(readComputerSession(owner, first.id), hasStatus(404)); await assert.rejects(controlComputer(owner, first.id, `revoked-${tag}`, true), hasStatus(404)); assert.equal(network, beforeRevoked);
     await prisma.causa.update({ where: { id: cause.id }, data: { abogadoId: owner.id } });
     await closeComputerSession(owner, first.id, `close-${tag}`);

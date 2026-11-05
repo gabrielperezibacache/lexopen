@@ -11,7 +11,6 @@ import { ensureResponsableMiembro, causaAccessWhere as scopedcausaAccessWhere, d
 import { can, canSome } from "@/lib/auth/permissions";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { isStaff } from "@/lib/auth/rbac";
-import { normalizarRut, validarRit, validarRuc, validarRut } from "@/lib/chile";
 import { checkConflicts } from "@/lib/conflict";
 import { prisma } from "@/lib/db";
 import { parseLocalDateInput } from "@/lib/minutas";
@@ -96,13 +95,6 @@ export async function POST(req: NextRequest) {
       abogadoId = assigned.id;
     }
 
-    if (body.rit && !validarRit(body.rit)) {
-      return jsonError("RIT inválido (ej. C-4521-2025)", 400);
-    }
-    if (body.ruc && !validarRuc(body.ruc)) {
-      return jsonError("RUC inválido", 400);
-    }
-
     const duplicateWhere = duplicateCausaWhere({
       rit: body.rit,
       ruc: body.ruc,
@@ -118,8 +110,7 @@ export async function POST(req: NextRequest) {
         if (!visible) return NextResponse.json({ error: "Existe una coincidencia reservada. Requiere revisión autorizada.", code: "causa_duplicate" }, { status: 409 });
         return NextResponse.json(
           {
-            error:
-              "Ya existe una causa con el mismo RIT o RUC en ese tribunal",
+            error: "Ya existe una causa con esa referencia en el mismo tribunal u órgano",
             code: "causa_duplicate",
             existingId: existing.id,
             id: existing.id,
@@ -130,12 +121,6 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-    for (const p of body.partes || []) {
-      if (p.rut && !validarRut(p.rut)) {
-        return jsonError(`RUT inválido: ${p.rut}`, 400);
-      }
-    }
-
     const risk = await checkConflicts({
       user,
       partes: (body.partes || []).map((p) => ({
@@ -184,7 +169,7 @@ export async function POST(req: NextRequest) {
             ? {
                 create: body.partes.map((p) => ({
                   nombre: p.nombre,
-                  rut: p.rut ? normalizarRut(p.rut) : null,
+                  rut: p.rut || null,
                   rol: p.rol,
                   domicilio: p.domicilio || null,
                 })),

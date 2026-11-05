@@ -29,11 +29,11 @@ export class KittiesGateway {
   }
   async readiness(provider: string, knownKittyNames: string[], requireConnectorGate = false) {
     const health = await this.json("/v1/health");
-    if (health.ok !== true || health.containers !== true || typeof health.version !== "string" || !health.version || /demo|scripted/i.test(health.version)) throw new ConnectorError("desktop_not_ready", "Kitties debe ofrecer contenedores reales disponibles. No se admite el modo demostración.", 409);
+    if (health.ok !== true || health.containers !== true || typeof health.version !== "string" || !health.version || /demo|scripted/i.test(health.version)) throw new ConnectorError("desktop_not_ready", "El gateway debe ofrecer contenedores reales disponibles. No se admite el modo demostración.", 409);
     if (requireConnectorGate && health.lexopen_connector_gate !== CONNECTOR_GATE) throw new ConnectorError("connector_gate_required", "Actualice el gateway con el refuerzo de permisos de LexOpen antes de habilitar conexiones.", 409);
     const data = await this.json("/v1/providers"), providers = Array.isArray(data.providers) ? data.providers : [];
     const selected = providers.find(item => item && typeof item === "object" && item.name === provider) as Record<string, unknown> | undefined;
-    if (!selected || /demo|scripted/i.test(JSON.stringify(selected))) throw new ConnectorError("provider_not_ready", "Configure un proveedor real de IA dentro del gateway Kitties. ALTAZOR no transferirá sus credenciales.", 409);
+    if (!selected || /demo|scripted/i.test(JSON.stringify(selected))) throw new ConnectorError("provider_not_ready", "Configure un proveedor real de IA en el gateway del escritorio. ALTAZOR no transferirá sus credenciales.", 409);
     const fleet = await this.json("/v1/kitties");
     if (!Array.isArray(fleet.kitties) || fleet.kitties.some(item => !item || typeof item !== "object" || !knownKittyNames.includes(item.name) || String(item.container || "").startsWith("demo-"))) throw new ConnectorError("gateway_not_dedicated", "Este gateway contiene escritorios ajenos a este espacio. Use una instancia independiente y dedicada.", 409);
     return { version: health.version.slice(0, 120), connectorGate: health.lexopen_connector_gate === CONNECTOR_GATE };
@@ -47,7 +47,7 @@ export class KittiesGateway {
   private validateKitty(value: unknown, name: string, provider: string, connectors: readonly string[] = ["-"]): KittyRecord {
     const k = value as Partial<KittyRecord> | null;
     const selected = normalizeConnectorNames(connectors);
-    if (!k || typeof k.id !== "string" || k.name !== name || k.provider !== provider || k.desktop !== true || typeof k.container !== "string" || !k.container || k.container.startsWith("demo-") || !Array.isArray(k.connectors) || JSON.stringify([...k.connectors].sort()) !== JSON.stringify(selected) || k.approvals !== "ask" || k.backup) throw new ConnectorError("kitty_contract", "Kitties no confirmó un escritorio real con los límites solicitados.", 502);
+    if (!k || typeof k.id !== "string" || k.name !== name || k.provider !== provider || k.desktop !== true || typeof k.container !== "string" || !k.container || k.container.startsWith("demo-") || !Array.isArray(k.connectors) || JSON.stringify([...k.connectors].sort()) !== JSON.stringify(selected) || k.approvals !== "ask" || k.backup) throw new ConnectorError("kitty_contract", "El gateway no confirmó un escritorio real con los límites solicitados.", 502);
     safeId(k.id); return k as KittyRecord;
   }
   async kitty(id: string, name: string, provider: string, connectors: readonly string[] = ["-"]) { const result = await this.json(`/v1/kitties/${safeId(id)}`); const kitty = this.validateKitty(result.kitty, name, provider, connectors); if (id !== name && kitty.id !== id) throw new ConnectorError("kitty_contract", "El gateway devolvió otro escritorio.", 502); return kitty; }

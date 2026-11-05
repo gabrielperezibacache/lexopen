@@ -1,6 +1,8 @@
 {
-  "source": "src/app/icon.svg",
-  "sourceSha256": "cac8ea8a8ed69f2fabf9eb5866bcb3ada090ea06b1da4d90978133c1527b2a15",
+  "source": "docs/assets/lexopen-lockup.png",
+  "sourceSha256": "9d7cc33909da56c074813cb18d0383c159e9175206e4964da0cc8fb0496e8064",
+  "reader": "docs/assets/lexopen-engraving.png",
+  "readerSha256": "8a7205c711fca238f2785e7008df8d88fa8a5e4142153ff876142211d5905972",
   "png": 1024,
   "ico": [
     16,
@@ -18,5 +20,13 @@
     256,
     512,
     1024
-  ]
+  ],
+  "web": {
+    "apple": 180,
+    "pwa": [
+      192,
+      512
+    ],
+    "maskable": 512
+  }
 }

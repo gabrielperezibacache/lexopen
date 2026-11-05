@@ -1,3 +1,4 @@
+import type { CaseManagementMode } from "../causas/management-mode";
 import { canSome, type PermissionSubject } from "../auth/permissions";
 import { isClientAllowedPagePath } from "../auth/client-paths";
 import { isRole, PORTAL_ROLES, STAFF_ROLES } from "../auth/roles";
@@ -38,6 +39,8 @@ type CatalogEntry = NavigationEntry & { access: "staff" | "signed-in" | "admin";
 const ENTRIES: readonly CatalogEntry[] = [
   { id: "inicio", href: "/inicio", labelKey: "nav.home", icon: "home", area: "jornada", access: "staff" },
   { id: "causas", href: "/causas", labelKey: "nav.caseFiles", icon: "cases", area: "causas", access: "staff", keywords: "expediente cartera RIT ROL" },
+  { id: "my-matters", href: "/mis-causas", labelKey: "nav.myMatters", icon: "files", area: "causas", access: "staff", keywords: "organizar expediente carpetas documentos Drive" },
+  { id: "pjud", href: "/pjud", labelKey: "nav.pjudCases", icon: "monitor", area: "causas", access: "staff", keywords: "PJUD Chile OJV ClaveÚnica RIT ROL tribunales" },
   { id: "sincronizacion", href: "/sincronizacion", labelKey: "nav.synchronization", icon: "monitor", area: "causas", access: "staff", keywords: "OJV ClaveÚnica Mis Causas Drive novedades descargar" },
   { id: "monitoreo", href: "/causas/monitoreo", labelKey: "nav.pjudMonitor", icon: "monitor", area: "causas", access: "staff", keywords: "OJV sincronizar seguimiento" },
   { id: "mis-causas", href: "/causas/mis-causas", labelKey: "nav.misCausas", icon: "portal", area: "causas", access: "staff", keywords: "ClaveÚnica OJV importar" },
@@ -69,21 +72,23 @@ const ENTRIES: readonly CatalogEntry[] = [
 ];
 
 /** Discovery only: pages and APIs remain responsible for enforcing access and scope. */
-export function buildNavigation(subject: PermissionSubject | null | undefined): NavigationModel {
+export function buildNavigation(subject: PermissionSubject | null | undefined, options: { caseManagementMode?: CaseManagementMode } = {}): NavigationModel {
   if (!subject || !isRole(subject.role)) return { mode: "none", areas: [], entries: [], utilities: [], shortcuts: [] };
   const role = subject.role;
+  const pjudEnabled = options.caseManagementMode === "pjud_cl";
   const staff = (STAFF_ROLES as readonly string[]).includes(role);
   const portal = (PORTAL_ROLES as readonly string[]).includes(role);
   const allowed = ENTRIES.filter(entry => {
+    if (["pjud", "monitoreo", "mis-causas"].includes(entry.id) && !pjudEnabled) return false;
     if (portal) return entry.access === "signed-in" && isClientAllowedPagePath(entry.href);
     if (!staff || (entry.access === "admin" && role !== "admin")) return false;
     return !entry.capability || canSome(subject, entry.capability);
-  }).map(({ id, href, labelKey, icon, area, groupKey, badge, keywords }) => ({ id, href, labelKey, icon, area, groupKey, badge, keywords }));
+  }).map(({ id, href, labelKey, icon, area, groupKey, badge, keywords }) => ({ id, href, labelKey: id === "causas" && pjudEnabled ? "nav.manualCases" : labelKey, icon, area, groupKey, badge, keywords }));
   const utilities = allowed.filter(entry => !entry.area);
   if (portal) return { mode: "portal", areas: [], entries: allowed.filter(entry => entry.area), utilities, shortcuts: [] };
   return {
     mode: "staff",
-    areas: AREAS.filter(area => allowed.some(entry => entry.area === area.id)).map(area => ({ ...area })),
+    areas: AREAS.filter(area => allowed.some(entry => entry.area === area.id)).map(area => area.id === "causas" && pjudEnabled ? { ...area, href: "/pjud" } : { ...area }),
     entries: allowed.filter(entry => entry.area),
     utilities,
     shortcuts: canSome(subject, "billing.manage") ? allowed.filter(entry => entry.id === "facturacion") : [],
@@ -95,8 +100,10 @@ export function navigationEntries(model: NavigationModel): NavigationEntry[] {
 }
 
 function cleanPath(path: string) { return path.split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/"; }
+function isCaseArchive(path: string) { return /^\/causas\/[^/]+\/expediente$/.test(path); }
 export function activeNavigationEntry(model: NavigationModel, pathname: string): NavigationEntry | undefined {
   const path = cleanPath(pathname);
+  if (isCaseArchive(path)) return model.entries.find(entry => entry.id === "my-matters");
   return navigationEntries(model).filter(entry => path === entry.href || path.startsWith(`${entry.href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0];
 }
@@ -106,7 +113,7 @@ export function activeNavigationArea(model: NavigationModel, pathname: string): 
 }
 export function secondaryNavigation(model: NavigationModel, pathname: string): NavigationEntry[] {
   const area = activeNavigationArea(model, pathname);
-  return area ? model.entries.filter(entry => entry.area === area.id && !["monitoreo", "mis-causas"].includes(entry.id)) : [];
+  return area ? model.entries.filter(entry => entry.area === area.id && entry.href !== area.href && !["monitoreo", "mis-causas"].includes(entry.id)) : [];
 }
 
 export type NavigationCrumb = { href: string; labelKey: string };
@@ -116,14 +123,15 @@ const DETAIL_KEYS: Record<string, string> = {
   tarifas: "nav.details.rates", uf: "nav.details.uf", facturas: "nav.details.invoices", "cuenta-corriente": "nav.details.ledger",
   isheets: "nav.details.tables", wiki: "nav.details.wiki", blog: "nav.details.blog", qa: "nav.details.questions", fuentes: "nav.details.sources",
 };
-const ENTITY_KEYS: Record<string, string> = { causas: "nav.details.case", audiencias: "nav.details.hearing", clientes: "nav.details.client", sites: "nav.details.space", biblioteca: "nav.details.book", fuentes: "nav.details.source", facturas: "nav.details.invoice", minutas: "nav.details.minute", isheets: "nav.details.table", archivos: "nav.details.file", documentos: "nav.details.document" };
+const ENTITY_KEYS: Record<string, string> = { causas: "nav.details.case", audiencias: "nav.details.hearing", clientes: "nav.details.client", sites: "nav.details.space", biblioteca: "nav.details.book", fuentes: "nav.details.source", facturas: "nav.details.invoice", minutas: "nav.details.minute", pjud: "nav.details.case", isheets: "nav.details.table", archivos: "nav.details.file", documentos: "nav.details.document" };
 
 export function navigationBreadcrumbs(model: NavigationModel, pathname: string): NavigationCrumb[] {
-  const parts = cleanPath(pathname).split("/").filter(Boolean);
+  const path = cleanPath(pathname), parts = path.split("/").filter(Boolean);
   if (!parts.length) return [];
   const entries = navigationEntries(model);
   const home = model.mode === "portal" ? "/portal" : "/inicio";
   const crumbs: NavigationCrumb[] = [{ href: home, labelKey: model.mode === "portal" ? "nav.portal" : "nav.home" }];
+  if (isCaseArchive(path) && model.mode === "staff") return [...crumbs, { href: "/mis-causas", labelKey: "nav.myMatters" }, { href: path, labelKey: "nav.caseFiles" }];
   for (let index = 0; index < parts.length; index++) {
     const href = "/" + parts.slice(0, index + 1).join("/");
     if (href === home) continue;

@@ -6,11 +6,11 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "LexOpen",
     short_name: "LexOpen",
     description:
-      "Operaciones jurídicas para estudios chilenos — plazos, causas y equipo en el Host local.",
+      "Causas, fuentes y trabajo diario de profesionales y estudios jurídicos.",
     start_url: "/inicio",
     display: "standalone",
-    background_color: "#f7f4ef",
-    theme_color: "#1f6f78",
+    background_color: "#0d1022",
+    theme_color: "#0d1022",
     lang: "es-CL",
     icons: [
       {

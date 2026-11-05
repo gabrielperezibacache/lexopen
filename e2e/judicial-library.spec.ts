@@ -60,8 +60,11 @@ test("sentencias: ficha manual, TXT privado, cita corroborada y reclasificación
   await fillJudicial(page, `J-${tag}`, "2024-02-29");
   const bytes = Buffer.from("Fuente enteramente ficticia para probar LexOpen.\n\nLa prueba del pago requiere antecedentes comprobables. Este texto no representa una sentencia real.");
   await page.locator('input[name="files"]').setInputFiles({ name: `${title}.txt`, mimeType: "text/plain", buffer: bytes });
+  await page.getByText("Opciones de importación", { exact: true }).click();
   await page.getByTestId("import-preserve-original").uncheck();
   await expect(page.getByTestId("import-convert-text")).toBeChecked();
+  await page.getByText("Opciones de importación", { exact: true }).click();
+  await expect(page.locator(".book-conversion-notice")).toContainText("El original no se guardará en LexOpen");
   const pendingImport = page.waitForResponse(response => new URL(response.url()).pathname === "/api/books" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Incorporar a mi biblioteca", exact: true }).click();
   const imported = await pendingImport; expect(imported.status(), await imported.text()).toBe(201);

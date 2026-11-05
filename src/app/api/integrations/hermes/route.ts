@@ -273,7 +273,7 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             error:
-              "Este borrador es modo demo. Márquelo explícitamente para guardar como minuta de prueba, o conecte Hermes.",
+              "Este borrador es modo demo. Márquelo explícitamente para guardar como minuta de prueba, o conecte un proveedor de IA.",
             code: "demo_approval_required",
           },
           { status: 400 }
@@ -340,10 +340,10 @@ export async function POST(req: Request) {
           : `Borrador copiloto — ${utilityLabel}`
       ).slice(0, 160);
       const hechos = isDemo
-        ? "BORRADOR DEMO (Hermes no conectado). Generado por el copiloto LexOpen en modo local y aprobado explícitamente como prueba. No usar como acta definitiva."
+        ? "BORRADOR DEMO (proveedor de IA no conectado). Generado por el copiloto LexOpen en modo local y aprobado explícitamente como prueba. No usar como acta definitiva."
         : "Borrador generado por el copiloto LexOpen y aprobado por un humano. Revisar antes de usar como acta definitiva.";
       const riesgos = isDemo
-        ? "Procedencia: copiloto IA en MODO DEMO. No proviene de Hermes real."
+        ? "Procedencia: copiloto IA en MODO DEMO. El borrador se generó en LexOpen sin un proveedor de IA."
         : "Procedencia: copiloto IA. Requiere revisión humana antes de presentación o comunicación al cliente.";
       const markdown = renderMinutaMarkdown({
         tipo: "reunion",

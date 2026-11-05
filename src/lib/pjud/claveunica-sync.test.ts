@@ -33,6 +33,7 @@ async function main() {
   let failJobCreateAt = 0;
   const createdJobs: Array<{ id: string; causaId: string; trigger: string; status: string }> = [];
   let claimBeforeClear = false;
+  let caseManagementMode = "pjud_cl", pauseAt: "health" | "mis-causas" | null = null;
   const whereCalls: unknown[] = [];
   const queueBatches: string[][] = [];
   const fixture = () => ({
@@ -47,6 +48,7 @@ async function main() {
   let settings = fixture();
   const item = (rit: string): MisCausasItem => ({ rit, tribunal: "1º Juzgado Civil de Santiago", ruc: "fixture-ruc" });
   overrideMethod(prisma.organization, "findMany", async () => [{ id: "fixture-org", settings }]);
+  overrideMethod(prisma.firmSettings, "findFirst", async () => ({ caseManagementMode }));
   overrideMethod(prisma.firmSettings, "updateMany", async ({ where, data }: {
     where: { OR?: unknown; claveUnicaLastSyncAt?: Date | null; claveUnicaLastSyncStatus?: string | null };
     data: Partial<typeof settings>;
@@ -100,6 +102,10 @@ async function main() {
   overrideMethod(globalThis, "fetch", async (input: string | URL | Request) => {
     fetches += 1;
     const url = String(input);
+    if (pauseAt && url.endsWith(`/${pauseAt}`)) {
+      caseManagementMode = "manual";
+      if (pauseAt === "mis-causas") throw new Error("fixture-sidecar-interrupted");
+    }
     if (url.endsWith("/health")) return Response.json({ scrapeReady: true });
     if (url.endsWith("/mis-causas")) return Response.json({ causas: causes });
     throw new Error("Unexpected external access in fixture test");
@@ -109,6 +115,7 @@ async function main() {
     failQueue = false; claimBeforeClear = false; fetches = 0; credentialReads = 0; whereCalls.length = 0; queueBatches.length = 0;
     jobCreateCount = 0; failJobCreateAt = 0; createdJobs.length = 0;
     causes = [item("C-1-2026")];
+    caseManagementMode = "pjud_cl"; pauseAt = null;
     process.env.PJUD_CLAVEUNICA_SCRAPE = "1";
     process.env.PJUD_PUBLIC_SCRAPE = "1";
   };
@@ -212,6 +219,12 @@ async function main() {
     assert.equal(interleaved.lastSyncNote, "Claim iniciado mientras se limpiaba");
     await assert.rejects(clearClaveUnicaSyncMessages(), /sincronización en curso/);
     assert.equal(settings.claveUnicaLastSyncNote, "Claim iniciado mientras se limpiaba");
+    for (const boundary of ["health", "mis-causas"] as const) {
+      reset(); pauseAt = boundary;
+      await assert.rejects(syncMisCausas({ syncMovimientos: false }), error => (error as { status?: number }).status === 409);
+      assert.equal(fetches, boundary === "health" ? 1 : 2, "a later login channel must not start after manual mode is selected");
+      assert.equal(created, 0);
+    }
   } finally {
     restoreMethods();
     for (const name of envNames) {

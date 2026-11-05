@@ -22,6 +22,8 @@
 .navigation details { margin-inline-start:auto; }
 .navigation details[open] { flex-basis:100%; order:3; }
 .navigation details > div { display:flex; flex-wrap:wrap; gap:.75rem 1.5rem; padding:.5rem 0 1rem; font-size:var(--text-sm); }
+.projectHeading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; }
+.projectHeading h2 { margin:0; }
 .start { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.9fr); gap:3rem; padding-bottom:2.5rem; }
 .journeys { display:grid; }
 .journeys button { display:flex; align-items:center; gap:1rem; text-align:start; padding:1.15rem .65rem; border-bottom:1px solid var(--line); transition:background-color 160ms ease-out; }

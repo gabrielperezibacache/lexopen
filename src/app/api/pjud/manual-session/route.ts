@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 import { createHash } from "node:crypto";
 import { after, type NextRequest } from "next/server";
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
@@ -27,6 +28,7 @@ async function requestContext(request: NextRequest, mutation: boolean) {
 export async function GET(request: NextRequest) {
   try {
     const { owner, capabilities } = await requestContext(request, false);
+    await assertPjudManagementEnabled();
     const id = manualOjvQuerySession(request);
     if (!capabilities.available || !capabilities.allowed) {
       return json({ capabilities, session: null });
@@ -44,6 +46,7 @@ export async function POST(request: NextRequest) {
       await writeAuditStrict({ actorId: user.id, action: "pjud.manual.close", entityType: "manual_ojv_session", after: { stage: "completed" } });
       return json({ capabilities, session });
     }
+    await assertPjudManagementEnabled();
     if (!capabilities.allowed) throw new ManualOjvUiError(capabilities.reason!, 403);
     if (!capabilities.available) throw new ManualOjvUiError(capabilities.reason!, 503);
     await writeAuditStrict({ actorId: user.id, action: `pjud.manual.${body.action}`, entityType: "manual_ojv_session", after: { stage: "requested", ...(body.action === "import" ? { selected: body.candidateIds.length } : {}) } });

@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled, getCaseManagementMode } from "@/lib/causas/management-mode";
 import { assertCausaCapability, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { can, canSome } from "@/lib/auth/permissions";
 import { NextRequest, NextResponse } from "next/server";
@@ -101,6 +102,8 @@ export async function POST(req: NextRequest) {
       actor = user;
     }
 
+    if (cron && await getCaseManagementMode() !== "pjud_cl") return NextResponse.json({ ok: true, paused: true, enqueued: 0, synced: 0 });
+    await assertPjudManagementEnabled();
     const body = await parseBody(
       req,
       z

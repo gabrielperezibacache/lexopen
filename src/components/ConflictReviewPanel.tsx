@@ -63,15 +63,16 @@ export function ConflictReviewPanel({
     router.refresh();
   }
 
+  const statusLabel = status === "blocked" ? "Requiere revisión de un socio" : status === "warning" ? "Coincidencias por revisar" : status === "clear" ? "Sin hallazgos registrados" : "Sin revisar";
+
   return (
     <section className="panel rounded-3xl p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Conflictos de interés</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-            Cruza RUT y nombres con causas activas y cerradas recientes. Estado:{" "}
-            <strong>{status || "sin revisar"}</strong>
-            {notes ? ` · Notas: ${notes}` : ""}
+            <strong>{statusLabel}</strong>
+            {notes ? ` · ${notes}` : ""}
           </p>
         </div>
         <button
@@ -119,10 +120,8 @@ export function ConflictReviewPanel({
             </li>
           ))}
         </ul>
-      ) : (
-        <p className="mt-4 text-sm text-[var(--ink-soft)]/65">
-          {restrictedMatch || status === "blocked" ? "Coincidencia reservada: requiere revisión de un socio autorizado" : "No hay detalles consultados. Use «Volver a revisar» tras cambiar partes."}
-        </p>
+      ) : (restrictedMatch || status === "blocked") && (
+        <p className="mt-4 text-sm text-[var(--ink-soft)]/65">Coincidencia reservada: requiere revisión de un socio autorizado.</p>
       )}
     </section>
   );

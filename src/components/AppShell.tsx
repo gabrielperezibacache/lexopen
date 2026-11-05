@@ -1,15 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Menu, Search, Command } from "lucide-react";
+import { Bell, Menu, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { Breadcrumbs } from "@/components/shell/Breadcrumbs";
-import { GlobalSearch } from "@/components/shell/GlobalSearch";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { CommandPalette, type CommandItem } from "@/components/ui/CommandPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import type { SessionUserSummary } from "@/components/auth/UserSwitcher";
@@ -158,7 +156,6 @@ export function AppShell({
 
           <div className="hidden min-w-0 flex-1 flex-col gap-1 md:flex">
             <Breadcrumbs navigation={navigation} />
-            <GlobalSearch />
           </div>
 
           <div className="min-w-0 flex-1 md:hidden">
@@ -166,11 +163,7 @@ export function AppShell({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <button type="button" className="shell-quick-nav hidden md:inline-flex" onClick={() => setCommandOpen(true)} aria-label={t("common.commandPalette")}>
-              <Command size={15} aria-hidden="true" /><span>{t("common.commandPalette")}</span><kbd>⌘K</kbd>
-            </button>
-            <Link href="/buscar" className="shell-icon-button md:hidden" aria-label={t("common.searchGlobal")}><Search size={19} aria-hidden="true" /></Link>
-            <div className="hidden md:block"><ThemeToggle /></div>
+            <Link href="/buscar" className="shell-icon-button" aria-label={t("common.searchGlobal")}><Search size={19} aria-hidden="true" /></Link>
             <button
               type="button"
               className="relative grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] text-[var(--ink)]"
@@ -179,7 +172,7 @@ export function AppShell({
             >
               <Bell size={18} aria-hidden="true" />
               {unreadCount > 0 && (
-                <span className="absolute -right-1 -top-1 min-w-[1.15rem] rounded-full bg-[var(--copper)] px-1 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
+                <span className="absolute -right-1 -top-1 min-w-[1.15rem] rounded-full bg-[var(--brand-iris)] px-1 py-0.5 text-center text-[10px] font-semibold leading-none text-[var(--brand-night)]">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}

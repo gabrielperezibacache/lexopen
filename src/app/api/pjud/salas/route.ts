@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 import { assertCausaCapability } from "@/lib/auth/causa-access";
 import { can } from "@/lib/auth/permissions";
 import { NextRequest, NextResponse } from "next/server";
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
   try {
     assertCsrf(req);
     const user = await requireStaff();
+    await assertPjudManagementEnabled();
     const body = await parseBody(
       req,
       z.object({

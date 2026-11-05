@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { llmEnvSnippet } from "@/lib/integrations/llm-env-snippet";
 import { apiMutation } from "@/lib/api-mutation";
+import { LocalModelsPanel } from "@/components/config/LocalModelsPanel";
+import type { LocalModelId } from "@/lib/integrations/local-model-profiles";
 
 type PresetKey = "openai" | "azure" | "groq" | "ollama" | "hermes" | "custom";
 
@@ -14,6 +16,7 @@ type LlmConfig = {
   requireApproval: boolean;
   allowDemo: boolean;
   hasApiKey?: boolean;
+  localProfile?: LocalModelId;
 };
 
 type PresetInfo = { label: string; apiUrl: string; model: string };
@@ -37,6 +40,7 @@ export function LlmSettingsForm() {
   const [clearApiKey, setClearApiKey] = useState(false);
   const [demoFailClosed, setDemoFailClosed] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [localBusy, setLocalBusy] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -103,6 +107,7 @@ export function LlmSettingsForm() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (localBusy) return;
     setMessage("");
     setOk(false);
     setSaving(true);
@@ -160,7 +165,7 @@ export function LlmSettingsForm() {
     setOk(Boolean(data.ok));
     setMessage(
       data.ok
-        ? `Conexión correcta · ${data.provider}/${data.model}: ${data.preview}`
+        ? `Conexión correcta · ${presets[data.provider ?? ""]?.label || "Proveedor configurado"}/${data.model}: ${data.preview}`
         : [data.note, data.error].filter(Boolean).join(" — ") ||
             "La prueba de conexión falló."
     );
@@ -174,18 +179,32 @@ export function LlmSettingsForm() {
     );
   }
 
+  function onLocalConnectionChanged(next: LlmConfig, active: boolean) {
+    setEnabled(active);
+    setConfig(next);
+    setClearApiKey(false);
+    setLoadError("");
+    setMessage("");
+  }
+
   return (
-    <form
+    <div className="space-y-4">
+      <LocalModelsPanel
+        activeModel={config.localProfile}
+        onConnectionChanged={onLocalConnectionChanged}
+        onBusyChange={setLocalBusy}
+        disabled={saving || testing}
+      />
+    {!config.localProfile && <form
       onSubmit={onSubmit}
       className="panel space-y-5 rounded-3xl p-5 md:p-6"
       data-testid="llm-settings-form"
     >
       <div>
-        <h2 className="text-lg font-semibold">Endpoints de IA</h2>
+        <h2 className="text-lg font-semibold">Conexión avanzada de IA</h2>
         <p className="mt-1 text-sm text-[var(--ink-soft)]/70">
-          Conecte el copiloto a OpenAI, Azure, Groq, Ollama, Hermes Agent u otro
-          servicio compatible. Hermes es el preset técnico; en la UI se muestra
-          como Copiloto IA. LexOpen usa la ruta{" "}
+          Conecte el copiloto a OpenAI, Azure, Groq, Ollama u otro servicio
+          compatible. LexOpen usa la ruta{" "}
           <code className="text-xs">{"{url}/chat/completions"}</code> del
           endpoint que indique.
         </p>
@@ -237,7 +256,7 @@ export function LlmSettingsForm() {
           <span className="mt-1 block text-xs text-[var(--ink-soft)]/60">
             Ejemplos: <code>https://api.openai.com/v1</code>,{" "}
             <code>http://localhost:11434/v1</code> (Ollama),{" "}
-            <code>http://localhost:8642/v1</code> (Hermes).
+            <code>http://localhost:8642/v1</code> (proveedor local compatible).
           </span>
         </label>
         <div className="md:col-span-2">
@@ -339,7 +358,7 @@ export function LlmSettingsForm() {
           entorno salvo que quiera fijar el valor al arrancar.
         </p>
         <pre
-          className="mt-2 overflow-x-auto rounded-xl bg-[#0c1c24] p-3 text-xs text-white/85"
+          className="mt-2 overflow-x-auto rounded-xl bg-[var(--brand-night)] p-3 text-xs text-white/85"
           data-testid="llm-env-snippet"
         >
           {llmEnvSnippet({
@@ -350,13 +369,13 @@ export function LlmSettingsForm() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button className="btn btn-primary" type="submit" disabled={saving || testing}>
+        <button className="btn btn-primary" type="submit" disabled={saving || testing || localBusy}>
           {saving ? "Guardando…" : "Guardar IA"}
         </button>
         <button
           className="btn btn-secondary"
           type="button"
-          disabled={testing || saving}
+          disabled={testing || saving || localBusy}
           onClick={onTest}
         >
           {testing ? "Probando…" : "Probar conexión"}
@@ -373,6 +392,7 @@ export function LlmSettingsForm() {
           {message}
         </p>
       )}
-    </form>
+    </form>}
+    </div>
   );
 }

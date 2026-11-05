@@ -358,7 +358,8 @@ export function pjudSyncIntervalMs() {
 }
 
 export async function fetchPjudMovimientos(
-  causa: PjudCausaRef
+  causa: PjudCausaRef,
+  controls?: { assertActive?: () => Promise<void> }
 ): Promise<PjudFetchResult> {
   // Self-hosted LexOpen: datos/vault en este host. APIs externas (OJV,
   // CAPTCHA, partner) están permitidas; no se usa un host SaaS ajeno.
@@ -368,8 +369,10 @@ export async function fetchPjudMovimientos(
 
   // 1) Sidecar solo si responde (evita ruido "fetch failed" con URL muerta)
   if (scraperSidecarConfigured()) {
+    await controls?.assertActive?.();
     const health = await probeScraperSidecarHealth();
     if (health.reachable) {
+      await controls?.assertActive?.();
       try {
         const fromSidecar = await fetchFromScraperSidecar(causa);
         if (fromSidecar) return fromSidecar;
@@ -389,6 +392,7 @@ export async function fetchPjudMovimientos(
 
   // 2a) Detalle autenticado Mis Causas (cuadernos / historia) si hay vault
   if (publicScrapeReady()) {
+    await controls?.assertActive?.();
     try {
       const { tryScrapeCausaDetailAuthenticated } = await import(
         "@/lib/pjud/claveunica"
@@ -403,6 +407,7 @@ export async function fetchPjudMovimientos(
 
   // 2b) Scrape OJV invitado (Playwright + CAPTCHA)
   if (publicScrapeReady()) {
+    await controls?.assertActive?.();
     try {
       const scraped = await scrapeCausaByRol(causa);
       return {
@@ -437,6 +442,7 @@ export async function fetchPjudMovimientos(
   }
 
   // 3) Partner API (externa, permitida — no es “host” de LexOpen)
+  await controls?.assertActive?.();
   const fromApi = await fetchFromPartnerApi(causa);
   if (fromApi) {
     if (sidecarError || scrapeError || claveUnicaError) {

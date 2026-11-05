@@ -8,9 +8,12 @@ import {
 import { safeJsonParse } from "@/lib/safe-json";
 import { decryptSecret, encryptSecret } from "@/lib/pjud/secret";
 import { getAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
-import { canSome } from "@/lib/auth/permissions";
+import { can, canSome } from "@/lib/auth/permissions";
 import { askPersonalCodex } from "@/lib/integrations/codex-dispatch";
 import { sha256 } from "@/lib/evidence/fragments";
+import { configuredLocalModel, localModelProfile, OLLAMA_LOCAL_API, type LocalModelId } from "./local-model-profiles";
+import { completeLocalModel } from "./local-models";
+import { writeAuditStrict } from "@/lib/audit";
 
 export type LlmPreset =
   | "openai"
@@ -27,7 +30,15 @@ export type LlmConfig = {
   model: string;
   requireApproval: boolean;
   allowDemo: boolean;
+  localProfile?: LocalModelId;
 };
+
+/** Keep approvals for an ordinary endpoint separate from a verified local profile. */
+export function llmEndpointHash(config: Pick<LlmConfig, "apiUrl" | "localProfile">) {
+  return sha256(config.localProfile ? JSON.stringify([
+    "lexopen-verified-local-v1", config.apiUrl, config.localProfile, localModelProfile(config.localProfile)?.sha256 ?? null,
+  ]) : config.apiUrl);
+}
 
 export type LlmMessage = {
   role: "system" | "user" | "assistant";
@@ -54,7 +65,7 @@ export const LLM_PRESETS: Record<
     model: "llama3.2",
   },
   hermes: {
-    label: "Hermes Agent",
+    label: "Proveedor local compatible",
     apiUrl: "http://localhost:8642/v1",
     model: "hermes-legal",
   },
@@ -141,8 +152,33 @@ function resolveStoredApiKey(raw: string | undefined, fallback?: string) {
 
 /** Prevents getLlmConfig → saveLlmConfig → getLlmConfig recursion during migration. */
 let migratingPlaintextApiKey = false;
+const LOCAL_SELECTION = "llm-local";
 
-export async function getLlmConfig(): Promise<LlmConfig> {
+/** A local choice sits above the existing provider, including its encrypted credentials. */
+export async function selectLocalLlmProfile(profileId: LocalModelId | null, actorId: string) {
+  await prisma.$transaction(async (tx) => {
+    const actor = await tx.user.findUnique({ where: { id: actorId }, select: { role: true, capabilityGrants: true, capabilityRevokes: true } });
+    if (!actor || !can(actor, "host.admin")) throw httpError("Se requiere permiso para configurar la IA del estudio.", 403);
+    if (profileId) {
+      const data = { enabled: true, configJson: JSON.stringify({ profileId }) };
+      await tx.integrationConfig.upsert({ where: { provider: LOCAL_SELECTION }, create: { provider: LOCAL_SELECTION, ...data }, update: data });
+    } else {
+      await tx.integrationConfig.updateMany({ where: { provider: LOCAL_SELECTION, enabled: true }, data: { enabled: false } });
+    }
+    await writeAuditStrict({ actorId, action: "llm.local.configure", entityType: "IntegrationConfig", entityId: LOCAL_SELECTION, after: { profileId } }, tx);
+  });
+}
+
+export async function getLlmConfig(options?: { omitLocal?: boolean }): Promise<LlmConfig> {
+  if (!options?.omitLocal) {
+    const selection = await prisma.integrationConfig.findUnique({ where: { provider: LOCAL_SELECTION } });
+    if (selection?.enabled) {
+      const value = safeJsonParse<{ profileId?: string } | null>(selection.configJson, null);
+      const profile = localModelProfile(value?.profileId);
+      if (!profile) throw httpError("Selecciona de nuevo el perfil en Configuración → IA local.", 503);
+      return { preset: "ollama", apiUrl: OLLAMA_LOCAL_API, model: profile.tag, localProfile: profile.id, allowDemo: false, requireApproval: true };
+    }
+  }
   const defaults = defaultsFromEnv();
   const [row, firm] = await Promise.all([
     loadConfigRow(),
@@ -156,6 +192,7 @@ export async function getLlmConfig(): Promise<LlmConfig> {
     ...defaults,
     ...parsed,
     apiKey: resolveStoredApiKey(parsed.apiKey, defaults.apiKey),
+    localProfile: undefined,
   };
   if (parsed.allowDemo === undefined && firm) {
     merged.allowDemo = Boolean(firm.hermesAllowDemo);
@@ -258,9 +295,9 @@ function isAllowedLlmUrl(value: string, localOnly = false) {
 
 export async function saveLlmConfig(input: {
   enabled?: boolean;
-  config: Partial<LlmConfig>;
+  config: Partial<Omit<LlmConfig, "localProfile">>;
 }) {
-  const current = await getLlmConfig();
+  const current = await getLlmConfig({ omitLocal: true });
   let next: LlmConfig = { ...current, ...input.config };
   if (input.config.preset && input.config.preset !== "custom") {
     next = {
@@ -284,7 +321,7 @@ export async function saveLlmConfig(input: {
 
   if (!isAllowedLlmUrl(next.apiUrl)) {
     throw httpError(
-      "La URL del endpoint de IA no está permitida. Use una dirección https pública, o en el Host active el permiso para endpoints locales (Ollama/Hermes).",
+      "La URL del endpoint de IA no está permitida. Use una dirección https pública, o en el Host active el permiso para servicios locales compatibles, como Ollama.",
       400
     );
   }
@@ -524,8 +561,13 @@ export async function askLlm(params: {
 
   const personal = await askPersonalCodex({ ...params, messages }, localOnly);
   if (personal) return personal;
-  if (params.expectedDestination && (params.expectedDestination.provider !== config.preset || params.expectedDestination.model !== config.model || params.expectedDestination.endpointHash !== sha256(config.apiUrl))) {
+  if (params.expectedDestination && (params.expectedDestination.provider !== config.preset || params.expectedDestination.model !== config.model || params.expectedDestination.endpointHash !== llmEndpointHash(config))) {
     return { source: "error" as const, content: "", requireApproval: true, provider: config.preset, model: config.model, note: "El destino de IA cambió; revise el proveedor antes de volver a enviar.", error: "llm_destination_changed", code: "llm_destination_changed" as const };
+  }
+
+  const localProfile = configuredLocalModel(config);
+  if (config.localProfile && !localProfile) {
+    return { source: "error" as const, content: "", requireApproval: true, provider: config.preset, model: config.model, note: "Vuelve a seleccionar el modelo en Configuración → IA local.", error: "llm_invalid_url", code: "llm_invalid_url" as const };
   }
 
   let apiUrl: URL;
@@ -543,7 +585,7 @@ export async function askLlm(params: {
         code: "llm_remote_forbidden" as const,
       };
     }
-    if (!isAllowedLlmUrl(config.apiUrl, localOnly)) {
+    if (!localProfile && !isAllowedLlmUrl(config.apiUrl, localOnly)) {
       return {
         source: "error" as const,
         content: "",
@@ -579,52 +621,42 @@ export async function askLlm(params: {
     "Content-Type": "application/json",
     Accept: "application/json",
   };
-  if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
+  if (!localProfile && config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
   const allowLocal = localOnly || allowLocalLlmUrl();
 
   try {
-    const endpoint = `${apiUrl.toString().replace(/\/+$/, "")}/chat/completions`;
-    const res = await fetchSafeOutbound(endpoint, {
-      allowHttp: allowLocal || process.env.NODE_ENV !== "production",
-      allowLoopback: allowLocal,
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: config.model,
-        messages,
-        temperature: 0.2,
-        stream: false,
-      }),
-      signal: params.signal ? AbortSignal.any([params.signal, AbortSignal.timeout(params.timeoutMs || 45_000)]) : AbortSignal.timeout(params.timeoutMs || 45_000),
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(
-        `LLM HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`
-      );
-    }
-
-    const raw = await res.text();
-    const parsed = parseChatCompletionBody(raw);
-    const content =
-      parsed ||
-      (looksLikeSse(raw)
-        ? ""
-        : "El proveedor no devolvió contenido.");
-    if (!content) {
-      throw new Error(
-        "El proveedor respondió con un stream SSE sin texto usable. Use un endpoint OpenAI-compatible `{base}/v1` (LexOpen llama a `/chat/completions` con stream:false)."
-      );
+    let content: string;
+    if (localProfile) {
+      // The local profile rejects oversized input rather than dropping prior turns or passages.
+      const completeInput = sanitizeLlmMessages(params.messages, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
+      content = await completeLocalModel(localProfile, completeInput, { signal: params.signal, timeoutMs: params.timeoutMs });
+    } else {
+      const endpoint = `${apiUrl.toString().replace(/\/+$/, "")}/chat/completions`;
+      const res = await fetchSafeOutbound(endpoint, {
+        allowHttp: allowLocal || process.env.NODE_ENV !== "production",
+        allowLoopback: allowLocal,
+        method: "POST",
+        headers,
+        body: JSON.stringify({ model: config.model, messages, temperature: 0.2, stream: false }),
+        signal: params.signal ? AbortSignal.any([params.signal, AbortSignal.timeout(params.timeoutMs || 45_000)]) : AbortSignal.timeout(params.timeoutMs || 45_000),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`LLM HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
+      }
+      const raw = await res.text();
+      content = parseChatCompletionBody(raw) || (looksLikeSse(raw) ? "" : "El proveedor no devolvió contenido.");
+      if (!content) {
+        throw new Error("El proveedor respondió con un stream SSE sin texto usable. Use un endpoint OpenAI-compatible `{base}/v1` (LexOpen llama a `/chat/completions` con stream:false).");
+      }
     }
 
     if (params.causaId) {
       await prisma.activity.create({
         data: {
           tipo: "ia",
-          mensaje: `IA (${config.preset}): ${content.slice(0, 180)}${
-            content.length > 180 ? "…" : ""
-          }`,
+          // The shared case timeline is not a substitute for the private response and its source ACL.
+          mensaje: "Solicitud de IA completada para revisión.",
           causaId: params.causaId,
           userId: params.userId,
         },
@@ -639,6 +671,12 @@ export async function askLlm(params: {
       model: config.model,
     };
   } catch (err) {
+    if (localProfile) {
+      const message = err instanceof Error && "status" in err
+        ? err.message
+        : "No se completó la consulta local. Revisa el modelo en Configuración → IA local.";
+      return { source: "error" as const, content: "", requireApproval: true, provider: config.preset, model: config.model, note: message, error: message, code: "llm_unreachable" as const };
+    }
     const classified = classifyLlmProviderError(err);
     if (!config.allowDemo) {
       return {

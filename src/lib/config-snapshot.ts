@@ -100,7 +100,7 @@ export async function getConfigSnapshot() {
       ivaPct: firm?.ivaPct ?? 0.19,
     },
     llm: {
-      enabled: llmRow?.enabled ?? hermesRow?.enabled ?? true,
+      enabled: llm.localProfile ? true : llmRow?.enabled ?? hermesRow?.enabled ?? true,
       config: publicLlmConfig(llm),
       presets: LLM_PRESET_CATALOG,
       env: {

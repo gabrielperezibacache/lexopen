@@ -69,8 +69,8 @@ Se comprobó localmente la estructura del DOCX ficticio y su apertura/render A4 
 
 ## Ampliación hacia un escritorio
 
-[Dots](https://learn.chatgpt.com/docs/dots) inspira el patrón de responsabilidad continua y computadora propia; la documentación consultada no establece una API para incrustar o controlar Dots desde LexOpen. [Codex app-server](https://learn.chatgpt.com/docs/app-server) sí documenta sesiones, streaming, interrupción y políticas de ejecución; la integración de texto personal existente se mantiene deliberadamente sin comandos ni navegador.
+La Mesa crea archivos de trabajo y Altazor ofrece un escritorio dedicado como superficie separada. Cada sesión limita los archivos a la selección de la persona y le permite tomar el control, cancelar y revisar los resultados. La incorporación al expediente conserva los permisos y recibos de LexOpen. [Guía del escritorio de Altazor](ESCRITORIO-ALTAZOR.md).
 
-[Kitties](https://github.com/madkoding/kitties/blob/main/docs/ARCHITECTURE.md) ofrece escritorios Docker/Podman y una [API HTTP](https://github.com/madkoding/kitties/blob/main/docs/API.md). Su posible adaptador es una etapa posterior: gateway dedicado o broker con autorización por propietario y causa, transferencia de inputs seleccionados, cancelación, revisión e importación por las mismas fronteras. Su bearer y biblioteca global no deben convertirse en permisos implícitos sobre toda la cartera. Antes de integrarlo se fijan versión y contratos; demo, documentación y código pueden diferir. No se instaló ni conectó Kitties en esta entrega.
+La conexión personal de Codex se limita a generar texto. Su protocolo contempla sesiones, transmisión incremental, interrupción y políticas de ejecución. [Documentación de Codex app-server](https://learn.chatgpt.com/docs/app-server).
 
 Referencias de las fronteras técnicas: [Docker Engine security](https://docs.docker.com/engine/security/), [red none](https://docs.docker.com/engine/network/drivers/none/), [OpenAI sandbox security](https://developers.openai.com/api/docs/guides/agents-api/environments/security).

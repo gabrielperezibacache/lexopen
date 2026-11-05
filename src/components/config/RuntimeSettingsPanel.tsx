@@ -200,7 +200,7 @@ export function RuntimeSettingsPanel() {
           />
           <Row
             label="Activo en DB"
-            value={`${llm.config.preset} · ${llm.config.model}`}
+            value={`${llm.presets[llm.config.preset].label} · ${llm.config.model}`}
           />
           <a href="#llm-settings" className="btn btn-ghost mt-3 inline-flex text-sm">
             Editar endpoints de IA

@@ -62,10 +62,8 @@ export function CausaActions({
         <summary>Más acciones</summary>
         <div className="case-actions-directory">
           <CausaManageActions causaId={causaId} titulo={titulo} estado={estado} isAdmin={isAdmin} compact />
-          <button className="btn btn-ghost" disabled={busy} onClick={syncObsidian} type="button">{busy ? "Sincronizando…" : "Sync Obsidian"}</button>
-          <Link href={`/agente?causaId=${causaId}&utility=briefing&run=1`} className="btn btn-ghost">Briefing IA</Link>
-          <Link href={`/agente?causaId=${causaId}&utility=doc_qa`} className="btn btn-ghost">Preguntar a docs</Link>
-          <Link href={`/agente?causaId=${causaId}&utility=copilot`} className="btn btn-ghost">Abrir copiloto</Link>
+          <button className="btn btn-ghost" disabled={busy} onClick={syncObsidian} type="button">{busy ? "Sincronizando…" : "Sincronizar notas"}</button>
+          <Link href={`/agente?causaId=${causaId}&utility=copilot`} className="btn btn-ghost">Hablar con ALTAZOR</Link>
         </div>
       </details>
     </div>

@@ -79,7 +79,7 @@ export default async function SiteFilesPage({ params }: Params) {
         <p className="text-sm text-[var(--ink-soft)]/75">
           {clientView
             ? "Documentos compartidos contigo. Los demás archivos permanecen dentro del equipo."
-            : "Carpetas, archivos y versiones del equipo. Usa la etiqueta «cliente» sólo en los documentos que quieras compartir en el portal."}
+            : "Archivos del equipo"}
         </p>
         {!clientView && (
           <SiteFileActions
@@ -98,18 +98,6 @@ export default async function SiteFilesPage({ params }: Params) {
           <EmptyState
             title="Todavía no hay archivos"
             description="Añade un archivo o importa una carpeta para empezar a organizar los documentos del equipo."
-            action={
-              !clientView ? (
-                <SiteFileActions
-                  siteId={site.id}
-                  folders={folders.map((f) => ({
-                    id: f.id,
-                    name: f.name,
-                    parentId: f.parentId,
-                  }))}
-                />
-              ) : undefined
-            }
           />
         )}
         {folders.map((folder) => (
@@ -153,9 +141,10 @@ export default async function SiteFilesPage({ params }: Params) {
                     · {f.versions.length} versiones
                     {!clientView && <Link href={`/sites/${site.id}/archivos/${f.id}/fuentes`} className="ml-3 text-[var(--sea)]">Ver fuentes</Link>}
                     {!clientView && (
-                      <div className="mt-2">
+                      <details className="mt-2">
+                        <summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Comentar</summary>
                         <FileCommentForm siteId={site.id} fileId={f.id} />
-                      </div>
+                      </details>
                     )}
                   </div>
                 </div>

@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled, getCaseManagementMode, pausePjudManagementJobs } from "@/lib/causas/management-mode";
 import { causaAccessWhere, assertCausaCapability, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
@@ -158,6 +159,7 @@ export async function syncCausaPjud(
     await assertCausaCapability(causaId, actor, "causa.write", client);
   };
   await assertActor();
+  await assertPjudManagementEnabled();
   const causa = await prisma.causa.findUnique({
     where: { id: causaId },
     include: {
@@ -213,8 +215,15 @@ export async function syncCausaPjud(
 
   let fetchResult: PjudFetchResult;
   try {
+    await assertPjudManagementEnabled();
     await opts?.assertActive?.();
-    fetchResult = await (opts?.fetchMovimientos ?? fetchPjudMovimientos)({
+    const fetchMovimientos: PjudMovimientosFetcher = opts?.fetchMovimientos ?? ((ref) => fetchPjudMovimientos(ref, {
+      assertActive: async () => {
+        await assertPjudManagementEnabled();
+        await opts?.assertActive?.();
+      },
+    }));
+    fetchResult = await fetchMovimientos({
       id: causa.id,
       rit: causa.rit,
       ruc: causa.ruc,
@@ -222,8 +231,10 @@ export async function syncCausaPjud(
       titulo: causa.titulo,
       caratula: causa.caratula,
     });
+    await assertPjudManagementEnabled();
     await opts?.assertActive?.();
   } catch (e) {
+    if (await getCaseManagementMode() !== "pjud_cl") { await pausePjudManagementJobs(); throw httpError("Actualización judicial pausada por la modalidad manual.", 409); }
     const note = e instanceof Error ? e.message : "Error de sync";
     const failCountAfter = (causa.pjudFailCount || 0) + 1;
     const next = nextSyncAtFrom(new Date(), failCountAfter, causa.pjudSyncIntervalMinutes);
@@ -309,6 +320,7 @@ export async function syncCausaPjud(
   const next = nextSyncAtFrom(new Date(), partial ? causa.pjudFailCount + 1 : 0, causa.pjudSyncIntervalMinutes);
 
   await prisma.$transaction(async (tx) => {
+    await assertPjudManagementEnabled(tx);
     await assertActor(tx);
     const persisted = await persistFetchedPjudMovimientos(tx, causaId, fetchResult.movimientos);
     inserted = persisted.inserted;
@@ -467,6 +479,7 @@ export async function syncCausaPjud(
 }
 
 export async function setMonitoreoActivo(causaId: string, activo: boolean) {
+  if (activo) await assertPjudManagementEnabled();
   return prisma.causa.update({
     where: { id: causaId },
     data: {
@@ -800,16 +813,17 @@ export function providerStatusPublic() {
 /** Status + probe corto al sidecar (/health). */
 export async function providerStatusPublicAsync() {
   const base = providerStatusPublic();
-  const sidecar = await probeScraperSidecarHealth();
+  const modeEnabled = await getCaseManagementMode() === "pjud_cl";
+  const sidecar = modeEnabled ? await probeScraperSidecarHealth() : { configured: base.scraperSidecarConfigured, reachable: false, scrapeReady: null, captcha: null, status: null, error: null, urlHost: null };
   let claveUnicaOptedIn = false;
   try {
     const { getClaveUnicaStatus } = await import("@/lib/pjud/claveunica");
-    const cu = await getClaveUnicaStatus();
-    claveUnicaOptedIn = Boolean(cu.enabled && cu.hasPassword);
+    const cu = modeEnabled ? await getClaveUnicaStatus() : null;
+    claveUnicaOptedIn = Boolean(cu?.enabled && cu.hasPassword);
   } catch {
     claveUnicaOptedIn = false;
   }
-  const claveUnicaOn = claveUnicaAutomationAllowed(claveUnicaOptedIn);
+  const claveUnicaOn = modeEnabled && claveUnicaAutomationAllowed(claveUnicaOptedIn);
   let honesty = base.honesty;
   if (sidecar.configured && !sidecar.reachable) {
     honesty = publicScrapeReady()
@@ -823,6 +837,8 @@ export async function providerStatusPublicAsync() {
     ...base,
     sidecar,
     claveUnicaScrapeEnabled: claveUnicaOn,
-    honesty,
+    managementMode: modeEnabled ? "pjud_cl" as const : "manual" as const,
+    liveIngestConfigured: modeEnabled && base.liveIngestConfigured,
+    honesty: modeEnabled ? honesty : "El seguimiento judicial está pausado en la modalidad de gestión manual.",
   };
 }

@@ -168,11 +168,17 @@ export async function POST(req: Request) {
     }
     if (body.action === "push-documento" && body.documentoId) {
       try {
+        const scopedCopy = body.studyFolderId === undefined ? undefined : {
+          folderId: typeof body.studyFolderId === "string" ? body.studyFolderId : "",
+          actorId: user.id,
+        };
         const result = await pushDocumentoToDrive(body.documentoId, {
           role: user.role,
+          scopedCopy,
         });
         return jsonGoogleAction(result);
       } catch (e) {
+        if (e instanceof Error && "status" in e) return handleRouteError(e);
         return (
           googleErrorResponse(e) ||
           NextResponse.json(

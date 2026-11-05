@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled, getCaseManagementMode } from "@/lib/causas/management-mode";
 import { can } from "@/lib/auth/permissions";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -34,6 +35,8 @@ export async function POST(req: NextRequest) {
       actorId = user.id;
     }
 
+    if (cron && await getCaseManagementMode() !== "pjud_cl") return NextResponse.json({ ok: true, paused: true });
+    await assertPjudManagementEnabled();
     const body = await parseBody(
       req,
       z

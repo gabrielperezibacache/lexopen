@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ModuleHeader } from "@/components/sites/SiteNav";
@@ -29,6 +28,8 @@ export function MessagesClient({
   const [messages, setMessages] = useState(initialMessages);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [receiverId, setReceiverId] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
@@ -60,8 +61,10 @@ export function MessagesClient({
         return;
       }
       form.reset();
+      setReceiverId("");
       setSubject("");
       setBody("");
+      setComposeOpen(false);
       await refresh();
     } catch {
       setError("No se pudo enviar el mensaje");
@@ -73,13 +76,11 @@ export function MessagesClient({
   return (
     <div className="space-y-6">
       <ModuleHeader
-        eyebrow="Mensajería"
         title="Mensajes"
-        subtitle="Bandeja del estudio y canal staff↔cliente acotado a miembros del portal (sin chat libre global)."
         actions={
-          <Link href="/notificaciones" className="btn btn-ghost">
-            Ir a notificaciones
-          </Link>
+          <button type="button" className="btn btn-primary" disabled={busy || directory.length === 0} onClick={() => setComposeOpen(value => !value)} aria-expanded={composeOpen} aria-controls="message-composer">
+            {composeOpen ? "Cerrar borrador" : subject || body || receiverId ? "Continuar borrador" : "Nuevo mensaje"}
+          </button>
         }
       />
       {error && (
@@ -90,11 +91,11 @@ export function MessagesClient({
           {error}
         </p>
       )}
-      <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+      <div className={`grid min-w-0 items-start gap-6 ${composeOpen ? "xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]" : ""}`}>
         {messages.length === 0 ? (
               <EmptyState
                 title="Bandeja vacía"
-                description="Envíe el primer mensaje a un colega o al canal del portal."
+                description="Tus mensajes aparecerán aquí."
               />
         ) : (
         <section className="panel min-w-0 overflow-hidden rounded-[var(--radius-lg)]">
@@ -115,25 +116,19 @@ export function MessagesClient({
           </div>
         </section>
         )}
-        <section className="panel min-w-0 rounded-[var(--radius-lg)] p-5">
+        <section id="message-composer" hidden={!composeOpen} className="panel min-w-0 rounded-[var(--radius-lg)] p-5" aria-label="Nuevo mensaje">
           <h2 className="mb-4 text-lg font-semibold">Nuevo mensaje</h2>
-          <MensajeBorradorAi
-            onApply={(draft) => {
-              setSubject(draft.subject);
-              setBody(draft.body);
-            }}
-          />
+          <details className="text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Ayuda de ALTAZOR</summary><MensajeBorradorAi onApply={draft => { setSubject(draft.subject); setBody(draft.body); }}/></details>
           <form onSubmit={send} className="mt-5 space-y-4">
             <label className="block space-y-2 text-sm font-medium">
               <span>Destinatario</span>
-            <select className="select" name="receiverId" required defaultValue="">
+            <select className="select" name="receiverId" required value={receiverId} disabled={busy} onChange={event => setReceiverId(event.target.value)}>
               <option value="" disabled>
                 Destinatario
               </option>
               {directory.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
-                  {u.role ? ` · ${u.role}` : ""}
                 </option>
               ))}
             </select>

@@ -176,7 +176,7 @@ export function FirmSettingsForm({ organization }: { organization: Settings }) {
           <span>
             <span className="font-medium">Permitir respuestas demo del asistente IA</span>
             <span className="mt-0.5 block text-[var(--ink-soft)]/65">
-              Fallback del estudio si el proveedor (OpenAI, Hermes, Ollama, etc.) no
+              Respuesta de demostración del estudio si el proveedor de IA no
               responde. También puede configurarse por proveedor en el panel de
               endpoints de IA más abajo.
             </span>

@@ -23,7 +23,7 @@ async function main() {
   let orgId = "";
   try {
     assert.equal(await prisma.organization.count(), 0, "fresh fixture organization required");
-    orgId = (await prisma.organization.create({ data: { name: `Queue fixture ${tag}`, settings: { create: {} } } })).id;
+    orgId = (await prisma.organization.create({ data: { name: `Queue fixture ${tag}`, settings: { create: { caseManagementMode: "pjud_cl" } } } })).id;
     const owner = await prisma.user.create({ data: { email: `${tag}@queue.invalid`, name: "Fixture owner", role: "abogado", password: "unused" } }); users.push(owner.id);
     const other = await prisma.user.create({ data: { email: `${tag}-other@queue.invalid`, name: "Fixture other", role: "abogado", password: "unused" } }); users.push(other.id);
     const rit = `C-${Date.now() % 800000 + 100000}-2026`, tribunal = "1º Juzgado Civil de Santiago";

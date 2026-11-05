@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireRole } from "@/lib/api";
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
       })
     );
 
+    if (body.action === "save" || body.action === "enable") await assertPjudManagementEnabled();
     if (body.action === "save") {
       if (!body.rut || !body.password) {
         return json(

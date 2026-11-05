@@ -40,7 +40,7 @@ export function prepareReleaseResources(target) {
   const buildId = fs.readFileSync(path.join(repo, ".next/BUILD_ID"), "utf8").trim();
   if (!/^[\w.-]{1,256}$/.test(buildId)) throw new Error("Invalid Next build identity");
   const version = JSON.parse(fs.readFileSync(path.join(desktop, "package.json"), "utf8")).version;
-  const metadata = { format: 1, version, platform: target.platform, arch: target.arch, sourceRevision: revision.stdout.trim(), sourceDirty: Boolean(dirty.stdout.trim()), buildId, sourceIconSha256: sha256(path.join(repo, "src/app/icon.svg")) };
+  const metadata = { format: 1, version, platform: target.platform, arch: target.arch, sourceRevision: revision.stdout.trim(), sourceDirty: Boolean(dirty.stdout.trim()), buildId, sourceIconSha256: sha256(path.join(repo, "docs/assets/lexopen-lockup.png")) };
   fs.writeFileSync(path.join(app, "lexopen-release.json"), JSON.stringify(metadata, null, 2));
   const verified = verifyReleaseResources(output, path.join(desktop, "node_modules"), target);
   verifyCanaryAbsent(output, process.env.LEXOPEN_RELEASE_CANARY);

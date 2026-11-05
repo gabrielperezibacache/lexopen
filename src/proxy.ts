@@ -251,6 +251,7 @@ export async function proxy(req: NextRequest) {
 
   if (
     PUBLIC_PATHS.includes(pathname) ||
+    pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.match(/\.(svg|png|jpg|css|js|ico|webp)$/)

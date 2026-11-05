@@ -1,6 +1,7 @@
 import { causaAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getCaseManagementMode, pausePjudManagementJobs } from "@/lib/causas/management-mode";
 import { mapWithConcurrency } from "@/lib/pjud/concurrency";
 import { syncCausaPjud, type PjudMovimientosFetcher, type SyncCausaResult } from "@/lib/pjud/sync";
 
@@ -132,6 +133,7 @@ export async function enqueueDueSyncJobs(opts?: {
   onJobEnqueued?: (jobId: string) => void;
 }) {
   if (opts?.causaIds !== undefined && opts.causaIds.length === 0) return [];
+  if (await getCaseManagementMode() !== "pjud_cl") return [];
   const trigger = opts?.trigger || "cron";
   const limit = Math.min(Math.max(opts?.limit || DEFAULT_BATCH, 1), 200);
 
@@ -201,6 +203,7 @@ export async function processPendingSyncJobs(opts?: {
       (typeof opts.fetchMovimientos !== "function" || !opts.jobIds?.length)) {
     throw new Error("El proveedor de sesión requiere una función interna y trabajos explícitos.");
   }
+  if (await getCaseManagementMode() !== "pjud_cl") return [];
   const limit = Math.min(Math.max(opts?.limit || DEFAULT_BATCH, 1), 100);
   await expireManualSessionSyncJobs({ jobIds: opts?.jobIds });
   await reclaimStuckRunningJobs({ jobIds: opts?.jobIds });
@@ -220,6 +223,7 @@ export async function processPendingSyncJobs(opts?: {
   // A Page-backed provider has a single mutable navigation context.
   const concurrency = opts?.fetchMovimientos ? 1 : opts?.concurrency ?? pjudSyncConcurrency();
   await mapWithConcurrency(pending, concurrency, async (job) => {
+    if (await getCaseManagementMode() !== "pjud_cl") return;
     await opts?.assertActive?.();
     const claimed = await prisma.pjudSyncJob.updateMany({
       where: {
@@ -246,9 +250,10 @@ export async function processPendingSyncJobs(opts?: {
       if (result.status === "disabled") await prisma.pjudSyncJob.updateMany({ where: { id: job.id, status: "running" }, data: { status: "dismissed", note: result.note, finishedAt: new Date() } });
       results.push(result);
     } catch (error) {
+      if (await getCaseManagementMode() !== "pjud_cl") { await pausePjudManagementJobs(); return; }
       const note = error instanceof Error ? error.message : "Error";
-      await prisma.pjudSyncJob.update({
-        where: { id: job.id },
+      await prisma.pjudSyncJob.updateMany({
+        where: { id: job.id, status: "running" },
         data: {
           status: "failed",
           lastError: note,
@@ -301,6 +306,7 @@ export async function requeueFailedJobs(opts?: {
   limit?: number;
 }) {
   if (opts?.causaIds !== undefined && opts.causaIds.length === 0) return [];
+  if (await getCaseManagementMode() !== "pjud_cl") return [];
   await reclaimStuckRunningJobs({ causaIds: opts?.causaIds });
 
   const failed = await prisma.pjudSyncJob.findMany({

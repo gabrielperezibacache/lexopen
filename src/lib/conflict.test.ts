@@ -4,7 +4,17 @@ import {
   labelConflictStatus,
   summarizeConflictStatus,
   sanitizeConflictHits,
+  partyIdentifiersMatch,
 } from "@/lib/conflict";
+
+assert.equal(partyIdentifiersMatch("AB123456", "CD123456"), false, "distinct international identifiers retain their letters");
+assert.equal(partyIdentifiersMatch("ab123456", "AB123456"), true, "complete identifier comparison is case insensitive");
+assert.equal(partyIdentifiersMatch("AB.123456", "AB123456"), false, "foreign punctuation is not discarded");
+assert.equal(partyIdentifiersMatch("123456789", "12.345.678-9"), false, "invalid RUT-shaped identifiers have no Chilean alias");
+assert.equal(partyIdentifiersMatch("12.345.678-5", "123456785"), true, "genuine legacy RUTs preserve their formatting equivalence");
+assert.equal(partyIdentifiersMatch("AB123456785", "12.345.678-5"), false, "a passport prefix never becomes a RUT");
+assert.equal(partyIdentifiersMatch("12.345.678–5", "12345678-5"), true, "a genuine RUT with a typographic dash remains equivalent");
+assert.equal(partyIdentifiersMatch("", ""), false);
 
 assert.equal(namesLikelyMatch("Juan Pérez Soto", "Juan Perez Soto"), true);
 assert.equal(namesLikelyMatch("Sociedad Andes SpA", "Andes SpA"), true);

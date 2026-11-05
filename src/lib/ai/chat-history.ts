@@ -12,7 +12,7 @@ export type LlmHistoryMessage = {
 
 /**
  * Replay persisted AgentChat messages for multi-turn LLM calls.
- * Mirrors Hermes copilot behaviour (skip errors/discarded, cap length).
+ * Preserves the copilot history rules (skip errors/discarded, cap length).
  */
 export function buildChatHistoryForLlm(
   messages: StoredChatMessage[],

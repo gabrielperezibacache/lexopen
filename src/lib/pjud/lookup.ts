@@ -3,7 +3,8 @@ import { assertCausaCapability } from "@/lib/auth/causa-access";
 import { canSome } from "@/lib/auth/permissions";
 import { httpError } from "@/lib/auth/access";
 import { prisma } from "@/lib/db";
-import { normalizarRut, validarRut } from "@/lib/chile";
+import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
+import { normalizarRut, validarRuc, validarRut } from "@/lib/chile";
 import { scrapeCausaByRol, scrapeCausasByRut, publicScrapeReady } from "@/lib/pjud/public-scrape";
 import { fetchFromScraperSidecar, buscarCausasByRutFromSidecar, scraperSidecarConfigured } from "@/lib/pjud/scraper-sidecar";
 import { isPlaceholderTribunal, parseRitParts } from "@/lib/pjud/ojv-dom";
@@ -18,11 +19,12 @@ export type LookupCreateResult = {
   note: string; syncError?: string;
 };
 
-export function lookupIdentity(input: { rit: string; tribunal: string }) {
+export function lookupIdentity(input: { rit: string; tribunal: string; ruc?: string | null }) {
   const rit = input.rit.trim().toUpperCase().replace(/[\u2010-\u2015\u2212]/g, "-").replace(/\s+/g, "");
   const tribunal = input.tribunal.replace(/\s+/g, " ").trim();
   if (!parseRitParts(rit)) throw httpError("Use el RIT/ROL completo, por ejemplo C-123-2026 o 123-2026.", 400);
   if (tribunal.length < 3 || isPlaceholderTribunal(tribunal)) throw httpError("Indique el tribunal concreto de la causa; el RIT/ROL por sí solo no identifica el expediente.", 400);
+  if (input.ruc?.trim() && !validarRuc(input.ruc)) throw httpError("Revise el formato del RUC chileno.", 400);
   return { rit, tribunal };
 }
 
@@ -43,12 +45,14 @@ export async function addCausaByRol(opts: {
   rit: string; tribunal: string; titulo?: string; ruc?: string | null; materia?: string;
   actorId?: string | null; syncNow?: boolean; origin?: CausaOrigin;
 }): Promise<LookupCreateResult> {
+  await assertPjudManagementEnabled();
   const { rit, tribunal } = lookupIdentity(opts);
   const actor = opts.actorId ? await prisma.user.findUniqueOrThrow({ where: { id: opts.actorId } }) : null;
   if (actor && !canSome(actor, "causa.create")) throw httpError("No puede crear causas", 403);
   const origin: CausaOrigin = opts.origin || "rol";
   async function persist() {
     return prisma.$transaction(async tx => {
+      await assertPjudManagementEnabled(tx);
       const existing = await tx.causa.findMany({
         where: duplicateCausaWhere({ rit, tribunal, ruc: opts.ruc })!,
         select: { id: true, pjudOrigin: true }, take: 2,
@@ -88,14 +92,17 @@ export async function addCausaByRol(opts: {
 
 export async function buscarPorRut(rut: string, signal?: AbortSignal): Promise<MisCausasItem[]> {
   if (!validarRut(rut)) throw httpError("Revise el RUT del litigante y su dígito verificador.", 400);
+  await assertPjudManagementEnabled();
   const normalized = normalizarRut(rut);
   signal?.throwIfAborted();
   if (scraperSidecarConfigured()) {
+    await assertPjudManagementEnabled();
     try {
       const causas = await buscarCausasByRutFromSidecar(normalized, signal);
       if (causas !== null) return causas; // Empty is a response, not a reason to spend another query.
     } catch { signal?.throwIfAborted(); }
   }
+  await assertPjudManagementEnabled();
   if (!publicScrapeReady()) throw httpError(lookupReadiness().configured
     ? "El servicio de consulta OJV no pudo responder. Revise su conexión en Configuración → PJUD y reintente."
     : lookupReadiness().note, 503);
@@ -105,15 +112,18 @@ export async function buscarPorRut(rut: string, signal?: AbortSignal): Promise<M
 
 /** Query without creating a matter or enabling monitoring. Results may be a partial history. */
 export async function previewRolLookup(opts: { rit: string; tribunal: string; ruc?: string | null; signal?: AbortSignal }) {
+  await assertPjudManagementEnabled();
   const identity = lookupIdentity(opts), queriedAt = new Date().toISOString();
   const causaRef = { id: "preview", ...identity, ruc: opts.ruc || null, titulo: identity.rit, caratula: null };
   let result: PjudFetchResult | null = null;
   opts.signal?.throwIfAborted();
   if (scraperSidecarConfigured()) {
+    await assertPjudManagementEnabled();
     try { result = await fetchFromScraperSidecar(causaRef, opts.signal, { downloadDocuments: false }); }
     catch { opts.signal?.throwIfAborted(); }
   }
   if (!result) {
+    await assertPjudManagementEnabled();
     if (!publicScrapeReady()) throw httpError(lookupReadiness().configured
       ? "El servicio de consulta OJV no pudo responder. Revise la conexión o registre la causa sin consultar."
       : lookupReadiness().note, 503);

@@ -2,6 +2,10 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      package_altazor:
+        type: boolean
+        default: false
   push:
     branches: [main, "cursor/**"]
   pull_request:
@@ -12,7 +16,20 @@ concurrency:
 
 jobs:
   altazor-computer-runtime:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.check }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            architecture: amd64
+            check: altazor-computer-runtime
+            evidence: altazor-computer-runtime-evidence
+          - runner: ubuntu-24.04-arm
+            architecture: arm64
+            check: altazor-computer-runtime-arm64
+            evidence: altazor-computer-runtime-evidence-arm64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     permissions:
       contents: read
@@ -40,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Read pinned public Kitties source without persisted credentials
+      - name: Read pinned desktop gateway source without persisted credentials
         uses: actions/checkout@v4
         with:
           repository: madkoding/kitties
@@ -55,6 +72,10 @@ jobs:
         with:
           go-version-file: .tmp/kitties-upstream/go.mod
           cache: false
+      - name: Verify native Linux container architecture
+        run: test "$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}')" = "linux/$ALTAZOR_TOOLPACK_ARCH"
+        env:
+          ALTAZOR_TOOLPACK_ARCH: ${{ matrix.architecture }}
       - name: Prepare dedicated gateway UID and restrict runtime egress
         shell: bash
         run: |
@@ -95,18 +116,46 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source_dir="$KITTIES_CI_SOURCE"
-          docker build --build-arg LUMEN_COMMIT=59d6ee5b18254c79041b4d4cfe78f0bc1aecd1b4 --iidfile "$RUNNER_TEMP/kitties-image-id" -t lexopen-kitty-ci:6aee950 "$source_dir/docker/kitty-desktop"
+          LEXOPEN_DESKTOP_IMAGE_ID_FILE="$RUNNER_TEMP/kitties-image-id" node scripts/altazor/build-desktop-image.mjs "$KITTIES_CI_SOURCE"
           image_id="$(cat "$RUNNER_TEMP/kitties-image-id")"
           test "$(docker image inspect --format '{{.Id}}' "$image_id")" = "$image_id"
           printf 'KITTIES_CI_IMAGE_ID=%s\n' "$image_id" >> "$GITHUB_ENV"
       - name: Actual desktop broker with selected fictitious data and local model fixture
         run: node --import tsx scripts/altazor/computer-smoke.ts
+        env:
+          ALTAZOR_TOOLPACK_ARCH: ${{ matrix.architecture }}
       - name: Retain safe fictitious runtime evidence
         uses: actions/upload-artifact@v4
         with:
-          name: altazor-computer-runtime-evidence
+          name: ${{ matrix.evidence }}
           path: ${{ env.KITTIES_CI_OUTPUT }}/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Export and restore the tested desktop image on the release runner
+        if: ${{ inputs.package_altazor && startsWith(github.ref, 'refs/tags/v') }}
+        shell: bash
+        env:
+          ALTAZOR_TOOLPACK_ARCH: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          docker builder prune --all --force
+          node scripts/altazor/pack-desktop-image.mjs "$KITTIES_CI_OUTPUT/summary.json" "$RUNNER_TEMP/altazor-toolpack"
+          version="$(node -p 'require("./desktop/package.json").version')"
+          profile_tag="$(node -p 'require("./desktop/altazor-desktop-profile.json").tag')"
+          docker image rm "$profile_tag"
+          if docker image inspect "$profile_tag" >/dev/null 2>&1; then
+            echo "The profile tag must be absent before checking archive restoration" >&2
+            exit 1
+          fi
+          docker image load --input "$RUNNER_TEMP/altazor-toolpack/LexOpen-$version-altazor-linux-$ALTAZOR_TOOLPACK_ARCH.tar.gz"
+          test "$(docker image inspect --format '{{.Id}}' "$profile_tag")" = "$KITTIES_CI_IMAGE_ID"
+      - name: Retain the desktop verification receipt
+        if: ${{ inputs.package_altazor && startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: altazor-toolpack-receipt-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/altazor-toolpack/*.json
           if-no-files-found: error
           retention-days: 7
   workbench-runtime:

@@ -6,7 +6,9 @@ async function main() {
   let reads = 0, writes = 0, calls = 0, revoked = false, hidden = false, transactionConflict = false;
   let rows: { id: string; pjudOrigin: string | null }[] = [], response: unknown = { movimientos: [] }, fetchFails = false;
   let created: Record<string, unknown> | null = null;
+  let caseManagementMode = "pjud_cl", pauseDuringFetch = false;
   const tx = {
+    firmSettings: { findFirst: async () => ({ caseManagementMode }) },
     causa: {
       findMany: async (args: { where: { OR: { rit?: { mode: string }; tribunal: { mode: string } }[] } }) => { reads++; assert.ok(args.where.OR.every(row => row.tribunal.mode === "insensitive")); return rows; },
       findUnique: async () => ({ acceso: hidden ? "equipo" : "estudio", abogadoId: hidden ? "other" : "owner", miembros: [] }),
@@ -15,16 +17,21 @@ async function main() {
     }, auditEvent: { create: async () => ({}) },
   };
   host.prisma = {
+    firmSettings: { findFirst: async () => ({ caseManagementMode }) },
     user: { findUniqueOrThrow: async () => ({ id: "owner", role: "abogado", capabilityRevokes: revoked ? "causa.create" : "", capabilityGrants: "" }) },
     $transaction: async (callback: (client: typeof tx) => Promise<unknown>) => { if (transactionConflict) { transactionConflict = false; throw Object.assign(new Error("retry"), { code: "P2034" }); } return callback(tx); },
   };
   process.env.PJUD_SCRAPER_URL = "http://127.0.0.1:8877"; process.env.PJUD_SCRAPER_ALLOW_PRIVATE = "1"; process.env.PJUD_PUBLIC_SCRAPE = "0";
-  globalThis.fetch = async input => { calls++; assert.ok(String(input).startsWith("http://127.0.0.1:8877/")); if (fetchFails) throw Error("synthetic credential must not be exposed"); return new Response(JSON.stringify(response)); };
+  globalThis.fetch = async input => { calls++; assert.ok(String(input).startsWith("http://127.0.0.1:8877/")); if (pauseDuringFetch) caseManagementMode = "manual"; if (fetchFails) throw Error("synthetic credential must not be exposed"); return new Response(JSON.stringify(response)); };
   try {
     const { addCausaByRol, buscarPorRut, lookupIdentity, previewRolLookup } = await import("./lookup");
     assert.deepEqual(lookupIdentity({ rit: " c–123–2026 ", tribunal: " 1º  Juzgado Civil de Santiago " }), { rit: "C-123-2026", tribunal: "1º Juzgado Civil de Santiago" });
     for (const identity of [{ rit: "123", tribunal: "Juzgado Civil" }, { rit: "C-123-2026", tribunal: "Tribunal no identificado" }]) await assert.rejects(async () => lookupIdentity(identity));
+    const invalidRuc = { rit: "C-123-2026", tribunal: "1º Juzgado Civil de Santiago", ruc: "EXP/DEMO-2026" };
+    await assert.rejects(previewRolLookup(invalidRuc), /formato del RUC chileno/);
+    await assert.rejects(addCausaByRol(invalidRuc), /formato del RUC chileno/);
     assert.equal(calls, 0);
+    assert.equal(writes, 0);
     await assert.rejects(buscarPorRut("12.345.678-0")); assert.equal(calls, 0);
     response = { causas: [] }; assert.deepEqual(await buscarPorRut("12.345.678-5"), []); assert.equal(calls, 1, "empty sidecar search is not queried again");
     response = { movimientos: [] }; const empty = await previewRolLookup({ rit: "C-123-2026", tribunal: "1º Juzgado Civil de Santiago" });
@@ -54,6 +61,13 @@ async function main() {
     rows.push({ id: "duplicate", pjudOrigin: null }); await assert.rejects(addCausaByRol(identity), /duplicados/); assert.equal(writes, priorWrites);
     rows = []; revoked = true; const priorReads = reads; await assert.rejects(addCausaByRol(identity), /No puede crear/); assert.equal(reads, priorReads); revoked = false;
     transactionConflict = true; assert.equal((await addCausaByRol(identity)).created, true);
+    process.env.PJUD_PUBLIC_SCRAPE = "1"; pauseDuringFetch = true; response = {};
+    for (const lookup of [() => previewRolLookup(identity), () => buscarPorRut("12.345.678-5")]) {
+      caseManagementMode = "pjud_cl";
+      const before: number = calls;
+      await assert.rejects(lookup(), error => (error as { status?: number }).status === 409);
+      assert.equal(calls, before + 1, "an in-flight sidecar failure cannot start a public fallback after switching to manual");
+    }
   } finally {
     host.prisma = originalPrisma; globalThis.fetch = originalFetch;
     for (const key of Object.keys(process.env)) if (!(key in env)) delete process.env[key]; Object.assign(process.env, env);

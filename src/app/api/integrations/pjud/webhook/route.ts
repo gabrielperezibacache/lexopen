@@ -1,3 +1,4 @@
+import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { classifyMovimiento } from "@/lib/pjud/classify";
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    await assertPjudManagementEnabled();
     const payload = parsePjudWebhookPayload(JSON.parse(rawBody));
     const causa = await findCause(payload);
     if (!causa) {
@@ -150,6 +152,7 @@ export async function POST(req: NextRequest) {
     });
 
     const inserted = await prisma.$transaction(async (tx) => {
+      await assertPjudManagementEnabled(tx);
       const created = await tx.causaMovimiento.createMany({
         data: movimientos.map((movement) => ({
           causaId: causa.id,

@@ -1,40 +1,53 @@
 @import "tailwindcss";
 
 /*
-  LexOpen design tokens — copper #c47a3a + sea #1f6f78.
+  LexOpen — indigo, silver and iris. Historical token names remain aliases for shared components.
   Light/dark via html.dark; ThemeProvider syncs localStorage + prefers-color-scheme.
 */
 
 :root {
   /* Brand */
-  --copper: #c47a3a;
-  --copper-deep: #9a5a28;
-  --copper-soft: rgba(196, 122, 58, 0.14);
-  --sea: #1f6f78;
-  --sea-solid: #1f6f78;
-  --sea-bright: #2a8f99;
-  --sea-soft: rgba(31, 111, 120, 0.12);
+  --brand-night: #0d1022;
+  --brand-silver: #f4f3f7;
+  --brand-iris: #aab5ff;
+  --brand-panel: #171b31;
+  --brand-rule: #313958;
+  --action-bg: #3d4da1;
+  --action-hover: #303e8a;
+  --action-ink: #ffffff;
+  --action-secondary: #e8eaf8;
+  --action-secondary-ink: #303d83;
+  --sidebar-muted: #b6bdd8;
+  --sidebar-current: rgba(170, 181, 255, 0.17);
+  --copper: var(--sea);
+  --copper-deep: var(--action-bg);
+  --copper-soft: var(--sea-soft);
+  --sea: #394994;
+  --sea-solid: #3d4da1;
+  --sea-bright: #495bc2;
+  --sea-soft: rgba(72, 89, 169, 0.11);
 
   /* Semantic light */
-  --ink: #0c1c24;
-  --ink-soft: #1a3340;
-  --mist: #e7eef1;
-  --paper: #f3f6f4;
+  --ink: #181c32;
+  --ink-soft: #353d59;
+  --mist: #eaedf8;
+  --paper: #f6f6fb;
   --sand: #d6c4a8;
   --danger: #b42318;
+  --danger-ink: #ffffff;
   --ok: #1f7a4c;
   --warn: #8d5414;
   --line: rgba(12, 28, 36, 0.12);
   --line-strong: rgba(12, 28, 36, 0.22);
   --surface: #ffffff;
   --surface-solid: #ffffff;
-  --muted: #52656d;
+  --muted: #545e79;
   --shadow: 0 12px 36px rgba(12, 28, 36, 0.1);
   --shadow-sm: 0 2px 8px rgba(12, 28, 36, 0.06);
   --background: var(--paper);
   --foreground: var(--ink);
-  --sidebar-bg: linear-gradient(180deg, #0c1c24 0%, #14313d 55%, #1a3d3f 100%);
-  --header-bg: rgba(247, 250, 248, 0.92);
+  --sidebar-bg: linear-gradient(180deg, var(--brand-night) 0%, var(--brand-panel) 100%);
+  --header-bg: #f9f9fd;
 
   /* Spacing scale (rem) */
   --space-1: 0.25rem;
@@ -68,30 +81,34 @@
 }
 
 html.dark {
-  --ink: #e8f0f2;
-  --ink-soft: #c5d4da;
-  --mist: #1a2c34;
-  --paper: #0e1a20;
-  --sand: #5c4a32;
-  --danger: #f97066;
-  --ok: #3dbf7a;
-  --warn: #e8a23a;
-  --line: rgba(232, 240, 242, 0.12);
-  --line-strong: rgba(232, 240, 242, 0.22);
-  --surface: #14242c;
-  --surface-solid: #14242c;
-  --muted: #a2b7bf;
-  --sea: #77c8cd;
-  --sea-bright: #8edce0;
-  --copper-deep: #d59a67;
+  --ink: var(--brand-silver);
+  --ink-soft: #d1d5e8;
+  --mist: #232945;
+  --paper: var(--brand-night);
+  --sand: #424863;
+  --danger: #ff9299;
+  --danger-ink: #261319;
+  --ok: #85d6ac;
+  --warn: #f2bb73;
+  --line: rgba(196, 204, 248, 0.16);
+  --line-strong: rgba(196, 204, 248, 0.3);
+  --surface: var(--brand-panel);
+  --surface-solid: var(--brand-panel);
+  --muted: #aeb6d3;
+  --sea: var(--brand-iris);
+  --sea-bright: #c6ceff;
+  --sea-solid: #343d70;
+  --sea-soft: rgba(149, 164, 255, 0.16);
+  --action-bg: var(--brand-iris);
+  --action-hover: #c5ceff;
+  --action-ink: #12162c;
+  --action-secondary: #2d365e;
+  --action-secondary-ink: var(--brand-silver);
   --shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
   --background: var(--paper);
   --foreground: var(--ink);
-  --copper-soft: rgba(196, 122, 58, 0.22);
-  --sea-soft: rgba(42, 143, 153, 0.2);
-  --sidebar-bg: linear-gradient(180deg, #071016 0%, #0f222a 55%, #123038 100%);
-  --header-bg: rgba(14, 26, 32, 0.92);
+  --header-bg: #11152a;
   color-scheme: dark;
 }
 
@@ -144,7 +161,7 @@ body {
 }
 
 ::selection {
-  background: rgba(196, 122, 58, 0.28);
+  background: color-mix(in srgb, var(--sea) 30%, transparent);
 }
 
 .display {
@@ -204,18 +221,15 @@ body {
 }
 
 .btn-primary {
-  background: #9a5a28;
-  color: white;
+  background: var(--action-bg);
+  color: var(--action-ink);
 }
+.btn-primary:hover:not(:disabled) { background: var(--action-hover); }
 
 .btn-secondary {
-  background: var(--ink);
-  color: var(--paper);
-}
-
-html.dark .btn-secondary {
-  background: #1f6f78;
-  color: white;
+  background: var(--action-secondary);
+  color: var(--action-secondary-ink);
+  border-color: var(--line);
 }
 
 .btn-ghost {
@@ -226,7 +240,7 @@ html.dark .btn-secondary {
 
 .btn-danger {
   background: var(--danger);
-  color: white;
+  color: var(--danger-ink);
 }
 
 .badge {
@@ -460,7 +474,6 @@ html.dark .badge-copper {
 .shell-header {
   background: var(--header-bg);
   border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(12px);
 }
 
 .sidebar-surface {
@@ -511,11 +524,10 @@ html.dark dialog::backdrop {
 .table-heading,
 thead[class~="bg-[var(--ink)]"] { background: var(--mist); color: var(--ink-soft); }
 .table-heading th { padding-block: .9rem; font-size: var(--text-sm); }
-.nav-link.active { background: rgba(255,255,255,.12); color: white; }
-.nav-link.active::before { content: ""; position: absolute; left: 0; top: 25%; bottom: 25%; width: 3px; background: var(--copper); border-radius: 2px; }
-.folio-brand { color: #f3f6f4; background: #9a5a28; }
-.folio-brand svg { transition: transform 220ms var(--motion-ease); }
-a:hover .folio-brand svg { transform: translateY(-1px) rotate(-4deg); }
+.nav-link.active { background: var(--sidebar-current); color: var(--brand-silver); }
+.nav-link.active::before { content: ""; position: absolute; left: 0; top: 25%; bottom: 25%; width: 2px; background: var(--brand-iris); border-radius: 2px; }
+.folio-brand img { width: 100%; height: 100%; border-radius: inherit; transition: transform 220ms var(--motion-ease); }
+a:hover .folio-brand img { transform: translateY(-1px); }
 .inicio-cards > * { min-width: 0; }
 .inicio-cards a { min-height: 44px; }
 .inicio-composer { display: flex; flex-direction: column; gap: .75rem; }
@@ -556,6 +568,6 @@ a:hover .folio-brand svg { transform: translateY(-1px) rotate(-4deg); }
   }
   .btn:hover { transform: none; }
   #lexopen-mobile-nav { transition: none; }
-  .folio-brand svg { transition: none; }
-  a:hover .folio-brand svg { transform: none; }
+  .folio-brand img { transition: none; }
+  a:hover .folio-brand img { transform: none; }
 }

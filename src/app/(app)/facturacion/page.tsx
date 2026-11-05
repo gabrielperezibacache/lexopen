@@ -13,8 +13,6 @@ import {
   Receipt,
   Wallet,
   CircleDollarSign,
-  FileSpreadsheet,
-  PiggyBank,
 } from "lucide-react";
 
 export default async function FacturacionPage() {
@@ -62,46 +60,16 @@ export default async function FacturacionPage() {
       icon: Receipt,
       href: "/facturacion/facturas",
     },
-    {
-      label: b.stats.provision,
-      value: clp(kpis.provisionClp),
-      sub: provisionSub,
-      icon: PiggyBank,
-      href: "/facturacion/cuenta-corriente",
-    },
-    {
-      label: b.stats.rates,
-      value: b.stats.honorarios,
-      sub: b.stats.feeTerms,
-      icon: FileSpreadsheet,
-      href: "/facturacion/tarifas",
-    },
-    {
-      label: b.stats.uf,
-      value: b.stats.ufValues,
-      sub: b.stats.ufHint,
-      icon: CircleDollarSign,
-      href: "/facturacion/uf",
-    },
   ];
 
   return (
     <div className="space-y-6">
       <ModuleHeader
-        eyebrow={b.eyebrow}
         title={b.title}
-        subtitle={b.subtitle}
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/facturacion/horas" className="btn btn-ghost">
-              {b.addHours}
-            </Link>
-            <Link href="/api/billing/invoices/export?format=csv" className="btn btn-ghost">
-              {b.exportCsv}
-            </Link>
-            <Link href="/facturacion/facturas" className="btn btn-primary">
-              {b.title}
-            </Link>
+            <details className="text-sm"><summary className="min-h-11 cursor-pointer py-3 text-[var(--ink-soft)]">Informes</summary><Link href="/api/billing/invoices/export?format=csv" className="inline-flex min-h-11 items-center text-[var(--sea)]">{b.exportCsv}</Link></details>
+            <Link href="/facturacion/horas" className="btn btn-primary">{b.addHours}</Link>
           </div>
         }
       />
@@ -109,7 +77,7 @@ export default async function FacturacionPage() {
 
       <section className="panel overflow-hidden rounded-3xl" aria-label={b.title}>
         <div className="grid sm:grid-cols-2 xl:grid-cols-4">
-          {stats.slice(0, 4).map(({ label, value, sub, icon: Icon, href }) => (
+          {stats.map(({ label, value, sub, icon: Icon, href }) => (
             <Link key={label} href={href} className="min-w-0 p-5 transition-colors hover:bg-[var(--sea-soft)]">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-[var(--ink-soft)]">{label}</span>
@@ -120,18 +88,7 @@ export default async function FacturacionPage() {
             </Link>
           ))}
         </div>
-        <div className="grid border-t border-[var(--line)] md:grid-cols-3">
-          {stats.slice(4).map(({ label, value, sub, icon: Icon, href }) => (
-            <Link key={label} href={href} className="flex min-w-0 items-start gap-3 p-5 transition-colors hover:bg-[var(--sea-soft)]">
-              <Icon size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--sea)]" />
-              <div className="min-w-0">
-                <div className="text-sm font-semibold">{label} <span aria-hidden="true">→</span></div>
-                <div className="mt-1 text-sm text-[var(--ink-soft)]">{value}</div>
-                <div className="mt-1 text-sm text-[var(--ink-soft)]">{sub}</div>
-              </div>
-            </Link>
-          ))}
-        </div>
+        {(kpis.provisionClp > 0 || kpis.adeudoClp > 0) && <Link href="/facturacion/cuenta-corriente" className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--line)] px-5 py-4 text-sm text-[var(--ink-soft)]"><span>{b.stats.provision}: {clp(kpis.provisionClp)}</span><span>{provisionSub}</span></Link>}
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">

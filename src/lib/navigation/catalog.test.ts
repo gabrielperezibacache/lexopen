@@ -35,9 +35,10 @@ assert.equal(buildNavigation({ role: "abogado", capabilityRevokes: "assistant.us
 assert.ok(buildNavigation({ role: "contabilidad" }).shortcuts.some(entry => entry.id === "facturacion"));
 assert.equal(buildNavigation({ role: "procurador" }).shortcuts.length, 0);
 
-const staff = buildNavigation({ role: "socio" });
+const staff = buildNavigation({ role: "socio" }, { caseManagementMode: "pjud_cl" });
 for (const [path, area, destination] of [
   ["/causas/a-case/escritos?draft=a-writing", "causas", "causas"],
+  ["/causas/a-case/expediente?carpeta=prueba", "causas", "my-matters"],
   ["/causas/mis-causas?alta=1", "causas", "mis-causas"],
   ["/audiencias/a-workspace", "agenda", "audiencias"],
   ["/biblioteca/a-book?causa=a-case", "biblioteca", "biblioteca"],
@@ -65,8 +66,15 @@ assert.ok(navigationEntries(staff).some(entry => entry.id === "mis-causas"), "Qu
 assert.deepEqual(navigationBreadcrumbs(staff, "/inicio"), [{ href: "/inicio", labelKey: "nav.home" }], "no repeated home crumb");
 assert.equal(navigationBreadcrumbs(staff, "/causas/a-case/escritos").at(-1)?.labelKey, "nav.details.writings");
 assert.equal(navigationBreadcrumbs(staff, "/causas/a-case/mesa").at(-1)?.labelKey, "nav.details.workbench");
+assert.equal(navigationBreadcrumbs(staff, "/causas/a-case/expediente").at(-2)?.href, "/mis-causas");
 assert.equal(navigationBreadcrumbs(staff, "/biblioteca/a-book").at(-1)?.labelKey, "nav.details.book");
 assert.deepEqual(navigationBreadcrumbs(buildNavigation({ role: "externo" }), "/portal"), [{ href: "/portal", labelKey: "nav.portal" }]);
 assert.ok(navigationBreadcrumbs(staff, "/documentos/a-document/fuentes/a-source").every(crumb => !crumb.href.endsWith("/fuentes")), "no intermediate source list without a page");
 assert.equal(navigationBreadcrumbs(staff, "/causas/%E0%A4%A").at(-1)?.labelKey, "nav.details.case", "opaque identifiers are never exposed or decoded");
+const manual = buildNavigation({ role: "socio" }, { caseManagementMode: "manual" });
+assert.equal(manual.areas.find(area => area.id === "causas")?.href,"/causas");
+assert.equal(staff.areas.find(area => area.id === "causas")?.href,"/pjud");
+assert.equal(navigationEntries(manual).some(entry => ["pjud","monitoreo","mis-causas"].includes(entry.id)),false,"manual mode hides Chile-only destinations");
+assert.ok(navigationEntries(staff).some(entry => entry.id === "causas"),"the connected mode retains access to manual files");
+assert.equal(activeNavigationEntry(staff,"/pjud/a-case")?.id,"pjud");
 console.log("navigation/catalog.test.ts OK");

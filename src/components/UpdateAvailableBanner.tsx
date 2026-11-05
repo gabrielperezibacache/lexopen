@@ -178,7 +178,7 @@ export function UpdateAvailableBanner({
 
   return (
     <div
-      className="border-b border-[var(--copper)]/30 bg-[rgba(176,122,74,0.12)] px-4 py-3 md:px-8"
+      className="border-b border-[var(--line)] bg-[var(--sea-soft)] px-4 py-3 md:px-8"
       role="status"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

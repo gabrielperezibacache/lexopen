@@ -130,10 +130,10 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
       </form>
       <form
         onSubmit={onImport}
-        className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/60 p-3 text-sm"
+        className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface-solid)] p-3 text-sm"
       >
         <span className="min-w-0 [overflow-wrap:anywhere] text-[var(--ink-soft)]/75">
-          Importar CSV (titulo…id,cuaderno,folio,etapa,tramite,receptor,documento)
+          Importar movimientos desde un archivo CSV
         </span>
         <a
           className="btn btn-ghost"
@@ -181,7 +181,7 @@ export function CausaMovimientoForm({ causaId }: { causaId: string }) {
           </span>
         )}
         {previewRows.length > 0 && (
-          <div className="basis-full rounded-xl border border-[var(--line)] bg-white/70 p-3 text-xs">
+          <div className="basis-full rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] p-3 text-xs">
             <div className="font-semibold">
               Primeras {previewRows.length} de {previewTotal} fila(s)
               {previewTruncated ? " (vista limitada)" : ""}

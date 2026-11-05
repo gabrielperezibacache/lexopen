@@ -52,6 +52,8 @@ async function main() {
       assert.equal(await prisma.organization.count(), 0, "A new database without organization settings is required");
       assert.equal(await prisma.user.count(), 0, "Existing accounts must not be used for validation");
       assert.equal(await prisma.firmSettings.count({ where: { OR: [{ claveUnicaRut: { not: null } }, { claveUnicaPasswordEnc: { not: null } }] } }), 0, "Credential vault must be empty before the provider starts");
+      // This diagnostic has already verified a fresh, isolated database and an explicit live opt-in.
+      await prisma.organization.create({ data: { settings: { create: { caseManagementMode: "pjud_cl" } } } });
       progress("public-register");
       const saved = await addCausaByRol({ ...PUBLIC_CASE, syncNow: false });
       const run = async () => {

@@ -68,12 +68,16 @@ test("ingreso manual, selección explícita e importación con cobertura complet
   expect(payloads.at(-1)).toEqual({ action: "focus", sessionId: "opaque-session-fixture" });
   current = session();
   await expect(panel.getByRole("button", { name: "Consultar Mis Causas", exact: true })).toBeVisible();
+  await panel.getByText("Filtrar por materia", { exact: true }).click();
   await panel.getByLabel("Materia", { exact: true }).selectOption("Civil");
   await panel.getByRole("button", { name: "Consultar Mis Causas", exact: true }).click();
   await expect(panel.getByText(/3 causas recibidas/)).toBeVisible();
   expect(payloads.some(body => body.action === "import")).toBeFalsy();
   await expect(panel.getByRole("checkbox", { name: /Guardar también las resoluciones y documentos nuevos/ })).not.toBeChecked();
+  await expect(panel.getByRole("combobox", { name: "Revisar novedades", exact: true })).toHaveCount(0);
+  await panel.getByText("Frecuencia de revisión", { exact: true }).click();
   await expect(panel.getByRole("combobox", { name: "Revisar novedades", exact: true })).toHaveValue("60");
+  await panel.getByText("Frecuencia de revisión", { exact: true }).click();
   const choices = panel.locator(".pjud-manual-case-list input");
   await choices.nth(0).check(); await choices.nth(1).check();
   await panel.getByLabel("Filtrar el listado").fill("revisión 3");
@@ -112,7 +116,8 @@ test("ingreso manual, selección explícita e importación con cobertura complet
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.screenshot({ path: info.outputPath("ojv-manual-result-mobile.png"), fullPage: true });
   await panel.getByRole("button", { name: "Continuar con otras causas de este listado", exact: true }).click();
-  await expect(panel.getByRole("list", { name: "Pasos de incorporación" }).locator('[aria-current="step"]')).toContainText("Revisar las causas");
+  await expect(panel.getByRole("heading", { name: "Revise antes de importar", exact: true })).toBeVisible();
+  await expect(panel.locator(".pjud-manual-case-list input")).toHaveCount(3);
   await expect(panel.getByText("Recibo de la importación anterior", { exact: true })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Volver a consultar Mis Causas", exact: true })).toBeEnabled();
   await panel.getByRole("button", { name: "Cerrar conexión", exact: true }).click();
@@ -143,6 +148,7 @@ test("descargar documentos requiere una elección y conserva el recibo y los pen
   await expect(downloads).not.toBeChecked();
   await panel.locator(".pjud-manual-case-list input").first().check();
   await downloads.check();
+  await panel.getByText("Frecuencia de revisión", { exact: true }).click();
   await panel.getByRole("combobox", { name: "Revisar novedades", exact: true }).selectOption("30");
   expect(payloads).toEqual([]);
   await panel.getByRole("button", { name: "Importar 1 causa", exact: true }).click();
@@ -242,7 +248,9 @@ test("un fallo al mostrar la ventana conserva la selección y el recibo sin rein
   await expect(panel.getByLabel("Filtrar el listado")).toHaveValue("revisión 2");
   await expect(panel.getByRole("list", { name: "Causas seleccionadas" }).getByText("C-100-2024", { exact: true })).toBeVisible();
   await expect(panel.getByText("Recibo de la importación anterior", { exact: true })).toBeVisible();
-  await expect(panel.getByRole("list", { name: "Pasos de incorporación" }).locator('[aria-current="step"]')).toContainText("Revisar las causas");
+  await expect(panel.getByRole("heading", { name: "Revise antes de importar", exact: true })).toBeVisible();
+  await expect(panel.locator(".pjud-manual-case-list input")).toHaveCount(1);
+  await expect(panel.locator(".pjud-manual-case-list").getByText("C-101-2024", { exact: true })).toBeVisible();
   await panel.getByText("Recibo de la importación anterior", { exact: true }).click();
   await expect(panel.getByRole("heading", { name: "Resultado de la importación" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Ingresar con ClaveÚnica", exact: true })).toHaveCount(0);

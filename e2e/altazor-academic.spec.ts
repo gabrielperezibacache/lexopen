@@ -79,6 +79,9 @@ test("Academia: fuente elegida, propuesta local, revisión, exportación y escri
   await page.goto("/academico");
   const academic = page.getByRole("region", { name: "Desarrollo académico", exact: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(academic.getByText("Abriendo tus trabajos académicos…", { exact: true })).toBeHidden();
+  const newWork = academic.getByRole("button", { name: "Nuevo trabajo", exact: true });
+  if (await newWork.isVisible()) await newWork.click();
   await expect(academic.getByRole("button", { name: /Investigar/ })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("academico-midnight-escritorio.png") });
   await page.setViewportSize({ width: 360, height: 800 });
@@ -89,6 +92,7 @@ test("Academia: fuente elegida, propuesta local, revisión, exportación y escri
   await academic.getByRole("button", { name: "Crear trabajo", exact: true }).click();
   await expect(academic.getByText("Trabajo creado. Comienza por tu objetivo.", { exact: true })).toBeVisible();
   const workspace = await db.altazorAcademicWorkspace.findFirstOrThrow({ where: { ownerId } });
+  await academic.getByText("Opciones del trabajo", { exact: true }).click();
   await academic.getByLabel("Qué quieres preparar", { exact: true }).selectOption("synthesis");
   await academic.getByLabel("Tu objetivo o texto de trabajo", { exact: true }).fill("Organiza el pasaje ficticio seleccionado como una propuesta breve para revisión humana.");
   await academic.getByRole("button", { name: "Guardar y elegir fuentes", exact: true }).click();
@@ -102,7 +106,7 @@ test("Academia: fuente elegida, propuesta local, revisión, exportación y escri
   await expect(academic.getByLabel("Qué quieres preparar", { exact: true })).toHaveValue("synthesis");
   await academic.getByRole("button", { name: "Trabajo", exact: true }).click();
   await expect(academic.getByText("1 pasaje elegido", { exact: false })).toBeVisible();
-  const consent = academic.getByRole("checkbox", { name: /Autorizo enviar el encargo/ }); if (await consent.count()) await consent.check();
+  await expect(academic.getByRole("checkbox", { name: /Autorizo enviar el encargo/ })).toHaveCount(0);
   await academic.getByRole("button", { name: "Preparar propuesta", exact: true }).click();
   const editor = academic.getByRole("region", { name: "Editor académico" }), prose = editor.getByRole("textbox", { name: "Texto de trabajo", exact: true });
   await expect(prose).toHaveValue(/\[R1\]/, { timeout: 25_000 });

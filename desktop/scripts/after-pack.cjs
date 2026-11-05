@@ -14,7 +14,13 @@ module.exports = async function afterPack(context) {
   const desktop = path.resolve(__dirname, "..");
   copyStagedReleaseResources(path.join(desktop, ".release", "resources"), resources, path.join(desktop, "node_modules"), target);
   const verified = verifyReleaseResources(resources, path.join(resources, "app.asar.unpacked", "node_modules"), target);
-  const appPackage = JSON.parse(asar.extractFile(path.join(resources, "app.asar"), "package.json").toString("utf8"));
+  const appArchive = path.join(resources, "app.asar");
+  const appPackage = JSON.parse(asar.extractFile(appArchive, "package.json").toString("utf8"));
+  for (const file of ["altazor-desktop-profile.cjs", "altazor-desktop-profile.json", "altazor-toolpack.cjs"]) {
+    if (!asar.extractFile(appArchive, file).length) throw new Error(`Missing desktop preparation resource: ${file}`);
+  }
+  const brand = asar.extractFile(appArchive, "renderer/lexopen-brand.png");
+  if (!brand.equals(fs.readFileSync(path.join(desktop, "renderer", "lexopen-brand.png")))) throw new Error("Desktop setup brand differs from the generated asset");
   if (appPackage.version !== verified.version) throw new Error("Desktop and staged application versions differ");
   verifyCanaryAbsent(path.join(resources, "app-standalone"), process.env.LEXOPEN_RELEASE_CANARY);
   verifyCanaryAbsent(path.join(resources, "app.asar"), process.env.LEXOPEN_RELEASE_CANARY);
