@@ -76,7 +76,7 @@ Desde la conversación puedes crear el proyecto y preparar el encargo con sus fu
 
 **Mesa de revisión** muestra pasajes sin acceso, lecturas de la matriz sin respaldo vinculado y secciones del manuscrito sin referencias a pasajes conservados. Desde los hallazgos puedes abrir las fuentes, la matriz o la propuesta para cotejar el argumento.
 
-![Apartado Académico real, con un proyecto y material ficticio de demostración](docs/conversation-first-2026-11-05/academico-escritorio.jpg)
+![Mesa de revisión académica con manuscritos y fuentes ficticias](docs/puesto-altazor-2026-11-05/mesa-revision-escritorio.jpg)
 
 ## Causas manuales o conectadas
 

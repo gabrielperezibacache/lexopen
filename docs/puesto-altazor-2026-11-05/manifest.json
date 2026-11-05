@@ -55,6 +55,14 @@
       "sha256": "6fd4a222226dbeac6ae0b3e4f8b1449c5b6b5e2bb5b26c20db0378f42023db71"
     },
     {
+      "path": "mesa-revision-escritorio.jpg",
+      "route": "/academico",
+      "width": 1440,
+      "height": 1000,
+      "size": 177783,
+      "sha256": "531e818cf7a7d870c4854145469bc6774ffc4db5464ba861220027c147504755"
+    },
+    {
       "path": "mis-causas-escritorio.jpg",
       "route": "/mis-causas",
       "width": 1440,

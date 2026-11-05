@@ -14,7 +14,7 @@ import { loginAs } from "./helpers";
 const database = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL), storage = process.env.STORAGE_PATH;
 if (new URL(process.env.DATABASE_URL!).toString() !== database || !storage || !path.isAbsolute(storage) || [process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw Error("Use a disposable local database and storage");
 const db = new PrismaClient({ datasources: { db: { url: database } } });
-test.use({ colorScheme: "dark" });
+test.use({ colorScheme: "dark", actionTimeout: 15_000 });
 test.afterAll(async () => { await db.$disconnect(); });
 
 test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privado y abre el editor", async ({ page }, testInfo) => {
@@ -91,7 +91,8 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
     await academic.getByRole("button", { name: "Mesa de revisión", exact: true }).click();
     const report = academic.getByRole("region", { name: "Mesa de revisión académica", exact: true });
     await expect(report).toBeVisible();
-    const work = report.getByLabel("Trabajo que quieres revisar", { exact: true });
+    const work = report.getByRole("combobox", { name: /Trabajo que quieres revisar/ });
+    await expect(work).toBeVisible();
     await expect(work.locator(`option[value="${foreign.id}"]`)).toHaveCount(0);
     await work.selectOption(blankId);
     await expect(report.getByText("Falta definir el objetivo", { exact: true })).toBeVisible();
@@ -111,7 +112,8 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
       await expect(item).toContainText(`${index + 1} de 2 secciones con pasajes vinculados.`);
     }
     const proposed = manuscripts.getByRole("listitem").filter({ hasText: fixtures[0].title });
-    await expect(proposed).toContainText("Una sección sin pasajes vinculados");
+    await proposed.getByText("Una sección sin pasajes vinculados", { exact: true }).click();
+    await expect(proposed.getByText("Inferencia pendiente", { exact: true })).toBeVisible();
     await expect(proposed).toContainText("Marcadores sin pasaje asociado R9");
     if (process.env.LEXOPEN_ACADEMIC_REVIEW_SCREENSHOT === "1") {
       await page.setViewportSize({ width: 1440, height: 1000 });
@@ -121,7 +123,9 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
     await page.setViewportSize({ width: 360, height: 800 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     await proposed.getByRole("button", { name: "Abrir propuesta", exact: true }).click();
-    await expect(academic.getByRole("region", { name: "Editor académico", exact: true }).getByRole("textbox", { name: "Texto de trabajo", exact: true })).toHaveValue(fixtures[0].body);
+    const prose = academic.getByRole("region", { name: "Editor académico", exact: true }).getByRole("textbox", { name: "Texto de trabajo", exact: true });
+    await expect(prose).toHaveValue(fixtures[0].body);
+    await expect(prose).toBeFocused();
 
     expect((await page.request.delete(`/api/books/${sources[0].book.id}`, { headers, data: { revision: sources[0].book.revision } })).status()).toBe(200);
     await academic.getByRole("button", { name: "Mesa de revisión", exact: true }).click();
