@@ -22,6 +22,7 @@ import { eventoCrearTool, eventoEditarTool, eventoEliminarTool } from "./evento"
 import { buscarTool } from "./buscar";
 import { jurisprudenciaBuscarTool, jurisprudenciaBriefTool } from "./jurisprudencia";
 import { respuestaLibreTool } from "./respuesta-libre";
+import { escritorioListarTool, escritorioEncargarTool } from "./escritorio";
 
 export const TOOLS: Record<AssistantIntentId, AnyAssistantTool> = {
   "nota.crear": notaCrearTool,
@@ -48,6 +49,8 @@ export const TOOLS: Record<AssistantIntentId, AnyAssistantTool> = {
   "jurisprudencia.buscar": jurisprudenciaBuscarTool,
   "jurisprudencia.brief": jurisprudenciaBriefTool,
   "respuesta.libre": respuestaLibreTool,
+  "escritorio.listar": escritorioListarTool,
+  "escritorio.encargar": escritorioEncargarTool,
 };
 
 // Sanity check en tiempo de carga: todo AssistantIntentId debe tener tool.

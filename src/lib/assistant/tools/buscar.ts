@@ -23,18 +23,27 @@ export const buscarTool: AssistantTool<BuscarInput> = secureTool({
     return `Buscar "${input.q}" en causas y documentos.`;
   },
   async execute(input, ctx) {
-    const causaIds = await ftsCausaIds(prisma, input.q, 10);
-    const documentoIds = await ftsDocumentoIds(prisma, input.q, 10);
+    const user = { ...ctx, id: ctx.userId };
+    const causaScope = causaAccessWhere(user);
+    const documentoScope = documentReadWhere(user);
+    const [causaIds, documentoIds] = await Promise.all([
+      ftsCausaIds(prisma, input.q, ids => prisma.causa.findMany({
+        where: { AND: [causaScope, { id: { in: ids } }] }, select: { id: true },
+      }), 10),
+      ftsDocumentoIds(prisma, input.q, ids => prisma.documento.findMany({
+        where: { AND: [documentoScope, { id: { in: ids } }] }, select: { id: true },
+      }), 10),
+    ]);
 
     const [causas, documentos] = await Promise.all([
       causaIds !== null
         ? prisma.causa.findMany({
-            where: { id: { in: causaIds }, ...causaAccessWhere({ ...ctx, id: ctx.userId }) },
+            where: { AND: [causaScope, { id: { in: causaIds } }] },
             select: { id: true, titulo: true, rit: true },
           })
         : prisma.causa.findMany({
             where: {
-              AND: [causaAccessWhere({ ...ctx, id: ctx.userId })],
+              AND: [causaScope],
               OR: [
                 { titulo: { contains: input.q, mode: "insensitive" } },
                 { rit: { contains: input.q, mode: "insensitive" } },
@@ -46,12 +55,12 @@ export const buscarTool: AssistantTool<BuscarInput> = secureTool({
           }),
       documentoIds !== null
         ? prisma.documento.findMany({
-            where: { id: { in: documentoIds }, ...documentReadWhere({ ...ctx, id: ctx.userId }) },
+            where: { AND: [documentoScope, { id: { in: documentoIds } }] },
             select: { id: true, nombre: true, causaId: true },
           })
         : prisma.documento.findMany({
             where: {
-              ...documentReadWhere({ ...ctx, id: ctx.userId }),
+              ...documentoScope,
               nombre: { contains: input.q, mode: "insensitive" },
             },
             select: { id: true, nombre: true, causaId: true },

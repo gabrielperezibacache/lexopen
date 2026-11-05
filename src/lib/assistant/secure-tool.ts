@@ -11,6 +11,7 @@ import { withAssistantTransaction } from "./transaction-context";
 import { readUndo, snapshotEntity, type UndoPayload } from "./plan-store";
 import type { AssistantTool } from "./tools/types";
 import type { ToolContext, ToolResult } from "./types";
+import { assertDesktopToolInputAccess } from "./tools/escritorio-access";
 
 class RejectedResult extends Error {
   constructor(readonly result: ToolResult) { super(result.message); }
@@ -42,6 +43,7 @@ export async function assertToolInputAccess(
   db: Prisma.TransactionClient = prisma,
 ) {
   ctx.signal?.throwIfAborted();
+  if (id === "escritorio.listar" || id === "escritorio.encargar") return assertDesktopToolInputAccess(id, input, ctx, write, db);
   const actor = { ...ctx, id: ctx.userId };
   const capability = toolCapability(id);
   let causaId = typeof input.causaId === "string" ? input.causaId : null;
@@ -131,6 +133,7 @@ export async function authorizeCommittedResult(
   id: string, input: Record<string, unknown>, result: ToolResult | undefined,
   actor: ToolContext, tx: Prisma.TransactionClient,
 ) {
+  if (id === "escritorio.encargar") return assertDesktopToolInputAccess(id, input, actor, false, tx);
   if (id !== "evento.eliminar" || !result) {
     return assertToolInputAccess(id, input, actor, true, tx);
   }

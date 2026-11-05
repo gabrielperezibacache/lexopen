@@ -194,6 +194,8 @@ export function ruleClassify(
   normalized: NormalizedAssistantInput
 ): RuleClassifyResult {
   const flat = normalizeSearch(normalized.text);
+  if (/\b(encarga|encargar|delega|delegar|envia|enviar)\b[^.]{0,100}\b(escritorio|computador)\b/.test(flat)) return { intents: [{ toolId: "escritorio.encargar", confidence: 0.95, slots: { texto: normalized.text } }] };
+  if (/\b(lista|listar|muestra|mostrar|consulta|consultar)\b[^.]{0,70}\b(escritorios|computadores)\b/.test(flat)) return { intents: [{ toolId: "escritorio.listar", confidence: 0.95, slots: {} }] };
   const matched: AssistantIntent[] = [];
 
   for (const rule of RULES) {

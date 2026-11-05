@@ -2,6 +2,8 @@
 
 ALTAZOR reúne la conversación, las fuentes y las herramientas de LexOpen en **Mi jornada**, al abrir la aplicación. Cada profesional conserva sus conversaciones, adjuntos, memoria y trabajos académicos en su cuenta. El acceso a una causa y a sus respaldos se comprueba de nuevo al utilizarlos.
 
+La ampliación de [Conexiones y Secretos](ALTAZOR-CONEXIONES.md) incorpora el catálogo de aplicaciones del escritorio, autorización de sus operaciones y credenciales privadas con escritura de un uso. También permite preparar desde la conversación un encargo para un escritorio ya abierto, con texto íntegro y confirmación antes de enviarlo.
+
 ## Empezar una conversación
 
 1. Abre **Mi jornada → Conversación** y elige tu espacio personal o una causa accesible.

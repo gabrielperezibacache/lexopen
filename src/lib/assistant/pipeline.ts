@@ -12,6 +12,7 @@ import { classifyIntents } from "./classify";
 import { getAssistantFirmPolicy } from "./firm-policy";
 import { getTool } from "./tools/registry";
 import { storePlan } from "./plan-store";
+import { resolveDesktopTaskInput } from "./tools/escritorio";
 import { causaAccessWhere } from "@/lib/auth/causa-access";
 import type { PermissionSubject } from "@/lib/auth/permissions";
 import type {
@@ -91,6 +92,10 @@ function buildToolInput(
   const causaId = (slots.causaId as string | undefined) || resolved.causaId;
 
   switch (toolId) {
+    case "escritorio.listar":
+      return {};
+    case "escritorio.encargar":
+      return { sessionId: slots.sessionId, texto };
     case "nota.crear":
       return {
         causaId,
@@ -287,7 +292,8 @@ export async function runAssistantTurn(
     const tool = getTool(intent.toolId);
     if (!tool.roles.includes(input.user.role)) continue;
     if (input.scope && typeof intent.slots.causaId === "string" && intent.slots.causaId !== input.scope.causaId) throw new Error("La acción apunta a una causa distinta de esta conversación");
-    const toolInput = buildToolInput(intent.toolId, input.scope ? { ...intent.slots, causaId: input.scope.causaId || undefined, ...(intent.toolId === "respuesta.libre" ? { texto: input.text } : {}) } : intent.slots, resolved);
+    let toolInput = buildToolInput(intent.toolId, input.scope ? { ...intent.slots, causaId: input.scope.causaId || undefined, ...(intent.toolId === "respuesta.libre" ? { texto: input.text } : {}) } : intent.slots, resolved);
+    if (intent.toolId === "escritorio.encargar") toolInput = await resolveDesktopTaskInput(toolInput, ctx);
     const parsed = tool.inputSchema.safeParse(toolInput);
     if (!parsed.success) {
       streamEvents.push({

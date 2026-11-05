@@ -152,10 +152,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Prohibido" }, { status: 403 });
     }
 
+    const causaScope = scopedcausaAccessWhere(user);
+    const documentoScope = { AND: [scopeddocumentReadWhere(user), docFilter] };
+    const wikiScope = scopedsiteRelatedWhere(user);
     const [ftsIds, docFtsIds, wikiFtsIds] = await Promise.all([
-      ftsCausaIds(prisma, q, 10),
-      ftsDocumentoIds(prisma, q, 10),
-      ftsWikiIds(prisma, q, 10),
+      ftsCausaIds(prisma, q, ids => prisma.causa.findMany({
+        where: { AND: [causaScope, { id: { in: ids } }] }, select: { id: true },
+      }), 10),
+      ftsDocumentoIds(prisma, q, ids => prisma.documento.findMany({
+        where: { AND: [documentoScope, { id: { in: ids } }] }, select: { id: true },
+      }), 10),
+      ftsWikiIds(prisma, q, ids => prisma.wikiPage.findMany({
+        where: { AND: [wikiScope, { id: { in: ids } }] }, select: { id: true },
+      }), 10),
     ]);
 
     const [
@@ -188,21 +197,19 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.causa.findMany({
-          where: { AND: [scopedcausaAccessWhere(user), {
-            AND: [
-              scopedcausaAccessWhere(user),
-              ftsIds?.length
-                ? { id: { in: ftsIds } }
-                : {
-                    OR: [
-                      { titulo: textMatch(q) },
-                      { rit: textMatch(q) },
-                      { caratula: textMatch(q) },
-                      { tribunal: textMatch(q) },
-                    ],
-                  },
-            ],
-          }] },
+          where: { AND: [
+            causaScope,
+            ftsIds?.length
+              ? { id: { in: ftsIds } }
+              : {
+                  OR: [
+                    { titulo: textMatch(q) },
+                    { rit: textMatch(q) },
+                    { caratula: textMatch(q) },
+                    { tribunal: textMatch(q) },
+                  ],
+                },
+          ] },
           select: causaSearchSelect,
           take: 10,
         }),
@@ -260,22 +267,20 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.documento.findMany({
-          where: { AND: [scopeddocumentReadWhere(user), {
-            AND: [
-              docFilter,
-              docFtsIds?.length
-                ? { id: { in: docFtsIds } }
-                : {
-                    OR: [
-                      { nombre: textMatch(q) },
-                      { ruta: textMatch(q) },
-                      { tipo: textMatch(q) },
-                      { extractedMarkdown: textMatch(q) },
-                      { contenido: textMatch(q) },
-                    ],
-                  },
-            ],
-          }] },
+          where: { AND: [
+            documentoScope,
+            docFtsIds?.length
+              ? { id: { in: docFtsIds } }
+              : {
+                  OR: [
+                    { nombre: textMatch(q) },
+                    { ruta: textMatch(q) },
+                    { tipo: textMatch(q) },
+                    { extractedMarkdown: textMatch(q) },
+                    { contenido: textMatch(q) },
+                  ],
+                },
+          ] },
           select: {
             ...documentoListSelect,
             causa: { select: { id: true, rit: true, titulo: true } },
@@ -317,7 +322,7 @@ export async function GET(req: NextRequest) {
           take: 10,
         }),
         prisma.wikiPage.findMany({
-          where: { AND: [scopedsiteRelatedWhere(user), wikiFtsIds?.length
+          where: { AND: [wikiScope, wikiFtsIds?.length
             ? { id: { in: wikiFtsIds } }
             : {
                 OR: [{ title: textMatch(q) }, { content: textMatch(q) }],

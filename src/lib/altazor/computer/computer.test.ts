@@ -9,6 +9,10 @@ import { createHash } from "node:crypto";
 
 const token = "gateway-fixture-token-only";
 const kitty = { id: "kitty-fixture", name: "altazor-fixture", provider: "model-fixture", desktop: true, container: "kitty-altazor-fixture", status: "running", connectors: ["-"], approvals: "ask", backup: "" };
+test("manual Unicode typing is bounded by the pinned gateway's UTF-8 byte limit", () => {
+  assert.equal(inputSchema.safeParse({ action: "type", args: { text: "é".repeat(1000) } }).success, true);
+  assert.equal(inputSchema.safeParse({ action: "type", args: { text: "é".repeat(1001) } }).success, false);
+});
 test("manual-input receipts use a keyed owner/session-bound digest instead of a password dictionary", () => {
   const input = { action: "type", args: { text: "123456" } }, secret = "fictitious-computer-key-for-test-2026-with-entropy";
   const hash = computerOperationHash("owner-a", "session-a", "input", input, secret);
@@ -48,6 +52,12 @@ test("a remote browser cannot configure the Host's loopback service", () => {
   assert.equal(localSetupAllowed({ ...local, url: "https://remote.example.test/api/altazor/computer" }, { LEXOPEN_BIND: "127.0.0.1" }), false);
   assert.equal(localSetupAllowed({ ...local, headers: new Headers({ origin: "https://remote.example.test", host: "127.0.0.1:3000" }) }, { LEXOPEN_BIND: "127.0.0.1" }), false);
   assert.equal(localSetupAllowed({ ...local, headers: new Headers({ origin: "http://127.0.0.1:3000", "x-forwarded-for": "203.0.113.5" }) }, { LEXOPEN_BIND: "127.0.0.1" }), false);
+  const canonicalized = { method: "POST", url: "http://localhost:3344/api/altazor/computer", headers: new Headers({ host: "127.0.0.1:3344", origin: "http://127.0.0.1:3344", "x-forwarded-for": "127.0.0.1" }) };
+  assert.equal(localSetupAllowed(canonicalized, { LEXOPEN_BIND: "127.0.0.1" }), true);
+  for (const host of ["evil.example:3344", "127.0.0.1:3345", "user@127.0.0.1:3344", "127.0.0.1:3344/path"]) {
+    assert.equal(localSetupAllowed({ ...canonicalized, headers: new Headers({ host, origin: "http://127.0.0.1:3344" }) }, { LEXOPEN_BIND: "127.0.0.1" }), false);
+  }
+  assert.equal(localSetupAllowed({ ...canonicalized, headers: new Headers({ host: "127.0.0.1:3344", origin: "http://localhost:3344" }) }, { LEXOPEN_BIND: "127.0.0.1" }), false);
 });
 test("expired sessions and raw command inputs fail closed", () => {
   assert.throws(() => assertSessionLive({ state: "ready", expiresAt: new Date(10) }, 11));
@@ -132,6 +142,6 @@ test("readiness contract works against a synthetic loopback HTTP server", async 
   try {
     const address = server.address(); assert.ok(address && typeof address !== "string");
     const client = new KittiesGateway(`http://127.0.0.1:${address.port}`, token);
-    assert.deepEqual(await client.readiness("model-fixture", []), { version: "synthetic-contract-fixture" });
+    assert.deepEqual(await client.readiness("model-fixture", []), { version: "synthetic-contract-fixture", connectorGate: false });
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });

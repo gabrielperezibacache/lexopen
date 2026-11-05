@@ -1,140 +1,107 @@
 <div align="center">
   <img src="docs/assets/lexopen-logo.svg" width="76" alt="LexOpen">
   <h1>LexOpen</h1>
-  <p><strong>La causa, sus fuentes y su trabajo, en un mismo lugar.</strong></p>
-  <p>Gestión jurídica abierta para profesionales y estudios en Chile.</p>
+  <p><strong>De los antecedentes al escrito, con sus fuentes a la vista.</strong></p>
+  <p>Una aplicación abierta para profesionales y estudios jurídicos en Chile.</p>
   <p>
-    <a href="https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml"><img src="https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml/badge.svg" alt="Estado de las comprobaciones automáticas"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/licencia-AGPL--3.0--or--later-1f6f78" alt="Licencia AGPL-3.0-or-later"></a>
+    <a href="https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml"><img src="https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml/badge.svg" alt="Comprobaciones automáticas"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/licencia-AGPL--3.0--or--later-1f6f78" alt="AGPL-3.0-or-later"></a>
   </p>
-  <p><a href="#recorrido-visual">Recorrido visual</a> · <a href="#empezar">Empezar</a> · <a href="https://github.com/gabrielperezibacache/lexopen/releases">Descargas</a> · <a href="#desarrollo-y-pruebas">Desarrollo</a> · <a href="#documentación">Documentación</a></p>
+  <p><a href="#el-trabajo-de-una-causa">Recorrido</a> · <a href="#altazor-ai">ALTAZOR AI</a> · <a href="#instalar">Instalar</a> · <a href="#desarrollo-y-comprobaciones">Desarrollo</a> · <a href="#guías">Guías</a></p>
 </div>
 
-![Interfaz real con datos ficticios: ALTAZOR AI en Mi jornada, con conversación, adjuntos y herramientas personales](docs/altazor-2026-11-04/inicio-desktop.png)
+![Interfaz real de LexOpen: conversación de ALTAZOR con documentos y herramientas, usando datos ficticios](docs/altazor-2026-11-04/inicio-desktop.png)
 
-> **Interfaz real, datos de demostración.** Las capturas usan personas, causas y documentos ficticios. ALTAZOR corresponde al trabajo de `1.1.0-preview.3`; estas imágenes no acreditan una versión publicada ni instaladores firmados. La reorganización de navegación del resto del recorrido corresponde a `1.1.0-preview.2`. Consulte las descargas efectivamente disponibles en [Releases](https://github.com/gabrielperezibacache/lexopen/releases). La Mesa del asistente se muestra con proveedor, eventos y resultado simulados. [Guía de ALTAZOR y límites](docs/ALTAZOR.md) · [Capturas de navegación y alcance](docs/interfaz-2026-11-04/README.md) · [Capturas de biblioteca y reproducción](docs/assets/screenshots/README.md).
+LexOpen reúne causas, biblioteca, investigación, audiencias y escritos con la agenda y la operación del estudio. ALTAZOR AI acompaña ese recorrido desde el inicio: recibe un encargo, trabaja con los documentos elegidos y presenta resultados que la persona puede revisar e incorporar.
 
-LexOpen reúne expedientes, biblioteca, investigación, audiencias y escritos con el trabajo cotidiano del estudio: clientes, plazos, calendario, tareas, comunicaciones y honorarios. Cada profesional puede preparar su causa, volver a un pasaje conservado y llevarlo a una nota o escrito con su referencia.
+**Versión del código: `1.1.0-preview.4`.** Consulte los archivos efectivamente publicados y su revisión en [GitHub Releases](https://github.com/gabrielperezibacache/lexopen/releases). El catálogo nuevo, las autorizaciones por operación y Secretos requieren esta revisión del código; los instaladores anteriores `preview.3` (`c878fc5`) no los incluyen. Una versión en el repositorio no acredita por sí sola que sus instaladores estén publicados.
 
-La aplicación se ejecuta en un **Host del estudio**: un computador o servidor que conserva PostgreSQL y los archivos. Se utiliza desde el navegador y dispone de una aplicación Desktop con modo Host o Cliente. El almacenamiento y los proveedores de IA se configuran según la instalación.
+Las imágenes son **capturas de la aplicación con datos ficticios**. Las respuestas de IA de las galerías usan servicios de prueba; una captura no acredita cuentas conectadas ni ejecución de Docker. Consulte [procedencia de ALTAZOR](docs/altazor-2026-11-04/README.md), [conexiones y Secretos](docs/altazor-conexiones-2026-11-04/README.md), [navegación](docs/interfaz-2026-11-04/README.md) y [biblioteca](docs/assets/screenshots/README.md).
 
-## Recorrido visual
+## El trabajo de una causa
 
-### Empiece con ALTAZOR AI
-
-**Mi jornada** abre una conversación privada para su espacio personal o una causa accesible. Escriba el encargo, adjunte documentos o elija pasajes de biblioteca y expediente. ALTAZOR muestra el destino de IA y solicita autorización para cada envío remoto; los cambios en las herramientas se presentan como un plan revisable antes de ejecutarse. Conversaciones, respuestas y estados quedan guardados para continuar después.
-
-**Memoria** reúne recuerdos y relaciones en un grafo y una lista accesible. Los estados Propuesto y Confirmado permanecen separados; sólo la memoria confirmada se incorpora al marcar su uso en una consulta. Cada recuerdo puede revisarse, editarse u olvidarse. Las referencias dependen del acceso vigente a sus respaldos.
-
-**Conexiones** lleva a Codex personal en Mi cuenta, al correo y a las integraciones existentes, según permisos. También permite preparar borradores privados para LinkedIn y revisar el estado de su autorización. El acceso web a LinkedIn necesita una aplicación registrada y un retorno HTTPS; no se ha conectado una cuenta real ni efectuado una publicación como parte de esta entrega. [Empezar, adjuntos, memoria y conexiones](docs/ALTAZOR.md).
-
-### Investigue, escriba y prepare su docencia
-
-**Academia** conserva trabajos privados con pregunta, destinatarios, fuentes, matriz de literatura y propuestas editables. Permite preparar síntesis, revisiones, bibliografía, textos, programas, rúbricas y propuestas de currículum a partir de su perfil. Los resultados pueden descargarse en Word o Markdown e incorporarse, tras revisión, como un escrito privado de una causa accesible.
-
-![Interfaz real con datos ficticios: Academia de ALTAZOR con un trabajo de investigación y sus herramientas](docs/altazor-2026-11-04/academia-desktop.png)
-
-**Descubrir** consulta Crossref y OpenAlex, explora relaciones bibliográficas y lee registros ORCID públicos. Envía sólo términos o identificadores autorizados. Los resultados son metadatos para revisar; no acreditan lectura ni cotejo del texto completo. Las alertas temáticas se actualizan manualmente y su RSS privado muestra el último resultado guardado. [Descubrimiento académico, formatos y comprobaciones](docs/altazor-discovery.md).
-
-### Una computadora opcional para el asistente
-
-**Computadora** permite encargar una tarea con archivos elegidos, observar el escritorio, tomar el control y cerrar la sesión cuando se ha preparado un entorno dedicado. Está desactivada por defecto y abrir ALTAZOR no instala ese entorno. El adaptador Kitties requiere configuración desde el Host local en loopback y un gateway separado por profesional y ámbito. Usa contenedores; no es una máquina virtual con kernel propio. La comprobación real de Docker requiere un resultado satisfactorio de su trabajo específico de CI; las pantallas y las pruebas simuladas no lo sustituyen. [Operación y pruebas de Computadora](src/lib/altazor/computer/README.md).
-
-### Encuentre el siguiente paso
-
-La agenda y el trabajo reciente continúan disponibles en **Mi jornada**. Siete áreas estables —Mi jornada, Causas, Agenda, Biblioteca, Clientes, Comunicaciones y Estudio— muestran sólo los destinos secundarios del área abierta. Búsqueda, avisos y cuenta permanecen a mano; el portal del cliente conserva su recorrido propio. [Guía de navegación y espacios de trabajo](docs/NAVEGACION-Y-ESPACIOS-DE-TRABAJO.md).
-
-### Prepare la causa
-
-La carpeta de la causa conecta antecedentes, documentos, hechos, cronología, contradicciones y próximos pasos. Bajo el título, **Resumen, Expediente, Preparación, Audiencias y Escritos** permiten continuar el trabajo; las acciones menos frecuentes se reúnen en **Más acciones**. Biblioteca y Mesa del asistente acompañan la preparación con fuentes.
-
-![Demostración con datos ficticios: causa de LexOpen con Resumen, Expediente, Preparación, Audiencias y Escritos](docs/interfaz-2026-11-04/cause-desktop.png)
-
-### Una biblioteca propia
-
-Incorpore libros y documentos en PDF, EPUB, DOC/DOCX, ODT, RTF o texto, entre otros formatos. Organice estantes, elija encuadernaciones y personalice su biblioteca con seis distribuciones. La colección personal es privada y las colecciones pueden compartirse con personas elegidas.
-
-![Demostración con datos ficticios: biblioteca personal de LexOpen con libros en tres dimensiones y estantes personalizados](docs/assets/screenshots/biblioteca.png)
-
-La importación permite conservar el original o retener sólo el texto convertido, con OCR cuando sea necesario y esté disponible. Las citas identifican qué material se conserva y con qué texto se realizó el cotejo. Las sentencias y resoluciones pueden tener ficha de tribunal, rol y fecha.
-
-### Lea y vuelva al pasaje
-
-El lector da el espacio principal a la página física del PDF conservado o al texto disponible. **Pasajes y citas**, **Ficha y descargas** y la personalización del ejemplar se abren en un panel contextual. Las referencias permiten regresar a su ubicación; las extracciones parciales y el OCR mantienen sus advertencias.
-
-![Demostración con datos ficticios: original PDF conservado y panel de pasajes en el lector de LexOpen](docs/interfaz-2026-11-04/reader-desktop.png)
-
-La investigación reúne material incorporado al Host y fuentes oficiales admitidas por los importadores. La biblioteca recupera pasajes mediante búsqueda léxica BM25; el análisis con IA utiliza el proveedor configurado y las fuentes elegidas.
-
-### Acompañe la audiencia
-
-Prepare un guion guardado, ordene sus puntos, tome notas y conserve registros durante la sesión. El panel en vivo ofrece control de tiempo, acceso al lector y conversión revisable a hechos propuestos, notas y borradores.
-
-**Audiencias en vivo** (`/audiencias`) reúne sus mesas privadas vinculadas a cada causa. En la mesa puede consultar fuentes, lectura y notas, preparar el guion y conversar con pasajes elegidos. El reloj y el capturador permanecen montados al consultar las herramientas; abrir la mesa no inicia el reloj ni activa el micrófono.
-
-![Demostración con datos ficticios: mesa de audiencia con reloj, configuración de captura y cuaderno de notas abierto](docs/interfaz-2026-11-04/hearing-notes-desktop.png)
-
-La captura de audio requiere una acción y autorización explícitas. La transcripción aparece por tramos de unos quince segundos, después del procesamiento, y conserva originales privados. Se pueden escuchar, elegir pasajes y reintentar fallos. La recuperación temporal al navegar no activa el micrófono ni envía audio automáticamente. [Funcionamiento y límites de la transcripción](docs/ENTREGA-TRANSCRIPCION-EN-VIVO-2026-11-02.md).
-
-### Escriba con memoria y respaldo
-
-El editor conserva borradores privados por causa, guardado automático e historial. La hoja ocupa el espacio principal; **Incorporar fuentes**, referencias, historial y exportación comparten un panel contextual. Puede incorporar hechos, notas de audiencia y pasajes de biblioteca, con referencias que se vuelven a comprobar al consultar o exportar. Los escritos se descargan en Markdown o TXT.
-
-![Demostración con datos ficticios: editor de escritos con hoja de trabajo, fuentes y estado de guardado](docs/interfaz-2026-11-04/writing-desktop.png)
-
-<details>
-<summary><strong>Mi jornada y uso desde el móvil</strong></summary>
-
-Plazos, eventos y tareas acompañan el trabajo de cada causa. En móvil, el menú conserva las siete áreas y la búsqueda tiene acceso propio en la cabecera. Los paneles de lectura, escritura y audiencia se abren como diálogo, con cierre y retorno de foco.
-
-![Demostración con datos ficticios: Mi jornada en escritorio](docs/interfaz-2026-11-04/jornada-desktop.png)
-
-<p align="center"><img src="docs/interfaz-2026-11-04/mobile-menu.png" width="360" alt="Demostración con datos ficticios: menú móvil de LexOpen"></p>
-
-[Ver la galería completa de escritorio y móvil](docs/interfaz-2026-11-04/README.md).
-
-</details>
-
-<details>
-<summary><strong>Mesa del asistente: preparar, ejecutar y revisar</strong></summary>
-
-Elija un objetivo y sus fuentes, ejecute con el destino disponible y revise el resultado antes de incorporarlo al escrito. Los trabajos guardados se pueden volver a abrir por su enlace. [Preparación del ejecutor y límites](docs/WORKBENCH.md).
-
-![Demostración con datos ficticios: Mesa del asistente con proveedor, eventos y resultado simulados; esta captura no prueba una ejecución de Docker](docs/interfaz-2026-11-04/workbench-desktop.png)
-
-</details>
-
-<details>
-<summary><strong>Biblioteca en modo oscuro</strong></summary>
-
-![Demostración con datos ficticios: biblioteca de LexOpen en modo oscuro](docs/assets/screenshots/biblioteca-oscura.png)
-
-</details>
-
-## Qué incluye
-
-| Apartado | Trabajo disponible |
+| Paso | Qué puede hacer |
 | --- | --- |
-| **ALTAZOR AI** | Conversaciones privadas, adjuntos conservados, fuentes elegidas, planes revisables y memoria confirmada por ámbito. |
-| **Academia** | Trabajos privados, matriz de literatura, escritura, docencia, perfil, descubrimiento bibliográfico y exportación Word/Markdown. |
-| **Causas y clientes** | Fichas, RIT/RUC, tribunales, partes, etapas, documentos, trámites y revisión de conflictos. |
-| **Documentos y fuentes** | Incorporación, versiones, páginas PDF, extracción de texto, OCR local y cotejo literal de pasajes. |
-| **Biblioteca y resoluciones** | Libros personales, estantes, colecciones compartibles, ficha judicial y recuperación de pasajes. |
-| **Conocimiento de la causa** | Hechos propuestos, revisión humana, cronología, incertidumbre y contradicciones vinculadas a citas. |
-| **Audiencias y audios** | Mesas privadas, lector, guion, notas, conversación con fuentes, registros, originales y transcripciones. |
-| **Escritos** | Borradores por causa, guardado automático, historial, referencias verificables y exportación Markdown/TXT. |
-| **Operación diaria** | Tareas, plazos, calendario, minutas, mensajes, notificaciones y panel de actividad. |
-| **Espacios y portal** | Archivos, miembros, wiki, publicaciones, Q&A, tablas y flujos de aprobación con permisos. |
-| **Honorarios y cobros** | Horas, gastos, tarifas, provisiones, pagos y documentos internos de cobro. |
-| **Acceso y trazabilidad** | Roles y capacidades, confidencialidad, sesiones firmadas, doble factor y auditoría de operaciones. |
+| **1. Reunir antecedentes** | Abra una causa, organice su expediente y vincule personas, documentos, tareas y plazos. Busque en OJV por RIT/ROL y tribunal o ingrese manualmente con ClaveÚnica para consultar Mis Causas e importar a su cartera. |
+| **2. Preparar con fuentes** | Incorpore documentos propios o archivos elegidos de espacios y Drive. Registre hechos, cronología y contradicciones con sus pasajes de respaldo. Consulte las fuentes oficiales admitidas por los importadores. |
+| **3. Acompañar la audiencia** | Abra una mesa privada por causa con guion, reloj, lector, notas y conversación con fuentes. Active expresamente la captura y revise los registros que convierta en hechos, notas o borradores. |
+| **4. Escribir y revisar** | Continúe en el editor de la causa, con guardado automático e historial. Incorpore hechos, notas y citas; vuelva al respaldo y exporte el escrito en Markdown o TXT. |
 
-## Empezar
+Las referencias vuelven a comprobar acceso, versión y pasaje conservado. El cotejo literal ayuda a localizar un respaldo; la pertinencia jurídica, la vigencia de la fuente y el cómputo de los plazos requieren revisión profesional.
 
-<a id="-empezar-guía-sencilla"></a>
+### Una biblioteca que se siente propia
 
-### Host del estudio
+Organice libros en estantes, elija encuadernaciones y personalice su biblioteca. La colección personal es privada y puede compartir colecciones con personas elegidas. Incorpore PDF, EPUB, DOC/DOCX, ODT, RTF y texto, entre otros formatos; las sentencias y resoluciones admiten ficha de tribunal, rol y fecha.
 
-Requisitos: **Node.js 22 o superior**, npm, Git y un directorio persistente con espacio para la base de datos y los documentos.
+![Biblioteca real de LexOpen con estantes y encuadernaciones personalizables; libros y datos ficticios](docs/assets/screenshots/biblioteca.png)
+
+Puede conservar el original o retener sólo el texto convertido, con OCR cuando sea necesario y esté disponible. El lector muestra el PDF conservado o el texto disponible y distingue extracción parcial, OCR y ubicación de los pasajes. La recuperación utiliza búsqueda léxica BM25; el análisis de IA trabaja con los pasajes elegidos. [Biblioteca, formatos y citas](docs/BIBLIOTECA-PERSONAL-2026-11-01.md).
+
+### La mesa de audiencia
+
+El reloj y el capturador permanecen montados al consultar herramientas. Abrir la mesa no activa el micrófono: la persona autoriza la captura. La transcripción se incorpora por tramos de unos quince segundos, después del procesamiento; conserva los originales privados y permite revisar o reintentar fallos.
+
+![Mesa real de audiencia con guion, reloj y notas; causa y contenido ficticios](docs/interfaz-2026-11-04/hearing-notes-desktop.png)
+
+Los registros se convierten en propuestas revisables antes de incorporarse a la causa o a un escrito. [Audiencias](docs/ENTREGA-AUDIENCIAS-EN-VIVO-2026-11-02.md) · [Audio, transcripción y recuperación](docs/ENTREGA-TRANSCRIPCION-EN-VIVO-2026-11-02.md).
+
+### El escrito conserva su recorrido
+
+La hoja ocupa el espacio principal; fuentes, referencias, historial y exportación se consultan en un panel contextual. El editor permite recuperar versiones y comprobar sus respaldos al consultar o exportar.
+
+![Editor real de escritos con guardado y panel de fuentes; escrito ficticio](docs/interfaz-2026-11-04/writing-desktop.png)
+
+## ALTAZOR AI
+
+**Mi jornada** abre una conversación privada, personal o vinculada a una causa accesible. Adjunte archivos, seleccione fuentes y revise el destino de IA antes de autorizar un envío remoto. Las acciones sobre herramientas se presentan como un plan revisable; conversaciones y trabajos guardados permiten continuar después.
+
+| Herramienta | Para qué sirve |
+| --- | --- |
+| **Memoria** | Recuerdos y relaciones en grafo y lista. Separa propuestas de recuerdos confirmados; permite editar u olvidar y revalida sus respaldos. La memoria confirmada se utiliza al autorizar su incorporación a la consulta. |
+| **Academia** | Investigación y docencia: pregunta, perfil, fuentes, matriz de literatura, bibliografía, programas, rúbricas y textos editables. Exporta Word o Markdown y permite incorporar un resultado revisado a una causa. |
+| **Descubrir** | Metadatos de Crossref, OpenAlex y ORCID público. Las alertas temáticas se actualizan manualmente. Un registro bibliográfico no implica lectura ni cotejo de su texto completo. |
+| **Conexiones** | Catálogo de 48 aplicaciones y servicios, búsqueda por categoría, configuración y estados. Elija las conexiones de cada escritorio y revise cada operación que solicite el asistente. |
+| **Secretos** | Credenciales privadas cifradas, introducidas en un formulario reservado. Su valor no vuelve a la interfaz ni se incorpora al chat o a la memoria. Cada escritura requiere control manual y confirmación de un uso concreto. |
+| **Computadora** | Escritorio opcional en contenedor: encargos con archivos elegidos, captura, control manual, cancelación y cierre. Requiere un gateway preparado por el administrador y está desactivado por defecto. |
+
+![Academia real de ALTAZOR con herramientas de investigación y docencia; proyecto y respuestas ficticios](docs/altazor-2026-11-04/academia-desktop.png)
+
+Desde la conversación también puede pedir un encargo para un escritorio ya abierto: ALTAZOR presenta el texto completo, el proveedor y las aplicaciones elegidas antes de confirmar. La tarjeta del resultado abre esa misma sesión; sus operaciones de conexión se autorizan allí por separado. No se copian adjuntos, memoria ni secretos automáticamente.
+
+Las conexiones abarcan mensajería, oficina, calendarios, repositorios, productividad, redes sociales, diagramas y otros servicios. Su disponibilidad depende de la cuenta, los permisos, la plataforma del gateway y la configuración del proveedor. OAuth suele requerir una aplicación registrada; una tarjeta del catálogo no conecta una cuenta.
+
+![Catálogo real de 48 aplicaciones en ALTAZOR, con cuentas sin configurar y datos ficticios; gateway de prueba simulado](docs/altazor-conexiones-2026-11-04/conexiones-desktop.png)
+
+Los trabajos académicos pueden preparar borradores para LinkedIn. La publicación personal exige revisar texto y cuenta y confirmar el envío; una respuesta incierta no se reenvía automáticamente. Las interacciones sociales permanecen en LinkedIn.
+
+**Secretos en el escritorio.** Una autorización dura hasta 60 segundos, vincula una versión del secreto con una sesión y se consume una vez. No pulsa Enter ni envía el formulario. El sitio y el campo son declarados por la persona: ALTAZOR comprueba sesión y control, pero no acredita el DOM ni la dirección de la página. Si el campo muestra el valor, el asistente podría verlo al devolverle el control. Los ajustes del gateway tienen un almacenamiento distinto al cifrado de Secretos. [Conexiones, operación y límites](docs/ALTAZOR-CONEXIONES.md).
+
+<details>
+<summary><strong>Ver Secretos y el recorrido móvil</strong></summary>
+
+![Lista privada real de Secretos con una credencial ficticia y sin mostrar su valor](docs/altazor-conexiones-2026-11-04/secretos-desktop.png)
+
+[Catorce capturas de escritorio y móvil, con su alcance y manifiesto](docs/altazor-conexiones-2026-11-04/README.md). El escritorio de esta galería utiliza un gateway simulado; su imagen interna es sintética y no acredita Docker ni acceso a cuentas externas.
+
+</details>
+
+## Instalar
+
+### Windows, macOS y Linux
+
+Descargue una versión publicada en [Releases](https://github.com/gabrielperezibacache/lexopen/releases) y elija **Host del estudio** o **Conectar a un Host**. El Host conserva PostgreSQL y los archivos; los clientes acceden a ese equipo. Los instaladores incluyen su runtime y no necesitan Node, Git o npm externos para iniciar.
+
+| Sistema | Arquitectura | Formatos |
+| --- | --- | --- |
+| Windows | x64 | `.exe`, `.zip` |
+| macOS | Apple Silicon e Intel | `.dmg`, `.zip` por arquitectura |
+| Linux | x64 | `.AppImage`, `.deb` |
+
+Son versiones preliminares: compruebe el estado de firma y notarización del paquete y su manifiesto. Las pruebas de paquetes en CI no sustituyen instalar y actualizar la ventana gráfica en cada equipo. OCR, modelos, transcripción, Codex y el entorno del escritorio tienen requisitos independientes. [Instaladores y alcance](docs/INSTALADORES.md) · [Desktop](docs/DESKTOP.md).
+
+### Host desde el código
+
+Requiere Node.js **22.12 o posterior**, npm, Git y un directorio persistente para base y documentos:
 
 ```bash
 git clone https://github.com/gabrielperezibacache/lexopen.git
@@ -143,123 +110,63 @@ npm ci
 npm run web:host
 ```
 
-El Host prepara el runtime, aplica las migraciones y arranca la aplicación con PostgreSQL embebido. Abra `http://127.0.0.1:3000/setup` y cree el primer administrador usando el token de instalación del archivo `.env` de la carpeta de datos.
+El asistente prepara PostgreSQL embebido, aplica migraciones y arranca la aplicación. Abra `http://127.0.0.1:3000/setup` y cree el primer administrador con el token de instalación de la configuración de su carpeta de datos. Una instalación nueva no carga expedientes ficticios automáticamente.
 
-Para elegir una carpeta de datos en macOS o Linux:
+Conserve esa carpeta fuera del directorio de la aplicación. Para elegirla:
 
 ```bash
 LEXOPEN_DATA_DIR=/ruta/persistente/lexopen npm run web:host
 ```
 
-En PowerShell:
-
-```powershell
-$env:LEXOPEN_DATA_DIR="C:\LexOpenData"
-npm run web:host
-```
-
-La configuración genera sus propios secretos y mantiene desactivadas las opciones de demostración. Al volver a abrir una instalación, ejecute `npm run web:host` desde el mismo clon y conserve su carpeta de datos.
-
-Las páginas físicas de PDF y el OCR utilizan herramientas locales como Poppler y Tesseract. Consulte su instalación y diagnóstico en la [guía del Host](docs/WEB-HOST.md#ocr-local-para-pdfs-escaneados).
-
-**Otros equipos:** el Host escucha en loopback por defecto. El acceso por LAN o Tailscale requiere configurar la dirección pública o el enlace de red, además de los orígenes permitidos. Siga la [guía de acceso de clientes](docs/WEB-HOST.md#acceso-desde-los-clientes). La captura del navegador necesita HTTPS o loopback.
-
-**Desktop:** consulte los [instaladores preliminares para Windows, macOS y Linux](docs/INSTALADORES.md) y los [modos Host/Cliente](docs/DESKTOP.md). La disponibilidad del micrófono y del audio compartido también depende del navegador y del sistema operativo.
-
-**Mesa del asistente:** cada causa dispone de un espacio para preparar un objetivo con fuentes elegidas, generar documentos revisables y convertirlos en escritos con sus referencias. El ejecutor local se habilita expresamente; consulte [el recorrido y su preparación](docs/WORKBENCH.md).
+En PowerShell, establezca `$env:LEXOPEN_DATA_DIR="C:\LexOpenData"` antes de ejecutar `npm run web:host`. LAN o Tailscale requieren configurar la red y los orígenes permitidos; la captura del navegador necesita HTTPS o loopback. [Guía del Host](docs/WEB-HOST.md).
 
 ### Actualizaciones y respaldos
 
-El panel de actualización de **Configuración** ofrece el flujo integrado cuando está disponible. Para una actualización manual, detenga primero el Host y ejecute desde su clon:
+Utilice **Configuración → Actualizaciones**, cuando esté disponible. Desktop separa los canales estable y vista previa. El flujo verifica la versión tras reiniciar y utiliza las dependencias fijadas; en modo Host requiere un respaldo comprobado antes de instalar.
 
-```bash
-git pull origin main
-npm ci
-npm ci --prefix desktop
-npm run desktop:build
-npm run web:host
-```
+Conserve la carpeta de datos y su configuración segura. No sustituya ni pierda `SESSION_SECRET`: protege sesiones y datos cifrados, incluidos los secretos nuevos. No copie `pgdata` mientras PostgreSQL está en marcha. [Actualización y recuperación](docs/ACTUALIZACIONES.md) · [Respaldos](docs/WEB-HOST.md) · [Desinstalación](docs/DESINSTALAR.md).
 
-Conserve la carpeta de datos y un respaldo consistente antes de actualizar. El flujo integrado sólo termina al verificar la versión, compilación y revisión esperadas después del reinicio; las dependencias se instalan desde sus locks. Los comandos de seed o reinicialización se reservan para bases de desarrollo. Consulte [actualizaciones y recuperación](docs/ACTUALIZACIONES.md) y [operación y respaldos](docs/WEB-HOST.md).
+## Otras herramientas del estudio
 
-<a id="-cómo-desinstalar"></a>
+La navegación agrupa **Mi jornada, Causas, Agenda, Biblioteca, Clientes, Comunicaciones y Estudio**, con destinos secundarios del área abierta. Incluye espacios de trabajo con archivos y miembros, tareas, calendarios, minutas, avisos, horas, gastos, provisiones y cobros internos. El portal del cliente conserva sus permisos y recorrido propios. La facturación interna no emite DTE del SII.
 
-Para retirar una instalación, use el [procedimiento de desinstalación](docs/DESINSTALAR.md) y revise las opciones de conservación de datos antes de ejecutarlo.
+Las integraciones son opcionales: Google Workspace, archivos de Drive, proveedores de IA y transcripción, cuenta personal ChatGPT/Codex, LinkedIn, PJUD/OJV y almacenamiento local o compatible con S3. OJV requiere acceso oficial vigente; los resultados parciales y cuadernos no accesibles se identifican y la automatización es una opción expresa. [PJUD e ingreso manual](docs/PJUD.md) · [Codex personal](docs/CODEX.md).
 
-## Integraciones y alcance
+## Desarrollo y comprobaciones
 
-Las integraciones son opcionales y necesitan su configuración o credenciales:
+Next.js 16, React 19, TypeScript, Prisma y PostgreSQL. Consulte [configuración](.env.example), [contribuciones](CONTRIBUTING.md) y `AGENTS.md`; esta versión de Next requiere revisar su documentación instalada.
 
-- **Google Workspace:** archivos elegidos de Drive, carpetas por causa, Calendar y funciones de correo admitidas.
-- **IA y transcripción:** proveedores configurables, con política de envío del estudio y opción de servicios locales.
-- **Codex personal:** cada profesional puede conectar su cuenta de ChatGPT/Codex desde **Mi cuenta**, elegir modelo y activar su uso en las próximas consultas de texto, sin API key. Requiere Codex CLI en el Host y respeta la política de sólo IA local. [Preparación, uso y límites verificados](docs/CODEX.md).
-- **LinkedIn personal:** borradores privados, previsualización y publicación con confirmación y recibo cuando la aplicación web y los permisos están habilitados. Las interacciones sociales siguen en LinkedIn; LexOpen no incorpora un feed, contactos ni mensajería social propios. No se ha probado una cuenta ni una publicación reales en esta entrega. [Configuración y alcance](docs/ALTAZOR.md#conexiones-y-linkedin).
-- **Descubrimiento académico:** metadatos de Crossref y OpenAlex, relaciones bibliográficas y registro público ORCID, con autorización expresa y revisión de las referencias. [Fuentes y límites](docs/altazor-discovery.md).
-- **Computadora opcional:** gateway Kitties dedicado por profesional y ámbito, configuración local expresa y escritorio en contenedor, con credenciales independientes. No se instala por defecto. [Preparación y evidencia exigida](src/lib/altazor/computer/README.md).
-- **PJUD / OJV:** consulta por RIT/ROL y tribunal, candidatos por RUT y Mis Causas con ClaveÚnica; lectura separada del registro y resultados parciales identificados. Importación CSV y seguimiento según el acceso y la configuración. Las consultas automatizadas son opt-in; no se presentan como un canal oficial. [Guía PJUD](docs/PJUD.md) · [Ingreso manual, cuadernos y verificación](docs/ojv-interfaz-2026-11-03/README.md).
-- **Obsidian y almacenamiento:** exportación Markdown y archivos locales o almacenamiento compatible con S3.
-
-Las citas comprueban pasajes, versiones, huellas y permisos; la fidelidad de una transcripción, la pertinencia jurídica y la vigencia de las fuentes necesitan revisión profesional. Los importadores oficiales admiten determinados tipos de documentos y no constituyen un corpus completo de toda la legislación o jurisprudencia.
-
-La facturación registra la operación interna del estudio: **no emite DTE del SII**. El motor de plazos es una ayuda de trabajo y requiere revisar el cómputo aplicable a la causa.
-
-## Desarrollo y pruebas
-
-El proyecto utiliza **Next.js 16, React 19, TypeScript, Prisma y PostgreSQL**, con almacenamiento local o compatible con S3. [Variables y opciones de configuración](.env.example).
-
-Para desarrollar, prepare una **base PostgreSQL vacía y exclusiva para desarrollo**, configure su conexión en `.env` y ejecute:
+Prepare una base PostgreSQL **vacía y exclusiva para desarrollo**:
 
 ```bash
 cp .env.example .env
-# Configure DATABASE_URL y SESSION_SECRET antes de continuar.
+# Configure DATABASE_URL y un SESSION_SECRET fuerte antes de continuar.
 npm ci
 npm run db:migrate
 npm run db:seed
 npm run dev
 ```
 
-El seed carga datos y usuarios ficticios; no debe ejecutarse contra información del estudio. La guía para colaborar está en [CONTRIBUTING.md](CONTRIBUTING.md).
-
-Comprobaciones habituales:
+El seed crea usuarios y datos ficticios; se reserva para desarrollo. Comprobaciones habituales:
 
 ```bash
 npm run lint
 npm test
 npm run build
+npm run test:altazor
 ```
 
-Las pruebas de integración usan `DATABASE_URL` y `E2E_DATABASE_URL` apuntando a la misma base local desechable, con nombre que incluya `test` o `e2e`. Las pruebas de navegador reinicializan su base dedicada:
+Las integraciones requieren `DATABASE_URL` y `E2E_DATABASE_URL` iguales, en una base local desechable cuyo nombre incluya `test` o `e2e`. `npm run test:altazor:integration` comprueba persistencia, permisos, conectores y Secretos con servicios ficticios. Playwright utiliza su propia base dedicada y puede reinicializarla. El job separado `altazor-computer-runtime` prueba contenedores reales con un modelo de prueba; simulaciones y capturas no sustituyen ese resultado. [Operación del escritorio y pruebas](src/lib/altazor/computer/README.md).
 
-```bash
-npm run e2e:install
-E2E_DATABASE_URL=postgresql://lexopen:lexopen@127.0.0.1:5432/lexopen_e2e npm run e2e
-```
-
-El [workflow de CI](.github/workflows/ci.yml) comprueba migraciones y diferencias de esquema, pruebas unitarias y de integración, lint, compilación y recorridos Chromium. La [galería de esta interfaz](docs/interfaz-2026-11-04/README.md) documenta la procedencia y el alcance de las imágenes; el [procedimiento de capturas anteriores](docs/assets/screenshots/README.md) conserva sus instrucciones de reproducción.
-
-## Documentación
+## Guías
 
 | Guía | Contenido |
 | --- | --- |
-| [ALTAZOR AI](docs/ALTAZOR.md) | Conversación, adjuntos, memoria revisable, Academia, conexiones, LinkedIn y computadora opcional. |
-| [Descubrimiento académico](docs/altazor-discovery.md) | Crossref, OpenAlex, ORCID, bibliografía, alertas manuales y comprobaciones públicas. |
-| [Computadora de ALTAZOR](src/lib/altazor/computer/README.md) | Gateway dedicado, preparación del Host, límites del contenedor y comprobación real de ejecución. |
-| [Navegación y espacios de trabajo](docs/NAVEGACION-Y-ESPACIOS-DE-TRABAJO.md) | Áreas, recorrido de la causa, paneles, ajustes y continuidad del trabajo. |
-| [Galería de la interfaz](docs/interfaz-2026-11-04/README.md) | Capturas reales con datos ficticios, procedencia y alcance de la validación visual. |
-| [Host web](docs/WEB-HOST.md) | Instalación, red, configuración, respaldos y operación. |
-| [Desktop](docs/DESKTOP.md) | Aplicación de escritorio, modos Host y Cliente. |
-| [Instaladores](docs/INSTALADORES.md) | Matriz de plataformas, construcción, firma y comprobantes de distribución. |
-| [Actualizaciones](docs/ACTUALIZACIONES.md) | Canales, respaldos, dependencias y recuperación. |
-| [Mesa del asistente](docs/WORKBENCH.md) | Fuentes elegidas, ejecutor separado, documentos y revisión por causa. |
-| [Asistente](docs/ASISTENTE.md) | Inicio, herramientas operativas y permisos. |
-| [Codex personal](docs/CODEX.md) | Cuenta de ChatGPT/Codex por profesional, preparación del Host, modelos y política de envío. |
-| [Biblioteca](docs/BIBLIOTECA-PERSONAL-2026-11-01.md) | Archivos personales, colecciones, lectores y citas. |
-| [Audiencias en vivo](docs/ENTREGA-AUDIENCIAS-EN-VIVO-2026-11-02.md) | Guion, sesión, notas y continuidad con escritos. |
-| [Transcripción y conversiones](docs/ENTREGA-TRANSCRIPCION-EN-VIVO-2026-11-02.md) | Captura, recuperación, fuentes y destinos revisables. |
-| [Plan de mejora y distribución](docs/PLAN-MEJORA-DISTRIBUCION-2026-11-04.md) | Pasos por apartado, dependencias, prioridades y criterios de aceptación. |
+| [ALTAZOR](docs/ALTAZOR.md) · [Conexiones y Secretos](docs/ALTAZOR-CONEXIONES.md) | Conversación, memoria, Academia, cuentas, autorizaciones y escritorio. |
+| [Descubrimiento académico](docs/altazor-discovery.md) | Índices, bibliografía, formatos y límites de las referencias. |
+| [Navegación](docs/NAVEGACION-Y-ESPACIOS-DE-TRABAJO.md) · [Galería](docs/interfaz-2026-11-04/README.md) | Recorridos de escritorio y móvil, capturas y procedencia. |
+| [Host](docs/WEB-HOST.md) · [Desktop](docs/DESKTOP.md) · [Instaladores](docs/INSTALADORES.md) | Instalación, permisos, red y distribución por plataforma. |
+| [Actualizaciones](docs/ACTUALIZACIONES.md) · [Mesa del asistente](docs/WORKBENCH.md) | Respaldo, recuperación y documentos revisables por causa. |
+| [Biblioteca](docs/BIBLIOTECA-PERSONAL-2026-11-01.md) · [Audiencias](docs/ENTREGA-AUDIENCIAS-EN-VIVO-2026-11-02.md) | Lectura, citas, preparación y continuidad con escritos. |
 
-## Contribuir y licencia
-
-Las contribuciones se coordinan mediante issues y pull requests. Incluya el problema, el cambio y la validación; mantenga los datos de demostración separados de los expedientes reales. [Cómo contribuir](CONTRIBUTING.md).
-
-LexOpen se distribuye bajo **AGPL-3.0-or-later**. Consulte [LICENSE](LICENSE) para sus términos.
+Las contribuciones se coordinan mediante issues y pull requests, con evidencia de validación y datos de prueba separados de expedientes reales. LexOpen se distribuye bajo **AGPL-3.0-or-later**: [licencia](LICENSE).

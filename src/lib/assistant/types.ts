@@ -33,6 +33,8 @@ export const ASSISTANT_TOOL_IDS = [
   "jurisprudencia.buscar",
   "jurisprudencia.brief",
   "respuesta.libre",
+  "escritorio.listar",
+  "escritorio.encargar",
 ] as const;
 
 export type AssistantIntentId = (typeof ASSISTANT_TOOL_IDS)[number];
