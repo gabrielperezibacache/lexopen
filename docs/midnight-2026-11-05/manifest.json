@@ -1,0 +1,75 @@
+{
+  "date": "2026-11-05",
+  "kind": "native application screenshots",
+  "data": "fictitious only",
+  "real_accounts_connected": false,
+  "google_operator_preparation": "fictitious identity; authorization never started",
+  "images": [
+    {
+      "file": "academico-escritorio.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "b11ff7cb3a780a17b6d93e47c791fc2a5a87f39c8124e228f6212a1ae0d439f2"
+    },
+    {
+      "file": "academico-movil.png",
+      "width": 360,
+      "height": 800,
+      "sha256": "8bfcd54f2939237742238dfcdf7d724103e8ece1a9682181a10d36c56bc5d8e6"
+    },
+    {
+      "file": "acompanante-biblioteca.png",
+      "width": 1440,
+      "height": 734,
+      "sha256": "ed11de4107da328b5fe54592e4994e1255e18bc0e76922b215447dea7ad07f86"
+    },
+    {
+      "file": "acompanante-tablet.png",
+      "width": 800,
+      "height": 1024,
+      "sha256": "59457ef66f8b68c8952ace22c06fb9366206fa0eff3f6738885e5af2900e5fdb"
+    },
+    {
+      "file": "google-consentimiento-escritorio.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "14bc85e5b13ba88e702a6dd1bd5f57026a9776a9b98d7d801f5d852c432d92fa"
+    },
+    {
+      "file": "google-consentimiento-movil.png",
+      "width": 360,
+      "height": 800,
+      "sha256": "025f6c7b896ed942f28d40aea461e507856fb1fb3d0826393d9bf408381c2098"
+    },
+    {
+      "file": "inicio-escritorio.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "8b52c98e319cdd6d3e30e335739705ee301537f116cc6a8594b1e4e66f12d437"
+    },
+    {
+      "file": "inicio-movil.png",
+      "width": 360,
+      "height": 800,
+      "sha256": "2ee1295461bc1776c9cb440ba89b18718c0576c43e524d2584c71699f5d07d54"
+    },
+    {
+      "file": "sincronizacion-cuentas.png",
+      "width": 1440,
+      "height": 734,
+      "sha256": "f938688efb0f00d061310d80937ab9d1f487c19f0c2d0830b3e3813601c39557"
+    },
+    {
+      "file": "sincronizacion-escritorio.png",
+      "width": 1440,
+      "height": 1000,
+      "sha256": "be2a2482f38e78b8240b2b21f6b36a98e78f978264a04e984bcdc0737bb5beff"
+    },
+    {
+      "file": "sincronizacion-movil.png",
+      "width": 360,
+      "height": 800,
+      "sha256": "059bfe52d950b52226d1ce22678ae5f6c6413f2d76b6bc1e0def13e95f46edde"
+    }
+  ]
+}

@@ -55,15 +55,15 @@ export function DocumentDriveAction({
               ? "Archivo subido a Drive"
               : "Subido a Drive como Google Doc"
             : data.status === "stub"
-              ? "Modo stub: conecte Google OAuth"
+              ? "Conecte Google para guardar esta copia"
               : data.status === "needs_reconnect"
-                ? "Reconecte Google OAuth"
+                ? "Vuelva a conectar Google"
                 : data.status === "blocked"
                   ? "Drive deshabilitado en Configuración"
                   : data.status === "needs_real_folder"
                     ? "Vincule una carpeta real en la causa"
                     : data.status === "needs_ocr"
-                      ? "Requiere OCR/extracción primero"
+                      ? "Primero hay que leer el texto de este documento"
                       : data.status === "unsupported"
                         ? "Sin contenido para subir"
                         : String(data.status))
@@ -82,17 +82,17 @@ export function DocumentDriveAction({
           title={
             canUpload
               ? hasBinary && !hasText
-                ? "Sube el archivo original a la carpeta Drive de la causa"
-                : "Sube archivo original o Markdown a la carpeta Drive de la causa"
-              : "Sin archivo ni texto indexado (OCR/extracción pendiente)"
+                ? "Guarda el archivo original con la cuenta de Google del estudio"
+                : "Guarda el archivo original o el texto con la cuenta de Google del estudio"
+              : "El texto del documento todavía se está preparando"
           }
           onClick={push}
         >
           {pending
             ? "Subiendo…"
             : googleDriveId
-              ? "Re-subir a Drive"
-              : "Subir a Drive"}
+              ? "Guardar otra copia en el Drive del estudio"
+              : "Guardar en el Drive del estudio"}
         </button>
         {openUrl && (
           <a

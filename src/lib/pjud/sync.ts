@@ -1,4 +1,4 @@
-import { causaAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
+import { causaAccessWhere, assertCausaCapability, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
 import {
@@ -18,13 +18,14 @@ import {
   probeScraperSidecarHealth,
   scraperSidecarConfigured,
 } from "@/lib/pjud/scraper-sidecar";
-import { pdfBackupEnabled, backupMovimientoDocuments, ingestPjudDocumentBuffer } from "@/lib/pjud/pdf-backup";
+import { pdfBackupEnabled, ingestPjudDocumentBuffer } from "@/lib/pjud/pdf-backup";
 import { isPlaceholderTribunal } from "@/lib/pjud/ojv-dom";
 import { publicScrapeEnabled, publicScrapeReady, claveUnicaAutomationAllowed } from "@/lib/pjud/public-scrape";
 import { pjudWebhookConfigured } from "@/lib/pjud/webhook";
 import type { Prisma } from "@prisma/client";
 import { normalizePjudCuaderno, omitLegacyScrapeAliases, type PjudCausaRef, type PjudFetchedMovimiento, type PjudCuadernosCoverage } from "@/lib/pjud/types";
 import { cuadernosCoverageNote, normalizeCuadernosCoverage, unknownCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
+import { enqueuePjudDocumentJobs, processPendingPjudDocumentJobs, pjudDocumentProgress } from "@/lib/pjud/document-queue";
 
 /** Process-local provider for an authenticated session; never accepted from JSON. */
 export type PjudMovimientosFetcher = (causa: PjudCausaRef) => Promise<PjudFetchResult>;
@@ -46,14 +47,15 @@ export type SyncCausaResult = {
   cuadernosCoverage?: PjudCuadernosCoverage;
   receptorCount?: number;
   escritosPendientes?: number;
+  documents?: Awaited<ReturnType<typeof pjudDocumentProgress>>;
 };
 
 function externalKey(rit: string | null, tribunal: string) {
   return `${(rit || "").toUpperCase()}|${tribunal}`.slice(0, 180);
 }
 
-function nextSyncAtFrom(now = new Date(), failCount = 0) {
-  const base = pjudSyncIntervalMs();
+function nextSyncAtFrom(now = new Date(), failCount = 0, intervalMinutes?: number | null) {
+  const base = intervalMinutes && intervalMinutes >= 15 && intervalMinutes <= 1440 ? intervalMinutes * 60_000 : pjudSyncIntervalMs();
   // Exponential backoff on repeated failures (cap 8× interval).
   const factor =
     failCount <= 0
@@ -77,13 +79,19 @@ export async function persistFetchedPjudMovimientos(
   ))];
   const existing = externalIds.length ? await tx.causaMovimiento.findMany({
     where: { causaId, externalId: { in: externalIds } },
-    select: { id: true, externalId: true, cuaderno: true },
+    select: { id: true, externalId: true, cuaderno: true, documentoRef: true },
   }) : [];
   const byExternalId = new Map(existing.filter((row) => row.externalId).map((row) => [row.externalId!, row]));
   const pending: PjudFetchedMovimiento[] = [];
   const seen = new Set<string>();
   for (const movement of movimientos) {
-    if (seen.has(movement.externalId) || byExternalId.has(movement.externalId)) continue;
+    if (seen.has(movement.externalId)) continue;
+    const current = byExternalId.get(movement.externalId);
+    if (current) {
+      // Signed download links expire; refresh unresolved sources without replacing saved originals.
+      if (movement.documentoRef && current.documentoRef !== movement.documentoRef && !current.documentoRef?.startsWith("doc:") && !current.documentoRef?.startsWith("lexopen:")) await tx.causaMovimiento.update({ where: { id: current.id }, data: { documentoRef: movement.documentoRef } });
+      continue;
+    }
     seen.add(movement.externalId);
     const legacy = movement.legacyExternalId ? byExternalId.get(movement.legacyExternalId) : null;
     const cuaderno = normalizePjudCuaderno(movement.cuaderno);
@@ -144,6 +152,12 @@ export async function syncCausaPjud(
     throw new Error("El proveedor de sesión debe ser una función interna.");
   }
   const trigger = opts?.trigger || "manual";
+  const assertActor = async (client: Pick<Prisma.TransactionClient, "user" | "causa" | "auditEvent"> = prisma) => {
+    if (!opts?.actorId) return;
+    const actor = await client.user.findUniqueOrThrow({ where: { id: opts.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
+    await assertCausaCapability(causaId, actor, "causa.write", client);
+  };
+  await assertActor();
   const causa = await prisma.causa.findUnique({
     where: { id: causaId },
     include: {
@@ -212,7 +226,7 @@ export async function syncCausaPjud(
   } catch (e) {
     const note = e instanceof Error ? e.message : "Error de sync";
     const failCountAfter = (causa.pjudFailCount || 0) + 1;
-    const next = nextSyncAtFrom(new Date(), failCountAfter);
+    const next = nextSyncAtFrom(new Date(), failCountAfter, causa.pjudSyncIntervalMinutes);
     await prisma.$transaction([
       prisma.causa.update({
         where: { id: causaId },
@@ -242,7 +256,7 @@ export async function syncCausaPjud(
 
   if (fetchResult.provider === "none") {
     const failCountAfter = (causa.pjudFailCount || 0) + 1;
-    const next = nextSyncAtFrom(new Date(), failCountAfter);
+    const next = nextSyncAtFrom(new Date(), failCountAfter, causa.pjudSyncIntervalMinutes);
     await prisma.$transaction([
       prisma.causa.update({
         where: { id: causaId },
@@ -292,9 +306,10 @@ export async function syncCausaPjud(
   let inserted = 0;
   let skipped = 0;
   const newRelevant: string[] = [];
-  const next = nextSyncAtFrom(new Date(), partial ? causa.pjudFailCount + 1 : 0);
+  const next = nextSyncAtFrom(new Date(), partial ? causa.pjudFailCount + 1 : 0, causa.pjudSyncIntervalMinutes);
 
   await prisma.$transaction(async (tx) => {
+    await assertActor(tx);
     const persisted = await persistFetchedPjudMovimientos(tx, causaId, fetchResult.movimientos);
     inserted = persisted.inserted;
     skipped = persisted.skipped;
@@ -372,9 +387,11 @@ export async function syncCausaPjud(
   });
 
   let pdfBackedUp = 0;
+  const downloadDocuments = opts?.downloadDocuments !== false && causa.pjudDocumentDownloadsEnabled && causa.pjudMonitoreoActivo && Boolean(causa.pjudDocumentDownloadOwnerId);
+  if (downloadDocuments) await enqueuePjudDocumentJobs(causaId, { actorId: opts?.actorId, waitingLogin: Boolean(opts?.fetchMovimientos) });
   // Prefer bytes captured with OJV session cookies during scrape.
   for (const m of fetchResult.movimientos) {
-    if (opts?.downloadDocuments === false) break;
+    if (!downloadDocuments) break;
     if (!m.documentoBytes?.byteLength) continue;
     const mov = await prisma.causaMovimiento.findFirst({
       where: { causaId, externalId: m.externalId },
@@ -388,16 +405,17 @@ export async function syncCausaPjud(
         bytes: m.documentoBytes,
         filename: m.documentoFilename,
         esReceptor: m.esReceptor,
+        requireReceipt: true,
       });
       if (id) pdfBackedUp += 1;
     } catch {
       /* best-effort */
     }
   }
-  if (opts?.downloadDocuments !== false && pdfBackupEnabled()) {
+  if (downloadDocuments && !opts?.fetchMovimientos && pdfBackupEnabled()) {
     try {
-      const backup = await backupMovimientoDocuments(causaId);
-      pdfBackedUp += backup.saved;
+      const backup = await processPendingPjudDocumentJobs({ causaId });
+      pdfBackedUp += backup.filter(row => row.status === "saved").length;
     } catch {
       /* PDF backup is best-effort */
     }
@@ -444,6 +462,7 @@ export async function syncCausaPjud(
     cuadernosCoverage,
     receptorCount,
     escritosPendientes,
+    ...(downloadDocuments ? { documents: await pjudDocumentProgress(causaId) } : {}),
   };
 }
 

@@ -237,13 +237,13 @@ function WritingSession({ causaId, initial, initialSources, initialBookId, onSav
     publish(result.data.draft); fieldsRef.current = { title: result.data.draft.title, body: result.data.draft.body }; setFields(fieldsRef.current);
     setSaveState("saved"); setNotice(action.success); setPanelOpen(false);
   }
-  async function download(format: "markdown" | "text") {
+  async function download(format: "markdown" | "text" | "docx") {
     if (!await flush()) return;
     setActionBusy(true); setError("");
     try {
       const response = await fetch(url + "/export?format=" + format, { cache: "no-store" });
       if (!response.ok) { const value = await response.json(); throw Object.assign(new Error(value.error || "No se pudo exportar."), { status: response.status, code: value.code }); }
-      fileDownload(await response.blob(), "lexopen-escrito." + (format === "markdown" ? "md" : "txt"));
+      fileDownload(await response.blob(), "lexopen-escrito." + (format === "markdown" ? "md" : format === "docx" ? "docx" : "txt"));
       setNotice("Archivo descargado con los respaldos que se acaban de comprobar.");
     } catch (reason) { const failure = reason as ApiError; if (!privateFailure(failure)) setError(failure.message); }
     finally { if (mounted.current) setActionBusy(false); }
@@ -281,7 +281,7 @@ function WritingSession({ causaId, initial, initialSources, initialBookId, onSav
         <div hidden={panel !== "sources"}><SourcePicker causaId={causaId} draftId={draft.id} active={panelOpen && panel === "sources"} visit={sourceVisit} initialKind={initialSources} initialBookId={initialBookId} disabled={locked || state === "conflict"} add={async source => { await commit("/sources", { source }, "Fuente incorporada al final del escrito. Sus citas quedan vinculadas a esta versión."); }} onCatalogError={catalogFailure} /></div>
         <div hidden={panel !== "references"} className="writing-companion-panel"><p>Los pasajes vinculados a esta versión vuelven a comprobarse al abrir o exportar el escrito.</p><References causaId={causaId} draftId={draft.id} references={draft.references} /><Warnings warnings={draft.warnings} /></div>
         <div hidden={panel !== "history"}><HistoryPanel url={url} visit={historyVisit} active={panelOpen && panel === "history"} current={draft.revision} canWrite={draft.canWrite} disabled={operating || state === "conflict"} restore={revision => commit("/restore", { targetRevision: revision }, "Versión recuperada como un nuevo guardado. El historial anterior se conserva.")} onPrivateError={privateFailure} /></div>
-        <section hidden={panel !== "export"}><p>Se comprueban los respaldos y el acceso antes de preparar la descarga. Los cambios pendientes se guardan primero.</p><div className="writing-actions"><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("markdown")}><Download size={16} aria-hidden="true" />Descargar Markdown</button><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("text")}>Descargar TXT</button></div></section>
+        <section hidden={panel !== "export"}><p>Se comprueban los respaldos y el acceso antes de preparar la descarga. Los cambios pendientes se guardan primero.</p><div className="writing-actions"><button type="button" className="btn btn-primary" disabled={operating || state === "conflict"} onClick={() => void download("docx")}><Download size={16} aria-hidden="true" />Descargar Word</button></div><details><summary>Otros formatos</summary><div className="writing-actions"><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("markdown")}>Descargar Markdown</button><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("text")}>Descargar TXT</button></div></details></section>
       </ContextPanel>
     </div>
   </div>;

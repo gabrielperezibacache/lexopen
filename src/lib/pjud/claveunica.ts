@@ -23,6 +23,9 @@ import type { PjudCausaRef, PjudFetchResult, PjudCuadernosCoverage } from "@/lib
 import { normalizeCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
 import { duplicateCausaWhere } from "@/lib/pjud/causa-origin";
 import type { PjudMovimientosFetcher } from "@/lib/pjud/sync";
+import { causaAccessWhere, assertCausaCapability, type CausaAccessUser } from "@/lib/auth/causa-access";
+import { manualMisCausasAllowed } from "@/lib/pjud/mis-causas-access";
+import { can } from "@/lib/auth/permissions";
 
 /** A live, process-owned session source; HTTP routes do not accept this option. */
 export type MisCausasSessionSource = {
@@ -32,6 +35,7 @@ export type MisCausasSessionSource = {
   assertActive?: () => Promise<void>;
   /** Process-local policy; never accepted from request JSON. */
   downloadDocuments?: boolean;
+  syncIntervalMinutes?: number;
 };
 
 export {
@@ -398,15 +402,16 @@ export async function tryScrapeCausaDetailAuthenticated(
   };
 }
 
-async function findExistingCausa(item: MisCausasItem) {
+async function findExistingCausa(item: MisCausasItem, actor?: CausaAccessUser | null) {
   // RIT y RUC pueden repetirse entre tribunales. Sin uno identificado no es
   // seguro vincular la entrada a una causa de la cartera.
   if (isPlaceholderTribunal(item.tribunal)) return null;
   const where = duplicateCausaWhere(item);
   if (!where) return null;
+  const now = new Date();
   return prisma.causa.findFirst({
-    where,
-    select: { id: true, pjudOrigin: true },
+    where: actor ? { AND: [where, causaAccessWhere(actor), ...(can(actor, "causa.write") ? [] : [{ OR: [{ abogadoId: actor.id }, { miembros: { some: { userId: actor.id, rol: { not: "lectura" }, desde: { lte: now }, OR: [{ hasta: null }, { hasta: { gt: now } }] } } }] }])] } : where,
+    select: { id: true, pjudOrigin: true, pjudMonitoreoActivo: true },
   });
 }
 
@@ -465,6 +470,8 @@ export async function syncMisCausas(opts?: {
     }
   }
   await opts?.sessionSource?.assertActive?.();
+  const actor = opts?.actorId ? await prisma.user.findUnique({ where: { id: opts.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } }) : null;
+  if (opts?.actorId && (!actor || (opts.sessionSource && !manualMisCausasAllowed(actor)))) throw httpError("No tiene permiso para importar causas.", 403);
   const { settings } = await getOrCreateFirmSettings();
   let claimedAt = opts?.claim?.claimedAt ?? null;
   if (opts?.claim && (
@@ -512,7 +519,7 @@ export async function syncMisCausas(opts?: {
 
     for (const item of items) {
       await opts?.sessionSource?.assertActive?.();
-      const existing = await findExistingCausa(item);
+      const existing = await findExistingCausa(item, actor);
       await opts?.sessionSource?.assertActive?.();
       let causaId = existing?.id;
       if (!causaId) {
@@ -526,11 +533,14 @@ export async function syncMisCausas(opts?: {
               : item.tribunal,
             materia: "Por clasificar",
             caratula: item.caratula || null,
-            ...(opts?.sessionSource && opts.actorId ? { abogadoId: opts.actorId } : {}),
+            ...(opts?.sessionSource && opts.actorId ? { abogadoId: opts.actorId, acceso: "equipo" } : {}),
             estado: item.estado?.toLowerCase().includes("termin")
               ? "terminada"
               : "activa",
             pjudMonitoreoActivo: true,
+            pjudDocumentDownloadsEnabled: opts?.sessionSource?.downloadDocuments === true && Boolean(opts.actorId),
+            ...(opts?.sessionSource?.downloadDocuments === true && opts.actorId ? { pjudDocumentDownloadOwnerId: opts.actorId } : {}),
+            ...(opts?.sessionSource?.syncIntervalMinutes ? { pjudSyncIntervalMinutes: opts.sessionSource.syncIntervalMinutes } : {}),
             pjudFromMisCausas: true,
             pjudOrigin: "claveunica",
             pjudSource: "claveunica",
@@ -542,14 +552,16 @@ export async function syncMisCausas(opts?: {
         causaId = createdCausa.id;
         created.push(causaId);
       } else {
+        if (actor) await assertCausaCapability(causaId, actor, "causa.write");
         await prisma.causa.update({
           where: { id: causaId },
           data: {
             pjudFromMisCausas: true,
-            pjudMonitoreoActivo: true,
+            ...(opts?.sessionSource?.downloadDocuments === true && opts.actorId ? { pjudDocumentDownloadsEnabled: true, pjudDocumentDownloadOwnerId: opts.actorId } : {}),
+            ...(opts?.sessionSource?.syncIntervalMinutes ? { pjudSyncIntervalMinutes: opts.sessionSource.syncIntervalMinutes } : {}),
             ...(existing?.pjudOrigin ? {} : { pjudOrigin: "claveunica" }),
             pjudSource: "claveunica",
-            pjudNextSyncAt: new Date(),
+            ...(existing?.pjudMonitoreoActivo ? { pjudNextSyncAt: new Date() } : {}),
             ...(!isPlaceholderTribunal(item.tribunal)
               ? { tribunal: item.tribunal }
               : {}),
@@ -568,6 +580,7 @@ export async function syncMisCausas(opts?: {
       note?: string;
       inserted?: number;
       cuadernosCoverage?: PjudCuadernosCoverage;
+      documents?: import("./sync").SyncCausaResult["documents"];
     }> = [];
     let enqueued = 0;
     let sessionUncovered = 0;
@@ -615,6 +628,7 @@ export async function syncMisCausas(opts?: {
           note: r.note,
           inserted: r.inserted,
           cuadernosCoverage: r.cuadernosCoverage,
+          documents: r.documents,
         }));
         if (opts?.sessionSource) {
           // An active job may have prevented enqueueing, or another worker may

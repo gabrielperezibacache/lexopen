@@ -28,7 +28,7 @@ async function fixture() {
 async function readChat(page: Page, id: string) { return json<Conversation>(await page.request.get(`/api/altazor/conversations/${id}`)); }
 function chatId(page: Page) { const id = new URL(page.url()).searchParams.get("conversacion"); expect(id).toBeTruthy(); return id!; }
 async function composerViewport(page: Page, phase: "new" | "recovered") {
-  await expect(page.locator(".altazor-send-settings:visible").filter({hasText:"fictitious-altazor-browser"})).toBeVisible();
+  await expect(page.locator(".altazor-send-settings:visible").filter({hasText:"IA local"})).toBeVisible();
   await page.evaluate(async()=>{await document.fonts.ready;});
   for(const viewport of [{width:1440,height:1000},{width:360,height:800}]){
     await page.setViewportSize(viewport);await page.evaluate(()=>window.scrollTo(0,0));expect(await page.evaluate(()=>window.scrollY)).toBe(0);
@@ -41,10 +41,13 @@ async function composerViewport(page: Page, phase: "new" | "recovered") {
   }
   await page.setViewportSize({width:1440,height:1000});
 }
+async function openTools(page: Page) {
+  const tools=page.locator(".altazor-tools"); if(await tools.getAttribute("open")===null)await tools.locator(":scope > summary").click();
+}
 async function send(page: Page, text: string) {
   const previous = new URL(page.url()).searchParams.get("conversacion"), before = previous ? (await readChat(page,previous)).turns.length : 0;
   await page.getByTestId("inicio-composer").fill(text);
-  const consent = page.getByRole("checkbox", { name: /Autorizo enviar este mensaje/ }); if (await consent.count()) await consent.check();
+  const consent = page.getByRole("checkbox", { name: /Permitir el envío de este mensaje/ }); if (await consent.count()) await consent.check();
   await page.getByTestId("inicio-send").click();
   await expect.poll(async () => { const id = new URL(page.url()).searchParams.get("conversacion"); if (!id) return "pending"; const data = await readChat(page,id); return data.turns.length === before + 1 ? data.turns.at(-1)?.status : "pending"; }, { timeout: 25_000 }).toBe("completed");
   await expect(page.getByTestId("inicio-composer")).toHaveValue("");
@@ -90,7 +93,20 @@ test("ALTAZOR conserva conversación, adjuntos y fuentes; errores y paneles pres
   await expect(page.getByTestId("altazor-home")).toBeVisible();await expect(page.getByLabel("Mensaje para ALTAZOR")).toBeVisible();
   await composerViewport(page,"new");
   const first=await send(page,"Analiza el primer antecedente enteramente ficticio"),id=first.conversation.id;
-  expect(first.turns.map(turn=>turn.ordinal)).toEqual([1]);await page.reload();await expect(page.locator(".altazor-turns")).toContainText(first.turns[0].assistantText);
+  expect(first.turns.map(turn=>turn.ordinal)).toEqual([1]);
+  const travellingDraft="Mensaje ficticio conservado al cambiar de apartado";
+  await page.getByTestId("inicio-composer").fill(travellingDraft);
+  await page.locator('a[href="/biblioteca"]:visible').first().click();
+  await page.getByRole("button",{name:"Conversar con ALTAZOR",exact:true}).click();
+  const companion=page.getByRole("dialog",{name:"ALTAZOR",exact:true});
+  await expect(companion.getByTestId("inicio-composer")).toHaveValue(travellingDraft);
+  await expect(companion.locator(".altazor-turns")).toContainText(first.turns[0].assistantText);
+  await expect(companion.getByRole("link",{name:"Abrir conversación completa",exact:true})).toHaveAttribute("href",`/inicio?conversacion=${id}`);
+  await companion.getByRole("link",{name:"Abrir conversación completa",exact:true}).click();
+  await expect(page.getByTestId("inicio-composer")).toHaveValue(travellingDraft);
+  await page.getByTestId("inicio-composer").fill("");
+  await expect.poll(async()=>(await page.request.get("/api/altazor/companion")).json().then(value=>value.activeConversationId)).toBe(id);
+  await page.reload();await expect(page.locator(".altazor-turns")).toContainText(first.turns[0].assistantText);
   await composerViewport(page,"recovered");
   const bytes=Buffer.from("El comprobante ficticio registra treinta unidades y exige una revisión prudente."),filename="antecedente-ficticio.txt";
   await page.locator('.altazor-composer input[type="file"]').setInputFiles({name:filename,mimeType:"text/plain",buffer:bytes});
@@ -111,7 +127,7 @@ test("ALTAZOR conserva conversación, adjuntos y fuentes; errores y paneles pres
   expect(modelRequests.slice(beforeSource).filter(messages=>!messages.some(message=>message.content.startsWith("Clasifica la intención"))).some(messages=>JSON.stringify(messages).includes("treinta unidades"))).toBe(true);
   const stored=await db.altazorTurn.findUniqueOrThrow({where:{id:third.turns.at(-1)!.id}}),ref=JSON.parse(stored.contextJson).refs[0];expect(ref.input.bookId).toBe(book.id);expect(ref.citations[0].sourceSha256).toBe(book.sourceSha256);
   expect((await readChat(page,id)).turns.map(turn=>turn.ordinal)).toEqual([1,2,3]);await page.reload();await expect(page.locator(".altazor-user-message")).toHaveCount(3);
-  const draft="Borrador ficticio todavía sin enviar";await page.getByTestId("inicio-composer").fill(draft);await page.getByRole("button",{name:"Memoria",exact:true}).click();await expect(page.getByTestId("altazor-memory")).toBeVisible();await page.getByRole("button",{name:"Conversación",exact:true}).click();await expect(page.getByTestId("inicio-composer")).toHaveValue(draft);
+  const draft="Borrador ficticio todavía sin enviar";await page.getByTestId("inicio-composer").fill(draft);await openTools(page);await page.getByRole("button",{name:"Memoria",exact:true}).click();await expect(page.getByTestId("altazor-memory")).toBeVisible();await page.getByRole("button",{name:"Conversación",exact:true}).click();await expect(page.getByTestId("inicio-composer")).toHaveValue(draft);
   let failedRequestId="";await page.route(`**/api/altazor/conversations/${id}/turns`,async route=>{if(route.request().method()==="POST"){failedRequestId=route.request().postDataJSON().requestId;return route.fulfill({status:503,json:{error:"Fallo ficticio de envío; el borrador debe conservarse"}});}return route.continue();});
   await page.getByTestId("inicio-send").click();await expect(page.getByTestId("altazor-home").getByRole("alert").filter({hasText:"Fallo ficticio"})).toBeVisible();await expect(page.getByTestId("inicio-composer")).toHaveValue(draft);expect((await readChat(page,id)).turns).toHaveLength(3);
   await page.unroute(`**/api/altazor/conversations/${id}/turns`);const retry=page.waitForRequest(request=>new URL(request.url()).pathname===`/api/altazor/conversations/${id}/turns`&&request.method()==="POST");await send(page,draft);expect((await retry).postDataJSON().requestId).toBe(failedRequestId);
@@ -120,11 +136,31 @@ test("ALTAZOR conserva conversación, adjuntos y fuentes; errores y paneles pres
   expect((await page.request.get(`/api/altazor/conversations/${id}/attachments/${attached.id}/original`)).status()).toBe(404);
   expect((await page.request.get(`/api/books/${book.id}`)).status()).toBe(200);expect(await db.libraryBook.count({where:{id:book.id,ownerId:user.id,deletedAt:null}})).toBe(1);
   await page.setViewportSize({width:360,height:800});await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(page.getByTestId("inicio-composer")).toBeVisible();
-  for(const name of ["Conversación","Memoria","Conexiones","Academia","Computadora"]){const tab=page.locator(".altazor-tabs").getByRole("button",{name,exact:true});await tab.focus();await expect(tab).toBeInViewport();expect(await tab.locator("span").evaluate(label=>{const text=label.getBoundingClientRect(),button=label.closest("button")!.getBoundingClientRect();return text.left>=Math.max(0,button.left)-1&&text.right<=Math.min(innerWidth,button.right)+1;}),`El destino ${name} debe conservar su etiqueta completa a 360px`).toBe(true);}
+  for(const name of ["Conversación","Memoria","Conexiones","Computadora"]){const tab=page.locator(".altazor-tabs").getByRole("button",{name,exact:true});await tab.focus();await expect(tab).toBeInViewport();expect(await tab.locator("span").evaluate(label=>{const text=label.getBoundingClientRect(),button=label.closest("button")!.getBoundingClientRect();return text.left>=Math.max(0,button.left)-1&&text.right<=Math.min(innerWidth,button.right)+1;}),`El destino ${name} debe conservar su etiqueta completa a 360px`).toBe(true);}
+});
+
+test("Inicio recibe otra consulta en la misma ruta y conserva el chat anterior sin enviar ni mezclar causas",async({page})=>{
+  test.setTimeout(100_000);const owner=await fixture(),outsider=await fixture();await loginAs(page,owner.email);
+  const original=await send(page,"Respuesta ficticia del espacio personal"),id=original.conversation.id,pending="Borrador personal pendiente antes de cambiar de causa";
+  await page.getByTestId("inicio-composer").fill(pending);
+  const create=async(title:string,abogadoId:string)=>{const cause=await db.causa.create({data:{titulo:title,tribunal:"Tribunal ficticio",materia:"civil",acceso:"equipo",abogadoId}});causaIds.push(cause.id);return cause.id;};
+  const firstCase=await create("Primera causa ficticia",owner.user.id),secondCase=await create("Segunda causa ficticia",owner.user.id),deniedCase=await create("Causa ajena ficticia",outsider.user.id),before=modelRequests.length;
+  const navigateQuery=async(causaId:string,intencion:string)=>{const query=new URLSearchParams({causaId,intencion});await page.evaluate(search=>history.pushState(null,"",`/inicio?${search}`),query.toString());};
+  await navigateQuery(firstCase,"Prepara el primer encargo ficticio sin enviarlo");
+  await expect(page.getByTestId("inicio-composer")).toHaveValue("Prepara el primer encargo ficticio sin enviarlo");await expect(page.locator(".altazor-context-label select")).toHaveValue(firstCase);
+  await navigateQuery(secondCase,"Prepara el segundo encargo ficticio sin enviarlo");
+  await expect(page.getByTestId("inicio-composer")).toHaveValue("Prepara el segundo encargo ficticio sin enviarlo");await expect(page.locator(".altazor-context-label select")).toHaveValue(secondCase);
+  await navigateQuery(deniedCase,"No se debe aplicar este encargo ajeno");
+  await expect(page.getByTestId("altazor-home").getByRole("alert")).toContainText(/no encontrada|no está disponible/i);await expect(page.getByTestId("inicio-composer")).toHaveValue("Prepara el segundo encargo ficticio sin enviarlo");await expect(page.locator(".altazor-context-label select")).toHaveValue(secondCase);
+  expect(modelRequests.length).toBe(before);expect(await db.altazorConversation.count({where:{ownerId:owner.user.id}})).toBe(1);const untouched=await readChat(page,id);expect(untouched.conversation.causaId).toBeNull();expect(untouched.turns).toHaveLength(1);
+  await page.evaluate(conversation=>history.pushState(null,"",`/inicio?conversacion=${conversation}`),id);
+  await expect(page.getByTestId("inicio-composer")).toHaveValue(pending);await expect(page.locator(".altazor-turns")).toContainText(original.turns[0].assistantText);
+  await page.evaluate(()=>history.pushState(null,"","/inicio"));await expect.poll(()=>new URL(page.url()).searchParams.get("conversacion")).toBe(id);
+  await send(page,pending);expect((await readChat(page,id)).turns).toHaveLength(2);
 });
 
 test("memoria privada: grafo confirmado entra al contexto y olvidar oculta el historial derivado",async({page})=>{
-  test.setTimeout(100_000);const {email,user}=await fixture();await loginAs(page,email);await page.getByRole("button",{name:"Memoria",exact:true}).click();const memory=page.getByTestId("altazor-memory");
+  test.setTimeout(100_000);const {email,user}=await fixture();await loginAs(page,email);await openTools(page);await page.getByRole("button",{name:"Memoria",exact:true}).click();const memory=page.getByTestId("altazor-memory");
   const labels=["Faro de redacción ficticia","Faro de revisión prudente"];
   await memory.getByText("Añadir recuerdo",{exact:true}).click();
   for(const label of labels){await memory.getByLabel("Qué prefieres recordar",{exact:true}).fill(label);await memory.getByLabel("Detalle opcional",{exact:true}).fill("Prefiero síntesis breves con un cierre explícito.");await memory.getByRole("button",{name:"Guardar propuesta",exact:true}).click();await memory.locator("article").getByRole("button",{name:new RegExp(`^${label}`)}).click();await memory.getByRole("button",{name:"Confirmar recuerdo",exact:true}).click();}

@@ -4,7 +4,7 @@ import { createManualOjvSession, ManualOjvSessionError, type ManualOjvSession } 
 import { ritLabelsMatch, tribunalLabelsMatch } from "@/lib/pjud/ojv-dom";
 import type { MisCausasItem } from "@/lib/pjud/types";
 import { syncMisCausas } from "@/lib/pjud/claveunica";
-import { misCausasCapabilities } from "@/lib/pjud/mis-causas-access";
+import { manualMisCausasAllowed } from "@/lib/pjud/mis-causas-access";
 import { MANUAL_OJV_MATERIAS, type ManualOjvCandidate, type ManualOjvImportResult, type ManualOjvMateria, type ManualOjvUiSession } from "@/lib/pjud/manual-session-contract";
 
 export const MANUAL_OJV_IMPORT_LIMIT = 20;
@@ -22,6 +22,7 @@ type Dependencies = {
   now: () => number;
   lifetimeMs: number;
   monitorMs: number;
+  ingestDocument: typeof import("./pdf-backup").ingestPjudDocumentBuffer;
 };
 type RecordState = {
   owner: ManualOjvOwner; view: ManualOjvUiSession; controller: AbortController;
@@ -29,6 +30,7 @@ type RecordState = {
   materias: ManualOjvMateria[] | undefined; monitor: ReturnType<typeof setInterval> | null;
   expiry: ReturnType<typeof setTimeout> | null; closing: Promise<void> | null;
   operation: "listing" | "importing" | null;
+  downloadDocuments: boolean; nextDocumentBatchAt: number;
 };
 export type ManualOjvPendingAction = { session: ManualOjvUiSession; run: () => Promise<void> };
 
@@ -44,7 +46,7 @@ async function authorize(owner: ManualOjvOwner) {
     prisma.user.findUnique({ where: { id: owner.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true, sessionVersion: true, totpEnabled: true } }),
     prisma.firmSettings.findFirst({ select: { require2faPrivileged: true } }),
   ]);
-  if (!user || user.sessionVersion !== owner.sessionVersion || !misCausasCapabilities(user).sync || mustEnrollTwoFactor({ role: user.role, totpEnabled: user.totpEnabled, policyEnabled: settings?.require2faPrivileged ?? true })) {
+  if (!user || user.sessionVersion !== owner.sessionVersion || !manualMisCausasAllowed(user) || mustEnrollTwoFactor({ role: user.role, totpEnabled: user.totpEnabled, policyEnabled: settings?.require2faPrivileged ?? true })) {
     throw new ManualOjvUiError("La autorización cambió. Cierre esta conexión y vuelva a ingresar en LexOpen.", 403);
   }
 }
@@ -66,7 +68,7 @@ export class ManualOjvSessionManager {
   private activeId: string | null = null;
   private readonly deps: Dependencies;
   constructor(deps: Partial<Dependencies> = {}) {
-    this.deps = { createSession: createManualOjvSession, sync: syncMisCausas, authorize, runtimeAllowed: manualOjvRuntimeEnabled, now: Date.now, lifetimeMs: LIFETIME_MS, monitorMs: 5_000, ...deps };
+    this.deps = { createSession: createManualOjvSession, sync: syncMisCausas, authorize, runtimeAllowed: manualOjvRuntimeEnabled, now: Date.now, lifetimeMs: LIFETIME_MS, monitorMs: 5_000, ingestDocument: async options => (await import("./pdf-backup")).ingestPjudDocumentBuffer(options), ...deps };
   }
 
   private async active(record: RecordState) {
@@ -134,6 +136,7 @@ export class ManualOjvSessionManager {
     record.view.candidates = [];
     record.candidates.clear();
     record.view.progress = null;
+    record.view.documentProgress = null;
     record.operation = null;
     if (record.monitor) clearInterval(record.monitor);
     record.monitor = null;
@@ -208,7 +211,7 @@ export class ManualOjvSessionManager {
     if (this.records.size >= 8) throw new ManualOjvUiError("Hay demasiadas conexiones temporales recientes. Espere a que terminen o vuelva a intentarlo en unos minutos.", 429);
     const id = randomUUID();
     const view: ManualOjvUiSession = { id, phase: "opening", expiresAt: new Date(this.deps.now() + Math.min(this.deps.lifetimeMs, LIFETIME_MS)).toISOString(), authenticated: false, listedAt: null, materiasTried: [], candidates: [], progress: null, result: null, error: null };
-    const record: RecordState = { owner: { ...owner }, view, controller: new AbortController(), browser: null, candidates: new Map(), materias: undefined, monitor: null, expiry: null, closing: null, operation: null };
+    const record: RecordState = { owner: { ...owner }, view, controller: new AbortController(), browser: null, candidates: new Map(), materias: undefined, monitor: null, expiry: null, closing: null, operation: null, downloadDocuments: false, nextDocumentBatchAt: 0 };
     this.records.set(id, record); this.latest.set(owner.actorId, id); this.activeId = id;
     record.expiry = setTimeout(() => {
       void this.closeRecord(record).finally(() => {
@@ -220,7 +223,7 @@ export class ManualOjvSessionManager {
     record.monitor = setInterval(() => {
       if (checking || record.view.phase === "closed") return;
       checking = true;
-      void this.active(record).then(async () => { if (record.browser?.status().phase === "closed") await this.closeRecord(record); }).catch(() => this.closeRecord(record)).finally(() => { checking = false; });
+      void this.active(record).then(async () => { if (record.browser?.status().phase === "closed") await this.closeRecord(record); else await this.continueDocumentDownloads(record); }).catch(() => this.closeRecord(record)).finally(() => { checking = false; });
     }, this.deps.monitorMs);
     record.monitor.unref();
     let started = false;
@@ -276,11 +279,12 @@ export class ManualOjvSessionManager {
     } };
   }
 
-  async import(owner: ManualOjvOwner, id: string, ids: string[]): Promise<ManualOjvPendingAction> {
+  async import(owner: ManualOjvOwner, id: string, ids: string[], options: { downloadDocuments?: boolean; intervalMinutes?: number } = {}): Promise<ManualOjvPendingAction> {
     const record = await this.available(owner, id, "importing");
     if (!ids.length || ids.length > MANUAL_OJV_IMPORT_LIMIT || new Set(ids).size !== ids.length) { record.operation = null; throw new ManualOjvUiError(`Seleccione entre 1 y ${MANUAL_OJV_IMPORT_LIMIT} causas distintas por operación.`, 400); }
     if (!record.view.listedAt || ids.some(key => !record.candidates.has(key))) { record.operation = null; throw new ManualOjvUiError("La selección no pertenece al último listado consultado en esta conexión.", 400); }
     const selected = ids.map(key => ({ ...record.candidates.get(key)! }));
+    record.downloadDocuments = options.downloadDocuments === true;
     record.view.phase = "importing"; record.view.error = null; record.view.result = null;
     record.view.progress = { completed: 0, total: selected.length };
     let started = false;
@@ -288,7 +292,7 @@ export class ManualOjvSessionManager {
       if (started) return; started = true;
       try {
         const result = await this.deps.sync({ actorId: owner.actorId, processJobsInline: true, sessionSource: {
-          assertActive: () => this.active(record), downloadDocuments: false,
+          assertActive: () => this.active(record), downloadDocuments: options.downloadDocuments === true, syncIntervalMinutes: options.intervalMinutes,
           listMisCausas: async () => {
             await this.active(record);
             const current = await this.browser(record).listMisCausas({ materias: record.materias });
@@ -304,7 +308,9 @@ export class ManualOjvSessionManager {
             const browser = this.browser(record);
             if (record.view.progress) record.view.progress.currentRit = causa.rit || undefined;
             try {
-              const detail = await browser.fetchCausaDetail(causa, { materias: record.materias });
+              const { prisma } = await import("@/lib/db");
+              const saved = options.downloadDocuments ? await prisma.causaMovimiento.findMany({ where: { causaId: causa.id, documentoRef: { startsWith: "doc:" } }, select: { externalId: true } }) : [];
+              const detail = await browser.fetchCausaDetail(causa, { materias: record.materias, downloadDocuments: options.downloadDocuments === true, excludeDocumentExternalIds: saved.flatMap(row => row.externalId ? [row.externalId] : []) });
               await this.active(record);
               return { ...detail, provider: "scrape", demo: false };
             } finally {
@@ -322,12 +328,51 @@ export class ManualOjvSessionManager {
     } };
   }
 
+  /** Continue opted-in originals in bounded batches while the same user session remains live. */
+  private async continueDocumentDownloads(record: RecordState) {
+    if (!record.downloadDocuments || !record.view.result?.items.length || record.view.phase !== "completed" || record.operation || !record.browser?.status().authenticated || process.env.PJUD_DOC_DOWNLOADS?.trim() === "0" || this.deps.now() < record.nextDocumentBatchAt) return;
+    record.operation = "importing";
+    record.nextDocumentBatchAt = this.deps.now() + 30_000;
+    const [{ prisma }, { assertCausaCapability }, { pjudDocDownloadMaxPerRun }, { pjudDocumentProgress }] = await Promise.all([import("@/lib/db"), import("@/lib/auth/causa-access"), import("@/lib/pjud/pdf-backup"), import("@/lib/pjud/document-queue")]);
+    try {
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: record.owner.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
+      const jobs = await prisma.pjudDocumentJob.findMany({
+        where: { causaId: { in: record.view.result.items.map(item => item.causaId) }, actorId: user.id, causa: { pjudDocumentDownloadsEnabled: true, pjudMonitoreoActivo: true }, status: { in: ["waiting_login", "pending", "failed"] }, nextAttemptAt: { lte: new Date() }, movimiento: { externalId: { not: null } } },
+        include: { movimiento: { select: { externalId: true } } }, orderBy: [{ nextAttemptAt: "asc" }, { id: "asc" }], take: pjudDocDownloadMaxPerRun(),
+      });
+      if (!jobs.length) return;
+      const causaId = jobs[0].causaId, batch = jobs.filter(job => job.causaId === causaId);
+      await this.active(record); await assertCausaCapability(causaId, user, "causa.write");
+      const cause = await prisma.causa.findUniqueOrThrow({ where: { id: causaId }, select: { id: true, rit: true, ruc: true, tribunal: true, titulo: true, caratula: true } });
+      record.view.documentProgress = { currentRit: cause.rit || "", attempted: 0, total: batch.length };
+      const detail = await this.browser(record).fetchCausaDetail(cause, { materias: record.materias, downloadDocuments: true, documentExternalIds: batch.map(job => job.movimiento.externalId!) });
+      const movementById = new Map(detail.movimientos.map(movement => [movement.externalId, movement]));
+      for (const job of batch) {
+        await this.active(record);
+        const movement = movementById.get(job.movimiento.externalId!);
+        const saved = movement?.documentoBytes?.length ? await this.deps.ingestDocument({ causaId, movimientoId: job.movimientoId, bytes: movement.documentoBytes, filename: movement.documentoFilename, esReceptor: movement.esReceptor, requireReceipt: true }) : null;
+        if (!saved) await prisma.pjudDocumentJob.updateMany({ where: { id: job.id, status: { in: ["waiting_login", "pending", "failed"] } }, data: { status: "waiting_login", attempts: { increment: 1 }, nextAttemptAt: new Date(this.deps.now() + 15 * 60_000), lastErrorCode: "session_document_pending", lastError: "El documento no estaba disponible en esta lectura de OJV." } });
+        if (record.view.documentProgress) record.view.documentProgress.attempted++;
+      }
+      const item = record.view.result?.items.find(item => item.causaId === causaId);
+      if (item) item.documents = await pjudDocumentProgress(causaId);
+    } catch (error) {
+      if (!record.controller.signal.aborted) {
+        record.view.error = error instanceof ManualOjvSessionError ? error.message : "Algunos documentos siguen pendientes. Puede continuar en el próximo ingreso a OJV.";
+        record.nextDocumentBatchAt = this.deps.now() + 2 * 60_000;
+      }
+    } finally {
+      record.view.documentProgress = null;
+      record.operation = null;
+    }
+  }
+
   private importResult(result: SyncResult): ManualOjvImportResult {
     return {
       created: result.created, linked: result.linked, syncOk: result.syncOk, syncFailed: result.syncFailed, syncPartial: result.syncPartial, inserted: result.inserted,
       items: result.items.map(item => {
         const sync = result.syncResults.find(row => row.causaId === item.causaId);
-        return { causaId: item.causaId, rit: item.rit, tribunal: item.tribunal, status: sync?.status || "failed", ...(sync?.note ? { note: sync.note } : {}), ...(sync?.cuadernosCoverage ? { cuadernosCoverage: sync.cuadernosCoverage } : {}) };
+        return { causaId: item.causaId, rit: item.rit, tribunal: item.tribunal, status: sync?.status || "failed", ...(sync?.note ? { note: sync.note } : {}), ...(sync?.cuadernosCoverage ? { cuadernosCoverage: sync.cuadernosCoverage } : {}), ...(sync?.documents ? { documents: sync.documents } : {}) };
       }),
     };
   }

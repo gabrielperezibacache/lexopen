@@ -101,7 +101,7 @@ export type ManualOjvSession = {
   showOfficialWindow?(): Promise<void>;
   waitForAuthentication(): Promise<ManualOjvSessionStatus>;
   listMisCausas(options?: Pick<MisCausasReadOptions, "materias" | "responseTimeoutMs">): Promise<MisCausasItem[]>;
-  fetchCausaDetail(causa: PjudCausaRef, options?: Pick<MisCausasReadOptions, "materias" | "responseTimeoutMs">): Promise<ScrapeLookupResult>;
+  fetchCausaDetail(causa: PjudCausaRef, options?: Pick<MisCausasReadOptions, "materias" | "responseTimeoutMs" | "downloadDocuments" | "excludeDocumentExternalIds" | "documentExternalIds">): Promise<ScrapeLookupResult>;
   /** Scope of the most recent list response; no case rows or account information. */
   lastListMaterias?(): readonly string[];
   close(): Promise<void>;
@@ -317,13 +317,13 @@ class OwnedManualSession implements ManualOjvSession {
     }, boundedMs(this.options.operationTimeoutMs, 120_000), "operation-timeout", "list");
   }
 
-  fetchCausaDetail(causa: PjudCausaRef, options: Pick<MisCausasReadOptions, "materias" | "responseTimeoutMs"> = {}) {
+  fetchCausaDetail(causa: PjudCausaRef, options: Pick<MisCausasReadOptions, "materias" | "responseTimeoutMs" | "downloadDocuments" | "excludeDocumentExternalIds" | "documentExternalIds"> = {}) {
     return this.serial(async () => {
       const page = await this.requireIdentifiedPage();
       if (!causa.rit || !this.listed.some(item => ritLabelsMatch(item.rit, causa.rit!) && tribunalLabelsMatch(item.tribunal, causa.tribunal))) {
         throw new ManualOjvSessionError("cause-not-listed");
       }
-      return readCausaDetailFromAuthenticatedOjv(page, causa, { ...options, materias: checkedMaterias(options.materias), allowPrompts: false, signal: this.options.signal });
+      return withManualPjudInteraction(() => readCausaDetailFromAuthenticatedOjv(page, causa, { ...options, materias: checkedMaterias(options.materias), allowPrompts: false, signal: this.options.signal }), { downloadDocuments: options.downloadDocuments === true });
     }, boundedMs(this.options.operationTimeoutMs, 120_000), "operation-timeout", "detail");
   }
 }

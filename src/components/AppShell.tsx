@@ -162,7 +162,7 @@ export function AppShell({
           </div>
 
           <div className="min-w-0 flex-1 md:hidden">
-            <div className="display truncate text-lg leading-tight">{t(currentArea?.labelKey || currentEntry?.labelKey || (navigation.mode === "portal" ? "nav.portal" : "brand.tagline"))}</div>
+            <div className="display truncate text-lg leading-tight">{t(currentEntry?.labelKey || currentArea?.labelKey || (navigation.mode === "portal" ? "nav.portal" : "brand.tagline"))}</div>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">

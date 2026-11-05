@@ -1,0 +1,20 @@
+.altazor-companion-launcher { position:fixed; z-index:35; right:1.5rem; bottom:1.5rem; display:flex; align-items:center; gap:.65rem; min-height:56px; padding:.45rem 1rem .45rem .55rem; background:var(--surface-solid); color:var(--ink); border:1px solid var(--line-strong); border-radius:14px; box-shadow:var(--shadow); text-align:left; }
+.altazor-companion-launcher:hover { border-color:var(--sea); }
+.altazor-companion-launcher:focus-visible { outline:2px solid var(--sea); outline-offset:4px; }
+.altazor-companion-launcher>span { font-weight:600; font-size:1rem; }
+.altazor-companion-launcher small { display:block; color:var(--ink-soft); font-size:.8rem; font-weight:400; margin-top:.15rem; }
+.lexopen-sheet.altazor-companion-sheet[data-presentation="overlay"] { width:min(800px,100vw); max-width:100vw; }
+.lexopen-sheet.altazor-companion-sheet[open] { animation:altazor-sheet-enter 180ms var(--motion-ease) both; }
+@keyframes altazor-sheet-enter { from { transform:translateX(24px); opacity:1; } to { transform:translateX(0); opacity:1; } }
+@media(prefers-reduced-motion:reduce) { .lexopen-sheet.altazor-companion-sheet[open] { animation:none; } }
+.altazor-companion-sheet .lexopen-sheet-heading h2 { font-family:var(--font-editorial),var(--font-sora),sans-serif; font-size:1.75rem; font-weight:500; }
+.altazor-companion-sheet .altazor-welcome { padding:1rem 0; }
+.altazor-companion-sheet .altazor-header { padding-bottom:.75rem; gap:1rem; }
+.altazor-companion-sheet .altazor-header h2 { font-size:1.25rem; }
+.altazor-companion-sheet .altazor-header p { display:none; }
+.altazor-companion-sheet .altazor-conversation { padding:.75rem; box-shadow:none; }
+.altazor-tools { margin-bottom:1rem; }
+.altazor-tools>summary { display:flex; align-items:center; gap:.5rem; width:fit-content; color:var(--ink-soft); }
+.altazor-tools .altazor-tabs { margin-bottom:.5rem; }
+.altazor-tools .altazor-send-settings { padding-block:.5rem 1rem; }
+@media(max-width:600px) { .altazor-companion-launcher { right:.75rem; bottom:calc(.75rem + env(safe-area-inset-bottom)); } .altazor-companion-launcher small { display:none; } .altazor-companion-sheet .lexopen-sheet-content { padding:.75rem; } }

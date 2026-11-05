@@ -37,6 +37,7 @@ async function startIntervalJob(opts) {
     log,
     run,
     timeoutMs = 120_000,
+    runOnStart = true,
   } = opts;
   const intervalMinutes = Number(env[intervalKey] || 0);
   if (!Number.isFinite(intervalMinutes) || intervalMinutes <= 0) return null;
@@ -54,17 +55,22 @@ async function startIntervalJob(opts) {
     return null;
   }
 
+  let busy = false;
   const tick = async () => {
+    if (busy) return;
+    busy = true;
     try {
       await run({ baseUrl, secret, env, log, timeoutMs });
     } catch (error) {
       log.warn(
         `${label} falló: ${error instanceof Error ? error.message : String(error)}`
       );
+    } finally {
+      busy = false;
     }
   };
 
-  await tick();
+  if (runOnStart) await tick();
   const timer = setInterval(() => void tick(), intervalMinutes * 60_000);
   log.info(`Scheduler ${label} activo cada ${intervalMinutes} minutos.`);
   return timer;
@@ -106,6 +112,16 @@ export async function startLocalHostSchedulers(opts) {
   const alreadyHealthy = Boolean(opts.alreadyHealthy);
 
   const timers = await Promise.all([
+    startIntervalJob({
+      env, baseUrl, alreadyHealthy, log,
+      intervalKey: "LEXOPEN_JORNADA_INTERVAL_MINUTES",
+      label: "trabajo pendiente",
+      timeoutMs: 300_000,
+      runOnStart: false,
+      run: async ({ baseUrl: url, secret, log: l, timeoutMs }) => {
+        await postCron({ url: `${url}/api/jornada/worker`, secret, timeoutMs, log: l, failLabel: "No se completó el ciclo de trabajo pendiente" });
+      },
+    }),
     startIntervalJob({
       env,
       baseUrl,

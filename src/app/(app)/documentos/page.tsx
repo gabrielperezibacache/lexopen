@@ -67,7 +67,7 @@ export default async function DocumentosPage() {
         subtitle={h.subtitle}
         actions={
           <Link className="btn btn-secondary" href="/agente?utility=doc_qa">
-            IA
+            Consultar con ALTAZOR
           </Link>
         }
       />
@@ -78,7 +78,7 @@ export default async function DocumentosPage() {
       {documentos.length === 0 ? (
         <EmptyState
           title="Sin documentos por causa"
-          description="Incorpore un escrito o una carpeta investigativa vinculada a una causa. Para el VDR del matter use Espacios → Archivos."
+          description="Añade archivos a una causa o reúne los documentos compartidos del equipo en Espacios."
           actionLabel="Ver espacios"
           actionHref="/sites"
         />
@@ -101,7 +101,7 @@ export default async function DocumentosPage() {
                 <tr role="row" key={d.id} className="table-row">
                   <td role="cell" data-label="Documento" className="data-table-primary px-4 py-3">
                     <div className="font-medium">{d.nombre}</div>
-                    {d.driveImport && <details className="mt-1 text-xs text-[var(--ink-soft)]"><summary className="cursor-pointer">Copia de Drive · revisión {d.driveImport.driveVersion}</summary><p>Importada el {formatDate(d.driveImport.importedAt)}. Se conserva esta revisión local; no se sincroniza automáticamente.</p><p className="break-all">SHA-256: {d.driveImport.sourceSha256}</p></details>}
+                    {d.driveImport && <details className="mt-1 text-xs text-[var(--ink-soft)]"><summary className="cursor-pointer">Procedencia: Google Drive</summary><p>Importada el {formatDate(d.driveImport.importedAt)}. Esta copia conserva la revisión {d.driveImport.driveVersion} del archivo.</p><Link className="underline" href="/sincronizacion">Revisar actualizaciones de mis archivos</Link><details className="mt-2"><summary className="cursor-pointer">Identidad del archivo conservado</summary><p className="break-all">SHA-256: {d.driveImport.sourceSha256}</p></details></details>}
                     {d.ruta && (
                       <div className="text-xs text-[var(--muted)]">{d.ruta}/</div>
                     )}
@@ -118,7 +118,7 @@ export default async function DocumentosPage() {
                           href={`/agente?causaId=${d.causaId}&utility=doc_qa&documentoId=${d.id}`}
                           className="inline-flex min-h-11 items-center text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline"
                         >
-                          Preguntar IA
+                          Consultar con ALTAZOR
                         </Link>
                       )}
                       <DocumentDriveAction
@@ -128,18 +128,7 @@ export default async function DocumentosPage() {
                         hasBinary={d.hasBinary}
                       />
                     </div>
-                    {d.obsidianPath && (
-                      <div className="text-xs text-[var(--muted)]">
-                        Obsidian: {d.obsidianPath}
-                      </div>
-                    )}
-                    {d.googleDriveId && (
-                      <div className="text-xs text-[var(--muted)]">
-                        {isRealDriveFolderId(d.googleDriveId)
-                          ? `Drive: ${d.googleDriveId}`
-                          : "Drive: stub / demo (conecte OAuth para IDs reales)"}
-                      </div>
-                    )}
+                    {(d.obsidianPath || d.googleDriveId) && <details className="mt-2 text-xs text-[var(--muted)]"><summary className="cursor-pointer">Ubicaciones vinculadas</summary>{d.obsidianPath && <p className="break-all">Obsidian: {d.obsidianPath}</p>}{d.googleDriveId && <p className="break-all">{isRealDriveFolderId(d.googleDriveId) ? `Google Drive: ${d.googleDriveId}` : "La ubicación de Google Drive todavía necesita configurarse."}</p>}</details>}
                   </td>
                   <td role="cell" data-label="Tipo" className="px-4 py-3">{d.tipo}</td>
                   <td role="cell" data-label="Causa" className="px-4 py-3">
@@ -160,11 +149,11 @@ export default async function DocumentosPage() {
                         href={`/api/documentos/${d.id}/markdown`}
                         className="text-[var(--sea)]"
                       >
-                        Markdown listo
+                        Descargar texto preparado
                       </a>
                     ) : d.extractionStatus === "needs_ocr" ? (
                       <span className="text-[var(--copper)]">
-                        Requiere OCR{" "}
+                        Texto pendiente de reconocer{" "}
                         <DocumentProcessingAction documentId={d.id} />
                       </span>
                     ) : d.extractionStatus === "unsupported" ? (

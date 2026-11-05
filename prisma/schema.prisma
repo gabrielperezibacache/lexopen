@@ -49,6 +49,10 @@ model FirmSettings {
 }
 
 model User {
+  altazorCompanion AltazorCompanion?
+  driveSyncSubscriptions DriveSyncSubscription[]
+  pjudDocumentJobs PjudDocumentJob[]
+  pjudDownloadAuthorizations Causa[] @relation("PjudDownloadAuthorization")
   altazorSecrets AltazorSecret[]
   altazorSecretReceipts AltazorSecretReceipt[]
   altazorSecretGrants AltazorSecretGrant[]
@@ -295,6 +299,12 @@ model Cliente {
 }
 
 model Causa {
+  pjudDocumentDownloadsEnabled Boolean @default(false)
+  pjudDocumentDownloadOwnerId String?
+  pjudDocumentDownloadOwner User? @relation("PjudDownloadAuthorization", fields: [pjudDocumentDownloadOwnerId], references: [id], onDelete: Restrict)
+  pjudSyncIntervalMinutes Int?
+  driveSyncSubscription DriveSyncSubscription?
+  pjudDocumentJobs PjudDocumentJob[]
   computerWorkspaces AltazorComputerWorkspace[]
   altazorConversations AltazorConversation[]
   altazorMemorySpaces AltazorMemorySpace[]
@@ -430,6 +440,7 @@ model EtapaHistorial {
 }
 
 model CausaMovimiento {
+  documentJob PjudDocumentJob?
   id          String   @id @default(cuid())
   titulo      String
   detalle     String?
@@ -630,6 +641,7 @@ model FileVersion {
 }
 
 model Documento {
+  pjudDocumentJobs PjudDocumentJob[]
   id            String   @id @default(cuid())
   nombre        String
   tipo          String   @default("otro")
@@ -1681,7 +1693,7 @@ model PjudMigrationArchive {
 model DriveDocumentImport {
   id String @id @default(cuid())
   causaId String
-  documentoId String @unique
+  documentoId String? @unique
   folderId String
   driveFileId String
   driveVersion String
@@ -1690,7 +1702,7 @@ model DriveDocumentImport {
   metadataJson String @default("{}") @db.Text
   importedAt DateTime @default(now())
   causa Causa @relation(fields: [causaId], references: [id], onDelete: Cascade)
-  documento Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  documento Documento? @relation(fields: [documentoId], references: [id], onDelete: SetNull)
 
   @@unique([causaId, driveFileId, driveVersion, exportMimeType])
   @@index([causaId, importedAt])
@@ -2289,6 +2301,7 @@ model WorkbenchImportReceipt {
 }
 
 model AltazorConversation {
+  companionSelections AltazorCompanion[]
   id String @id @default(cuid())
   ownerId String
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -2308,6 +2321,7 @@ model AltazorConversation {
   @@index([ownerId, status, updatedAt])
 }
 model AltazorTurn {
+  actorSessionVersion Int?
   id String @id @default(cuid())
   conversationId String
   conversation AltazorConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -2540,6 +2554,7 @@ model AltazorAcademicWorkspace {
   @@index([ownerId,archivedAt,updatedAt])
 }
 model AltazorAcademicArtifact {
+  versions AltazorAcademicArtifactVersion[]
   id String @id @default(cuid())
   workspaceId String
   workspace AltazorAcademicWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
@@ -2562,6 +2577,81 @@ model AltazorAcademicArtifact {
   @@unique([workspaceId,requestId])
   @@index([workspaceId,createdAt])
 }
+model AltazorAcademicArtifactVersion {
+  id String @id @default(cuid())
+  artifactId String
+  artifact AltazorAcademicArtifact @relation(fields:[artifactId],references:[id],onDelete:Cascade)
+  revision Int
+  body String @db.Text
+  bodySha256 String
+  reviewed Boolean @default(false)
+  createdAt DateTime @default(now())
+  @@unique([artifactId,revision])
+  @@index([artifactId,createdAt])
+}
+
+model AltazorCompanion {
+  ownerId String @id
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  activeConversationId String?
+  activeConversation AltazorConversation? @relation(fields:[activeConversationId],references:[id],onDelete:SetNull)
+  memoryEnabled Boolean @default(true)
+  backgroundEnabled Boolean @default(true)
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DriveSyncSubscription {
+  account String @default("study")
+  connectionId String?
+  id String @id @default(cuid())
+  causaId String @unique
+  causa Causa @relation(fields:[causaId],references:[id],onDelete:Cascade)
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  folderId String
+  enabled Boolean @default(false)
+  intervalMinutes Int @default(60)
+  nextRunAt DateTime?
+  lastRunAt DateTime?
+  status String @default("idle")
+  note String?
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  generation Int @default(1)
+  scanCursor String? @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([enabled,nextRunAt])
+  @@index([ownerId])
+}
+
+model PjudDocumentJob {
+  id String @id @default(cuid())
+  causaId String
+  causa Causa @relation(fields:[causaId],references:[id],onDelete:Cascade)
+  movimientoId String @unique
+  movimiento CausaMovimiento @relation(fields:[movimientoId],references:[id],onDelete:Cascade)
+  actorId String?
+  actor User? @relation(fields:[actorId],references:[id],onDelete:Restrict)
+  sourceRefHash String
+  status String @default("pending")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  documentoId String?
+  documento Documento? @relation(fields:[documentoId],references:[id],onDelete:SetNull)
+  sourceSha256 String?
+  lastErrorCode String?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status,nextAttemptAt])
+  @@index([causaId])
+}
+
 model AltazorAcademicProfile {
   ownerId String @id
   owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)

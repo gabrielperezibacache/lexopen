@@ -1,9 +1,12 @@
 .altazor-home { width:100%; max-width: 1120px; min-width: 0; margin-inline: auto; --altazor-warm: #f3efe4; }
-.altazor-header { display:flex; align-items:center; gap:2rem; padding:0 0 1.5rem; }
+.altazor-identity-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem 1rem; padding-bottom:1rem; }
+.altazor-header { display:flex; align-items:center; gap:1rem; min-width:0; }
+.altazor-identity-row .altazor-tools { margin-bottom:0; }
+.altazor-identity-row .altazor-tools[open] { flex-basis:100%; order:2; }
 .altazor-brand { display:inline-flex; align-items:center; gap:.55rem; flex-shrink:0; }
-.altazor-companion { display:inline-block; flex-shrink:0; background-image:url('/altazor/companion-states.png'); background-repeat:no-repeat; background-size:200% 200%; }
+.altazor-companion { display:inline-block; flex-shrink:0; background-image:url('/altazor/companion-engraving-v2.png'); background-repeat:no-repeat; background-size:200% 200%; }
 .altazor-header .altazor-companion { animation:altazor-arrive .75s cubic-bezier(.16,1,.3,1) both; }
-.altazor-wordmark { font-family:var(--font-fraunces),Georgia,serif; font-size:1.6rem; font-weight:500; letter-spacing:-.025em; color:var(--ink); }
+.altazor-wordmark { font-family:var(--font-editorial),var(--font-sora),sans-serif; font-size:1.75rem; font-weight:500; letter-spacing:.025em; color:var(--ink); }
 .altazor-wordmark>span { display:block; font-family:var(--font-sora),sans-serif; color:var(--sea); font-size:1rem; letter-spacing:.1em; }
 .altazor-header h2 { font-family:var(--font-fraunces),Georgia,serif; font-size:1.6rem; line-height:1.2; margin-bottom:.45rem; }
 .altazor-header p,.altazor-section-heading p { max-width:65ch; color:var(--ink-soft); line-height:1.65; }
@@ -65,9 +68,9 @@
 .altazor-attachments button { min-width:44px; min-height:44px; display:grid; place-items:center; }
 .altazor-attachments small,.altazor-conversation-list small,.altazor-academic-results small { display:block; color:var(--muted); font-size:1rem; }
 .altazor-send-settings { display:grid; gap:.5rem; padding:.5rem .6rem; color:var(--ink-soft); font-size:1rem; line-height:1.65; }
-.altazor-send-settings label,.altazor-check { display:flex!important; align-items:flex-start; gap:.65rem!important; }
+.altazor-send-settings label,.altazor-check { display:flex!important; align-items:flex-start; gap:.65rem!important; min-height:44px; }
 .altazor-send-settings p { overflow-wrap:anywhere; }
-.altazor-send-settings button { color:var(--sea); text-decoration:underline; }
+.altazor-send-settings button:not(.btn) { color:var(--sea); text-decoration:underline; }
 .altazor-source-disclosure { margin-top:1rem; border-top:1px solid var(--line); }
 .altazor-source-disclosure summary>span { margin-left:auto; color:var(--muted); font-weight:400; }
 .altazor-sources { padding-block:1rem; }

@@ -1031,6 +1031,16 @@ export async function pushDocumentoToDrive(
 }
 
 /** Vincula una causa a una carpeta de Drive existente (URL o ID). */
+/** Changing a linked folder revokes the previous automatic-pull choice. */
+async function updateLinkedDriveFolder(causaId: string, data: { googleDriveFolderId: string | null; googleDriveFolderUrl: string | null; googleDriveFolderName: string | null }) {
+  return prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${causaId} FOR UPDATE`;
+    const prior = await tx.causa.findUniqueOrThrow({ where: { id: causaId }, select: { googleDriveFolderId: true } });
+    if (prior.googleDriveFolderId !== data.googleDriveFolderId) await tx.driveSyncSubscription.updateMany({ where: { causaId }, data: { enabled: false, status: "paused", generation: { increment: 1 }, nextRunAt: null, scanCursor: null, leaseToken: null, leaseExpiresAt: null, note: "La carpeta cambió. Active la actualización para usar la nueva selección." } });
+    return tx.causa.update({ where: { id: causaId }, data });
+  });
+}
+
 export async function linkCausaDriveFolder(causaId: string, folderRef: string) {
   const parsed = parseGoogleDriveFolderRef(folderRef);
   if (!parsed) {
@@ -1069,13 +1079,10 @@ export async function linkCausaDriveFolder(causaId: string, folderRef: string) {
       // Dev: allow offline link of a real-looking ID without verification.
       const folderName =
         causa.rit || causa.titulo.slice(0, 80) || "Carpeta LexOpen";
-      const updated = await prisma.causa.update({
-        where: { id: causaId },
-        data: {
+      const updated = await updateLinkedDriveFolder(causaId, {
           googleDriveFolderId: parsed.folderId,
           googleDriveFolderUrl: parsed.folderUrl,
           googleDriveFolderName: folderName,
-        },
       });
       await prisma.activity.create({
         data: {
@@ -1124,13 +1131,10 @@ export async function linkCausaDriveFolder(causaId: string, folderRef: string) {
   if (meta.name) folderName = meta.name;
   if (meta.webViewLink) folderUrl = meta.webViewLink;
 
-  const updated = await prisma.causa.update({
-    where: { id: causaId },
-    data: {
+  const updated = await updateLinkedDriveFolder(causaId, {
       googleDriveFolderId: parsed.folderId,
       googleDriveFolderUrl: folderUrl,
       googleDriveFolderName: folderName,
-    },
   });
 
   await prisma.activity.create({
@@ -1190,13 +1194,10 @@ export async function createCausaDriveFolder(
       if (e.code !== "needs_oauth") throw e;
       const stubId = makeStubFolderId(causa.id);
       const url = stubFolderUrl(stubId);
-      const updated = await prisma.causa.update({
-        where: { id: causaId },
-        data: {
+      const updated = await updateLinkedDriveFolder(causaId, {
           googleDriveFolderId: stubId,
           googleDriveFolderUrl: url,
           googleDriveFolderName: `${name} (stub local)`,
-        },
       });
       await prisma.activity.create({
         data: {
@@ -1245,13 +1246,10 @@ export async function createCausaDriveFolder(
   const folder = (await res.json()) as { id: string; name?: string };
   const url = driveFolderUrl(folder.id);
 
-  const updated = await prisma.causa.update({
-    where: { id: causaId },
-    data: {
+  const updated = await updateLinkedDriveFolder(causaId, {
       googleDriveFolderId: folder.id,
       googleDriveFolderUrl: url,
       googleDriveFolderName: folder.name || name,
-    },
   });
 
   await prisma.activity.create({
@@ -1270,13 +1268,10 @@ export async function createCausaDriveFolder(
 }
 
 export async function unlinkCausaDriveFolder(causaId: string) {
-  const updated = await prisma.causa.update({
-    where: { id: causaId },
-    data: {
+  const updated = await updateLinkedDriveFolder(causaId, {
       googleDriveFolderId: null,
       googleDriveFolderUrl: null,
       googleDriveFolderName: null,
-    },
   });
   await prisma.activity.create({
     data: {

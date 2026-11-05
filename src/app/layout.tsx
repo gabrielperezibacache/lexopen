@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
 import { headers } from "next/headers";
 import Script from "next/script";
-import { Fraunces, Sora } from "next/font/google";
+import { Barlow_Condensed, Fraunces, Sora } from "next/font/google";
 import { CsrfFetchPatch } from "@/components/CsrfFetchPatch";
 import { PwaRegister } from "@/components/PwaRegister";
 import { I18nProvider } from "@/components/i18n/I18nProvider";
@@ -29,6 +29,12 @@ const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin"],
 });
+const editorial = Barlow_Condensed({
+  variable: "--font-editorial",
+  weight: ["400", "500", "600"],
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
@@ -51,7 +57,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} data-scroll-behavior="smooth" suppressHydrationWarning>
-      <body className={`${sora.variable} ${fraunces.variable} antialiased`}>
+      <body className={`${sora.variable} ${fraunces.variable} ${editorial.variable} antialiased`}>
         <Script id="lexopen-theme-boot" strategy="beforeInteractive" nonce={nonce}>
           {themeBootScript}
         </Script>

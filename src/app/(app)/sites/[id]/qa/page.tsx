@@ -50,13 +50,13 @@ export default async function SiteQaPage({ params }: Params) {
         <p className="text-sm text-[var(--ink-soft)]/75">
           {clientView
             ? "Preguntas abiertas del espacio — puede abrir hilos y responder mientras estén abiertos."
-            : "Q&A del espacio — hilos con cliente y equipo, con respuestas oficiales."}
+            : "Preguntas del cliente y del equipo, con respuestas que el estudio marca como oficiales."}
         </p>
         <QaActions siteId={site.id} canMarkAnswer={!clientView} />
       </div>
       {threads.length === 0 && (
         <EmptyState
-          title="Sin hilos de Q&A"
+          title="Todavía no hay preguntas"
           description={
             clientView
               ? "Abra una pregunta para el estudio. Solo verá hilos abiertos."

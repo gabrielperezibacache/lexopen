@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { ROLES, STAFF_ROLES } from "../auth/roles";
+import { canSome } from "../auth/permissions";
 import { isClientAllowedPagePath } from "../auth/client-paths";
 import { getDictionary, translate } from "../i18n";
 import { activeNavigationArea, activeNavigationEntry, buildNavigation, navigationBreadcrumbs, navigationEntries, secondaryNavigation } from "./catalog";
@@ -9,7 +10,7 @@ for (const role of ROLES) {
   const entries = navigationEntries(model);
   assert.equal(new Set(entries.map(entry => entry.id)).size, entries.length, `${role}: unique destinations`);
   if ((STAFF_ROLES as readonly string[]).includes(role)) {
-    assert.equal(model.areas.length, 7, `${role}: seven work areas`);
+    assert.equal(model.areas.length, canSome({ role }, "assistant.use") ? 8 : 7, `${role}: accessible work areas`);
     for (const area of model.areas) assert.ok(entries.some(entry => entry.href === area.href), `${role}: reachable area ${area.id}`);
     for (const href of ["/clientes", "/correo", "/facturacion", "/audiencias", "/biblioteca"]) assert.ok(entries.some(entry => entry.href === href), `${role}: read gate is staff ${href}`);
     assert.equal(entries.some(entry => entry.href === "/configuracion"), role === "admin");
@@ -30,6 +31,7 @@ for (const role of ROLES) {
 for (const subject of [null, undefined, { role: "" }, { role: "unknown" }]) assert.equal(navigationEntries(buildNavigation(subject)).length, 0);
 assert.equal(navigationEntries(buildNavigation({ role: "socio", capabilityGrants: "host.admin,audit.read" })).some(entry => entry.id === "configuracion" || entry.id === "auditoria"), false, "navigation must not grant a role-gated page");
 assert.equal(navigationEntries(buildNavigation({ role: "abogado", capabilityRevokes: "assistant.use" })).some(entry => entry.id === "agente"), false);
+assert.equal(buildNavigation({ role: "abogado", capabilityRevokes: "assistant.use" }).areas.some(area => area.id === "academico"), false);
 assert.ok(buildNavigation({ role: "contabilidad" }).shortcuts.some(entry => entry.id === "facturacion"));
 assert.equal(buildNavigation({ role: "procurador" }).shortcuts.length, 0);
 
@@ -40,6 +42,8 @@ for (const [path, area, destination] of [
   ["/audiencias/a-workspace", "agenda", "audiencias"],
   ["/biblioteca/a-book?causa=a-case", "biblioteca", "biblioteca"],
   ["/jurisprudencia/fuentes/a-source", "biblioteca", "jurisprudencia"],
+  ["/academico?trabajo=private", "academico", "academico"],
+  ["/sincronizacion", "causas", "sincronizacion"],
   ["/facturacion/facturas/a-invoice", "estudio", "facturacion"],
   ["/sites/a-space/wiki", "estudio", "sites"],
 ] as const) {
@@ -53,8 +57,8 @@ for (const path of ["/causas", "/causas/monitoreo/", "/causas/mis-causas?alta=1#
   assert.equal(secondaryNavigation(staff, path).some(entry => ["monitoreo", "mis-causas"].includes(entry.id)), false, "Case section tabs own these destinations on their three routes");
 }
 for (const path of ["/causas/nueva", "/causas/a-case", "/documentos", "/minutas"]) {
-  assert.ok(secondaryNavigation(staff, path).some(entry => entry.id === "monitoreo"));
-  assert.ok(secondaryNavigation(staff, path).some(entry => entry.id === "mis-causas"));
+  assert.ok(secondaryNavigation(staff, path).some(entry => entry.id === "sincronizacion"));
+  assert.equal(secondaryNavigation(staff, path).some(entry => ["monitoreo", "mis-causas"].includes(entry.id)), false);
 }
 assert.ok(navigationEntries(staff).some(entry => entry.id === "monitoreo"), "Quick navigation retains the monitoring destination");
 assert.ok(navigationEntries(staff).some(entry => entry.id === "mis-causas"), "Quick navigation retains the ClaveÚnica destination");

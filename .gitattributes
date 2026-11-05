@@ -1,3 +1,5 @@
 *.pdf binary
 *.epub binary
 *.docx binary
+# Preserve the upstream license notices byte-for-byte.
+public/fonts/licenses/*-OFL.txt whitespace=-blank-at-eol

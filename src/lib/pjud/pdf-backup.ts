@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto";
+import { pjudDocumentRefHash } from "./document-identity";
+import { assertCausaCapability } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { fetchSafeOutbound, isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
-import { newStorageKey, putObject } from "@/lib/storage";
+import { putObject } from "@/lib/storage";
 import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 
 /**
@@ -77,6 +80,9 @@ export async function ingestPjudDocumentBuffer(opts: {
   filename?: string | null;
   esReceptor?: boolean;
   mimeHint?: string | null;
+  receiptLeaseToken?: string;
+  requireReceipt?: boolean;
+  enqueue?: typeof enqueueDocumentProcessing;
 }) {
   const buf = opts.bytes;
   if (buf.byteLength < 100 || buf.byteLength > 20 * 1024 * 1024) {
@@ -99,32 +105,56 @@ export async function ingestPjudDocumentBuffer(opts: {
     return null;
   }
 
+  // Check the durable tombstone before even writing storage bytes again.
+  const receipt = await prisma.pjudDocumentJob.findUnique({ where: { movimientoId: opts.movimientoId }, select: { status: true, documentoId: true, actorId: true, leaseToken: true, leaseExpiresAt: true } });
+  if (receipt?.status === "saved") return receipt.documentoId;
+  if ((opts.requireReceipt || opts.receiptLeaseToken) && !receipt) return null;
+  if (receipt && !receipt.actorId) return null;
+  if (opts.receiptLeaseToken && (!receipt || receipt.status !== "running" || receipt.leaseToken !== opts.receiptLeaseToken || !receipt.leaseExpiresAt || receipt.leaseExpiresAt <= new Date())) return null;
+  if (receipt?.actorId) {
+    const cause = await prisma.causa.findUniqueOrThrow({ where: { id: opts.causaId }, select: { pjudDocumentDownloadOwnerId: true, pjudDocumentDownloadsEnabled: true, pjudMonitoreoActivo: true } });
+    if (!cause.pjudDocumentDownloadsEnabled || !cause.pjudMonitoreoActivo || cause.pjudDocumentDownloadOwnerId !== receipt.actorId) return null;
+    const actor = await prisma.user.findUniqueOrThrow({ where: { id: receipt.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
+    await assertCausaCapability(opts.causaId, actor, "causa.write");
+  }
+  const existingMovement = await prisma.causaMovimiento.findUnique({ where: { id: opts.movimientoId }, select: { causaId: true, documentoRef: true } });
+  if (!existingMovement || existingMovement.causaId !== opts.causaId) throw new Error("Documento fuera del expediente");
+  if (existingMovement.documentoRef?.startsWith("doc:")) return existingMovement.documentoRef.slice(4);
+
   const filename = (opts.filename || `pjud-${opts.movimientoId}.pdf`)
     .replace(/[^\w.\-()+ ]+/g, "_")
     .slice(0, 180);
-  const key = newStorageKey(`pjud/${opts.causaId}`, filename);
+  const sourceSha256 = createHash("sha256").update(buf).digest("hex");
+  const key = `pjud/${encodeURIComponent(opts.causaId)}/${encodeURIComponent(opts.movimientoId)}/${sourceSha256}`;
   await putObject({ key, body: buf, contentType: mime });
-  const doc = await prisma.documento.create({
-    data: {
-      nombre: filename,
-      tipo: opts.esReceptor ? "notificacion" : "escrito",
-      mimeType: mime,
-      storageKey: key,
-      causaId: opts.causaId,
-      ruta: "PJUD",
-      extractionStatus: "pending",
-    },
+  const result = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${opts.causaId} FOR UPDATE`;
+    const movement = await tx.causaMovimiento.findUniqueOrThrow({ where: { id: opts.movimientoId } });
+    if (movement.causaId !== opts.causaId) throw new Error("Documento fuera del expediente");
+    const prior = await tx.pjudDocumentJob.findUnique({ where: { movimientoId: movement.id } });
+    if ((opts.requireReceipt || opts.receiptLeaseToken) && !prior) return { id: null, created: false };
+    if (prior?.status === "saved") return { id: prior.documentoId, created: false };
+    if (movement.documentoRef?.startsWith("doc:")) return { id: movement.documentoRef.slice(4), created: false };
+    if (opts.receiptLeaseToken && (!prior || prior.leaseToken !== opts.receiptLeaseToken || prior.status !== "running" || !prior.leaseExpiresAt || prior.leaseExpiresAt <= new Date())) return { id: null, created: false };
+    if (!opts.receiptLeaseToken && prior?.status === "running") return { id: null, created: false };
+    if (process.env.PJUD_DOC_DOWNLOADS?.trim() === "0") return { id: null, created: false };
+    if (prior) {
+      const cause = await tx.causa.findUniqueOrThrow({ where: { id: opts.causaId }, select: { pjudDocumentDownloadsEnabled: true, pjudMonitoreoActivo: true, pjudDocumentDownloadOwnerId: true } });
+      if (!cause.pjudDocumentDownloadsEnabled || !cause.pjudMonitoreoActivo) return { id: null, created: false };
+      if (!prior.actorId || prior.actorId !== cause.pjudDocumentDownloadOwnerId) return { id: null, created: false };
+      if (prior.sourceRefHash !== pjudDocumentRefHash(opts.causaId, movement.id, movement.documentoRef || "")) return { id: null, created: false };
+      if (prior.actorId) {
+        const actor = await tx.user.findUniqueOrThrow({ where: { id: prior.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
+        await assertCausaCapability(opts.causaId, actor, "causa.write", tx);
+      }
+    }
+    const doc = await tx.documento.create({ data: { nombre: filename, tipo: opts.esReceptor ? "notificacion" : "escrito", mimeType: mime, storageKey: key, causaId: opts.causaId, ruta: "PJUD", extractionStatus: "pending" } });
+    await tx.causaMovimiento.update({ where: { id: movement.id }, data: { documentoRef: `doc:${doc.id}` } });
+    if (prior) await tx.pjudDocumentJob.update({ where: { id: prior.id }, data: { status: "saved", documentoId: doc.id, sourceSha256, lastError: null, lastErrorCode: null, leaseToken: null, leaseExpiresAt: null } });
+    return { id: doc.id, created: true };
   });
-  enqueueDocumentProcessing({
-    id: doc.id,
-    name: doc.nombre,
-    bytes: buf,
-  });
-  await prisma.causaMovimiento.update({
-    where: { id: opts.movimientoId },
-    data: { documentoRef: `doc:${doc.id}` },
-  });
-  return doc.id;
+  if (result.id && result.created) (opts.enqueue || enqueueDocumentProcessing)({ id: result.id, name: filename, bytes: buf });
+  return result.id;
 }
 
 /**
@@ -191,7 +221,7 @@ export async function backupMovimientoDocuments(
       }
       const contentType =
         res.headers.get("content-type") || "application/octet-stream";
-      const buf = Buffer.from(await res.arrayBuffer());
+      const buf = await readPjudDocumentResponse(res);
       const id = await ingestPjudDocumentBuffer({
         causaId,
         movimientoId: mov.id,
@@ -245,4 +275,15 @@ export async function listPendingPjudDocumentMovimientos(causaId: string, max: n
     cursor = rows.at(-1)!.id;
   }
   return pending;
+}
+
+/** Reject oversized responses while streaming, before allocating an unbounded body. */
+export async function readPjudDocumentResponse(response: Response, maximum = 20 * 1024 * 1024) {
+  if (Number(response.headers.get("content-length") || 0) > maximum) { await response.body?.cancel(); throw new Error("El documento supera el tamaño permitido"); }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("Documento vacío");
+  let size = 0; const chunks: Uint8Array[] = [];
+  try { for (;;) { const part = await reader.read(); if (part.done) break; size += part.value.length; if (size > maximum) { await reader.cancel(); throw new Error("El documento supera el tamaño permitido"); } chunks.push(part.value); } }
+  finally { reader.releaseLock(); }
+  return Buffer.concat(chunks, size);
 }

@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
     const pending = body.action === "start" ? await manualOjvSessions.start(owner)
       : body.action === "list" ? await manualOjvSessions.list(owner, body.sessionId, body.materias)
-        : await manualOjvSessions.import(owner, body.sessionId, body.candidateIds);
+        : await manualOjvSessions.import(owner, body.sessionId, body.candidateIds, { downloadDocuments: body.downloadDocuments, intervalMinutes: body.intervalMinutes });
     after(pending.run);
     return json({ capabilities, session: pending.session }, { status: 202 });
   } catch (error) { return privatePjudResponse(handleRouteError(error)); }

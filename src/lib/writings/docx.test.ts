@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { assertPlainDocx } from "@/lib/workbench/docx";
+import { assertWritingDocx, readWritingDocxParts, renderCaseWritingDocx } from "./docx";
+import type { WritingDraftView, WritingReferenceView } from "./types";
+const reference = { id: "R1", source: { version: 1, kind: "book", title: "Lectura ficticia <inert>", text: "La interpretación debe conservar sus límites.", href: "/biblioteca/ficticia", citations: [{ reference: "Autora ficticia, Lectura de prueba", locator: "Pasaje 1; sin página física", quote: "La interpretación debe conservar sus límites.", href: "/biblioteca/ficticia?fragment=1", quoteSha256: "a".repeat(64), textSha256: "b".repeat(64), sourceSha256: "c".repeat(64), sourceKey: "fake-source", verificationBasis: "retained_text", retainedSha256: "d".repeat(64), warnings: [] }], warnings: [] } } as unknown as WritingReferenceView;
+const draft: WritingDraftView = { id: "fictitious", causaId: "fake-case", title: "Análisis jurídico de demostración", body: "## Argumento\nFuente comprobada [^R1]. Otra mención [^R1].\n<script>texto inerte</script>", revision: 3, references: [reference], canWrite: true, createdAt: new Date(0).toISOString(), updatedAt: new Date(0).toISOString(), warnings: [] };
+test("Word package has native footnotes linked to server-captured sources", () => {
+  const bytes = renderCaseWritingDocx(draft, { titulo: "Causa ficticia", rit: "C-123-2026" }, new Date(0).toISOString());
+  assert.doesNotThrow(() => assertWritingDocx(bytes));
+  const parts = readWritingDocxParts(bytes);
+  assert.equal(parts.size, 6);
+  const document = parts.get("word/document.xml")!, notes = parts.get("word/footnotes.xml")!;
+  assert.equal([...document.matchAll(/w:footnoteReference w:id="[12]"/g)].length, 2);
+  assert.equal([...notes.matchAll(/<w:footnote w:id="1">/g)].length, 1);
+  assert.match(notes, /Autora ficticia, Lectura de prueba/);
+  assert.equal([...notes.matchAll(/<w:footnote w:id="[12]">/g)].length, 2);
+  assert.match(document, /La interpretación debe conservar sus límites/);
+  assert.match(notes, /original no conservado/);
+  assert.match(document, /&lt;script&gt;texto inerte&lt;\/script&gt;/);
+  assert.match(document, /w:pStyle w:val="Heading1"/);
+  assert.doesNotMatch(document, /\[\^R1\]|## Argumento|<script>/);
+  assert.doesNotMatch(parts.get("word/_rels/document.xml.rels")!, /TargetMode|Target="https?:/);
+  assert.throws(() => assertPlainDocx(bytes), "the recipe validator remains restricted to five parts");
+});
+test("Word rejects unsupported citation markers, fake handwritten definitions and corrupt bytes", () => {
+  const cause = { titulo: "Causa ficticia", rit: null };
+  assert.throws(() => renderCaseWritingDocx({ ...draft, body: "Texto [^R9]" }, cause), /sin fuente/);
+  assert.throws(() => renderCaseWritingDocx({ ...draft, body: "[^R1]: pie inventado" }, cause), /manualmente/);
+  assert.throws(() => renderCaseWritingDocx({ ...draft, body: "Texto\u0000inválido" }, cause), /carácter/);
+  const bytes = renderCaseWritingDocx(draft, cause), corrupt = Buffer.from(bytes); corrupt[40] ^= 1;
+  assert.throws(() => assertWritingDocx(corrupt));
+  assert.throws(() => assertWritingDocx(Buffer.concat([bytes, Buffer.from("trailing payload")])));
+});

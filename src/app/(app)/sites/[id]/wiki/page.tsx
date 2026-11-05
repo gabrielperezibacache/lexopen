@@ -51,7 +51,7 @@ export default async function SiteWikiPage({ params }: Params) {
       {pages.length === 0 ? (
         <EmptyState
           title="Wiki vacía"
-          description="Documente playbooks, checklists o el home del matter en Markdown."
+          description="Reúne los procedimientos, las listas de verificación y los acuerdos del equipo."
           action={canEdit ? <NewWikiButton siteId={site.id} /> : undefined}
         />
       ) : (

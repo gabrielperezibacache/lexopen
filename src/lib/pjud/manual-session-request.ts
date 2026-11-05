@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { MANUAL_OJV_MATERIAS, type ManualOjvCapabilities } from "@/lib/pjud/manual-session-contract";
 import { MANUAL_OJV_IMPORT_LIMIT, ManualOjvUiError, manualOjvRuntimeEnabled } from "@/lib/pjud/manual-session-manager";
-import { misCausasCapabilities } from "@/lib/pjud/mis-causas-access";
+import { manualMisCausasAllowed } from "@/lib/pjud/mis-causas-access";
 import type { PermissionSubject } from "@/lib/auth/permissions";
 
 const uuid = z.string().uuid("La identificación de la conexión no es válida.");
@@ -10,7 +10,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start") }).strict("La solicitud contiene campos no admitidos."),
   z.object({ action: z.literal("focus"), sessionId: uuid }).strict("La solicitud contiene campos no admitidos."),
   z.object({ action: z.literal("list"), sessionId: uuid, materias: z.array(z.enum(MANUAL_OJV_MATERIAS, { errorMap: () => ({ message: "Seleccione una materia disponible." }) })).min(1, "Seleccione una materia para consultar.").max(MANUAL_OJV_MATERIAS.length).optional() }).strict("La solicitud contiene campos no admitidos."),
-  z.object({ action: z.literal("import"), sessionId: uuid, candidateIds: z.array(candidateId).min(1, "Seleccione al menos una causa.").max(MANUAL_OJV_IMPORT_LIMIT, `Seleccione hasta ${MANUAL_OJV_IMPORT_LIMIT} causas por operación.`).refine(ids => new Set(ids).size === ids.length, "La selección contiene causas repetidas") }).strict("La solicitud contiene campos no admitidos."),
+  z.object({ action: z.literal("import"), sessionId: uuid, downloadDocuments: z.boolean().optional(), intervalMinutes: z.union([z.literal(15), z.literal(30), z.literal(60), z.literal(180), z.literal(360), z.literal(1440)]).optional(), candidateIds: z.array(candidateId).min(1, "Seleccione al menos una causa.").max(MANUAL_OJV_IMPORT_LIMIT, `Seleccione hasta ${MANUAL_OJV_IMPORT_LIMIT} causas por operación.`).refine(ids => new Set(ids).size === ids.length, "La selección contiene causas repetidas") }).strict("La solicitud contiene campos no admitidos."),
   z.object({ action: z.literal("close"), sessionId: uuid }).strict("La solicitud contiene campos no admitidos."),
 ]);
 
@@ -37,14 +37,14 @@ export function manualOjvLocalRequest(request: Pick<Request, "url" | "headers">)
 }
 
 export function manualOjvCapabilities(request: Pick<Request, "url" | "headers">, user: PermissionSubject): ManualOjvCapabilities {
-  const allowed = misCausasCapabilities(user).sync;
+  const allowed = manualMisCausasAllowed(user);
   const hostLocal = manualOjvLocalRequest(request);
   const configured = manualOjvRuntimeEnabled();
   return {
     available: hostLocal && configured, allowed, hostLocal, importLimit: MANUAL_OJV_IMPORT_LIMIT,
-    reason: !allowed ? "La importación de Mis Causas requiere autorización para gestionar la cartera del estudio."
-      : !hostLocal ? "El ingreso manual abre una ventana en el Host local. Abra LexOpen desde ese equipo para conectar su cuenta."
-        : !configured ? "El Host debe habilitar el ingreso manual OJV y disponer de un navegador con ventana visible. Revise la configuración PJUD del Host."
+    reason: !allowed ? "Su cuenta necesita permiso para incorporar y gestionar causas."
+      : !hostLocal ? "Abra LexOpen en el equipo principal del estudio para ingresar personalmente con ClaveÚnica."
+        : !configured ? "El ingreso judicial no está preparado en este equipo. Su administrador puede habilitarlo en Configuración."
           : null,
   };
 }

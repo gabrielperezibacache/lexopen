@@ -10,6 +10,8 @@ import { sha256 } from "@/lib/evidence/fragments";
 import { canonicalJson } from "@/lib/command-execution";
 import { resolveCitation, toStoredCitation, verifyStoredCitation, type StoredCitation } from "@/lib/knowledge/citations";
 import { captureWritingSource, verifyWritingSource, writingSourceCatalog } from "@/lib/writings/sources";
+import { authorizedEvidenceDocument } from "@/lib/evidence/service";
+import { documentReadWhere } from "@/lib/auth/causa-access";
 import type { StoredWritingSource, WritingSourceCandidate } from "@/lib/writings/source-types";
 
 import { altazorSourceInputSchema, type AltazorSourceInput } from "./resource-input";
@@ -88,8 +90,32 @@ export async function verifyAltazorSources(user: CausaAccessUser, refs: AltazorS
   return { context: context(refs), refs };
 }
 
-export async function altazorSourceCatalog(user: CausaAccessUser, query: { causaId?: string | null; kind?: "book" | "fact" | "note"; bookId?: string; q?: string; after?: string } = {}) {
+export async function altazorSourceCatalog(user: CausaAccessUser, query: { causaId?: string | null; kind?: "book" | "fact" | "note" | "document"; bookId?: string; documentoId?: string; q?: string; after?: string } = {}) {
   const { actor, client } = await authorized(user, { causaId: query.causaId });
+  if (query.kind === "document") {
+    if (!query.causaId) throw httpError("Elija la causa del documento", 400);
+    const documents = await client.documento.findMany({ where: { AND: [{ causaId: query.causaId }, documentReadWhere(actor)] }, select: { id: true, nombre: true }, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 100 });
+    const candidates: WritingSourceCandidate[] = [], warnings: string[] = []; let nextAfter: string | null = null;
+    if (query.documentoId) {
+      const document = await authorizedEvidenceDocument(query.documentoId, actor, client);
+      if (document.causaId !== query.causaId) throw httpError("El documento no pertenece a esta causa", 404);
+      if (!documents.some(item => item.id === document.id)) documents.push({ id: document.id, nombre: document.nombre });
+      const after = Number(query.after || -1);
+      if (!Number.isSafeInteger(after) || after < -1 || after > 1_000_000) throw httpError("Ventana de pasajes inválida", 400);
+      const version = await client.documentEvidenceVersion.findFirst({ where: { resource: { documentoId: document.id, siteFileId: null } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } });
+      if (version) {
+        const rows = await client.documentEvidenceFragment.findMany({ where: { versionId: version.id, ordinal: { gt: after } }, orderBy: { ordinal: "asc" }, take: 21, select: { id: true, ordinal: true, text: true } }), cache = new Map<string, unknown>();
+        for (const row of rows.slice(0,20)) {
+          try {
+            const value = await captureWritingSource(query.causaId, { kind: "document", fragmentId: row.id, versionId: version.id, quote: row.text.slice(0,3000) }, actor, client, cache);
+            if (!query.q || `${value.title}\n${value.text}`.toLocaleLowerCase().includes(query.q.toLocaleLowerCase())) candidates.push({ input: value.input, kind: "document", title: value.title, text: value.text, href: value.href, review: "Pasaje cotejado con el documento conservado", warnings: value.warnings, citationCount: value.citations.length });
+          } catch (error) { if (![403,404,409].includes(Number((error as {status?:number}).status))) throw error; warnings.push("Se omitieron pasajes que requieren volver a preparar el documento."); }
+        }
+        if (rows.length > 20) nextAfter = String(rows[19].ordinal);
+      } else warnings.push("Prepare el texto del documento desde el expediente para poder citarlo.");
+    }
+    return { kind: "document", books: [], documents, candidates, nextAfter, limited: Boolean(nextAfter) || documents.length >= 100, warnings: [...new Set(warnings)], coverage: { networkRequests: 0, modelUsed: false, scope: "Un documento elegido. Veinte pasajes por ventana; el filtro busca sólo en esa ventana. Se cotejan al seleccionar y al enviar." } };
+  }
   if (query.causaId) return writingSourceCatalog(query.causaId, actor, query, client);
   if (query.kind && query.kind !== "book") throw httpError("Los hechos y notas pertenecen a una causa", 400);
   const books = await client.libraryBook.findMany({ where: bookAccessWhere(actor), select: { id: true, title: true, ownerId: true }, orderBy: [{ title: "asc" }, { id: "asc" }], take: 101 });

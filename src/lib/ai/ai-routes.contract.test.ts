@@ -17,9 +17,8 @@ const aiActions = read("src/app/api/ai/actions/route.ts");
 assert.match(aiActions, /writeAudit\(/);
 assert.match(aiActions, /buildActionContext/);
 
-const agentePage = read("src/app/(app)/agente/page.tsx");
-assert.match(agentePage, /AgenteInner/);
-assert.doesNotMatch(read("src/components/agente/useAgenteCopilot.ts"), /!res\.ok/);
+// The compatibility redirect and private archive are exercised end-to-end in
+// agente-document-scope.spec.ts; they no longer mount the former Copilot.
 
 const jurisPage = read("src/app/(app)/jurisprudencia/page.tsx");
 assert.match(jurisPage, /JurisprudenciaBrief/);

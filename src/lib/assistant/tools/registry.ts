@@ -23,6 +23,9 @@ import { buscarTool } from "./buscar";
 import { jurisprudenciaBuscarTool, jurisprudenciaBriefTool } from "./jurisprudencia";
 import { respuestaLibreTool } from "./respuesta-libre";
 import { escritorioListarTool, escritorioEncargarTool } from "./escritorio";
+import { academiaListarTool, academiaCrearTool, academiaPrepararTool } from "./academic";
+import { audienciaListarTool, audienciaCrearTool, audienciaNotaTool, escritoListarTool, escritoGuardarTool } from "./workflow";
+import { bibliotecaListarTool, sincronizacionEstadoTool } from "./library-sync";
 
 export const TOOLS: Record<AssistantIntentId, AnyAssistantTool> = {
   "nota.crear": notaCrearTool,
@@ -51,6 +54,16 @@ export const TOOLS: Record<AssistantIntentId, AnyAssistantTool> = {
   "respuesta.libre": respuestaLibreTool,
   "escritorio.listar": escritorioListarTool,
   "escritorio.encargar": escritorioEncargarTool,
+  "academia.listar": academiaListarTool,
+  "academia.crear": academiaCrearTool,
+  "academia.preparar": academiaPrepararTool,
+  "audiencia.listar": audienciaListarTool,
+  "audiencia.crear": audienciaCrearTool,
+  "audiencia.nota": audienciaNotaTool,
+  "escrito.listar": escritoListarTool,
+  "escrito.guardar": escritoGuardarTool,
+  "biblioteca.listar": bibliotecaListarTool,
+  "sincronizacion.estado": sincronizacionEstadoTool,
 };
 
 // Sanity check en tiempo de carga: todo AssistantIntentId debe tener tool.

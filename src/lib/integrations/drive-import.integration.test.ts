@@ -132,6 +132,13 @@ async function main() {
     await assert.rejects(listDriveImportCandidates(causaId, owner, null, { ...options, fetch: async () => Response.redirect("http://127.0.0.1:1/private", 302) }), status(502));
     await assert.rejects(listDriveImportCandidates(causaId, owner, null, { ...options, timeoutMs: 5, fetch: async (_input, init) => new Promise((_resolve, reject) => { init?.signal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true }); }) }), status(504));
 
+    // Delete a local original while Drive still offers exactly the same revision.
+    remote={...remote,version:"9",mimeType:"text/plain",size:String(body.length),md5Checksum:sha(body,"md5")};servedBytes=body;
+    const removable=await importSelectedDriveFile(choose(),owner,options);
+    await prisma.documento.delete({where:{id:removable.documentoId}});
+    const beforeRemoved=downloaded;
+    await assert.rejects(importSelectedDriveFile(choose(),owner,options),status(410));
+    assert.equal(downloaded,beforeRemoved,"deliberate local deletion keeps the receipt and does not fetch the body again");
     remote = { ...remote, version: "10", mimeType: "text/plain", size: String(body.length) }; servedBytes = body;
     await prisma.$executeRawUnsafe(`CREATE FUNCTION "${trigger}"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."actorId" = '${owner.id}' AND NEW.action = 'document.drive.import' THEN RAISE EXCEPTION 'Drive fixture audit failure'; END IF; RETURN NEW; END $$`);
     await prisma.$executeRawUnsafe(`CREATE TRIGGER "${trigger}" BEFORE INSERT ON "AuditEvent" FOR EACH ROW EXECUTE FUNCTION "${trigger}"()`); triggerInstalled = true;

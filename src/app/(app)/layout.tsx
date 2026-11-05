@@ -1,5 +1,7 @@
 import { AppShell } from "@/components/AppShell";
+import { AltazorCompanionProvider } from "@/components/altazor/AltazorCompanionProvider";
 import { enforceAppAccess } from "@/lib/auth/access";
+import { canSome } from "@/lib/auth/permissions";
 import { isStaff } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db";
 import { buildNavigation } from "@/lib/navigation/catalog";
@@ -31,7 +33,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       showUpdateBanner={showUpdateBanner}
       canSelfUpdate={canSelfUpdate}
     >
-      {children}
+      {isStaff(user.role) && canSome(user, "assistant.use")
+        ? <AltazorCompanionProvider userId={user.id}>{children}</AltazorCompanionProvider>
+        : children}
     </AppShell>
   );
 }

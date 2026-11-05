@@ -12,7 +12,7 @@ import { writeAuditStrict } from "@/lib/audit";
 import { createCaseWritingFromSnapshots } from "@/lib/writings/service";
 import { captureWritingSource } from "@/lib/writings/sources";
 import { resolveAltazorSources, verifyAltazorSources, type AltazorSourceSnapshot } from "./resources";
-import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, ACADEMIC_LABELS, emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
+import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, ACADEMIC_LABELS, emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
 import { parseAcademicOutput, academicReferenceAppendix, academicWritingBody } from "./academic-output";
 const missing = () => httpError("El trabajo académico no está disponible", 404);
 const unavailableRowTitle = "Fila cuyo respaldo ya no está disponible";
@@ -52,12 +52,19 @@ export async function createAcademicWorkspace(raw: unknown, user: CausaAccessUse
     const previous = await tx.altazorAcademicWorkspace.findUnique({ where: { ownerId_requestId: { ownerId: actor.id, requestId: input.requestId } } });
     if (previous) { if (previous.title !== input.title || previous.kind !== input.kind) throw httpError("Esta solicitud identifica otro trabajo", 409); return { id: previous.id, reused: true }; }
     if (await tx.altazorAcademicWorkspace.count({ where: { ownerId: actor.id, archivedAt: null } }) >= 100) throw httpError("Archive un trabajo para crear otro; el límite activo es cien", 413);
-    const workspace = await tx.altazorAcademicWorkspace.create({ data: { ...input, ownerId: actor.id, briefJson: JSON.stringify(emptyAcademicBrief), matrixJson: JSON.stringify(emptyAcademicMatrix) } });
+    const task = input.kind === "course" ? "syllabus" : input.kind === "career" ? "cv" : input.kind === "writing" ? "academic_writing" : "literature_review";
+    const workspace = await tx.altazorAcademicWorkspace.create({ data: { ...input, ownerId: actor.id, briefJson: JSON.stringify({ ...emptyAcademicBrief, task }), matrixJson: JSON.stringify(emptyAcademicMatrix) } });
     return { id: workspace.id, reused: false };
   });
 }
 export async function readAcademicWorkspace(id: string, user: CausaAccessUser, client: PrismaClient = prisma) {
   const { actor, workspace } = await workspaceFor(id, user, client), matrix = JSON.parse(workspace.matrixJson);
+  const sources = [], storedSources = JSON.parse(workspace.sourcesJson) as AltazorSourceSnapshot[];
+  let unavailableSources = 0;
+  for (const source of storedSources) {
+    try { await verifyAltazorSources(actor, [source], { client }); sources.push({ input: source.input, title: source.title, text: source.text, href: source.href, review: source.warnings.join(" ") || "Pasaje conservado de tu biblioteca; se coteja nuevamente al preparar la propuesta." }); }
+    catch (error) { if (!unavailableSource(error)) throw error; unavailableSources++; }
+  }
   // A cell with a source is a dependent artifact: hide the whole row if the source was revoked.
   for (const row of matrix.rows || []) {
     try { await verifyAltazorSources(actor, row.proofs || [], { client }); }
@@ -69,7 +76,7 @@ export async function readAcademicWorkspace(id: string, user: CausaAccessUser, c
     try { artifacts.push(await readAcademicArtifact(id, row.id, actor, client)); }
     catch (error) { if (![403,404,409,410,413,422].includes(Number((error as { status?: number }).status))) throw error; artifacts.push({ id: row.id, available: false as const }); }
   }
-  return { id, title: workspace.title, kind: workspace.kind, revision: workspace.revision, brief: JSON.parse(workspace.briefJson), matrix, artifacts };
+  return { id, title: workspace.title, kind: workspace.kind, revision: workspace.revision, brief: { ...emptyAcademicBrief, ...JSON.parse(workspace.briefJson) }, matrix, artifacts, sources, unavailableSources };
 }
 export async function saveAcademicWorkspace(id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
   const input = academicWorkspaceSaveSchema.parse(raw);
@@ -100,7 +107,8 @@ export async function saveAcademicWorkspace(id: string, raw: unknown, user: Caus
       const { refs } = await resolveAltazorSources(actor, sources, { client: tx });
       rows.push({ ...row, proofs: refs });
     }
-    const changed = await tx.altazorAcademicWorkspace.updateMany({ where: { id, ownerId: actor.id, revision: input.expectedRevision, archivedAt: null }, data: { title: input.title, briefJson: JSON.stringify(input.brief), matrixJson: JSON.stringify({ dimensions: input.matrix.dimensions, rows }), revision: { increment: 1 } } });
+    const selection = input.sources ? await resolveAltazorSources(actor, input.sources, { client: tx }) : null;
+    const changed = await tx.altazorAcademicWorkspace.updateMany({ where: { id, ownerId: actor.id, revision: input.expectedRevision, archivedAt: null }, data: { title: input.title, briefJson: JSON.stringify(input.brief), matrixJson: JSON.stringify({ dimensions: input.matrix.dimensions, rows }), ...(selection ? { sourcesJson: JSON.stringify(selection.refs) } : {}), revision: { increment: 1 } } });
     if (!changed.count) throw httpError("El trabajo cambió. Recargue antes de guardar", 409);
     return { revision: input.expectedRevision + 1 };
   });
@@ -186,10 +194,58 @@ export async function cancelAcademicArtifact(workspaceId: string, id: string, us
 export async function saveAcademicArtifact(workspaceId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
   const input = academicArtifactSaveSchema.parse(raw);
   return bookTransaction(client, async tx => {
-    await readAcademicArtifact(workspaceId, id, user, tx);
+    const current = await readAcademicArtifact(workspaceId, id, user, tx);
+    if (current.revision !== input.expectedRevision || !["proposed", "reviewed"].includes(current.status)) throw httpError("El resultado cambió. Recargue antes de guardar su revisión", 409);
+    if (current.body === input.body && (current.status === "reviewed") === input.reviewed) return { revision: current.revision };
+    await retainAcademicVersion(id, current.revision, current.body, current.status === "reviewed", tx);
     const changed = await tx.altazorAcademicArtifact.updateMany({ where: { id, workspaceId, revision: input.expectedRevision, status: { in: ["proposed","reviewed"] } }, data: { body: input.body, bodySha256: sha256(input.body), status: input.reviewed ? "reviewed" : "proposed", revision: { increment: 1 } } });
     if (!changed.count) throw httpError("El resultado cambió. Recargue antes de guardar su revisión", 409);
+    await retainAcademicVersion(id, input.expectedRevision + 1, input.body, input.reviewed, tx);
     return { revision: input.expectedRevision + 1 };
+  });
+}
+
+async function retainAcademicVersion(artifactId: string, revision: number, body: string, reviewed: boolean, client: AcademicClient) {
+  const bodySha256 = sha256(body), previous = await client.altazorAcademicArtifactVersion.findUnique({ where: { artifactId_revision: { artifactId, revision } } });
+  if (previous) {
+    if (previous.bodySha256 !== bodySha256 || previous.body !== body || previous.reviewed !== reviewed) throw httpError("La versión conservada no coincide con el resultado. No se guardaron cambios", 409);
+    return;
+  }
+  await client.altazorAcademicArtifactVersion.create({ data: { artifactId, revision, body, bodySha256, reviewed } });
+}
+export async function academicArtifactHistory(workspaceId: string, id: string, user: CausaAccessUser, before?: number, client: PrismaClient = prisma) {
+  const current = await readAcademicArtifact(workspaceId, id, user, client);
+  if (!["proposed", "reviewed"].includes(current.status)) throw httpError("Esta propuesta aún no tiene un texto para revisar", 409);
+  const versions = await client.altazorAcademicArtifactVersion.findMany({ where: { artifactId: id, ...(before ? { revision: { lt: before } } : {}) }, select: { revision: true, reviewed: true, createdAt: true }, orderBy: { revision: "desc" }, take: 51 });
+  // Existing documents retain their first body atomically on their next save.
+  // Reading their history must not mutate application data.
+  if (!before && !versions.some(version => version.revision === current.revision)) versions.unshift({ revision: current.revision, reviewed: current.status === "reviewed", createdAt: new Date(current.createdAt) });
+  const page = versions.slice(0, 50);
+  return { versions: page.map(version => ({ ...version, createdAt: version.createdAt.toISOString() })), currentRevision: current.revision, nextBefore: versions.length > 50 ? page[page.length - 1].revision : null };
+}
+export async function readAcademicArtifactVersion(workspaceId: string, id: string, revision: number, user: CausaAccessUser, client: AcademicClient = prisma) {
+  const current = await readAcademicArtifact(workspaceId, id, user, client);
+  const row = await client.altazorAcademicArtifactVersion.findUnique({ where: { artifactId_revision: { artifactId: id, revision } } });
+  if (!row) {
+    if (revision === current.revision && ["proposed", "reviewed"].includes(current.status)) return { revision, body: current.body, reviewed: current.status === "reviewed" };
+    throw httpError("La versión solicitada no está disponible", 404);
+  }
+  if (sha256(row.body) !== row.bodySha256) throw httpError("El texto conservado no coincide con su versión", 409);
+  return { revision: row.revision, body: row.body, reviewed: row.reviewed };
+}
+export async function restoreAcademicArtifactVersion(workspaceId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const input = academicArtifactRestoreSchema.parse(raw);
+  return bookTransaction(client, async tx => {
+    const current = await readAcademicArtifact(workspaceId, id, user, tx);
+    if (current.revision !== input.expectedRevision || !["proposed", "reviewed"].includes(current.status)) throw httpError("El trabajo cambió. Recargue antes de recuperar esta versión", 409);
+    const version = await readAcademicArtifactVersion(workspaceId, id, input.revision, user, tx);
+    await retainAcademicVersion(id, current.revision, current.body, current.status === "reviewed", tx);
+    const revision = current.revision + 1;
+    const changed = await tx.altazorAcademicArtifact.updateMany({ where: { id, workspaceId, revision: current.revision, status: { in: ["proposed", "reviewed"] } }, data: { body: version.body, bodySha256: sha256(version.body), status: "proposed", revision: { increment: 1 } } });
+    if (!changed.count) throw httpError("El trabajo cambió. No se recuperó la versión; recargue para continuar", 409);
+    await retainAcademicVersion(id, revision, version.body, false, tx);
+    await writeAuditStrict({ actorId: user.id, action: "altazor.academic.restore", entityType: "AltazorAcademicArtifact", entityId: id, after: { fromRevision: input.revision, revision } }, tx);
+    return { revision, body: version.body, reviewed: false };
   });
 }
 

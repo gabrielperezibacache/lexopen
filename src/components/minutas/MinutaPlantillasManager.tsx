@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
+import { parseMinutaTemplate } from "@/lib/minutas/template";
+import { TIPOS_MINUTA, labelTipoMinuta } from "@/lib/minutas";
 
 type Plantilla = {
   id: string;
@@ -27,6 +29,12 @@ export function MinutaPlantillasManager({
     setError("");
     const fd = new FormData(e.currentTarget);
     const form = e.currentTarget;
+    let bodyJson: string;
+    try {
+      const advanced = String(fd.get("bodyJson") || "").trim();
+      bodyJson = advanced || JSON.stringify({ titulo: String(fd.get("titulo") || ""), resumenEjecutivo: String(fd.get("resumenEjecutivo") || ""), hechosRelevantes: String(fd.get("hechosRelevantes") || ""), acuerdos: String(fd.get("acuerdos") || ""), riesgosAlertas: String(fd.get("riesgosAlertas") || ""), proximosPasos: String(fd.get("proximosPasos") || "").split("\n").map(line => line.trim()).filter(Boolean) });
+      parseMinutaTemplate(bodyJson);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Revisa el contenido de la plantilla."); setBusy(false); return; }
     const result = await apiMutation("/api/minutas/plantillas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -34,7 +42,7 @@ export function MinutaPlantillasManager({
         tipo: fd.get("tipo"),
         nombre: fd.get("nombre"),
         materia: fd.get("materia") || null,
-        bodyJson: fd.get("bodyJson") || "{}",
+        bodyJson,
       }),
     });
     setBusy(false);
@@ -62,7 +70,7 @@ export function MinutaPlantillasManager({
   }
 
   return (
-    <section className="panel rounded-[var(--radius-lg)] p-5">
+    <section className="panel rounded-[var(--radius-lg)] p-5" aria-label="Plantillas de minutas">
       <div className="mb-4">
         <h2 className="text-lg font-semibold">Plantillas de minutas</h2>
         <p className="text-sm text-[var(--muted)]">
@@ -72,30 +80,24 @@ export function MinutaPlantillasManager({
       <form onSubmit={create} className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className="block space-y-2 text-sm font-medium">
         <span>Tipo</span>
-        <input className="input" name="tipo" required placeholder="Tipo" />
+        <select className="select" name="tipo" required disabled={busy}>{TIPOS_MINUTA.map(tipo=><option key={tipo.value} value={tipo.value}>{tipo.label}</option>)}</select>
       </label>
         <label className="block space-y-2 text-sm font-medium">
         <span>Nombre</span>
-        <input className="input" name="nombre" required placeholder="Nombre" />
+        <input className="input" name="nombre" required placeholder="Nombre" disabled={busy}/>
       </label>
         <label className="block space-y-2 text-sm font-medium">
         <span>Materia</span>
-        <input className="input" name="materia" placeholder="Materia" />
+        <input className="input" name="materia" placeholder="Materia" disabled={busy}/>
       </label>
         <button className="btn btn-primary" disabled={busy} type="submit">
           Crear
         </button>
-        <label className="block space-y-2 text-sm font-medium sm:col-span-2 lg:col-span-4">
-        <span>Contenido de la plantilla (JSON)</span>
-        <textarea
-          className="textarea"
-          name="bodyJson"
-          placeholder='{"titulo":"Audiencia"}'
-        />
-      </label>
+        <details className="sm:col-span-2 lg:col-span-4"><summary className="cursor-pointer text-sm font-medium">Añadir textos sugeridos a la plantilla</summary><div className="mt-4 grid gap-4 sm:grid-cols-2">{[{name:"titulo",label:"Título sugerido"},{name:"resumenEjecutivo",label:"Resumen"},{name:"hechosRelevantes",label:"Hechos relevantes"},{name:"acuerdos",label:"Acuerdos"},{name:"riesgosAlertas",label:"Riesgos y alertas"},{name:"proximosPasos",label:"Próximos pasos · uno por línea"}].map(field=><label key={field.name} className="block space-y-2 text-sm"><span>{field.label}</span><textarea className="textarea" name={field.name} rows={3} disabled={busy} maxLength={field.name==="titulo"?300:8000}/></label>)}</div></details>
+        <details className="sm:col-span-2 lg:col-span-4"><summary className="cursor-pointer text-sm text-[var(--ink-soft)]">Formato avanzado de la plantilla</summary><p className="my-2 text-sm text-[var(--ink-soft)]">Si importas una plantilla en JSON, su contenido reemplaza los textos sugeridos de este formulario.</p><label className="block space-y-2 text-sm"><span>Contenido de la plantilla (JSON)</span><textarea className="textarea" name="bodyJson" disabled={busy} maxLength={60000} placeholder='{"titulo":"Audiencia"}'/></label></details>
       </form>
       {error && (
-        <p className="mt-3 text-sm text-[var(--danger)]" role="status">
+        <p className="mt-3 text-sm text-[var(--danger)]" role="alert">
           {error}
         </p>
       )}
@@ -108,7 +110,7 @@ export function MinutaPlantillasManager({
             <div>
               <div className="font-medium">{p.nombre}</div>
               <div className="text-xs text-[var(--muted)]">
-                {p.tipo}
+                {labelTipoMinuta(p.tipo)}
                 {p.materia ? ` · ${p.materia}` : ""}
               </div>
             </div>

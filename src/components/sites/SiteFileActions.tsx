@@ -255,7 +255,7 @@ export function SiteFileActions({
         }}
       />
       {open && (
-        <Dialog open onClose={() => setOpen(null)} title={open === "folder" ? "Nueva carpeta" : open === "import" ? "Importar carpeta al VDR" : "Nuevo archivo"}>
+        <Dialog open onClose={() => setOpen(null)} title={open === "folder" ? "Nueva carpeta" : open === "import" ? "Importar carpeta al espacio" : "Nuevo archivo"}>
           <form
             onSubmit={
               open === "import"

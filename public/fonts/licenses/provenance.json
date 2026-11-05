@@ -1,0 +1,23 @@
+[
+  {
+    "family": "Barlow Condensed",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/barlowcondensed/OFL.txt",
+    "license": "SIL Open Font License 1.1",
+    "file": "barlowcondensed-OFL.txt",
+    "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+  },
+  {
+    "family": "Sora",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/sora/OFL.txt",
+    "license": "SIL Open Font License 1.1",
+    "file": "sora-OFL.txt",
+    "sha256": "ba0b9729c9428ba79a0459ab8ec575791b51509dbec213e383d0316d37fec299"
+  },
+  {
+    "family": "Fraunces",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/fraunces/OFL.txt",
+    "license": "SIL Open Font License 1.1",
+    "file": "fraunces-OFL.txt",
+    "sha256": "bdf4c22802eaf804f998195871c6b8938aac2ac14b2d78a8bd66a6f1eced833b"
+  }
+]

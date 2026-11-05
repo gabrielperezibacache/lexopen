@@ -13,6 +13,7 @@ import { chileGreeting } from "@/lib/assistant/greeting";
 import { buildInicioStatus } from "@/lib/assistant/status";
 import { causaAccessWhere as scopedcausaAccessWhere, relatedCausaWhere as scopedrelatedCausaWhere, plazoAccessWhere } from "@/lib/auth/causa-access";
 import { requireStaff } from "@/lib/auth/session";
+import { canSome } from "@/lib/auth/permissions";
 import {
   addCivilDays,
   civilDayQueryRange,
@@ -214,9 +215,9 @@ async function InicioStream({
 
   return (
     <>
-      <div>
+      {canSome(user, "assistant.use") && <div>
         <AltazorHome initialData={initialData} />
-      </div>
+      </div>}
       <p
         className="mt-6 max-w-3xl text-sm text-[var(--ink-soft)]/80 sm:text-base"
         data-testid="inicio-status-line"

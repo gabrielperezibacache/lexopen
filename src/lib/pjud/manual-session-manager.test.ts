@@ -68,6 +68,7 @@ async function main() {
   try {
     await Promise.all([
       withManualPjudInteraction(async () => { await pause(10); assert.equal(pjudCaptchaAutoSolveAllowed(), false); assert.equal(pjudDocumentDownloadsAllowed(), false); }),
+      withManualPjudInteraction(async () => { await pause(10); assert.equal(pjudCaptchaAutoSolveAllowed(), false, "document consent must never allow CAPTCHA solving"); assert.equal(pjudDocumentDownloadsAllowed(), true); }, { downloadDocuments: true }),
       (async () => { await pause(5); assert.equal(pjudCaptchaAutoSolveAllowed(), true); assert.equal(pjudDocumentDownloadsAllowed(), true); })(),
     ]);
   } finally {

@@ -10,6 +10,8 @@ import {
 } from "@/lib/integrations/drive-folder";
 import { apiMutation } from "@/lib/api-mutation";
 import type { DriveImportCandidate } from "@/lib/integrations/drive-import";
+import { PersonalDriveFolderPicker } from "./PersonalDriveFolderPicker";
+import { DriveAutoSyncPanel } from "./DriveAutoSyncPanel";
 
 type Props = {
   causaId: string;
@@ -29,6 +31,7 @@ export function DriveFolderPanel({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [folderRef, setFolderRef] = useState("");
+  const [folderAccount, setFolderAccount] = useState<"study" | "personal">("personal");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [files, setFiles] = useState<DriveImportCandidate[] | null>(null);
@@ -53,10 +56,10 @@ export function DriveFolderPanel({
       error?: string;
       message?: string;
       status?: string;
-    }>("/api/integrations/google", {
+    }>(action === "link-causa-folder" && folderAccount === "personal" ? `/api/integrations/google/drive/${encodeURIComponent(causaId)}/sync` : "/api/integrations/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, causaId, ...extra }),
+      body: JSON.stringify(action === "link-causa-folder" && folderAccount === "personal" ? { action: "link-personal-folder", folderRef: extra.folderRef } : { action, causaId, ...extra }),
     });
     if (!result.ok) {
       setError(result.error || "Error");
@@ -97,38 +100,35 @@ export function DriveFolderPanel({
   }
 
   return (
-    <section className="panel rounded-3xl p-5">
+    <section id="drive-folder" className="panel case-destination rounded-3xl p-5">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold">Google Drive</h2>
           <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
-            Vincule una carpeta y elija qué archivos conservar en el expediente.
-            La copia queda en LexOpen con su revisión y procedencia; los cambios
-            posteriores en Drive requieren una nueva importación.
+            Elija una carpeta para este expediente. Al activar la actualización
+            automática se guardan sus archivos nuevos y sus nuevas versiones,
+            conservando cada original para su lectura y citas.
           </p>
         </div>
         <FolderOpen className="text-[var(--copper)]" size={20} />
       </div>
 
+      {canImport && <div className="mt-4"><PersonalDriveFolderPicker causaId={causaId} /></div>}
       {folderId ? (
-        <div className="mt-4 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3">
+        <div className="mt-4 rounded-2xl border border-[var(--line)] px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="text-sm font-medium">
               {folderName || "Carpeta vinculada"}
             </div>
             {isPlaceholder ? (
-              <span className="badge badge-pendiente">stub / demo</span>
+              <span className="badge badge-pendiente">Carpeta pendiente</span>
             ) : (
               <span className="badge badge-activa">Drive</span>
             )}
           </div>
-          <div className="mt-1 break-all text-xs text-[var(--ink-soft)]/65">
-            ID: {folderId}
-          </div>
           {isPlaceholder && (
             <p className="mt-2 text-xs text-[var(--ink-soft)]/70">
-              Marcador local: no abre Google Drive. Conecte OAuth y cree una
-              carpeta real para subir documentos.
+              Conecte Google y cree una carpeta para guardar los documentos de esta causa.
             </p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -179,6 +179,7 @@ export function DriveFolderPanel({
               Desvincular
             </button>}
           </div>
+          {isReal && <DriveAutoSyncPanel causaId={causaId} canConfigure={canImport} />}
           {files && listedFolderId === folderId && (
             <div className="mt-4 min-w-0 border-t border-[var(--line)] pt-4">
               <p className="mb-3 text-sm text-[var(--ink-soft)]/80">Sólo se muestran los archivos de esta carpeta visibles para la cuenta conectada a LexOpen. Cada página contiene hasta 50 archivos.</p>
@@ -195,7 +196,7 @@ export function DriveFolderPanel({
                     {canImport && <input type="radio" name={`drive-selection-${causaId}`} className="mt-1 shrink-0" checked={selection === f.id} disabled={pending || !f.importable} onChange={() => { setSelection(f.id); setMsg(""); setError(""); setImportedHref(null); }} aria-label={`Seleccionar ${f.name}`} />}
                     <span className="min-w-0"><span className="block break-words font-medium">{f.name}</span>
                     <span className="mt-1 block break-all text-sm text-[var(--ink-soft)]/75">
-                      {f.mimeType.replace("application/vnd.google-apps.", "")} · Revisión {f.version || "no informada"}{f.sizeBytes !== null ? ` · ${new Intl.NumberFormat("es-CL").format(f.sizeBytes)} bytes` : ""}
+                      {f.name.split(".").length > 1 ? f.name.split(".").at(-1)?.toUpperCase() : "Documento"}{f.sizeBytes !== null ? ` · ${new Intl.NumberFormat("es-CL", { maximumFractionDigits: 1 }).format(f.sizeBytes / 1024)} KB` : ""}
                     </span>
                     {f.reason && <span className="mt-1 block text-sm text-[var(--ink-soft)]/80">{f.reason}</span>}
                     <a
@@ -220,7 +221,7 @@ export function DriveFolderPanel({
                 <p className="mt-2 break-words text-sm">{selectedFile.name}</p>
                 <p className="mt-1 text-sm text-[var(--ink-soft)]/80">Revisión {selectedFile.version}. {selectedFile.exportMimeType ? selectedFile.exportMimeType === "application/pdf" ? "Se conservará una exportación PDF de este documento de Google." : "Se conservará una exportación XLSX de esta planilla de Google." : "Se conservará el archivo original."}</p>
                 {selectedFile.modifiedTime && <p className="mt-1 break-words text-sm text-[var(--ink-soft)]/80">Modificado en Drive: {selectedFile.modifiedTime}</p>}
-                <p className="mt-2 text-sm text-[var(--ink-soft)]/80">Se copiará sólo este archivo. Conservará los permisos de la causa y no se actualizará automáticamente desde Drive.</p>
+                <p className="mt-2 text-sm text-[var(--ink-soft)]/80">Esta copia conserva los permisos de la causa. La actualización automática puede guardar revisiones nuevas por separado.</p>
                 <button type="button" className="btn btn-primary mt-3" disabled={pending || !selectedFile.importable} onClick={() => startTransition(importSelected)}>{pending ? "Guardando copia…" : "Guardar copia elegida en LexOpen"}</button>
               </div>}
             </div>
@@ -236,26 +237,26 @@ export function DriveFolderPanel({
               startTransition(() => run("create-causa-folder"))
             }
           >
-            Crear carpeta en Drive
+            Crear carpeta en el Drive del estudio
           </button>
-          <details className="rounded-2xl border border-[var(--line)] bg-white/50 p-3">
+          <details className="rounded-2xl border border-[var(--line)] p-3">
             <summary className="cursor-pointer text-sm font-medium">
-              Vincular carpeta existente (avanzado)
+              Usar un enlace de carpeta
             </summary>
             <p className="mt-2 text-xs text-[var(--ink-soft)]/70">
-              Con <code>drive.file</code> solo se pueden verificar carpetas
-              creadas o abiertas por esta app. Si falla, use «Crear carpeta».
+              Pegue el enlace de la carpeta que desea usar para este expediente. La cuenta conectada debe tener acceso a sus archivos.
             </p>
+            <label className="mt-3 block text-sm">Cuenta de Google<select className="input mt-1" value={folderAccount} onChange={event => setFolderAccount(event.target.value as "study" | "personal")}><option value="personal">Mi Google Drive personal</option><option value="study">Google del estudio</option></select></label>
             <label className="mt-3 block text-sm">
               <span className="mb-1 block text-[var(--ink-soft)]/70">
-                URL o ID de carpeta
+                Enlace de la carpeta
               </span>
               <input
                 className="input"
                 value={folderRef}
                 onChange={(e) => setFolderRef(e.target.value)}
                 placeholder="https://drive.google.com/drive/folders/…"
-                aria-label="URL o ID de carpeta Google Drive"
+                aria-label="Enlace de la carpeta Google Drive"
               />
             </label>
             <button
@@ -282,7 +283,7 @@ export function DriveFolderPanel({
       )}
       {importedHref && <a className="mt-2 inline-block text-sm text-[var(--sea)] underline" href={importedHref}>Abrir copia en el expediente</a>}
       {error && (
-        <p className="mt-3 text-sm text-red-700" role="alert">
+        <p className="mt-3 text-sm text-[var(--danger)]" role="alert">
           {error}
         </p>
       )}

@@ -63,6 +63,7 @@ function intervalOn(env, key) {
 
 /** Interval env keys that require CRON_SECRET when > 0 (keep in sync with local-host-schedulers). */
 export const SCHEDULER_INTERVAL_KEYS = [
+  "LEXOPEN_JORNADA_INTERVAL_MINUTES",
   "PJUD_SYNC_INTERVAL_MINUTES",
   "PJUD_DIGEST_INTERVAL_MINUTES",
   "PJUD_MIS_CAUSAS_INTERVAL_MINUTES",
