@@ -43,16 +43,16 @@
       "route": "/inicio",
       "width": 1440,
       "height": 1000,
-      "size": 109153,
-      "sha256": "6ba3f343984f009ca42813efe58f7faf648ec42514f4e208eb8d2ea81dd64e1a"
+      "size": 108390,
+      "sha256": "1c23a4abe98ff7d02f4006ac5da8ad58d6bf94463d8cbc65b7aa4d630ced876e"
     },
     {
       "path": "inicio-movil.jpg",
       "route": "/inicio",
       "width": 360,
       "height": 800,
-      "size": 49043,
-      "sha256": "6fd4a222226dbeac6ae0b3e4f8b1449c5b6b5e2bb5b26c20db0378f42023db71"
+      "size": 48877,
+      "sha256": "d9a6b658c5672fb2dbfdaea2bbb97bd6e7a2549488368c83851294787652bac9"
     },
     {
       "path": "mesa-revision-escritorio.jpg",

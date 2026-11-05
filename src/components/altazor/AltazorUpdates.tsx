@@ -53,7 +53,7 @@ const dueDate = new Intl.DateTimeFormat("es-CL", { day: "numeric", month: "long"
 export function AltazorUpdateMessage({ update }: { update: AltazorUpdate }) {
   return (
     <article className="altazor-update-message">
-      <div className="altazor-answer-author"><AltazorMark size={36} state="reading" /><strong>ALTAZOR</strong><span><Bell size={14} aria-hidden="true" /> Aviso</span></div>
+      <div className="altazor-answer-author"><AltazorMark size={36} state="reading" /><strong>Altazor</strong><span><Bell size={14} aria-hidden="true" /> Aviso</span></div>
       <div className="altazor-update-heading">
         <strong>{update.title}</strong>
         <time dateTime={update.occurredAt}>{shortDate.format(new Date(update.occurredAt))}</time>

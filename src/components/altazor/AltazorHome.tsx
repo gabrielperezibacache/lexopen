@@ -69,7 +69,7 @@ export function AltazorHome({ showDesktopActivity = false }: { showDesktopActivi
           ))}</ol>}
         {updates.status === "unavailable" && <p role="status" className="altazor-muted">No pude comprobar si hay avisos nuevos. Puedes <Link href="/plazos">abrir Plazos</Link> mientras vuelvo a intentarlo.</p>}
         </section>
-        {clarification && <p className="altazor-clarification" role="status"><strong>ALTAZOR</strong>{clarification}</p>}
+        {clarification && <p className="altazor-clarification" role="status"><strong>Altazor</strong>{clarification}</p>}
         {currentCase && <div className="altazor-context-line">
           <span className="altazor-case-context">{currentLabel}</span>
           <button className="btn btn-ghost" type="button" aria-label="Quitar el contexto de la causa" title="Quitar el contexto de la causa"
@@ -114,7 +114,7 @@ function AltazorTurnMessage({ turn, busy, onAction }: { turn: TimelineTurn; busy
     <div className="altazor-answer">
       <div className="altazor-answer-author">
         <AltazorMark size={36} state={turn.status === "running" ? "thinking" : "reading"} />
-        <strong>ALTAZOR</strong>
+        <strong>Altazor</strong>
       </div>
       {turn.assistantText && <p className="altazor-prose">{turn.assistantText}</p>}
       {turn.sourceRefs.length > 0 && <ul className="altazor-inline-sources">
