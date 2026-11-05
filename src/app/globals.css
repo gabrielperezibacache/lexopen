@@ -152,6 +152,29 @@ body {
   letter-spacing: -0.02em;
 }
 
+/* Midnight editorial: tall titles, readable controls, book serif for reading. */
+.workspace-title {
+  font-family: var(--font-editorial), var(--font-sora), sans-serif;
+  font-size: clamp(2.25rem, 3.2vw, 3rem);
+  line-height: 1.08;
+  font-weight: 500;
+  letter-spacing: -.025em;
+  text-wrap: balance;
+}
+
+.editorial-rule {
+  color: var(--copper-deep);
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+.editorial-rule::after {
+  content: "";
+  height: 1px;
+  background: var(--line);
+  flex: 1;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);

@@ -121,6 +121,7 @@ test("escrito por causa: guardado, tres orígenes, historial y salida con respal
   await expect(editor.getByTestId("writing-reference")).toHaveCount(3);
   await openWritingTool(editor, "export");
   const download = page.waitForEvent("download");
+  await editor.getByText("Otros formatos", { exact: true }).click();
   await editor.getByRole("button", { name: "Descargar Markdown", exact: true }).click();
   const file = await download, exported = await readFile((await file.path())!, "utf8");
   const readableMarkdown = exported.replace(/\\([\\`*_{}\[\]()#+!|.\-])/g, "$1");

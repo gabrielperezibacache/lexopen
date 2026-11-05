@@ -23,7 +23,8 @@ const BINARY = new Set(["application/pdf", "text/plain", "text/markdown", "text/
 
 type RemoteFile = { id: string; name: string; mimeType: string; version?: string; modifiedTime?: string; size?: string; parents?: string[]; trashed?: boolean; md5Checksum?: string; sha256Checksum?: string; capabilities?: { canDownload?: boolean } };
 export type DriveImportCandidate = { id: string; name: string; mimeType: string; version: string | null; modifiedTime: string | null; sizeBytes: number | null; exportMimeType: string | null; importable: boolean; reason: string | null };
-type Dependencies = { client?: PrismaClient; fetch?: typeof fetch; session?: typeof requireDriveSession; enqueue?: typeof enqueueDocumentProcessing; timeoutMs?: number };
+export type DriveImportDependencies = { client?: PrismaClient; fetch?: typeof fetch; session?: typeof requireDriveSession; enqueue?: typeof enqueueDocumentProcessing; timeoutMs?: number; sourceFolderId?: string; assertActive?: (client: PrismaClient | Prisma.TransactionClient) => Promise<void> };
+type Dependencies = DriveImportDependencies;
 function fail(message: string, status: number, code: string) { return Object.assign(new Error(message), { status, code }); }
 function validateId(id: string) { if (!ID.test(id)) throw fail("Identificador Drive inválido", 400, "invalid_drive_id"); }
 function hash(bytes: Buffer, algorithm = "sha256") { return createHash(algorithm).update(bytes).digest("hex"); }
@@ -63,8 +64,9 @@ function transport(config: Awaited<ReturnType<typeof requireDriveSession>>, opti
   return {
     async get(path: string, max: number) {
       try {
+        await options.assertActive?.(options.client || prisma);
         const response = await (options.fetch || fetch)(`${API}${path}`, { headers: { Authorization: `Bearer ${config.accessToken}` }, redirect: "error", signal: controller.signal, cache: "no-store" });
-        if (!response.ok) { await response.body?.cancel(); throw fail(response.status === 401 ? "La conexión Drive venció; vuelva a conectar Google" : response.status === 403 ? "Google no permite leer o descargar este archivo con la cuenta conectada" : response.status === 404 ? "Archivo o carpeta de Drive no disponible" : "Drive no pudo completar la lectura; vuelva a intentar", response.status === 401 ? 401 : response.status === 403 ? 403 : response.status === 404 ? 404 : 502, "drive_api_error"); }
+        if (!response.ok) { await response.body?.cancel(); throw fail(response.status === 401 ? "La conexión Drive venció; vuelva a conectar Google" : response.status === 403 ? "Google no permite leer o descargar este archivo con la cuenta conectada" : response.status === 404 ? "Archivo o carpeta de Drive no disponible" : "Drive no pudo completar la lectura; vuelva a intentar", response.status === 401 ? 401 : response.status === 403 ? 403 : response.status === 404 ? 404 : 502, response.status === 400 && path.includes("pageToken=") ? "drive_invalid_cursor" : "drive_api_error"); }
         return await readBounded(response, max);
       } catch (error) {
         if (controller.signal.aborted) throw fail("La lectura de Drive agotó su tiempo; vuelva a intentar", 504, "drive_timeout");
@@ -87,8 +89,47 @@ function metadata(file: RemoteFile) {
   return { id: file.id, name: file.name, mimeType: file.mimeType, version: file.version && VERSION.test(file.version) ? file.version : null, modifiedTime: typeof file.modifiedTime === "string" ? file.modifiedTime : null, sizeBytes: size, exportMimeType: exported?.mimeType || null, importable: reason === null, reason } satisfies DriveImportCandidate;
 }
 async function readFolder(io: ReturnType<typeof transport>, folderId: string) {
-  const folder = parseJson<RemoteFile>(await io.get(`/${folderId}?${new URLSearchParams({ fields: "id,mimeType,trashed", supportsAllDrives: "true" })}`, 32 * 1024));
+  validateId(folderId);
+  const folder = parseJson<RemoteFile>(await io.get(`/${folderId}?${new URLSearchParams({ fields: "id,name,mimeType,trashed,parents", supportsAllDrives: "true" })}`, 32 * 1024));
   if (folder.id !== folderId || folder.mimeType !== "application/vnd.google-apps.folder" || folder.trashed !== false) throw fail("La carpeta Drive vinculada ya no está disponible", 409, "drive_folder_changed");
+  return folder;
+}
+/** Inspect one explicitly chosen folder using the supplied owner-bound server session. */
+export async function inspectChosenDriveFolder(folderId: string, session: Awaited<ReturnType<typeof requireDriveSession>>, options: Dependencies = {}) {
+  const io = transport(session, options);
+  try { const folder = await readFolder(io, folderId); return { id: folder.id, name: typeof folder.name === "string" ? folder.name.slice(0, 250) : "Carpeta elegida" }; }
+  finally { io.close(); }
+}
+/** Native folder picker: bounded metadata only; selecting a folder is a separate mutation. */
+export async function listDriveFoldersWithSession(session: Awaited<ReturnType<typeof requireDriveSession>>, input: { parentId?: string; query?: string; pageToken?: string }, options: Dependencies = {}) {
+  const parentId = input.parentId || "root";
+  if (parentId !== "root") validateId(parentId);
+  if (input.query && (input.query.length > 120 || /[\x00-\x1f]/.test(input.query))) throw fail("Búsqueda de carpeta inválida", 400, "invalid_drive_query");
+  if (input.pageToken && (input.pageToken.length > 2048 || /[\x00-\x1f]/.test(input.pageToken))) throw fail("Página de carpetas inválida", 400, "invalid_drive_cursor");
+  const escape = (value: string) => value.replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+  const query = ["mimeType='application/vnd.google-apps.folder'", "trashed=false", input.query?.trim() ? `name contains '${escape(input.query.trim())}'` : `'${parentId}' in parents`].join(" and ");
+  const io = transport(session, options);
+  try {
+    const params = new URLSearchParams({ q: query, pageSize: "50", fields: "nextPageToken,incompleteSearch,files(id,name,mimeType,trashed)", orderBy: "name", spaces: "drive", supportsAllDrives: "true", includeItemsFromAllDrives: "true", ...(input.pageToken ? { pageToken: input.pageToken } : {}) });
+    const data = parseJson<{ files?: RemoteFile[]; nextPageToken?: string; incompleteSearch?: boolean }>(await io.get(`?${params}`, 256 * 1024));
+    if (!Array.isArray(data.files) || data.files.length > 50 || (data.nextPageToken && (typeof data.nextPageToken !== "string" || data.nextPageToken.length > 2048))) throw fail("Drive devolvió una lista inválida", 502, "drive_invalid_metadata");
+    const folders = data.files.filter(file => ID.test(file.id) && file.mimeType === "application/vnd.google-apps.folder" && file.trashed === false && typeof file.name === "string").map(file => ({ id: file.id, name: file.name.slice(0, 250) }));
+    return { folders, nextPageToken: data.nextPageToken || null, incompleteSearch: data.incompleteSearch === true };
+  } finally { io.close(); }
+}
+/** Verify the selected descendant afresh; shortcuts and folders moved outside the root are rejected. */
+async function assertFolderWithinRoot(io: ReturnType<typeof transport>, rootId: string, sourceId: string) {
+  const seen = new Set<string>();
+  let currentId = sourceId;
+  for (let depth = 0; depth <= 8; depth++) {
+    if (seen.has(currentId)) break;
+    seen.add(currentId);
+    const folder = await readFolder(io, currentId);
+    if (currentId === rootId) return;
+    if (!Array.isArray(folder.parents) || folder.parents.length !== 1 || !ID.test(folder.parents[0])) break;
+    currentId = folder.parents[0];
+  }
+  throw fail("La subcarpeta ya no pertenece a la carpeta elegida o supera la profundidad admitida", 409, "drive_parent_changed");
 }
 async function readFile(io: ReturnType<typeof transport>, fileId: string, folderId: string) {
   const file = parseJson<RemoteFile>(await io.get(`/${fileId}?${new URLSearchParams({ fields: META, supportsAllDrives: "true" })}`, 32 * 1024));
@@ -98,7 +139,7 @@ async function readFile(io: ReturnType<typeof transport>, fileId: string, folder
   return file;
 }
 
-/** Lists only the selected case's linked folder; never searches the whole account. */
+/** Lists only the case's chosen folder or a verified descendant; never searches account files. */
 export async function listDriveImportCandidates(causaId: string, user: CausaAccessUser, pageToken?: string | null, options: Dependencies = {}) {
   if (pageToken && (pageToken.length > 2048 || /[\x00-\x1f]/.test(pageToken))) throw fail("Página Drive inválida", 400, "invalid_drive_cursor");
   const client = options.client || prisma;
@@ -106,14 +147,16 @@ export async function listDriveImportCandidates(causaId: string, user: CausaAcce
   const config = await (options.session || requireDriveSession)();
   const io = transport(config, options);
   try {
-    await readFolder(io, before.folderId);
-    const params = new URLSearchParams({ q: `'${before.folderId}' in parents and trashed=false`, pageSize: "50", fields: `nextPageToken,incompleteSearch,files(${META})`, orderBy: "name", spaces: "drive", supportsAllDrives: "true", includeItemsFromAllDrives: "true", ...(pageToken ? { pageToken } : {}) });
+    const sourceFolderId = options.sourceFolderId || before.folderId;
+    await assertFolderWithinRoot(io, before.folderId, sourceFolderId);
+    const params = new URLSearchParams({ q: `'${sourceFolderId}' in parents and trashed=false`, pageSize: "50", fields: `nextPageToken,incompleteSearch,files(${META})`, orderBy: "name", spaces: "drive", supportsAllDrives: "true", includeItemsFromAllDrives: "true", ...(pageToken ? { pageToken } : {}) });
     const data = parseJson<{ files?: RemoteFile[]; nextPageToken?: string; incompleteSearch?: boolean }>(await io.get(`?${params}`, 256 * 1024));
     if (!Array.isArray(data.files) || data.files.length > 50 || (data.nextPageToken && (typeof data.nextPageToken !== "string" || data.nextPageToken.length > 2048))) throw fail("Drive devolvió una lista inválida", 502, "drive_invalid_metadata");
-    const files = data.files.filter(file => Array.isArray(file.parents) && file.parents.includes(before.folderId)).map(metadata);
+    const files = data.files.filter(file => Array.isArray(file.parents) && file.parents.includes(sourceFolderId)).map(metadata);
     const after = await scope(causaId, user, client);
     if (after.folderId !== before.folderId) throw fail("La carpeta de la causa cambió; vuelva a abrir sus archivos", 409, "drive_folder_changed");
-    return { folderId: before.folderId, files, nextPageToken: data.nextPageToken || null, incompleteSearch: data.incompleteSearch === true, scope: "Archivos visibles en la carpeta vinculada con la cuenta OAuth de LexOpen" };
+    await assertFolderWithinRoot(io, before.folderId, sourceFolderId);
+    return { folderId: before.folderId, sourceFolderId, files, nextPageToken: data.nextPageToken || null, incompleteSearch: data.incompleteSearch === true, scope: "Archivos visibles en la carpeta vinculada con la cuenta OAuth de LexOpen" };
   } finally { io.close(); }
 }
 
@@ -127,8 +170,9 @@ export async function importSelectedDriveFile(input: { causaId: string; folderId
   const config = await (options.session || requireDriveSession)();
   const io = transport(config, options);
   try {
-    await readFolder(io, before.folderId);
-    const file = await readFile(io, input.fileId, before.folderId);
+    const sourceFolderId = options.sourceFolderId || before.folderId;
+    await assertFolderWithinRoot(io, before.folderId, sourceFolderId);
+    const file = await readFile(io, input.fileId, sourceFolderId);
     if (file.version !== input.version) throw fail("El archivo cambió en Drive. Revise y seleccione la nueva revisión", 409, "drive_version_changed");
     const exported = EXPORTS[file.mimeType];
     const exportMimeType = exported?.mimeType || "";
@@ -136,6 +180,7 @@ export async function importSelectedDriveFile(input: { causaId: string; folderId
     const unique = { causaId_driveFileId_driveVersion_exportMimeType: identity };
     const prior = await client.driveDocumentImport.findUnique({ where: unique, select: { documentoId: true, sourceSha256: true } });
     if (prior) {
+      if (!prior.documentoId) throw fail("Esta revisión fue eliminada del expediente. Puede cargar el archivo manualmente si desea recuperarlo.", 410, "drive_import_removed");
       const current = await scope(input.causaId, user, client, true);
       if (current.folderId !== input.folderId || !await client.documento.count({ where: { id: prior.documentoId, ...documentReadWhere(current.actor) } })) throw fail("Documento no encontrado o sin acceso", 404, "import_not_found");
       return { documentoId: prior.documentoId, sourceSha256: prior.sourceSha256, reused: true, href: `/documentos/${prior.documentoId}/fuentes` };
@@ -143,26 +188,29 @@ export async function importSelectedDriveFile(input: { causaId: string; folderId
     const path = exported ? `/${file.id}/export?${new URLSearchParams({ mimeType: exported.mimeType })}` : `/${file.id}?${new URLSearchParams({ alt: "media", supportsAllDrives: "true" })}`;
     const bytes = await io.get(path, exported ? 10 * 1024 * 1024 : MAX_STORAGE_OBJECT_BYTES);
     if (!bytes.length) throw fail("El archivo está vacío", 422, "drive_empty_file");
-    const afterFile = await readFile(io, input.fileId, before.folderId);
+    const afterFile = await readFile(io, input.fileId, sourceFolderId);
     if (afterFile.version !== file.version || afterFile.mimeType !== file.mimeType || afterFile.name !== file.name || afterFile.modifiedTime !== file.modifiedTime || afterFile.size !== file.size || afterFile.md5Checksum !== file.md5Checksum || afterFile.sha256Checksum !== file.sha256Checksum) throw fail("El archivo cambió durante la descarga. Vuelva a revisar su revisión", 409, "drive_version_changed");
     if (!exported && ((file.size !== undefined && Number(file.size) !== bytes.length) || (file.md5Checksum && hash(bytes, "md5") !== file.md5Checksum.toLowerCase()) || (file.sha256Checksum && hash(bytes) !== file.sha256Checksum.toLowerCase()))) throw fail("La descarga no coincide con la revisión de Drive", 409, "drive_bytes_changed");
     if (exported?.mimeType === "application/pdf" && bytes.subarray(0, 5).toString("ascii") !== "%PDF-") throw fail("Drive no devolvió la exportación PDF esperada", 422, "drive_export_invalid");
     if (exported?.suffix === ".xlsx" && bytes.subarray(0, 2).toString("ascii") !== "PK") throw fail("Drive no devolvió la planilla esperada", 422, "drive_export_invalid");
+    await assertFolderWithinRoot(io, before.folderId, sourceFolderId);
     const sourceSha256 = hash(bytes), downloadedAt = new Date();
     const storageKey = `drive-import/${encodeURIComponent(input.causaId)}/${input.fileId}/${input.version}/${sourceSha256}`;
     await putObject({ key: storageKey, body: bytes, contentType: exported?.mimeType || file.mimeType });
     const name = exported && !file.name.toLowerCase().endsWith(exported.suffix) ? `${file.name.slice(0, 980)}${exported.suffix}` : file.name;
-    const provenance = { provider: "google-drive", folderId: before.folderId, driveFileId: file.id, driveVersion: file.version, name: file.name, mimeType: file.mimeType, modifiedTime: file.modifiedTime || null, size: file.size || null, md5Checksum: file.md5Checksum || null, exportMimeType: exported?.mimeType || null, acquiredAs: exported ? "workspace-export" : "original-download", downloadedAt: downloadedAt.toISOString(), connectedEmail: config.connectedEmail || null, sourceSha256 };
+    const provenance = { provider: "google-drive", folderId: before.folderId, sourceFolderId, driveFileId: file.id, driveVersion: file.version, name: file.name, mimeType: file.mimeType, modifiedTime: file.modifiedTime || null, size: file.size || null, md5Checksum: file.md5Checksum || null, exportMimeType: exported?.mimeType || null, acquiredAs: exported ? "workspace-export" : "original-download", downloadedAt: downloadedAt.toISOString(), connectedEmail: config.connectedEmail || null, sourceSha256 };
     for (let attempt = 0; ; attempt++) {
       try {
         const result = await client.$transaction(async tx => {
+          await options.assertActive?.(tx);
           const current = await scope(input.causaId, user, tx, true);
           if (current.folderId !== before.folderId) throw fail("La carpeta de la causa cambió; vuelva a abrir sus archivos", 409, "drive_folder_changed");
           const existing = await tx.driveDocumentImport.findUnique({ where: unique, select: { documentoId: true, sourceSha256: true } });
           if (existing) {
+            if (!existing.documentoId) throw fail("Esta revisión fue eliminada del expediente. Puede cargar el archivo manualmente si desea recuperarlo.", 410, "drive_import_removed");
             if (existing.sourceSha256 !== sourceSha256) throw fail("Drive devolvió distintos bytes para la misma revisión; no se reemplazó el original", 409, "drive_revision_conflict");
             if (!await tx.documento.count({ where: { id: existing.documentoId, ...documentReadWhere(current.actor) } })) throw fail("Documento no encontrado o sin acceso", 404, "import_not_found");
-            return { ...existing, reused: true };
+            return { documentoId: existing.documentoId, sourceSha256: existing.sourceSha256, reused: true };
           }
           const doc = await tx.documento.create({ data: { nombre: name, tipo: inferDocumentoTipo(name), mimeType: exported?.mimeType || file.mimeType, storageKey, extractionStatus: "pending", causaId: input.causaId, autorId: current.actor.id } });
           await tx.driveDocumentImport.create({ data: { ...identity, folderId: before.folderId, documentoId: doc.id, sourceSha256, metadataJson: JSON.stringify(provenance), importedAt: downloadedAt } });

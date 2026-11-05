@@ -704,7 +704,7 @@ export default async function CausaDetailPage({ params, searchParams }: Params) 
                       href={`/api/documentos/${d.id}/markdown`}
                       className="text-xs text-[var(--sea)]"
                     >
-                      Markdown
+                      Texto preparado
                     </a>
                   )}
                   <DocumentDriveAction

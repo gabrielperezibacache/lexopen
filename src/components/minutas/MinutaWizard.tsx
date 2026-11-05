@@ -1,4 +1,5 @@
 "use client";
+import { parseMinutaTemplate } from "@/lib/minutas/template";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -115,14 +116,9 @@ export function MinutaWizard({
   function applyPlantilla(id: string) {
     const plantilla = plantillas.find((p) => p.id === id);
     if (!plantilla) return;
-    const body = JSON.parse(plantilla.bodyJson || "{}") as {
-      titulo?: string;
-      resumenEjecutivo?: string;
-      hechosRelevantes?: string;
-      acuerdos?: string;
-      riesgosAlertas?: string;
-      proximosPasos?: string[];
-    };
+    let body: ReturnType<typeof parseMinutaTemplate>;
+    try { body = parseMinutaTemplate(plantilla.bodyJson || "{}"); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo abrir esta plantilla. Puedes continuar sin ella."); return; }
     if (body.titulo) setTitulo(body.titulo);
     if (body.resumenEjecutivo !== undefined) setResumenEjecutivo(body.resumenEjecutivo);
     if (body.hechosRelevantes !== undefined) setHechosRelevantes(body.hechosRelevantes);
@@ -307,8 +303,8 @@ export function MinutaWizard({
           <div>
             <h2 className="text-lg font-semibold">¿Qué tipo de acto fue?</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Elija el formato: la minuta quedará como handoff para cualquier
-              abogado del estudio.
+              Elige el formato para dejar un registro claro que el equipo pueda
+              continuar.
             </p>
           </div>
           <div
@@ -482,7 +478,7 @@ export function MinutaWizard({
               className="input min-h-[80px]"
               value={estadoCausaNota}
               onChange={(e) => setEstadoCausaNota(e.target.value)}
-              placeholder="Estado procesal tras el acto (para handoff)."
+              placeholder="Estado procesal al terminar la actuación."
             />
           </label>
           <label className="block text-sm">
@@ -669,8 +665,8 @@ export function MinutaWizard({
           <div>
             <h2 className="text-lg font-semibold">Publicar y notificar</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Se genera documento Markdown, actividad en la causa y aviso al
-              equipo.
+              Se guarda la minuta en la causa, se registra la actividad y se
+              prepara el aviso al equipo.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -711,7 +707,7 @@ export function MinutaWizard({
                 Subir a carpeta Google Drive
                 {!hasRealDriveFolder && (
                   <span className="text-xs text-[var(--muted)]">
-                    (requiere carpeta real, no stub)
+                    (conecta primero la carpeta de esta causa)
                   </span>
                 )}
               </label>
@@ -726,7 +722,7 @@ export function MinutaWizard({
             </div>
           </div>
           <div className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--surface-solid)] p-4 text-sm">
-            <div className="font-medium">Vista previa del handoff</div>
+            <div className="font-medium">Vista previa de la minuta</div>
             <ul className="mt-2 space-y-1 text-[var(--ink-soft)]/80">
               <li>
                 · {TIPOS_MINUTA.find((t) => t.value === tipo)?.label}: {titulo}

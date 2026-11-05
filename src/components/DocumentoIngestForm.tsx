@@ -233,8 +233,8 @@ export function DocumentoIngestForm({
         <div>
           <h2 className="text-lg font-semibold">Incorporar al expediente</h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-[var(--muted)]">
-            Suba archivos sueltos o una carpeta investigativa completa. Se preserva la
-            estructura de subcarpetas y se encola el OCR/Markdown.
+            Añade archivos o una carpeta completa. Conservamos sus subcarpetas y
+            preparamos el texto disponible para consultar y citar.
           </p>
         </div>
         <div className="flex gap-2">
@@ -296,7 +296,7 @@ export function DocumentoIngestForm({
             value={tipo}
             onChange={(e) => setTipo(e.target.value)}
           >
-            <option value="auto">Auto (según carpeta/nombre)</option>
+            <option value="auto">Detectar según el archivo o la carpeta</option>
             <option value="escrito">Escrito</option>
             <option value="contrato">Contrato</option>
             <option value="minuta">Minuta</option>
@@ -347,7 +347,7 @@ export function DocumentoIngestForm({
           checked={pushDrive}
           onChange={(e) => setPushDrive(e.target.checked)}
         />
-        Intentar subir a Google Drive (texto/markdown; requiere carpeta real en la causa)
+        Guardar también una copia del texto en la carpeta de Google Drive de la causa
       </label>
 
       {rows.length > 0 && (

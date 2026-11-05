@@ -8,12 +8,13 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { prisma } from "@/lib/db";
+import { parseMinutaTemplate } from "@/lib/minutas/template";
 
 const plantillaSchema = z.object({
   tipo: z.string().min(2),
   nombre: z.string().min(2),
   materia: z.string().optional().nullable(),
-  bodyJson: z.string().optional(),
+  bodyJson: z.string().max(60000).superRefine((value, context) => { try { parseMinutaTemplate(value); } catch (error) { context.addIssue({ code: "custom", message: error instanceof Error ? error.message : "Revisa el contenido de la plantilla" }); } }).optional(),
 });
 
 export async function GET() {

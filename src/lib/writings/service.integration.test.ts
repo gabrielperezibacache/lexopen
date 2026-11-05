@@ -9,7 +9,8 @@ import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { importBook, readBook } from "@/lib/books/service";
 import { bookMetadataSchema } from "@/lib/books/ingest";
 import { addCaseWritingSource, createCaseWriting, listCaseWritingHistory, listCaseWritings, readCaseWriting, readCaseWritingRevision, restoreCaseWriting, saveCaseWriting } from "./service";
-import { exportCaseWriting } from "./export";
+import { exportCaseWriting, exportCaseWritingDocx } from "./export";
+import { assertWritingDocx, readWritingDocxParts } from "./docx";
 const status = (value: number) => (error: unknown) => (error as { status?: number }).status === value;
 async function main() {
   const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
@@ -73,6 +74,13 @@ async function main() {
     assert.ok(markdown.content.includes(cause.rit!)); assert.ok(markdown.content.includes("[^R1]: **Pasaje de biblioteca")); assert.ok(!markdown.content.includes("<script>"));
     assert.equal(markdown.content.split("\n").filter(line => line.startsWith("[^R1]:")).length, 1, "Author text cannot forge an extra corroborated footnote");
     const text = await exportCaseWriting(cause.id, draft.id, "text", owner, db); assert.match(text.content, /Cita SHA-256/); assert.ok(text.content.includes(passage.text));
+    await assert.rejects(exportCaseWritingDocx(cause.id, draft.id, owner, db), status(409)); // A handwritten definition is never made a Word footnote.
+    draft = (await saveCaseWriting(cause.id, draft.id, { requestId: randomUUID(), expectedRevision: draft.revision, title: draft.title, body: "## Argumento ficticio\nTexto propio con fuente incorporada [^R1]." }, owner, db)).draft;
+    const word = await exportCaseWritingDocx(cause.id, draft.id, owner, db); assertWritingDocx(word.content);
+    assert.match(word.contentType, /wordprocessingml/); assert.match(word.filename, /\.docx$/);
+    const wordParts = readWritingDocxParts(word.content); assert.match(wordParts.get("word/document.xml")!, /w:footnoteReference w:id="1"/); assert.ok(wordParts.get("word/document.xml")!.includes(passage.text)); assert.match(wordParts.get("word/footnotes.xml")!, /Obra ficticia incorporada/);
+    await assert.rejects(exportCaseWritingDocx(cause.id, draft.id, colleague, db), status(404));
+    await assert.rejects(exportCaseWritingDocx(otherCause.id, draft.id, owner, db), status(404));
     draft = (await saveCaseWriting(cause.id, draft.id, { requestId: randomUUID(), expectedRevision: draft.revision, title: draft.title, body: "Una referencia por completar [^R999]." }, owner, db)).draft;
     assert.ok(draft.warnings.some(warning => warning.includes("sin una fuente"))); await assert.rejects(exportCaseWriting(cause.id, draft.id, "markdown", owner, db), status(409));
     draft = (await restoreCaseWriting(cause.id, draft.id, { requestId: randomUUID(), expectedRevision: draft.revision, targetRevision: citedRevision }, owner, db)).draft;
@@ -83,6 +91,7 @@ async function main() {
     assert.equal(draft.revision, beforeFailure.revision); assert.equal(draft.body, beforeFailure.body); assert.equal(await db.caseWritingRevision.count({ where: { draftId: draft.id } }), revisionsBeforeFailure); assert.equal(await db.caseWritingRequest.count({ where: { draftId: draft.id } }), requestsBeforeFailure);
     await db.libraryBook.update({ where: { id: book.id }, data: { deletedAt: new Date() } });
     await assert.rejects(readCaseWriting(cause.id, draft.id, owner, db), status(409)); await assert.rejects(exportCaseWriting(cause.id, draft.id, "text", owner, db), status(409));
+    await assert.rejects(exportCaseWritingDocx(cause.id, draft.id, owner, db), status(409));
     const blockedList = await listCaseWritings(cause.id, owner, undefined, db); assert.deepEqual(blockedList.drafts.find(row => row.id === draft.id), { id: draft.id, available: false }); assert.ok(!JSON.stringify(blockedList).includes(draft.title));
     const history = await listCaseWritingHistory(cause.id, draft.id, owner, undefined, db); assert.ok(history.revisions.length > 0); assert.ok(!JSON.stringify(history).includes(draft.title)); assert.ok(!JSON.stringify(history).includes(passage.text));
     await assert.rejects(readCaseWritingRevision(cause.id, draft.id, citedRevision, owner, db), status(409));

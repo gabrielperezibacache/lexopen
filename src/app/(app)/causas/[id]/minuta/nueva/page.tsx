@@ -31,7 +31,7 @@ export default async function NuevaMinutaPage({ params, searchParams }: Params) 
       </Link>
       <PageHeader
         title="Nueva minuta"
-        subtitle="Tras cada audiencia, reunión o llamada, deje el handoff listo para que cualquier abogado continúe la tramitación."
+        subtitle="Registra lo ocurrido tras una audiencia, reunión o llamada para que el equipo pueda continuar la tramitación."
       />
       <MinutaWizard
         causaId={causa.id}

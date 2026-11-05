@@ -4,6 +4,7 @@ import { httpError } from "@/lib/auth/access";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { readCaseWritingForExport } from "./service";
 import type { WritingDraftView } from "./types";
+import { renderCaseWritingDocx } from "./docx";
 const safeHref = (href: string) => /^\/(?!\/)[^\s<>]*$/.test(href) ? href : "";
 const md = (value: string) => value.replace(/\r\n?/g, "\n").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   .replace(/[\\`*_{}\[\]()#+!|~]/g, "\\$&")
@@ -52,4 +53,8 @@ export function renderCaseWriting(draft: WritingDraftView, cause: { id: string; 
 export async function exportCaseWriting(causaId: string, id: string, format: "markdown" | "text", user: CausaAccessUser, client: PrismaClient = prisma) {
   const { draft, caseIdentity } = await readCaseWritingForExport(causaId, id, user, client);
   return { content: renderCaseWriting(draft, caseIdentity, format), filename: `escrito-${draft.id}-v${draft.revision}.${format === "markdown" ? "md" : "txt"}`, contentType: format === "markdown" ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8" };
+}
+export async function exportCaseWritingDocx(causaId: string, id: string, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const { draft, caseIdentity } = await readCaseWritingForExport(causaId, id, user, client);
+  return { content: renderCaseWritingDocx(draft, caseIdentity), filename: `escrito-${draft.id}-v${draft.revision}.docx`, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
 }

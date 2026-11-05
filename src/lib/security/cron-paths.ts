@@ -5,6 +5,7 @@ import { createHmac, timingSafeEqual } from "crypto";
  * Must stay in sync with scripts/local-host-schedulers.mjs.
  */
 export const CRON_API_PATHS = [
+  "/api/jornada/worker",
   "/api/causas/monitoreo",
   "/api/pjud/mis-causas",
   "/api/pjud/digest",

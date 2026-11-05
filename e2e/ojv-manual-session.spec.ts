@@ -72,6 +72,8 @@ test("ingreso manual, selección explícita e importación con cobertura complet
   await panel.getByRole("button", { name: "Consultar Mis Causas", exact: true }).click();
   await expect(panel.getByText(/3 causas recibidas/)).toBeVisible();
   expect(payloads.some(body => body.action === "import")).toBeFalsy();
+  await expect(panel.getByRole("checkbox", { name: /Guardar también las resoluciones y documentos nuevos/ })).not.toBeChecked();
+  await expect(panel.getByRole("combobox", { name: "Revisar novedades", exact: true })).toHaveValue("60");
   const choices = panel.locator(".pjud-manual-case-list input");
   await choices.nth(0).check(); await choices.nth(1).check();
   await panel.getByLabel("Filtrar el listado").fill("revisión 3");
@@ -93,7 +95,7 @@ test("ingreso manual, selección explícita e importación con cobertura complet
   await expect(panel.getByRole("button", { name: "Mostrar ventana oficial", exact: true })).toHaveCount(0);
   await expect(panel.getByRole("heading", { name: "Resultado de la importación" })).toBeVisible();
   await expect(panel.getByRole("heading", { name: "Resultado de la importación" })).toBeFocused();
-  expect(payloads.find(body => body.action === "import")).toEqual({ action: "import", sessionId: "opaque-session-fixture", candidateIds: ["opaque-fixture-0", "opaque-fixture-1"] });
+  expect(payloads.find(body => body.action === "import")).toEqual({ action: "import", sessionId: "opaque-session-fixture", candidateIds: ["opaque-fixture-0", "opaque-fixture-1"], downloadDocuments: false, intervalMinutes: 60 });
   const reports = panel.locator(".pjud-manual-result .pjud-cuadernos");
   await expect(reports.nth(0)).toHaveAttribute("data-status", "complete");
   await expect(reports.nth(1)).toHaveAttribute("data-status", "partial");
@@ -117,6 +119,54 @@ test("ingreso manual, selección explícita e importación con cobertura complet
   await expect(panel.getByRole("heading", { name: "Conexión cerrada", exact: true })).toBeVisible();
   await expect(panel.getByRole("link", { name: "Ver mi cartera" })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("descargar documentos requiere una elección y conserva el recibo y los pendientes al cambiar de sección", async ({ page }) => {
+  let closes = 0;
+  let current = session({ listedAt: "2026-11-03T18:00:00Z", materiasTried: ["Civil"], candidates: candidates(1) });
+  const payloads: Record<string, unknown>[] = [];
+  await page.route("**/api/pjud/manual-session", async route => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON(); payloads.push(body);
+      if (body.action === "import") current = { ...current, phase: "completed", progress: { completed: 1, total: 1 },
+        documentProgress: { currentRit: "C-100-2024", attempted: 1, total: 5 },
+        result: { created: 1, linked: 0, syncOk: 1, syncPartial: 0, syncFailed: 0, inserted: 14, items: [
+          { causaId: "fictitious-cause-documents", rit: "C-100-2024", tribunal: "1º Juzgado Civil de Santiago", status: "ok", cuadernosCoverage: coverage,
+            documents: { saved: 1, pending: 1, waitingLogin: 1, failed: 1, removed: 1, total: 5 } },
+        ] } };
+      if (body.action === "close") { closes++; current = { ...current, phase: "closed", authenticated: false, documentProgress: null }; }
+    }
+    await route.fulfill({ json: { capabilities, session: current } satisfies ManualOjvUiResponse });
+  });
+  const panel = await openPanel(page);
+  const downloads = panel.getByRole("checkbox", { name: /Guardar también las resoluciones y documentos nuevos/ });
+  await expect(downloads).not.toBeChecked();
+  await panel.locator(".pjud-manual-case-list input").first().check();
+  await downloads.check();
+  await panel.getByRole("combobox", { name: "Revisar novedades", exact: true }).selectOption("30");
+  expect(payloads).toEqual([]);
+  await panel.getByRole("button", { name: "Importar 1 causa", exact: true }).click();
+  await expect(panel.getByRole("heading", { name: "Resultado de la importación", exact: true })).toBeFocused();
+  expect(payloads).toEqual([{ action: "import", sessionId: "opaque-session-fixture", candidateIds: ["opaque-fixture-0"], downloadDocuments: true, intervalMinutes: 30 }]);
+  await expect(panel.getByText("1 causa creada · 0 vinculadas · 14 movimientos nuevos", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "Guardando documentos", exact: true })).toBeVisible();
+  await expect(panel.getByText("C-100-2024 · 1 de 5 revisados en este grupo.", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Documentos: 1 guardados · 1 pendientes · 1 requieren continuar con ClaveÚnica · 1 por reintentar · 1 eliminados por el profesional.", { exact: true })).toBeVisible();
+  current = { ...current, documentProgress: null, result: { ...current.result!, items: current.result!.items.map(item => ({ ...item, documents: { saved: 2, pending: 0, waitingLogin: 1, failed: 1, removed: 1, total: 5 } })) } };
+  await expect(panel.getByRole("heading", { name: "Guardando documentos", exact: true })).toHaveCount(0);
+  await expect(panel.getByText("Documentos: 2 guardados · 0 pendientes · 1 requieren continuar con ClaveÚnica · 1 por reintentar · 1 eliminados por el profesional.", { exact: true })).toBeVisible();
+  await expect(panel.getByText("1 causa creada · 0 vinculadas · 14 movimientos nuevos", { exact: true })).toBeVisible();
+  await panel.getByRole("link", { name: "Consultar por RIT/ROL", exact: true }).click();
+  await expect(page).toHaveURL(/\/causas\/monitoreo/);
+  expect(closes).toBe(0);
+  await page.getByRole("navigation", { name: "Apartado causas" }).getByRole("link", { name: "ClaveÚnica", exact: true }).click();
+  const returned = page.getByRole("region", { name: "Su cuenta judicial, su cartera", exact: true });
+  await expect(returned.getByRole("heading", { name: "Resultado de la importación", exact: true })).toBeVisible();
+  await expect(returned.getByText(/Documentos: 2 guardados · 0 pendientes · 1 requieren continuar con ClaveÚnica/)).toBeVisible();
+  expect(payloads.filter(body => body.action === "import")).toHaveLength(1);
+  await returned.getByRole("button", { name: "Cerrar conexión", exact: true }).click();
+  await expect(returned.getByRole("heading", { name: "Conexión cerrada", exact: true })).toBeVisible();
+  expect(closes).toBe(1);
 });
 
 test("límite de lote, selección entre páginas y consulta vacía diferenciada", async ({ page }) => {

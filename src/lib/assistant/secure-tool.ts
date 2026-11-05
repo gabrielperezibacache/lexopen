@@ -12,6 +12,9 @@ import { readUndo, snapshotEntity, type UndoPayload } from "./plan-store";
 import type { AssistantTool } from "./tools/types";
 import type { ToolContext, ToolResult } from "./types";
 import { assertDesktopToolInputAccess } from "./tools/escritorio-access";
+import { assertAcademicToolInputAccess } from "./tools/academic-access";
+import { assertWorkflowToolInputAccess, authorizeWorkflowResult } from "./tools/workflow-access";
+import { assertLibrarySyncToolInputAccess } from "./tools/library-sync-access";
 
 class RejectedResult extends Error {
   constructor(readonly result: ToolResult) { super(result.message); }
@@ -44,6 +47,9 @@ export async function assertToolInputAccess(
 ) {
   ctx.signal?.throwIfAborted();
   if (id === "escritorio.listar" || id === "escritorio.encargar") return assertDesktopToolInputAccess(id, input, ctx, write, db);
+  if (id.startsWith("academia.")) return assertAcademicToolInputAccess(id, input, ctx, write, db);
+  if (id.startsWith("audiencia.") || id.startsWith("escrito.")) return assertWorkflowToolInputAccess(id, input, ctx, write, db);
+  if (id === "biblioteca.listar" || id === "sincronizacion.estado") return assertLibrarySyncToolInputAccess(id, input, ctx, write, db);
   const actor = { ...ctx, id: ctx.userId };
   const capability = toolCapability(id);
   let causaId = typeof input.causaId === "string" ? input.causaId : null;
@@ -134,6 +140,8 @@ export async function authorizeCommittedResult(
   actor: ToolContext, tx: Prisma.TransactionClient,
 ) {
   if (id === "escritorio.encargar") return assertDesktopToolInputAccess(id, input, actor, false, tx);
+  if (id.startsWith("academia.")) return assertAcademicToolInputAccess(id, input, actor, false, tx);
+  if ((id.startsWith("audiencia.") || id.startsWith("escrito.")) && result) return authorizeWorkflowResult(id, input, result, actor, tx);
   if (id !== "evento.eliminar" || !result) {
     return assertToolInputAccess(id, input, actor, true, tx);
   }

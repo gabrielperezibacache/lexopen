@@ -236,13 +236,14 @@ export async function processPendingSyncJobs(opts?: {
     try {
       const result = await syncCausaPjud(job.causaId, {
         actorId: opts?.actorId,
-        force: true,
+        force: job.trigger !== "cron",
         trigger: (job.trigger as "cron" | "manual" | "retry" | typeof PJUD_MANUAL_SESSION_TRIGGER) || "cron",
         existingJobId: job.id,
         fetchMovimientos: opts?.fetchMovimientos,
         assertActive: opts?.assertActive,
         downloadDocuments: opts?.downloadDocuments,
       });
+      if (result.status === "disabled") await prisma.pjudSyncJob.updateMany({ where: { id: job.id, status: "running" }, data: { status: "dismissed", note: result.note, finishedAt: new Date() } });
       results.push(result);
     } catch (error) {
       const note = error instanceof Error ? error.message : "Error";

@@ -29,14 +29,14 @@ export default async function SiteISheetsPage({ params }: Params) {
       <SiteNav siteId={site.id} siteName={site.name} tipo={site.tipo} color={site.color} active="/isheets" />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <p className="mt-1 max-w-2xl text-sm text-[var(--ink-soft)]/75">
-          iSheets — tablas estructuradas colaborativas (seguimiento procesal, issues log, reporting).
+          Tablas compartidas para organizar el seguimiento procesal, los asuntos pendientes y los informes.
         </p>
         <NewISheetButton siteId={site.id} />
       </div>
       {sheets.length === 0 ? (
         <EmptyState
-          title="Sin iSheets"
-          description="Cree una tabla para seguimiento procesal, issues log o reporting del matter."
+          title="Todavía no hay tablas"
+          description="Crea una tabla para ordenar los datos y el seguimiento del equipo."
           action={<NewISheetButton siteId={site.id} />}
         />
       ) : (

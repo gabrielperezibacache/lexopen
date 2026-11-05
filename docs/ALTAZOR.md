@@ -6,7 +6,7 @@ La ampliación de [Conexiones y Secretos](ALTAZOR-CONEXIONES.md) incorpora el ca
 
 ## Empezar una conversación
 
-1. Abre **Mi jornada → Conversación** y elige tu espacio personal o una causa accesible.
+1. Abre **Mi jornada**, o pulsa **ALTAZOR** desde cualquier apartado. Elige tu espacio personal o una causa accesible.
 2. Escribe el encargo. Puedes arrastrar archivos, pulsar **Adjuntar** o seleccionar pasajes de la biblioteca, hechos y notas de audiencia.
 3. Revisa el destino de IA. Si es remoto, autoriza el envío de ese mensaje y su selección. La configuración de sólo IA local del estudio prevalece.
 4. Envía el mensaje. Las lecturas se ejecutan directamente; los cambios en causas, agenda u otras herramientas muestran un plan que debes revisar y confirmar.
@@ -15,6 +15,12 @@ La ampliación de [Conexiones y Secretos](ALTAZOR-CONEXIONES.md) incorpora el ca
 El ámbito de una conversación queda fijado al crearla. Para trabajar en otra causa, crea otra conversación. No se reutiliza silenciosamente el contexto de expedientes distintos.
 
 Los mensajes guardados y los trabajos en curso se recuperan. Un mensaje que todavía no se ha enviado permanece en el editor mientras cambias de apartado; al cerrar la ventana con texto pendiente aparece la advertencia del navegador. La aplicación conserva el texto ante errores de envío. Una solicitud interrumpida se identifica como tal y no se vuelve a ejecutar automáticamente.
+
+## Continuar entre apartados
+
+Inicio y el panel lateral comparten conversación y borrador mientras navegas. «Mi asistente» reúne memoria, conexiones y computadora; Académico tiene un apartado propio. El Host puede continuar mensajes expresamente enviados durante un máximo de 24 horas, con permisos, sesión y fuentes vigentes; no confirma escrituras ni reproduce operaciones interrumpidas.
+
+Consulta [Sincronización](SINCRONIZACION.md) para conectar el contenido de Drive personal, separado del conector de metadatos de la computadora.
 
 ## Adjuntos y fuentes
 

@@ -1,0 +1,26 @@
+.dialog { width: min(44rem, calc(100vw - 2rem)); max-height: min(48rem, calc(100dvh - 2rem)); padding: 0; color: var(--ink); background: var(--surface-solid); border: 1px solid var(--line-strong); border-radius: var(--radius-lg, 1rem); box-shadow: 0 2rem 6rem #0006; }
+.dialog::backdrop { background: #0009; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; padding: 1.5rem 1.5rem 1rem; }
+.header h2 { margin: 0 0 .4rem; font-family: var(--font-editorial, var(--font-fraunces)), Georgia, serif; font-size: 1.6rem; line-height: 1.2; }
+.header p, .footer p, .body p { color: var(--ink-soft); line-height: 1.7; margin: 0; overflow-wrap: anywhere; }
+.search { display: flex; gap: .75rem; align-items: center; margin: 0 1.5rem 1rem; padding: .75rem 1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-md, .85rem); }
+.search svg { flex: none; color: var(--ink-soft); }
+.search input { color: var(--ink); width: 100%; min-width: 0; background: transparent; border: 0; font: inherit; outline: none; }
+.search:focus-within { outline: 2px solid var(--sea); outline-offset: 3px; }
+.breadcrumb { display: flex; flex-wrap: wrap; padding: 0 1.5rem 1rem; gap: .5rem; border-bottom: 1px solid var(--line); }
+.breadcrumb button { display: inline-flex; align-items: center; gap: .5rem; background: transparent; border: 0; padding: .35rem 0; font: inherit; color: var(--sea); cursor: pointer; overflow-wrap: anywhere; text-align: left; }
+.breadcrumb button:disabled { color: var(--ink-soft); cursor: default; }
+.body { min-height: 12rem; max-height: 42dvh; overflow: auto; padding: 1rem 1.5rem; }
+.body > p { display: flex; align-items: center; gap: .5rem; }
+.body a { color: var(--sea); text-decoration: underline; }
+.folders { list-style: none; padding: 0; margin: 0; }
+.folders li { border-bottom: 1px solid var(--line); }
+.folders button { display: flex; align-items: center; width: 100%; gap: .85rem; min-height: 3.4rem; padding: .65rem .25rem; color: var(--ink); background: transparent; border: 0; font: inherit; text-align: left; cursor: pointer; }
+.folders button:hover { color: var(--sea); }
+.folders button span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.folders svg { flex: none; color: var(--copper-deep); }
+.footer { display: grid; gap: 1rem; border-top: 1px solid var(--line); padding: 1rem 1.5rem 1.5rem; }
+.footer p { font-size: .82rem; }
+.footer > div { display: flex; gap: .75rem; flex-wrap: wrap; justify-content: flex-end; }
+.dialog :is(button, a):focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
+@media (max-width: 480px) { .header, .body, .footer { padding-inline: 1rem; } .search { margin-inline: 1rem; } .breadcrumb { padding-inline: 1rem; } .footer > div { justify-content: stretch; } .footer :global(.btn) { flex: 1; } }

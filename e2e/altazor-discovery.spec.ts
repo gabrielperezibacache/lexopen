@@ -12,7 +12,7 @@ const db = new PrismaClient({ datasources: { db: { url } } }), tag = randomUUID(
 let ownerId = "";
 test.beforeAll(async () => { ownerId = (await db.user.create({ data: { name: "Investigadora ficticia", email, password: await hash("lexopen", 10), role: "abogado" } })).id; });
 test.afterAll(async () => { try { if (ownerId) { await db.altazorAcademicSearch.deleteMany({ where: { ownerId } }); await db.altazorBibliographyEntry.deleteMany({ where: { ownerId } }); await db.auditEvent.deleteMany({ where: { actorId: ownerId } }); await db.user.deleteMany({ where: { id: ownerId } }); } } finally { await db.$disconnect(); } });
-async function openDiscovery(page: Page) { await page.goto("/inicio"); await page.getByRole("button", { name: "Academia", exact: true }).click(); await page.getByRole("button", { name: "Descubrir", exact: true }).click(); await expect(page.getByRole("heading", { name: "Descubrir y citar", exact: true })).toBeVisible(); }
+async function openDiscovery(page: Page) { await page.goto("/academico"); await page.getByRole("button", { name: "Buscar bibliografía", exact: true }).click(); await expect(page.getByRole("heading", { name: "Descubrir y citar", exact: true })).toBeVisible(); }
 test("Descubrimiento académico: consentimiento, bibliografía persistente y lectura móvil con datos ficticios", async ({ page }, info) => {
   await page.addInitScript(() => { Object.defineProperty(globalThis.crypto, "randomUUID", { value: undefined, configurable: true }); });
   await loginAs(page, email); let searches = 0;

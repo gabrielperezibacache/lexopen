@@ -169,6 +169,14 @@ export function explicitDesktopListing(normalized: NormalizedAssistantInput): As
   const match = /^(?:(?:por favor[,\s]+|solo\s*|solamente\s+|unicamente\s+|puedes\s+|podrias\s+))*(?:muestrame|muestra|mostrar|ensename|ensena|lista|listar|consulta|consultar|ver|quiero ver|deseo ver)\s+(?:(?:los|mis)\s+)?(?:escritorios|computadores)((?:\s+(?:activos|abiertos|disponibles)|\s+de\s+(?:altazor(?:\s+ai)?|lexopen)|\s+(?:de|en)\s+(?:este\s+(?:espacio|ambito)|esta\s+causa|mi\s+(?:espacio|cuenta)))*)(?:,?\s+por favor)?$/.exec(text);
   return match ? { toolId: "escritorio.listar", confidence: 1, slots: {} } : undefined;
 }
+/** Precise navigation reads stay local and never inspect document contents. */
+export function explicitWorkflowListing(normalized: NormalizedAssistantInput): AssistantIntent | undefined {
+  const text=normalizeSearch(normalized.text).replace(/^[¿¡\s]+|[?!.\s]+$/g,"");
+  if(/^(?:(?:muestrame|muestra|consulta|consultar|ver)\s+(?:el\s+)?)?estado de (?:la )?sincronizacion(?: de (?:esta|la) causa)?$/.test(text))return{toolId:"sincronizacion.estado",confidence:1,slots:{}};
+  const match=/^(?:(?:por favor[,\s]+|solo\s+|puedes\s+|podrias\s+))*(?:muestrame|muestra|mostrar|lista|listar|consulta|consultar|ver|quiero ver)\s+(?:(?:mi|mis|la|las|los)\s+)?(audiencias|escritos|trabajos academicos|biblioteca)(?:\s+(?:de esta causa|de la causa|privados|guardados|disponibles))?(?:,?\s+por favor)?$/.exec(text);
+  const ids:Record<string,AssistantIntentId>={audiencias:"audiencia.listar",escritos:"escrito.listar","trabajos academicos":"academia.listar",biblioteca:"biblioteca.listar"};
+  return match?{toolId:ids[match[1]],confidence:1,slots:{}}:undefined;
+}
 
 function buildDefaultSlots(
   toolId: AssistantIntentId,
@@ -203,6 +211,9 @@ export function ruleClassify(
   const flat = normalizeSearch(normalized.text);
   const desktopRead = explicitDesktopListing(normalized);
   if (desktopRead) return { intents: [desktopRead] };
+  const workflowRead=explicitWorkflowListing(normalized);
+  if(workflowRead) return {intents:[workflowRead]};
+  if (/^guarda(?:r)?\s+(?:la|esta|tu|ultima)\s+respuesta\s+como\s+(?:un\s+)?(?:borrador\s+de\s+)?escrito\b/.test(flat)) return {intents:[{toolId:"escrito.guardar",confidence:1,slots:{titulo:normalized.text.match(/(?:titulado|llamado)\s+["«]?(.+?)["»]?$/i)?.[1]?.slice(0,200)}}]};
   if (/\b(encarga|encargar|delega|delegar|envia|enviar)\b[^.]{0,100}\b(escritorio|computador)\b/.test(flat)) return { intents: [{ toolId: "escritorio.encargar", confidence: 0.95, slots: { texto: normalized.text } }] };
   const matched: AssistantIntent[] = [];
 

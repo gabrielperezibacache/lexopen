@@ -6,6 +6,9 @@ El ingreso simplificado, la renovación y el cierre tras vencimiento se incorpor
 
 [Galería real de escritorio y móvil](altazor-conexiones-2026-11-04/README.md), con datos ficticios, gateway simulado y manifiesto de imágenes. La imagen interna del escritorio de esa galería es sintética; no acredita contenedores reales ni cuentas conectadas.
 
+
+La revisión `1.1.0-preview.5` incorpora [Drive personal y sincronización de carpetas](SINCRONIZACION.md), independiente del conector de metadatos del escritorio descrito aquí. Cada profesional autoriza contenido y renovación en Google desde **Causas → Sincronización → Mi Google Drive**; el administrador prepara la aplicación una vez. Esta cuenta no necesita iniciar una computadora de ALTAZOR.
+
 ## Conectar una aplicación
 
 1. Abra **Mi jornada → Conexiones** y elija Google Workspace o GitHub. Una tarjeta del catálogo no concede acceso a una cuenta.

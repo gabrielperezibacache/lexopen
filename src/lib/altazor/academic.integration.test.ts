@@ -10,7 +10,7 @@ import { bookMetadataSchema } from "@/lib/books/ingest";
 import { importBook, readBook, createBookCollection, updateBookCollection } from "@/lib/books/service";
 import { workbenchDestination } from "@/lib/workbench/policy";
 import { emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
-import { createAcademicWorkspace, saveAcademicWorkspace, readAcademicWorkspace, prepareAcademicArtifact, executeAcademicArtifact, readAcademicArtifact, saveAcademicArtifact, incorporateAcademicWriting, cancelAcademicArtifact, saveAcademicProfile } from "./academic";
+import { createAcademicWorkspace, saveAcademicWorkspace, readAcademicWorkspace, prepareAcademicArtifact, executeAcademicArtifact, readAcademicArtifact, saveAcademicArtifact, incorporateAcademicWriting, cancelAcademicArtifact, saveAcademicProfile, academicArtifactHistory, readAcademicArtifactVersion, restoreAcademicArtifactVersion } from "./academic";
 import { exportCaseWriting } from "@/lib/writings/export";
 import { prepareAcademicLinkedInDraft, verifyAltazorShareOrigin } from "./share-origin";
 const status=(expected:number)=>(error:unknown)=>(error as {status?:number}).status===expected;
@@ -58,6 +58,23 @@ async function main(){
     assert.equal((await db.externalShareDraft.findUniqueOrThrow({where:{id:socialRow.id}})).body,"Edición propia ficticia para compartir");
     await saveAcademicArtifact(workspace.id,artifactId,{expectedRevision:reviewed.revision,body:result.body+"\nNueva revisión ficticia",reviewed:true},owner,db);
     await assert.rejects(verifyAltazorShareOrigin(socialRow,owner,db),status(409));
+    // Autosave retains the generated original and each CAS revision. Recovery
+    // produces a new, unreviewed revision, preserving the source snapshots.
+    const history=await academicArtifactHistory(workspace.id,artifactId,owner,undefined,db);
+    assert.deepEqual(history.versions.map(item=>item.revision),[3,2,1]);
+    assert.equal((await readAcademicArtifactVersion(workspace.id,artifactId,1,owner,db)).body,result.body);
+    await assert.rejects(academicArtifactHistory(workspace.id,artifactId,other,undefined,db),status(404));
+    await assert.rejects(readAcademicArtifactVersion(workspace.id,artifactId,1,other,db),status(404));
+    const originalSources=(await db.altazorAcademicArtifact.findUniqueOrThrow({where:{id:artifactId}})).sourceSnapshotsJson;
+    const restored=await restoreAcademicArtifactVersion(workspace.id,artifactId,{expectedRevision:3,revision:1},owner,db);
+    assert.equal(restored.revision,4);assert.equal(restored.body,result.body);assert.equal(restored.reviewed,false);
+    assert.equal((await db.altazorAcademicArtifact.findUniqueOrThrow({where:{id:artifactId}})).sourceSnapshotsJson,originalSources);
+    await assert.rejects(restoreAcademicArtifactVersion(workspace.id,artifactId,{expectedRevision:3,revision:1},owner,db),status(409));
+    const races=await Promise.allSettled([saveAcademicArtifact(workspace.id,artifactId,{expectedRevision:4,body:result.body+"\nEdición A",reviewed:false},owner,db),saveAcademicArtifact(workspace.id,artifactId,{expectedRevision:4,body:result.body+"\nEdición B",reviewed:false},owner,db)]);
+    assert.equal(races.filter(item=>item.status==="fulfilled").length,1);
+    const afterRace=await readAcademicArtifact(workspace.id,artifactId,owner,db),versionCount=await db.altazorAcademicArtifactVersion.count({where:{artifactId}});
+    assert.equal((await saveAcademicArtifact(workspace.id,artifactId,{expectedRevision:afterRace.revision,body:afterRace.body,reviewed:false},owner,db)).revision,afterRace.revision);
+    assert.equal(await db.altazorAcademicArtifactVersion.count({where:{artifactId}}),versionCount);
     // A revoked matrix row is hidden yet retained. Saving surrounding metadata
     // or regranting access cannot turn that hidden row into unbacked manual text.
     const shared=await importBook({...bookMetadataSchema.parse({title:"Libro compartido ficticio"}),requestId:randomUUID(),name:"compartido.txt",bytes},other,db),sharedDetail=await readBook(shared.book.id,other,{},db);
@@ -82,8 +99,14 @@ async function main(){
     await saveAcademicProfile({expectedRevision:0,profile},owner,db);await assert.rejects(saveAcademicProfile({expectedRevision:0,profile},owner,db),status(409));
     const latestForCancel=await readAcademicWorkspace(workspace.id,owner,db),cancelled=await prepareAcademicArtifact(workspace.id,{...input,requestId:randomUUID(),expectedRevision:latestForCancel.revision},owner,db);
     await cancelAcademicArtifact(workspace.id,cancelled.artifact.id,owner,db);assert.equal((await executeAcademicArtifact(workspace.id,cancelled.artifact.id,owner,db,model)).status,"cancelled");assert.equal(modelCalls,1);
+    await db.altazorAcademicArtifactVersion.update({where:{artifactId_revision:{artifactId,revision:1}},data:{body:"Alteración ficticia sin hash"}});
+    await assert.rejects(readAcademicArtifactVersion(workspace.id,artifactId,1,owner,db),status(409));
+    await assert.rejects(restoreAcademicArtifactVersion(workspace.id,artifactId,{expectedRevision:afterRace.revision,revision:1},owner,db),status(409));
+    await db.libraryBook.update({where:{id:imported.book.id},data:{deletedAt:new Date()}});
+    await assert.rejects(academicArtifactHistory(workspace.id,artifactId,owner,undefined,db),status(404));
+    await assert.rejects(readAcademicArtifactVersion(workspace.id,artifactId,2,owner,db),status(404));
     assert.equal(network,0);
-    console.log("ALTAZOR academic disposable integration passed: owner isolation, CAS, source-backed proposals, native writing replay, LinkedIn origin/revision, matrix revocation and regrant retention, profile CAS and cancellation; zero provider traffic.");
+    console.log("ALTAZOR academic disposable integration passed: owner isolation, source-backed proposals, original/version history, CAS save races, idempotent save, recovery as unreviewed revision, tamper/source-revocation denial, native writing replay, LinkedIn origin/revision, matrix retention, profile CAS and cancellation; zero provider traffic.");
   }finally{
     globalThis.fetch=originalFetch;
     await db.externalShareDraft.deleteMany({where:{ownerId:{in:users}}});

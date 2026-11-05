@@ -2,7 +2,7 @@ import { canSome, type PermissionSubject } from "../auth/permissions";
 import { isClientAllowedPagePath } from "../auth/client-paths";
 import { isRole, PORTAL_ROLES, STAFF_ROLES } from "../auth/roles";
 
-export type NavigationAreaId = "jornada" | "causas" | "agenda" | "biblioteca" | "clientes" | "comunicaciones" | "estudio";
+export type NavigationAreaId = "jornada" | "causas" | "agenda" | "biblioteca" | "academico" | "clientes" | "comunicaciones" | "estudio";
 export type NavigationIcon = "home" | "cases" | "calendar" | "library" | "clients" | "inbox" | "studio" | "files" | "minutes" | "deadlines" | "tasks" | "hearings" | "research" | "portal" | "messages" | "billing" | "people" | "spaces" | "workflows" | "settings" | "integrations" | "audit" | "assistant" | "search" | "notifications" | "account" | "monitor";
 export type NavigationEntry = {
   id: string;
@@ -28,6 +28,7 @@ const AREAS: readonly NavigationArea[] = [
   { id: "causas", labelKey: "nav.areas.causas", href: "/causas", icon: "cases" },
   { id: "agenda", labelKey: "nav.areas.agenda", href: "/calendario", icon: "calendar" },
   { id: "biblioteca", labelKey: "nav.areas.biblioteca", href: "/biblioteca", icon: "library" },
+  { id: "academico", labelKey: "nav.academic", href: "/academico", icon: "research" },
   { id: "clientes", labelKey: "nav.areas.clientes", href: "/clientes", icon: "clients" },
   { id: "comunicaciones", labelKey: "nav.areas.comunicaciones", href: "/correo", icon: "inbox" },
   { id: "estudio", labelKey: "nav.areas.estudio", href: "/dashboard", icon: "studio" },
@@ -37,6 +38,7 @@ type CatalogEntry = NavigationEntry & { access: "staff" | "signed-in" | "admin";
 const ENTRIES: readonly CatalogEntry[] = [
   { id: "inicio", href: "/inicio", labelKey: "nav.home", icon: "home", area: "jornada", access: "staff" },
   { id: "causas", href: "/causas", labelKey: "nav.caseFiles", icon: "cases", area: "causas", access: "staff", keywords: "expediente cartera RIT ROL" },
+  { id: "sincronizacion", href: "/sincronizacion", labelKey: "nav.synchronization", icon: "monitor", area: "causas", access: "staff", keywords: "OJV ClaveÚnica Mis Causas Drive novedades descargar" },
   { id: "monitoreo", href: "/causas/monitoreo", labelKey: "nav.pjudMonitor", icon: "monitor", area: "causas", access: "staff", keywords: "OJV sincronizar seguimiento" },
   { id: "mis-causas", href: "/causas/mis-causas", labelKey: "nav.misCausas", icon: "portal", area: "causas", access: "staff", keywords: "ClaveÚnica OJV importar" },
   { id: "documentos", href: "/documentos", labelKey: "nav.caseDocuments", icon: "files", area: "causas", access: "staff" },
@@ -47,6 +49,7 @@ const ENTRIES: readonly CatalogEntry[] = [
   { id: "tareas", href: "/tareas", labelKey: "nav.tasks", icon: "tasks", area: "agenda", access: "staff" },
   { id: "biblioteca", href: "/biblioteca", labelKey: "nav.ownedLibrary", icon: "library", area: "biblioteca", access: "staff", keywords: "libros sentencias resoluciones colecciones fuentes PDF EPUB citas" },
   { id: "jurisprudencia", href: "/jurisprudencia", labelKey: "nav.officialResearch", icon: "research", area: "biblioteca", access: "staff", keywords: "jurisprudencia fuentes oficiales BCN" },
+  { id: "academico", href: "/academico", labelKey: "nav.academic", icon: "research", area: "academico", access: "staff", capability: "assistant.use", keywords: "investigar escribir enseñar bibliografía artículos" },
   { id: "clientes", href: "/clientes", labelKey: "nav.clientDirectory", icon: "clients", area: "clientes", access: "staff" },
   { id: "portal", href: "/portal", labelKey: "nav.portal", icon: "portal", area: "clientes", access: "signed-in" },
   { id: "correo", href: "/correo", labelKey: "nav.mailbox", icon: "inbox", area: "comunicaciones", access: "staff", badge: "mail", keywords: "bandeja PJUD" },
@@ -60,7 +63,6 @@ const ENTRIES: readonly CatalogEntry[] = [
   { id: "configuracion", href: "/configuracion", labelKey: "nav.settings", icon: "settings", area: "estudio", groupKey: "nav.secondary.administration", access: "admin" },
   { id: "integraciones", href: "/integraciones", labelKey: "nav.integrations", icon: "integrations", area: "estudio", groupKey: "nav.secondary.administration", access: "staff" },
   { id: "auditoria", href: "/auditoria", labelKey: "nav.audit", icon: "audit", area: "estudio", groupKey: "nav.secondary.administration", access: "admin" },
-  { id: "agente", href: "/agente", labelKey: "nav.assistant", icon: "assistant", access: "staff", capability: "assistant.use", keywords: "IA asistente" },
   { id: "buscar", href: "/buscar", labelKey: "nav.search", icon: "search", access: "signed-in" },
   { id: "notificaciones", href: "/notificaciones", labelKey: "nav.notifications", icon: "notifications", access: "signed-in" },
   { id: "cuenta", href: "/cuenta", labelKey: "nav.account", icon: "account", access: "signed-in" },
@@ -81,7 +83,7 @@ export function buildNavigation(subject: PermissionSubject | null | undefined): 
   if (portal) return { mode: "portal", areas: [], entries: allowed.filter(entry => entry.area), utilities, shortcuts: [] };
   return {
     mode: "staff",
-    areas: AREAS.map(area => ({ ...area })),
+    areas: AREAS.filter(area => allowed.some(entry => entry.area === area.id)).map(area => ({ ...area })),
     entries: allowed.filter(entry => entry.area),
     utilities,
     shortcuts: canSome(subject, "billing.manage") ? allowed.filter(entry => entry.id === "facturacion") : [],
@@ -104,9 +106,7 @@ export function activeNavigationArea(model: NavigationModel, pathname: string): 
 }
 export function secondaryNavigation(model: NavigationModel, pathname: string): NavigationEntry[] {
   const area = activeNavigationArea(model, pathname);
-  const path = cleanPath(pathname);
-  const hasCaseSectionTabs = ["/causas", "/causas/monitoreo", "/causas/mis-causas"].includes(path);
-  return area ? model.entries.filter(entry => entry.area === area.id && !(hasCaseSectionTabs && ["monitoreo", "mis-causas"].includes(entry.id))) : [];
+  return area ? model.entries.filter(entry => entry.area === area.id && !["monitoreo", "mis-causas"].includes(entry.id)) : [];
 }
 
 export type NavigationCrumb = { href: string; labelKey: string };

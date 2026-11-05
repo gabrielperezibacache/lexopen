@@ -50,6 +50,8 @@ export function PjudManualSessionPanel() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
   const [reviewingNextBatch, setReviewingNextBatch] = useState(false);
+  const [downloadDocuments, setDownloadDocuments] = useState(false);
+  const [intervalMinutes, setIntervalMinutes] = useState(60);
   const snapshot = useRef<ManualOjvUiResponse | null>(null);
   const mounted = useRef(false);
   const revision = useRef(0);
@@ -108,7 +110,7 @@ export function PjudManualSessionPanel() {
         if (!disposed) {
           setLoading(false);
           const session = snapshot.current?.session;
-          if (session && session.phase !== "closed") timer = setTimeout(poll, workingPhases.has(session.phase) ? 1500 : 10_000);
+          if (session && session.phase !== "closed") timer = setTimeout(poll, workingPhases.has(session.phase) || session.documentProgress ? 1500 : 10_000);
         }
       }
     }
@@ -122,8 +124,9 @@ export function PjudManualSessionPanel() {
       mounted.current = false;
       pending.current?.abort();
       const session = snapshot.current?.session;
-      // An accepted import continues on the Host; read-only sessions close when leaving.
-      if (session && session.phase !== "closed" && session.phase !== "importing" && pendingAction.current !== "import") {
+      // An accepted import and its opted-in downloads continue on the Host.
+      const pendingDocuments = session?.result?.items.some(item => item.documents && item.documents.pending + item.documents.waitingLogin + item.documents.failed > 0);
+      if (session && session.phase !== "closed" && session.phase !== "importing" && !pendingDocuments && pendingAction.current !== "import") {
         void apiMutation(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "close", sessionId: session.id }), keepalive: true });
       }
     };
@@ -140,7 +143,7 @@ export function PjudManualSessionPanel() {
     setError("");
     const body = { action, ...(action !== "start" ? { sessionId: data?.session?.id } : {}),
       ...(action === "list" && materia !== "all" ? { materias: [materia] } : {}),
-      ...(action === "import" ? { candidateIds: [...selected] } : {}) };
+      ...(action === "import" ? { candidateIds: [...selected], downloadDocuments, intervalMinutes } : {}) };
     const timeout = window.setTimeout(() => controller.abort(), 30_000);
     try {
       const response = await apiMutation<ManualOjvUiResponse>(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: controller.signal });
@@ -230,7 +233,7 @@ export function PjudManualSessionPanel() {
     {loading && !data && <p className="pjud-manual-status" role="status"><LoaderCircle size={18} aria-hidden="true" />Comprobando el ingreso manual…</p>}
 
     {data && <>
-      {!canStart && <div className="pjud-manual-message" role="status"><p>{data.capabilities.reason || "El ingreso manual se abre en el equipo Host de LexOpen. Acceda desde ese equipo para continuar."}</p><p>Puede consultar causas públicas por RIT/ROL y tribunal desde la cartera.</p></div>}
+      {!canStart && <div className="pjud-manual-message" role="status"><p>{data.capabilities.reason || "Abra LexOpen en el equipo principal del estudio para ingresar con ClaveÚnica."}</p><p>Puede consultar causas públicas por RIT/ROL y tribunal desde la cartera.</p></div>}
       <div className="pjud-manual-connection">
         <div className="pjud-manual-connection-copy"><h3>{phaseLabel(session)}</h3>
           {!connectionOpen && <p>La contraseña se escribe sólo en ClaveÚnica. Esta conexión temporal permite revisar las causas antes de incorporarlas al estudio.</p>}
@@ -257,7 +260,7 @@ export function PjudManualSessionPanel() {
         <section className="pjud-manual-result" aria-labelledby="pjud-manual-result-title">
         <div className="pjud-manual-list-heading"><div><h3 ref={resultHeadingRef} tabIndex={-1} id="pjud-manual-result-title">Resultado de la importación</h3><p role="status">{result.created} {result.created === 1 ? "causa creada" : "causas creadas"} · {result.linked} {result.linked === 1 ? "vinculada" : "vinculadas"} · {result.inserted} movimientos nuevos</p></div><Link className="btn btn-secondary" href="/causas/monitoreo">Ver mi cartera <ArrowUpRight size={17} aria-hidden="true" /></Link></div>
         {(result.syncPartial > 0 || result.syncFailed > 0) && <p className="pjud-manual-message" data-tone="warning" role="status">La incorporación incluye lecturas pendientes: {result.syncPartial} {result.syncPartial === 1 ? "parcial" : "parciales"} y {result.syncFailed} {result.syncFailed === 1 ? "con error" : "con errores"}. Revise cada causa antes de reintentar; las que tienen enlace ya están en su cartera.</p>}
-        <ul className="pjud-manual-result-list">{result.items.map(item => <li key={item.causaId}><div><Link href={`/causas/${encodeURIComponent(item.causaId)}`} className="pjud-manual-case-link">{item.rit} <ArrowUpRight size={16} aria-hidden="true" /></Link><p>{item.tribunal}</p></div><PjudCuadernosCoverage coverage={item.cuadernosCoverage} compact />{item.note && <p className="pjud-manual-result-note">{item.note}</p>}</li>)}</ul>
+        <ul className="pjud-manual-result-list">{result.items.map(item => <li key={item.causaId}><div><Link href={`/causas/${encodeURIComponent(item.causaId)}`} className="pjud-manual-case-link">{item.rit} <ArrowUpRight size={16} aria-hidden="true" /></Link><p>{item.tribunal}</p></div><PjudCuadernosCoverage coverage={item.cuadernosCoverage} compact />{item.documents && <p className="pjud-manual-result-note">Documentos: {item.documents.saved} guardados · {item.documents.pending} pendientes{item.documents.waitingLogin ? ` · ${item.documents.waitingLogin} requieren continuar con ClaveÚnica` : ""}{item.documents.failed ? ` · ${item.documents.failed} por reintentar` : ""}{item.documents.removed ? ` · ${item.documents.removed} eliminados por el profesional` : ""}.</p>}{item.note && <details className="pjud-manual-result-note"><summary>Detalle de la lectura</summary><p>{item.note}</p></details>}</li>)}</ul>
         {canRead && !reviewingNextBatch && <button type="button" className="pjud-manual-text-action" onClick={continueReview}>Continuar con otras causas de este listado</button>}
       </section></details>}
 
@@ -269,15 +272,19 @@ export function PjudManualSessionPanel() {
           {visible.length > 0 ? <ul className="pjud-manual-case-list">{visible.map(item => <li key={item.id}><label><input type="checkbox" checked={selected.has(item.id)} disabled={!canRead || Boolean(busy) || (!selected.has(item.id) && selected.size >= limit)} onChange={() => toggle(item.id)} /><span><strong>{item.rit}</strong><span>{item.tribunal}</span>{item.caratula && <span>{item.caratula}</span>}{item.estado && <small>{item.estado}</small>}</span></label></li>)}</ul> : <p className="pjud-manual-empty">Ninguna causa coincide con el filtro. Pruebe con otro RIT/ROL o tribunal.</p>}
           <div className="pjud-manual-pagination"><p>{filtered.length ? `${currentPage * pageSize + 1}–${Math.min((currentPage + 1) * pageSize, filtered.length)} de ${filtered.length}` : "Sin coincidencias"}</p><div><button className="btn btn-ghost" type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Anterior</button><button className="btn btn-ghost" type="button" disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)}>Siguiente</button></div></div>
           <div className="pjud-manual-import"><div><h3>Incorporar a mi cartera</h3><p>Se crearán o vincularán sólo las causas seleccionadas. LexOpen consultará todos sus cuadernos disponibles y mostrará las lecturas que queden pendientes.</p>
+            <label className="mt-3 flex items-start gap-3 text-sm"><input className="mt-1" type="checkbox" checked={downloadDocuments} onChange={event => setDownloadDocuments(event.target.checked)} disabled={Boolean(busy)} /><span>Guardar también las resoluciones y documentos nuevos en cada causa.<span className="mt-1 block text-xs">Los originales se conservan para su lectura y citas. Si OJV solicita identificarse de nuevo, podrá continuar con ClaveÚnica.</span></span></label>
+            <label className="mt-3 block text-sm">Revisar novedades<select className="input mt-1" value={intervalMinutes} disabled={Boolean(busy)} onChange={event => setIntervalMinutes(Number(event.target.value))}>{[[15,"Cada 15 minutos"],[30,"Cada 30 minutos"],[60,"Cada hora"],[180,"Cada 3 horas"],[360,"Cada 6 horas"],[1440,"Una vez al día"]].map(([value,label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+            <p className="mt-2 text-xs">Las causas que ya estaban pausadas conservan su pausa.</p>
             {selected.size > 0 && <ul className="pjud-manual-selected" aria-label="Causas seleccionadas">{candidates.filter(item => selected.has(item.id)).map(item => <li key={item.id}><span><strong>{item.rit}</strong> · {item.tribunal}</span><button type="button" className="btn btn-ghost" disabled={!canRead || Boolean(busy)} aria-label={`Quitar ${item.rit}, ${item.tribunal} de la selección`} onClick={() => toggle(item.id)}><X size={17} aria-hidden="true" /></button></li>)}</ul>}
           </div><button className="btn btn-primary" type="button" disabled={!canRead || Boolean(busy) || selected.size === 0 || selected.size > limit} onClick={() => void act("import")}>Importar {selected.size || "las"} {selected.size === 1 ? "causa" : "causas seleccionadas"}</button></div>
         </> : <p className="pjud-manual-empty">La OJV no devolvió causas en esta consulta. Puede probar otra materia o volver a consultar; esta respuesta no acredita ausencia de causas.</p>}
       </div>}
 
       {session?.phase === "importing" && <div className="pjud-manual-progress" role="status"><LoaderCircle size={22} aria-hidden="true" /><div><h3>Recuperando los cuadernos de sus causas</h3><p>{session.progress ? `${session.progress.completed} de ${session.progress.total} causas procesadas${session.progress.currentRit ? ` · ${session.progress.currentRit}` : ""}` : "Preparando la importación…"}</p><p>La importación continuará si cambia de sección. Al volver, podrá consultar su resultado.</p></div></div>}
+      {session?.documentProgress && <div className="pjud-manual-progress" role="status"><LoaderCircle size={22} aria-hidden="true" /><div><h3>Guardando documentos</h3><p>{session.documentProgress.currentRit} · {session.documentProgress.attempted} de {session.documentProgress.total} revisados en este grupo.</p></div></div>}
 
 
     </>}
-    <footer className="pjud-manual-footer"><p><ExternalLink size={16} aria-hidden="true" />El ingreso ocurre en la página oficial. La conexión temporal dura hasta 30 minutos y no guarda la contraseña en LexOpen.</p><p>Las actualizaciones posteriores dependen del monitoreo configurado en el Host. Las causas privadas requieren una sesión OJV vigente.</p></footer>
+    <footer className="pjud-manual-footer"><p><ExternalLink size={16} aria-hidden="true" />El ingreso ocurre en la página oficial. La conexión temporal dura hasta 30 minutos y no guarda la contraseña en LexOpen.</p><p>Las novedades se revisan mientras el equipo principal del estudio está abierto. Si OJV pide identificarse otra vez, los documentos pendientes se conservan hasta el siguiente ingreso.</p></footer>
   </section>;
 }

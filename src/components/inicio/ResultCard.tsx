@@ -27,6 +27,14 @@ function primaryLink(card: Record<string, unknown> | null | undefined): {
   const href = typeof card.href === "string" ? card.href : undefined;
 
   switch (type) {
+    case "academia":
+      return href && /^\/academico(?:\?|$)/.test(href) ? { href, label: "Abrir trabajo académico" } : null;
+    case "audiencia":
+      return href && /^\/(?:causas\/[\w-]+\/audiencias|audiencias\/[\w-]+)(?:\?|$)/.test(href) ? { href, label: "Abrir audiencias" } : null;
+    case "escrito":
+      return href && /^\/causas\/[\w-]+\/escritos(?:\?|$)/.test(href) ? { href, label: "Abrir editor de escritos" } : null;
+    case "biblioteca": return {href:"/biblioteca",label:"Abrir mi biblioteca"};
+    case "sincronizacion": return causaId ? {href:`/causas/${encodeURIComponent(causaId)}`,label:"Revisar actualización de la causa"}:null;
     case "escritorio":
       return { href: `/inicio?altazor=computer${id ? `&escritorio=${encodeURIComponent(id)}` : ""}${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`, label: "Abrir escritorio" };
     case "evento":

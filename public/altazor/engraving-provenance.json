@@ -1,0 +1,18 @@
+{
+  "asset": "companion-engraving-v2.png",
+  "sha256": "bf96aef73d39da0bc7103636bf3fa989a646de09bf8db7c0126d205a85f149a1",
+  "date": "2026-11-05",
+  "kind": "original generated engraved raster illustration",
+  "generator": "built-in image_gen reference style-transfer",
+  "source_identity": {
+    "owner": "gabrielperezibacache",
+    "repository": "altazor-ai",
+    "revision": "9db1524d455f14a241f4fa4332eb782123223e48",
+    "selected_asset": "web/public/chungungo.png",
+    "authorization": "Repository owner explicitly requested integration of selected original graphics; no private configuration or archive included."
+  },
+  "layout": "2 x 2: ready, reading, thinking, finished",
+  "transparent": true,
+  "contains_application_data": false,
+  "prompt": "Original copperplate engraved marine otter sprite sheet. Preserve supplied original grey/cream chungungo identity. Four contained poses: attentive with closed book, reading, thinking with paper, presenting manuscript. Antique ivory and pale silver engraving with muted copper/teal accents; fine hatching; transparent alpha; no lettering, logos, backgrounds or third-party figures."
+}

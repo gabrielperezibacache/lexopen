@@ -65,7 +65,7 @@ export default async function SiteBlogPage({ params }: Params) {
       {posts.length === 0 ? (
         <EmptyState
           title="Sin publicaciones"
-          description="Publique anuncios o actualizaciones del matter."
+          description="Comparte anuncios y novedades de este espacio."
           action={!clientView ? <NewBlogPostButton siteId={site.id} /> : undefined}
         />
       ) : (

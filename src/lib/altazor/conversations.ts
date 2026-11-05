@@ -72,7 +72,7 @@ async function verifiedContext(row: AltazorTurn, user: CausaAccessUser, client: 
   if (visited.has(row.id)) throw httpError("Dependencia circular de conversación", 409);
   visited.add(row.id);
   const { actor, conversation } = await conversationFor(row.conversationId, user, client), snapshot = parseContext(row);
-  const toolContext: ToolContext = { ...actor, userId: actor.id, chatId: conversation.id, scope: { causaId: conversation.causaId } };
+  const toolContext: ToolContext = { ...actor, userId: actor.id, chatId: conversation.id, nativeTurnId: row.id, scope: { causaId: conversation.causaId } };
   const results = JSON.parse(row.resultsJson) as Array<{ result?: ToolResult }>;
   if (row.planId) {
     const record = await client.assistantPlanRecord.findFirst({ where: { id: row.planId, ownerId: actor.id } });
@@ -125,7 +125,7 @@ export async function readAltazorConversation(id: string, user: CausaAccessUser,
     if (available && row.planId && ["awaiting_confirmation", "partial"].includes(row.status)) {
       const stored = await getPlan(row.planId, actor.id);
       if (stored) {
-        try { const ctx = { ...actor, userId: actor.id, chatId: conversation.id, scope: { causaId: conversation.causaId } }; plan = { id: stored.id, needsConfirm: stored.needsConfirm, steps: await Promise.all(stored.steps.map(async step => ({ toolId: step.toolId, preview: await getTool(step.toolId).preview(step.input, ctx) }))) }; } catch { available = false; plan = null; }
+        try { const ctx = { ...actor, userId: actor.id, chatId: conversation.id, nativeTurnId: row.id, scope: { causaId: conversation.causaId } }; plan = { id: stored.id, needsConfirm: stored.needsConfirm, steps: await Promise.all(stored.steps.map(async step => ({ toolId: step.toolId, preview: await getTool(step.toolId).preview(step.input, ctx) }))) }; } catch { available = false; plan = null; }
       }
     }
     turns.push({ id: row.id, requestId: row.requestId, ordinal: row.ordinal, status: available ? row.status : "blocked", userText: available ? row.userText : "Contenido no disponible: cambió el acceso a una fuente.", assistantText: available ? row.assistantText : "", results: available ? JSON.parse(row.resultsJson) : [], plan, sourceRefs: available ? parseContext(row).refs : [], attachmentIds: available ? parseContext(row).attachmentIds : [], errorCode: available ? row.errorCode : "context_unavailable", createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() || null });
@@ -151,7 +151,7 @@ export async function createAltazorTurn(id: string, raw: unknown, user: CausaAcc
     if (current.conversation.revision !== input.expectedRevision) throw httpError("Llegó otro mensaje o cambió la conversación. Vuelva a cargarla", 409);
     if (await tx.altazorTurn.count({ where: { conversationId: id, status: { in: ["queued", "running"] } } })) throw httpError("Ya hay una respuesta en curso en esta conversación", 409);
     const turnId = randomUUID();
-    await tx.altazorTurn.create({ data: { id: turnId, conversationId: id, ownerId: actor.id, requestId: input.requestId, ordinal: current.conversation.nextOrdinal, inputSha256, userText: input.text, planId: `altazor-${turnId}`, contextJson: canonicalJson(context), destinationJson: canonicalJson({ ...destination, allowRemote: input.allowRemote, useMemory: input.useMemory }) } });
+    await tx.altazorTurn.create({ data: { id: turnId, conversationId: id, ownerId: actor.id, actorSessionVersion: current.actor.sessionVersion, requestId: input.requestId, ordinal: current.conversation.nextOrdinal, inputSha256, userText: input.text, planId: `altazor-${turnId}`, contextJson: canonicalJson(context), destinationJson: canonicalJson({ ...destination, allowRemote: input.allowRemote, useMemory: input.useMemory }) } });
     await tx.altazorConversation.update({ where: { id }, data: { revision: { increment: 1 }, nextOrdinal: { increment: 1 } } });
     return { turnId, reused: false };
   });
@@ -180,10 +180,16 @@ async function turnFor(id: string, turnId: string, user: CausaAccessUser, client
   if (!row) throw httpError("Mensaje no encontrado o sin acceso actual", 404);
   return { ...access, row };
 }
+async function assertTurnActor(row: AltazorTurn, user: CausaAccessUser, client: AltazorClient) {
+  const actor = await altazorActor(user, client);
+  if (row.actorSessionVersion !== null && row.actorSessionVersion !== actor.sessionVersion) throw httpError("La sesión cambió. Prepare de nuevo la solicitud", 409);
+  return actor;
+}
 /** Each invocation owns a bounded lease. No detached fire-and-forget job. */
 export async function executeAltazorTurn(id: string, turnId: string, user: CausaAccessUser, client: PrismaClient = prisma, options: AltazorServiceOptions = {}) {
   const { actor, conversation, row } = await turnFor(id, turnId, user, client, true);
   if (row.status !== "queued") return readAltazorConversation(id, actor, client, {}, options);
+  await assertTurnActor(row, actor, client);
   const leaseToken = randomUUID(), claimed = await client.altazorTurn.updateMany({ where: { id: turnId, ownerId: actor.id, status: "queued", cancelRequestedAt: null }, data: { status: "running", leaseToken, leaseExpiresAt: new Date(Date.now() + ALTAZOR_LIMITS.leaseMs), startedAt: new Date() } });
   if (!claimed.count) return readAltazorConversation(id, actor, client, {}, options);
   const control = new AbortController(), signal = AbortSignal.any([control.signal, AbortSignal.timeout(ALTAZOR_LIMITS.deadlineMs)]); let checking = false;
@@ -191,7 +197,7 @@ export async function executeAltazorTurn(id: string, turnId: string, user: Causa
   try {
     const destination = JSON.parse(row.destinationJson) as AltazorDestination & { allowRemote: boolean };
     const authorizeContext = async () => {
-      signal.throwIfAborted(); await conversationFor(id, actor, client, true);
+      signal.throwIfAborted(); await assertTurnActor(row, actor, client); await conversationFor(id, actor, client, true);
       checkAltazorDestination(await (options.destination || altazorDestination)(actor.id), destination.key, destination.allowRemote);
       const current = await client.altazorTurn.findFirst({ where: { id: turnId, status: "running", leaseToken, cancelRequestedAt: null } });
       if (!current) throw httpError("El mensaje fue cancelado", 409);
@@ -202,7 +208,7 @@ export async function executeAltazorTurn(id: string, turnId: string, user: Causa
     await client.altazorTurn.updateMany({ where: { id: turnId, status: "running", leaseToken, cancelRequestedAt: null }, data: { contextJson: canonicalJson(context.snapshot) } });
     await authorizeContext();
     const validatedReferences = context.snapshot.refs.flatMap((source, index) => source.citations.map(citation => ({ marker: `R${index + 1}`, quote: citation.quote })));
-    const result = await (options.execute || runAssistantTurn)({ text: row.userText, user: actor, chatId: id, scope: { causaId: conversation.causaId }, history: context.history, context: context.context, validatedReferences, signal, expectedDestination: destination, authorizeContext, planId: row.planId || `altazor-${row.id}` });
+    const result = await (options.execute || runAssistantTurn)({ text: row.userText, now: row.createdAt, user: actor, chatId: id, nativeTurnId: row.id, scope: { causaId: conversation.causaId }, history: context.history, context: context.context, validatedReferences, signal, expectedDestination: destination, authorizeContext, planId: row.planId || `altazor-${row.id}` });
     await authorizeContext();
     const waiting = Boolean(result.planId) && result.autoResults === undefined && !result.clarify;
     const assistantText = result.clarify || result.autoResults?.map(item => item.result.message).join("\n\n") || (waiting ? "Revise el plan y confirme antes de ejecutar los cambios." : result.streamEvents.find(event => event.type === "error")?.message || "No se pudo preparar una respuesta.");
@@ -227,6 +233,7 @@ export async function confirmAltazorTurn(id: string, turnId: string, confirm: bo
   const { actor, conversation, row } = await turnFor(id, turnId, user, client, true);
   if (row.status === "completed") { await verifiedContext(row, actor, client, options); return readAltazorConversation(id, actor, client, {}, options); }
   if (!["awaiting_confirmation", "partial"].includes(row.status) || !row.planId) throw httpError("El plan no está disponible para confirmar", 409);
+  await assertTurnActor(row, actor, client);
   await verifiedContext(row, actor, client, options);
   const plan = await getPlan(row.planId, actor.id); if (!plan) throw httpError("El plan venció o fue cancelado. Prepare uno nuevo", 409);
   const leaseToken = randomUUID();
@@ -240,11 +247,11 @@ export async function confirmAltazorTurn(id: string, turnId: string, confirm: bo
   const monitor = setInterval(() => { if (checking) return; checking = true; void client.altazorTurn.findFirst({ where: { id: turnId, status: "running", leaseToken, cancelRequestedAt: null }, select: { id: true } }).then(current => { if (!current) controller.abort(); }).catch(() => controller.abort()).finally(() => { checking = false; }); }, 300);
   try {
     const destination = JSON.parse(row.destinationJson) as AltazorDestination & { allowRemote: boolean };
-    const authorizeContext = async () => { signal.throwIfAborted(); await conversationFor(id, actor, client, true); await verifiedContext(row, actor, client, options); checkAltazorDestination(await (options.destination || altazorDestination)(actor.id), destination.key, destination.allowRemote); const current = await client.altazorTurn.findUniqueOrThrow({ where: { id: turnId } }); if (current.status !== "running" || current.leaseToken !== leaseToken || current.cancelRequestedAt) throw httpError("El plan fue cancelado", 409); };
+    const authorizeContext = async () => { signal.throwIfAborted(); await assertTurnActor(row, actor, client); await conversationFor(id, actor, client, true); await verifiedContext(row, actor, client, options); checkAltazorDestination(await (options.destination || altazorDestination)(actor.id), destination.key, destination.allowRemote); const current = await client.altazorTurn.findUniqueOrThrow({ where: { id: turnId } }); if (current.status !== "running" || current.leaseToken !== leaseToken || current.cancelRequestedAt) throw httpError("El plan fue cancelado", 409); };
     await authorizeContext();
     const context = await executionContext(row, actor, client, options, true);
     const validatedReferences = context.snapshot.refs.flatMap((source, index) => source.citations.map(citation => ({ marker: `R${index + 1}`, quote: citation.quote })));
-    const results = await executePlanSteps(plan.steps, { ...actor, userId: actor.id, chatId: id, scope: { causaId: conversation.causaId }, commandKey: `assistant-plan:${plan.id}`, signal, expectedDestination: destination, authorizeContext, history: context.history, context: context.context, validatedReferences });
+    const results = await executePlanSteps(plan.steps, { ...actor, userId: actor.id, chatId: id, nativeTurnId: row.id, scope: { causaId: conversation.causaId }, commandKey: `assistant-plan:${plan.id}`, signal, expectedDestination: destination, authorizeContext, history: context.history, context: context.context, validatedReferences });
     const allOk = results.length === plan.steps.length && results.every(item => item.result.ok);
     await altazorTransaction(client, async tx => {
       const current = await tx.altazorTurn.findFirst({ where: { id: turnId, status: "running", leaseToken } });

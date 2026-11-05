@@ -11,6 +11,7 @@ assert.ok(CRON_API_PATHS.includes("/api/notify/worker"));
 assert.ok(CRON_API_PATHS.includes("/api/notify/digest"));
 assert.ok(CRON_API_PATHS.includes("/api/notify/escalamiento"));
 assert.ok(CRON_API_PATHS.includes("/api/mail/sync"));
+assert.ok(CRON_API_PATHS.includes("/api/jornada/worker"));
 assert.equal(isCronApiPath("/api/causas/monitoreo"), true);
 assert.equal(isCronApiPath("/api/pjud/digest"), true);
 assert.equal(isCronApiPath("/api/health"), false);

@@ -7,12 +7,13 @@ export type ManualOjvUiPhase = "opening" | "waiting-login" | "waiting-user-confi
 export type ManualOjvCandidate = { id: string; rit: string; tribunal: string; caratula: string | null; estado: string | null };
 export type ManualOjvImportResult = {
   created: number; linked: number; syncOk: number; syncFailed: number; syncPartial: number; inserted: number;
-  items: { causaId: string; rit: string; tribunal: string; status: string; note?: string; cuadernosCoverage?: PjudCuadernosCoverage }[];
+  items: { causaId: string; rit: string; tribunal: string; status: string; note?: string; cuadernosCoverage?: PjudCuadernosCoverage; documents?: { saved: number; removed?: number; pending: number; waitingLogin: number; failed: number; total: number } }[];
 };
 export type ManualOjvUiSession = {
   id: string; phase: ManualOjvUiPhase; expiresAt: string; authenticated: boolean;
   listedAt: string | null; materiasTried: ManualOjvMateria[]; candidates: ManualOjvCandidate[];
   progress: { completed: number; total: number; currentRit?: string } | null;
+  documentProgress?: { currentRit: string; attempted: number; total: number } | null;
   result: ManualOjvImportResult | null; error: string | null;
 };
 export type ManualOjvCapabilities = {

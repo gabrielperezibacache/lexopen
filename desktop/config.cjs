@@ -45,6 +45,8 @@ const PRESERVE_IF_SET = new Set([
   "PJUD_SCRAPER_KEY",
   "PJUD_SCRAPER_ALLOW_PRIVATE",
   "CRON_SECRET",
+  "LEXOPEN_JORNADA_INTERVAL_MINUTES",
+  "PJUD_SYNC_INTERVAL_MINUTES",
   "STORAGE_PATH",
   "OBSIDIAN_VAULT_PATH",
   "OBSIDIAN_REST_URL",
@@ -61,6 +63,8 @@ const PRESERVE_IF_SET = new Set([
   "S3_SECRET_ACCESS_KEY",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
+  "PERSONAL_DRIVE_GOOGLE_CLIENT_ID",
+  "PERSONAL_DRIVE_GOOGLE_CLIENT_SECRET",
   "GOOGLE_REDIRECT_URI",
 ]);
 
@@ -470,6 +474,8 @@ function ensureHostEnv(dataDir = defaultDataDir(), opts = {}) {
     LEXOPEN_BOOTSTRAP_TOKEN: crypto.randomBytes(32).toString("hex"),
     LEXOPEN_RECOVERY_TOKEN: crypto.randomBytes(32).toString("hex"),
     CRON_SECRET: crypto.randomBytes(24).toString("hex"),
+    LEXOPEN_JORNADA_INTERVAL_MINUTES: "1",
+    PJUD_SYNC_INTERVAL_MINUTES: "5",
     PJUD_SCRAPER_KEY: crypto.randomBytes(24).toString("hex"),
     PJUD_SCRAPER_URL: "http://127.0.0.1:8787",
     PJUD_SCRAPER_ALLOW_PRIVATE: "1",

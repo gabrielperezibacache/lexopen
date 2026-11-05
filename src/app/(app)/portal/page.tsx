@@ -111,7 +111,7 @@ export default async function PortalPage() {
           title="Sin espacios en el portal"
           description={
             isCliente(user.role)
-              ? "Cuando el estudio comparta un matter o carpeta, aparecerá aquí con documentos y Q&A."
+              ? "Cuando el estudio comparta un espacio o una carpeta, aquí encontrarás sus documentos y consultas."
               : "Marque un espacio como visible al cliente y asigne miembros para activar el portal."
           }
           actionLabel={isStaff(user.role) ? "Ir a espacios" : undefined}

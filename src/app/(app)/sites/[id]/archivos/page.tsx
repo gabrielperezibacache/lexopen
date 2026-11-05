@@ -78,8 +78,8 @@ export default async function SiteFilesPage({ params }: Params) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--ink-soft)]/75">
           {clientView
-            ? "Documentos compartidos con usted (etiqueta «cliente»). El resto del data room permanece interno."
-            : "VDR / Archivos del espacio — carpetas, versiones, comentarios y metadatos. Los documentos por causa están en Documentos. Etiquete con «cliente» para compartir al portal."}
+            ? "Documentos compartidos contigo. Los demás archivos permanecen dentro del equipo."
+            : "Carpetas, archivos y versiones del equipo. Usa la etiqueta «cliente» sólo en los documentos que quieras compartir en el portal."}
         </p>
         {!clientView && (
           <SiteFileActions
@@ -96,8 +96,8 @@ export default async function SiteFilesPage({ params }: Params) {
       <div className="space-y-4">
         {folders.length === 0 && rootFiles.length === 0 && (
           <EmptyState
-            title="Data room vacío"
-            description="Suba el primer archivo, cree una carpeta o importe una carpeta del disco para organizar el VDR."
+            title="Todavía no hay archivos"
+            description="Añade un archivo o importa una carpeta para empezar a organizar los documentos del equipo."
             action={
               !clientView ? (
                 <SiteFileActions

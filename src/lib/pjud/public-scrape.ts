@@ -50,7 +50,7 @@ import {
 } from "@/lib/pjud/parse-html";
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
-import { manualPjudInteractionActive } from "@/lib/pjud/manual-interaction-policy";
+import { manualPjudInteractionActive, manualPjudDocumentDownloadsAllowed } from "@/lib/pjud/manual-interaction-policy";
 import path from "node:path";
 import type { MisCausasItem } from "@/lib/pjud/types";
 import { normalizePjudCuaderno, omitLegacyScrapeAliases, type PjudCausaRef, type PjudCuadernosCoverage, type PjudFetchedMovimiento } from "@/lib/pjud/types";
@@ -104,7 +104,7 @@ export function pjudCaptchaAutoSolveAllowed() {
 }
 
 export function pjudDocumentDownloadsAllowed() {
-  return !manualPjudInteractionActive() && process.env.PJUD_DOC_DOWNLOADS?.trim() !== "0";
+  return (!manualPjudInteractionActive() || manualPjudDocumentDownloadsAllowed()) && process.env.PJUD_DOC_DOWNLOADS?.trim() !== "0";
 }
 
 /**
@@ -1339,18 +1339,26 @@ export async function changeCuaderno(
 /** Read every listed cuaderno in its own scope, retaining explicit partial results. */
 export async function scrapeAllCuadernos(
   page: PlaywrightPage,
-  options: { panelTimeoutMs?: number; transitionTimeoutMs?: number; totalTimeoutMs?: number; emptyIdleMs?: number; allowPrompts?: boolean; signal?: AbortSignal; downloadDocuments?: boolean } = {}
+  options: { panelTimeoutMs?: number; transitionTimeoutMs?: number; totalTimeoutMs?: number; emptyIdleMs?: number; allowPrompts?: boolean; signal?: AbortSignal; downloadDocuments?: boolean; excludeDocumentExternalIds?: readonly string[]; documentExternalIds?: readonly string[] } = {}
 ): Promise<{ movimientos: PjudFetchedMovimiento[]; cuadernos: PjudCuadernosCoverage }> {
   const deadlineAt = Date.now() + (options.totalTimeoutMs ?? 120_000);
   const first = await cuadernoSelector(page);
   let remainingDocuments = 0;
-  if (options.downloadDocuments && options.allowPrompts !== false && pjudDocumentDownloadsAllowed()) {
+  let remainingDocumentBytes = 20 * 1024 * 1024;
+  if (options.downloadDocuments && pjudDocumentDownloadsAllowed()) {
     remainingDocuments = (await import("@/lib/pjud/pdf-backup")).pjudDocDownloadMaxPerRun();
   }
   const download = async (rows: PjudFetchedMovimiento[]) => {
-    if (remainingDocuments <= 0) return rows;
-    const result = await attachDocumentoBytesFromPage(page, rows, { limit: remainingDocuments });
-    remainingDocuments -= result.filter(row => row.documentoBytes).length;
+    if (remainingDocuments <= 0 || remainingDocumentBytes < 100) return rows;
+    const excluded = new Set(options.excludeDocumentExternalIds);
+    const allowed = options.documentExternalIds ? new Set(options.documentExternalIds) : null;
+    const { isBackupableDocumentoRef } = await import("@/lib/pjud/pdf-backup");
+    const eligible = rows.filter(row => isBackupableDocumentoRef(row.documentoRef) && !excluded.has(row.externalId) && (!allowed || allowed.has(row.externalId))).slice(0, remainingDocuments);
+    const downloaded = await attachDocumentoBytesFromPage(page, eligible, { limit: remainingDocuments, maxTotalBytes: remainingDocumentBytes });
+    const byId = new Map(downloaded.map(row => [row.externalId, row]));
+    const result = rows.map(row => byId.get(row.externalId) || row);
+    remainingDocuments -= eligible.length;
+    remainingDocumentBytes -= downloaded.reduce((sum, row) => sum + (row.documentoBytes?.length || 0), 0);
     return result;
   };
   if (!first?.options.length) {
@@ -1407,76 +1415,56 @@ export async function scrapeAllCuadernos(
 export async function attachDocumentoBytesFromPage(
   page: PlaywrightPage,
   movimientos: PjudFetchedMovimiento[],
-  opts?: { limit?: number; delayMs?: number }
+  opts?: { limit?: number; delayMs?: number; maxTotalBytes?: number }
 ): Promise<PjudFetchedMovimiento[]> {
   if (!pjudDocumentDownloadsAllowed()) return movimientos;
-  const {
-    looksLikePdf,
-    pjudDocDownloadDelayMs,
-    pjudDocDownloadMaxPerRun,
-  } = await import("@/lib/pjud/pdf-backup");
-  const limit = opts?.limit ?? pjudDocDownloadMaxPerRun();
-  const delayMs = opts?.delayMs ?? pjudDocDownloadDelayMs();
-  let downloaded = 0;
+  const { looksLikePdf, pjudDocDownloadDelayMs, pjudDocDownloadMaxPerRun } = await import("@/lib/pjud/pdf-backup");
+  const limit = opts?.limit ?? pjudDocDownloadMaxPerRun(), delayMs = opts?.delayMs ?? pjudDocDownloadDelayMs();
+  let remainingBytes = Math.min(opts?.maxTotalBytes ?? 20 * 1024 * 1024, 20 * 1024 * 1024), attempted = 0;
   const out: PjudFetchedMovimiento[] = [];
-
-  const isPjudHost = (href: string) => {
+  const pageUrl = new URL(page.url());
+  for (const movement of movimientos) {
+    const ref = movement.documentoRef || null;
+    let allowed = false;
+    try { const url = new URL(ref || ""); allowed = url.protocol === "https:" && (!url.port || url.port === "443") && !url.username && !url.password && (url.hostname === "pjud.cl" || url.hostname.endsWith(".pjud.cl")) && pageUrl.protocol === "https:" && (!pageUrl.port || pageUrl.port === "443") && (pageUrl.hostname === "pjud.cl" || pageUrl.hostname.endsWith(".pjud.cl")); } catch { /* Not a valid official document URL. */ }
+    if (attempted >= limit || remainingBytes < 100 || !allowed || !ref) { out.push(movement); continue; }
+    if (attempted > 0 && delayMs > 0) await delay(delayMs);
+    attempted++;
     try {
-      const host = new URL(href).hostname.toLowerCase();
-      return host === "pjud.cl" || host.endsWith(".pjud.cl");
-    } catch {
-      return false;
-    }
-  };
-
-  for (const m of movimientos) {
-    // The parser associates a download with its own table row. A global
-    // folio/title substring cannot distinguish folio 1 from 11 or cuadernos.
-    const ref = m.documentoRef || null;
-
-    if (downloaded >= limit || !ref || !isPjudHost(ref)) {
-      out.push({ ...m, documentoRef: ref || m.documentoRef });
-      continue;
-    }
-
-    try {
-      if (downloaded > 0 && delayMs > 0) {
-        await delay(delayMs);
-      }
-      const res = await page.request.get(ref, { timeout: 35_000 });
-      if (!res.ok()) {
-        out.push({ ...m, documentoRef: ref });
-        continue;
-      }
-      const buf = Buffer.from(await res.body());
-      const ct = res.headers()["content-type"] || "";
-      if (
-        buf.byteLength >= 100 &&
-        buf.byteLength <= 20 * 1024 * 1024 &&
-        (looksLikePdf(buf) ||
-          /pdf|msword|officedocument|octet-stream/i.test(ct)) &&
-        !/^\s*</.test(buf.subarray(0, 40).toString("utf8"))
-      ) {
-        let filename = `folio-${m.folio || downloaded + 1}.pdf`;
+      // Same-origin reads stay in the browser; cross-origin official documents use a URL-scoped local transport.
+      // APIRequestContext.get buffers the entire response; the page reader cancels at the bound.
+      const result = new URL(ref).origin === pageUrl.origin ? await page.evaluate(async ({ href, maximum }) => {
+        const target = new URL(href);
+        if (target.protocol !== "https:" || target.origin !== location.origin || target.username || target.password || !(target.hostname === "pjud.cl" || target.hostname.endsWith(".pjud.cl"))) return null;
+        const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 35_000);
         try {
-          filename =
-            new URL(ref).pathname.split("/").filter(Boolean).pop() || filename;
-        } catch {
-          /* keep */
-        }
-        out.push({
-          ...m,
-          documentoRef: ref,
-          documentoBytes: buf,
-          documentoFilename: filename,
-        });
-        downloaded += 1;
-        continue;
-      }
-      out.push({ ...m, documentoRef: ref });
-    } catch {
-      out.push({ ...m, documentoRef: ref });
-    }
+          const response = await fetch(target.href, { credentials: "include", redirect: "error", cache: "no-store", signal: controller.signal });
+          const contentType = response.headers.get("content-type") || "";
+          if (!response.ok || /text\/html/i.test(contentType) || Number(response.headers.get("content-length") || 0) > maximum) { await response.body?.cancel(); return null; }
+          const reader = response.body?.getReader();
+          if (!reader) return null;
+          const chunks: string[] = []; let total = 0;
+          try {
+            for (;;) {
+              const part = await reader.read(); if (part.done) break;
+              total += part.value.length;
+              if (total > maximum || chunks.length > 4096) { await reader.cancel(); return null; }
+              for (let offset = 0; offset < part.value.length; offset += 32768) chunks.push(btoa(String.fromCharCode(...part.value.subarray(offset, offset + 32768))));
+            }
+            return { chunks, contentType };
+          } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+        } catch { return null; }
+        finally { clearTimeout(timer); }
+      }, { href: ref, maximum: remainingBytes }) : null;
+      const direct = new URL(ref).origin === pageUrl.origin ? null : await (await import("@/lib/pjud/authenticated-document")).readAuthenticatedPjudDocument(page, ref, remainingBytes);
+      if (!result && !direct) { out.push(movement); continue; }
+      const bytes = direct?.bytes || Buffer.concat(result!.chunks.map(chunk => Buffer.from(chunk, "base64")));
+      const contentType = direct?.contentType || result!.contentType;
+      if (bytes.length < 100 || bytes.length > remainingBytes || (!looksLikePdf(bytes) && !/pdf|msword|officedocument|octet-stream/i.test(contentType)) || /^\s*</.test(bytes.subarray(0, 40).toString("utf8"))) { out.push(movement); continue; }
+      remainingBytes -= bytes.length;
+      const filename = new URL(ref).pathname.split("/").filter(Boolean).pop() || `folio-${movement.folio || attempted}.pdf`;
+      out.push({ ...movement, documentoBytes: bytes, documentoFilename: filename });
+    } catch { out.push(movement); }
   }
   return out;
 }
@@ -1984,6 +1972,8 @@ async function dismissOjvPrompts(page: AnyPage) {
 export type MisCausasMateria = typeof MIS_CAUSAS_MATERIAS[number] | "Corte Apelaciones";
 export type MisCausasReadOptions = {
   allowPrompts?: boolean;
+  downloadDocuments?: boolean;
+  excludeDocumentExternalIds?: readonly string[]; documentExternalIds?: readonly string[];
   responseTimeoutMs?: number;
   materias?: readonly MisCausasMateria[];
   signal?: AbortSignal;
@@ -2503,7 +2493,7 @@ export async function readCausaDetailFromAuthenticatedOjv(
 
     assertMisCausasReadActive(options);
     const historyHtml = await modalInnerHtml(page);
-    const { movimientos, cuadernos } = await scrapeAllCuadernos(page, { signal: options.signal, allowPrompts: options.allowPrompts, downloadDocuments: options.allowPrompts !== false });
+    const { movimientos, cuadernos } = await scrapeAllCuadernos(page, { signal: options.signal, allowPrompts: options.allowPrompts, downloadDocuments: options.downloadDocuments ?? options.allowPrompts !== false, excludeDocumentExternalIds: options.excludeDocumentExternalIds, documentExternalIds: options.documentExternalIds });
     const sala = parseSalaFromHtml(await modalInnerHtml(page));
     const withDocs = movimientos.filter((movement) => movement.documentoBytes).length;
     if (movimientos.length === 0 && cuadernos.status === "unknown" && !hasExplicitEmptyHistory(historyHtml)) {

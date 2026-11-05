@@ -35,6 +35,16 @@ export const ASSISTANT_TOOL_IDS = [
   "respuesta.libre",
   "escritorio.listar",
   "escritorio.encargar",
+  "academia.listar",
+  "academia.crear",
+  "academia.preparar",
+  "audiencia.listar",
+  "audiencia.crear",
+  "audiencia.nota",
+  "escrito.listar",
+  "escrito.guardar",
+  "biblioteca.listar",
+  "sincronizacion.estado",
 ] as const;
 
 export type AssistantIntentId = (typeof ASSISTANT_TOOL_IDS)[number];
@@ -52,6 +62,8 @@ export type ToolContext = {
   capabilityGrants?: string | null;
   capabilityRevokes?: string | null;
   chatId?: string | null;
+  /** Exact durable turn bound by the native service, never a model slot. */
+  nativeTurnId?: string;
   /** Server-built scope/context. Never populated from model slots. */
   scope?: { causaId: string | null };
   history?: Array<{ role: "user" | "assistant"; content: string }>;

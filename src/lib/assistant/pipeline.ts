@@ -13,6 +13,9 @@ import { getAssistantFirmPolicy } from "./firm-policy";
 import { getTool } from "./tools/registry";
 import { storePlan } from "./plan-store";
 import { resolveDesktopTaskInput } from "./tools/escritorio";
+import { resolveAcademicToolInput } from "./tools/academic";
+import { resolveWorkflowToolInput } from "./tools/workflow";
+import { resolveLibrarySyncInput } from "./tools/library-sync";
 import { causaAccessWhere } from "@/lib/auth/causa-access";
 import type { PermissionSubject } from "@/lib/auth/permissions";
 import type {
@@ -28,6 +31,7 @@ export type AssistantTurnInput = {
   attachments?: string[];
   user: PermissionSubject & { id: string; role: Role };
   chatId?: string | null;
+  nativeTurnId?: string;
   now?: Date;
   scope?: ToolContext["scope"];
   history?: ToolContext["history"];
@@ -92,6 +96,14 @@ function buildToolInput(
   const causaId = (slots.causaId as string | undefined) || resolved.causaId;
 
   switch (toolId) {
+    case "academia.listar": return {};
+    case "academia.crear": return { titulo: slots.titulo, tipo: slots.tipo || "research" };
+    case "academia.preparar": return { trabajoId: slots.trabajoId, mode: slots.mode || "synthesis", instruction: slots.instruction || texto };
+    case "audiencia.listar": case "escrito.listar": return {};
+    case "biblioteca.listar": case "sincronizacion.estado": return {};
+    case "audiencia.crear": return { titulo: slots.titulo, fecha: slots.fechaISO || null };
+    case "audiencia.nota": return { workspaceId: slots.workspaceId, titulo: slots.titulo || "Nota de audiencia", texto: slots.contenido || texto };
+    case "escrito.guardar": return { titulo: slots.titulo };
     case "escritorio.listar":
       return {};
     case "escritorio.encargar":
@@ -277,6 +289,7 @@ export async function runAssistantTurn(
     capabilityGrants: input.user.capabilityGrants,
     capabilityRevokes: input.user.capabilityRevokes,
     chatId: input.chatId,
+    nativeTurnId: input.nativeTurnId,
     scope: input.scope, history: input.history, context: input.context, validatedReferences: input.validatedReferences,
     signal: input.signal, expectedDestination: input.expectedDestination, authorizeContext: input.authorizeContext,
   };
@@ -295,6 +308,16 @@ export async function runAssistantTurn(
     if (input.scope && typeof intent.slots.causaId === "string" && intent.slots.causaId !== input.scope.causaId) throw new Error("La acción apunta a una causa distinta de esta conversación");
     let toolInput = buildToolInput(intent.toolId, input.scope ? { ...intent.slots, causaId: input.scope.causaId || undefined, ...(intent.toolId === "respuesta.libre" ? { texto: input.text } : {}) } : intent.slots, resolved);
     if (intent.toolId === "escritorio.encargar") toolInput = await resolveDesktopTaskInput(toolInput, ctx);
+    const academic = intent.toolId.startsWith("academia."), workflow = intent.toolId.startsWith("audiencia.") || intent.toolId.startsWith("escrito.");
+    try {
+      if (academic) toolInput = await resolveAcademicToolInput(intent.toolId, toolInput, ctx);
+      if (workflow) toolInput = await resolveWorkflowToolInput(intent.toolId, toolInput, ctx);
+      if (intent.toolId === "biblioteca.listar" || intent.toolId === "sincronizacion.estado") toolInput = await resolveLibrarySyncInput(intent.toolId,toolInput,ctx);
+    } catch (error) {
+      if (!(error instanceof Error) || ![403,404,409].includes(Number((error as {status?:number}).status))) throw error;
+      streamEvents.push({type:"clarify",message:error.message});
+      return {planId:null,clarify:error.message,previewSteps:[],streamEvents,classification:classificationMeta};
+    }
     const parsed = tool.inputSchema.safeParse(toolInput);
     if (!parsed.success) {
       streamEvents.push({

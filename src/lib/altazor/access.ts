@@ -7,7 +7,7 @@ import { isRole, STAFF_ROLES } from "@/lib/auth/roles";
 import type { AltazorClient } from "./types";
 
 export async function altazorActor(user: CausaAccessUser, client: AltazorClient = prisma) {
-  const actor = await client.user.findUnique({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
+  const actor = await client.user.findUnique({ where: { id: user.id }, select: { id: true, role: true, sessionVersion: true, capabilityGrants: true, capabilityRevokes: true } });
   if (!actor || !isRole(actor.role) || !STAFF_ROLES.includes(actor.role) || !canSome(actor, "assistant.use")) throw httpError("No tiene permiso para usar ALTAZOR", 403);
   return { ...actor, role: actor.role };
 }
