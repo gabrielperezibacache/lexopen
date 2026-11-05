@@ -72,7 +72,7 @@ async function verifiedContext(row: AltazorTurn, user: CausaAccessUser, client: 
   if (visited.has(row.id)) throw httpError("Dependencia circular de conversación", 409);
   visited.add(row.id);
   const { actor, conversation } = await conversationFor(row.conversationId, user, client), snapshot = parseContext(row);
-  const toolContext: ToolContext = { ...actor, userId: actor.id, scope: { causaId: conversation.causaId } };
+  const toolContext: ToolContext = { ...actor, userId: actor.id, chatId: conversation.id, scope: { causaId: conversation.causaId } };
   const results = JSON.parse(row.resultsJson) as Array<{ result?: ToolResult }>;
   if (row.planId) {
     const record = await client.assistantPlanRecord.findFirst({ where: { id: row.planId, ownerId: actor.id } });
@@ -125,7 +125,7 @@ export async function readAltazorConversation(id: string, user: CausaAccessUser,
     if (available && row.planId && ["awaiting_confirmation", "partial"].includes(row.status)) {
       const stored = await getPlan(row.planId, actor.id);
       if (stored) {
-        try { const ctx = { ...actor, userId: actor.id, scope: { causaId: conversation.causaId } }; plan = { id: stored.id, needsConfirm: stored.needsConfirm, steps: await Promise.all(stored.steps.map(async step => ({ toolId: step.toolId, preview: await getTool(step.toolId).preview(step.input, ctx) }))) }; } catch { available = false; plan = null; }
+        try { const ctx = { ...actor, userId: actor.id, chatId: conversation.id, scope: { causaId: conversation.causaId } }; plan = { id: stored.id, needsConfirm: stored.needsConfirm, steps: await Promise.all(stored.steps.map(async step => ({ toolId: step.toolId, preview: await getTool(step.toolId).preview(step.input, ctx) }))) }; } catch { available = false; plan = null; }
       }
     }
     turns.push({ id: row.id, requestId: row.requestId, ordinal: row.ordinal, status: available ? row.status : "blocked", userText: available ? row.userText : "Contenido no disponible: cambió el acceso a una fuente.", assistantText: available ? row.assistantText : "", results: available ? JSON.parse(row.resultsJson) : [], plan, sourceRefs: available ? parseContext(row).refs : [], attachmentIds: available ? parseContext(row).attachmentIds : [], errorCode: available ? row.errorCode : "context_unavailable", createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() || null });

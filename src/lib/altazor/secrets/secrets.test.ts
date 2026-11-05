@@ -15,6 +15,12 @@ const owner = { id: "owner", role: "abogado", capabilityGrants: "", capabilityRe
 const outsider = { ...owner, id: "outsider" };
 const input = { requestId: "create-fixture-001", name: "Credencial ficticia", provider: "Portal del estudio", username: "persona ficticia", kind: "password" as const, value };
 const target: SecretTarget = { sessionId: "session", origin: "https://portal.example.invalid", field: "password", fieldLabel: "Contraseña declarada por persona" };
+test("Unicode credentials obey the actual pinned keyboard byte limit before storage", () => {
+  assert.equal(createSecretSchema.safeParse({ ...input, value: "é".repeat(1000) }).success, true);
+  assert.equal(createSecretSchema.safeParse({ ...input, value: "é".repeat(1001) }).success, false);
+  assert.equal(createSecretSchema.safeParse({ ...input, value: "🦦".repeat(500) }).success, true);
+  assert.equal(createSecretSchema.safeParse({ ...input, value: "🦦".repeat(501) }).success, false);
+});
 const hasCode = (code: string) => (error: unknown) => (error as { code?: string }).code === code;
 const hasStatus = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
 

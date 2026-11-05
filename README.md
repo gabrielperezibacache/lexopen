@@ -66,6 +66,8 @@ La hoja ocupa el espacio principal; fuentes, referencias, historial y exportaci�
 
 ![Academia real de ALTAZOR con herramientas de investigación y docencia; proyecto y respuestas ficticios](docs/altazor-2026-11-04/academia-desktop.png)
 
+Desde la conversación también puede pedir un encargo para un escritorio ya abierto: ALTAZOR presenta el texto completo, el proveedor y las aplicaciones elegidas antes de confirmar. La tarjeta del resultado abre esa misma sesión; sus operaciones de conexión se autorizan allí por separado. No se copian adjuntos, memoria ni secretos automáticamente.
+
 Las conexiones abarcan mensajería, oficina, calendarios, repositorios, productividad, redes sociales, diagramas y otros servicios. Su disponibilidad depende de la cuenta, los permisos, la plataforma del gateway y la configuración del proveedor. OAuth suele requerir una aplicación registrada; una tarjeta del catálogo no conecta una cuenta.
 
 ![Catálogo real de 48 aplicaciones en ALTAZOR, con cuentas sin configurar y datos ficticios; gateway de prueba simulado](docs/altazor-conexiones-2026-11-04/conexiones-desktop.png)

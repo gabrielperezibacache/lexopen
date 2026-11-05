@@ -9,6 +9,10 @@ import { createHash } from "node:crypto";
 
 const token = "gateway-fixture-token-only";
 const kitty = { id: "kitty-fixture", name: "altazor-fixture", provider: "model-fixture", desktop: true, container: "kitty-altazor-fixture", status: "running", connectors: ["-"], approvals: "ask", backup: "" };
+test("manual Unicode typing is bounded by the pinned gateway's UTF-8 byte limit", () => {
+  assert.equal(inputSchema.safeParse({ action: "type", args: { text: "é".repeat(1000) } }).success, true);
+  assert.equal(inputSchema.safeParse({ action: "type", args: { text: "é".repeat(1001) } }).success, false);
+});
 test("manual-input receipts use a keyed owner/session-bound digest instead of a password dictionary", () => {
   const input = { action: "type", args: { text: "123456" } }, secret = "fictitious-computer-key-for-test-2026-with-entropy";
   const hash = computerOperationHash("owner-a", "session-a", "input", input, secret);

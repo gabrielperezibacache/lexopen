@@ -28,7 +28,7 @@ function primaryLink(card: Record<string, unknown> | null | undefined): {
 
   switch (type) {
     case "escritorio":
-      return id ? { href: `/inicio?altazor=computer&escritorio=${encodeURIComponent(id)}${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`, label: "Abrir escritorio" } : null;
+      return { href: `/inicio?altazor=computer${id ? `&escritorio=${encodeURIComponent(id)}` : ""}${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`, label: "Abrir escritorio" };
     case "evento":
       return { href: "/calendario", label: "Ver en calendario" };
     case "plazo":

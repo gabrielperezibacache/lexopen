@@ -48,9 +48,9 @@ func TestLexOpenReadRequiresApprovalAndMissingStoreFailsClosed(t *testing.T) {
 }
 `;
 const originals = {
-  "internal/chat/limit.go": "475c0632b58e1c3eb1257c5d9f01a4b9beabcf1fa453672479ea86345edb264f",
-  "internal/chat/approve.go": "6ce0c502714a8b64cf86fa9e7ad7b384e0b4a369e1cffe8c7e4ede1a4dd265cc",
-  "internal/gateway/gateway.go": "8ffa2212d02f060e75985bcf18c5b7199ab0084a2518286b49170f89e7dbe40a",
+  "internal/chat/limit.go": "860c0c96adfa350eab15801543c1471baf0ff077c7c0cca846906df264aa8d95",
+  "internal/chat/approve.go": "2155d330c1a3b4c87278857c6b15e240b309dc756cfdd7ad020a5c6546f51106",
+  "internal/gateway/gateway.go": "d39393bbb377e15cbdf01fdc2650524128c81fe91fabff19f68ca5b668f3a740",
 };
 const hash = value => createHash("sha256").update(value).digest("hex");
 function once(source, before, after) {

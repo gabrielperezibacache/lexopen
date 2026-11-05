@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { escritorioEncargarSchema, escritorioListarSchema, desktopHref } from "./escritorio";
+import { ruleClassify } from "../classify-rules";
+import { normalizeAssistantInput } from "../normalize";
+import { ASSISTANT_TOOL_IDS } from "../types";
+import { getTool } from "./registry";
+assert.equal(escritorioListarSchema.safeParse({}).success, true);
+assert.equal(escritorioListarSchema.safeParse({ causaId: "other" }).success, false);
+assert.equal(escritorioEncargarSchema.safeParse({ sessionId: "s", texto: "Encargo" }).success, true);
+for (const input of [{ sessionId: "s", texto: "x".repeat(4001) }, { sessionId: "s", texto: "Encargo", files: [] }, { sessionId: "s", texto: "Encargo", causaId: "other" }, { sessionId: "s", texto: "Encargo", confirmed: true }]) assert.equal(escritorioEncargarSchema.safeParse(input).success, false);
+assert.deepEqual(ruleClassify(normalizeAssistantInput("Lista mis escritorios activos")).intents.map(row => row.toolId), ["escritorio.listar"]);
+assert.deepEqual(ruleClassify(normalizeAssistantInput("Encarga al escritorio que cree una nota de ejemplo")).intents.map(row => row.toolId), ["escritorio.encargar"]);
+assert.equal(getTool("escritorio.encargar").kind, "write");
+assert.equal(getTool("escritorio.listar").kind, "read");
+assert.ok(ASSISTANT_TOOL_IDS.includes("escritorio.encargar"));
+assert.equal(desktopHref("session-owned", "case-owned"), "/inicio?altazor=computer&escritorio=session-owned&causaId=case-owned");
+console.log("Desktop assistant schemas, explicit routing and confirmation kind PASS.");

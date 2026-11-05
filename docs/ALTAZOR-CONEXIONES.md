@@ -106,6 +106,12 @@ El gateway puede imprimir su token al iniciar: no publique la salida sin revisar
 
 La política **sólo IA local** bloquea crear sesiones, tareas y control/entrada para este adaptador: un gateway loopback no acredita el destino de su modelo independiente. Las sesiones tienen un límite de acceso de veinte minutos; vencer no demuestra que el contenedor ni sus archivos hayan sido destruidos. El operador debe detener y retirar los recursos de su instancia.
 
+## Encargar desde la conversación
+
+En una conversación personal o de causa, ALTAZOR puede consultar los escritorios propios de ese mismo ámbito. Abra uno previamente; la conversación no crea escritorios ni amplía su selección de aplicaciones. Al pedir un encargo, el plan muestra el texto completo (hasta 4000 caracteres), la sesión, el proveedor independiente y las aplicaciones autorizadas. Sólo la confirmación de ese plan permite enviarlo; no se transfieren archivos, memoria ni secretos. La tarjeta «Abrir escritorio» lleva a la sesión correspondiente.
+
+Las acciones de sus aplicaciones siguen pidiendo autorización individual en el escritorio. Un resultado incierto conserva su recibo sin reenvío automático. Las credenciales admiten hasta 2000 bytes UTF-8 para ser compatibles con el teclado del entorno fijado.
+
 ## Validación y diagnóstico
 
 ```bash

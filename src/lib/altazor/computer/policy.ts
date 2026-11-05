@@ -32,7 +32,7 @@ export function computerEnabled(env: Readonly<Record<string, string | undefined>
 export function assertComputerEnabled() { if (!computerEnabled()) throw new ConnectorError("computer_disabled", "El computador opcional está desactivado en este Host.", 503); }
 export const inputSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("click"), args: z.object({ x: z.number().int().min(0).max(10000), y: z.number().int().min(0).max(10000) }).strict() }).strict(),
-  z.object({ action: z.literal("type"), args: z.object({ text: z.string().min(1).max(2000) }).strict() }).strict(),
+  z.object({ action: z.literal("type"), args: z.object({ text: z.string().min(1).max(2000).refine(value => Buffer.byteLength(value, "utf8") <= 2000, "Escriba hasta 2000 bytes UTF-8 cada vez.") }).strict() }).strict(),
   z.object({ action: z.literal("key"), args: z.object({ keys: z.string().regex(/^[A-Za-z0-9_+.-]{1,80}$/) }).strict() }).strict(),
   z.object({ action: z.literal("scroll"), args: z.object({ direction: z.enum(["up", "down"]), amount: z.number().int().min(1).max(10) }).strict() }).strict(),
 ]);
