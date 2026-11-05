@@ -157,4 +157,4 @@ npm run build
 
 ## Licencia
 
-[AGPL-3.0-or-later](LICENSE). Consulta [SECURITY.md](SECURITY.md) para comunicar problemas de seguridad y las licencias y procedencias de los recursos incorporados.
+[AGPL-3.0-or-later](LICENSE). Consulta también los [avisos tipográficos](public/fonts/licenses/provenance.json) y la [procedencia del gráfico de ALTAZOR](public/altazor/engraving-provenance.json).
