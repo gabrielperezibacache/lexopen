@@ -20,6 +20,8 @@ async function main() {
   const ids = { a: `${tag}_a`, b: `${tag}_b`, outsider: `${tag}_outsider`, socio: `${tag}_socio`, admin: `${tag}_admin` };
   const userIds = Object.values(ids), causeId = `${tag}_case`, plazoId = `${tag}_deadline`;
   const now = new Date("2026-11-05T16:00:00Z");
+  // The supervisor must already be active at the simulated escalation time.
+  const supervisorMembership = { causaId: causeId, userId: ids.b, rol: "supervisor", desde: new Date(0) };
   const functionName = `${tag}_fail_outbox`, triggerName = `${tag}_trigger`;
   let triggerInstalled = false;
   let deliveryCalls = 0;
@@ -33,7 +35,7 @@ async function main() {
     await db.user.createMany({ data: userIds.map(id => ({ id, email: `${id}@example.invalid`, name: id,
       role: id === ids.socio ? "socio" : id === ids.admin ? "admin" : "abogado", capabilityGrants: id === ids.admin ? "causa.override_walls" : "", password: "fixture-no-login" })) });
     await db.causa.create({ data: { id: causeId, titulo: "Fixture privada", tribunal: "Fixture", materia: "civil", acceso: "equipo", abogadoId: ids.a } });
-    await db.causaMiembro.create({ data: { causaId: causeId, userId: ids.b, rol: "supervisor" } });
+    await db.causaMiembro.create({ data: supervisorMembership });
     await db.plazo.create({ data: { id: plazoId, titulo: "Fixture fatal", fechaLimite: new Date("2026-11-05T00:00:00Z"), esFatal: true, responsableId: ids.a, causaId: causeId } });
     for (let n = 0; n < 2; n += 1) {
       const endpoint = `https://fcm.googleapis.com/fcm/send/${tag}-${n}`;
@@ -72,7 +74,7 @@ async function main() {
     assert.equal((await visibleNotifications(ids.b, db)).length, 0);
     const suppressed = await processOutboxBatch({ client: db, messageIds: await outboxIds(revoked.notificationId!), providerFor });
     assert.equal(suppressed.suppressed, 1, JSON.stringify({ suppressed, rows: await db.mensajeSaliente.findMany({ where: { notificationId: revoked.notificationId! } }) }));
-    await db.causaMiembro.create({ data: { causaId: causeId, userId: ids.b, rol: "supervisor" } });
+    await db.causaMiembro.create({ data: supervisorMembership });
     await processPlazoEscalamiento({ now, client: db, plazoIds: [plazoId] });
     const escalations = await db.notification.findMany({ where: { entityId: plazoId, tipo: "plazo.fatal.escalamiento" } });
     assert.deepEqual(escalations.map(n => n.userId).sort(), [ids.b, ids.socio].sort());
