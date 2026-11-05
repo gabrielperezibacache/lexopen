@@ -3,7 +3,7 @@ import { ConnectorError } from "@/lib/personal-connectors/core";
 import type { ComputerFile } from "./types";
 
 export const KITTIES_SOURCE_COMMIT = "6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3";
-export const COMPUTER_LIMITS = { files: 5, totalBytes: 20 * 1024 * 1024, imageBytes: 5 * 1024 * 1024, sessionMs: 20 * 60_000, bodyBytes: 29 * 1024 * 1024 } as const;
+export const COMPUTER_LIMITS = { files: 5, totalBytes: 20 * 1024 * 1024, imageBytes: 5 * 1024 * 1024, sessionMs: 20 * 60_000, renewalWindowMs: 2 * 60 * 60_000, bodyBytes: 29 * 1024 * 1024 } as const;
 export function endpointFor(value: string) {
   let url: URL;
   try { url = new URL(value); } catch { throw new ConnectorError("gateway_url", "Use la dirección local del gateway dedicado."); }

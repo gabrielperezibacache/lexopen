@@ -16,6 +16,8 @@ LexOpen reúne causas, biblioteca, investigación, audiencias y escritos con la 
 
 **Versión del código: `1.1.0-preview.4`.** Consulte los archivos efectivamente publicados y su revisión en [GitHub Releases](https://github.com/gabrielperezibacache/lexopen/releases). El catálogo nuevo, las autorizaciones por operación y Secretos requieren esta revisión del código; los instaladores anteriores `preview.3` (`c878fc5`) no los incluyen. Una versión en el repositorio no acredita por sí sola que sus instaladores estén publicados.
 
+El inicio de sesión simplificado, la renovación del escritorio y las mejoras de navegación descritas aquí corresponden al desarrollo posterior a `preview.4`; requieren una compilación que incluya esos cambios.
+
 Las imágenes son **capturas de la aplicación con datos ficticios**. Las respuestas de IA de las galerías usan servicios de prueba; una captura no acredita cuentas conectadas ni ejecución de Docker. Consulte [procedencia de ALTAZOR](docs/altazor-2026-11-04/README.md), [conexiones y Secretos](docs/altazor-conexiones-2026-11-04/README.md), [navegación](docs/interfaz-2026-11-04/README.md) y [biblioteca](docs/assets/screenshots/README.md).
 
 ## El trabajo de una causa
@@ -68,6 +70,8 @@ La hoja ocupa el espacio principal; fuentes, referencias, historial y exportaci�
 
 Desde la conversación también puede pedir un encargo para un escritorio ya abierto: ALTAZOR presenta el texto completo, el proveedor y las aplicaciones elegidas antes de confirmar. La tarjeta del resultado abre esa misma sesión; sus operaciones de conexión se autorizan allí por separado. No se copian adjuntos, memoria ni secretos automáticamente.
 
+El recorrido recupera causas y escritorios anteriores aunque hayan salido de las listas recientes. Una conversación archivada conserva los resultados consultables, con acceso vigente a sus fuentes. Para continuar un ingreso manual, la persona puede mantener el mismo escritorio durante 20 minutos más, con un máximo de dos horas desde su apertura y una nueva comprobación de permisos.
+
 Las conexiones abarcan mensajería, oficina, calendarios, repositorios, productividad, redes sociales, diagramas y otros servicios. Su disponibilidad depende de la cuenta, los permisos, la plataforma del gateway y la configuración del proveedor. OAuth suele requerir una aplicación registrada; una tarjeta del catálogo no conecta una cuenta.
 
 ![Catálogo real de 48 aplicaciones en ALTAZOR, con cuentas sin configurar y datos ficticios; gateway de prueba simulado](docs/altazor-conexiones-2026-11-04/conexiones-desktop.png)
@@ -75,6 +79,12 @@ Las conexiones abarcan mensajería, oficina, calendarios, repositorios, producti
 Los trabajos académicos pueden preparar borradores para LinkedIn. La publicación personal exige revisar texto y cuenta y confirmar el envío; una respuesta incierta no se reenvía automáticamente. Las interacciones sociales permanecen en LinkedIn.
 
 **Secretos en el escritorio.** Una autorización dura hasta 60 segundos, vincula una versión del secreto con una sesión y se consume una vez. No pulsa Enter ni envía el formulario. El sitio y el campo son declarados por la persona: ALTAZOR comprueba sesión y control, pero no acredita el DOM ni la dirección de la página. Si el campo muestra el valor, el asistente podría verlo al devolverle el control. Los ajustes del gateway tienen un almacenamiento distinto al cifrado de Secretos. [Conexiones, operación y límites](docs/ALTAZOR-CONEXIONES.md).
+
+**Conectar una cuenta.** Google Workspace y GitHub ofrecen el recorrido **Conectar → ingreso en la página oficial → volver a LexOpen**. El administrador habilita el servicio una vez; cada profesional concede su propio acceso. Los campos de claves y tokens quedan en opciones avanzadas. La autorización de Google es temporal y se limita a metadatos de Drive; GitHub permite consultar el perfil y repositorios públicos. [Preparación y alcance](docs/ALTAZOR-CONEXIONES.md#inicio-de-sesión-sencillo).
+
+![Nuevo ingreso sencillo de Google en LexOpen; componente real con APIs y datos ficticios](docs/altazor-oauth-2026-11-05/google-desktop.png)
+
+[Vista móvil y procedencia de las capturas](docs/altazor-oauth-2026-11-05/README.md). Estas imágenes muestran pruebas controladas de la interfaz, no cuentas reales conectadas.
 
 <details>
 <summary><strong>Ver Secretos y el recorrido móvil</strong></summary>

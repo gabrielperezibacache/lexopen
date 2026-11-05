@@ -79,13 +79,18 @@ assert.equal(keepDemos.LEXOPEN_RELAX_CSRF, "0");
 const identityFile = path.join(tmp, "identity.env");
 fs.writeFileSync(
   identityFile,
-  "DATABASE_URL=postgresql://lexopen:host@127.0.0.1:54329/lexopen\nSESSION_SECRET=host-secret-value-ok\nPORT=3011\n",
+  "DATABASE_URL=postgresql://lexopen:host@127.0.0.1:54329/lexopen\nSESSION_SECRET=host-secret-value-ok\nPORT=3011\nAPP_URL=http://127.0.0.1:3011\nALTAZOR_GOOGLE_CLIENT_ID=host-google-client\nALTAZOR_GOOGLE_CLIENT_SECRET=host-google-fixture\nALTAZOR_GITHUB_CLIENT_ID=host-github-client\nALTAZOR_GITHUB_CLIENT_SECRET=host-github-fixture\n",
   "utf8"
 );
 const identityEnv = {
   DATABASE_URL: "postgresql://lexopen:lexopen@127.0.0.1:5432/lexopen_e2e",
   SESSION_SECRET: "shell-secret",
   PORT: "3000",
+  APP_URL: "https://unrelated.invalid",
+  ALTAZOR_GOOGLE_CLIENT_ID: "shell-google-client",
+  ALTAZOR_GOOGLE_CLIENT_SECRET: "shell-google-fixture",
+  ALTAZOR_GITHUB_CLIENT_ID: "shell-github-client",
+  ALTAZOR_GITHUB_CLIENT_SECRET: "shell-github-fixture",
 };
 preferEnvFileKeys(identityFile, undefined, identityEnv);
 assert.equal(
@@ -94,6 +99,11 @@ assert.equal(
 );
 assert.equal(identityEnv.SESSION_SECRET, "host-secret-value-ok");
 assert.equal(identityEnv.PORT, "3011");
+assert.equal(identityEnv.APP_URL, "http://127.0.0.1:3011");
+for (const provider of ["GOOGLE", "GITHUB"]) {
+  assert.equal(identityEnv[`ALTAZOR_${provider}_CLIENT_ID`], `host-${provider.toLowerCase()}-client`);
+  assert.equal(identityEnv[`ALTAZOR_${provider}_CLIENT_SECRET`], `host-${provider.toLowerCase()}-fixture`);
+}
 
 const electronMsg = setupPendingMessage({ isElectron: true, port: 3000 });
 assert.match(electronMsg, /Desktop/);

@@ -1,0 +1,22 @@
+.root { min-width: 0; padding-block: 1.25rem; border-block: 1px solid var(--line); margin-block: 1.5rem; }
+.root h4 { font-size: var(--text-lg); font-weight: 650; line-height: 1.4; margin: 0 0 .75rem; }
+.root p { max-width: 70ch; margin: .65rem 0; line-height: 1.7; overflow-wrap: anywhere; }
+.root a { color: var(--sea); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; margin-top: 1.25rem; }
+.root button, .root .admin > a { min-height: 44px; max-width: 100%; }
+.root .primary { background: var(--ink); color: var(--surface-solid); border-color: var(--ink); }
+.root button:focus-visible, .root a:focus-visible, .root input:focus-visible, .root summary:focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
+.error { color: var(--danger); }.notice, .connected { color: var(--sea); }
+.connected { display: flex; align-items: start; gap: .6rem; }.connected svg { flex: 0 0 auto; margin-top: .2rem; }
+.disconnect { display: grid; justify-items: start; gap: .75rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.root .disconnect > label.disconnectLabel { display: flex; align-items: start; gap: .65rem; font-size: 1rem; font-weight: 400; line-height: 1.65; }
+.disconnect input { flex: 0 0 auto; width: 18px; height: 18px; margin-top: .2rem; accent-color: var(--sea); }
+.admin { margin-top: 1.25rem; }.admin summary { cursor: pointer; min-height: 44px; padding-block: .65rem; }
+.root .admin > a { display: inline-flex; align-items: center; gap: .4rem; }
+.setup { padding-top: .5rem; }.setup code { overflow-wrap: anywhere; }
+.setup > button { margin-top: .75rem; }
+.setupLinks { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin-block: 1rem; }.root .setupLinks a { display: inline-flex; align-items: center; gap: .35rem; min-height: 44px; }
+.setupForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+.root .setupForm label { display: grid; gap: .5rem; min-width: 0; font-size: 1rem; }.root .setupForm input { width: 100%; min-width: 0; min-height: 46px; font-size: 1rem; }
+.setupForm > p, .setupForm > button { grid-column: 1 / -1; justify-self: start; }
+@media (max-width: 600px) { .root p, .root .disconnect > label { font-size: 1rem; }.actions { align-items: stretch; }.actions > button { flex: 1 1 auto; }.admin > a { flex-wrap: wrap; }.setupForm { grid-template-columns: minmax(0, 1fr); } }

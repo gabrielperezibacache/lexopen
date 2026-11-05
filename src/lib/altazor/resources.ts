@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
-import { assertCausaAccess, type CausaAccessUser } from "@/lib/auth/causa-access";
+import { assertCausaAccess, causaAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { actorFor, bookAccessWhere, bookFor } from "@/lib/books/access";
 import { resolveBookCitation } from "@/lib/books/service";
 import type { BookCitation } from "@/lib/books/types";
@@ -16,6 +16,16 @@ import { altazorSourceInputSchema, type AltazorSourceInput } from "./resource-in
 export { altazorSourceInputSchema, type AltazorSourceInput } from "./resource-input";
 type SourceClient = PrismaClient | Prisma.TransactionClient;
 type Options = { causaId?: string | null; client?: SourceClient };
+/** Pin an explicitly linked, currently accessible case even outside the recent picker page. */
+export async function altazorCauseOptions(user: CausaAccessUser, requestedId?: string | null, client: SourceClient = prisma) {
+  const actor = await actorFor(user, client), where = causaAccessWhere(actor);
+  const select = { id: true, titulo: true, rit: true } as const;
+  const causes = await client.causa.findMany({ where, select, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 100 });
+  if (!requestedId || causes.some(cause => cause.id === requestedId)) return causes;
+  const requested = await client.causa.findFirst({ where: { AND: [where, { id: requestedId }] }, select });
+  if (!requested) throw httpError("La causa solicitada no está disponible o ya no tiene acceso.", 404);
+  return [...causes, requested];
+}
 type Proof = { kind: "writing"; value: StoredWritingSource } | { kind: "book"; value: BookCitation } | { kind: "legal"; value: StoredCitation };
 export type AltazorSourceSnapshot = {
   version: 1; scopeKey: string; input: AltazorSourceInput; title: string; text: string; href: string;

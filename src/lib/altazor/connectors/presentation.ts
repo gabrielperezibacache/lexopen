@@ -10,5 +10,9 @@ const slackHelp: Record<string, string> = {
   client_secret: "Secreto de esa misma aplicación Slack. Se introduce aquí una vez; su valor no vuelve a mostrarse.",
 };
 export function connectorFieldPresentation(kind: string, field: ConnectorField) {
+  if (kind === "google-workspace" && field.name === "token") return { label: "Token temporal de Google (sólo lectura)", help: "Modalidad avanzada con permiso drive.metadata.readonly. Para el ingreso habitual, use Conectar Google. Este valor no vuelve a mostrarse y caduca según Google, sin renovación automática; permite consultar sólo metadatos de Drive." };
+  if (kind === "github" && field.name === "token") return { label: "Token de acceso de GitHub", help: "Modalidad avanzada: token fine-grained limitado al repositorio y a Contents: Read-only. Para el ingreso habitual, use Conectar GitHub. Su valor no vuelve a mostrarse." };
+  if (["google-workspace", "github"].includes(kind) && field.name === "client_id") return { label: labels.client_id, help: "Configuración avanzada de una aplicación propia en el gateway. Para el ingreso habitual, use el botón Conectar." };
+  if (["google-workspace", "github"].includes(kind) && field.name === "client_secret") return { label: labels.client_secret, help: "Secreto de su propia aplicación OAuth, cuando el proveedor lo requiera. Déjelo vacío si utiliza el token de acceso." };
   return { label: kind === "slack" && field.name === "url" ? "Dirección del webhook de Slack" : kind === "slack" && field.name === "token" ? "Token del bot de Slack" : labels[field.name] || field.label, help: kind === "slack" ? slackHelp[field.name] || field.help : field.help };
 }

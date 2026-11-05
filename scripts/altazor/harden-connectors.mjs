@@ -47,10 +47,86 @@ func TestLexOpenReadRequiresApprovalAndMissingStoreFailsClosed(t *testing.T) {
   if !held || got.err == "" || *posts != 0 { t.Fatal("missing approval store failed open") }
 }
 `;
+const googleTokenTests = `package connector
+
+import (
+  "context"
+  "io"
+  "net/http"
+  "strings"
+  "testing"
+)
+
+func TestLexOpenGoogleManualTokenSignsReadsAndRejectsWrites(t *testing.T) {
+  kind, _ := LookupKind("google-workspace")
+  settings := Settings{"token":"fictitious-google-read-only-access-token"}
+  if !kind.KeySet(settings) || kind.AuthOf(settings, false) != AuthToken { t.Fatal("manual token requires an OAuth app") }
+  found := false
+  for _, field := range kind.Fields {
+    if field.Name == "token" { found = field.Secret && !field.Required && field.Key == keyToken }
+  }
+  if !found { t.Fatal("manual token must be an optional secret account key") }
+  old := httpDo
+  t.Cleanup(func() { httpDo = old })
+  calls := 0
+  httpDo = func(req *http.Request) (*http.Response, error) {
+    calls++
+    if req.Header.Get("Authorization") != "Bearer " + settings["token"] { t.Fatal("Google request did not use the typed token") }
+    if req.Method != http.MethodGet { t.Fatal("temporary token made a write request") }
+    body := "{}"
+    switch req.URL.Path {
+    case "/gmail/v1/users/me/messages": body = "{\\"messages\\":[]}"
+    case "/calendar/v3/calendars/primary/events": body = "{\\"items\\":[]}"
+    case "/drive/v3/about":
+      if req.URL.Query().Get("fields") != "user(permissionId)" { t.Fatal("unexpected Drive fields") }
+      body = "{\\"user\\":{\\"permissionId\\":\\"fictitious-permission-id\\"}}"
+    default: t.Fatalf("unexpected Google path: %s", req.URL.Path)
+    }
+    return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}, nil
+  }
+  c, err := Build("google-workspace", WithTokenSource(settings, func(context.Context) (string,error) { t.Fatal("typed token unexpectedly used OAuth"); return "",nil }), "")
+  if err != nil { t.Fatal(err) }
+  account, err := c.(Checker).Check(context.Background())
+  if err != nil || account != "fictitious-permission-id" { t.Fatalf("check: %v %s", err, account) }
+  for _, args := range []map[string]any{
+    {"action":"list_mail"},
+    {"action":"list_events"},
+    {"action":"request", "path":"/drive/v3/about", "query":map[string]any{"fields":"user(permissionId)"}},
+  } { if _, err := c.Call(context.Background(), args); err != nil { t.Fatal(err) } }
+  before := calls
+  for _, args := range []map[string]any{
+    {"action":"send_mail", "to":"fixture@example.invalid", "text":"fictitious content"},
+    {"action":"request", "method":"POST", "path":"/drive/v3/files", "body":map[string]any{"name":"never created"}},
+    {"action":"request", "method":"DELETE", "path":"/drive/v3/files/fictitious-id"},
+  } { if _, err := c.Call(context.Background(), args); err == nil || !strings.Contains(err.Error(), "only permits reading") { t.Fatalf("write was not blocked: %v", err) } }
+  if calls != before { t.Fatal("rejected write reached Google") }
+}
+
+func TestLexOpenGoogleOAuthRemainsAvailableWithoutManualToken(t *testing.T) {
+  old := httpDo
+  t.Cleanup(func() { httpDo = old })
+  httpDo = func(req *http.Request) (*http.Response, error) {
+    if req.Header.Get("Authorization") != "Bearer fictitious-oauth-access-token" { t.Fatal("registered-app OAuth contract changed") }
+    if req.URL.Path == "/gmail/v1/users/me/profile" {
+      if req.Method != http.MethodGet { t.Fatal("registered-app check changed") }
+      return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("{\\"emailAddress\\":\\"fixture@example.invalid\\"}"))}, nil
+    }
+    if req.Method != http.MethodPost { t.Fatal("registered-app action changed") }
+    return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("{\\"id\\":\\"fictitious-message\\"}"))}, nil
+  }
+  c, err := Build("google-workspace", WithTokenSource(Settings{}, func(context.Context) (string,error) { return "fictitious-oauth-access-token",nil }), "")
+  if err != nil { t.Fatal(err) }
+  account, err := c.(Checker).Check(context.Background())
+  if err != nil || account != "fixture@example.invalid" { t.Fatal("registered-app account check changed") }
+  if _, err := c.Call(context.Background(), map[string]any{"action":"send_mail", "to":"fixture@example.invalid", "text":"synthetic transport only"}); err != nil { t.Fatal(err) }
+}
+`;
 const originals = {
   "internal/chat/limit.go": "860c0c96adfa350eab15801543c1471baf0ff077c7c0cca846906df264aa8d95",
   "internal/chat/approve.go": "2155d330c1a3b4c87278857c6b15e240b309dc756cfdd7ad020a5c6546f51106",
   "internal/gateway/gateway.go": "d39393bbb377e15cbdf01fdc2650524128c81fe91fabff19f68ca5b668f3a740",
+  "internal/connector/catalog.go": "35e3a8c86b985059788f9156ed257183b3b6b032deb104353d17fe8d3203a985",
+  "internal/connector/check.go": "8f31816ef9dbddb4f10c749878bda583567c59617196b96100871e641b3a2d09",
 };
 const hash = value => createHash("sha256").update(value).digest("hex");
 function once(source, before, after) {
@@ -60,6 +136,26 @@ function once(source, before, after) {
 
 // Exported separately so a small credential-free fixture can verify the actual rewrites.
 export function rewriteConnectorGate(path, source) {
+  if (path === "internal/connector/catalog.go") {
+    source = once(source, 'Fields: fApp("console.cloud.google.com (a Desktop or Web client)"),', 'Fields: signIn(nil, f("token", "Temporary Google access token (read only)", "Optional: access token from https://developers.google.com/oauthplayground/ using drive.metadata.readonly. Check reads only Drive account metadata. Expires according to Google; no automatic refresh. This mode blocks writes.", false, true), "console.cloud.google.com (a Desktop or Web client)"),');
+    return once(source, 'func (a *api) send(ctx context.Context, req *request) ([]byte, error) {', `func (a *api) send(ctx context.Context, req *request) ([]byte, error) {
+\t// LexOpen's manually supplied Google access token is a temporary, read-only mode.
+\t// Native Google actions do not set their own bearer header, unlike generic requests.
+\tif a.kind.Name == "google-workspace" && strings.TrimSpace(a.s["token"]) != "" {
+\t\tif req.method != "GET" && req.method != "HEAD" {
+\t\t\treturn nil, errors.New("the temporary Google token mode only permits reading; use a registered OAuth app for writing")
+\t\t}
+\t\tif req.headers == nil { req.headers = map[string]string{} }
+\t\treq.headers["Authorization"] = "Bearer " + strings.TrimSpace(a.s["token"])
+\t}`);
+  }
+  if (path === "internal/connector/check.go") {
+    return once(source, 'return get("https://gmail.googleapis.com/gmail/v1/users/me/profile", bearer(s["token"]))\n\t}, []string{"emailAddress"}},', `if strings.TrimSpace(s["token"]) != "" {
+\t\t\treturn get("https://www.googleapis.com/drive/v3/about?fields=user(permissionId)", bearer(strings.TrimSpace(s["token"])))
+\t\t}
+\t\treturn get("https://gmail.googleapis.com/gmail/v1/users/me/profile", nil)
+\t}, []string{"user.permissionId", "emailAddress"}},`);
+  }
   if (path === "internal/chat/limit.go") return `package chat
 
 import "github.com/madkoding/kitties/internal/kitty"
@@ -104,6 +200,7 @@ export async function hardenConnectors(directory) {
   // All inputs are checked before any file is written. Never run this against a user's gateway data.
   for (const [file, source] of changes) await writeFile(file, source);
   await writeFile(join(root, "internal/chat/lexopen_gate_test.go"), gateTests, { flag: "wx" });
+  await writeFile(join(root, "internal/connector/lexopen_google_token_test.go"), googleTokenTests, { flag: "wx" });
   await writeFile(join(root, ".lexopen-connector-gate"), CONNECTOR_GATE + "\n");
   return { source: PINNED_COMMIT, connectorGate: CONNECTOR_GATE, files: changes.length };
 }
