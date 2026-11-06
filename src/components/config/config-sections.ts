@@ -1,16 +1,33 @@
 export type ConfigSection = { id: string; label: string; labelEn: string };
+export type SettingsVisibility = { canManage: boolean; canSetCountry: boolean; assistant: boolean; communications: boolean };
 
 /** These fragment identifiers are public links; grouping never renames them. */
 export const CONFIG_CATEGORIES = [
+  {
+    id: "preferencias-personales", label: "Preferencias personales", labelEn: "Personal preferences",
+    description: "Cuenta, seguridad personal y preferencias de Altazor.",
+    descriptionEn: "Account, personal security and Altazor preferences.",
+    sections: [
+      { id: "cuenta-personal", label: "Cuenta", labelEn: "Account" },
+      { id: "preferencias-altazor", label: "Altazor", labelEn: "Altazor" },
+    ],
+  },
   {
     id: "estudio-equipo", label: "Estudio y equipo", labelEn: "Firm and team",
     description: "Datos del estudio, políticas de IA y personas que trabajan en él.",
     descriptionEn: "Firm details, AI policies and the people who work here.",
     sections: [
       { id: "estudio", label: "Estudio", labelEn: "Firm" },
+      { id: "work-country", label: "País de trabajo", labelEn: "Work country" },
       { id: "case-management-settings", label: "Gestión de causas", labelEn: "Case management" },
       { id: "usuarios", label: "Usuarios", labelEn: "Users" },
     ],
+  },
+  {
+    id: "comunicaciones", label: "Comunicaciones", labelEn: "Communications",
+    description: "Correo judicial y mensajes del estudio.",
+    descriptionEn: "Court mail and firm messages.",
+    sections: [{ id: "comunicaciones", label: "Correo y mensajes", labelEn: "Mail and messages" }],
   },
   {
     id: "conexiones-ia", label: "Conexiones e IA", labelEn: "Connections and AI",
@@ -47,6 +64,7 @@ export const CONFIG_CATEGORIES = [
     descriptionEn: "Language, Host diagnostics and demonstration data.",
     sections: [
       { id: "idioma", label: "Idioma", labelEn: "Language" },
+      { id: "apariencia", label: "Apariencia", labelEn: "Appearance" },
       { id: "runtime-settings", label: "Entorno", labelEn: "Environment" },
       { id: "host-status", label: "Host", labelEn: "Host" },
       { id: "purge-demo", label: "Demo", labelEn: "Demo" },
@@ -55,17 +73,19 @@ export const CONFIG_CATEGORIES = [
 ] as const;
 
 export const CONFIG_SECTIONS: readonly ConfigSection[] = CONFIG_CATEGORIES.flatMap<ConfigSection>(category => [...category.sections]);
-export function configCategoriesForMode(mode: "manual" | "pjud_cl") {
-  return CONFIG_CATEGORIES.map(category => ({ ...category, sections: category.sections.filter(section => mode === "pjud_cl" || !["pjud-settings", "pjud-log"].includes(section.id)) }));
+export function configCategoriesForMode(mode: "manual" | "pjud_cl", visibility: SettingsVisibility) {
+  return CONFIG_CATEGORIES.map(category => ({ ...category, sections: category.sections.filter(section => {
+    if (section.id === "preferencias-altazor") return visibility.assistant;
+    if (section.id === "comunicaciones") return visibility.communications;
+    if (section.id === "work-country") return visibility.canSetCountry;
+    if (["cuenta-personal", "idioma", "apariencia"].includes(section.id)) return true;
+    if (!visibility.canManage) return false;
+    return mode === "pjud_cl" || !["pjud-settings", "pjud-log"].includes(section.id);
+  }) })).filter(category => category.sections.length > 0);
 }
 
-export function configSectionFromHash(hash: string, mode: "manual" | "pjud_cl" = "pjud_cl") {
+export function configSectionFromHash(hash: string, categories: ReturnType<typeof configCategoriesForMode>) {
   let id;
   try { id = decodeURIComponent(hash.replace(/^#/, "")); } catch { return undefined; }
-  return configCategoriesForMode(mode).flatMap(category => category.sections).find(section => section.id === id);
-}
-
-export function configCategoryForSection(id: string, mode: "manual" | "pjud_cl" = "pjud_cl") {
-  const categories = configCategoriesForMode(mode);
-  return categories.find(category => category.sections.some(section => section.id === id)) || categories[0];
+  return categories.flatMap(category => category.sections).find(section => section.id === id);
 }

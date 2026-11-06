@@ -54,7 +54,6 @@ export const es = {
     secondary: { management: "Gestión", collaboration: "Equipo y colaboración", administration: "Administración" },
     mainNavigation: "Navegación principal",
     globalTools: "Herramientas globales",
-    pendingItems: "pendientes",
     shortcuts: "Accesos de trabajo",
     caseFiles: "Expedientes",
     myMatters: "Mis Causas",
@@ -109,6 +108,7 @@ export const es = {
     mailbox: "Correo PJUD",
     notifications: "Notificaciones",
     account: "Mi cuenta",
+    feedback: "Feedback",
   },
   siteTabs: {
     overview: "Resumen",

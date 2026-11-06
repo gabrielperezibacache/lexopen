@@ -56,7 +56,6 @@ export const en: Dictionary = {
     secondary: { management: "Management", collaboration: "Team and collaboration", administration: "Administration" },
     mainNavigation: "Main navigation",
     globalTools: "Global tools",
-    pendingItems: "pending",
     shortcuts: "Work shortcuts",
     caseFiles: "Case files",
     myMatters: "My Matters",
@@ -111,6 +110,7 @@ export const en: Dictionary = {
     mailbox: "PJUD mail",
     notifications: "Notifications",
     account: "My account",
+    feedback: "Feedback",
   },
   siteTabs: {
     overview: "Overview",

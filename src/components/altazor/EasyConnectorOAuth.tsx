@@ -14,11 +14,17 @@ type ProviderSetup = { provider: EasyConnectorProvider; label: string; configure
 type Props = { provider: EasyConnectorProvider; workspaceId: string | null; causaId?: string | null; hasActiveSession: boolean; busy?: boolean; onBusyChange: (busy: boolean) => void; onDisconnect: (name: string, requestId: string) => Promise<boolean> };
 const api = "/api/altazor/connectors/oauth";
 const adminGuide = "https://github.com/gabrielperezibacache/lexopen/blob/main/docs/ALTAZOR-CONEXIONES.md#inicio-de-sesión-sencillo";
-const providerLabels = { google: "Google", github: "GitHub" };
+const providerLabels = { google: "Google", github: "GitHub", dropbox: "Dropbox" };
+const providerOrigins: Record<EasyConnectorProvider, string> = { google: "https://accounts.google.com", github: "https://github.com", dropbox: "https://www.dropbox.com" };
+const providerHelp: Record<EasyConnectorProvider, string> = {
+  google: "Consulte la lista y los datos básicos de sus archivos de Drive. El contenido de los documentos queda fuera de este permiso.",
+  github: "Consulte su perfil y sus repositorios públicos de GitHub. Esta conexión permite lectura.",
+  dropbox: "Busque, liste y lea archivos de Dropbox con su autorización. El acceso es temporal y se renueva desde aquí cuando vence.",
+};
 
 function officialUrl(raw: string, provider: EasyConnectorProvider) {
-  const url = new URL(raw), host = provider === "google" ? "accounts.google.com" : "github.com";
-  if (url.protocol !== "https:" || url.hostname !== host || url.username || url.password || url.hash || raw.length > 12000 || ["access_token", "refresh_token", "client_secret", "password"].some(key => url.searchParams.has(key))) throw new Error("No se pudo confirmar la página oficial de ingreso. Vuelva a comprobar la conexión.");
+  const url = new URL(raw);
+  if (url.origin !== providerOrigins[provider] || url.username || url.password || url.hash || raw.length > 12000 || ["access_token", "refresh_token", "client_secret", "password"].some(key => url.searchParams.has(key))) throw new Error("No se pudo confirmar la página oficial de ingreso. Vuelva a comprobar la conexión.");
   return url.href;
 }
 
@@ -113,7 +119,7 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, hasActiveSe
   const computerHref = `/inicio?altazor=computer${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`;
   return <section className={styles.root} aria-labelledby={`${uid}-title`} data-testid="easy-connector-oauth">
     <h4 id={`${uid}-title`}>Conecte su cuenta de {label}</h4>
-    <p>{provider === "google" ? "Consulte la lista y los datos básicos de sus archivos de Drive. El contenido de los documentos queda fuera de este permiso." : "Consulte su perfil y sus repositorios públicos de GitHub. Esta conexión permite lectura."}</p>
+    <p>{providerHelp[provider]}</p>
     <p>Inicie sesión personalmente en la página oficial de {label}; al terminar volverá a este espacio.</p>
     {error && <p role="alert" className={styles.error}>{error}</p>}{notice && <p role="status" className={styles.notice}>{notice}</p>}
     {loading ? <p role="status">Comprobando su conexión…</p> : !workspaceId ? <p>El administrador debe preparar este espacio de ALTAZOR antes de conectar sus aplicaciones.</p> : <>

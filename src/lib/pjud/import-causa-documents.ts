@@ -1,8 +1,10 @@
 import { assertPjudManagementEnabled } from "@/lib/causas/management-mode";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
+import { assertCausaCapability } from "@/lib/auth/causa-access";
 import { fetchPjudMovimientos } from "@/lib/pjud/provider";
 import { normalizePjudCuaderno, type PjudFetchedMovimiento } from "@/lib/pjud/types";
+import { pjudDocumentRefHash } from "@/lib/pjud/document-identity";
 import {
   backupMovimientoDocuments,
   ingestPjudDocumentBuffer,
@@ -134,7 +136,7 @@ async function countPendingDocumentoRefs(causaId: string) {
   }).length;
 }
 
-async function runImport(causaId: string) {
+async function runImport(causaId: string, actorId: string) {
   const job = jobs.get(causaId);
   if (!job) return;
 
@@ -143,8 +145,17 @@ async function runImport(causaId: string) {
   job.delayMs = delayMs;
   job.maxPerRun = max;
 
-  try {
+  async function assertActive() {
     await assertPjudManagementEnabled();
+    const actor = await prisma.user.findUniqueOrThrow({
+      where: { id: actorId },
+      select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true },
+    });
+    await assertCausaCapability(causaId, actor, "causa.write");
+  }
+
+  try {
+    await assertActive();
     const causa = await prisma.causa.findUnique({
       where: { id: causaId },
       select: {
@@ -175,8 +186,8 @@ async function runImport(causaId: string) {
         tribunal: causa.tribunal,
         titulo: causa.titulo,
         caratula: causa.caratula,
-      }, { assertActive: assertPjudManagementEnabled });
-      await assertPjudManagementEnabled();
+      }, { assertActive });
+      await assertActive();
 
       // Persist OJV http refs onto local movimientos so phase 2 / UI can import them.
       for (const m of fetchResult.movimientos) {
@@ -189,8 +200,8 @@ async function runImport(causaId: string) {
         });
         if (!mov || mov.documentoRef?.startsWith("doc:")) continue;
         if (mov.documentoRef !== ref) {
-          await prisma.causaMovimiento.update({
-            where: { id: mov.id },
+          await prisma.causaMovimiento.updateMany({
+            where: { id: mov.id, causaId, documentoRef: mov.documentoRef },
             data: { documentoRef: ref },
           });
         }
@@ -223,6 +234,8 @@ async function runImport(causaId: string) {
             bytes: m.documentoBytes,
             filename: m.documentoFilename,
             esReceptor: m.esReceptor,
+            actorId,
+            expectedSourceRefHash: pjudDocumentRefHash(causaId, mov.id, mov.documentoRef || ""),
           });
           if (id) {
             scrapeSaved += 1;
@@ -250,6 +263,7 @@ async function runImport(causaId: string) {
       const backup = await backupMovimientoDocuments(causaId, {
         max: remainingBudget,
         delayMs,
+        actorId,
         force: true,
         onProgress: (info) => {
           job.currentLabel = info.label;
@@ -291,7 +305,7 @@ async function runImport(causaId: string) {
  * Start a sequential document import for one causa.
  * Only one import runs globally at a time to avoid saturating OJV.
  */
-export function startCausaDocImport(causaId: string): {
+export function startCausaDocImport(causaId: string, actorId: string): {
   started: boolean;
   alreadyRunning: boolean;
   globalBusy: boolean;
@@ -334,7 +348,7 @@ export function startCausaDocImport(causaId: string): {
   };
   globalRunningCausaId = causaId;
   jobs.set(causaId, job);
-  job.promise = runImport(causaId);
+  job.promise = runImport(causaId, actorId);
   return {
     started: true,
     alreadyRunning: false,

@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { minutaConfidentialWhere } from "@/lib/api";
 import { canSome } from "@/lib/auth/permissions";
-import { causaAccessWhere, documentReadWhere, plazoAccessWhere, taskAccessWhere } from "@/lib/auth/causa-access";
+import { causaAccessWhere, documentReadWhere, plazoAccessWhere, taskAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 
 export type NotificationSubject = {
   entityType?: string | null;
@@ -10,58 +10,53 @@ export type NotificationSubject = {
   href?: string | null;
 };
 
-/** Resolve the original resource again: memberships may change while mail is queued. */
-export async function notificationCausa(
-  subject: NotificationSubject,
-  tx: Prisma.TransactionClient
-): Promise<{ exists: boolean; causaId: string | null }> {
-  const id = subject.entityId;
-  const type = subject.entityType?.toLowerCase();
-  if (id && type === "causa") return { exists: true, causaId: id };
-  if (id && ["plazo", "minuta", "tramite", "documento"].includes(type || "")) {
-    const resource = type === "plazo"
-      ? await tx.plazo.findUnique({ where: { id }, select: { causaId: true } })
-      : type === "minuta"
-        ? await tx.minuta.findUnique({ where: { id }, select: { causaId: true } })
-        : type === "tramite"
-          ? await tx.tramite.findUnique({ where: { id }, select: { causaId: true } })
-          : await tx.documento.findUnique({ where: { id }, select: { causaId: true } });
-    return { exists: Boolean(resource), causaId: resource?.causaId || null };
-  }
-  if (id && type === "task") {
-    const task = await tx.task.findUnique({
-      where: { id }, select: { causaId: true, site: { select: { causaId: true } } },
-    });
-    return { exists: Boolean(task), causaId: task?.causaId || task?.site?.causaId || null };
-  }
-  const legacyCase = subject.href?.match(/^\/causas\/([^/?#]+)(?:[/?#]|$)/)?.[1];
-  return { exists: true, causaId: subject.causaId || legacyCase || null };
-}
-
-export async function canReceiveNotification(
-  userId: string,
-  subject: NotificationSubject,
-  tx: Prisma.TransactionClient
-) {
-  const user = await tx.user.findUnique({
+export function notificationActor(userId: string, tx: Prisma.TransactionClient) {
+  return tx.user.findUnique({
     where: { id: userId },
     select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true },
   });
-  if (!user) return false;
-  const type = subject.entityType?.toLowerCase(), id = subject.entityId;
-  if (id && type === "documento" && !await tx.documento.findFirst({ where: { id, ...documentReadWhere(user) }, select: { id: true } })) return false;
-  if (id && type === "plazo" && !await tx.plazo.findFirst({ where: { id, ...plazoAccessWhere(user) }, select: { id: true } })) return false;
-  if (id && type === "minuta" && !await tx.minuta.findFirst({ where: { id, ...minutaConfidentialWhere(user) }, select: { id: true } })) return false;
-  if (id && type === "task" && !await tx.task.findFirst({ where: { AND: [{ id }, taskAccessWhere(user)] }, select: { id: true } })) return false;
-  if (id && type === "message") {
-    if (!canSome(user, "client.message")) return false;
-    return Boolean(await tx.message.findFirst({ where: { id, receiverId: userId }, select: { id: true } }));
-  }
-  const resource = await notificationCausa(subject, tx);
-  if (!resource.exists) return false;
-  if (!resource.causaId) return true;
-  return Boolean(await tx.causa.findFirst({
-    where: { AND: [{ id: resource.causaId }, causaAccessWhere(user)] },
-    select: { id: true },
-  }));
+}
+
+/** Resolve each kind of original resource in one query per page. */
+export async function visibleNotificationSubjects<T extends NotificationSubject>(user: CausaAccessUser, subjects: readonly T[], tx: Prisma.TransactionClient) {
+  const candidates = subjects.map(subject => ({ subject, id: subject.entityId, type: subject.entityType?.toLowerCase() }));
+  const idsFor = (type: string) => [...new Set(candidates.flatMap(item => item.type === type && item.id ? [item.id] : []))];
+  const documento = idsFor("documento"), plazo = idsFor("plazo"), minuta = idsFor("minuta"), tramite = idsFor("tramite"), task = idsFor("task"), message = idsFor("message");
+  const fields = { id: true, causaId: true } as const;
+  const [documents, deadlines, minutes, proceedings, tasks, messages] = await Promise.all([
+    documento.length ? tx.documento.findMany({ where: { AND: [{ id: { in: documento } }, documentReadWhere(user)] }, select: fields }) : [],
+    plazo.length ? tx.plazo.findMany({ where: { AND: [{ id: { in: plazo } }, plazoAccessWhere(user)] }, select: fields }) : [],
+    minuta.length ? tx.minuta.findMany({ where: { AND: [{ id: { in: minuta } }, minutaConfidentialWhere(user)] }, select: fields }) : [],
+    tramite.length ? tx.tramite.findMany({ where: { id: { in: tramite } }, select: fields }) : [],
+    task.length ? tx.task.findMany({ where: { AND: [{ id: { in: task } }, taskAccessWhere(user)] }, select: { ...fields, site: { select: { causaId: true } } } }) : [],
+    message.length && canSome(user, "client.message") ? tx.message.findMany({ where: { id: { in: message }, receiverId: user.id }, select: { id: true } }) : [],
+  ]);
+  const causesByResource = (rows: { id: string; causaId: string | null }[]) => new Map(rows.map(row => [row.id, row.causaId]));
+  const byType = new Map([
+    ["documento", causesByResource(documents)], ["plazo", causesByResource(deadlines)], ["minuta", causesByResource(minutes)],
+    ["tramite", causesByResource(proceedings)], ["task", causesByResource(tasks.map(item => ({ id: item.id, causaId: item.causaId || item.site?.causaId || null })))],
+    ["message", causesByResource(messages.map(item => ({ id: item.id, causaId: null })))],
+  ]);
+  const resolved = candidates.flatMap(({ subject, id, type }) => {
+    if (id && type === "causa") return [{ subject, causaId: id }];
+    const resources = id && type ? byType.get(type) : undefined;
+    if (resources && id) {
+      const causaId = resources.get(id);
+      return causaId === undefined ? [] : [{ subject, causaId }];
+    }
+    const legacyCase = subject.href?.match(/^\/causas\/([^/?#]+)(?:[/?#]|$)/)?.[1];
+    return [{ subject, causaId: subject.causaId || legacyCase || null }];
+  });
+  const causeIds = [...new Set(resolved.flatMap(item => item.causaId ? [item.causaId] : []))];
+  const causes = causeIds.length ? await tx.causa.findMany({
+    where: { AND: [{ id: { in: causeIds } }, causaAccessWhere(user)] }, select: { id: true },
+  }) : [];
+  const readable = new Set(causes.map(cause => cause.id));
+  return resolved.filter(item => !item.causaId || readable.has(item.causaId)).map(item => item.subject);
+}
+
+/** Resolve the original resource again before delivery or acknowledgment. */
+export async function canReceiveNotification(userId: string, subject: NotificationSubject, tx: Prisma.TransactionClient) {
+  const user = await notificationActor(userId, tx);
+  return Boolean(user && (await visibleNotificationSubjects(user, [subject], tx)).length);
 }

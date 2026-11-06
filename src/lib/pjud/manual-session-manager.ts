@@ -352,7 +352,10 @@ export class ManualOjvSessionManager {
       for (const job of batch) {
         await this.active(record);
         const movement = movementById.get(job.movimiento.externalId!);
-        const saved = movement?.documentoBytes?.length ? await this.deps.ingestDocument({ causaId, movimientoId: job.movimientoId, bytes: movement.documentoBytes, filename: movement.documentoFilename, esReceptor: movement.esReceptor, requireReceipt: true }) : null;
+        const saved = movement?.documentoBytes?.length ? await this.deps.ingestDocument({
+          causaId, movimientoId: job.movimientoId, bytes: movement.documentoBytes, filename: movement.documentoFilename,
+          esReceptor: movement.esReceptor, actorId: user.id, expectedSourceRefHash: job.sourceRefHash, requireReceipt: true,
+        }) : null;
         if (!saved) await prisma.pjudDocumentJob.updateMany({ where: { id: job.id, status: { in: ["waiting_login", "pending", "failed"] } }, data: { status: "waiting_login", attempts: { increment: 1 }, nextAttemptAt: new Date(this.deps.now() + 15 * 60_000), lastErrorCode: "session_document_pending", lastError: "El documento no estaba disponible en esta lectura de OJV." } });
         if (record.view.documentProgress) record.view.documentProgress.attempted++;
       }

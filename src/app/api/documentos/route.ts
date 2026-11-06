@@ -10,6 +10,7 @@ import { writeAuditStrict } from "@/lib/audit";
 import { assertCausaCapability, documentReadWhere as scopeddocumentReadWhere } from "@/lib/auth/causa-access";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { canSeeConfidential } from "@/lib/auth/rbac";
+import { ingestManualCaseDocument } from "@/lib/causas/document-intake";
 import { prisma } from "@/lib/db";
 import { inferDocumentoTipo, normalizeIngestPath } from "@/lib/document-ingest";
 import { MAX_PROCESSING_BYTES } from "@/lib/document-processing";
@@ -154,15 +155,8 @@ export async function POST(req: NextRequest) {
         const bytes = Buffer.from(await uploaded.arrayBuffer());
         processingBytes = bytes;
         extractionStatus = "pending";
-        const key = newStorageKey("documentos", nombre);
-        await putObject({
-          key,
-          body: bytes,
-          contentType: mimeType,
-        });
-        storageKey = key;
       }
-      if (!storageKey) {
+      if (!processingBytes) {
         contenido = String(form.get("contenido") || "");
         mimeType = sanitizeUploadMimeType(mimeType || "text/plain");
       }
@@ -176,11 +170,20 @@ export async function POST(req: NextRequest) {
 
     mimeType = sanitizeUploadMimeType(mimeType || "text/markdown");
 
-    if (contenido && !storageKey) {
+    const original = processingBytes || (contenido ? Buffer.from(contenido, "utf8") : null);
+    if (causaId) {
+      const { doc, reused } = await ingestManualCaseDocument({
+        nombre, tipo, contenido, mimeType, ruta, extractionStatus, confidencial, privilegio, causaId, clienteId,
+      }, original, user);
+      if (processingBytes && !reused) enqueueDocumentProcessing({ id: doc.id, name: doc.nombre, bytes: processingBytes });
+      return NextResponse.json({ ...doc, reused }, { status: reused ? 200 : 201 });
+    }
+
+    if (original) {
       const key = newStorageKey("documentos", nombre);
       await putObject({
         key,
-        body: contenido,
+        body: original,
         contentType: mimeType,
       });
       storageKey = key;
@@ -214,16 +217,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (doc.causaId) {
-      await prisma.activity.create({
-        data: {
-          tipo: "documento",
-          mensaje: `Documento creado: ${doc.nombre}`,
-          causaId: doc.causaId,
-          userId: user.id,
-        },
-      });
-    }
     await writeAuditStrict({
       actorId: user.id,
       action: "documento.create",

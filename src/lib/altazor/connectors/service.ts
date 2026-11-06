@@ -8,7 +8,8 @@ import { assertComputerEnabled } from "../computer/policy";
 import { assertComputerPolicy } from "../computer/privacy";
 import { computerOperationHash } from "../computer/operation-hash";
 import { KittiesGateway } from "../computer/gateway";
-import { connectorNameSchema, validateConnectorConfiguration } from "./policy";
+import { assertGatewayOAuthAllowed, connectorNameSchema, validateConnectorConfiguration } from "./policy";
+import { EASY_OAUTH_PROVIDERS } from "./easy-oauth-providers";
 import type { ConnectorConfiguration, ConnectorInventory } from "./types";
 
 type Client = typeof prisma | Prisma.TransactionClient;
@@ -68,7 +69,7 @@ async function mutation(user: Actor, workspaceId: string, requestId: string, kin
     // Changing a native connection in advanced settings invalidates its old OAuth
     // proof before the external write, including when its outcome is uncertain.
     const name = input && typeof input === "object" && "name" in input ? String(input.name) : "";
-    if (["configure", "remove"].includes(kind)) for (const provider of ["google", "github"]) {
+    if (["configure", "remove"].includes(kind)) for (const provider of EASY_OAUTH_PROVIDERS) {
       if (name === `altazor-${provider}-${digest(`${actor.id}:${workspaceId}`).slice(0, 16)}`) await tx.personalConnectorAccount.updateMany({ where: { ownerId: actor.id, provider: `altazor-desktop:${workspaceId}:${provider}` }, data: { status: "reconnect_required", lastVerifiedAt: null, credentialsEnc: null } });
     }
     return tx.altazorConnectorOperation.create({ data: { ownerId: actor.id, workspaceId, requestId, kind, inputHash } });
@@ -103,7 +104,10 @@ export async function removeConnector(user: Actor, workspaceId: string, requestI
 }
 export async function beginConnectorOAuth(user: Actor, workspaceId: string, requestId: string, name: string) {
   connectorNameSchema.parse(name);
-  return mutation(user, workspaceId, requestId, "oauth", { name }, async client => ({ oauth: await client.connectorOAuth(name) }));
+  return mutation(user, workspaceId, requestId, "oauth", { name }, async client => ({ oauth: await client.connectorOAuth(name) }), false, async client => {
+    const settings = await client.connectorSettings();
+    assertGatewayOAuthAllowed(settings.connections.find(connection => connection.name === name)?.kind);
+  });
 }
 export async function testConnector(user: Actor, workspaceId: string, name: string) {
   connectorNameSchema.parse(name); const { workspace } = await access(user, workspaceId); await policy();

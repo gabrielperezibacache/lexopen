@@ -140,7 +140,7 @@ export function DocumentoIngestForm({
     if (confidencial) fd.set("confidencial", "on");
     if (privilegio) fd.set("privilegio", "on");
 
-    const result = await apiMutation<{ id?: string }>("/api/documentos", {
+    const result = await apiMutation<{ id?: string; reused?: boolean }>("/api/documentos", {
       method: "POST",
       body: fd,
     });
@@ -149,7 +149,7 @@ export function DocumentoIngestForm({
     }
     const body = result.data;
 
-    if (destinationFolder && body.id && resolvedCausaId) {
+    if (!body.reused && destinationFolder && body.id && resolvedCausaId) {
       const placement = await apiMutation(`/api/causas/${encodeURIComponent(resolvedCausaId)}/expediente`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -180,7 +180,7 @@ export function DocumentoIngestForm({
         };
       }
     }
-    return {};
+    return body.reused ? { warning: "El archivo ya está en el expediente. Se conservó su ubicación." } : {};
   }
 
   async function onSubmit(e: FormEvent) {

@@ -8,18 +8,18 @@ import { operationKey } from "@/lib/client-submission-key";
 import { AltazorSecretUse } from "./AltazorSecretUse";
 import type { ConnectorInventory } from "@/lib/altazor/connectors/types";
 import { desktopPoint } from "@/lib/altazor/computer/coordinates";
-import { COMPUTER_ATTACHMENT_FORMATS, type ComputerFile, type ComputerSessionView, type ComputerStatus } from "@/lib/altazor/computer/types";
+import { COMPUTER_ATTACHMENT_FORMATS, computerTurnNeedsHelp, type ComputerFile, type ComputerReview, type ComputerSessionView, type ComputerStatus } from "@/lib/altazor/computer/types";
 import styles from "./AltazorComputer.module.css";
 
 const api = "/api/altazor/computer";
 const stateLabel: Record<string, string> = { disabled: "Desactivado", unconfigured: "Por preparar", configured: "Escritorio preparado", error: "Requiere comprobación", creating: "Creación pendiente", starting: "Escritorio iniciándose", ready: "Escritorio disponible", unknown: "Creación sin confirmar", closed: "Escritorio detenido", expired: "Acceso vencido", stopped: "Escritorio detenido" };
 type ActionReply = { action: { id: string; status: string; result: { held?: boolean; cancelled?: boolean; stopped?: boolean } | null } };
-type PanelProps = { causaId?: string | null; active?: boolean; preferredSessionId?: string | null };
+type PanelProps = { causaId?: string | null; active?: boolean; preferredSessionId?: string | null; review?: ComputerReview };
 export function AltazorComputer(props: PanelProps) {
   return <ComputerPanel key={`${props.causaId || "personal"}:${props.preferredSessionId || "default"}`} {...props} />;
 }
 
-function ComputerPanel({ causaId, active = true, preferredSessionId }: PanelProps) {
+function ComputerPanel({ causaId, active = true, preferredSessionId, review }: PanelProps) {
   const uid = useId(), tokenRef = useRef<HTMLInputElement>(null), openedFromLink = useRef(false), selectedRef = useRef(""), selectionEpoch = useRef(0);
   const [status, setStatus] = useState<ComputerStatus | null>(null), [view, setView] = useState<ComputerSessionView | null>(null), [selected, setSelected] = useState("");
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState(""), [notice, setNotice] = useState("");
@@ -30,6 +30,8 @@ function ComputerPanel({ causaId, active = true, preferredSessionId }: PanelProp
   const [frame, setFrame] = useState(0), [manualText, setManualText] = useState("");
   const [inventory, setInventory] = useState<ConnectorInventory | null>(null), [connections, setConnections] = useState<string[]>([]);
   const [zoom, setZoom] = useState(0), [screenWidth, setScreenWidth] = useState(1280);
+  const title = useRef<HTMLHeadingElement>(null), approvalHeading = useRef<HTMLHeadingElement>(null);
+  const helpMessage = useRef<HTMLElement>(null), openedReview = useRef(false);
   const query = causaId ? `?causaId=${encodeURIComponent(causaId)}` : "";
   const selectSession = useCallback((id: string) => { selectedRef.current = id; selectionEpoch.current++; setSelected(id); setView(null); setRenewConfirmed(false); setRenewKey(""); }, []);
   const refresh = useCallback(async () => {
@@ -69,6 +71,13 @@ function ComputerPanel({ causaId, active = true, preferredSessionId }: PanelProp
     queueMicrotask(poll); const timer = setInterval(poll, 6000);
     return () => { live = false; clearInterval(timer); };
   }, [active, selected, loadSession]);
+  useEffect(() => {
+    if (!active) { openedReview.current = false; return; }
+    if (!review || !preferredSessionId || view?.session.id !== preferredSessionId || openedReview.current) return;
+    openedReview.current = true;
+    const heading = review === "approval" ? approvalHeading.current : helpMessage.current;
+    (heading ?? title.current)?.focus();
+  }, [active, review, preferredSessionId, view]);
   async function mutate<T>(url: string, body: unknown): Promise<T | null> {
     setBusy(true); setError(""); setNotice("");
     try { const result = await apiMutation<T>(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); if (!result.ok) { setError(result.error); return null; } return result.data; }
@@ -137,8 +146,9 @@ function ComputerPanel({ causaId, active = true, preferredSessionId }: PanelProp
   const canAct = Boolean(selected && view && selectedState === "ready"), canWork = canAct && Boolean(status?.policyAllowed);
   const canCleanup = Boolean(selected && selectedSummary && selectedState !== "closed");
   const needsStop = Boolean(status?.sessions.some(session => session.requiresStop || ["creating", "starting", "ready", "unknown"].includes(session.state)));
+  const lastTurn = view?.turns.at(-1);
   return <section className={styles.root} aria-labelledby={`${uid}-title`}>
-    <header className={styles.header}><div><h2 id={`${uid}-title`}>Escritorio de Altazor</h2><p>Encarga una tarea con los archivos que elijas o toma el control para revisar el trabajo.</p></div><Monitor size={24} aria-hidden="true" /></header>
+    <header className={styles.header}><div><h2 id={`${uid}-title`} ref={title} tabIndex={-1}>Escritorio de Altazor</h2><p>Encarga una tarea con los archivos que elijas o toma el control para revisar el trabajo.</p></div><Monitor size={24} aria-hidden="true" /></header>
     {error && <p className={styles.error} role="alert">{error}{linkFailure && <> <a href={`/inicio?altazor=computer${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`}>Volver a los escritorios de este ámbito</a></>}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
     <div className={styles.status} aria-busy={loading}>
       <strong>{loading ? "Consultando escritorio…" : status ? stateLabel[status.state] : "Estado no disponible"}</strong>
@@ -165,8 +175,16 @@ function ComputerPanel({ causaId, active = true, preferredSessionId }: PanelProp
       {canAct ? <><div className={styles.actions} aria-label="Ampliación del escritorio"><button type="button" aria-pressed={zoom === 0} onClick={() => setZoom(0)}>Vista completa</button><button type="button" aria-pressed={zoom === 1} onClick={() => setZoom(1)}>Tamaño real · 100 %</button><button type="button" aria-pressed={zoom === 1.5} onClick={() => setZoom(1.5)}>Ampliar · 150 %</button></div><p id={`${uid}-zoom-help`} className={styles.expiry}>Amplíe para leer y elegir un campo. Deslice la vista en ambas direcciones; con teclado, enfoque la imagen y use las flechas para desplazarse.</p><div className={styles.screen} tabIndex={0} role="region" aria-label="Vista del escritorio con desplazamiento" aria-describedby={`${uid}-zoom-help`}><Image key={`${selected}:${frame}`} unoptimized src={`${api}/sessions/${encodeURIComponent(selected)}/screenshot?frame=${frame}`} width={1280} height={800} alt="Captura del escritorio privado en contenedor" style={zoom ? { width: `${screenWidth * zoom}px`, maxWidth: "none" } : undefined} onLoad={event => setScreenWidth(event.currentTarget.naturalWidth)} className={held ? styles.controllable : undefined} onClick={event => { if (!held || busy || !canWork) return; const image = event.currentTarget, rect = image.getBoundingClientRect(); const point = desktopPoint({ x: event.clientX, y: event.clientY }, rect, { width: image.naturalWidth, height: image.naturalHeight }); if (point) void action({ action: "input", input: { action: "click", args: point } }); }} /></div><div className={styles.actions}><button type="button" disabled={busy} onClick={() => setFrame(Date.now())}>Actualizar captura</button>{held && canWork && <><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "key", args: { keys: "Return" } } })}>Enter</button><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "key", args: { keys: "Tab" } } })}>Tab</button><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "scroll", args: { direction: "down", amount: 3 } } })}>Desplazar abajo</button></>}</div>{held && canWork && <form className={styles.manual} onSubmit={event => { event.preventDefault(); void action({ action: "input", input: { action: "type", args: { text: manualText } } }).then(() => setManualText("")); }}><label htmlFor={`${uid}-manual`}>Texto para escribir manualmente en el escritorio</label><input id={`${uid}-manual`} value={manualText} type="password" autoComplete="off" maxLength={2000} disabled={busy} onChange={event => setManualText(event.target.value)} /><button type="submit" disabled={busy || !manualText}>Escribir en escritorio</button><p>Se envía al teclado del contenedor, sin incorporarse al chat del modelo.</p></form>}</> : <p className={styles.waiting}><CircleAlert size={18} aria-hidden="true" />El escritorio todavía no está disponible. No se muestra una imagen de demostración.</p>}
       {held && canWork && <AltazorSecretUse key={selected} sessionId={selected} onBusyChange={setBusy} />}
       {view?.session.connectors?.length ? <p className={styles.expiry}>Aplicaciones autorizadas para esta sesión: {view.session.connectors.join(", ")}.</p> : null}
-      {view?.approvals?.length ? <section className={styles.approvals} aria-label="Autorizaciones de aplicaciones"><h3>ALTAZOR espera su decisión</h3><p>Revise el destino y el contenido. Autorizar ejecuta esta operación una sola vez.</p>{view.approvals.map(approval => <article key={approval.id}><h4>{approval.connector} · {approval.action}</h4><p>{approval.summary}</p><pre>{JSON.stringify(approval.args, null, 2)}</pre>{!approval.reviewable && <p>El detalle contiene datos ocultos o supera el límite de revisión. Puede rechazarlo y realizar la operación directamente en la aplicación.</p>}<div className={styles.actions}><button type="button" disabled={busy || !canWork || held || !approval.reviewable} onClick={() => action({ action: "connector_approval", approvalId: approval.id, approve: true })}>Autorizar esta operación</button><button type="button" disabled={busy || !canAct} onClick={() => action({ action: "connector_approval", approvalId: approval.id, approve: false })}>Rechazar</button></div>{held && <p>Devuelva el control para ejecutar una operación autorizada.</p>}</article>)}</section> : null}
-      <div className={styles.chat} aria-live="polite">{view?.turns.length ? view.turns.map(turn => <article key={turn.index}><strong>{turn.from === "user" ? "Usted" : turn.from === "assistant" ? "Altazor AI" : "Sistema"}{turn.working ? " · trabajando" : ""}{turn.needsHelp ? " · requiere su intervención" : ""}</strong><p>{turn.text}</p>{turn.steps.length > 0 && <small>{turn.steps.map(step => step.action).join(" · ")}</small>}</article>) : <p>Escriba una tarea y elija expresamente sus archivos. La conversación de ALTAZOR y los expedientes no se envían automáticamente.</p>}</div>
+      {view?.approvals?.length ? <section className={styles.approvals} aria-label="Autorizaciones de aplicaciones"><h3 ref={approvalHeading} tabIndex={-1}>Altazor espera tu decisión</h3><p>Revise el destino y el contenido. Autorizar ejecuta esta operación una sola vez.</p>{view.approvals.map(approval => <article key={approval.id}><h4>{approval.connector} · {approval.action}</h4><p>{approval.summary}</p><pre>{JSON.stringify(approval.args, null, 2)}</pre>{!approval.reviewable && <p>El detalle contiene datos ocultos o supera el límite de revisión. Puede rechazarlo y realizar la operación directamente en la aplicación.</p>}<div className={styles.actions}><button type="button" disabled={busy || !canWork || held || !approval.reviewable} onClick={() => action({ action: "connector_approval", approvalId: approval.id, approve: true })}>Autorizar esta operación</button><button type="button" disabled={busy || !canAct} onClick={() => action({ action: "connector_approval", approvalId: approval.id, approve: false })}>Rechazar</button></div>{held && <p>Devuelva el control para ejecutar una operación autorizada.</p>}</article>)}</section> : null}
+      <div className={styles.chat} aria-live="polite">{view?.turns.length ? view.turns.map(turn => {
+        const help = turn === lastTurn && computerTurnNeedsHelp(turn);
+        return <article key={turn.index} {...(help ? { ref: helpMessage, tabIndex: -1, "aria-label": "Solicitud de ayuda de Altazor" } : {})}>
+          <strong>{turn.from === "user" ? "Usted" : turn.from === "assistant" ? "Altazor AI" : "Sistema"}{help ? " · necesita tu ayuda" : turn.working ? " · trabajando" : ""}</strong>
+          {turn.text && <p>{turn.text}</p>}
+          {help && turn.working && <p>Toma el control del escritorio y devuélveselo a Altazor cuando termines.</p>}
+          {turn.steps.length > 0 && <small>{turn.steps.map(step => step.action).join(" · ")}</small>}
+        </article>;
+      }) : <p>Escriba una tarea y elija expresamente sus archivos. La conversación de ALTAZOR y los expedientes no se envían automáticamente.</p>}</div>
       <form className={styles.composer} onSubmit={event => { event.preventDefault(); void send(); }}><label htmlFor={`${uid}-task`}>Tarea para este escritorio</label><textarea id={`${uid}-task`} rows={4} value={text} maxLength={16000} disabled={busy || !canWork || held} onChange={event => { setText(event.target.value); setApproved(false); setMessageKey(""); }} /><label htmlFor={`${uid}-files`}>Archivos elegidos para esta tarea</label><input key={files.length ? "selected" : "empty"} id={`${uid}-files`} type="file" multiple accept={COMPUTER_ATTACHMENT_FORMATS} disabled={busy || !canWork || held} onChange={event => { const chosen = Array.from(event.target.files || []); if (chosen.length > 5 || chosen.reduce((total, file) => total + file.size, 0) > 20 * 1024 * 1024) { setError("Elija hasta cinco archivos y 20 MiB en total."); event.target.value = ""; setFiles([]); return; } setFiles(chosen); setApproved(false); setMessageKey(""); }} />{files.length > 0 && <ul>{files.map((file, index) => <li key={`${file.name}:${index}`}>{file.name} · {(file.size / 1024).toFixed(0)} KiB</li>)}</ul>}<label className={styles.check}><input type="checkbox" checked={approved} disabled={busy || !canWork || held} onChange={event => setApproved(event.target.checked)} />Autorizo enviar esta tarea y sólo estos archivos al gateway y a su proveedor configurado.</label><button type="submit" className={styles.primary} disabled={busy || !canWork || held || !approved || !text.trim()}>{busy ? "Enviando…" : "Enviar tarea al escritorio"}</button></form>
     </div>}
   </section>;

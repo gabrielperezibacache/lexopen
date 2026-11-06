@@ -7,7 +7,7 @@ import { normalizeAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { ConnectorError, digest, encryptionKey, seal, unseal } from "@/lib/personal-connectors/core";
 import { assertComputerEnabled, assertSessionLive, COMPUTER_LIMITS, computerEnabled, endpointFor, inputSchema, inspectSelectedFiles, type PersonInput } from "./policy";
 import { KittiesGateway } from "./gateway";
-import type { ComputerActivity, ComputerActivityState, ComputerMessage, ComputerSessionSummary, ComputerSessionView, ComputerStatus } from "./types";
+import { computerTurnNeedsHelp, type ComputerActivity, type ComputerActivityState, type ComputerMessage, type ComputerSessionSummary, type ComputerSessionView, type ComputerStatus } from "./types";
 import { assertComputerPolicy, computerPolicyAllowed, COMPUTER_LOCAL_ONLY_REASON } from "./privacy";
 import { computerOperationHash } from "./operation-hash";
 import { prepareSecretUse, redeemSecretUse, revokeSecretUse } from "@/lib/altazor/secrets/service";
@@ -228,7 +228,9 @@ export async function readComputerActivity(user: CausaAccessUser, causaId?: stri
   if (!computerPolicyAllowed(await computerPolicy())) return reply("restricted");
   if (await passiveControlHeld(after.session)) return reply("paused", candidate.id, true);
   if (view.session.state !== "ready") return reply(view.session.state === "starting" ? "starting" : "unavailable", candidate.id, true);
-  return reply(view.approvals.length ? "approval" : view.working ? "working" : "ready", candidate.id, true);
+  if (view.approvals.length) return reply("approval", candidate.id, true);
+  if (computerTurnNeedsHelp(view.turns.at(-1))) return reply("help", candidate.id, true);
+  return reply(view.working ? "working" : "ready", candidate.id, true);
 }
 function actionView(row: AltazorComputerAction) { return { id: row.id, status: row.status === "sending" && Date.now() - row.createdAt.getTime() > 60_000 ? "unknown" : row.status, result: row.status === "completed" && row.resultJson ? JSON.parse(row.resultJson) as Record<string, unknown> : null }; }
 function assertRenewable(session: AltazorComputerSession, now = Date.now()) {

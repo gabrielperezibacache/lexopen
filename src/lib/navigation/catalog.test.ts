@@ -10,10 +10,10 @@ for (const role of ROLES) {
   const entries = navigationEntries(model);
   assert.equal(new Set(entries.map(entry => entry.id)).size, entries.length, `${role}: unique destinations`);
   if ((STAFF_ROLES as readonly string[]).includes(role)) {
-    assert.equal(model.areas.length, canSome({ role }, "assistant.use") ? 8 : 7, `${role}: accessible work areas`);
+    assert.equal(model.areas.length, canSome({ role }, "assistant.use") ? 7 : 6, `${role}: accessible work areas`);
     for (const area of model.areas) assert.ok(entries.some(entry => entry.href === area.href), `${role}: reachable area ${area.id}`);
-    for (const href of ["/clientes", "/correo", "/facturacion", "/audiencias", "/biblioteca"]) assert.ok(entries.some(entry => entry.href === href), `${role}: read gate is staff ${href}`);
-    assert.equal(entries.some(entry => entry.href === "/configuracion"), role === "admin");
+    for (const href of ["/clientes", "/configuracion", "/facturacion", "/audiencias", "/biblioteca"]) assert.ok(entries.some(entry => entry.href === href), `${role}: read gate is staff ${href}`);
+    assert.ok(entries.every(entry => !["/correo", "/mensajes", "/configuracion#comunicaciones"].includes(entry.href)), `${role}: communications absent from unconfigured discovery`);
     assert.equal(entries.some(entry => entry.href === "/auditoria"), role === "admin");
   } else {
     assert.equal(model.mode, "portal");
@@ -32,14 +32,20 @@ for (const subject of [null, undefined, { role: "" }, { role: "unknown" }]) asse
 const delegated = navigationEntries(buildNavigation({ role: "socio", capabilityGrants: "host.admin,audit.read" }));
 assert.ok(delegated.some(entry => entry.id === "configuracion"), "delegated Host administrators can find firm settings");
 assert.equal(delegated.some(entry => entry.id === "auditoria"), false, "audit remains role-gated in navigation");
-assert.equal(navigationEntries(buildNavigation({ role: "admin", capabilityRevokes: "host.admin" })).some(entry => entry.id === "configuracion"), false, "revoked Host administration hides firm settings");
+assert.equal(navigationEntries(buildNavigation({ role: "admin", capabilityRevokes: "host.admin" })).some(entry => entry.id === "configuracion"), true, "personal settings remain accessible when Host administration is revoked");
 assert.equal(navigationEntries(buildNavigation({ role: "cliente", capabilityGrants: "host.admin" })).some(entry => entry.id === "configuracion"), false, "portal access never exposes firm settings");
 assert.equal(navigationEntries(buildNavigation({ role: "abogado", capabilityRevokes: "assistant.use" })).some(entry => entry.id === "agente"), false);
 assert.equal(buildNavigation({ role: "abogado", capabilityRevokes: "assistant.use" }).areas.some(area => area.id === "academico"), false);
 assert.ok(buildNavigation({ role: "contabilidad" }).shortcuts.some(entry => entry.id === "facturacion"));
 assert.equal(buildNavigation({ role: "procurador" }).shortcuts.length, 0);
 
-const staff = buildNavigation({ role: "socio" }, { caseManagementMode: "pjud_cl" });
+const staff = buildNavigation({ role: "socio" }, { caseManagementMode: "pjud_cl", communicationsAvailable: true });
+assert.equal(staff.utilities.find(entry => entry.id === "mail-settings")?.href, "/configuracion#comunicaciones");
+assert.ok(!navigationEntries(staff).some(entry => ["/correo", "/mensajes"].includes(entry.href)), "staff communications open from settings, not as separate navigation entries");
+assert.ok(!navigationEntries(buildNavigation({ role: "cliente" }, { communicationsAvailable: true })).some(entry => entry.id === "mail-settings"));
+assert.deepEqual(navigationBreadcrumbs(staff, "/correo?id=mail").map(crumb => crumb.href), ["/inicio", "/configuracion", "/configuracion#comunicaciones", "/correo"]);
+assert.deepEqual(navigationBreadcrumbs(staff, "/mensajes").map(crumb => crumb.href), ["/inicio", "/configuracion", "/configuracion#comunicaciones", "/mensajes"]);
+assert.equal(activeNavigationEntry(staff, "/configuracion/correo")?.id, "configuracion");
 for (const [path, area, destination] of [
   ["/causas/a-case/escritos?draft=a-writing", "causas", "causas"],
   ["/causas/a-case/expediente?carpeta=prueba", "causas", "my-matters"],

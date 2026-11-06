@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { loginAs } from "./helpers";
+import { CSRF_COOKIE, CSRF_HEADER } from "../src/lib/auth/csrf-constants";
 
 const legacyAnchors = ["idioma", "estudio", "usuarios", "transcription-settings", "llm-settings", "obsidian-settings", "google-settings", "notify-settings", "pjud-settings", "pjud-log", "runtime-settings", "integraciones-overview", "host-status", "purge-demo"];
 
-test("ajustes móviles: cinco categorías, ancla estable durante la carga y destinos antiguos", async ({ page }, info) => {
+test("ajustes móviles: categorías, ancla estable durante la carga y destinos antiguos", async ({ page }, info) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await loginAs(page, "socio@estudio.cl");
@@ -19,7 +20,7 @@ test("ajustes móviles: cinco categorías, ancla estable durante la carga y dest
     await page.goto("/configuracion#runtime-settings");
     const category = page.getByRole("combobox", { name: "Categoría de configuración" });
     await expect(category).toHaveValue("aplicacion-datos");
-    await expect(category.locator("option")).toHaveCount(5);
+    await expect(category.locator("option")).toHaveCount(7);
     const runtime = page.locator("#runtime-settings");
     await expect(runtime).toHaveCount(1);
     await expect(runtime).toContainText("Cargando");
@@ -37,6 +38,53 @@ test("ajustes móviles: cinco categorías, ancla estable durante la carga y dest
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     await page.screenshot({ path: info.outputPath("settings-categories-mobile.png"), fullPage: false });
   } finally { release(); }
+});
+
+test("el país muestra Comunicaciones de forma independiente de la modalidad PJUD", async ({ page }, info) => {
+  test.slow();
+  await loginAs(page, "socio@estudio.cl");
+  const modePath = "/api/configuracion/causas", countryPath = "/api/configuracion/pais";
+  const previousMode = await (await page.request.get(modePath)).json();
+  const previousCountry = await (await page.request.get(countryPath)).json();
+  const csrf = (await page.context().cookies()).find(cookie => cookie.name === CSRF_COOKIE)?.value;
+  expect(csrf).toBeTruthy();
+  async function patch(path: string, data: object) {
+    const response = await page.request.patch(path, { data, headers: { [CSRF_HEADER]: csrf!, origin: new URL(page.url()).origin } });
+    expect(response.ok(), await response.text()).toBeTruthy();
+  }
+  try {
+    await patch(modePath, { mode: "manual" });
+    await patch(countryPath, { country: "AR" });
+    const settingsMarkup = await page.request.get("/configuracion");
+    expect(settingsMarkup.ok()).toBeTruthy();
+    expect(await settingsMarkup.text()).not.toContain("claveUnicaPasswordEnc");
+    await page.goto("/configuracion#work-country");
+    const country = page.getByRole("combobox", { name: "País", exact: true });
+    await expect(country).toHaveValue("AR");
+    await expect(page.locator("#comunicaciones")).toHaveCount(0);
+    await country.selectOption("CL");
+    await page.getByRole("button", { name: "Guardar país" }).click();
+    await expect(page.locator("#comunicaciones").getByRole("link", { name: "Configurar correo" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Gestión manual" })).toBeChecked();
+    await page.getByRole("radio", { name: "Poder Judicial de Chile" }).check();
+    await page.getByRole("button", { name: "Guardar modalidad" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Modalidad guardada" })).toBeVisible();
+    await country.selectOption("AR");
+    await page.getByRole("button", { name: "Guardar país" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "País de trabajo guardado" })).toBeVisible();
+    await page.reload();
+    await expect(country).toHaveValue("AR");
+    await expect(page.locator("#comunicaciones")).toHaveCount(1);
+    await expect(page.locator("#comunicaciones")).toBeVisible();
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("/configuracion#comunicaciones");
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await page.screenshot({ path: info.outputPath("comunicaciones-movil.png") });
+  } finally {
+    await patch(countryPath, previousCountry);
+    await patch(modePath, previousMode);
+  }
 });
 
 test("ajustes: cambiar de categoría y usar atrás/adelante conserva campos y mensajes sin guardar", async ({ page }, info) => {

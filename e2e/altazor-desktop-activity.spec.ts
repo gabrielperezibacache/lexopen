@@ -32,3 +32,45 @@ test("Inicio móvil muestra el escritorio activo debajo del mensaje y lo oculta 
   expect(captures).toBe(previous);
   expect(mutations).toEqual([]);
 });
+
+for (const state of ["help", "approval"] as const) {
+  test(`la conversación lleva a la revisión del escritorio (${state}) sin autorizarla`, async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    const sessionId = `desktop-review-${state}`;
+    const session = { id: sessionId, state: "ready", held: false, canRenew: false, connectors: [] };
+    const isHelp = state === "help";
+    const mutations: string[] = [];
+    page.on("request", request => {
+      if (request.url().includes("/api/altazor/computer") && request.method() !== "GET") mutations.push(request.url());
+    });
+    await page.route("**/api/altazor/computer/activity", route => route.fulfill({ json: { state, sessionId, monitor: true } }));
+    await page.route(`**/api/altazor/computer?sessionId=${sessionId}`, route => route.fulfill({
+      json: { computer: { enabled: true, configured: true, policyAllowed: true, state: "configured", sessions: [session] } },
+    }));
+    await page.route(`**/api/altazor/computer/sessions/${sessionId}`, route => route.fulfill({
+      json: {
+        session,
+        approvals: isHelp ? [] : [{ id: "fixture-approval", connector: "Dropbox de prueba", action: "list_folder", summary: "Listar carpeta de prueba", args: { path: "/prueba" }, reviewable: true }],
+        turns: isHelp ? [{ index: 0, from: "assistant", text: "", working: true, needsHelp: false, steps: [{ action: "ask_help", at: "" }] }] : [],
+      },
+    }));
+    await page.route(`**/api/altazor/computer/sessions/${sessionId}/screenshot?*`, route => route.fulfill({
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7ioAAAAASUVORK5CYII=", "base64"),
+      contentType: "image/png",
+    }));
+    await loginAs(page, "abogado@estudio.cl");
+    await expect(page.getByRole("status").filter({ hasText: isHelp ? "Altazor necesita tu ayuda" : "Espera tu confirmación" })).toBeVisible();
+    await page.getByRole("button", { name: isHelp ? "Revisar solicitud" : "Revisar autorización" }).click();
+    if (isHelp) {
+      const request = page.getByRole("article", { name: "Solicitud de ayuda de Altazor" });
+      await expect(request).toContainText("Toma el control del escritorio y devuélveselo a Altazor cuando termines.");
+      await expect(request).toBeFocused();
+      await expect(page.getByRole("button", { name: "Tomar control" })).toBeEnabled();
+    } else {
+      await expect(page.getByRole("heading", { name: "Altazor espera tu decisión" })).toBeFocused();
+      await expect(page.getByText("Listar carpeta de prueba", { exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Autorizar esta operación" })).toBeEnabled();
+    }
+    expect(mutations).toEqual([]);
+  });
+}

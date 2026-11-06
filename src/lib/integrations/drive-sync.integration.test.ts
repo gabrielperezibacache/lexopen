@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { prisma } from "@/lib/db";
+import { ingestManualCaseDocument } from "@/lib/causas/document-intake";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { configureDriveSync, processDueDriveSyncSubscriptions } from "./drive-sync";
 
@@ -49,6 +50,10 @@ async function main() {
       const match = url.pathname.match(/_(\d{3})$/); assert.ok(match); const index = Number(match[1]); return Response.json(deniedFirst && index === 400 ? deniedMeta() : index >= 100 && index < 200 ? nestedMeta(index) : metadata(index));
     };
     const deps = { client: prisma, fetch: fixtureFetch, session: async () => ({ scopes: ["https://www.googleapis.com/auth/drive.file"], syncDrive: true, syncCalendar: false, accessToken: "fixture-only-never-real", connectedEmail: "fixture@drive.invalid" }), enqueue: () => { enqueued++; return true; } };
+    const manual = await ingestManualCaseDocument({
+      causaId, clienteId: null, nombre: "Original manual.txt", tipo: "otro", contenido: null, mimeType: "text/plain",
+      ruta: null, extractionStatus: "pending", confidencial: false, privilegio: false,
+    }, bytes(), user);
     await assert.rejects(configureDriveSync(causaId, other, { enabled: true, intervalMinutes: 60, account: "study" }), (error: unknown) => (error as { status: number }).status === 404);
     await configureDriveSync(causaId, user, { enabled: true, intervalMinutes: 60, account: "study" });
     const run = async () => { await prisma.driveSyncSubscription.update({ where: { causaId }, data: { nextRunAt: new Date(0) } }); return processDueDriveSyncSubscriptions({ ...deps, causaId }); };
@@ -56,11 +61,12 @@ async function main() {
     assert.ok((await prisma.driveSyncSubscription.findUniqueOrThrow({ where: { causaId } })).scanCursor);
     const second = await run(); assert.equal(second[0].imported, 20);
     const third = await run(); assert.equal(third[0].imported, 5); assert.equal(third[0].complete, true);
-    assert.equal(downloads, 45); assert.equal(enqueued, 45); assert.equal(await prisma.documento.count({ where: { causaId } }), 45);
+    assert.equal(downloads, 45); assert.equal(enqueued, 44); assert.equal(await prisma.documento.count({ where: { causaId } }), 45);
     assert.equal((await prisma.driveSyncSubscription.findUniqueOrThrow({ where: { causaId } })).scanCursor, null);
     const repeat = await run(); assert.equal(repeat[0].imported, 0); assert.equal(downloads, 45);
     const old = await prisma.driveDocumentImport.findFirstOrThrow({ where: { causaId, driveFileId: metadata(0).id } });
-    assert.ok(old.documentoId);
+    assert.equal(old.documentoId, manual.doc.id, "the worker preserves the manual original for the first Drive revision");
+    assert.equal(await prisma.caseDocumentIntake.count({ where: { documentoId: manual.doc.id } }), 2);
     version = "2";
     const updated = await run(); assert.equal(updated[0].imported, 1); assert.equal(downloads, 46);
     assert.equal(await prisma.documento.count({ where: { causaId } }), 46);

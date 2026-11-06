@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { santiagoDateKey } from "@/lib/chile-time";
+import { POST as tickJornada } from "@/app/api/jornada/worker/route";
+import { changeDailyBrief, processDueDailyBriefs, readDailyBriefState } from "./daily-brief";
 import { readAltazorUpdates } from "./updates";
 
 async function main() {
@@ -17,6 +19,9 @@ async function main() {
   const deadlineTime = new Date(now.getTime() - 60_000);
   const secret = `PRIVATE_CONTENT_${tag}`;
   const originalFetch = globalThis.fetch;
+  const previousSecret = process.env.CRON_SECRET;
+  const cronSecret = randomUUID();
+  process.env.CRON_SECRET = cronSecret;
   globalThis.fetch = async () => { throw new Error("Reading the feed must not call any provider"); };
   try {
     const [owner, other] = await Promise.all(userIds.map(id => db.user.create({
@@ -90,14 +95,53 @@ async function main() {
     assert.ok(!announced.some(update => update.id === `upcoming-deadline:${approaching.id}`), "Persisted notice replaces the fallback");
     assert.ok(!JSON.stringify(announced).includes(secret));
 
+    assert.equal((await readDailyBriefState(owner, db)).enabled, false);
+    await changeDailyBrief("enable", owner, db, now);
+    await changeDailyBrief("enable", other, db, now);
+    await db.altazorCompanion.update({ where: { ownerId: other.id }, data: { backgroundEnabled: false } });
+    const tick = (value: string) => tickJornada(new Request("http://localhost/api/jornada/worker", { method: "POST", headers: { "x-cron-secret": value } }));
+    assert.equal((await tick("wrong")).status, 401);
+    const result = await tick(cronSecret);
+    assert.equal(result.status, 200);
+    assert.equal((await result.json()).jobs.dailyBrief, true);
+    const day = santiagoDateKey(now);
+    assert.deepEqual(await readDailyBriefState(owner, db), { enabled: true, backgroundEnabled: true, lastDay: day });
+    assert.deepEqual(await readDailyBriefState(other, db), { enabled: true, backgroundEnabled: false, lastDay: null });
+    assert.ok(!(await readAltazorUpdates(other, db)).updates.some(update => update.kind === "daily-brief"));
+    await Promise.all([changeDailyBrief("run", owner, db, now), changeDailyBrief("run", owner, db, now)]);
+    assert.equal(await db.altazorDailyBrief.count({ where: { ownerId: owner.id } }), 1);
+    const todaysBrief = (await read()).updates.find(update => update.kind === "daily-brief");
+    assert.ok(todaysBrief);
+    assert.match(todaysBrief.message, /2 plazos pendientes para revisar/);
+    assert.match(todaysBrief.message, /2 correos judiciales/);
+    assert.ok(!JSON.stringify(todaysBrief).includes(secret));
+    assert.equal(todaysBrief.mailHref, "/correo");
+
     await db.causaMiembro.delete({ where: { id: member.id } });
-    assert.deepEqual((await read()).updates.map(update => update.id), [`court-mail:${visibleMail.id}`]);
-    await db.mailboxMessage.createMany({ data: Array.from({ length: 30 }, (_, index) => ({ ...mail, externalId: `gmail:cap-${index}` })) });
-    assert.equal((await read()).updates.length, 24);
+    const afterRevocation = (await read()).updates;
+    assert.deepEqual(afterRevocation.filter(update => update.kind !== "daily-brief").map(update => update.id), [`court-mail:${visibleMail.id}`]);
+    const revised = afterRevocation.find(update => update.kind === "daily-brief");
+    assert.equal(revised?.id, todaysBrief.id);
+    assert.equal(revised?.occurredAt, todaysBrief.occurredAt);
+    assert.doesNotMatch(revised?.message || "", /plazo/);
+    assert.match(revised?.message || "", /1 correo judicial/);
+    await changeDailyBrief("pause", owner, db, now);
+    const tomorrow = new Date(now.getTime() + 36 * 3_600_000);
+    await processDueDailyBriefs({ client: db, now: tomorrow });
+    assert.equal((await readDailyBriefState(owner, db)).lastDay, day);
+    assert.equal((await readDailyBriefState(other, db)).lastDay, null);
+    await changeDailyBrief("run", other, db, now);
+    assert.equal((await readDailyBriefState(other, db)).lastDay, day, "Manual brief remains available while background work is paused");
+    await db.mailboxMessage.createMany({ data: Array.from({ length: 100 }, (_, index) => ({ ...mail, externalId: `gmail:cap-${index}` })) });
+    const capped = (await read()).updates;
+    assert.equal(capped.filter(update => update.kind !== "daily-brief").length, 24);
+    assert.match(capped.find(update => update.kind === "daily-brief")?.message || "", /al menos \d+ correos judiciales/);
     await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "assistant.use" } });
     await assert.rejects(read(), (error: unknown) => (error as { status?: number }).status === 403);
-    console.log("Altazor updates integration passed: owner and case ACL, confidential source, minimized data, stable IDs and links, result cap and zero provider calls.");
+    console.log("Altazor updates and daily brief: current ACL, minimized data, protected worker, personal opt-in and pause, concurrent idempotence and zero provider calls passed.");
   } finally {
+    if (previousSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previousSecret;
     globalThis.fetch = originalFetch;
     await db.causa.deleteMany({ where: { id: caseId } });
     await db.user.deleteMany({ where: { id: { in: userIds } } });

@@ -11,7 +11,7 @@ La revisión `1.1.0-preview.5` incorpora [Drive personal y sincronización de ca
 
 ## Conectar una aplicación
 
-1. Abra **Mi jornada → Conexiones** y elija Google Workspace o GitHub. Una tarjeta del catálogo no concede acceso a una cuenta.
+1. Abra **Configuración → Preferencias personales → Altazor → Conexiones y secretos** y elija Google Workspace, GitHub o Dropbox. Una tarjeta del catálogo no concede acceso a una cuenta.
 2. Pulse **Conectar**, revise el acceso solicitado e inicie sesión personalmente en la página oficial. Contraseñas y códigos se introducen allí; no se envían al chat.
 3. Vuelva a LexOpen para comprobar el resultado. La conexión sólo se muestra confirmada cuando la autorización y la comprobación del servicio terminaron correctamente. Una denegación o interrupción no se presenta como conexión exitosa.
 4. Al crear un escritorio, elija expresamente las conexiones que podrá usar. Una selección vacía significa ninguna. La selección queda fijada a esa sesión; cambiar la configuración requiere cerrar las sesiones activas o inciertas.
@@ -31,10 +31,13 @@ La preparación corresponde al administrador del Host, una sola vez por desplieg
 | --- | --- |
 | Google | `ALTAZOR_GOOGLE_CLIENT_ID` y `ALTAZOR_GOOGLE_CLIENT_SECRET`. |
 | GitHub | `ALTAZOR_GITHUB_CLIENT_ID` y `ALTAZOR_GITHUB_CLIENT_SECRET`. |
+| Dropbox | `ALTAZOR_DROPBOX_CLIENT_ID` y `ALTAZOR_DROPBOX_CLIENT_SECRET`. |
 
 El retorno autorizado es el origen configurado de LexOpen seguido de `/api/altazor/connectors/oauth/callback`. Registre ese retorno exactamente en el proveedor. No añada contraseñas ni tokens a la URL. En un Host local, utilice su dirección loopback; una instalación publicada debe tener su propio registro y configuración autorizados por el proveedor.
 
-Cada inicio vincula la autorización al profesional, a su sesión de LexOpen y al espacio elegido, con un plazo y uso único. El proveedor entrega la autorización al servidor, que la comprueba y la guarda expresamente en el gateway dedicado. El retorno al navegador contiene únicamente el identificador del intento. El conector de Google usa una autorización temporal, sin renovación automática en esta revisión; al caducar, la persona vuelve a conectar.
+Cada inicio vincula la autorización al profesional, a su sesión de LexOpen y al espacio elegido, con un plazo y uso único. El proveedor entrega la autorización al servidor, que la comprueba y la guarda expresamente en el gateway dedicado. El retorno al navegador contiene únicamente el identificador del intento. Google y Dropbox conceden autorizaciones temporales. Al caducar, la persona puede volver a conectar desde el mismo apartado.
+
+Para habilitar **Dropbox**, prepare una aplicación en la consola oficial con permisos `account_info.read`, `files.metadata.read` y `files.content.read`. Puede limitar el acceso de la aplicación a su propia carpeta de Dropbox. Actualice el escritorio de Altazor para disponer de las operaciones de listado, búsqueda y lectura de archivos de hasta 4 MiB. Cada consulta requiere confirmación. Los usuarios inician sesión desde **Conectar Dropbox**. [Guía oficial de autorización de Dropbox](https://docs.dropboxapi.com/dropbox-api/docs/get-started/authorization).
 
 Registrar una aplicación no conecta las cuentas del estudio ni de sus profesionales. Cada persona debe conceder su propia autorización. Si el Host no tiene la aplicación preparada, el botón informa del requisito administrativo; no simula un ingreso exitoso.
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Building2, Check, CircleAlert, Copy, Linkedin, Link2, Mail, RefreshCw, SquareTerminal } from "lucide-react";
 import { apiMutation } from "@/lib/api-mutation";
 import { operationKey } from "@/lib/client-submission-key";
+import { COMMUNICATIONS_SETTINGS_PATH } from "@/lib/mail/settings-location";
 import type { PublicLinkedInAccount, PublicationReceipt, ShareDraft, SharePreview } from "@/lib/personal-connectors/types";
 import styles from "./AltazorConnectors.module.css";
 
@@ -13,7 +14,7 @@ const attemptKey = "altazor:linkedin:pending-attempt";
 const stateLabels: Record<PublicLinkedInAccount["state"], string> = { unconfigured: "Configuración pendiente", disconnected: "Sin conectar", connecting: "Autorización pendiente", connected: "Autorización comprobada", expired: "Autorización vencida", verification_required: "Requiere comprobación", reconnect_required: "Vuelva a conectar", error: "No se pudo comprobar" };
 const existingConnections = [
   { provider: "codex", label: "ChatGPT / Codex personal", href: "/cuenta#codex", description: "Inicie sesión y compruebe su autorización en Mi cuenta.", icon: SquareTerminal },
-  { provider: "mail", label: "Mi correo", href: "/correo", description: "Abra su bandeja y administre sus cuentas de correo.", icon: Mail },
+  { provider: "mail", label: "Mi correo", href: COMMUNICATIONS_SETTINGS_PATH, description: "Abra su bandeja y administre sus cuentas desde Configuración.", icon: Mail },
   { provider: "google", label: "Conexiones del estudio", href: "/integraciones", description: "Revise Google y los servicios del estudio según sus permisos.", icon: Building2 },
 ] as const;
 type Form = { id?: string; revision?: number; title: string; body: string; sourceUrl: string; visibility: "CONNECTIONS" | "PUBLIC" };

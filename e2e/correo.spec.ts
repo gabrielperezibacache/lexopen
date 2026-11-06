@@ -63,9 +63,11 @@ test("correo PJUD separa la configuración personal de la bandeja", async ({
   await expect(page).toHaveURL(/\/correo$/);
 });
 
-test("el equipo encuentra su correo en Mi cuenta y el portal no puede acceder", async ({ page, browser }) => {
+test("el equipo encuentra su correo en Configuración y el portal no puede acceder", async ({ page, browser }) => {
   await loginAs(page, "abogado@estudio.cl");
   await page.goto("/cuenta");
+  await expect(page.locator("main").getByRole("link", { name: "Configurar correo" })).toHaveCount(0);
+  await page.locator("main").getByRole("link", { name: "Configuración", exact: true }).click();
   await page.locator("main").getByRole("link", { name: "Configurar correo" }).click();
   await expect(page.getByRole("heading", { name: "Configuración de correo" })).toBeVisible();
   await page.setViewportSize({ width: 360, height: 800 });

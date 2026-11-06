@@ -121,12 +121,97 @@ func TestLexOpenGoogleOAuthRemainsAvailableWithoutManualToken(t *testing.T) {
   if _, err := c.Call(context.Background(), map[string]any{"action":"send_mail", "to":"fixture@example.invalid", "text":"synthetic transport only"}); err != nil { t.Fatal(err) }
 }
 `;
+const dropboxTests = `package connector
+
+import (
+  "context"
+  "encoding/json"
+  "io"
+  "net/http"
+  "strings"
+  "testing"
+  "testing/iotest"
+)
+
+func TestLexOpenDropboxReadsOnlyThroughApprovedEndpoints(t *testing.T) {
+  old := httpDo
+  t.Cleanup(func() { httpDo = old })
+  calls := 0
+  httpDo = func(req *http.Request) (*http.Response, error) {
+    calls++
+    if req.Method != "POST" || req.Header.Get("Authorization") != "Bearer fixture-dropbox" { t.Fatalf("unexpected Dropbox request: %s %s", req.Method, req.URL) }
+    body := "{}"
+    switch req.URL.String() {
+    case "https://api.dropboxapi.com/2/users/get_current_account": body = "{\\"email\\":\\"fixture@example.invalid\\"}"
+    case "https://api.dropboxapi.com/2/files/list_folder": body = "{\\"entries\\":[]}"
+    case "https://api.dropboxapi.com/2/files/search_v2": body = "{\\"matches\\":[]}"
+    case "https://content.dropboxapi.com/2/files/download":
+      arg := req.Header.Get("Dropbox-API-Arg")
+      if strings.ContainsAny(arg, "é📄") { t.Fatalf("non-ASCII request header: %q", arg) }
+      var value struct { Path string }
+      if err := json.Unmarshal([]byte(arg), &value); err != nil || value.Path != "/Café📄.pdf" { t.Fatalf("invalid Dropbox path: %v %q", err, value.Path) }
+      body = "fixture PDF bytes"
+    default: t.Fatalf("request escaped the Dropbox read endpoints: %s", req.URL)
+    }
+    return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body)), ContentLength: int64(len(body))}, nil
+  }
+  c, err := Build("dropbox", Settings{"token":"fixture-dropbox"}, "")
+  if err != nil { t.Fatal(err) }
+  if _, err := c.(Checker).Check(context.Background()); err != nil { t.Fatal(err) }
+  for _, args := range []map[string]any{{"action":"list"}, {"action":"search", "query":"fixture"}} {
+    if _, err := c.Call(context.Background(), args); err != nil { t.Fatal(err) }
+  }
+  if _, name, data, err := c.(Filer).CallFile(context.Background(), map[string]any{"action":"read", "path":"/Café📄.pdf"}); err != nil || name != "Café📄.pdf" || string(data) != "fixture PDF bytes" { t.Fatalf("download failed: %v", err) }
+  for _, action := range []string{"upload", "share_link", "request"} {
+    if _, err := c.Call(context.Background(), map[string]any{"action":action, "path":"/2/files/delete_v2", "method":"POST"}); err == nil { t.Fatalf("allowed unsupported Dropbox action %s", action) }
+  }
+  if calls != 4 { t.Fatalf("expected four read requests, got %d", calls) }
+}
+
+func TestLexOpenDropboxDownloadRequiresCompleteBoundedBody(t *testing.T) {
+  const capBytes = 4 << 20
+  old := httpDo
+  t.Cleanup(func() { httpDo = old })
+  c, err := Build("dropbox", Settings{"token":"fixture-dropbox"}, "")
+  if err != nil { t.Fatal(err) }
+  for _, tc := range []struct {
+    name string
+    status int
+    length int64
+    body io.Reader
+    success bool
+  }{
+    {"exact cap", http.StatusOK, capBytes, strings.NewReader(strings.Repeat("x", capBytes)), true},
+    {"exact cap without length", http.StatusOK, -1, strings.NewReader(strings.Repeat("x", capBytes)), true},
+    {"declared over cap", http.StatusOK, capBytes + 1, strings.NewReader(""), false},
+    {"stream over cap", http.StatusOK, -1, strings.NewReader(strings.Repeat("x", capBytes + 1)), false},
+    {"interrupted stream", http.StatusOK, -1, io.MultiReader(strings.NewReader("partial"), iotest.ErrReader(io.ErrUnexpectedEOF)), false},
+    {"premature EOF", http.StatusOK, 10, strings.NewReader("short"), false},
+    {"partial HTTP response", http.StatusPartialContent, 7, strings.NewReader("partial"), false},
+  } {
+    t.Run(tc.name, func(t *testing.T) {
+      httpDo = func(req *http.Request) (*http.Response, error) {
+        if req.URL.String() != "https://content.dropboxapi.com/2/files/download" { t.Fatalf("unexpected endpoint: %s", req.URL) }
+        return &http.Response{StatusCode: tc.status, Header: http.Header{}, Body: io.NopCloser(tc.body), ContentLength: tc.length}, nil
+      }
+      text, name, data, err := c.(Filer).CallFile(context.Background(), map[string]any{"action":"read", "path":"/Resolución.pdf"})
+      if tc.success {
+        if err != nil || name != "Resolución.pdf" || len(data) != capBytes || data[capBytes-1] != 'x' { t.Fatalf("complete download failed: %v, bytes=%d", err, len(data)) }
+        return
+      }
+      if err == nil || name != "" || text != "" || data != nil { t.Fatalf("incomplete download produced a result: %q, %q, bytes=%d, err=%v", text, name, len(data), err) }
+    })
+  }
+}
+`;
 const originals = {
   "internal/chat/limit.go": "860c0c96adfa350eab15801543c1471baf0ff077c7c0cca846906df264aa8d95",
   "internal/chat/approve.go": "2155d330c1a3b4c87278857c6b15e240b309dc756cfdd7ad020a5c6546f51106",
   "internal/gateway/gateway.go": "d39393bbb377e15cbdf01fdc2650524128c81fe91fabff19f68ca5b668f3a740",
   "internal/connector/catalog.go": "35e3a8c86b985059788f9156ed257183b3b6b032deb104353d17fe8d3203a985",
   "internal/connector/check.go": "8f31816ef9dbddb4f10c749878bda583567c59617196b96100871e641b3a2d09",
+  "internal/connector/media.go": "3e468531e6a1bd5b00d91ba6c0819b66dd0322c6e9f762ad519a20ed3de301e9",
+  "internal/connector/fullapi.go": "32dc42de5e3c7b99cd2f963feea553b5ab570a9a59d286cfef42e152d9d642a5",
 };
 const hash = value => createHash("sha256").update(value).digest("hex");
 function once(source, before, after) {
@@ -136,8 +221,53 @@ function once(source, before, after) {
 
 // Exported separately so a small credential-free fixture can verify the actual rewrites.
 export function rewriteConnectorGate(path, source) {
+  if (path === "internal/connector/media.go") {
+    const first = source.indexOf('\n\t\t"upload": func(s Settings, a map[string]any) (request, error) {', source.indexOf("func makeDropbox("));
+    const last = source.indexOf('\n\t}, "list")', first);
+    if (first < 0 || last < 0 || !source.slice(first, last).includes('"share_link": func(')) throw new Error("Pinned Dropbox actions no longer match");
+    source = source.slice(0, first) + source.slice(last);
+    source = once(source, '\n\t"time"\n', '\n\t"time"\n\t"unicode/utf16"\n');
+    source = once(source, 'h["Dropbox-API-Arg"] = string(raw)', `var escaped strings.Builder
+		for _, r := range string(raw) {
+			if r < 0x7f { escaped.WriteRune(r); continue }
+			for _, unit := range utf16.Encode([]rune{r}) { fmt.Fprintf(&escaped, "\\\\u%04x", unit) }
+		}
+		h["Dropbox-API-Arg"] = escaped.String()`);
+    source = once(source, 'files in Dropbox: list, search, read, save text files and share a link', 'files in Dropbox: list, search and read');
+    const uploadAction = source.match(/\n\t\t\t\t\{Name: "upload", Help: "save a text file \([^\n]+/);
+    if (!uploadAction) throw new Error("Pinned Dropbox action description no longer matches");
+    source = once(source, uploadAction[0], '');
+    source = once(source, '\n\t\t\t\t{Name: "share_link", Help: "a link anyone can open to a file", Args: []string{"path"}},', '');
+    return once(source, `
+		case "upload":
+			var r struct {
+				Path string \`json:"path_display"\`
+			}
+			if json.Unmarshal(data, &r) == nil && r.Path != "" {
+				return "saved as " + r.Path
+			}`, '');
+  }
+  if (path === "internal/connector/fullapi.go") return once(source, '\n\t"dropbox":  {root: fixed("https://api.dropboxapi.com"), hosts: []string{"content.dropboxapi.com"}, headers: tokenHeader, docs: "www.dropbox.com/developers/documentation/http/documentation"},', '');
   if (path === "internal/connector/catalog.go") {
     source = once(source, 'Fields: fApp("console.cloud.google.com (a Desktop or Web client)"),', 'Fields: signIn(nil, f("token", "Temporary Google access token (read only)", "Optional: access token from https://developers.google.com/oauthplayground/ using drive.metadata.readonly. Check reads only Drive account metadata. Expires according to Google; no automatic refresh. This mode blocks writes.", false, true), "console.cloud.google.com (a Desktop or Web client)"),');
+    source = once(source, 'data, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))', `const maxResponseBytes = 4 << 20
+	if r.url == dropboxContent + "/files/download" && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		if resp.StatusCode != http.StatusOK {
+			return nil, errors.New("Dropbox did not return a complete download")
+		}
+		if resp.ContentLength > maxResponseBytes {
+			return nil, errors.New("Dropbox download exceeds the 4 MiB limit")
+		}
+		data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes + 1))
+		if err != nil || (resp.ContentLength >= 0 && resp.ContentLength != int64(len(data))) {
+			return nil, errors.New("Dropbox download ended before the file was complete")
+		}
+		if len(data) > maxResponseBytes {
+			return nil, errors.New("Dropbox download exceeds the 4 MiB limit")
+		}
+		return data, nil
+	}
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))`);
     return once(source, 'func (a *api) send(ctx context.Context, req *request) ([]byte, error) {', `func (a *api) send(ctx context.Context, req *request) ([]byte, error) {
 \t// LexOpen's manually supplied Google access token is a temporary, read-only mode.
 \t// Native Google actions do not set their own bearer header, unlike generic requests.
@@ -180,7 +310,7 @@ func (s *Service) runLimit(id string, a action, k *kitty.Kitty, allowed map[stri
   }
   if (path === "internal/gateway/gateway.go") {
     source = once(source, '\t"net/http"\n\t"strconv"', '\t"net/http"\n\t"runtime"\n\t"strconv"');
-    return once(source, 'out := map[string]any{"ok": true, "version": s.version,', 'out := map[string]any{"ok": true, "lexopen_connector_gate": "v1", "lexopen_connector_platform": runtime.GOOS, "version": s.version,');
+    return once(source, 'out := map[string]any{"ok": true, "version": s.version,', 'out := map[string]any{"ok": true, "lexopen_connector_gate": "v1", "lexopen_connector_platform": runtime.GOOS, "lexopen_dropbox_read_gate": true, "version": s.version,');
   }
   throw new Error("Not a pinned connector gate file");
 }
@@ -201,6 +331,7 @@ export async function hardenConnectors(directory) {
   for (const [file, source] of changes) await writeFile(file, source);
   await writeFile(join(root, "internal/chat/lexopen_gate_test.go"), gateTests, { flag: "wx" });
   await writeFile(join(root, "internal/connector/lexopen_google_token_test.go"), googleTokenTests, { flag: "wx" });
+  await writeFile(join(root, "internal/connector/lexopen_dropbox_test.go"), dropboxTests, { flag: "wx" });
   await writeFile(join(root, ".lexopen-connector-gate"), CONNECTOR_GATE + "\n");
   return { source: PINNED_COMMIT, connectorGate: CONNECTOR_GATE, files: changes.length };
 }

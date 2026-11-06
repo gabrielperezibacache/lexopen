@@ -1,6 +1,6 @@
 import styles from "@/components/config/WorkspaceArea.module.css";
 import Link from "next/link";
-import { Bell, Mail, Settings } from "lucide-react";
+import { Bell, MessageSquare, Settings } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { PasswordChangeForm } from "@/components/PasswordChangeForm";
 import { TotpSettingsPanel } from "@/components/TotpSettingsPanel";
@@ -9,14 +9,16 @@ import { getI18n } from "@/lib/i18n/server";
 import { can, canSome } from "@/lib/auth/permissions";
 import { isStaff } from "@/lib/auth/rbac";
 import { CodexConnection } from "@/components/config/CodexConnection";
-import { MAIL_SETTINGS_PATH } from "@/lib/mail/settings-location";
+import { AltazorDailyBriefSettings } from "@/components/altazor/AltazorDailyBriefSettings";
+import { readDailyBriefState } from "@/lib/altazor/daily-brief";
 
 export default async function CuentaPage() {
   const user = await requireUser();
-  const { dict, locale, t } = await getI18n();
+  const { dict, locale } = await getI18n();
   const h = dict.hubs.cuenta;
   const staff = isStaff(user.role);
   const canConfigureFirm = staff && can(user, "host.admin");
+  const dailyBrief = staff && canSome(user, "assistant.use") ? await readDailyBriefState(user) : null;
 
   return (
     <div className={`${styles.area} space-y-6`}>
@@ -28,10 +30,10 @@ export default async function CuentaPage() {
           <Link className="btn btn-ghost" href="/cuenta/notificaciones">
             <Bell size={16} aria-hidden="true" /> {dict.nav.notifications}
           </Link>
-          {staff && <Link className="btn btn-ghost" href={MAIL_SETTINGS_PATH}><Mail size={16} aria-hidden="true" /> {t("mailbox.openSettings")}</Link>}
-          {canConfigureFirm && (
+          {staff && <Link className="btn btn-ghost" href="/cuenta/feedback"><MessageSquare size={16} aria-hidden="true" /> Feedback</Link>}
+          {staff && (
             <Link className="btn btn-secondary" href="/configuracion">
-              <Settings size={16} aria-hidden="true" /> {dict.hubs.configuracion.title}
+              <Settings size={16} aria-hidden="true" /> {dict.nav.settings}
             </Link>
           )}
         </>}
@@ -45,6 +47,7 @@ export default async function CuentaPage() {
       )}
       <PasswordChangeForm />
       <TotpSettingsPanel />
+      {dailyBrief && <AltazorDailyBriefSettings key={`daily-brief:${user.id}`} initial={dailyBrief} locale={locale} />}
       {staff && canSome(user, "assistant.use") && <CodexConnection key={user.id} />}
     </div>
   );

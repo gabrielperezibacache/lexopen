@@ -2,13 +2,20 @@
 
 import Link from "next/link";
 import { Bell } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { AltazorUpdate } from "@/lib/altazor/updates";
 import { AltazorMark } from "./AltazorMark";
 
 type UpdatesState = { updates: AltazorUpdate[]; status: "loading" | "ready" | "unavailable" };
+const updatesChanged = "lexopen:altazor-updates-changed";
+
+export function requestAltazorUpdatesRefresh() {
+  window.dispatchEvent(new Event(updatesChanged));
+}
 
 export function useAltazorUpdates(): UpdatesState {
+  const inConversation = usePathname() === "/inicio";
   const [state, setState] = useState<UpdatesState>({ updates: [], status: "loading" });
 
   useEffect(() => {
@@ -34,15 +41,23 @@ export function useAltazorUpdates(): UpdatesState {
       else { current?.abort(); current = null; }
     }
 
+    function onUpdatesChanged() {
+      current?.abort();
+      current = null;
+      void refresh();
+    }
+
     void refresh();
     const timer = window.setInterval(refresh, 60_000);
     document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener(updatesChanged, onUpdatesChanged);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener(updatesChanged, onUpdatesChanged);
       current?.abort();
     };
-  }, []);
+  }, [inConversation]);
 
   return state;
 }
@@ -51,9 +66,10 @@ const shortDate = new Intl.DateTimeFormat("es-CL", { day: "numeric", month: "sho
 const dueDate = new Intl.DateTimeFormat("es-CL", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 export function AltazorUpdateMessage({ update }: { update: AltazorUpdate }) {
+  const brief = update.kind === "daily-brief";
   return (
     <article className="altazor-update-message">
-      <div className="altazor-answer-author"><AltazorMark size={36} state="reading" /><strong>Altazor</strong><span><Bell size={14} aria-hidden="true" /> Aviso</span></div>
+      <div className="altazor-answer-author"><AltazorMark size={36} state="reading" /><strong>Altazor</strong><span><Bell size={14} aria-hidden="true" /> {brief ? "Resumen" : "Aviso"}</span></div>
       <div className="altazor-update-heading">
         <strong>{update.title}</strong>
         <time dateTime={update.occurredAt}>{shortDate.format(new Date(update.occurredAt))}</time>
@@ -61,6 +77,7 @@ export function AltazorUpdateMessage({ update }: { update: AltazorUpdate }) {
       <p>{update.message}</p>
       {update.dueAt && <p>Vencimiento <time dateTime={update.dueAt}>{dueDate.format(new Date(update.dueAt))}</time></p>}
       <Link href={update.href}>{update.kind === "court-mail" ? "Abrir correo" : "Ver plazos del mes"}</Link>
+      {update.mailHref && <Link className="ml-4" href={update.mailHref}>Revisar correo</Link>}
     </article>
   );
 }

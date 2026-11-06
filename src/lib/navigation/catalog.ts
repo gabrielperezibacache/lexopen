@@ -2,8 +2,9 @@ import type { CaseManagementMode } from "../causas/management-mode";
 import { canSome, type PermissionSubject } from "../auth/permissions";
 import { isClientAllowedPagePath } from "../auth/client-paths";
 import { isRole, PORTAL_ROLES, STAFF_ROLES } from "../auth/roles";
+import { COMMUNICATIONS_SETTINGS_PATH, MAIL_SETTINGS_PATH } from "../mail/settings-location";
 
-export type NavigationAreaId = "jornada" | "causas" | "agenda" | "biblioteca" | "academico" | "clientes" | "comunicaciones" | "estudio";
+export type NavigationAreaId = "jornada" | "causas" | "agenda" | "biblioteca" | "academico" | "clientes" | "estudio";
 export type NavigationIcon = "home" | "cases" | "calendar" | "library" | "clients" | "inbox" | "studio" | "files" | "minutes" | "deadlines" | "tasks" | "hearings" | "research" | "portal" | "messages" | "billing" | "people" | "spaces" | "workflows" | "settings" | "integrations" | "audit" | "assistant" | "search" | "notifications" | "account" | "monitor";
 export type NavigationEntry = {
   id: string;
@@ -12,7 +13,6 @@ export type NavigationEntry = {
   icon: NavigationIcon;
   area?: NavigationAreaId;
   groupKey?: string;
-  badge?: "mail";
   keywords?: string;
 };
 export type NavigationArea = { id: NavigationAreaId; labelKey: string; href: string; icon: NavigationIcon };
@@ -31,11 +31,10 @@ const AREAS: readonly NavigationArea[] = [
   { id: "biblioteca", labelKey: "nav.areas.biblioteca", href: "/biblioteca", icon: "library" },
   { id: "academico", labelKey: "nav.academic", href: "/academico", icon: "research" },
   { id: "clientes", labelKey: "nav.areas.clientes", href: "/clientes", icon: "clients" },
-  { id: "comunicaciones", labelKey: "nav.areas.comunicaciones", href: "/correo", icon: "inbox" },
   { id: "estudio", labelKey: "nav.areas.estudio", href: "/dashboard", icon: "studio" },
 ];
 
-type CatalogEntry = NavigationEntry & { access: "staff" | "signed-in" | "admin"; capability?: "assistant.use" | "host.admin" };
+type CatalogEntry = NavigationEntry & { access: "staff" | "signed-in" | "portal" | "admin"; capability?: "assistant.use" };
 const ENTRIES: readonly CatalogEntry[] = [
   { id: "inicio", href: "/inicio", labelKey: "nav.home", icon: "home", area: "jornada", access: "staff" },
   { id: "causas", href: "/causas", labelKey: "nav.caseFiles", icon: "cases", area: "causas", access: "staff", keywords: "expediente cartera RIT ROL" },
@@ -55,23 +54,24 @@ const ENTRIES: readonly CatalogEntry[] = [
   { id: "academico", href: "/academico", labelKey: "nav.academic", icon: "research", area: "academico", access: "staff", capability: "assistant.use", keywords: "investigar escribir enseñar bibliografía artículos" },
   { id: "clientes", href: "/clientes", labelKey: "nav.clientDirectory", icon: "clients", area: "clientes", access: "staff" },
   { id: "portal", href: "/portal", labelKey: "nav.portal", icon: "portal", area: "clientes", access: "signed-in" },
-  { id: "correo", href: "/correo", labelKey: "nav.mailbox", icon: "inbox", area: "comunicaciones", access: "staff", badge: "mail", keywords: "bandeja PJUD" },
-  { id: "mensajes", href: "/mensajes", labelKey: "nav.messages", icon: "messages", area: "comunicaciones", access: "signed-in" },
+  { id: "mensajes", href: "/mensajes", labelKey: "nav.messages", icon: "messages", area: "clientes", access: "portal" },
   { id: "dashboard", href: "/dashboard", labelKey: "nav.firmOverview", icon: "studio", area: "estudio", groupKey: "nav.secondary.management", access: "staff" },
   { id: "facturacion", href: "/facturacion", labelKey: "nav.fees", icon: "billing", area: "estudio", groupKey: "nav.secondary.management", access: "staff", keywords: "honorarios facturación horas gastos cobros cuenta corriente tarifas UF" },
   { id: "personas", href: "/personas", labelKey: "nav.team", icon: "people", area: "estudio", groupKey: "nav.secondary.collaboration", access: "staff" },
   { id: "sites", href: "/sites", labelKey: "nav.sites", icon: "spaces", area: "estudio", groupKey: "nav.secondary.collaboration", access: "signed-in" },
   { id: "flujos", href: "/flujos", labelKey: "nav.workflows", icon: "workflows", area: "estudio", groupKey: "nav.secondary.collaboration", access: "staff" },
-  { id: "configuracion", href: "/configuracion", labelKey: "nav.settings", icon: "settings", area: "estudio", groupKey: "nav.secondary.administration", access: "staff", capability: "host.admin" },
   { id: "integraciones", href: "/integraciones", labelKey: "nav.integrations", icon: "integrations", area: "estudio", groupKey: "nav.secondary.administration", access: "staff" },
   { id: "auditoria", href: "/auditoria", labelKey: "nav.audit", icon: "audit", area: "estudio", groupKey: "nav.secondary.administration", access: "admin" },
   { id: "buscar", href: "/buscar", labelKey: "nav.search", icon: "search", access: "signed-in" },
   { id: "notificaciones", href: "/notificaciones", labelKey: "nav.notifications", icon: "notifications", access: "signed-in" },
   { id: "cuenta", href: "/cuenta", labelKey: "nav.account", icon: "account", access: "signed-in" },
+  { id: "configuracion", href: "/configuracion", labelKey: "nav.settings", icon: "settings", access: "staff" },
+  { id: "mail-settings", href: COMMUNICATIONS_SETTINGS_PATH, labelKey: "nav.areas.comunicaciones", icon: "inbox", access: "staff", keywords: "configuración correo bandeja mensajes PJUD" },
+  { id: "feedback", href: "/cuenta/feedback", labelKey: "nav.feedback", icon: "messages", access: "staff", keywords: "comentarios sugerencias problemas errores soporte" },
 ];
 
 /** Discovery only: pages and APIs remain responsible for enforcing access and scope. */
-export function buildNavigation(subject: PermissionSubject | null | undefined, options: { caseManagementMode?: CaseManagementMode } = {}): NavigationModel {
+export function buildNavigation(subject: PermissionSubject | null | undefined, options: { caseManagementMode?: CaseManagementMode; communicationsAvailable?: boolean } = {}): NavigationModel {
   if (!subject || !isRole(subject.role)) return { mode: "none", areas: [], entries: [], utilities: [], shortcuts: [] };
   const role = subject.role;
   const pjudEnabled = options.caseManagementMode === "pjud_cl";
@@ -79,10 +79,11 @@ export function buildNavigation(subject: PermissionSubject | null | undefined, o
   const portal = (PORTAL_ROLES as readonly string[]).includes(role);
   const allowed = ENTRIES.filter(entry => {
     if (["pjud", "monitoreo", "mis-causas"].includes(entry.id) && !pjudEnabled) return false;
-    if (portal) return entry.access === "signed-in" && isClientAllowedPagePath(entry.href);
-    if (!staff || (entry.access === "admin" && role !== "admin")) return false;
+    if (entry.id === "mail-settings" && !options.communicationsAvailable) return false;
+    if (portal) return (entry.access === "signed-in" || entry.access === "portal") && isClientAllowedPagePath(entry.href);
+    if (!staff || entry.access === "portal" || (entry.access === "admin" && role !== "admin")) return false;
     return !entry.capability || canSome(subject, entry.capability);
-  }).map(({ id, href, labelKey, icon, area, groupKey, badge, keywords }) => ({ id, href, labelKey: id === "causas" && pjudEnabled ? "nav.manualCases" : labelKey, icon, area, groupKey, badge, keywords }));
+  }).map(({ id, href, labelKey, icon, area, groupKey, keywords }) => ({ id, href, labelKey: id === "causas" && pjudEnabled ? "nav.manualCases" : labelKey, icon, area, groupKey, keywords }));
   const utilities = allowed.filter(entry => !entry.area);
   if (portal) return { mode: "portal", areas: [], entries: allowed.filter(entry => entry.area), utilities, shortcuts: [] };
   return {
@@ -130,9 +131,14 @@ export function navigationBreadcrumbs(model: NavigationModel, pathname: string):
   const entries = navigationEntries(model);
   const home = model.mode === "portal" ? "/portal" : "/inicio";
   const crumbs: NavigationCrumb[] = [{ href: home, labelKey: model.mode === "portal" ? "nav.portal" : "nav.home" }];
-  if (path === "/configuracion/correo" && model.mode === "staff") {
-    const settings = entries.find(entry => entry.id === "configuracion");
-    return [...crumbs, settings ? { href: settings.href, labelKey: settings.labelKey } : { href: "/cuenta", labelKey: "nav.account" }, { href: path, labelKey: "mailbox.settingsTitle" }];
+  if (model.mode === "staff" && [MAIL_SETTINGS_PATH, "/correo", "/mensajes"].includes(path)) {
+    const communications = entries.find(entry => entry.id === "mail-settings");
+    return [
+      ...crumbs,
+      { href: "/configuracion", labelKey: "nav.settings" },
+      ...(communications ? [{ href: communications.href, labelKey: communications.labelKey }] : []),
+      { href: path, labelKey: path === MAIL_SETTINGS_PATH ? "mailbox.settingsTitle" : path === "/correo" ? "nav.mailbox" : "nav.messages" },
+    ];
   }
   if (isCaseArchive(path) && model.mode === "staff") return [...crumbs, { href: "/mis-causas", labelKey: "nav.myMatters" }, { href: path, labelKey: "nav.caseFiles" }];
   for (let index = 0; index < parts.length; index++) {

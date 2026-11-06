@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useI18n } from "@/components/i18n/I18nProvider";
-import { configCategoriesForMode, configCategoryForSection, configSectionFromHash } from "./config-sections";
+import { type configCategoriesForMode, configSectionFromHash } from "./config-sections";
 import styles from "./WorkspaceArea.module.css";
 
-export function ConfigSectionNav({ mode = "pjud_cl" }: { mode?: "manual" | "pjud_cl" }) {
+export function ConfigSectionNav({ categories }: { categories: ReturnType<typeof configCategoriesForMode> }) {
   const { locale } = useI18n();
-  const router = useRouter();
   const english = locale === "en";
-  const [active, setActive] = useState("estudio");
+  const [active, setActive] = useState<string>(categories[0].sections[0].id);
   const navRef = useRef<HTMLElement>(null);
-  const categories = configCategoriesForMode(mode), category = configCategoryForSection(active, mode);
+  const category = categories.find(item => item.sections.some(section => section.id === active)) ?? categories[0];
 
   useEffect(() => {
     const nav = navRef.current;
@@ -24,7 +22,7 @@ export function ConfigSectionNav({ mode = "pjud_cl" }: { mode?: "manual" | "pjud
     const inspect = () => {
       frame = 0;
       if (pendingHash) {
-        const target = document.getElementById(pendingHash);
+        const target = workspace.querySelector<HTMLElement>(`#${CSS.escape(pendingHash)}`);
         if (!target) return; // Google/Obsidian can mount after their initial fetch.
         const id = pendingHash;
         pendingHash = undefined;
@@ -32,9 +30,11 @@ export function ConfigSectionNav({ mode = "pjud_cl" }: { mode?: "manual" | "pjud
         setActive(id);
         return;
       }
+      // A chosen section stays selected after the sticky navigation changes height.
+      if (configSectionFromHash(window.location.hash, categories)) return;
       const edge = nav.getBoundingClientRect().bottom + 20;
-      const targets = configCategoriesForMode(mode).flatMap(category => category.sections).flatMap(section => {
-        const element = document.getElementById(section.id);
+      const targets = categories.flatMap(category => category.sections).flatMap(section => {
+        const element = workspace.querySelector<HTMLElement>(`#${CSS.escape(section.id)}`);
         return element ? [{ id: section.id, top: element.getBoundingClientRect().top }] : [];
       });
       const current = targets.findLast(target => target.top <= edge) || targets[0];
@@ -42,13 +42,14 @@ export function ConfigSectionNav({ mode = "pjud_cl" }: { mode?: "manual" | "pjud
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(inspect); };
     const syncHash = () => {
-      const section = configSectionFromHash(window.location.hash, mode);
+      const section = configSectionFromHash(window.location.hash, categories);
       pendingHash = section?.id;
       if (section) setActive(section.id);
       schedule();
     };
     const measure = () => {
       workspace.style.setProperty("--settings-nav-height", `${Math.ceil(nav.getBoundingClientRect().height)}px`);
+      pendingHash ??= configSectionFromHash(window.location.hash, categories)?.id;
       schedule();
     };
     const resize = new ResizeObserver(measure);
@@ -73,7 +74,7 @@ export function ConfigSectionNav({ mode = "pjud_cl" }: { mode?: "manual" | "pjud
       window.removeEventListener("resize", measure);
       workspace.style.removeProperty("--settings-nav-height");
     };
-  }, [mode]);
+  }, [categories]);
 
   return (
     <nav ref={navRef} className={styles.sectionNav} aria-label={english ? "Settings sections" : "Secciones de configuración"}>
@@ -81,7 +82,7 @@ export function ConfigSectionNav({ mode = "pjud_cl" }: { mode?: "manual" | "pjud
         <span>{english ? "Settings category" : "Categoría de configuración"}</span>
         <select id="settings-category" className="select" value={category.id} onChange={event => {
           const selected = categories.find(item => item.id === event.target.value);
-          if (selected) { setActive(selected.sections[0].id); router.push(`#${selected.sections[0].id}`); }
+          if (selected) window.location.hash = selected.sections[0].id;
         }}>
           {categories.map(item => <option key={item.id} value={item.id}>{english ? item.labelEn : item.label}</option>)}
         </select>

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { ArrowUpRight, Monitor } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import type { ComputerActivity, ComputerActivityState } from "@/lib/altazor/computer/types";
+import type { ComputerActivity, ComputerActivityState, ComputerReview } from "@/lib/altazor/computer/types";
 import styles from "./AltazorDesktopActivity.module.css";
 
 const endpoint = "/api/altazor/computer";
@@ -16,13 +16,14 @@ const stateLabel: Record<ComputerActivityState, string> = {
   ready: "Escritorio abierto",
   working: "Altazor está trabajando",
   approval: "Espera tu confirmación",
+  help: "Altazor necesita tu ayuda",
   paused: "Vista pausada durante el control manual",
   expired: "Acceso vencido",
   unavailable: "Vista no disponible",
 };
-const frameStates: ReadonlySet<ComputerActivityState> = new Set(["ready", "working", "approval"]);
+const frameStates: ReadonlySet<ComputerActivityState> = new Set(["ready", "working", "approval", "help"]);
 
-export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | null; onOpen: (sessionId: string | null, sessionCaseId: string | null) => void }) {
+export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | null; onOpen: (sessionId: string | null, sessionCaseId: string | null, review?: ComputerReview) => void }) {
   const heading = useId(), container = useRef<HTMLElement>(null);
   const sessionPin = useRef<{ id: string; causaId: string | null } | null>(null);
   const [activity, setActivity] = useState<ComputerActivity | null>(null);
@@ -100,13 +101,14 @@ export function AltazorDesktopActivity({ causaId, onOpen }: { causaId: string | 
 
   const label = activity ? stateLabel[activity.state] : "Consultando escritorio…";
   const needsPreparation = activity?.state === "unconfigured" || activity?.state === "disabled";
+  const review = activity?.state === "help" || activity?.state === "approval" ? activity.state : undefined;
   const visibleFrame = frame && activity && frame.sessionId === activity.sessionId && frameStates.has(activity.state) ? frame : null;
   return <section className={styles.activity} aria-labelledby={heading} ref={container}>
     <header className={styles.header}>
       <Monitor aria-hidden="true" size={20} />
       <div className={styles.heading}><h2 id={heading}>Escritorio de Altazor</h2><p role="status">{label}</p></div>
-      <button type="button" className="btn btn-ghost" onClick={() => onOpen(activity?.sessionId ?? null, activity?.causaId === undefined ? causaId : activity.causaId)}>
-        {needsPreparation ? "Preparar escritorio" : "Abrir escritorio"}<ArrowUpRight size={16} aria-hidden="true" />
+      <button type="button" className={review ? "btn btn-primary" : "btn btn-ghost"} onClick={() => onOpen(activity?.sessionId ?? null, activity?.causaId === undefined ? causaId : activity.causaId, review)}>
+        {review === "help" ? "Revisar solicitud" : review === "approval" ? "Revisar autorización" : needsPreparation ? "Preparar escritorio" : "Abrir escritorio"}<ArrowUpRight size={16} aria-hidden="true" />
       </button>
     </header>
     {visibleFrame && <div className={styles.screen}>

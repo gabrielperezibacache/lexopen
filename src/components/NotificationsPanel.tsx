@@ -6,62 +6,41 @@ import { useState } from "react";
 import { formatDateTime } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
 import { apiMutation } from "@/lib/api-mutation";
+import { needsNotificationAcknowledgment, NOTIFICATION_INBOX_CHANGED, type NotificationInbox, type NotificationListItem } from "@/lib/notify/inbox";
 
-type Notif = {
-  id: string;
-  title: string;
-  body: string;
-  read: boolean;
-  href: string | null;
-  createdAt: string | Date;
-  tipo?: string | null;
-  severidad?: string | null;
-  ackAt?: string | Date | null;
-  entityType?: string | null;
-  entityId?: string | null;
-};
-
-export function NotificationsPanel({ initial }: { initial: Notif[] }) {
+export function NotificationsPanel({ initial }: { initial: NotificationInbox }) {
   const router = useRouter();
-  const [items, setItems] = useState(initial);
+  const [updated, setUpdated] = useState<{ base: NotificationInbox; inbox: NotificationInbox } | null>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
-  // ⚡ Bolt: Avoid allocating a new array with filter().length by using reduce() for counts
-  const unread = items.reduce((count, n) => (!n.read ? count + 1 : count), 0);
+  const [error, setError] = useState("");
+  const { items, unreadCount: unread } = updated?.base === initial ? updated.inbox : initial;
 
-  async function markOne(id: string) {
-    setLoadingAction(id);
+  function apply(items: NotificationListItem[], unreadCount: number) {
+    setUpdated({ base: initial, inbox: { items, unreadCount } });
+    window.dispatchEvent(new Event(NOTIFICATION_INBOX_CHANGED));
+    router.refresh();
+  }
+
+  async function markRead(id?: string) {
+    if (loadingAction !== null) return;
+    setLoadingAction(id ?? "all");
+    setError("");
     try {
-      const result = await apiMutation("/api/notifications", {
+      const result = await apiMutation<{ unreadCount: number }>("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify(id ? { id } : { action: "read-all" }),
       });
-      if (!result.ok) return;
-      setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-      router.refresh();
+      if (!result.ok) { setError(result.error); return; }
+      apply(items.map(n => !id || n.id === id ? { ...n, read: true } : n), result.data.unreadCount);
     } finally {
       setLoadingAction(null);
     }
   }
 
-  async function markAll() {
-    setLoadingAction("all");
-    try {
-      const result = await apiMutation("/api/notifications", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "read-all" }),
-      });
-      if (!result.ok) return;
-      setItems((prev) => prev.map((n) => ({ ...n, read: true })));
-      router.refresh();
-    } finally {
-      setLoadingAction(null);
-    }
-  }
-
-  async function ackOne(n: Notif) {
+  async function ackOne(n: NotificationListItem) {
     setLoadingAction(`ack-${n.id}`);
+    setError("");
     try {
       const result = await apiMutation("/api/notify/ack", {
         method: "POST",
@@ -72,15 +51,15 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
           via: "inapp",
         }),
       });
-      if (!result.ok) return;
-      setItems((prev) =>
-        prev.map((x) =>
+      if (!result.ok) { setError(result.error); return; }
+      apply(
+        items.map((x) =>
           x.id === n.id
             ? { ...x, ackAt: new Date().toISOString(), read: true }
             : x
-        )
+        ),
+        n.read || unread >= 100 ? unread : Math.max(0, unread - 1),
       );
-      router.refresh();
     } finally {
       setLoadingAction(null);
     }
@@ -101,19 +80,20 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--ink-soft)]/70">
-          {unread > 0 ? `${unread} sin leer` : "Todas leídas"}
+          {unread > 0 ? `${unread > 99 ? "99+" : unread} sin leer` : "Todas leídas"}
         </p>
         {unread > 0 && (
           <button
             className="btn btn-secondary"
             type="button"
             disabled={loadingAction !== null}
-            onClick={markAll}
+            onClick={() => void markRead()}
           >
             {loadingAction === "all" ? "Marcando..." : "Marcar todas como leídas"}
           </button>
         )}
       </div>
+      {error && <p role="alert" className="text-sm text-[var(--danger)]">{error}</p>}
       <div className="space-y-3">
         {items.map((n) => (
           <article
@@ -131,10 +111,7 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
                 </p>
               </div>
               <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-                {(n.tipo === "plazo.fatal" ||
-                  n.tipo === "plazo.fatal.escalamiento" ||
-                  n.severidad === "critica") &&
-                  !n.ackAt && (
+                {needsNotificationAcknowledgment(n) && (
                     <button
                       className="btn btn-primary"
                       type="button"
@@ -156,13 +133,13 @@ export function NotificationsPanel({ initial }: { initial: Notif[] }) {
                     className="btn btn-ghost"
                     type="button"
                     disabled={loadingAction !== null}
-                    onClick={() => markOne(n.id)}
+                    onClick={() => void markRead(n.id)}
                   >
                     {loadingAction === n.id ? "Marcando..." : "Marcar leída"}
                   </button>
                 )}
                 {n.href && (
-                  <Link className="btn btn-secondary" href={n.href} onClick={() => markOne(n.id)}>
+                  <Link className="btn btn-secondary" href={n.href} onNavigate={() => { if (!n.read) void markRead(n.id); }}>
                     Abrir
                   </Link>
                 )}

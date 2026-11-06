@@ -92,9 +92,13 @@ export function DriveFolderPanel({
   async function importSelected() {
     if (!selectedFile?.version || !listedFolderId) return;
     setMsg(""); setError(""); setImportedHref(null);
-    const result = await apiMutation<{ documentoId: string; href: string; reused: boolean }>(`/api/integrations/google/drive/${encodeURIComponent(causaId)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folderId: listedFolderId, fileId: selectedFile.id, version: selectedFile.version }) });
+    const result = await apiMutation<{ documentoId: string; href: string; reused: boolean; reusedDocument?: boolean }>(`/api/integrations/google/drive/${encodeURIComponent(causaId)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folderId: listedFolderId, fileId: selectedFile.id, version: selectedFile.version }) });
     if (!result.ok) { setError(result.error); return; }
-    setMsg(result.data.reused ? "Esta revisión ya está guardada en el expediente." : "Copia guardada en el expediente; su texto se procesará localmente.");
+    setMsg(result.data.reused
+      ? "Esta revisión ya está guardada en el expediente."
+      : result.data.reusedDocument
+        ? "Se añadió el origen de Drive al archivo que ya estaba en el expediente."
+        : "Copia guardada en el expediente. Su texto se procesará localmente.");
     setImportedHref(`/documentos/${encodeURIComponent(result.data.documentoId)}/fuentes`);
     router.refresh();
   }

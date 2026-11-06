@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { CSRF_COOKIE, CSRF_HEADER } from "../src/lib/auth/csrf-constants";
 import { loginAs } from "./helpers";
 
 test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
@@ -93,6 +94,23 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   expect(overpayment.status()).toBe(409);
 });
 
+test("un profesional abre sus ajustes sin acceso a la administración", async ({ page }) => {
+  await loginAs(page, "abogado@estudio.cl");
+  await page.getByTestId("desktop-sidebar").getByRole("link", { name: "Configuración", exact: true }).click();
+  await expect(page).toHaveURL(/\/configuracion$/);
+  await expect(page.getByRole("heading", { name: "Usuarios del estudio", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Estado del Host", exact: true })).toHaveCount(0);
+  const origin = new URL(page.url()).origin;
+  const csrf = (await page.context().cookies(origin)).find(cookie => cookie.name === CSRF_COOKIE)?.value;
+  expect(csrf).toBeTruthy();
+  const response = await page.request.patch("/api/configuracion", {
+    headers: { Origin: origin, [CSRF_HEADER]: csrf! },
+    data: { name: "Cambio ficticio no autorizado", defaultRetencionPct: 0, ivaPct: 0 },
+  });
+  expect(response.status()).toBe(403);
+  expect((await page.request.get("/api/admin/host-status")).status()).toBe(403);
+});
+
 test("un cliente queda limitado al portal y a sus espacios", async ({ page }) => {
   test.setTimeout(90_000);
   await loginAs(page, "cliente@andes.cl");
@@ -104,6 +122,8 @@ test("un cliente queda limitado al portal y a sus espacios", async ({ page }) =>
   await expect(page.getByText("Acceso restringido:")).toBeVisible();
   await expect(page.getByRole("link", { name: "Causas" })).toHaveCount(0);
   expect((await page.request.get("/api/admin/host-status")).status()).toBe(403);
+  await page.goto("/configuracion");
+  await expect(page).toHaveURL(/\/portal$/);
 
   const sitesResponse = await page.request.get("/api/sites");
   expect(sitesResponse.ok()).toBeTruthy();

@@ -24,6 +24,13 @@
 - Hitos de plazo fatal (T-7…T-0) con acuse e escalamiento sin ack; UI `/cuenta/notificaciones` y panel admin.
 - PWA básica: `manifest.ts`, service worker y suscripción push (VAPID).
 
+## 1.1.0-preview.7
+
+- **Novedades.** Reúne documentos de carga manual, correo, Drive y OJV. Conserva el origen de cada ingreso y distingue las revisiones de Drive.
+- **Altazor.** Admite pegar documentos en el chat, revisar solicitudes del escritorio, preparar un resumen privado y conectar Dropbox para lectura.
+- **Configuración.** Centraliza ajustes y muestra Comunicaciones al elegir Chile o habilitar las herramientas del PJUD.
+- **Feedback y avisos.** Permite seguir comentarios del equipo y leer los avisos recientes desde la campana. El acuse de avisos críticos sigue siendo una acción separada.
+
 ## 1.0.0 — 2026-10-30
 
 Primera versión estable del Host local LexOpen para práctica chilena.

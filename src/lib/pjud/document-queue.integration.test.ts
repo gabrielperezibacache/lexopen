@@ -13,6 +13,7 @@ import type { ManualOjvSession } from "./manual-session";
 import { pjudDocumentRefHash } from "./document-identity";
 import { scrapeMovimientoIdentity } from "./types";
 import { getObject } from "@/lib/storage";
+import { ingestManualCaseDocument } from "@/lib/causas/document-intake";
 
 async function main() {
   assert.equal(assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL), new URL(process.env.DATABASE_URL!).toString());
@@ -46,6 +47,9 @@ async function main() {
     assert.equal(await prisma.pjudDocumentJob.count({ where: { causaId } }), 3, "one receipt per judicial row");
     assert.doesNotMatch(JSON.stringify(await prisma.pjudDocumentJob.findMany({ where: { causaId } })), /PRIVATE|https:/, "receipts contain no copied source URLs");
     const bytes = Buffer.from("%PDF-1.4\n%Synthetic fixture only\n" + "x".repeat(300));
+    const revised = Buffer.concat([bytes, Buffer.from("\n%Distinct revision")]);
+    const manualInput = { causaId, clienteId: null, nombre: "Resolución aportada.pdf", tipo: "escrito", contenido: null, mimeType: "application/pdf", ruta: null, extractionStatus: "pending", confidencial: false, privilegio: false };
+    const manual = await ingestManualCaseDocument(manualInput, bytes, owner);
     let requests = 0, enqueued = 0;
     const firstJob = await prisma.pjudDocumentJob.findFirstOrThrow({ where: { causaId }, orderBy: [{ nextAttemptAt: "asc" },{ id: "asc" }] });
     const fixtureFetch = async () => { requests++; return requests === 1 ? new Response("", { status: 401 }) : new Response(new Uint8Array(bytes), { headers: { "content-type": "application/pdf" } }); };
@@ -53,18 +57,54 @@ async function main() {
     assert.equal(login[0].status, "waiting_login");
     const drained = await processPendingPjudDocumentJobs({ causaId, limit: 2, fetch: fixtureFetch, enqueue: () => { enqueued++; return true; } });
     assert.equal(drained.filter(row => row.status === "saved").length, 2, "a protected first document must not starve the remaining queue");
-    assert.equal(requests, 3); assert.equal(enqueued, 2);
+    assert.equal(requests, 3); assert.equal(enqueued, 0, "identical judicial originals reuse the already filed document");
     const saved = await prisma.pjudDocumentJob.findFirstOrThrow({ where: { causaId, status: "saved" }, include: { documento: true } });
+    assert.equal(saved.documentoId, manual.doc.id);
     assert.equal(saved.sourceSha256, createHash("sha256").update(bytes).digest("hex"));
     assert.deepEqual(await getObject(saved.documento!.storageKey!), bytes);
-    const recovered = await Promise.all([0,1].map(() => ingestPjudDocumentBuffer({ causaId, movimientoId: firstJob.movimientoId, bytes, enqueue: () => { enqueued++; return true; } })));
-    assert.equal(recovered[0], recovered[1]); assert.equal(enqueued, 3, "concurrent authenticated retries keep one original");
+    const recovered = await Promise.all([0,1].map(() => ingestPjudDocumentBuffer({ causaId, movimientoId: firstJob.movimientoId, bytes: revised, enqueue: () => { enqueued++; return true; } })));
+    assert.equal(recovered[0], recovered[1]); assert.equal(enqueued, 1, "concurrent authenticated retries keep one original");
+    assert.ok(recovered[0]);
+    assert.notEqual(recovered[0], manual.doc.id, "distinct bytes are preserved as a different document");
+    const uploadedRevision = await ingestManualCaseDocument({ ...manualInput, nombre: "Otra copia.pdf" }, revised, owner);
+    assert.equal(uploadedRevision.doc.id, recovered[0], "manual upload also reuses an OJV original");
+    const origins = await prisma.caseDocumentIntake.findMany({ where: { causaId, source: "ojv" } });
+    assert.equal(origins.length, 3);
+    assert.equal(origins.filter(origin => origin.documentoId === manual.doc.id).length, 2);
+    assert.doesNotMatch(JSON.stringify(origins), /PRIVATE|https:/);
+    assert.equal(await prisma.documento.count({ where: { causaId } }), 2);
     assert.equal((await pjudDocumentProgress(causaId)).saved, 3);
     await prisma.documento.delete({ where: { id: saved.documentoId! } });
     assert.equal(await ingestPjudDocumentBuffer({ causaId, movimientoId: saved.movimientoId, bytes, enqueue: () => true }), null, "deleted original tombstone must not silently recreate a document");
-    assert.equal((await pjudDocumentProgress(causaId)).removed, 1);
+    assert.equal((await pjudDocumentProgress(causaId)).removed, 2);
     assert.deepEqual(await processPendingPjudDocumentJobs({ causaId, fetch: fixtureFetch }), []);
     assert.equal(requests, 3);
+    const directRef = "https://oficinajudicialvirtual.pjud.cl/direct.pdf";
+    const direct = await prisma.causaMovimiento.create({ data: { causaId, titulo: "Explicit fixture import", documentoRef: directRef } });
+    assert.equal(await ingestPjudDocumentBuffer({
+      causaId, movimientoId: direct.id, actorId: owner.id, bytes: revised,
+      expectedSourceRefHash: pjudDocumentRefHash(causaId, direct.id, directRef + "?changed=1"),
+    }), null, "bytes captured from an older reference cannot change the movement");
+    assert.equal(await ingestPjudDocumentBuffer({ causaId, movimientoId: direct.id, actorId: owner.id, bytes: revised }), recovered[0]);
+    assert.equal(await prisma.pjudDocumentJob.count({ where: { movimientoId: direct.id } }), 0);
+    assert.equal((await prisma.caseDocumentIntake.findUniqueOrThrow({ where: {
+      causaId_source_sourceKey: { causaId, source: "ojv", sourceKey: direct.id },
+    } })).actorId, owner.id, "manual downloads without a queued receipt still keep the authorized origin");
+    const simultaneous = await prisma.causaMovimiento.create({ data: { causaId, titulo: "Concurrent source fixture", documentoRef: directRef } });
+    const simultaneousBytes = Buffer.concat([bytes, Buffer.from("\n%Simultaneous imports")]);
+    const [uploaded, downloaded] = await Promise.all([
+      ingestManualCaseDocument({ ...manualInput, nombre: "Ingreso simultáneo.pdf" }, simultaneousBytes, owner),
+      ingestPjudDocumentBuffer({ causaId, movimientoId: simultaneous.id, actorId: owner.id, bytes: simultaneousBytes, enqueue: () => true }),
+    ]);
+    assert.equal(downloaded, uploaded.doc.id);
+    assert.deepEqual((await prisma.caseDocumentIntake.findMany({
+      where: { documentoId: uploaded.doc.id }, select: { source: true }, orderBy: { source: "asc" },
+    })).map(origin => origin.source), ["manual", "ojv"]);
+    const unauthorized = await prisma.causaMovimiento.create({
+      data: { causaId: hidden.id, titulo: "Unauthorized source fixture", documentoRef: directRef },
+    });
+    await assert.rejects(ingestPjudDocumentBuffer({ causaId: hidden.id, movimientoId: unauthorized.id, actorId: owner.id, bytes }));
+    assert.equal(await prisma.caseDocumentIntake.count({ where: { causaId: hidden.id } }), 0);
     let cancelled = false;
     const oversized = new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(101)); }, cancel() { cancelled = true; } }));
     await assert.rejects(readPjudDocumentResponse(oversized, 100), /tamaño/); assert.equal(cancelled, true);
