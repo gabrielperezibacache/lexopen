@@ -17,6 +17,7 @@ async function main(){
   const priorEnv={...process.env},root=await mkdtemp(path.join(tmpdir(),"lexopen-personal-drive-")),originalFetch=globalThis.fetch,tag=randomUUID().replaceAll("-","");
   Object.assign(process.env,{SESSION_SECRET:"fictitious-personal-drive-session-secret-64-characters-valid",APP_URL:"http://127.0.0.1:9999",PERSONAL_DRIVE_GOOGLE_CLIENT_ID:"fixture-personal-drive-client",PERSONAL_DRIVE_GOOGLE_CLIENT_SECRET:"fixture-personal-drive-secret",STORAGE_PATH:root});
   const priorOperator=await prisma.integrationConfig.findUnique({where:{provider:"personal-drive-oauth"}});
+  const priorWorkspace=await prisma.integrationConfig.findUnique({where:{provider:"altazor-oauth-google"}});
   const users:string[]=[];let causaId="",wrongScope=false,refreshes=0,exchanges=0,downloads=0,providerCalls=0;
   const folderId=`Folder_${tag}`,fileId=`File_${tag}`,bytes=Buffer.from("Un documento completamente ficticio de Drive para conservar su original."),meta={id:fileId,name:"fixture.txt",mimeType:"text/plain",version:"1",size:String(bytes.length),parents:[folderId],trashed:false,md5Checksum:createHash("md5").update(bytes).digest("hex"),capabilities:{canDownload:true}};
   const fixtureFetch:typeof fetch=async(input,init)=>{
@@ -39,6 +40,41 @@ async function main(){
     const actor={id:owner.id,sessionVersion:owner.sessionVersion,sessionHash:sessionHash("fixture-session")},stranger={id:other.id,sessionVersion:other.sessionVersion,sessionHash:sessionHash("other-fixture-session")};
     await prisma.user.update({where:{id:other.id},data:{role:"socio",capabilityGrants:"host.admin"}});assert.equal((await personalDriveConnectionStatus(other.id)).canAdmin,false);await assert.rejects(personalDriveSetupStatus(stranger),status(403));
     await prisma.user.update({where:{id:other.id},data:{role:"admin",capabilityGrants:""}});
+    const origin = process.env.APP_URL!;
+    const localSetup = { env: { APP_URL: origin } };
+    await prisma.integrationConfig.deleteMany({ where: { provider: "altazor-oauth-google" } });
+    assert.equal((await personalDriveSetupStatus(stranger, localSetup, origin)).canReuseAltazorApp, false);
+    const previousSetup = await prisma.integrationConfig.findUnique({ where: { provider: "personal-drive-oauth" } });
+    await assert.rejects(savePersonalDriveSetup(stranger, { useAltazorApp: true, confirmed: true }, origin, localSetup), status(409));
+    assert.deepEqual(await prisma.integrationConfig.findUnique({ where: { provider: "personal-drive-oauth" } }), previousSetup);
+
+    const standalone = await savePersonalDriveSetup(stranger, {
+      useAltazorApp: false, confirmed: true, clientId: "fixture-standalone-app", clientSecret: "fixture-standalone-secret",
+    }, origin, localSetup);
+    assert.equal(standalone.source, "saved");
+    const sharedCredentials = seal({
+      clientId: "fixture-saved-workspace-app", clientSecret: "fixture-saved-workspace-secret", appUrl: origin,
+    }, "altazor:desktop:oauth:operator:google");
+    await prisma.integrationConfig.create({
+      data: { provider: "altazor-oauth-google", enabled: true, configJson: JSON.stringify({ credentialsEnc: sharedCredentials }) },
+    });
+    const reuseStatus = await personalDriveSetupStatus(stranger, localSetup, origin);
+    assert.equal(reuseStatus.canReuseAltazorApp, true);
+    assert.equal(reuseStatus.source, "saved", "discovering a reusable app keeps the separate preparation");
+    assert.doesNotMatch(JSON.stringify(reuseStatus), /fixture-(?:saved-workspace|standalone)|credentialsEnc/);
+    assert.equal((await personalDriveSetupStatus(stranger, localSetup, "http://localhost:9999")).canReuseAltazorApp, false);
+    assert.equal((await personalDriveSetupStatus(stranger, { env: { APP_URL: origin, ALTAZOR_GOOGLE_CLIENT_ID: "fixture-incomplete" } }, origin)).canReuseAltazorApp, false);
+
+    const savedAlias = await savePersonalDriveSetup(stranger, { useAltazorApp: true, confirmed: true }, origin, localSetup);
+    assert.equal(savedAlias.source, "altazor");
+    assert.equal(savedAlias.canReuseAltazorApp, true);
+    const reusable = await startPersonalDriveOAuth(actor, { requestId: randomUUID(), confirmed: true }, origin, localSetup);
+    const reuseUrl = new URL(reusable.authUrl);
+    assert.equal(reuseUrl.searchParams.get("client_id"), "fixture-saved-workspace-app");
+    assert.equal(reuseUrl.searchParams.get("scope"), scopes[0]);
+    assert.equal(reuseUrl.searchParams.get("redirect_uri"), `${origin}/api/personal-connectors/google-drive/oauth/callback`);
+    assert.equal((await personalDriveConnectionStatus(owner.id, localSetup)).connected, false, "shared app is not consent");
+
     const prepared=await savePersonalDriveSetup(stranger,{useAltazorApp:true,confirmed:true},process.env.APP_URL!,{env:{APP_URL:process.env.APP_URL,ALTAZOR_GOOGLE_CLIENT_ID:"fixture-shared-app",ALTAZOR_GOOGLE_CLIENT_SECRET:"fixture-shared-secret"}});assert.equal(prepared.configured,true);assert.equal(prepared.source,"altazor");const storedSetup=await prisma.integrationConfig.findUniqueOrThrow({where:{provider:"personal-drive-oauth"}});assert.ok(!storedSetup.configJson.includes("fixture-shared-secret"),"an operator alias never copies tokens or secret material");
     assert.equal((await personalDriveConnectionStatus(owner.id)).connected,false);
     async function start(){const value=await startPersonalDriveOAuth(actor,{requestId:randomUUID(),confirmed:true},process.env.APP_URL!),url=new URL(value.authUrl);assert.equal(url.searchParams.get("access_type"),"offline");assert.equal(url.searchParams.get("scope"),scopes[0]);assert.equal(url.searchParams.get("include_granted_scopes"),"false");const attempt=await prisma.personalOAuthAttempt.findUniqueOrThrow({where:{id:value.attemptId}}),binding=unseal<{verifier:string}>(attempt.resultEnc!,`google-drive:content:attempt:${owner.id}:${attempt.id}`);assert.equal(url.searchParams.get("code_challenge"),createHash("sha256").update(binding.verifier).digest("base64url"));assert.ok(!value.authUrl.includes("fixture-personal-drive-secret"));return{...value,state:url.searchParams.get("state")!};}
@@ -67,6 +103,6 @@ async function main(){
     const pending=await start();await disconnectPersonalDrive(actor);await assert.rejects(receivePersonalDriveCallback({state:pending.state,code:"fixture-code"}),status(409));assert.equal((await personalDriveConnectionStatus(owner.id)).connected,false);assert.equal((await prisma.personalConnectorAccount.findUniqueOrThrow({where:{id:account.id}})).credentialsEnc,null);
     const stale=await start();await prisma.user.update({where:{id:owner.id},data:{sessionVersion:{increment:1}}});await assert.rejects(receivePersonalDriveCallback({state:stale.state,code:"fixture-code"}),status(409));assert.equal(exchanges,2,"cancelled/stale returns cannot exchange another code");
     console.log("Personal Drive passed: exact content/offline consent, PKCE/state, metadata-only denial, private encrypted tokens, replay/session ownership, refresh CAS, native metadata folder picker/selection, stale picker/ACL denial, real folder-worker integration, identity generation pause, disconnect and stale-session denial (fictitious provider only).");
-  }finally{globalThis.fetch=originalFetch;if(causaId){await prisma.documento.deleteMany({where:{causaId}});await prisma.causa.deleteMany({where:{id:causaId}});}await prisma.auditEvent.deleteMany({where:{actorId:{in:users}}});await prisma.user.deleteMany({where:{id:{in:users}}});if(priorOperator)await prisma.integrationConfig.upsert({where:{provider:"personal-drive-oauth"},create:priorOperator,update:{enabled:priorOperator.enabled,configJson:priorOperator.configJson}});else await prisma.integrationConfig.deleteMany({where:{provider:"personal-drive-oauth"}});await prisma.$disconnect();await rm(root,{recursive:true,force:true});for(const key of Object.keys(process.env))if(!(key in priorEnv))delete process.env[key];Object.assign(process.env,priorEnv);}
+  }finally{globalThis.fetch=originalFetch;if(causaId){await prisma.documento.deleteMany({where:{causaId}});await prisma.causa.deleteMany({where:{id:causaId}});}await prisma.auditEvent.deleteMany({where:{actorId:{in:users}}});await prisma.user.deleteMany({where:{id:{in:users}}});for(const [name,prior] of [["personal-drive-oauth",priorOperator],["altazor-oauth-google",priorWorkspace]] as const){if(prior)await prisma.integrationConfig.upsert({where:{provider:name},create:prior,update:{enabled:prior.enabled,configJson:prior.configJson}});else await prisma.integrationConfig.deleteMany({where:{provider:name}});}await prisma.$disconnect();await rm(root,{recursive:true,force:true});for(const key of Object.keys(process.env))if(!(key in priorEnv))delete process.env[key];Object.assign(process.env,priorEnv);}
 }
 void main().catch(error=>{console.error(error);process.exitCode=1;});

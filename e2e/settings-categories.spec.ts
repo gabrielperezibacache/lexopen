@@ -27,6 +27,13 @@ test("ajustes móviles: categorías, ancla estable durante la carga y destinos a
   await page.setViewportSize({ width: 360, height: 800 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await loginAs(page, "socio@estudio.cl");
+  const [modeResponse, countryResponse] = await Promise.all([
+    page.request.get("/api/configuracion/causas"),
+    page.request.get("/api/configuracion/pais"),
+  ]);
+  expect(modeResponse.ok() && countryResponse.ok()).toBeTruthy();
+  const pjudEnabled = (await modeResponse.json()).mode === "pjud_cl";
+  const communicationsEnabled = pjudEnabled || (await countryResponse.json()).country === "CL";
   // This test controls the loading transition, rather than measuring the
   // independent Host diagnostics endpoint's response time under CI load.
   const snapshotResponse = await page.request.get("/api/admin/config-snapshot");
@@ -39,7 +46,7 @@ test("ajustes móviles: categorías, ancla estable durante la carga y destinos a
     await page.goto("/configuracion#runtime-settings");
     const category = page.getByRole("combobox", { name: "Categoría de configuración" });
     await expect(category).toHaveValue("aplicacion-datos");
-    await expect(category.locator("option")).toHaveCount(7);
+    await expect(category.locator("option")).toHaveCount(communicationsEnabled ? 7 : 6);
     const runtime = page.locator("#runtime-settings");
     await expect(runtime).toHaveCount(1);
     await expect(runtime).toContainText("Cargando");
@@ -47,13 +54,26 @@ test("ajustes móviles: categorías, ancla estable durante la carga y destinos a
     release();
     await expect(runtime).toContainText("Entorno y operación");
     await expect(runtime).toHaveAttribute("data-retained-root", "yes");
-    for (const id of legacyAnchors) await expect(page.locator(`[id="${id}"]`)).toHaveCount(1);
+    for (const id of legacyAnchors) {
+      const expected = ["pjud-settings", "pjud-log"].includes(id) && !pjudEnabled ? 0 : 1;
+      await expect(page.locator(`[id="${id}"]`)).toHaveCount(expected);
+    }
     await category.selectOption("conexiones-ia");
-    await expect(page).toHaveURL(/#llm-settings$/);
+    await expect(page).toHaveURL(/#cuentas-conectadas$/);
     const nav = page.getByRole("navigation", { name: "Secciones de configuración" });
+    await expect(nav.getByRole("link", { name: "Cuentas conectadas", exact: true })).toHaveAttribute("aria-current", "location");
+    const accounts = page.getByRole("region", { name: "Cuentas conectadas", exact: true });
+    await expect(accounts.getByRole("link", { name: /Google Drive/ })).toHaveAttribute("href", "/sincronizacion#sync-google");
+    await expect(accounts.getByRole("link", { name: /Google Workspace/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=google");
+    await expect(accounts.getByRole("link", { name: /GitHub/ })).toHaveAttribute("href", "/inicio?altazor=connectors&connector=github");
+    await nav.getByRole("link", { name: "IA", exact: true }).click();
+    await expect(page).toHaveURL(/#llm-settings$/);
     await expect(nav.getByRole("link", { name: "IA", exact: true })).toHaveAttribute("aria-current", "location");
     await category.selectOption("estudio-equipo");
     await expect(page).toHaveURL(/#estudio$/);
+    await page.goto("/configuracion#preferencias-altazor");
+    await page.locator("#preferencias-altazor").getByRole("link", { name: "Cuentas conectadas", exact: true }).click();
+    await expect(nav.getByRole("link", { name: "Cuentas conectadas", exact: true })).toHaveAttribute("aria-current", "location");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     await page.screenshot({ path: info.outputPath("settings-categories-mobile.png"), fullPage: false });
   } finally { release(); }
@@ -159,7 +179,7 @@ test("un enlace antiguo a Google se resuelve cuando termina de cargar su formula
     const form = page.getByTestId("google-settings-form");
     await expect(form).toBeVisible();
     const nav = page.getByRole("navigation", { name: "Secciones de configuración" });
-    await expect(nav.getByRole("link", { name: "Google", exact: true })).toHaveAttribute("aria-current", "location");
+    await expect(nav.getByRole("link", { name: "Google del estudio", exact: true })).toHaveAttribute("aria-current", "location");
     await expect.poll(async () => form.evaluate(element => element.getBoundingClientRect().top)).toBeGreaterThan(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   } finally { release(); }

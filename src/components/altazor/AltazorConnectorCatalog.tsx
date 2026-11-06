@@ -24,6 +24,7 @@ function AdvancedOptions({ enabled, children }: { enabled: boolean; children: Re
 
 export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }) {
   const uid = useId(), formRef = useRef<HTMLFormElement>(null), requestKey = useRef(operationKey());
+  const detailHeading = useRef<HTMLHeadingElement>(null), searchInput = useRef<HTMLInputElement>(null), previousSelection = useRef("");
   const [computer, setComputer] = useState<ComputerStatus | null>(null), [inventory, setInventory] = useState<Inventory | null>(null);
   const [category, setCategory] = useState("all"), [query, setQuery] = useState(""), [selected, setSelected] = useState("");
   const [connection, setConnection] = useState<ConnectorConnection | null>(null), [name, setName] = useState("");
@@ -39,10 +40,35 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
     const result = await response.json(); if (!response.ok) throw new Error(result.error || "No se pudieron comprobar las conexiones.");
     setInventory(result.connectors);
   }, [causaId]);
-  useEffect(() => { let active = true; queueMicrotask(() => { if (active) { const params = new URLSearchParams(location.search), provider = EASY_OAUTH_PROVIDERS.find(value => value === params.get("oauthProvider")); if (params.has("oauthAttempt") && provider) setSelected(EASY_OAUTH_CONNECTOR[provider]); void load().catch(cause => { if (active) setError(cause.message); }).finally(() => { if (active) setLoading(false); }); } }); return () => { active = false; }; }, [load]);
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      const params = new URLSearchParams(location.search);
+      const returningProvider = params.has("oauthAttempt") && EASY_OAUTH_PROVIDERS.find(value => value === params.get("oauthProvider"));
+      const provider = returningProvider || EASY_OAUTH_PROVIDERS.find(value => value === params.get("connector"));
+      if (provider) {
+        const kind = EASY_OAUTH_CONNECTOR[provider];
+        setSelected(kind);
+        setName(kind);
+      }
+      if (!returningProvider && params.get("oauth") === "failed") setError("No se pudo confirmar el ingreso. Elija la aplicación y vuelva a conectar su cuenta.");
+      void load().catch(cause => { if (active) setError(cause.message); }).finally(() => { if (active) setLoading(false); });
+    });
+    return () => { active = false; };
+  }, [load]);
+  useEffect(() => {
+    if (previousSelection.current === selected) return;
+    previousSelection.current = selected;
+    const target = selected ? detailHeading.current : searchInput.current;
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: "start", behavior: "instant" });
+  }, [selected]);
   const catalog = inventory?.catalog || withoutRuntime;
   const entry = catalog.find(item => item.id === selected);
   const easyProvider = EASY_OAUTH_PROVIDERS.find(provider => EASY_OAUTH_CONNECTOR[provider] === entry?.id);
+  const workspaceId = computer?.configured ? computer.workspaceId : null;
+  const gatewayReady = Boolean(computer?.policyAllowed && inventory?.gateReady && entry?.available && entry.fields.some(field => field.name === "token" && field.secret));
   const activeSession = Boolean(computer?.sessions.some(session => session.requiresStop || ["creating", "starting", "ready", "unknown"].includes(session.state)));
   const filtered = catalog.filter(item => (category === "all" || item.category === category) && `${item.label} ${item.description}`.toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es").trim()));
   const canConfigure = Boolean(computer?.configured && inventory && computer.policyAllowed && !activeSession);
@@ -81,8 +107,8 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
     {inventory?.operations?.map(operation => <div key={operation.id} className={styles.pending}><p>Hay un cambio de conexión sin confirmar. Revise el estado de la aplicación; reconocerlo aquí no repite ni confirma su resultado.</p><button type="button" disabled={busy} onClick={async () => { const result = await mutate(`/operations/${encodeURIComponent(operation.id)}`, {}); if (result) { await load().catch(() => {}); setNotice("Revisión registrada. La operación anterior no se reenvió."); } }}>Revisé el estado; continuar sin repetir</button></div>)}
     {entry ? <div className={styles.detail}>
       <button type="button" disabled={busy} onClick={() => { setSelected(""); setConnection(null); setAuthUrl(""); }}><ArrowLeft size={16} aria-hidden="true" />Todas las aplicaciones</button>
-      <div className={styles.detailHeading}><h3>{entry.label}</h3><p>{easyProvider ? "Ingreso personal con permisos de lectura." : entry.description}</p></div>
-      {easyProvider && <EasyConnectorOAuth key={`${computer?.workspaceId || "unavailable"}:${easyProvider}`} provider={easyProvider} workspaceId={computer?.workspaceId || null} causaId={causaId} hasActiveSession={activeSession} busy={busy} onBusyChange={setBusy} onDisconnect={disconnectEasy} />}
+      <div className={styles.detailHeading}><h3 ref={detailHeading} tabIndex={-1}>{entry.label}</h3>{!easyProvider && <p>{entry.description}</p>}</div>
+      {easyProvider && !loading && <EasyConnectorOAuth key={`${workspaceId || "unavailable"}:${easyProvider}`} provider={easyProvider} workspaceId={workspaceId} causaId={causaId} gatewayReady={gatewayReady} hasActiveSession={activeSession} busy={busy} onBusyChange={setBusy} onDisconnect={disconnectEasy} />}
       <AdvancedOptions enabled={Boolean(easyProvider)}>
       {entry.fields.some(field => field.name === "token") && ["github", "google-workspace"].includes(entry.id) && <div className={styles.setup}><h4>Probar con permisos de lectura</h4>{entry.id === "google-workspace" ? <><p>En OAuth Playground, elija acceso Online y autorice únicamente <code>https://www.googleapis.com/auth/drive.metadata.readonly</code>. Inicie sesión personalmente, intercambie el código y pegue sólo el access token en el campo reservado de abajo. No necesita completar los campos de una aplicación OAuth para esta modalidad.</p><a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener noreferrer">Abrir OAuth Playground de Google <ArrowUpRight size={15} aria-hidden="true" /></a></> : <><p>Cree personalmente un token fine-grained con caducidad de un día, acceso sólo al repositorio que elija y permiso Contents de lectura. Péguelo en el campo reservado de abajo. No necesita completar los campos de una aplicación OAuth para esta modalidad.</p><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">Crear token limitado en GitHub <ArrowUpRight size={15} aria-hidden="true" /></a></>}<p>Guarde la conexión y pulse Probar acceso. Un inicio de sesión en el navegador no configura por sí solo este conector. Introduzca las credenciales únicamente en el proveedor o en el formulario reservado; no las envíe al chat.</p></div>}
       {entry.id === "slack" && <div className={styles.setup}><h4>Elija cómo conectar Slack</h4><ul><li><strong>Webhook:</strong> pegue su dirección para el canal al que enviará mensajes.</li><li><strong>Bot:</strong> introduzca el token del bot y el canal de destino.</li><li><strong>Inicio de sesión:</strong> registre su propia aplicación Slack, introduzca su identificador y secreto, y elija un canal. Después de guardar podrá iniciar sesión.</li></ul><p>Complete sólo los campos de la modalidad elegida. Los campos individuales se marcan según lo declarado por el servicio.</p></div>}
@@ -98,7 +124,7 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
       {connection && <div className={styles.connectionActions}><div className={styles.actions}><button type="button" disabled={busy || !canConfigure} onClick={test}>Probar acceso</button>{entry.oauth && <button type="button" disabled={busy || !canConfigure || !(entry.oauthReady || connection.ownAppConfigured)} onClick={oauth}>Iniciar sesión en {entry.label}</button>}</div>{entry.oauth && !(entry.oauthReady || connection.ownAppConfigured) && <p>Para iniciar sesión, registre una aplicación en este servicio y guarde su identificador de cliente y su secreto. Las cuentas personales no autorizan el acceso automáticamente.</p>}{authUrl && <a href={authUrl} target="_blank" rel="noopener noreferrer">Continuar en la página oficial <ArrowUpRight size={15} aria-hidden="true" /></a>}<label className={styles.check}><input type="checkbox" disabled={busy || !canConfigure} checked={removeConfirmed} onChange={event => { setRemoveConfirmed(event.target.checked); requestKey.current = operationKey(); }} />Deseo retirar esta conexión del escritorio.</label><button type="button" disabled={busy || !canConfigure || !removeConfirmed} onClick={remove}>Retirar conexión</button></div>}
       </AdvancedOptions>
     </div> : <>
-      <div className={styles.search}><Search size={18} aria-hidden="true" /><label className="sr-only" htmlFor={`${uid}-search`}>Buscar aplicaciones</label><input id={`${uid}-search`} value={query} type="search" placeholder="Buscar correo, GitHub, calendario…" onChange={event => setQuery(event.target.value)} /></div>
+      <div className={styles.search}><Search size={18} aria-hidden="true" /><label className="sr-only" htmlFor={`${uid}-search`}>Buscar aplicaciones</label><input ref={searchInput} id={`${uid}-search`} value={query} type="search" placeholder="Buscar correo, GitHub, calendario…" onChange={event => setQuery(event.target.value)} /></div>
       <nav className={styles.categories} aria-label="Categorías de aplicaciones">{categories.filter(item => item.id === "all" || catalog.some(entry => entry.category === item.id)).map(item => <button type="button" key={item.id} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</nav>
       <p className={styles.count} role="status">{filtered.length} aplicaciones{category !== "all" ? ` · ${categories.find(item => item.id === category)?.label}` : ""}</p>
       <ul className={styles.list}>{filtered.map(item => { const Icon = categories.find(category => category.id === item.category)?.Icon || Globe, accounts = inventory?.connections.filter(connection => connection.kind === item.id) || []; return <li key={item.id}><button type="button" onClick={() => select(item, accounts[0] || null)}><Icon size={22} aria-hidden="true" /><span><strong>{item.label}</strong><small>{accounts.length ? `${accounts.length} conexión(es) configurada(s)` : item.platform === "macos-host" ? "Requiere macOS" : "Sin configurar"}</small></span><ArrowRight size={17} aria-hidden="true" /></button></li>; })}</ul>
