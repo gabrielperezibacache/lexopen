@@ -54,11 +54,11 @@ jobs:
       ALTAZOR_COMPUTER_ENABLED: "1"
       LEXOPEN_ALTAZOR_TEST_DOCKER: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Read pinned desktop gateway source without persisted credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: madkoding/kitties
           ref: 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3
@@ -182,7 +182,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -235,7 +235,7 @@ jobs:
       LEXOPEN_RELAX_CSRF: "1"
       LEXOPEN_PDF_REQUIRE_TOOLS: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
