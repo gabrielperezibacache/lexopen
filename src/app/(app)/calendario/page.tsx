@@ -339,6 +339,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
     <div className="space-y-6">
       <PageHeader
         title="Calendario"
+        artwork="calendar"
         subtitle="Plazos procesales, tareas, eventos y audiencias. Arrastre eventos (verde) entre días en mes o semana."
         actions={<>
           <GoogleCalendarPullButton />

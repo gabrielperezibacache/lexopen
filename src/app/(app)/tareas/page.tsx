@@ -38,7 +38,7 @@ export default async function GlobalTasksPage({ searchParams }: {
 
   return (
     <div>
-      <ModuleHeader title={dict.hubs.tareas.title} subtitle={dict.hubs.tareas.subtitle} />
+      <ModuleHeader title={dict.hubs.tareas.title} subtitle={dict.hubs.tareas.subtitle} artwork="tasks" />
       <GlobalTasksPanel
         tasks={tasks.map(task => ({
           id: task.id, title: task.title, description: task.description, instructions: task.instructions,
