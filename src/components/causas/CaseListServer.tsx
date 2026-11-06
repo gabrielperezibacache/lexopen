@@ -73,7 +73,14 @@ export async function CaseListServer({ mode, searchParams, organizer = false }: 
           <span>{!causa.pjudMonitoreoActivo ? tr("Sin seguimiento", "Not tracked") : !causa.pjudLastSyncStatus || causa.pjudLastSyncStatus === "never" ? tr("Pendiente de primera consulta", "Awaiting first check") : causa.pjudLastSyncStatus === "ok" ? tr("Consulta actualizada", "Query updated") : labelPjudSyncStatus(causa.pjudLastSyncStatus)}</span>
           {causa.pjudLastSyncAt && <p className="mt-1 text-xs text-[var(--muted)]">{tr("Revisada", "Checked")} {formatDate(causa.pjudLastSyncAt)}</p>}
         </> : formatDate(causa.updatedAt)}</td>
-        <td role="cell" data-label={options} className="data-table-actions px-4 py-4"><details><summary className="min-h-11 cursor-pointer py-3 text-[var(--sea)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--sea)]">{options}</summary><CausaManageActions causaId={causa.id} titulo={causa.titulo} estado={causa.estado} isAdmin={isAdmin(user)} compact /></details></td>
+        <td role="cell" data-label={options} className="data-table-actions px-4 py-4">
+          <div className="flex flex-wrap items-baseline gap-x-4">
+            {organizer && <Link href={`/causas/${encodeURIComponent(causa.id)}/expediente?vista=novedades`}
+              className="inline-flex min-h-11 items-center text-[var(--sea)] underline-offset-4 hover:underline"
+              aria-label={tr(`Novedades de ${causa.titulo}`, `Updates for ${causa.titulo}`)}>{tr("Novedades", "Updates")}</Link>}
+            <details><summary className="min-h-11 cursor-pointer py-3 text-[var(--sea)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--sea)]">{options}</summary><CausaManageActions causaId={causa.id} titulo={causa.titulo} estado={causa.estado} isAdmin={isAdmin(user)} compact /></details>
+          </div>
+        </td>
       </tr>)}{causas.length === 0 && <tr role="row"><td role="cell" colSpan={4} className="px-4 py-10 text-center text-[var(--muted)]"><p>{hasFilters ? t("causas.empty") : t("causas.emptyActive")}</p><Link className="mt-3 inline-flex min-h-11 items-center text-[var(--sea)]" href={hasFilters ? base : connected ? "/causas/mis-causas" : "/causas/nueva"}>{hasFilters ? tr("Quitar filtros", "Clear filters") : connected ? tr("Conectar mis causas", "Connect my matters") : t("causas.emptyCreate")}</Link></td></tr>}</tbody>
     </table></div></div>
     {totalPages > 1 && <nav className="flex items-center justify-between gap-3 text-sm" aria-label={tr("Páginas de causas", "Matter pages")}>{page > 1 ? <Link className="min-h-11 py-3 text-[var(--sea)]" href={pageHref(page - 1)}>{t("causas.prevPage")}</Link> : <span />}{page < totalPages && <Link className="min-h-11 py-3 text-[var(--sea)]" href={pageHref(page + 1)}>{t("causas.nextPage")}</Link>}</nav>}

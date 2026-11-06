@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Cloud, FileSearch, Folder, Search } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { CaseArchiveOrganizer } from "@/components/causas/CaseArchiveOrganizer";
+import { CaseDocumentNews } from "@/components/causas/CaseDocumentNews";
 import { DocumentoIngestForm } from "@/components/DocumentoIngestForm";
 import { DriveFolderPanel } from "@/components/DriveFolderPanel";
 import { CausaDocumentImportButton } from "@/components/pjud/CausaDocumentImportButton";
@@ -11,13 +12,15 @@ import { requireStaffPage } from "@/lib/auth/access";
 import { assertCausaAccess, causaAccessWhere, documentReadWhere } from "@/lib/auth/causa-access";
 import { can, canSome } from "@/lib/auth/permissions";
 import { getCaseManagementMode } from "@/lib/causas/management-mode";
+import { listCaseUpdates } from "@/lib/causas/updates";
 import { validarRit } from "@/lib/chile";
 import { prisma } from "@/lib/db";
+import { getI18n } from "@/lib/i18n/server";
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 
 type Params = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ carpeta?: string; q?: string; origen?: string; pagina?: string }>;
+  searchParams: Promise<{ carpeta?: string; q?: string; origen?: string; pagina?: string; vista?: string; antes?: string }>;
 };
 
 const pageSize = 40;
@@ -36,15 +39,63 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
   });
   const canWrite = can(user, "causa.write", { causaRol: access.causaRol });
   const canAsk = canSome(user, "assistant.use");
-  const [causa, folders, managementMode] = await Promise.all([
+  const [causa, { locale }] = await Promise.all([
     prisma.causa.findFirst({
       where: { AND: [{ id }, causaAccessWhere(user)] },
       select: { titulo: true, rit: true, tribunal: true, googleDriveFolderId: true, googleDriveFolderName: true, googleDriveFolderUrl: true, driveSyncSubscription: { select: { account: true } } },
     }),
+    getI18n(),
+  ]);
+  if (!causa) notFound();
+  const tr = (es: string, en: string) => locale === "en" ? en : es;
+  const base = `/causas/${encodeURIComponent(id)}/expediente`;
+  const newsHref = `${base}?vista=novedades`;
+  const isNews = filters.vista === "novedades";
+  const assistant = (documentoId?: string) => `/inicio?${new URLSearchParams({
+    causaId: id,
+    ...(documentoId ? { documentoId } : {}),
+    intencion: documentoId
+      ? "Ayúdame a revisar este documento y cita los pasajes que respaldan tus observaciones."
+      : "Ayúdame a revisar este expediente y cita los pasajes que respaldan tus observaciones.",
+  })}`;
+  const heading = <PageHeader title={causa.titulo} subtitle={[causa.rit, causa.tribunal].filter(Boolean).join(" · ")} actions={<>
+    <Link href={`/causas/${encodeURIComponent(id)}#ficha`} className="btn btn-ghost" aria-label="Ficha de la causa">
+      <span>Ficha<span className="hidden sm:inline"> de la causa</span></span>
+    </Link>
+    {canAsk && <Link href={assistant()} className="btn btn-secondary" aria-label="Consultar expediente"><FileSearch size={17} aria-hidden="true" />
+      <span>Consultar<span className="hidden sm:inline"> expediente</span></span>
+    </Link>}
+  </>} />;
+  const archiveViews = [
+    { url: base, label: tr("Carpetas y documentos", "Folders and documents"), current: !isNews },
+    { url: newsHref, label: tr("Novedades", "Updates"), current: isNews },
+  ];
+  const tabs = (
+    <nav className="flex flex-wrap gap-x-5 border-b border-[var(--line)]" aria-label={tr("Vistas del expediente", "Case file views")}>
+      {archiveViews.map(({ url, label, current }) => (
+        <Link key={url} href={url} aria-current={current ? "page" : undefined}
+          className={`inline-flex min-h-11 items-center border-b-2 px-1 text-sm font-medium hover:text-[var(--sea)] ${current ? "border-[var(--sea)] text-[var(--sea)]" : "border-transparent text-[var(--ink-soft)]"}`}>{label}</Link>
+      ))}
+    </nav>
+  );
+  if (isNews) {
+    const before = typeof filters.antes === "string" ? filters.antes : null;
+    const feed = await listCaseUpdates(id, user, { before }).catch(error => {
+      if ((error as { status?: number }).status === 404) notFound();
+      if ((error as { status?: number }).status === 400) redirect(newsHref);
+      throw error;
+    });
+    return <div className="mx-auto max-w-6xl space-y-5" data-testid="case-archive">
+      {heading}
+      {tabs}
+      <CaseDocumentNews feed={feed} archiveHref={base} newsHref={newsHref} older={Boolean(before)} canWrite={canWrite} locale={locale} />
+    </div>;
+  }
+
+  const [folders, managementMode] = await Promise.all([
     prisma.caseDocumentFolder.findMany({ where: { causaId: id, causa: causaAccessWhere(user) }, orderBy: [{ name: "asc" }, { id: "asc" }], select: { id: true, name: true, parentId: true } }),
     getCaseManagementMode(),
   ]);
-  if (!causa) notFound();
 
   const byId = new Map(folders.map(folder => [folder.id, folder]));
   function pathFor(folderId: string) {
@@ -62,14 +113,6 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
   const q = typeof filters.q === "string" ? filters.q.trim().slice(0, 120) : "";
   const origin = typeof filters.origen === "string" && Object.hasOwn(origins, filters.origen) ? filters.origen : "";
   const page = Math.min(5000, Math.max(1, Number.parseInt(String(filters.pagina), 10) || 1));
-  const base = `/causas/${encodeURIComponent(id)}/expediente`;
-  const assistant = (documentoId?: string) => `/inicio?${new URLSearchParams({
-    causaId: id,
-    ...(documentoId ? { documentoId } : {}),
-    intencion: documentoId
-      ? "Ayúdame a revisar este documento y cita los pasajes que respaldan tus observaciones."
-      : "Ayúdame a revisar este expediente y cita los pasajes que respaldan tus observaciones.",
-  })}`;
   function href(next: { folderId?: string | null; page?: number; preserve?: boolean } = {}) {
     const query = new URLSearchParams();
     const selected = next.folderId === undefined ? folderId : next.folderId;
@@ -125,14 +168,8 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
   const children = folders.filter(value => value.parentId === folderId);
 
   return <div className="mx-auto max-w-6xl space-y-5" data-testid="case-archive">
-    <PageHeader title={causa.titulo} subtitle={[causa.rit, causa.tribunal].filter(Boolean).join(" · ")} actions={<>
-      <Link href={`/causas/${encodeURIComponent(id)}#ficha`} className="btn btn-ghost" aria-label="Ficha de la causa">
-        <span>Ficha<span className="hidden sm:inline"> de la causa</span></span>
-      </Link>
-      {canAsk && <Link href={assistant()} className="btn btn-secondary" aria-label="Consultar expediente"><FileSearch size={17} aria-hidden="true" />
-        <span>Consultar<span className="hidden sm:inline"> expediente</span></span>
-      </Link>}
-    </>} />
+    {heading}
+    {tabs}
     <nav aria-label="Ubicación en Mis Causas" className="flex flex-wrap items-baseline gap-x-2 text-xs sm:text-sm">
       <Link className="inline-flex min-h-11 items-center text-[var(--sea)]" href="/mis-causas">Mis Causas</Link>
       <span aria-hidden="true">/</span>

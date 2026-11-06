@@ -9,6 +9,18 @@ export const MAX_STORAGE_OBJECT_BYTES = 25 * 1024 * 1024;
 export async function discardBookImportAttempt(key: string): Promise<void> {
   assertSafeStorageKey(key);
   if (!/^library-books\/book_[a-f0-9]{40}\/attempts\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\/(?:original|text)\/[a-f0-9]{64}$/.test(key)) throw new Error("Sólo se puede limpiar un intento aislado de importación");
+  await discardIsolatedObject(key);
+}
+
+export async function discardCaseUploadAttempt(key: string): Promise<void> {
+  assertSafeStorageKey(key);
+  if (!/^documentos\/case-intake-attempt\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(key)) {
+    throw new Error("Sólo se puede limpiar un intento aislado de carga");
+  }
+  await discardIsolatedObject(key);
+}
+
+async function discardIsolatedObject(key: string) {
   if (storageMode() === "incomplete") throw Object.assign(new Error("La configuración de almacenamiento está incompleta"), { status: 503 });
   if (storageConfigured()) {
     await s3Client().send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: key }), { abortSignal: AbortSignal.timeout(30_000) });

@@ -95,6 +95,7 @@ model User {
   causasAsignadas Causa[]          @relation("AbogadoResponsable")
   clientesAsignados Cliente[]      @relation("ClienteAbogado")
   documentos      Documento[]
+  caseDocumentIntakes CaseDocumentIntake[]
   actividades     Activity[]
   plazos          Plazo[]
   tramites        Tramite[]        @relation("TramiteResponsable")
@@ -365,6 +366,7 @@ model Causa {
   partes          Parte[]
   documentos      Documento[]
   documentFolders CaseDocumentFolder[]
+  documentIntakes CaseDocumentIntake[]
   driveImports    DriveDocumentImport[]
   plazos          Plazo[]
   tramites        Tramite[]
@@ -677,6 +679,7 @@ model Documento {
   evidenceResource DocumentResource?
   driveImport DriveDocumentImport?
   archivePlacement CaseDocumentPlacement?
+  caseIntakes CaseDocumentIntake[]
   caseAudioSource CaseAudio? @relation("CaseAudioSourceDocument")
   caseAudioPublications CaseAudio[] @relation("CaseAudioTranscriptDocument")
   audioPublication CaseAudioPublication?
@@ -709,6 +712,32 @@ model CaseDocumentPlacement {
   folder      CaseDocumentFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
 
   @@index([folderId])
+}
+
+/// Immutable record of an original received manually or through a case mailbox.
+model CaseDocumentIntake {
+  id                  String   @id @default(cuid())
+  causaId             String
+  documentoId         String?
+  documentVersion     Int      @default(1)
+  source              String
+  sourceKey           String
+  sourceSha256        String?
+  sourceName          String
+  storageKey          String?
+  actorId             String?
+  mailboxAttachmentId String?  @unique
+  receivedAt          DateTime @default(now())
+  causa               Causa    @relation(fields: [causaId], references: [id], onDelete: Cascade)
+  documento           Documento? @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+  actor               User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  mailboxAttachment   MailboxAttachment? @relation(fields: [mailboxAttachmentId], references: [id], onDelete: SetNull)
+
+  @@unique([causaId, source, sourceKey])
+  @@index([causaId, sourceSha256])
+  @@index([causaId, receivedAt, id])
+  @@index([documentoId])
+  @@index([actorId])
 }
 
 model Plazo {
@@ -1281,6 +1310,7 @@ model MailboxAttachment {
   documentoId String?
   siteFileId  String?
   createdAt   DateTime @default(now())
+  caseIntake  CaseDocumentIntake?
 
   @@unique([messageId, sha256])
   @@index([documentoId])

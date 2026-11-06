@@ -6,13 +6,14 @@ import { prisma } from "@/lib/db";
 import { writeAuditStrict } from "@/lib/audit";
 import { serializable } from "@/lib/command-execution";
 import { ensureCaseMailFolder } from "@/lib/causas/document-organization";
+import { findCaseIntakeOriginal } from "@/lib/causas/document-intake";
 import { getObject, newStorageKey, putObject } from "@/lib/storage";
 import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 import { looksLikePdf } from "@/lib/pjud/pdf-backup";
 import { isRealDriveFolderId } from "@/lib/integrations/drive-folder";
 import { pushDocumentoToDrive } from "@/lib/integrations/google";
 import { mailCourtKey, parseMailContent, type ExactMailMatter, type ParsedMail } from "@/lib/mail/parse";
-import { assertCausaMailAccess } from "@/lib/mail/access";
+import { assertCausaMailAccess, currentMailActor } from "@/lib/mail/access";
 
 const MAX_ATTACHMENT = 20 * 1024 * 1024;
 const SITE_FOLDER_NAME = "Correo PJUD";
@@ -166,7 +167,7 @@ export async function fileMailboxMessageToCausa(
 
   // Verify the stashed originals before opening the transaction. File and site
   // records can reference the same immutable bytes, without duplicating blobs.
-  const originals = new Map<string, { storageKey: string; bytes: Buffer; mimeType: string }>();
+  const originals = new Map<string, { storageKey: string; bytes: Buffer; mimeType: string; sha256: string }>();
   for (const attachment of initial.attachments) {
     if (attachment.documentoId || !attachment.storageKey) continue;
     const bytes = await getObject(attachment.storageKey);
@@ -175,7 +176,7 @@ export async function fileMailboxMessageToCausa(
       throw httpError("No se pudo comprobar el archivo original del correo", 409);
     }
     const mimeType = looksLikePdf(bytes) ? "application/pdf" : attachment.mimeType || "application/octet-stream";
-    originals.set(attachment.id, { storageKey: attachment.storageKey, bytes, mimeType });
+    originals.set(attachment.id, { storageKey: attachment.storageKey, bytes, mimeType, sha256: attachment.sha256 });
   }
 
   const result = await serializable(async tx => {
@@ -218,14 +219,23 @@ export async function fileMailboxMessageToCausa(
       })).id;
     }
 
-    const folderId = pending.length ? await ensureCaseMailFolder(tx, causaId) : null;
+    const actor = await currentMailActor(user, tx);
+    let folderId: string | undefined;
     const documents = [];
+    const documentIds = [];
     for (const attachment of pending) {
       const original = originals.get(attachment.id);
-      if (!original || original.storageKey !== attachment.storageKey) {
+      if (!original || original.storageKey !== attachment.storageKey || original.sha256 !== attachment.sha256 || original.bytes.byteLength !== attachment.sizeBytes) {
         throw httpError("Los adjuntos cambiaron. Vuelve a intentar el archivo del correo", 409);
       }
-      const doc = await tx.documento.create({
+      const reusable = await findCaseIntakeOriginal(tx, actor, {
+        causaId, clienteId: null, confidencial: false, privilegio: false,
+      }, {
+        sourceSha256: attachment.sha256,
+        sizeBytes: original.bytes.byteLength,
+      });
+      if (!reusable) folderId ??= await ensureCaseMailFolder(tx, causaId);
+      const doc = reusable || await tx.documento.create({
         data: {
           nombre: attachment.filename,
           tipo: "notificacion",
@@ -234,11 +244,24 @@ export async function fileMailboxMessageToCausa(
           causaId,
           ruta: "correo/pjud",
           extractionStatus: "pending",
-          ...(folderId ? { archivePlacement: { create: { folderId } } } : {}),
+          archivePlacement: { create: { folderId: folderId! } },
         },
-        select: { id: true, nombre: true },
+        select: { id: true, nombre: true, version: true, storageKey: true },
       });
-      const siteFileId = await copyDocumentoToSiteFolder({
+      await tx.caseDocumentIntake.create({ data: {
+        causaId,
+        documentoId: doc.id,
+        documentVersion: doc.version,
+        source: "mail",
+        sourceKey: attachment.id,
+        sourceName: attachment.filename,
+        sourceSha256: attachment.sha256,
+        storageKey: doc.storageKey,
+        actorId: actor.id,
+        mailboxAttachmentId: attachment.id,
+        receivedAt: message.receivedAt,
+      } });
+      const siteFileId = reusable ? null : await copyDocumentoToSiteFolder({
         tx, causaId, actorId: user.id, filename: attachment.filename, mimeType: original.mimeType,
         storageKey: original.storageKey, sizeBytes: original.bytes.byteLength,
       });
@@ -246,7 +269,8 @@ export async function fileMailboxMessageToCausa(
       if (movimientoId) await tx.causaMovimiento.updateMany({
         where: { id: movimientoId, documentoRef: null }, data: { documentoRef: `doc:${doc.id}` },
       });
-      documents.push({ id: doc.id, name: doc.nombre, bytes: original.bytes });
+      documentIds.push(doc.id);
+      if (!reusable) documents.push({ id: doc.id, name: doc.nombre, bytes: original.bytes });
     }
     const cause = documents.length ? await tx.causa.findUnique({ where: { id: causaId }, select: { googleDriveFolderId: true } }) : null;
     const updated = await tx.mailboxMessage.update({ where: { id: message.id }, data: { status: "aplicado", causaId } });
@@ -255,7 +279,7 @@ export async function fileMailboxMessageToCausa(
       action: "mail.apply",
       entityType: "MailboxMessage",
       entityId: message.id,
-      after: { causaId, kind: message.kind, automatic: Boolean(options?.identity), documentIds: documents.map(doc => doc.id) },
+      after: { causaId, kind: message.kind, automatic: Boolean(options?.identity), documentIds },
     }, tx);
     return { message: updated, documents, drive: isRealDriveFolderId(cause?.googleDriveFolderId) };
   });
