@@ -25,6 +25,10 @@
 }
 
 .area [id] {
+  scroll-margin-top: calc(var(--shell-header-offset, 6rem) + 1rem);
+}
+
+.area[data-settings-workspace] [id] {
   scroll-margin-top: calc(var(--shell-header-offset, 6rem) + var(--settings-nav-height) + 2rem);
 }
 
@@ -132,6 +136,56 @@
   color: var(--muted);
   font-size: var(--text-sm);
 }
+
+.personalIndex { padding: var(--space-5); }
+
+.personalHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block-end: var(--space-4);
+}
+
+.personalHeading h3 {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: var(--text-xl);
+  line-height: var(--leading-tight);
+}
+
+.personalHeading p {
+  margin-block-start: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.personalEmblem {
+  inline-size: 3.75rem;
+  block-size: auto;
+  flex: none;
+}
+
+.personalLinks { border-block: 1px solid var(--line); }
+.personalLinks li + li { border-block-start: 1px solid var(--line); }
+
+.personalLink {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: 44px;
+  padding-block: var(--space-3);
+}
+
+.personalLink svg { color: var(--sea); }
+.personalLink small {
+  display: block;
+  margin-block-start: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+.personalLink:hover strong { text-decoration: underline; text-underline-offset: var(--space-1); }
+.personalLink:focus-visible { outline: 2px solid var(--sea); outline-offset: 2px; }
 
 @media (max-width: 700px) {
   .categoryLinks {

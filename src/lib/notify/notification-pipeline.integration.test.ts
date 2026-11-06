@@ -143,7 +143,8 @@ async function main() {
     ] });
     const pushDigest = await emitNotification({ tipo: "general", userId: ids.a, title: "Push grouped", body: "Fixture", dedupeKey: `${tag}:push-digest` }, db);
     await db.mensajeSaliente.updateMany({ where: { notificationId: pushDigest.notificationId }, data: { proximoIntentoAt: new Date(0) } });
-    assert.equal((await processDigests({ client: db, userIds: [ids.a] })).queued, 2, "digest groups preserve separate push destinations");
+    // Keep the previous deadline digests in their future slot while processing the two due push destinations.
+    assert.equal((await processDigests({ client: db, now, userIds: [ids.a] })).queued, 2, "digest groups preserve separate push destinations");
     const pushEnvelopes = await db.mensajeSaliente.findMany({ where: { userId: ids.a, plantilla: "digest", canal: "push" } });
     assert.equal(new Set(pushEnvelopes.map(row => row.canalUsuarioId)).size, 2);
 

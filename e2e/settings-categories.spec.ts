@@ -4,6 +4,25 @@ import { CSRF_COOKIE, CSRF_HEADER } from "../src/lib/auth/csrf-constants";
 
 const legacyAnchors = ["idioma", "estudio", "usuarios", "transcription-settings", "llm-settings", "obsidian-settings", "google-settings", "notify-settings", "pjud-settings", "pjud-log", "runtime-settings", "integraciones-overview", "host-status", "purge-demo"];
 
+test("Preferencias personales lleva directamente a la seguridad de la cuenta", async ({ page }, info) => {
+  await loginAs(page, "abogado@estudio.cl");
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await page.goto("/configuracion#cuenta-personal");
+  const account = page.getByRole("region", { name: "Tu cuenta", exact: true });
+  const security = account.getByRole("link", { name: /Contraseña y verificación/ });
+  await expect(security).toBeVisible();
+  for (const [width, height] of [[360, 800], [1440, 1000]] as const) {
+    await page.setViewportSize({ width, height });
+    await account.scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await page.screenshot({ path: info.outputPath(`preferencias-${width}.png`) });
+  }
+  await security.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/cuenta#seguridad$/);
+  await expect(page.getByRole("heading", { name: "Cambiar contraseña" })).toBeVisible();
+});
+
 test("ajustes móviles: categorías, ancla estable durante la carga y destinos antiguos", async ({ page }, info) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.emulateMedia({ reducedMotion: "reduce" });

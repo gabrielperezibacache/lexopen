@@ -41,6 +41,18 @@ test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", asyn
     await page.getByTestId("desktop-sidebar").getByRole("link", { name: "Causas", exact: true }).click();
     await expect(page).toHaveURL(/\/mis-causas$/);
     await expect(page.getByRole("heading", { name: "Mis Causas", exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 360, height: 800 });
+    const lookup = page.getByRole("form", { name: "Búsqueda de causas", exact: true });
+    const term = "PRUEBA DE PAGO";
+    await lookup.getByRole("searchbox", { name: "Buscar causas", exact: true }).fill(term);
+    await lookup.getByRole("button", { name: "Buscar", exact: true }).click();
+    await expect(page).toHaveURL(url => url.searchParams.get("q") === term);
+    await expect(page.getByRole("link", { name: title, exact: true })).toBeVisible();
+    const repeated = new URL(page.url());
+    repeated.searchParams.append("q", "término sin coincidencias");
+    await page.goto(repeated.toString());
+    await expect(page.getByRole("link", { name: title, exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.getByRole("link", { name: title, exact: true }).click();
     const archive = page.getByTestId("case-archive");
     await expect(archive.getByRole("heading", { name: "Carpetas y documentos" })).toBeVisible();

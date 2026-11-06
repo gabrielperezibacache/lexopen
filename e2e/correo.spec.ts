@@ -1,4 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs } from "./helpers";
 
 test("correo PJUD separa la configuración personal de la bandeja", async ({
@@ -103,4 +107,44 @@ test("un aviso de Altazor abre un correo que ya no aparece en el listado", async
   await page.evaluate(() => window.history.pushState(null, "", "/correo?id=correo-no-disponible"));
   await expect(page.getByText("No se pudo abrir este correo.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Resolución de demostración" })).toHaveCount(0);
+});
+
+test("el retorno de correo confirma el proveedor y el estado persistido", async ({ page }) => {
+  const url = assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
+  expect(new URL(process.env.DATABASE_URL!).toString()).toBe(url);
+  const db = new PrismaClient({ datasources: { db: { url } } });
+  const user = await db.user.create({ data: {
+    email: `mail-status-${randomUUID()}@example.invalid`,
+    name: "Profesional ficticio",
+    role: "abogado",
+    password: await bcrypt.hash("lexopen", 10),
+  } });
+  try {
+    await loginAs(page, user.email);
+    const success = page.getByText("Buzón conectado", { exact: true });
+    const error = page.getByTestId("mailbox-error");
+    await page.goto("/configuracion/correo?gmail=connected");
+    await expect(error).toContainText("No se pudo conectar el buzón");
+    await expect(success).toHaveCount(0);
+
+    const account = await db.mailboxAccount.create({ data: {
+      userId: user.id, protocol: "microsoft", status: "connected", email: user.email,
+      oauthRefreshEnc: "synthetic-placeholder-not-a-credential",
+    } });
+    await page.reload();
+    await expect(error).toContainText("No se pudo conectar el buzón");
+    await expect(success).toHaveCount(0);
+
+    await page.goto("/configuracion/correo?microsoft=connected");
+    await expect(success).toBeVisible();
+    await expect(error).toHaveCount(0);
+
+    await db.mailboxAccount.update({ where: { id: account.id }, data: { status: "error", lastError: "La autorización de prueba dejó de ser válida." } });
+    await page.reload();
+    await expect(error).toContainText("No se pudo conectar el buzón");
+    await expect(success).toHaveCount(0);
+  } finally {
+    await db.user.delete({ where: { id: user.id } });
+    await db.$disconnect();
+  }
 });

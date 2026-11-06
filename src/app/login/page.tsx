@@ -94,6 +94,7 @@ function LoginCredentials({ demo, next }: { demo: boolean; next: string }) {
               height={1254}
               sizes="(max-width: 767px) 1px, 320px"
               alt=""
+              loading="eager"
               className="edition-engraving login-engraving"
             />
           </Link>
