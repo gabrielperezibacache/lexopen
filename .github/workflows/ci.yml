@@ -64,7 +64,7 @@ jobs:
           ref: 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3
           path: .tmp/kitties-upstream
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -183,7 +183,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -236,7 +236,7 @@ jobs:
       LEXOPEN_PDF_REQUIRE_TOOLS: "1"
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
