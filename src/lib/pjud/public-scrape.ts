@@ -37,7 +37,9 @@ import {
   pickBestTribunalOption,
   pickCorteForTribunal,
   pickTribunalFromTexts,
+  ritLabelsMatch,
   splitRut,
+  tribunalLabelsMatch,
   type OjvCompetenciaValue,
 } from "@/lib/pjud/ojv-dom";
 import {
@@ -57,7 +59,8 @@ import { normalizePjudCuaderno, omitLegacyScrapeAliases, type PjudCausaRef, type
 import { PJUD_MAX_CAUSA_MOVIMIENTOS, PJUD_MAX_CUADERNOS } from "@/lib/pjud/cuadernos-limits";
 import { cuadernosCoverageNote, unknownCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
 import { isClaveUnicaAccountsUrl, startClaveUnicaOidcFromOjv, waitForOidcPageAfterTrigger } from "@/lib/pjud/ojv-oidc";
-import { clearManualMisCausasRows, snapshotManualMisCausasRows, waitForFreshManualMisCausasRows } from "@/lib/pjud/manual-mis-causas-response";
+import { clearManualMisCausasRows, snapshotManualMisCausasRows, waitForFreshManualMisCausasRows, type ManualMisCausasPageState } from "@/lib/pjud/manual-mis-causas-response";
+import type { Locator } from "playwright";
 
 export type { MisCausasItem } from "@/lib/pjud/types";
 export { OJV_CONSULTA_URL as PJUD_CONSULTA_URL };
@@ -759,21 +762,23 @@ export async function clickBuscar(page: PlaywrightPage, responseTimeoutMs = 30_0
 export async function openExactCauseModal(
   page: PlaywrightPage,
   causa: { rit: string; tribunal: string },
-  selector = "#dtaTableDetalle tr, #verDetalleJuridica tr, #resultConsultaJuridica tr"
+  selector = "#dtaTableDetalle tr, #verDetalleJuridica tr, #resultConsultaJuridica tr",
+  freshScope?: Locator
 ): Promise<string | null> {
-  const rows = page.locator(selector);
-  const snapshots = await rows.evaluateAll((nodes) => nodes.map((node) => {
+  const rows = (freshScope ?? page).locator(selector);
+  const snapshots = await rows.evaluateAll((nodes, requireFresh) => nodes.map((node) => {
     const el = node as HTMLElement;
     const visible = el.getBoundingClientRect().height > 0 && getComputedStyle(el).visibility !== "hidden" &&
       (el.tagName === "TR" || !el.querySelector("tr, .card, .list-group-item"));
+    const fresh = !requireFresh || Boolean((window as ManualMisCausasPageState).lexopenManualMisCausasFresh?.has(node));
     const cells = [...node.children].filter((child) => /^(TD|TH)$/.test(child.tagName));
     return {
-      visible,
+      eligible: visible && fresh,
       cells: (cells.length ? cells : [...node.children]).map((cell) => (cell.textContent || "").replace(/\s+/g, " ").trim()),
     };
-  }));
+  }), Boolean(freshScope));
   const matches = snapshots.map((row, index) => ({ ...row, index }))
-    .filter((row) => row.visible && causeRowMatches(row.cells, causa));
+    .filter((row) => row.eligible && causeRowMatches(row.cells, causa));
   if (matches.length > 1) {
     throw new PjudScrapeError(`OJV devolvió varias filas para ${causa.rit} y «${causa.tribunal}». No se pudo confirmar un expediente único.`);
   }
@@ -786,13 +791,19 @@ export async function openExactCauseModal(
   const staleDetails = (await page.locator(".modal").evaluateAll((nodes) => nodes.map((node) => node.innerHTML)))
     .filter((html) => parseMovimientosFromHtml(html).length > 0 || hasExplicitEmptyHistory(html));
   const row = rows.nth(matches[0].index);
-  const clicked = await row.evaluate((node) => {
+  const clicked = await row.evaluate((node, expectedCells) => {
+    if (expectedCells) {
+      if (!(window as ManualMisCausasPageState).lexopenManualMisCausasFresh?.has(node)) return false;
+      const cells = [...node.children].filter((child) => /^(TD|TH)$/.test(child.tagName));
+      const texts = (cells.length ? cells : [...node.children]).map((cell) => (cell.textContent || "").replace(/\s+/g, " ").trim());
+      if (texts.length !== expectedCells.length || texts.some((text, index) => text !== expectedCells[index])) return false;
+    }
     const icon = node.querySelector('img[src*="lupa" i], .glyphicon-search, .fa-search');
     const target = icon?.closest("a, button") || node.querySelector('a[title*="detalle" i], a[title*="ver" i], td a[onclick], td a, a[onclick], button');
     if (!(target instanceof HTMLElement)) return false;
     target.click();
     return true;
-  });
+  }, freshScope ? matches[0].cells : undefined);
   if (!clicked) throw new PjudScrapeError(`La fila exacta de ${causa.rit} no tiene un enlace de detalle reconocible.`);
   await page.locator(`:is(${OJV.modal}):visible`).first().waitFor({ state: "visible", timeout: 20_000 });
   if (staleDetails.length) {
@@ -2065,18 +2076,18 @@ async function openMisCausasMenu(page: AnyPage, options: MisCausasReadOptions = 
   return false;
 }
 
-async function misCausasActiveScope(page: AnyPage) {
+async function misCausasActiveScope(page: PlaywrightPage) {
   const active = page.locator(".tab-pane.active").filter({ visible: true });
   const current = active.filter({ has: page.locator('[id^="filtroMisCau"], [id^="btnConsultaMisCau"], table[id^="dtaTableDetalleMisCau"]') });
   if (await current.count()) return current.last();
   return await active.count() ? active.last() : page.locator("body");
 }
 
-export async function clickMisCausasBuscar(page: AnyPage, options: MisCausasReadOptions = {}) {
-  const scope = await misCausasActiveScope(page);
-  const buscar = scope
+export async function clickMisCausasBuscar(page: AnyPage, options: MisCausasReadOptions = {}, scope?: Locator) {
+  const panel = scope ?? await misCausasActiveScope(page);
+  const buscar = panel
     .getByRole("button", { name: /^Buscar$/i })
-    .or(scope.locator(OJV.misCausasBuscar))
+    .or(panel.locator(OJV.misCausasBuscar))
     .filter({ visible: true }).first();
   if ((await buscar.count().catch(() => 0)) === 0) {
     if (options.allowPrompts === false) throw new PjudScrapeError("No se encontró un botón Buscar visible en Mis Causas.");
@@ -2085,7 +2096,7 @@ export async function clickMisCausasBuscar(page: AnyPage, options: MisCausasRead
   if (options.allowPrompts === false) {
     await snapshotManualMisCausasRows(page);
     await buscar.click({ timeout: 8_000 });
-    return waitForFreshManualMisCausasRows(page, options.responseTimeoutMs);
+    return waitForFreshManualMisCausasRows(page, options.responseTimeoutMs, scope);
   } else {
     await buscar.click({ timeout: 8_000 });
   }
@@ -2094,30 +2105,24 @@ export async function clickMisCausasBuscar(page: AnyPage, options: MisCausasRead
   return true;
 }
 
-/** Abre solamente una fila con RIT y tribunal confirmados en Mis Causas. */
-async function openMisCausasLupaForRit(
-  page: PlaywrightPage,
-  causa: { rit: string; tribunal: string }
-): Promise<boolean> {
-  return Boolean(await openExactCauseModal(page, causa, "tr, .card, .list-group-item"));
-}
-
 /** Follow visible, enabled next controls; repeated pages and truncation are errors. */
 export async function collectOjvResultPages(
   page: PlaywrightPage,
-  visitPage: () => Promise<boolean | void>
+  visitPage: () => Promise<boolean | void>,
+  scope?: Locator
 ): Promise<boolean> {
+  const panel = scope ?? page;
   const seen = new Set<string>();
   for (let i = 0; i < 25; i++) {
-    const signature = await page.locator("tr, .card, .list-group-item, .pagination, .dataTables_paginate").filter({ visible: true })
+    const signature = await panel.locator("tr, .card, .list-group-item, .pagination, .dataTables_paginate").filter({ visible: true })
       .allTextContents().then((texts) => texts.join("\n"));
     if (seen.has(signature)) throw new PjudScrapeError("La paginación de OJV repitió una página. La consulta quedó incompleta; reintente.");
     seen.add(signature);
     if (await visitPage()) return true;
-    const next = page
+    const next = panel
       .getByRole("link", { name: /^(Siguiente|Next|›|»)$/i })
-      .or(page.getByRole("button", { name: /^(Siguiente|Next|›|»)$/i }))
-      .or(page.locator('.pagination a[rel="next"], [aria-label="Next" i], [aria-label="Siguiente" i], .paginate_button.next, a.page-link:has-text("›")'))
+      .or(panel.getByRole("button", { name: /^(Siguiente|Next|›|»)$/i }))
+      .or(panel.locator('.pagination a[rel="next"], [aria-label="Next" i], [aria-label="Siguiente" i], .paginate_button.next, a.page-link:has-text("›")'))
       .filter({ visible: true }).first();
     if (!(await next.count())) return false;
     const disabled = await next.evaluate((el) => Boolean(
@@ -2461,6 +2466,24 @@ export async function readCausaDetailFromAuthenticatedOjv(
     throw new PjudScrapeError("No se encontró el menú de Mis Causas en la sesión identificada.");
   }
 
+  const identity = { rit: causa.rit, tribunal: causa.tribunal };
+  const searchForDetail = async () => {
+    await applyMisCausasFiltros(page);
+    const scope = options.allowPrompts === false ? await misCausasActiveScope(page) : undefined;
+    const response = await clickMisCausasBuscar(page, options, scope);
+    let firstPage = Array.isArray(response) ? response : undefined;
+    return collectOjvResultPages(page, async () => {
+      if (scope) {
+        const fresh = firstPage ?? await waitForFreshManualMisCausasRows(page, options.responseTimeoutMs, scope);
+        firstPage = undefined;
+        if (!fresh.some((item) => ritLabelsMatch(item.rit, identity.rit) && tribunalLabelsMatch(item.tribunal, identity.tribunal))) {
+          return false;
+        }
+      }
+      return Boolean(await openExactCauseModal(page, identity, "tr, .card, .list-group-item", scope));
+    }, scope);
+  };
+
   let opened = false;
   try {
     for (const materia of options.materias ?? MIS_CAUSAS_MATERIAS) {
@@ -2479,15 +2502,11 @@ export async function readCausaDetailFromAuthenticatedOjv(
         await tab.click({ force: !(await tab.isVisible().catch(() => false)), timeout: 8_000 }).catch(() => undefined);
       }
       await sleep(400);
-      await applyMisCausasFiltros(page);
-      await clickMisCausasBuscar(page, options);
-      opened = await collectOjvResultPages(page, () => openMisCausasLupaForRit(page, { rit: causa.rit!, tribunal: causa.tribunal }));
+      opened = await searchForDetail();
       if (opened) break;
     }
     if (!opened && !options.materias) {
-      await applyMisCausasFiltros(page);
-      await clickMisCausasBuscar(page, options);
-      opened = await collectOjvResultPages(page, () => openMisCausasLupaForRit(page, { rit: causa.rit!, tribunal: causa.tribunal }));
+      opened = await searchForDetail();
     }
     if (!opened) throw new PjudScrapeError("No se encontró un detalle exacto para el RIT/ROL y tribunal solicitados en Mis Causas.");
 
