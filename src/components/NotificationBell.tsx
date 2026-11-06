@@ -83,7 +83,7 @@ export function NotificationBell() {
       aria-haspopup="dialog" aria-expanded={open} aria-controls={dialogId}
       onClick={() => { setPreview(null); setLoadError(false); setSaveError(false); setOpen(true); }}>
       <Bell size={18} aria-hidden="true" />
-      {unreadCount > 0 && <span aria-hidden="true" className="shell-nav-count absolute -right-1 -top-1">{count}</span>}
+      {unreadCount > 0 && <span aria-hidden="true" className="notification-bell-badge">{count}</span>}
     </button>
     <Sheet id={dialogId} open={open} onClose={() => setOpen(false)} title={title}>
       <div className="space-y-4">

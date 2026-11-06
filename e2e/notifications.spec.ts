@@ -35,6 +35,9 @@ test("la campana muestra avisos privados, sincroniza las lecturas y se puede usa
     const access = await db.causaMiembro.create({ data: { causaId: hiddenCausa.id, userId: user.id, rol: "lectura", desde: new Date(0) } });
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await expect(bell).toHaveAccessibleName("Notificaciones · 1 sin leer");
+    const badge = bell.locator(".notification-bell-badge");
+    await expect(badge).toHaveText("1");
+    await expect(badge).toHaveCSS("background-color", "rgb(170, 181, 255)");
     await bell.click();
     await expect(drawer.getByText(hidden.title, { exact: true })).toBeVisible();
     await db.causaMiembro.delete({ where: { id: access.id } });
