@@ -82,7 +82,7 @@ function newestFirst(a: Position, b: Position) {
     (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
 }
 
-/** Readable documents with intake receipts, plus private filed notices that have no attachments. */
+/** Readable documents with intake receipts, plus private filed notices without a linked entry. */
 export async function listCaseUpdates(
   causaId: string,
   user: CausaAccessUser,
@@ -137,7 +137,13 @@ export async function listCaseUpdates(
       tx.mailboxMessage.findMany({
         where: {
           ...ownedFiledMail,
-          attachments: { none: {} },
+          attachments: { none: { OR: [
+            // A tracked attachment is represented by its readable case document.
+            // If that document leaves the feed, keep the owner's mail notice.
+            { caseIntake: { is: { causaId, source: "mail", documento: { is: documentsInScope } } } },
+            // Earlier attachments only stored a document ID, without a receipt.
+            { caseIntake: { is: null }, documentoId: { not: null } },
+          ] } },
           ...(position?.kind === "d" ? { receivedAt: { lte: position.receivedAt } } : {}),
           ...(position?.kind === "m" ? { OR: [
             { receivedAt: { lt: position.receivedAt } },

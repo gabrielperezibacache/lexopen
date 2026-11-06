@@ -87,6 +87,10 @@ async function main() {
         receivedAt: when(day), subject: secret, bodyText: secret, fromAddress: "privado@example.invalid", ...data,
       } });
     const ownerNotice = await newNotice(11);
+    const deletedAttachmentDocument = await addDoc("Adjunto eliminado del expediente.pdf");
+    const deletedAttachmentNotice = await addMail(deletedAttachmentDocument.id, 9, true);
+    await prisma.documento.delete({ where: { id: deletedAttachmentDocument.id } });
+    const otherCaseAttachmentNotice = await addMail(other.id, 8, true);
     const ownColleagueNotice = await newNotice(14, { userId: colleague.id, accountId: colleagueAccount.id });
     const mismatch = await newNotice(17, { accountId: colleagueAccount.id });
     const pending = await newNotice(16, { status: "vinculado" });
@@ -124,9 +128,11 @@ async function main() {
     assert.deepEqual(visibleDocuments.find(item => item.documentId === legacyDrive.id)?.origins, [{ kind: "drive", receivedAt: when(2).toISOString(), documentVersion: 1, sourceRevision: "6" }]);
     assert.deepEqual(visibleDocuments.find(item => item.documentId === legacyOjv.id)?.origins, [{ kind: "ojv", receivedAt: when(2).toISOString(), documentVersion: 1 }]);
     assert.ok(!visibleDocuments.some(item => item.documentId === drive.id || item.documentId === other.id));
-    assert.deepEqual(visible.items.filter(item => item.kind === "mail-notice"), [{
-      kind: "mail-notice", messageId: ownerNotice.id, latestAt: when(11).toISOString(), mailHref: `/correo?id=${ownerNotice.id}`,
-    }]);
+    assert.deepEqual(visible.items.filter(item => item.kind === "mail-notice"),
+      [ownerNotice, deletedAttachmentNotice, otherCaseAttachmentNotice].map(message => ({
+        kind: "mail-notice", messageId: message.id,
+        latestAt: message.receivedAt.toISOString(), mailHref: `/correo?id=${message.id}`,
+      })));
     for (const hidden of [mismatch, pending, otherCaseNotice, ownColleagueNotice]) assert.ok(!JSON.stringify(visible).includes(hidden.id));
     assert.equal(visible.nextBefore, null);
     assert.doesNotMatch(JSON.stringify(visible), /Contenidos reservados|privado@example\.invalid|correo\/inbox|sourceKey|private-folder/);
@@ -161,7 +167,7 @@ async function main() {
     const combinedPages = [...firstPage.items, ...secondPage.items, ...thirdPage.items].map(item => item.kind === "document" ? item.documentId : item.messageId);
     assert.equal(new Set(combinedPages).size, combinedPages.length);
     assert.deepEqual(combinedPages, [
-      confidential.id, combined.id, ownerNotice.id, ...ties.map(doc => doc.id).sort().reverse(),
+      confidential.id, combined.id, ownerNotice.id, deletedAttachmentNotice.id, otherCaseAttachmentNotice.id, ...ties.map(doc => doc.id).sort().reverse(),
       ...mailTies.map(mail => mail.id).sort().reverse(),
       ...[legacyManual.id, legacyMail.id, legacyDrive.id, legacyOjv.id].sort().reverse(),
     ]);
