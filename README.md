@@ -14,18 +14,18 @@ LexOpen reúne los documentos de cada causa, tus plazos, la preparación de audi
 
 ![Inicio de LexOpen en índigo y plata, con el chat, un aviso de plazo y el estado del escritorio de Altazor](docs/readme/inicio-escritorio.jpg)
 
-*Las capturas muestran LexOpen con expedientes y conversaciones ficticios. La galería incluye la versión de desarrollo y sus novedades más recientes.*
+*Las capturas muestran LexOpen con expedientes y conversaciones ficticios. La galería muestra las herramientas de esta versión.*
 
 ## Descargar LexOpen
 
-Elige el archivo para tu equipo. La versión publicada es **1.1.0-preview.6**. [Ver la versión y todos sus archivos](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.6)
+Elige el archivo para tu equipo en la versión **1.1.0-preview.7**. [Ver la versión y todos sus archivos](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.7)
 
 | Tu equipo | Descarga |
 | --- | --- |
-| Windows de 64 bits, Intel o AMD | [Instalador EXE](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.6/LexOpen-1.1.0-preview.6-win-x64.exe) |
-| Mac con chip Apple | [Instalador DMG](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.6/LexOpen-1.1.0-preview.6-mac-arm64.dmg) |
-| Mac con procesador Intel | [Instalador DMG](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.6/LexOpen-1.1.0-preview.6-mac-x64.dmg) |
-| Linux de 64 bits, Intel o AMD | [DEB](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.6/LexOpen-1.1.0-preview.6-linux-amd64.deb) · [AppImage](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.6/LexOpen-1.1.0-preview.6-linux-x86_64.AppImage) |
+| Windows de 64 bits, Intel o AMD | [Instalador EXE](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.7/LexOpen-1.1.0-preview.7-win-x64.exe) |
+| Mac con chip Apple | [Instalador DMG](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.7/LexOpen-1.1.0-preview.7-mac-arm64.dmg) |
+| Mac con procesador Intel | [Instalador DMG](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.7/LexOpen-1.1.0-preview.7-mac-x64.dmg) |
+| Linux de 64 bits, Intel o AMD | [DEB](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.7/LexOpen-1.1.0-preview.7-linux-amd64.deb) · [AppImage](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.7/LexOpen-1.1.0-preview.7-linux-x86_64.AppImage) |
 
 Esta versión es **preliminar**. Los instaladores de Windows y macOS carecen de firma de editor y macOS puede mostrar avisos. [Guía de instalación y requisitos](docs/INSTALADORES.md)
 
@@ -37,7 +37,7 @@ Esta versión es **preliminar**. Los instaladores de Windows y macOS carecen de 
 
 Google Drive, correo y la integración judicial chilena se activan cuando el estudio los necesita. Altazor, su escritorio, la transcripción y los modelos locales tienen su propia preparación. [Conectar archivos y causas](docs/SINCRONIZACION.md) · [Preparar el escritorio de Altazor](docs/ESCRITORIO-ALTAZOR.md)
 
-En **Configuración** se reúnen tus preferencias y los ajustes del estudio. En la versión de desarrollo, **Comunicaciones** aparece allí al elegir Chile como país de trabajo o al activar las herramientas del PJUD.
+En **Configuración** se reúnen tus preferencias y los ajustes del estudio. **Comunicaciones** aparece allí al elegir Chile como país de trabajo o al activar las herramientas del PJUD.
 
 La **campanita** muestra los avisos recientes y los que quedan por leer. Desde allí puedes revisar un aviso o abrir el historial. Los avisos críticos mantienen su confirmación de recepción por separado.
 
@@ -45,7 +45,7 @@ La **campanita** muestra los avisos recientes y los que quedan por leer. Desde a
 
 ### Mis Causas
 
-Cada expediente reúne carpetas, documentos, hechos, cronología, minutas y encargos del equipo. En **Novedades** puedes ver de dónde llegó un archivo y volver al original. La versión de desarrollo agrupa ingresos idénticos verificados de carga manual, correo, Google Drive y OJV. Las revisiones de Drive con identidad propia conservan su copia.
+Cada expediente reúne carpetas, documentos, hechos, cronología, minutas y encargos del equipo. En **Novedades** puedes ver de dónde llegó un archivo y volver al original. Novedades agrupa ingresos idénticos verificados de carga manual, correo, Google Drive y OJV. Las revisiones de Drive con identidad propia conservan su copia.
 
 ![Novedades de una causa ficticia, con cuatro orígenes para un solo documento y una revisión de Drive separada](docs/readme/novedades-escritorio.jpg)
 
@@ -69,7 +69,7 @@ Crea un trabajo para investigar, escribir o enseñar. Reúne bibliografía y pas
 
 Habla con Altazor desde **Inicio** o desde el acompañante lateral. Comparte el archivo de la causa que quieres revisar y retoma el trabajo desde el mismo hilo. Altazor recupera el contexto al que tienes acceso y te pide revisar los cambios que prepara. Debajo del chat puedes observar el escritorio cuando haya una sesión activa. [Guía de Altazor](docs/ALTAZOR.md) · [Conexiones y secretos](docs/ALTAZOR-CONEXIONES.md)
 
-En la versión de desarrollo puedes pegar un documento directamente en el chat, abrir una solicitud de ayuda del escritorio y activar desde **Mi cuenta** un resumen privado de plazos y correo judicial recibido.
+Puedes pegar un documento directamente en el chat, abrir una solicitud de ayuda del escritorio y activar desde **Mi cuenta** un resumen privado de plazos y correo judicial recibido.
 
 <details>
 <summary>Más capturas de la aplicación</summary>
