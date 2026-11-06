@@ -31,6 +31,9 @@ test("la campana muestra avisos privados, sincroniza las lecturas y se puede usa
     await page.keyboard.press("Escape");
     await expect(drawer).toBeHidden();
     await expect(bell).toBeFocused();
+    await page.goto("/notificaciones");
+    await page.getByRole("link", { name: "Configurar notificaciones", exact: true }).click();
+    await expect(page).toHaveURL(/\/cuenta\/notificaciones$/);
 
     const access = await db.causaMiembro.create({ data: { causaId: hiddenCausa.id, userId: user.id, rol: "lectura", desde: new Date(0) } });
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
@@ -89,13 +92,13 @@ test("la campana muestra avisos privados, sincroniza las lecturas y se puede usa
     await expect(bell).toHaveAccessibleName("Notificaciones");
     const criticalRow = page.getByRole("article").filter({ hasText: critical.title });
     await criticalRow.getByRole("button", { name: "Acusar recibo", exact: true }).click();
-    await expect(criticalRow.getByText("Acusado", { exact: true })).toBeVisible();
+    await expect(criticalRow.getByText("Acuse registrado", { exact: true })).toBeVisible();
     await expect(bell).toHaveAccessibleName("Notificaciones");
 
     const next = await db.notification.create({ data: { userId: user.id, title: "Nueva notificación ficticia", body: "Otro aviso por revisar." } });
     await page.reload();
     await expect(bell).toHaveAccessibleName("Notificaciones · 1 sin leer");
-    await expect(criticalRow.getByText("Acusado", { exact: true })).toBeVisible();
+    await expect(criticalRow.getByText("Acuse registrado", { exact: true })).toBeVisible();
     await bell.click();
     await drawer.getByRole("button", { name: "Marcar todas como leídas", exact: true }).click();
     await expect(drawer.getByRole("status")).toHaveText("Todas leídas");
@@ -107,6 +110,20 @@ test("la campana muestra avisos privados, sincroniza las lecturas y se puede usa
     expect(persisted.filter(n => n.read).map(n => n.id).sort()).toEqual([general.id, critical.id, next.id].sort());
     expect(persisted.find(n => n.id === critical.id)?.ackAt).not.toBeNull();
     expect(persisted.find(n => n.id === hidden.id)?.read).toBe(false);
+
+    const linked = await db.notification.create({ data: {
+      userId: user.id, title: "Aviso crítico con destino", body: "Acceso desde la campana.",
+      severidad: "critica", href: "/tareas",
+    } });
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(bell).toHaveAccessibleName("Notificaciones · 1 sin leer");
+    await bell.click();
+    await drawer.getByRole("link", { name: "Abrir · Aviso crítico con destino" }).click();
+    await expect(page).toHaveURL(/\/tareas$/);
+    await expect(bell).toHaveAccessibleName("Notificaciones");
+    const opened = await db.notification.findUniqueOrThrow({ where: { id: linked.id } });
+    expect(opened.read).toBe(true);
+    expect(opened.ackAt).toBeNull();
   } finally {
     if (hiddenCausaId) await db.causa.delete({ where: { id: hiddenCausaId } });
     await db.user.delete({ where: { id: user.id } });

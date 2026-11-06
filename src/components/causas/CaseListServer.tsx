@@ -15,10 +15,12 @@ import { getI18n } from "@/lib/i18n/server";
 import { causaOrigenWhere, labelPjudSyncStatus } from "@/lib/pjud/causa-origin";
 import { PjudManagementNotice } from "./PjudManagementNotice";
 
-export type CaseListSearchParams = {
-  q?: string; materia?: string; estado?: string; origen?: string; monitoreo?: string; page?: string;
-};
+export type CaseListSearchParams = Partial<Record<"q" | "materia" | "estado" | "origen" | "monitoreo" | "page", string | string[]>>;
 const PAGE_SIZE = 50;
+
+function firstFilter(value: string | string[] | undefined) {
+  return (Array.isArray(value) ? value[0] : value)?.trim() || undefined;
+}
 
 /** Both workspaces read the same accessible matters; the connected view adds PJUD tools. */
 export async function CaseListServer({ mode, searchParams, organizer = false }: { mode: CaseManagementMode; searchParams: Promise<CaseListSearchParams>; organizer?: boolean }) {
@@ -29,13 +31,14 @@ export async function CaseListServer({ mode, searchParams, organizer = false }: 
   const base = organizer ? "/mis-causas" : connected ? "/pjud" : "/causas";
   const { t, locale } = await getI18n(), tr = (es: string, en: string) => locale === "en" ? en : es;
   const sp = await searchParams;
-  const q = sp.q?.trim(), materia = sp.materia?.trim();
-  const origen = connected ? sp.origen?.trim() : undefined, monitoreo = connected ? sp.monitoreo?.trim() : undefined;
-  const rawEstado = sp.estado, estado = !rawEstado ? "activa" : rawEstado === "all" ? "" : rawEstado;
-  const requestedPage = Number(sp.page || 1), page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const q = firstFilter(sp.q), materia = firstFilter(sp.materia);
+  const origen = connected ? firstFilter(sp.origen) : undefined, monitoreo = connected ? firstFilter(sp.monitoreo) : undefined;
+  const rawEstado = firstFilter(sp.estado), estado = !rawEstado ? "activa" : rawEstado === "all" ? "" : rawEstado;
+  const requestedPage = Number(firstFilter(sp.page) || 1), page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const search = q ? { contains: q, mode: "insensitive" as const } : null;
   const where: Prisma.CausaWhereInput = { AND: [
     causaAccessWhere(user),
-    q ? { OR: [{ titulo: { contains: q } }, { rit: { contains: q } }, { ruc: { contains: q } }, { caratula: { contains: q } }, { tribunal: { contains: q } }] } : {},
+    search ? { OR: [{ titulo: search }, { rit: search }, { ruc: search }, { caratula: search }, { tribunal: search }] } : {},
     materia ? { materia } : {}, estado ? { estado } : {},
     connected ? causaOrigenWhere(origen) as Prisma.CausaWhereInput : {},
     monitoreo === "on" ? { pjudMonitoreoActivo: true } : monitoreo === "off" ? { pjudMonitoreoActivo: false } : {},

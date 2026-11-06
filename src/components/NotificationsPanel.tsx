@@ -6,10 +6,13 @@ import { useState } from "react";
 import { formatDateTime } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
 import { apiMutation } from "@/lib/api-mutation";
+import { useI18n } from "@/components/i18n/I18nProvider";
 import { needsNotificationAcknowledgment, NOTIFICATION_INBOX_CHANGED, type NotificationInbox, type NotificationListItem } from "@/lib/notify/inbox";
 
 export function NotificationsPanel({ initial }: { initial: NotificationInbox }) {
   const router = useRouter();
+  const { locale } = useI18n();
+  const tr = (es: string, en: string) => locale === "en" ? en : es;
   const [updated, setUpdated] = useState<{ base: NotificationInbox; inbox: NotificationInbox } | null>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -68,10 +71,11 @@ export function NotificationsPanel({ initial }: { initial: NotificationInbox }) 
   if (items.length === 0) {
     return (
       <EmptyState
-        title="Bandeja vacía"
-        description="Cuando le asignen tareas, minutas o movimientos, aparecerán aquí."
-        actionLabel="Ir a tareas"
-        actionHref="/tareas"
+        title={tr("Aún no tienes avisos", "You have no notifications yet")}
+        description={tr("Aquí podrás volver a los avisos que recibas en LexOpen.", "You can find your LexOpen notifications here.")}
+        actionLabel={tr("Configurar notificaciones", "Notification settings")}
+        actionHref="/cuenta/notificaciones"
+        symbol="evidence"
       />
     );
   }
@@ -80,7 +84,7 @@ export function NotificationsPanel({ initial }: { initial: NotificationInbox }) 
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--ink-soft)]/70">
-          {unread > 0 ? `${unread > 99 ? "99+" : unread} sin leer` : "Todas leídas"}
+          {unread > 0 ? tr(`${unread > 99 ? "99+" : unread} sin leer`, `${unread > 99 ? "99+" : unread} unread`) : tr("Todas leídas", "All read")}
         </p>
         {unread > 0 && (
           <button
@@ -89,7 +93,7 @@ export function NotificationsPanel({ initial }: { initial: NotificationInbox }) 
             disabled={loadingAction !== null}
             onClick={() => void markRead()}
           >
-            {loadingAction === "all" ? "Marcando..." : "Marcar todas como leídas"}
+            {loadingAction === "all" ? tr("Marcando…", "Marking…") : tr("Marcar todas como leídas", "Mark all as read")}
           </button>
         )}
       </div>
@@ -107,7 +111,7 @@ export function NotificationsPanel({ initial }: { initial: NotificationInbox }) 
                 <h2 className="font-semibold">{n.title}</h2>
                 <p className="mt-1 text-sm leading-relaxed text-[var(--ink-soft)]">{n.body}</p>
                 <p className="mt-2 text-sm text-[var(--ink-soft)]">
-                  {formatDateTime(n.createdAt)} · {n.read ? "leída" : "pendiente"}
+                  {formatDateTime(n.createdAt, locale)} · {n.read ? tr("Leída", "Read") : tr("Sin leer", "Unread")}
                 </p>
               </div>
               <div className="flex w-full flex-wrap gap-2 sm:w-auto">
@@ -119,13 +123,13 @@ export function NotificationsPanel({ initial }: { initial: NotificationInbox }) 
                       onClick={() => ackOne(n)}
                     >
                       {loadingAction === `ack-${n.id}`
-                        ? "Acusando..."
-                        : "Acusar recibo"}
+                        ? tr("Confirmando…", "Confirming…")
+                        : tr("Acusar recibo", "Acknowledge")}
                     </button>
                   )}
                 {n.ackAt && (
                   <span className="self-center text-xs text-[var(--sea)]">
-                    Acusado
+                    {tr("Acuse registrado", "Acknowledged")}
                   </span>
                 )}
                 {!n.read && (
@@ -135,12 +139,12 @@ export function NotificationsPanel({ initial }: { initial: NotificationInbox }) 
                     disabled={loadingAction !== null}
                     onClick={() => void markRead(n.id)}
                   >
-                    {loadingAction === n.id ? "Marcando..." : "Marcar leída"}
+                    {loadingAction === n.id ? tr("Marcando…", "Marking…") : tr("Marcar leída", "Mark as read")}
                   </button>
                 )}
                 {n.href && (
                   <Link className="btn btn-secondary" href={n.href} onNavigate={() => { if (!n.read) void markRead(n.id); }}>
-                    Abrir
+                    {tr("Abrir", "Open")}
                   </Link>
                 )}
               </div>

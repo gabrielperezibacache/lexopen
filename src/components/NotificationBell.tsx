@@ -112,7 +112,10 @@ export function NotificationBell() {
                     {needsNotificationAcknowledgment(item) && <span className="text-[var(--warn)]">{tr("Pendiente de acuse", "Acknowledgment pending")}</span>}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3">
-                    {item.href && <Link href={item.href} aria-label={tr(`Abrir · ${item.title}`, `Open · ${item.title}`)} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline" onNavigate={() => setOpen(false)}>{tr("Abrir", "Open")}<ArrowUpRight size={14} aria-hidden="true" /></Link>}
+                    {item.href && <Link href={item.href} aria-label={tr(`Abrir · ${item.title}`, `Open · ${item.title}`)} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-[var(--sea)] underline-offset-4 hover:underline" onNavigate={() => {
+                      if (!item.read) void markRead(item.id);
+                      setOpen(false);
+                    }}>{tr("Abrir", "Open")}<ArrowUpRight size={14} aria-hidden="true" /></Link>}
                     {!item.read && <button type="button" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-[var(--ink-soft)] underline-offset-4 hover:underline disabled:opacity-60" disabled={pending !== null} onClick={() => void markRead(item.id)} aria-label={tr(`Marcar como leída · ${item.title}`, `Mark as read · ${item.title}`)}><Check size={15} aria-hidden="true" />{tr("Marcar como leída", "Mark as read")}</button>}
                   </div>
                 </div>

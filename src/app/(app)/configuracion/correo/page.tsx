@@ -16,6 +16,13 @@ export default async function CorreoSettingsPage({ searchParams }: { searchParam
     searchParams,
   ]);
   const result = mailSettingsResult(query);
+  const mailbox = publicMailboxAccount(account);
+  // An OAuth return flag is navigational. Confirm success against the user's
+  // persisted account, including the provider that initiated the return.
+  const oauthStatus = result?.status === "connected" &&
+    (mailbox.status !== "connected" || !mailbox.hasOauth || mailbox.protocol !== result.provider)
+    ? "error"
+    : result?.status ?? null;
 
   return (
     <div className="space-y-6">
@@ -23,7 +30,7 @@ export default async function CorreoSettingsPage({ searchParams }: { searchParam
         title={t("mailbox.settingsTitle")}
         actions={<Link className="btn btn-secondary" href="/correo"><Inbox size={16} aria-hidden="true" /> {t("mailbox.openInbox")}</Link>}
       />
-      <MailboxSettingsPanel key={`${user.id}:${result?.provider ?? ""}:${result?.status ?? ""}`} initialAccount={publicMailboxAccount(account)} oauthStatus={result?.status ?? null} />
+      <MailboxSettingsPanel key={`${user.id}:${result?.provider ?? ""}:${oauthStatus ?? ""}`} initialAccount={mailbox} oauthStatus={oauthStatus} />
     </div>
   );
 }

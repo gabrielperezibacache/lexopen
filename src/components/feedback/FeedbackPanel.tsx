@@ -3,6 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
+import { FolioSymbol } from "@/components/ui/FolioSymbol";
 import type { FeedbackItem, FeedbackPage } from "@/lib/feedback/service";
 
 export function FeedbackPanel({ initial, locale }: { initial: FeedbackPage; locale: "es" | "en" }) {
@@ -83,7 +84,7 @@ export function FeedbackPanel({ initial, locale }: { initial: FeedbackPage; loca
   }
 
   return <div className="max-w-3xl space-y-8">
-    <form onSubmit={submit} className="panel space-y-4 p-4 sm:p-6" aria-label={tr("Enviar comentario", "Send feedback")} aria-busy={busy}>
+    <form data-feedback-form onSubmit={submit} className="panel space-y-4 p-4 sm:p-6" aria-label={tr("Enviar comentario", "Send feedback")} aria-busy={busy}>
       <h2 className="text-lg font-semibold">{tr("Nuevo comentario", "New feedback")}</h2>
       <label className="grid gap-2 text-sm font-medium">
         <span>{tr("Tipo de comentario", "Feedback type")}</span>
@@ -95,14 +96,14 @@ export function FeedbackPanel({ initial, locale }: { initial: FeedbackPage; loca
         <span>{tr("Título", "Title")}</span>
         <input className="input w-full" name="title" placeholder={tr("Resume el comentario", "Summarize your feedback")} required maxLength={120} disabled={busy} />
       </label>
-      <label className="grid gap-2 text-sm font-medium">
-        <span>{tr("Descripción", "Description")}</span>
-        <textarea className="input w-full" name="details" rows={5} placeholder={tr("Cuéntanos qué ocurrió o qué te gustaría mejorar", "Tell us what happened or what you would like to improve")} required maxLength={3000} disabled={busy} aria-describedby="feedback-privacy" />
-      </label>
+      <div className="grid gap-2 text-sm">
+        <label className="font-medium" htmlFor="feedback-details">{tr("Descripción", "Description")}</label>
+        <p id="feedback-privacy" className="text-[var(--ink-soft)]">
+          {tr("Lo revisará la administración del estudio. Usa ejemplos ficticios y omite datos reservados.", "Your firm's administrators will review this. Use fictitious examples and leave out confidential information.")}
+        </p>
+        <textarea className="input w-full" id="feedback-details" name="details" rows={4} placeholder={tr("Cuéntanos qué ocurrió o qué te gustaría mejorar", "Tell us what happened or what you would like to improve")} required maxLength={3000} disabled={busy} aria-describedby="feedback-privacy" />
+      </div>
       <button type="submit" className="btn btn-primary" disabled={busy}>{tr("Enviar comentario", "Send feedback")}</button>
-      <p id="feedback-privacy" className="text-sm text-[var(--ink-soft)]">
-        {tr("Lo revisará la administración del estudio. Usa ejemplos ficticios y omite datos reservados.", "Your firm's administrators will review this. Use fictitious examples and leave out confidential information.")}
-      </p>
     </form>
 
     {notice && <p role="status" className="text-sm text-[var(--sea)]">{notice}</p>}
@@ -110,7 +111,12 @@ export function FeedbackPanel({ initial, locale }: { initial: FeedbackPage; loca
 
     <section className="space-y-3" aria-labelledby="feedback-history">
       <h2 id="feedback-history" className="text-lg font-semibold">{initial.canManage ? tr("Comentarios del equipo", "Team feedback") : tr("Mis comentarios", "My feedback")}</h2>
-      {items.length === 0 ? <p className="text-sm text-[var(--ink-soft)]">{tr("Todavía no hay comentarios.", "There is no feedback yet.")}</p> :
+      {items.length === 0 ? <div className="flex items-center gap-3 border-y border-[var(--line)] py-4">
+        <FolioSymbol variant="evidence" className="size-10 shrink-0 text-[var(--sea)]" />
+        <p className="text-sm text-[var(--ink-soft)]">
+          {tr("Todavía no hay comentarios. Cuando envíes uno, podrás seguir su estado aquí.", "There is no feedback yet. When you submit something, you can follow its status here.")}
+        </p>
+      </div> :
         <ul className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
           {items.map(item => <li key={item.id} className="space-y-2 py-4 wrap-anywhere">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

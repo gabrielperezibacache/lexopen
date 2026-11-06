@@ -33,6 +33,7 @@ import { WorkCountrySettings } from "@/components/config/WorkCountrySettings";
 import { AltazorPreferencesPanel } from "@/components/config/AltazorPreferencesPanel";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { firmFormSelect } from "@/lib/config/firm-form-fields";
+import { PersonalSettingsIndex } from "@/components/config/PersonalSettingsIndex";
 
 async function adminSections(userId: string, mode: CaseManagementMode, country: WorkCountry | null, locale: "es" | "en", canSetCountry: boolean): Promise<Record<string, ReactNode>> {
   const [organization, hostStatus, users, groups] = await Promise.all([
@@ -156,15 +157,7 @@ export default async function ConfiguracionPage() {
       </div>
       <Link className="btn btn-ghost" href="/biblioteca?personalizar=1">{tr("Personalizar biblioteca", "Personalize library")}</Link>
     </section>,
-    "cuenta-personal": <section id="cuenta-personal" className="panel space-y-3 p-5">
-      <h3 className="text-lg font-semibold">{tr("Tu cuenta", "Your account")}</h3>
-      <div className="flex flex-wrap gap-2">
-        <Link className="btn btn-secondary" href="/cuenta">{tr("Contraseña y verificación", "Password and verification")}</Link>
-        <Link className="btn btn-ghost" href="/cuenta/notificaciones">{tr("Mis notificaciones", "My notifications")}</Link>
-        <Link className="btn btn-ghost" href="/sincronizacion">{tr("Archivos y Google Drive", "Files and Google Drive")}</Link>
-        <Link className="btn btn-ghost" href="/cuenta/feedback">Feedback</Link>
-      </div>
-    </section>,
+    "cuenta-personal": <PersonalSettingsIndex locale={locale} />,
     "preferencias-altazor": visibility.assistant ? <AltazorPreferencesPanel locale={locale} /> : undefined,
     comunicaciones: visibility.communications ? <section id="comunicaciones" className="panel space-y-3 p-5">
       <h3 className="text-lg font-semibold">{tr("Correo y mensajes", "Mail and messages")}</h3>

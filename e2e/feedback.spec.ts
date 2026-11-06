@@ -10,12 +10,20 @@ test("el equipo informa problemas y sólo la administración puede seguir coment
   await page.getByRole("link", { name: "Feedback", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Feedback" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  const launcher = page.getByRole("button", { name: "Conversar con ALTAZOR" });
+  const send = page.getByRole("button", { name: "Enviar comentario" });
+  await expect(launcher).toBeVisible();
+  const overlay = (await launcher.boundingBox())!;
+  for (const control of [send, page.locator("#feedback-privacy")]) {
+    const bounds = (await control.boundingBox())!;
+    expect(bounds.x + bounds.width <= overlay.x || bounds.y + bounds.height <= overlay.y).toBeTruthy();
+  }
   await page.screenshot({ path: testInfo.outputPath("feedback-movil.png"), fullPage: true });
 
   await page.getByLabel("Tipo de comentario").selectOption("error");
   await page.getByLabel("Título", { exact: true }).fill(title);
   await page.getByLabel("Descripción", { exact: true }).fill("Reproducción ficticia para probar el seguimiento.");
-  await page.getByRole("button", { name: "Enviar comentario" }).click();
+  await send.click();
   await expect(page.getByRole("status").filter({ hasText: "Comentario recibido" })).toBeVisible();
   const own = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
   await expect(own).toContainText("Recibido");

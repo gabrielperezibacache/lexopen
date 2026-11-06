@@ -45,8 +45,10 @@ export default async function CuentaPage() {
             : "Aquí puedes cambiar tus preferencias personales. La configuración del estudio está a cargo de su administrador."}
         </p>
       )}
-      <PasswordChangeForm />
-      <TotpSettingsPanel />
+      <div id="seguridad" className="space-y-6">
+        <PasswordChangeForm />
+        <TotpSettingsPanel />
+      </div>
       {dailyBrief && <AltazorDailyBriefSettings key={`daily-brief:${user.id}`} initial={dailyBrief} locale={locale} />}
       {staff && canSome(user, "assistant.use") && <CodexConnection key={user.id} />}
     </div>

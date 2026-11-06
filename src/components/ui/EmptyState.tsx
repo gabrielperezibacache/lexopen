@@ -8,16 +8,18 @@ export function EmptyState({
   actionLabel,
   actionHref,
   action,
+  symbol = "collection",
 }: {
   title: string;
   description: string;
   actionLabel?: string;
   actionHref?: string;
   action?: ReactNode;
+  symbol?: "mark" | "collection" | "evidence";
 }) {
   return (
     <div className="panel empty-state px-6 py-10 text-center" role="status">
-      <FolioSymbol variant="collection" className="mx-auto mb-4 h-12 w-12 text-[var(--sea)]" />
+      <FolioSymbol variant={symbol} className="mx-auto mb-4 h-12 w-12 text-[var(--sea)]" />
       <h3 className="text-lg font-semibold text-[var(--ink)]">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">{description}</p>
       {(action || (actionLabel && actionHref)) && (

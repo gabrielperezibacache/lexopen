@@ -84,7 +84,7 @@ test("avisos del canal PJUD van al log de Configuración, no a Cartera", async (
   await expect(page.getByText("Aviso del Host")).toHaveCount(0);
 
   await page.goto("/configuracion#pjud-log");
-  await expect(page.getByTestId("pjud-ops-log")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Seguridad y avisos" }).getByTestId("pjud-ops-log")).toBeVisible();
   await expect(page.getByRole("link", { name: "Log PJUD" })).toBeVisible();
 });
 
