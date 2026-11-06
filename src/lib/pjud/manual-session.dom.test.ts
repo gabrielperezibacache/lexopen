@@ -102,6 +102,9 @@ async function main() {
       assert.equal(await page.locator("#terms").count(), 1, "the session must leave terms untouched");
       await page.getByRole("button", { name: "Acepto", exact: true }).click();
       assert.equal((await authenticated).authenticated, true);
+      await page.locator("body").evaluate(body => {
+        body.insertAdjacentHTML("beforeend", '<table id="outsideMisCausas"><tr><td><button onclick="window.outsideDetailOpened=true">Ver</button></td><td>20-2024</td><td>Corte Suprema</td></tr></table>');
+      });
       const [items, detail] = await Promise.all([
         session.listMisCausas({ materias: ["Corte Suprema"], responseTimeoutMs: 500 }),
         session.fetchCausaDetail(cause, { materias: ["Corte Suprema"], responseTimeoutMs: 500 }),
@@ -112,6 +115,7 @@ async function main() {
       assert.equal(detail.movimientos[0].documentoBytes, undefined);
       assert.equal(first.documentRequests(), 0);
       assert.equal(first.accountsVisits(), 1, "listing and detail must not start another login");
+      assert.equal(await page.evaluate(() => Boolean((window as typeof window & { outsideDetailOpened?: boolean }).outsideDetailOpened)), false, "an exact duplicate outside the active panel must not block or open the detail");
       assert.equal(await page.evaluate(() => Boolean((window as typeof window & { overlap?: boolean }).overlap)), false, "shared page operations must run in series");
       assert.equal(await page.evaluate(() => Boolean((window as typeof window & { unexpectedMateria?: boolean }).unexpectedMateria)), false);
       await assert.rejects(session.fetchCausaDetail({ ...cause, rit: "99-2024" }), (error: unknown) => error instanceof ManualOjvSessionError && error.code === "cause-not-listed");
@@ -156,6 +160,46 @@ async function main() {
       await delayed.waitForAuthentication();
       assert.equal(await page.locator("#misCausasContent").isVisible(), false, "an identified shell does not imply the AJAX menu is ready");
       assert.equal((await delayed.listMisCausas({ materias: ["Corte Suprema"], responseTimeoutMs: 500 })).length, 1, "listing must wait for the selected materia after opening its AJAX menu");
+      await page.locator("body").evaluate(body => {
+        body.insertAdjacentHTML("beforeend", '<table id="outsideMisCausas"><tbody></tbody></table>');
+        const button = body.querySelector("#btnConsultaMisCauSup");
+        button?.setAttribute("onclick", "document.querySelector('#outsideMisCausas tbody').innerHTML='<tr><td>Ver</td><td>20-2024</td><td>Corte Suprema</td></tr>'");
+      });
+      await assert.rejects(
+        delayed.fetchCausaDetail(cause, { materias: ["Corte Suprema"], responseTimeoutMs: 250, downloadDocuments: false }),
+        (error: unknown) => error instanceof ManualOjvSessionError && error.code === "action-failed",
+        "a fresh duplicate outside the active panel must not validate an old row within it"
+      );
+      assert.equal(await page.locator("#outsideMisCausas tbody tr").count(), 1);
+      assert.equal(await page.evaluate(() => (window as typeof window & { detailOpened: number }).detailOpened), 0);
+
+      await page.locator("#btnConsultaMisCauSup").evaluate(button => {
+        button.setAttribute("onclick", "document.querySelector('#tab1').insertAdjacentHTML('beforeend', '<div class=card id=freshWithoutLink>20-2024 | Corte Suprema</div>')");
+      });
+      await assert.rejects(
+        delayed.fetchCausaDetail(cause, { materias: ["Corte Suprema"], responseTimeoutMs: 500, downloadDocuments: false }),
+        (error: unknown) => error instanceof ManualOjvSessionError && error.code === "action-failed",
+        "a fresh result without an exact detail control must not fall back to an old row in the same panel"
+      );
+      assert.equal(await page.locator("#freshWithoutLink").count(), 1);
+      assert.equal(await page.evaluate(() => (window as typeof window & { detailOpened: number }).detailOpened), 0);
+      assert.equal(await page.evaluate(() => "lexopenManualMisCausasFresh" in window), false);
+
+      await page.locator("body").evaluate(body => {
+        body.querySelector("#freshWithoutLink")?.remove();
+        const row = body.querySelector("#dtaTableDetalleMisCauSup tbody tr")!.outerHTML;
+        const first = JSON.stringify(row.replace("20-2024", "99-2024"));
+        const second = JSON.stringify(row);
+        body.querySelector("#btnConsultaMisCauSup")!.setAttribute("onclick", `document.querySelector('#dtaTableDetalleMisCauSup tbody').innerHTML=${first}`);
+        const next = document.createElement("button");
+        next.textContent = "Siguiente";
+        next.setAttribute("onclick", `document.querySelector('#dtaTableDetalleMisCauSup tbody').innerHTML=${second}; this.disabled=true`);
+        body.querySelector("#tab1")!.append(next);
+        body.insertAdjacentHTML("afterbegin", '<button onclick="window.outsidePaginationUsed=true">Siguiente</button>');
+      });
+      const paginated = await delayed.fetchCausaDetail(cause, { materias: ["Corte Suprema"], responseTimeoutMs: 500, downloadDocuments: false });
+      assert.equal(paginated.movimientos.length, 1, "read the exact fresh row on page two of the same panel");
+      assert.equal(await page.evaluate(() => Boolean((window as typeof window & { outsidePaginationUsed?: boolean }).outsidePaginationUsed)), false);
     } finally {
       await delayed.close();
     }

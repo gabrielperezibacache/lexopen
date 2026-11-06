@@ -31,6 +31,20 @@ La comprobación pública de red obtuvo HTTP 200 en GitHub y Google OAuth. Drive
 
 La suite local completa obtuvo 112 de 115 pruebas con Turbopack. Tres pruebas de audio recibieron un 404 antes de alcanzar la ruta de carga o reintento. Las tres pasaron en una repetición focalizada con `E2E_BUNDLER=webpack`. Con webpack y toda la suite se reprodujeron los tres fallos de audio y vencieron siete esperas de cinco segundos en expediente, PDF, navegación, Codex, notificaciones y Mesa. La prueba en servidor precompilado confirmó carga, conservación del audio tras un error del proveedor, reintento y descarga del TXT. La ejecución del PR que prepara los instaladores pasó sus 113 pruebas de navegador. [Comprobaciones del PR](https://github.com/gabrielperezibacache/lexopen/actions/runs/42150986183)
 
+## Seguimiento del piloto
+
+El PR de auditoría pasó las 115 pruebas de navegador en GitHub. La prueba de resúmenes de avisos usa la hora del escenario para evitar que entren avisos de otro tramo horario. [Ejecución de CI](https://github.com/gabrielperezibacache/lexopen/actions/runs/42210660964)
+
+| Conexión | Resultado |
+| --- | --- |
+| OJV por RIT/ROL | LexOpen leyó 510 movimientos en los tres cuadernos disponibles del expediente público C-876-2022, del 3.º Juzgado Civil de Santiago. La prueba se limitó a lectura. [Referencia oficial](https://www.pjud.cl/prensa-y-comunicaciones/noticias-del-poder-judicial/147149) |
+| Mis Causas con ClaveÚnica | El usuario inició sesión en una ventana temporal oficial y LexOpen leyó el listado real en siete materias. La primera consulta de detalle falló. Tras acotar la búsqueda al panel activo y exigir una fila nueva con el RIT y el tribunal exactos, una segunda sesión leyó el detalle y sus movimientos. Queda sin confirmar la cobertura de cuadernos de esa causa. En ambas pruebas se cerró la sesión sin descargar documentos ni importar expedientes. |
+| Google Drive y Google Workspace | Queda pendiente registrar la aplicación del estudio. En la ficha de Drive personal, el administrador puede abrir la consola oficial, ver la dirección de retorno y completar la preparación. Después, cada profesional autoriza su cuenta con Google. [Preparación oficial](https://developers.google.com/identity/protocols/oauth2/web-server) |
+| GitHub | La autorización de un usuario de LexOpen sigue pendiente de la aplicación registrada por el estudio y de la preparación de Altazor en su equipo. [Registro oficial](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app) |
+| Correo, Dropbox y otros proveedores | El entorno de prueba carecía de su preparación para recibir una autorización real. |
+
+En la prueba ficticia, una fila nueva fuera del panel activo no sirve como respaldo para abrir una fila antigua. El nuevo control se comprueba también en la segunda página de resultados. Queda por comprobar en la OJV real la reapertura consecutiva de un mismo detalle.
+
 ## Próximos pasos
 
 1. **Cerrar el piloto de conexiones.** Mostrar cuenta, alcance, última comprobación y acción siguiente en la misma ficha. Validar, con cuentas de prueba, renovación, revocación y retorno al paso pendiente. Con PJUD, comprobar al menos dos cuadernos, un documento nuevo y el vencimiento de sesión.

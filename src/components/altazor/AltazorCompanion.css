@@ -21,6 +21,6 @@
 @media(max-width:600px) { .altazor-companion-launcher { right:.75rem; bottom:calc(.75rem + env(safe-area-inset-bottom)); } .altazor-companion-sheet .lexopen-sheet-content { padding:.75rem; } }
 
 @media (max-width: 480px) {
-  body:has([data-feedback-form]) .altazor-companion-launcher { padding: var(--space-2); }
-  body:has([data-feedback-form]) .altazor-companion-launcher .altazor-wordmark { display: none; }
+  body:has(:is([data-feedback-form], #sync-google)) .altazor-companion-launcher { padding: var(--space-2); }
+  body:has(:is([data-feedback-form], #sync-google)) .altazor-companion-launcher .altazor-wordmark { display: none; }
 }
