@@ -4,7 +4,7 @@ import { Cloud,ExternalLink } from "lucide-react";
 import styles from "./PersonalDriveConnection.module.css";
 import { withCsrfHeaders } from "@/lib/client-csrf";
 type Status={connected:boolean;configured:boolean;label:string;email:string|null;connectionId:string|null;reason:string|null;lastVerifiedAt:string|null;canAdmin:boolean};
-type Setup={configured:boolean;source:string;canEdit:boolean;callbackUri:string|null;callbackPath:string;reason:string|null;registrationUrl:string};
+type Setup={configured:boolean;source:string;canEdit:boolean;canReuseAltazorApp:boolean;callbackUri:string|null;callbackPath:string;reason:string|null;registrationUrl:string};
 async function request<T>(path:string,body?:unknown,method="POST"):Promise<T>{const response=await fetch(`/api/personal-connectors/google-drive${path}`,{method:body===undefined?"GET":method,headers:body===undefined?undefined:withCsrfHeaders({"Content-Type":"application/json"}),body:body===undefined?undefined:JSON.stringify(body),cache:"no-store"}),value=await response.json();if(!response.ok)throw Error(value.error||"No se pudo completar la conexión");return value;}
 /** Direct content consent is independent of the computer's metadata connector. */
 export function PersonalDriveConnection({onChange}:{onChange?:()=>void}){
@@ -22,8 +22,48 @@ export function PersonalDriveConnection({onChange}:{onChange?:()=>void}){
     catch(reason){popup?.close();setError(reason instanceof Error?reason.message:"No se pudo iniciar la conexión");}finally{setBusy(false);}
   }
   async function disconnect(){setBusy(true);setError("");try{setStatus(await request<Status>("",{},"DELETE"));setAttempt(null);setAuthUrl("");setDisconnectOpen(false);setNotice("Cuenta desconectada de LexOpen. Las actualizaciones personales se pausaron y tus copias se conservan.");onChange?.();}catch(reason){setError(reason instanceof Error?reason.message:"No se pudo desconectar");}finally{setBusy(false);}}
-  async function loadSetup(){setError("");try{const value=await request<Setup>("/setup");setAlias(value.source==="altazor");setSetup(value);}catch(reason){setError(reason instanceof Error?reason.message:"No se pudo abrir la configuración");}}
-  async function saveSetup(){setBusy(true);setError("");try{const prepared=await request<Setup>("/setup",{useAltazorApp:alias,...(alias?{}:{clientId,clientSecret}),confirmed:true},"PUT");setSetup(prepared);setClientSecret("");if(!prepared.configured){await reload();throw Error(prepared.reason||"Complete la aplicación de Google antes de conectar cuentas.");}setSetupConfirmed(false);await reload();setNotice("Aplicación preparada. Cada profesional puede conectar su propia cuenta.");}catch(reason){setError(reason instanceof Error?reason.message:"No se pudo guardar la configuración");}finally{setBusy(false);}}
+  function chooseApplication(shared:boolean) {
+    setAlias(shared);
+    setSetupConfirmed(false);
+    if (shared) { setClientId(""); setClientSecret(""); }
+  }
+  async function loadSetup(){
+    setError("");
+    try {
+      const value = await request<Setup>("/setup");
+      chooseApplication(value.canReuseAltazorApp && value.source !== "saved");
+      setSetup(value);
+    } catch(reason) {
+      setError(reason instanceof Error ? reason.message : "No se pudo abrir la configuración");
+    }
+  }
+  const useSharedApp = alias && setup?.canReuseAltazorApp === true;
+  const sharedAppSaved = useSharedApp && setup?.configured && setup.source === "altazor";
+  async function saveSetup(){
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const prepared = await request<Setup>("/setup", {
+        useAltazorApp: useSharedApp,
+        ...(useSharedApp ? {} : { clientId, clientSecret }),
+        confirmed: true,
+      }, "PUT");
+      setSetup(prepared);
+      setClientSecret("");
+      if (!prepared.configured) {
+        await reload();
+        throw Error(prepared.reason || "Completa la aplicación de Google antes de conectar cuentas.");
+      }
+      setSetupConfirmed(false);
+      await reload();
+      setNotice("Aplicación preparada. Cada profesional puede autorizar su propia cuenta de Drive.");
+    } catch(reason) {
+      setError(reason instanceof Error ? reason.message : "No se pudo guardar la configuración");
+    } finally {
+      setBusy(false);
+    }
+  }
   return <section className={styles.root} aria-label="Mi cuenta de Google Drive">
     <div className={styles.heading}>
       <div className={styles.identity}>
@@ -45,21 +85,29 @@ export function PersonalDriveConnection({onChange}:{onChange?:()=>void}){
     {status?.canAdmin && <details className={styles.setup} onToggle={event=>{if(event.currentTarget.open&&!setup)void loadSetup();}}>
       <summary>{status.configured?"Configuración de la conexión":"Preparar conexión para el estudio"}</summary>
       {setup && <div className="altazor-send-settings">
-        <ol className={styles.steps}>
-          <li><a href={setup.registrationUrl} target="_blank" rel="noopener noreferrer">Abrir Google Cloud <ExternalLink size={15} aria-hidden="true" /></a> Registra un cliente OAuth de tipo «Aplicación web» y habilita la API de Drive con permiso de lectura.</li>
-          <li>Añade esta dirección en «URI de redireccionamiento autorizados».
-            <code>{setup.callbackUri||`${window.location.origin}${setup.callbackPath}`}</code>
-          </li>
-        </ol>
         {setup.canEdit && <>
-          <label><input type="checkbox" checked={alias} onChange={event=>setAlias(event.target.checked)}/>Reutilizar la aplicación de Google preparada para Altazor</label>
-          {!alias && <>
-            <label>ID de cliente de Google<input value={clientId} autoComplete="off" onChange={event=>setClientId(event.target.value)} maxLength={1000}/></label>
-            <label>Secreto de cliente de Google<input type="password" value={clientSecret} autoComplete="new-password" onChange={event=>setClientSecret(event.target.value)} maxLength={4000}/></label>
+          {sharedAppSaved ? <p>Esta instalación usa la aplicación de Google Workspace. Cada profesional autoriza Drive por separado.</p> : <>
+            {useSharedApp && <p>Ya tienes una aplicación de Google Workspace. Puedes usar la misma para preparar Drive.</p>}
+            <ol className={styles.steps}>
+              <li><a href={setup.registrationUrl} target="_blank" rel="noopener noreferrer">Abrir Google Cloud <ExternalLink size={15} aria-hidden="true" /></a> {useSharedApp ? "Abre la aplicación de Workspace y habilita la API de Drive." : "Registra un cliente de tipo «Aplicación web» y habilita la API de Drive."}</li>
+              <li>{useSharedApp ? "Conserva el retorno de Workspace y añade también el de Drive personal." : "Añade esta dirección en «URI de redireccionamiento autorizados»."}
+                <code>{useSharedApp ? `${window.location.origin}${setup.callbackPath}` : setup.callbackUri || `${window.location.origin}${setup.callbackPath}`}</code>
+              </li>
+            </ol>
+            {!useSharedApp && <>
+              <label>ID de cliente de Google<input value={clientId} autoComplete="off" onChange={event=>setClientId(event.target.value)} maxLength={1000}/></label>
+              <label>Secreto de cliente de Google<input type="password" value={clientSecret} autoComplete="new-password" onChange={event=>setClientSecret(event.target.value)} maxLength={4000}/></label>
+            </>}
+            <label><input type="checkbox" checked={setupConfirmed} disabled={busy} onChange={event=>setSetupConfirmed(event.target.checked)}/>Registré el retorno de Drive y habilité la lectura de archivos. Cada profesional autorizará su cuenta por separado.</label>
+            <button type="button" className="btn btn-primary" disabled={busy || !setupConfirmed || !useSharedApp && (!clientId || !clientSecret)} onClick={()=>void saveSetup()}>
+              {useSharedApp ? "Usar la aplicación de Google Workspace" : "Guardar preparación de Drive"}
+            </button>
           </>}
-          <label><input type="checkbox" checked={setupConfirmed} onChange={event=>setSetupConfirmed(event.target.checked)}/>Registré la dirección y el permiso de lectura en Google. Después, cada profesional podrá autorizar su cuenta.</label>
-          <button type="button" className="btn btn-outline" disabled={busy||!setupConfirmed||!alias&&(!clientId||!clientSecret)} onClick={()=>void saveSetup()}>Guardar preparación</button>
+          {setup.canReuseAltazorApp && <button type="button" className="btn btn-ghost" disabled={busy} onClick={()=>chooseApplication(!useSharedApp)}>
+            {useSharedApp ? "Usar otra aplicación" : "Elegir la aplicación de Google Workspace"}
+          </button>}
         </>}
+        {!setup.canEdit && <p>{setup.reason || "El administrador ya preparó esta aplicación desde el equipo principal."}</p>}
       </div>}
     </details>}
   </section>;

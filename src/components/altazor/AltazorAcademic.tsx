@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { EditorialHeading } from "@/components/ui/EditorialHeading";
 import { ArrowLeft, ArrowRight, BookOpen, Check, GraduationCap, PenLine, Plus, Save } from "lucide-react";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 import { prepareAssistantSubmission } from "@/lib/altazor/client-send-policy";
@@ -146,10 +147,10 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
   }
   return <section ref={section} className={`${styles.root} altazor-academic`} aria-label="Desarrollo académico">
     <header className={styles.header}>
-      <div>
+      <EditorialHeading artwork="academic">
         <h1>Académico</h1>
         <p>Investiga, escribe y prepara tus clases con las fuentes de cada trabajo a la vista.</p>
-      </div>
+      </EditorialHeading>
       <Link href="/inicio" className="btn btn-ghost" onClick={event => { if (dirty || editorDirty || profileDirty) { event.preventDefault(); setNotice("Guarda los cambios antes de volver a ALTAZOR."); } }}>Pedir ayuda a Altazor</Link>
     </header>
     <nav className={styles.navigation} aria-label="Herramientas académicas">

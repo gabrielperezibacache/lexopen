@@ -31,11 +31,12 @@ export const CONFIG_CATEGORIES = [
   },
   {
     id: "conexiones-ia", label: "Conexiones e IA", labelEn: "Connections and AI",
-    description: "Proveedor de IA, Google y seguimiento judicial.",
-    descriptionEn: "AI provider, Google and court monitoring.",
+    description: "Cuentas conectadas y servicios del estudio.",
+    descriptionEn: "Connected accounts and firm services.",
     sections: [
+      { id: "cuentas-conectadas", label: "Cuentas conectadas", labelEn: "Connected accounts" },
       { id: "llm-settings", label: "IA", labelEn: "AI" },
-      { id: "google-settings", label: "Google", labelEn: "Google" },
+      { id: "google-settings", label: "Google del estudio", labelEn: "Firm Google" },
       { id: "pjud-settings", label: "PJUD", labelEn: "PJUD" },
       { id: "integraciones-overview", label: "APIs", labelEn: "APIs" },
     ],
@@ -75,7 +76,7 @@ export const CONFIG_CATEGORIES = [
 export const CONFIG_SECTIONS: readonly ConfigSection[] = CONFIG_CATEGORIES.flatMap<ConfigSection>(category => [...category.sections]);
 export function configCategoriesForMode(mode: "manual" | "pjud_cl", visibility: SettingsVisibility) {
   return CONFIG_CATEGORIES.map(category => ({ ...category, sections: category.sections.filter(section => {
-    if (section.id === "preferencias-altazor") return visibility.assistant;
+    if (section.id === "preferencias-altazor" || section.id === "cuentas-conectadas") return visibility.assistant;
     if (section.id === "comunicaciones") return visibility.communications;
     if (section.id === "work-country") return visibility.canSetCountry;
     if (["cuenta-personal", "idioma", "apariencia"].includes(section.id)) return true;
