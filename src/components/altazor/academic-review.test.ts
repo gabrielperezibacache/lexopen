@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { emptyAcademicBrief } from "@/lib/altazor/academic-schemas";
-import { academicReview } from "./academic-review";
+import { academicReview, nextAcademicReview } from "./academic-review";
 import type { AcademicWorkspace } from "./academic-ui";
 
 const emptyWorkspace: AcademicWorkspace = {
@@ -67,4 +67,22 @@ test("only prose sections count towards marker coverage, even with headings in a
   assert.equal(empty.textSections, 0);
   assert.equal(empty.sectionsWithoutReference, 0);
   assert.equal(review.artifacts.awaitingReview, 2);
+});
+
+test("the next review action follows available evidence and never opens a withheld proposal", () => {
+  const active = { ...emptyWorkspace, brief: { ...emptyAcademicBrief, objective: "Contrastar la hipótesis" } };
+  const availableSources = [{ ...source, input: sourceInput, review: "Pasaje disponible" }];
+  const linked = { id: "linked", available: true, status: "reviewed", body: "Párrafo con cita [R1].", sources: [source] };
+  const unlinked = { id: "unlinked", available: true, status: "reviewed", body: "Párrafo sin referencia." };
+  const pending = { ...linked, id: "pending", status: "proposed" };
+  const next = (change: Partial<AcademicWorkspace> = {}) => nextAcademicReview(academicReview({ ...active, ...change }));
+
+  assert.deepEqual(next({ brief: emptyAcademicBrief }), { reason: "missingObjective", destination: { kind: "objective" } });
+  assert.deepEqual(next({ artifacts: [{ ...unlinked, available: false }, pending] }), { reason: "lostAccess", destination: { kind: "sources" } });
+  assert.deepEqual(next({ matrix: { dimensions: [], rows: [{ id: "unsupported", title: "Lectura pendiente", included: true, cells: {} }] }, artifacts: [unlinked] }), { reason: "matrixGaps", destination: { kind: "matrix" } });
+  assert.deepEqual(next({ artifacts: [pending, unlinked] }), { reason: "citationGaps", destination: { kind: "artifact", id: "unlinked" } });
+  assert.deepEqual(next({ artifacts: [pending] }), { reason: "pendingReview", destination: { kind: "artifact", id: "pending" } });
+  assert.deepEqual(next(), { reason: "missingSources", destination: { kind: "sources" } });
+  assert.deepEqual(next({ sources: availableSources }), { reason: "noProposals", destination: { kind: "work" } });
+  assert.equal(next({ artifacts: [linked], sources: availableSources }), null);
 });

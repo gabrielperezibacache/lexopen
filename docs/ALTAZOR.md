@@ -50,12 +50,13 @@ La memoria funciona con nodos y relaciones en PostgreSQL; no requiere instalar o
 
 ## Investigación, escritura y docencia
 
-**Academia** organiza trabajos privados de investigación, escritura, docencia y carrera académica. Cada trabajo conserva su pregunta, destinatarios, matriz y resultados.
+**Académico** organiza trabajos privados de investigación, escritura, docencia y carrera académica. Busca un trabajo por su título para retomar su pregunta, destinatarios, matriz y resultados.
 
 | Apartado | Recorrido |
 | --- | --- |
 | Trabajo | Elegir fuentes y preparar síntesis, estado del arte, comparación, revisión de afirmaciones o bibliografía, escritura, traducción, abstract y revisión por pares. |
 | Matriz de literatura | Configurar dimensiones de texto, número, fecha o etiqueta; registrar filas; incluirlas o excluirlas del análisis; asociar pasajes a celdas. |
+| Mesa de revisión | Identificar el siguiente paso del trabajo y comprobar qué secciones de cada manuscrito enlazan con un pasaje disponible. |
 | Docencia | Usar objetivo, destinatarios, duración, resultados de aprendizaje y evaluación para preparar programas, rúbricas y material docente. |
 | Mi perfil | Conservar los datos profesionales aportados por el titular y preparar propuestas de currículum; no certifica títulos ni cumplimiento de formularios institucionales. |
 | Descubrir | Consultar Crossref y OpenAlex, explorar relaciones bibliográficas, contrastar un registro ORCID público y conservar referencias. |

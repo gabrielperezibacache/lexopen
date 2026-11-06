@@ -58,7 +58,12 @@ export async function createAcademicWorkspace(raw: unknown, user: CausaAccessUse
   });
 }
 export async function readAcademicWorkspace(id: string, user: CausaAccessUser, client: PrismaClient = prisma) {
-  const { actor, workspace } = await workspaceFor(id, user, client), matrix = JSON.parse(workspace.matrixJson);
+  const { actor, workspace } = await workspaceFor(id, user, client);
+  const storedMatrix = JSON.parse(workspace.matrixJson);
+  const matrix = {
+    dimensions: storedMatrix.dimensions ?? emptyAcademicMatrix.dimensions,
+    rows: storedMatrix.rows ?? [],
+  };
   const sources = [], storedSources = JSON.parse(workspace.sourcesJson) as AltazorSourceSnapshot[];
   let unavailableSources = 0;
   for (const source of storedSources) {
@@ -66,7 +71,7 @@ export async function readAcademicWorkspace(id: string, user: CausaAccessUser, c
     catch (error) { if (!unavailableSource(error)) throw error; unavailableSources++; }
   }
   // A cell with a source is a dependent artifact: hide the whole row if the source was revoked.
-  for (const row of matrix.rows || []) {
+  for (const row of matrix.rows) {
     try { await verifyAltazorSources(actor, row.proofs || [], { client }); }
     catch (error) { if (!unavailableSource(error)) throw error; row.title = unavailableRowTitle; row.cells = {}; row.included = false; row.available = false; }
     delete row.proofs;
@@ -84,8 +89,10 @@ export async function saveAcademicWorkspace(id: string, raw: unknown, user: Caus
     const actor = await actorFor(user, tx), current = await tx.altazorAcademicWorkspace.findFirst({ where: { id, ownerId: actor.id, revision: input.expectedRevision, archivedAt: null } });
     if (!current) throw httpError("El trabajo cambió. Recargue antes de guardar", 409);
     type StoredRow = (typeof input.matrix.rows)[number] & { proofs: AltazorSourceSnapshot[] };
-    const previous = JSON.parse(current.matrixJson) as { dimensions: typeof input.matrix.dimensions; rows: StoredRow[] }, retained = new Map<string, StoredRow>(), rows: StoredRow[] = [];
-    for (const row of previous.rows) {
+    const previous = JSON.parse(current.matrixJson) as { dimensions?: typeof input.matrix.dimensions; rows?: StoredRow[] };
+    const previousDimensions = previous.dimensions ?? emptyAcademicMatrix.dimensions;
+    const retained = new Map<string, StoredRow>(), rows: StoredRow[] = [];
+    for (const row of previous.rows ?? []) {
       const placeholder = input.matrix.rows.find(item => item.id === row.id), redacted = Boolean(placeholder && placeholder.title === unavailableRowTitle && !placeholder.included && !Object.keys(placeholder.cells).length);
       let unavailable = false;
       try { await verifyAltazorSources(actor, row.proofs || [], { client: tx }); }
@@ -96,7 +103,7 @@ export async function saveAcademicWorkspace(id: string, raw: unknown, user: Caus
       // A revoked source may be restored while this redacted form is still open.
       // The placeholder is never a replacement for the retained source or its cells.
       if (unavailable || redacted && row.proofs?.length) {
-        if (!redacted || JSON.stringify(previous.dimensions) !== JSON.stringify(input.matrix.dimensions)) throw httpError("Hay filas cuyo respaldo no está disponible. Se conservaron sin cambios; recargue antes de modificar la estructura de la matriz", 409);
+        if (!redacted || JSON.stringify(previousDimensions) !== JSON.stringify(input.matrix.dimensions)) throw httpError("Hay filas cuyo respaldo no está disponible. Se conservaron sin cambios; recargue antes de modificar la estructura de la matriz", 409);
         retained.set(row.id, row);
       }
     }
@@ -118,8 +125,6 @@ export async function prepareAcademicArtifact(id: string, raw: unknown, user: Ca
   const prior = await client.altazorAcademicArtifact.findUnique({ where: { workspaceId_requestId: { workspaceId: id, requestId: input.requestId } } });
   if (prior) { if (prior.inputSha256 !== inputSha256) throw httpError("El intento identifica otra preparación", 409); return { artifact: await readAcademicArtifact(id, prior.id, actor, client), reused: true }; }
   if (workspace.revision !== input.expectedRevision) throw httpError("Guarde y recargue el trabajo antes de preparar otro resultado", 409);
-  if (["synthesis", "literature_review", "comparison", "claim_audit", "bibliography_audit", "peer_review"].includes(input.mode) && !input.sources.length) throw httpError("Esta revisión necesita al menos una fuente seleccionada", 400);
-  if (input.mode === "comparison" && new Set(input.sources.map(source => source.kind === "book" ? source.bookId : source.kind === "legal" || source.kind === "document" ? source.versionId : "")).size < 2) throw httpError("Seleccione pasajes de dos documentos distintos para compararlos", 400);
   const destination = await workbenchDestination(actor.id, "assisted_draft");
   if (destination.key !== input.destinationKey || !destination.permitted || destination.remote && !input.allowRemote) throw httpError("Revise el destino y autorice el envío de la selección antes de continuar", 409);
   const selection = [...input.sources], profile = input.mode === "cv" ? await client.altazorAcademicProfile.findUnique({ where: { ownerId: actor.id } }) : null;
@@ -131,6 +136,13 @@ export async function prepareAcademicArtifact(id: string, raw: unknown, user: Ca
   }
   if (selection.length > 8) throw httpError("Elija hasta ocho pasajes entre la selección y las filas incluidas de la matriz", 413);
   const { refs } = await resolveAltazorSources(actor, selection, { client });
+  if (["synthesis", "literature_review", "comparison", "claim_audit", "bibliography_audit", "peer_review"].includes(input.mode) && !refs.length) {
+    throw httpError("Esta revisión necesita al menos una fuente seleccionada", 400);
+  }
+  if (input.mode === "comparison") {
+    const documents = new Set(refs.map(({ input: source }) => source.kind === "book" ? source.bookId : source.kind === "legal" || source.kind === "document" ? source.versionId : ""));
+    if (documents.size < 2) throw httpError("Seleccione pasajes de dos documentos distintos para compararlos", 400);
+  }
   const data = { destination, instruction: input.instruction, brief: JSON.parse(workspace.briefJson), matrix: { dimensions: matrix.dimensions || [], rows: (matrix.rows || []).filter((row: { included: boolean }) => row.included) }, profile: profile ? JSON.parse(profile.profileJson) : null };
   if (JSON.stringify(data).length > 60000) throw httpError("La matriz o el perfil excede el contexto de una consulta; reduzca la selección", 413);
   return bookTransaction(client, async tx => {

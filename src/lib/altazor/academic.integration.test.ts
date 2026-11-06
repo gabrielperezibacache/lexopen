@@ -26,7 +26,11 @@ async function main(){
     const workspace=await createAcademicWorkspace(create,owner,db);workspaces.push(workspace.id);
     assert.equal((await createAcademicWorkspace(create,owner,db)).id,workspace.id);
     await assert.rejects(readAcademicWorkspace(workspace.id,other,db),status(404));
-    const change={expectedRevision:1,title:create.title,brief:emptyAcademicBrief,matrix:emptyAcademicMatrix};
+    // Older workspaces may still use the database default of an empty object.
+    await db.altazorAcademicWorkspace.update({ where: { id: workspace.id }, data: { matrixJson: "{}" } });
+    const legacy = await readAcademicWorkspace(workspace.id, owner, db);
+    assert.deepEqual(legacy.matrix, emptyAcademicMatrix);
+    const change={expectedRevision:legacy.revision,title:create.title,brief:emptyAcademicBrief,matrix:legacy.matrix};
     const concurrency=await Promise.allSettled([saveAcademicWorkspace(workspace.id,change,owner,db),saveAcademicWorkspace(workspace.id,{...change,title:"Título concurrente ficticio"},owner,db)]);
     assert.equal(concurrency.filter(result=>result.status==="fulfilled").length,1);
     const w=await readAcademicWorkspace(workspace.id,owner,db);
@@ -80,11 +84,24 @@ async function main(){
     const shared=await importBook({...bookMetadataSchema.parse({title:"Libro compartido ficticio"}),requestId:randomUUID(),name:"compartido.txt",bytes},other,db),sharedDetail=await readBook(shared.book.id,other,{},db);
     const collection=(await createBookCollection({name:"Colección ficticia académica"},other,db)).collection;
     let grant=(await updateBookCollection(collection.id,{revision:collection.revision,bookIds:[shared.book.id],memberIds:[owner.id]},other,db)).collection;
-    const current=await readAcademicWorkspace(workspace.id,owner,db),matrix={dimensions:emptyAcademicMatrix.dimensions,rows:[{id:"row-1",title:"Fuente compartida ficticia",included:true,cells:{finding:{value:"Hallazgo ficticio",source:{kind:"book" as const,bookId:shared.book.id,fragmentId:sharedDetail.fragments[0].id,quote:sharedDetail.fragments[0].text}}}}]};
-    await saveAcademicWorkspace(workspace.id,{expectedRevision:current.revision,title:current.title,brief:current.brief,matrix},owner,db);
+    const matrixSource = { kind: "book" as const, bookId: shared.book.id, fragmentId: sharedDetail.fragments[0].id, quote: sharedDetail.fragments[0].text };
+    const current=await readAcademicWorkspace(workspace.id,owner,db),matrix={dimensions:emptyAcademicMatrix.dimensions,rows:[{id:"row-1",title:"Fuente compartida ficticia",included:true,cells:{finding:{value:"Hallazgo ficticio",source:matrixSource}}}]};
+    const matrixRevision = await saveAcademicWorkspace(workspace.id,{expectedRevision:current.revision,title:current.title,brief:current.brief,matrix},owner,db);
+    // An included, verified matrix passage contributes to the same preparation
+    // as direct sources, without counting the same document twice.
+    const matrixOnly = { ...input, requestId: randomUUID(), expectedRevision: matrixRevision.revision, sources: [] };
+    const matrixSynthesis = await prepareAcademicArtifact(workspace.id, matrixOnly, owner, db);
+    const synthesis = await readAcademicArtifact(workspace.id, matrixSynthesis.artifact.id, owner, db);
+    assert.deepEqual(synthesis.sources.map(ref => ref.title), ["Libro compartido ficticio"]);
+    const comparison = { ...matrixOnly, requestId: randomUUID(), mode: "comparison", sources: [source] };
+    const mixed = await prepareAcademicArtifact(workspace.id, comparison, owner, db);
+    const compared = await readAcademicArtifact(workspace.id, mixed.artifact.id, owner, db);
+    assert.deepEqual(compared.sources.map(ref => ref.title), ["Lectura ficticia del titular", "Libro compartido ficticio"]);
+    await assert.rejects(prepareAcademicArtifact(workspace.id, { ...comparison, requestId: randomUUID(), sources: [matrixSource] }, owner, db), status(400));
     const original=JSON.parse((await db.altazorAcademicWorkspace.findUniqueOrThrow({where:{id:workspace.id}})).matrixJson).rows[0];
     grant=(await updateBookCollection(collection.id,{revision:grant.revision,memberIds:[]},other,db)).collection;
     const hidden=await readAcademicWorkspace(workspace.id,owner,db);assert.equal(hidden.matrix.rows[0].available,false);assert.deepEqual(hidden.matrix.rows[0].cells,{});
+    await assert.rejects(prepareAcademicArtifact(workspace.id, { ...matrixOnly, requestId: randomUUID() }, owner, db), status(404));
     const hiddenMatrix={dimensions:hidden.matrix.dimensions,rows:hidden.matrix.rows.map((row:{id:string;title:string;included:boolean;cells:Record<string,unknown>})=>({id:row.id,title:row.title,included:row.included,cells:row.cells}))};
     await saveAcademicWorkspace(workspace.id,{expectedRevision:hidden.revision,title:"Metadatos renombrados",brief:hidden.brief,matrix:hiddenMatrix},owner,db);
     assert.deepEqual(JSON.parse((await db.altazorAcademicWorkspace.findUniqueOrThrow({where:{id:workspace.id}})).matrixJson).rows[0],original);
@@ -106,7 +123,7 @@ async function main(){
     await assert.rejects(academicArtifactHistory(workspace.id,artifactId,owner,undefined,db),status(404));
     await assert.rejects(readAcademicArtifactVersion(workspace.id,artifactId,2,owner,db),status(404));
     assert.equal(network,0);
-    console.log("ALTAZOR academic disposable integration passed: owner isolation, source-backed proposals, original/version history, CAS save races, idempotent save, recovery as unreviewed revision, tamper/source-revocation denial, native writing replay, LinkedIn origin/revision, matrix retention, profile CAS and cancellation; zero provider traffic.");
+    console.log("ALTAZOR academic disposable integration passed: owner isolation, source-backed proposals, original/version history, CAS save races, idempotent save, recovery as unreviewed revision, tamper/source-revocation denial, native writing replay, LinkedIn origin/revision, legacy matrix, matrix-backed preparation and retention, profile CAS and cancellation; zero provider traffic.");
   }finally{
     globalThis.fetch=originalFetch;
     await db.externalShareDraft.deleteMany({where:{ownerId:{in:users}}});

@@ -1,6 +1,10 @@
 import { academicOutline } from "@/lib/altazor/academic-templates";
 import type { AcademicArtifact, AcademicWorkspace } from "./academic-ui";
 
+export type ReviewDestination =
+  | { kind: "objective" | "sources" | "matrix" | "work" }
+  | { kind: "artifact"; id: string };
+
 export type AcademicManuscriptReview = {
   artifactId: string;
   title: string;
@@ -86,4 +90,27 @@ export function academicReview(workspace: AcademicWorkspace) {
     }
   }
   return { objective, sources, matrix, artifacts };
+}
+
+type NextReview = {
+  reason: "missingObjective" | "lostAccess" | "matrixGaps" | "citationGaps" | "pendingReview" | "missingSources" | "noProposals";
+  destination: ReviewDestination;
+};
+
+export function nextAcademicReview(review: ReturnType<typeof academicReview>): NextReview | null {
+  const { objective, sources, matrix, artifacts } = review;
+  if (!objective.defined) return { reason: "missingObjective", destination: { kind: "objective" } };
+  if (sources.unavailable || artifacts.unavailable) return { reason: "lostAccess", destination: { kind: "sources" } };
+  if (matrix.unavailable.length || matrix.withoutEvidence.length) return { reason: "matrixGaps", destination: { kind: "matrix" } };
+
+  const citationGap = artifacts.manuscripts.find(item => item.sectionsWithoutReference || item.invalidReferenceIds.length);
+  if (citationGap) return { reason: "citationGaps", destination: { kind: "artifact", id: citationGap.artifactId } };
+  const pending = artifacts.manuscripts.find(item => item.status === "proposed");
+  if (pending) return { reason: "pendingReview", destination: { kind: "artifact", id: pending.artifactId } };
+  if (!artifacts.manuscripts.length) {
+    return sources.available
+      ? { reason: "noProposals", destination: { kind: "work" } }
+      : { reason: "missingSources", destination: { kind: "sources" } };
+  }
+  return null;
 }

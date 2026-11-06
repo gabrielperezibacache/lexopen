@@ -1,14 +1,16 @@
 # Descubrimiento académico y bibliografía
 
-En **Inicio → ALTAZOR → Academia → Descubrir**, escribe un tema o referencia,
+En **Académico → Buscar bibliografía**, escribe un tema o referencia,
 elige Crossref y/o OpenAlex y autoriza el envío de esos términos. La aplicación
 consulta la primera ventana de hasta diez obras por fuente y conserva su
 procedencia y fecha. No incorpora datos de causas, conversaciones o archivos
 a la consulta. Estos servicios proporcionan metadatos, que requieren revisión
 antes de fundamentar una afirmación o atribuir lectura de una obra.
 
-Puedes conservar referencias, consultar un DOI en Crossref, tomar los metadatos
-de un libro propio o importar RIS, BibTeX y JSON de metadatos LexOpen. La
+Puedes conservar referencias, consultar un DOI en Crossref y tomar los metadatos
+de un libro propio. En **Mi bibliografía → Importar referencias**, puedes elegir
+un archivo RIS, BibTeX o JSON de LexOpen en UTF-8, o pegar su texto. Revisa
+el contenido antes de confirmar la importación. La
 bibliografía usa plantillas deterministas en texto plano APA, IEEE, Vancouver,
 Chicago y MLA, además de exportar BibTeX y RIS. Los campos ausentes y nombres
 sin separación entre apellidos e iniciales se identifican para revisión. Los

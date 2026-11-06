@@ -46,6 +46,10 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
     const blank = await page.request.post("/api/altazor/academic", { headers, data: { title: "Trabajo ficticio sin objetivo", kind: "research", requestId: randomUUID() } });
     expect(blank.status()).toBe(201);
     const { id: blankId } = await blank.json() as { id: string };
+    const queued = await db.altazorAcademicArtifact.create({ data: {
+      workspaceId: blankId, title: "Encargo ficticio por ejecutar", mode: "academic_writing",
+      requestId: randomUUID(), inputSha256: tag,
+    } });
     expect((await page.request.get(`/api/altazor/academic/${foreign.id}`)).status()).toBe(404);
 
     const sources = [];
@@ -88,6 +92,15 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
     await page.goto("/academico");
     const academic = page.getByRole("region", { name: "Desarrollo académico", exact: true });
     await expect(academic.getByRole("button", { name: new RegExp(title) })).toBeVisible();
+    const projectSearch = academic.getByRole("searchbox", { name: "Buscar por título", exact: true });
+    await projectSearch.fill("MANUSCRITO ACADEMICO");
+    await expect(academic.getByRole("button", { name: new RegExp(title) })).toBeVisible();
+    await expect(academic.getByRole("button", { name: /Trabajo ficticio sin objetivo/ })).toHaveCount(0);
+    await projectSearch.fill("Título inexistente");
+    await expect(academic.getByText("No hay trabajos con ese título.")).toBeVisible();
+    await academic.getByRole("button", { name: "Limpiar búsqueda" }).click();
+    await expect(projectSearch).toBeFocused();
+    await expect(academic.getByRole("button", { name: /Trabajo ficticio sin objetivo/ })).toBeVisible();
     await academic.getByRole("button", { name: "Mesa de revisión", exact: true }).click();
     const report = academic.getByRole("region", { name: "Mesa de revisión académica", exact: true });
     await expect(report).toBeVisible();
@@ -97,7 +110,16 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
     await work.selectOption(blankId);
     await expect(report.getByText("Falta definir el objetivo", { exact: true })).toBeVisible();
     await report.getByRole("button", { name: "Definir objetivo", exact: true }).click();
-    await expect(academic.getByLabel("Tu objetivo o texto de trabajo", { exact: true })).toBeVisible();
+    const objectiveInput = academic.getByRole("textbox", { name: "Tu objetivo o texto de trabajo", exact: true });
+    await expect(objectiveInput).toBeVisible();
+    const pendingObjective = "Objetivo ficticio escrito mientras el encargo anterior seguía guardado.";
+    await objectiveInput.fill(pendingObjective);
+    await academic.getByRole("button", { name: "Detener", exact: true }).click();
+    await expect(academic.getByText("Preparación detenida.", { exact: true })).toBeVisible();
+    await expect(objectiveInput).toHaveValue(pendingObjective);
+    expect((await db.altazorAcademicArtifact.findUniqueOrThrow({ where: { id: queued.id } })).status).toBe("cancelled");
+    await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
+    await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
     await academic.getByRole("button", { name: "Mesa de revisión", exact: true }).click();
     await work.selectOption(workspaceId);
     const sourceReport = report.getByRole("region", { name: "Fuentes y matriz", exact: true });
@@ -132,6 +154,13 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
     await expect(manuscripts.getByText("Sin acceso al respaldo", { exact: true }).locator("..").getByText("2", { exact: true })).toBeVisible();
     await expect(report.getByText(fixtures[0].title, { exact: true })).toHaveCount(0);
     await expect(report.getByRole("button", { name: "Abrir propuesta", exact: true })).toHaveCount(0);
+    await academic.getByRole("button", { name: "Mis trabajos", exact: true }).click();
+    await academic.getByLabel("Nombre del trabajo", { exact: true }).fill(`${title} actualizado`);
+    await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
+    await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
+    const retained = await db.altazorAcademicWorkspace.findUniqueOrThrow({ where: { id: workspaceId } });
+    expect(retained.title).toBe(`${title} actualizado`);
+    expect(JSON.parse(retained.sourcesJson)).toEqual(proofs);
     expect(blocked).toEqual([]);
   } finally {
     const books = await db.libraryBook.findMany({ where: { ownerId: { in: userIds } }, select: { id: true } });

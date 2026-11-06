@@ -42,8 +42,12 @@
 .bibliography li>.btn { margin-top:.75rem; }
 .innerDisclosure { margin-top:1rem; padding-top:1rem; border-top:1px solid var(--line); }
 .innerDisclosure summary,.graph summary { cursor:pointer; padding:.75rem 0; min-height:44px; font-weight:500; }
-.innerDisclosure>label,.innerDisclosure>button { margin-block:1rem; }
-.innerDisclosure textarea { resize:vertical; }
+.importForm { display:grid; gap:1rem; min-width:0; }
+.importForm label { min-width:0; }
+.importField { display:grid; gap:.5rem; min-width:0; }
+.importForm textarea { resize:vertical; }
+.importForm input[type=file]::file-selector-button { margin-inline-end:.75rem; }
+.importForm>.error,.importForm>.notice { padding:0; }
 .error { color:var(--danger); padding:.75rem 0 1rem; line-height:1.7; }
 .notice { color:var(--sea); padding:.75rem 0 1rem; line-height:1.7; }
 .network { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.9fr) minmax(0,1fr); gap:1.5rem; margin-block:1.5rem; align-items:start; }
