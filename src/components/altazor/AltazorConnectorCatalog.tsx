@@ -10,6 +10,7 @@ import { connectorFieldPresentation } from "@/lib/altazor/connectors/presentatio
 import type { ConnectorCatalogEntry, ConnectorConnection, ConnectorInventory } from "@/lib/altazor/connectors/types";
 import type { ComputerStatus } from "@/lib/altazor/computer/types";
 import { EasyConnectorOAuth } from "./EasyConnectorOAuth";
+import { EASY_OAUTH_CONNECTOR, EASY_OAUTH_PROVIDERS } from "@/lib/altazor/connectors/easy-oauth-providers";
 import styles from "./AltazorConnectorCatalog.module.css";
 
 const categories = [
@@ -38,10 +39,10 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
     const result = await response.json(); if (!response.ok) throw new Error(result.error || "No se pudieron comprobar las conexiones.");
     setInventory(result.connectors);
   }, [causaId]);
-  useEffect(() => { let active = true; queueMicrotask(() => { if (active) { const params = new URLSearchParams(location.search), provider = params.get("oauthProvider"); if (params.has("oauthAttempt") && ["google", "github"].includes(provider || "")) setSelected(provider === "google" ? "google-workspace" : "github"); void load().catch(cause => { if (active) setError(cause.message); }).finally(() => { if (active) setLoading(false); }); } }); return () => { active = false; }; }, [load]);
+  useEffect(() => { let active = true; queueMicrotask(() => { if (active) { const params = new URLSearchParams(location.search), provider = EASY_OAUTH_PROVIDERS.find(value => value === params.get("oauthProvider")); if (params.has("oauthAttempt") && provider) setSelected(EASY_OAUTH_CONNECTOR[provider]); void load().catch(cause => { if (active) setError(cause.message); }).finally(() => { if (active) setLoading(false); }); } }); return () => { active = false; }; }, [load]);
   const catalog = inventory?.catalog || withoutRuntime;
   const entry = catalog.find(item => item.id === selected);
-  const easyProvider = entry?.id === "google-workspace" ? "google" : entry?.id === "github" ? "github" : null;
+  const easyProvider = EASY_OAUTH_PROVIDERS.find(provider => EASY_OAUTH_CONNECTOR[provider] === entry?.id);
   const activeSession = Boolean(computer?.sessions.some(session => session.requiresStop || ["creating", "starting", "ready", "unknown"].includes(session.state)));
   const filtered = catalog.filter(item => (category === "all" || item.category === category) && `${item.label} ${item.description}`.toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es").trim()));
   const canConfigure = Boolean(computer?.configured && inventory && computer.policyAllowed && !activeSession);
@@ -74,7 +75,7 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
   async function disconnectEasy(connectionName: string, requestId: string) { const result = await mutate(`/${encodeURIComponent(connectionName)}`, { requestId }, "DELETE"); if (result?.operation?.status !== "completed") return false; setConnection(previous => previous?.name === connectionName ? null : previous); return true; }
   return <section className={styles.catalog} aria-labelledby={`${uid}-heading`} data-testid="altazor-connector-catalog">
     <header className={styles.heading}><div><h2 id={`${uid}-heading`}>Su mesa de conexiones</h2><p>Elija las aplicaciones de su trabajo y decida cuándo puede usarlas ALTAZOR.</p></div><Link2 size={25} aria-hidden="true" /></header>
-    <div className={styles.boundary}><ShieldCheck size={22} aria-hidden="true" /><div><p>Las cuentas se conectan al escritorio privado de este espacio. Cada sesión recibe sólo las aplicaciones que usted elija; sus acciones requieren una decisión de uso.</p><p>Sus accesos de <Link href="/cuenta#codex">ChatGPT / Codex</Link>, <Link href="/correo">Correo</Link> y <Link href="/integraciones">Google del estudio</Link> se administran en sus apartados.</p></div></div>
+    <div className={styles.boundary}><ShieldCheck size={22} aria-hidden="true" /><div><p>Las cuentas se conectan al escritorio privado de este espacio. Cada sesión recibe sólo las aplicaciones que usted elija; sus acciones requieren una decisión de uso.</p><p>Los ajustes de la aplicación están en <Link href="/configuracion">Configuración</Link>.</p></div></div>
     {error && <p className={styles.error} role="alert">{error}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
     {loading ? <p role="status">Comprobando su espacio y aplicaciones…</p> : !computer?.configured ? <p className={styles.setup}>Para conectar aplicaciones, configure primero su <a href={`/inicio?altazor=computer${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`}>Computadora de ALTAZOR <ArrowRight size={15} aria-hidden="true" /></a>. Puede explorar aquí las {catalog.length} integraciones disponibles.</p> : <div className={styles.runtime}><span>{inventory?.gateReady ? "Permisos por uso activos" : "El gateway requiere el refuerzo de permisos de LexOpen"}</span><button type="button" disabled={busy} onClick={() => { setError(""); void load().catch(cause => setError(cause.message)); }}><RefreshCw size={16} aria-hidden="true" />Comprobar estado</button></div>}
     {inventory?.operations?.map(operation => <div key={operation.id} className={styles.pending}><p>Hay un cambio de conexión sin confirmar. Revise el estado de la aplicación; reconocerlo aquí no repite ni confirma su resultado.</p><button type="button" disabled={busy} onClick={async () => { const result = await mutate(`/operations/${encodeURIComponent(operation.id)}`, {}); if (result) { await load().catch(() => {}); setNotice("Revisión registrada. La operación anterior no se reenvió."); } }}>Revisé el estado; continuar sin repetir</button></div>)}

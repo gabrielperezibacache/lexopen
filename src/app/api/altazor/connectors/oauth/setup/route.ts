@@ -6,7 +6,8 @@ import { canSome } from "@/lib/auth/permissions";
 import { localSetupAllowed } from "@/lib/altazor/computer/policy";
 import { parseKnowledgeBody } from "@/lib/knowledge/route-body";
 import { easyOAuthSetupStatus, saveEasyOAuthSetup, nativeOAuthActor } from "@/lib/altazor/connectors/easy-oauth";
-const schema = z.object({ provider: z.enum(["google", "github"]), clientId: z.string().trim().min(1).max(1000), clientSecret: z.string().trim().min(1).max(4000), confirmed: z.literal(true) }).strict();
+import { EASY_OAUTH_PROVIDERS } from "@/lib/altazor/connectors/easy-oauth-providers";
+const schema = z.object({ provider: z.enum(EASY_OAUTH_PROVIDERS), clientId: z.string().trim().min(1).max(1000), clientSecret: z.string().trim().min(1).max(4000), confirmed: z.literal(true) }).strict();
 export const runtime = "nodejs";
 async function admin(request: NextRequest, mutation = false) {
   const actor = await connectorActor(request, mutation), user = await nativeOAuthActor(actor);

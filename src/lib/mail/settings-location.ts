@@ -1,4 +1,5 @@
 export const MAIL_SETTINGS_PATH = "/configuracion/correo";
+export const COMMUNICATIONS_SETTINGS_PATH = "/configuracion#comunicaciones";
 
 const oauthResults = new Set(["connected", "error", "invalid_state", "missing_code"]);
 

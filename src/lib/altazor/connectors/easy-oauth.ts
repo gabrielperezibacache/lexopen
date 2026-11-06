@@ -12,8 +12,9 @@ import { normalizeAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { computerOperationHash } from "../computer/operation-hash";
 import { configureConnector, connectorInventory, testConnector } from "./service";
 
-export const EASY_OAUTH_PROVIDERS = ["google", "github"] as const;
-export type EasyOAuthProvider = typeof EASY_OAUTH_PROVIDERS[number];
+import { EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth-providers";
+
+export { EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth-providers";
 type Client = typeof prisma | Prisma.TransactionClient;
 type Options = { env?: Readonly<Record<string, string | undefined>>; fetcher?: typeof fetch };
 const prefix = "altazor-desktop:", callbackPath = "/api/altazor/connectors/oauth/callback";
@@ -21,6 +22,7 @@ const setupReason = "El administrador debe habilitar esta conexión en LexOpen u
 const specifications = {
   google: { label: "Google Workspace", kind: "google-workspace", scopes: ["https://www.googleapis.com/auth/drive.metadata.readonly"], authorize: "https://accounts.google.com/o/oauth2/v2/auth", token: "https://oauth2.googleapis.com/token", registrationUrl: "https://console.cloud.google.com/auth/clients" },
   github: { label: "GitHub", kind: "github", scopes: ["read:user"], authorize: "https://github.com/login/oauth/authorize", token: "https://github.com/login/oauth/access_token", registrationUrl: "https://github.com/settings/developers" },
+  dropbox: { label: "Dropbox", kind: "dropbox", scopes: ["account_info.read", "files.content.read", "files.metadata.read"], authorize: "https://www.dropbox.com/oauth2/authorize", token: "https://api.dropboxapi.com/oauth2/token", registrationUrl: "https://www.dropbox.com/developers/apps" },
 } as const;
 type Config = { provider: EasyOAuthProvider; clientId: string; clientSecret: string; origin: string; redirectUri: string; configured: boolean; source: "environment" | "saved" | "none"; reason: string | null };
 type Binding = { workspaceId: string; workspaceBinding: string; configurationBinding: string; connectionName: string; causaId: string | null; state: string; verifier: string; nonce: string };
@@ -128,6 +130,7 @@ export async function startEasyOAuth(actor: ConnectorActor, input: { workspaceId
   });
   const params = new URLSearchParams({ response_type: "code", client_id: config.clientId, redirect_uri: config.redirectUri, state: binding.state, scope: spec.scopes.join(" "), code_challenge: createHash("sha256").update(binding.verifier).digest("base64url"), code_challenge_method: "S256" });
   if (input.provider === "google") { params.set("access_type", "online"); params.set("include_granted_scopes", "false"); params.set("prompt", "consent"); }
+  if (input.provider === "dropbox") params.set("token_access_type", "online");
   return { attemptId: attempt.id, provider: input.provider, authUrl: `${spec.authorize}?${params}`, expiresAt: attempt.expiresAt.toISOString() };
 }
 async function providerJson(url: string, init: RequestInit, fetcher: typeof fetch) {
@@ -141,6 +144,15 @@ async function providerJson(url: string, init: RequestInit, fetcher: typeof fetc
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error();
     return body as Record<string, unknown>;
   } catch { throw new ConnectorError("oauth_provider_rejected", "El servicio no confirmó la autorización. Inicie una conexión nueva.", 502); }
+}
+async function verifyProviderAccount(provider: EasyOAuthProvider, headers: Record<string, string>, fetcher: typeof fetch) {
+  if (provider === "dropbox") {
+    const account = await providerJson("https://api.dropboxapi.com/2/users/get_current_account", { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: "null" }, fetcher);
+    return account.account_id;
+  }
+  if (provider === "github") return (await providerJson("https://api.github.com/user", { headers }, fetcher)).id;
+  const account = await providerJson("https://www.googleapis.com/drive/v3/about?fields=user(permissionId)", { headers }, fetcher);
+  return account.user && typeof account.user === "object" ? (account.user as Record<string, unknown>).permissionId : null;
 }
 export async function receiveEasyOAuth(actor: ConnectorActor, input: { state: string; code?: string; denied?: boolean }, origin: string, options: Options = {}) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(input.state)) throw new ConnectorError("invalid_state", "El intento no puede verificarse.");
@@ -159,11 +171,12 @@ export async function receiveEasyOAuth(actor: ConnectorActor, input: { state: st
     const scopes = typeof tokens.scope === "string" ? [...new Set(tokens.scope.split(/[\s,]+/).filter(Boolean))].sort() : [];
     if (scopes.length !== spec.scopes.length || scopes.some((scope, index) => scope !== [...spec.scopes].sort()[index]) || typeof tokens.access_token !== "string" || !tokens.access_token || tokens.access_token.length > 16000 || /[\r\n]/.test(tokens.access_token) || String(tokens.token_type).toLowerCase() !== "bearer") throw new ConnectorError("oauth_scope_mismatch", "El servicio no confirmó exactamente los permisos de lectura solicitados.", 409);
     const ttl = tokens.expires_in;
-    if ((provider === "google" || ttl !== undefined) && (typeof ttl !== "number" || !Number.isFinite(ttl) || ttl < 60 || ttl > 366 * 86400)) throw new ConnectorError("oauth_expiry_invalid", "El servicio no confirmó una vigencia válida.", 409);
+    if ((provider !== "github" || ttl !== undefined) && (typeof ttl !== "number" || !Number.isFinite(ttl) || ttl < 60 || ttl > 366 * 86400)) throw new ConnectorError("oauth_expiry_invalid", "El servicio no confirmó una vigencia válida.", 409);
     const expiresAt = typeof ttl === "number" ? new Date(Date.now() + ttl * 1000) : null;
-    const identity = await providerJson(provider === "google" ? "https://www.googleapis.com/drive/v3/about?fields=user(permissionId)" : "https://api.github.com/user", { headers: { Authorization: `Bearer ${tokens.access_token}`, Accept: "application/json" } }, fetcher);
-    const subject = provider === "google" && identity.user && typeof identity.user === "object" ? (identity.user as Record<string, unknown>).permissionId : provider === "github" ? identity.id : null;
+    const headers = { Authorization: `Bearer ${tokens.access_token}`, Accept: "application/json" };
+    const subject = await verifyProviderAccount(provider, headers, fetcher);
     if ((typeof subject !== "string" && typeof subject !== "number") || !String(subject).trim() || String(subject).length > 200) throw new ConnectorError("oauth_identity_invalid", "No se pudo comprobar esta autorización de lectura.", 409);
+    if (provider === "dropbox" && (typeof tokens.account_id !== "string" || !constantEqual(tokens.account_id, String(subject)))) throw new ConnectorError("oauth_identity_invalid", "Dropbox no confirmó la misma cuenta autorizada.", 409);
     const currentConfig = requireConfig(await configFor(provider, options)), current = await access(actor, workspace.id);
     if (appBinding(actor, workspace.id, currentConfig) !== binding.configurationBinding || workspaceBinding(current.workspace) !== binding.workspaceBinding) throw new ConnectorError("oauth_binding_changed", "La configuración cambió durante la autorización.", 409);
     // Lock the operator configuration and attempt through the one outbound save. A
@@ -228,9 +241,10 @@ export async function easyOAuthStatus(actor: ConnectorActor, workspaceId: string
   for (const provider of EASY_OAUTH_PROVIDERS) {
     const config = await configFor(provider, options), name = easyConnectionName(actor.id, workspace.id, provider), account = await prisma.personalConnectorAccount.findUnique({ where: { ownerId_provider: { ownerId: actor.id, provider: accountProvider(workspace.id, provider) } } });
     const saved = inventory?.connections.find(connection => connection.name === name && connection.kind === specifications[provider].kind);
+    const dropboxReady = provider !== "dropbox" || Boolean(inventory?.gateReady && inventory.catalog.find(entry => entry.id === "dropbox")?.available);
     const hasStoredConnection = Boolean(saved), canDisconnect = hasStoredConnection && Boolean(inventory?.gateReady) && !active;
     let state: EasyOAuthStatus["providers"][number]["state"] = config.configured ? "idle" : "blocked", tested = false, reason = config.reason;
-    if (config.configured && account) {
+    if (config.configured && dropboxReady && account) {
       try {
         const proof = unseal<ConnectionProof>(account.credentialsEnc || "", proofContext(actor.id, account.id));
         if (account.status !== "connected" || account.clientId !== config.clientId || proof.workspaceBinding !== workspaceBinding(workspace) || proof.connectionName !== name) throw new Error();
@@ -248,7 +262,8 @@ export async function easyOAuthStatus(actor: ConnectorActor, workspaceId: string
       } catch { state = "reconnect_required"; reason = "Compruebe el computador y vuelva a conectar esta aplicación."; }
     }
     if (attemptView?.provider === provider && ["pending", "exchanging"].includes(attemptView.state) && state !== "connected") state = "pending";
-    providers.push({ provider, label: specifications[provider].label, available: config.configured, reason, scopes: [...specifications[provider].scopes], connectionName: name, state, connected: state === "connected", tested, hasStoredConnection, canDisconnect, expiresAt: account?.expiresAt?.toISOString() || null, lastVerifiedAt: account?.lastVerifiedAt?.toISOString() || null });
+    if (config.configured && !dropboxReady) { state = "blocked"; reason = "Actualice el escritorio de Altazor para conectar Dropbox con permisos de lectura."; }
+    providers.push({ provider, label: specifications[provider].label, available: config.configured && dropboxReady, reason, scopes: [...specifications[provider].scopes], connectionName: name, state, connected: state === "connected", tested: dropboxReady && tested, hasStoredConnection, canDisconnect, expiresAt: account?.expiresAt?.toISOString() || null, lastVerifiedAt: account?.lastVerifiedAt?.toISOString() || null });
   }
   return { workspaceId, causaId: workspace.causaId, canAdmin: canSome(user, "host.admin"), requiresStop: Boolean(active), providers, ...(attemptView ? { attempt: attemptView } : {}) };
 }

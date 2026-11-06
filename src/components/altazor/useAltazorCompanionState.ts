@@ -29,15 +29,22 @@ export function useAltazorCompanionState() {
   const [preference, setPreference] = useState<CompanionPreference>({ activeConversationId: null, memoryEnabled: true, backgroundEnabled: true, revision: 0, selectionUnavailable: false });
   const preferenceWrites = useRef<Promise<unknown>>(Promise.resolve());
   const [preferenceSaving, setPreferenceSaving] = useState(false);
+  const [preferenceError, setPreferenceError] = useState("");
   const preferencePending = useRef(0);
   function savePreference(changes: Partial<Pick<CompanionPreference, "activeConversationId" | "memoryEnabled" | "backgroundEnabled">>) {
+    const isSetting = changes.memoryEnabled !== undefined || changes.backgroundEnabled !== undefined;
+    if (isSetting) setPreferenceError("");
     preferencePending.current++; setPreferenceSaving(true);
     setPreference(previous => ({ ...previous, ...changes }));
     preferenceWrites.current = preferenceWrites.current.catch(() => {}).then(async () => {
       const current = await request<CompanionPreference>("/api/altazor/companion");
       const next = await request<CompanionPreference>("/api/altazor/companion", { ...changes, expectedRevision: current.revision }, "PATCH");
       setPreference(next); return next;
-    }).catch(async reason => { setError(reason instanceof Error ? reason.message : "No se pudo guardar la preferencia"); await request<CompanionPreference>("/api/altazor/companion").then(setPreference).catch(() => {}); }).finally(() => { preferencePending.current--; if (!preferencePending.current) setPreferenceSaving(false); });
+    }).catch(async reason => {
+      const message = reason instanceof Error ? reason.message : "No se pudo guardar la preferencia";
+      if (isSetting) setPreferenceError(message); else setError(message);
+      await request<CompanionPreference>("/api/altazor/companion").then(setPreference).catch(() => {});
+    }).finally(() => { preferencePending.current--; if (!preferencePending.current) setPreferenceSaving(false); });
     return preferenceWrites.current;
   }
   const conversationRequest = useRef(createSubmissionKeys()), turnRequest = useRef(createSubmissionKeys()), input = useRef<HTMLInputElement>(null), textarea = useRef<HTMLTextAreaElement>(null), drafts = useRef(new Map<string, string>()), liveId = useRef("");
@@ -144,10 +151,13 @@ export function useAltazorCompanionState() {
     finally { setBusy(false); }
   }
   async function upload(files: FileList | null) {
-    if (!files?.length || uploading || busy) return; setUploading(true); setError("");
+    if (!files?.length || uploading || busy) return;
+    // Clipboard and drag data are only readable while the browser dispatches the event.
+    const selectedFiles = Array.from(files);
+    setUploading(true); setError("");
     try {
       const id = await ensureConversation(); if (!id) return;
-      for (const file of Array.from(files)) {
+      for (const file of selectedFiles) {
         const form = new FormData(); form.append("file", file); form.append("requestId", operationKey());
         const response = await fetch(`/api/altazor/conversations/${id}/attachments`, { method: "POST", headers: withCsrfHeaders(), body: form }), result = await response.json();
         if (!response.ok) throw new Error(result.error || `No se pudo preparar ${file.name}`);
@@ -187,5 +197,5 @@ export function useAltazorCompanionState() {
     }).catch(reason=>{if(!controller.signal.aborted)setError(reason.message);});
     return()=>controller.abort();
   }
-  return { linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, preference, preferenceSaving, savePreference,synchronizeLocation };
+  return { linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, preference, preferenceSaving, preferenceError, savePreference,synchronizeLocation };
 }

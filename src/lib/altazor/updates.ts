@@ -12,12 +12,13 @@ const deadlineTypes = ["plazo.normal", "plazo.fatal", "plazo.fatal.escalamiento"
 
 export type AltazorUpdate = {
   id: string;
-  kind: "court-mail" | "deadline";
+  kind: "court-mail" | "deadline" | "daily-brief";
   title: string;
   message: string;
   occurredAt: string;
   href: string;
   dueAt?: string;
+  mailHref?: string;
 };
 
 /** Project private, already recorded events. This reader does not sync or send anything. */
@@ -28,7 +29,7 @@ export async function readAltazorUpdates(user: CausaAccessUser, client: PrismaCl
   const range = civilSpanQueryRange(today, addCivilDays(today, 7));
   return client.$transaction(async (tx) => {
     const actor = await altazorActor(user, tx);
-    const [mail, notices, urgentDeadlines] = await Promise.all([
+    const [mail, notices, urgentDeadlines, brief] = await Promise.all([
       tx.mailboxMessage.findMany({
         where: {
           userId: actor.id,
@@ -55,6 +56,10 @@ export async function readAltazorUpdates(user: CausaAccessUser, client: PrismaCl
         select: { id: true, createdAt: true, fechaLimite: true },
         orderBy: [{ fechaLimite: "asc" }, { id: "asc" }],
         take: limit,
+      }),
+      tx.altazorDailyBrief.findUnique({
+        where: { ownerId_day: { ownerId: actor.id, day: today } },
+        select: { createdAt: true },
       }),
     ]);
     const noticeIds = [...new Set(notices.flatMap((notice) => notice.entityId ? [notice.entityId] : []))];
@@ -106,8 +111,32 @@ export async function readAltazorUpdates(user: CausaAccessUser, client: PrismaCl
         dueAt,
       });
     }
+    const recentMail = brief ? updates.filter(update => update.kind === "court-mail" && Date.parse(update.occurredAt) >= now.getTime() - 86_400_000).length : 0;
+    const dailyBrief: AltazorUpdate | null = brief ? {
+      id: `daily-brief:${today}`,
+      kind: "daily-brief",
+      title: "Resumen de hoy",
+      message: summaryText(
+        new Set([...urgentIds, ...alreadyAnnounced]).size,
+        recentMail,
+        mail.length === candidateLimit || notices.length === candidateLimit || urgentDeadlines.length === limit,
+      ),
+      occurredAt: brief.createdAt.toISOString(),
+      href: `/plazos?mes=${today.slice(0, 7)}`,
+      ...(recentMail ? { mailHref: "/correo" } : {}),
+    } : null;
     const chronological = (a: AltazorUpdate, b: AltazorUpdate) => b.occurredAt.localeCompare(a.occurredAt) || b.id.localeCompare(a.id);
     updates.sort((a, b) => Number(priorityUpdates.has(b.id)) - Number(priorityUpdates.has(a.id)) || chronological(a, b));
-    return { updates: updates.slice(0, limit).sort(chronological) };
+    const latest = updates.slice(0, limit);
+    if (dailyBrief) latest.push(dailyBrief);
+    return { updates: latest.sort(chronological) };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+}
+
+function summaryText(deadlines: number, mail: number, limited: boolean) {
+  if (!deadlines && !mail) return "Entre tus avisos recientes no encontré plazos pendientes ni correo judicial nuevo para revisar.";
+  const counts = [];
+  if (deadlines) counts.push(deadlines === 1 ? "1 plazo pendiente para revisar" : `${deadlines} plazos pendientes para revisar`);
+  if (mail) counts.push(mail === 1 ? "1 correo judicial registrado en las últimas 24 horas" : `${mail} correos judiciales registrados en las últimas 24 horas`);
+  return `Entre tus avisos recientes encontré ${limited ? "al menos " : ""}${counts.join(" y ")}.`;
 }

@@ -3,7 +3,7 @@ import { endpointFor } from "./policy";
 import type { ComputerFile, ComputerTurn } from "./types";
 import type { PersonInput } from "./policy";
 import { CONNECTOR_GATE, connectorKind } from "../connectors/catalog";
-import { connectorConfigBody, connectorNameSchema, normalizeConnectorNames, projectConnectorSettings, validateConnectorConfiguration } from "../connectors/policy";
+import { assertGatewayOAuthAllowed, connectorConfigBody, connectorNameSchema, normalizeConnectorNames, projectConnectorSettings, validateConnectorConfiguration } from "../connectors/policy";
 import type { ConnectorApproval, ConnectorConfiguration } from "../connectors/types";
 
 type Fetcher = typeof fetch;
@@ -52,7 +52,10 @@ export class KittiesGateway {
   }
   async kitty(id: string, name: string, provider: string, connectors: readonly string[] = ["-"]) { const result = await this.json(`/v1/kitties/${safeId(id)}`); const kitty = this.validateKitty(result.kitty, name, provider, connectors); if (id !== name && kitty.id !== id) throw new ConnectorError("kitty_contract", "El gateway devolvió otro escritorio.", 502); return kitty; }
   async requireConnectorGate() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_connector_gate !== CONNECTOR_GATE) throw new ConnectorError("connector_gate_required", "El gateway necesita el refuerzo de permisos de LexOpen para usar conexiones.", 409); }
-  async connectorSettings() { const health = await this.json("/v1/health"); return projectConnectorSettings(await this.json("/v1/settings"), health.lexopen_connector_gate === CONNECTOR_GATE && ["darwin", "linux", "windows"].includes(String(health.lexopen_connector_platform)) ? String(health.lexopen_connector_platform) : "unknown"); }
+  async connectorSettings() {
+    const health = await this.json("/v1/health"), hardened = health.lexopen_connector_gate === CONNECTOR_GATE;
+    return projectConnectorSettings(await this.json("/v1/settings"), hardened && ["darwin", "linux", "windows"].includes(String(health.lexopen_connector_platform)) ? String(health.lexopen_connector_platform) : "unknown", hardened && health.lexopen_dropbox_read_gate === true);
+  }
   async setConnector(name: string, value: ConnectorConfiguration) {
     connectorNameSchema.parse(name); const input = validateConnectorConfiguration(value);
     return projectConnectorSettings(await this.json(`/v1/settings/connectors/${safeId(name)}${input.signIn ? "?sign_in=1" : ""}`, "PUT", connectorConfigBody(input)));
@@ -66,6 +69,7 @@ export class KittiesGateway {
   async connectorOAuth(name: string) {
     connectorNameSchema.parse(name);
     const settings = await this.json("/v1/settings"), projected = projectConnectorSettings(settings), connection = projected.connections.find(row => row.name === name);
+    assertGatewayOAuthAllowed(connection?.kind);
     const kind = connection && connectorKind(connection.kind);
     if (!kind?.oauth) throw new ConnectorError("connector_oauth", "Esta conexión no ofrece inicio de sesión OAuth.", 409);
     const raw = (settings.connectors as Record<string, unknown>[]).find(row => row.name === name);
@@ -73,7 +77,7 @@ export class KittiesGateway {
     const result = await this.json(`/v1/oauth/${safeId(name)}/start`, "POST", {});
     let url: URL, redirect: URL;
     try { url = new URL(String(result.url)); redirect = new URL(String(result.redirect)); } catch { throw new ConnectorError("connector_oauth_contract", "El gateway no confirmó un ingreso oficial.", 502); }
-    const hosts: Record<string, string[]> = { google: ["accounts.google.com"], microsoft: ["login.microsoftonline.com"], slack: ["slack.com"], github: ["github.com"], spotify: ["accounts.spotify.com"], tidal: ["login.tidal.com"], dropbox: ["www.dropbox.com"], notion: ["api.notion.com"], todoist: ["todoist.com"], linear: ["linear.app"], airtable: ["airtable.com"], figma: ["www.figma.com"], atlassian: ["auth.atlassian.com"], x: ["x.com"], linkedin: ["www.linkedin.com"], facebook: ["www.facebook.com"] };
+    const hosts: Record<string, string[]> = { google: ["accounts.google.com"], microsoft: ["login.microsoftonline.com"], slack: ["slack.com"], github: ["github.com"], spotify: ["accounts.spotify.com"], tidal: ["login.tidal.com"], notion: ["api.notion.com"], todoist: ["todoist.com"], linear: ["linear.app"], airtable: ["airtable.com"], figma: ["www.figma.com"], atlassian: ["auth.atlassian.com"], x: ["x.com"], linkedin: ["www.linkedin.com"], facebook: ["www.facebook.com"] };
     let allowed = hosts[kind.oauth]?.includes(url.hostname) === true;
     if (["mastodon", "gitlab", "home-assistant"].includes(kind.oauth)) {
       try { allowed = url.origin === new URL(String(fields.url || raw?.url || (kind.oauth === "gitlab" ? "https://gitlab.com" : ""))).origin; } catch { allowed = false; }
@@ -110,6 +114,7 @@ export class KittiesGateway {
     const pending = await this.pendingApprovals(kittyId, chatId, connectors);
     const selected = pending.find(row => row.id === id);
     if (!selected) throw new ConnectorError("connector_approval_missing", "La autorización ya cambió o no pertenece a esta sesión.", 409);
+    if (approve && selected.kind === "dropbox" && !(connectorKind("dropbox")?.actions as readonly string[]).includes(selected.action)) throw new ConnectorError("connector_action_unavailable", "Dropbox sólo permite listar, buscar y leer archivos.", 409);
     if (approve && !selected.reviewable) throw new ConnectorError("connector_approval_incomplete", "El detalle contiene datos ocultos o excede el límite de revisión. Rechácelo y revise la operación directamente en la aplicación.", 409);
     const result = await this.json(`/v1/approvals/${safeId(id)}/${approve ? "approve" : "reject"}`, "POST", approve ? { always: false } : { reason: "La persona rechazó esta operación en LexOpen.", always: false });
     const approval = result.approval as Record<string, unknown> | undefined;

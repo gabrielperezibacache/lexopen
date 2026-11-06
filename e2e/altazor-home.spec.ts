@@ -140,7 +140,39 @@ test("ALTAZOR conserva conversación, adjuntos y fuentes; errores y paneles pres
   expect((await page.request.get(`/api/altazor/conversations/${id}/attachments/${attached.id}/original`)).status()).toBe(404);
   expect((await page.request.get(`/api/books/${book.id}`)).status()).toBe(200);expect(await db.libraryBook.count({where:{id:book.id,ownerId:user.id,deletedAt:null}})).toBe(1);
   await page.setViewportSize({width:360,height:800});await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(page.getByTestId("inicio-composer")).toBeVisible();
-  for(const name of ["Conversación","Memoria","Conexiones","Computadora"]){const tab=page.locator(".altazor-tabs").getByRole("button",{name,exact:true});await tab.focus();await expect(tab).toBeInViewport();expect(await tab.locator("span").evaluate(label=>{const text=label.getBoundingClientRect(),button=label.closest("button")!.getBoundingClientRect();return text.left>=Math.max(0,button.left)-1&&text.right<=Math.min(innerWidth,button.right)+1;}),`El destino ${name} debe conservar su etiqueta completa a 360px`).toBe(true);}
+  for(const name of ["Conversación","Memoria","Computadora"]){const tab=page.locator(".altazor-tabs").getByRole("button",{name,exact:true});await tab.focus();await expect(tab).toBeInViewport();expect(await tab.locator("span").evaluate(label=>{const text=label.getBoundingClientRect(),button=label.closest("button")!.getBoundingClientRect();return text.left>=Math.max(0,button.left)-1&&text.right<=Math.min(innerWidth,button.right)+1;}),`El destino ${name} debe conservar su etiqueta completa a 360px`).toBe(true);}
+  await expect(page.getByRole("link", { name: "Configurar Altazor" })).toHaveAttribute("href", "/configuracion#preferencias-altazor");
+});
+
+test("pegar un documento lo adjunta sin enviar el borrador a la IA", async ({ page }) => {
+  const owner = await fixture();
+  await loginAs(page, owner.email);
+  const composer = page.getByTestId("inicio-composer");
+  const draft = "Borrador para revisar después";
+  const content = "Texto ficticio para comprobar el adjunto.";
+  const before = modelRequests.length;
+  await composer.fill(draft);
+  expect(await composer.evaluate(editor => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "Texto para pegar");
+    return editor.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  })).toBe(true);
+  const accepted = await composer.evaluate((editor, value) => {
+    const data = new DataTransfer();
+    data.items.add(new File([value], "archivo-pegado.txt", { type: "text/plain" }));
+    const prevented = !editor.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    data.items.clear();
+    return prevented;
+  }, content);
+  expect(accepted).toBe(true);
+  await expect(page.getByRole("button", { name: "No adjuntar archivo-pegado.txt" })).toBeVisible();
+  await expect(composer).toHaveValue(draft);
+  const id = chatId(page);
+  const chat = await readChat(page, id);
+  expect(chat.turns).toHaveLength(0);
+  expect(chat.attachments).toHaveLength(1);
+  expect(chat.attachments[0].sourceSha256).toBe(sha(content));
+  expect(modelRequests.length).toBe(before);
 });
 
 test("Inicio recibe otra consulta en la misma ruta y conserva el chat anterior sin enviar ni mezclar causas",async({page})=>{

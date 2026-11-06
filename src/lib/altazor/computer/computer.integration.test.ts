@@ -8,7 +8,7 @@ import { completeLinkedInOAuth, publicLinkedInAccount, receiveLinkedInCallback }
 import { closeComputerSession, computerScreenshot, configureComputer, controlComputer, createComputerSession, inputComputer, readComputerActivity, readComputerSession, sendComputerMessage } from "./service";
 
 type KittyFixture = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
-type TurnFixture = { from: string; text: string; working?: boolean };
+type TurnFixture = { from: string; text: string; working?: boolean; needs_help?: boolean; steps?: { action: string }[] };
 const hasStatus = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
 const fixtureFrame = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7ioAAAAASUVORK5CYII=", "base64");
 async function main() {
@@ -69,6 +69,18 @@ async function main() {
     const healthBeforePreview = await prisma.altazorComputerWorkspace.findUniqueOrThrow({ where: { id: configured.workspaceId }, select: { updatedAt: true, lastVerifiedAt: true } });
     assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "ready", sessionId: first.id, monitor: true });
     assert.deepEqual(await readComputerActivity(owner, null, first.id), { state: "ready", sessionId: first.id, monitor: true, causaId: cause.id });
+    const chat = [...chats.values()][0];
+    const turn: TurnFixture = { from: "fixture-kitty", text: "Petición privada que no debe salir en la vista de actividad", working: true, steps: [{ action: "ask_help" }] };
+    chat.turns.push(turn);
+    assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "help", sessionId: first.id, monitor: true });
+    turn.steps?.push({ action: "helped" });
+    assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "working", sessionId: first.id, monitor: true });
+    turn.working = false;
+    turn.needs_help = true;
+    assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "help", sessionId: first.id, monitor: true });
+    chat.turns.push({ from: "user", text: "Continuemos", working: true });
+    assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "working", sessionId: first.id, monitor: true });
+    chat.turns.length = 0;
     assert.deepEqual(await computerScreenshot(owner, first.id, true), fixtureFrame);
     assert.equal(mutations, beforePreviewWrites, "watching a desktop does not operate it");
     assert.deepEqual(await prisma.altazorComputerWorkspace.findUniqueOrThrow({ where: { id: configured.workspaceId }, select: { updatedAt: true, lastVerifiedAt: true } }), healthBeforePreview);

@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { Mail } from "lucide-react";
 import type { ReactNode } from "react";
-import { requireRole } from "@/lib/auth/session";
+import { requireStaff } from "@/lib/auth/session";
+import { can, canSome } from "@/lib/auth/permissions";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { getI18n } from "@/lib/i18n/server";
 import { TranscriptionSettings } from "@/components/audio/TranscriptionSettings";
@@ -25,15 +25,18 @@ import { getHostStatus } from "@/lib/host-status";
 import { buildPjudOpsLog } from "@/lib/pjud/ops-log";
 import styles from "@/components/config/WorkspaceArea.module.css";
 import { CaseManagementSettings } from "@/components/config/CaseManagementSettings";
-import { getCaseManagementMode } from "@/lib/causas/management-mode";
+import { getCaseManagementMode, type CaseManagementMode } from "@/lib/causas/management-mode";
 import { MAIL_SETTINGS_PATH } from "@/lib/mail/settings-location";
+import { showCommunications, workCountryOptions, type WorkCountry } from "@/lib/config/countries";
+import { getWorkCountry } from "@/lib/config/work-country";
+import { WorkCountrySettings } from "@/components/config/WorkCountrySettings";
+import { AltazorPreferencesPanel } from "@/components/config/AltazorPreferencesPanel";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { firmFormSelect } from "@/lib/config/firm-form-fields";
 
-export default async function ConfiguracionPage() {
-  const me = await requireRole("admin");
-  const { dict, locale, t } = await getI18n();
-  const h = dict.hubs.configuracion;
+async function adminSections(userId: string, mode: CaseManagementMode, country: WorkCountry | null, locale: "es" | "en", canSetCountry: boolean): Promise<Record<string, ReactNode>> {
   const [organization, hostStatus, users, groups] = await Promise.all([
-    prisma.organization.findFirst({ include: { settings: true } }),
+    prisma.organization.findFirst({ select: firmFormSelect }),
     getHostStatus(),
     prisma.user.findMany({
       include: {
@@ -49,10 +52,19 @@ export default async function ConfiguracionPage() {
   ]);
   const settingsOrganization =
     organization ||
-    (await prisma.organization.create({ data: {}, include: { settings: true } }));
+    (await prisma.organization.create({ data: {}, select: firmFormSelect }));
 
-  const settings = settingsOrganization.settings;
-  const caseManagementMode = await getCaseManagementMode();
+  const settings = await prisma.firmSettings.findUnique({
+    where: { organizationId: settingsOrganization.id },
+    select: {
+      claveUnicaLastSyncAt: true,
+      claveUnicaLastSyncStatus: true,
+      claveUnicaLastSyncNote: true,
+      pjudDigestLastAt: true,
+      pjudDigestLastStatus: true,
+      pjudDigestLastNote: true,
+    },
+  });
   const pjudOpsLog = buildPjudOpsLog({
     generatedAt: hostStatus.generatedAt,
     honesty: hostStatus.pjud.honesty,
@@ -79,12 +91,12 @@ export default async function ConfiguracionPage() {
     failedJobs: hostStatus.pjud.failedJobs,
   });
 
-  const sections: Record<string, ReactNode> = {
-    idioma: <div id="idioma"><LanguageSettingsPanel /></div>,
+  return {
     estudio: <FirmSettingsForm organization={settingsOrganization} />,
-    "case-management-settings": <CaseManagementSettings initialMode={caseManagementMode} />,
+    "work-country": canSetCountry ? <WorkCountrySettings initial={country} locale={locale} options={workCountryOptions(locale)} /> : undefined,
+    "case-management-settings": <CaseManagementSettings initialMode={mode} />,
     usuarios: <UsersAdminPanel
-        currentUserId={me.id}
+        currentUserId={userId}
         users={users.map((u) => ({
           id: u.id,
           name: u.name,
@@ -123,18 +135,58 @@ export default async function ConfiguracionPage() {
     "host-status": <HostStatusPanel status={hostStatus} />,
     "purge-demo": <PurgeDemoPanel />,
   };
+}
+
+export default async function ConfiguracionPage() {
+  const user = await requireStaff();
+  const [{ dict, locale, t }, mode, country] = await Promise.all([getI18n(), getCaseManagementMode(), getWorkCountry()]);
+  const h = dict.hubs.configuracion;
+  const canManage = can(user, "host.admin");
+  const canSetCountry = canManage && user.role === "admin";
+  const visibility = { canManage, canSetCountry, assistant: canSome(user, "assistant.use"), communications: showCommunications(country, mode) };
+  const categories = configCategoriesForMode(mode, visibility);
+  const tr = (es: string, en: string) => locale === "en" ? en : es;
+  const sections: Record<string, ReactNode> = {
+    ...(canManage ? await adminSections(user.id, mode, country, locale, canSetCountry) : {}),
+    idioma: <div id="idioma"><LanguageSettingsPanel /></div>,
+    apariencia: <section id="apariencia" className="panel space-y-3 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold">{tr("Apariencia de LexOpen", "LexOpen appearance")}</h3>
+        <ThemeToggle />
+      </div>
+      <Link className="btn btn-ghost" href="/biblioteca?personalizar=1">{tr("Personalizar biblioteca", "Personalize library")}</Link>
+    </section>,
+    "cuenta-personal": <section id="cuenta-personal" className="panel space-y-3 p-5">
+      <h3 className="text-lg font-semibold">{tr("Tu cuenta", "Your account")}</h3>
+      <div className="flex flex-wrap gap-2">
+        <Link className="btn btn-secondary" href="/cuenta">{tr("Contraseña y verificación", "Password and verification")}</Link>
+        <Link className="btn btn-ghost" href="/cuenta/notificaciones">{tr("Mis notificaciones", "My notifications")}</Link>
+        <Link className="btn btn-ghost" href="/sincronizacion">{tr("Archivos y Google Drive", "Files and Google Drive")}</Link>
+        <Link className="btn btn-ghost" href="/cuenta/feedback">Feedback</Link>
+      </div>
+    </section>,
+    "preferencias-altazor": visibility.assistant ? <AltazorPreferencesPanel locale={locale} /> : undefined,
+    comunicaciones: visibility.communications ? <section id="comunicaciones" className="panel space-y-3 p-5">
+      <h3 className="text-lg font-semibold">{tr("Correo y mensajes", "Mail and messages")}</h3>
+      <p className="max-w-prose text-sm text-[var(--ink-soft)]">{tr("Conecta tu buzón para revisar avisos judiciales y vincularlos a tus causas.", "Connect your mailbox to review court notices and link them to your matters.")}</p>
+      <div className="flex flex-wrap gap-2">
+        <Link className="btn btn-secondary" href={MAIL_SETTINGS_PATH}>{t("mailbox.openSettings")}</Link>
+        <Link className="btn btn-ghost" href="/correo">{t("mailbox.openInbox")}</Link>
+        <Link className="btn btn-ghost" href="/mensajes">{t("nav.messages")}</Link>
+      </div>
+    </section> : undefined,
+  };
 
   return (
     <div className={`${styles.area} space-y-6`} data-settings-workspace>
       <ModuleHeader
         eyebrow={h.eyebrow}
-        title={h.title}
-        subtitle={h.subtitle}
-        actions={<Link className="btn btn-secondary" href={MAIL_SETTINGS_PATH}><Mail size={16} aria-hidden="true" /> {t("mailbox.openSettings")}</Link>}
+        title={canManage ? h.title : dict.nav.settings}
+        subtitle={canManage ? h.subtitle : tr("Ajusta tu cuenta, tus avisos y las herramientas que usas.", "Adjust your account, notifications and tools.")}
       />
-      <ConfigSectionNav mode={caseManagementMode} />
+      <ConfigSectionNav categories={categories} />
       <div className={styles.groups}>
-        {configCategoriesForMode(caseManagementMode).map(category => (
+        {categories.map(category => (
           <section key={category.id} className={styles.group} aria-labelledby={`settings-${category.id}-title`}>
             <header className={styles.groupHeader}>
               <h2 id={`settings-${category.id}-title`}>{locale === "en" ? category.labelEn : category.label}</h2>

@@ -37,6 +37,10 @@ Esta versión es **preliminar**. Los instaladores de Windows y macOS carecen de 
 
 Google Drive, correo y la integración judicial chilena se activan cuando el estudio los necesita. Altazor, su escritorio, la transcripción y los modelos locales tienen su propia preparación. [Conectar archivos y causas](docs/SINCRONIZACION.md) · [Preparar el escritorio de Altazor](docs/ESCRITORIO-ALTAZOR.md)
 
+En **Configuración** se reúnen tus preferencias y los ajustes del estudio. En la versión de desarrollo, **Comunicaciones** aparece allí al elegir Chile como país de trabajo o al activar las herramientas del PJUD.
+
+La **campanita** muestra los avisos recientes y los que quedan por leer. Desde allí puedes revisar un aviso o abrir el historial. Los avisos críticos mantienen su confirmación de recepción por separado.
+
 ## Recorrido por la aplicación
 
 ### Mis Causas
@@ -65,6 +69,8 @@ Crea un trabajo para investigar, escribir o enseñar. Reúne bibliografía y pas
 
 Habla con Altazor desde **Inicio** o desde el acompañante lateral. Comparte el archivo de la causa que quieres revisar y retoma el trabajo desde el mismo hilo. Altazor recupera el contexto al que tienes acceso y te pide revisar los cambios que prepara. Debajo del chat puedes observar el escritorio cuando haya una sesión activa. [Guía de Altazor](docs/ALTAZOR.md) · [Conexiones y secretos](docs/ALTAZOR-CONEXIONES.md)
 
+En la versión de desarrollo puedes pegar un documento directamente en el chat, abrir una solicitud de ayuda del escritorio y activar desde **Mi cuenta** un resumen privado de plazos y correo judicial recibido.
+
 <details>
 <summary>Más capturas de la aplicación</summary>
 
@@ -85,7 +91,7 @@ Los expedientes se guardan en el servidor del estudio y se comparten según los 
 
 - **Instalación o actualización.** [Instaladores](docs/INSTALADORES.md) · [Respaldos y recuperación](docs/ACTUALIZACIONES.md)
 - **Sincronización.** [Google Drive](docs/SINCRONIZACION.md) · [Poder Judicial de Chile](docs/PJUD.md)
-- **Sugerencias o fallos.** Describe qué intentabas hacer, tu sistema y la versión de LexOpen. Usa ejemplos ficticios y protege los datos de tu estudio. [Abrir un reporte en GitHub](https://github.com/gabrielperezibacache/lexopen/issues)
+- **Sugerencias o fallos.** En **Mi cuenta → Feedback** puedes escribirle a la administración de tu estudio y seguir el estado del comentario. Si reportas un problema públicamente, usa ejemplos ficticios e indica la versión de LexOpen. [Abrir un reporte en GitHub](https://github.com/gabrielperezibacache/lexopen/issues)
 
 ## Desarrollo y licencia
 
@@ -95,6 +101,7 @@ Los expedientes se guardan en el servidor del estudio y se comparten según los 
 - [Guía de contribución](CONTRIBUTING.md) y [configuración de ejemplo](.env.example).
 - [Preparar el servidor desde el código](docs/WEB-HOST.md) y [comprobaciones automáticas](https://github.com/gabrielperezibacache/lexopen/actions/workflows/ci.yml).
 - [Plan de desarrollo](docs/PLAN-DESARROLLO-2026-11-05.md) e [identidad visual](docs/REFERENCIAS-GRAFICAS-2026-11-05.md).
+- [Cobertura funcional de Altazor](docs/COBERTURA-ALTAZOR.md).
 
 </details>
 

@@ -107,7 +107,7 @@ jobs:
           printf '%s\n' 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3 > "$source_dir/.lexopen-source-commit"
           node scripts/altazor/harden-connectors.test.mjs
           node scripts/altazor/harden-connectors.mjs "$source_dir"
-          (cd "$source_dir" && go test ./internal/chat -run '^TestLexOpen' -count=1)
+          (cd "$source_dir" && go test ./internal/chat ./internal/connector -run '^TestLexOpen' -count=1)
           make -C "$source_dir" WEB=0 VERSION=lexopen-ci build
           node scripts/altazor/prepare-computer-ci.test.mjs
           node scripts/altazor/prepare-computer-ci.mjs "$source_dir"

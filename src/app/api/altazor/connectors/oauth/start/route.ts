@@ -6,7 +6,8 @@ import { localSetupAllowed } from "@/lib/altazor/computer/policy";
 import { requestIdSchema } from "@/lib/altazor/computer/http";
 import { parseKnowledgeBody } from "@/lib/knowledge/route-body";
 import { startEasyOAuth } from "@/lib/altazor/connectors/easy-oauth";
-const schema = z.object({ workspaceId: z.string().min(1).max(100), provider: z.enum(["google", "github"]), requestId: requestIdSchema, confirmed: z.literal(true) }).strict();
+import { EASY_OAUTH_PROVIDERS } from "@/lib/altazor/connectors/easy-oauth-providers";
+const schema = z.object({ workspaceId: z.string().min(1).max(100), provider: z.enum(EASY_OAUTH_PROVIDERS), requestId: requestIdSchema, confirmed: z.literal(true) }).strict();
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {

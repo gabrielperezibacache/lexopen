@@ -835,21 +835,16 @@ export const CONNECTOR_CATALOG = [
     "id": "dropbox",
     "label": "Dropbox",
     "category": "office",
-    "description": "Busca y lee archivos, guarda texto y crea enlaces.",
+    "description": "Busca, lista y lee archivos con acceso de sólo lectura.",
     "platform": "gateway",
-    "oauth": "dropbox",
+    "oauth": "",
     "fieldNames": [
-      "token",
-      "client_id",
-      "client_secret"
+      "token"
     ],
     "actions": [
       "list",
       "search",
-      "read",
-      "upload",
-      "share_link",
-      "request"
+      "read"
     ],
     "source": "internal/connector/media.go#L531"
   },

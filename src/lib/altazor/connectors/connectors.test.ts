@@ -36,6 +36,39 @@ test("OAuth readiness comes from the gateway and Mac apps need an attested nativ
   assert.equal(projectConnectorSettings(raw, "darwin").catalog.find(kind => kind.id === "apple")?.available, true);
   assert.equal(projectConnectorSettings(raw).catalog.find(kind => kind.id === "apple")?.available, false);
 });
+test("Dropbox is offered only by gateways with read-only protection and pending writes cannot be approved", async () => {
+  let hardened = false, writes = 0;
+  const client = new KittiesGateway(endpoint, token, fake((path, method) => {
+    if (path === "/v1/health") return { ok: true, lexopen_connector_gate: "v1", lexopen_dropbox_read_gate: hardened };
+    if (path === "/v1/settings") return settings();
+    if (path === "/v1/approvals?status=pending") return { approvals: [{ id: "approval-dropbox", kitty: "kitty-a", chat: "chat-a", connector: "files", kind: "dropbox", action: "request", args: { path: "/2/files/delete_v2" }, status: "pending" }] };
+    if (method === "POST") writes++;
+    throw new Error("Unexpected gateway request");
+  }));
+  const getDropbox = async () => (await client.connectorSettings()).catalog.find(kind => kind.id === "dropbox");
+  assert.equal((await getDropbox())?.available, false);
+  hardened = true;
+  assert.equal((await getDropbox())?.available, true);
+  assert.deepEqual((await getDropbox())?.actions, ["list", "search", "read"]);
+  await assert.rejects(() => client.decideApproval("approval-dropbox", "kitty-a", "chat-a", ["files"], true), /sólo permite/);
+  assert.equal(writes, 0);
+});
+test("Dropbox sign-in only uses the guided flow and rejects legacy OAuth and PUT sign-in", async () => {
+  let writes = 0;
+  const client = new KittiesGateway(endpoint, token, fake((path, method) => {
+    if (path === "/v1/settings" && method === "GET") return { ...settings(), oauth_ready: ["dropbox"], connectors: [{ name: "private-files", kind: "dropbox", settings: { client_id: "legacy-app" }, needs_sign_in: true }] };
+    if (method !== "GET") writes++;
+    throw new Error("Legacy Dropbox sign-in reached the gateway");
+  }));
+  const dropbox = CONNECTOR_CATALOG.find(kind => kind.id === "dropbox");
+  assert.equal(dropbox?.oauth, "");
+  assert.deepEqual(dropbox?.fieldNames, ["token"]);
+  await assert.rejects(() => client.connectorOAuth("private-files"), /Use Conectar Dropbox/);
+  await assert.rejects(() => client.setConnector("private-files", { kind: "dropbox", settings: { token: "fictitious" }, signIn: true }), /Use Conectar Dropbox/);
+  assert.throws(() => validateConnectorConfiguration({ kind: "dropbox", settings: { client_id: "legacy-app" } }));
+  assert.deepEqual(validateConnectorConfiguration({ kind: "dropbox", settings: { token: "fictitious" }, signIn: false }).settings, { token: "fictitious" });
+  assert.equal(writes, 0);
+});
 test("only pinned configuration fields are accepted and Host programs are blocked", () => {
   assert.equal(validateConnectorConfiguration({ kind: "github", settings: { token: "fictitious", repo: "owner/project" } }).kind, "github");
   assert.throws(() => validateConnectorConfiguration({ kind: "github", settings: { oauth_access_token: "not-allowed" } }));

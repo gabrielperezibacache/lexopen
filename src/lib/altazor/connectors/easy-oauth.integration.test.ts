@@ -5,9 +5,9 @@ import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { digest, unseal } from "@/lib/personal-connectors/core";
 import { configureComputer } from "../computer/service";
-import { configureConnector, removeConnector } from "./service";
+import { beginConnectorOAuth, configureConnector, removeConnector } from "./service";
 import { CONNECTOR_CATALOG } from "./catalog";
-import { easyConnectionName, easyOAuthReturnContext, failEasyOAuthReturn, easyOAuthSetupStatus, easyOAuthStatus, receiveEasyOAuth, saveEasyOAuthSetup, startEasyOAuth, type EasyOAuthProvider } from "./easy-oauth";
+import { easyConnectionName, easyOAuthReturnContext, failEasyOAuthReturn, easyOAuthSetupStatus, easyOAuthStatus, receiveEasyOAuth, saveEasyOAuthSetup, startEasyOAuth, EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth";
 
 const denied = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
 async function main() {
@@ -15,16 +15,19 @@ async function main() {
   process.env.ALTAZOR_COMPUTER_ENABLED = "1";
   const stamp = randomUUID(), userIds: string[] = [], caseIds: string[] = [], workspaceIds: string[] = [], oldFetch = globalThis.fetch;
   let puts = 0, providerExchanges = 0, wrongDestination = 0, revoked = false, broadScope = false, pauseExchange: (() => Promise<void>) | undefined;
+  let dropboxReadGate = true, dropboxIdentity = "dbid:fictitious-account", legacyDropboxStarts = 0;
+  const dropboxScopes = "account_info.read files.content.read files.metadata.read";
   const gatewayTokens = new Map<string, { kind: string; token: string }>();
   const snapshot = () => ({ connector_catalog: CONNECTOR_CATALOG.map(kind => ({ name: kind.id, fields: kind.fieldNames.map(name => ({ name, label: name, secret: /token|secret/.test(name) })) })), connectors: [...gatewayTokens].map(([name, value]) => ({ name, kind: value.kind, settings: {}, secrets_set: ["token"], token_set: true, needs_sign_in: false, auth: "token" })) });
   globalThis.fetch = (async (raw, init) => {
     const url = new URL(String(raw)), method = init?.method || "GET";
     if (url.origin !== "http://127.0.0.1:18999") { wrongDestination++; throw new Error("Unexpected fictitious gateway destination"); }
     assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-easy-oauth-gateway");
-    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux" });
+    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate });
     if (url.pathname === "/v1/providers") return Response.json({ providers: [{ name: "fixture-model", kind: "openai" }] });
     if (url.pathname === "/v1/kitties") return Response.json({ kitties: [] });
     if (url.pathname === "/v1/settings") return Response.json(snapshot());
+    if (url.pathname.startsWith("/v1/oauth/")) { legacyDropboxStarts++; throw new Error("Unexpected legacy OAuth request"); }
     if (url.pathname.endsWith("/test")) return Response.json({ ok: !revoked, tested: true, account: "must-never-leave-private-profile" });
     if (url.pathname.startsWith("/v1/settings/connectors/")) {
       const name = decodeURIComponent(url.pathname.split("/").pop()!);
@@ -36,12 +39,18 @@ async function main() {
   const providerFetch = (async (raw, init) => {
     const url = new URL(String(raw));
     assert.equal(url.searchParams.has("access_token"), false); assert.equal(url.username, ""); assert.equal(init?.redirect, "error");
-    if (url.href === "https://oauth2.googleapis.com/token" || url.href === "https://github.com/login/oauth/access_token") {
+    if (["https://oauth2.googleapis.com/token", "https://github.com/login/oauth/access_token", "https://api.dropboxapi.com/oauth2/token"].includes(url.href)) {
       providerExchanges++; assert.equal(init?.method, "POST");
       const body = new URLSearchParams(String(init?.body)); assert.equal(body.get("grant_type"), "authorization_code"); assert.ok(body.get("code_verifier")); assert.match(body.get("redirect_uri")!, /^http:\/\/127.0.0.1:3349\/api\/altazor\/connectors\/oauth\/callback$/);
       const pause = pauseExchange; pauseExchange = undefined; if (pause) await pause();
+      if (url.hostname === "api.dropboxapi.com") return Response.json({ access_token: "fictitious-dropbox-consented-access", token_type: "bearer", account_id: "dbid:fictitious-account", scope: broadScope ? `${dropboxScopes} files.content.write` : dropboxScopes, expires_in: 14_400 });
       const google = url.hostname === "oauth2.googleapis.com";
       return Response.json({ access_token: google ? "fictitious-google-consented-access" : "fictitious-github-consented-access", token_type: "Bearer", scope: broadScope ? "repo" : google ? "https://www.googleapis.com/auth/drive.metadata.readonly" : "read:user", ...(google ? { expires_in: 3600 } : {}) });
+    }
+    if (url.href === "https://api.dropboxapi.com/2/users/get_current_account") {
+      assert.equal(init?.method, "POST"); assert.equal(init?.body, "null");
+      assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-dropbox-consented-access");
+      return Response.json({ account_id: dropboxIdentity, email: "private@example.invalid" });
     }
     assert.equal(init?.method || "GET", "GET");
     if (url.hostname === "www.googleapis.com") { assert.equal(url.pathname, "/drive/v3/about"); assert.equal(url.searchParams.get("fields"), "user(permissionId)"); assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-google-consented-access"); return Response.json({ user: { permissionId: "fictitious-google-subject" } }); }
@@ -66,13 +75,18 @@ async function main() {
     assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[0].state, "blocked");
     await assert.rejects(start("google", "blocked"), denied(503));
     await assert.rejects(saveEasyOAuthSetup(actor, { provider: "google", clientId: "fictitious-client", clientSecret: "fictitious-secret", confirmed: true }, origin), denied(403));
-    for (const provider of ["google", "github"] as const) await saveEasyOAuthSetup(administrator, { provider, clientId: `fictitious-${provider}-client`, clientSecret: `fictitious-${provider}-operator-secret`, confirmed: true }, origin);
+    for (const provider of EASY_OAUTH_PROVIDERS) await saveEasyOAuthSetup(administrator, { provider, clientId: `fictitious-${provider}-client`, clientSecret: `fictitious-${provider}-operator-secret`, confirmed: true }, origin);
     const persistedSetup = await prisma.integrationConfig.findMany({ where: { provider: { startsWith: "altazor-oauth-" } } });
     assert.equal(JSON.stringify(persistedSetup).includes("fictitious-google-operator-secret"), false);
     assert.equal(JSON.stringify(await easyOAuthSetupStatus()).includes("fictitious-google-client"), false);
-    for (const provider of ["google", "github"] as const) {
+    dropboxReadGate = false;
+    assert.equal((await easyOAuthStatus(actor, workspaceId)).providers.find(item => item.provider === "dropbox")?.available, false);
+    await assert.rejects(start("dropbox", "old-gateway"), denied(409));
+    dropboxReadGate = true;
+    for (const provider of EASY_OAUTH_PROVIDERS) {
       const begun = await start(provider, provider), auth = new URL(begun.authUrl), state = auth.searchParams.get("state")!;
-      assert.equal(auth.hostname, provider === "google" ? "accounts.google.com" : "github.com"); assert.equal(auth.searchParams.get("code_challenge_method"), "S256"); assert.equal(auth.searchParams.has("client_secret"), false);
+      assert.equal(auth.hostname, { google: "accounts.google.com", github: "github.com", dropbox: "www.dropbox.com" }[provider]); assert.equal(auth.searchParams.get("code_challenge_method"), "S256"); assert.equal(auth.searchParams.has("client_secret"), false);
+      if (provider === "dropbox") { assert.equal(auth.searchParams.get("scope"), dropboxScopes); assert.equal(auth.searchParams.get("token_access_type"), "online"); assert.equal(auth.searchParams.has("include_granted_scopes"), false); }
       const pending = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: begun.attemptId } });
       const payload = unseal<{ verifier: string }>(pending.resultEnc!, `altazor:desktop:oauth:${owner.id}:${pending.id}`);
       assert.equal(auth.searchParams.get("code_challenge"), createHash("sha256").update(payload.verifier).digest("base64url")); assert.equal(pending.resultEnc!.includes(payload.verifier), false);
@@ -83,7 +97,7 @@ async function main() {
       assert.equal(providerExchanges, before + 1);
       const status = await easyOAuthStatus(actor, workspaceId, begun.attemptId);
       assert.equal(status.providers.find(item => item.provider === provider)?.connected, true); assert.equal(status.attempt?.state, "completed");
-      for (const secret of ["fictitious-google-consented-access", "fictitious-github-consented-access", "private-profile-not-returned", "must-never-leave-private-profile", "private@example.invalid"]) assert.equal(JSON.stringify(status).includes(secret), false);
+      for (const secret of ["fictitious-google-consented-access", "fictitious-github-consented-access", "fictitious-dropbox-consented-access", "dbid:fictitious-account", "private-profile-not-returned", "must-never-leave-private-profile", "private@example.invalid"]) assert.equal(JSON.stringify(status).includes(secret), false);
       await assert.rejects(receiveEasyOAuth(actor, { state, code: "fictitious-code" }, origin, options), denied(409)); assert.equal(providerExchanges, before + 1);
       const stored = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: begun.attemptId } });
       assert.equal(stored.resultEnc!.includes(payload.verifier), false);
@@ -97,6 +111,24 @@ async function main() {
     assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[0].connected, false);
     await removeConnector(owner, workspaceId, `remove-${stamp}`, easyConnectionName(owner.id, workspaceId, "github"));
     assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[1].connected, false);
+    const dropboxName = easyConnectionName(owner.id, workspaceId, "dropbox");
+    const legacyStartId = `legacy-start-${stamp}`, legacyPutId = `legacy-put-${stamp}`, beforeLegacy = puts;
+    const guidedOnly = (error: unknown) => (error as { code?: string }).code === "dropbox_guided_oauth_required";
+    await assert.rejects(beginConnectorOAuth(owner, workspaceId, legacyStartId, dropboxName), guidedOnly);
+    await assert.rejects(configureConnector(owner, workspaceId, legacyPutId, dropboxName, { kind: "dropbox", settings: {}, signIn: true }), guidedOnly);
+    assert.equal(legacyDropboxStarts, 0); assert.equal(puts, beforeLegacy);
+    assert.equal(await prisma.altazorConnectorOperation.count({ where: { ownerId: owner.id, requestId: { in: [legacyStartId, legacyPutId] } } }), 0);
+    await removeConnector(owner, workspaceId, `remove-dropbox-${stamp}`, dropboxName);
+    assert.equal((await easyOAuthStatus(actor, workspaceId)).providers.find(item => item.provider === "dropbox")?.connected, false);
+    for (const rejected of ["broad", "different-account"]) {
+      broadScope = rejected === "broad";
+      dropboxIdentity = rejected === "different-account" ? "dbid:unexpected-account" : "dbid:fictitious-account";
+      const attempt = await start("dropbox", `dropbox-${rejected}`), before = puts;
+      await receiveEasyOAuth(actor, { state: new URL(attempt.authUrl).searchParams.get("state")!, code: "fake" }, origin, options);
+      assert.equal(puts, before);
+      assert.equal((await easyOAuthStatus(actor, workspaceId, attempt.attemptId)).attempt?.state, "failed");
+    }
+    broadScope = false; dropboxIdentity = "dbid:fictitious-account";
     const active = await prisma.altazorComputerSession.create({ data: { ownerId: owner.id, workspaceId, requestId: `active-${stamp}`, kittyName: "fictitious-active", state: "ready", expiresAt: new Date(Date.now() + 60_000) } });
     await assert.rejects(start("google", "active"), denied(409));
     await prisma.altazorComputerSession.update({ where: { id: active.id }, data: { expiresAt: new Date(0) } });
@@ -147,12 +179,12 @@ async function main() {
     await prisma.causa.update({ where: { id: cause.id }, data: { abogadoId: owner.id } });
     await prisma.user.update({ where: { id: owner.id }, data: { sessionVersion: owner.sessionVersion + 1 } });
     await assert.rejects(easyOAuthStatus(actor, workspaceId), denied(401));
-    console.log("Easy OAuth PG PASS: official Google/GitHub PKCE, original session, one-use callback, encrypted setup/verifier, exact read-only scopes, real connector test before green, revoked/advanced mutation invalidation, active desktop denial, operator rotation while exchange paused, expected gateway binding and current ACL/session revocation. HTTP is fictitious only.");
+    console.log("Easy OAuth PG PASS: Google, GitHub and Dropbox PKCE, original session, one-use callback, encrypted setup/verifier, exact read-only scopes, confirmed access, invalidation, active desktop denial, configuration rotation and current ACL/session checks. HTTP is simulated.");
   } finally {
     globalThis.fetch = oldFetch;
     await prisma.personalOAuthAttempt.deleteMany({ where: { ownerId: { in: userIds } } }); await prisma.personalConnectorAccount.deleteMany({ where: { ownerId: { in: userIds } } });
     await prisma.altazorComputerAction.deleteMany({ where: { ownerId: { in: userIds } } }); await prisma.altazorComputerSession.deleteMany({ where: { ownerId: { in: userIds } } }); await prisma.altazorConnectorOperation.deleteMany({ where: { ownerId: { in: userIds } } }); await prisma.altazorComputerWorkspace.deleteMany({ where: { id: { in: workspaceIds } } });
-    await prisma.causa.deleteMany({ where: { id: { in: caseIds } } }); await prisma.user.deleteMany({ where: { id: { in: userIds } } }); await prisma.integrationConfig.deleteMany({ where: { provider: { in: ["altazor-oauth-google", "altazor-oauth-github"] } } });
+    await prisma.causa.deleteMany({ where: { id: { in: caseIds } } }); await prisma.user.deleteMany({ where: { id: { in: userIds } } }); await prisma.integrationConfig.deleteMany({ where: { provider: { in: EASY_OAUTH_PROVIDERS.map(provider => `altazor-oauth-${provider}`) } } });
     if (organizationId) await prisma.organization.delete({ where: { id: organizationId } }); await prisma.$disconnect();
   }
 }

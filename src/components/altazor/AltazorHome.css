@@ -65,9 +65,7 @@
 .altazor-attachments button { min-width:44px; min-height:44px; display:grid; place-items:center; }
 .altazor-attachments small,.altazor-academic-results small { display:block; color:var(--muted); font-size:1rem; }
 .altazor-send-settings { display:grid; gap:.5rem; padding:.5rem .6rem; color:var(--ink-soft); font-size:1rem; line-height:1.65; }
-.altazor-send-settings label,.altazor-check { display:flex!important; align-items:flex-start; gap:.65rem!important; min-height:44px; }
-.altazor-send-settings p { overflow-wrap:anywhere; }
-.altazor-send-settings button:not(.btn) { color:var(--sea); text-decoration:underline; }
+.altazor-check { display:flex!important; align-items:flex-start; gap:.65rem!important; min-height:44px; }
 .altazor-source-disclosure { margin-top:1rem; border-top:1px solid var(--line); }
 .altazor-source-disclosure summary>span { margin-left:auto; color:var(--muted); font-weight:400; }
 .altazor-sources { padding-block:1rem; }
@@ -139,8 +137,8 @@
  .altazor-header h2 { font-size:1.25rem; margin:0; }
  .altazor-header p { display:none; }
  .altazor-header .altazor-companion { width:48px!important; height:48px!important; }
- .altazor-header .altazor-wordmark strong { font-size:1.4rem; }
- .altazor-header .altazor-wordmark small { font-size:.75rem; }
+ .altazor-header .altazor-wordmark strong { font-size:var(--text-xl); }
+ .altazor-header .altazor-wordmark small { font-size:var(--text-xs); }
  .altazor-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.25rem; overflow:visible; margin-bottom:1rem; }
  .altazor-tabs>button { min-width:0; padding:.5rem .25rem; gap:.35rem; font-size:1rem; white-space:normal; }
  .altazor-tabs>button:last-child { grid-column:1/-1; }
@@ -170,7 +168,7 @@
 .altazor-clarification { display:grid; gap:.5rem; padding:1rem 0; line-height:1.7; color:var(--ink); }
 .altazor-clarification strong { color:var(--sea); }
 .altazor-connection-notice { padding:.5rem; color:var(--ink-soft); line-height:1.6; }
-.altazor-connection-notice button { color:var(--sea); text-decoration:underline; min-height:44px; }
+.altazor-connection-notice a { color:var(--sea); text-decoration:underline; }
 .altazor-attachment-archive { margin-top:.75rem; }
 .altazor-attachment-archive>summary { display:flex; gap:.6rem; align-items:center; color:var(--ink-soft); font-size:var(--text-sm); }
 .altazor-attachment-archive>summary span { color:var(--muted); }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, parseBody, requireRole } from "@/lib/api";
+import { firmFormSelect } from "@/lib/config/firm-form-fields";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -26,8 +27,8 @@ export async function PATCH(req: NextRequest) {
     await requireRole("admin");
     const body = await parseBody(req, schema);
     const current =
-      (await prisma.organization.findFirst({ include: { settings: true } })) ||
-      (await prisma.organization.create({ data: {}, include: { settings: true } }));
+      (await prisma.organization.findFirst({ select: { id: true } })) ||
+      (await prisma.organization.create({ data: {}, select: { id: true } }));
     const org = await prisma.organization.update({
       where: { id: current.id },
       data: {
@@ -67,7 +68,7 @@ export async function PATCH(req: NextRequest) {
           },
         },
       },
-      include: { settings: true },
+      select: firmFormSelect,
     });
     return NextResponse.json(org);
   } catch (e) {

@@ -24,8 +24,8 @@ export const libraryLayouts = [
 ] as const;
 const defaults: BookPreferences = { libraryName: "Mi biblioteca jurídica", shelfTheme: "walnut", view: "covers", layout: "mesa", defaultConvertToText: false, defaultPreserveOriginal: true, heavyFileThresholdMb: 10 };
 
-export function Bookshelf({ userName, initialJudicial = false, causaId, writingDraftId }: { userName: string; initialJudicial?: boolean; causaId?: string; writingDraftId?: string }) {
-  const id = useId(), [data, setData] = useState<BooksData | null>(null), [reload, setReload] = useState(0), [error, setError] = useState(""), [panel, setPanel] = useState<"" | "import" | "personalize">(""), [tab, setTab] = useState<"books" | "judicial" | "writing" | "collections">(initialJudicial ? "judicial" : "books"), [query, setQuery] = useState(""), [shelf, setShelf] = useState(""), [ownership, setOwnership] = useState("all"), [selected, setSelected] = useState<string[]>([]);
+export function Bookshelf({ userName, initialJudicial = false, initialPersonalization = false, causaId, writingDraftId }: { userName: string; initialJudicial?: boolean; initialPersonalization?: boolean; causaId?: string; writingDraftId?: string }) {
+  const id = useId(), [data, setData] = useState<BooksData | null>(null), [reload, setReload] = useState(0), [error, setError] = useState(""), [panel, setPanel] = useState<"" | "import" | "personalize">(initialPersonalization ? "personalize" : ""), [tab, setTab] = useState<"books" | "judicial" | "writing" | "collections">(initialJudicial ? "judicial" : "books"), [query, setQuery] = useState(""), [shelf, setShelf] = useState(""), [ownership, setOwnership] = useState("all"), [selected, setSelected] = useState<string[]>([]);
   const [deskVisit, setDeskVisit] = useState(0), [unavailable, setUnavailable] = useState(false);
   const showTab = useCallback((value: typeof tab) => { setTab(value); if (value === "writing") setDeskVisit(visit => visit + 1); }, []);
   const carriedBook = useRef(false);

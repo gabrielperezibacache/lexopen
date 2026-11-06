@@ -1,12 +1,18 @@
 import { expect, test } from "@playwright/test";
 import { loginAs } from "./helpers";
 
-test("ocho áreas, secundario contextual y navegación rápida comparten destinos", async ({ page }) => {
+test("siete áreas, secundario contextual y comunicaciones dentro de Configuración", async ({ page }) => {
+  const hydrationErrors: string[] = [];
+  page.on("console", message => {
+    if (message.type() === "error" && /hydration|hydrated/i.test(message.text())) hydrationErrors.push(message.text());
+  });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await loginAs(page, "socio@estudio.cl");
   const sidebar = page.getByTestId("desktop-sidebar");
   const main = sidebar.getByTestId("primary-navigation");
-  await expect(main.locator("a")).toHaveCount(8);
+  await expect(main.locator("a")).toHaveCount(7);
+  await expect(main.getByRole("link", { name: "Comunicaciones", exact: true })).toHaveCount(0);
+  await expect(sidebar.getByRole("link", { name: "Configuración", exact: true })).toHaveAttribute("href", "/configuracion");
   await expect(sidebar.getByRole("link", { name: "Iniciar sesión", exact: true })).toHaveCount(0);
   await main.getByRole("link", { name: "Agenda", exact: true }).click();
   const secondary = sidebar.getByTestId("secondary-navigation");
@@ -21,6 +27,12 @@ test("ocho áreas, secundario contextual y navegación rápida comparten destino
   await expect(dialog.getByRole("button", { name: /Mis libros y sentencias/ })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/biblioteca$/);
+  await page.getByRole("link", { name: "Búsqueda global", exact: true }).focus();
+  await page.keyboard.press("Control+k");
+  await dialog.getByRole("textbox", { name: "Ir a un apartado", exact: true }).fill("comunicaciones");
+  await dialog.getByRole("button", { name: /Comunicaciones/ }).click();
+  await expect(page).toHaveURL(/\/configuracion#comunicaciones$/);
+  await expect(page.locator("#comunicaciones")).toBeVisible();
   await main.getByRole("link", { name: "Causas", exact: true }).click();
   await expect(sidebar.getByTestId("secondary-navigation").getByRole("link", { name: "Sincronización", exact: true })).toBeVisible();
   await expect(sidebar.getByTestId("secondary-navigation").getByRole("link", { name: "Mis causas · ClaveÚnica", exact: true })).toHaveCount(0);
@@ -33,16 +45,19 @@ test("ocho áreas, secundario contextual y navegación rápida comparten destino
   await expect(sidebar.getByRole("link", { name: "Causas manuales", exact: true })).toHaveAttribute("href", "/causas");
   await expect(page.getByRole("navigation", { name: "Miga de pan", exact: true })).toContainText("PJUD · Chile");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  expect(hydrationErrors).toEqual([]);
 });
 
-test("móvil conserva las ocho áreas y ofrece búsqueda sin abrir el menú", async ({ page }) => {
+test("móvil conserva las siete áreas y Configuración para profesionales", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await loginAs(page, "abogado@estudio.cl");
   await expect(page.getByRole("link", { name: "Búsqueda global", exact: true })).toBeVisible();
   const trigger = page.getByRole("button", { name: "Abrir menú", exact: true });
   await trigger.click();
   const drawer = page.getByRole("dialog", { name: "Menú", exact: true });
-  await expect(drawer.getByTestId("primary-navigation").locator("a")).toHaveCount(8);
+  await expect(drawer.getByTestId("primary-navigation").locator("a")).toHaveCount(7);
+  await expect(drawer.getByRole("link", { name: "Comunicaciones", exact: true })).toHaveCount(0);
+  await expect(drawer.getByRole("link", { name: "Configuración", exact: true })).toHaveAttribute("href", "/configuracion");
   await expect(drawer.getByTestId("primary-navigation").getByRole("link", { name: "Causas", exact: true })).toHaveAttribute("href", "/mis-causas");
   expect(await drawer.evaluate(el => el.contains(document.activeElement))).toBeTruthy();
   await page.keyboard.press("Escape");
@@ -50,6 +65,10 @@ test("móvil conserva las ocho áreas y ofrece búsqueda sin abrir el menú", as
   await expect(trigger).toBeFocused();
   await page.getByRole("link", { name: "Búsqueda global", exact: true }).click();
   await expect(page).toHaveURL(/\/buscar$/);
+  await trigger.click();
+  await drawer.getByRole("link", { name: "Configuración", exact: true }).click();
+  await expect(page).toHaveURL(/\/configuracion$/);
+  await expect(drawer).not.toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 });
 
@@ -59,6 +78,8 @@ test("portal y paleta de cliente no ofrecen destinos internos", async ({ page })
   const sidebar = page.getByTestId("desktop-sidebar");
   await expect(sidebar.getByRole("link", { name: "Causas", exact: true })).toHaveCount(0);
   await expect(sidebar.getByRole("link", { name: "Académico", exact: true })).toHaveCount(0);
+  await expect(sidebar.getByRole("link", { name: "Configuración", exact: true })).toHaveCount(0);
+  await expect(sidebar.getByRole("link", { name: "Mensajes", exact: true })).toHaveAttribute("href", "/mensajes");
   await expect(page.getByRole("button", { name: "Conversar con ALTAZOR", exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: "Búsqueda global", exact: true }).focus();
   await page.keyboard.press("Control+k");

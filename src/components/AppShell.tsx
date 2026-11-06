@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Menu, Search } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
+import { NotificationBell } from "@/components/NotificationBell";
 import { StudioCredit } from "@/components/StudioCredit";
 import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { Breadcrumbs } from "@/components/shell/Breadcrumbs";
 import { CommandPalette, type CommandItem } from "@/components/ui/CommandPalette";
-import { Sheet } from "@/components/ui/Sheet";
 import type { SessionUserSummary } from "@/components/auth/UserSwitcher";
 import { activeNavigationArea, activeNavigationEntry, navigationEntries, type NavigationModel } from "@/lib/navigation/catalog";
 import "@/components/shell/shell.css";
@@ -39,16 +39,12 @@ function getSidebarCollapsed(key: string) {
 export function AppShell({
   navigation,
   user,
-  unreadCount = 0,
-  mailPendingCount = 0,
   showUpdateBanner = false,
   canSelfUpdate = false,
   children,
 }: {
   navigation: NavigationModel;
   user?: SessionUserSummary;
-  unreadCount?: number;
-  mailPendingCount?: number;
   showUpdateBanner?: boolean;
   canSelfUpdate?: boolean;
   children: React.ReactNode;
@@ -65,7 +61,6 @@ export function AppShell({
     () => getSidebarCollapsed(sidebarKey),
     () => false
   );
-  const [notifOpen, setNotifOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const currentArea = activeNavigationArea(navigation, pathname || "/");
   const currentEntry = activeNavigationEntry(navigation, pathname || "/");
@@ -131,7 +126,6 @@ export function AppShell({
       <AppSidebar
         navigation={navigation}
         user={user}
-        mailPendingCount={mailPendingCount}
         mobileOpen={mobileOpen}
         onMobileOpenChange={setMobileOpen}
         collapsed={collapsed}
@@ -165,19 +159,7 @@ export function AppShell({
 
           <div className="flex shrink-0 items-center gap-2">
             <Link href="/buscar" className="shell-icon-button" aria-label={t("common.searchGlobal")}><Search size={19} aria-hidden="true" /></Link>
-            <button
-              type="button"
-              className="relative grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] text-[var(--ink)]"
-              aria-label={unreadCount > 0 ? `${t("nav.notifications")}: ${unreadCount}` : t("nav.notifications")}
-              onClick={() => setNotifOpen(true)}
-            >
-              <Bell size={18} aria-hidden="true" />
-              {unreadCount > 0 && (
-                <span className="absolute -right-1 -top-1 min-w-[1.15rem] rounded-full bg-[var(--brand-iris)] px-1 py-0.5 text-center text-[10px] font-semibold leading-none text-[var(--brand-night)]">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-            </button>
+            <NotificationBell key={user?.id} />
           </div>
         </header>
 
@@ -201,25 +183,6 @@ export function AppShell({
 
       <CommandPalette items={commandItems} open={commandOpen} onOpenChange={setCommandOpen} />
 
-      <Sheet
-        open={notifOpen}
-        onClose={() => setNotifOpen(false)}
-        title={t("nav.notifications")}
-        side="right"
-      >
-        <p className="text-sm text-[var(--muted)]">
-          {unreadCount > 0
-            ? String(unreadCount)
-            : t("common.noNotifications")}
-        </p>
-        <Link
-          href="/notificaciones"
-          className="btn btn-primary mt-4 w-full"
-          onClick={() => setNotifOpen(false)}
-        >
-          {t("common.viewAll")}
-        </Link>
-      </Sheet>
     </div>
   );
 }

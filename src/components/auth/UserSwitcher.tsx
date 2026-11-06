@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { apiMutation } from "@/lib/api-mutation";
+import { STAFF_ROLES, isRole } from "@/lib/auth/roles";
 
 export type SessionUserSummary = {
   id: string;
@@ -127,7 +128,7 @@ export function UserSwitcher({ initialUser, compact = false }: { initialUser?: S
       >
         <span
           className="grid h-8 w-8 place-items-center rounded-full text-xs font-bold text-white"
-          style={{ background: user.avatarColor || "#1f6f78" }}
+          style={{ background: user.avatarColor || "var(--sea-solid)" }}
         >
           {user.name
             .split(" ")
@@ -159,7 +160,7 @@ export function UserSwitcher({ initialUser, compact = false }: { initialUser?: S
                 >
                   <span
                     className="h-6 w-6 rounded-full"
-                    style={{ background: u.avatarColor || "#1f6f78" }}
+                    style={{ background: u.avatarColor || "var(--sea-solid)" }}
                   />
                   <span className="min-w-0">
                     <span className="block truncate">{u.name}</span>
@@ -176,6 +177,13 @@ export function UserSwitcher({ initialUser, compact = false }: { initialUser?: S
           >
             Mi cuenta
           </Link>
+          {isRole(user.role) && STAFF_ROLES.includes(user.role) && <Link
+            href="/cuenta/feedback"
+            className="mt-1 flex w-full items-center rounded-lg px-2 py-2 text-left text-sm text-white/80 hover:bg-white/10"
+            onClick={() => setOpen(false)}
+          >
+            Feedback
+          </Link>}
           <div className="mt-2 flex items-center gap-2 border-t border-white/10 pt-2"><LanguageSwitcher variant="dark" className="min-w-0 flex-1" /><ThemeToggle variant="dark" /></div>
           <button
             type="button"
