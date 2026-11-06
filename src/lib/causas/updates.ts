@@ -6,13 +6,14 @@ import { prisma } from "@/lib/db";
 
 const pageSize = 20;
 const originsPerKind = 4;
-const intakeSources = ["manual", "mail"] as const;
+const intakeSources = ["manual", "mail", "drive", "ojv"] as const;
 type IntakeSource = typeof intakeSources[number];
 
 export type CaseUpdateOrigin = {
   kind: IntakeSource;
   receivedAt: string;
   documentVersion: number | null;
+  sourceRevision?: string;
   mailHref?: string;
 };
 
@@ -99,6 +100,14 @@ export async function listCaseUpdates(
     const documentsInScope = { AND: [{ causaId }, documentReadWhere(actor)] } satisfies Prisma.DocumentoWhereInput;
     const supportedIntakes = { causaId, source: { in: [...intakeSources] } };
     const ownedFiledMail = { causaId, userId: actor.id, account: { userId: actor.id }, status: "aplicado" };
+    const savedOjv = { causaId, status: "saved" };
+    const legacyOrigins: Prisma.DocumentoWhereInput[] = [
+      manualStorage,
+      legacyMailStorage,
+      { driveImport: { is: { causaId } } },
+      { pjudDocumentJobs: { some: savedOjv } },
+      { storageKey: { startsWith: "pjud/" } },
+    ];
     const [intakeDocuments, legacyDocuments, mailNotices] = await Promise.all([
       tx.caseDocumentIntake.groupBy({
         by: ["documentoId"],
@@ -115,7 +124,7 @@ export async function listCaseUpdates(
       tx.documento.findMany({
         where: { AND: [
           documentsInScope,
-          { caseIntakes: { none: supportedIntakes }, OR: [manualStorage, legacyMailStorage] },
+          { caseIntakes: { none: supportedIntakes }, OR: legacyOrigins },
           ...(position ? [{ OR: [
             { createdAt: { lt: position.receivedAt } },
             ...(position.kind === "d" ? [{ createdAt: position.receivedAt, id: { lt: position.id } }] : []),
@@ -152,22 +161,26 @@ export async function listCaseUpdates(
 
     const ids = page.flatMap(row => row.kind === "d" ? [row.id] : []);
     const pageDocuments = { AND: [documentsInScope, { id: { in: ids } }] } satisfies Prisma.DocumentoWhereInput;
-    const [documents, mailDocuments] = await Promise.all([
+    const [documents, ...receiptGroups] = await Promise.all([
       tx.documento.findMany({
         where: pageDocuments,
         select: {
           id: true, nombre: true, tipo: true, version: true, extractionStatus: true, storageKey: true, createdAt: true,
-          caseIntakes: recentReceipts(causaId, "manual"),
+          driveImport: { select: { causaId: true, driveVersion: true, importedAt: true } },
+          pjudDocumentJobs: { where: savedOjv, select: { id: true }, take: 1 },
         },
       }),
-      tx.documento.findMany({
+      ...intakeSources.map(source => tx.documento.findMany({
         where: pageDocuments,
-        select: { id: true, caseIntakes: recentReceipts(causaId, "mail") },
-      }),
+        select: { id: true, caseIntakes: recentReceipts(causaId, source) },
+      })),
     ]);
-    const manualByDocument = new Map(documents.map(doc => [doc.id, doc]));
-    const mailByDocument = new Map(mailDocuments.map(doc => [doc.id, doc.caseIntakes]));
-    const mailboxReceiptKeys = mailDocuments.flatMap(doc => doc.caseIntakes.flatMap(receipt => receipt.mailboxAttachmentId ? [receipt.mailboxAttachmentId] : []));
+    const documentsById = new Map(documents.map(doc => [doc.id, doc]));
+    const receiptsByKind = new Map(intakeSources.map((source, index) => [
+      source, new Map(receiptGroups[index].map(doc => [doc.id, doc.caseIntakes])),
+    ]));
+    const mailboxReceiptKeys = [...(receiptsByKind.get("mail")?.values() ?? [])].flatMap(receipts =>
+      receipts.flatMap(receipt => receipt.mailboxAttachmentId ? [receipt.mailboxAttachmentId] : []));
     const legacyMailIds = documents.filter(doc => legacySource(doc.storageKey) === "mail").map(doc => doc.id);
     const ownMail = mailboxReceiptKeys.length || legacyMailIds.length ? await tx.mailboxAttachment.findMany({
       where: {
@@ -191,31 +204,35 @@ export async function listCaseUpdates(
         kind: "mail-notice", messageId: row.id, latestAt: row.receivedAt.toISOString(),
         mailHref: `/correo?id=${encodeURIComponent(row.id)}`,
       }];
-      const doc = manualByDocument.get(row.id);
+      const doc = documentsById.get(row.id);
       if (!doc) return [];
-      const manual = doc.caseIntakes;
-      const mail = mailByDocument.get(doc.id) ?? [];
-      const origins: CaseUpdateOrigin[] = [
-        ...manual.slice(0, originsPerKind).map(receipt => ({
-          kind: "manual" as const, receivedAt: receipt.receivedAt.toISOString(), documentVersion: receipt.documentVersion,
-        })),
-        ...mail.slice(0, originsPerKind).map(receipt => {
-          const attachment = receipt.mailboxAttachmentId ? ownMailByReceipt.get(receipt.mailboxAttachmentId) : undefined;
+      const drive = doc.driveImport?.causaId === causaId ? doc.driveImport : null;
+      let moreOrigins = false;
+      const origins: CaseUpdateOrigin[] = intakeSources.flatMap(kind => {
+        const receipts = receiptsByKind.get(kind)?.get(doc.id) ?? [];
+        if (receipts.length > originsPerKind) moreOrigins = true;
+        return receipts.slice(0, originsPerKind).map(receipt => {
+          const attachment = kind === "mail" && receipt.mailboxAttachmentId ? ownMailByReceipt.get(receipt.mailboxAttachmentId) : undefined;
           return {
-            kind: "mail" as const, receivedAt: receipt.receivedAt.toISOString(), documentVersion: receipt.documentVersion,
+            kind, receivedAt: receipt.receivedAt.toISOString(), documentVersion: receipt.documentVersion,
+            ...(kind === "drive" && drive ? { sourceRevision: drive.driveVersion } : {}),
             ...(attachment?.documentoId === doc.id ? { mailHref: `/correo?id=${encodeURIComponent(attachment.message.id)}` } : {}),
           };
-        }),
-      ];
+        });
+      });
       const fallback = legacySource(doc.storageKey);
-      const fallbackNeeded = (fallback === "manual" && !manual.length) || (fallback === "mail" && !mail.length);
-      if (fallbackNeeded && fallback) {
-        const attachment = fallback === "mail" ? ownMailByDocument.get(doc.id) : undefined;
+      const recordLegacy = (kind: IntakeSource, date: Date) => {
+        if (origins.some(origin => origin.kind === kind)) return;
+        const attachment = kind === "mail" ? ownMailByDocument.get(doc.id) : undefined;
         origins.push({
-          kind: fallback, receivedAt: doc.createdAt.toISOString(), documentVersion: doc.version === 1 ? 1 : null,
+          kind, receivedAt: date.toISOString(), documentVersion: doc.version === 1 ? 1 : null,
+          ...(kind === "drive" && drive ? { sourceRevision: drive.driveVersion } : {}),
           ...(attachment ? { mailHref: `/correo?id=${encodeURIComponent(attachment.message.id)}` } : {}),
         });
-      }
+      };
+      if (fallback) recordLegacy(fallback, doc.createdAt);
+      if (drive) recordLegacy("drive", drive.importedAt);
+      if (doc.pjudDocumentJobs.length || doc.storageKey?.startsWith("pjud/")) recordLegacy("ojv", doc.createdAt);
       if (!origins.length) return [];
       return [{
         kind: "document",
@@ -225,10 +242,10 @@ export async function listCaseUpdates(
         version: doc.version,
         status: doc.extractionStatus,
         latestAt: row.receivedAt.toISOString(),
-        firstReceivedAt: new Date(fallbackNeeded ? Math.min(doc.createdAt.getTime(), row.firstAt.getTime()) : row.firstAt.getTime()).toISOString(),
+        firstReceivedAt: origins.reduce((earliest, origin) => origin.receivedAt < earliest ? origin.receivedAt : earliest, row.firstAt.toISOString()),
         hasOriginal: Boolean(doc.storageKey),
         origins: origins.sort((a, b) => b.receivedAt.localeCompare(a.receivedAt) || a.kind.localeCompare(b.kind)),
-        moreOrigins: manual.length > originsPerKind || mail.length > originsPerKind,
+        moreOrigins,
       }];
     });
     const last = page.at(-1);

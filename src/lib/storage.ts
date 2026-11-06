@@ -14,7 +14,7 @@ export async function discardBookImportAttempt(key: string): Promise<void> {
 
 export async function discardCaseUploadAttempt(key: string): Promise<void> {
   assertSafeStorageKey(key);
-  if (!/^documentos\/case-intake-attempt\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(key)) {
+  if (!/^(?:documentos\/case-intake-attempt|pjud\/intake-attempt)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(key)) {
     throw new Error("Sólo se puede limpiar un intento aislado de carga");
   }
   await discardIsolatedObject(key);

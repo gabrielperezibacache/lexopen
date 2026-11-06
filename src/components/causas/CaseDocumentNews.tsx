@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDownToLine, FilePlus2, Mail } from "lucide-react";
+import { ArrowDownToLine, Cloud, FilePlus2, Landmark, Mail } from "lucide-react";
 import { formatDateTime } from "@/components/ui";
 import type { listCaseUpdates } from "@/lib/causas/updates";
 import type { Locale } from "@/lib/i18n";
@@ -15,13 +15,18 @@ export function CaseDocumentNews({ feed, archiveHref, newsHref, older, canWrite,
   locale: Locale;
 }) {
   const tr = (es: string, en: string) => locale === "en" ? en : es;
-  const originLabel = { manual: tr("Carga manual", "Manual upload"), mail: tr("Correo", "Mail") };
+  const origins = {
+    manual: { label: tr("Carga manual", "Manual upload"), Icon: FilePlus2 },
+    mail: { label: tr("Correo", "Mail"), Icon: Mail },
+    drive: { label: "Google Drive", Icon: Cloud },
+    ojv: { label: "OJV", Icon: Landmark },
+  };
   return (
     <section className="panel rounded-[var(--radius-lg)] p-4 sm:p-5" aria-labelledby="case-news-title" data-testid="case-news">
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <h2 id="case-news-title" className="text-lg font-semibold">{tr("Últimos ingresos", "Recent additions")}</h2>
-          <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">{tr("Documentos y avisos incorporados por correo o carga manual, con el origen de cada ingreso.", "Documents and notices received by email or uploaded manually, with the source of each intake.")}</p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">{tr("Revisa los documentos y avisos del expediente y el origen de cada ingreso.", "Review the documents and notices in this case file and the source of each intake.")}</p>
         </div>
         {canWrite && <Link className="btn btn-secondary" href={`${archiveHref}#incorporar-documentos`}><FilePlus2 size={16} aria-hidden="true" />{tr("Añadir archivos", "Add files")}</Link>}
       </header>
@@ -38,6 +43,7 @@ export function CaseDocumentNews({ feed, archiveHref, newsHref, older, canWrite,
             );
             const id = encodeURIComponent(item.documentId);
             const kinds = [...new Set(item.origins.map(origin => origin.kind))];
+            const driveRevision = item.origins.find(origin => origin.kind === "drive")?.sourceRevision;
             const showHistory = item.origins.length > 1 || item.moreOrigins || item.version > 1 || Boolean(item.origins[0]?.mailHref);
             return (
               <li key={item.documentId} className="grid gap-x-5 gap-y-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
@@ -48,9 +54,10 @@ export function CaseDocumentNews({ feed, archiveHref, newsHref, older, canWrite,
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
                     <time dateTime={item.latestAt}>{formatDateTime(item.latestAt, locale)}</time>
                     {kinds.map(kind => {
-                      const Icon = kind === "mail" ? Mail : FilePlus2;
-                      return <span key={kind} className="inline-flex items-center gap-1.5"><Icon size={14} aria-hidden="true" />{originLabel[kind]}</span>;
+                      const { label, Icon } = origins[kind];
+                      return <span key={kind} className="inline-flex items-center gap-1.5"><Icon size={14} aria-hidden="true" />{label}</span>;
                     })}
+                    {driveRevision && <span>{tr("Revisión de Drive", "Drive revision")} {driveRevision}</span>}
                     {item.version > 1 && <span>{tr("Versión", "Version")} {item.version}</span>}
                     {["failed", "needs_ocr"].includes(item.status || "") && <span>{tr("Revisar lectura", "Check extracted text")}</span>}
                     {["pending", "queued", "processing"].includes(item.status || "") && <span>{tr("Preparando texto", "Extracting text")}</span>}
@@ -67,7 +74,7 @@ export function CaseDocumentNews({ feed, archiveHref, newsHref, older, canWrite,
                     <ul className="space-y-1 pb-1 text-xs text-[var(--muted)]">
                       {item.origins.map((origin, index) => (
                         <li key={`${origin.kind}-${origin.receivedAt}-${index}`} className="flex flex-wrap items-center gap-x-2">
-                          <span>{originLabel[origin.kind]}</span>
+                          <span>{origins[origin.kind].label}</span>
                           <time dateTime={origin.receivedAt}>{formatDateTime(origin.receivedAt, locale)}</time>
                           {item.version > 1 && <span>{origin.documentVersion
                             ? `${tr("Versión", "Version")} ${origin.documentVersion}`
@@ -83,7 +90,7 @@ export function CaseDocumentNews({ feed, archiveHref, newsHref, older, canWrite,
             );
           })}
         </ol>
-      ) : <p className="mt-4 border-t border-[var(--line)] pt-4 text-sm text-[var(--muted)]">{tr("Todavía no hay ingresos por correo ni archivos cargados en esta causa.", "There are no email attachments or manual uploads for this matter yet.")}</p>}
+      ) : <p className="mt-4 border-t border-[var(--line)] pt-4 text-sm text-[var(--muted)]">{tr("Todavía no hay ingresos en esta causa.", "There are no additions to this matter yet.")}</p>}
       {(older || feed.nextBefore) && (
         <nav className="mt-2 flex flex-wrap gap-x-3 text-sm" aria-label={tr("Páginas de novedades", "Updates pages")}>
           {older && <Link className="btn btn-ghost" href={newsHref}>{tr("Volver a lo reciente", "Back to recent")}</Link>}

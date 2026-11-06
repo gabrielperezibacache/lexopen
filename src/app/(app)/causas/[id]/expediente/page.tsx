@@ -24,12 +24,6 @@ type Params = {
 };
 
 const pageSize = 40;
-const pjud: Prisma.DocumentoWhereInput = { OR: [
-  { pjudDocumentJobs: { some: { status: "saved" } } },
-  { storageKey: { not: null, startsWith: "pjud/" } },
-] };
-const drive: Prisma.DocumentoWhereInput = { driveImport: { isNot: null } };
-const origins: Record<string, Prisma.DocumentoWhereInput> = { pjud, drive, lexopen: { NOT: [pjud, drive] } };
 
 export default async function CaseArchivePage({ params, searchParams }: Params) {
   const [user, { id }, filters] = await Promise.all([requireStaffPage(), params, searchParams]);
@@ -111,6 +105,21 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
   const folder = folderId ? byId.get(folderId)! : null;
   const trail = folderId ? pathFor(folderId) : [];
   const q = typeof filters.q === "string" ? filters.q.trim().slice(0, 120) : "";
+  const savedOjv = { causaId: id, status: "saved" };
+  const ojvIntake = { causaId: id, source: "ojv" };
+  const pjud: Prisma.DocumentoWhereInput = { OR: [
+    { pjudDocumentJobs: { some: savedOjv } },
+    { caseIntakes: { some: ojvIntake } },
+    { storageKey: { not: null, startsWith: "pjud/" } },
+  ] };
+  const drive: Prisma.DocumentoWhereInput = { driveImport: { is: { causaId: id } } };
+  const lexopen: Prisma.DocumentoWhereInput = { OR: [
+    { NOT: [pjud, drive] },
+    { caseIntakes: { some: { causaId: id, source: { in: ["manual", "mail"] } } } },
+    { storageKey: { startsWith: "documentos/" } },
+    { storageKey: { startsWith: "correo/" } },
+  ] };
+  const origins: Record<string, Prisma.DocumentoWhereInput> = { pjud, drive, lexopen };
   const origin = typeof filters.origen === "string" && Object.hasOwn(origins, filters.origen) ? filters.origen : "";
   const page = Math.min(5000, Math.max(1, Number.parseInt(String(filters.pagina), 10) || 1));
   function href(next: { folderId?: string | null; page?: number; preserve?: boolean } = {}) {
@@ -141,8 +150,9 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
       select: {
         id: true, nombre: true, ruta: true, storageKey: true, googleDriveId: true, extractionStatus: true, confidencial: true, privilegio: true,
         archivePlacement: { select: { folderId: true } },
-        driveImport: { select: { id: true } },
-        pjudDocumentJobs: { where: { status: "saved" }, take: 1, select: { id: true } },
+        driveImport: { select: { causaId: true } },
+        pjudDocumentJobs: { where: savedOjv, take: 1, select: { id: true } },
+        caseIntakes: { where: ojvIntake, take: 1, select: { id: true } },
       },
     }),
   ]);
@@ -154,12 +164,12 @@ export default async function CaseArchivePage({ params, searchParams }: Params) 
   const studyDriveFolderId = (!causa.driveSyncSubscription || causa.driveSyncSubscription.account === "study") &&
     isRealDriveFolderId(causa.googleDriveFolderId) ? causa.googleDriveFolderId : null;
   const rows = documents.map(document => {
-    const fromDrive = Boolean(document.driveImport);
-    const fromPjud = Boolean(document.pjudDocumentJobs.length || document.storageKey?.startsWith("pjud/"));
+    const fromDrive = document.driveImport?.causaId === id;
+    const fromPjud = Boolean(document.pjudDocumentJobs.length || document.caseIntakes.length || document.storageKey?.startsWith("pjud/"));
     return {
       id: document.id, name: document.nombre, route: document.ruta, status: document.extractionStatus,
       folder: document.archivePlacement ? destinationNames.get(document.archivePlacement.folderId) || null : null,
-      source: fromDrive ? "Importado de Drive" : fromPjud ? "Descargado de OJV" : "LexOpen",
+      source: fromDrive && fromPjud ? "Google Drive y OJV" : fromDrive ? "Importado de Drive" : fromPjud ? "Descargado de OJV" : "LexOpen",
       hasStudyCopy: Boolean(studyDriveFolderId && document.googleDriveId),
       copyToStudyFolderId: canWrite && document.storageKey && !fromDrive && !document.googleDriveId && !document.confidencial && !document.privilegio ? studyDriveFolderId : null,
       assistantHref: canAsk ? assistant(document.id) : null,

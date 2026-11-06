@@ -27,6 +27,7 @@ import type { Prisma } from "@prisma/client";
 import { normalizePjudCuaderno, omitLegacyScrapeAliases, type PjudCausaRef, type PjudFetchedMovimiento, type PjudCuadernosCoverage } from "@/lib/pjud/types";
 import { cuadernosCoverageNote, normalizeCuadernosCoverage, unknownCuadernosCoverage } from "@/lib/pjud/cuadernos-coverage";
 import { enqueuePjudDocumentJobs, processPendingPjudDocumentJobs, pjudDocumentProgress } from "@/lib/pjud/document-queue";
+import { pjudDocumentRefHash } from "@/lib/pjud/document-identity";
 
 /** Process-local provider for an authenticated session; never accepted from JSON. */
 export type PjudMovimientosFetcher = (causa: PjudCausaRef) => Promise<PjudFetchResult>;
@@ -411,12 +412,15 @@ export async function syncCausaPjud(
     });
     if (!mov || mov.documentoRef?.startsWith("doc:")) continue;
     try {
+      await opts?.assertActive?.();
       const id = await ingestPjudDocumentBuffer({
         causaId,
         movimientoId: mov.id,
         bytes: m.documentoBytes,
         filename: m.documentoFilename,
         esReceptor: m.esReceptor,
+        actorId: opts?.fetchMovimientos ? opts.actorId || undefined : undefined,
+        expectedSourceRefHash: pjudDocumentRefHash(causaId, mov.id, mov.documentoRef || ""),
         requireReceipt: true,
       });
       if (id) pdfBackedUp += 1;

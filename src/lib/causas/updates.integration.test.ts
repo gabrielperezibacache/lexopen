@@ -49,6 +49,18 @@ async function main() {
     const confidential = await addDoc("Documento confidencial.pdf", { confidential: true, day: 19 });
     const other = await addDoc("Documento de otra causa.pdf", { causaId: different.id });
     const drive = await addDoc("Importado por otro medio.pdf", { key: `drive/${tag}/archivo.pdf`, ruta: "correo/pjud" });
+    const legacyDrive = await addDoc("Revisión de Drive anterior.pdf", { key: `drive/${tag}/original.pdf` });
+    const legacyOjv = await addDoc("Original judicial anterior.pdf", { key: `pjud/${tag}/original.pdf` });
+    const [driveReceipt] = await Promise.all([
+      prisma.driveDocumentImport.create({ data: {
+        causaId: cause.id, documentoId: combined.id, folderId: "private-folder", driveFileId: `${tag}-connected`,
+        driveVersion: "7", exportMimeType: "", sourceSha256: "a".repeat(64), importedAt: when(13),
+      } }),
+      prisma.driveDocumentImport.create({ data: {
+        causaId: cause.id, documentoId: legacyDrive.id, folderId: "private-folder", driveFileId: `${tag}-legacy`,
+        driveVersion: "6", exportMimeType: "", sourceSha256: "b".repeat(64), importedAt: when(2),
+      } }),
+    ]);
     const account = await prisma.mailboxAccount.create({ data: { userId: owner.id } });
 
     async function addMail(documentoId: string, day: number, receipt: boolean) {
@@ -81,6 +93,8 @@ async function main() {
     const otherCaseNotice = await newNotice(18, { causaId: different.id });
     await prisma.caseDocumentIntake.createMany({ data: [
       { causaId: cause.id, documentoId: combined.id, source: "manual", sourceKey: `${tag}-manual`, sourceName: secret, actorId: owner.id, receivedAt: when(2) },
+      { causaId: cause.id, documentoId: combined.id, source: "drive", sourceKey: driveReceipt.id, sourceName: secret, actorId: owner.id, receivedAt: when(13) },
+      { causaId: cause.id, documentoId: combined.id, source: "ojv", sourceKey: `${tag}-ojv`, sourceName: secret, actorId: owner.id, receivedAt: when(15) },
       { causaId: cause.id, documentoId: confidential.id, source: "manual", sourceKey: `${tag}-confidential`, sourceName: secret, receivedAt: when(19) },
       // Broken historical relation must not admit another matter's document into this one.
       { causaId: cause.id, documentoId: other.id, source: "manual", sourceKey: `${tag}-wrong-scope`, sourceName: secret, receivedAt: when(20) },
@@ -94,28 +108,36 @@ async function main() {
     const update = visibleDocuments.find(item => item.documentId === combined.id);
     assert.ok(update);
     assert.equal(update.firstReceivedAt, when(2).toISOString());
-    assert.equal(update.latestAt, when(12).toISOString());
+    assert.equal(update.latestAt, when(15).toISOString());
     assert.equal(update.status, "pending");
     assert.equal(update.version, 2);
     assert.equal(update.hasOriginal, true);
     assert.deepEqual(update.origins, [
+      { kind: "ojv", receivedAt: when(15).toISOString(), documentVersion: 1 },
+      { kind: "drive", receivedAt: when(13).toISOString(), documentVersion: 1, sourceRevision: "7" },
       { kind: "mail", receivedAt: when(12).toISOString(), documentVersion: 1, mailHref: `/correo?id=${secondMail.id}` },
       { kind: "mail", receivedAt: when(10).toISOString(), documentVersion: 1, mailHref: `/correo?id=${firstMail.id}` },
       { kind: "manual", receivedAt: when(2).toISOString(), documentVersion: 1 },
     ]);
     assert.deepEqual(visibleDocuments.find(item => item.documentId === legacyManual.id)?.origins, [{ kind: "manual", receivedAt: when(2).toISOString(), documentVersion: 1 }]);
     assert.deepEqual(visibleDocuments.find(item => item.documentId === legacyMail.id)?.origins, [{ kind: "mail", receivedAt: when(2).toISOString(), documentVersion: 1, mailHref: `/correo?id=${oldMail.id}` }]);
+    assert.deepEqual(visibleDocuments.find(item => item.documentId === legacyDrive.id)?.origins, [{ kind: "drive", receivedAt: when(2).toISOString(), documentVersion: 1, sourceRevision: "6" }]);
+    assert.deepEqual(visibleDocuments.find(item => item.documentId === legacyOjv.id)?.origins, [{ kind: "ojv", receivedAt: when(2).toISOString(), documentVersion: 1 }]);
     assert.ok(!visibleDocuments.some(item => item.documentId === drive.id || item.documentId === other.id));
     assert.deepEqual(visible.items.filter(item => item.kind === "mail-notice"), [{
       kind: "mail-notice", messageId: ownerNotice.id, latestAt: when(11).toISOString(), mailHref: `/correo?id=${ownerNotice.id}`,
     }]);
     for (const hidden of [mismatch, pending, otherCaseNotice, ownColleagueNotice]) assert.ok(!JSON.stringify(visible).includes(hidden.id));
     assert.equal(visible.nextBefore, null);
-    assert.doesNotMatch(JSON.stringify(visible), /Contenidos reservados|privado@example\.invalid|correo\/inbox|sourceKey/);
+    assert.doesNotMatch(JSON.stringify(visible), /Contenidos reservados|privado@example\.invalid|correo\/inbox|sourceKey|private-folder/);
 
     const colleagueFeed = await listCaseUpdates(cause.id, colleague);
     const colleagueDocuments = colleagueFeed.items.filter(item => item.kind === "document");
-    assert.deepEqual(colleagueDocuments.find(item => item.documentId === combined.id)?.origins, update.origins.map(({ kind, receivedAt, documentVersion }) => ({ kind, receivedAt, documentVersion })));
+    assert.deepEqual(colleagueDocuments.find(item => item.documentId === combined.id)?.origins, update.origins.map(origin => {
+      const expected = { ...origin };
+      delete expected.mailHref;
+      return expected;
+    }));
     assert.ok(!colleagueDocuments.some(item => item.documentId === confidential.id));
     assert.deepEqual(colleagueFeed.items.filter(item => item.kind === "mail-notice").map(item => item.messageId), [ownColleagueNotice.id]);
     for (const hidden of [firstMail, oldMail, ownerNotice]) assert.ok(!JSON.stringify(colleagueFeed).includes(hidden.id));
@@ -141,12 +163,12 @@ async function main() {
     assert.deepEqual(combinedPages, [
       confidential.id, combined.id, ownerNotice.id, ...ties.map(doc => doc.id).sort().reverse(),
       ...mailTies.map(mail => mail.id).sort().reverse(),
-      ...[legacyManual.id, legacyMail.id].sort().reverse(),
+      ...[legacyManual.id, legacyMail.id, legacyDrive.id, legacyOjv.id].sort().reverse(),
     ]);
 
     await prisma.causaMiembro.delete({ where: { id: membership.id } });
     await assert.rejects(listCaseUpdates(cause.id, colleague), httpStatus(404));
-    console.log("Novedades: two origins on one document, private mail links and notices, legacy rows, revoked access and stable mixed keyset pagination passed.");
+    console.log("Novedades: four sources on one document, Drive revisions, private mail, legacy rows, revoked access and mixed pagination passed.");
   } finally {
     await prisma.documento.deleteMany({ where: { id: { in: documentIds } } });
     await prisma.causa.deleteMany({ where: { id: { in: caseIds } } });

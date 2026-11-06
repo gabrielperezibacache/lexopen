@@ -1,11 +1,14 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { pjudDocumentRefHash } from "./document-identity";
-import { assertCausaCapability } from "@/lib/auth/causa-access";
+import { assertCausaCapability, documentReadWhere } from "@/lib/auth/causa-access";
 import { prisma } from "@/lib/db";
 import { fetchSafeOutbound, isSafeOutboundHttpUrl } from "@/lib/net/safe-url";
-import { putObject } from "@/lib/storage";
+import { discardCaseUploadAttempt, putObject } from "@/lib/storage";
 import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 import { assertPjudManagementEnabled, getCaseManagementMode } from "@/lib/causas/management-mode";
+import { findCaseIntakeOriginal } from "@/lib/causas/document-intake";
+import { serializable } from "@/lib/command-execution";
 
 /**
  * PDF backup: explicit PJUD_PDF_BACKUP=1|0, else on when public scrape is enabled
@@ -71,6 +74,15 @@ export function isBackupableDocumentoRef(ref: string | null | undefined) {
   }
 }
 
+async function authorizeDownloadActor(causaId: string, actorId: string, client: Prisma.TransactionClient = prisma) {
+  const actor = await client.user.findUniqueOrThrow({
+    where: { id: actorId },
+    select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true },
+  });
+  await assertCausaCapability(causaId, actor, "causa.write", client);
+  return actor;
+}
+
 /**
  * Persist PDF/DOC bytes captured during scrape into Documento + link movimiento.
  */
@@ -81,6 +93,8 @@ export async function ingestPjudDocumentBuffer(opts: {
   filename?: string | null;
   esReceptor?: boolean;
   mimeHint?: string | null;
+  actorId?: string;
+  expectedSourceRefHash?: string;
   receiptLeaseToken?: string;
   requireReceipt?: boolean;
   enqueue?: typeof enqueueDocumentProcessing;
@@ -89,7 +103,7 @@ export async function ingestPjudDocumentBuffer(opts: {
   if (buf.byteLength < 100 || buf.byteLength > 20 * 1024 * 1024) {
     return null;
   }
-  if (await getCaseManagementMode() !== "pjud_cl") return null;
+  if (process.env.PJUD_DOC_DOWNLOADS?.trim() === "0" || await getCaseManagementMode() !== "pjud_cl") return null;
   if (
     /^\s*<(!DOCTYPE|html|head|body)/i.test(buf.subarray(0, 200).toString("utf8"))
   ) {
@@ -107,55 +121,65 @@ export async function ingestPjudDocumentBuffer(opts: {
     return null;
   }
 
-  // Check the durable tombstone before even writing storage bytes again.
-  const receipt = await prisma.pjudDocumentJob.findUnique({ where: { movimientoId: opts.movimientoId }, select: { status: true, documentoId: true, actorId: true, leaseToken: true, leaseExpiresAt: true } });
-  if (receipt?.status === "saved") return receipt.documentoId;
-  if ((opts.requireReceipt || opts.receiptLeaseToken) && !receipt) return null;
-  if (receipt && !receipt.actorId) return null;
-  if (opts.receiptLeaseToken && (!receipt || receipt.status !== "running" || receipt.leaseToken !== opts.receiptLeaseToken || !receipt.leaseExpiresAt || receipt.leaseExpiresAt <= new Date())) return null;
-  if (receipt?.actorId) {
-    const cause = await prisma.causa.findUniqueOrThrow({ where: { id: opts.causaId }, select: { pjudDocumentDownloadOwnerId: true, pjudDocumentDownloadsEnabled: true, pjudMonitoreoActivo: true } });
-    if (!cause.pjudDocumentDownloadsEnabled || !cause.pjudMonitoreoActivo || cause.pjudDocumentDownloadOwnerId !== receipt.actorId) return null;
-    const actor = await prisma.user.findUniqueOrThrow({ where: { id: receipt.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
-    await assertCausaCapability(opts.causaId, actor, "causa.write");
-  }
-  const existingMovement = await prisma.causaMovimiento.findUnique({ where: { id: opts.movimientoId }, select: { causaId: true, documentoRef: true } });
-  if (!existingMovement || existingMovement.causaId !== opts.causaId) throw new Error("Documento fuera del expediente");
-  if (existingMovement.documentoRef?.startsWith("doc:")) return existingMovement.documentoRef.slice(4);
-
   const filename = (opts.filename || `pjud-${opts.movimientoId}.pdf`)
     .replace(/[^\w.\-()+ ]+/g, "_")
     .slice(0, 180);
   const sourceSha256 = createHash("sha256").update(buf).digest("hex");
-  const key = `pjud/${encodeURIComponent(opts.causaId)}/${encodeURIComponent(opts.movimientoId)}/${sourceSha256}`;
-  await putObject({ key, body: buf, contentType: mime });
-  const result = await prisma.$transaction(async tx => {
+  const key = `pjud/intake-attempt/${randomUUID()}`;
+  let staged: ReturnType<typeof putObject> | undefined;
+  const result = await serializable(async tx => {
     await assertPjudManagementEnabled(tx);
     await tx.$queryRaw`SELECT id FROM "Causa" WHERE id = ${opts.causaId} FOR UPDATE`;
     const movement = await tx.causaMovimiento.findUniqueOrThrow({ where: { id: opts.movimientoId } });
     if (movement.causaId !== opts.causaId) throw new Error("Documento fuera del expediente");
     const prior = await tx.pjudDocumentJob.findUnique({ where: { movimientoId: movement.id } });
+    if (prior && prior.causaId !== opts.causaId) throw new Error("Documento fuera del expediente");
     if ((opts.requireReceipt || opts.receiptLeaseToken) && !prior) return { id: null, created: false };
-    if (prior?.status === "saved") return { id: prior.documentoId, created: false };
-    if (movement.documentoRef?.startsWith("doc:")) return { id: movement.documentoRef.slice(4), created: false };
+    let actor = opts.actorId ? await authorizeDownloadActor(opts.causaId, opts.actorId, tx) : null;
+    if (opts.requireReceipt && actor && actor.id !== prior?.actorId) return { id: null, created: false };
+    if (prior?.status === "saved" || movement.documentoRef?.startsWith("doc:")) {
+      const id = prior?.status === "saved" ? prior.documentoId : movement.documentoRef!.slice(4);
+      const doc = id && await tx.documento.findFirst({
+        where: { AND: [{ id, causaId: opts.causaId }, ...(actor ? [documentReadWhere(actor)] : [])] },
+        select: { id: true },
+      });
+      return { id: doc ? doc.id : null, created: false };
+    }
     if (opts.receiptLeaseToken && (!prior || prior.leaseToken !== opts.receiptLeaseToken || prior.status !== "running" || !prior.leaseExpiresAt || prior.leaseExpiresAt <= new Date())) return { id: null, created: false };
     if (!opts.receiptLeaseToken && prior?.status === "running") return { id: null, created: false };
     if (process.env.PJUD_DOC_DOWNLOADS?.trim() === "0") return { id: null, created: false };
+    const sourceRefHash = pjudDocumentRefHash(opts.causaId, movement.id, movement.documentoRef || "");
+    if (opts.expectedSourceRefHash && opts.expectedSourceRefHash !== sourceRefHash) return { id: null, created: false };
     if (prior) {
       const cause = await tx.causa.findUniqueOrThrow({ where: { id: opts.causaId }, select: { pjudDocumentDownloadsEnabled: true, pjudMonitoreoActivo: true, pjudDocumentDownloadOwnerId: true } });
       if (!cause.pjudDocumentDownloadsEnabled || !cause.pjudMonitoreoActivo) return { id: null, created: false };
       if (!prior.actorId || prior.actorId !== cause.pjudDocumentDownloadOwnerId) return { id: null, created: false };
-      if (prior.sourceRefHash !== pjudDocumentRefHash(opts.causaId, movement.id, movement.documentoRef || "")) return { id: null, created: false };
-      if (prior.actorId) {
-        const actor = await tx.user.findUniqueOrThrow({ where: { id: prior.actorId }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
-        await assertCausaCapability(opts.causaId, actor, "causa.write", tx);
-      }
+      if (prior.sourceRefHash !== sourceRefHash) return { id: null, created: false };
+      const owner = actor?.id === prior.actorId ? actor : await authorizeDownloadActor(opts.causaId, prior.actorId, tx);
+      actor ??= owner;
     }
-    const doc = await tx.documento.create({ data: { nombre: filename, tipo: opts.esReceptor ? "notificacion" : "escrito", mimeType: mime, storageKey: key, causaId: opts.causaId, ruta: "PJUD", extractionStatus: "pending" } });
+    const intakeKey = { causaId: opts.causaId, source: "ojv", sourceKey: movement.id };
+    // Manual downloads can predate the durable queue. The intake still protects a removed original.
+    if (await tx.caseDocumentIntake.findUnique({ where: { causaId_source_sourceKey: intakeKey }, select: { id: true } })) {
+      return { id: null, created: false };
+    }
+    const reusable = actor && await findCaseIntakeOriginal(tx, actor, {
+      causaId: opts.causaId, clienteId: null, confidencial: false, privilegio: false,
+    }, { sourceSha256, sizeBytes: buf.byteLength });
+    if (!reusable) {
+      staged ??= putObject({ key, body: buf, contentType: mime });
+      await staged;
+    }
+    const doc = reusable || await tx.documento.create({ data: { nombre: filename, tipo: opts.esReceptor ? "notificacion" : "escrito", mimeType: mime, storageKey: key, causaId: opts.causaId, ruta: "PJUD", extractionStatus: "pending" } });
+    await tx.caseDocumentIntake.create({ data: {
+      ...intakeKey, documentoId: doc.id, documentVersion: doc.version, sourceSha256, sourceName: filename,
+      storageKey: doc.storageKey, actorId: actor?.id,
+    } });
     await tx.causaMovimiento.update({ where: { id: movement.id }, data: { documentoRef: `doc:${doc.id}` } });
     if (prior) await tx.pjudDocumentJob.update({ where: { id: prior.id }, data: { status: "saved", documentoId: doc.id, sourceSha256, lastError: null, lastErrorCode: null, leaseToken: null, leaseExpiresAt: null } });
-    return { id: doc.id, created: true };
+    return { id: doc.id, created: !reusable };
   });
+  if (!result.created && staged) await discardCaseUploadAttempt(key).catch(() => undefined);
   if (result.id && result.created) (opts.enqueue || enqueueDocumentProcessing)({ id: result.id, name: filename, bytes: buf });
   return result.id;
 }
@@ -170,6 +194,7 @@ export async function backupMovimientoDocuments(
   opts?: {
     max?: number;
     delayMs?: number;
+    actorId?: string;
     /** Manual import bypasses backup preferences, but never the download kill switch. */
     force?: boolean;
     onProgress?: (info: {
@@ -214,6 +239,7 @@ export async function backupMovimientoDocuments(
 
     try {
       await assertPjudManagementEnabled();
+      if (opts?.actorId) await authorizeDownloadActor(causaId, opts.actorId);
       const parsed = new URL(ref!);
       const res = await fetchSafeOutbound(ref!, {
         allowHttp: process.env.NODE_ENV !== "production",
@@ -237,6 +263,8 @@ export async function backupMovimientoDocuments(
           `pjud-${mov.folio || mov.id}.pdf`,
         esReceptor: mov.esReceptor,
         mimeHint: contentType,
+        actorId: opts?.actorId,
+        expectedSourceRefHash: pjudDocumentRefHash(causaId, mov.id, ref!),
       });
       if (id) saved += 1;
       else skipped += 1;

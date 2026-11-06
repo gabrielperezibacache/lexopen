@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Causa no encontrada" }, { status: 404 });
     }
 
-    const result = startCausaDocImport(id);
+    const result = startCausaDocImport(id, user.id);
     if (result.globalBusy) {
       return NextResponse.json(
         {

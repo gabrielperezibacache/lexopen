@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { assertCausaAccess, assertCausaCapability, documentReadWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
 import { isStaff } from "@/lib/auth/rbac";
 import { writeAuditStrict } from "@/lib/audit";
+import { findCaseIntakeOriginal } from "@/lib/causas/document-intake";
 import { inferDocumentoTipo } from "@/lib/document-ingest";
 import { enqueueDocumentProcessing } from "@/lib/document-processing-queue";
 import { MAX_STORAGE_OBJECT_BYTES, putObject } from "@/lib/storage";
@@ -160,7 +161,7 @@ export async function listDriveImportCandidates(causaId: string, user: CausaAcce
   } finally { io.close(); }
 }
 
-/** Explicit single-file import; a new Drive version creates a separate local original. */
+/** Import the selected revision and retain separate originals across revisions of a Drive file. */
 export async function importSelectedDriveFile(input: { causaId: string; folderId: string; fileId: string; version: string }, user: CausaAccessUser, options: Dependencies = {}) {
   validateId(input.folderId); validateId(input.fileId);
   if (!VERSION.test(input.version)) throw fail("Seleccione una revisión válida desde la lista Drive", 400, "invalid_drive_version");
@@ -181,9 +182,12 @@ export async function importSelectedDriveFile(input: { causaId: string; folderId
     const prior = await client.driveDocumentImport.findUnique({ where: unique, select: { documentoId: true, sourceSha256: true } });
     if (prior) {
       if (!prior.documentoId) throw fail("Esta revisión fue eliminada del expediente. Puede cargar el archivo manualmente si desea recuperarlo.", 410, "drive_import_removed");
+      await options.assertActive?.(client);
       const current = await scope(input.causaId, user, client, true);
-      if (current.folderId !== input.folderId || !await client.documento.count({ where: { id: prior.documentoId, ...documentReadWhere(current.actor) } })) throw fail("Documento no encontrado o sin acceso", 404, "import_not_found");
-      return { documentoId: prior.documentoId, sourceSha256: prior.sourceSha256, reused: true, href: `/documentos/${prior.documentoId}/fuentes` };
+      if (current.folderId !== input.folderId || !await client.documento.count({ where: {
+        AND: [{ id: prior.documentoId, causaId: input.causaId }, documentReadWhere(current.actor)],
+      } })) throw fail("Documento no encontrado o sin acceso", 404, "import_not_found");
+      return { documentoId: prior.documentoId, sourceSha256: prior.sourceSha256, reused: true, reusedDocument: true, href: `/documentos/${prior.documentoId}/fuentes` };
     }
     const path = exported ? `/${file.id}/export?${new URLSearchParams({ mimeType: exported.mimeType })}` : `/${file.id}?${new URLSearchParams({ alt: "media", supportsAllDrives: "true" })}`;
     const bytes = await io.get(path, exported ? 10 * 1024 * 1024 : MAX_STORAGE_OBJECT_BYTES);
@@ -196,7 +200,8 @@ export async function importSelectedDriveFile(input: { causaId: string; folderId
     await assertFolderWithinRoot(io, before.folderId, sourceFolderId);
     const sourceSha256 = hash(bytes), downloadedAt = new Date();
     const storageKey = `drive-import/${encodeURIComponent(input.causaId)}/${input.fileId}/${input.version}/${sourceSha256}`;
-    await putObject({ key: storageKey, body: bytes, contentType: exported?.mimeType || file.mimeType });
+    const mimeType = exported?.mimeType || file.mimeType;
+    let staged: ReturnType<typeof putObject> | undefined;
     const name = exported && !file.name.toLowerCase().endsWith(exported.suffix) ? `${file.name.slice(0, 980)}${exported.suffix}` : file.name;
     const provenance = { provider: "google-drive", folderId: before.folderId, sourceFolderId, driveFileId: file.id, driveVersion: file.version, name: file.name, mimeType: file.mimeType, modifiedTime: file.modifiedTime || null, size: file.size || null, md5Checksum: file.md5Checksum || null, exportMimeType: exported?.mimeType || null, acquiredAs: exported ? "workspace-export" : "original-download", downloadedAt: downloadedAt.toISOString(), connectedEmail: config.connectedEmail || null, sourceSha256 };
     for (let attempt = 0; ; attempt++) {
@@ -209,16 +214,57 @@ export async function importSelectedDriveFile(input: { causaId: string; folderId
           if (existing) {
             if (!existing.documentoId) throw fail("Esta revisión fue eliminada del expediente. Puede cargar el archivo manualmente si desea recuperarlo.", 410, "drive_import_removed");
             if (existing.sourceSha256 !== sourceSha256) throw fail("Drive devolvió distintos bytes para la misma revisión; no se reemplazó el original", 409, "drive_revision_conflict");
-            if (!await tx.documento.count({ where: { id: existing.documentoId, ...documentReadWhere(current.actor) } })) throw fail("Documento no encontrado o sin acceso", 404, "import_not_found");
-            return { documentoId: existing.documentoId, sourceSha256: existing.sourceSha256, reused: true };
+            if (!await tx.documento.count({ where: {
+              AND: [{ id: existing.documentoId, causaId: input.causaId }, documentReadWhere(current.actor)],
+            } })) throw fail("Documento no encontrado o sin acceso", 404, "import_not_found");
+            return { documentoId: existing.documentoId, sourceSha256: existing.sourceSha256, reused: true, reusedDocument: true };
           }
-          const doc = await tx.documento.create({ data: { nombre: name, tipo: inferDocumentoTipo(name), mimeType: exported?.mimeType || file.mimeType, storageKey, extractionStatus: "pending", causaId: input.causaId, autorId: current.actor.id } });
-          await tx.driveDocumentImport.create({ data: { ...identity, folderId: before.folderId, documentoId: doc.id, sourceSha256, metadataJson: JSON.stringify(provenance), importedAt: downloadedAt } });
-          await writeAuditStrict({ actorId: current.actor.id, action: "document.drive.import", entityType: "Documento", entityId: doc.id, after: { causaId: input.causaId, driveFileId: file.id, driveVersion: file.version, sourceSha256, acquiredAs: provenance.acquiredAs } }, tx);
-          await tx.activity.create({ data: { tipo: "documento", mensaje: `Se importó una copia de Drive: ${name}`, causaId: input.causaId, userId: current.actor.id } });
-          return { documentoId: doc.id, sourceSha256, reused: false };
-        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-        if (!result.reused) (options.enqueue || enqueueDocumentProcessing)({ id: result.documentoId, name, bytes });
+
+          // Later remote revisions keep their own local identity, even when Drive advances
+          // the version without changing the contents. Workspace exports retain their origin.
+          const priorRevision = !exported && await tx.driveDocumentImport.findFirst({
+            where: { causaId: input.causaId, driveFileId: input.fileId },
+            select: { id: true },
+          });
+          const reusable = !exported && !priorRevision
+            ? await findCaseIntakeOriginal(tx, current.actor, {
+              causaId: input.causaId, clienteId: null, confidencial: false, privilegio: false,
+            }, { sourceSha256, sizeBytes: bytes.length }, { driveImport: { is: null } })
+            : null;
+          if (!reusable) {
+            staged ??= putObject({ key: storageKey, body: bytes, contentType: mimeType });
+            await staged;
+          }
+          const doc = reusable || await tx.documento.create({
+            data: { nombre: name, tipo: inferDocumentoTipo(name), mimeType, storageKey, extractionStatus: "pending", causaId: input.causaId, autorId: current.actor.id },
+            select: { id: true, version: true, storageKey: true },
+          });
+          const receipt = await tx.driveDocumentImport.create({
+            data: { ...identity, folderId: before.folderId, documentoId: doc.id, sourceSha256, metadataJson: JSON.stringify(provenance), importedAt: downloadedAt },
+            select: { id: true },
+          });
+          await tx.caseDocumentIntake.create({ data: {
+            causaId: input.causaId,
+            documentoId: doc.id,
+            documentVersion: doc.version,
+            source: "drive",
+            sourceKey: receipt.id,
+            sourceName: file.name,
+            sourceSha256,
+            storageKey: doc.storageKey,
+            actorId: current.actor.id,
+            receivedAt: downloadedAt,
+          } });
+          await writeAuditStrict({
+            actorId: current.actor.id, action: "document.drive.import", entityType: "Documento", entityId: doc.id,
+            after: { causaId: input.causaId, driveFileId: file.id, driveVersion: file.version, sourceSha256, acquiredAs: provenance.acquiredAs, reusedDocument: Boolean(reusable) },
+          }, tx);
+          if (!reusable) await tx.activity.create({
+            data: { tipo: "documento", mensaje: `Se importó una copia de Drive: ${name}`, causaId: input.causaId, userId: current.actor.id },
+          });
+          return { documentoId: doc.id, sourceSha256, reused: false, reusedDocument: Boolean(reusable) };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10_000, timeout: 30_000 });
+        if (!result.reusedDocument) (options.enqueue || enqueueDocumentProcessing)({ id: result.documentoId, name, bytes });
         return { ...result, href: `/documentos/${result.documentoId}/fuentes` };
       } catch (error) {
         if (attempt < 3 && error instanceof Prisma.PrismaClientKnownRequestError && ["P2034", "P2002"].includes(error.code)) continue;

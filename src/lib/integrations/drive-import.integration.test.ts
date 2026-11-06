@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { prisma } from "@/lib/db";
+import { ingestManualCaseDocument } from "@/lib/causas/document-intake";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { getObject } from "@/lib/storage";
 import { importSelectedDriveFile, listDriveImportCandidates } from "./drive-import";
@@ -68,12 +69,16 @@ async function main() {
     assert.equal(await prisma.driveDocumentImport.count({ where: { causaId } }), 1);
     const first = await prisma.documento.findUniqueOrThrow({ where: { id: imported[0].documentoId }, include: { driveImport: true } });
     assert.deepEqual(await getObject(first.storageKey!), body); assert.equal(first.extractionStatus, "pending"); assert.equal(first.driveImport!.sourceSha256, sha(body));
+    assert.equal(await prisma.caseDocumentIntake.count({ where: { causaId, source: "drive", sourceKey: first.driveImport!.id, documentoId: first.id } }), 1);
     assert.equal(first.googleDriveId, null, "Import provenance does not repurpose the uploader's remote destination");
     const provenance = JSON.parse(first.driveImport!.metadataJson);
     assert.equal(provenance.driveVersion, "3"); assert.equal(provenance.acquiredAs, "original-download"); assert.equal(provenance.connectedEmail, "fixture@drive.invalid"); assert.equal(JSON.stringify(provenance).includes("fixture-token"), false);
     assert.equal(await prisma.auditEvent.count({ where: { actorId: owner.id, action: "document.drive.import" } }), 1);
     assert.equal(await prisma.activity.count({ where: { causaId } }), 1);
     const already = await importSelectedDriveFile(choose(), owner, options); assert.equal(already.reused, true); assert.equal(enqueued, 1);
+    await prisma.documento.update({ where: { id: first.id }, data: { causaId: null } });
+    await assert.rejects(importSelectedDriveFile(choose(), owner, options), status(404));
+    await prisma.documento.update({ where: { id: first.id }, data: { causaId } });
     await prisma.documento.update({ where: { id: first.id }, data: { confidencial: true } });
     await prisma.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "doc.confidential.read" } });
     await assert.rejects(importSelectedDriveFile(choose(), owner, options), status(404));
@@ -132,8 +137,43 @@ async function main() {
     await assert.rejects(listDriveImportCandidates(causaId, owner, null, { ...options, fetch: async () => Response.redirect("http://127.0.0.1:1/private", 302) }), status(502));
     await assert.rejects(listDriveImportCandidates(causaId, owner, null, { ...options, timeoutMs: 5, fetch: async (_input, init) => new Promise((_resolve, reject) => { init?.signal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true }); }) }), status(504));
 
+    // The first binary Drive revision shares the manually retained original. A new revision
+    // or a distinct Drive file must keep its own identity even when the bytes are unchanged.
+    const manualBytes = Buffer.from("Original ficticio para probar procedencia cruzada.");
+    const manual = await ingestManualCaseDocument({
+      causaId, clienteId: null, nombre: "Manual.txt", tipo: "otro", contenido: null, mimeType: "text/plain",
+      ruta: null, extractionStatus: "pending", confidencial: false, privilegio: false,
+    }, manualBytes, owner);
+    const originalStorage = (await prisma.documento.findUniqueOrThrow({ where: { id: manual.doc.id } })).storageKey;
+    remote = { ...remote, id: `Cross_${tag}`, name: "Mismo antecedente.txt", version: "1", mimeType: "text/plain", size: String(manualBytes.length), md5Checksum: sha(manualBytes, "md5") };
+    servedBytes = manualBytes;
+    const importCurrent = () => importSelectedDriveFile({ causaId, folderId, fileId: remote.id, version: remote.version }, owner, options);
+    const enqueuedBeforeReuse = enqueued;
+    const shared = await Promise.all([importCurrent(), importCurrent()]);
+    assert.deepEqual(shared.map(result => result.documentoId), [manual.doc.id, manual.doc.id]);
+    assert.deepEqual(shared.map(result => result.reused).sort(), [false, true]);
+    assert.ok(shared.every(result => result.reusedDocument));
+    assert.equal(enqueued, enqueuedBeforeReuse, "The first Drive origin does not enqueue the existing original again");
+    const sharedDoc = await prisma.documento.findUniqueOrThrow({ where: { id: manual.doc.id }, include: { driveImport: true, caseIntakes: true } });
+    assert.equal(sharedDoc.storageKey, originalStorage);
+    assert.deepEqual(sharedDoc.caseIntakes.map(receipt => receipt.source).sort(), ["drive", "manual"]);
+    assert.equal(sharedDoc.caseIntakes.find(receipt => receipt.source === "drive")?.sourceKey, sharedDoc.driveImport?.id);
+    assert.equal(sharedDoc.driveImport?.driveVersion, "1");
+    const externalId = remote.id;
+    remote = { ...remote, version: "2" };
+    const separateRevision = await importCurrent();
+    assert.equal(separateRevision.reusedDocument, false);
+    assert.notEqual(separateRevision.documentoId, manual.doc.id);
+    remote = { ...remote, id: `Distinct_${tag}`, version: "1" };
+    const otherIdentity = await importCurrent();
+    assert.equal(otherIdentity.reusedDocument, false);
+    assert.notEqual(otherIdentity.documentoId, manual.doc.id);
+    assert.notEqual(otherIdentity.documentoId, separateRevision.documentoId);
+    assert.equal(await prisma.driveDocumentImport.count({ where: { causaId, driveFileId: externalId } }), 2);
+    assert.deepEqual(await getObject(originalStorage!), manualBytes);
+
     // Delete a local original while Drive still offers exactly the same revision.
-    remote={...remote,version:"9",mimeType:"text/plain",size:String(body.length),md5Checksum:sha(body,"md5")};servedBytes=body;
+    remote={...remote,id:fileId,version:"9",mimeType:"text/plain",size:String(body.length),md5Checksum:sha(body,"md5")};servedBytes=body;
     const removable=await importSelectedDriveFile(choose(),owner,options);
     await prisma.documento.delete({where:{id:removable.documentoId}});
     const beforeRemoved=downloaded;

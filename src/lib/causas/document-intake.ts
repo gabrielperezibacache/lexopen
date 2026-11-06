@@ -48,10 +48,11 @@ export async function findCaseIntakeOriginal(
   actor: CausaAccessUser,
   scope: IntakeScope,
   identity: OriginalIdentity,
+  eligible: Prisma.DocumentoWhereInput = {},
 ): Promise<OriginalDocument | null> {
   // Restricted files can have different readers even in the same case.
   if (scope.confidencial || scope.privilegio) return null;
-  const where = currentScope(actor, scope);
+  const where: Prisma.DocumentoWhereInput = { AND: [currentScope(actor, scope), eligible] };
   const receipts = await tx.caseDocumentIntake.findMany({
     where: {
       causaId: scope.causaId,
@@ -148,6 +149,21 @@ export async function findCaseIntakeOriginal(
       receivedAt: doc.createdAt,
     } });
     return doc;
+  }
+
+  const legacyConnected = await tx.documento.findMany({
+    where: { AND: [where, {
+      OR: [
+        { driveImport: { is: { causaId: scope.causaId, sourceSha256: identity.sourceSha256 } } },
+        { pjudDocumentJobs: { some: { causaId: scope.causaId, status: "saved", sourceSha256: identity.sourceSha256 } } },
+      ],
+    }] },
+    select: originalSelect,
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: 25,
+  });
+  for (const doc of legacyConnected) {
+    if (doc.storageKey && !checked.has(doc.storageKey) && await originalMatches(doc.storageKey, identity)) return doc;
   }
   return null;
 }
