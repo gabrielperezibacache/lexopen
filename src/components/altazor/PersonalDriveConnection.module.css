@@ -1,5 +1,9 @@
 .root { min-width:0; padding-block:1.5rem; border-block:1px solid var(--line); color:var(--ink); }
-.root h3 { display:flex; align-items:center; gap:.6rem; font-size:1.25rem; font-weight:600; }
+.heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.75rem 1rem; }
+.identity { display:flex; align-items:flex-start; min-width:0; gap:.65rem; }
+.icon { flex:none; margin-top:.18rem; color:var(--sea); }
+.root h3 { font-family:var(--font-fraunces), Georgia, serif; font-size:1.25rem; font-weight:500; line-height:1.2; }
+.identity p { margin-block:.25rem 0; }
 .root p { max-width:70ch; color:var(--ink-soft); line-height:1.7; margin-block:.5rem; overflow-wrap:anywhere; }
 .root label { display:flex; align-items:flex-start; gap:.65rem; font-size:1rem; line-height:1.65; color:var(--ink); padding-block:.35rem; }
 .root label:has(input:not([type=checkbox])) { display:grid; gap:.5rem; }
@@ -7,10 +11,13 @@
 .root input[type=checkbox] { flex:none; width:20px; height:20px; margin-top:.2rem; accent-color:var(--sea); }
 .root input:focus-visible { outline:2px solid var(--sea); outline-offset:3px; }
 .root summary { min-height:44px; width:fit-content; cursor:pointer; padding-block:.7rem; color:var(--ink-soft); }
-.root code { overflow-wrap:anywhere; word-break:break-all; color:var(--ink); }
+.root code { display:block; margin-top:.35rem; padding:.55rem .7rem; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-solid); overflow-wrap:anywhere; color:var(--ink); }
 .root a { display:inline-flex; align-items:center; gap:.4rem; min-height:44px; color:var(--sea); text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
-.root :global(.altazor-section-heading) { align-items:center; flex-wrap:wrap; }
+.setup { margin-top:.75rem; border-top:1px solid var(--line); }
+.setup :global(.btn) { justify-self:start; }
+.steps { max-width:68ch; margin:0 0 .7rem; padding-inline-start:1.45rem; list-style:decimal; line-height:1.65; color:var(--ink-soft); }
+.steps li+li { margin-top:.35rem; }
 .root :global(.altazor-send-settings) { padding:.5rem 0; max-width:75ch; }
 .root :global(.altazor-error) { color:var(--danger); }
 .root :global(.altazor-notice) { color:var(--sea); }
-@media(max-width:600px) { .root { padding-block:1rem; } .root :global(.altazor-section-heading)>div { flex:1 1 100%; } .root :global(.btn) { white-space:normal; } }
+@media(max-width:600px) { .root { padding-block:1rem; } .identity { flex:1 1 100%; } .root :global(.btn) { white-space:normal; } }

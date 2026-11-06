@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowDownToLine, Cloud, FilePlus2, Landmark, Mail } from "lucide-react";
 import { formatDateTime } from "@/components/ui";
+import { FolioSymbol } from "@/components/ui/FolioSymbol";
 import type { listCaseUpdates } from "@/lib/causas/updates";
 import type { Locale } from "@/lib/i18n";
 
@@ -21,16 +22,24 @@ export function CaseDocumentNews({ feed, archiveHref, newsHref, older, canWrite,
     drive: { label: "Google Drive", Icon: Cloud },
     ojv: { label: "OJV", Icon: Landmark },
   };
+  const hasItems = feed.items.length > 0;
+  const addFiles = canWrite && (
+    <Link className="btn btn-secondary" href={`${archiveHref}#incorporar-documentos`}>
+      <FilePlus2 size={16} aria-hidden="true" />{tr("Añadir archivos", "Add files")}
+    </Link>
+  );
   return (
     <section className="panel rounded-[var(--radius-lg)] p-4 sm:p-5" aria-labelledby="case-news-title" data-testid="case-news">
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-          <h2 id="case-news-title" className="text-lg font-semibold">{tr("Últimos ingresos", "Recent additions")}</h2>
+          <h2 id="case-news-title" className="font-[family-name:var(--font-fraunces)] text-xl leading-tight font-medium">
+            {tr("Últimos ingresos", "Recent additions")}
+          </h2>
           <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">{tr("Revisa los documentos y avisos del expediente y el origen de cada ingreso.", "Review the documents and notices in this case file and the source of each intake.")}</p>
         </div>
-        {canWrite && <Link className="btn btn-secondary" href={`${archiveHref}#incorporar-documentos`}><FilePlus2 size={16} aria-hidden="true" />{tr("Añadir archivos", "Add files")}</Link>}
+        {hasItems && addFiles}
       </header>
-      {feed.items.length ? (
+      {hasItems ? (
         <ol className="mt-4 divide-y divide-[var(--line)] border-y border-[var(--line)]">
           {feed.items.map(item => {
             if (item.kind === "mail-notice") return (
@@ -90,7 +99,17 @@ export function CaseDocumentNews({ feed, archiveHref, newsHref, older, canWrite,
             );
           })}
         </ol>
-      ) : <p className="mt-4 border-t border-[var(--line)] pt-4 text-sm text-[var(--muted)]">{tr("Todavía no hay ingresos en esta causa.", "There are no additions to this matter yet.")}</p>}
+      ) : (
+        <div className="mt-4 flex items-start gap-3 border-t border-[var(--line)] pt-4">
+          <FolioSymbol variant="evidence" className="size-10 shrink-0 text-[var(--sea)]" />
+          <div className="min-w-0 space-y-3 py-1">
+            <p className="text-sm leading-relaxed font-medium text-[var(--ink)]">
+              {tr("Todavía no hay ingresos en esta causa.", "There are no additions to this matter yet.")}
+            </p>
+            {addFiles}
+          </div>
+        </div>
+      )}
       {(older || feed.nextBefore) && (
         <nav className="mt-2 flex flex-wrap gap-x-3 text-sm" aria-label={tr("Páginas de novedades", "Updates pages")}>
           {older && <Link className="btn btn-ghost" href={newsHref}>{tr("Volver a lo reciente", "Back to recent")}</Link>}
