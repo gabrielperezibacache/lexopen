@@ -69,6 +69,8 @@ function manuscriptSessionBody({ title, startsAt, endsAt, content }: ManuscriptS
   const resourceLabel = ({ title, href }: TeachingSessionContent["readings"][number]) =>
     href ? `${markdownSessionText(title)} — ${href}` : markdownSessionText(title);
   const sections = [
+    { label: "Ponentes", entries: (content.speakers ?? []).map(markdownSessionText) },
+    { label: "Moderación", entries: (content.moderators ?? []).map(markdownSessionText) },
     { label: "Resultados de aprendizaje", entries: content.outcomes.map(markdownSessionText) },
     { label: "Lecturas", entries: content.readings.map(resourceLabel) },
     { label: "Materiales", entries: content.materials.map(resourceLabel) },
@@ -76,6 +78,7 @@ function manuscriptSessionBody({ title, startsAt, endsAt, content }: ManuscriptS
   return [
     `### ${markdownSessionText(title)}`,
     `${end ? `${start} – ${end}` : start} (Santiago)`,
+    ...(content.location ? [`**Sala o modalidad**`, markdownSessionText(content.location)] : []),
     ...sections.filter(({ entries }) => entries.length)
       .flatMap(({ label, entries }) => [`**${label}**`, entries.map(entry => `- ${entry}`).join("\n")]),
   ].join("\n\n");

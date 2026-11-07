@@ -153,6 +153,9 @@ async function main(){
       readings: [{ title: "Lectura pactada", href: "/biblioteca/libro-ficticio" }],
       materials: [{ title: "Guía práctica", href: "https://example.org/guia" }],
       outcomes: ["Argumentar a partir de las fuentes"],
+      speakers: ["Ponente ficticia"],
+      moderators: ["Moderador ficticio"],
+      location: "Aula ficticia 204",
     };
     const [early, late, ignored, foreign] = await Promise.all([
       db.altazorTeachingSession.create({ data: {
@@ -184,6 +187,7 @@ async function main(){
     assert.match(sessionsBlock, /\*\*Resultados de aprendizaje\*\*\n\n- Argumentar a partir de las fuentes/);
     assert.match(sessionsBlock, /- Lectura pactada — \/biblioteca\/libro-ficticio/);
     assert.match(sessionsBlock, /- Guía práctica — https:\/\/example.org\/guia/);
+    for (const value of [...content.speakers, ...content.moderators, content.location]) assert.ok(sessionsBlock.includes(value));
     assert.doesNotMatch(body, /Sesión excluida|Sesión ajena|10080/);
     for (const session of [early, late, ignored, foreign]) assert.ok(!body.includes(session.id));
 
@@ -237,6 +241,17 @@ async function main(){
     const programBody = (await readAcademicArtifact(congress.id, program.id, owner, db)).body;
     assert.match(programBody, /## Programa y mesas\n\n### Mesa de trabajo\n\n17-11-2026, 13:00 \(Santiago\)/);
     assert.match(programBody, /Lectura pactada|Guía práctica|Argumentar a partir de las fuentes/);
+    for (const value of [...content.speakers, ...content.moderators, content.location]) assert.ok(programBody.includes(value));
+
+    await db.altazorTeachingSession.update({ where: { id: table.id }, data: {
+      contentJson: JSON.stringify({ ...content, speakers: ["Nueva ponente"], moderators: ["Nueva moderación"], location: "Nueva sala" }),
+    } });
+    const updatedProgram = await createAcademicDraft(congress.id, { ...programInput, requestId: randomUUID() }, owner, db);
+    const updatedProgramBody = (await readAcademicArtifact(congress.id, updatedProgram.id, owner, db)).body;
+    for (const value of ["Nueva ponente", "Nueva moderación", "Nueva sala"]) assert.ok(updatedProgramBody.includes(value));
+    assert.doesNotMatch(updatedProgramBody, /Ponente ficticia|Moderador ficticio|Aula ficticia 204/);
+    assert.deepEqual(await createAcademicDraft(congress.id, programInput, owner, db), { id: program.id, reused: true });
+    assert.equal((await readAcademicArtifactVersion(congress.id, program.id, 1, owner, db)).body, programBody);
 
     const genericProgram = await createAcademicDraft(congress.id, { ...programInput, requestId: randomUUID(), template: "workshop" }, owner, db);
     const genericProgramBody = (await readAcademicArtifact(congress.id, genericProgram.id, owner, db)).body;

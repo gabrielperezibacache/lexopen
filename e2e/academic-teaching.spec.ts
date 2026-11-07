@@ -189,6 +189,9 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
               readings: [{ title: "Lectura sobre métodos", href: "/biblioteca/libro-prueba?fragment=2#fragment-2" }],
               materials: [{ title: "Guía de discusión", href: "https://example.invalid/guias/discusion" }],
               outcomes: ["Comparar métodos de análisis."],
+              speakers: ["Ponente ficticia del encuentro"],
+              moderators: ["Moderador ficticio del encuentro"],
+              location: "Sala 204 · modalidad híbrida",
             }) },
           { workspaceId: projectId, requestId: randomUUID(), title: excluded, startsAt: new Date("2030-05-09T22:00:00Z") },
           { workspaceId: projectId, requestId: randomUUID(), title: close, startsAt: new Date("2030-05-09T23:00:00Z") },
@@ -231,6 +234,9 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
         expect(original).toContain("Lectura sobre métodos — /biblioteca/libro-prueba?fragment=2#fragment-2");
         expect(original).toContain("Guía de discusión — https://example.invalid/guias/discusion");
         expect(original).toContain("Comparar métodos de análisis.");
+        expect(original).toContain("Ponente ficticia del encuentro");
+        expect(original).toContain("Moderador ficticio del encuentro");
+        expect(original).toContain("Sala 204 · modalidad híbrida");
         expect(original).not.toContain(excluded);
         expect(original).toContain(`### ${close}`);
         expect(original.indexOf(open)).toBeLessThan(original.indexOf(close));
@@ -238,6 +244,12 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
         const edited = `${original}\n\nNota para participantes del encuentro.`;
         await text.fill(edited);
         await expect(editor.getByText("Guardado", { exact: true })).toBeVisible();
+        if (kind === "seminar") {
+          const session = await db.altazorTeachingSession.findFirstOrThrow({ where: { workspaceId: projectId, title: open } });
+          await db.altazorTeachingSession.update({ where: { id: session.id }, data: { contentJson: JSON.stringify({
+            ...JSON.parse(session.contentJson), speakers: ["Ponente nueva"], moderators: ["Moderadora nueva"], location: "Sala nueva",
+          }) } });
+        }
         await page.reload();
         await expect(text).toHaveValue(edited);
       });

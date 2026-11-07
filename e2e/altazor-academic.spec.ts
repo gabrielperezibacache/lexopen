@@ -244,6 +244,16 @@ test("Docencia arma un syllabus editable desde la ficha y separa la consulta bib
   const lesson = agenda.getByRole("listitem").filter({ hasText: "Sesión de fuentes jurídicas" });
   await lesson.getByText("Contenido de la sesión", { exact: true }).click();
   await lesson.getByRole("button", { name: "Editar contenido", exact: true }).click();
+  await expect(lesson.getByRole("button", { name: "Guardar contenido", exact: true })).toBeDisabled();
+  await expect(ficha.getByRole("button", { name: "Crear syllabus" })).toBeEnabled();
+  await lesson.getByText("Ponentes, moderación y lugar", { exact: true }).click();
+  await expect(lesson.getByRole("button", { name: "Guardar contenido", exact: true })).toBeDisabled();
+  await expect(ficha.getByRole("button", { name: "Crear syllabus" })).toBeEnabled();
+  await lesson.getByRole("button", { name: "Añadir ponente", exact: true }).click();
+  await lesson.getByLabel("Nombre del ponente 1", { exact: true }).fill("Profesora ficticia de fuentes");
+  await lesson.getByRole("button", { name: "Añadir moderador", exact: true }).click();
+  await lesson.getByLabel("Nombre del moderador 1", { exact: true }).fill("Moderador ficticio de la clase");
+  await lesson.getByLabel("Sala o modalidad de la sesión", { exact: true }).fill("Aula 305 · presencial");
   await lesson.getByRole("button", { name: "Añadir lectura", exact: true }).click();
   await lesson.getByLabel("Título de la lectura 1", { exact: true }).fill("Lectura asignada sobre fuentes");
   await lesson.getByLabel("Enlace de la lectura 1 (opcional)", { exact: true }).fill(`${new URL(testInfo.project.use.baseURL as string).origin}/biblioteca/libro-prueba?fragment=2#fragment-2`);
@@ -259,6 +269,9 @@ test("Docencia arma un syllabus editable desde la ficha y separa la consulta bib
     .toHaveAttribute("href", "/biblioteca/libro-prueba?fragment=2#fragment-2");
   await expect(lesson.getByRole("link", { name: "Guía ficticia de análisis", exact: true }))
     .toHaveAttribute("href", "https://example.invalid/materiales/guia");
+  await expect(lesson.getByText("Profesora ficticia de fuentes", { exact: true })).toBeVisible();
+  await expect(lesson.getByText("Moderador ficticio de la clase", { exact: true })).toBeVisible();
+  await expect(lesson.getByText("Aula 305 · presencial", { exact: true })).toBeVisible();
   if (process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
     await lesson.screenshot({ path: testInfo.outputPath("contenido-sesion-movil.png") });
   }
@@ -294,6 +307,9 @@ test("Docencia arma un syllabus editable desde la ficha y separa la consulta bib
   expect(initial).toContain("/biblioteca/libro-prueba?fragment=2#fragment-2");
   expect(initial).toContain("Guía ficticia de análisis");
   expect(initial).toContain("Clasificar las fuentes de un caso.");
+  expect(initial).toContain("Profesora ficticia de fuentes");
+  expect(initial).toContain("Moderador ficticio de la clase");
+  expect(initial).toContain("Aula 305 · presencial");
   expect(initial).not.toContain("Sesión de ejercicios internos");
   expect(initial).not.toContain("Sugiere bibliografía");
   const workspace = await db.altazorAcademicWorkspace.findFirstOrThrow({ where: { ownerId, title: "Curso ficticio de argumentación" } });

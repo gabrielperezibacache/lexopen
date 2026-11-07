@@ -7,13 +7,19 @@ import styles from "./AcademicSessionContent.module.css";
 
 type Reference = TeachingSessionContent["readings"][number];
 type ReferenceKind = "readings" | "materials";
+type PeopleKind = "speakers" | "moderators";
+type ListKind = ReferenceKind | PeopleKind | "outcomes";
 type ReferenceDraft = { key: string; title: string; href: string };
 type OutcomeDraft = { key: string; value: string };
-type Draft = { readings: ReferenceDraft[]; materials: ReferenceDraft[]; outcomes: OutcomeDraft[] };
+type Draft = { readings: ReferenceDraft[]; materials: ReferenceDraft[]; outcomes: OutcomeDraft[]; speakers: OutcomeDraft[]; moderators: OutcomeDraft[]; location: string };
 
 const labels = {
   readings: { group: "Lecturas", article: "de la lectura", add: "Añadir lectura", remove: "Quitar lectura" },
   materials: { group: "Materiales", article: "del material", add: "Añadir material", remove: "Quitar material" },
+};
+const peopleLabels = {
+  speakers: { group: "Ponentes", field: "Nombre del ponente", add: "Añadir ponente", remove: "Quitar ponente" },
+  moderators: { group: "Moderación", field: "Nombre del moderador", add: "Añadir moderador", remove: "Quitar moderador" },
 };
 
 function toDraft(content: TeachingSessionContent): Draft {
@@ -22,6 +28,9 @@ function toDraft(content: TeachingSessionContent): Draft {
     readings: rows(content.readings),
     materials: rows(content.materials),
     outcomes: content.outcomes.map((value, index) => ({ key: `saved-${index}`, value })),
+    speakers: (content.speakers ?? []).map((value, index) => ({ key: `saved-${index}`, value })),
+    moderators: (content.moderators ?? []).map((value, index) => ({ key: `saved-${index}`, value })),
+    location: content.location ?? "",
   };
 }
 
@@ -41,6 +50,9 @@ function toContent(draft: Draft, origin?: string): TeachingSessionContent {
     readings: draft.readings.map(reference),
     materials: draft.materials.map(reference),
     outcomes: draft.outcomes.map(item => item.value.trim()),
+    ...(draft.speakers.length ? { speakers: draft.speakers.map(item => item.value.trim()) } : {}),
+    ...(draft.moderators.length ? { moderators: draft.moderators.map(item => item.value.trim()) } : {}),
+    ...(draft.location.trim() ? { location: draft.location.trim() } : {}),
   };
 }
 
@@ -71,8 +83,9 @@ export function AcademicSessionContent({ sessionId, title, content, contentRevis
   const rowId = useRef(0);
   const form = useRef<HTMLFormElement>(null);
   const edit = useRef<HTMLButtonElement>(null);
-  const count = content.readings.length + content.materials.length + content.outcomes.length;
-  const dirty = Boolean(draft && JSON.stringify(toContent(draft)) !== JSON.stringify(content));
+  const count = content.readings.length + content.materials.length + content.outcomes.length
+    + (content.speakers?.length ?? 0) + (content.moderators?.length ?? 0) + Number(Boolean(content.location));
+  const dirty = Boolean(draft && JSON.stringify(toContent(draft)) !== JSON.stringify(toContent(toDraft(content))));
 
   useEffect(() => {
     if (!dirty) return;
@@ -96,17 +109,17 @@ export function AcademicSessionContent({ sessionId, title, content, contentRevis
     requestAnimationFrame(() => edit.current?.focus({ preventScroll: true }));
   }
 
-  function add(kind: keyof Draft) {
+  function add(kind: ListKind) {
     const key = `new-${++rowId.current}`;
     setDraft(current => {
       if (!current || current[kind].length >= TEACHING_CONTENT_LIMITS.itemsPerGroup) return current;
-      if (kind === "outcomes") return { ...current, outcomes: [...current.outcomes, { key, value: "" }] };
-      return { ...current, [kind]: [...current[kind], { key, title: "", href: "" }] };
+      if (kind === "readings" || kind === "materials") return { ...current, [kind]: [...current[kind], { key, title: "", href: "" }] };
+      return { ...current, [kind]: [...current[kind], { key, value: "" }] };
     });
     focusInForm(`${kind}-${key}`);
   }
 
-  function remove(kind: keyof Draft, key: string) {
+  function remove(kind: ListKind, key: string) {
     setDraft(current => current ? { ...current, [kind]: current[kind].filter(item => item.key !== key) } : current);
     focusInForm(`add-${kind}`);
   }
@@ -122,7 +135,7 @@ export function AcademicSessionContent({ sessionId, title, content, contentRevis
     const result = teachingSessionContentSchema.safeParse(toContent(draft, window.location.origin));
     if (!result.success) {
       const issue = result.error.issues[0];
-      setError(issue?.code === "too_small" ? "Completa los títulos de los recursos y el texto de los resultados." : issue?.message || "Revisa los títulos y enlaces antes de guardar.");
+      setError(issue?.code === "too_small" ? "Completa los elementos que añadiste o quita los que estén vacíos." : issue?.message || "Revisa el contenido antes de guardar.");
       return;
     }
     try {
@@ -141,7 +154,11 @@ export function AcademicSessionContent({ sessionId, title, content, contentRevis
     </summary>
     <div className={styles.body}>
       {notice && <p role="status" className={styles.notice}>{notice}</p>}
-      {draft ? <form aria-label="Contenido de la sesión" tabIndex={-1} ref={form} onSubmit={save} className={styles.editor}>
+      {draft ? <form aria-label="Contenido de la sesión" tabIndex={-1} ref={form} onSubmit={save} className={styles.editor}
+        onInvalidCapture={event => {
+          const disclosure = (event.target as HTMLElement).closest("details");
+          if (disclosure) disclosure.open = true;
+        }}>
         {error && <p role="alert" className={styles.error}>{error}</p>}
         <p className={styles.helper}>Puedes pegar un enlace de la <a href="/biblioteca" target="_blank" rel="noopener noreferrer">Biblioteca</a> o de un sitio seguro (https://).</p>
         {(Object.keys(labels) as ReferenceKind[]).map(kind => {
@@ -188,6 +205,38 @@ export function AcademicSessionContent({ sessionId, title, content, contentRevis
           </button>
           {draft.outcomes.length === TEACHING_CONTENT_LIMITS.itemsPerGroup && <p className={styles.helper}>Alcanzaste el máximo de {TEACHING_CONTENT_LIMITS.itemsPerGroup} resultados.</p>}
         </fieldset>
+        <details className={styles.people}>
+          <summary>Ponentes, moderación y lugar</summary>
+          <div className={styles.peopleFields}>
+            {(Object.keys(peopleLabels) as PeopleKind[]).map(kind => {
+              const text = peopleLabels[kind];
+              return <fieldset key={kind} disabled={busy} className={styles.group}>
+                <legend>{text.group}</legend>
+                {draft[kind].map((item, index) => <div className={styles.outcome} key={item.key}>
+                  <label>{text.field} {index + 1}
+                    <input className="input" value={item.value} required maxLength={TEACHING_CONTENT_LIMITS.nameLength}
+                      data-session-focus={`${kind}-${item.key}`} onChange={event => {
+                        const value = event.target.value;
+                        setDraft(current => current ? { ...current, [kind]: current[kind].map(row => row.key === item.key ? { ...row, value } : row) } : current);
+                      }} />
+                  </label>
+                  <button type="button" className="btn btn-ghost" aria-label={`${text.remove} ${index + 1}`} onClick={() => remove(kind, item.key)}>
+                    <Trash2 size={16} aria-hidden="true" /><span>Quitar</span>
+                  </button>
+                </div>)}
+                <button type="button" className="btn btn-outline" data-session-focus={`add-${kind}`}
+                  disabled={draft[kind].length >= TEACHING_CONTENT_LIMITS.itemsPerGroup} onClick={() => add(kind)}>
+                  <Plus size={16} aria-hidden="true" /> {text.add}
+                </button>
+                {draft[kind].length === TEACHING_CONTENT_LIMITS.itemsPerGroup && <p className={styles.helper}>Alcanzaste el máximo de {TEACHING_CONTENT_LIMITS.itemsPerGroup} nombres.</p>}
+              </fieldset>;
+            })}
+            <label>Sala o modalidad de la sesión
+              <input className="input" value={draft.location} maxLength={TEACHING_CONTENT_LIMITS.locationLength} disabled={busy} placeholder="Ej. Aula 204 o videoconferencia"
+                onChange={event => { const location = event.target.value; setDraft(current => current ? { ...current, location } : current); }} />
+            </label>
+          </div>
+        </details>
         <div className={styles.actions}>
           <button type="submit" className="btn btn-primary" disabled={busy || !dirty}>Guardar contenido</button>
           <button type="button" className="btn btn-ghost" disabled={busy} onClick={endEdit}>Cancelar</button>
@@ -201,6 +250,11 @@ export function AcademicSessionContent({ sessionId, title, content, contentRevis
             <h4>Resultados de aprendizaje</h4>
             <ul>{content.outcomes.map((value, index) => <li key={index}>{value}</li>)}</ul>
           </div>}
+          {(Object.keys(peopleLabels) as PeopleKind[]).map(kind => (content[kind]?.length ?? 0) > 0 && <div key={kind}>
+            <h4>{peopleLabels[kind].group}</h4>
+            <ul>{content[kind]?.map((value, index) => <li key={index}>{value}</li>)}</ul>
+          </div>)}
+          {content.location && <div><h4>Sala o modalidad</h4><p className={styles.location}>{content.location}</p></div>}
         </div>}
         <button ref={edit} type="button" className="btn btn-outline" disabled={busy} onClick={startEdit}>Editar contenido</button>
       </>}

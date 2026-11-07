@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const TEACHING_CONTENT_LIMITS = { itemsPerGroup: 12, titleLength: 200, outcomeLength: 500, hrefLength: 1000 } as const;
+export const TEACHING_CONTENT_LIMITS = { itemsPerGroup: 12, titleLength: 200, outcomeLength: 500, hrefLength: 1000, nameLength: 200, locationLength: 600 } as const;
 
 function singleLine(length: number) {
   return z.string().trim().min(1).max(length)
@@ -31,6 +31,9 @@ export const teachingSessionContentSchema = z.object({
   readings: z.array(resource).max(TEACHING_CONTENT_LIMITS.itemsPerGroup),
   materials: z.array(resource).max(TEACHING_CONTENT_LIMITS.itemsPerGroup),
   outcomes: z.array(singleLine(TEACHING_CONTENT_LIMITS.outcomeLength)).max(TEACHING_CONTENT_LIMITS.itemsPerGroup),
+  speakers: z.array(singleLine(TEACHING_CONTENT_LIMITS.nameLength)).max(TEACHING_CONTENT_LIMITS.itemsPerGroup).optional(),
+  moderators: z.array(singleLine(TEACHING_CONTENT_LIMITS.nameLength)).max(TEACHING_CONTENT_LIMITS.itemsPerGroup).optional(),
+  location: singleLine(TEACHING_CONTENT_LIMITS.locationLength).optional(),
 }).strict();
 
 export type TeachingSessionContent = z.infer<typeof teachingSessionContentSchema>;

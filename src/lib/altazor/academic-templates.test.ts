@@ -49,6 +49,9 @@ test("teaching programs place Agenda sessions under the existing program heading
       readings: [{ title: "Lectura base" }],
       materials: [{ title: "Guía", href: "https://example.org/guia" }],
       outcomes: ["Distinguir argumentos"],
+      speakers: ["Profesora de prueba", "Investigador [invitado]"],
+      moderators: ["Moderadora ficticia"],
+      location: "Aula 204 · modalidad híbrida",
     },
   };
   for (const [template, section, next] of [
@@ -60,6 +63,9 @@ test("teaching programs place Agenda sessions under the existing program heading
     const schedule = program.split(`## ${section}\n\n`)[1]?.split(`\n\n## ${next}`)[0];
     assert.ok(schedule);
     assert.match(schedule, /^### Discusión inicial\n\n15-11-2026, 13:00 \(Santiago\)/);
+    assert.ok(schedule.includes("**Sala o modalidad**\n\nAula 204 · modalidad híbrida"));
+    assert.ok(schedule.includes("**Ponentes**\n\n- Profesora de prueba\n- Investigador \\[invitado\\]"));
+    assert.ok(schedule.includes("**Moderación**\n\n- Moderadora ficticia"));
     assert.match(schedule, /\*\*Resultados de aprendizaje\*\*\n\n- Distinguir argumentos/);
     assert.match(schedule, /\*\*Lecturas\*\*\n\n- Lectura base/);
     assert.match(schedule, /\*\*Materiales\*\*\n\n- Guía — https:\/\/example.org\/guia/);

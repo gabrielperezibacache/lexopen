@@ -34,7 +34,7 @@ async function main() {
     assert.equal(first.session.agendaHref, "/calendario?vista=agenda&ym=2026-11&tipo=evento");
     const { id } = first.session;
     await assert.rejects(createTeachingSession(course.id, { ...data, title: "Otro título" }, owner, db), statusIs(409));
-    await createTeachingSession(workshop.id, { requestId: randomUUID(), title: "Taller privado", startsAtLocal: "2026-11-30T10:00" }, owner, db);
+    const legacyWorkshop = await createTeachingSession(workshop.id, { requestId: randomUUID(), title: "Taller privado", startsAtLocal: "2026-11-30T10:00" }, owner, db);
     assert.deepEqual((await listTeachingSessions(course.id, owner, db)).sessions, [first.session]);
     await assert.rejects(listTeachingSessions(course.id, other, db), statusIs(404));
     await assert.rejects(deleteTeachingSession(course.id, id, other, db), statusIs(404));
@@ -52,6 +52,9 @@ async function main() {
       ],
       materials: [{ title: "Presentación del taller", href: "https://example.invalid/material.pdf" }],
       outcomes: ["Comparar dos argumentos."],
+      speakers: ["Ponente ficticia", "Segundo ponente"],
+      moderators: ["Moderadora ficticia"],
+      location: "Sala ficticia 204 · modalidad híbrida",
     };
     const update = { expectedRevision: 0, content };
     await assert.rejects(updateTeachingSessionContent(course.id, id, update, other, db), statusIs(404));
@@ -72,6 +75,23 @@ async function main() {
     await assert.rejects(updateTeachingSessionContent(course.id, id, {
       expectedRevision: 0, content: { ...empty, outcomes: Array(TEACHING_CONTENT_LIMITS.itemsPerGroup + 1).fill("Resultado") },
     }, owner, db), { name: "ZodError" });
+    for (const invalid of [
+      { speakers: [" "] },
+      { speakers: ["Ponente\n## encabezado"] },
+      { speakers: Array(TEACHING_CONTENT_LIMITS.itemsPerGroup + 1).fill("Ponente") },
+      { speakers: ["x".repeat(TEACHING_CONTENT_LIMITS.nameLength + 1)] },
+      { moderators: [""] },
+      { moderators: ["Moderación\rprivada"] },
+      { moderators: Array(TEACHING_CONTENT_LIMITS.itemsPerGroup + 1).fill("Moderación") },
+      { moderators: ["x".repeat(TEACHING_CONTENT_LIMITS.nameLength + 1)] },
+      { location: "" },
+      { location: "Sala\nnueva línea" },
+      { location: "x".repeat(TEACHING_CONTENT_LIMITS.locationLength + 1) },
+    ]) {
+      await assert.rejects(updateTeachingSessionContent(course.id, id, {
+        expectedRevision: 0, content: { ...empty, ...invalid },
+      }, owner, db), { name: "ZodError" });
+    }
     const token = (await enableCalendarFeed(course.id, owner, db)).path.split("/").at(-1)!;
     const publicBefore = await readCalendarFeed(token, db);
     const beforeContent = await db.altazorTeachingSession.findUniqueOrThrow({ where: { id } });
@@ -90,7 +110,13 @@ async function main() {
     assert.equal(afterContent.updatedAt.getTime(), beforeContent.updatedAt.getTime());
     assert.equal(afterContent.calendarSequence, beforeContent.calendarSequence);
     assert.equal(await readCalendarFeed(token, db), publicBefore);
-    assert.ok(!(await exportTeachingSessions(course.id, owner, db)).includes("Lectura: capítulo 2"));
+    const exportedContent = await exportTeachingSessions(course.id, owner, db);
+    for (const privateValue of ["Lectura: capítulo 2", ...content.speakers, ...content.moderators, content.location]) {
+      assert.ok(!exportedContent.includes(privateValue));
+    }
+    const legacyContent = { readings: [{ title: "Lectura anterior" }], materials: [], outcomes: ["Resultado anterior"] };
+    await db.altazorTeachingSession.update({ where: { id: legacyWorkshop.session.id }, data: { contentJson: JSON.stringify(legacyContent) } });
+    assert.deepEqual((await listTeachingSessions(workshop.id, owner, db)).sessions[0].content, legacyContent);
 
     const range = { start: new Date("2026-11-30T03:00:00Z"), end: new Date("2026-12-01T02:59:59Z") };
     assert.deepEqual((await teachingCalendarSessions(owner, range, db)).map(item => item.workspaceId), [workshop.id, course.id]);

@@ -50,6 +50,12 @@
 .saved ul { display:grid; gap:.35rem; margin-block:.35rem 0; padding-inline-start:1.2rem; list-style:disc; }
 .saved a,.helper a { text-decoration:underline; text-underline-offset:.2em; }
 .saved a svg { display:inline; vertical-align:middle; }
+.location { font-size:var(--text-sm); overflow-wrap:anywhere; }
+.people { border-block:1px solid var(--line); min-width:0; }
+.people > summary { display:flex; align-items:center; gap:.55rem; min-height:44px; color:var(--sea); cursor:pointer; font-size:var(--text-sm); }
+.people > summary::after { content:""; inline-size:.48rem; block-size:.48rem; flex:none; border-block-end:1px solid currentColor; border-inline-end:1px solid currentColor; transform:rotate(45deg); }
+.people[open] > summary::after { transform:rotate(225deg); }
+.peopleFields { display:grid; gap:1rem; padding-block:.5rem 1rem; min-width:0; }
 
 @media (max-width:700px) {
   .reference,.outcome { grid-template-columns:minmax(0,1fr); }
