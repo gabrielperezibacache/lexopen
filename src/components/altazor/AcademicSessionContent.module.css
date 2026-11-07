@@ -1,0 +1,56 @@
+.root { grid-column:1/-1; min-width:0; }
+.root > summary {
+  display:flex;
+  align-items:center;
+  gap:.55rem;
+  min-height:44px;
+  width:fit-content;
+  color:var(--sea);
+  cursor:pointer;
+  font-size:var(--text-sm);
+}
+.root > summary::after {
+  content:"";
+  flex:none;
+  inline-size:.48rem;
+  block-size:.48rem;
+  border-block-end:1px solid currentColor;
+  border-inline-end:1px solid currentColor;
+  margin-block-start:-.2rem;
+  transform:rotate(45deg);
+}
+.root[open] > summary::after { margin-block-start:.2rem; transform:rotate(225deg); }
+.root > summary svg { flex:none; }
+.count {
+  display:inline-grid;
+  place-items:center;
+  min-inline-size:1.5rem;
+  min-block-size:1.5rem;
+  padding-inline:.2rem;
+  border-radius:99px;
+  background:var(--mist);
+  color:var(--ink);
+}
+.body,.editor,.group,.saved { display:grid; gap:.7rem; min-width:0; }
+.body { border-block-start:1px solid var(--line); padding-block:.75rem .3rem; }
+.body > button,.group > button { justify-self:start; }
+.editor,.saved { gap:1rem; }
+.group { border-block-end:1px solid var(--line); padding-block:.25rem .85rem; }
+.group legend,.saved h4 { font-size:var(--text-sm); font-weight:600; margin-block:0 .2rem; }
+.reference,.outcome { display:grid; align-items:end; gap:.6rem; }
+.reference { grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; }
+.outcome { grid-template-columns:minmax(0,1fr) auto; }
+.reference input,.outcome input { min-width:0; }
+.reference button,.outcome button { min-height:44px; justify-self:start; }
+.actions { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+.helper,.notice,.error,.saved li { font-size:var(--text-sm); overflow-wrap:anywhere; }
+.helper { color:var(--ink-soft); }
+.error { color:var(--danger); }
+.notice,.saved a,.helper a { color:var(--sea); }
+.saved ul { display:grid; gap:.35rem; margin-block:.35rem 0; padding-inline-start:1.2rem; list-style:disc; }
+.saved a,.helper a { text-decoration:underline; text-underline-offset:.2em; }
+.saved a svg { display:inline; vertical-align:middle; }
+
+@media (max-width:700px) {
+  .reference,.outcome { grid-template-columns:minmax(0,1fr); }
+}

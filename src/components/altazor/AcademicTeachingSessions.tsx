@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Bell, CalendarDays, Download, Pencil, Repeat } from "lucide-react";
 import { Button, Dialog } from "@/components/ui";
 import type { TeachingSession } from "@/lib/altazor/teaching-sessions";
+import type { TeachingSessionContent } from "@/lib/altazor/teaching-session-content";
 import { TEACHING_REMINDER_LEADS, type TeachingReminderLead } from "@/lib/altazor/teaching-reminder-policy";
 import { formatCivilDate, SANTIAGO_TZ } from "@/lib/chile-time";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 import { AcademicCalendarSubscription } from "./AcademicCalendarSubscription";
+import { AcademicSessionContent } from "./AcademicSessionContent";
 import { academicApi } from "./academic-ui";
 import styles from "./AcademicTeaching.module.css";
 
@@ -87,10 +89,12 @@ function TeachingSessionEditor({ session, busy, error, notice, onSave, onReminde
   </div>;
 }
 
-export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved = true }: {
+export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved = true, onSessionsChange, onContentDirty }: {
   workspaceId: string;
   deadline?: string;
   deadlineSaved?: boolean;
+  onSessionsChange?: () => void;
+  onContentDirty?: (dirty: boolean) => void;
 }) {
   const [sessions, setSessions] = useState<TeachingSession[] | null>(null);
   const [title, setTitle] = useState("");
@@ -106,6 +110,7 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editError, setEditError] = useState("");
   const [editNotice, setEditNotice] = useState("");
+  const [dirtySessions, setDirtySessions] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState("");
@@ -115,6 +120,17 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
   const editTrigger = useRef<HTMLButtonElement | null>(null);
   const endpoint = `/api/altazor/academic/${encodeURIComponent(workspaceId)}/teaching-sessions`;
   const deadlineActivity = sessions?.find(item => item.callDeadline);
+  const contentDirty = dirtySessions.length > 0;
+
+  const trackContentDraft = useCallback((id: string, dirty: boolean) => {
+    setDirtySessions(current => {
+      if (dirty === current.includes(id)) return current;
+      return dirty ? [...current, id] : current.filter(item => item !== id);
+    });
+  }, []);
+
+  useEffect(() => onContentDirty?.(contentDirty), [onContentDirty, contentDirty]);
+  useEffect(() => () => onContentDirty?.(false), [onContentDirty]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -154,6 +170,7 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
       const incoming = result.sessions ?? (result.session ? [result.session] : []);
       key.current.complete(input);
       mergeSessions(incoming);
+      onSessionsChange?.();
       setTitle(""); setStartsAtLocal(""); setEndsAtLocal(""); setRepeat(""); setCount("4"); setReminder(null);
       setNotice(result.reused
         ? incoming.length ? "La actividad ya se había registrado en tu Agenda de LexOpen." : "Esta serie ya se había registrado. Sus sesiones fueron retiradas."
@@ -170,6 +187,7 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
         ...values, expectedSequence: session.calendarSequence,
       }, "PATCH");
       mergeSessions([result.session]);
+      onSessionsChange?.();
       setEditNotice("Actividad actualizada en tu Agenda de LexOpen.");
     } catch (reason) { setEditError(errorText(reason)); }
     finally { setBusy(false); }
@@ -188,6 +206,18 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
     finally { setBusy(false); }
   }
 
+  async function saveContent(sessionId: string, expectedRevision: number, content: TeachingSessionContent) {
+    if (busy) throw new Error("Espera a que se guarde la otra actividad.");
+    setBusy(true);
+    try {
+      const saved = await academicApi<{ contentRevision: number; content: TeachingSessionContent }>(
+        `${endpoint}/${encodeURIComponent(sessionId)}/content`, { expectedRevision, content }, "PATCH",
+      );
+      setSessions(current => current?.map(session => session.id === sessionId ? { ...session, ...saved } : session) ?? null);
+      onSessionsChange?.();
+    } finally { setBusy(false); }
+  }
+
   async function remove() {
     if (!pendingDelete || busy) return;
     const selected = pendingDelete;
@@ -198,6 +228,7 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
     try {
       await academicApi(`${endpoint}/${encodeURIComponent(selected.id)}${following ? "?scope=following" : ""}`, {}, "DELETE");
       setSessions(current => current?.filter(item => !removed(item)) || []);
+      onSessionsChange?.();
       if (sessions?.some(item => item.id === editingId && removed(item))) setEditingId(null);
       setNotice(following ? "Sesiones retiradas de tu Agenda." : "Actividad retirada de tu Agenda.");
     } catch (reason) { setError(errorText(reason)); }
@@ -211,6 +242,7 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
     try {
       const { session } = await academicApi<{ session: TeachingSession }>(endpoint, { action: "schedule-call-deadline", date: deadline, localDate: agendaDate || deadline, time: deadlineTime });
       mergeSessions([session]);
+      onSessionsChange?.();
       setDeadlineTime("");
       setAgendaDate("");
       setNotice("El cierre está registrado en tu Agenda de LexOpen.");
@@ -288,7 +320,8 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
               </p>}
             </div>
             <div className={styles.actions}>
-              <Link className="btn btn-ghost" href={session.agendaHref}>Ver en Agenda</Link>
+              {contentDirty ? <button type="button" className="btn btn-ghost" disabled title="Guarda o cancela los cambios en el contenido para abrir la Agenda.">Ver en Agenda</button>
+                : <Link className="btn btn-ghost" href={session.agendaHref}>Ver en Agenda</Link>}
               <button type="button" className="btn btn-ghost" disabled={busy} aria-expanded={editingId === session.id}
                 aria-label={`${session.callDeadline ? "Configurar recordatorio" : "Editar actividad"}: ${session.title}`}
                 onClick={event => {
@@ -303,6 +336,8 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
             </div>
             {editingId === session.id && <TeachingSessionEditor key={session.id} session={session} busy={busy} error={editError} notice={editNotice}
               onSave={(item, values) => void saveChanges(item, values)} onReminder={(item, minutes) => void saveReminder(item, minutes)} onClose={closeEditor} />}
+            {!session.callDeadline && <AcademicSessionContent sessionId={session.id} title={session.title} content={session.content} contentRevision={session.contentRevision}
+              busy={busy} onDirtyChange={trackContentDraft} onSave={(expectedRevision, content) => saveContent(session.id, expectedRevision, content)} />}
           </li>)}
         </ul>}
         {sessions.length > 0 && <a href={`${endpoint}/export`} className="btn btn-ghost"><Download size={16} aria-hidden="true" /> Descargar agenda (.ics)</a>}
@@ -315,6 +350,7 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
         <label><input type="radio" name="teaching-removal" checked={removalScope === "single"} onChange={() => setRemovalScope("single")} /> Sólo esta sesión</label>
         <label><input type="radio" name="teaching-removal" checked={removalScope === "following"} onChange={() => setRemovalScope("following")} /> Esta sesión y las siguientes</label>
       </fieldset>}
+      {pendingDelete && !pendingDelete.callDeadline && <p className="mt-2 text-sm text-[var(--muted)]">También se quitarán las lecturas, los materiales y los resultados de las sesiones retiradas.</p>}
       <div className="mt-5 flex flex-wrap justify-end gap-2">
         <Button variant="ghost" disabled={busy} onClick={() => setPendingDelete(null)}>Cancelar</Button>
         <Button variant="danger" loading={busy} onClick={() => void remove()}>{removalScope === "following" ? "Retirar sesiones" : "Retirar"}</Button>

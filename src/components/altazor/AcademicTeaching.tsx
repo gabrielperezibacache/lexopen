@@ -8,6 +8,7 @@ import { ACADEMIC_MANUSCRIPT_TEMPLATES, ACADEMIC_TEACHING_TEMPLATES } from "@/li
 import { formatCivilDate, SANTIAGO_TZ } from "@/lib/chile-time";
 import { isWorkCountry, workCountryOptions } from "@/lib/config/countries";
 import { AcademicCallSources } from "./AcademicCallSources";
+import { AcademicSyllabusSessions } from "./AcademicSyllabusSessions";
 import { AltazorMark } from "./AltazorMark";
 import { useOptionalAltazorCompanion } from "./AltazorCompanionProvider";
 import type { AcademicProject } from "./academic-ui";
@@ -122,10 +123,13 @@ export function AcademicCallForm({ value = emptyAcademicCall, origin, busy, onCh
   </section>;
 }
 
-export function AcademicSyllabusForm({ title, brief, busy, onChange, onBriefChange, onCreate, onSearch }: {
+export function AcademicSyllabusForm({ workspaceId, sessionsVersion, title, brief, busy, sessionContentDirty, onChange, onBriefChange, onCreate, onSearch }: {
+  workspaceId: string;
+  sessionsVersion: number;
   title: string;
   brief: typeof emptyAcademicBrief;
   busy: boolean;
+  sessionContentDirty: boolean;
   onChange: (syllabus: AcademicSyllabus) => void;
   onBriefChange: (key: CourseBriefKey, value: string) => void;
   onCreate: () => void;
@@ -160,12 +164,15 @@ export function AcademicSyllabusForm({ title, brief, busy, onChange, onBriefChan
       <label data-wide=""><span>Bibliografía base</span><textarea rows={4} maxLength={5000} placeholder="Una referencia por párrafo."
         value={values.bibliography} onChange={event => onChange({ ...values, bibliography: event.target.value })} /></label>
     </fieldset>
+    <AcademicSyllabusSessions workspaceId={workspaceId} version={sessionsVersion} selection={values.sessionIds || []}
+      onChange={sessionIds => onChange({ ...values, sessionIds })} disabled={busy} />
+    {sessionContentDirty && <p className={styles.meta} role="status">Guarda o descarta el contenido de la sesión antes de crear el syllabus.</p>}
     <div className={styles.actions}>
-      <button type="button" className="btn btn-primary" disabled={busy || !title.trim()} onClick={onCreate}>Crear syllabus <ArrowRight size={16} aria-hidden="true" /></button>
+      <button type="button" className="btn btn-primary" disabled={busy || sessionContentDirty || !title.trim()} onClick={onCreate}>Crear syllabus <ArrowRight size={16} aria-hidden="true" /></button>
       {companion && <button type="button" className="btn btn-outline" disabled={busy || !title.trim() || companion.loading} onClick={recommend}>
         <AltazorMark size={21} state="ready" /> Pedir bibliografía a Altazor
       </button>}
-      <button type="button" className="btn btn-ghost" disabled={busy} onClick={onSearch}><BookOpen size={16} aria-hidden="true" /> Buscar obras</button>
+      <button type="button" className="btn btn-ghost" disabled={busy || sessionContentDirty} onClick={onSearch}><BookOpen size={16} aria-hidden="true" /> Buscar obras</button>
     </div>
     <p className={styles.meta}><CalendarDays size={16} aria-hidden="true" /> La ficha conserva el horario y la sala para el documento.</p>
     {notice && <p role="status" className={styles.meta}>{notice}</p>}

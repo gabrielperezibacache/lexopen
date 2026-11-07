@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
-import { createTeachingSeries, createTeachingSession, deleteTeachingSession, editTeachingSession, exportTeachingSessions, listTeachingSessions, scheduleTeachingCallDeadline, teachingCalendarSessions } from "./teaching-sessions";
+import { enableCalendarFeed, readCalendarFeed } from "./calendar-feed";
+import { emptyTeachingSessionContent, TEACHING_CONTENT_LIMITS } from "./teaching-session-content";
+import { createTeachingSeries, createTeachingSession, deleteTeachingSession, editTeachingSession, exportTeachingSessions, listTeachingSessions, scheduleTeachingCallDeadline, teachingCalendarSessions, updateTeachingSessionContent } from "./teaching-sessions";
 
 const statusIs = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
 
@@ -38,18 +40,72 @@ async function main() {
     await assert.rejects(deleteTeachingSession(course.id, id, other, db), statusIs(404));
     await assert.rejects(deleteTeachingSession(workshop.id, id, owner, db), statusIs(404));
 
+    const empty = emptyTeachingSessionContent();
+    assert.deepEqual(first.session.content, empty);
+    assert.equal(first.session.contentRevision, 0);
+    assert.deepEqual(await updateTeachingSessionContent(course.id, id, { expectedRevision: 0, content: empty }, owner, db),
+      { contentRevision: 0, content: empty });
+    const content = {
+      readings: [
+        { title: "Lectura: capítulo 2", href: "/biblioteca/libro-ficticio" },
+        { title: "Pasaje de discusión", href: "/biblioteca/libro-ficticio?fragment=12#fragment-12" },
+      ],
+      materials: [{ title: "Presentación del taller", href: "https://example.invalid/material.pdf" }],
+      outcomes: ["Comparar dos argumentos."],
+    };
+    const update = { expectedRevision: 0, content };
+    await assert.rejects(updateTeachingSessionContent(course.id, id, update, other, db), statusIs(404));
+    await assert.rejects(updateTeachingSessionContent(workshop.id, id, update, owner, db), statusIs(404));
+    for (const href of [
+      "javascript:alert(1)", "//example.invalid/material", "http://example.invalid/",
+      "https://usuario:secreto@example.invalid/", "https://example.invalid/a\nb", "/biblioteca/../clientes",
+      "/biblioteca/libro?fragment=1#fragment-2", "/biblioteca/libro?fragment=0#fragment-0",
+      "/biblioteca/libro?fragment=9007199254740992#fragment-9007199254740992",
+    ]) {
+      await assert.rejects(updateTeachingSessionContent(course.id, id, {
+        expectedRevision: 0, content: { ...empty, readings: [{ title: "Lectura", href }] },
+      }, owner, db), { name: "ZodError" });
+    }
+    await assert.rejects(updateTeachingSessionContent(course.id, id, {
+      expectedRevision: 0, content: { ...empty, outcomes: ["Objetivo válido\n## encabezado"] },
+    }, owner, db), { name: "ZodError" });
+    await assert.rejects(updateTeachingSessionContent(course.id, id, {
+      expectedRevision: 0, content: { ...empty, outcomes: Array(TEACHING_CONTENT_LIMITS.itemsPerGroup + 1).fill("Resultado") },
+    }, owner, db), { name: "ZodError" });
+    const token = (await enableCalendarFeed(course.id, owner, db)).path.split("/").at(-1)!;
+    const publicBefore = await readCalendarFeed(token, db);
+    const beforeContent = await db.altazorTeachingSession.findUniqueOrThrow({ where: { id } });
+    const concurrent = await Promise.allSettled([
+      updateTeachingSessionContent(course.id, id, update, owner, db),
+      updateTeachingSessionContent(course.id, id, { ...update, content: { ...content, outcomes: ["Evaluar una objeción."] } }, owner, db),
+    ]);
+    const saved = concurrent.find(result => result.status === "fulfilled");
+    const conflict = concurrent.find(result => result.status === "rejected");
+    assert.ok(saved && conflict && statusIs(409)(conflict.reason));
+    assert.equal(saved.value.contentRevision, 1);
+    const [withContent] = (await listTeachingSessions(course.id, owner, db)).sessions;
+    assert.deepEqual(withContent.content, saved.value.content);
+    assert.equal(withContent.contentRevision, 1);
+    const afterContent = await db.altazorTeachingSession.findUniqueOrThrow({ where: { id } });
+    assert.equal(afterContent.updatedAt.getTime(), beforeContent.updatedAt.getTime());
+    assert.equal(afterContent.calendarSequence, beforeContent.calendarSequence);
+    assert.equal(await readCalendarFeed(token, db), publicBefore);
+    assert.ok(!(await exportTeachingSessions(course.id, owner, db)).includes("Lectura: capítulo 2"));
+
     const range = { start: new Date("2026-11-30T03:00:00Z"), end: new Date("2026-12-01T02:59:59Z") };
     assert.deepEqual((await teachingCalendarSessions(owner, range, db)).map(item => item.workspaceId), [workshop.id, course.id]);
     assert.deepEqual(await teachingCalendarSessions(other, range, db), []);
     assert.equal(await db.evento.count({ where: { titulo: data.title } }), 0);
     const revoked = await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "assistant.use" } });
     await assert.rejects(listTeachingSessions(course.id, owner, db), statusIs(403));
+    await assert.rejects(updateTeachingSessionContent(course.id, id, { ...update, expectedRevision: 1 }, owner, db), statusIs(403));
     assert.deepEqual(await teachingCalendarSessions(revoked, range, db), []);
     await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "" } });
 
     await db.altazorAcademicWorkspace.update({ where: { id: course.id }, data: { archivedAt: new Date() } });
     assert.deepEqual((await teachingCalendarSessions(owner, range, db)).map(item => item.workspaceId), [workshop.id]);
     await assert.rejects(listTeachingSessions(course.id, owner, db), statusIs(404));
+    await assert.rejects(updateTeachingSessionContent(course.id, id, { ...update, expectedRevision: 1 }, owner, db), statusIs(404));
     await db.altazorAcademicWorkspace.update({ where: { id: course.id }, data: { archivedAt: null } });
     assert.deepEqual(await deleteTeachingSession(course.id, id, owner, db), { deleted: true });
     assert.deepEqual((await listTeachingSessions(course.id, owner, db)).sessions, []);
@@ -66,6 +122,7 @@ async function main() {
     assert.equal(scheduled.session.id, retry.session.id);
     assert.equal(scheduled.session.callDeadline, true);
     assert.equal(scheduled.session.startsAt, "2026-12-14T19:30:00.000Z");
+    await assert.rejects(updateTeachingSessionContent(call.id, scheduled.session.id, update, owner, db), statusIs(409));
     const rescheduled = await scheduleTeachingCallDeadline(call.id, { ...deadline, time: "17:45" }, owner, db);
     assert.equal(rescheduled.session.id, scheduled.session.id);
     assert.equal(rescheduled.session.startsAt, "2026-12-14T20:45:00.000Z");
@@ -111,9 +168,16 @@ async function main() {
     const edit = { title: "Segunda sesión reprogramada", startsAtLocal: "2026-08-29T11:30", endsAtLocal: null, expectedSequence: 0 };
     await assert.rejects(editTeachingSession(course.id, middle.id, edit, other, db), statusIs(404));
     await assert.rejects(editTeachingSession(call.id, rescheduled.session.id, edit, owner, db), statusIs(409));
-    const moved = (await editTeachingSession(course.id, middle.id, edit, owner, db)).session;
+    await Promise.all([
+      editTeachingSession(course.id, middle.id, edit, owner, db),
+      updateTeachingSessionContent(course.id, middle.id, update, owner, db),
+    ]);
+    const [moved, untouchedFirst, untouchedLast] = (await listTeachingSessions(course.id, owner, db)).sessions;
     assert.equal(moved.id, middle.id);
     assert.equal(moved.calendarSequence, 1);
+    assert.equal(moved.contentRevision, 1);
+    assert.deepEqual(moved.content, content);
+    assert.deepEqual([untouchedFirst, untouchedLast], [earliest, latest]);
     assert.deepEqual(moved.series, middle.series);
     assert.equal(moved.endsAt, null);
     assert.equal(moved.reminderLeadMinutes, 60);
@@ -140,7 +204,7 @@ async function main() {
     await assert.rejects(createTeachingSeries(course.id, { ...seriesInput, requestId: capacityKey }, owner, db), statusIs(413));
     assert.equal(await db.altazorTeachingSeries.count({ where: { workspaceId: course.id, requestId: capacityKey } }), 0);
     assert.equal(await db.altazorTeachingSession.count({ where: { workspaceId: course.id } }), 199);
-    console.log("Teaching sessions passed: ownership, Santiago time, recurring DST and limits, replay, edits, removal by series order, call deadlines and private calendar export.");
+    console.log("Teaching sessions passed: ownership, content revisions and calendar privacy, Santiago time, recurring DST and limits, replay, edits, removal by series order and call deadlines.");
   } finally {
     await db.auditEvent.deleteMany({ where: { actorId: { in: ids } } });
     await db.altazorAcademicWorkspace.deleteMany({ where: { ownerId: { in: ids } } });

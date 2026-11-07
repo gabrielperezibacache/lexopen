@@ -9,8 +9,8 @@ import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { bookMetadataSchema } from "@/lib/books/ingest";
 import { importBook, readBook, createBookCollection, updateBookCollection } from "@/lib/books/service";
 import { workbenchDestination } from "@/lib/workbench/policy";
-import { emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
-import { createAcademicWorkspace, saveAcademicWorkspace, readAcademicWorkspace, prepareAcademicArtifact, executeAcademicArtifact, readAcademicArtifact, saveAcademicArtifact, incorporateAcademicWriting, cancelAcademicArtifact, saveAcademicProfile, academicArtifactHistory, readAcademicArtifactVersion, readAcademicArtifactDownload, restoreAcademicArtifactVersion } from "./academic";
+import { emptyAcademicBrief, emptyAcademicMatrix, emptyAcademicSyllabus } from "./academic-schemas";
+import { createAcademicWorkspace, saveAcademicWorkspace, readAcademicWorkspace, prepareAcademicArtifact, executeAcademicArtifact, readAcademicArtifact, saveAcademicArtifact, incorporateAcademicWriting, cancelAcademicArtifact, saveAcademicProfile, academicArtifactHistory, readAcademicArtifactVersion, readAcademicArtifactDownload, restoreAcademicArtifactVersion, createAcademicDraft } from "./academic";
 import { exportCaseWriting } from "@/lib/writings/export";
 import { prepareAcademicLinkedInDraft, verifyAltazorShareOrigin } from "./share-origin";
 const status=(expected:number)=>(error:unknown)=>(error as {status?:number}).status===expected;
@@ -143,8 +143,81 @@ async function main(){
     await assert.rejects(readAcademicArtifactVersion(workspace.id,artifactId,2,owner,db),status(404));
     await assert.rejects(readAcademicArtifactDownload(workspace.id,artifactId,owner,{ revision: 2 },db),status(404));
     await assert.rejects(readAcademicArtifactDownload(workspace.id,artifactId,owner,{ revision: 2, referencesOnly: true },db),status(404));
+
+    const course = await createAcademicWorkspace({ requestId: randomUUID(), kind: "course", title: "Curso ficticio" }, owner, db);
+    const foreignCourse = await createAcademicWorkspace({ requestId: randomUUID(), kind: "course", title: "Otro curso ficticio" }, other, db);
+    workspaces.push(course.id, foreignCourse.id);
+    const courseSession = (title: string, startsAt: Date, workspaceId = course.id) =>
+      ({ workspaceId, title, startsAt, requestId: randomUUID() });
+    const content = {
+      readings: [{ title: "Lectura pactada", href: "/biblioteca/libro-ficticio" }],
+      materials: [{ title: "Guía práctica", href: "https://example.org/guia" }],
+      outcomes: ["Argumentar a partir de las fuentes"],
+    };
+    const [early, late, ignored, foreign] = await Promise.all([
+      db.altazorTeachingSession.create({ data: {
+        ...courseSession("Primera sesión", new Date("2026-11-10T01:00:00Z")), endsAt: new Date("2026-11-10T02:00:00Z"),
+        reminderLeadMinutes: 10080, contentJson: JSON.stringify(content),
+      } }),
+      db.altazorTeachingSession.create({ data: courseSession("Segunda sesión", new Date("2026-11-15T16:00:00Z")) }),
+      db.altazorTeachingSession.create({ data: courseSession("Sesión excluida", new Date("2026-11-12T16:00:00Z")) }),
+      db.altazorTeachingSession.create({ data: courseSession("Sesión ajena", new Date("2026-11-11T16:00:00Z"), foreignCourse.id) }),
+    ]);
+    async function saveSessions(sessionIds: string[]) {
+      const current = await readAcademicWorkspace(course.id, owner, db);
+      return saveAcademicWorkspace(course.id, {
+        expectedRevision: current.revision, title: current.title, matrix: emptyAcademicMatrix,
+        brief: { ...emptyAcademicBrief, syllabus: { ...emptyAcademicSyllabus, sessionIds } },
+      }, owner, db);
+    }
+    const selected = [late.id, early.id];
+    const selection = await saveSessions(selected);
+    const persisted = await readAcademicWorkspace(course.id, owner, db);
+    assert.deepEqual(persisted.brief.syllabus.sessionIds, selected);
+    const syllabusInput = { requestId: randomUUID(), expectedRevision: selection.revision, template: "course" };
+    const syllabus = await createAcademicDraft(course.id, syllabusInput, owner, db);
+    const { body } = await readAcademicArtifact(course.id, syllabus.id, owner, db);
+    const sessionsBlock = body.split("## Unidades y sesiones\n\n")[1]?.split("\n\n## Evaluación")[0];
+    assert.ok(sessionsBlock);
+    assert.match(sessionsBlock, /^### Primera sesión\n\n09-11-2026, 22:00 – 23:00 \(Santiago\)/);
+    assert.ok(sessionsBlock.indexOf("Primera sesión") < sessionsBlock.indexOf("Segunda sesión"));
+    assert.match(sessionsBlock, /\*\*Resultados de aprendizaje\*\*\n\n- Argumentar a partir de las fuentes/);
+    assert.match(sessionsBlock, /- Lectura pactada — \/biblioteca\/libro-ficticio/);
+    assert.match(sessionsBlock, /- Guía práctica — https:\/\/example.org\/guia/);
+    assert.doesNotMatch(body, /Sesión excluida|Sesión ajena|10080/);
+    for (const session of [early, late, ignored, foreign]) assert.ok(!body.includes(session.id));
+
+    await db.altazorTeachingSession.update({ where: { id: early.id }, data: {
+      title: "Sesión revisada", contentJson: JSON.stringify({ ...content, outcomes: ["Resultado revisado"] }),
+    } });
+    const replaySyllabus = await createAcademicDraft(course.id, syllabusInput, owner, db);
+    assert.deepEqual(replaySyllabus, { id: syllabus.id, reused: true });
+    assert.equal((await readAcademicArtifactVersion(course.id, syllabus.id, 1, owner, db)).body, body);
+    const revisedSyllabus = await createAcademicDraft(course.id, { ...syllabusInput, requestId: randomUUID() }, owner, db);
+    const revisedBody = (await readAcademicArtifact(course.id, revisedSyllabus.id, owner, db)).body;
+    assert.match(revisedBody, /Sesión revisada/);
+    assert.match(revisedBody, /Resultado revisado/);
+
+    await db.altazorTeachingSession.delete({ where: { id: late.id } });
+    await assert.rejects(createAcademicDraft(course.id, { ...syllabusInput, requestId: randomUUID() }, owner, db), status(409));
+    const foreignSelection = await saveSessions([foreign.id]);
+    await assert.rejects(createAcademicDraft(course.id, { ...syllabusInput, requestId: randomUUID(), expectedRevision: foreignSelection.revision }, owner, db), status(409));
+
+    const extensiveResources = Array.from({ length: 12 }, (_, index) => ({
+      title: `Recurso ${index} ${"x".repeat(185)}`, href: `https://example.org/${"x".repeat(980)}`,
+    }));
+    const extensiveContent = JSON.stringify({
+      readings: extensiveResources, materials: extensiveResources, outcomes: Array(12).fill("x".repeat(500)),
+    });
+    const longSessions = await Promise.all([1, 2, 3].map(index => db.altazorTeachingSession.create({ data: {
+      ...courseSession(`Sesión extensa ${index}`, new Date("2026-11-16T16:00:00Z")), contentJson: extensiveContent,
+    } })));
+    const longSelection = await saveSessions(longSessions.map(session => session.id));
+    await assert.rejects(createAcademicDraft(course.id, { ...syllabusInput, requestId: randomUUID(), expectedRevision: longSelection.revision }, owner, db), status(413));
+    assert.equal(await db.altazorAcademicArtifact.count({ where: { workspaceId: course.id } }), 2);
+    assert.equal((await readAcademicArtifact(course.id, syllabus.id, owner, db)).body, body);
     assert.equal(network,0);
-    console.log("ALTAZOR academic disposable integration passed: owner isolation, source-backed proposals, original/version history, CAS save races, idempotent save, recovery as unreviewed revision, tamper/source-revocation denial, native writing replay, LinkedIn origin/revision, legacy matrix, matrix-backed preparation and retention, profile CAS and cancellation; zero provider traffic.");
+    console.log("ALTAZOR academic disposable integration passed: owner isolation, source-backed proposals, original/version history, CAS save races, idempotent save, recovery as unreviewed revision, tamper/source-revocation denial, native writing replay, LinkedIn origin/revision, legacy matrix, matrix-backed preparation and retention, profile CAS and cancellation, selected syllabus sessions and retained snapshots; zero provider traffic.");
   }finally{
     globalThis.fetch=originalFetch;
     await db.externalShareDraft.deleteMany({where:{ownerId:{in:users}}});

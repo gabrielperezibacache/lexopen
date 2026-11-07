@@ -1,4 +1,6 @@
+import { SANTIAGO_TZ, santiagoDateKey } from "@/lib/chile-time";
 import type { AcademicMode, emptyAcademicBrief } from "./academic-schemas";
+import type { TeachingSessionContent } from "./teaching-session-content";
 
 export type AcademicJourney = "research" | "writing" | "course";
 export const ACADEMIC_JOURNEYS = [
@@ -38,7 +40,44 @@ export function isAcademicTeachingKind(kind: string): kind is (typeof ACADEMIC_T
   return ACADEMIC_TEACHING_TEMPLATES.some(id => id === kind);
 }
 
-export function academicManuscriptBody(templateId: AcademicManuscriptTemplate, title: string, brief: typeof emptyAcademicBrief) {
+type SyllabusSession = {
+  title: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  content: TeachingSessionContent;
+};
+
+const sessionDateTime = new Intl.DateTimeFormat("es-CL", { timeZone: SANTIAGO_TZ, dateStyle: "medium", timeStyle: "short", hourCycle: "h23" });
+const sessionTime = new Intl.DateTimeFormat("es-CL", { timeZone: SANTIAGO_TZ, timeStyle: "short", hourCycle: "h23" });
+
+function markdownSessionText(value: string) {
+  return value.replace(/[\s\p{Cc}]+/gu, " ").trim().replace(/[\\`*\[\]]/g, "\\$&");
+}
+
+function syllabusSessionBody({ title, startsAt, endsAt, content }: SyllabusSession) {
+  const start = sessionDateTime.format(startsAt);
+  const end = endsAt && (santiagoDateKey(startsAt) === santiagoDateKey(endsAt) ? sessionTime : sessionDateTime).format(endsAt);
+  const resourceLabel = ({ title, href }: TeachingSessionContent["readings"][number]) =>
+    href ? `${markdownSessionText(title)} — ${href}` : markdownSessionText(title);
+  const sections = [
+    { label: "Resultados de aprendizaje", entries: content.outcomes.map(markdownSessionText) },
+    { label: "Lecturas", entries: content.readings.map(resourceLabel) },
+    { label: "Materiales", entries: content.materials.map(resourceLabel) },
+  ];
+  return [
+    `### ${markdownSessionText(title)}`,
+    `${end ? `${start} – ${end}` : start} (Santiago)`,
+    ...sections.filter(({ entries }) => entries.length)
+      .flatMap(({ label, entries }) => [`**${label}**`, entries.map(entry => `- ${entry}`).join("\n")]),
+  ].join("\n\n");
+}
+
+export function academicManuscriptBody(
+  templateId: AcademicManuscriptTemplate,
+  title: string,
+  brief: typeof emptyAcademicBrief,
+  sessions: readonly SyllabusSession[] = [],
+) {
   if (templateId === "blank") return "";
   const heading = `# ${title.replace(/\s+/g, " ")}`;
   if (templateId === "call" && brief.call) {
@@ -55,7 +94,7 @@ export function academicManuscriptBody(templateId: AcademicManuscriptTemplate, t
     ["Destinatarios y requisitos", brief.audience, fields?.requirements],
     ["Horario y sala", fields?.schedule, fields?.room, brief.duration],
     ["Resultados de aprendizaje", brief.learningOutcomes],
-    ["Unidades y sesiones"],
+    ["Unidades y sesiones", ...sessions.map(syllabusSessionBody)],
     ["Evaluación", brief.evaluation],
     ["Bibliografía base", fields?.bibliography],
   ];

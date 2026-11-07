@@ -12,10 +12,11 @@ import { writeAuditStrict } from "@/lib/audit";
 import { createCaseWritingFromSnapshots } from "@/lib/writings/service";
 import { captureWritingSource } from "@/lib/writings/sources";
 import { resolveAltazorSources, verifyAltazorSources, type AltazorSourceSnapshot } from "./resources";
-import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, academicDraftCreateSchema, ACADEMIC_LABELS, ACADEMIC_WORKSPACE_LIMIT, emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
+import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, academicDraftCreateSchema, ACADEMIC_LABELS, ACADEMIC_MANUSCRIPT_MAX, ACADEMIC_WORKSPACE_LIMIT, emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
 import { parseAcademicOutput, academicReferenceAppendix, academicWritingBody } from "./academic-output";
 import { academicManuscriptBody, ACADEMIC_MANUSCRIPT_TEMPLATES, isAcademicTeachingKind, type AcademicManuscriptTemplate } from "./academic-templates";
 import type { AcademicCallOrigin } from "./academic-calls";
+import { readTeachingSessionContent } from "./teaching-session-content";
 const missing = () => httpError("El trabajo académico no está disponible", 404);
 const unavailableRowTitle = "Fila cuyo respaldo ya no está disponible";
 const unavailableSource = (error: unknown) => [403,404,409,410,413,422].includes(Number((error as { status?: number }).status));
@@ -150,7 +151,10 @@ export async function prepareAcademicArtifact(id: string, raw: unknown, user: Ca
     const documents = new Set(refs.map(({ input: source }) => source.kind === "book" ? source.bookId : source.kind === "legal" || source.kind === "document" ? source.versionId : ""));
     if (documents.size < 2) throw httpError("Seleccione pasajes de dos documentos distintos para compararlos", 400);
   }
-  const data = { destination, instruction: input.instruction, brief: JSON.parse(workspace.briefJson), matrix: { dimensions: matrix.dimensions || [], rows: (matrix.rows || []).filter((row: { included: boolean }) => row.included) }, profile: profile ? JSON.parse(profile.profileJson) : null };
+  const brief = JSON.parse(workspace.briefJson) as typeof emptyAcademicBrief;
+  // The saved Agenda selection belongs to the local syllabus draft.
+  if (brief.syllabus) delete brief.syllabus.sessionIds;
+  const data = { destination, instruction: input.instruction, brief, matrix: { dimensions: matrix.dimensions || [], rows: (matrix.rows || []).filter((row: { included: boolean }) => row.included) }, profile: profile ? JSON.parse(profile.profileJson) : null };
   if (JSON.stringify(data).length > 60000) throw httpError("La matriz o el perfil excede el contexto de una consulta; reduzca la selección", 413);
   return bookTransaction(client, async tx => {
     await actorFor(actor, tx); await verifyAltazorSources(actor, refs, { client: tx });
@@ -181,7 +185,23 @@ export async function createAcademicDraft(id: string, raw: unknown, user: CausaA
     await verifyAltazorSources(actor, refs, { client: tx });
     const template = ACADEMIC_MANUSCRIPT_TEMPLATES[input.template];
     const title = `${input.template === "blank" ? "Borrador" : template.label} · ${workspace.title}`.slice(0, 240);
-    const body = academicManuscriptBody(input.template, workspace.title, { ...emptyAcademicBrief, ...JSON.parse(workspace.briefJson) });
+    const brief: typeof emptyAcademicBrief = { ...emptyAcademicBrief, ...JSON.parse(workspace.briefJson) };
+    const sessionIds = input.template === "course" && workspace.kind === "course" ? brief.syllabus?.sessionIds ?? [] : [];
+    const sessions = sessionIds.length ? await tx.altazorTeachingSession.findMany({
+      where: { workspaceId: workspace.id, id: { in: sessionIds } },
+      select: { title: true, startsAt: true, endsAt: true, contentJson: true },
+      orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+    }) : [];
+    if (sessions.length !== sessionIds.length) {
+      throw httpError("Alguna sesión elegida ya no está disponible. Revisa la selección de la Agenda antes de crear el syllabus.", 409);
+    }
+    const body = academicManuscriptBody(input.template, workspace.title, brief, sessions.map(({ contentJson, ...session }) => ({
+      ...session,
+      content: readTeachingSessionContent(contentJson),
+    })));
+    if (body.length > ACADEMIC_MANUSCRIPT_MAX) {
+      throw httpError("Las sesiones elegidas exceden el tamaño del syllabus. Reduce la selección e inténtalo nuevamente.", 413);
+    }
     const mode = input.template === "course" ? "syllabus" : isAcademicTeachingKind(input.template) ? "teaching_material" : "academic_writing";
     const artifact = await tx.altazorAcademicArtifact.create({
       data: {
@@ -236,7 +256,7 @@ export async function executeAcademicArtifact(workspaceId: string, id: string, u
     abort.signal.throwIfAborted();
     if (result.source !== "llm") throw httpError(result.note || "No se obtuvo una respuesta del proveedor configurado", 503);
     const body = `# ${row.title}\n\nPropuesta de ALTAZOR para revisión profesional.\n\n${parseAcademicOutput(result.content, refs)}${academicReferenceAppendix(refs)}`;
-    if (body.length > 100000) throw httpError("La respuesta excedió el tamaño de un documento. Prepare un encargo más acotado", 413);
+    if (body.length > ACADEMIC_MANUSCRIPT_MAX) throw httpError("La respuesta excedió el tamaño de un documento. Prepare un encargo más acotado", 413);
     await readAcademicArtifact(workspaceId, id, actor, client); await actorFor(actor, client);
     const saved = await client.altazorAcademicArtifact.updateMany({ where: { id, leaseToken: token, status: "running", cancelRequestedAt: null }, data: { status: "proposed", body, bodySha256: sha256(body), leaseToken: null, leaseExpiresAt: null } });
     if (!saved.count) throw httpError("El trabajo se canceló antes de guardar el resultado", 409);

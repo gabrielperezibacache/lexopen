@@ -202,6 +202,7 @@ test("Academia: fuente elegida, propuesta local, revisión, exportación y escri
 });
 
 test("Docencia arma un syllabus editable desde la ficha y separa la consulta bibliográfica", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
   await loginAs(page, email);
   const initialRequests = requests.length;
   await page.setViewportSize({ width: 360, height: 800 });
@@ -231,6 +232,56 @@ test("Docencia arma un syllabus editable desde la ficha y separa la consulta bib
   await expect(chat.getByRole("textbox", { name: "Mensaje para ALTAZOR" })).not.toHaveValue(/Lectura base ficticia|Aula 204/);
   await page.keyboard.press("Escape");
   await expect(chat).toBeHidden();
+
+  const agenda = academic.getByRole("region", { name: "Actividades en mi Agenda" });
+  for (const [name, date] of [["Sesión de fuentes jurídicas", "2030-05-09"], ["Sesión de ejercicios internos", "2030-05-16"]]) {
+    await agenda.getByRole("textbox", { name: "Nombre de la actividad", exact: true }).fill(name);
+    await agenda.getByLabel("Inicio", { exact: true }).fill(`${date}T16:30`);
+    await agenda.getByLabel("Término (opcional)", { exact: true }).fill(`${date}T17:30`);
+    await agenda.getByRole("button", { name: "Agregar a mi Agenda", exact: true }).click();
+    await expect(agenda.getByRole("listitem").filter({ hasText: name })).toBeVisible();
+  }
+  const lesson = agenda.getByRole("listitem").filter({ hasText: "Sesión de fuentes jurídicas" });
+  await lesson.getByText("Contenido de la sesión", { exact: true }).click();
+  await lesson.getByRole("button", { name: "Editar contenido", exact: true }).click();
+  await lesson.getByRole("button", { name: "Añadir lectura", exact: true }).click();
+  await lesson.getByLabel("Título de la lectura 1", { exact: true }).fill("Lectura asignada sobre fuentes");
+  await lesson.getByLabel("Enlace de la lectura 1 (opcional)", { exact: true }).fill(`${new URL(testInfo.project.use.baseURL as string).origin}/biblioteca/libro-prueba?fragment=2#fragment-2`);
+  await lesson.getByRole("button", { name: "Añadir material", exact: true }).click();
+  await lesson.getByLabel("Título del material 1", { exact: true }).fill("Guía ficticia de análisis");
+  await lesson.getByLabel("Enlace del material 1 (opcional)", { exact: true }).fill("https://example.invalid/materiales/guia");
+  await lesson.getByRole("button", { name: "Añadir resultado", exact: true }).click();
+  await lesson.getByLabel("Resultado de aprendizaje 1", { exact: true }).fill("Clasificar las fuentes de un caso.");
+  await expect(ficha.getByRole("button", { name: "Crear syllabus" })).toBeDisabled();
+  await lesson.getByRole("button", { name: "Guardar contenido", exact: true }).click();
+  await expect(ficha.getByRole("button", { name: "Crear syllabus" })).toBeEnabled();
+  await expect(lesson.getByRole("link", { name: "Lectura asignada sobre fuentes", exact: true }))
+    .toHaveAttribute("href", "/biblioteca/libro-prueba?fragment=2#fragment-2");
+  await expect(lesson.getByRole("link", { name: "Guía ficticia de análisis", exact: true }))
+    .toHaveAttribute("href", "https://example.invalid/materiales/guia");
+  if (process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
+    await lesson.screenshot({ path: testInfo.outputPath("contenido-sesion-movil.png") });
+  }
+
+  const picker = ficha.locator("#syllabus-agenda");
+  await picker.getByText("Sesiones de la Agenda", { exact: true }).click();
+  const selectedLesson = picker.getByRole("checkbox", { name: /Sesión de fuentes jurídicas/ });
+  const otherLesson = picker.getByRole("checkbox", { name: /Sesión de ejercicios internos/ });
+  await selectedLesson.check();
+  await expect(otherLesson).not.toBeChecked();
+  await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
+  await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
+  await page.reload();
+  await picker.getByText("Sesiones de la Agenda", { exact: true }).click();
+  await expect(selectedLesson).toBeChecked();
+  await expect(otherLesson).not.toBeChecked();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  if (process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
+    await page.setViewportSize({ width: 1280, height: 880 });
+    await picker.screenshot({ path: testInfo.outputPath("seleccion-syllabus-escritorio.png") });
+    await page.setViewportSize({ width: 360, height: 800 });
+  }
+
   await ficha.getByRole("button", { name: "Crear syllabus" }).click();
   const editor = academic.getByRole("region", { name: "Editor académico" });
   const prose = editor.getByRole("textbox", { name: "Texto de trabajo", exact: true });
@@ -238,6 +289,12 @@ test("Docencia arma un syllabus editable desde la ficha y separa la consulta bib
   const initial = await prose.inputValue();
   expect(initial).toContain("## Bibliografía base\n\nAutora de prueba. Lectura base ficticia.");
   expect(initial).toContain("Distinguir premisas y conclusiones.");
+  expect(initial).toContain("Sesión de fuentes jurídicas");
+  expect(initial).toContain("Lectura asignada sobre fuentes");
+  expect(initial).toContain("/biblioteca/libro-prueba?fragment=2#fragment-2");
+  expect(initial).toContain("Guía ficticia de análisis");
+  expect(initial).toContain("Clasificar las fuentes de un caso.");
+  expect(initial).not.toContain("Sesión de ejercicios internos");
   expect(initial).not.toContain("Sugiere bibliografía");
   const workspace = await db.altazorAcademicWorkspace.findFirstOrThrow({ where: { ownerId, title: "Curso ficticio de argumentación" } });
   const artifact = await db.altazorAcademicArtifact.findFirstOrThrow({ where: { workspaceId: workspace.id } });

@@ -14,6 +14,7 @@ import { altazorActor, altazorTransaction } from "./access";
 import { ACADEMIC_TEACHING_TEMPLATES } from "./academic-templates";
 import { altazorRequestId } from "./schemas";
 import { teachingReminderFields, teachingReminderLeadSchema } from "./teaching-reminder-policy";
+import { readTeachingSessionContent, teachingSessionContentMutationSchema, type TeachingSessionContent } from "./teaching-session-content";
 
 const sessionLimit = 200;
 const deadlineRequestId = "academic-call-deadline";
@@ -60,11 +61,15 @@ export type TeachingSession = {
   callDeadline?: true;
   series?: { id: string; occurrence: number; count: number; intervalWeeks: 1 | 2 };
   reminderLeadMinutes: number | null;
+  contentRevision: number;
+  content: TeachingSessionContent;
 };
 
+const calendarSessionSelect = { id: true, title: true, startsAt: true, endsAt: true } as const;
 const sessionSelect = {
-  id: true, title: true, startsAt: true, endsAt: true, requestId: true, calendarSequence: true, updatedAt: true,
+  ...calendarSessionSelect, requestId: true, calendarSequence: true, updatedAt: true,
   reminderLeadMinutes: true, seriesOccurrence: true, series: { select: { id: true, count: true, intervalWeeks: true } },
+  contentRevision: true, contentJson: true,
 } as const;
 type Session = Prisma.AltazorTeachingSessionGetPayload<{ select: typeof sessionSelect }>;
 const ownedTeachingWork = (ownerId: string) => ({ ownerId, kind: { in: [...ACADEMIC_TEACHING_TEMPLATES] }, archivedAt: null });
@@ -105,6 +110,7 @@ function view(row: Session): TeachingSession {
   return { id: row.id, title: row.title, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt?.toISOString() ?? null, agendaHref: `/calendario?vista=agenda&ym=${ym}&tipo=evento`,
     startsAtLocal: localTeachingTime(row.startsAt), endsAtLocal: row.endsAt ? localTeachingTime(row.endsAt) : null,
     calendarSequence: row.calendarSequence, reminderLeadMinutes: row.reminderLeadMinutes,
+    contentRevision: row.contentRevision, content: readTeachingSessionContent(row.contentJson),
     ...(row.requestId === deadlineRequestId ? { callDeadline: true as const } : {}),
     ...(row.series && row.seriesOccurrence && { series: {
       id: row.series.id, occurrence: row.seriesOccurrence, count: row.series.count,
@@ -119,21 +125,21 @@ async function teachingWorkspace(id: string, user: CausaAccessUser, client: Pris
   return actor;
 }
 
-async function readTeachingSessions(workspaceId: string, user: CausaAccessUser, client: PrismaClient) {
+async function readTeachingSessions<T extends Prisma.AltazorTeachingSessionSelect>(workspaceId: string, user: CausaAccessUser, client: PrismaClient, select: T) {
   const actor = await teachingWorkspace(workspaceId, user, client);
   return client.altazorTeachingSession.findMany({
-    where: { workspaceId, workspace: ownedTeachingWork(actor.id) }, select: sessionSelect,
+    where: { workspaceId, workspace: ownedTeachingWork(actor.id) }, select,
     orderBy: [{ startsAt: "asc" }, { id: "asc" }], take: sessionLimit,
   });
 }
 
 export async function listTeachingSessions(workspaceId: string, user: CausaAccessUser, client: PrismaClient = prisma) {
-  const sessions = await readTeachingSessions(workspaceId, user, client);
+  const sessions = await readTeachingSessions(workspaceId, user, client, sessionSelect);
   return { sessions: sessions.map(view) };
 }
 
 export async function exportTeachingSessions(workspaceId: string, user: CausaAccessUser, client: PrismaClient = prisma) {
-  const sessions = await readTeachingSessions(workspaceId, user, client);
+  const sessions = await readTeachingSessions(workspaceId, user, client, calendarSessionSelect);
   return buildIcs(sessions.map(session => ({
     id: session.id, titulo: session.title, inicio: session.startsAt, fin: session.endsAt,
   })));
@@ -225,6 +231,30 @@ export async function editTeachingSession(workspaceId: string, id: string, raw: 
     });
     await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.edit", entityType: "AltazorTeachingSession", entityId: saved.id }, tx);
     return { session: view(saved) };
+  });
+}
+
+export async function updateTeachingSessionContent(workspaceId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const { expectedRevision, content } = teachingSessionContentMutationSchema.parse(raw);
+  const contentJson = JSON.stringify(content);
+  return altazorTransaction(client, async tx => {
+    const actor = await teachingWorkspace(workspaceId, user, tx);
+    const where = { id, workspaceId };
+    const current = await tx.altazorTeachingSession.findFirst({
+      where, select: { contentRevision: true, contentJson: true, updatedAt: true, requestId: true },
+    });
+    if (!current) throw missing();
+    if (current.requestId === deadlineRequestId) throw httpError("El cierre de una convocatoria no admite contenido de una sesión.", 409);
+    if (current.contentRevision !== expectedRevision) throw httpError("El contenido de la sesión cambió. Vuelve a cargarlo antes de guardar.", 409);
+    if (contentJson === JSON.stringify(readTeachingSessionContent(current.contentJson))) return { contentRevision: current.contentRevision, content };
+    const saved = await tx.altazorTeachingSession.update({
+      where: { ...where, contentRevision: expectedRevision },
+      // This private content never changes the event revision exposed by the calendar.
+      data: { contentJson, contentRevision: { increment: 1 }, updatedAt: current.updatedAt },
+      select: { contentRevision: true },
+    });
+    await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.content-update", entityType: "AltazorTeachingSession", entityId: id }, tx);
+    return { contentRevision: saved.contentRevision, content };
   });
 }
 

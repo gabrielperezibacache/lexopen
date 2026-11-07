@@ -2655,6 +2655,8 @@ model AltazorTeachingSession {
   calendarSequence Int @default(0)
   reminderLeadMinutes Int?
   reminderDueAt DateTime?
+  contentJson String @default("{}") @db.Text
+  contentRevision Int @default(0)
   @@unique([workspaceId,requestId])
   @@unique([seriesId,seriesOccurrence])
   @@index([startsAt,workspaceId])

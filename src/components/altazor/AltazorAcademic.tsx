@@ -42,12 +42,14 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
   const [teachingStart, setTeachingStart] = useState<TeachingTemplate | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [discoveryQuery, setDiscoveryQuery] = useState("");
+  const [teachingSessionsVersion, setTeachingSessionsVersion] = useState(0);
+  const [sessionContentDirty, setSessionContentDirty] = useState(false);
   const [selectedId, setSelectedId] = useState(""), [dirty, setDirty] = useState(false), [editorDirty, setEditorDirty] = useState(false), [profileDirty, setProfileDirty] = useState(false);
   const [causas, setCausas] = useState<{ id: string; titulo: string; rit: string | null }[]>([]);
   const createId = useRef(createSubmissionKeys()), prepareId = useRef(createSubmissionKeys()), currentWorkspace = useRef(""), mounted = useRef(true);
   const section = useRef<HTMLElement>(null);
   const projectSearch = useRef<HTMLInputElement>(null);
-  const blocked = busy || stopping || dirty || editorDirty || profileDirty;
+  const blocked = busy || stopping || dirty || editorDirty || profileDirty || sessionContentDirty;
   useEffect(() => {
     const controller = new AbortController(); mounted.current = true;
     void Promise.all([api<AcademicOverview>("/api/altazor/academic", undefined, "GET", controller.signal), api<{ causas?: typeof causas }>("/api/altazor/resources", undefined, "GET", controller.signal)])
@@ -73,10 +75,10 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
     }
   }, [initialTeaching, loading]);
   useEffect(() => {
-    if (!dirty && !editorDirty && !profileDirty) return;
+    if (!dirty && !editorDirty && !profileDirty && !sessionContentDirty) return;
     const leave = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
     window.addEventListener("beforeunload", leave); return () => window.removeEventListener("beforeunload", leave);
-  }, [dirty, editorDirty, profileDirty]);
+  }, [dirty, editorDirty, profileDirty, sessionContentDirty]);
   async function load(id: string, onlyProposals = false) {
     const data = await api<AcademicWorkspace>(`/api/altazor/academic/${encodeURIComponent(id)}`);
     if (mounted.current && currentWorkspace.current === id) {
@@ -183,7 +185,7 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
   }
   const draftRequest = useRef(createSubmissionKeys());
   async function createDraft(next: AcademicManuscriptTemplate) {
-    if (!workspace || busy || editorDirty || !workspace.title.trim()) return;
+    if (!workspace || busy || editorDirty || sessionContentDirty || !workspace.title.trim()) return;
     const revision = await saveWorkspace();
     if (revision === null) return;
     setBusy(true); setError(""); setNotice("");
@@ -251,11 +253,11 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
         <h1>Académico</h1>
         <p>Investiga, escribe y prepara tus clases con las fuentes de cada trabajo a la vista.</p>
       </EditorialHeading>
-      <Link href="/inicio" className="btn btn-ghost" onClick={event => { if (dirty || editorDirty || profileDirty) { event.preventDefault(); setNotice("Guarda los cambios antes de volver a ALTAZOR."); } }}>Pedir ayuda a Altazor</Link>
+      <Link href="/inicio" className="btn btn-ghost" onClick={event => { if (dirty || editorDirty || profileDirty || sessionContentDirty) { event.preventDefault(); setNotice("Guarda los cambios antes de volver a ALTAZOR."); } }}>Pedir ayuda a Altazor</Link>
     </header>
     <nav className={styles.navigation} aria-label="Herramientas académicas">
-      <button type="button" aria-current={pane === "work" ? "page" : undefined} disabled={profileDirty || editorDirty} onClick={() => setPane("work")}>Mis trabajos</button>
-      <button type="button" aria-current={pane === "discovery" ? "page" : undefined} disabled={profileDirty || editorDirty} onClick={() => { setDiscoveryQuery(""); setPane("discovery"); }}>Buscar bibliografía</button>
+      <button type="button" aria-current={pane === "work" ? "page" : undefined} disabled={profileDirty || editorDirty || sessionContentDirty} onClick={() => setPane("work")}>Mis trabajos</button>
+      <button type="button" aria-current={pane === "discovery" ? "page" : undefined} disabled={profileDirty || editorDirty || sessionContentDirty} onClick={() => { setDiscoveryQuery(""); setPane("discovery"); }}>Buscar bibliografía</button>
       <button type="button" aria-current={pane === "teaching" ? "page" : undefined} disabled={blocked} onClick={() => setPane("teaching")}>Docencia</button>
       <button type="button" aria-current={pane === "review" ? "page" : undefined} disabled={blocked} onClick={() => void openReview()}>Mesa de revisión</button>
     </nav>
@@ -342,22 +344,24 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
           {step === 0 && pane === "work" && <label className={styles.title}>Nombre del trabajo<input value={workspace.title} onChange={event => updateWorkspace({ title: event.target.value })} maxLength={200} disabled={busy}/></label>}
           {pane === "matrix" ? <><fieldset data-academic-matrix disabled={busy} style={{border:0,padding:0,minWidth:0}}><legend className="sr-only">Matriz académica</legend><AcademicMatrix title={workspace.title} matrix={workspace.matrix} sources={sources} onChange={matrix => updateWorkspace({ matrix })}/></fieldset><button type="button" className="btn btn-outline" onClick={() => setPane("work")}>Volver al trabajo</button></> : <>
             <nav className={styles.steps} aria-label="Pasos del trabajo académico">{workSteps.map(({ label, icon: Icon }, index) =>
-              <button key={label} type="button" aria-current={step === index ? "step" : undefined} disabled={busy || (editorDirty && index !== 2)} onClick={() => setStep(index)}>
+              <button key={label} type="button" aria-current={step === index ? "step" : undefined} disabled={busy || (editorDirty && index !== 2) || (sessionContentDirty && index !== 0)} onClick={() => setStep(index)}>
                 <span aria-hidden="true"><Icon size={14} /></span>{label}
               </button>)}</nav>
             {step === 0 && <div className={styles.objective}>
-              {workspace.kind === "course" && <AcademicSyllabusForm title={workspace.title} brief={workspace.brief} busy={busy}
+              {workspace.kind === "course" && <AcademicSyllabusForm key={workspace.id} workspaceId={workspace.id} sessionsVersion={teachingSessionsVersion}
+                title={workspace.title} brief={workspace.brief} busy={busy} sessionContentDirty={sessionContentDirty}
                 onChange={syllabus => updateWorkspace({ brief: { ...workspace.brief, syllabus } })}
                 onBriefChange={(key, value) => updateWorkspace({ brief: { ...workspace.brief, [key]: value } })}
                 onCreate={() => void createDraft("course")}
                 onSearch={() => { setDiscoveryQuery(workspace.title.trim()); setPane("discovery"); }} />}
               {workspace.kind === "call" && <AcademicCallForm value={workspace.brief.call} origin={workspace.callOrigin} busy={busy}
                 onChange={call => updateWorkspace({ brief: { ...workspace.brief, call } })} />}
-              <label>Tu objetivo o texto de trabajo<textarea rows={7} value={workspace.brief.objective} disabled={busy} onChange={event => updateWorkspace({ brief: { ...workspace.brief, objective: event.target.value } })} maxLength={8000} placeholder={ACADEMIC_INSTRUCTIONS[mode]}/></label><details><summary>Opciones del trabajo</summary><div className={styles.brief}><label>Qué quieres preparar<select aria-label="Qué quieres preparar" value={mode} disabled={busy} onChange={event => { setMode(event.target.value as AcademicMode); updateWorkspace({ brief: { ...workspace.brief, task: event.target.value as AcademicMode } }); }}>{ACADEMIC_JOURNEYS.map(item => <optgroup key={item.id} label={item.label}>{item.modes.map(id => <option key={id} value={id}>{ACADEMIC_LABELS[id]}</option>)}</optgroup>)}</select></label>{(["audience", "language", ...(["syllabus", "rubric", "teaching_material"].includes(mode) ? ["duration", "learningOutcomes", "evaluation"] as const : [])] as const).map(key => <label key={key}>{{ audience: "Destinatarios", language: "Idioma", duration: "Duración", learningOutcomes: "Resultados de aprendizaje", evaluation: "Evaluación o actividad" }[key]}<textarea value={workspace.brief[key]} rows={key === "language" || key === "duration" ? 1 : 3} maxLength={key === "language" ? 80 : key === "duration" ? 100 : key === "audience" ? 1000 : 6000} disabled={busy} onChange={event => updateWorkspace({ brief: { ...workspace.brief, [key]: event.target.value } })}/></label>)}</div></details>{mode === "cv" && <button className="btn btn-outline" type="button" disabled={busy || editorDirty} onClick={() => setPane("profile")}>Completar perfil para el currículum</button>}
+              <label>Tu objetivo o texto de trabajo<textarea rows={7} value={workspace.brief.objective} disabled={busy} onChange={event => updateWorkspace({ brief: { ...workspace.brief, objective: event.target.value } })} maxLength={8000} placeholder={ACADEMIC_INSTRUCTIONS[mode]}/></label><details><summary>Opciones del trabajo</summary><div className={styles.brief}><label>Qué quieres preparar<select aria-label="Qué quieres preparar" value={mode} disabled={busy} onChange={event => { setMode(event.target.value as AcademicMode); updateWorkspace({ brief: { ...workspace.brief, task: event.target.value as AcademicMode } }); }}>{ACADEMIC_JOURNEYS.map(item => <optgroup key={item.id} label={item.label}>{item.modes.map(id => <option key={id} value={id}>{ACADEMIC_LABELS[id]}</option>)}</optgroup>)}</select></label>{(["audience", "language", ...(["syllabus", "rubric", "teaching_material"].includes(mode) ? ["duration", "learningOutcomes", "evaluation"] as const : [])] as const).map(key => <label key={key}>{{ audience: "Destinatarios", language: "Idioma", duration: "Duración", learningOutcomes: "Resultados de aprendizaje", evaluation: "Evaluación o actividad" }[key]}<textarea value={workspace.brief[key]} rows={key === "language" || key === "duration" ? 1 : 3} maxLength={key === "language" ? 80 : key === "duration" ? 100 : key === "audience" ? 1000 : 6000} disabled={busy} onChange={event => updateWorkspace({ brief: { ...workspace.brief, [key]: event.target.value } })}/></label>)}</div></details>{mode === "cv" && <button className="btn btn-outline" type="button" disabled={busy || editorDirty || sessionContentDirty} onClick={() => setPane("profile")}>Completar perfil para el currículum</button>}
               {isAcademicTeachingKind(workspace.kind) && <AcademicTeachingSessions key={workspace.id} workspaceId={workspace.id}
-                deadline={workspace.kind === "call" ? workspace.brief.call?.deadline : undefined} deadlineSaved={!dirty} />}
-              {workspace.kind !== "course" && <button type="button" className="btn btn-outline" disabled={busy}
-                onClick={() => { setTemplate(isAcademicTeachingKind(workspace.kind) ? workspace.kind : "blank"); setShowTemplates(true); setStep(2); }}><PenLine size={16} aria-hidden="true" /> Abrir editor</button>}<button type="button" className="btn btn-primary" disabled={busy || !workspace.brief.objective.trim()} onClick={() => { void saveWorkspace().then(saved => { if (saved) setStep(1); }); }}>{dirty ? "Guardar y elegir fuentes" : "Elegir fuentes"}<ArrowRight size={16}/></button></div>}
+                deadline={workspace.kind === "call" ? workspace.brief.call?.deadline : undefined} deadlineSaved={!dirty}
+                onSessionsChange={() => setTeachingSessionsVersion(version => version + 1)} onContentDirty={setSessionContentDirty} />}
+              {workspace.kind !== "course" && <button type="button" className="btn btn-outline" disabled={busy || sessionContentDirty}
+                onClick={() => { setTemplate(isAcademicTeachingKind(workspace.kind) ? workspace.kind : "blank"); setShowTemplates(true); setStep(2); }}><PenLine size={16} aria-hidden="true" /> Abrir editor</button>}<button type="button" className="btn btn-primary" disabled={busy || sessionContentDirty || !workspace.brief.objective.trim()} onClick={() => { void saveWorkspace().then(saved => { if (saved) setStep(1); }); }}>{dirty ? "Guardar y elegir fuentes" : "Elegir fuentes"}<ArrowRight size={16}/></button></div>}
             {step === 1 && <div className={styles.sourceStep}>
               {workspace.unavailableSources > 0 && <p role="status">
                 {workspace.unavailableSources === 1 ? "Un pasaje guardado ya no está disponible." : `${workspace.unavailableSources} pasajes guardados ya no están disponibles.`}

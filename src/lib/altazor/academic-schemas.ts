@@ -2,7 +2,9 @@ import { z } from "zod";
 import { altazorSourceInputSchema } from "./resource-input";
 import { ACADEMIC_MANUSCRIPT_TEMPLATE_IDS, ACADEMIC_TEACHING_TEMPLATES } from "./academic-templates";
 import { isWorkCountry } from "@/lib/config/countries";
+import { writingId } from "@/lib/writings/schemas";
 export const ACADEMIC_WORKSPACE_LIMIT = 100;
+export const ACADEMIC_MANUSCRIPT_MAX = 100000;
 export const ACADEMIC_MODES = ["synthesis", "literature_review", "comparison", "claim_audit", "bibliography_audit", "academic_writing", "translation", "abstract", "peer_review", "syllabus", "rubric", "teaching_material", "cv"] as const;
 export const academicModeSchema = z.enum(ACADEMIC_MODES);
 export type AcademicMode = z.infer<typeof academicModeSchema>;
@@ -18,6 +20,8 @@ const syllabus = z.object({
   room: z.string().max(600),
   requirements: z.string().max(3000),
   bibliography: z.string().max(5000),
+  sessionIds: z.array(writingId).max(200)
+    .refine(ids => new Set(ids).size === ids.length, "Elige cada sesión una sola vez").optional(),
 }).strict();
 export type AcademicSyllabus = z.infer<typeof syllabus>;
 export const emptyAcademicSyllabus: AcademicSyllabus = { summary: "", approach: "", schedule: "", room: "", requirements: "", bibliography: "" };
@@ -57,7 +61,7 @@ export const academicWorkspaceCreateSchema = z.object({ requestId, title: z.stri
 export const academicWorkspaceSaveSchema = z.object({ expectedRevision: revision, title: z.string().trim().min(1).max(200), brief, matrix, sources: z.array(altazorSourceInputSchema).max(8).optional() }).strict();
 export const academicPrepareSchema = z.object({ requestId, expectedRevision: revision, mode: academicModeSchema, instruction: z.string().trim().min(1).max(12000), sources: z.array(altazorSourceInputSchema).max(8), destinationKey: z.string().length(64), allowRemote: z.boolean().default(false) }).strict();
 export const academicDraftCreateSchema = z.object({ requestId, expectedRevision: revision, template: z.enum(ACADEMIC_MANUSCRIPT_TEMPLATE_IDS) }).strict();
-export const academicArtifactSaveSchema = z.object({ expectedRevision: revision, body: z.string().max(100000), reviewed: z.boolean() }).strict();
+export const academicArtifactSaveSchema = z.object({ expectedRevision: revision, body: z.string().max(ACADEMIC_MANUSCRIPT_MAX), reviewed: z.boolean() }).strict();
 export const academicArtifactRestoreSchema = z.object({ expectedRevision: revision, revision }).strict();
 export const emptyAcademicBrief: z.infer<typeof brief> = { objective: "", audience: "", language: "Español", duration: "", learningOutcomes: "", evaluation: "", task: "literature_review" };
 export const emptyAcademicMatrix = { dimensions: [{ id: "question", label: "Pregunta y método", type: "text" as const }, { id: "finding", label: "Hallazgo", type: "text" as const }, { id: "limitations", label: "Límites", type: "text" as const }], rows: [] };
