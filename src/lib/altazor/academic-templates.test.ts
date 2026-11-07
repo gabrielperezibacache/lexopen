@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ACADEMIC_MODES, emptyAcademicBrief } from "./academic-schemas";
+import { ACADEMIC_MODES, academicCongressSchema, emptyAcademicBrief } from "./academic-schemas";
 import { ACADEMIC_JOURNEYS, ACADEMIC_INSTRUCTIONS, academicHref, academicJourney, academicManuscriptBody, academicOutline, academicTextStats, tidyAcademicSpacing } from "./academic-templates";
 
 test("the three academic journeys retain every supported task exactly once", () => {
@@ -97,7 +97,9 @@ test("congress programs group chosen sessions by axis and table while keeping le
       { id: "debate", axisId: "derecho", title: "Debate jurídico", responsible: "Coordinadora [invitada]", sessionIds: ["segunda", "primera"] },
       { id: "otra", axisId: "interno", title: "Mesa excluida", responsible: "Responsable interno", sessionIds: ["no-elegida"] },
     ],
-    actions: [{ id: "encargo", title: "Encargo privado del comité", responsible: "Responsable privada", status: "pending" as const, notes: "Notas internas del encargo", dueAtLocal: "2030-05-09T09:00", tableId: "debate" }],
+    actions: [{ id: "encargo", title: "Encargo privado del comité", responsible: "Responsable privada", status: "pending" as const, notes: "Notas internas del encargo", dueAtLocal: "2030-05-09T09:00", tableId: "debate",
+      deliverables: [{ id: "entrega", title: "Entregable reservado", status: "submitted" as const, notes: "Observaciones privadas de revisión", href: "https://example.org/archivo-privado" }],
+    }],
     meetings: [{ id: "reunion", title: "Reunión interna del comité", date: "2030-05-01", attendees: "Asistentes privados", notes: "Notas reservadas de reunión", agreements: [{ id: "acuerdo", text: "Acuerdo reservado de organización" }] }],
   };
   const brief = { ...emptyAcademicBrief, congress };
@@ -107,12 +109,40 @@ test("congress programs group chosen sessions by axis and table while keeping le
   assert.ok(body.includes("**Sesión primera**"));
   assert.ok(body.indexOf("Sesión primera") < body.indexOf("Sesión segunda"));
   assert.ok(body.includes("### Otras sesiones\n\n**Sesión libre**"));
-  assert.doesNotMatch(body, /Eje interno|Mesa excluida|Responsable interno|Encargo privado|Responsable privada|Notas internas|Reunión interna|Asistentes privados|Notas reservadas|Acuerdo reservado/);
+  assert.doesNotMatch(body, /Eje interno|Mesa excluida|Responsable interno|Encargo privado|Responsable privada|Notas internas|Reunión interna|Asistentes privados|Notas reservadas|Acuerdo reservado|Entregable reservado|Observaciones privadas|archivo-privado/);
   assert.doesNotMatch(body, /^#{4,}/m);
   const legacy = academicManuscriptBody("congress", "Congreso", emptyAcademicBrief, sessions);
   assert.equal(academicManuscriptBody("congress", "Congreso", { ...emptyAcademicBrief, congress: { axes: [], tables: [] } }, sessions), legacy);
   assert.match(legacy, /## Programa y mesas\n\n### Sesión primera/);
   for (const template of ["seminar", "participant_handout"] as const) {
-    assert.doesNotMatch(academicManuscriptBody(template, "Congreso", brief, sessions), /Derecho y tecnología|Coordinadora|Debate jurídico|Encargo privado|Responsable privada|Notas internas|Reunión interna|Asistentes privados|Notas reservadas|Acuerdo reservado/);
+    assert.doesNotMatch(academicManuscriptBody(template, "Congreso", brief, sessions), /Derecho y tecnología|Coordinadora|Debate jurídico|Encargo privado|Responsable privada|Notas internas|Reunión interna|Asistentes privados|Notas reservadas|Acuerdo reservado|Entregable reservado|Observaciones privadas|archivo-privado/);
   }
+});
+
+test("committee deliverables retain legacy actions and reject duplicate identities, unsafe destinations and capacity overflow", () => {
+  const delivery = { id: "delivery-safe", title: "Lista de invitaciones", status: "submitted" as const, notes: "Comprobar las confirmaciones." };
+  const action = { id: "action-safe", title: "Preparar invitaciones", responsible: "", status: "pending" as const, notes: "" };
+  const congress = { axes: [], tables: [], actions: [action] };
+  assert.deepEqual(academicCongressSchema.parse(congress), congress);
+  for (const href of ["https://example.org/lista.pdf?version=2", "/biblioteca/libro", "/biblioteca/libro?fragment=2#fragment-2", academicHref("trabajo", "resultado")]) {
+    assert.equal(academicCongressSchema.safeParse({ ...congress, actions: [{ ...action, deliverables: [{ ...delivery, href }] }] }).success, true, href);
+  }
+  for (const href of ["javascript:alert(1)", "data:text/plain,contenido", "http://example.org/archivo", "https://nombre:clave@example.org/archivo", "https://example.org/archivo\\ruta", "https://example.org/arch\nivo", "//example.org/archivo", "/configuracion", "/biblioteca/libro?fragment=2#fragment-3", "/academico?trabajo=trabajo", "/academico?trabajo=trabajo&resultado=resultado&otro=dato"]) {
+    assert.equal(academicCongressSchema.safeParse({ ...congress, actions: [{ ...action, deliverables: [{ ...delivery, href }] }] }).success, false, href);
+  }
+  for (const deliverables of [
+    [delivery, delivery],
+    [{ ...delivery, id: action.id }],
+    [{ ...delivery, title: "" }],
+    [{ ...delivery, status: "done" }],
+    [{ ...delivery, notes: "x".repeat(2001) }],
+    Array.from({ length: 13 }, (_, index) => ({ ...delivery, id: `delivery-${index}` })),
+  ]) assert.equal(academicCongressSchema.safeParse({ ...congress, actions: [{ ...action, deliverables }] }).success, false);
+  const actions = Array.from({ length: 17 }, (_, index) => ({
+    ...action, id: `action-${index}`,
+    deliverables: Array.from({ length: 12 }, (_, item) => ({ ...delivery, id: `delivery-${index}-${item}` })),
+  }));
+  assert.equal(academicCongressSchema.safeParse({ ...congress, actions }).success, false);
+  actions[16].deliverables = actions[16].deliverables.slice(0, 8);
+  assert.equal(academicCongressSchema.safeParse({ ...congress, actions }).success, true);
 });

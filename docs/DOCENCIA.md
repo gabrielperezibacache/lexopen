@@ -6,7 +6,7 @@ Abre **Académico → Docencia** y elige el tipo de trabajo. Cada trabajo conser
 | --- | --- | --- |
 | Cursos | Ficha de curso, bibliografía base y sugerencias por solicitud. Crea un syllabus editable con las sesiones que elijas de la Agenda. | Añadir unidades y evaluaciones reutilizables. |
 | Seminarios | Programa editable con las sesiones elegidas, sus ponentes, moderación, lecturas y lugar. | Vincular responsabilidades de organización y avisos del encuentro. |
-| Congresos | Organiza mesas, programa y encargos privados con fechas en tu Agenda. Registra reuniones y convierte acuerdos en encargos que conservan su origen. | Vincular entregables a los encargos y revisar su avance. |
+| Congresos | Organiza mesas, programa y encargos privados con fechas en tu Agenda. Registra reuniones, convierte acuerdos en encargos y revisa sus entregables conservando el origen. | Añadir vistas de seguimiento por responsable y fecha de revisión. |
 | Talleres | Programa editable y hoja para participantes con las sesiones elegidas, sus consignas, lecturas y materiales. | Vincular rúbricas y recoger entregas de las actividades. |
 | Convocatorias | Ficha con país, organismo, bases, fecha límite y estado. Las fichas guardadas desde un aviso conservan su procedencia y la fecha de consulta. | Vincular responsables, anexos y un curso o proyecto de investigación. |
 | Búsqueda y fuentes por país | Catálogo oficial por país. Busca por tema entre los avisos que ya consultaste y filtra tu cartera por país. | Ampliar las fuentes y los filtros por área, elegibilidad y modalidad. |
@@ -54,6 +54,15 @@ Este seguimiento es privado del trabajo académico. Los responsables se indican 
 3. Completa el responsable, la mesa y la fecha del encargo. En **Origen del encargo** puedes consultar la reunión, su fecha y el texto conservado al crearlo. **Ver encargo** permite volver a ese seguimiento desde el acuerdo.
 
 La conversión recupera el encargo existente si vuelves a solicitarla para el mismo acuerdo. El origen del encargo conserva su copia aunque después edites o retires la reunión. Las reuniones y los acuerdos forman parte del seguimiento privado del congreso.
+
+## Vincular entregables y revisar su avance
+
+1. Abre un encargo del comité y despliega **Entregables**. Pulsa **Añadir entregable** y escribe el documento, archivo o resultado que se espera recibir.
+2. Puedes elegir un **Documento de este trabajo** o añadir un enlace HTTPS al archivo, incluido un enlace a tu Biblioteca de LexOpen. **Abrir entregable** permite consultarlo. Vincular un enlace no cambia los permisos del archivo ni crea una copia.
+3. Cambia el estado entre **Pendiente**, **En preparación**, **Para revisar** y **Aprobado**. Conserva las correcciones o la decisión en **Observaciones de revisión** y pulsa **Guardar cambios**.
+4. El contador muestra cuántos entregables están aprobados y cuáles esperan revisión. Completar los entregables no cambia automáticamente el estado del encargo: puedes decidir cuándo darlo por completado.
+
+El encargo conserva su reunión y acuerdo de origen junto con los entregables, aunque después edites o retires la reunión. Los enlaces ya guardados pueden mantenerse si el archivo deja de estar disponible; los documentos de LexOpen conservan sus permisos y puedes reemplazar los enlaces o quitarlos. Los entregables y sus observaciones permanecen en el seguimiento privado del comité y no se añaden al programa, a las hojas para participantes ni a las suscripciones de calendario.
 
 ## Preparar una hoja para participantes
 

@@ -386,6 +386,9 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
               {programKind && <AcademicTeachingProgram key={`program-${workspace.id}`} kind={programKind}
                 workspaceId={workspace.id} sessionsVersion={teachingSessionsVersion} selection={workspace.brief.programSessionIds ?? []}
                 congress={workspace.brief.congress} onCongressChange={congress => updateWorkspace({ brief: { ...workspace.brief, congress } })}
+                documents={workspace.artifacts.filter(item => item.available && ["proposed", "reviewed"].includes(item.status ?? "")).map(item => ({
+                  id: item.id, title: item.title ?? "Documento del trabajo", href: academicHref(workspace.id, item.id),
+                }))}
                 onConvertAgreement={convertAgreement}
                 title={workspace.title} busy={busy} sessionContentDirty={sessionContentDirty}
                 onChange={programSessionIds => updateWorkspace({ brief: { ...workspace.brief, programSessionIds } })}

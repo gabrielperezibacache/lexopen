@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { z } from "zod";
 import { prisma } from "@/lib/db";
-import { actorFor } from "@/lib/books/access";
+import { actorFor, bookFor } from "@/lib/books/access";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { httpError } from "@/lib/auth/access";
 import { bookTransaction } from "@/lib/books/service";
@@ -19,6 +19,7 @@ import { academicManuscriptBody, ACADEMIC_MANUSCRIPT_TEMPLATES, isAcademicTeachi
 import type { AcademicCallOrigin } from "./academic-calls";
 import { readTeachingSessionContent } from "./teaching-session-content";
 import { teachingTime } from "./teaching-sessions";
+import { parseCommitteeDeliverableHref } from "./committee-deliverables";
 const missing = () => httpError("El trabajo académico no está disponible", 404);
 const unavailableRowTitle = "Fila cuyo respaldo ya no está disponible";
 const unavailableSource = (error: unknown) => [403,404,409,410,413,422].includes(Number((error as { status?: number }).status));
@@ -108,9 +109,36 @@ export async function saveAcademicWorkspace(id: string, raw: unknown, user: Caus
     }
     const storedBrief = JSON.parse(current.briefJson) as typeof emptyAcademicBrief;
     const storedOrigins = new Map((storedBrief.congress?.actions ?? []).map(action => [action.id, action.agreementOrigin]));
+    const storedActions = new Map((storedBrief.congress?.actions ?? []).map(action => [action.id, action]));
+    const verifiedDeliverableLinks = new Set<string>();
     for (const action of congress?.actions ?? []) {
       if (JSON.stringify(action.agreementOrigin) !== JSON.stringify(storedOrigins.get(action.id))) {
         throw httpError("El origen de un encargo se conserva al crearlo desde un acuerdo. Recarga el trabajo antes de guardar.", 409);
+      }
+      const previousDeliverables = new Map((storedActions.get(action.id)?.deliverables ?? []).map(deliverable => [deliverable.id, deliverable]));
+      for (const deliverable of action.deliverables ?? []) {
+        if (!deliverable.href) continue;
+        const link = parseCommitteeDeliverableHref(deliverable.href);
+        if (!link) throw httpError("Revisa el enlace del entregable antes de guardar.", 400);
+        if (link.kind === "academic" && link.workspaceId !== id) {
+          throw httpError("Vincula un resultado del mismo trabajo académico al entregable.", 409);
+        }
+        // Existing references remain editable if the destination is later removed.
+        // The destination's own reader still enforces current access when opened.
+        if (previousDeliverables.get(deliverable.id)?.href === deliverable.href || verifiedDeliverableLinks.has(deliverable.href)) continue;
+        try {
+          if (link.kind === "academic") await readAcademicArtifact(id, link.artifactId, actor, tx);
+          else if (link.kind === "library") {
+            await bookFor(link.bookId, actor, tx);
+            if (link.fragmentOrdinal !== undefined && !await tx.libraryBookFragment.findFirst({ where: { bookId: link.bookId, ordinal: link.fragmentOrdinal }, select: { id: true } })) {
+              throw httpError("El fragmento de Biblioteca ya no está disponible.", 404);
+            }
+          }
+        } catch (error) {
+          if (!unavailableSource(error)) throw error;
+          throw httpError("Un documento del entregable ya no está disponible o no tienes acceso. Revisa su enlace antes de guardar.", 409);
+        }
+        verifiedDeliverableLinks.add(deliverable.href);
       }
     }
     type StoredRow = (typeof input.matrix.rows)[number] & { proofs: AltazorSourceSnapshot[] };

@@ -6,10 +6,13 @@ import { ConfirmDialog } from "@/components/ui";
 import { operationKey } from "@/lib/client-submission-key";
 import { formatCivilDate } from "@/lib/chile-time";
 import { ACADEMIC_CONGRESS_ACTION_STATUS, ACADEMIC_CONGRESS_LIMITS, emptyAcademicCongress, type AcademicCongress, type AcademicCongressAction } from "@/lib/altazor/academic-schemas";
+import { AcademicCommitteeDeliverables } from "./AcademicCommitteeDeliverables";
 import styles from "./AcademicCongressActions.module.css";
 
-export function AcademicCongressActions({ value, disabled, onChange }: {
+export function AcademicCongressActions({ value, workspaceId, documents, disabled, onChange }: {
   value: AcademicCongress | undefined;
+  workspaceId: string;
+  documents: { id: string; title: string; href: string }[];
   disabled: boolean;
   onChange: (value: AcademicCongress) => void;
 }) {
@@ -20,6 +23,7 @@ export function AcademicCongressActions({ value, disabled, onChange }: {
   const disclosure = useRef<HTMLDetailsElement>(null);
   const pending = actions.filter(action => action.status !== "done").length;
   const completed = actions.length - pending;
+  const totalDeliverables = actions.reduce((count, action) => count + (action.deliverables?.length ?? 0), 0);
 
   useEffect(() => {
     function reveal() {
@@ -78,12 +82,16 @@ export function AcademicCongressActions({ value, disabled, onChange }: {
         {actions.length === 0 && <p className={styles.helper}>Añade un encargo del congreso o vincúlalo a una de sus mesas.</p>}
         {actions.map((action, index) => {
           const number = index + 1;
+          const deliverables = action.deliverables ?? [];
+          const approved = deliverables.filter(item => item.status === "approved").length;
+          const awaitingReview = deliverables.filter(item => item.status === "submitted").length;
           return <section key={action.id} id={`encargo-${action.id}`} className={styles.action} role="group" aria-label={`Encargo ${number}`}>
             <details>
               <summary>
                 <span className={styles.actionHeading}>
                   <strong>{action.title.trim() || `Encargo ${number}`}</strong>
                   <span>{ACADEMIC_CONGRESS_ACTION_STATUS[action.status]}{action.dueAtLocal && ` · ${formatCivilDate(action.dueAtLocal.slice(0, 10))} · ${action.dueAtLocal.slice(11)}`}</span>
+                  {deliverables.length > 0 && <span>{approved} de {deliverables.length} entregables aprobados{awaitingReview > 0 && ` · ${awaitingReview} para revisar`}</span>}
                 </span>
               </summary>
               <div className={styles.editor}>
@@ -125,6 +133,9 @@ export function AcademicCongressActions({ value, disabled, onChange }: {
                       placeholder="Qué hay que hacer y qué debe tenerse en consideración." onChange={event => update(action.id, { notes: event.target.value })} />
                   </label>
                 </details>
+                <AcademicCommitteeDeliverables value={action.deliverables} workspaceId={workspaceId} documents={documents}
+                  actionNumber={number} disabled={disabled} remaining={ACADEMIC_CONGRESS_LIMITS.deliverables - totalDeliverables}
+                  onChange={items => update(action.id, { deliverables: items })} />
                 {action.agreementOrigin && <details className={styles.notes}>
                   <summary>Origen del encargo</summary>
                   <div className={styles.origin}>
@@ -150,7 +161,7 @@ export function AcademicCongressActions({ value, disabled, onChange }: {
       </div>
     </details>
     <ConfirmDialog open={Boolean(removal)} onClose={() => setRemoval(null)} onConfirm={remove} busy={disabled}
-      title="Quitar encargo del comité" description={`Se quitará «${removal?.title ?? ""}» y sus indicaciones. Guarda los cambios del trabajo para confirmar la eliminación.`}
+      title="Quitar encargo del comité" description={`Se quitará «${removal?.title ?? ""}», sus indicaciones y el seguimiento de sus entregables. Los documentos vinculados se conservan. Guarda los cambios del trabajo para confirmar la eliminación.`}
       confirmLabel="Quitar encargo" />
   </section>;
 }

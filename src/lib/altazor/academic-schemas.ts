@@ -4,6 +4,7 @@ import { ACADEMIC_MANUSCRIPT_TEMPLATE_IDS, ACADEMIC_TEACHING_TEMPLATES } from ".
 import { isWorkCountry } from "@/lib/config/countries";
 import { writingId } from "@/lib/writings/schemas";
 import { isValidYmd } from "@/lib/chile-time";
+import { parseCommitteeDeliverableHref } from "./committee-deliverables";
 export const ACADEMIC_WORKSPACE_LIMIT = 100;
 export const ACADEMIC_MANUSCRIPT_MAX = 100000;
 export const ACADEMIC_MODES = ["synthesis", "literature_review", "comparison", "claim_audit", "bibliography_audit", "academic_writing", "translation", "abstract", "peer_review", "syllabus", "rubric", "teaching_material", "cv"] as const;
@@ -27,7 +28,7 @@ const syllabus = z.object({
 }).strict();
 export type AcademicSyllabus = z.infer<typeof syllabus>;
 export const emptyAcademicSyllabus: AcademicSyllabus = { summary: "", approach: "", schedule: "", room: "", requirements: "", bibliography: "" };
-export const ACADEMIC_CONGRESS_LIMITS = { axes: 12, tables: 48, actions: 100, meetings: 30, agreementsPerMeeting: 30, agreements: 200, titleLength: 200, responsibleLength: 200, actionNotesLength: 2000, meetingAttendeesLength: 2000, meetingNotesLength: 8000, agreementTextLength: 2000, sessionsPerTable: 200, sessions: 200 } as const;
+export const ACADEMIC_CONGRESS_LIMITS = { axes: 12, tables: 48, actions: 100, meetings: 30, agreementsPerMeeting: 30, agreements: 200, deliverablesPerAction: 12, deliverables: 200, titleLength: 200, responsibleLength: 200, actionNotesLength: 2000, meetingAttendeesLength: 2000, meetingNotesLength: 8000, agreementTextLength: 2000, deliverableNotesLength: 2000, deliverableHrefLength: 1000, sessionsPerTable: 200, sessions: 200 } as const;
 const congressTitle = z.string().trim().min(1).max(ACADEMIC_CONGRESS_LIMITS.titleLength)
   .regex(/^[^\p{Cc}\p{Zl}\p{Zp}]+$/u, "Escribe el nombre en una sola línea.");
 const meetingDate = z.string().refine(isValidYmd, "Elige una fecha válida para la reunión.");
@@ -50,6 +51,16 @@ const congressMeeting = z.object({
 }).strict();
 export type AcademicCongressMeeting = z.infer<typeof congressMeeting>;
 export const ACADEMIC_CONGRESS_ACTION_STATUS = { pending: "Pendiente", in_progress: "En curso", done: "Completado" } as const;
+export const ACADEMIC_CONGRESS_DELIVERABLE_STATUS = { pending: "Pendiente", in_progress: "En preparación", submitted: "Para revisar", approved: "Aprobado" } as const;
+const congressDeliverable = z.object({
+  id: writingId,
+  title: congressTitle,
+  status: z.enum(["pending", "in_progress", "submitted", "approved"]),
+  notes: z.string().max(ACADEMIC_CONGRESS_LIMITS.deliverableNotesLength),
+  href: z.string().trim().min(1).max(ACADEMIC_CONGRESS_LIMITS.deliverableHrefLength)
+    .refine(value => parseCommitteeDeliverableHref(value) !== null, "Usa un enlace HTTPS, de Biblioteca o de un resultado de este trabajo.").optional(),
+}).strict();
+export type AcademicCongressDeliverable = z.infer<typeof congressDeliverable>;
 const congressAction = z.object({
   id: writingId,
   title: congressTitle,
@@ -61,6 +72,7 @@ const congressAction = z.object({
   status: z.enum(["pending", "in_progress", "done"]),
   notes: z.string().max(ACADEMIC_CONGRESS_LIMITS.actionNotesLength),
   agreementOrigin: agreementOrigin.optional(),
+  deliverables: z.array(congressDeliverable).max(ACADEMIC_CONGRESS_LIMITS.deliverablesPerAction).optional(),
 }).strict();
 export type AcademicCongressAction = z.infer<typeof congressAction>;
 export const academicCongressSchema = z.object({
@@ -77,14 +89,16 @@ export const academicCongressSchema = z.object({
   meetings: z.array(congressMeeting).max(ACADEMIC_CONGRESS_LIMITS.meetings).optional(),
 }).strict().superRefine((value, ctx) => {
   const agreements = value.meetings?.flatMap(meeting => meeting.agreements) ?? [];
-  const ids = [...value.axes, ...value.tables, ...(value.actions ?? []), ...(value.meetings ?? []), ...agreements].map(item => item.id);
+  const deliverables = value.actions?.flatMap(action => action.deliverables ?? []) ?? [];
+  const ids = [...value.axes, ...value.tables, ...(value.actions ?? []), ...(value.meetings ?? []), ...agreements, ...deliverables].map(item => item.id);
   const origins = (value.actions ?? []).flatMap(action => action.agreementOrigin
     ? [JSON.stringify([action.agreementOrigin.meetingId, action.agreementOrigin.agreementId])] : []);
   const axes = new Set(value.axes.map(axis => axis.id));
   const tables = new Set(value.tables.map(table => table.id));
   const sessionIds = value.tables.flatMap(table => table.sessionIds);
-  if (new Set(ids).size !== ids.length) ctx.addIssue({ code: "custom", message: "Cada eje, mesa, encargo, reunión y acuerdo debe tener un identificador propio." });
+  if (new Set(ids).size !== ids.length) ctx.addIssue({ code: "custom", message: "Cada eje, mesa, encargo, reunión, acuerdo y entregable debe tener un identificador propio." });
   if (agreements.length > ACADEMIC_CONGRESS_LIMITS.agreements) ctx.addIssue({ code: "custom", message: "El congreso admite hasta 200 acuerdos en sus reuniones." });
+  if (deliverables.length > ACADEMIC_CONGRESS_LIMITS.deliverables) ctx.addIssue({ code: "custom", message: "El congreso admite hasta 200 entregables entre sus encargos." });
   if (new Set(origins).size !== origins.length) ctx.addIssue({ code: "custom", message: "Cada acuerdo puede tener un único encargo vinculado." });
   if (value.tables.some(table => !axes.has(table.axisId))) ctx.addIssue({ code: "custom", message: "Asigna cada mesa a un eje del congreso." });
   if (value.actions?.some(action => action.tableId && !tables.has(action.tableId))) ctx.addIssue({ code: "custom", message: "Asigna cada encargo a una mesa disponible o al seguimiento general." });

@@ -396,6 +396,48 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
           await expect(convertedTask.getByText("Reunión ficticia de coordinación", { exact: true })).toBeVisible();
           await expect(convertedTask.locator("time")).toHaveAttribute("datetime", "2030-05-06");
           await expect(convertedTask.getByRole("paragraph").filter({ hasText: agreementText })).toBeVisible();
+          const deliverableSummary = convertedTask.locator("summary").filter({ hasText: /^Entregables/ });
+          await deliverableSummary.click();
+          await convertedTask.getByRole("button", { name: "Añadir entregable", exact: true }).click();
+          const firstDeliverable = convertedTask.getByRole("group", { name: "Entregable 1 del encargo 2", exact: true });
+          await firstDeliverable.getByRole("textbox", { name: "Entregable 1 del encargo 2", exact: true }).fill("Lista de confirmaciones para revisión");
+          const firstDeliveryLink = firstDeliverable.getByLabel("Enlace del entregable 1 del encargo 2", { exact: true });
+          await firstDeliveryLink.fill("javascript:alert(1)");
+          await expect(firstDeliveryLink).toHaveAttribute("aria-invalid", "true");
+          await expect(firstDeliverable.getByRole("link", { name: "Abrir entregable", exact: true })).toHaveCount(0);
+          await firstDeliveryLink.fill("https://example.invalid/comite/confirmaciones.pdf");
+          await firstDeliverable.getByLabel("Estado del entregable 1 del encargo 2", { exact: true }).selectOption("submitted");
+          await firstDeliverable.getByLabel("Observaciones de revisión del entregable 1 del encargo 2", { exact: true }).fill("Falta confirmar una respuesta antes de aprobar.");
+          await expect(firstDeliverable.getByRole("link", { name: "Abrir entregable", exact: true })).toHaveAttribute("href", "https://example.invalid/comite/confirmaciones.pdf");
+          await convertedTask.getByRole("button", { name: "Añadir entregable", exact: true }).click();
+          const secondDeliverable = convertedTask.getByRole("group", { name: "Entregable 2 del encargo 2", exact: true });
+          await secondDeliverable.getByLabel("Documento de este trabajo para el entregable 2 del encargo 2", { exact: true }).selectOption(originalProgramId!);
+          await expect(secondDeliverable.getByLabel("Enlace del entregable 2 del encargo 2", { exact: true })).toHaveValue(`/academico?trabajo=${projectId}&resultado=${originalProgramId}`);
+          await secondDeliverable.getByLabel("Estado del entregable 2 del encargo 2", { exact: true }).selectOption("approved");
+          await expect(deliverableSummary).toContainText("1 de 2 aprobados · 1 para revisar");
+          await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
+          await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
+          await page.reload();
+          await expect(deliverableSummary).toContainText("1 de 2 aprobados · 1 para revisar");
+          await deliverableSummary.click();
+          await expect(firstDeliverable.getByLabel("Observaciones de revisión del entregable 1 del encargo 2", { exact: true })).toHaveValue("Falta confirmar una respuesta antes de aprobar.");
+          await firstDeliverable.getByLabel("Estado del entregable 1 del encargo 2", { exact: true }).selectOption("approved");
+          await firstDeliverable.getByLabel("Observaciones de revisión del entregable 1 del encargo 2", { exact: true }).fill("Confirmaciones revisadas y aprobadas.");
+          await expect(deliverableSummary).toContainText("2 de 2 aprobados");
+          await expect(convertedTask.getByLabel("Estado del encargo 2", { exact: true })).toHaveValue("pending");
+          await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
+          await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
+          const deliverablesDetail = deliverableSummary.locator("..");
+          await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+          if (process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
+            await deliverablesDetail.screenshot({ path: info.outputPath("entregables-comite-movil.png") });
+            await page.setViewportSize({ width: 1280, height: 880 });
+            await deliverablesDetail.screenshot({ path: info.outputPath("entregables-comite-escritorio.png") });
+            await page.setViewportSize({ width: 360, height: 800 });
+          }
+          await convertedTask.getByText("Origen del encargo", { exact: true }).click();
+          await expect(convertedTask.getByText("Reunión ficticia de coordinación", { exact: true })).toBeVisible();
+          await expect(convertedTask.getByRole("paragraph").filter({ hasText: agreementText })).toBeVisible();
           if (process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
             await convertedTask.screenshot({ path: info.outputPath("origen-acuerdo-movil.png") });
             await page.setViewportSize({ width: 1280, height: 880 });
@@ -415,6 +457,9 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
           expect(agreementConversions).toBe(1);
           const storedCongress = JSON.parse((await db.altazorAcademicWorkspace.findUniqueOrThrow({ where: { id: projectId } })).briefJson).congress;
           expect(storedCongress.actions.filter((item: { agreementOrigin?: { agreementText: string } }) => item.agreementOrigin?.agreementText === agreementText)).toHaveLength(1);
+          const storedAction = storedCongress.actions.find((item: { id: string }) => item.id === actionId);
+          expect(storedAction.deliverables.map((item: { status: string }) => item.status)).toEqual(["approved", "approved"]);
+          expect(storedAction.agreementOrigin.meetingTitle).toBe("Reunión ficticia de coordinación");
         }
         if (kind === "workshop") {
           const programId = new URL(page.url()).searchParams.get("resultado");

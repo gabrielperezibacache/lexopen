@@ -186,13 +186,14 @@ export function AcademicSyllabusForm({ workspaceId, sessionsVersion, title, brie
 
 const programTitles = { seminar: "Programa del seminario", congress: "Programa del congreso", workshop: "Programa del taller" } as const;
 
-export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, selection, title, congress, busy, sessionContentDirty, onChange, onCongressChange, onConvertAgreement, onCreate, onHandout }: {
+export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, selection, title, congress, documents, busy, sessionContentDirty, onChange, onCongressChange, onConvertAgreement, onCreate, onHandout }: {
   kind: keyof typeof programTitles;
   workspaceId: string;
   sessionsVersion: number;
   selection: string[];
   title: string;
   congress?: AcademicCongress;
+  documents: { id: string; title: string; href: string }[];
   busy: boolean;
   sessionContentDirty: boolean;
   onChange: (sessionIds: string[]) => void;
@@ -214,11 +215,11 @@ export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, se
       value={congress} disabled={busy} onChange={onCongressChange} />}
     {kind === "congress" && <AcademicCongressMeetings value={congress} disabled={busy || sessionContentDirty}
       onChange={onCongressChange} onConvert={onConvertAgreement} />}
-    {kind === "congress" && <AcademicCongressActions value={congress} disabled={busy} onChange={onCongressChange} />}
+    {kind === "congress" && <AcademicCongressActions value={congress} workspaceId={workspaceId} documents={documents} disabled={busy} onChange={onCongressChange} />}
     <AcademicAgendaSessionPicker documentKind="programa" workspaceId={workspaceId} version={sessionsVersion}
       selection={selection} onChange={onChange} disabled={busy} />
     {sessionContentDirty && <p className={styles.meta} role="status">Guarda o descarta el contenido de la sesión antes de crear el programa.</p>}
-    {incompleteOrganization && <p className={styles.meta} role="status">Revisa los datos de la organización y las reuniones antes de crear un documento.</p>}
+    {incompleteOrganization && <p className={styles.meta} role="status">Revisa los datos de la organización, las reuniones y los entregables antes de crear un documento.</p>}
     <div className={styles.actions}>
       <button type="button" className="btn btn-primary" disabled={busy || sessionContentDirty || incompleteOrganization || !title.trim()} onClick={onCreate}>Crear programa <ArrowRight size={16} aria-hidden="true" /></button>
     </div>
