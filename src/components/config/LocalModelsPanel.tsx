@@ -4,17 +4,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 import { LOCAL_MODELS, LOCAL_CONTEXT_TOKENS, type LocalModelId } from "@/lib/integrations/local-model-profiles";
 import type { publicLlmConfig } from "@/lib/integrations/llm";
+import type { LocalModelHardware, LocalModelRecommendation } from "@/lib/integrations/local-model-hardware";
+import styles from "./LocalModelsPanel.module.css";
 
 type Status = {
   runtime: "ready" | "cloud_enabled" | "needs_update" | "unavailable";
   message: string;
   models: { id: LocalModelId; state: "ready" | "missing" | "different" | null }[];
+  hardware: LocalModelHardware;
+  recommendations: LocalModelRecommendation[];
+  installed: { name: string; size: number; catalogId?: LocalModelId; state: "verified" | "unmanaged" }[];
+  installedLimited: boolean;
+  installedCount: number;
 };
 
 type ConnectionView = ReturnType<typeof publicLlmConfig>;
 type Action = "download" | "test" | "activate" | "restore";
 
 const endpoint = "/api/integrations/llm/local";
+const purposes = { documents: "Revisar documentos", writing: "Redactar y ordenar notas", browser: "Apoyar el uso del navegador y conectores" } as const;
+const memoryLabel = (bytes: number) => `${(bytes / 1024 ** 3).toLocaleString("es-CL", { maximumFractionDigits: 1 })} GB`;
 
 async function checkLocalModels(signal: AbortSignal): Promise<Status> {
   const response = await fetch(endpoint, { signal, cache: "no-store" });
@@ -31,6 +40,7 @@ export function LocalModelsPanel({
   disabled: boolean;
 }) {
   const [selection, setSelection] = useState<LocalModelId | undefined>();
+  const [purpose, setPurpose] = useState<keyof typeof purposes>("documents");
   const [status, setStatus] = useState<Status | null>(null);
   const [checking, setChecking] = useState(true);
   const [checkingError, setCheckingError] = useState("");
@@ -38,7 +48,8 @@ export function LocalModelsPanel({
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; error: boolean } | null>(null);
   const operation = useRef<AbortController | null>(null);
-  const profile = LOCAL_MODELS.find((model) => model.id === (selection ?? activeModel)) ?? LOCAL_MODELS[0];
+  const recommendation = status?.recommendations?.find(item => item.purpose === purpose);
+  const profile = LOCAL_MODELS.find((model) => model.id === (selection ?? activeModel ?? recommendation?.candidateId)) ?? LOCAL_MODELS[0];
   const state = status?.models.find((model) => model.id === profile.id)?.state;
   const active = activeModel === profile.id;
 
@@ -67,6 +78,7 @@ export function LocalModelsPanel({
   }, [refresh]);
 
   async function run(next: Action) {
+    if (operation.current || disabled) return;
     const controller = new AbortController();
     operation.current = controller;
     onBusyChange(true);
@@ -99,6 +111,12 @@ export function LocalModelsPanel({
         error: false,
       });
       if (next === "download") await refresh(controller.signal);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        setFeedback({ text: "Solicitud cancelada. Vuelve a detectar los modelos para comprobar su estado.", error: false });
+      } else {
+        setFeedback({ text: error instanceof Error ? error.message : "No se pudo completar la operación. Vuelve a detectar los modelos e inténtalo de nuevo.", error: true });
+      }
     } finally {
       if (operation.current === controller) operation.current = null;
       setAction(null);
@@ -107,6 +125,7 @@ export function LocalModelsPanel({
   }
 
   function recheck() {
+    if (operation.current || disabled) return;
     const controller = new AbortController();
     operation.current = controller;
     setChecking(true);
@@ -119,15 +138,43 @@ export function LocalModelsPanel({
   return (
     <section className="panel space-y-4 rounded-3xl p-5 md:p-6" aria-labelledby="local-ai-title" aria-busy={checking || Boolean(action)}>
       <div>
-        <h2 id="local-ai-title" className="text-lg font-semibold">IA local</h2>
+        <h2 id="local-ai-title" className="text-lg font-semibold">Modelos de IA local</h2>
         <p className="mt-1 max-w-prose text-sm text-[var(--ink-soft)]">
-          Usa Ollama en el equipo que aloja LexOpen para tareas breves. El tamaño que se muestra corresponde a la descarga. La memoria de trabajo depende del equipo.
+          Elige un modelo para trabajar con textos en el equipo que aloja LexOpen. Puedes detectar lo que ya está instalado, descargar un modelo y probarlo antes de usarlo.
         </p>
       </div>
 
       {(checking || status?.message || checkingError) && (
         <p role="status" className="text-sm text-[var(--ink-soft)]">{checking ? "Comprobando Ollama…" : checkingError || status?.message}</p>
       )}
+
+      {status?.hardware && <div className={styles.hardware} aria-label="Equipo detectado">
+        <h3>Tu equipo</h3>
+        <p>{status.hardware.cpuName} · {status.hardware.cpuCores} núcleos</p>
+        <dl>
+          <div><dt>Memoria total</dt><dd>{memoryLabel(status.hardware.totalMemoryBytes)}</dd></div>
+          <div><dt>Memoria disponible ahora</dt><dd>{memoryLabel(status.hardware.availableMemoryBytes)}</dd></div>
+          <div><dt>Espacio de disco de referencia</dt><dd>{status.hardware.diskFreeBytes === null ? "Sin comprobar" : memoryLabel(status.hardware.diskFreeBytes)}</dd></div>
+        </dl>
+        <details><summary>Acerca de esta detección</summary><p>Corresponde al equipo que aloja LexOpen, aunque te conectes desde otro dispositivo. La memoria disponible cambia con las aplicaciones abiertas. El disco medido puede ser distinto del utilizado por Ollama. La aceleración gráfica no está comprobada.</p></details>
+      </div>}
+
+      <div className={styles.recommendation}>
+        <label className="block max-w-md text-sm font-medium">Uso principal
+          <select className="select w-full" aria-label="Uso principal de la IA local" value={purpose} disabled={Boolean(action) || disabled}
+            onChange={event => { setPurpose(event.target.value as keyof typeof purposes); setSelection(undefined); setAcceptedTerms(false); setFeedback(null); }}>
+            {Object.entries(purposes).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        </label>
+        {recommendation && <div role="status">
+          <p><strong>{recommendation.candidateId ? `Recomendación: ${LOCAL_MODELS.find(item => item.id === recommendation.candidateId)?.name}` : "Sin recomendación para el estado actual del equipo"}</strong></p>
+          <p>{recommendation.reason}</p>
+          {recommendation.candidateId && profile.id !== recommendation.candidateId && <button className="btn btn-secondary" type="button" disabled={Boolean(action) || disabled} onClick={() => {
+            setSelection(recommendation.candidateId ?? undefined); setAcceptedTerms(false); setFeedback(null);
+          }}>Seleccionar recomendado</button>}
+        </div>}
+        <p className="text-sm text-[var(--ink-soft)]">La recomendación es una estimación de recursos. Elegir un modelo no lo descarga ni cambia la conexión activa.</p>
+      </div>
       {status && status.runtime !== "ready" && (
         <div className="flex flex-wrap gap-2">
           <a className="btn btn-secondary" href={status.runtime === "cloud_enabled" ? "https://docs.ollama.com/faq#how-do-i-disable-ollamas-cloud-features" : "https://ollama.com/download"} target="_blank" rel="noreferrer">
@@ -149,7 +196,7 @@ export function LocalModelsPanel({
           }}
         >
           {LOCAL_MODELS.map((model) => (
-            <option key={model.id} value={model.id}>{model.name} · {model.download}{model.id === "qwen-small" ? " · Recomendado" : ""}</option>
+            <option key={model.id} value={model.id}>{model.name} · {model.download}{model.id === recommendation?.candidateId ? " · Recomendado" : ""}{status?.models.find(item => item.id === model.id)?.state === "ready" ? " · Instalado" : ""}</option>
           ))}
         </select>
       </label>
@@ -176,7 +223,7 @@ export function LocalModelsPanel({
         {action === "download" ? (
           <button className="btn btn-secondary" type="button" onClick={() => operation.current?.abort()}>Cancelar descarga</button>
         ) : (
-          <button className="btn btn-secondary" type="button" disabled={disabled || checking || Boolean(action)} onClick={recheck}>Comprobar Ollama</button>
+          <button className="btn btn-secondary" type="button" disabled={disabled || checking || Boolean(action)} onClick={recheck}>Detectar equipo y modelos</button>
         )}
         {activeModel && (
           <button className="btn btn-ghost" type="button" disabled={disabled || Boolean(action)} onClick={() => void run("restore")}>
@@ -184,8 +231,19 @@ export function LocalModelsPanel({
           </button>
         )}
       </div>
+      {status?.runtime === "ready" && <details className={styles.inventory}>
+        <summary>Modelos ya instalados · {status.installedCount ?? status.installed?.length ?? 0}</summary>
+        {status.installed?.length ? <ul>{status.installed.map(model => <li key={model.name}>
+          <div><strong>{model.name}</strong><span>{memoryLabel(model.size)} · {model.state === "verified" ? "Edición reconocida del catálogo" : "Detectado fuera del catálogo gestionado"}</span></div>
+          {model.catalogId && <button className="btn btn-secondary" type="button" disabled={disabled || Boolean(action)} onClick={() => {
+            setSelection(model.catalogId); setAcceptedTerms(false); setFeedback(null);
+          }}>Seleccionar</button>}
+        </li>)}</ul> : <p>No se encontraron modelos instalados en Ollama.</p>}
+        {status.installedLimited && <p>Se muestran los primeros cien modelos reconocidos. Ollama conserva el inventario completo.</p>}
+        <p>Los modelos fuera del catálogo se reconocen, pero no se activan automáticamente. Puedes configurarlos desde la conexión avanzada de IA{activeModel ? ", después de volver a la conexión anterior" : ""}.</p>
+      </details>}
       <p className="max-w-prose text-sm text-[var(--ink-soft)]">
-        El perfil reserva una ventana de {LOCAL_CONTEXT_TOKENS.toLocaleString("es-CL")} tokens para texto y contexto. Las conclusiones y citas requieren revisión.
+        Los modelos de este catálogo trabajan con texto. El perfil reserva una ventana de {LOCAL_CONTEXT_TOKENS.toLocaleString("es-CL")} tokens. OCR, audio y acciones en aplicaciones utilizan sus propias herramientas; la selección del modelo no las instala ni les concede permisos.
       </p>
       {feedback && <p role={feedback.error ? "alert" : "status"} className="text-sm text-[var(--ink)]">{feedback.text}</p>}
     </section>
