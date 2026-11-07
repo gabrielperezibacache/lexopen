@@ -1,7 +1,7 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { ArrowRight, BookOpen, ClipboardCheck, PenLine } from "lucide-react";
 import { FolioSymbol } from "@/components/ui/FolioSymbol";
-import { academicReview, nextAcademicReview, type ReviewDestination } from "./academic-review";
+import { academicReview, nextAcademicReview, type AcademicManuscriptReview, type AcademicPassageReference, type ReviewDestination } from "./academic-review";
 import type { AcademicOverview, AcademicWorkspace } from "./academic-ui";
 import styles from "./AltazorAcademic.module.css";
 
@@ -25,6 +25,31 @@ type ReviewProps = {
   onAction: (destination: ReviewDestination) => void;
   onCreate: () => void;
 };
+
+function PassageDisclosure({ id, source }: AcademicPassageReference) {
+  const [open, setOpen] = useState(false);
+  return <details onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>{id} · {source.title}</summary>
+    {open && <>
+      <blockquote>{source.text}</blockquote>
+      {source.warnings.map(warning => <p key={warning}>{warning}</p>)}
+      <a href={source.href}>Abrir pasaje en la fuente</a>
+    </>}
+  </details>;
+}
+
+function ManuscriptPassages({ sections }: { sections: AcademicManuscriptReview["linkedSections"] }) {
+  const [open, setOpen] = useState(false);
+  return <details className={styles.reviewPassages} onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>Pasajes citados por sección</summary>
+    {open && <ol>
+      {sections.map((section, index) => <li key={index}>
+        <h4>{section.title}</h4>
+        {section.references.map(reference => <PassageDisclosure key={reference.id} {...reference} />)}
+      </li>)}
+    </ol>}
+  </details>;
+}
 
 export function AcademicReview({ workspaces, workspace, loading, onChoose, onAction, onCreate }: ReviewProps) {
   const selectId = useId();
@@ -93,7 +118,7 @@ export function AcademicReview({ workspaces, workspace, loading, onChoose, onAct
           <div><dt>Sin acceso al respaldo</dt><dd>{review.artifacts.unavailable}</dd></div>
         </dl>
         {review.artifacts.manuscripts.length > 0 ? <>
-          <p className={styles.reviewMethod}>LexOpen comprueba si cada sección enlaza con pasajes conservados. Abre la propuesta para cotejar que el pasaje sostenga el argumento.</p>
+          <p className={styles.reviewMethod}>Comprueba qué pasajes enlaza cada sección y coteja su relación con el argumento. Puedes abrir la propuesta para corregir el texto.</p>
           <ul className={styles.reviewManuscripts}>
             {review.artifacts.manuscripts.map(item => <li key={item.artifactId}>
               <div>
@@ -107,6 +132,7 @@ export function AcademicReview({ workspaces, workspace, loading, onChoose, onAct
                     </div>
                   </div>
                   : <p>El manuscrito todavía no tiene secciones de texto.</p>}
+                {item.linkedSections.length > 0 && <ManuscriptPassages sections={item.linkedSections} />}
                 {item.sectionsWithoutReference > 0 && <details className={styles.reviewGap}>
                   <summary>{item.sectionsWithoutReference === 1 ? "Una sección sin pasajes vinculados" : `${item.sectionsWithoutReference} secciones sin pasajes vinculados`}</summary>
                   <ul>{item.unlinkedSectionTitles.map((title, index) => <li key={index}>{title}</li>)}</ul>

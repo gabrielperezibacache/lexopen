@@ -8,7 +8,7 @@ import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { CSRF_COOKIE, CSRF_HEADER } from "../src/lib/auth/csrf-constants";
-import { assertPlainDocx } from "../src/lib/workbench/docx";
+import { assertAcademicDocx } from "../src/lib/workbench/docx";
 import { assertWritingDocx } from "../src/lib/writings/docx";
 import { loginAs } from "./helpers";
 
@@ -112,6 +112,12 @@ test("Academia: fuente elegida, propuesta local, revisión, exportación y escri
   await expect(prose).toHaveValue(/\[R1\]/, { timeout: 25_000 });
   expect(requests).toHaveLength(1); expect(JSON.stringify(requests[0])).toContain(sourceText);
   const generated = await prose.inputValue(), reviewed = `${generated}\n\nObservación personal revisada.`;
+  const original = await db.altazorAcademicArtifact.findFirstOrThrow({ where: { workspaceId: workspace.id } });
+  const exportPath = `/api/altazor/academic/${workspace.id}/artifacts/${original.id}/export`;
+  const firstExport = await page.request.get(`${exportPath}?format=md&revision=1`);
+  expect(firstExport.status()).toBe(200);
+  expect(await firstExport.text()).toBe(generated);
+  expect(await db.altazorAcademicArtifactVersion.count({ where: { artifactId: original.id } })).toBe(0);
   await prose.fill(reviewed);
   await academic.getByRole("checkbox", { name: "He revisado este contenido y sus fuentes", exact: true }).check();
   await expect(editor.getByText("Guardado", { exact: true })).toBeVisible();
@@ -125,7 +131,7 @@ test("Academia: fuente elegida, propuesta local, revisión, exportación y escri
   const markdownPath = testInfo.outputPath("propuesta-academica-ficticia.md"); await (await markdownDownload).saveAs(markdownPath);
   expect(await readFile(markdownPath, "utf8")).toBe(reviewed);
   const wordDownload = page.waitForEvent("download"); await academic.getByRole("link", { name: "Descargar Word", exact: true }).click();
-  const wordPath = testInfo.outputPath("propuesta-academica-ficticia.docx"); await (await wordDownload).saveAs(wordPath); assertPlainDocx(await readFile(wordPath));
+  const wordPath = testInfo.outputPath("propuesta-academica-ficticia.docx"); await (await wordDownload).saveAs(wordPath); assertAcademicDocx(await readFile(wordPath));
   await editor.getByText("Incorporar o compartir una revisión", { exact: true }).click();
   await academic.getByRole("button", { name: "Preparar para LinkedIn", exact: true }).click();
   await expect(academic.getByText(/Borrador privado conservado en Conexiones/)).toBeVisible();
@@ -141,6 +147,44 @@ test("Academia: fuente elegida, propuesta local, revisión, exportación y escri
   await page.reload(); await expect(prose).toHaveValue(reviewed);
   await editor.getByRole("button", { name: "Historial", exact: true }).click();
   await editor.getByRole("button", { name: /^Versión 1 ·/ }).click();
+  const oldWord = page.waitForEvent("download");
+  await editor.getByRole("button", { name: "Descargar versión 1 en Word", exact: true }).click();
+  const oldWordFile = await oldWord;
+  expect(oldWordFile.suggestedFilename()).toBe(`altazor-${artifact.id}-v1.docx`);
+  const oldWordBytes = await readFile((await oldWordFile.path())!);
+  assertAcademicDocx(oldWordBytes);
+  expect(oldWordBytes.includes(Buffer.from("Lectura ficticia"))).toBe(true);
+  expect(oldWordBytes.includes(Buffer.from("Observación personal revisada."))).toBe(false);
+  // A newer unsaved edit must not replace the selected historical version or
+  // become part of its download. Keep the autosave offline in this scenario.
+  const artifactRoute = `**/api/altazor/academic/${workspace.id}/artifacts/${artifact.id}`;
+  await page.route(artifactRoute, route => route.request().method() === "PATCH"
+    ? route.fulfill({ status: 503, json: { error: "Guardado ficticio en pausa" } })
+    : route.fallback());
+  const pending = `${reviewed}\n\nApunte sin guardar.`;
+  await prose.fill(pending);
+  const oldMarkdown = page.waitForEvent("download");
+  await editor.getByRole("button", { name: "Descargar versión 1 en Markdown", exact: true }).click();
+  const oldMarkdownFile = await oldMarkdown;
+  expect(oldMarkdownFile.suggestedFilename()).toBe(`altazor-${artifact.id}-v1.md`);
+  expect(await readFile((await oldMarkdownFile.path())!, "utf8")).toBe(generated);
+  await expect(prose).toHaveValue(pending);
+  const references = page.waitForEvent("download");
+  await editor.getByRole("button", { name: "Descargar fuentes de la versión", exact: true }).click();
+  const referencesFile = await references;
+  expect(referencesFile.suggestedFilename()).toBe(`altazor-${artifact.id}-v1-fuentes.md`);
+  const referenceText = await readFile((await referencesFile.path())!, "utf8");
+  expect(referenceText).toContain("# Fuentes de la versión 1");
+  expect(referenceText).toContain("[R1] Lectura académica ficticia");
+  expect(referenceText).toContain(sourceText);
+  expect(referenceText).not.toContain("Apunte sin guardar.");
+  expect((await db.altazorAcademicArtifact.findUniqueOrThrow({ where: { id: artifact.id } })).body).toBe(reviewed);
+  await prose.fill(reviewed);
+  await editor.getByRole("checkbox", { name: "He revisado este contenido y sus fuentes" }).check();
+  await page.unroute(artifactRoute);
+  expect((await page.request.get(`${exportPath}?format=md&revision=0`)).status()).toBe(400);
+  expect((await page.request.get(`${exportPath}?format=md&revision=1&revision=2`)).status()).toBe(400);
+  expect((await page.request.get(`${exportPath}?format=md&revision=500`)).status()).toBe(404);
   await editor.getByRole("button", { name: "Recuperar como nueva revisión", exact: true }).click();
   await expect(prose).toHaveValue(generated);
   await expect(editor.getByRole("checkbox", { name: "He revisado este contenido y sus fuentes" })).not.toBeChecked();
@@ -149,5 +193,91 @@ test("Academia: fuente elegida, propuesta local, revisión, exportación y escri
   const currentBook = (await current.json()).book;
   expect((await page.request.delete(`/api/books/${book.id}`, { headers: mutationHeaders, data: { revision: currentBook.revision } })).status()).toBe(200);
   expect([404, 409]).toContain((await page.request.get(`/api/altazor/academic/${workspace.id}/artifacts/${artifact.id}/export?format=md`)).status());
+  for (const format of ["md", "docx", "references"]) {
+    const denied = await page.request.get(`${exportPath}?format=${format}&revision=1`);
+    expect([404, 409]).toContain(denied.status());
+    expect(denied.headers()["content-disposition"]).toBeUndefined();
+  }
   expect(requests).toHaveLength(1); expect(blocked).toEqual([]);
+});
+
+test("Docencia arma un syllabus editable desde la ficha y separa la consulta bibliográfica", async ({ page }, testInfo) => {
+  await loginAs(page, email);
+  const initialRequests = requests.length;
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/academico");
+  const academic = page.getByRole("region", { name: "Desarrollo académico" });
+  await academic.getByRole("button", { name: "Docencia", exact: true }).click();
+  await expect(academic.getByRole("heading", { name: "Docencia y encuentros" })).toBeVisible();
+  for (const label of ["Seminario", "Congreso", "Taller", "Convocatoria"]) {
+    await expect(academic.getByRole("button", { name: new RegExp(`^${label}`) })).toBeVisible();
+  }
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("docencia-movil.png") });
+  await academic.getByRole("button", { name: /^Curso / }).click();
+  await academic.getByLabel("Nombre del trabajo", { exact: true }).fill("Curso ficticio de argumentación");
+  await academic.getByRole("button", { name: "Crear trabajo", exact: true }).click();
+  const ficha = academic.getByRole("region", { name: "Ficha para el syllabus" });
+  await ficha.getByLabel("Resumen del curso").fill("Analizar y discutir argumentos a partir de un caso ficticio.");
+  await ficha.getByLabel("Enfoque y metodología").fill("Lectura previa y discusión guiada.");
+  await ficha.getByLabel("Horario").fill("Lunes de 16:00 a 17:30");
+  await ficha.getByLabel("Sala o modalidad").fill("Aula 204");
+  await ficha.getByLabel("Exigencias y requisitos").fill("Lecturas previas a cada sesión.");
+  await ficha.getByLabel("Resultados de aprendizaje").fill("Distinguir premisas y conclusiones.");
+  await ficha.getByLabel("Bibliografía base").fill("Autora de prueba. Lectura base ficticia.");
+  await ficha.getByRole("button", { name: "Pedir bibliografía a Altazor" }).click();
+  const chat = page.getByRole("dialog", { name: "ALTAZOR" });
+  await expect(chat.getByRole("textbox", { name: "Mensaje para ALTAZOR" })).toHaveValue(/Sugiere bibliografía para el curso «Curso ficticio de argumentación»/);
+  await expect(chat.getByRole("textbox", { name: "Mensaje para ALTAZOR" })).not.toHaveValue(/Lectura base ficticia|Aula 204/);
+  await page.keyboard.press("Escape");
+  await expect(chat).toBeHidden();
+  await ficha.getByRole("button", { name: "Crear syllabus" }).click();
+  const editor = academic.getByRole("region", { name: "Editor académico" });
+  const prose = editor.getByRole("textbox", { name: "Texto de trabajo", exact: true });
+  await expect(prose).toHaveValue(/## Horario y sala\n\nLunes de 16:00 a 17:30\n\nAula 204/);
+  const initial = await prose.inputValue();
+  expect(initial).toContain("## Bibliografía base\n\nAutora de prueba. Lectura base ficticia.");
+  expect(initial).toContain("Distinguir premisas y conclusiones.");
+  expect(initial).not.toContain("Sugiere bibliografía");
+  const workspace = await db.altazorAcademicWorkspace.findFirstOrThrow({ where: { ownerId, title: "Curso ficticio de argumentación" } });
+  const artifact = await db.altazorAcademicArtifact.findFirstOrThrow({ where: { workspaceId: workspace.id } });
+  const csrf = (await page.context().cookies()).find(cookie => cookie.name === CSRF_COOKIE)?.value;
+  const retry = await page.request.post(`/api/altazor/academic/${workspace.id}/artifacts/draft`, {
+    headers: { Origin: new URL(testInfo.project.use.baseURL as string).origin, [CSRF_HEADER]: csrf! },
+    data: { requestId: artifact.requestId, expectedRevision: workspace.revision, template: "course" },
+  });
+  expect(retry.status()).toBe(200);
+  expect(await retry.json()).toEqual({ id: artifact.id, reused: true });
+  const saved = `${initial}\n\n**Nota docente añadida al borrador.**`;
+  await prose.fill(saved);
+  await expect(editor.getByText("Guardado", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(prose).toHaveValue(saved);
+  expect(requests).toHaveLength(initialRequests);
+});
+
+test("Docencia conserva el país, las bases y el estado de una convocatoria", async ({ page }) => {
+  await loginAs(page, email);
+  await page.goto("/academico");
+  const academic = page.getByRole("region", { name: "Desarrollo académico" });
+  await academic.getByRole("button", { name: "Docencia", exact: true }).click();
+  await academic.getByRole("button", { name: /^Convocatoria / }).click();
+  await academic.getByLabel("Nombre del trabajo", { exact: true }).fill("Fondo ficticio de investigación");
+  await academic.getByRole("button", { name: "Crear trabajo", exact: true }).click();
+  const fiche = academic.getByRole("region", { name: "Ficha de la convocatoria" });
+  await fiche.getByLabel("País", { exact: true }).selectOption("CL");
+  await fiche.getByLabel("Organismo convocante").fill("Institución ficticia");
+  await fiche.getByLabel("Fecha de cierre").fill("2030-05-16");
+  await fiche.getByLabel("Estado", { exact: true }).selectOption("preparing");
+  await fiche.getByLabel("Enlace a las bases").fill("https://example.invalid/bases");
+  await academic.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect(academic.getByText("Objetivo y cambios guardados.")).toBeVisible();
+  await page.reload();
+  await academic.getByRole("button", { name: "Docencia", exact: true }).click();
+  const calls = academic.getByRole("region", { name: "Mis convocatorias" });
+  await calls.getByLabel("Filtrar por país").selectOption("CL");
+  const card = calls.getByRole("button", { name: /Fondo ficticio de investigación/ });
+  await expect(card).toContainText("Chile · Preparando postulación · Cierre 2030-05-16");
+  await card.click();
+  await expect(fiche.getByLabel("Enlace a las bases")).toHaveValue("https://example.invalid/bases");
 });

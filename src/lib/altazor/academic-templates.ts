@@ -1,4 +1,4 @@
-import type { AcademicMode } from "./academic-schemas";
+import type { AcademicMode, emptyAcademicBrief } from "./academic-schemas";
 
 export type AcademicJourney = "research" | "writing" | "course";
 export const ACADEMIC_JOURNEYS = [
@@ -8,13 +8,56 @@ export const ACADEMIC_JOURNEYS = [
 ] as const satisfies readonly { id: AcademicJourney; label: string; description: string; initialMode: AcademicMode; modes: readonly AcademicMode[] }[];
 
 export function academicJourney(kind: string): AcademicJourney {
-  return kind === "course" ? "course" : kind === "writing" || kind === "career" ? "writing" : "research";
+  return isAcademicTeachingKind(kind) ? "course" : kind === "writing" || kind === "career" ? "writing" : "research";
 }
 export function academicHref(workspaceId?: string, artifactId?: string) {
   const query = new URLSearchParams();
   if (workspaceId) query.set("trabajo", workspaceId);
   if (artifactId) query.set("resultado", artifactId);
   return `/academico${query.size ? `?${query}` : ""}`;
+}
+
+export const ACADEMIC_MANUSCRIPT_TEMPLATES = {
+  blank: { label: "Documento en blanco", description: "Escribe con tu propia estructura.", headings: [] },
+  article: { label: "Artículo académico", description: "Presenta una pregunta, su método y tus hallazgos.", headings: ["Resumen", "Palabras clave", "Introducción", "Marco teórico", "Metodología", "Resultados", "Discusión", "Conclusiones", "Referencias"] },
+  legal_essay: { label: "Ensayo jurídico", description: "Desarrolla una tesis, sus objeciones y sus fundamentos.", headings: ["Problema jurídico", "Tesis", "Marco normativo y jurisprudencial", "Argumentación", "Objeciones y respuesta", "Conclusiones", "Referencias"] },
+  thesis: { label: "Proyecto de tesis", description: "Delimita la investigación y organiza su ejecución.", headings: ["Problema y justificación", "Pregunta de investigación", "Objetivos", "Estado del arte", "Metodología", "Cronograma", "Referencias"] },
+  paper: { label: "Ponencia", description: "Prepara una intervención para un encuentro académico.", headings: ["Resumen", "Problema y tesis", "Argumentos", "Conclusiones", "Preguntas para el diálogo", "Referencias"] },
+  course: { label: "Programa de curso", description: "Planifica unidades, sesiones y evaluación.", headings: ["Descripción y destinatarios", "Resultados de aprendizaje", "Unidades y sesiones", "Metodología", "Evaluación", "Calendario", "Lecturas"] },
+  seminar: { label: "Seminario", description: "Ordena sesiones, ponentes, lecturas y discusión.", headings: ["Propósito y destinatarios", "Programa y ponentes", "Lecturas previas", "Preguntas de discusión", "Calendario y responsabilidades"] },
+  congress: { label: "Congreso", description: "Prepara el programa y distribuye el trabajo del equipo.", headings: ["Tema y ejes", "Comité y responsabilidades", "Programa y mesas", "Convocatoria y evaluación", "Inscripción y logística", "Hitos y plazos"] },
+  workshop: { label: "Taller", description: "Diseña actividades, materiales y una pauta de evaluación.", headings: ["Resultados esperados", "Destinatarios y requisitos", "Actividades y tiempos", "Materiales", "Evaluación y seguimiento"] },
+  call: { label: "Convocatoria", description: "Registra bases, elegibilidad, entregables y fechas clave.", headings: ["Entidad convocante y país", "Bases y fuente oficial", "Requisitos de elegibilidad", "Documentos y entregables", "Fechas y zona horaria", "Equipo y responsabilidades", "Seguimiento"] },
+} as const;
+export type AcademicManuscriptTemplate = keyof typeof ACADEMIC_MANUSCRIPT_TEMPLATES;
+export const ACADEMIC_MANUSCRIPT_TEMPLATE_IDS = Object.keys(ACADEMIC_MANUSCRIPT_TEMPLATES) as [AcademicManuscriptTemplate, ...AcademicManuscriptTemplate[]];
+export const ACADEMIC_TEACHING_TEMPLATES = ["course", "seminar", "congress", "workshop", "call"] as const;
+export function isAcademicTeachingKind(kind: string): kind is (typeof ACADEMIC_TEACHING_TEMPLATES)[number] {
+  return ACADEMIC_TEACHING_TEMPLATES.some(id => id === kind);
+}
+
+export function academicManuscriptBody(templateId: AcademicManuscriptTemplate, title: string, brief: typeof emptyAcademicBrief) {
+  if (templateId === "blank") return "";
+  const heading = `# ${title.replace(/\s+/g, " ")}`;
+  if (templateId === "call" && brief.call) {
+    const { country, organization, url, deadline } = brief.call;
+    const [entity, source, requirements, deliverables, dates, roles, followup] = ACADEMIC_MANUSCRIPT_TEMPLATES.call.headings;
+    const countryName = country ? new Intl.DisplayNames(["es"], { type: "region" }).of(country) : "";
+    return [heading, `## ${entity}`, [organization, countryName].filter(Boolean).join(" · "), `## ${source}`, url,
+      `## ${requirements}`, `## ${deliverables}`, `## ${dates}`, deadline ? `Cierre registrado: ${deadline}` : "", `## ${roles}`, `## ${followup}`].filter(Boolean).join("\n\n");
+  }
+  if (templateId !== "course") return [heading, ...ACADEMIC_MANUSCRIPT_TEMPLATES[templateId].headings.map(label => `## ${label}`)].join("\n\n");
+  const fields = brief.syllabus;
+  const blocks = [
+    ["Resumen y enfoque", fields?.summary, fields?.approach],
+    ["Destinatarios y requisitos", brief.audience, fields?.requirements],
+    ["Horario y sala", fields?.schedule, fields?.room, brief.duration],
+    ["Resultados de aprendizaje", brief.learningOutcomes],
+    ["Unidades y sesiones"],
+    ["Evaluación", brief.evaluation],
+    ["Bibliografía base", fields?.bibliography],
+  ];
+  return [heading, ...blocks.map(([label, ...contents]) => [`## ${label}`, ...contents.map(value => value?.trim()).filter(Boolean)].join("\n\n"))].join("\n\n");
 }
 export const ACADEMIC_INSTRUCTIONS: Record<AcademicMode, string> = {
   literature_review: "Organiza el estado del arte sobre la pregunta del trabajo. Distingue consensos, desacuerdos, métodos y vacíos de investigación en las fuentes elegidas.",

@@ -7,18 +7,20 @@ import { ArrowLeft, ArrowRight, BookOpen, FileText, GraduationCap, PenLine, Plus
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 import { prepareAssistantSubmission } from "@/lib/altazor/client-send-policy";
 import { ACADEMIC_LABELS, type AcademicMode } from "@/lib/altazor/academic-schemas";
-import { ACADEMIC_INSTRUCTIONS, ACADEMIC_JOURNEYS, academicHref, academicJourney, type AcademicJourney } from "@/lib/altazor/academic-templates";
+import { ACADEMIC_INSTRUCTIONS, ACADEMIC_JOURNEYS, ACADEMIC_MANUSCRIPT_TEMPLATES, ACADEMIC_MANUSCRIPT_TEMPLATE_IDS, academicHref, academicJourney, isAcademicTeachingKind, type AcademicJourney, type AcademicManuscriptTemplate } from "@/lib/altazor/academic-templates";
 import { AltazorSources, type AltazorSelectedSource } from "./AltazorSources";
 import { AltazorDiscovery } from "./AltazorDiscovery";
 import { AcademicMatrix } from "./AcademicMatrix";
 import { AcademicProfile } from "./AcademicProfile";
 import { AcademicEditor } from "./AcademicEditor";
 import { AcademicReview, type ReviewDestination } from "./AcademicReview";
+import { AcademicCallForm, AcademicSyllabusForm, AcademicTeaching, type TeachingTemplate } from "./AcademicTeaching";
+import { AcademicTeachingSessions } from "./AcademicTeachingSessions";
 import { academicApi as api, type AcademicArtifact, type AcademicOverview, type AcademicWorkspace } from "./academic-ui";
 import styles from "./AltazorAcademic.module.css";
 
-type Pane = "work" | "matrix" | "profile" | "discovery" | "review";
-const kindLabels: Record<string, string> = { research: "Investigación", writing: "Escritura", course: "Docencia", career: "Carrera académica" };
+type Pane = "work" | "matrix" | "profile" | "discovery" | "review" | "teaching";
+const kindLabels: Record<string, string> = { research: "Investigación", writing: "Escritura", course: "Curso", seminar: "Seminario", congress: "Congreso", workshop: "Taller", call: "Convocatoria", career: "Carrera académica" };
 const statusLabels: Record<string, string> = { prepared: "Lista para preparar", running: "En preparación", proposed: "Por revisar", reviewed: "Revisado", failed: "Necesita reintento", cancelled: "Detenida", interrupted: "Interrumpida" };
 const journeyIcons = { research: BookOpen, writing: PenLine, course: GraduationCap };
 const workSteps = [{ label: "Objetivo", icon: PenLine }, { label: "Fuentes", icon: BookOpen }, { label: "Trabajo", icon: FileText }];
@@ -32,6 +34,10 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
   const [journey, setJourney] = useState<AcademicJourney>("research"), [newTitle, setNewTitle] = useState(""), [mode, setMode] = useState<AcademicMode>("literature_review"), [step, setStep] = useState(0), [pane, setPane] = useState<Pane>("work");
   const [sources, setSources] = useState<AltazorSelectedSource[]>([]), [sourcesChanged, setSourcesChanged] = useState(false), [creating, setCreating] = useState(false), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [reviewCurrent, setReviewCurrent] = useState(false), [projectQuery, setProjectQuery] = useState(""), [stopping, setStopping] = useState(false);
+  const [template, setTemplate] = useState<AcademicManuscriptTemplate>("blank");
+  const [teachingStart, setTeachingStart] = useState<TeachingTemplate | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [discoveryQuery, setDiscoveryQuery] = useState("");
   const [selectedId, setSelectedId] = useState(""), [dirty, setDirty] = useState(false), [editorDirty, setEditorDirty] = useState(false), [profileDirty, setProfileDirty] = useState(false);
   const [causas, setCausas] = useState<{ id: string; titulo: string; rit: string | null }[]>([]);
   const createId = useRef(createSubmissionKeys()), prepareId = useRef(createSubmissionKeys()), currentWorkspace = useRef(""), mounted = useRef(true);
@@ -50,7 +56,7 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
           if (controller.signal.aborted) return;
           setWorkspace(work); setSources(work.sources || []); setSourcesChanged(false); const kind = academicJourney(work.kind); setJourney(kind); setMode(work.brief.task);
           const artifact = initialArtifactId ? work.artifacts.find(item => item.id === initialArtifactId) : work.artifacts.find(item => item.available && ["proposed", "reviewed", "prepared"].includes(item.status || ""));
-          if (artifact?.available) { setSelectedId(artifact.id); setStep(2); }
+          if (artifact?.available && !(isAcademicTeachingKind(work.kind) && window.location.hash === "#agenda-docencia")) { setSelectedId(artifact.id); setStep(2); }
           else if (initialArtifactId) setError("Este resultado o sus fuentes ya no están disponibles. Puedes continuar con el resto del trabajo.");
         }
       }).catch(reason => { if (!controller.signal.aborted) setError(message(reason, "No se pudieron abrir tus trabajos. Inténtalo nuevamente.")); })
@@ -83,7 +89,7 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
     setSelectedId(""); setEditorDirty(false);
     try {
       const data = await load(id);
-      setJourney(academicJourney(data.kind)); setMode(data.brief.task); setStep(0);
+      setJourney(academicJourney(data.kind)); setMode(data.brief.task); setStep(0); setShowTemplates(false);
       setPane(destination); setReviewCurrent(destination === "review"); replaceLink(id);
     } catch (reason) {
       currentWorkspace.current = workspace?.id || "";
@@ -123,7 +129,8 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
   async function create() {
     if (!newTitle.trim() || blocked) return; setBusy(true); setError("");
     try {
-      const result = await api<{ id: string }>("/api/altazor/academic", { requestId: createId.current.forPayload({ title: newTitle, kind: journey }), title: newTitle, kind: journey });
+      const payload = { title: newTitle, kind: teachingStart || journey };
+      const result = await api<{ id: string }>("/api/altazor/academic", { ...payload, requestId: createId.current.forPayload(payload) });
       currentWorkspace.current = result.id;
       const data = await load(result.id);
       setOverview(previous => previous ? {
@@ -131,12 +138,14 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
         workspaces: [{ id: data.id, title: data.title, kind: data.kind }, ...previous.workspaces.filter(item => item.id !== data.id)],
       } : previous);
       setJourney(academicJourney(data.kind)); setMode(data.brief.task);
-      setSelectedId(""); setStep(0); setPane("work"); setNewTitle(""); setCreating(false);
+      const openingTemplates = Boolean(teachingStart && teachingStart !== "course" && teachingStart !== "call");
+      setSelectedId(""); setStep(openingTemplates ? 2 : 0); setPane("work"); setNewTitle(""); setCreating(false);
+      setShowTemplates(openingTemplates); setTemplate(teachingStart || "blank"); setTeachingStart(null);
       createId.current = createSubmissionKeys(); setNotice("Trabajo creado. Comienza por tu objetivo."); replaceLink(result.id);
     } catch (reason) { setError(message(reason, "No se pudo crear el trabajo.")); } finally { setBusy(false); }
   }
   async function saveWorkspace() {
-    if (!workspace) return false; if (!dirty) return true;
+    if (!workspace) return null; if (!dirty) return workspace.revision;
     setBusy(true); setError("");
     try {
       const result = await api<{ revision: number }>(`/api/altazor/academic/${workspace.id}`, {
@@ -150,12 +159,36 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
       setSourcesChanged(false); setDirty(false); setNotice("Objetivo y cambios guardados.");
       setOverview(previous => previous ? {
         ...previous,
-        workspaces: [{ id: workspace.id, title: workspace.title, kind: workspace.kind }, ...previous.workspaces.filter(item => item.id !== workspace.id)],
+        workspaces: [{ id: workspace.id, title: workspace.title, kind: workspace.kind, call: workspace.brief.call }, ...previous.workspaces.filter(item => item.id !== workspace.id)],
       } : previous);
-      return true;
-    } catch (reason) { setError(message(reason, "No se pudieron guardar los cambios.")); return false; } finally { setBusy(false); }
+      return result.revision;
+    } catch (reason) { setError(message(reason, "No se pudieron guardar los cambios.")); return null; } finally { setBusy(false); }
   }
   function updateWorkspace(change: Partial<AcademicWorkspace>) { if (workspace) { setWorkspace({ ...workspace, ...change }); setDirty(true); } }
+  function startTeaching(next: TeachingTemplate) {
+    if (blocked) return;
+    currentWorkspace.current = "";
+    setWorkspace(null); setSelectedId(""); setSources([]); setStep(0);
+    setTeachingStart(next); setJourney("course"); setMode("syllabus");
+    setNewTitle(""); setCreating(true); setPane("work"); setNotice(""); setError(""); replaceLink();
+  }
+  const draftRequest = useRef(createSubmissionKeys());
+  async function createDraft(next: AcademicManuscriptTemplate) {
+    if (!workspace || busy || editorDirty || !workspace.title.trim()) return;
+    const revision = await saveWorkspace();
+    if (revision === null) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const payload = { expectedRevision: revision, template: next };
+      const result = await api<{ id: string }>(`/api/altazor/academic/${workspace.id}/artifacts/draft`, { ...payload, requestId: draftRequest.current.forPayload({ id: workspace.id, ...payload }) });
+      await load(workspace.id);
+      draftRequest.current = createSubmissionKeys();
+      setSelectedId(result.id); setStep(2); setShowTemplates(false); replaceLink(workspace.id, result.id);
+      setNotice(next === "course" ? "Syllabus creado. Ya puedes editarlo." : "Borrador creado. Ya puedes editarlo.");
+      window.requestAnimationFrame(() => section.current?.querySelector("[aria-label='Editor académico']")?.scrollIntoView({ block: "start" }));
+    } catch (reason) { setError(message(reason, "No se pudo abrir el borrador. Inténtalo de nuevo.")); }
+    finally { setBusy(false); }
+  }
   async function prepare(existingId?: string) {
     if (!workspace || !overview || blocked) return; setBusy(true); setError(""); setNotice("");
     let artifactId = existingId;
@@ -213,7 +246,8 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
     </header>
     <nav className={styles.navigation} aria-label="Herramientas académicas">
       <button type="button" aria-current={pane === "work" ? "page" : undefined} disabled={profileDirty || editorDirty} onClick={() => setPane("work")}>Mis trabajos</button>
-      <button type="button" aria-current={pane === "discovery" ? "page" : undefined} disabled={profileDirty || editorDirty} onClick={() => setPane("discovery")}>Buscar bibliografía</button>
+      <button type="button" aria-current={pane === "discovery" ? "page" : undefined} disabled={profileDirty || editorDirty} onClick={() => { setDiscoveryQuery(""); setPane("discovery"); }}>Buscar bibliografía</button>
+      <button type="button" aria-current={pane === "teaching" ? "page" : undefined} disabled={blocked} onClick={() => setPane("teaching")}>Docencia</button>
       <button type="button" aria-current={pane === "review" ? "page" : undefined} disabled={blocked} onClick={() => void openReview()}>Mesa de revisión</button>
     </nav>
     {error && <div className={styles.error} role="alert"><p>{error}</p>{!overview && <button type="button" className="btn btn-outline" onClick={() => window.location.reload()}>Volver a cargar</button>}</div>}
@@ -221,8 +255,9 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
     {loading ? <div className={styles.loading} role="status">Abriendo tus trabajos académicos…</div> : <>
       {pane === "discovery" && <>
         <p className={styles.discoveryHint}>Guarda las referencias en Mi bibliografía. Para citar un pasaje, incorpora el texto a tu biblioteca y selecciónalo en el trabajo.</p>
-        <AltazorDiscovery />
+        <AltazorDiscovery initialQuery={discoveryQuery} />
       </>}
+      {pane === "teaching" && <AcademicTeaching projects={projects.filter(item => isAcademicTeachingKind(item.kind))} blocked={blocked} onStart={startTeaching} onOpen={id => void chooseWorkspace(id)} />}
       {pane === "review" && overview && <AcademicReview
         workspaces={overview.workspaces}
         workspace={reviewCurrent ? workspace : null}
@@ -246,10 +281,10 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
             </div>
             {(creating || !projects.length) && <div className={styles.start}>
               <div>
-                <h3>¿Qué quieres desarrollar?</h3>
+                <h3>{teachingStart ? `Nuevo trabajo · ${ACADEMIC_MANUSCRIPT_TEMPLATES[teachingStart].label}` : "¿Qué quieres desarrollar?"}</h3>
                 <div className={styles.journeys} role="group" aria-label="Propósito del nuevo trabajo">{ACADEMIC_JOURNEYS.map(item => {
                   const Icon = journeyIcons[item.id];
-                  return <button key={item.id} type="button" aria-pressed={journey === item.id} disabled={busy} onClick={() => { setJourney(item.id); setMode(item.initialMode); }}>
+                  return <button key={item.id} type="button" aria-pressed={journey === item.id} disabled={busy} onClick={() => { setTeachingStart(null); setJourney(item.id); setMode(item.initialMode); }}>
                     <Icon size={21} aria-hidden="true"/><span><strong>{item.label}</strong><small>{item.description}</small></span>
                     <ArrowRight size={17} aria-hidden="true"/>
                   </button>;
@@ -301,7 +336,18 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
               <button key={label} type="button" aria-current={step === index ? "step" : undefined} disabled={busy || (editorDirty && index !== 2)} onClick={() => setStep(index)}>
                 <span aria-hidden="true"><Icon size={14} /></span>{label}
               </button>)}</nav>
-            {step === 0 && <div className={styles.objective}><label>Tu objetivo o texto de trabajo<textarea rows={7} value={workspace.brief.objective} disabled={busy} onChange={event => updateWorkspace({ brief: { ...workspace.brief, objective: event.target.value } })} maxLength={8000} placeholder={ACADEMIC_INSTRUCTIONS[mode]}/></label><details><summary>Opciones del trabajo</summary><div className={styles.brief}><label>Qué quieres preparar<select aria-label="Qué quieres preparar" value={mode} disabled={busy} onChange={event => { setMode(event.target.value as AcademicMode); updateWorkspace({ brief: { ...workspace.brief, task: event.target.value as AcademicMode } }); }}>{ACADEMIC_JOURNEYS.map(item => <optgroup key={item.id} label={item.label}>{item.modes.map(id => <option key={id} value={id}>{ACADEMIC_LABELS[id]}</option>)}</optgroup>)}</select></label>{(["audience", "language", ...(["syllabus", "rubric", "teaching_material"].includes(mode) ? ["duration", "learningOutcomes", "evaluation"] as const : [])] as const).map(key => <label key={key}>{{ audience: "Destinatarios", language: "Idioma", duration: "Duración", learningOutcomes: "Resultados de aprendizaje", evaluation: "Evaluación o actividad" }[key]}<textarea value={workspace.brief[key]} rows={key === "language" || key === "duration" ? 1 : 3} maxLength={key === "language" ? 80 : key === "duration" ? 100 : key === "audience" ? 1000 : 6000} disabled={busy} onChange={event => updateWorkspace({ brief: { ...workspace.brief, [key]: event.target.value } })}/></label>)}</div></details>{mode === "cv" && <button className="btn btn-outline" type="button" disabled={busy || editorDirty} onClick={() => setPane("profile")}>Completar perfil para el currículum</button>}<button type="button" className="btn btn-primary" disabled={busy || !workspace.brief.objective.trim()} onClick={() => { void saveWorkspace().then(saved => { if (saved) setStep(1); }); }}>{dirty ? "Guardar y elegir fuentes" : "Elegir fuentes"}<ArrowRight size={16}/></button></div>}
+            {step === 0 && <div className={styles.objective}>
+              {workspace.kind === "course" && <AcademicSyllabusForm title={workspace.title} brief={workspace.brief} busy={busy}
+                onChange={syllabus => updateWorkspace({ brief: { ...workspace.brief, syllabus } })}
+                onBriefChange={(key, value) => updateWorkspace({ brief: { ...workspace.brief, [key]: value } })}
+                onCreate={() => void createDraft("course")}
+                onSearch={() => { setDiscoveryQuery(workspace.title.trim()); setPane("discovery"); }} />}
+              {workspace.kind === "call" && <AcademicCallForm value={workspace.brief.call} busy={busy}
+                onChange={call => updateWorkspace({ brief: { ...workspace.brief, call } })} />}
+              <label>Tu objetivo o texto de trabajo<textarea rows={7} value={workspace.brief.objective} disabled={busy} onChange={event => updateWorkspace({ brief: { ...workspace.brief, objective: event.target.value } })} maxLength={8000} placeholder={ACADEMIC_INSTRUCTIONS[mode]}/></label><details><summary>Opciones del trabajo</summary><div className={styles.brief}><label>Qué quieres preparar<select aria-label="Qué quieres preparar" value={mode} disabled={busy} onChange={event => { setMode(event.target.value as AcademicMode); updateWorkspace({ brief: { ...workspace.brief, task: event.target.value as AcademicMode } }); }}>{ACADEMIC_JOURNEYS.map(item => <optgroup key={item.id} label={item.label}>{item.modes.map(id => <option key={id} value={id}>{ACADEMIC_LABELS[id]}</option>)}</optgroup>)}</select></label>{(["audience", "language", ...(["syllabus", "rubric", "teaching_material"].includes(mode) ? ["duration", "learningOutcomes", "evaluation"] as const : [])] as const).map(key => <label key={key}>{{ audience: "Destinatarios", language: "Idioma", duration: "Duración", learningOutcomes: "Resultados de aprendizaje", evaluation: "Evaluación o actividad" }[key]}<textarea value={workspace.brief[key]} rows={key === "language" || key === "duration" ? 1 : 3} maxLength={key === "language" ? 80 : key === "duration" ? 100 : key === "audience" ? 1000 : 6000} disabled={busy} onChange={event => updateWorkspace({ brief: { ...workspace.brief, [key]: event.target.value } })}/></label>)}</div></details>{mode === "cv" && <button className="btn btn-outline" type="button" disabled={busy || editorDirty} onClick={() => setPane("profile")}>Completar perfil para el currículum</button>}
+              {isAcademicTeachingKind(workspace.kind) && <AcademicTeachingSessions key={workspace.id} workspaceId={workspace.id} />}
+              {workspace.kind !== "course" && <button type="button" className="btn btn-outline" disabled={busy}
+                onClick={() => { setTemplate(isAcademicTeachingKind(workspace.kind) ? workspace.kind : "blank"); setShowTemplates(true); setStep(2); }}><PenLine size={16} aria-hidden="true" /> Abrir editor</button>}<button type="button" className="btn btn-primary" disabled={busy || !workspace.brief.objective.trim()} onClick={() => { void saveWorkspace().then(saved => { if (saved) setStep(1); }); }}>{dirty ? "Guardar y elegir fuentes" : "Elegir fuentes"}<ArrowRight size={16}/></button></div>}
             {step === 1 && <div className={styles.sourceStep}>
               {workspace.unavailableSources > 0 && <p role="status">
                 {workspace.unavailableSources === 1 ? "Un pasaje guardado ya no está disponible." : `${workspace.unavailableSources} pasajes guardados ya no están disponibles.`}
@@ -319,12 +365,26 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
               </div>
             </div>}
             {step === 2 && <>
+              <section className={styles.manuscriptStart} aria-labelledby="academic-manuscript-title">
+                <div><h2 id="academic-manuscript-title">Editor de documentos</h2><p>Escribe desde cero o parte de una estructura editable.</p></div>
+                <button type="button" className="btn btn-outline" aria-expanded={showTemplates} disabled={busy || editorDirty}
+                  onClick={() => setShowTemplates(value => !value)}><PenLine size={16} aria-hidden="true" /> {showTemplates ? "Cerrar plantillas" : "Nuevo borrador"}</button>
+                {showTemplates && <form onSubmit={event => { event.preventDefault(); void createDraft(template); }}>
+                  <label>Plantilla del documento<select aria-label="Plantilla del documento" value={template} disabled={busy} onChange={event => setTemplate(event.target.value as AcademicManuscriptTemplate)}>
+                    {ACADEMIC_MANUSCRIPT_TEMPLATE_IDS.filter(id => isAcademicTeachingKind(workspace.kind) || !isAcademicTeachingKind(id)).map(id =>
+                      <option key={id} value={id}>{ACADEMIC_MANUSCRIPT_TEMPLATES[id].label}</option>)}
+                  </select></label>
+                  <p>{ACADEMIC_MANUSCRIPT_TEMPLATES[template].description}</p>
+                  {workspace.unavailableSources > 0 && <p role="status">Revisa los pasajes que perdieron acceso en Fuentes antes de crear el borrador.</p>}
+                  <button type="submit" className="btn btn-primary" disabled={busy || editorDirty || !workspace.title.trim()}>Crear borrador <ArrowRight size={16} aria-hidden="true" /></button>
+                </form>}
+              </section>
               <div className={styles.prepare}><div><h2>{ACADEMIC_LABELS[mode]}</h2><p>{sources.length ? `${sources.length} ${sources.length === 1 ? "pasaje elegido" : "pasajes elegidos"}` : "Sin pasajes elegidos directamente"} · <button type="button" disabled={editorDirty || busy} onClick={() => setStep(1)}>Cambiar fuentes</button></p>
                 {matrixEvidenceRows > 0 && <p>{matrixEvidenceRows === 1 ? "1 fila incluida de la matriz aporta pasajes." : `${matrixEvidenceRows} filas incluidas de la matriz aportan pasajes.`}</p>}
               </div><p>{workspace.brief.objective || "Vuelve a Objetivo para indicar tu encargo."}</p>
                 <button type="button" className="btn btn-primary" disabled={blocked || !workspace.brief.objective.trim() || !overview?.destination.permitted} onClick={() => void prepare()}>{busy ? "Preparando…" : "Preparar propuesta"}</button>{dirty && <p role="status">Guarda tus cambios antes de preparar otra propuesta.</p>}{overview && !overview.destination.permitted && <p>Configura un proveedor de IA en <a href="/configuracion">Configuración</a> para preparar propuestas.</p>}
               </div>
-              {workspace.artifacts.length > 0 && <section className={styles.results}><h2>Propuestas del trabajo</h2><ul>{workspace.artifacts.map(artifact => <li key={artifact.id}><button type="button" disabled={!artifact.available || busy || Boolean(editorDirty && artifact.id !== selectedId)} aria-current={selectedId === artifact.id ? "true" : undefined} onClick={() => selectArtifact(artifact)}><span>{artifact.available ? artifact.title : "Resultado cuyo respaldo ya no está disponible"}</span><small>{statusLabels[artifact.status || ""] || "No disponible"}</small></button></li>)}</ul></section>}
+              {workspace.artifacts.length > 0 && <section className={styles.results}><h2>Documentos del trabajo</h2><ul>{workspace.artifacts.map(artifact => <li key={artifact.id}><button type="button" disabled={!artifact.available || busy || Boolean(editorDirty && artifact.id !== selectedId)} aria-current={selectedId === artifact.id ? "true" : undefined} onClick={() => selectArtifact(artifact)}><span>{artifact.available ? artifact.title : "Resultado cuyo respaldo ya no está disponible"}</span><small>{(artifact.template && artifact.status === "proposed" ? "Borrador" : statusLabels[artifact.status || ""]) || "No disponible"}</small></button></li>)}</ul></section>}
               {selected?.available && selected.status === "prepared" && <div className={styles.prepared}><p>Este encargo está guardado y aún no se ha enviado al proveedor.</p><button type="button" className="btn btn-primary" disabled={blocked} onClick={() => void prepare(selected.id)}>Ejecutar encargo guardado</button></div>}
               {selected?.available && ["proposed", "reviewed"].includes(selected.status || "") && <AcademicEditor key={selected.id} workspaceId={workspace.id} artifact={selected} causas={causas} onDirty={setEditorDirty} onSaved={artifact => setWorkspace(current => current ? { ...current, artifacts: current.artifacts.map(item => item.id === artifact.id ? artifact : item) } : current)} onSelectionTask={(text, nextMode) => { if (text.length > 7000) { setError("Elige hasta 7.000 caracteres para preparar una revisión de la selección."); return; } setMode(nextMode); updateWorkspace({ brief: { ...workspace.brief, objective: text, task: nextMode } }); setStep(0); setNotice("Selección copiada al objetivo. Guarda el encargo y prepara otra propuesta; el original se conserva."); }}/>}
             </>}

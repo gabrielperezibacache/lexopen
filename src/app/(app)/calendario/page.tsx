@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import {
   CalendarioBoard,
   type BoardDay,
+  type BoardEvento,
 } from "@/components/calendario/CalendarioBoard";
 import {
   CalendarioClient,
@@ -17,7 +18,8 @@ import {
   weekDays,
   weekQueryRange,
 } from "@/lib/calendario/week";
-import { civilDateKey, civilMonthQueryRange, formatCivilDate } from "@/lib/chile-time";
+import { teachingCalendarSessions } from "@/lib/altazor/teaching-sessions";
+import { civilDateKey, civilMonthQueryRange, civilSpanQueryRange, formatCivilDate, santiagoDateKey, SANTIAGO_TZ } from "@/lib/chile-time";
 import { prisma } from "@/lib/db";
 import { clasificarUrgencia, labelTipoComputo } from "@/lib/plazos";
 import Link from "next/link";
@@ -67,6 +69,13 @@ function dayLabel(ymd: string) {
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
+const teachingClock = new Intl.DateTimeFormat("es-CL", { timeZone: SANTIAGO_TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const calendarEventHref = (event: BoardEvento) => event.teachingHref || (event.causaId ? `/causas/${event.causaId}` : "/calendario");
+function calendarEventLabel(event: BoardEvento) {
+  if (event.teachingHref) return `${teachingClock.format(new Date(event.inicio))} · Docencia · ${event.titulo}`;
+  return `${event.tipo === "audiencia" ? "Audiencia" : "Evento"} · ${event.titulo}`;
+}
+
 type Vista = "mes" | "semana" | "agenda";
 
 function parseVista(raw?: string): Vista {
@@ -106,8 +115,10 @@ export default async function CalendarioPage({ searchParams }: Props) {
     vista === "semana"
       ? weekQueryRange(weekMonday)
       : civilMonthQueryRange(year, monthIndex);
+  const teachingRange = vista === "semana" ? civilSpanQueryRange(weekMonday, weekDays(weekMonday)[6]) : range;
 
-  const [plazos, tasks, causasTabla, movAudiencias, eventosRaw, causasOptions] =
+  const showsEvents = filterTipo === "todos" || filterTipo === "evento";
+  const [plazos, tasks, causasTabla, movAudiencias, eventosRaw, causasOptions, teaching] =
     await Promise.all([
       prisma.plazo.findMany({
         where: { AND: [plazoAccessWhere(user), {
@@ -167,6 +178,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
         orderBy: { updatedAt: "desc" },
         take: 100,
       }),
+      showsEvents ? teachingCalendarSessions(user, teachingRange) : [],
     ]);
 
   const eventos: EventoListItem[] = eventosRaw.map((e) => ({
@@ -230,7 +242,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
   const pByDate = new Map<string, typeof plazos>();
   const tByDate = new Map<string, typeof tasks>();
   const aByDate = new Map<string, Array<{ id: string; titulo: string; causaId: string; sala: string | null }>>();
-  const evByDate = new Map<string, typeof eventos>();
+  const evByDate = new Map<string, BoardEvento[]>();
 
   if (filterTipo === "todos" || filterTipo === "plazo") {
     for (const x of plazos) {
@@ -273,11 +285,19 @@ export default async function CalendarioPage({ searchParams }: Props) {
     }
   }
 
-  if (filterTipo === "todos" || filterTipo === "evento") {
-    for (const x of eventos) {
-      const key = civilDateKey(new Date(x.inicio));
+  if (showsEvents) {
+    const activities: BoardEvento[] = [
+      ...eventos,
+      ...teaching.map(item => ({
+        id: item.id, titulo: item.title, tipo: "docencia", inicio: item.startsAt.toISOString(), causaId: null,
+        teachingHref: `/academico?trabajo=${encodeURIComponent(item.workspaceId)}#agenda-docencia`,
+      })),
+    ];
+    for (const event of activities.sort((a, b) => a.inicio.localeCompare(b.inicio))) {
+      const startsAt = new Date(event.inicio);
+      const key = event.teachingHref ? santiagoDateKey(startsAt) : civilDateKey(startsAt);
       if (!evByDate.has(key)) evByDate.set(key, []);
-      evByDate.get(key)!.push(x);
+      evByDate.get(key)!.push(event);
     }
   }
 
@@ -312,13 +332,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
         titulo: x.titulo,
         causaId: x.causaId,
       })),
-      ev: ev.map((x) => ({
-        id: x.id,
-        titulo: x.titulo,
-        tipo: x.tipo,
-        inicio: x.inicio,
-        causaId: x.causaId,
-      })),
+      ev: ev.map(({ id, titulo, tipo, inicio, causaId, teachingHref }) => ({ id, titulo, tipo, inicio, causaId, teachingHref })),
     };
   });
 
@@ -434,11 +448,10 @@ export default async function CalendarioPage({ searchParams }: Props) {
                 {ev.map((x) => (
                   <Link
                     key={x.id}
-                    href={x.causaId ? `/causas/${x.causaId}` : "/calendario"}
-                    className="block rounded-lg bg-emerald-100 px-2 py-1.5 text-sm text-emerald-950"
+                    href={calendarEventHref(x)}
+                    className={`block rounded-lg px-2 py-1.5 text-sm ${x.teachingHref ? "bg-[var(--sea-soft)] text-[var(--ink)]" : "bg-emerald-100 text-emerald-950"}`}
                   >
-                    {x.tipo === "audiencia" ? "Audiencia · " : "Evento · "}
-                    {x.titulo}
+                    {calendarEventLabel(x)}
                   </Link>
                 ))}
               </div>
@@ -489,11 +502,10 @@ export default async function CalendarioPage({ searchParams }: Props) {
                     {ev.map((x) => (
                       <Link
                         key={x.id}
-                        href={x.causaId ? `/causas/${x.causaId}` : "/calendario"}
+                        href={calendarEventHref(x)}
                         className="block"
                       >
-                        {x.tipo === "audiencia" ? "Audiencia · " : "Evento · "}
-                        {x.titulo}
+                        {calendarEventLabel(x)}
                       </Link>
                     ))}
                   </div>

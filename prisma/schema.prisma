@@ -34,6 +34,8 @@ model FirmSettings {
   caseManagementMode String @default("manual")
   /// ISO 3166-1 alpha-2. Null means the Host has not selected a country.
   workCountry     String? @db.VarChar(2)
+  /// Optional staff navigation areas. Null preserves the default catalog.
+  visibleSections Json?
   /// ClaveÚnica del estudio (AES-GCM) — flujo CausaMonitor / OJV Mis Causas
   claveUnicaRut            String?
   claveUnicaPasswordEnc    String?
@@ -2613,8 +2615,21 @@ model AltazorAcademicWorkspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   artifacts AltazorAcademicArtifact[]
+  teachingSessions AltazorTeachingSession[]
   @@unique([ownerId,requestId])
   @@index([ownerId,archivedAt,updatedAt])
+}
+model AltazorTeachingSession {
+  id String @id @default(cuid())
+  workspaceId String
+  workspace AltazorAcademicWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  requestId String
+  title String
+  startsAt DateTime
+  endsAt DateTime?
+  createdAt DateTime @default(now())
+  @@unique([workspaceId,requestId])
+  @@index([startsAt,workspaceId])
 }
 model AltazorAcademicArtifact {
   versions AltazorAcademicArtifactVersion[]

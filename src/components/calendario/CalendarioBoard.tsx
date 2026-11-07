@@ -12,6 +12,7 @@ export type BoardEvento = {
   tipo: string;
   inicio: string;
   causaId: string | null;
+  teachingHref?: string;
 };
 
 export type BoardPlazo = {
@@ -194,7 +195,11 @@ export function CalendarioBoard({
                     {x.titulo}
                   </Link>
                 ))}
-                {c.ev.slice(0, mode === "semana" ? 8 : 3).map((x) => (
+                {c.ev.slice(0, mode === "semana" ? 8 : 3).map((x) => x.teachingHref ? (
+                  <Link key={x.id} href={x.teachingHref} className="block truncate rounded bg-[var(--sea-soft)] px-1 text-[10px] text-[var(--ink)]" title={`Docencia · ${x.titulo}`}>
+                    Docencia · {x.titulo}
+                  </Link>
+                ) : (
                   <div
                     key={x.id}
                     draggable

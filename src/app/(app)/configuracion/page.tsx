@@ -35,9 +35,11 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { firmFormSelect } from "@/lib/config/firm-form-fields";
 import { PersonalSettingsIndex } from "@/components/config/PersonalSettingsIndex";
 import { ConnectedAccountsPanel } from "@/components/config/ConnectedAccountsPanel";
+import { HostSectionSettings } from "@/components/config/HostSectionSettings";
+import { getHostNavigationSections } from "@/lib/config/host-navigation-sections";
 
 async function adminSections(userId: string, mode: CaseManagementMode, country: WorkCountry | null, locale: "es" | "en", canSetCountry: boolean): Promise<Record<string, ReactNode>> {
-  const [organization, hostStatus, users, groups] = await Promise.all([
+  const [organization, hostStatus, users, groups, visibleSections] = await Promise.all([
     prisma.organization.findFirst({ select: firmFormSelect }),
     getHostStatus(),
     prisma.user.findMany({
@@ -51,6 +53,7 @@ async function adminSections(userId: string, mode: CaseManagementMode, country: 
       include: { members: { include: { user: true } } },
       orderBy: { name: "asc" },
     }),
+    canSetCountry ? getHostNavigationSections() : null,
   ]);
   const settingsOrganization =
     organization ||
@@ -95,6 +98,7 @@ async function adminSections(userId: string, mode: CaseManagementMode, country: 
 
   return {
     estudio: <FirmSettingsForm organization={settingsOrganization} />,
+    "apartados-visibles": visibleSections ? <HostSectionSettings initial={visibleSections} locale={locale} /> : undefined,
     "work-country": canSetCountry ? <WorkCountrySettings initial={country} locale={locale} options={workCountryOptions(locale)} /> : undefined,
     "case-management-settings": <CaseManagementSettings initialMode={mode} />,
     usuarios: <UsersAdminPanel

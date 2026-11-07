@@ -134,6 +134,14 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
       await expect(item).toContainText(`${index + 1} de 2 secciones con pasajes vinculados.`);
     }
     const proposed = manuscripts.getByRole("listitem").filter({ hasText: fixtures[0].title });
+    const reviewed = manuscripts.getByRole("listitem").filter({ hasText: fixtures[1].title });
+    await reviewed.getByText("Pasajes citados por sección", { exact: true }).click();
+    for (const [index, title] of ["Hipótesis", "Alcance"].entries()) {
+      const section = reviewed.getByRole("heading", { name: title, exact: true }).locator("..");
+      await section.getByText(`R${index + 1} · ${proofs[index].title}`, { exact: true }).click();
+      await expect(section.getByText(proofs[index].text, { exact: true })).toBeVisible();
+      await expect(section.getByRole("link", { name: "Abrir pasaje en la fuente", exact: true })).toHaveAttribute("href", proofs[index].href);
+    }
     await proposed.getByText("Una sección sin pasajes vinculados", { exact: true }).click();
     await expect(proposed.getByText("Inferencia pendiente", { exact: true })).toBeVisible();
     await expect(proposed).toContainText("Marcadores sin pasaje asociado R9");
@@ -154,6 +162,8 @@ test("Mesa de revisión distingue vacíos y respaldo, conserva el trabajo privad
     await expect(manuscripts.getByText("Sin acceso al respaldo", { exact: true }).locator("..").getByText("2", { exact: true })).toBeVisible();
     await expect(report.getByText(fixtures[0].title, { exact: true })).toHaveCount(0);
     await expect(report.getByRole("button", { name: "Abrir propuesta", exact: true })).toHaveCount(0);
+    await expect(report.getByText("Pasajes citados por sección", { exact: true })).toHaveCount(0);
+    await expect(report.getByText(proofs[0].text, { exact: true })).toHaveCount(0);
     await academic.getByRole("button", { name: "Mis trabajos", exact: true }).click();
     await academic.getByLabel("Nombre del trabajo", { exact: true }).fill(`${title} actualizado`);
     await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();

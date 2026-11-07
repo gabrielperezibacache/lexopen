@@ -57,11 +57,13 @@ La memoria funciona con nodos y relaciones en PostgreSQL; no requiere instalar o
 | Trabajo | Elegir fuentes y preparar síntesis, estado del arte, comparación, revisión de afirmaciones o bibliografía, escritura, traducción, abstract y revisión por pares. |
 | Matriz de literatura | Configurar dimensiones de texto, número, fecha o etiqueta; registrar filas; incluirlas o excluirlas del análisis; asociar pasajes a celdas. |
 | Mesa de revisión | Identificar el siguiente paso del trabajo y comprobar qué secciones de cada manuscrito enlazan con un pasaje disponible. |
-| Docencia | Usar objetivo, destinatarios, duración, resultados de aprendizaje y evaluación para preparar programas, rúbricas y material docente. |
+| Docencia | Organizar cursos, seminarios, congresos, talleres y convocatorias en trabajos privados. Crear un syllabus desde la ficha del curso o partir de una plantilla en el editor. |
 | Mi perfil | Conservar los datos profesionales aportados por el titular y preparar propuestas de currículum; no certifica títulos ni cumplimiento de formularios institucionales. |
 | Descubrir | Consultar Crossref y OpenAlex, explorar relaciones bibliográficas, contrastar un registro ORCID público y conservar referencias. |
 
-Las propuestas de IA se guardan para edición y revisión. Puedes descargarlas en Word real o Markdown. **Incorporar a una causa** crea un escrito privado con sus respaldos nativos, después de revisar el resultado; repetir la incorporación recupera el mismo escrito. No presenta documentos ante tribunales.
+El editor reúne borradores propios y propuestas de IA en el mismo trabajo. Puedes comenzar con un documento en blanco o con una plantilla, dar formato al texto, insertar referencias a pasajes del trabajo y revisar una vista previa. Descarga una versión guardada en Word o Markdown y su respaldo en un archivo separado. **Incorporar a una causa** crea un escrito privado con sus respaldos nativos después de revisar el resultado. Si repites la incorporación, vuelves al mismo escrito.
+
+El syllabus recoge resumen, enfoque, destinatarios, requisitos, horario, sala, evaluación y bibliografía base. Puedes abrir un mensaje editable en Altazor para solicitar sugerencias bibliográficas. Tú decides qué referencias incorporar después de revisarlas. El [mapa docente](DOCENCIA.md) describe el flujo y sus siguientes etapas.
 
 Una fila de matriz con acceso revocado se oculta, pero su contenido y respaldo originales se conservan. Guardar el título o los datos generales no la transforma en una fila manual vacía. Las ediciones concurrentes se rechazan antes de sobrescribir cambios.
 

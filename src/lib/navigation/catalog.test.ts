@@ -4,6 +4,7 @@ import { canSome } from "../auth/permissions";
 import { isClientAllowedPagePath } from "../auth/client-paths";
 import { getDictionary, translate } from "../i18n";
 import { activeNavigationArea, activeNavigationEntry, buildNavigation, navigationBreadcrumbs, navigationEntries, secondaryNavigation } from "./catalog";
+import { HOST_NAVIGATION_SECTIONS, resolveHostNavigationSections } from "./host-sections";
 
 for (const role of ROLES) {
   const model = buildNavigation({ role });
@@ -87,4 +88,16 @@ assert.equal(staff.areas.find(area => area.id === "causas")?.href, "/mis-causas"
 assert.equal(navigationEntries(manual).some(entry => ["pjud","monitoreo","mis-causas"].includes(entry.id)),false,"manual mode hides Chile-only destinations");
 assert.ok(navigationEntries(staff).some(entry => entry.id === "causas"),"the connected mode retains access to manual files");
 assert.equal(activeNavigationEntry(staff,"/pjud/a-case")?.id,"pjud");
+
+assert.deepEqual(resolveHostNavigationSections(null), [...HOST_NAVIGATION_SECTIONS], "legacy Hosts retain the complete catalog");
+assert.deepEqual(resolveHostNavigationSections([]), [], "an empty selection is intentional");
+assert.deepEqual(resolveHostNavigationSections(["estudio", "agenda", "other", "agenda"]), ["agenda", "estudio"]);
+const focused = buildNavigation({ role: "admin" }, { caseManagementMode: "pjud_cl", visibleSections: ["biblioteca", "academico"] });
+assert.deepEqual(focused.areas.map(area => area.id), ["jornada", "biblioteca", "academico"]);
+assert.deepEqual(focused.entries.map(entry => entry.id), ["inicio", "biblioteca", "jurisprudencia", "academico"]);
+assert.equal(focused.shortcuts.length, 0);
+assert.ok(focused.utilities.some(entry => entry.id === "configuracion"));
+assert.deepEqual(buildNavigation({ role: "admin" }, { visibleSections: [] }).areas.map(area => area.id), ["jornada"]);
+assert.deepEqual(buildNavigation({ role: "abogado", capabilityRevokes: "assistant.use" }, { visibleSections: ["academico"] }).areas.map(area => area.id), ["jornada"], "visibility cannot grant a capability");
+assert.deepEqual(buildNavigation({ role: "cliente" }, { visibleSections: [] }), buildNavigation({ role: "cliente" }), "Host choices leave the client portal intact");
 console.log("navigation/catalog.test.ts OK");

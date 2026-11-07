@@ -1,0 +1,25 @@
+.studio { display:grid; gap:1.75rem; min-width:0; }
+.heading { display:flex; align-items:flex-start; gap:.9rem; padding-block:.4rem; }
+.heading > svg { color:var(--sea); flex-shrink:0; margin-top:.2rem; }
+.heading h2,.heading h3 { margin:0; font-size:var(--text-xl); line-height:1.2; }
+.heading p { margin:.5rem 0 0; color:var(--ink-soft); max-width:60ch; }
+.catalog,.projects { margin:0; padding:0; list-style:none; border-top:1px solid var(--line); }
+.catalog button,.projects button { width:100%; display:grid; align-items:center; gap:1rem; text-align:start; padding:1rem .5rem; border-bottom:1px solid var(--line); }
+.catalog button { grid-template-columns:auto auto minmax(0,1fr) auto; }
+.projects button { grid-template-columns:minmax(0,1fr) auto; }
+.catalog button:hover:not(:disabled),.projects button:hover:not(:disabled) { background:var(--mist); }
+.catalog button svg { color:var(--sea); }
+.catalog small,.index { display:block; font-size:var(--text-sm); color:var(--ink-soft); }
+.index { font-variant-numeric:tabular-nums; }
+.syllabus { display:grid; gap:1rem; padding:1.25rem 0; border-block:1px solid var(--line); }
+.fields { border:0; margin:0; padding:0; display:grid; gap:.9rem 1.25rem; min-width:0; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.fields label { align-content:start; }
+.fields [data-wide] { grid-column:1/-1; }
+.actions,.meta { display:flex; align-items:center; flex-wrap:wrap; gap:.6rem; }
+.meta { margin:0; font-size:var(--text-sm); color:var(--ink-soft); }
+@media (max-width:600px) {
+  .fields { grid-template-columns:1fr; }
+  .catalog button { grid-template-columns:auto minmax(0,1fr) auto; gap:.65rem; }
+  .index { display:none; }
+  :global(body:has(.altazor-companion-launcher)) :is(.catalog,.projects) button { padding-inline-end:4.25rem; }
+}

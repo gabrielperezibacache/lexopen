@@ -66,6 +66,7 @@ export const CONFIG_CATEGORIES = [
     sections: [
       { id: "idioma", label: "Idioma", labelEn: "Language" },
       { id: "apariencia", label: "Apariencia", labelEn: "Appearance" },
+      { id: "apartados-visibles", label: "Apartados visibles", labelEn: "Visible sections" },
       { id: "runtime-settings", label: "Entorno", labelEn: "Environment" },
       { id: "host-status", label: "Host", labelEn: "Host" },
       { id: "purge-demo", label: "Demo", labelEn: "Demo" },
@@ -79,6 +80,7 @@ export function configCategoriesForMode(mode: "manual" | "pjud_cl", visibility: 
     if (section.id === "preferencias-altazor" || section.id === "cuentas-conectadas") return visibility.assistant;
     if (section.id === "comunicaciones") return visibility.communications;
     if (section.id === "work-country") return visibility.canSetCountry;
+    if (section.id === "apartados-visibles") return visibility.canSetCountry;
     if (["cuenta-personal", "idioma", "apariencia"].includes(section.id)) return true;
     if (!visibility.canManage) return false;
     return mode === "pjud_cl" || !["pjud-settings", "pjud-log"].includes(section.id);

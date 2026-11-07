@@ -34,6 +34,74 @@ test("Descubrimiento académico: consentimiento, bibliografía persistente y lec
   await page.getByRole("checkbox", { name: /Autorizo enviar sólo los términos/ }).check();
   await page.getByRole("button", { name: "Buscar obras", exact: true }).click();
   await expect(page.getByRole("link", { name: "Investigación enteramente ficticia sobre educación jurídica" })).toBeVisible(); expect(searches).toBe(1);
+  const graphRequests: string[] = [];
+  const titles = {
+    W1: "Investigación enteramente ficticia sobre educación jurídica",
+    W2: "Referencia ficticia de ética",
+    W3: "Obra citante ficticia",
+    W4: "Obra temática ficticia",
+  };
+  const graphPaper = (id: keyof typeof titles) => ({
+    key: `openalex:${id}`, metadata: { openalexId: id, title: titles[id], authors: [], year: 2024, doi: "" },
+    landingUrl: `https://openalex.org/${id}`,
+  });
+  await page.route("**/api/altazor/academic/discovery/graph", async route => {
+    const request = route.request();
+    expect(request.method()).toBe("POST");
+    const { openalexId } = request.postDataJSON();
+    expect(request.postDataJSON()).toEqual({ openalexId, allowExternal: true });
+    graphRequests.push(openalexId);
+    const centerId = openalexId === "W2" ? "W2" : "W1";
+    const nodes = centerId === "W1" ? [graphPaper("W1"), graphPaper("W2"), graphPaper("W3"), graphPaper("W4")] : [graphPaper("W2")];
+    const edges = centerId === "W1" ? [
+      { from: "W1", to: "W2", relation: "cites" },
+      { from: "W3", to: "W1", relation: "cites" },
+      { from: "W1", to: "W4", relation: "related" },
+    ] : [];
+    await route.fulfill({ json: { centerId, nodes, edges, checkedAt: "2026-11-04T12:00:00.000Z", notice: "Metadatos ficticios del vecindario de citas.", limited: false } });
+  });
+  await page.setViewportSize({ width: 360, height: 800 });
+  const openGraph = page.getByRole("button", { name: "Explorar red de citas", exact: true });
+  await openGraph.click();
+  const graph = page.getByRole("region", { name: "Red bibliográfica consultada" });
+  const map = graph.getByRole("group", { name: "Grafo interactivo de citas", exact: true });
+  const selected = graph.getByRole("region", { name: "Obra seleccionada" });
+  await expect(graph.getByRole("heading", { name: "Red de citas", exact: true })).toBeFocused();
+  await expect(map).toHaveAttribute("viewBox", "0 0 600 420");
+  await graph.getByRole("button", { name: "Acercar red", exact: true }).click();
+  await expect(graph.getByLabel("Nivel de acercamiento")).toHaveText("120 %");
+  await map.scrollIntoViewIfNeeded();
+  const originalBox = await map.getAttribute("viewBox"), box = await map.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + 16, box!.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + 50, box!.y + 32, { steps: 5 });
+  await page.mouse.up();
+  await expect(map).not.toHaveAttribute("viewBox", originalBox!);
+  await graph.getByRole("button", { name: "Restablecer vista de la red", exact: true }).click();
+  await expect(map).toHaveAttribute("viewBox", "0 0 600 420");
+  const citing = map.getByRole("button", { name: titles.W3, exact: true });
+  await citing.focus();
+  await page.keyboard.press("Enter");
+  await expect(citing).toHaveAttribute("aria-pressed", "true");
+  await expect(selected).toContainText("Cita a la obra consultada");
+  await graph.getByLabel("Buscar en esta red", { exact: true }).fill("etica");
+  await graph.getByRole("button", { name: "Centrar coincidencia", exact: true }).click();
+  await expect(selected).toContainText(titles.W2);
+  await expect(selected).toContainText("Citada por la obra consultada");
+  expect(graphRequests).toEqual(["W1"]);
+  const consent = page.getByRole("checkbox", { name: /Autorizo enviar sólo los términos/ });
+  await consent.uncheck();
+  const expand = selected.getByRole("button", { name: "Consultar red de esta obra", exact: true });
+  await expect(expand).toBeDisabled();
+  await consent.check();
+  await expand.click();
+  await expect(selected).toContainText("Obra consultada");
+  await expect(selected).toContainText(titles.W2);
+  expect(graphRequests).toEqual(["W1", "W2"]);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await graph.getByRole("button", { name: "Cerrar red", exact: true }).click();
+  await expect(openGraph).toBeFocused();
   await page.getByText("Búsquedas temáticas y alertas", { exact: false }).click();
   await page.getByLabel("Nombre de esta búsqueda", { exact: true }).fill("Tema académico ficticio conservado");
   await page.getByRole("button", { name: "Guardar búsqueda", exact: true }).click();
