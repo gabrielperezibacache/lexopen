@@ -15,6 +15,7 @@ import type { PrepareSecretUseInput, SecretTarget } from "@/lib/altazor/secrets/
 import { normalizeConnectorNames } from "@/lib/altazor/connectors/policy";
 import { connectorKind } from "@/lib/altazor/connectors/catalog";
 import { computerActivityDetail } from "./activity-detail";
+import { continueApprovedRead } from "./approval-continuation";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 const credentialContext = (row: Pick<AltazorComputerWorkspace, "id" | "ownerId" | "scopeKey">) => `altazor:computer:${row.ownerId}:${row.id}:${row.scopeKey}`;
@@ -318,7 +319,7 @@ async function executeAction(user: CausaAccessUser, id: string, kind: string, re
     if (needsModelPolicy) await policyAllowsAction(tx);
     const locked = await tx.altazorComputerSession.updateMany({ where: actionSessionWhere(session, workspace.id, cleanup), data: session.kittyId ? { updatedAt: session.updatedAt } : { kittyId } });
     if (!locked.count) throw new ConnectorError("session_changed", "La sesión cambió o venció. Actualice antes de actuar.", 409);
-    if (kind === "message" && await tx.altazorComputerAction.findFirst({ where: { sessionId: id, kind: "message", status: { in: ["sending", "unknown"] } }, select: { id: true } })) throw new ConnectorError("task_unconfirmed", "Existe una tarea sin confirmación. Compruebe el chat o cierre la sesión; no se reenviará automáticamente.", 409);
+    if (kind === "message" && await tx.altazorComputerAction.findFirst({ where: { sessionId: id, kind: { in: ["message", "connector_approval"] }, status: { in: ["sending", "unknown"] } }, select: { id: true } })) throw new ConnectorError("task_unconfirmed", "Existe una tarea sin confirmación. Compruebe el chat o cierre la sesión; no se reenviará automáticamente.", 409);
     const row = await tx.altazorComputerAction.create({ data: { ownerId: actor.id, sessionId: id, requestId, kind, inputHash } });
     return { row, claimed: true, session: await tx.altazorComputerSession.findUniqueOrThrow({ where: { id } }) };
   });
@@ -456,10 +457,14 @@ export async function cancelComputerSecret(user: CausaAccessUser, id: string, gr
   return revokeSecretUse(user, grantId);
 }
 export async function decideComputerApproval(user: CausaAccessUser, id: string, requestId: string, approvalId: string, approve: boolean) {
-  return executeAction(user, id, approve ? "connector_approval" : "connector_reject", requestId, { approvalId, approve }, async (client, session) => {
+  return executeAction(user, id, approve ? "connector_approval" : "connector_reject", requestId, { approvalId, approve }, async (client, session, tx, actionId) => {
     const names = sessionConnectors(session);
     if (names[0] === "-") throw new ConnectorError("connector_selection", "Esta sesión no tiene aplicaciones autorizadas.", 409);
     if (approve && session.held && Date.now() - session.updatedAt.getTime() < 5 * 60_000) throw new ConnectorError("manual_control", "Devuelva el control al asistente antes de autorizar una operación.", 409);
-    return client.decideApproval(approvalId, session.kittyId!, session.chatId!, names, approve);
+    const result = await client.decideApproval(approvalId, session.kittyId!, session.chatId!, names, approve);
+    if (!result.canContinue) return result;
+    const unresolved = await tx.altazorComputerAction.count({ where: { sessionId: id, id: { not: actionId }, kind: { in: ["message", "connector_approval"] }, status: { in: ["sending", "unknown"] } } });
+    if (unresolved) return { ...result, continued: false, continuationPending: true };
+    return { ...result, ...await continueApprovedRead(client, { chatId: session.chatId!, kittyId: session.kittyId!, actionId, expiresAt: session.expiresAt }, async () => { assertSessionLive(session); await workspaceFor(session.workspaceId, user, tx); await policyAllowsAction(tx); }) };
   });
 }

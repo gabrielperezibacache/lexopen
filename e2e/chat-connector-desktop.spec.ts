@@ -125,3 +125,43 @@ test("el escritorio recibe sólo las cuentas elegidas y conserva la opción de a
   expect(starts[0].requestId).not.toBe(starts[1].requestId);
   expect(starts[1].requestId).not.toBe(starts[2].requestId);
 });
+
+test("las autorizaciones muestran origen comprensible y conservan los detalles completos sin ejecutar nada", async ({ page }, info) => {
+  await page.setViewportSize({ width: 360, height: 900 });
+  const { mutations } = await fixtures(page);
+  const task = "Lee el material seleccionado y prepara un resumen para revisión.";
+  const wrapper = `INSTRUCCIONES DEL ENTORNO (no son contenido de archivos):\nReceta técnica ficticia.\n\nENCARGO DE LA PERSONA:\n${task}`;
+  await page.route("**/api/altazor/computer/activity", route => route.fulfill({ json: { state: "idle", sessionId: null, monitor: false } }));
+  await page.route(`**/api/altazor/computer/sessions/${sessionId}`, route => route.fulfill({ json: {
+    session: { id: sessionId, state: "ready", held: false, canRenew: false, connectors: connections }, working: false,
+    turns: [{ index: 0, from: "user", text: wrapper, working: false, needsHelp: false, steps: [] }],
+    approvals: [
+      { id: "fictitious-github-read", connector: connections[1], kind: "github", action: "download_file", summary: "Download selected public fixture", args: { action: "download_file", repo: "fictitious/legal-research", path: "docs/README.md", ref: "main" }, reviewable: true },
+      { id: "fictitious-google-read", connector: connections[0], kind: "google-workspace", action: "download_file", summary: "Read selected fictitious document", args: { action: "download_file", id: "fictitious_document_123", format: "text" }, reviewable: true },
+    ],
+  } }));
+  await loginAs(page, "abogado@estudio.cl");
+  await page.goto(`/inicio?altazor=computer&escritorio=${sessionId}`);
+  const panel = page.getByRole("region", { name: "Escritorio de Altazor", exact: true });
+  const approvals = panel.getByRole("region", { name: "Autorizaciones de aplicaciones", exact: true });
+  await expect(approvals.getByRole("heading", { name: "Descargar archivo de GitHub", exact: true })).toBeVisible();
+  await expect(approvals.getByRole("link", { name: /^fictitious\/legal-research/ })).toHaveAttribute("href", "https://github.com/fictitious/legal-research");
+  await expect(approvals.getByText("docs/README.md", { exact: true })).toBeVisible();
+  await expect(approvals.getByRole("heading", { name: "Descargar archivo de Google Drive", exact: true })).toBeVisible();
+  await expect(approvals.getByRole("link", { name: /^fictitious_document_123/ })).toHaveAttribute("href", "https://drive.google.com/file/d/fictitious_document_123/view");
+  await expect(approvals.getByText("Texto plano", { exact: true })).toBeVisible();
+  await expect(approvals.locator("details[open]")).toHaveCount(0);
+  await expect(approvals.locator("pre:visible")).toHaveCount(0);
+  await expect(approvals.getByRole("button", { name: "Autorizar esta operación", exact: true })).toHaveCount(2);
+  await expect(panel.getByText(task, { exact: true })).toBeVisible();
+  await expect(panel.getByText("Receta técnica ficticia.", { exact: false })).not.toBeVisible();
+  const environment = panel.locator("details").filter({ has: page.locator("summary", { hasText: "Información del entorno" }) });
+  await expect(environment).not.toHaveAttribute("open", "");
+  const githubDetails = approvals.locator("article").filter({ has: page.getByRole("heading", { name: "Descargar archivo de GitHub", exact: true }) }).locator("details");
+  await githubDetails.locator("summary").click();
+  await expect(githubDetails.locator("pre")).toContainText('"path": "docs/README.md"');
+  await githubDetails.locator("summary").click();
+  await approvals.screenshot({ path: info.outputPath("readable-connector-approvals-mobile.png") });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(mutations).toEqual([]);
+});

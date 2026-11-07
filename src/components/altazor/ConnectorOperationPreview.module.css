@@ -1,0 +1,6 @@
+.fields { display: grid; gap: .8rem; margin: 1rem 0; font-size: var(--text-sm); line-height: 1.6; }
+.fields dt { color: var(--muted); margin: 0 0 .1rem; }
+.fields dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.fields a { color: var(--sea); text-decoration: underline; text-underline-offset: .2em; }
+.details summary { min-height: 44px; padding-block: .7rem; cursor: pointer; color: var(--sea); font-size: var(--text-sm); }
+.details summary:focus-visible { outline: 2px solid var(--sea); outline-offset: 3px; }
