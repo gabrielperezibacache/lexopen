@@ -111,6 +111,8 @@ jobs:
           node scripts/altazor/harden-async-messages.mjs "$source_dir"
           node scripts/altazor/harden-read-files.test.mjs
           node scripts/altazor/harden-read-files.mjs "$source_dir"
+          node scripts/altazor/harden-vision-context.test.mjs
+          node scripts/altazor/harden-vision-context.mjs "$source_dir"
           (cd "$source_dir" && go test ./internal/chat ./internal/connector ./internal/gateway -run '^TestLexOpen' -count=1)
           make -C "$source_dir" WEB=0 VERSION=lexopen-ci build
           node scripts/altazor/prepare-computer-ci.test.mjs
@@ -259,7 +261,7 @@ jobs:
             --exit-code
       - run: npm test
       - name: Check connection setup and OAuth errors
-        run: node --import tsx --test src/lib/altazor/connectors/github-application-check.test.ts src/lib/altazor/connectors/oauth-token-response.test.ts src/lib/altazor/connectors/oauth-access.test.ts src/lib/altazor/connectors/desktop-read-policy.test.ts src/lib/assistant/connector-desktop-intent.test.ts src/lib/altazor/computer/activity-detail.test.ts
+        run: node --import tsx --test src/lib/altazor/connectors/github-application-check.test.ts src/lib/altazor/connectors/oauth-token-response.test.ts src/lib/altazor/connectors/oauth-access.test.ts src/lib/altazor/connectors/desktop-read-policy.test.ts src/lib/assistant/connector-desktop-intent.test.ts src/lib/altazor/computer/activity-detail.test.ts src/lib/altazor/computer/file-read-capability.test.ts
       - run: npm run test:integration
       - run: npm run lint
       - run: npm run build

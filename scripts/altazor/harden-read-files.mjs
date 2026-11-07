@@ -33,6 +33,7 @@ export function rewriteReadFiles(path, source) {
 export async function hardenReadFiles(directory) {
   const root = await realpath(directory);
   if ((await readFile(join(root, ".lexopen-source-commit"), "utf8")).trim() !== PINNED_COMMIT || (await readFile(join(root, ".lexopen-connector-gate"), "utf8")).trim() !== "v1" || (await readFile(join(root, ".lexopen-async-messages"), "utf8")).trim() !== "v1") throw new Error("File reading requires the exact connector and async hardened public source");
+  if (await lstat(join(root, ".lexopen-file-reads")).catch(error => { if (error.code === "ENOENT") return null; throw error; })) throw new Error("File-reading hardening marker already exists");
   const changes = [];
   for (const [path, expected] of Object.entries(originals)) {
     const file = join(root, path), stat = await lstat(file);
