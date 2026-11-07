@@ -24,11 +24,19 @@
 .actions,.meta { display:flex; align-items:center; flex-wrap:wrap; gap:.6rem; }
 .meta { margin:0; font-size:var(--text-sm); color:var(--ink-soft); }
 .sessionRow { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.6rem 1rem; border-top:1px solid var(--line); padding-block:.75rem; }
-.calendarFeed { min-width:0; border-block:1px solid var(--line); }
-.calendarFeed > summary { display:flex; min-height:44px; align-items:center; gap:.5rem; cursor:pointer; color:var(--sea); }
-.calendarFeed > summary::after { content:""; inline-size:.48rem; block-size:.48rem; border-block-end:1px solid currentColor; border-inline-end:1px solid currentColor; margin-inline-start:.2rem; margin-block-start:-.18rem; transform:rotate(45deg); }
-.calendarFeed[open] > summary::after { margin-block-start:.18rem; transform:rotate(225deg); }
-.calendarFeed > summary svg { flex:none; }
+.sessionCaption { display:flex; align-items:center; gap:.4rem; color:var(--ink-soft); font-size:var(--text-sm); margin-block:.3rem 0; }
+.sessionCaption svg { flex:none; }
+.sessionEditor { grid-column:1/-1; display:grid; gap:1rem; min-width:0; border-top:1px solid var(--line); padding-block:1rem .25rem; scroll-margin-block-start:calc(var(--shell-header-offset, 4rem) + .75rem); }
+.sessionReminder { display:grid; gap:.6rem; max-width:31rem; }
+.removalChoices { display:grid; gap:.7rem; margin-block-start:1rem; }
+.removalChoices label { display:flex; align-items:baseline; gap:.5rem; }
+:is(.calendarFeed,.sessionOptions) { min-width:0; border-block:1px solid var(--line); }
+:is(.calendarFeed,.sessionOptions) > summary { display:flex; min-height:44px; align-items:center; gap:.5rem; cursor:pointer; color:var(--sea); }
+:is(.calendarFeed,.sessionOptions) > summary::after { content:""; inline-size:.48rem; block-size:.48rem; flex:none; border-block-end:1px solid currentColor; border-inline-end:1px solid currentColor; margin-inline-start:.2rem; margin-block-start:-.18rem; transform:rotate(45deg); }
+:is(.calendarFeed,.sessionOptions)[open] > summary::after { margin-block-start:.18rem; transform:rotate(225deg); }
+:is(.calendarFeed,.sessionOptions) > summary svg { flex:none; }
+.sessionOptions > .fields { padding-block:.25rem 1rem; }
+.sessionOptions [data-wide] > .meta { margin-block-start:.4rem; }
 .feedControls { display:grid; gap:.65rem; min-width:0; }
 .calendarFeed > .feedControls { padding-block:.25rem 1rem; }
 .feedControls .meta,.feedConfirmation .meta { display:block; max-width:62ch; }
@@ -40,5 +48,5 @@
   .catalog button { grid-template-columns:auto minmax(0,1fr) auto; gap:.65rem; }
   .index { display:none; }
   :global(body:has(.altazor-companion-launcher)) :is(.catalog,.projects) button { padding-inline-end:4.25rem; }
-  :global(body:has(.altazor-companion-launcher)) :is(.studio > .heading,.sessionIntro,.sessionRow,.calendarFeed) { padding-inline-end:4.25rem; }
+  :global(body:has(.altazor-companion-launcher)) :is(.studio > .heading,.sessionIntro,.sessionRow,.calendarFeed,.sessionOptions) { padding-inline-end:4.25rem; }
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
-import { createTeachingSession, deleteTeachingSession, exportTeachingSessions, listTeachingSessions, scheduleTeachingCallDeadline, teachingCalendarSessions } from "./teaching-sessions";
+import { createTeachingSeries, createTeachingSession, deleteTeachingSession, editTeachingSession, exportTeachingSessions, listTeachingSessions, scheduleTeachingCallDeadline, teachingCalendarSessions } from "./teaching-sessions";
 
 const statusIs = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
 
@@ -79,7 +79,68 @@ async function main() {
     assert.ok(ics.replace(/\r\n /g, "").includes(`SUMMARY:${unicode}\\nATTENDEE: ficticio`));
     assert.ok(ics.split("\r\n").every(line => Buffer.byteLength(line) <= 75));
     assert.ok(!ics.includes("\r\nATTENDEE:"));
-    console.log("Teaching sessions passed: ownership, Santiago time, idempotency, call deadline updates and private calendar export.");
+
+    const seriesInput = {
+      requestId: randomUUID(), title: "Seminario semanal", startsAtLocal: "2026-08-30T09:00",
+      endsAtLocal: "2026-08-30T10:00", recurrence: { count: 3, intervalWeeks: 1 }, reminderLeadMinutes: 60,
+    };
+    await assert.rejects(createTeachingSeries(course.id, seriesInput, other, db), statusIs(404));
+    await assert.rejects(createTeachingSeries(course.id, { ...seriesInput, requestId: randomUUID(),
+      startsAtLocal: "2026-08-30T00:30", endsAtLocal: null }, owner, db), statusIs(400));
+    assert.equal(await db.altazorTeachingSeries.count({ where: { workspaceId: course.id } }), 0);
+    assert.equal(await db.altazorTeachingSession.count({ where: { workspaceId: course.id } }), 0);
+
+    const [series, retriedSeries] = await Promise.all([
+      createTeachingSeries(course.id, seriesInput, owner, db), createTeachingSeries(course.id, seriesInput, owner, db),
+    ]);
+    assert.notEqual(series.reused, retriedSeries.reused);
+    assert.deepEqual(series.sessions, retriedSeries.sessions);
+    assert.deepEqual(series.sessions.map(item => item.startsAtLocal), ["2026-08-30T09:00", "2026-09-06T09:00", "2026-09-13T09:00"]);
+    assert.deepEqual(series.sessions.map(item => item.startsAt), ["2026-08-30T13:00:00.000Z", "2026-09-06T12:00:00.000Z", "2026-09-13T12:00:00.000Z"]);
+    const [earliest, middle, latest] = series.sessions;
+    assert.deepEqual(middle.series, { id: earliest.series!.id, occurrence: 2, count: 3, intervalWeeks: 1 });
+    assert.equal(middle.reminderLeadMinutes, 60);
+    await assert.rejects(createTeachingSeries(course.id, { ...seriesInput, recurrence: { intervalWeeks: 2, count: 3 } }, owner, db), statusIs(409));
+    const singleInput = { requestId: seriesInput.requestId, title: seriesInput.title, startsAtLocal: seriesInput.startsAtLocal };
+    await assert.rejects(createTeachingSession(course.id, singleInput, owner, db), statusIs(409));
+    await assert.rejects(db.altazorTeachingSession.create({ data: {
+      workspaceId: workshop.id, requestId: randomUUID(), title: "Ámbito incorrecto",
+      startsAt: new Date(), seriesId: earliest.series!.id, seriesOccurrence: 4,
+    } }), (error: unknown) => (error as { code?: string }).code === "P2003");
+
+    const edit = { title: "Segunda sesión reprogramada", startsAtLocal: "2026-08-29T11:30", endsAtLocal: null, expectedSequence: 0 };
+    await assert.rejects(editTeachingSession(course.id, middle.id, edit, other, db), statusIs(404));
+    await assert.rejects(editTeachingSession(call.id, rescheduled.session.id, edit, owner, db), statusIs(409));
+    const moved = (await editTeachingSession(course.id, middle.id, edit, owner, db)).session;
+    assert.equal(moved.id, middle.id);
+    assert.equal(moved.calendarSequence, 1);
+    assert.deepEqual(moved.series, middle.series);
+    assert.equal(moved.endsAt, null);
+    assert.equal(moved.reminderLeadMinutes, 60);
+    assert.equal((await db.altazorTeachingSession.findUniqueOrThrow({ where: { id: moved.id } })).reminderDueAt?.toISOString(), "2026-08-29T14:30:00.000Z");
+    assert.equal((await editTeachingSession(course.id, middle.id, { ...edit, expectedSequence: 1 }, owner, db)).session.calendarSequence, 1);
+    await assert.rejects(editTeachingSession(course.id, middle.id, edit, owner, db), statusIs(409));
+    assert.deepEqual((await createTeachingSeries(course.id, seriesInput, owner, db)).sessions, [earliest, moved, latest]);
+    await assert.rejects(deleteTeachingSession(course.id, middle.id, other, db, "following"), statusIs(404));
+    await assert.rejects(deleteTeachingSession(call.id, rescheduled.session.id, owner, db, "following"), statusIs(409));
+    await deleteTeachingSession(course.id, middle.id, owner, db, "following");
+    assert.deepEqual((await listTeachingSessions(course.id, owner, db)).sessions, [earliest]);
+    await deleteTeachingSession(course.id, earliest.id, owner, db);
+    assert.deepEqual(await createTeachingSeries(course.id, seriesInput, owner, db), { session: null, sessions: [], reused: true });
+
+    const fortnightly = await createTeachingSeries(course.id, {
+      ...seriesInput, requestId: randomUUID(), startsAtLocal: "2026-12-28T12:15",
+      endsAtLocal: null, recurrence: { intervalWeeks: 2, count: 2 },
+    }, owner, db);
+    assert.deepEqual(fortnightly.sessions.map(item => item.startsAtLocal), ["2026-12-28T12:15", "2027-01-11T12:15"]);
+    assert.deepEqual(await db.altazorTeachingSession.createMany({ data: Array.from({ length: 197 }, () => ({
+      workspaceId: course.id, requestId: randomUUID(), title: "Actividad de prueba", startsAt: new Date("2027-02-01T09:00:00Z"),
+    })) }), { count: 197 });
+    const capacityKey = randomUUID();
+    await assert.rejects(createTeachingSeries(course.id, { ...seriesInput, requestId: capacityKey }, owner, db), statusIs(413));
+    assert.equal(await db.altazorTeachingSeries.count({ where: { workspaceId: course.id, requestId: capacityKey } }), 0);
+    assert.equal(await db.altazorTeachingSession.count({ where: { workspaceId: course.id } }), 199);
+    console.log("Teaching sessions passed: ownership, Santiago time, recurring DST and limits, replay, edits, removal by series order, call deadlines and private calendar export.");
   } finally {
     await db.auditEvent.deleteMany({ where: { actorId: { in: ids } } });
     await db.altazorAcademicWorkspace.deleteMany({ where: { ownerId: { in: ids } } });

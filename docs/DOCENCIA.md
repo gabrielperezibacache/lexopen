@@ -4,16 +4,23 @@ Abre **Académico → Docencia** y elige el tipo de trabajo. Cada trabajo conser
 
 | Flujo | Disponible en LexOpen | Siguiente paso |
 | --- | --- | --- |
-| Cursos | Ficha de curso, syllabus editable, bibliografía base y sugerencias por solicitud. | Añadir unidades, sesiones repetidas, resultados y evaluaciones como elementos reutilizables. Permitir escoger las sesiones que se incorporan al syllabus. |
+| Cursos | Ficha de curso, syllabus editable, bibliografía base y sugerencias por solicitud. Sesiones semanales o quincenales en Agenda. | Añadir unidades, resultados y evaluaciones reutilizables. Permitir escoger las sesiones que se incorporan al syllabus. |
 | Seminarios | Trabajo privado y plantilla de programa, ponentes, lecturas y discusión. | Vincular ponentes, moderación, lecturas y materiales a cada sesión. |
 | Congresos | Trabajo y plantilla de ejes, comité, programa, convocatoria e hitos. | Estructurar mesas, responsables, sedes, revisiones y avisos de programa por versión. |
 | Talleres | Trabajo y plantilla de actividades, tiempos, materiales y evaluación. | Ordenar los bloques de trabajo y generar una hoja para participantes a partir de los bloques elegidos. |
 | Convocatorias | Ficha con país, organismo, bases, fecha límite y estado. Las fichas guardadas desde un aviso conservan su procedencia y la fecha de consulta. | Vincular responsables, anexos y un curso o proyecto de investigación. |
 | Búsqueda y fuentes por país | Catálogo oficial por país. Busca por tema entre los avisos que ya consultaste y filtra tu cartera por país. | Ampliar las fuentes y los filtros por área, elegibilidad y modalidad. |
 | Suscripciones | Sigue los feeds compatibles y elige si consultarlos a demanda o automáticamente. Las novedades de las consultas programadas aparecen en la campana de LexOpen. | Añadir consultas temáticas guardadas e historial de avisos por fuente. |
-| Agenda | Las actividades aparecen en tu Agenda privada y enlazan de vuelta al trabajo. Puedes descargar un archivo ICS o suscribir otro calendario a las actividades de un trabajo mediante un enlace revocable. | Añadir recurrencia y recordatorios configurables. |
+| Agenda | Programa series semanales o quincenales, ajusta cada sesión y configura avisos en la campana. Puedes descargar un archivo ICS o suscribir otro calendario mediante un enlace revocable. | Preparar un programa con las sesiones seleccionadas y añadir opciones para planificar varios días de la semana. |
 
 Las sesiones se registran en hora de Santiago de Chile, la zona que usa la Agenda interna. Sólo tú puedes ver las actividades de tus trabajos privados. Puedes revisarlas en las vistas de mes, semana y lista.
+
+## Programar sesiones y recordatorios
+
+1. En **Actividades en mi Agenda**, escribe el nombre, el inicio y el término si corresponde. Abre **Repetición y recordatorio** para programar entre 2 y 24 sesiones semanales o quincenales. La hora local de Santiago se conserva a través de los cambios de horario.
+2. Usa **Editar** en una sesión para moverla o cambiar su nombre. Para retirar actividades, elige **Sólo esta sesión** o **Esta sesión y las siguientes** dentro del orden de la serie.
+3. Configura un aviso de 15 minutos, 1 hora, 24 horas o 1 semana antes. Puedes aplicarlo al crear la serie o cambiarlo en una sesión. El Host muestra el aviso en la campana cuando está disponible antes del inicio. Si mueves o retiras una actividad, los avisos anteriores se ocultan.
+4. Si suscribiste otro calendario, éste recoge los cambios cuando vuelve a consultar el enlace. La programación y los avisos de LexOpen se administran desde el trabajo docente.
 
 ## Consultar y guardar convocatorias
 
@@ -44,4 +51,4 @@ Si administras un servidor publicado por un proxy, excluye `/api/altazor/academi
 2. **Cartera de convocatorias.** Conservar país, organismo, enlace, bases, zona horaria, fecha límite, estado y versión. Reutilizar la misma ficha en la búsqueda, la revisión y la agenda.
 3. **Descubrimiento por país.** Ampliar el catálogo con fuentes oficiales verificadas y presentar filtros por área, elegibilidad y cierre según los datos de cada organismo.
 4. **Feeds.** Añadir consultas guardadas e historial de cambios por convocatoria, conservando el origen y la fecha de consulta.
-5. **Agenda y recordatorios.** Añadir sesiones recurrentes y recordatorios configurables por trabajo.
+5. **Programa docente.** Vincular lecturas, materiales y resultados de aprendizaje a sesiones seleccionadas y generar el programa desde la Agenda.

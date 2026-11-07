@@ -3,9 +3,12 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
-import { santiagoDateKey } from "@/lib/chile-time";
+import { santiagoDateKey, SANTIAGO_TZ } from "@/lib/chile-time";
 import { POST as tickJornada } from "@/app/api/jornada/worker/route";
+import { notificationInbox } from "@/lib/notify/read";
+import { wallParts } from "@/lib/notify/time";
 import { changeDailyBrief, processDueDailyBriefs, readDailyBriefState } from "./daily-brief";
+import { createTeachingSession } from "./teaching-sessions";
 import { readAltazorUpdates } from "./updates";
 
 async function main() {
@@ -99,6 +102,11 @@ async function main() {
     await changeDailyBrief("enable", owner, db, now);
     await changeDailyBrief("enable", other, db, now);
     await db.altazorCompanion.update({ where: { ownerId: other.id }, data: { backgroundEnabled: false } });
+    const teaching = await db.altazorAcademicWorkspace.create({ data: { ownerId: owner.id, title: secret, kind: "course", requestId: randomUUID() } });
+    const local = wallParts(new Date(Date.now() + 8 * 60_000), SANTIAGO_TZ);
+    const startsAtLocal = `${local.ymd}T${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
+    const { session } = await createTeachingSession(teaching.id, { requestId: randomUUID(), title: secret, startsAtLocal, reminderLeadMinutes: 15 }, owner, db);
+    assert.ok(session);
     const tick = (value: string) => tickJornada(new Request("http://localhost/api/jornada/worker", { method: "POST", headers: { "x-cron-secret": value } }));
     assert.equal((await tick("wrong")).status, 401);
     const result = await tick(cronSecret);
@@ -106,6 +114,18 @@ async function main() {
     const jobs = (await result.json()).jobs;
     assert.equal(jobs.dailyBrief, true);
     assert.equal(jobs.academicCalls, true);
+    assert.equal(jobs.teachingReminders, true);
+    const readTeachingNotices = async (userId: string) =>
+      (await notificationInbox(userId, db, 20)).items.filter(item => item.tipo === "academico.recordatorio");
+    const teachingNotice = (await readTeachingNotices(owner.id))[0];
+    assert.equal(teachingNotice?.href, `/academico?trabajo=${teaching.id}#agenda-docencia`);
+    assert.ok(!JSON.stringify(teachingNotice).includes(secret));
+    assert.deepEqual(await readTeachingNotices(other.id), []);
+    await tick(cronSecret);
+    assert.equal((await readTeachingNotices(owner.id)).length, 1);
+    // An outdated delivery no longer appears when the original activity changes.
+    await db.altazorTeachingSession.update({ where: { id: session.id }, data: { startsAt: new Date(+new Date(session.startsAt) + 60_000) } });
+    assert.deepEqual(await readTeachingNotices(owner.id), []);
     const day = santiagoDateKey(now);
     assert.deepEqual(await readDailyBriefState(owner, db), { enabled: true, backgroundEnabled: true, lastDay: day });
     assert.deepEqual(await readDailyBriefState(other, db), { enabled: true, backgroundEnabled: false, lastDay: null });

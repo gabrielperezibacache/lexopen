@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { writeAuditStrict } from "@/lib/audit";
@@ -6,51 +7,109 @@ import { httpError } from "@/lib/auth/access";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { canSome } from "@/lib/auth/permissions";
 import { isStaff } from "@/lib/auth/rbac";
-import { isValidYmd, santiagoDateKey, SANTIAGO_TZ } from "@/lib/chile-time";
+import { addCivilDays, isValidYmd, santiagoDateKey, SANTIAGO_TZ } from "@/lib/chile-time";
 import { prisma } from "@/lib/db";
 import { isValidHhmm, wallParts, zonedTime } from "@/lib/notify/time";
 import { altazorActor, altazorTransaction } from "./access";
 import { ACADEMIC_TEACHING_TEMPLATES } from "./academic-templates";
 import { altazorRequestId } from "./schemas";
+import { teachingReminderFields, teachingReminderLeadSchema } from "./teaching-reminder-policy";
 
 const sessionLimit = 200;
 const deadlineRequestId = "academic-call-deadline";
 const localDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "Elige una fecha y una hora de la Agenda.");
-export const teachingSessionSchema = z.object({
-  requestId: altazorRequestId.refine(value => value !== deadlineRequestId),
+const activityFields = {
   title: z.string().trim().min(1, "Escribe un nombre para la actividad.").max(160),
   startsAtLocal: localDateTime,
-  endsAtLocal: localDateTime.optional(),
+  endsAtLocal: localDateTime.nullish(),
+};
+export const teachingSessionSchema = z.object({
+  ...activityFields,
+  requestId: altazorRequestId.refine(value => value !== deadlineRequestId),
+  reminderLeadMinutes: teachingReminderLeadSchema.optional(),
 }).strict();
+const teachingSeriesSchema = teachingSessionSchema.extend({
+  recurrence: z.object({
+    intervalWeeks: z.union([z.literal(1), z.literal(2)]),
+    count: z.number().int().min(2).max(24),
+  }).strict(),
+});
+export const teachingSessionEditSchema = z.object({
+  ...activityFields,
+  expectedSequence: z.number().int().min(0).max(2_147_483_647),
+}).strict();
+export const teachingSessionDeleteScope = z.enum(["single", "following"]);
 const callDeadlineSchema = z.object({
   action: z.literal("schedule-call-deadline"),
   date: z.string().refine(isValidYmd, "La fecha de cierre no es válida."),
   localDate: z.string().refine(isValidYmd, "Elige una fecha válida para la Agenda."),
   time: z.string().refine(isValidHhmm, "Elige una hora para el cierre."),
+  reminderLeadMinutes: teachingReminderLeadSchema.optional(),
 }).strict();
-export const teachingSessionMutationSchema = z.union([teachingSessionSchema, callDeadlineSchema]);
+export const teachingSessionMutationSchema = z.union([teachingSessionSchema, teachingSeriesSchema, callDeadlineSchema]);
 
-export type TeachingSession = { id: string; title: string; startsAt: string; endsAt: string | null; agendaHref: string; callDeadline?: true };
+export type TeachingSession = {
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string | null;
+  startsAtLocal: string;
+  endsAtLocal: string | null;
+  calendarSequence: number;
+  agendaHref: string;
+  callDeadline?: true;
+  series?: { id: string; occurrence: number; count: number; intervalWeeks: 1 | 2 };
+  reminderLeadMinutes: number | null;
+};
 
-const sessionSelect = { id: true, title: true, startsAt: true, endsAt: true, requestId: true } as const;
+const sessionSelect = {
+  id: true, title: true, startsAt: true, endsAt: true, requestId: true, calendarSequence: true, updatedAt: true,
+  reminderLeadMinutes: true, seriesOccurrence: true, series: { select: { id: true, count: true, intervalWeeks: true } },
+} as const;
 type Session = Prisma.AltazorTeachingSessionGetPayload<{ select: typeof sessionSelect }>;
 const ownedTeachingWork = (ownerId: string) => ({ ownerId, kind: { in: [...ACADEMIC_TEACHING_TEMPLATES] }, archivedAt: null });
 const missing = () => httpError("La actividad o el trabajo docente no están disponibles.", 404);
+const requestConflict = () => httpError("Este intento ya corresponde a otra actividad. Revisa los datos y vuelve a intentarlo.", 409);
+const editConflict = () => httpError("La actividad cambió. Vuelve a cargarla antes de guardar.", 409);
 
-function teachingTime(value: string) {
+function teachingTime(value: string, offsetDays = 0) {
   const [day, time] = value.split("T");
   if (!isValidYmd(day) || !isValidHhmm(time)) throw httpError("Elige una fecha y una hora válidas.", 400);
-  const instant = zonedTime(day, time, SANTIAGO_TZ), wall = wallParts(instant, SANTIAGO_TZ);
-  if (wall.ymd !== day || `${String(wall.hour).padStart(2, "0")}:${String(wall.minute).padStart(2, "0")}` !== time) {
-    throw httpError("Esa hora no existe en Santiago por el cambio de horario. Elige otra.", 400);
+  const actualDay = offsetDays ? addCivilDays(day, offsetDays) : day;
+  if (!isValidYmd(actualDay)) throw httpError("Elige una fecha y una hora válidas.", 400);
+  const instant = zonedTime(actualDay, time, SANTIAGO_TZ);
+  if (localTeachingTime(instant) !== `${actualDay}T${time}`) {
+    throw httpError(`La hora ${time} del ${actualDay} no existe en Santiago por el cambio de horario. Elige otra.`, 400);
   }
   return instant;
+}
+
+function localTeachingTime(date: Date) {
+  const wall = wallParts(date, SANTIAGO_TZ);
+  return `${wall.ymd}T${String(wall.hour).padStart(2, "0")}:${String(wall.minute).padStart(2, "0")}`;
+}
+
+function teachingDates(startsAtLocal: string, endsAtLocal?: string | null, offsetDays = 0) {
+  const startsAt = teachingTime(startsAtLocal, offsetDays);
+  const endsAt = endsAtLocal ? teachingTime(endsAtLocal, offsetDays) : null;
+  if (endsAt && endsAt <= startsAt) throw httpError("La hora de término debe ser posterior al inicio.", 400);
+  return { startsAt, endsAt };
+}
+
+function matchesActivity(row: Session, title: string, startsAt: Date, endsAt: Date | null) {
+  return row.title === title && +row.startsAt === +startsAt && row.endsAt?.getTime() === endsAt?.getTime();
 }
 
 function view(row: Session): TeachingSession {
   const ym = santiagoDateKey(row.startsAt).slice(0, 7);
   return { id: row.id, title: row.title, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt?.toISOString() ?? null, agendaHref: `/calendario?vista=agenda&ym=${ym}&tipo=evento`,
+    startsAtLocal: localTeachingTime(row.startsAt), endsAtLocal: row.endsAt ? localTeachingTime(row.endsAt) : null,
+    calendarSequence: row.calendarSequence, reminderLeadMinutes: row.reminderLeadMinutes,
     ...(row.requestId === deadlineRequestId ? { callDeadline: true as const } : {}),
+    ...(row.series && row.seriesOccurrence && { series: {
+      id: row.series.id, occurrence: row.seriesOccurrence, count: row.series.count,
+      intervalWeeks: row.series.intervalWeeks === 2 ? 2 as const : 1 as const,
+    } }),
   };
 }
 
@@ -81,28 +140,96 @@ export async function exportTeachingSessions(workspaceId: string, user: CausaAcc
 }
 
 export async function createTeachingSession(workspaceId: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
-  const { requestId, title, startsAtLocal, endsAtLocal } = teachingSessionSchema.parse(raw);
-  const startsAt = teachingTime(startsAtLocal), endsAt = endsAtLocal ? teachingTime(endsAtLocal) : null;
-  if (endsAt && endsAt <= startsAt) throw httpError("La hora de término debe ser posterior al inicio.", 400);
+  const { requestId, title, startsAtLocal, endsAtLocal, reminderLeadMinutes = null } = teachingSessionSchema.parse(raw);
+  const { startsAt, endsAt } = teachingDates(startsAtLocal, endsAtLocal);
+  const requestPayloadSha256 = createHash("sha256").update(JSON.stringify([title, startsAtLocal, endsAtLocal ?? null, reminderLeadMinutes])).digest("hex");
   return altazorTransaction(client, async tx => {
     const actor = await teachingWorkspace(workspaceId, user, tx);
     const where = { workspaceId_requestId: { workspaceId, requestId } };
-    const previous = await tx.altazorTeachingSession.findUnique({ where, select: sessionSelect });
+    const previous = await tx.altazorTeachingSession.findUnique({ where, select: { ...sessionSelect, requestPayloadSha256: true } });
     if (previous) {
-      if (previous.title !== title || +previous.startsAt !== +startsAt || previous.endsAt?.getTime() !== endsAt?.getTime()) {
-        throw httpError("Este intento ya corresponde a otra actividad. Revisa los datos y vuelve a intentarlo.", 409);
-      }
+      const matches = previous.requestPayloadSha256
+        ? previous.requestPayloadSha256 === requestPayloadSha256
+        : matchesActivity(previous, title, startsAt, endsAt) && (reminderLeadMinutes === null || previous.reminderLeadMinutes === reminderLeadMinutes);
+      if (previous.series || !matches) throw requestConflict();
       return { session: view(previous), reused: true };
     }
-    if (await tx.altazorTeachingSession.count({ where: { workspaceId } }) >= sessionLimit) throw httpError("Este trabajo alcanzó el límite de doscientas actividades.", 413);
-    const created = await tx.altazorTeachingSession.create({ data: { workspaceId, requestId, title, startsAt, endsAt }, select: sessionSelect });
+    if (await tx.altazorTeachingSeries.findUnique({ where, select: { id: true } })) throw requestConflict();
+    await assertCapacity(tx, workspaceId, 1);
+    const created = await tx.altazorTeachingSession.create({
+      data: { workspaceId, requestId, requestPayloadSha256, title, startsAt, endsAt, ...teachingReminderFields(startsAt, reminderLeadMinutes) },
+      select: sessionSelect,
+    });
     await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.schedule", entityType: "AltazorTeachingSession", entityId: created.id }, tx);
     return { session: view(created), reused: false };
   });
 }
 
+async function assertCapacity(tx: Prisma.TransactionClient, workspaceId: string, count: number) {
+  if (await tx.altazorTeachingSession.count({ where: { workspaceId } }) + count > sessionLimit) {
+    throw httpError("Este trabajo alcanzó el límite de doscientas actividades.", 413);
+  }
+}
+
+export async function createTeachingSeries(workspaceId: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const { requestId, title, startsAtLocal, endsAtLocal, reminderLeadMinutes = null, recurrence } = teachingSeriesSchema.parse(raw);
+  const { intervalWeeks, count } = recurrence;
+  const inputSha256 = createHash("sha256").update(JSON.stringify([title, startsAtLocal, endsAtLocal ?? null, reminderLeadMinutes, intervalWeeks, count])).digest("hex");
+  return altazorTransaction(client, async tx => {
+    const actor = await teachingWorkspace(workspaceId, user, tx);
+    const where = { workspaceId_requestId: { workspaceId, requestId } };
+    const previous = await tx.altazorTeachingSeries.findUnique({ where, select: { id: true, inputSha256: true } });
+    if (previous && previous.inputSha256 !== inputSha256) throw requestConflict();
+    if (!previous && await tx.altazorTeachingSession.findUnique({ where, select: { id: true } })) throw requestConflict();
+    const series = previous ?? await tx.altazorTeachingSeries.create({
+      data: { workspaceId, requestId, inputSha256, intervalWeeks, count }, select: { id: true, inputSha256: true },
+    });
+    if (!previous) {
+      await assertCapacity(tx, workspaceId, count);
+      await tx.altazorTeachingSession.createMany({
+        data: Array.from({ length: count }, (_, index) => {
+          const dates = teachingDates(startsAtLocal, endsAtLocal, index * intervalWeeks * 7);
+          return {
+            workspaceId, title, requestId: randomUUID(), seriesId: series.id, seriesOccurrence: index + 1,
+            ...dates, ...teachingReminderFields(dates.startsAt, reminderLeadMinutes),
+          };
+        }),
+      });
+      await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.series-create", entityType: "AltazorTeachingSeries", entityId: series.id }, tx);
+    }
+    const rows = await tx.altazorTeachingSession.findMany({
+      where: { workspaceId, seriesId: series.id }, select: sessionSelect, orderBy: { seriesOccurrence: "asc" },
+    });
+    const sessions = rows.map(view);
+    return { session: sessions[0] ?? null, sessions, reused: Boolean(previous) };
+  });
+}
+
+export async function editTeachingSession(workspaceId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const { title, startsAtLocal, endsAtLocal, expectedSequence } = teachingSessionEditSchema.parse(raw);
+  const { startsAt, endsAt } = teachingDates(startsAtLocal, endsAtLocal);
+  return altazorTransaction(client, async tx => {
+    const actor = await teachingWorkspace(workspaceId, user, tx);
+    const current = await tx.altazorTeachingSession.findFirst({ where: { id, workspaceId }, select: sessionSelect });
+    if (!current) throw missing();
+    if (current.requestId === deadlineRequestId) throw httpError("Actualiza esta fecha de cierre desde su convocatoria.", 409);
+    if (current.calendarSequence !== expectedSequence) throw editConflict();
+    if (matchesActivity(current, title, startsAt, endsAt)) return { session: view(current) };
+    const saved = await tx.altazorTeachingSession.update({
+      where: { id, workspaceId, calendarSequence: expectedSequence },
+      data: {
+        title, startsAt, endsAt, calendarSequence: { increment: 1 },
+        ...(+current.startsAt !== +startsAt ? teachingReminderFields(startsAt, current.reminderLeadMinutes) : {}),
+      },
+      select: sessionSelect,
+    });
+    await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.edit", entityType: "AltazorTeachingSession", entityId: saved.id }, tx);
+    return { session: view(saved) };
+  });
+}
+
 export async function scheduleTeachingCallDeadline(workspaceId: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
-  const { date, localDate, time } = callDeadlineSchema.parse(raw);
+  const { date, localDate, time, reminderLeadMinutes } = callDeadlineSchema.parse(raw);
   const startsAt = teachingTime(`${localDate}T${time}`);
   return altazorTransaction(client, async tx => {
     const actor = await altazorActor(user, tx);
@@ -117,22 +244,43 @@ export async function scheduleTeachingCallDeadline(workspaceId: string, raw: unk
     const title = `Cierre · ${workspace.title}`.slice(0, 160);
     const where = { workspaceId_requestId: { workspaceId, requestId: deadlineRequestId } };
     const previous = await tx.altazorTeachingSession.findUnique({ where, select: sessionSelect });
-    if (previous?.startsAt.getTime() === startsAt.getTime() && previous.title === title) return { session: view(previous), reused: true };
-    if (!previous && await tx.altazorTeachingSession.count({ where: { workspaceId } }) >= sessionLimit) throw httpError("Este trabajo alcanzó el límite de doscientas actividades.", 413);
+    const lead = reminderLeadMinutes === undefined ? previous?.reminderLeadMinutes ?? null : reminderLeadMinutes;
+    const startsAtChanged = previous?.startsAt.getTime() !== startsAt.getTime();
+    const calendarChanged = startsAtChanged || previous?.title !== title;
+    const reminderChanged = lead !== previous?.reminderLeadMinutes;
+    if (previous && !calendarChanged && !reminderChanged) return { session: view(previous), reused: true };
+    if (!previous) await assertCapacity(tx, workspaceId, 1);
     const saved = await tx.altazorTeachingSession.upsert({
-      where, create: { workspaceId, requestId: deadlineRequestId, title, startsAt },
-      update: { title, startsAt, calendarSequence: { increment: 1 } }, select: sessionSelect,
+      where, create: { workspaceId, requestId: deadlineRequestId, title, startsAt, ...teachingReminderFields(startsAt, lead) },
+      update: {
+        title, startsAt,
+        ...(calendarChanged ? { calendarSequence: { increment: 1 } } : { updatedAt: previous?.updatedAt }),
+        ...(startsAtChanged || reminderChanged ? teachingReminderFields(startsAt, lead) : {}),
+      },
+      select: sessionSelect,
     });
     await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.call-deadline", entityType: "AltazorTeachingSession", entityId: saved.id }, tx);
     return { session: view(saved), reused: Boolean(previous) };
   });
 }
 
-export async function deleteTeachingSession(workspaceId: string, id: string, user: CausaAccessUser, client: PrismaClient = prisma) {
+export async function deleteTeachingSession(workspaceId: string, id: string, user: CausaAccessUser, client: PrismaClient = prisma,
+  scope: z.infer<typeof teachingSessionDeleteScope> = "single",
+) {
   return altazorTransaction(client, async tx => {
     const actor = await teachingWorkspace(workspaceId, user, tx);
-    if (!(await tx.altazorTeachingSession.deleteMany({ where: { id, workspaceId } })).count) throw missing();
-    await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.remove", entityType: "AltazorTeachingSession", entityId: id }, tx);
+    if (scope === "following") {
+      const anchor = await tx.altazorTeachingSession.findFirst({ where: { id, workspaceId }, select: { seriesId: true, seriesOccurrence: true } });
+      if (!anchor) throw missing();
+      if (!anchor.seriesId || !anchor.seriesOccurrence) throw httpError("Esta actividad no pertenece a una serie.", 409);
+      await tx.altazorTeachingSession.deleteMany({ where: {
+        workspaceId, seriesId: anchor.seriesId, seriesOccurrence: { gte: anchor.seriesOccurrence },
+      } });
+      await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.series-remove-following", entityType: "AltazorTeachingSeries", entityId: anchor.seriesId }, tx);
+    } else {
+      if (!(await tx.altazorTeachingSession.deleteMany({ where: { id, workspaceId } })).count) throw missing();
+      await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.remove", entityType: "AltazorTeachingSession", entityId: id }, tx);
+    }
     return { deleted: true };
   });
 }
@@ -142,6 +290,6 @@ export async function teachingCalendarSessions(user: CausaAccessUser, range: { s
   if (!isStaff(user.role) || !canSome(user, "assistant.use")) return [];
   return client.altazorTeachingSession.findMany({
     where: { workspace: ownedTeachingWork(user.id), startsAt: { gte: range.start, lte: range.end } },
-    select: { ...sessionSelect, workspaceId: true }, orderBy: [{ startsAt: "asc" }, { id: "asc" }], take: 300,
+    select: { id: true, title: true, startsAt: true, endsAt: true, workspaceId: true }, orderBy: [{ startsAt: "asc" }, { id: "asc" }], take: 300,
   });
 }

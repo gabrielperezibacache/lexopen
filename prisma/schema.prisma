@@ -2621,23 +2621,44 @@ model AltazorAcademicWorkspace {
   updatedAt DateTime @updatedAt
   artifacts AltazorAcademicArtifact[]
   teachingSessions AltazorTeachingSession[]
+  teachingSeries AltazorTeachingSeries[]
   @@unique([ownerId,requestId])
   @@unique([ownerId,callOriginKey])
   @@index([ownerId,archivedAt,updatedAt])
+}
+model AltazorTeachingSeries {
+  id String @id @default(cuid())
+  workspaceId String
+  workspace AltazorAcademicWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  requestId String
+  inputSha256 String @db.VarChar(64)
+  count Int
+  intervalWeeks Int
+  sessions AltazorTeachingSession[]
+  @@unique([workspaceId,requestId])
+  @@unique([id,workspaceId])
 }
 model AltazorTeachingSession {
   id String @id @default(cuid())
   workspaceId String
   workspace AltazorAcademicWorkspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
   requestId String
+  requestPayloadSha256 String? @db.VarChar(64)
+  seriesId String?
+  seriesOccurrence Int?
+  series AltazorTeachingSeries? @relation(fields:[seriesId,workspaceId],references:[id,workspaceId],onDelete:Cascade)
   title String
   startsAt DateTime
   endsAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
   calendarSequence Int @default(0)
+  reminderLeadMinutes Int?
+  reminderDueAt DateTime?
   @@unique([workspaceId,requestId])
+  @@unique([seriesId,seriesOccurrence])
   @@index([startsAt,workspaceId])
+  @@index([reminderDueAt,startsAt])
 }
 model AltazorAcademicArtifact {
   versions AltazorAcademicArtifactVersion[]
