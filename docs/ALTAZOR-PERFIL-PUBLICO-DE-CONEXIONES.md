@@ -36,4 +36,4 @@ Los archivos de cuenta, autorizaciones y credenciales personales siguen excluido
 
 ## Alcance de esta incorporación
 
-Se verificaron el parser, la prioridad de configuración, el arranque aislado del Host, el empaquetado y las comprobaciones de integridad con datos ficticios. Esto prepara la distribución del perfil; no acredita por sí solo un nuevo instalador publicado, una identidad pública registrada, una autorización real ni la preparación automática de un escritorio por persona.
+Se verificaron el parser, la prioridad de configuración, el arranque aislado del Host, el empaquetado y las comprobaciones de integridad con datos ficticios. Después se registró la identidad real del publicador y se guardó su perfil en la configuración protegida de compilación, con comprobaciones técnicas en ambos proveedores. El [registro de validación](ALTAZOR-CONEXIONES-VALIDACION-2026-11-07.md) distingue esas pruebas de las conexiones reales existentes y de las tareas todavía pendientes: nueva publicación, ingreso completo en una instalación limpia y verificación pública de Google. El perfil no prepara automáticamente un escritorio por persona.
