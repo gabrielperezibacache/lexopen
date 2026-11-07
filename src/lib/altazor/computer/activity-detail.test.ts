@@ -28,3 +28,12 @@ test("only generated identities are abbreviated, while user connection names rem
   assert.equal(computerConnectionLabel("Estudio · lectura"), "Estudio · lectura");
   assert.equal(computerConnectionLabel("altazor-google-invalid"), "altazor-google-invalid");
 });
+
+test("real native browser and selected connector steps get safe progress labels", () => {
+  for (const action of ["open", "page_read", "page_click", "page_type", "read_screen", "launch"]) {
+    assert.ok(computerActivityDetail(view(action))?.step?.label);
+  }
+  const github = "altazor-github-1234567890abcdef";
+  assert.equal(computerActivityDetail(view(github, [github]))?.step?.label, "Consultando GitHub");
+  assert.equal(computerActivityDetail(view(github)), undefined, "A connection outside this session is never presented as current work");
+});
