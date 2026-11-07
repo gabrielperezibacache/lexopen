@@ -29,9 +29,13 @@ const message = (reason: unknown, fallback: string) => reason instanceof Error ?
 function replaceLink(workspaceId?: string, artifactId?: string) {
   if (window.location.pathname === "/academico") window.history.replaceState(null, "", academicHref(workspaceId, artifactId));
 }
-export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "" }: { initialWorkspaceId?: string; initialArtifactId?: string }) {
+export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "", initialTeaching = false }: {
+  initialWorkspaceId?: string;
+  initialArtifactId?: string;
+  initialTeaching?: boolean;
+}) {
   const [overview, setOverview] = useState<AcademicOverview | null>(null), [workspace, setWorkspace] = useState<AcademicWorkspace | null>(null);
-  const [journey, setJourney] = useState<AcademicJourney>("research"), [newTitle, setNewTitle] = useState(""), [mode, setMode] = useState<AcademicMode>("literature_review"), [step, setStep] = useState(0), [pane, setPane] = useState<Pane>("work");
+  const [journey, setJourney] = useState<AcademicJourney>("research"), [newTitle, setNewTitle] = useState(""), [mode, setMode] = useState<AcademicMode>("literature_review"), [step, setStep] = useState(0), [pane, setPane] = useState<Pane>(initialTeaching ? "teaching" : "work");
   const [sources, setSources] = useState<AltazorSelectedSource[]>([]), [sourcesChanged, setSourcesChanged] = useState(false), [creating, setCreating] = useState(false), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [reviewCurrent, setReviewCurrent] = useState(false), [projectQuery, setProjectQuery] = useState(""), [stopping, setStopping] = useState(false);
   const [template, setTemplate] = useState<AcademicManuscriptTemplate>("blank");
@@ -63,6 +67,11 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => { mounted.current = false; controller.abort(); };
   }, [initialWorkspaceId, initialArtifactId]);
+  useEffect(() => {
+    if (!loading && initialTeaching && window.location.hash === "#convocatorias-oficiales") {
+      document.getElementById("convocatorias-oficiales")?.scrollIntoView({ block: "start" });
+    }
+  }, [initialTeaching, loading]);
   useEffect(() => {
     if (!dirty && !editorDirty && !profileDirty) return;
     const leave = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };

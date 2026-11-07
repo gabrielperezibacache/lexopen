@@ -10,6 +10,7 @@ import { isAuthorizedCronRequest } from "@/lib/security/cron-paths";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { isStrongSessionSecret } from "@/lib/security/production-env";
 import { isClientAllowedPath } from "@/lib/auth/client-paths";
+import { calendarSubscriptionBasePath, isCalendarSubscriptionPath } from "@/lib/altazor/calendar-feed-policy";
 import { PORTAL_ROLES, VALID_ROLE_SET } from "@/lib/auth/roles";
 import {
   isTwoFactorExemptPath,
@@ -231,6 +232,16 @@ function migrateQueryToken(req: NextRequest, nonce: string, requestId: string) {
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // Calendar clients use a bearer capability instead of a browser session.
+  // Let only the exact read route through without attaching pathname or cookies.
+  if (pathname.startsWith(`${calendarSubscriptionBasePath}/`)) {
+    if ((req.method === "GET" || req.method === "HEAD") && isCalendarSubscriptionPath(pathname)) {
+      return NextResponse.next();
+    }
+    return new NextResponse(null, { status: 404, headers: {
+      "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer",
+    } });
+  }
   const nonce = newCspNonce();
   const requestId =
     req.headers.get("x-request-id")?.trim() || newRequestId();

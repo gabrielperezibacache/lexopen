@@ -17,6 +17,8 @@ export function academicHref(workspaceId?: string, artifactId?: string) {
   return `/academico${query.size ? `?${query}` : ""}`;
 }
 
+export const ACADEMIC_CALLS_HREF = "/academico?vista=docencia#convocatorias-oficiales";
+
 export const ACADEMIC_MANUSCRIPT_TEMPLATES = {
   blank: { label: "Documento en blanco", description: "Escribe con tu propia estructura.", headings: [] },
   article: { label: "Artículo académico", description: "Presenta una pregunta, su método y tus hallazgos.", headings: ["Resumen", "Palabras clave", "Introducción", "Marco teórico", "Metodología", "Resultados", "Discusión", "Conclusiones", "Referencias"] },

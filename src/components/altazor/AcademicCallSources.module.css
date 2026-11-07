@@ -18,6 +18,8 @@
 .rows > li { border-block-start:1px solid var(--line); padding-block:1rem; min-width:0; overflow-wrap:anywhere; }
 .source,.item { display:grid; gap:.35rem; }
 .source > strong { font-weight:600; }
+.schedule { display:flex; align-items:flex-start; gap:.45rem; margin-block:.25rem; font-size:var(--text-sm); }
+.schedule svg { flex:none; color:var(--sea); margin-block-start:.2rem; }
 .actions,.itemMetadata { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .85rem; }
 .actions { margin-block-start:.25rem; }
 .actions button { max-width:100%; white-space:normal; text-align:start; }

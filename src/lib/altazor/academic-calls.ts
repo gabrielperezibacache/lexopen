@@ -4,16 +4,23 @@ import { z } from "zod";
 import { writeAuditStrict } from "@/lib/audit";
 import { httpError } from "@/lib/auth/access";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
+import { canSome } from "@/lib/auth/permissions";
+import { isStaff } from "@/lib/auth/rbac";
 import { isValidYmd } from "@/lib/chile-time";
 import { prisma } from "@/lib/db";
 import { sha256 } from "@/lib/evidence/fragments";
 import { altazorActor, altazorTransaction } from "./access";
 import { ACADEMIC_WORKSPACE_LIMIT, emptyAcademicBrief, emptyAcademicCall, emptyAcademicMatrix } from "./academic-schemas";
+import { ACADEMIC_CALLS_HREF } from "./academic-templates";
 import { CALL_SOURCES, readCallSource, type CallFeedItem, type CallSource } from "./call-sources";
 import type { AltazorClient } from "./types";
 
 const maximumItems = 50;
 const leaseMs = 60_000;
+const cadenceMs = 12 * 60 * 60 * 1000;
+const firstRetryMs = 30 * 60 * 1000;
+const batchSize = 30;
+const scheduledKeyPrefix = "scheduled-";
 const providerError = "No pudimos actualizar esta fuente. Puedes intentar otra vez.";
 const missingSubscription = () => httpError("La suscripción a esta fuente no está disponible.", 404);
 const staleRefresh = () => httpError("La suscripción cambió durante la consulta. Abre de nuevo Convocatorias.", 409);
@@ -25,6 +32,7 @@ export const academicCallAction = z.discriminatedUnion("action", [
   z.object({ action: z.literal("subscribe"), sourceId }).strict(),
   z.object({ action: z.literal("unsubscribe"), sourceId }).strict(),
   z.object({ action: z.literal("refresh"), sourceId }).strict(),
+  z.object({ action: z.literal("set-automatic"), sourceId, enabled: z.boolean() }).strict(),
   z.object({ action: z.literal("save"), sourceId, itemId, checkedAt: checkedAt.optional() }).strict(),
 ]);
 type CallAction = z.infer<typeof academicCallAction>;
@@ -61,7 +69,12 @@ export type AcademicCallSnapshot = {
   subscriptions: {
     sourceId: string;
     checkedAt: string | null;
+    lastAttemptAt: string | null;
+    automatic: boolean;
+    nextAttemptAt: string | null;
     error: string | null;
+    newCount: number;
+    changedCount: number;
     items: (CallFeedItem & { workspaceId?: string; changed?: true })[];
   }[];
 };
@@ -75,14 +88,17 @@ function sourceFor(id: string): CallSource {
 
 const originKey = (sourceId: string, externalId: string) => sha256(JSON.stringify([sourceId, externalId]));
 const readItems = (itemsJson: string) => feedItems.parse(JSON.parse(itemsJson));
-const changedSince = (item: CallFeedItem, origin: AcademicCallOrigin) =>
+const changedSince = (item: CallFeedItem, origin: Omit<CallFeedItem, "id">) =>
   item.title !== origin.title || item.url !== origin.url || item.summary !== origin.summary || item.deadline !== origin.deadline;
 
 async function snapshot(ownerId: string, client: AltazorClient): Promise<AcademicCallSnapshot> {
   const rows = await client.altazorCallSubscription.findMany({
     where: { ownerId, sourceId: { in: publicSources.map(source => source.id) } },
     orderBy: { sourceId: "asc" },
-    select: { sourceId: true, checkedAt: true, errorCode: true, itemsJson: true },
+    select: {
+      sourceId: true, checkedAt: true, lastAttemptAt: true, automatic: true, nextAttemptAt: true,
+      errorCode: true, newCount: true, changedCount: true, itemsJson: true,
+    },
   });
   const sources = rows.map(({ itemsJson, ...row }) => ({ ...row, items: readItems(itemsJson) }));
   const keys = sources.flatMap(row => row.items.map(item => originKey(row.sourceId, item.id)));
@@ -96,7 +112,12 @@ async function snapshot(ownerId: string, client: AltazorClient): Promise<Academi
     subscriptions: sources.map(row => ({
       sourceId: row.sourceId,
       checkedAt: row.checkedAt?.toISOString() ?? null,
+      lastAttemptAt: row.lastAttemptAt?.toISOString() ?? null,
+      automatic: row.automatic,
+      nextAttemptAt: row.nextAttemptAt?.toISOString() ?? null,
       error: row.errorCode ? providerError : null,
+      newCount: row.newCount,
+      changedCount: row.changedCount,
       items: row.items.map(item => {
         const existing = savedByKey.get(originKey(row.sourceId, item.id));
         if (!existing?.callOriginJson) return item;
@@ -126,6 +147,77 @@ async function changeSubscription(action: "subscribe" | "unsubscribe", sourceId:
   });
 }
 
+async function setAutomatic(sourceId: string, enabled: boolean, user: CausaAccessUser, client: PrismaClient) {
+  sourceFor(sourceId);
+  return altazorTransaction(client, async tx => {
+    const actor = await altazorActor(user, tx);
+    const where = { ownerId_sourceId: { ownerId: actor.id, sourceId } };
+    const row = await tx.altazorCallSubscription.findUnique({
+      where, select: { automatic: true, checkedAt: true, errorCode: true, refreshKey: true },
+    });
+    if (!row) throw missingSubscription();
+    if (row.automatic !== enabled) {
+      const now = Date.now();
+      const recent = row.checkedAt && !row.errorCode ? +row.checkedAt + cadenceMs : now;
+      await tx.altazorCallSubscription.update({
+        where,
+        data: {
+          automatic: enabled, nextAttemptAt: enabled ? new Date(Math.max(now, recent)) : null, failureCount: 0,
+          ...(row.refreshKey?.startsWith(scheduledKeyPrefix) ? { refreshKey: null, refreshStartedAt: null } : {}),
+        },
+      });
+    }
+    return snapshot(actor.id, tx);
+  });
+}
+
+async function readCallItems(sourceId: string, read: CallReader, signal?: AbortSignal) {
+  try {
+    const seen = new Set<string>();
+    return feedItems.parse((await read(sourceId, { signal })).filter(item => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    }).slice(0, maximumItems));
+  } catch {
+    // A failed provider response does not replace the last successful snapshot.
+    return undefined;
+  }
+}
+
+const refreshState = { automatic: true, checkedAt: true, failureCount: true, itemsJson: true } as const;
+
+function refreshOutcome(row: {
+  automatic: boolean;
+  checkedAt: Date | null;
+  failureCount: number;
+  itemsJson: string;
+}, items: CallFeedItem[] | undefined, observedAt: Date) {
+  const newItems: CallFeedItem[] = [], changedItems: CallFeedItem[] = [];
+  if (items && row.checkedAt) {
+    const previous = new Map(readItems(row.itemsJson).map(item => [item.id, item]));
+    for (const item of items) {
+      const prior = previous.get(item.id);
+      if (!prior) newItems.push(item);
+      else if (changedSince(item, prior)) changedItems.push(item);
+    }
+  }
+  const failureCount = items ? 0 : Math.min(row.failureCount + 1, 6);
+  const delay = items ? cadenceMs : Math.min(cadenceMs, firstRetryMs * 2 ** (failureCount - 1));
+  return {
+    newItems, changedItems,
+    data: {
+      ...(items ? {
+        itemsJson: JSON.stringify(items), checkedAt: observedAt, errorCode: null,
+        newCount: newItems.length, changedCount: changedItems.length,
+      } : { errorCode: "source_unavailable" }),
+      lastAttemptAt: observedAt, failureCount,
+      nextAttemptAt: row.automatic ? new Date(+observedAt + delay) : null,
+      refreshKey: null, refreshStartedAt: null,
+    },
+  };
+}
+
 async function refreshCalls(sourceId: string, user: CausaAccessUser, client: PrismaClient, read: CallReader, signal?: AbortSignal) {
   sourceFor(sourceId);
   const token = randomUUID();
@@ -141,30 +233,104 @@ async function refreshCalls(sourceId: string, user: CausaAccessUser, client: Pri
     if (!acquired.count) throw httpError("La fuente ya se está actualizando. Espera a que termine la consulta.", 409);
     return row;
   });
-  let items: CallFeedItem[] | undefined;
-  try {
-    const seen = new Set<string>();
-    items = feedItems.parse((await read(sourceId, { signal })).filter(item => {
-      if (seen.has(item.id)) return false;
-      seen.add(item.id);
-      return true;
-    }).slice(0, maximumItems));
-  } catch {
-    // A failed provider response does not replace the last successful snapshot.
-  }
+  const items = await readCallItems(sourceId, read, signal);
   const observedAt = new Date();
   return altazorTransaction(client, async tx => {
     const actor = await altazorActor(user, tx);
-    const updated = await tx.altazorCallSubscription.updateMany({
-      where: { id: subscription.id, ownerId: actor.id, refreshKey: token },
-      data: {
-        ...(items ? { itemsJson: JSON.stringify(items), checkedAt: observedAt, errorCode: null } : { errorCode: "source_unavailable" }),
-        refreshKey: null, refreshStartedAt: null,
-      },
-    });
-    if (!updated.count) throw staleRefresh();
+    const where = { id: subscription.id, ownerId: actor.id, refreshKey: token };
+    const row = await tx.altazorCallSubscription.findFirst({ where, select: refreshState });
+    if (!row) throw staleRefresh();
+    await tx.altazorCallSubscription.update({ where, data: refreshOutcome(row, items, observedAt).data });
     return snapshot(actor.id, tx);
   });
+}
+
+const currentOwner = { select: { role: true, capabilityGrants: true, capabilityRevokes: true } } as const;
+const canRefreshAutomatically = (owner: CausaAccessUser | Omit<CausaAccessUser, "id">) =>
+  isStaff(owner.role) && canSome(owner, "assistant.use");
+const clearSchedule = { automatic: false, nextAttemptAt: null, refreshKey: null, refreshStartedAt: null } as const;
+
+function claimScheduledSource(sourceId: string, now: Date, token: string, client: PrismaClient) {
+  return altazorTransaction(client, async tx => {
+    const due = {
+      sourceId, automatic: true, nextAttemptAt: { lte: now },
+      OR: [{ refreshStartedAt: null }, { refreshStartedAt: { lt: new Date(+now - leaseMs) } }],
+    };
+    const rows = await tx.altazorCallSubscription.findMany({
+      where: due, select: { id: true, owner: currentOwner },
+      orderBy: [{ nextAttemptAt: "asc" }, { id: "asc" }], take: batchSize,
+    });
+    const eligible: string[] = [], revoked: string[] = [];
+    for (const row of rows) (canRefreshAutomatically(row.owner) ? eligible : revoked).push(row.id);
+    if (revoked.length) {
+      await tx.altazorCallSubscription.updateMany({ where: { ...due, id: { in: revoked } }, data: clearSchedule });
+    }
+    const claimed = eligible.length ? await tx.altazorCallSubscription.updateMany({
+      where: { ...due, id: { in: eligible } }, data: { refreshKey: token, refreshStartedAt: now },
+    }) : { count: 0 };
+    return { claimed: claimed.count, skipped: revoked.length };
+  });
+}
+
+function deltaKey(items: CallFeedItem[]) {
+  return items.map(item => [item.id, item.title, item.url, item.summary, item.deadline ?? ""]).sort((left, right) => left[0].localeCompare(right[0]));
+}
+
+function completeScheduledSource(source: CallSource, token: string, items: CallFeedItem[] | undefined, now: Date, client: PrismaClient) {
+  return altazorTransaction(client, async tx => {
+    const where = { sourceId: source.id, automatic: true, refreshKey: token };
+    const rows = await tx.altazorCallSubscription.findMany({
+      where, select: { id: true, ownerId: true, owner: currentOwner, ...refreshState },
+    });
+    let updated = 0;
+    for (const row of rows) {
+      const current = { ...where, id: row.id };
+      if (!canRefreshAutomatically(row.owner)) {
+        await tx.altazorCallSubscription.update({ where: current, data: clearSchedule });
+        continue;
+      }
+      const { data, newItems, changedItems } = refreshOutcome(row, items, now);
+      await tx.altazorCallSubscription.update({ where: current, data });
+      updated++;
+      if (newItems.length || changedItems.length) {
+        const delta = [
+          newItems.length && `${newItems.length} ${newItems.length === 1 ? "aviso nuevo" : "avisos nuevos"}`,
+          changedItems.length && `${changedItems.length} ${changedItems.length === 1 ? "aviso con cambios" : "avisos con cambios"}`,
+        ].filter(Boolean).join(" y ");
+        const key = sha256(JSON.stringify([deltaKey(newItems), deltaKey(changedItems)]));
+        // One private in-app notice. The external notification outbox is not involved.
+        await tx.notification.createMany({ skipDuplicates: true, data: {
+          userId: row.ownerId, tipo: "academico.convocatorias", severidad: "baja",
+          entityType: "AltazorCallSubscription", entityId: row.id,
+          title: "Novedades de convocatorias", body: `${source.label} · ${delta}. Revisa el aviso en Docencia.`,
+          href: ACADEMIC_CALLS_HREF, dedupeKey: `academic-calls:${row.id}:${key}`,
+        } });
+      }
+    }
+    return updated;
+  });
+}
+
+/** At most one official request per source and tick. Never refresh a manual subscription. */
+export async function runScheduledAcademicCallRefresh(
+  client: PrismaClient = prisma,
+  options: { now?: Date; read?: CallReader; signal?: AbortSignal } = {},
+) {
+  const result = { refreshed: 0, failed: 0, skipped: 0, sources: 0 };
+  for (const source of CALL_SOURCES) {
+    if (options.signal?.aborted) break;
+    if (!source.feedUrl) continue;
+    const token = scheduledKeyPrefix + randomUUID();
+    const { claimed, skipped } = await claimScheduledSource(source.id, options.now ?? new Date(), token, client);
+    result.skipped += skipped;
+    if (!claimed) continue;
+    result.sources++;
+    const items = await readCallItems(source.id, options.read ?? readCallSource, options.signal);
+    const updated = await completeScheduledSource(source, token, items, options.now ?? new Date(), client);
+    result[items ? "refreshed" : "failed"] += updated;
+    result.skipped += claimed - updated;
+  }
+  return result;
 }
 
 const savedWorkspace = { id: true, title: true, archivedAt: true, briefJson: true } as const;
@@ -241,6 +407,8 @@ export async function mutateAcademicCalls(raw: unknown, user: CausaAccessUser, c
       return changeSubscription(input.action, input.sourceId, user, client);
     case "refresh":
       return refreshCalls(input.sourceId, user, client, options.read ?? readCallSource, options.signal);
+    case "set-automatic":
+      return setAutomatic(input.sourceId, input.enabled, user, client);
     case "save":
       return saveCall(input, user, client);
   }

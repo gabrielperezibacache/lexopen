@@ -26,7 +26,8 @@ test("Docencia conserva la última consulta y el origen de una convocatoria guar
   ];
   const origin = new URL(info.project.use.baseURL as string).origin;
   const actions: string[] = [];
-  let followed = false, saved = false, refreshCount = 0;
+  const nextAttemptAt = "2026-11-06T15:00:00.000Z";
+  let followed = false, automatic = false, saved = false, refreshCount = 0;
   try {
     const project = await db.altazorAcademicWorkspace.create({ data: {
       requestId: randomUUID(), ownerId: owner.id, kind: "call", title, briefJson: JSON.stringify({ call, task: "teaching_material" }),
@@ -34,6 +35,9 @@ test("Docencia conserva la última consulta y el origen de una convocatoria guar
     const catalogue = () => ({ sources, subscriptions: followed ? [{
       sourceId: "feed-es", checkedAt: refreshCount ? checkedAt : null,
       error: refreshCount === 2 ? "La fuente no respondió." : null,
+      automatic, nextAttemptAt: automatic ? nextAttemptAt : null,
+      lastAttemptAt: refreshCount ? checkedAt : null,
+      newCount: refreshCount > 2 ? 2 : 0, changedCount: refreshCount > 2 ? 1 : 0,
       items: refreshCount ? [{ ...item, ...(saved && { workspaceId: project.id }), ...(refreshCount > 2 && { changed: true }) }] : [],
     }] : [] });
     await page.route("**/*", route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
@@ -50,6 +54,10 @@ test("Docencia conserva la última consulta y el origen de una convocatoria guar
       if (input.action === "subscribe") followed = true;
       if (input.action === "unsubscribe") followed = false;
       if (input.action === "refresh") refreshCount++;
+      if (input.action === "set-automatic") {
+        expect(typeof input.enabled).toBe("boolean");
+        automatic = input.enabled;
+      }
       if (input.action === "save") {
         expect(input).toEqual({ action: "save", sourceId: "feed-es", itemId: item.id, checkedAt });
         saved = true;
@@ -88,6 +96,13 @@ test("Docencia conserva la última consulta y el origen de una convocatoria guar
     await expect(page.getByRole("region", { name: "Mis convocatorias" }).getByRole("button", { name: new RegExp(title) })).toBeVisible();
     await panel.getByRole("button", { name: "Actualizar feed de Agencia ficticia" }).click();
     await expect(panel.getByText(/El aviso cambió desde que guardaste la ficha/)).toBeVisible();
+    await expect(panel.getByText(/2 avisos nuevos · 1 aviso actualizado/)).toBeVisible();
+    await panel.getByRole("button", { name: "Activar consultas automáticas de Agencia ficticia" }).click();
+    await expect(panel.getByText("Consultas automáticas activas")).toBeVisible();
+    await expect(panel.getByText(/Siguiente consulta a partir de/).locator("time")).toHaveAttribute("datetime", nextAttemptAt);
+    await panel.getByRole("button", { name: "Pausar consultas automáticas de Agencia ficticia" }).click();
+    await expect(panel.getByText("Consulta manual", { exact: true })).toBeVisible();
+    await expect(panel.getByText(/Siguiente consulta a partir de/)).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();
     await panel.getByRole("button", { name: `Abrir ficha de ${title}` }).click();
     const fiche = page.getByRole("region", { name: "Ficha de la convocatoria" });

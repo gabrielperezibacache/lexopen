@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ui";
 import type { TeachingSession } from "@/lib/altazor/teaching-sessions";
 import { formatCivilDate, SANTIAGO_TZ } from "@/lib/chile-time";
 import { createSubmissionKeys } from "@/lib/client-submission-key";
+import { AcademicCalendarSubscription } from "./AcademicCalendarSubscription";
 import { academicApi } from "./academic-ui";
 import styles from "./AcademicTeaching.module.css";
 
@@ -131,6 +132,7 @@ export function AcademicTeachingSessions({ workspaceId, deadline, deadlineSaved 
         </ul>}
         {sessions.length > 0 && <a href={`${endpoint}/export`} className="btn btn-ghost"><Download size={16} aria-hidden="true" /> Descargar agenda (.ics)</a>}
       </>}
+    <AcademicCalendarSubscription workspaceId={workspaceId} />
     <ConfirmDialog open={Boolean(pendingDelete)} onClose={() => setPendingDelete(null)} onConfirm={() => void remove()}
       title="Retirar actividad de la Agenda" description={pendingDelete ? `Se retirará «${pendingDelete.title}» de tu Agenda.` : ""} confirmLabel="Retirar" busy={busy} />
   </section>;

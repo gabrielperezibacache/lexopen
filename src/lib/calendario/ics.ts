@@ -9,6 +9,7 @@ export type IcsEvento = {
   lugar?: string | null;
   notas?: string | null;
   updatedAt?: Date | null;
+  sequence?: number;
 };
 
 function icsEscape(value: string): string {
@@ -47,19 +48,28 @@ function formatDateOnly(date: Date): string {
 }
 
 /** Serializa un `VCALENDAR` con un `VEVENT` por elemento de `eventos`. */
-export function buildIcs(eventos: IcsEvento[]): string {
+export function buildIcs(eventos: IcsEvento[], mode: "download" | "subscription" = "download"): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//LexOpen//Asistente//ES",
     "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
+    ...(mode === "download" ? ["METHOD:PUBLISH"] : ["X-WR-CALNAME:Docencia de LexOpen"]),
   ];
+  // RFC 5545 requires a component even after the last event has been removed.
+  if (mode === "subscription" && !eventos.length) {
+    lines.push("BEGIN:VTIMEZONE", "TZID:Etc/UTC", "BEGIN:STANDARD", "DTSTART:19700101T000000",
+      "TZOFFSETFROM:+0000", "TZOFFSETTO:+0000", "TZNAME:UTC", "END:STANDARD", "END:VTIMEZONE");
+  }
 
   for (const evento of eventos) {
     lines.push("BEGIN:VEVENT");
     lines.push(`UID:${evento.id}@lexopen`);
     lines.push(`DTSTAMP:${formatUtcStamp(evento.updatedAt || new Date())}`);
+    if (mode === "subscription" && evento.updatedAt) {
+      lines.push(`LAST-MODIFIED:${formatUtcStamp(evento.updatedAt)}`);
+    }
+    if (evento.sequence !== undefined) lines.push(`SEQUENCE:${evento.sequence}`);
     if (evento.todoElDia) {
       lines.push(`DTSTART;VALUE=DATE:${formatDateOnly(evento.inicio)}`);
       const fin = evento.fin || new Date(evento.inicio.getTime() + 24 * 60 * 60 * 1000);

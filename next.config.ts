@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { calendarSubscriptionBasePath } from "./src/lib/altazor/calendar-feed-policy";
 import { buildSecurityHeaders } from "./src/lib/security/headers";
 
 // CSP is applied per-request from src/proxy.ts with a fresh nonce.
@@ -18,6 +19,9 @@ const nextConfig: NextConfig = {
   /* Hide the floating "N" Next.js Dev Tools badge in development.
      Compile/runtime errors still surface via the error overlay. */
   devIndicators: false,
+  logging: {
+    incomingRequests: { ignore: [/\/api\/altazor\/academic\/calendar-subscriptions\//] },
+  },
   serverExternalPackages: [
     "@firecrawl/anydoc",
     "@firecrawl/pdf-inspector",
@@ -30,6 +34,10 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      {
+        source: `${calendarSubscriptionBasePath}/:path*`,
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
     ];
   },

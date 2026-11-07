@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, ExternalLink, Radio, RefreshCw, Search } from "lucide-react";
+import { ArrowRight, ExternalLink, Radio, RefreshCw, Search, Timer } from "lucide-react";
 import type { AcademicCallSnapshot as Catalogue } from "@/lib/altazor/academic-calls";
 import { formatCivilDate, SANTIAGO_TZ } from "@/lib/chile-time";
 import { academicApi, type AcademicProject } from "./academic-ui";
@@ -11,7 +11,7 @@ type CallSource = Catalogue["sources"][number];
 type Subscription = Catalogue["subscriptions"][number];
 type CallItem = Subscription["items"][number];
 type SourceAction = "subscribe" | "refresh" | "unsubscribe";
-type Pending = { action: SourceAction | "save"; sourceId: string; itemId?: string };
+type Pending = { action: SourceAction | "save" | "set-automatic"; sourceId: string; itemId?: string };
 
 const endpoint = "/api/altazor/academic/calls";
 const regions = new Intl.DisplayNames(["es"], { type: "region" });
@@ -19,7 +19,17 @@ const countryName = (code: string) => /^[A-Z]{2}$/.test(code) ? regions.of(code)
 const countrySort = new Intl.Collator("es");
 const queryKey = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("es").trim();
 const infoDate = new Intl.DateTimeFormat("es", { dateStyle: "medium", timeZone: SANTIAGO_TZ });
+const attemptDate = new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeStyle: "short", timeZone: SANTIAGO_TZ });
 const failure = (reason: unknown, fallback: string) => reason instanceof Error ? reason.message : fallback;
+
+function changesInLatestCheck(subscription: Subscription) {
+  const fresh = subscription.newCount ?? 0;
+  const changed = subscription.changedCount ?? 0;
+  return [
+    fresh > 0 ? `${fresh} ${fresh === 1 ? "aviso nuevo" : "avisos nuevos"}` : "",
+    changed > 0 ? `${changed} ${changed === 1 ? "aviso actualizado" : "avisos actualizados"}` : "",
+  ].filter(Boolean).join(" · ");
+}
 
 export function AcademicCallSources({ blocked, onOpen, onSaved }: {
   blocked: boolean;
@@ -80,6 +90,14 @@ export function AcademicCallSources({ blocked, onOpen, onSaved }: {
     });
   }
 
+  async function setAutomatic(source: CallSource, enabled: boolean) {
+    const input = { action: "set-automatic" as const, sourceId: source.id, enabled };
+    await act(input, signal => academicApi<Catalogue>(endpoint, input, "POST", signal), result => {
+      setData(result);
+      setNotice(enabled ? `Activaste las consultas automáticas de ${source.label}.` : `Pausaste las consultas automáticas de ${source.label}.`);
+    });
+  }
+
   async function save(source: CallSource, subscription: Subscription, item: CallItem) {
     const input = { action: "save" as const, sourceId: source.id, itemId: item.id, ...(subscription.checkedAt && { checkedAt: subscription.checkedAt }) };
     await act(input, signal => academicApi<{ workspaceId: string; reused: boolean; workspace: AcademicProject }>(endpoint, input, "POST", signal), result => {
@@ -128,21 +146,36 @@ export function AcademicCallSources({ blocked, onOpen, onSaved }: {
         <div className={styles.ledger}>
           <section aria-labelledby="official-call-sources-title" className={styles.sources}>
             <h4 id="official-call-sources-title">Fuentes</h4>
-            <p className={styles.muted}>Sigue las fuentes con feed y consulta sus avisos cuando quieras. La búsqueda se realiza sobre los avisos ya consultados.</p>
+            <p className={styles.muted}>Sigue una fuente para consultar sus avisos. Puedes activar consultas automáticas por fuente mientras LexOpen esté disponible.</p>
             <ul className={styles.rows}>
               {shownSources.map(source => {
                 const subscription = subscriptions.get(source.id);
                 const active = pending?.sourceId === source.id ? pending.action : undefined;
+                const changes = subscription ? changesInLatestCheck(subscription) : "";
                 return <li key={source.id} className={styles.source}>
                   <strong>{source.label}</strong>
                   <p className={styles.muted}>{countryName(source.country)} · {source.feed ? subscription ? "En seguimiento" : "Feed público" : "Consulta en el portal"}</p>
-                  {subscription?.checkedAt && <p className={styles.muted}>Consultada el <time dateTime={subscription.checkedAt}>{infoDate.format(new Date(subscription.checkedAt))}</time></p>}
+                  {subscription?.checkedAt && <p className={styles.muted}>Última consulta exitosa <time dateTime={subscription.checkedAt}>{infoDate.format(new Date(subscription.checkedAt))}</time></p>}
                   {subscription?.error && <p className={styles.error}>{subscription.error}{subscription.items.length ? " Se muestran los avisos de la última consulta disponible." : ""}</p>}
+                  {changes && <p className={styles.notice}>En la última consulta exitosa · {changes}</p>}
+                  {subscription && <div className={styles.schedule}>
+                    <Timer size={16} aria-hidden="true" />
+                    <div>
+                      <p>{subscription.automatic ? "Consultas automáticas activas" : "Consulta manual"}</p>
+                      {subscription.automatic && subscription.nextAttemptAt && <p className={styles.muted}>
+                        Siguiente consulta a partir de <time dateTime={subscription.nextAttemptAt}>{attemptDate.format(new Date(subscription.nextAttemptAt))}</time> (Santiago).
+                      </p>}
+                    </div>
+                  </div>}
                   <div className={styles.actions}>
                     <a className={styles.external} href={source.url} target="_blank" rel="noopener noreferrer">Portal oficial <ExternalLink size={15} aria-hidden="true" /><span className="sr-only"> de {source.label}</span></a>
                     {source.feed && (subscription ? <>
                       <button className="btn btn-outline" type="button" disabled={disabled} onClick={() => void changeSource("refresh", source)} aria-label={`${subscription.checkedAt ? "Actualizar feed" : "Consultar feed"} de ${source.label}`}>
                         <RefreshCw size={16} aria-hidden="true" />{active === "refresh" ? "Consultando…" : subscription.checkedAt ? "Actualizar feed" : "Consultar feed"}
+                      </button>
+                      <button className="btn btn-ghost" type="button" disabled={disabled} onClick={() => void setAutomatic(source, !subscription.automatic)}
+                        aria-label={`${subscription.automatic ? "Pausar" : "Activar"} consultas automáticas de ${source.label}`}>
+                        {active === "set-automatic" ? "Guardando…" : subscription.automatic ? "Pausar consultas" : "Activar consultas automáticas"}
                       </button>
                       <button className="btn btn-ghost" type="button" disabled={disabled} aria-label={`Dejar de seguir ${source.label}`} onClick={() => void changeSource("unsubscribe", source)}>{active === "unsubscribe" ? "Quitando…" : "Dejar de seguir"}</button>
                     </> : <button className="btn btn-outline" type="button" disabled={disabled} aria-label={`Seguir ${source.label}`} onClick={() => void changeSource("subscribe", source)}>{active === "subscribe" ? "Guardando…" : "Seguir fuente"}</button>)}

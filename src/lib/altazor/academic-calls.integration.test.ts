@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
+import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { readAcademicWorkspace, saveAcademicWorkspace } from "./academic";
-import { listAcademicCalls, mutateAcademicCalls } from "./academic-calls";
+import { listAcademicCalls, mutateAcademicCalls, runScheduledAcademicCallRefresh } from "./academic-calls";
+import { ACADEMIC_CALLS_HREF } from "./academic-templates";
 import type { CallFeedItem } from "./call-sources";
 
 const isStatus = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
@@ -36,6 +38,108 @@ function pausedRead() {
   const started = new Promise<void>(ready => { entered = ready; });
   const response = new Promise<CallFeedItem[]>(ready => { resolve = ready; });
   return { started, resolve, read: () => { entered(); return response; } };
+}
+
+async function verifyScheduledRefresh(owner: CausaAccessUser, other: CausaAccessUser, db: PrismaClient) {
+  const enable = { action: "set-automatic", sourceId: feed, enabled: true };
+  const disable = { ...enable, enabled: false };
+  const clock = (hours: number) => new Date(start + hours * 3_600_000);
+  const start = Date.now() + 24 * 3_600_000;
+  const notices = { userId: owner.id, tipo: "academico.convocatorias" };
+  let reads = 0;
+  let remote: CallFeedItem[] | undefined = [first];
+  const read = async (sourceId: string) => {
+    assert.equal(sourceId, feed);
+    reads++;
+    if (!remote) throw Error("fictitious outage");
+    return remote;
+  };
+  const tick = (hours: number) => runScheduledAcademicCallRefresh(db, { now: clock(hours), read });
+  const view = async (actor: CausaAccessUser) => (await listAcademicCalls(actor, db)).subscriptions[0];
+
+  await mutateAcademicCalls(subscribe, owner, db);
+  await assert.rejects(mutateAcademicCalls(enable, other, db), isStatus(404));
+  await mutateAcademicCalls(subscribe, other, db);
+  assert.equal((await view(owner)).automatic, false);
+  assert.equal((await view(owner)).nextAttemptAt, null);
+  await tick(0);
+  assert.equal(reads, 0);
+  const enabled = updated(await mutateAcademicCalls(enable, owner, db));
+  assert.equal(enabled.automatic, true);
+  assert.ok(enabled.nextAttemptAt && new Date(enabled.nextAttemptAt) <= clock(0));
+  assert.equal(updated(await mutateAcademicCalls(enable, owner, db)).nextAttemptAt, enabled.nextAttemptAt);
+  await mutateAcademicCalls(enable, other, db);
+
+  // Same public feed is fetched once, even when both owners are due.
+  assert.deepEqual(await tick(0), { refreshed: 2, failed: 0, skipped: 0, sources: 1 });
+  assert.equal(reads, 1);
+  assert.deepEqual((await view(owner)).items, [first]);
+  assert.equal((await view(owner)).newCount, 0);
+  assert.equal((await view(owner)).nextAttemptAt, clock(12).toISOString());
+  assert.equal(await db.notification.count({ where: notices }), 0);
+  await tick(11.99);
+  assert.equal(reads, 1);
+
+  await mutateAcademicCalls(disable, other, db);
+  remote = undefined;
+  assert.equal((await tick(12)).failed, 1);
+  let current = await view(owner);
+  assert.ok(current.error);
+  assert.equal(current.checkedAt, clock(0).toISOString());
+  assert.equal(current.lastAttemptAt, clock(12).toISOString());
+  assert.equal(current.nextAttemptAt, clock(12.5).toISOString());
+  assert.deepEqual(current.items, [first]);
+  assert.equal((await tick(12.5)).failed, 1);
+  assert.equal((await view(owner)).nextAttemptAt, clock(13.5).toISOString());
+
+  remote = [{ ...first, deadline: "2027-04-30" }, second];
+  assert.equal((await tick(13.5)).refreshed, 1);
+  current = await view(owner);
+  assert.equal(current.newCount, 1);
+  assert.equal(current.changedCount, 1);
+  assert.equal(current.error, null);
+  const notification = await db.notification.findFirstOrThrow({ where: notices });
+  assert.equal(notification.href, ACADEMIC_CALLS_HREF);
+  assert.match(notification.body, /1 aviso nuevo y 1 aviso con cambios/);
+  assert.equal(await db.mensajeSaliente.count({ where: { notificationId: notification.id } }), 0);
+  assert.equal(await db.notification.count({ where: { ...notices, userId: other.id } }), 0);
+  assert.deepEqual((await view(other)).items, [first]);
+  assert.equal((await tick(25.5)).refreshed, 1);
+  assert.equal((await view(owner)).newCount, 0);
+  assert.equal(await db.notification.count({ where: notices }), 1);
+
+  // A manual refresh cannot take an automatic lease. Off/on also invalidates the old scheduled result.
+  const paused = pausedRead();
+  const running = runScheduledAcademicCallRefresh(db, { now: clock(37.5), read: paused.read });
+  await paused.started;
+  await assert.rejects(mutateAcademicCalls(refresh, owner, db, { read }), isStatus(409));
+  assert.equal((await tick(37.5)).sources, 0);
+  await mutateAcademicCalls(disable, owner, db);
+  await mutateAcademicCalls(enable, owner, db);
+  paused.resolve([first]);
+  assert.equal((await running).skipped, 1);
+  assert.equal((await view(owner)).checkedAt, clock(25.5).toISOString());
+
+  const revoked = pausedRead();
+  const late = runScheduledAcademicCallRefresh(db, { now: clock(37.5), read: revoked.read });
+  await revoked.started;
+  await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "assistant.use" } });
+  revoked.resolve([first]);
+  assert.equal((await late).skipped, 1);
+  const row = await db.altazorCallSubscription.findUniqueOrThrow({ where: { ownerId_sourceId: { ownerId: owner.id, sourceId: feed } } });
+  assert.equal(row.automatic, false);
+  assert.equal(row.nextAttemptAt, null);
+  assert.equal(row.refreshKey, null);
+  assert.equal(row.checkedAt?.toISOString(), clock(25.5).toISOString());
+  assert.equal(await db.notification.count({ where: notices }), 1);
+
+  // A role that cannot access Docencia is stopped before any source request.
+  await mutateAcademicCalls(enable, other, db);
+  await db.user.update({ where: { id: other.id }, data: { role: "cliente" } });
+  const previousReads = reads;
+  assert.equal((await tick(48)).skipped, 1);
+  assert.equal(reads, previousReads);
+  assert.equal((await db.altazorCallSubscription.findUniqueOrThrow({ where: { ownerId_sourceId: { ownerId: other.id, sourceId: feed } } })).automatic, false);
 }
 
 async function main() {
@@ -129,8 +233,11 @@ async function main() {
     await assert.rejects(listAcademicCalls(owner, db), isStatus(403));
     await assert.rejects(mutateAcademicCalls(subscribe, owner, db), isStatus(403));
     assert.equal((await db.altazorCallSubscription.findFirstOrThrow({ where: { ownerId: owner.id } })).checkedAt, null);
+    await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "" } });
+    await mutateAcademicCalls(unsubscribe, owner, db);
+    await verifyScheduledRefresh(owner, other, db);
     assert.equal(network, 0);
-    console.log("Convocatorias verificadas: privacidad, permisos vigentes, deduplicación, consulta concurrente, conservación de origen y recuperación ante caída.");
+    console.log("Convocatorias verificadas: permisos, deduplicación, conservación del origen, programación optativa, reintentos, carreras y avisos privados.");
   } finally {
     globalThis.fetch = originalFetch;
     await db.auditEvent.deleteMany({ where: { actorId: { in: ids } } });

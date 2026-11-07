@@ -2613,6 +2613,8 @@ model AltazorAcademicWorkspace {
   sourcesJson String @default("[]") @db.Text
   callOriginKey String?
   callOriginJson String? @db.Text
+  calendarFeedTokenHash String? @unique @db.VarChar(64)
+  calendarFeedEnabledAt DateTime?
   revision Int @default(1)
   archivedAt DateTime?
   createdAt DateTime @default(now())
@@ -2632,6 +2634,8 @@ model AltazorTeachingSession {
   startsAt DateTime
   endsAt DateTime?
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  calendarSequence Int @default(0)
   @@unique([workspaceId,requestId])
   @@index([startsAt,workspaceId])
 }
@@ -2841,10 +2845,17 @@ model AltazorCallSubscription {
   sourceId String
   itemsJson String @default("[]") @db.Text
   checkedAt DateTime?
+  lastAttemptAt DateTime?
   errorCode String?
+  automatic Boolean @default(false)
+  nextAttemptAt DateTime?
+  failureCount Int @default(0)
+  newCount Int @default(0)
+  changedCount Int @default(0)
   refreshKey String?
   refreshStartedAt DateTime?
   @@unique([ownerId, sourceId])
+  @@index([sourceId, automatic, nextAttemptAt])
 }
 model AltazorBibliographyEntry {
   id String @id @default(cuid())

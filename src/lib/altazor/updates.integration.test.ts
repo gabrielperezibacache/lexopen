@@ -103,7 +103,9 @@ async function main() {
     assert.equal((await tick("wrong")).status, 401);
     const result = await tick(cronSecret);
     assert.equal(result.status, 200);
-    assert.equal((await result.json()).jobs.dailyBrief, true);
+    const jobs = (await result.json()).jobs;
+    assert.equal(jobs.dailyBrief, true);
+    assert.equal(jobs.academicCalls, true);
     const day = santiagoDateKey(now);
     assert.deepEqual(await readDailyBriefState(owner, db), { enabled: true, backgroundEnabled: true, lastDay: day });
     assert.deepEqual(await readDailyBriefState(other, db), { enabled: true, backgroundEnabled: false, lastDay: null });

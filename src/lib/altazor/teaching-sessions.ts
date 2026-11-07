@@ -121,7 +121,7 @@ export async function scheduleTeachingCallDeadline(workspaceId: string, raw: unk
     if (!previous && await tx.altazorTeachingSession.count({ where: { workspaceId } }) >= sessionLimit) throw httpError("Este trabajo alcanzó el límite de doscientas actividades.", 413);
     const saved = await tx.altazorTeachingSession.upsert({
       where, create: { workspaceId, requestId: deadlineRequestId, title, startsAt },
-      update: { title, startsAt }, select: sessionSelect,
+      update: { title, startsAt, calendarSequence: { increment: 1 } }, select: sessionSelect,
     });
     await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.call-deadline", entityType: "AltazorTeachingSession", entityId: saved.id }, tx);
     return { session: view(saved), reused: Boolean(previous) };
