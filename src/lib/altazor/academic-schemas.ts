@@ -2,6 +2,7 @@ import { z } from "zod";
 import { altazorSourceInputSchema } from "./resource-input";
 import { ACADEMIC_MANUSCRIPT_TEMPLATE_IDS, ACADEMIC_TEACHING_TEMPLATES } from "./academic-templates";
 import { isWorkCountry } from "@/lib/config/countries";
+export const ACADEMIC_WORKSPACE_LIMIT = 100;
 export const ACADEMIC_MODES = ["synthesis", "literature_review", "comparison", "claim_audit", "bibliography_audit", "academic_writing", "translation", "abstract", "peer_review", "syllabus", "rubric", "teaching_material", "cv"] as const;
 export const academicModeSchema = z.enum(ACADEMIC_MODES);
 export type AcademicMode = z.infer<typeof academicModeSchema>;

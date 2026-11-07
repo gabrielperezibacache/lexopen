@@ -12,9 +12,10 @@ import { writeAuditStrict } from "@/lib/audit";
 import { createCaseWritingFromSnapshots } from "@/lib/writings/service";
 import { captureWritingSource } from "@/lib/writings/sources";
 import { resolveAltazorSources, verifyAltazorSources, type AltazorSourceSnapshot } from "./resources";
-import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, academicDraftCreateSchema, ACADEMIC_LABELS, emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
+import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, academicDraftCreateSchema, ACADEMIC_LABELS, ACADEMIC_WORKSPACE_LIMIT, emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
 import { parseAcademicOutput, academicReferenceAppendix, academicWritingBody } from "./academic-output";
 import { academicManuscriptBody, ACADEMIC_MANUSCRIPT_TEMPLATES, isAcademicTeachingKind, type AcademicManuscriptTemplate } from "./academic-templates";
+import type { AcademicCallOrigin } from "./academic-calls";
 const missing = () => httpError("El trabajo académico no está disponible", 404);
 const unavailableRowTitle = "Fila cuyo respaldo ya no está disponible";
 const unavailableSource = (error: unknown) => [403,404,409,410,413,422].includes(Number((error as { status?: number }).status));
@@ -28,7 +29,7 @@ async function workspaceFor(id: string, user: CausaAccessUser, client: AcademicC
 export async function academicOverview(user: CausaAccessUser, client: PrismaClient = prisma) {
   const actor = await actorFor(user, client);
   const [workspaces, profile, destination] = await Promise.all([
-    client.altazorAcademicWorkspace.findMany({ where: { ownerId: actor.id, archivedAt: null }, select: { id: true, title: true, kind: true, revision: true, updatedAt: true, briefJson: true }, orderBy: { updatedAt: "desc" }, take: 100 }),
+    client.altazorAcademicWorkspace.findMany({ where: { ownerId: actor.id, archivedAt: null }, select: { id: true, title: true, kind: true, revision: true, updatedAt: true, briefJson: true }, orderBy: { updatedAt: "desc" }, take: ACADEMIC_WORKSPACE_LIMIT }),
     client.altazorAcademicProfile.findUnique({ where: { ownerId: actor.id } }),
     workbenchDestination(actor.id, "assisted_draft"),
   ]);
@@ -56,7 +57,7 @@ export async function createAcademicWorkspace(raw: unknown, user: CausaAccessUse
   return bookTransaction(client, async tx => {
     const previous = await tx.altazorAcademicWorkspace.findUnique({ where: { ownerId_requestId: { ownerId: actor.id, requestId: input.requestId } } });
     if (previous) { if (previous.title !== input.title || previous.kind !== input.kind) throw httpError("Esta solicitud identifica otro trabajo", 409); return { id: previous.id, reused: true }; }
-    if (await tx.altazorAcademicWorkspace.count({ where: { ownerId: actor.id, archivedAt: null } }) >= 100) throw httpError("Archive un trabajo para crear otro; el límite activo es cien", 413);
+    if (await tx.altazorAcademicWorkspace.count({ where: { ownerId: actor.id, archivedAt: null } }) >= ACADEMIC_WORKSPACE_LIMIT) throw httpError("Archive un trabajo para crear otro; el límite activo es cien", 413);
     const task = input.kind === "course" ? "syllabus" : isAcademicTeachingKind(input.kind) ? "teaching_material" : input.kind === "career" ? "cv" : input.kind === "writing" ? "academic_writing" : "literature_review";
     const workspace = await tx.altazorAcademicWorkspace.create({ data: { ...input, ownerId: actor.id, briefJson: JSON.stringify({ ...emptyAcademicBrief, task }), matrixJson: JSON.stringify(emptyAcademicMatrix) } });
     return { id: workspace.id, reused: false };
@@ -86,7 +87,8 @@ export async function readAcademicWorkspace(id: string, user: CausaAccessUser, c
     try { artifacts.push(await readAcademicArtifact(id, row.id, actor, client)); }
     catch (error) { if (![403,404,409,410,413,422].includes(Number((error as { status?: number }).status))) throw error; artifacts.push({ id: row.id, available: false as const }); }
   }
-  return { id, title: workspace.title, kind: workspace.kind, revision: workspace.revision, brief: { ...emptyAcademicBrief, ...JSON.parse(workspace.briefJson) }, matrix, artifacts, sources, unavailableSources };
+  const callOrigin = workspace.callOriginJson ? JSON.parse(workspace.callOriginJson) as AcademicCallOrigin : undefined;
+  return { id, title: workspace.title, kind: workspace.kind, revision: workspace.revision, brief: { ...emptyAcademicBrief, ...JSON.parse(workspace.briefJson) }, matrix, artifacts, sources, unavailableSources, ...(callOrigin ? { callOrigin } : {}) };
 }
 export async function saveAcademicWorkspace(id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
   const input = academicWorkspaceSaveSchema.parse(raw);

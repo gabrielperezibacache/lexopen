@@ -63,6 +63,7 @@ model User {
   altazorSecretReceipts AltazorSecretReceipt[]
   altazorSecretGrants AltazorSecretGrant[]
   altazorAcademicSearches AltazorAcademicSearch[]
+  altazorCallSubscriptions AltazorCallSubscription[]
   altazorBibliographyEntries AltazorBibliographyEntry[]
   computerWorkspaces AltazorComputerWorkspace[]
   computerSessions AltazorComputerSession[]
@@ -2610,6 +2611,8 @@ model AltazorAcademicWorkspace {
   briefJson String @default("{}") @db.Text
   matrixJson String @default("{}") @db.Text
   sourcesJson String @default("[]") @db.Text
+  callOriginKey String?
+  callOriginJson String? @db.Text
   revision Int @default(1)
   archivedAt DateTime?
   createdAt DateTime @default(now())
@@ -2617,6 +2620,7 @@ model AltazorAcademicWorkspace {
   artifacts AltazorAcademicArtifact[]
   teachingSessions AltazorTeachingSession[]
   @@unique([ownerId,requestId])
+  @@unique([ownerId,callOriginKey])
   @@index([ownerId,archivedAt,updatedAt])
 }
 model AltazorTeachingSession {
@@ -2829,6 +2833,18 @@ model AltazorAcademicSearch {
   updatedAt DateTime @updatedAt
   @@unique([ownerId, requestId])
   @@index([ownerId, status, updatedAt])
+}
+model AltazorCallSubscription {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sourceId String
+  itemsJson String @default("[]") @db.Text
+  checkedAt DateTime?
+  errorCode String?
+  refreshKey String?
+  refreshStartedAt DateTime?
+  @@unique([ownerId, sourceId])
 }
 model AltazorBibliographyEntry {
   id String @id @default(cuid())

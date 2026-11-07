@@ -1,5 +1,5 @@
 import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
-import { createTeachingSession, listTeachingSessions, teachingSessionSchema } from "@/lib/altazor/teaching-sessions";
+import { createTeachingSession, listTeachingSessions, scheduleTeachingCallDeadline, teachingSessionMutationSchema } from "@/lib/altazor/teaching-sessions";
 import { parseKnowledgeBody } from "@/lib/knowledge/route-body";
 
 export const runtime = "nodejs";
@@ -17,8 +17,8 @@ export async function POST(request: Request, { params }: Params) {
   try {
     assertCsrf(request);
     const user = await requireStaff(), { id } = await params;
-    const input = await parseKnowledgeBody(request, teachingSessionSchema, 2048);
-    const result = await createTeachingSession(id, input, user);
+    const input = await parseKnowledgeBody(request, teachingSessionMutationSchema, 2048);
+    const result = "action" in input ? await scheduleTeachingCallDeadline(id, input, user) : await createTeachingSession(id, input, user);
     return Response.json(result, { status: result.reused ? 200 : 201, headers });
   } catch (error) { return handleRouteError(error); }
 }

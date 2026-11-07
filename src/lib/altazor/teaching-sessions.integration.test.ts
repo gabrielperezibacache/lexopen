@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
-import { createTeachingSession, deleteTeachingSession, listTeachingSessions, teachingCalendarSessions } from "./teaching-sessions";
+import { createTeachingSession, deleteTeachingSession, exportTeachingSessions, listTeachingSessions, scheduleTeachingCallDeadline, teachingCalendarSessions } from "./teaching-sessions";
 
 const statusIs = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
 
@@ -53,7 +53,33 @@ async function main() {
     await db.altazorAcademicWorkspace.update({ where: { id: course.id }, data: { archivedAt: null } });
     assert.deepEqual(await deleteTeachingSession(course.id, id, owner, db), { deleted: true });
     assert.deepEqual((await listTeachingSessions(course.id, owner, db)).sessions, []);
-    console.log("Teaching sessions passed: owner-only read and mutation, active teaching kinds, Santiago time, transactional idempotency, local calendar and archive handling.");
+
+    const call = await db.altazorAcademicWorkspace.create({
+      data: { ownerId: owner.id, kind: "call", title: "Convocatoria ficticia", requestId: randomUUID(), briefJson: JSON.stringify({ call: { deadline: "2026-12-15" } }) },
+    });
+    const deadline = { action: "schedule-call-deadline", date: "2026-12-15", localDate: "2026-12-14", time: "16:30" };
+    await assert.rejects(scheduleTeachingCallDeadline(call.id, deadline, other, db), statusIs(404));
+    await assert.rejects(scheduleTeachingCallDeadline(course.id, deadline, owner, db), statusIs(404));
+    await assert.rejects(scheduleTeachingCallDeadline(call.id, { ...deadline, date: "2026-12-14" }, owner, db), statusIs(409));
+    const [scheduled, retry] = await Promise.all([scheduleTeachingCallDeadline(call.id, deadline, owner, db), scheduleTeachingCallDeadline(call.id, deadline, owner, db)]);
+    assert.notEqual(scheduled.reused, retry.reused);
+    assert.equal(scheduled.session.id, retry.session.id);
+    assert.equal(scheduled.session.callDeadline, true);
+    assert.equal(scheduled.session.startsAt, "2026-12-14T19:30:00.000Z");
+    const rescheduled = await scheduleTeachingCallDeadline(call.id, { ...deadline, time: "17:45" }, owner, db);
+    assert.equal(rescheduled.session.id, scheduled.session.id);
+    assert.equal(rescheduled.session.startsAt, "2026-12-14T20:45:00.000Z");
+    assert.equal((await listTeachingSessions(call.id, owner, db)).sessions.length, 1);
+    await assert.rejects(exportTeachingSessions(call.id, other, db), statusIs(404));
+    const unicode = "áó🙂".repeat(21);
+    await createTeachingSession(call.id, { requestId: randomUUID(), title: `${unicode}\r\nATTENDEE: ficticio`, startsAtLocal: "2026-12-14T20:45" }, owner, db);
+    const ics = await exportTeachingSessions(call.id, owner, db);
+    assert.match(ics, /SUMMARY:Cierre · Convocatoria ficticia/);
+    assert.match(ics, /DTSTART:20261214T204500Z/);
+    assert.ok(ics.replace(/\r\n /g, "").includes(`SUMMARY:${unicode}\\nATTENDEE: ficticio`));
+    assert.ok(ics.split("\r\n").every(line => Buffer.byteLength(line) <= 75));
+    assert.ok(!ics.includes("\r\nATTENDEE:"));
+    console.log("Teaching sessions passed: ownership, Santiago time, idempotency, call deadline updates and private calendar export.");
   } finally {
     await db.auditEvent.deleteMany({ where: { actorId: { in: ids } } });
     await db.altazorAcademicWorkspace.deleteMany({ where: { ownerId: { in: ids } } });

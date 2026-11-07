@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { writeAuditStrict } from "@/lib/audit";
+import { buildIcs } from "@/lib/calendario/ics";
 import { httpError } from "@/lib/auth/access";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { canSome } from "@/lib/auth/permissions";
@@ -13,17 +14,25 @@ import { ACADEMIC_TEACHING_TEMPLATES } from "./academic-templates";
 import { altazorRequestId } from "./schemas";
 
 const sessionLimit = 200;
+const deadlineRequestId = "academic-call-deadline";
 const localDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "Elige una fecha y una hora de la Agenda.");
 export const teachingSessionSchema = z.object({
-  requestId: altazorRequestId,
+  requestId: altazorRequestId.refine(value => value !== deadlineRequestId),
   title: z.string().trim().min(1, "Escribe un nombre para la actividad.").max(160),
   startsAtLocal: localDateTime,
   endsAtLocal: localDateTime.optional(),
 }).strict();
+const callDeadlineSchema = z.object({
+  action: z.literal("schedule-call-deadline"),
+  date: z.string().refine(isValidYmd, "La fecha de cierre no es válida."),
+  localDate: z.string().refine(isValidYmd, "Elige una fecha válida para la Agenda."),
+  time: z.string().refine(isValidHhmm, "Elige una hora para el cierre."),
+}).strict();
+export const teachingSessionMutationSchema = z.union([teachingSessionSchema, callDeadlineSchema]);
 
-export type TeachingSession = { id: string; title: string; startsAt: string; endsAt: string | null; agendaHref: string };
+export type TeachingSession = { id: string; title: string; startsAt: string; endsAt: string | null; agendaHref: string; callDeadline?: true };
 
-const sessionSelect = { id: true, title: true, startsAt: true, endsAt: true } as const;
+const sessionSelect = { id: true, title: true, startsAt: true, endsAt: true, requestId: true } as const;
 type Session = Prisma.AltazorTeachingSessionGetPayload<{ select: typeof sessionSelect }>;
 const ownedTeachingWork = (ownerId: string) => ({ ownerId, kind: { in: [...ACADEMIC_TEACHING_TEMPLATES] }, archivedAt: null });
 const missing = () => httpError("La actividad o el trabajo docente no están disponibles.", 404);
@@ -40,7 +49,9 @@ function teachingTime(value: string) {
 
 function view(row: Session): TeachingSession {
   const ym = santiagoDateKey(row.startsAt).slice(0, 7);
-  return { id: row.id, title: row.title, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt?.toISOString() ?? null, agendaHref: `/calendario?vista=agenda&ym=${ym}&tipo=evento` };
+  return { id: row.id, title: row.title, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt?.toISOString() ?? null, agendaHref: `/calendario?vista=agenda&ym=${ym}&tipo=evento`,
+    ...(row.requestId === deadlineRequestId ? { callDeadline: true as const } : {}),
+  };
 }
 
 async function teachingWorkspace(id: string, user: CausaAccessUser, client: Prisma.TransactionClient) {
@@ -49,13 +60,24 @@ async function teachingWorkspace(id: string, user: CausaAccessUser, client: Pris
   return actor;
 }
 
-export async function listTeachingSessions(workspaceId: string, user: CausaAccessUser, client: PrismaClient = prisma) {
+async function readTeachingSessions(workspaceId: string, user: CausaAccessUser, client: PrismaClient) {
   const actor = await teachingWorkspace(workspaceId, user, client);
-  const sessions = await client.altazorTeachingSession.findMany({
+  return client.altazorTeachingSession.findMany({
     where: { workspaceId, workspace: ownedTeachingWork(actor.id) }, select: sessionSelect,
     orderBy: [{ startsAt: "asc" }, { id: "asc" }], take: sessionLimit,
   });
+}
+
+export async function listTeachingSessions(workspaceId: string, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const sessions = await readTeachingSessions(workspaceId, user, client);
   return { sessions: sessions.map(view) };
+}
+
+export async function exportTeachingSessions(workspaceId: string, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const sessions = await readTeachingSessions(workspaceId, user, client);
+  return buildIcs(sessions.map(session => ({
+    id: session.id, titulo: session.title, inicio: session.startsAt, fin: session.endsAt,
+  })));
 }
 
 export async function createTeachingSession(workspaceId: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
@@ -76,6 +98,33 @@ export async function createTeachingSession(workspaceId: string, raw: unknown, u
     const created = await tx.altazorTeachingSession.create({ data: { workspaceId, requestId, title, startsAt, endsAt }, select: sessionSelect });
     await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.schedule", entityType: "AltazorTeachingSession", entityId: created.id }, tx);
     return { session: view(created), reused: false };
+  });
+}
+
+export async function scheduleTeachingCallDeadline(workspaceId: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const { date, localDate, time } = callDeadlineSchema.parse(raw);
+  const startsAt = teachingTime(`${localDate}T${time}`);
+  return altazorTransaction(client, async tx => {
+    const actor = await altazorActor(user, tx);
+    const workspace = await tx.altazorAcademicWorkspace.findFirst({
+      where: { id: workspaceId, ownerId: actor.id, kind: "call", archivedAt: null },
+      select: { title: true, briefJson: true },
+    });
+    if (!workspace) throw missing();
+    if (JSON.parse(workspace.briefJson).call?.deadline !== date) {
+      throw httpError("La fecha de cierre cambió. Guarda la ficha y revisa la fecha antes de agendar.", 409);
+    }
+    const title = `Cierre · ${workspace.title}`.slice(0, 160);
+    const where = { workspaceId_requestId: { workspaceId, requestId: deadlineRequestId } };
+    const previous = await tx.altazorTeachingSession.findUnique({ where, select: sessionSelect });
+    if (previous?.startsAt.getTime() === startsAt.getTime() && previous.title === title) return { session: view(previous), reused: true };
+    if (!previous && await tx.altazorTeachingSession.count({ where: { workspaceId } }) >= sessionLimit) throw httpError("Este trabajo alcanzó el límite de doscientas actividades.", 413);
+    const saved = await tx.altazorTeachingSession.upsert({
+      where, create: { workspaceId, requestId: deadlineRequestId, title, startsAt },
+      update: { title, startsAt }, select: sessionSelect,
+    });
+    await writeAuditStrict({ actorId: actor.id, action: "altazor.teaching.call-deadline", entityType: "AltazorTeachingSession", entityId: saved.id }, tx);
+    return { session: view(saved), reused: Boolean(previous) };
   });
 }
 

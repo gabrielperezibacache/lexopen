@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, BookOpen, CalendarDays, GraduationCap, LibraryBig, Megaphone, PenTool, UsersRound } from "lucide-react";
+import { ArrowDown, ArrowRight, BookOpen, CalendarDays, ExternalLink, GraduationCap, LibraryBig, Megaphone, PenTool, UsersRound } from "lucide-react";
+import type { AcademicCallOrigin } from "@/lib/altazor/academic-calls";
 import { ACADEMIC_CALL_STATUS, emptyAcademicCall, emptyAcademicSyllabus, type AcademicCall, type AcademicSyllabus, type emptyAcademicBrief } from "@/lib/altazor/academic-schemas";
 import { ACADEMIC_MANUSCRIPT_TEMPLATES, ACADEMIC_TEACHING_TEMPLATES } from "@/lib/altazor/academic-templates";
+import { formatCivilDate, SANTIAGO_TZ } from "@/lib/chile-time";
 import { isWorkCountry, workCountryOptions } from "@/lib/config/countries";
+import { AcademicCallSources } from "./AcademicCallSources";
 import { AltazorMark } from "./AltazorMark";
 import { useOptionalAltazorCompanion } from "./AltazorCompanionProvider";
 import type { AcademicProject } from "./academic-ui";
@@ -29,12 +32,14 @@ const courseBriefFields = [
 type CourseBriefKey = (typeof courseBriefFields)[number]["id"];
 const countries = workCountryOptions("es");
 const countryNames = new Map<string, string>(countries.map(({ code, label }) => [code, label]));
+const consultationDate = new Intl.DateTimeFormat("es", { dateStyle: "medium", timeZone: SANTIAGO_TZ });
 
-export function AcademicTeaching({ projects, blocked, onStart, onOpen }: {
+export function AcademicTeaching({ projects, blocked, onStart, onOpen, onSaved }: {
   projects: AcademicProject[];
   blocked: boolean;
   onStart: (template: TeachingTemplate) => void;
   onOpen: (id: string) => void;
+  onSaved: (project: AcademicProject) => void;
 }) {
   const [country, setCountry] = useState("");
   const calls = projects.filter(project => project.kind === "call");
@@ -46,7 +51,9 @@ export function AcademicTeaching({ projects, blocked, onStart, onOpen }: {
   return <section className={styles.studio} aria-labelledby="teaching-title">
     <header className={styles.heading}>
       <GraduationCap size={32} strokeWidth={1.4} aria-hidden="true" />
-      <div><h2 id="teaching-title">Docencia y encuentros</h2><p>Organiza un curso, una actividad o una convocatoria. Cada trabajo reúne su ficha, sus fuentes y sus documentos.</p></div>
+      <div><h2 id="teaching-title">Docencia y encuentros</h2><p>Organiza un curso, una actividad o una convocatoria. Cada trabajo reúne su ficha, sus fuentes y sus documentos.</p>
+        <a className={styles.callJump} href="#convocatorias-oficiales">Buscar convocatorias oficiales <ArrowDown size={15} aria-hidden="true" /></a>
+      </div>
     </header>
     <ul className={styles.catalog}>
       {ACADEMIC_TEACHING_TEMPLATES.map((id, index) => {
@@ -75,11 +82,13 @@ export function AcademicTeaching({ projects, blocked, onStart, onOpen }: {
       <h3 id="teaching-projects-title">Mis trabajos docentes</h3>
       <ul className={styles.projects}>{otherProjects.map(project => <li key={project.id}><button type="button" disabled={blocked} onClick={() => onOpen(project.id)}>{project.title}<ArrowRight size={16} aria-hidden="true" /></button></li>)}</ul>
     </section>}
+    <AcademicCallSources blocked={blocked} onOpen={onOpen} onSaved={onSaved} />
   </section>;
 }
 
-export function AcademicCallForm({ value = emptyAcademicCall, busy, onChange }: {
+export function AcademicCallForm({ value = emptyAcademicCall, origin, busy, onChange }: {
   value?: AcademicCall;
+  origin?: AcademicCallOrigin | null;
   busy: boolean;
   onChange: (call: AcademicCall) => void;
 }) {
@@ -87,6 +96,14 @@ export function AcademicCallForm({ value = emptyAcademicCall, busy, onChange }: 
     <header className={styles.heading}><Megaphone size={27} strokeWidth={1.4} aria-hidden="true" />
       <div><h3 id="call-details-title">Ficha de la convocatoria</h3><p>Conserva los datos de las bases para seguir la postulación y consultar su origen.</p></div>
     </header>
+    {origin && <details className={styles.origin}>
+      <summary>Origen de la convocatoria · {origin.sourceLabel}</summary>
+      <p className={styles.meta}>Consulta guardada el <time dateTime={origin.checkedAt}>{consultationDate.format(new Date(origin.checkedAt))}</time>.</p>
+      <p><strong>{origin.title}</strong></p>
+      {origin.summary && <p className={styles.originSummary}>{origin.summary}</p>}
+      {origin.deadline && <p className={styles.meta}>Cierre informado en esa consulta <time dateTime={origin.deadline}>{formatCivilDate(origin.deadline)}</time></p>}
+      <a className={styles.callJump} href={origin.url} target="_blank" rel="noopener noreferrer">Abrir aviso oficial <ExternalLink size={15} aria-hidden="true" /></a>
+    </details>}
     <fieldset disabled={busy} className={styles.fields}>
       <legend className="sr-only">Datos de la convocatoria</legend>
       <label>País<select aria-label="País" value={value.country} onChange={event => {

@@ -16,19 +16,25 @@ function icsEscape(value: string): string {
     .replace(/\\/g, "\\\\")
     .replace(/;/g, "\\;")
     .replace(/,/g, "\\,")
-    .replace(/\n/g, "\\n");
+    .replace(/\r\n?|\n/g, "\\n");
 }
 
 function foldLine(line: string): string {
   // RFC 5545: líneas ≤ 75 octetos; continuación con espacio inicial.
-  if (line.length <= 75) return line;
   const chunks: string[] = [];
-  let rest = line;
-  while (rest.length > 75) {
-    chunks.push(rest.slice(0, 75));
-    rest = ` ${rest.slice(75)}`;
+  let current = "";
+  let bytes = 0;
+  for (const character of line) {
+    const size = Buffer.byteLength(character);
+    if (bytes + size > 75) {
+      chunks.push(current);
+      current = " ";
+      bytes = 1;
+    }
+    current += character;
+    bytes += size;
   }
-  chunks.push(rest);
+  chunks.push(current);
   return chunks.join("\r\n");
 }
 
