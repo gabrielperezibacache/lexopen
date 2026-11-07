@@ -1,0 +1,482 @@
+{
+  "date": "2026-11-07",
+  "generator": "ImageGen and Google Flow; see individual asset records",
+  "contains_application_data": false,
+  "assets": [
+    {
+      "file": "libro-contable-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/libro-contable.png",
+      "sha256": "19958f30799e9a472ce9c3dd6a97b6f27c5c301962df3897f7b9f6d2c4727cfd",
+      "dimensions": [
+        720,
+        480
+      ],
+      "transparent": true,
+      "prompt": "Use case: illustration-story. Asset type: transparent editorial engraving for the billing workspace header in LexOpen, a sophisticated legal app. Create one isolated compact still life: a classic cloth-bound accounting ledger open at an oblique three-quarter angle, neat faint ruled columns on its pages and a slim traditional fountain pen placed beside it, with one narrow ribbon bookmark. Pages show only delicate horizontal and vertical rules, absolutely no readable characters. Fine nineteenth-century copperplate / steel engraving, intricate crosshatching, tactile paper edges, subtle cloth binding, elegant antique scholarly book frontispiece style. Palette strictly cool silver white #f4f3f7, slate indigo #313958 and deep ink #0d1022, tiny restrained iris #aab5ff bookmark. Strong compact legible silhouette, readable at 144px wide. Center subject with transparent margins, genuine alpha transparency, no scene background and no floating cast shadow. NO text, lettering, numbers, money signs, logos, feather quills, scales of justice, gavels, gradients, glow, mockups or UI.",
+      "refinement": "Remove only the broad grey haze, glow, smoky shadow and dark atmospheric vignette behind and around this engraved object. Keep the entire object, exact composition, silver/indigo linework and iris detail unchanged. Output a crisp clean cutout with real alpha transparency around the object and in all gaps. Background must be entirely transparent right up to the actual engraved outlines. No halos, no atmospheric illumination, no added cast shadows, no backdrop. Preserve fine crosshatching and the elegant original illustration."
+    },
+    {
+      "file": "expedientes-v2.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-expedientes-base-v2.jpg",
+      "sha256": "194b9e6a12e37b7d76a786f95270272e2879dff0764db5f8e9669fdcbb51bd3a",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "9647711b-0d6c-43fe-b1f5-b587afc5d475",
+      "prompt": "Create a refined editorial spot illustration for LexOpen, a legal work application. A real documentary case folder lying OPEN on a flat surface, viewed from a fixed three-quarter angle, with a small orderly stack of three loose paper folios inside and a simple restrained metal paper fastener on the LEFT spine. Thin rigid archival grey-blue cardboard cover, straight clean structural edges, papers clearly separate from the cover. No book binding, no decorative ribbon, no bow, no gift packaging. Fine nineteenth-century silver steel engraving and precise crosshatching, cool silver white #f4f3f7, indigo ink #313958, one restrained iris #aab5ff tab. Entire folder and every paper edge fully visible, compact horizontal silhouette occupying only the middle 65 percent of a 16:9 image. At least 15 percent empty safe margin on all sides, nothing cropped. Perfectly plain uniform deep indigo #0d1022 background, no horizon, no scene, no smoke, no surrounding glow, no dramatic shadows. Paper contains only subtle non-readable engraved ruling: absolutely no letters, numbers, writing, labels, text or logos. Elegant, restrained, professional legal publisher engraving, clean and readable at small size."
+    },
+    {
+      "file": "plazos-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-plazos-v1-original.mp4",
+      "sha256": "32d2eeaaebd49047a468f947efaab59e2d25667b7d678ef4a6ecef65184539ff",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Veo 3.1 - Fast (poster at 3 seconds)",
+      "flowAssetId": "125322c3-dfd8-43c6-9053-f82822653b96",
+      "prompt": "Animate this exact engraved pocket watch as a restrained eight-second editorial still life. LOCKED camera. Preserve the exact original shape, perspective, silver steel-engraved crosshatching, dial, twelve hour marks, winding crown, chain and uniform deep indigo background throughout. The watch case and entire chain remain absolutely stationary. ONLY the existing LONG minute hand advances smoothly CLOCKWISE by a small restrained angle, about twelve degrees over the whole eight seconds. Its pivot remains fixed at the center. The short hour hand remains still. Do not add a second hand. No spinning or full revolutions, no wobbling, no stretching, no melting metal, no deformation of the dial or rim. Preserve all original safe margins, keep the whole watch and chain inside frame. No zoom, orbit, pan, camera shake, new props, letters, numerals, logos, characters, light flares, smoke or sparkles. Elegant subtly accelerated passage of time, professional scholarly engraving, not a realistic photograph. Silent video, no music, voices or sound effects.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/nuevos-elementos-flow.json"
+    },
+    {
+      "file": "investigacion-flow-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flow-investigacion-v1-original.jpg",
+      "sha256": "da2ba1d829f97f795fa2df4c2aac3f016290f2a5f64df399149847f0185e97e3",
+      "originalSha256": "a527d3860530c5a379ead1226be863f88785f952736809780fb3d865ea448560",
+      "dimensions": [
+        720,
+        402
+      ],
+      "transparent": false,
+      "generator": "Google Flow / Nano Banana 2.1",
+      "flowAssetId": "d1f19d6b-70be-4f8b-83e1-117303fdf910",
+      "prompt": "Subject: a large elegant handheld magnifying glass lying at a three-quarter angle across three neatly layered blank archival index slips. A coherent thin silver lens rim, dark slender handle, transparent clear lens showing the blank ruled slip underneath without distortion. Each slip carries only two faint horizontal rules. No writing or symbols. A tiny iris tab on the bottom slip. Create ONE refined editorial spot illustration for LexOpen, a professional legal work application. Fine nineteenth-century SILVER STEEL ENGRAVING, exquisite precise crosshatching and tactile fine linework, scholarly book frontispiece quality. Palette strictly cool silver white #f4f3f7, indigo #313958, deep ink #0d1022, one tiny restrained iris #aab5ff accent. Perfectly FLAT uniform deep indigo #0d1022 backdrop, no scene, floor, horizon, haze, glow or vignette. Compact coherent horizontal composition occupying 78 percent of a 16:9 canvas, all edges fully visible, safe margin around everything, strong silhouette readable at 144px wide. No letters, words, numbers, labels, logos, people, hands, gavels, justice scales, pictograms, clip-art, decorative borders, gradients or photorealism. The result belongs to the same family of antique silver engraved notebooks and pocket watches on indigo.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/serie-modulos-flow-v1.json"
+    },
+    {
+      "file": "filosofo-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/filosofo-gpt-v1-original.png",
+      "sha256": "acbf04e7d722a7d861f00271405f0fbdacaefb69c6e24eb6ca9b9a069a8cfc29",
+      "originalSha256": "7e8fb5195e56ca5743f993671e3b6f602c7224550bcfab4d83ab8d82d21b6a4b",
+      "dimensions": [
+        960,
+        1280
+      ],
+      "transparent": true,
+      "generator": "OpenAI GPT image generation / built-in image_gen",
+      "prompt": "Use case: illustration-story. Asset type: a genuine transparent-background editorial engraving for LexOpen, a scholarly legal application. Create ONE anonymous philosopher of ancient Greece in a classic gesture of thought. Full seated figure, three-quarter view facing LEFT, wearing a simply draped Greek himation. Calm mature Hellenic profile, curly hair, finely engraved beard, dignified expression. Leaning forward slightly, one elbow naturally supported on his own knee, the knuckles of that hand resting lightly beneath his chin in reflection. The other hand rests quietly on his lap inside the robe folds. Anatomically coherent hands, exactly two arms, sensible joints and proportions. Seated on one small plain stone support; include the whole figure, support and feet with twelve percent clear safe margin on all sides. Portrait 3:4 composition. Render as an exquisite nineteenth-century silver steel engraving, like a classical scholar in a fine legal publisher's frontispiece: very precise fine crosshatching, delicately carved curls and beard, tactile robe folds, elegant controlled silhouette, strong negative spaces. Match the visual family of an antique silver engraved Greek reader, never a cartoon or modern icon. Palette strictly cool silver-white #f4f3f7, slate-indigo #313958, deep ink #0d1022, with one almost imperceptible iris #aab5ff accent in a robe fold. Favor engraved lines and open dark negative spaces over broad white fills. This will be rendered quietly at low opacity over a deep indigo interface background. Genuine clean alpha transparency all around the figure and in every gap; no rectangular backdrop, floor, horizon, atmosphere, smoke, halo, aura, glow, rays, surrounding shadow, architecture, columns, books, scrolls, text, letters, numbers, lettering, signature, logos or watermarks. No photorealistic marble photograph, no painted statue, no pedestal inscription. Restrained, thoughtful and beautifully drawn.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/filosofo-gpt-v1.json",
+      "use": "Subtle fixed illustration on indigo workspace and blue sidebar; decorative, non-interactive."
+    },
+    {
+      "file": "atenea-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/atenea-gpt-v1-original.png",
+      "sha256": "76e255f4a29618328b9df821e5a6beed2557ded68dfc931369a3856e4f81418f",
+      "originalSha256": "083ee672df48fe1041ebf87a3fff0f8eaaed7fceec26a104b783a32b6f75bf44",
+      "dimensions": [
+        720,
+        960
+      ],
+      "transparent": true,
+      "generator": "OpenAI GPT image generation / built-in image_gen",
+      "prompt": "Use case: illustration-story. Asset type: a NEW genuine transparent-background editorial engraving for the LEFT NAVIGATION SIDEBAR of LexOpen. This must be distinctly different from the application's central seated male philosopher with his chin on his hand; DO NOT draw a seated man or a thinker pose. Create one exquisite classical BUST OF ATHENA: a dignified adult woman in an ancient Greek peplos, head and shoulders in a calm three-quarter profile facing RIGHT toward the application's central workspace. Recognizable refined Corinthian helmet pushed back above her brow so her serene face and thoughtful eyes are fully visible, with a restrained narrow crest. Graceful engraved waves of hair under the helmet; draped cloth over the shoulders, a simple small plinth beneath the bust. No arms or hands, no weapons, no shield, no Medusa face, no aggressive expression. Fine nineteenth-century silver STEEL ENGRAVING like an antique scholarly frontispiece, incredibly precise crosshatching, carved curls, delicate metal hatching on the helmet, tactile cloth folds. Match a classical Greek silver engraved reader and scholar family: elegant, realistic drawn proportions, dense fine cut lines, strong negative spaces; no cartoon, vector icon, photography or glossy 3D render. Palette only cool silver white #f4f3f7, slate indigo #313958, deep ink #0d1022, one extremely tiny restrained iris #aab5ff detail on the helmet rim. Portrait 3:4 composition; the entire bust, helmet crest and plinth fully inside the canvas with twelve percent clear margin all around, nothing cropped. Strong coherent silhouette readable as a subtle background at 250px wide. Genuine clean alpha transparency around the whole object and in all gaps. NO background, rectangular plate, floor, horizon, architecture, columns, scenery, surrounding shadows, smoke, haze, halo, rays, aura, glow, ornamental frame, writing, numbers, letters, captions, inscriptions, logos, signature or watermark. Quiet, learned, editorial and beautifully hand-engraved.",
+      "generationRecord": "docs/estetica-editorial-2026-11-07/media-sources/atenea-gpt-v1.json",
+      "use": "Distinct Athena bust in navigation sidebar and mobile drawer, blended into blue; central philosopher retained."
+    },
+    {
+      "file": "expedientes-flow-v2-poster.webp",
+      "source": "public/editorial/generated/expedientes-flow-v2.mp4",
+      "provider": "Google Flow (derived first-frame poster)",
+      "processing": "First-frame extraction only; no generative changes. Theme compositing is CSS.",
+      "dimensions": [
+        640,
+        360
+      ],
+      "bytes": 27528,
+      "sha256": "7b6e0b69d7d3b4064fdef1845c73bf21c1c9a66315d17f642bd0481b50f3a5b8",
+      "transparent": false,
+      "compositing": "Shared SVG luminance-to-alpha filter removes the dark Flow matte without inverting or replacing the silver artwork; applies to poster and video in both themes."
+    },
+    {
+      "file": "libro-contable-flow-v1-poster.webp",
+      "source": "public/editorial/generated/libro-contable-flow-v1.mp4",
+      "provider": "Google Flow (derived first-frame poster)",
+      "processing": "First-frame extraction only; no generative changes. Theme compositing is CSS.",
+      "dimensions": [
+        640,
+        360
+      ],
+      "bytes": 75936,
+      "sha256": "83fe68359ad001fb0016e5c3062187611972912cbcae28424d30045288b66f03",
+      "transparent": false,
+      "compositing": "Shared SVG luminance-to-alpha filter removes the dark Flow matte without inverting or replacing the silver artwork; applies to poster and video in both themes."
+    },
+    {
+      "file": "plazos-flow-v1-poster.webp",
+      "source": "public/editorial/generated/plazos-flow-v1.mp4",
+      "provider": "Google Flow (derived first-frame poster)",
+      "processing": "First-frame extraction only; no generative changes. Theme compositing is CSS.",
+      "dimensions": [
+        640,
+        360
+      ],
+      "bytes": 23894,
+      "sha256": "64be31dad56e174980e3f05bc3162d1ebea975063fc8fc3d305d61099d7207ac",
+      "transparent": false,
+      "compositing": "Shared SVG luminance-to-alpha filter removes the dark Flow matte without inverting or replacing the silver artwork; applies to poster and video in both themes."
+    },
+    {
+      "file": "investigacion-motion-flow-v1-poster.webp",
+      "source": "public/editorial/generated/investigacion-motion-flow-v1.mp4",
+      "provider": "Google Flow (derived first-frame poster)",
+      "processing": "First-frame extraction only; no generative changes. Theme compositing is CSS.",
+      "dimensions": [
+        640,
+        360
+      ],
+      "bytes": 29788,
+      "sha256": "515b6fdab0e4a08e7fe1a1a5fa74101128e3f4edcf0e4dae0ca71038d629b918",
+      "transparent": false,
+      "compositing": "Shared SVG luminance-to-alpha filter removes the dark Flow matte without inverting or replacing the silver artwork; applies to poster and video in both themes."
+    },
+    {
+      "file": "escritura-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/escritura-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 57832,
+      "sha256": "2d04b6c02d1e288d52aca5d9b7a8c84fc300a7ff1bfeb0a5ee931f801abe1963",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: A small clear faceted glass inkwell with its cap closed at the LEFT, a slender silver fountain pen with a distinct nib resting diagonally in the foreground, and two aligned loose blank manuscript folios at the RIGHT. The top folio has one gently lifted upper-right paper corner, and only three extremely faint straight engraved rules with no characters. One tiny iris bookmark peeks from beneath the lower folio. Make paper thin and physically coherent; the pen has only one nib and one continuous rigid body.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "audiencias-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/audiencias-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 36102,
+      "sha256": "bc80903fa4ef3ed8090e9572c17ad3a0bc044218e638ce8da9eb0a18d89c879a",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: A single mechanically coherent desktop gooseneck microphone on a small low round base, its slender curved metal neck ending in one compact finely engraved mesh head. Beside it, one small CLOSED plain paper notepad with a tiny iris cloth tab. Keep the microphone silhouette elegant and understated, with no LEDs, buttons, sound waves, cables leaving frame or brand marks. Exactly one microphone, one base and one notepad.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "personas-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/personas-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 66594,
+      "sha256": "c137213bf5c25a6eaa04625a82be59c9d40411e11217c5bfbb2c8b1250cf256e",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: One small desktop card-index box, its rigid hinged lid already open, containing three simple blank paper divider cards with staggered tabs. One loose blank contact card leans against its front. The front card has no text or portrait. Fine engraved silver box construction and crisp paper edges; a tiny iris middle divider tab. A compact realistic archival contact register, with no human figures or people icons.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "flujos-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/flujos-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 63812,
+      "sha256": "eae4987d8c27c46c2859373174d93af171cdf7cf4ccdca7ec03bb6bd6f188917",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: Three distinct blank rectangular paper work cards laid in a graceful stepped horizontal sequence on a shared plane. One continuous slender silk thread passes through ONE small round eyelet at the corner of EACH card, connecting them naturally. Each card has two faint short straight engraved rules, no characters. A tiny iris section of the thread. Tangible paper and silk; no arrows, diagrams, digital nodes or floating elements. All three cards and the complete thread stay within the composition.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "conexiones-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/conexiones-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 76174,
+      "sha256": "0ca45de721357404b732d7d066d0f4b9f5214afb9b5ef4ee3ac101da622dc0e3",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: Exactly two solid slim oval silver chain links naturally and genuinely interlocked at a three-quarter angle, resting beside one small CLOSED plain archival document wallet with a tiny iris tab. The links must be mechanically coherent and remain separate rigid objects; neither fused nor open. No extra chain extending outside the canvas, no padlock, digital icons, buttons or arrows. Exquisite fine engraving on metal, tactile quiet paper.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "avisos-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/avisos-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 39296,
+      "sha256": "c6356447f5c87b228f4b61dd111e34dff0bc6b1bbc5b596fdb4330a8ca171812",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: One small classic handheld silver desk bell standing upright, with a narrow elegant turned handle joined to a single coherent flared bell body. Two overlapping blank paper reminder slips rest beside it, one with a tiny iris corner tab. The bell is one rigid object with clean mechanically plausible construction. No hotel counter, sound waves, clapper floating outside the bell, pictograms or lettering.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "configuracion-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/configuracion-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 58026,
+      "sha256": "9fca0c8dd1ebef0cf52f616f05d51957fcfbc542cb7a2ecc6738e62870348eb5",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: A precision antique metal divider compass with EXACTLY TWO thin rigid legs slightly open at ONE shared knurled pivot, resting across a small flat round adjustment wheel with a finely knurled rim. A blank drafting slip beneath them has three short parallel engraved guide marks. One tiny iris detail on the existing pivot. The compass remains mechanically coherent with no extra legs, pivots or points. No numerals, measurement labels, hands or extra drafting tools.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "tareas-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/tareas-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 61410,
+      "sha256": "6b9883f4855225cbb0f6be10d0554da2da12e57a2e2742c302760ac68e267abf",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: A small practical desk notebook lying OPEN in three-quarter view. Its left paper page carries exactly five faint blank horizontal rules and one empty small square at the start of each rule; its right page is blank. A slender silver mechanical pencil lies diagonally across the lower right page, with one tiny iris cloth page tab at the outer edge. Real coherent book binding and thin layered paper, no accounting columns, writing or marks inside the squares. The upper outer corner of the right PAPER page is slightly free.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "correspondencia-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/correspondencia-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 51688,
+      "sha256": "c009bc65c41f41491b6e26d43eb122b99861c4017cc53b2d088e35c556749084",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: One elegant OPEN paper envelope in three-quarter view, its triangular flap fixed upright behind it, a single blank folded letter emerging halfway from its mouth, and a smaller CLOSED envelope beside it. Crisp coherent folds and tactile cotton paper edges. The visible letter has three extremely faint straight engraved rules with no characters. One tiny iris detail on the edge of the smaller envelope. No seal, stamps, ribbons, addresses or additional sheets.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "academico-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/academico-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 93098,
+      "sha256": "7ec13ce1802efc8715f820cae6401280276c0cfbd700c27b228cd29b3a10fa19",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: One thick scholarly book lying CLOSED with a second book resting OPEN above it in a coherent balanced stack, plus one delicate pale silver feather quill lying diagonally across the lower open pages. The pages contain only fine regular abstract engraved lines, no legible characters or symbols. Exquisite layered page edges, precise book spines and fine feather barbs; one tiny iris cloth bookmark peeks from the open book. No ink pot, hands, glasses or further props.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "agenda-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/agenda-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 48918,
+      "sha256": "e344ea9e06b3792f558110aa9e698f382b5ae7647803a4b0316df6a67fa2f1fe",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: One elegant small hourglass standing upright with exactly two clear glass bulbs, a narrow central neck, restrained sand inside and a mechanically coherent silver frame with three slender supports. Beside it lies one small CLOSED practical appointment planner with a single simple fastening strap and a tiny iris ribbon bookmark. Keep both objects fully visible, calm and balanced. No clock face, calendar grid, dates, lettering or extra props.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    },
+    {
+      "file": "clientes-gpt-v1.webp",
+      "source": "docs/estetica-editorial-2026-11-07/media-sources/clientes-gpt-v1-original.png",
+      "provider": "OpenAI GPT image generation",
+      "tool": "built-in image_gen",
+      "styleReference": "public/editorial/generated/atenea-gpt-v1.webp",
+      "dimensions": [
+        720,
+        405
+      ],
+      "transparent": true,
+      "bytes": 74404,
+      "sha256": "dc03575ea5e1ed8cefcbe167c4653d61667c068fc715fdb3f09ee4ab4e04d7b5",
+      "prompt": "Use case: illustration-story. Asset type: a new polished editorial spot engraving for a LexOpen legal-work application header. Image 1 is a STYLE REFERENCE ONLY: match its exquisite fine silver steel-engraved crosshatching, cool metal-and-paper tones and nineteenth-century scholarly frontispiece craftsmanship. Do NOT reproduce Athena, any person, helmet, bust, face or plinth. Draw only the specified object still life. This must be a genuine drawn ENGRAVING with delicate cut lines, controlled dense hatching, tactile edges and elegant realistic construction; not a photograph, glossy 3D render, vector icon or cartoon. Palette restricted to cool silver-white #f4f3f7, deep indigo #0d1022, slate-indigo #313958 and one tiny restrained iris #aab5ff material detail ON the object. Landscape 16:9 composition, balanced compact group centered with generous clean margins on every side, every extremity visible. The group occupies about 75 percent of the width and no more than 70 percent of the height, clearly legible when used at 144 pixels wide. GENUINE ALPHA TRANSPARENCY behind and between all objects. No opaque rectangle, background, room, floor, horizon, halo, haze, cast shadow, glow, surrounding specks, particles or frame. No lettering, numbers, labels, logos, symbols, UI, decorative scales of justice, gavels or watermark. No added props. Calm, refined, editorial and precise.\nSubject: A compact refined consultation still life: two elegant EMPTY upholstered classic armchairs facing one another at a gentle three-quarter angle, separated by a small simple round pedestal table carrying one CLOSED plain notebook with a tiny iris cover detail. Mechanically coherent furniture, precise armrests and quiet etched upholstery. The notebook is small relative to the table; no people, room, floor, cups, plants or extra objects.",
+      "processing": "Contain resize to 720x405 and WebP encoding only; generated alpha preserved."
+    }
+  ],
+  "flowProject": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79",
+  "videos": [
+    {
+      "name": "expedientes",
+      "version": 2,
+      "provider": "Google Flow",
+      "model": "Veo 3.1 - Fast",
+      "flowAssetId": "e8846c67-37fd-4228-9105-c6176dc1a933",
+      "flowUrl": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79/edit/e8846c67-37fd-4228-9105-c6176dc1a933",
+      "prompt": "A restrained eight-second editorial animation of this exact OPEN archival case folder. Use the supplied first and last images exactly. The rigid grey-blue cardboard cover, metal fastener, binding, perspective, object position, silhouette and background stay absolutely FIXED for every frame. The folder is NOT a book and its cover must NEVER bend, peel, open further or turn into paper. Only the free OUTER RIGHT CORNER of the TOP PAPER FOLIO makes one small believable lift of a few millimeters, then gently settles flat on the stack. The paper remains attached at the left fastener. No sheet turns over, no full page flip, no curling the entire paper, no floating loose sheets. Hold the first two seconds still, one very small paper-corner movement in the middle, then hold the final two seconds completely still. Locked-off camera: no zoom, pan, orbit or reframing. Keep the WHOLE folder and every edge inside the frame with the generous existing margins throughout. Preserve the original silver steel-engraving crosshatching and straight ruled lines. Uniform unchanged indigo backdrop, no new objects, hands, text, numbers, logos, sparkles, light sweeps, smoke or glow. Silent, no music or sound effects. Understated and precise, suitable for a professional legal application.",
+      "startFrameAssetId": "9647711b-0d6c-43fe-b1f5-b587afc5d475",
+      "endFrameAssetId": "9647711b-0d6c-43fe-b1f5-b587afc5d475",
+      "originalFile": "docs/estetica-editorial-2026-11-07/media-sources/flow-expedientes-v2-original.mp4",
+      "originalSha256": "49004ad32d9776e4a48c0e9c1ea20f8afcdd1491386b57d3b94fbe903a127e35",
+      "file": "expedientes-flow-v2.mp4",
+      "sha256": "4770b98765555e1be84a26e1d8d6c977c68cc442e60755da045797f1fedc4646",
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "width": 640,
+            "height": 360,
+            "r_frame_rate": "24/1",
+            "duration": "7.916667"
+          }
+        ],
+        "format": {
+          "duration": "7.916667",
+          "size": "150883"
+        }
+      },
+      "processing": "FFmpeg: scale=640:360, H.264 CRF 25, yuv420p, faststart, audio removed; original Flow animation unchanged."
+    },
+    {
+      "name": "libro-contable",
+      "provider": "Google Flow",
+      "model": "Veo 3.1 - Fast",
+      "flowAssetId": "81e16dc8-2adc-42c3-87d1-f8effb592450",
+      "flowUrl": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79/edit/81e16dc8-2adc-42c3-87d1-f8effb592450",
+      "prompt": "Animate this exact silver and indigo steel engraving as an eight-second editorial still life. Preserve the open ruled accounting ledger, fountain pen, iris ribbon bookmark and precise crosshatching. One page lifts very slowly, turns gently and settles; the pen and book remain fixed. Locked camera, no zoom, no cuts, no writing or characters appearing. Keep the antique engraved style throughout, no photorealistic conversion. Restrained subtle motion against perfectly uniform deep indigo #0d1022, no room, no horizon, no smoke, no glow, no additional objects or people. Calm beginning and ending, suitable for a sober legal application. Silent video, no voices, no music, no sound effects.",
+      "originalFile": "docs/estetica-editorial-2026-11-07/media-sources/flow-libro-contable-original.mp4",
+      "originalSha256": "abcdaf46d7f6690e5658f62945bf231a81fc689c4062d0ef688e10c97f8621ec",
+      "file": "libro-contable-flow-v1.mp4",
+      "sha256": "85abff31b4ada2b1fd5a90151914c3d8164ca12e5dfcbeb1ffbe54e5bccc2222",
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "width": 640,
+            "height": 360,
+            "r_frame_rate": "24/1",
+            "duration": "7.916667"
+          }
+        ],
+        "format": {
+          "duration": "7.916667",
+          "size": "438285"
+        }
+      },
+      "processing": "FFmpeg: scale=640:360, H.264 CRF 25, yuv420p, faststart, audio removed; original Flow animation unchanged."
+    },
+    {
+      "name": "plazos",
+      "provider": "Google Flow",
+      "model": "Veo 3.1 - Fast",
+      "flowAssetId": "125322c3-dfd8-43c6-9053-f82822653b96",
+      "startFrameAssetId": "1115c93e-3c60-41c6-a761-31a6e8ba35a1",
+      "prompt": "Animate this exact engraved pocket watch as a restrained eight-second editorial still life. LOCKED camera. Preserve the exact original shape, perspective, silver steel-engraved crosshatching, dial, twelve hour marks, winding crown, chain and uniform deep indigo background throughout. The watch case and entire chain remain absolutely stationary. ONLY the existing LONG minute hand advances smoothly CLOCKWISE by a small restrained angle, about twelve degrees over the whole eight seconds. Its pivot remains fixed at the center. The short hour hand remains still. Do not add a second hand. No spinning or full revolutions, no wobbling, no stretching, no melting metal, no deformation of the dial or rim. Preserve all original safe margins, keep the whole watch and chain inside frame. No zoom, orbit, pan, camera shake, new props, letters, numerals, logos, characters, light flares, smoke or sparkles. Elegant subtly accelerated passage of time, professional scholarly engraving, not a realistic photograph. Silent video, no music, voices or sound effects.",
+      "review": "The complete source was inspected in a 16-frame contact sheet. Flow adds a thin second hand during the opening seconds. The UI uses only the stable segment from 3 seconds onward, with its matching first-frame poster. Watch case, chain and framing stay stable; the hands advance visibly. No locally generated motion.",
+      "processing": "Trim first 3 seconds; resize to 640x360; H.264 CRF25; audio removed. Poster extracted from the same Flow frame at 3 seconds.",
+      "originalFile": "docs/estetica-editorial-2026-11-07/media-sources/flow-plazos-v1-original.mp4",
+      "originalSha256": "1ca041ab230bddebefbd290394bd374c4eded2fad8887279c43b26fc17b009f8",
+      "file": "plazos-flow-v1.mp4",
+      "sha256": "c19b2214ac81bb400941da30c6ec2661dd77becb4808c18d49d577028cc5ec4e",
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "width": 640,
+            "height": 360,
+            "r_frame_rate": "24/1",
+            "duration": "4.916667"
+          }
+        ],
+        "format": {
+          "duration": "4.916667",
+          "size": "135786"
+        }
+      }
+    },
+    {
+      "name": "investigacion",
+      "startFrameAssetId": "d1f19d6b-70be-4f8b-83e1-117303fdf910",
+      "endFrameAssetId": "d1f19d6b-70be-4f8b-83e1-117303fdf910",
+      "resourceTitle": "Magnifying glass on index slips",
+      "prompt": "Only the rigid magnifying glass slides a very short distance to the left across the slips, no more than two percent of the frame width, then returns exactly to its initial position. Its circular lens and solid handle remain geometrically rigid and the paper slips remain completely fixed. No magnification distortion or writing appears. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "model": "Veo 3.1 - Fast",
+      "submitted": true,
+      "flowAssetId": "5403e0b7-6ba9-42e1-9e9b-5075076685a1",
+      "originalFile": "docs/estetica-editorial-2026-11-07/media-sources/flow-investigacion-motion-v1-original.mp4",
+      "status": "generated; integrated after review",
+      "retryCount": 0,
+      "provider": "Google Flow",
+      "version": 1,
+      "flowUrl": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79/edit/5403e0b7-6ba9-42e1-9e9b-5075076685a1",
+      "originalSha256": "7cec7dcfb69c7b1e37ef0bc44d267f23908a84ef8b239dbf47c7972f11d017b7",
+      "file": "investigacion-motion-flow-v1.mp4",
+      "sha256": "e43cbe99a53a4539394e7845c2b2aed16b324d6cf94378164d94cf204c847f52",
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "width": 640,
+            "height": 360,
+            "r_frame_rate": "24/1",
+            "duration": "7.916667"
+          }
+        ],
+        "format": {
+          "duration": "7.916667",
+          "size": "277756"
+        }
+      },
+      "processing": "Scale 640x360, H.264 CRF25, yuv420p, faststart; audio removed. Original Google Flow movement preserved.",
+      "review": "Reviewed in 16 frames at 2 fps. Magnifying glass scans more broadly than the two-percent prompt; circular lens and handle stay coherent, paper slips and camera stay fixed, the object remains within frame and returns to its original arrangement."
+    }
+  ],
+  "productionPolicy": {
+    "newImages": "OpenAI GPT image generation (built-in image_gen)",
+    "newAnimations": "Google Flow only"
+  }
+}

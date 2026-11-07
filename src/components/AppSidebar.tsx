@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import {
   Inbox, LayoutDashboard, Home, Briefcase, BookOpen, Files, CalendarClock, Puzzle,
   Bot, DoorOpen, Building2, ListTodo, CalendarDays, Search, Users, MessageSquare,
@@ -102,13 +102,14 @@ function SidebarChrome({ navigation, user, onNavigate, onClose, showClose, colla
   </>;
 }
 
-export function AppSidebar({ navigation, user, mobileOpen = false, onMobileOpenChange, collapsed = false, onCollapsedChange }: {
+export function AppSidebar({ navigation, user, mobileOpen = false, onMobileOpenChange, collapsed = false, onCollapsedChange, returnFocusRef }: {
   navigation: NavigationModel;
   user?: SessionUserSummary;
   mobileOpen?: boolean;
   onMobileOpenChange?: (open: boolean) => void;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const { t } = useI18n();
   const drawerRef = useRef<HTMLElement>(null);
@@ -117,7 +118,7 @@ export function AppSidebar({ navigation, user, mobileOpen = false, onMobileOpenC
     if (!mobileOpen) return;
     const root = drawerRef.current;
     if (!root) return;
-    const previousFocus = document.activeElement;
+    const previousFocus = returnFocusRef?.current || document.activeElement;
     const focusable = () => Array.from(root.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])')).filter(el => el.getClientRects().length > 0);
     focusable()[0]?.focus();
     const onKey = (event: KeyboardEvent) => {
@@ -132,11 +133,11 @@ export function AppSidebar({ navigation, user, mobileOpen = false, onMobileOpenC
       document.removeEventListener("keydown", onKey);
       if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
     };
-  }, [mobileOpen]);
+  }, [mobileOpen, returnFocusRef]);
 
   return <>
     <div className="sticky top-0 hidden h-dvh shrink-0 md:block" data-testid="desktop-sidebar">
-      <aside className={cn("sidebar-surface shell-sidebar flex h-full shrink-0 flex-col text-white", collapsed ? "w-[76px]" : "w-[252px]")}>
+      <aside className={cn("sidebar-surface shell-sidebar flex h-full shrink-0 flex-col text-white", collapsed ? "w-[76px]" : "w-[252px]")} data-sidebar-collapsed={collapsed || undefined}>
         <SidebarChrome navigation={navigation} user={user} collapsed={collapsed} onToggleCollapse={() => onCollapsedChange?.(!collapsed)} />
       </aside>
     </div>

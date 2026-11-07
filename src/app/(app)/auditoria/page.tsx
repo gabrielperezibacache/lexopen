@@ -62,7 +62,7 @@ export default async function AuditoriaPage({ searchParams }: Props) {
 
   return (
     <div className={`${styles.area} space-y-6`}>
-      <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
+      <ModuleHeader artwork="research" eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
 
       <p className="text-sm text-[var(--ink-soft)]">
         Mostrando hasta 300 eventos más recientes (luego filtros en pantalla).

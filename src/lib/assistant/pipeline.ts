@@ -322,7 +322,7 @@ export async function runAssistantTurn(
     if (!parsed.success) {
       streamEvents.push({
         type: "status",
-        message: `No se pudo preparar "${intent.toolId}": ${parsed.error.errors
+        message: `No se pudo preparar "${intent.toolId}": ${parsed.error.issues
           .map((e) => e.message)
           .join("; ")}`,
       });

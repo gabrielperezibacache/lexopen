@@ -14,6 +14,7 @@ import { AcademicEditor } from "./AcademicEditor";
 import { AcademicReview, type ReviewDestination } from "./AcademicReview";
 import { academicApi as api, type AcademicArtifact, type AcademicOverview, type AcademicWorkspace } from "./academic-ui";
 import styles from "./AltazorAcademic.module.css";
+import { EditorialHeading } from "@/components/ui/EditorialHeading";
 
 type Pane = "work" | "matrix" | "profile" | "discovery" | "review";
 const kindLabels: Record<string, string> = { research: "Investigación", writing: "Escritura", course: "Docencia", career: "Carrera académica" };
@@ -146,10 +147,10 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
   }
   return <section ref={section} className={`${styles.root} altazor-academic`} aria-label="Desarrollo académico">
     <header className={styles.header}>
-      <div>
+      <EditorialHeading artwork="academic">
         <h1>Académico</h1>
         <p>Investiga, escribe y prepara tus clases con las fuentes de cada trabajo a la vista.</p>
-      </div>
+      </EditorialHeading>
       <Link href="/inicio" className="btn btn-ghost" onClick={event => { if (dirty || editorDirty || profileDirty) { event.preventDefault(); setNotice("Guarda los cambios antes de volver a ALTAZOR."); } }}>Pedir ayuda a Altazor</Link>
     </header>
     <nav className={styles.navigation} aria-label="Herramientas académicas">

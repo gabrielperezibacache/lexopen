@@ -5,7 +5,7 @@ import type { ConnectorKindId } from "./catalog";
 import type { ConnectorCatalogEntry, ConnectorConfiguration, ConnectorConnection } from "./types";
 
 export const connectorNameSchema = z.string().regex(/^[a-z][a-z0-9-]{0,79}$/);
-export const connectorConfigurationSchema = z.object({ kind: z.string().max(80), settings: z.record(z.string().max(6000)), signIn: z.boolean().optional(), clear: z.array(z.string().max(80)).max(30).optional() }).strict();
+export const connectorConfigurationSchema = z.object({ kind: z.string().max(80), settings: z.record(z.string(), z.string().max(6000)), signIn: z.boolean().optional(), clear: z.array(z.string().max(80)).max(30).optional() }).strict();
 export function assertGatewayOAuthAllowed(kind: ConnectorKindId | undefined) {
   if (kind === "dropbox") throw new ConnectorError("dropbox_guided_oauth_required", "Use Conectar Dropbox para autorizar el acceso de sólo lectura.", 409);
 }

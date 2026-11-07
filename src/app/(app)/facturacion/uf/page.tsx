@@ -14,7 +14,7 @@ export default async function UfPage() {
   });
   return (
     <div className="space-y-6">
-      <ModuleHeader
+      <ModuleHeader artwork="billing"
         eyebrow="Unidad de Fomento"
         title="UF"
         subtitle="Valores diarios para convertir tarifas pactadas en UF a CLP al registrar horas o facturar."

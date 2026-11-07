@@ -1,0 +1,176 @@
+{
+  "base": "617a705556b2b2c1d8995ae16c8a8054a8aab1da",
+  "source": "3e73992a6ef64b5473be8d845e179c9427800ba2",
+  "release": "v1.1.0-preview.8",
+  "headers": [
+    {
+      "file": "src/components/pjud/PjudPortfolioWorkspace.tsx",
+      "art": "artwork=\"connections\""
+    },
+    {
+      "file": "src/components/MessagesClient.tsx",
+      "art": "artwork=\"correspondence\""
+    },
+    {
+      "file": "src/app/(app)/dashboard/page.tsx",
+      "art": "artwork=\"workflows\""
+    },
+    {
+      "file": "src/components/pjud/PjudAccountWorkspace.tsx",
+      "art": "artwork=\"connections\""
+    },
+    {
+      "file": "src/app/(app)/clientes/page.tsx",
+      "art": "artwork=\"clients\""
+    },
+    {
+      "file": "src/app/(app)/personas/page.tsx",
+      "art": "artwork=\"people\""
+    },
+    {
+      "file": "src/components/causas/CaseListServer.tsx",
+      "art": "artwork=\"casefiles\""
+    },
+    {
+      "file": "src/app/(app)/buscar/page.tsx",
+      "art": "artwork=\"research\""
+    },
+    {
+      "file": "src/app/(app)/configuracion/page.tsx",
+      "art": "artwork=\"settings\""
+    },
+    {
+      "file": "src/app/(app)/causas/[id]/minuta/nueva/page.tsx",
+      "art": "artwork=\"writing\""
+    },
+    {
+      "file": "src/app/(app)/jurisprudencia/page.tsx",
+      "art": "artwork=\"research\""
+    },
+    {
+      "file": "src/app/(app)/configuracion/correo/page.tsx",
+      "art": "artwork=\"correspondence\""
+    },
+    {
+      "file": "src/app/(app)/flujos/page.tsx",
+      "art": "artwork=\"workflows\""
+    },
+    {
+      "file": "src/app/(app)/auditoria/page.tsx",
+      "art": "artwork=\"research\""
+    },
+    {
+      "file": "src/app/(app)/facturacion/facturas/page.tsx",
+      "art": "artwork=\"billing\""
+    },
+    {
+      "file": "src/app/(app)/causas/[id]/minutas/[minutaId]/page.tsx",
+      "art": "artwork=\"writing\""
+    },
+    {
+      "file": "src/app/(app)/facturacion/gastos/page.tsx",
+      "art": "artwork=\"billing\""
+    },
+    {
+      "file": "src/app/(app)/facturacion/cuenta-corriente/page.tsx",
+      "art": "artwork=\"billing\""
+    },
+    {
+      "file": "src/app/(app)/facturacion/tarifas/page.tsx",
+      "art": "artwork=\"billing\""
+    },
+    {
+      "file": "src/app/(app)/tareas/page.tsx",
+      "art": "artwork=\"tasks\""
+    },
+    {
+      "file": "src/app/(app)/facturacion/horas/page.tsx",
+      "art": "artwork=\"deadlines\""
+    },
+    {
+      "file": "src/app/(app)/plazos/page.tsx",
+      "art": "artwork=\"deadlines\""
+    },
+    {
+      "file": "src/app/(app)/facturacion/uf/page.tsx",
+      "art": "artwork=\"billing\""
+    },
+    {
+      "file": "src/app/(app)/integraciones/page.tsx",
+      "art": "artwork=\"connections\""
+    },
+    {
+      "file": "src/app/(app)/documentos/page.tsx",
+      "art": "artwork=\"casefiles\""
+    },
+    {
+      "file": "src/app/(app)/cuenta/page.tsx",
+      "art": "artwork=\"settings\""
+    },
+    {
+      "file": "src/app/(app)/cuenta/feedback/page.tsx",
+      "art": "artwork=\"correspondence\""
+    },
+    {
+      "file": "src/app/(app)/notificaciones/page.tsx",
+      "art": "artwork=\"notifications\""
+    },
+    {
+      "file": "src/app/(app)/cuenta/notificaciones/page.tsx",
+      "art": "artwork=\"notifications\""
+    },
+    {
+      "file": "src/app/(app)/portal/page.tsx",
+      "art": "artwork=\"people\""
+    },
+    {
+      "file": "src/app/(app)/sites/page.tsx",
+      "art": "artwork=\"workflows\""
+    },
+    {
+      "file": "src/app/(app)/correo/page.tsx",
+      "art": "artwork=\"correspondence\""
+    },
+    {
+      "file": "src/app/(app)/calendario/page.tsx",
+      "art": "artwork=\"calendar\""
+    },
+    {
+      "file": "src/app/(app)/minutas/page.tsx",
+      "art": "artwork=\"writing\""
+    }
+  ],
+  "media": [
+    "academico-gpt-v1.webp",
+    "agenda-gpt-v1.webp",
+    "expedientes-v2.webp",
+    "clientes-gpt-v1.webp",
+    "libro-contable-v1.webp",
+    "tareas-gpt-v1.webp",
+    "plazos-flow-v1.webp",
+    "correspondencia-gpt-v1.webp",
+    "investigacion-flow-v1.webp",
+    "escritura-gpt-v1.webp",
+    "audiencias-gpt-v1.webp",
+    "personas-gpt-v1.webp",
+    "flujos-gpt-v1.webp",
+    "conexiones-gpt-v1.webp",
+    "avisos-gpt-v1.webp",
+    "configuracion-gpt-v1.webp",
+    "expedientes-flow-v2.mp4",
+    "libro-contable-flow-v1.mp4",
+    "plazos-flow-v1.mp4",
+    "investigacion-motion-flow-v1.mp4",
+    "expedientes-flow-v2-poster.webp",
+    "libro-contable-flow-v1-poster.webp",
+    "plazos-flow-v1-poster.webp",
+    "investigacion-motion-flow-v1-poster.webp",
+    "atenea-gpt-v1.webp",
+    "filosofo-gpt-v1.webp"
+  ],
+  "excluded": [
+    "Cambios locales de backend, conectores, modelos locales, modo sin conexión, migraciones y Android",
+    "36 commits de otras tareas no integrados en main",
+    "Medios descartados y fuentes originales de trabajo"
+  ]
+}

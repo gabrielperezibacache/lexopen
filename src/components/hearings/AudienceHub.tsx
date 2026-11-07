@@ -8,6 +8,7 @@ import { apiMutation } from "@/lib/api-mutation";
 import { formatCivilDate, santiagoDateKey, SANTIAGO_TZ } from "@/lib/chile-time";
 import type { AudienceHubCatalog, AudienceHubStatus } from "@/lib/hearings/hub-types";
 import "./audience-hub.css";
+import { EditorialHeading } from "@/components/ui/EditorialHeading";
 
 const states = { preparation: "En preparación", live: "En audiencia", closed: "Cerrada" };
 const phases = { idle: "Sesión sin iniciar", running: "Tiempo en curso", paused: "Tiempo en pausa", finished: "Sesión finalizada" };
@@ -58,7 +59,7 @@ export function AudienceHub({ userName }: { userName: string }) {
     finally { setMoreBusy(false); }
   }
   return <div className="audience-hub" data-testid="audience-hub">
-    <header className="audience-hub-heading"><div><h1>Audiencias en vivo</h1><p>Prepare su intervención y vuelva a su mesa con cada fuente a mano.</p></div><button className="btn btn-primary" type="button" aria-expanded={open} aria-controls={`${id}-create`} onClick={toggleCreate} disabled={!data}><Plus size={17} aria-hidden="true" />Preparar audiencia</button></header>
+    <header className="audience-hub-heading"><EditorialHeading artwork="hearings"><h1>Audiencias en vivo</h1><p>Prepare su intervención y vuelva a su mesa con cada fuente a mano.</p></EditorialHeading><button className="btn btn-primary" type="button" aria-expanded={open} aria-controls={`${id}-create`} onClick={toggleCreate} disabled={!data}><Plus size={17} aria-hidden="true" />Preparar audiencia</button></header>
     <div className="audience-hub-intro"><p><LockKeyhole size={17} aria-hidden="true" /><span>Mesas privadas de <strong>{userName}</strong>. Cada audiencia permanece vinculada a su causa.</span></p><Link href="/cuenta#codex">Mi conexión Codex<ArrowRight size={16} aria-hidden="true" /></Link></div>
     <section id={`${id}-create`} className="audience-hub-create" hidden={!open || !data} aria-labelledby={`${id}-create-title`}>
       <div className="audience-hub-section-heading"><div><h2 id={`${id}-create-title`}>Una mesa para la audiencia</h2><p>Elija el expediente y un nombre reconocible. Podrá fijar fecha, hora y asuntos en Agenda.</p></div><button type="button" className="audience-hub-close" onClick={() => setOpen(false)} aria-label="Cerrar preparación"><X size={20} aria-hidden="true" /></button></div>

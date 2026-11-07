@@ -61,7 +61,7 @@ export default async function DocumentosPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader artwork="casefiles"
         eyebrow={h.eyebrow}
         title={h.title}
         actions={

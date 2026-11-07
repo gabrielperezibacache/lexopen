@@ -1,6 +1,6 @@
 {
   "name": "lexopen",
-  "version": "1.1.0-preview.7",
+  "version": "1.1.0-preview.8",
   "private": false,
   "license": "AGPL-3.0-or-later",
   "description": "LexOpen — operaciones jurídicas open source para Chile: abogados independientes y estudios gestionan causas, plazos, CRM y facturación en un Host local (Obsidian, Google Workspace, IA OpenAI-compatible).",
@@ -88,13 +88,13 @@
     "imapflow": "^1.7.1",
     "lucide-react": "^0.511.0",
     "mailparser": "^3.9.15",
-    "next": "^16.3.0",
-    "nodemailer": "^7.0.13",
+    "next": "^16.4.5",
+    "nodemailer": "^10.4.0",
     "playwright": "^1.62.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "web-push": "^3.6.7",
-    "zod": "^3.25.28"
+    "zod": "^4.6.7"
   },
   "optionalDependencies": {
     "@d0paminedriven/pdfdown-ocr": "^0.9.9"

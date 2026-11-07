@@ -18,14 +18,14 @@ LexOpen reúne los documentos de cada causa, tus plazos, la preparación de audi
 
 ## Descargar LexOpen
 
-Elige el archivo para tu equipo en la versión **1.1.0-preview.7**. [Ver la versión y todos sus archivos](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.7)
+Elige el archivo para tu equipo en la versión **1.1.0-preview.8**. [Ver la versión y todos sus archivos](https://github.com/gabrielperezibacache/lexopen/releases/tag/v1.1.0-preview.8)
 
 | Tu equipo | Descarga |
 | --- | --- |
-| Windows de 64 bits, Intel o AMD | [Instalador EXE](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.7/LexOpen-1.1.0-preview.7-win-x64.exe) |
-| Mac con chip Apple | [Instalador DMG](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.7/LexOpen-1.1.0-preview.7-mac-arm64.dmg) |
-| Mac con procesador Intel | [Instalador DMG](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.7/LexOpen-1.1.0-preview.7-mac-x64.dmg) |
-| Linux de 64 bits, Intel o AMD | [DEB](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.7/LexOpen-1.1.0-preview.7-linux-amd64.deb) · [AppImage](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.7/LexOpen-1.1.0-preview.7-linux-x86_64.AppImage) |
+| Windows de 64 bits, Intel o AMD | [Instalador EXE](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.8/LexOpen-1.1.0-preview.8-win-x64.exe) |
+| Mac con chip Apple | [Instalador DMG](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.8/LexOpen-1.1.0-preview.8-mac-arm64.dmg) |
+| Mac con procesador Intel | [Instalador DMG](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.8/LexOpen-1.1.0-preview.8-mac-x64.dmg) |
+| Linux de 64 bits, Intel o AMD | [DEB](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.8/LexOpen-1.1.0-preview.8-linux-amd64.deb) · [AppImage](https://github.com/gabrielperezibacache/lexopen/releases/download/v1.1.0-preview.8/LexOpen-1.1.0-preview.8-linux-x86_64.AppImage) |
 
 Esta versión es **preliminar**. Los instaladores de Windows y macOS carecen de firma de editor y macOS puede mostrar avisos. [Guía de instalación y requisitos](docs/INSTALADORES.md)
 

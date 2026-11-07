@@ -1,4 +1,4 @@
-import type { ZodType, ZodTypeDef } from "zod";
+import type { ZodType } from "zod";
 import type { Role } from "@/lib/auth/rbac";
 import type {
   AssistantIntentId,
@@ -17,8 +17,8 @@ export type AssistantTool<TInput = unknown> = {
   description: string;
   kind: ToolKind;
   roles: Role[];
-  /** El tipo `Input` (3er genérico) se deja abierto: algunos schemas usan `.default()`. */
-  inputSchema: ZodType<TInput, ZodTypeDef, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /** The tool receives parsed output, including defaults supplied by its schema. */
+  inputSchema: ZodType<TInput>;
   preview: (input: TInput, ctx: ToolContext) => Promise<string> | string;
   execute: (input: TInput, ctx: ToolContext) => Promise<ToolResult>;
   undo?: (token: string, ctx: ToolContext) => Promise<ToolResult>;

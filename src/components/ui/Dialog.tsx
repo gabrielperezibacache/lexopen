@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/chile";
 import { useI18n } from "@/components/i18n/I18nProvider";
@@ -15,23 +15,29 @@ export function Dialog({
   title,
   children,
   className,
+  returnFocusRef,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   className?: string;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const previousFocus = useRef<HTMLElement | null>(null);
   const { t } = useI18n();
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (open && !el.open) el.showModal();
+    if (open && !el.open) {
+      previousFocus.current = returnFocusRef?.current || (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      el.showModal();
+    }
     if (!open && el.open) el.close();
-  }, [open]);
+  }, [open, returnFocusRef]);
 
   return (
     <dialog
@@ -41,7 +47,7 @@ export function Dialog({
         className
       )}
       aria-labelledby={titleId}
-      onClose={onClose}
+      onClose={() => { onClose(); if (previousFocus.current?.isConnected) previousFocus.current.focus({ preventScroll: true }); }}
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}

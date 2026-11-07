@@ -54,7 +54,7 @@ export default async function HorasPage({
 
   return (
     <div className="space-y-6">
-      <ModuleHeader
+      <ModuleHeader artwork="deadlines"
         eyebrow="Control de horas"
         title="Horas facturables"
         subtitle="Registro de tiempo por causa, actividad y tarifa. Listo para agrupar en boleta o factura."

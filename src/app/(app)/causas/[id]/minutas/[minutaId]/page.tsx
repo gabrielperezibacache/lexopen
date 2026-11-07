@@ -54,7 +54,7 @@ export default async function MinutaDetailPage({ params, searchParams }: Params)
       <Link href={`/causas/${id}`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
         ← {minuta.causa.titulo}
       </Link>
-      <PageHeader
+      <PageHeader artwork="writing"
         title={minuta.titulo}
         subtitle={<>{formatDateTime(minuta.fecha)} · {minuta.autor?.name || "Sin autor"} · {minuta.causa.rit || "Sin RIT"}</>}
         actions={<Link href={`/causas/${id}/minuta/nueva?tipo=${minuta.tipo}`} className="btn btn-primary">Nueva minuta</Link>}

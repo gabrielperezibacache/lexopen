@@ -321,7 +321,7 @@ export default function MisCausasPage() {
 
   return (
     <div className="pjud-cu space-y-6">
-      <PageHeader
+      <PageHeader artwork="connections"
         title="Mis Causas en OJV"
         subtitle="Ingrese con ClaveÚnica, revise las causas y elija cuáles incorporar a su cartera con sus cuadernos."
       />

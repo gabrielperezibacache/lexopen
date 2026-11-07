@@ -158,7 +158,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
+      <PageHeader artwork="workflows"
         eyebrow={t("dashboard.eyebrow")}
         title={
           user

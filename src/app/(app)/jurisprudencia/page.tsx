@@ -70,7 +70,7 @@ export default async function JurisprudenciaPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
+      <PageHeader artwork="research" eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
 
       <Link href="/biblioteca?fuentes=judicial" className="btn btn-secondary">Mis sentencias y resoluciones · archivo, lectura y citas</Link>
       <LegalResearchWorkbench initialCases={cases} initialRunId={sp.investigacion} />

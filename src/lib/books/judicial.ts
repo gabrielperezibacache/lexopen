@@ -14,15 +14,15 @@ export function validDecisionDate(value: string): boolean {
   const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
   return day <= [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
 }
-const optionalText = (max: number) => z.string().trim().max(max).default("");
+const optionalText = (max: number) => z.string().trim().max(max);
 const officialUrl = z.string().trim().max(2000).refine(value => {
   if (!value) return true;
   try { const url = new URL(value); return !/[\u0000-\u001f\u007f]/.test(value) && ["http:", "https:"].includes(url.protocol) && !url.username && !url.password; }
   catch { return false; }
-}, "Indique una URL HTTP o HTTPS sin credenciales").default("");
+}, "Indique una URL HTTP o HTTPS sin credenciales");
 
 /** Manual descriptive metadata; validation does not contact a court or establish authenticity. */
-export const judicialMetadataSchema = z.object({
+const judicialMetadataFields = {
   court: z.string().trim().min(1).max(240),
   chamber: optionalText(160),
   caseNumber: z.string().trim().min(1).max(120),
@@ -31,10 +31,16 @@ export const judicialMetadataSchema = z.object({
   decisionDate: z.string().refine(validDecisionDate, "Indique una fecha civil válida en formato AAAA-MM-DD"),
   caseTitle: optionalText(300),
   matter: optionalText(160),
-  jurisdiction: z.string().trim().min(1).max(80).default("CL"),
+  jurisdiction: z.string().trim().min(1).max(80),
   officialUrl,
+};
+export const judicialMetadataSchema = z.object({
+  ...judicialMetadataFields,
+  chamber: judicialMetadataFields.chamber.default(""), rit: judicialMetadataFields.rit.default(""), ruc: judicialMetadataFields.ruc.default(""),
+  caseTitle: judicialMetadataFields.caseTitle.default(""), matter: judicialMetadataFields.matter.default(""),
+  jurisdiction: judicialMetadataFields.jurisdiction.default("CL"), officialUrl: judicialMetadataFields.officialUrl.default(""),
 }).strict();
-export const judicialMetadataPatchSchema = judicialMetadataSchema.partial();
+export const judicialMetadataPatchSchema = z.object(judicialMetadataFields).partial().strict();
 export type JudicialMetadata = z.infer<typeof judicialMetadataSchema>;
 
 export function normalizeJudicialMetadata(sourceType: BookSourceType, value: unknown): JudicialMetadata | null {

@@ -7,11 +7,11 @@ import type { PermissionSubject } from "@/lib/auth/permissions";
 const uuid = z.string().uuid("La identificación de la conexión no es válida.");
 const candidateId = z.string().uuid("La selección no es válida. Consulte nuevamente Mis Causas.");
 const schema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("start") }).strict("La solicitud contiene campos no admitidos."),
-  z.object({ action: z.literal("focus"), sessionId: uuid }).strict("La solicitud contiene campos no admitidos."),
-  z.object({ action: z.literal("list"), sessionId: uuid, materias: z.array(z.enum(MANUAL_OJV_MATERIAS, { errorMap: () => ({ message: "Seleccione una materia disponible." }) })).min(1, "Seleccione una materia para consultar.").max(MANUAL_OJV_MATERIAS.length).optional() }).strict("La solicitud contiene campos no admitidos."),
-  z.object({ action: z.literal("import"), sessionId: uuid, downloadDocuments: z.boolean().optional(), intervalMinutes: z.union([z.literal(15), z.literal(30), z.literal(60), z.literal(180), z.literal(360), z.literal(1440)]).optional(), candidateIds: z.array(candidateId).min(1, "Seleccione al menos una causa.").max(MANUAL_OJV_IMPORT_LIMIT, `Seleccione hasta ${MANUAL_OJV_IMPORT_LIMIT} causas por operación.`).refine(ids => new Set(ids).size === ids.length, "La selección contiene causas repetidas") }).strict("La solicitud contiene campos no admitidos."),
-  z.object({ action: z.literal("close"), sessionId: uuid }).strict("La solicitud contiene campos no admitidos."),
+  z.strictObject({ action: z.literal("start") }, { error: "La solicitud contiene campos no admitidos." }),
+  z.strictObject({ action: z.literal("focus"), sessionId: uuid }, { error: "La solicitud contiene campos no admitidos." }),
+  z.strictObject({ action: z.literal("list"), sessionId: uuid, materias: z.array(z.enum(MANUAL_OJV_MATERIAS, { error: "Seleccione una materia disponible." })).min(1, "Seleccione una materia para consultar.").max(MANUAL_OJV_MATERIAS.length).optional() }, { error: "La solicitud contiene campos no admitidos." }),
+  z.strictObject({ action: z.literal("import"), sessionId: uuid, downloadDocuments: z.boolean().optional(), intervalMinutes: z.union([z.literal(15), z.literal(30), z.literal(60), z.literal(180), z.literal(360), z.literal(1440)]).optional(), candidateIds: z.array(candidateId).min(1, "Seleccione al menos una causa.").max(MANUAL_OJV_IMPORT_LIMIT, `Seleccione hasta ${MANUAL_OJV_IMPORT_LIMIT} causas por operación.`).refine(ids => new Set(ids).size === ids.length, "La selección contiene causas repetidas") }, { error: "La solicitud contiene campos no admitidos." }),
+  z.strictObject({ action: z.literal("close"), sessionId: uuid }, { error: "La solicitud contiene campos no admitidos." }),
 ]);
 
 /** Browser-origin gate for local UX; authenticated ownership and capabilities remain the authorization boundary. */

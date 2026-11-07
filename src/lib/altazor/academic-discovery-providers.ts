@@ -8,7 +8,7 @@ const active = new Map<string, number>();
 export type AcademicTransport = typeof fetch;
 type FetchOptions = { fetch?: AcademicTransport; signal?: AbortSignal };
 function clean(value: unknown, max = 1000): string { return typeof value === "string" ? value.replace(/<[^>]*>/g, " ").replace(/[\x00-\x1f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : ""; }
-const object = z.record(z.unknown());
+const object = z.record(z.string(), z.unknown());
 function row(value: unknown) { return object.parse(value); }
 function first(value: unknown) { return Array.isArray(value) ? clean(value[0]) : clean(value); }
 function doi(value: unknown) { try { return normalizeDoi(clean(value, 300)); } catch { return ""; } }

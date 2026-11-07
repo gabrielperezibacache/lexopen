@@ -1,0 +1,62 @@
+.root {
+  position: relative;
+  flex: none;
+  inline-size: var(--editorial-media-width, clamp(5rem, 12vw, 9rem));
+}
+
+.frame {
+  position: relative;
+  inline-size: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.still { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
+.root[data-editorial-ready] .still { opacity: 0; }
+.video {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+  opacity: 0;
+}
+.root[data-editorial-ready] .video { opacity: 1; }
+
+.toggle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-items: center;
+  justify-items: end;
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  inline-size: 100%;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  cursor: pointer;
+  opacity: 0;
+}
+.root:hover .toggle, .toggle:focus-visible,
+.root[data-editorial-user-control] .toggle { opacity: 1; }
+.toggle svg {
+  align-self: end;
+  box-sizing: content-box;
+  padding: .375rem;
+  margin: 0 0 -.375rem;
+  border-radius: 50%;
+  background: var(--paper);
+  opacity: .8;
+}
+.toggle:hover svg, .toggle:focus-visible svg { color: var(--sea); opacity: 1; }
+.toggle:focus-visible { outline: 2px solid var(--sea); outline-offset: 4px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .still, .video { transition: opacity 240ms ease-out; }
+  .toggle { transition: opacity 160ms ease-out; }
+  .toggle svg { transition: color 160ms ease-out, opacity 160ms ease-out; }
+}
+
+@media (hover: none) {
+  .toggle { opacity: .65; }
+}
