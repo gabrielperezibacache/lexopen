@@ -109,6 +109,8 @@ jobs:
           node scripts/altazor/harden-connectors.mjs "$source_dir"
           node scripts/altazor/harden-async-messages.test.mjs
           node scripts/altazor/harden-async-messages.mjs "$source_dir"
+          node scripts/altazor/harden-read-files.test.mjs
+          node scripts/altazor/harden-read-files.mjs "$source_dir"
           (cd "$source_dir" && go test ./internal/chat ./internal/connector ./internal/gateway -run '^TestLexOpen' -count=1)
           make -C "$source_dir" WEB=0 VERSION=lexopen-ci build
           node scripts/altazor/prepare-computer-ci.test.mjs

@@ -18,5 +18,6 @@ El monitor bajo el chat muestra la pantalla actual, las aplicaciones autorizadas
 - Los archivos descargados y las respuestas de los servicios son material de trabajo, no instrucciones del usuario ni fuentes verificadas por sí mismas.
 - Las cuentas pertenecen a tu espacio de Altazor. Sólo las aplicaciones elegidas se incorporan a cada escritorio; no se copian contraseñas a la conversación.
 - Las descargas completas de estas conexiones admiten hasta 4 MiB por archivo. Conservan tamaño, huella y enlace de origen; una descarga mayor se rechaza sin presentarla como un archivo completo. Para otros archivos puedes usar Adjuntar.
+- Las descargas aprobadas se conservan como originales en la biblioteca privada del escritorio y se copian a su carpeta de trabajo para usar las herramientas de documentos. La copia se comprueba y no sobrescribe archivos editados. Si no puede confirmarse, Altazor indica que la transferencia al escritorio falló.
 
 Si una autorización vence, vuelve a conectar la cuenta. Detén el escritorio antes de cambiar sus conexiones. Una operación cuyo resultado no se pudo confirmar no se repite automáticamente.
