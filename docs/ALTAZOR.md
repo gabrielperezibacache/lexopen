@@ -106,6 +106,10 @@ El conector envía un nonce por intento y exige su correspondencia en el ID toke
 
 El recorrido permite crear una sesión con caducidad, enviar un encargo y archivos expresamente elegidos, observar capturas, tomar el control para un ingreso manual, devolverlo, cancelar una tarea y cerrar la sesión. LexOpen conserva sus propios permisos y recibos. No entrega su base de datos, el almacenamiento completo ni sus credenciales al escritorio.
 
+La vista ampliada actualiza las capturas mientras está visible y pausa las consultas al ocultarla. Si la apertura falla después de crear una sesión, vuelve a comprobar el listado y muestra la sesión pendiente para revisarla o detenerla, sin reenviar el encargo. Una comprobación fallida de conexiones deja su estado **Sin comprobar** y bloquea las operaciones hasta recibir una respuesta actual.
+
+En Configuración, el [gestor de modelos locales](MODELOS-LOCALES.md) reúne la detección del equipo, las recomendaciones por uso y el inventario de Ollama. La conexión de IA del estudio y el modelo independiente del escritorio conservan sus propias configuraciones y comprobaciones.
+
 El adaptador está desactivado por defecto. No instala ni inicia un motor al abrir Mi jornada. La configuración se realiza desde el Host local y exige un gateway preparado expresamente para ese espacio. Con la política **sólo IA local**, no se permite iniciar tareas en un gateway cuyo destino de modelo independiente no pueda acreditarse como local.
 
 La Mesa de documentos por causa sigue disponible para su receta local de Word y Markdown. El escritorio amplía ese recorrido; la existencia de un botón no prueba que haya un entorno preparado. La interfaz muestra el estado real de configuración y comprobación.

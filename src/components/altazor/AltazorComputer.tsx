@@ -6,6 +6,7 @@ import { CircleAlert, ExternalLink, Monitor, MousePointer2, RefreshCw, Square } 
 import { apiMutation } from "@/lib/api-mutation";
 import { operationKey } from "@/lib/client-submission-key";
 import { AltazorSecretUse } from "./AltazorSecretUse";
+import { useComputerScreen } from "./useComputerScreen";
 import type { ConnectorInventory } from "@/lib/altazor/connectors/types";
 import { desktopPoint } from "@/lib/altazor/computer/coordinates";
 import { COMPUTER_ATTACHMENT_FORMATS, computerTurnNeedsHelp, type ComputerFile, type ComputerReview, type ComputerSessionView, type ComputerStatus } from "@/lib/altazor/computer/types";
@@ -21,6 +22,7 @@ export function AltazorComputer(props: PanelProps) {
 
 function ComputerPanel({ causaId, active = true, preferredSessionId, review }: PanelProps) {
   const uid = useId(), tokenRef = useRef<HTMLInputElement>(null), openedFromLink = useRef(false), selectedRef = useRef(""), selectionEpoch = useRef(0);
+  const statusVersion = useRef(0), statusRequest = useRef<AbortController | null>(null), sessionVersion = useRef(0), creationPending = useRef(false);
   const [status, setStatus] = useState<ComputerStatus | null>(null), [view, setView] = useState<ComputerSessionView | null>(null), [selected, setSelected] = useState("");
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [linkFailure, setLinkFailure] = useState(false);
@@ -31,45 +33,72 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
   const [inventory, setInventory] = useState<ConnectorInventory | null>(null), [connections, setConnections] = useState<string[]>([]);
   const [zoom, setZoom] = useState(0), [screenWidth, setScreenWidth] = useState(1280);
   const title = useRef<HTMLHeadingElement>(null), approvalHeading = useRef<HTMLHeadingElement>(null);
+  const screen = useRef<HTMLDivElement>(null);
   const helpMessage = useRef<HTMLElement>(null), openedReview = useRef(false);
   const query = causaId ? `?causaId=${encodeURIComponent(causaId)}` : "";
   const selectSession = useCallback((id: string) => { selectedRef.current = id; selectionEpoch.current++; setSelected(id); setView(null); setRenewConfirmed(false); setRenewKey(""); }, []);
   const refresh = useCallback(async () => {
+    const version = ++statusVersion.current;
+    statusRequest.current?.abort();
+    const controller = new AbortController(); statusRequest.current = controller;
+    const current = () => !controller.signal.aborted && version === statusVersion.current;
     const requested = preferredSessionId || new URLSearchParams(location.search).get("escritorio");
     const parameters = new URLSearchParams(query);
     if (requested) parameters.set("sessionId", requested);
-    const response = await fetch(`${api}${parameters.size ? `?${parameters}` : ""}`, { cache: "no-store" }), data = await response.json();
-    if (!response.ok) { selectSession(""); setStatus(null); setInventory(null); setLinkFailure(Boolean(requested)); throw new Error(data.error || "No se pudo consultar el computador opcional."); }
+    try {
+    const response = await fetch(`${api}${parameters.size ? `?${parameters}` : ""}`, { cache: "no-store", signal: controller.signal }), data = await response.json();
+    if (!current()) return null;
+    if (!response.ok) throw new Error(data.error || "No se pudo consultar el computador opcional.");
+    const computer = data.computer as ComputerStatus;
     setObservedAt(Date.now());
-    setStatus(data.computer);
+    setStatus(computer);
     if (!openedFromLink.current) {
       openedFromLink.current = true;
       if (requested && data.computer.sessions.some((session: { id: string }) => session.id === requested)) selectSession(requested);
     }
-    if (data.computer.configured && data.computer.workspaceId) {
-      const inventoryReply = await fetch(`/api/altazor/connectors?workspaceId=${encodeURIComponent(data.computer.workspaceId)}`, { cache: "no-store" });
-      if (inventoryReply.ok) setInventory((await inventoryReply.json()).connectors); else setInventory(null);
+    if (computer.configured && computer.workspaceId) {
+      try {
+        const inventoryReply = await fetch(`/api/altazor/connectors?workspaceId=${encodeURIComponent(computer.workspaceId)}`, { cache: "no-store", signal: controller.signal });
+        const nextInventory = inventoryReply.ok ? (await inventoryReply.json()).connectors : null;
+        if (current()) setInventory(nextInventory);
+      } catch { if (current()) setInventory(null); }
     } else setInventory(null);
+    return current() ? computer : null;
+    } catch (cause) {
+      if (!current()) return null;
+      selectSession(""); setStatus(null); setInventory(null); setLinkFailure(Boolean(requested));
+      throw cause;
+    } finally { if (statusRequest.current === controller) statusRequest.current = null; }
   }, [preferredSessionId, query, selectSession]);
-  const loadSession = useCallback(async (id: string) => {
+  const loadSession = useCallback(async (id: string, signal?: AbortSignal) => {
     const epoch = selectionEpoch.current;
-    const response = await fetch(`${api}/sessions/${encodeURIComponent(id)}`, { cache: "no-store" }), data = await response.json();
-    if (selectedRef.current !== id || epoch !== selectionEpoch.current) return;
+    const version = ++sessionVersion.current;
+    const response = await fetch(`${api}/sessions/${encodeURIComponent(id)}`, { cache: "no-store", signal }), data = await response.json();
+    if (signal?.aborted || selectedRef.current !== id || epoch !== selectionEpoch.current || version !== sessionVersion.current) return;
     setObservedAt(Date.now());
     if (!response.ok) {
+      setView(null);
       if ([403, 404].includes(response.status)) { selectSession(""); setLinkFailure(true); }
       if (response.status === 410) { setView(null); setLinkFailure(true); }
       throw new Error(data.error || "No se pudo consultar la sesión.");
     }
     setView(data);
   }, [selectSession]);
-  useEffect(() => { if (!active) return; let live = true; queueMicrotask(() => { if (live) void refresh().catch(cause => { if (live) setError(cause instanceof Error ? cause.message : "No se pudo consultar el computador."); }).finally(() => { if (live) setLoading(false); }); }); return () => { live = false; }; }, [active, refresh]);
+  useEffect(() => { if (!active) return; let live = true; queueMicrotask(() => { if (live) void refresh().catch(cause => { if (live) setError(cause instanceof Error ? cause.message : "No se pudo consultar el computador."); }).finally(() => { if (live) setLoading(false); }); }); return () => { live = false; statusRequest.current?.abort(); }; }, [active, refresh]);
   useEffect(() => {
     if (!active || !selected) return;
-    let live = true;
-    const poll = () => { if (live) void loadSession(selected).catch(cause => { if (live) setError(cause instanceof Error ? cause.message : "No se pudo consultar la sesión."); }); };
-    queueMicrotask(poll); const timer = setInterval(poll, 6000);
-    return () => { live = false; clearInterval(timer); };
+    let live = true, request: AbortController | null = null, timer: number | undefined;
+    const visible = () => document.visibilityState !== "hidden";
+    async function poll() {
+      if (!live || request || !visible()) return;
+      const controller = new AbortController(); request = controller;
+      try { await loadSession(selected, controller.signal); }
+      catch (cause) { if (live && !controller.signal.aborted) setError(cause instanceof Error ? cause.message : "No se pudo consultar la sesión."); }
+      finally { if (request === controller) request = null; if (live && visible()) timer = window.setTimeout(() => void poll(), 6_000); }
+    }
+    const synchronize = () => { window.clearTimeout(timer); if (document.visibilityState === "hidden") request?.abort(); else void poll(); };
+    queueMicrotask(synchronize); document.addEventListener("visibilitychange", synchronize);
+    return () => { live = false; window.clearTimeout(timer); request?.abort(); document.removeEventListener("visibilitychange", synchronize); };
   }, [active, selected, loadSession]);
   useEffect(() => {
     if (!active) { openedReview.current = false; return; }
@@ -96,10 +125,22 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
     if (result) { setStatus(result.computer); setNotice("El gateway respondió con un proveedor y contenedores disponibles."); }
   }
   async function start() {
-    if (!status?.workspaceId) return;
+    if (!status?.workspaceId || creationPending.current) return;
+    creationPending.current = true;
     const requestId = createKey || operationKey(); setCreateKey(requestId);
-    const result = await mutate<{ session: { id: string } }>(`${api}/sessions`, { workspaceId: status.workspaceId, requestId, connectors: [...connections].sort(), confirmed: true });
-    if (result) { selectSession(result.session.id); setCreateKey(""); await refresh().catch(() => {}); }
+    try {
+      const result = await mutate<{ session: { id: string } }>(`${api}/sessions`, { workspaceId: status.workspaceId, requestId, connectors: [...connections].sort(), confirmed: true });
+      setBusy(true);
+      if (result) { selectSession(result.session.id); setCreateKey(""); }
+      const current = await refresh().catch(() => null);
+      if (!result) {
+        const pending = current?.sessions.find(session => session.requiresStop || ["creating", "starting", "ready", "unknown"].includes(session.state));
+        if (pending) {
+          selectSession(pending.id); setCreateKey("");
+          setNotice("La apertura no quedó confirmada. Se recuperó la sesión pendiente; revísala y pulsa Detener escritorio antes de abrir otra.");
+        } else setNotice("No se confirmó la apertura. Comprueba la conexión antes de volver a intentarlo; no se abrirá otro escritorio automáticamente.");
+      }
+    } finally { creationPending.current = false; setBusy(false); }
   }
   async function renew() {
     if (!selected || !renewConfirmed) return;
@@ -147,6 +188,7 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
   const canCleanup = Boolean(selected && selectedSummary && selectedState !== "closed");
   const needsStop = Boolean(status?.sessions.some(session => session.requiresStop || ["creating", "starting", "ready", "unknown"].includes(session.state)));
   const lastTurn = view?.turns.at(-1);
+  const desktopScreen = useComputerScreen(active && canAct, selected, frame, screen);
   return <section className={styles.root} aria-labelledby={`${uid}-title`}>
     <header className={styles.header}><div><h2 id={`${uid}-title`} ref={title} tabIndex={-1}>Escritorio de Altazor</h2><p>Encarga una tarea con los archivos que elijas o toma el control para revisar el trabajo.</p></div><Monitor size={24} aria-hidden="true" /></header>
     {error && <p className={styles.error} role="alert">{error}{linkFailure && <> <a href={`/inicio?altazor=computer${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`}>Volver a los escritorios de este ámbito</a></>}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
@@ -172,7 +214,7 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
       <div className={styles.toolbar}><strong>{stateLabel[selectedState || ""] || "Comprobando escritorio…"}</strong><div className={styles.actions}><button type="button" disabled={busy || !canWork} onClick={() => action({ action: "control", hold: !held })}><MousePointer2 size={15} aria-hidden="true" />{held ? "Devolver control" : "Tomar control"}</button><button type="button" disabled={busy || !canCleanup} onClick={() => action({ action: "cancel" })}>Cancelar tarea</button><button type="button" disabled={busy || !canCleanup} onClick={() => action({ action: "close" })}><Square size={14} aria-hidden="true" />Detener escritorio</button></div></div>
       {selectedExpiry && <p className={styles.expiry}>Acceso hasta {new Date(selectedExpiry).toLocaleTimeString("es-CL")}.{renewableUntil && <> Puede mantener este mismo escritorio hasta las {new Date(renewableUntil).toLocaleTimeString("es-CL")}.</>} Al vencer se bloquea el acceso desde ALTAZOR; el gateway puede conservar el escritorio y sus archivos.</p>}
       {canRenew && <form className={styles.manual} onSubmit={event => { event.preventDefault(); void renew(); }}><label className={styles.check}><input type="checkbox" checked={renewConfirmed} disabled={busy} onChange={event => setRenewConfirmed(event.target.checked)} />Confirmo mantener este mismo escritorio durante 20 minutos más, sin superar dos horas desde su apertura.</label><button type="submit" disabled={busy || !renewConfirmed}>Mantener sesión 20 min</button></form>}
-      {canAct ? <><div className={styles.actions} aria-label="Ampliación del escritorio"><button type="button" aria-pressed={zoom === 0} onClick={() => setZoom(0)}>Vista completa</button><button type="button" aria-pressed={zoom === 1} onClick={() => setZoom(1)}>Tamaño real · 100 %</button><button type="button" aria-pressed={zoom === 1.5} onClick={() => setZoom(1.5)}>Ampliar · 150 %</button></div><p id={`${uid}-zoom-help`} className={styles.expiry}>Amplíe para leer y elegir un campo. Deslice la vista en ambas direcciones; con teclado, enfoque la imagen y use las flechas para desplazarse.</p><div className={styles.screen} tabIndex={0} role="region" aria-label="Vista del escritorio con desplazamiento" aria-describedby={`${uid}-zoom-help`}><Image key={`${selected}:${frame}`} unoptimized src={`${api}/sessions/${encodeURIComponent(selected)}/screenshot?frame=${frame}`} width={1280} height={800} alt="Captura del escritorio privado en contenedor" style={zoom ? { width: `${screenWidth * zoom}px`, maxWidth: "none" } : undefined} onLoad={event => setScreenWidth(event.currentTarget.naturalWidth)} className={held ? styles.controllable : undefined} onClick={event => { if (!held || busy || !canWork) return; const image = event.currentTarget, rect = image.getBoundingClientRect(); const point = desktopPoint({ x: event.clientX, y: event.clientY }, rect, { width: image.naturalWidth, height: image.naturalHeight }); if (point) void action({ action: "input", input: { action: "click", args: point } }); }} /></div><div className={styles.actions}><button type="button" disabled={busy} onClick={() => setFrame(Date.now())}>Actualizar captura</button>{held && canWork && <><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "key", args: { keys: "Return" } } })}>Enter</button><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "key", args: { keys: "Tab" } } })}>Tab</button><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "scroll", args: { direction: "down", amount: 3 } } })}>Desplazar abajo</button></>}</div>{held && canWork && <form className={styles.manual} onSubmit={event => { event.preventDefault(); void action({ action: "input", input: { action: "type", args: { text: manualText } } }).then(() => setManualText("")); }}><label htmlFor={`${uid}-manual`}>Texto para escribir manualmente en el escritorio</label><input id={`${uid}-manual`} value={manualText} type="password" autoComplete="off" maxLength={2000} disabled={busy} onChange={event => setManualText(event.target.value)} /><button type="submit" disabled={busy || !manualText}>Escribir en escritorio</button><p>Se envía al teclado del contenedor, sin incorporarse al chat del modelo.</p></form>}</> : <p className={styles.waiting}><CircleAlert size={18} aria-hidden="true" />El escritorio todavía no está disponible. No se muestra una imagen de demostración.</p>}
+      {canAct ? <><div className={styles.actions} aria-label="Ampliación del escritorio"><button type="button" aria-pressed={zoom === 0} onClick={() => setZoom(0)}>Vista completa</button><button type="button" aria-pressed={zoom === 1} onClick={() => setZoom(1)}>Tamaño real · 100 %</button><button type="button" aria-pressed={zoom === 1.5} onClick={() => setZoom(1.5)}>Ampliar · 150 %</button></div><p id={`${uid}-zoom-help`} className={styles.expiry}>Amplíe para leer y elegir un campo. Deslice la vista en ambas direcciones; con teclado, enfoque la imagen y use las flechas para desplazarse.</p><div ref={screen} className={styles.screen} tabIndex={0} role="region" aria-label="Vista del escritorio con desplazamiento" aria-describedby={`${uid}-zoom-help`}>{desktopScreen.frame ? <Image key={`${selected}:${frame}`} unoptimized src={desktopScreen.frame.url} width={1280} height={800} alt="Captura del escritorio privado en contenedor" style={zoom ? { width: `${screenWidth * zoom}px`, maxWidth: "none" } : undefined} onLoad={event => setScreenWidth(event.currentTarget.naturalWidth)} className={held ? styles.controllable : undefined} onClick={event => { if (!held || busy || !canWork) return; const image = event.currentTarget, rect = image.getBoundingClientRect(); const point = desktopPoint({ x: event.clientX, y: event.clientY }, rect, { width: image.naturalWidth, height: image.naturalHeight }); if (point) void action({ action: "input", input: { action: "click", args: point } }); }} /> : <p role="status">{desktopScreen.failed ? "No se pudo actualizar la vista. Reintentaremos la captura; también puedes pulsar Actualizar captura." : "Actualizando vista del escritorio…"}</p>}</div><div className={styles.actions}><button type="button" disabled={busy} onClick={() => setFrame(Date.now())}>Actualizar captura</button>{held && canWork && <><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "key", args: { keys: "Return" } } })}>Enter</button><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "key", args: { keys: "Tab" } } })}>Tab</button><button type="button" disabled={busy} onClick={() => action({ action: "input", input: { action: "scroll", args: { direction: "down", amount: 3 } } })}>Desplazar abajo</button></>}</div>{held && canWork && <form className={styles.manual} onSubmit={event => { event.preventDefault(); void action({ action: "input", input: { action: "type", args: { text: manualText } } }).then(() => setManualText("")); }}><label htmlFor={`${uid}-manual`}>Texto para escribir manualmente en el escritorio</label><input id={`${uid}-manual`} value={manualText} type="password" autoComplete="off" maxLength={2000} disabled={busy} onChange={event => setManualText(event.target.value)} /><button type="submit" disabled={busy || !manualText}>Escribir en escritorio</button><p>Se envía al teclado del contenedor, sin incorporarse al chat del modelo.</p></form>}</> : <p className={styles.waiting}><CircleAlert size={18} aria-hidden="true" />El escritorio todavía no está disponible. No se muestra una imagen de demostración.</p>}
       {held && canWork && <AltazorSecretUse key={selected} sessionId={selected} onBusyChange={setBusy} />}
       {view?.session.connectors?.length ? <p className={styles.expiry}>Aplicaciones autorizadas para esta sesión: {view.session.connectors.join(", ")}.</p> : null}
       {view?.approvals?.length ? <section className={styles.approvals} aria-label="Autorizaciones de aplicaciones"><h3 ref={approvalHeading} tabIndex={-1}>Altazor espera tu decisión</h3><p>Revise el destino y el contenido. Autorizar ejecuta esta operación una sola vez.</p>{view.approvals.map(approval => <article key={approval.id}><h4>{approval.connector} · {approval.action}</h4><p>{approval.summary}</p><pre>{JSON.stringify(approval.args, null, 2)}</pre>{!approval.reviewable && <p>El detalle contiene datos ocultos o supera el límite de revisión. Puede rechazarlo y realizar la operación directamente en la aplicación.</p>}<div className={styles.actions}><button type="button" disabled={busy || !canWork || held || !approval.reviewable} onClick={() => action({ action: "connector_approval", approvalId: approval.id, approve: true })}>Autorizar esta operación</button><button type="button" disabled={busy || !canAct} onClick={() => action({ action: "connector_approval", approvalId: approval.id, approve: false })}>Rechazar</button></div>{held && <p>Devuelva el control para ejecutar una operación autorizada.</p>}</article>)}</section> : null}
