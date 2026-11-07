@@ -14,7 +14,7 @@ import { captureWritingSource } from "@/lib/writings/sources";
 import { resolveAltazorSources, verifyAltazorSources, type AltazorSourceSnapshot } from "./resources";
 import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, academicDraftCreateSchema, ACADEMIC_LABELS, ACADEMIC_MANUSCRIPT_MAX, ACADEMIC_WORKSPACE_LIMIT, emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
 import { parseAcademicOutput, academicReferenceAppendix, academicWritingBody } from "./academic-output";
-import { academicManuscriptBody, ACADEMIC_MANUSCRIPT_TEMPLATES, isAcademicTeachingKind, isAcademicTeachingProgram, type AcademicManuscriptTemplate } from "./academic-templates";
+import { academicManuscriptBody, ACADEMIC_MANUSCRIPT_TEMPLATES, isAcademicTeachingKind, isAcademicTeachingProgram, isAcademicTeachingSessionKind, type AcademicManuscriptTemplate } from "./academic-templates";
 import type { AcademicCallOrigin } from "./academic-calls";
 import { readTeachingSessionContent } from "./teaching-session-content";
 const missing = () => httpError("El trabajo académico no está disponible", 404);
@@ -182,16 +182,21 @@ export async function createAcademicDraft(id: string, raw: unknown, user: CausaA
     }
     if (workspace.revision !== input.expectedRevision) throw httpError("El trabajo cambió. Recárgalo antes de crear el borrador", 409);
     if (await tx.altazorAcademicArtifact.count({ where: { workspaceId: id } }) >= 100) throw httpError("El trabajo alcanzó cien resultados; crea otro trabajo para continuar", 413);
+    const handout = input.template === "participant_handout";
+    if (handout && !isAcademicTeachingSessionKind(workspace.kind)) {
+      throw httpError("La hoja para participantes se prepara desde un curso, seminario, congreso o taller.", 400);
+    }
     const refs = JSON.parse(workspace.sourcesJson) as AltazorSourceSnapshot[];
     await verifyAltazorSources(actor, refs, { client: tx });
     const template = ACADEMIC_MANUSCRIPT_TEMPLATES[input.template];
     const title = `${input.template === "blank" ? "Borrador" : template.label} · ${workspace.title}`.slice(0, 240);
     const brief: typeof emptyAcademicBrief = { ...emptyAcademicBrief, ...JSON.parse(workspace.briefJson) };
     const syllabus = input.template === "course";
-    const selectedSessionIds = syllabus ? brief.syllabus?.sessionIds : brief.programSessionIds;
-    const sessionIds = input.template === workspace.kind && (syllabus || isAcademicTeachingProgram(input.template))
+    const selectedSessionIds = workspace.kind === "course" ? brief.syllabus?.sessionIds : brief.programSessionIds;
+    const sessionIds = handout || input.template === workspace.kind && (syllabus || isAcademicTeachingProgram(input.template))
       ? selectedSessionIds ?? [] : [];
-    const documentLabel = syllabus ? "syllabus" : "programa";
+    if (handout && !sessionIds.length) throw httpError("Elige al menos una sesión de la Agenda para crear la hoja para participantes.", 400);
+    const documentLabel = handout ? "material para participantes" : syllabus ? "syllabus" : "programa";
     const sessions = sessionIds.length ? await tx.altazorTeachingSession.findMany({
       where: { workspaceId: workspace.id, id: { in: sessionIds } },
       select: { title: true, startsAt: true, endsAt: true, contentJson: true },
@@ -207,7 +212,7 @@ export async function createAcademicDraft(id: string, raw: unknown, user: CausaA
     if (body.length > ACADEMIC_MANUSCRIPT_MAX) {
       throw httpError(`Las sesiones elegidas exceden el tamaño del ${documentLabel}. Reduce la selección e inténtalo nuevamente.`, 413);
     }
-    const mode = syllabus ? "syllabus" : isAcademicTeachingKind(input.template) ? "teaching_material" : "academic_writing";
+    const mode = syllabus ? "syllabus" : handout || isAcademicTeachingKind(input.template) ? "teaching_material" : "academic_writing";
     const artifact = await tx.altazorAcademicArtifact.create({
       data: {
         workspaceId: id, requestId: input.requestId, inputSha256, mode, title,

@@ -1,7 +1,7 @@
 # Descubrimiento académico y bibliografía
 
 En **Académico → Buscar bibliografía**, escribe un tema o referencia,
-elige Crossref y/o OpenAlex y autoriza el envío de esos términos. La aplicación
+elige Crossref y/o OpenAlex y pulsa **Buscar obras**. La aplicación
 consulta la primera ventana de hasta diez obras por fuente y conserva su
 procedencia y fecha. No incorpora datos de causas, conversaciones o archivos
 a la consulta. Estos servicios proporcionan metadatos, que requieren revisión
@@ -37,8 +37,8 @@ o experiencia. La cuenta social se gestiona por separado mediante LinkedIn.
 Las solicitudes usan HTTPS, los hosts fijos `api.crossref.org`,
 `api.openalex.org` y `pub.orcid.org`, no siguen redirecciones ni envían cookies.
 Cada respuesta tiene un máximo de 2 MiB, tiempo acotado y una única consulta
-simultánea por host en cada proceso. Las búsquedas, DOI, red y ORCID requieren
-autorización explícita. Los objetos privados se vuelven a comprobar al leer,
+simultánea por host en cada proceso. Cada consulta comienza al pulsar su botón,
+incluidas las búsquedas, los DOI, la red de citas y ORCID. Los objetos privados se vuelven a comprobar al leer,
 actualizar y exportar; los metadatos de un libro propio retirado se excluyen.
 
 Las consultas básicas anónimas y el acceso con clave tienen límites distintos;

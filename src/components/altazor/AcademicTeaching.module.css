@@ -6,6 +6,12 @@
 .callJump { display:inline-flex; align-items:center; gap:.4rem; min-height:44px; color:var(--sea); text-decoration:underline; text-underline-offset:.2em; }
 .callJump svg { flex:none; }
 .inlineLink { color:var(--sea); text-decoration:underline; text-underline-offset:.18em; }
+.participantMaterial { min-width:0; border-block:1px solid var(--line); }
+.participantMaterial > summary { display:flex; align-items:center; gap:.6rem; min-height:44px; color:var(--sea); cursor:pointer; }
+.participantMaterial > summary::after { content:""; inline-size:.48rem; block-size:.48rem; flex:none; border-block-end:1px solid currentColor; border-inline-end:1px solid currentColor; transform:rotate(45deg); }
+.participantMaterial[open] > summary::after { transform:rotate(225deg); }
+.participantMaterial > div { display:grid; gap:.7rem; padding-block:.3rem 1rem; }
+.participantMaterial > div > button { justify-self:start; }
 .origin { border-block:1px solid var(--line); padding-block:0 .45rem; overflow-wrap:anywhere; }
 .origin > summary { min-height:44px; color:var(--sea); }
 .originSummary { margin-block:.35rem; color:var(--ink-soft); white-space:pre-line; }

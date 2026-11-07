@@ -1,5 +1,5 @@
 .picker { border-block:1px solid var(--line); min-width:0; scroll-margin-block-start:calc(var(--shell-header-offset, 4rem) + .75rem); }
-.picker > summary { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; min-height:44px; padding-block:.5rem; color:var(--sea); cursor:pointer; }
+.picker > summary { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; min-height:44px; padding:.5rem .75rem; color:var(--sea); cursor:pointer; }
 .picker > summary svg { flex:none; }
 .count { margin-inline-start:auto; color:var(--ink-soft); font-size:var(--text-sm); }
 .picker[open] > summary .chevron { transform:rotate(180deg); }

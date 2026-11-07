@@ -11,7 +11,7 @@ type PeopleKind = "speakers" | "moderators";
 type ListKind = ReferenceKind | PeopleKind | "outcomes";
 type ReferenceDraft = { key: string; title: string; href: string };
 type OutcomeDraft = { key: string; value: string };
-type Draft = { readings: ReferenceDraft[]; materials: ReferenceDraft[]; outcomes: OutcomeDraft[]; speakers: OutcomeDraft[]; moderators: OutcomeDraft[]; location: string };
+type Draft = { readings: ReferenceDraft[]; materials: ReferenceDraft[]; outcomes: OutcomeDraft[]; speakers: OutcomeDraft[]; moderators: OutcomeDraft[]; location: string; activity: string };
 
 const labels = {
   readings: { group: "Lecturas", article: "de la lectura", add: "Añadir lectura", remove: "Quitar lectura" },
@@ -31,6 +31,7 @@ function toDraft(content: TeachingSessionContent): Draft {
     speakers: (content.speakers ?? []).map((value, index) => ({ key: `saved-${index}`, value })),
     moderators: (content.moderators ?? []).map((value, index) => ({ key: `saved-${index}`, value })),
     location: content.location ?? "",
+    activity: content.activity ?? "",
   };
 }
 
@@ -53,6 +54,7 @@ function toContent(draft: Draft, origin?: string): TeachingSessionContent {
     ...(draft.speakers.length ? { speakers: draft.speakers.map(item => item.value.trim()) } : {}),
     ...(draft.moderators.length ? { moderators: draft.moderators.map(item => item.value.trim()) } : {}),
     ...(draft.location.trim() ? { location: draft.location.trim() } : {}),
+    ...(draft.activity.trim() ? { activity: draft.activity.trim() } : {}),
   };
 }
 
@@ -84,7 +86,7 @@ export function AcademicSessionContent({ sessionId, title, content, contentRevis
   const form = useRef<HTMLFormElement>(null);
   const edit = useRef<HTMLButtonElement>(null);
   const count = content.readings.length + content.materials.length + content.outcomes.length
-    + (content.speakers?.length ?? 0) + (content.moderators?.length ?? 0) + Number(Boolean(content.location));
+    + (content.speakers?.length ?? 0) + (content.moderators?.length ?? 0) + Number(Boolean(content.location)) + Number(Boolean(content.activity));
   const dirty = Boolean(draft && JSON.stringify(toContent(draft)) !== JSON.stringify(toContent(toDraft(content))));
 
   useEffect(() => {
@@ -206,6 +208,16 @@ export function AcademicSessionContent({ sessionId, title, content, contentRevis
           {draft.outcomes.length === TEACHING_CONTENT_LIMITS.itemsPerGroup && <p className={styles.helper}>Alcanzaste el máximo de {TEACHING_CONTENT_LIMITS.itemsPerGroup} resultados.</p>}
         </fieldset>
         <details className={styles.people}>
+          <summary>Actividad para participantes</summary>
+          <div className={styles.peopleFields}>
+            <label>Consigna de la actividad
+              <textarea className="input" rows={5} value={draft.activity} maxLength={TEACHING_CONTENT_LIMITS.activityLength} disabled={busy}
+                onChange={event => { const activity = event.target.value; setDraft(current => current ? { ...current, activity } : current); }} />
+            </label>
+            <p className={styles.helper}>Se incluirá en el programa y en la hoja para participantes.</p>
+          </div>
+        </details>
+        <details className={styles.people}>
           <summary>Ponentes, moderación y lugar</summary>
           <div className={styles.peopleFields}>
             {(Object.keys(peopleLabels) as PeopleKind[]).map(kind => {
@@ -255,6 +267,7 @@ export function AcademicSessionContent({ sessionId, title, content, contentRevis
             <ul>{content[kind]?.map((value, index) => <li key={index}>{value}</li>)}</ul>
           </div>)}
           {content.location && <div><h4>Sala o modalidad</h4><p className={styles.location}>{content.location}</p></div>}
+          {content.activity && <div><h4>Actividad</h4><p className={styles.activity}>{content.activity}</p></div>}
         </div>}
         <button ref={edit} type="button" className="btn btn-outline" disabled={busy} onClick={startEdit}>Editar contenido</button>
       </>}

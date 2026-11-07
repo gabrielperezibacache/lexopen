@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { CSRF_COOKIE, CSRF_HEADER } from "../src/lib/auth/csrf-constants";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { loginAs } from "./helpers";
@@ -192,12 +193,16 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
               speakers: ["Ponente ficticia del encuentro"],
               moderators: ["Moderador ficticio del encuentro"],
               location: "Sala 204 · modalidad híbrida",
+              activity: "Compara las dos fuentes.\nAnota una conclusión fundamentada.",
             }) },
           { workspaceId: projectId, requestId: randomUUID(), title: excluded, startsAt: new Date("2030-05-09T22:00:00Z") },
           { workspaceId: projectId, requestId: randomUUID(), title: close, startsAt: new Date("2030-05-09T23:00:00Z") },
         ] });
 
         await page.goto(`/academico?trabajo=${projectId}`);
+        await program.getByText("Material para participantes", { exact: true }).click();
+        await expect(program.getByRole("button", { name: "Crear hoja para participantes", exact: true })).toBeDisabled();
+        await academic.getByLabel("Tu objetivo o texto de trabajo", { exact: true }).fill("Nota privada del equipo organizador.");
         const picker = program.getByText("Sesiones de la Agenda", { exact: true });
         const firstSession = program.getByRole("checkbox", { name: new RegExp(open) });
         const lastSession = program.getByRole("checkbox", { name: new RegExp(close) });
@@ -237,6 +242,7 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
         expect(original).toContain("Ponente ficticia del encuentro");
         expect(original).toContain("Moderador ficticio del encuentro");
         expect(original).toContain("Sala 204 · modalidad híbrida");
+        expect(original).toContain("Compara las dos fuentes.\nAnota una conclusión fundamentada.");
         expect(original).not.toContain(excluded);
         expect(original).toContain(`### ${close}`);
         expect(original.indexOf(open)).toBeLessThan(original.indexOf(close));
@@ -252,6 +258,35 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
         }
         await page.reload();
         await expect(text).toHaveValue(edited);
+        if (kind === "workshop") {
+          const programId = new URL(page.url()).searchParams.get("resultado");
+          expect(programId).toBeTruthy();
+          await academic.getByRole("button", { name: "Objetivo", exact: true }).click();
+          await program.getByText("Material para participantes", { exact: true }).click();
+          await program.getByRole("button", { name: "Crear hoja para participantes", exact: true }).click();
+          await expect(text).toHaveValue(/Hoja para participantes/);
+          const handout = await text.inputValue();
+          expect(handout).toContain(open);
+          expect(handout).toContain(close);
+          expect(handout).toMatch(/16:30\s*–\s*17:30 \(Santiago\)/);
+          expect(handout).toContain("Lectura sobre métodos");
+          expect(handout).toContain("Guía de discusión");
+          expect(handout).toContain("Comparar métodos de análisis.");
+          expect(handout).toContain("Ponente ficticia del encuentro");
+          expect(handout).toContain("Moderador ficticio del encuentro");
+          expect(handout).toContain("Sala 204 · modalidad híbrida");
+          expect(handout).toContain("Compara las dos fuentes.\nAnota una conclusión fundamentada.");
+          expect(handout).toContain("Tus notas");
+          expect(handout).not.toContain(excluded);
+          expect(handout).not.toContain("Nota privada del equipo organizador.");
+          expect(handout).not.toContain("Nota para participantes del encuentro.");
+          expect((await db.altazorAcademicArtifact.findUniqueOrThrow({ where: { id: programId! } })).body).toBe(edited);
+          const download = page.waitForEvent("download");
+          await editor.getByRole("link", { name: "Markdown", exact: true }).click();
+          const destination = info.outputPath("hoja-participantes-ficticia.md");
+          await (await download).saveAs(destination);
+          expect(await readFile(destination, "utf8")).toBe(handout);
+        }
       });
     }
   } finally {

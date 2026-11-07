@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, BookOpen, FileText, GraduationCap, PenLine, Plus
 import { createSubmissionKeys } from "@/lib/client-submission-key";
 import { prepareAssistantSubmission } from "@/lib/altazor/client-send-policy";
 import { ACADEMIC_LABELS, type AcademicMode } from "@/lib/altazor/academic-schemas";
-import { ACADEMIC_INSTRUCTIONS, ACADEMIC_JOURNEYS, ACADEMIC_MANUSCRIPT_TEMPLATES, ACADEMIC_MANUSCRIPT_TEMPLATE_IDS, academicHref, academicJourney, isAcademicTeachingKind, isAcademicTeachingProgram, type AcademicJourney, type AcademicManuscriptTemplate } from "@/lib/altazor/academic-templates";
+import { ACADEMIC_INSTRUCTIONS, ACADEMIC_JOURNEYS, ACADEMIC_MANUSCRIPT_TEMPLATES, ACADEMIC_MANUSCRIPT_TEMPLATE_IDS, academicHref, academicJourney, isAcademicTeachingKind, isAcademicTeachingProgram, isAcademicTeachingSessionKind, type AcademicJourney, type AcademicManuscriptTemplate } from "@/lib/altazor/academic-templates";
 import { AltazorSources, type AltazorSelectedSource } from "./AltazorSources";
 import { AltazorDiscovery } from "./AltazorDiscovery";
 import { AcademicMatrix } from "./AcademicMatrix";
@@ -196,8 +196,10 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
       await load(workspace.id);
       draftRequest.current = createSubmissionKeys();
       setSelectedId(result.id); setStep(2); setShowTemplates(false); replaceLink(workspace.id, result.id);
-      const label = next === "course" ? "Syllabus" : next === workspace.kind && isAcademicTeachingProgram(next) ? "Programa" : "Borrador";
-      setNotice(`${label} creado. Ya puedes editarlo.`);
+      const label = next === "course" ? "Syllabus creado"
+        : next === "participant_handout" ? "Hoja para participantes creada"
+        : next === workspace.kind && isAcademicTeachingProgram(next) ? "Programa creado" : "Borrador creado";
+      setNotice(`${label}. Ya puedes editarlo.`);
       window.requestAnimationFrame(() => section.current?.querySelector("[aria-label='Editor académico']")?.scrollIntoView({ block: "start" }));
     } catch (reason) { setError(message(reason, "No se pudo abrir el borrador. Inténtalo de nuevo.")); }
     finally { setBusy(false); }
@@ -356,12 +358,13 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
                 onChange={syllabus => updateWorkspace({ brief: { ...workspace.brief, syllabus } })}
                 onBriefChange={(key, value) => updateWorkspace({ brief: { ...workspace.brief, [key]: value } })}
                 onCreate={() => void createDraft("course")}
+                onHandout={() => void createDraft("participant_handout")}
                 onSearch={() => { setDiscoveryQuery(workspace.title.trim()); setPane("discovery"); }} />}
               {programKind && <AcademicTeachingProgram key={`program-${workspace.id}`} kind={programKind}
                 workspaceId={workspace.id} sessionsVersion={teachingSessionsVersion} selection={workspace.brief.programSessionIds ?? []}
                 title={workspace.title} busy={busy} sessionContentDirty={sessionContentDirty}
                 onChange={programSessionIds => updateWorkspace({ brief: { ...workspace.brief, programSessionIds } })}
-                onCreate={() => void createDraft(programKind)} />}
+                onCreate={() => void createDraft(programKind)} onHandout={() => void createDraft("participant_handout")} />}
               {workspace.kind === "call" && <AcademicCallForm value={workspace.brief.call} origin={workspace.callOrigin} busy={busy}
                 onChange={call => updateWorkspace({ brief: { ...workspace.brief, call } })} />}
               <label>Tu objetivo o texto de trabajo<textarea rows={7} value={workspace.brief.objective} disabled={busy} onChange={event => updateWorkspace({ brief: { ...workspace.brief, objective: event.target.value } })} maxLength={8000} placeholder={ACADEMIC_INSTRUCTIONS[mode]}/></label><details><summary>Opciones del trabajo</summary><div className={styles.brief}><label>Qué quieres preparar<select aria-label="Qué quieres preparar" value={mode} disabled={busy} onChange={event => { setMode(event.target.value as AcademicMode); updateWorkspace({ brief: { ...workspace.brief, task: event.target.value as AcademicMode } }); }}>{ACADEMIC_JOURNEYS.map(item => <optgroup key={item.id} label={item.label}>{item.modes.map(id => <option key={id} value={id}>{ACADEMIC_LABELS[id]}</option>)}</optgroup>)}</select></label>{(["audience", "language", ...(["syllabus", "rubric", "teaching_material"].includes(mode) ? ["duration", "learningOutcomes", "evaluation"] as const : [])] as const).map(key => <label key={key}>{{ audience: "Destinatarios", language: "Idioma", duration: "Duración", learningOutcomes: "Resultados de aprendizaje", evaluation: "Evaluación o actividad" }[key]}<textarea value={workspace.brief[key]} rows={key === "language" || key === "duration" ? 1 : 3} maxLength={key === "language" ? 80 : key === "duration" ? 100 : key === "audience" ? 1000 : 6000} disabled={busy} onChange={event => updateWorkspace({ brief: { ...workspace.brief, [key]: event.target.value } })}/></label>)}</div></details>{mode === "cv" && <button className="btn btn-outline" type="button" disabled={busy || editorDirty || sessionContentDirty} onClick={() => setPane("profile")}>Completar perfil para el currículum</button>}
@@ -393,7 +396,9 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
                   onClick={() => setShowTemplates(value => !value)}><PenLine size={16} aria-hidden="true" /> {showTemplates ? "Cerrar plantillas" : "Nuevo borrador"}</button>
                 {showTemplates && <form onSubmit={event => { event.preventDefault(); void createDraft(template); }}>
                   <label>Plantilla del documento<select aria-label="Plantilla del documento" value={template} disabled={busy} onChange={event => setTemplate(event.target.value as AcademicManuscriptTemplate)}>
-                    {ACADEMIC_MANUSCRIPT_TEMPLATE_IDS.filter(id => isAcademicTeachingKind(workspace.kind) || !isAcademicTeachingKind(id)).map(id =>
+                    {ACADEMIC_MANUSCRIPT_TEMPLATE_IDS.filter(id => id === "participant_handout"
+                      ? isAcademicTeachingSessionKind(workspace.kind)
+                      : isAcademicTeachingKind(workspace.kind) || !isAcademicTeachingKind(id)).map(id =>
                       <option key={id} value={id}>{ACADEMIC_MANUSCRIPT_TEMPLATES[id].label}</option>)}
                   </select></label>
                   <p>{ACADEMIC_MANUSCRIPT_TEMPLATES[template].description}</p>

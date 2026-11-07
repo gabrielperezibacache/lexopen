@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const TEACHING_CONTENT_LIMITS = { itemsPerGroup: 12, titleLength: 200, outcomeLength: 500, hrefLength: 1000, nameLength: 200, locationLength: 600 } as const;
+export const TEACHING_CONTENT_LIMITS = { itemsPerGroup: 12, titleLength: 200, outcomeLength: 500, hrefLength: 1000, nameLength: 200, locationLength: 600, activityLength: 3000 } as const;
 
 function singleLine(length: number) {
   return z.string().trim().min(1).max(length)
@@ -34,6 +34,9 @@ export const teachingSessionContentSchema = z.object({
   speakers: z.array(singleLine(TEACHING_CONTENT_LIMITS.nameLength)).max(TEACHING_CONTENT_LIMITS.itemsPerGroup).optional(),
   moderators: z.array(singleLine(TEACHING_CONTENT_LIMITS.nameLength)).max(TEACHING_CONTENT_LIMITS.itemsPerGroup).optional(),
   location: singleLine(TEACHING_CONTENT_LIMITS.locationLength).optional(),
+  activity: z.string().trim().min(1).max(TEACHING_CONTENT_LIMITS.activityLength)
+    .regex(/^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\p{Zl}\p{Zp}]*$/u, "La actividad contiene caracteres no admitidos.")
+    .optional(),
 }).strict();
 
 export type TeachingSessionContent = z.infer<typeof teachingSessionContentSchema>;

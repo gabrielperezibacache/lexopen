@@ -52,6 +52,7 @@ test("teaching programs place Agenda sessions under the existing program heading
       speakers: ["Profesora de prueba", "Investigador [invitado]"],
       moderators: ["Moderadora ficticia"],
       location: "Aula 204 · modalidad híbrida",
+      activity: "Compara las fuentes.\nAnota una conclusión.",
     },
   };
   for (const [template, section, next] of [
@@ -69,7 +70,15 @@ test("teaching programs place Agenda sessions under the existing program heading
     assert.match(schedule, /\*\*Resultados de aprendizaje\*\*\n\n- Distinguir argumentos/);
     assert.match(schedule, /\*\*Lecturas\*\*\n\n- Lectura base/);
     assert.match(schedule, /\*\*Materiales\*\*\n\n- Guía — https:\/\/example.org\/guia/);
+    assert.ok(schedule.includes("**Actividad**\n\nCompara las fuentes.\nAnota una conclusión."));
     assert.ok(academicManuscriptBody(template, "Encuentro", emptyAcademicBrief).includes(`## ${section}\n\n## ${next}`));
   }
   assert.doesNotMatch(academicManuscriptBody("call", "Convocatoria", emptyAcademicBrief, [session]), /Discusión inicial/);
+  const handout = academicManuscriptBody("participant_handout", "Encuentro", {
+    ...emptyAcademicBrief, objective: "Nota privada del equipo", evaluation: "Pauta de corrección privada",
+  }, [session]);
+  assert.match(handout, /^# Hoja para participantes\n\n## Encuentro\n\n### Discusión inicial/);
+  assert.ok(handout.includes("**Actividad**\n\nCompara las fuentes.\nAnota una conclusión."));
+  assert.ok(handout.includes("**Tus notas**\n\n\n\n\n"));
+  assert.doesNotMatch(handout, /Nota privada|Pauta de corrección/);
 });

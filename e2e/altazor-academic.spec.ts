@@ -254,6 +254,8 @@ test("Docencia arma un syllabus editable desde la ficha y separa la consulta bib
   await lesson.getByRole("button", { name: "Añadir moderador", exact: true }).click();
   await lesson.getByLabel("Nombre del moderador 1", { exact: true }).fill("Moderador ficticio de la clase");
   await lesson.getByLabel("Sala o modalidad de la sesión", { exact: true }).fill("Aula 305 · presencial");
+  await lesson.getByText("Actividad para participantes", { exact: true }).click();
+  await lesson.getByLabel("Consigna de la actividad", { exact: true }).fill("Identifica las fuentes del caso.\nJustifica la selección en dos párrafos.");
   await lesson.getByRole("button", { name: "Añadir lectura", exact: true }).click();
   await lesson.getByLabel("Título de la lectura 1", { exact: true }).fill("Lectura asignada sobre fuentes");
   await lesson.getByLabel("Enlace de la lectura 1 (opcional)", { exact: true }).fill(`${new URL(testInfo.project.use.baseURL as string).origin}/biblioteca/libro-prueba?fragment=2#fragment-2`);
@@ -272,6 +274,7 @@ test("Docencia arma un syllabus editable desde la ficha y separa la consulta bib
   await expect(lesson.getByText("Profesora ficticia de fuentes", { exact: true })).toBeVisible();
   await expect(lesson.getByText("Moderador ficticio de la clase", { exact: true })).toBeVisible();
   await expect(lesson.getByText("Aula 305 · presencial", { exact: true })).toBeVisible();
+  await expect(lesson.getByText("Identifica las fuentes del caso. Justifica la selección en dos párrafos.", { exact: true })).toBeVisible();
   if (process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
     await lesson.screenshot({ path: testInfo.outputPath("contenido-sesion-movil.png") });
   }
@@ -310,6 +313,7 @@ test("Docencia arma un syllabus editable desde la ficha y separa la consulta bib
   expect(initial).toContain("Profesora ficticia de fuentes");
   expect(initial).toContain("Moderador ficticio de la clase");
   expect(initial).toContain("Aula 305 · presencial");
+  expect(initial).toContain("Identifica las fuentes del caso.\nJustifica la selección en dos párrafos.");
   expect(initial).not.toContain("Sesión de ejercicios internos");
   expect(initial).not.toContain("Sugiere bibliografía");
   const workspace = await db.altazorAcademicWorkspace.findFirstOrThrow({ where: { ownerId, title: "Curso ficticio de argumentación" } });

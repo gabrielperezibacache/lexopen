@@ -29,6 +29,9 @@ const teachingProgramSections = {
 export function isAcademicTeachingProgram(kind: string): kind is keyof typeof teachingProgramSections {
   return Object.hasOwn(teachingProgramSections, kind);
 }
+export function isAcademicTeachingSessionKind(kind: string): kind is "course" | keyof typeof teachingProgramSections {
+  return kind === "course" || isAcademicTeachingProgram(kind);
+}
 
 export const ACADEMIC_MANUSCRIPT_TEMPLATES = {
   blank: { label: "Documento en blanco", description: "Escribe con tu propia estructura.", headings: [] },
@@ -40,6 +43,7 @@ export const ACADEMIC_MANUSCRIPT_TEMPLATES = {
   seminar: { label: "Seminario", description: "Ordena sesiones, ponentes, lecturas y discusión.", headings: ["Propósito y destinatarios", teachingProgramSections.seminar, "Lecturas previas", "Preguntas de discusión", "Calendario y responsabilidades"] },
   congress: { label: "Congreso", description: "Prepara el programa y distribuye el trabajo del equipo.", headings: ["Tema y ejes", "Comité y responsabilidades", teachingProgramSections.congress, "Convocatoria y evaluación", "Inscripción y logística", "Hitos y plazos"] },
   workshop: { label: "Taller", description: "Diseña actividades, materiales y una pauta de evaluación.", headings: ["Resultados esperados", "Destinatarios y requisitos", teachingProgramSections.workshop, "Materiales", "Evaluación y seguimiento"] },
+  participant_handout: { label: "Hoja para participantes", description: "Reúne las sesiones elegidas, sus actividades y espacio para notas.", headings: [] },
   call: { label: "Convocatoria", description: "Registra bases, elegibilidad, entregables y fechas clave.", headings: ["Entidad convocante y país", "Bases y fuente oficial", "Requisitos de elegibilidad", "Documentos y entregables", "Fechas y zona horaria", "Equipo y responsabilidades", "Seguimiento"] },
 } as const;
 export type AcademicManuscriptTemplate = keyof typeof ACADEMIC_MANUSCRIPT_TEMPLATES;
@@ -81,6 +85,7 @@ function manuscriptSessionBody({ title, startsAt, endsAt, content }: ManuscriptS
     ...(content.location ? [`**Sala o modalidad**`, markdownSessionText(content.location)] : []),
     ...sections.filter(({ entries }) => entries.length)
       .flatMap(({ label, entries }) => [`**${label}**`, entries.map(entry => `- ${entry}`).join("\n")]),
+    ...(content.activity ? ["**Actividad**", content.activity.split(/\r\n?|\n/).map(markdownSessionText).join("\n")] : []),
   ].join("\n\n");
 }
 
@@ -92,6 +97,11 @@ export function academicManuscriptBody(
 ) {
   if (templateId === "blank") return "";
   const heading = `# ${title.replace(/\s+/g, " ")}`;
+  if (templateId === "participant_handout") {
+    return ["# Hoja para participantes", `## ${markdownSessionText(title)}`, ...sessions.map(session =>
+      `${manuscriptSessionBody(session)}\n\n**Tus notas**\n\n\n\n\n`,
+    )].join("\n\n");
+  }
   if (templateId === "call" && brief.call) {
     const { country, organization, url, deadline } = brief.call;
     const [entity, source, requirements, deliverables, dates, roles, followup] = ACADEMIC_MANUSCRIPT_TEMPLATES.call.headings;

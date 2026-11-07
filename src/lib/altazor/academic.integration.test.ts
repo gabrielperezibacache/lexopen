@@ -156,6 +156,7 @@ async function main(){
       speakers: ["Ponente ficticia"],
       moderators: ["Moderador ficticio"],
       location: "Aula ficticia 204",
+      activity: "Compara las fuentes.\nRedacta una conclusión fundamentada.",
     };
     const [early, late, ignored, foreign] = await Promise.all([
       db.altazorTeachingSession.create({ data: {
@@ -220,6 +221,13 @@ async function main(){
     await assert.rejects(createAcademicDraft(course.id, { ...syllabusInput, requestId: randomUUID(), expectedRevision: longSelection.revision }, owner, db), status(413));
     assert.equal(await db.altazorAcademicArtifact.count({ where: { workspaceId: course.id } }), 2);
     assert.equal((await readAcademicArtifact(course.id, syllabus.id, owner, db)).body, body);
+    const handoutSelection = await saveSessions([early.id]);
+    const courseHandout = await createAcademicDraft(course.id, { requestId: randomUUID(), expectedRevision: handoutSelection.revision, template: "participant_handout" }, owner, db);
+    const courseHandoutBody = (await readAcademicArtifact(course.id, courseHandout.id, owner, db)).body;
+    assert.match(courseHandoutBody, /^# Hoja para participantes/);
+    assert.match(courseHandoutBody, /Sesión revisada/);
+    assert.doesNotMatch(courseHandoutBody, /Sesión extensa|Sesión excluida/);
+    await assert.rejects(createAcademicDraft(workspace.id, { requestId: randomUUID(), expectedRevision: latestForCancel.revision, template: "participant_handout" }, owner, db), status(400));
 
     const congress = await createAcademicWorkspace({ requestId: randomUUID(), kind: "congress", title: "Congreso ficticio" }, owner, db);
     workspaces.push(congress.id);
@@ -231,7 +239,7 @@ async function main(){
       const current = await readAcademicWorkspace(congress.id, owner, db);
       return saveAcademicWorkspace(congress.id, {
         expectedRevision: current.revision, title: current.title, matrix: emptyAcademicMatrix,
-        brief: { ...current.brief, programSessionIds },
+        brief: { ...current.brief, programSessionIds, objective: "Nota privada del comité", evaluation: "Pauta privada de corrección" },
       }, owner, db);
     }
     const programSelection = await saveProgramSessionIds([table.id]);
@@ -242,6 +250,15 @@ async function main(){
     assert.match(programBody, /## Programa y mesas\n\n### Mesa de trabajo\n\n17-11-2026, 13:00 \(Santiago\)/);
     assert.match(programBody, /Lectura pactada|Guía práctica|Argumentar a partir de las fuentes/);
     for (const value of [...content.speakers, ...content.moderators, content.location]) assert.ok(programBody.includes(value));
+    const handoutInput = { ...programInput, requestId: randomUUID(), template: "participant_handout" };
+    const handout = await createAcademicDraft(congress.id, handoutInput, owner, db);
+    const handoutBody = (await readAcademicArtifact(congress.id, handout.id, owner, db)).body;
+    assert.match(handoutBody, /^# Hoja para participantes\n\n## Congreso ficticio/);
+    assert.ok(handoutBody.includes("**Actividad**\n\nCompara las fuentes.\nRedacta una conclusión fundamentada."));
+    assert.ok(handoutBody.includes("**Tus notas**\n\n\n\n\n"));
+    assert.doesNotMatch(handoutBody, /Nota privada|Pauta privada|programSessionIds/);
+    assert.deepEqual(await readAcademicArtifactDownload(congress.id, handout.id, owner, {}, db), { id: handout.id, revision: 1, body: handoutBody });
+    await assert.rejects(createAcademicDraft(congress.id, handoutInput, other, db), status(404));
 
     await db.altazorTeachingSession.update({ where: { id: table.id }, data: {
       contentJson: JSON.stringify({ ...content, speakers: ["Nueva ponente"], moderators: ["Nueva moderación"], location: "Nueva sala" }),
@@ -252,6 +269,8 @@ async function main(){
     assert.doesNotMatch(updatedProgramBody, /Ponente ficticia|Moderador ficticio|Aula ficticia 204/);
     assert.deepEqual(await createAcademicDraft(congress.id, programInput, owner, db), { id: program.id, reused: true });
     assert.equal((await readAcademicArtifactVersion(congress.id, program.id, 1, owner, db)).body, programBody);
+    assert.deepEqual(await createAcademicDraft(congress.id, handoutInput, owner, db), { id: handout.id, reused: true });
+    assert.equal((await readAcademicArtifactVersion(congress.id, handout.id, 1, owner, db)).body, handoutBody);
 
     const genericProgram = await createAcademicDraft(congress.id, { ...programInput, requestId: randomUUID(), template: "workshop" }, owner, db);
     const genericProgramBody = (await readAcademicArtifact(congress.id, genericProgram.id, owner, db)).body;
@@ -267,13 +286,16 @@ async function main(){
 
     await db.altazorTeachingSession.delete({ where: { id: table.id } });
     await assert.rejects(createAcademicDraft(congress.id, { ...programInput, requestId: randomUUID() }, owner, db), status(409));
+    await assert.rejects(createAcademicDraft(congress.id, { ...handoutInput, requestId: randomUUID() }, owner, db), status(409));
     assert.deepEqual(await createAcademicDraft(congress.id, programInput, owner, db), { id: program.id, reused: true });
     assert.equal((await readAcademicArtifactVersion(congress.id, program.id, 1, owner, db)).body, programBody);
     for (const outside of [early.id, foreign.id]) {
       const invalid = await saveProgramSessionIds([outside]);
       await assert.rejects(createAcademicDraft(congress.id, { ...programInput, requestId: randomUUID(), expectedRevision: invalid.revision }, owner, db), status(409));
+      await assert.rejects(createAcademicDraft(congress.id, { ...handoutInput, requestId: randomUUID(), expectedRevision: invalid.revision }, owner, db), status(409));
     }
     const cleared = await saveProgramSessionIds([]);
+    await assert.rejects(createAcademicDraft(congress.id, { ...handoutInput, requestId: randomUUID(), expectedRevision: cleared.revision }, owner, db), status(400));
     const emptyProgram = await createAcademicDraft(congress.id, { ...programInput, requestId: randomUUID(), expectedRevision: cleared.revision }, owner, db);
     assert.doesNotMatch((await readAcademicArtifact(congress.id, emptyProgram.id, owner, db)).body, /Mesa de trabajo/);
     assert.equal(network,0);

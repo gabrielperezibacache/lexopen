@@ -18,10 +18,17 @@ async function openDiscovery(page: Page) {
   await page.getByRole("button", { name: "Buscar bibliografía", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Descubrir y citar", exact: true })).toBeVisible();
 }
-test("Descubrimiento académico: consentimiento, bibliografía persistente y lectura móvil con datos ficticios", async ({ page }, info) => {
+test("Descubrimiento académico: consultas por acción, bibliografía persistente y lectura móvil con datos ficticios", async ({ page }, info) => {
   test.setTimeout(60_000);
   await page.addInitScript(() => { Object.defineProperty(globalThis.crypto, "randomUUID", { value: undefined, configurable: true }); });
   await loginAs(page, email); let searches = 0;
+  const remoteRequests: string[] = [];
+  page.on("request", request => {
+    if (request.method() !== "POST") return;
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/altazor/academic/discovery" || /\/discovery\/(graph|orcid|saved\/[^/]+\/refresh)$/.test(path)
+      || (path.endsWith("/discovery/bibliography") && request.postDataJSON()?.kind === "remote")) remoteRequests.push(path);
+  });
   await page.route("**/api/altazor/academic/discovery", async route => {
     if (route.request().method() !== "POST") return route.continue(); searches++;
     expect(route.request().postDataJSON()).toMatchObject({ query: "educación jurídica ficticia", allowExternal: true });
@@ -29,9 +36,19 @@ test("Descubrimiento académico: consentimiento, bibliografía persistente y lec
     await route.fulfill({ json: { query: "educación jurídica ficticia", results: [{ key: "doi:10.5555/fictitious-browser-search", metadata, provider: "crossref", sourceUrl: "https://api.crossref.org/works/10.5555%2Ffictitious-browser-search", landingUrl: "https://doi.org/10.5555/fictitious-browser-search", checkedAt: "2026-11-04T12:00:00.000Z", openAccess: null, citedByCount: 0 }], warnings: [], checkedAt: "2026-11-04T12:00:00.000Z" } });
   });
   await openDiscovery(page);
+  await expect(page.getByRole("checkbox", { name: /Autorizo enviar sólo los términos/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Buscar obras", exact: true })).toBeDisabled();
+  expect(remoteRequests).toEqual([]);
   await page.getByLabel("Tema o referencia bibliográfica", { exact: true }).fill("educación jurídica ficticia");
-  await expect(page.getByRole("button", { name: "Buscar obras", exact: true })).toBeDisabled(); expect(searches).toBe(0);
-  await page.getByRole("checkbox", { name: /Autorizo enviar sólo los términos/ }).check();
+  await expect(page.getByRole("button", { name: "Buscar obras", exact: true })).toBeEnabled();
+  await page.getByRole("checkbox", { name: "Crossref", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "OpenAlex", exact: true }).uncheck();
+  await expect(page.getByRole("button", { name: "Buscar obras", exact: true })).toBeDisabled();
+  await page.getByRole("checkbox", { name: "Crossref", exact: true }).check();
+  await page.getByRole("checkbox", { name: "OpenAlex", exact: true }).check();
+  await expect(page.getByRole("button", { name: "Buscar obras", exact: true })).toBeEnabled();
+  expect(searches).toBe(0);
+  expect(remoteRequests).toEqual([]);
   await page.getByRole("button", { name: "Buscar obras", exact: true }).click();
   await expect(page.getByRole("link", { name: "Investigación enteramente ficticia sobre educación jurídica" })).toBeVisible(); expect(searches).toBe(1);
   const graphRequests: string[] = [];
@@ -90,11 +107,8 @@ test("Descubrimiento académico: consentimiento, bibliografía persistente y lec
   await expect(selected).toContainText(titles.W2);
   await expect(selected).toContainText("Citada por la obra consultada");
   expect(graphRequests).toEqual(["W1"]);
-  const consent = page.getByRole("checkbox", { name: /Autorizo enviar sólo los términos/ });
-  await consent.uncheck();
   const expand = selected.getByRole("button", { name: "Consultar red de esta obra", exact: true });
-  await expect(expand).toBeDisabled();
-  await consent.check();
+  await expect(expand).toBeEnabled();
   await expand.click();
   await expect(selected).toContainText("Obra consultada");
   await expect(selected).toContainText(titles.W2);
@@ -108,7 +122,7 @@ test("Descubrimiento académico: consentimiento, bibliografía persistente y lec
   await expect(page.getByRole("heading", { name: "Tema académico ficticio conservado", exact: true })).toBeVisible();
   await page.locator("summary").filter({ hasText: /^Mi bibliografía/ }).click();
   await page.getByText("Importar una bibliografía", { exact: true }).click();
-  await page.getByRole("checkbox", { name: /Autorizo enviar sólo los términos/ }).uncheck();
+  const remoteBeforeImport = remoteRequests.length;
   let imports = 0;
   page.on("request", request => { if (new URL(request.url()).pathname.endsWith("/bibliography/import")) imports++; });
   const file = page.getByLabel("Archivo de referencias (.bib, .ris o .json)");
@@ -132,7 +146,16 @@ test("Descubrimiento académico: consentimiento, bibliografía persistente y lec
   await submit.click();
   await expect(page.getByText("1 referencia ya estaba en tu bibliografía.", { exact: true })).toBeVisible();
   expect(imports).toBe(2);
+  expect(remoteRequests).toHaveLength(remoteBeforeImport);
   await page.getByLabel("Estilo bibliográfico", { exact: true }).selectOption("ris");
+  const selectStyle = await page.getByLabel("Estilo bibliográfico", { exact: true }).evaluate(select => {
+    const style = getComputedStyle(select);
+    return { appearance: style.appearance, padding: parseFloat(style.paddingInlineEnd), size: style.backgroundSize, image: style.backgroundImage };
+  });
+  expect(selectStyle.appearance).toBe("none");
+  expect(selectStyle.padding).toBeGreaterThanOrEqual(44);
+  expect(selectStyle.size).toBe("16px 16px");
+  expect(selectStyle.image).not.toBe("none");
   await expect(page.locator("p").filter({ hasText: /TY  - JOUR/ }).first()).toBeVisible();
   const pending = page.waitForEvent("download"); await page.getByRole("link", { name: "Descargar bibliografía", exact: true }).click(); const download = await pending, destination = info.outputPath("bibliografia-ficticia.ris"); await download.saveAs(destination);
   const exported = await readFile(destination, "utf8"); expect(exported).toContain(title); expect(exported).toContain("DO  - 10.5555/fictitious-browser-import");

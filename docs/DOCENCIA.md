@@ -7,7 +7,7 @@ Abre **Académico → Docencia** y elige el tipo de trabajo. Cada trabajo conser
 | Cursos | Ficha de curso, bibliografía base y sugerencias por solicitud. Crea un syllabus editable con las sesiones que elijas de la Agenda. | Añadir unidades y evaluaciones reutilizables. |
 | Seminarios | Programa editable con las sesiones elegidas, sus ponentes, moderación, lecturas y lugar. | Vincular responsabilidades de organización y avisos del encuentro. |
 | Congresos | Programa editable con ejes, comité y mesas. Las sesiones elegidas aportan sus ponentes, moderación y lugar. | Organizar mesas por eje y distribuir tareas del comité. |
-| Talleres | Programa editable con actividades, tiempos, materiales y evaluación. Incorpora las sesiones elegidas de la Agenda. | Generar una hoja para participantes a partir de las actividades elegidas. |
+| Talleres | Programa editable y hoja para participantes con las sesiones elegidas, sus consignas, lecturas y materiales. | Vincular rúbricas y recoger entregas de las actividades. |
 | Convocatorias | Ficha con país, organismo, bases, fecha límite y estado. Las fichas guardadas desde un aviso conservan su procedencia y la fecha de consulta. | Vincular responsables, anexos y un curso o proyecto de investigación. |
 | Búsqueda y fuentes por país | Catálogo oficial por país. Busca por tema entre los avisos que ya consultaste y filtra tu cartera por país. | Ampliar las fuentes y los filtros por área, elegibilidad y modalidad. |
 | Suscripciones | Sigue los feeds compatibles y elige si consultarlos a demanda o automáticamente. Las novedades de las consultas programadas aparecen en la campana de LexOpen. | Añadir consultas temáticas guardadas e historial de avisos por fuente. |
@@ -29,6 +29,14 @@ Las sesiones se registran en hora de Santiago de Chile, la zona que usa la Agend
 2. Para una lectura o material, puedes guardar sólo el título o añadir un enlace HTTPS, incluido un enlace a un libro o pasaje de tu Biblioteca de LexOpen. El enlace conserva los permisos de acceso de la Biblioteca.
 3. Abre **Sesiones de la Agenda** en la **Ficha para el syllabus** del curso o en el **Programa** del seminario, congreso o taller. Marca las sesiones de ese trabajo que quieras incorporar. **Guardar cambios** conserva la selección para retomarla después. Si retiras una sesión elegida de la Agenda, usa **Quitar sesiones retiradas** para actualizar la selección.
 4. Pulsa **Crear syllabus** o **Crear programa**. El borrador incorpora los horarios, ponentes, moderación, lugar y contenidos guardados en orden cronológico. Si dejas la selección vacía, puedes empezar desde la plantilla. Cada borrador conserva una copia editable. Los cambios posteriores de la Agenda se reflejan al crear otro borrador.
+
+## Preparar una hoja para participantes
+
+1. En **Contenido de la sesión → Editar contenido**, abre **Actividad para participantes** y escribe la **Consigna de la actividad**. Puedes separar los pasos en varios párrafos. Guarda el contenido.
+2. En el syllabus o programa, elige al menos una sesión en **Sesiones de la Agenda**. Abre **Material para participantes** y pulsa **Crear hoja para participantes**.
+3. La hoja reúne los horarios, participantes, lugar, consignas, lecturas, materiales y resultados de esas sesiones, con un espacio para notas. Revisa sus datos en el editor y descárgala en **Word** o **Markdown**. Los enlaces a tu Biblioteca conservan sus permisos de acceso.
+
+La hoja tiene su propio texto e historial. Puedes adaptarla para tu grupo. Al generar otra hoja se recupera el contenido de las sesiones guardado en ese momento.
 
 ## Consultar y guardar convocatorias
 

@@ -55,6 +55,7 @@ async function main() {
       speakers: ["Ponente ficticia", "Segundo ponente"],
       moderators: ["Moderadora ficticia"],
       location: "Sala ficticia 204 · modalidad híbrida",
+      activity: "Compara dos argumentos.\nRedacta una conclusión fundamentada.",
     };
     const update = { expectedRevision: 0, content };
     await assert.rejects(updateTeachingSessionContent(course.id, id, update, other, db), statusIs(404));
@@ -87,6 +88,9 @@ async function main() {
       { location: "" },
       { location: "Sala\nnueva línea" },
       { location: "x".repeat(TEACHING_CONTENT_LIMITS.locationLength + 1) },
+      { activity: " " },
+      { activity: "x".repeat(TEACHING_CONTENT_LIMITS.activityLength + 1) },
+      { activity: "Consigna\u0000oculta" },
     ]) {
       await assert.rejects(updateTeachingSessionContent(course.id, id, {
         expectedRevision: 0, content: { ...empty, ...invalid },
@@ -111,7 +115,7 @@ async function main() {
     assert.equal(afterContent.calendarSequence, beforeContent.calendarSequence);
     assert.equal(await readCalendarFeed(token, db), publicBefore);
     const exportedContent = await exportTeachingSessions(course.id, owner, db);
-    for (const privateValue of ["Lectura: capítulo 2", ...content.speakers, ...content.moderators, content.location]) {
+    for (const privateValue of ["Lectura: capítulo 2", ...content.speakers, ...content.moderators, content.location, "Redacta una conclusión fundamentada."]) {
       assert.ok(!exportedContent.includes(privateValue));
     }
     const legacyContent = { readings: [{ title: "Lectura anterior" }], materials: [], outcomes: ["Resultado anterior"] };

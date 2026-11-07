@@ -4,14 +4,13 @@
 .heading p,.graph>p { max-width:70ch; line-height:1.7; color:var(--muted); }
 .heading>svg { flex-shrink:0; color:var(--sea); margin-top:.25rem; }
 .search { display:grid; gap:1rem; padding-bottom:1.5rem; }
-.root label:not(.consent) { display:grid; gap:.5rem; line-height:1.5; }
+.root label { display:grid; gap:.5rem; line-height:1.5; }
 .root input:not([type=checkbox]),.root select,.root textarea { width:100%; min-width:0; padding:.75rem .85rem; border:1px solid var(--line-strong); border-radius:.5rem; background:var(--surface-solid); color:var(--ink); font:inherit; line-height:1.65; }
 .root input::placeholder,.root textarea::placeholder { color:var(--muted); }
 .root input[type=checkbox] { width:18px; height:18px; flex:0 0 auto; margin-top:.15rem; accent-color:var(--sea); }
 .root fieldset { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem 1.5rem; border:0; margin:0; padding:0; }
 .root legend { margin-bottom:.7rem; font-weight:600; }
-.root fieldset label,.consent { display:flex!important; align-items:start; gap:.65rem!important; }
-.consent { max-width:75ch; line-height:1.65; }
+.root fieldset label { display:flex!important; align-items:start; gap:.65rem!important; }
 .actions { display:flex; flex-wrap:wrap; align-items:center; gap:.65rem; min-width:0; }
 .actions>span,.detail,.resultHeading>span { color:var(--muted); font-size:1rem; line-height:1.65; }
 .actions>span { flex:1 1 220px; }

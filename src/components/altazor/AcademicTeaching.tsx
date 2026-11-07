@@ -123,7 +123,7 @@ export function AcademicCallForm({ value = emptyAcademicCall, origin, busy, onCh
   </section>;
 }
 
-export function AcademicSyllabusForm({ workspaceId, sessionsVersion, title, brief, busy, sessionContentDirty, onChange, onBriefChange, onCreate, onSearch }: {
+export function AcademicSyllabusForm({ workspaceId, sessionsVersion, title, brief, busy, sessionContentDirty, onChange, onBriefChange, onCreate, onHandout, onSearch }: {
   workspaceId: string;
   sessionsVersion: number;
   title: string;
@@ -133,6 +133,7 @@ export function AcademicSyllabusForm({ workspaceId, sessionsVersion, title, brie
   onChange: (syllabus: AcademicSyllabus) => void;
   onBriefChange: (key: CourseBriefKey, value: string) => void;
   onCreate: () => void;
+  onHandout: () => void;
   onSearch: () => void;
 }) {
   const companion = useOptionalAltazorCompanion();
@@ -174,6 +175,7 @@ export function AcademicSyllabusForm({ workspaceId, sessionsVersion, title, brie
       </button>}
       <button type="button" className="btn btn-ghost" disabled={busy || sessionContentDirty} onClick={onSearch}><BookOpen size={16} aria-hidden="true" /> Buscar obras</button>
     </div>
+    <ParticipantHandoutAction disabled={busy || sessionContentDirty || !title.trim()} hasSelection={Boolean(values.sessionIds?.length)} onCreate={onHandout} />
     <p className={styles.meta}><CalendarDays size={16} aria-hidden="true" /> La ficha conserva el horario y la sala para el documento.</p>
     {notice && <p role="status" className={styles.meta}>{notice}</p>}
   </section>;
@@ -181,7 +183,7 @@ export function AcademicSyllabusForm({ workspaceId, sessionsVersion, title, brie
 
 const programTitles = { seminar: "Programa del seminario", congress: "Programa del congreso", workshop: "Programa del taller" } as const;
 
-export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, selection, title, busy, sessionContentDirty, onChange, onCreate }: {
+export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, selection, title, busy, sessionContentDirty, onChange, onCreate, onHandout }: {
   kind: keyof typeof programTitles;
   workspaceId: string;
   sessionsVersion: number;
@@ -191,6 +193,7 @@ export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, se
   sessionContentDirty: boolean;
   onChange: (sessionIds: string[]) => void;
   onCreate: () => void;
+  onHandout: () => void;
 }) {
   const Icon = icons[kind];
   return <section className={styles.syllabus} aria-labelledby="teaching-program-title">
@@ -206,5 +209,21 @@ export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, se
     <div className={styles.actions}>
       <button type="button" className="btn btn-primary" disabled={busy || sessionContentDirty || !title.trim()} onClick={onCreate}>Crear programa <ArrowRight size={16} aria-hidden="true" /></button>
     </div>
+    <ParticipantHandoutAction disabled={busy || sessionContentDirty || !title.trim()} hasSelection={selection.length > 0} onCreate={onHandout} />
   </section>;
+}
+
+function ParticipantHandoutAction({ disabled, hasSelection, onCreate }: {
+  disabled: boolean;
+  hasSelection: boolean;
+  onCreate: () => void;
+}) {
+  return <details className={styles.participantMaterial}>
+    <summary>Material para participantes</summary>
+    <div>
+      <p className={styles.meta}>Prepara una hoja editable con los horarios, las actividades, las lecturas y un espacio para tomar notas de las sesiones elegidas.</p>
+      {!hasSelection && <p className={styles.meta}>Elige al menos una sesión de la Agenda para crear la hoja.</p>}
+      <button type="button" className="btn btn-outline" disabled={disabled || !hasSelection} onClick={onCreate}>Crear hoja para participantes <ArrowRight size={16} aria-hidden="true" /></button>
+    </div>
+  </details>;
 }
