@@ -103,11 +103,13 @@ Proteja directorios y respaldos del gateway con una cuenta de sistema dedicada y
 
 ### Construir el gateway reforzado
 
-La construcción del servicio usa una revisión fija, identificada en el [flujo de comprobación del escritorio](../.github/workflows/ci.yml). Ese flujo prepara una copia limpia, verifica la revisión, aplica el refuerzo de LexOpen y ejecuta sus pruebas antes de compilar. Si ya hay un paquete publicado para tu versión y arquitectura, sigue la [preparación del escritorio](ESCRITORIO-ALTAZOR.md).
+La construcción del servicio usa una revisión fija, identificada en el [flujo de comprobación del escritorio](../.github/workflows/ci.yml). Ese flujo prepara una copia limpia, verifica la revisión, aplica primero `harden-connectors.mjs` y después `harden-async-messages.mjs`, y ejecuta sus pruebas antes de compilar. Si ya hay un paquete publicado para tu versión y arquitectura, sigue la [preparación del escritorio](ESCRITORIO-ALTAZOR.md).
 
 Para compilar manualmente, reproduce esos pasos en directorios nuevos, sin archivos ni credenciales del usuario. El refuerzo valida las huellas de la revisión, desactiva los cambios de permisos solicitados por el modelo y exige confirmación por operación. No lo apliques sobre los datos de una instalación existente.
 
 La respuesta de salud de la compilación reforzada debe incluir `lexopen_connector_gate: "v1"` y `lexopen_connector_platform` con su sistema real. LexOpen exige esa capacidad antes de habilitar conexiones; un gateway sin el refuerzo puede seguir ofreciendo el escritorio sin conectores. El indicador es una capacidad del ejecutable administrado localmente, no una certificación externa.
+
+Para recibir encargos también necesita `lexopen_async_messages: "v1"`. LexOpen usa un identificador persistido por encargo y exige un recibo HTTP 202 con ese mismo identificador y el chat correspondiente. El escritorio guarda el encargo y permite cancelarlo antes de consultar al modelo. Una repetición del mismo identificador conserva el recibo sin ejecutar otra vez; tras reiniciar, los trabajos interrumpidos quedan registrados y no se reanudan solos. La aceptación confirma la recepción, no la terminación del trabajo, que se consulta en su actividad. Un gateway anterior puede seguir consultándose o deteniéndose, pero no recibe tareas mediante el antiguo envío síncrono.
 
 Prepara la imagen y una configuración nueva siguiendo la [guía del escritorio](ESCRITORIO-ALTAZOR.md). Usa un motor local disponible, directorios dedicados, una dirección local, puerto propio y autorización independiente. Revisa los registros del servicio antes de compartirlos: su salida puede contener datos de acceso.
 

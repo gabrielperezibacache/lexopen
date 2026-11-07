@@ -26,6 +26,7 @@ export function gatewayRequestCategory(method: string, path: string) {
   if (path === "/v1/chats" && method === "POST") return "chat_create";
   if (/^\/v1\/kitties\/[A-Za-z0-9_-]+$/.test(path) && method === "GET") return "kitty_read";
   if (/^\/v1\/chats\/[A-Za-z0-9_-]+$/.test(path) && method === "GET") return "chat_read";
+  if (/^\/v1\/chats\/[A-Za-z0-9_-]+\/messages\/async$/.test(path) && method === "POST") return "message";
   const action = /^\/v1\/(?:chats|kitties)\/[A-Za-z0-9_-]+\/(messages|cancel|control|input|stop|screenshot)$/.exec(path)?.[1];
   return action === "messages" ? "message" : action && operations.has(action) ? action : "other";
 }

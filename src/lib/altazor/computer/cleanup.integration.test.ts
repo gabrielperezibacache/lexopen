@@ -25,7 +25,7 @@ async function main() {
     assert.equal(/artifacts|\/exec|settings|vault|local-token|control|input|messages/.test(path), false);
     if (method !== "GET") posts.push(path);
     const fleet = fleets.get(url.origin) || []; fleets.set(url.origin, fleet);
-    if (path === "/v1/health") { const pause = pauseHealth; pauseHealth = undefined; if (pause) await pause(); return Response.json({ ok: true, containers: true, version: "fictitious-cleanup" }); }
+    if (path === "/v1/health") { const pause = pauseHealth; pauseHealth = undefined; if (pause) await pause(); return Response.json({ ok: true, containers: true, version: "fictitious-cleanup", lexopen_async_messages: "v1" }); }
     if (path === "/v1/providers") return Response.json({ providers: [{ name: "cleanup-model", kind: "openai" }] });
     if (path === "/v1/kitties" && method === "GET") return Response.json({ kitties: fleet });
     if (/^\/v1\/kitties\/[\w-]+$/.test(path) && method === "GET") return Response.json({ kitty: fleet.find(kitty => kitty.id === path.split("/").pop() || kitty.name === path.split("/").pop()) });

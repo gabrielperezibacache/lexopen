@@ -26,12 +26,17 @@ async function main() {
     if (target.port === "19999") return Response.json({ choices: [{ message: { content: JSON.stringify({ intents: [{ toolId: "escritorio.encargar", confidence: 1, slots: { texto: text } }] }) } }] });
     assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-desktop-tool-token");
     const snapshot = snapshots.get(target.origin); assert.ok(snapshot);
-    if (path === "/v1/health") return Response.json({ ok:true, version:"desktop-tool-fixture", containers:true, lexopen_connector_gate:"v1", lexopen_connector_platform:"linux" });
+    if (path === "/v1/health") return Response.json({ ok:true, version:"desktop-tool-fixture", containers:true, lexopen_connector_gate:"v1", lexopen_connector_platform:"linux", lexopen_async_messages:"v1" });
     if (path === "/v1/providers") return Response.json({ providers:[{name:"separate-model",kind:"openai"}] });
     if (path === "/v1/kitties") return Response.json({kitties:[snapshot.kitty]});
     if (path === `/v1/kitties/${snapshot.kitty.id}`) return Response.json({kitty:snapshot.kitty});
     if (path === `/v1/chats/${snapshot.chat.id}`) return Response.json({chat:snapshot.chat});
-    if (path.endsWith("/messages")) { assert.deepEqual(body.files,[]); payloads.push(body); return Response.json({turns:[]}); }
+    if (path.endsWith("/messages/async")) {
+      assert.deepEqual(body.files,[]);
+      assert.match(String(body.request_id), /^[A-Za-z0-9_-]{1,100}$/);
+      payloads.push(body);
+      return Response.json({ request_id: body.request_id, chat_id: snapshot.chat.id, status: "accepted", state: "accepted" }, { status: 202 });
+    }
     throw new Error("Unexpected synthetic desktop tool endpoint");
   }) as typeof fetch;
   try {

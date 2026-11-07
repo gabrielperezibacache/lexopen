@@ -20,7 +20,7 @@ export class KittiesGateway {
     const reader = response.body?.getReader(); if (!reader) throw new ConnectorError("gateway_response", "El gateway devolvió una respuesta vacía.", 502);
     const chunks: Uint8Array[] = []; let size = 0;
     try { for (;;) { const part = await reader.read(); if (part.done) break; size += part.value.length; if (size > max) { await reader.cancel(); throw new ConnectorError("gateway_response_limit", "La respuesta del gateway supera el límite admitido.", 502); } chunks.push(part.value); } } finally { reader.releaseLock(); }
-    return { bytes: Buffer.concat(chunks, size), contentType: response.headers.get("content-type") || "" };
+    return { bytes: Buffer.concat(chunks, size), contentType: response.headers.get("content-type") || "", status: response.status };
   }
   private async json(path: string, method = "GET", body?: unknown) {
     const response = await this.response(path, method, body);
@@ -135,7 +135,22 @@ export class KittiesGateway {
     const result = await this.json(`/v1/chats/${safeId(id)}`), chat = this.validateChat(result.chat, kittyId, true, id);
     return { working: chat.turns.some(turn => turn.working === true), turns: chat.turns.slice(-80).map((turn, index) => ({ index: Math.max(0, chat.turns.length - 80) + index, from: turn.from === "user" ? "user" : turn.from === "system" ? "system" : "assistant", text: typeof turn.text === "string" ? turn.text.slice(0, 24000) : "", working: turn.working === true, needsHelp: turn.needs_help === true, steps: Array.isArray(turn.steps) ? turn.steps.slice(-60).map(step => ({ action: typeof step.action === "string" ? step.action.slice(0, 80) : "acción", at: typeof step.at === "string" ? step.at.slice(0, 60) : "" })) : [] })) };
   }
-  async send(chatId: string, text: string, files: ComputerFile[]) { await this.json(`/v1/chats/${safeId(chatId)}/messages`, "POST", { text, files }); return { accepted: true }; }
+  async requireAsyncMessages() {
+    const health = await this.json("/v1/health");
+    if (health.ok !== true || health.lexopen_async_messages !== "v1") throw new ConnectorError("async_messages_required", "Actualice el escritorio para enviar encargos que puedan supervisarse y detenerse desde el inicio.", 409);
+  }
+  async send(chatId: string, text: string, files: ComputerFile[], requestId: string) {
+    // This is the persisted action ID, not a fresh ID on each network attempt.
+    // Never fall back to the synchronous endpoint or resend an ambiguous request.
+    safeId(chatId); safeId(requestId);
+    await this.requireAsyncMessages();
+    const response = await this.response(`/v1/chats/${safeId(chatId)}/messages/async`, "POST", { text, files, request_id: requestId });
+    let receipt: Record<string, unknown>;
+    try { receipt = JSON.parse(response.bytes.toString("utf8")); }
+    catch { throw new ConnectorError("gateway_receipt_unknown", "El escritorio no confirmó la recepción del encargo. Compruebe su actividad antes de continuar; no se reenviará automáticamente.", 502); }
+    if (response.status !== 202 || !response.contentType.startsWith("application/json") || !receipt || typeof receipt !== "object" || Array.isArray(receipt) || receipt.request_id !== requestId || receipt.chat_id !== chatId || receipt.status !== "accepted") throw new ConnectorError("gateway_receipt_unknown", "El escritorio no confirmó la recepción del encargo. Compruebe su actividad antes de continuar; no se reenviará automáticamente.", 502);
+    return { accepted: true, requestId };
+  }
   async cancel(chatId: string) { const result = await this.json(`/v1/chats/${safeId(chatId)}/cancel`, "POST", {}); return { cancelled: result.cancelled === true }; }
   async control(kittyId: string, hold: boolean) { const result = await this.json(`/v1/kitties/${safeId(kittyId)}/control`, "POST", { hold }); if (typeof result.held !== "boolean") throw new ConnectorError("control_contract", "El gateway no confirmó el control manual.", 502); return { held: result.held }; }
   async input(kittyId: string, input: PersonInput) { await this.json(`/v1/kitties/${safeId(kittyId)}/input`, "POST", input); return { accepted: true }; }

@@ -282,7 +282,7 @@ function matchingAction(row: AltazorComputerAction, sessionId: string, kind: str
   if (row.sessionId !== sessionId || row.kind !== kind || row.inputHash !== inputHash) throw new ConnectorError("request_conflict", "La operación corresponde a otra acción.", 409);
   return row;
 }
-async function executeAction(user: CausaAccessUser, id: string, kind: string, requestId: string, input: unknown, run: (client: KittiesGateway, row: AltazorComputerSession, tx: Prisma.TransactionClient) => Promise<Record<string, unknown>>) {
+async function executeAction(user: CausaAccessUser, id: string, kind: string, requestId: string, input: unknown, run: (client: KittiesGateway, row: AltazorComputerSession, tx: Prisma.TransactionClient, actionId: string) => Promise<Record<string, unknown>>) {
   const cleanup = kind === "cancel" || kind === "close";
   const access = await sessionFor(id, user, cleanup), { actor, workspace } = access;
   const needsModelPolicy = !["cancel", "close", "connector_reject"].includes(kind);
@@ -293,6 +293,7 @@ async function executeAction(user: CausaAccessUser, id: string, kind: string, re
   if (existing) return actionView(matchingAction(existing, id, kind, inputHash));
   if (cleanup) cleanupSession(session);
   const client = await readyGateway(workspace);
+  if (kind === "message") await client.requireAsyncMessages();
   let kittyId = session.kittyId;
   if (kind === "close" && !session.kittyId) {
     const recovered = await client.kitty(session.kittyName, session.kittyName, workspace.providerName, sessionConnectors(session));
@@ -339,7 +340,7 @@ async function executeAction(user: CausaAccessUser, id: string, kind: string, re
         await client.kitty(liveSession.kittyId!, liveSession.kittyName, workspace.providerName, sessionConnectors(liveSession));
         if (liveSession.chatId) await client.chat(liveSession.chatId, liveSession.kittyId!);
       }
-      const result = await run(client, liveSession, tx);
+      const result = await run(client, liveSession, tx, row.id);
       if (!cleanup && kind !== "control") return { result, receipt: null };
       const controlAt = kind === "control" ? (await tx.altazorComputerSession.findUniqueOrThrow({ where: { id }, select: { updatedAt: true } })).updatedAt : undefined;
       // Commit confirmed cleanup or control and its receipt atomically while
@@ -363,13 +364,13 @@ async function executeAction(user: CausaAccessUser, id: string, kind: string, re
 export async function sendComputerMessage(user: CausaAccessUser, id: string, input: ComputerMessage) {
   if (input.confirmed !== true || !input.text.trim() || input.text.length > 16000) throw new ConnectorError("task_approval_required", "Revise y autorice una tarea de hasta 16000 caracteres antes de enviarla.", 400);
   const files = inspectSelectedFiles(input.files), safeHashInput = { text: input.text, files: files.map(file => ({ name: file.name, mime: file.mime, hash: digest(file.data) })) };
-  return executeAction(user, id, "message", input.requestId, safeHashInput, async (client, session) => {
+  return executeAction(user, id, "message", input.requestId, safeHashInput, async (client, session, _tx, actionId) => {
     if (session.held && Date.now() - session.updatedAt.getTime() < 5 * 60_000) throw new ConnectorError("manual_control", "Devuelva el control al asistente antes de enviar otra tarea.", 409);
     const status = await client.chat(session.chatId!, session.kittyId!);
     if (status.working) throw new ConnectorError("task_busy", "La tarea actual sigue en curso. Espere o solicite cancelarla.", 409);
     await policyAllowsAction();
     if (sessionConnectors(session)[0] !== "-") await client.requireConnectorGate();
-    return client.send(session.chatId!, input.text, files);
+    return client.send(session.chatId!, input.text, files, actionId);
   });
 }
 export async function controlComputer(user: CausaAccessUser, id: string, requestId: string, hold: boolean) {

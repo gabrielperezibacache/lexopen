@@ -36,6 +36,7 @@ function fake(handler: (path: string, method: string, body: Record<string, unkno
     assert.equal(new Headers(init?.headers).get("Authorization"), `Bearer ${token}`);
     assert.equal(init?.redirect, "error");
     const result = handler(new URL(String(url)).pathname, init?.method || "GET", init?.body ? JSON.parse(String(init.body)) : null);
+    if (result instanceof Response) return result;
     return new Response(JSON.stringify(result), { headers: { "Content-Type": "application/json" } });
   }) as typeof fetch;
 }
@@ -125,10 +126,58 @@ test("pinned GET null turns means an empty owned chat, never missing or foreign 
   }
 });
 test("mutation transport never retries an ambiguous request", async () => {
-  let calls = 0;
-  const client = new KittiesGateway("http://127.0.0.1:7488", token, (async () => { calls++; throw new Error("fixture interrupted after request"); }) as typeof fetch);
-  await assert.rejects(client.send("chat-fixture", "Tarea ficticia", []), error => (error as { code: string }).code === "gateway_outcome_unknown");
-  assert.equal(calls, 1);
+  let mutations = 0;
+  const client = new KittiesGateway("http://127.0.0.1:7488", token, fake((path, method) => {
+    if (path === "/v1/health" && method === "GET") return { ok: true, lexopen_async_messages: "v1" };
+    mutations++; throw new Error("fixture interrupted after request");
+  }));
+  await assert.rejects(client.send("chat-fixture", "Tarea ficticia", [], "action-fixture"), error => (error as { code: string }).code === "gateway_outcome_unknown");
+  assert.equal(mutations, 1);
+});
+test("task delivery requires the async capability and never falls back to synchronous messages", async () => {
+  for (const capability of [undefined, true, "v2", "V1"]) {
+    let mutations = 0;
+    const client = new KittiesGateway("http://127.0.0.1:7488", token, fake((path, method) => {
+      if (path === "/v1/health" && method === "GET") return { ok: true, lexopen_async_messages: capability };
+      mutations++; throw new Error("No task may leave for a legacy gateway");
+    }));
+    await assert.rejects(client.send("chat-fixture", "Tarea ficticia", [], "action-fixture"), error => (error as { code: string }).code === "async_messages_required");
+    assert.equal(mutations, 0);
+  }
+});
+test("async acceptance binds the durable action and chat without waiting for model completion", async () => {
+  const file = { name: "fixture.txt", mime: "text/plain", data: Buffer.from("Fictitious selected bytes").toString("base64") };
+  let posts = 0;
+  const client = new KittiesGateway("http://127.0.0.1:7488", token, fake((path, method, body) => {
+    if (path === "/v1/health") return { ok: true, lexopen_async_messages: "v1" };
+    assert.equal(path, "/v1/chats/chat-fixture/messages/async"); assert.equal(method, "POST");
+    assert.deepEqual(body, { text: "Encargo ficticio", files: [file], request_id: "action-fixture" }); posts++;
+    return Response.json({ request_id: "action-fixture", chat_id: "chat-fixture", status: "accepted", state: "running" }, { status: 202 });
+  }));
+  assert.deepEqual(await client.send("chat-fixture", "Encargo ficticio", [file], "action-fixture"), { accepted: true, requestId: "action-fixture" });
+  assert.equal(posts, 1);
+});
+test("a mismatched or malformed async receipt remains uncertain without a second POST", async () => {
+  const receipt = { request_id: "action-fixture", chat_id: "chat-fixture", status: "accepted" };
+  const variants = [
+    Response.json(receipt, { status: 200 }),
+    Response.json({ ...receipt, request_id: "other-action" }, { status: 202 }),
+    Response.json({ ...receipt, chat_id: "other-chat" }, { status: 202 }),
+    Response.json({ ...receipt, status: "completed" }, { status: 202 }),
+    Response.json(null, { status: 202 }),
+    Response.json([receipt], { status: 202 }),
+    new Response("not JSON", { status: 202, headers: { "Content-Type": "application/json" } }),
+    new Response(JSON.stringify(receipt), { status: 202, headers: { "Content-Type": "text/plain" } }),
+  ];
+  for (const response of variants) {
+    let posts = 0;
+    const client = new KittiesGateway("http://127.0.0.1:7488", token, fake(path => {
+      if (path === "/v1/health") return { ok: true, lexopen_async_messages: "v1" };
+      posts++; return response;
+    }));
+    await assert.rejects(client.send("chat-fixture", "Encargo ficticio", [], "action-fixture"), error => (error as { code: string }).code === "gateway_receipt_unknown");
+    assert.equal(posts, 1);
+  }
 });
 test("readiness contract works against a synthetic loopback HTTP server", async t => {
   const server = createServer((request, response) => {

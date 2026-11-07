@@ -23,7 +23,7 @@ async function main() {
     assert.equal(target.origin, "http://127.0.0.1:18845"); assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer fictitious-bridge-gateway-token");
     const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
     let result: unknown;
-    if (path === "/v1/health") result = { ok: true, version: "synthetic-bridge-contract", containers: true };
+    if (path === "/v1/health") result = { ok: true, version: "synthetic-bridge-contract", containers: true, lexopen_async_messages: "v1" };
     else if (path === "/v1/providers") result = { providers: [{ name: "fixture-model", kind: "openai", describe: "Synthetic provider" }] };
     else if (path === "/v1/kitties" && method === "GET") result = { kitties: fleet };
     else if (path === "/v1/kitties" && method === "POST") {
@@ -45,7 +45,10 @@ async function main() {
       else if (body.action === "key") { if (/return|enter/i.test(String((body.args as { keys: string }).keys))) enterKeys++; }
       else assert.fail("Unexpected input action in fixture");
       result = { ok: true };
-    } else if (path.endsWith("/messages")) { taskMessages++; result = { accepted: true }; }
+    } else if (path.endsWith("/messages/async")) {
+      taskMessages++;
+      return Response.json({ request_id: body.request_id, chat_id: path.split("/")[3], status: "accepted", state: "accepted" }, { status: 202 });
+    }
     else throw new Error("Unexpected synthetic bridge endpoint");
     return new Response(JSON.stringify(result), { headers: { "Content-Type": "application/json" } });
   }) as typeof fetch;

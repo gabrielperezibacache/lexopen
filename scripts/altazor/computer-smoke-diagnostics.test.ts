@@ -22,5 +22,6 @@ assert.equal(runtimeFailureSummary({ name: "ConnectorError", code: endpoint, sta
 assert.equal(runtimeFailureSummary(new Error(secret), null, "none"), "category=unknown, status=none, http=none, operation=none");
 assert.equal(gatewayRequestCategory("POST", "/v1/kitties"), "kitty_create");
 assert.equal(gatewayRequestCategory("GET", "/v1/chats/fictitious-id"), "chat_read");
+assert.equal(gatewayRequestCategory("POST", "/v1/chats/fictitious-id/messages/async"), "message");
 assert.equal(gatewayRequestCategory("POST", `/private/${secret}`), "other");
 console.log("Computer smoke diagnostics PASS: bounded fixed categories and process status without private log reflection.");

@@ -19,7 +19,7 @@ async function main() {
     const url = new URL(String(raw)); assert.equal(url.origin, "http://127.0.0.1:18846");
     assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer fictitious-navigation-token");
     let result: unknown;
-    if (url.pathname === "/v1/health") { const pause = pauseHealth; pauseHealth = undefined; if (pause) await pause(); result = { ok: true, containers: true, version: "fictitious-navigation-contract" }; }
+    if (url.pathname === "/v1/health") { const pause = pauseHealth; pauseHealth = undefined; if (pause) await pause(); result = { ok: true, containers: true, version: "fictitious-navigation-contract", lexopen_async_messages: "v1" }; }
     else if (url.pathname === "/v1/providers") result = { providers: [{ name: "navigation-model", kind: "openai" }] };
     else if (url.pathname === "/v1/kitties") result = { kitties: kitty ? [kitty] : [] };
     else if (url.pathname === "/v1/kitties/navigation-kitty") result = { kitty };

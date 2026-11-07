@@ -21,7 +21,7 @@ async function main() {
     assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-renewal-token");
     if ((init?.method || "GET") !== "GET") mutationCount++;
     if (failGateway) throw new Error("Fictitious unavailable gateway");
-    if (url.pathname === "/v1/health") { const pause = pauseHealth; pauseHealth = undefined; if (pause) await pause(); return Response.json({ ok: true, containers: true, version: "fictitious-renewal" }); }
+    if (url.pathname === "/v1/health") { const pause = pauseHealth; pauseHealth = undefined; if (pause) await pause(); return Response.json({ ok: true, containers: true, version: "fictitious-renewal", lexopen_async_messages: "v1" }); }
     if (url.pathname === "/v1/providers") return Response.json({ providers: [{ name: "renewal-model", kind: "openai" }] });
     if (url.pathname === "/v1/kitties") return Response.json({ kitties: kitty ? [kitty] : [] });
     if (url.pathname === "/v1/kitties/renewal-kitty") return Response.json({ kitty });
