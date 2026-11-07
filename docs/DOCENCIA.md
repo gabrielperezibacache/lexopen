@@ -5,9 +5,9 @@ Abre **Académico → Docencia** y elige el tipo de trabajo. Cada trabajo conser
 | Flujo | Disponible en LexOpen | Siguiente paso |
 | --- | --- | --- |
 | Cursos | Ficha de curso, bibliografía base y sugerencias por solicitud. Crea un syllabus editable con las sesiones que elijas de la Agenda. | Añadir unidades y evaluaciones reutilizables. |
-| Seminarios | Trabajo privado, plantilla de programa y sesiones con lecturas, materiales y resultados de aprendizaje. | Vincular ponentes y moderación a cada sesión. |
-| Congresos | Trabajo y plantilla de ejes, comité, programa, convocatoria e hitos. | Estructurar mesas, responsables, sedes, revisiones y avisos de programa por versión. |
-| Talleres | Trabajo y plantilla de actividades, tiempos, materiales y evaluación. | Ordenar los bloques de trabajo y generar una hoja para participantes a partir de los bloques elegidos. |
+| Seminarios | Programa editable con secciones para ponentes y discusión. Incorpora las sesiones elegidas de la Agenda. | Vincular ponentes y moderación a cada sesión. |
+| Congresos | Programa editable con ejes, comité, mesas, convocatoria e hitos. Incorpora las sesiones elegidas de la Agenda. | Estructurar mesas, responsables, sedes y avisos de programa por versión. |
+| Talleres | Programa editable con actividades, tiempos, materiales y evaluación. Incorpora las sesiones elegidas de la Agenda. | Generar una hoja para participantes a partir de las actividades elegidas. |
 | Convocatorias | Ficha con país, organismo, bases, fecha límite y estado. Las fichas guardadas desde un aviso conservan su procedencia y la fecha de consulta. | Vincular responsables, anexos y un curso o proyecto de investigación. |
 | Búsqueda y fuentes por país | Catálogo oficial por país. Busca por tema entre los avisos que ya consultaste y filtra tu cartera por país. | Ampliar las fuentes y los filtros por área, elegibilidad y modalidad. |
 | Suscripciones | Sigue los feeds compatibles y elige si consultarlos a demanda o automáticamente. Las novedades de las consultas programadas aparecen en la campana de LexOpen. | Añadir consultas temáticas guardadas e historial de avisos por fuente. |
@@ -22,12 +22,12 @@ Las sesiones se registran en hora de Santiago de Chile, la zona que usa la Agend
 3. Configura un aviso de 15 minutos, 1 hora, 24 horas o 1 semana antes. Puedes aplicarlo al crear la serie o cambiarlo en una sesión. El Host muestra el aviso en la campana cuando está disponible antes del inicio. Si mueves o retiras una actividad, los avisos anteriores se ocultan.
 4. Si suscribiste otro calendario, éste recoge los cambios cuando vuelve a consultar el enlace. La programación y los avisos de LexOpen se administran desde el trabajo docente.
 
-## Preparar sesiones y crear el syllabus
+## Preparar sesiones y crear un programa
 
 1. En **Actividades en mi Agenda**, abre **Contenido de la sesión → Editar contenido**. Añade las lecturas, los materiales y los resultados de aprendizaje de esa sesión y pulsa **Guardar contenido**.
 2. Para una lectura o material, puedes guardar sólo el título o añadir un enlace HTTPS, incluido un enlace a un libro o pasaje de tu Biblioteca de LexOpen. El enlace conserva los permisos de acceso de la Biblioteca.
-3. En la **Ficha para el syllabus**, abre **Sesiones de la Agenda** y marca las que quieras incluir. **Guardar cambios** conserva la selección para retomarla después. Si retiras una sesión elegida de la Agenda, usa **Quitar sesiones retiradas** para actualizar la selección.
-4. Pulsa **Crear syllabus**. El borrador incorpora los horarios y contenidos guardados de las sesiones elegidas en orden cronológico. Puedes editarlo y crear otro con una selección nueva. Los cambios posteriores de la Agenda quedan reflejados en los nuevos borradores.
+3. Abre **Sesiones de la Agenda** en la **Ficha para el syllabus** del curso o en el **Programa** del seminario, congreso o taller. Marca las sesiones de ese trabajo que quieras incorporar. **Guardar cambios** conserva la selección para retomarla después. Si retiras una sesión elegida de la Agenda, usa **Quitar sesiones retiradas** para actualizar la selección.
+4. Pulsa **Crear syllabus** o **Crear programa**. El borrador incorpora los horarios y contenidos guardados en orden cronológico. Si dejas la selección vacía, puedes empezar desde la plantilla. Cada borrador conserva una copia editable. Los cambios posteriores de la Agenda se reflejan al crear otro borrador.
 
 ## Consultar y guardar convocatorias
 
@@ -58,4 +58,3 @@ Si administras un servidor publicado por un proxy, excluye `/api/altazor/academi
 2. **Cartera de convocatorias.** Conservar país, organismo, enlace, bases, zona horaria, fecha límite, estado y versión. Reutilizar la misma ficha en la búsqueda, la revisión y la agenda.
 3. **Descubrimiento por país.** Ampliar el catálogo con fuentes oficiales verificadas y presentar filtros por área, elegibilidad y cierre según los datos de cada organismo.
 4. **Feeds.** Añadir consultas guardadas e historial de cambios por convocatoria, conservando el origen y la fecha de consulta.
-5. **Programa docente.** Extender la selección de sesiones a los programas de seminarios, congresos y talleres.

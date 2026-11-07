@@ -149,3 +149,102 @@ test("Una serie docente se puede editar por sesión y cancelar desde una fecha e
     await db.user.deleteMany({ where: { id } });
   }
 });
+
+test("Docencia crea programas editables con las sesiones elegidas para cada encuentro", async ({ page }, info) => {
+  test.setTimeout(90_000);
+  const ownerId = `programs-${randomUUID()}`;
+  const examples = [
+    { kind: "seminar", label: "Seminario", region: "Programa del seminario", section: "Programa y ponentes" },
+    { kind: "congress", label: "Congreso", region: "Programa del congreso", section: "Programa y mesas" },
+    { kind: "workshop", label: "Taller", region: "Programa del taller", section: "Actividades y tiempos" },
+  ] as const;
+  try {
+    const owner = await db.user.create({ data: {
+      id: ownerId, name: "Profesional ficticio", email: `${ownerId}@example.invalid`, role: "abogado", password: await hash("lexopen", 10),
+    } });
+    await loginAs(page, owner.email);
+    await page.setViewportSize({ width: 360, height: 800 });
+    const academic = page.getByRole("region", { name: "Desarrollo académico", exact: true });
+    for (const { kind, label, region, section } of examples) {
+      await test.step(`Preparar programa para ${label.toLowerCase()}`, async () => {
+        const title = `${label} ficticio de investigación`;
+        const program = academic.getByRole("region", { name: region, exact: true });
+        let projectId: string;
+        if (kind === "seminar") {
+          await page.goto("/academico?vista=docencia");
+          await academic.getByRole("button", { name: /^Seminario / }).click();
+          await academic.getByLabel("Nombre del trabajo", { exact: true }).fill(title);
+          await academic.getByRole("button", { name: "Crear trabajo", exact: true }).click();
+          await expect(program.getByRole("button", { name: "Crear programa", exact: true })).toBeVisible();
+          projectId = (await db.altazorAcademicWorkspace.findFirstOrThrow({ where: { ownerId, title, kind } })).id;
+        } else {
+          projectId = (await db.altazorAcademicWorkspace.create({ data: { ownerId, title, kind, requestId: randomUUID() } })).id;
+        }
+        const open = "Apertura y discusión de fuentes";
+        const close = "Puesta en común";
+        const excluded = "Reunión de coordinación interna";
+        await db.altazorTeachingSession.createMany({ data: [
+          { workspaceId: projectId, requestId: randomUUID(), title: open, startsAt: new Date("2030-05-09T20:30:00Z"),
+            endsAt: new Date("2030-05-09T21:30:00Z"), contentJson: JSON.stringify({
+              readings: [{ title: "Lectura sobre métodos", href: "/biblioteca/libro-prueba?fragment=2#fragment-2" }],
+              materials: [{ title: "Guía de discusión", href: "https://example.invalid/guias/discusion" }],
+              outcomes: ["Comparar métodos de análisis."],
+            }) },
+          { workspaceId: projectId, requestId: randomUUID(), title: excluded, startsAt: new Date("2030-05-09T22:00:00Z") },
+          { workspaceId: projectId, requestId: randomUUID(), title: close, startsAt: new Date("2030-05-09T23:00:00Z") },
+        ] });
+
+        await page.goto(`/academico?trabajo=${projectId}`);
+        const picker = program.getByText("Sesiones de la Agenda", { exact: true });
+        const firstSession = program.getByRole("checkbox", { name: new RegExp(open) });
+        const lastSession = program.getByRole("checkbox", { name: new RegExp(close) });
+        const internalSession = program.getByRole("checkbox", { name: new RegExp(excluded) });
+        await picker.click();
+        await expect(firstSession).not.toBeChecked();
+        await lastSession.evaluate(input => input.scrollIntoView({ block: "center", behavior: "instant" }));
+        await lastSession.check();
+        await firstSession.evaluate(input => input.scrollIntoView({ block: "center", behavior: "instant" }));
+        await firstSession.check();
+        await expect(program).toHaveCount(1);
+        await expect(internalSession).not.toBeChecked();
+        await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
+        await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
+        await page.reload();
+        await picker.click();
+        await expect(firstSession).toBeChecked();
+        await expect(lastSession).toBeChecked();
+        await expect(internalSession).not.toBeChecked();
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+        if (kind === "seminar" && process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
+          await program.screenshot({ path: info.outputPath("programa-seminario-movil.png") });
+          await page.setViewportSize({ width: 1280, height: 880 });
+          await program.screenshot({ path: info.outputPath("programa-seminario-escritorio.png") });
+          await page.setViewportSize({ width: 360, height: 800 });
+        }
+
+        await program.getByRole("button", { name: "Crear programa", exact: true }).click();
+        const editor = academic.getByRole("region", { name: "Editor académico", exact: true });
+        const text = editor.getByRole("textbox", { name: "Texto de trabajo", exact: true });
+        await expect(text).toHaveValue(new RegExp(`## ${section}\\n\\n### ${open}`));
+        const original = await text.inputValue();
+        expect(original).toMatch(/16:30\s*–\s*17:30 \(Santiago\)/);
+        expect(original).toContain("Lectura sobre métodos — /biblioteca/libro-prueba?fragment=2#fragment-2");
+        expect(original).toContain("Guía de discusión — https://example.invalid/guias/discusion");
+        expect(original).toContain("Comparar métodos de análisis.");
+        expect(original).not.toContain(excluded);
+        expect(original).toContain(`### ${close}`);
+        expect(original.indexOf(open)).toBeLessThan(original.indexOf(close));
+
+        const edited = `${original}\n\nNota para participantes del encuentro.`;
+        await text.fill(edited);
+        await expect(editor.getByText("Guardado", { exact: true })).toBeVisible();
+        await page.reload();
+        await expect(text).toHaveValue(edited);
+      });
+    }
+  } finally {
+    await db.auditEvent.deleteMany({ where: { actorId: ownerId } });
+    await db.altazorAcademicWorkspace.deleteMany({ where: { ownerId } });
+    await db.user.deleteMany({ where: { id: ownerId } });
+  }
+});

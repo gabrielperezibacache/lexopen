@@ -21,6 +21,15 @@ export function academicHref(workspaceId?: string, artifactId?: string) {
 
 export const ACADEMIC_CALLS_HREF = "/academico?vista=docencia#convocatorias-oficiales";
 
+const teachingProgramSections = {
+  seminar: "Programa y ponentes",
+  congress: "Programa y mesas",
+  workshop: "Actividades y tiempos",
+} as const;
+export function isAcademicTeachingProgram(kind: string): kind is keyof typeof teachingProgramSections {
+  return Object.hasOwn(teachingProgramSections, kind);
+}
+
 export const ACADEMIC_MANUSCRIPT_TEMPLATES = {
   blank: { label: "Documento en blanco", description: "Escribe con tu propia estructura.", headings: [] },
   article: { label: "Artículo académico", description: "Presenta una pregunta, su método y tus hallazgos.", headings: ["Resumen", "Palabras clave", "Introducción", "Marco teórico", "Metodología", "Resultados", "Discusión", "Conclusiones", "Referencias"] },
@@ -28,9 +37,9 @@ export const ACADEMIC_MANUSCRIPT_TEMPLATES = {
   thesis: { label: "Proyecto de tesis", description: "Delimita la investigación y organiza su ejecución.", headings: ["Problema y justificación", "Pregunta de investigación", "Objetivos", "Estado del arte", "Metodología", "Cronograma", "Referencias"] },
   paper: { label: "Ponencia", description: "Prepara una intervención para un encuentro académico.", headings: ["Resumen", "Problema y tesis", "Argumentos", "Conclusiones", "Preguntas para el diálogo", "Referencias"] },
   course: { label: "Programa de curso", description: "Planifica unidades, sesiones y evaluación.", headings: ["Descripción y destinatarios", "Resultados de aprendizaje", "Unidades y sesiones", "Metodología", "Evaluación", "Calendario", "Lecturas"] },
-  seminar: { label: "Seminario", description: "Ordena sesiones, ponentes, lecturas y discusión.", headings: ["Propósito y destinatarios", "Programa y ponentes", "Lecturas previas", "Preguntas de discusión", "Calendario y responsabilidades"] },
-  congress: { label: "Congreso", description: "Prepara el programa y distribuye el trabajo del equipo.", headings: ["Tema y ejes", "Comité y responsabilidades", "Programa y mesas", "Convocatoria y evaluación", "Inscripción y logística", "Hitos y plazos"] },
-  workshop: { label: "Taller", description: "Diseña actividades, materiales y una pauta de evaluación.", headings: ["Resultados esperados", "Destinatarios y requisitos", "Actividades y tiempos", "Materiales", "Evaluación y seguimiento"] },
+  seminar: { label: "Seminario", description: "Ordena sesiones, ponentes, lecturas y discusión.", headings: ["Propósito y destinatarios", teachingProgramSections.seminar, "Lecturas previas", "Preguntas de discusión", "Calendario y responsabilidades"] },
+  congress: { label: "Congreso", description: "Prepara el programa y distribuye el trabajo del equipo.", headings: ["Tema y ejes", "Comité y responsabilidades", teachingProgramSections.congress, "Convocatoria y evaluación", "Inscripción y logística", "Hitos y plazos"] },
+  workshop: { label: "Taller", description: "Diseña actividades, materiales y una pauta de evaluación.", headings: ["Resultados esperados", "Destinatarios y requisitos", teachingProgramSections.workshop, "Materiales", "Evaluación y seguimiento"] },
   call: { label: "Convocatoria", description: "Registra bases, elegibilidad, entregables y fechas clave.", headings: ["Entidad convocante y país", "Bases y fuente oficial", "Requisitos de elegibilidad", "Documentos y entregables", "Fechas y zona horaria", "Equipo y responsabilidades", "Seguimiento"] },
 } as const;
 export type AcademicManuscriptTemplate = keyof typeof ACADEMIC_MANUSCRIPT_TEMPLATES;
@@ -40,7 +49,7 @@ export function isAcademicTeachingKind(kind: string): kind is (typeof ACADEMIC_T
   return ACADEMIC_TEACHING_TEMPLATES.some(id => id === kind);
 }
 
-type SyllabusSession = {
+type ManuscriptSession = {
   title: string;
   startsAt: Date;
   endsAt: Date | null;
@@ -54,7 +63,7 @@ function markdownSessionText(value: string) {
   return value.replace(/[\s\p{Cc}]+/gu, " ").trim().replace(/[\\`*\[\]]/g, "\\$&");
 }
 
-function syllabusSessionBody({ title, startsAt, endsAt, content }: SyllabusSession) {
+function manuscriptSessionBody({ title, startsAt, endsAt, content }: ManuscriptSession) {
   const start = sessionDateTime.format(startsAt);
   const end = endsAt && (santiagoDateKey(startsAt) === santiagoDateKey(endsAt) ? sessionTime : sessionDateTime).format(endsAt);
   const resourceLabel = ({ title, href }: TeachingSessionContent["readings"][number]) =>
@@ -76,7 +85,7 @@ export function academicManuscriptBody(
   templateId: AcademicManuscriptTemplate,
   title: string,
   brief: typeof emptyAcademicBrief,
-  sessions: readonly SyllabusSession[] = [],
+  sessions: readonly ManuscriptSession[] = [],
 ) {
   if (templateId === "blank") return "";
   const heading = `# ${title.replace(/\s+/g, " ")}`;
@@ -87,14 +96,19 @@ export function academicManuscriptBody(
     return [heading, `## ${entity}`, [organization, countryName].filter(Boolean).join(" · "), `## ${source}`, url,
       `## ${requirements}`, `## ${deliverables}`, `## ${dates}`, deadline ? `Cierre registrado: ${deadline}` : "", `## ${roles}`, `## ${followup}`].filter(Boolean).join("\n\n");
   }
-  if (templateId !== "course") return [heading, ...ACADEMIC_MANUSCRIPT_TEMPLATES[templateId].headings.map(label => `## ${label}`)].join("\n\n");
+  if (templateId !== "course") {
+    const sessionSection = isAcademicTeachingProgram(templateId) ? teachingProgramSections[templateId] : undefined;
+    return [heading, ...ACADEMIC_MANUSCRIPT_TEMPLATES[templateId].headings.flatMap(label =>
+      label === sessionSection ? [`## ${label}`, ...sessions.map(manuscriptSessionBody)] : [`## ${label}`],
+    )].join("\n\n");
+  }
   const fields = brief.syllabus;
   const blocks = [
     ["Resumen y enfoque", fields?.summary, fields?.approach],
     ["Destinatarios y requisitos", brief.audience, fields?.requirements],
     ["Horario y sala", fields?.schedule, fields?.room, brief.duration],
     ["Resultados de aprendizaje", brief.learningOutcomes],
-    ["Unidades y sesiones", ...sessions.map(syllabusSessionBody)],
+    ["Unidades y sesiones", ...sessions.map(manuscriptSessionBody)],
     ["Evaluación", brief.evaluation],
     ["Bibliografía base", fields?.bibliography],
   ];

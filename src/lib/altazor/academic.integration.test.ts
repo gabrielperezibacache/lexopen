@@ -216,8 +216,53 @@ async function main(){
     await assert.rejects(createAcademicDraft(course.id, { ...syllabusInput, requestId: randomUUID(), expectedRevision: longSelection.revision }, owner, db), status(413));
     assert.equal(await db.altazorAcademicArtifact.count({ where: { workspaceId: course.id } }), 2);
     assert.equal((await readAcademicArtifact(course.id, syllabus.id, owner, db)).body, body);
+
+    const congress = await createAcademicWorkspace({ requestId: randomUUID(), kind: "congress", title: "Congreso ficticio" }, owner, db);
+    workspaces.push(congress.id);
+    const table = await db.altazorTeachingSession.create({ data: {
+      ...courseSession("Mesa de trabajo", new Date("2026-11-17T16:00:00Z"), congress.id),
+      contentJson: JSON.stringify(content),
+    } });
+    async function saveProgramSessionIds(programSessionIds: string[]) {
+      const current = await readAcademicWorkspace(congress.id, owner, db);
+      return saveAcademicWorkspace(congress.id, {
+        expectedRevision: current.revision, title: current.title, matrix: emptyAcademicMatrix,
+        brief: { ...current.brief, programSessionIds },
+      }, owner, db);
+    }
+    const programSelection = await saveProgramSessionIds([table.id]);
+    assert.deepEqual((await readAcademicWorkspace(congress.id, owner, db)).brief.programSessionIds, [table.id]);
+    const programInput = { requestId: randomUUID(), expectedRevision: programSelection.revision, template: "congress" };
+    const program = await createAcademicDraft(congress.id, programInput, owner, db);
+    const programBody = (await readAcademicArtifact(congress.id, program.id, owner, db)).body;
+    assert.match(programBody, /## Programa y mesas\n\n### Mesa de trabajo\n\n17-11-2026, 13:00 \(Santiago\)/);
+    assert.match(programBody, /Lectura pactada|Guía práctica|Argumentar a partir de las fuentes/);
+
+    const genericProgram = await createAcademicDraft(congress.id, { ...programInput, requestId: randomUUID(), template: "workshop" }, owner, db);
+    const genericProgramBody = (await readAcademicArtifact(congress.id, genericProgram.id, owner, db)).body;
+    assert.match(genericProgramBody, /## Actividades y tiempos/);
+    assert.doesNotMatch(genericProgramBody, /Mesa de trabajo/);
+
+    const assisted = await prepareAcademicArtifact(congress.id, {
+      ...input, requestId: randomUUID(), expectedRevision: programSelection.revision, mode: "teaching_material", sources: [],
+    }, owner, db);
+    const assistedRecord = await db.altazorAcademicArtifact.findUniqueOrThrow({ where: { id: assisted.artifact.id } });
+    assert.doesNotMatch(assistedRecord.destinationJson, /programSessionIds|Mesa de trabajo/);
+    assert.ok(!assistedRecord.destinationJson.includes(table.id));
+
+    await db.altazorTeachingSession.delete({ where: { id: table.id } });
+    await assert.rejects(createAcademicDraft(congress.id, { ...programInput, requestId: randomUUID() }, owner, db), status(409));
+    assert.deepEqual(await createAcademicDraft(congress.id, programInput, owner, db), { id: program.id, reused: true });
+    assert.equal((await readAcademicArtifactVersion(congress.id, program.id, 1, owner, db)).body, programBody);
+    for (const outside of [early.id, foreign.id]) {
+      const invalid = await saveProgramSessionIds([outside]);
+      await assert.rejects(createAcademicDraft(congress.id, { ...programInput, requestId: randomUUID(), expectedRevision: invalid.revision }, owner, db), status(409));
+    }
+    const cleared = await saveProgramSessionIds([]);
+    const emptyProgram = await createAcademicDraft(congress.id, { ...programInput, requestId: randomUUID(), expectedRevision: cleared.revision }, owner, db);
+    assert.doesNotMatch((await readAcademicArtifact(congress.id, emptyProgram.id, owner, db)).body, /Mesa de trabajo/);
     assert.equal(network,0);
-    console.log("ALTAZOR academic disposable integration passed: owner isolation, source-backed proposals, original/version history, CAS save races, idempotent save, recovery as unreviewed revision, tamper/source-revocation denial, native writing replay, LinkedIn origin/revision, legacy matrix, matrix-backed preparation and retention, profile CAS and cancellation, selected syllabus sessions and retained snapshots; zero provider traffic.");
+    console.log("ALTAZOR academic disposable integration passed: owner isolation, source-backed proposals, original/version history, CAS save races, idempotent save, recovery as unreviewed revision, tamper/source-revocation denial, native writing replay, LinkedIn origin/revision, legacy matrix, matrix-backed preparation and retention, profile CAS and cancellation, selected teaching sessions and retained snapshots; zero provider traffic.");
   }finally{
     globalThis.fetch=originalFetch;
     await db.externalShareDraft.deleteMany({where:{ownerId:{in:users}}});

@@ -14,7 +14,7 @@ import { captureWritingSource } from "@/lib/writings/sources";
 import { resolveAltazorSources, verifyAltazorSources, type AltazorSourceSnapshot } from "./resources";
 import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, academicDraftCreateSchema, ACADEMIC_LABELS, ACADEMIC_MANUSCRIPT_MAX, ACADEMIC_WORKSPACE_LIMIT, emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
 import { parseAcademicOutput, academicReferenceAppendix, academicWritingBody } from "./academic-output";
-import { academicManuscriptBody, ACADEMIC_MANUSCRIPT_TEMPLATES, isAcademicTeachingKind, type AcademicManuscriptTemplate } from "./academic-templates";
+import { academicManuscriptBody, ACADEMIC_MANUSCRIPT_TEMPLATES, isAcademicTeachingKind, isAcademicTeachingProgram, type AcademicManuscriptTemplate } from "./academic-templates";
 import type { AcademicCallOrigin } from "./academic-calls";
 import { readTeachingSessionContent } from "./teaching-session-content";
 const missing = () => httpError("El trabajo académico no está disponible", 404);
@@ -152,8 +152,9 @@ export async function prepareAcademicArtifact(id: string, raw: unknown, user: Ca
     if (documents.size < 2) throw httpError("Seleccione pasajes de dos documentos distintos para compararlos", 400);
   }
   const brief = JSON.parse(workspace.briefJson) as typeof emptyAcademicBrief;
-  // The saved Agenda selection belongs to the local syllabus draft.
+  // Agenda selections belong to locally generated drafts.
   if (brief.syllabus) delete brief.syllabus.sessionIds;
+  delete brief.programSessionIds;
   const data = { destination, instruction: input.instruction, brief, matrix: { dimensions: matrix.dimensions || [], rows: (matrix.rows || []).filter((row: { included: boolean }) => row.included) }, profile: profile ? JSON.parse(profile.profileJson) : null };
   if (JSON.stringify(data).length > 60000) throw httpError("La matriz o el perfil excede el contexto de una consulta; reduzca la selección", 413);
   return bookTransaction(client, async tx => {
@@ -186,23 +187,27 @@ export async function createAcademicDraft(id: string, raw: unknown, user: CausaA
     const template = ACADEMIC_MANUSCRIPT_TEMPLATES[input.template];
     const title = `${input.template === "blank" ? "Borrador" : template.label} · ${workspace.title}`.slice(0, 240);
     const brief: typeof emptyAcademicBrief = { ...emptyAcademicBrief, ...JSON.parse(workspace.briefJson) };
-    const sessionIds = input.template === "course" && workspace.kind === "course" ? brief.syllabus?.sessionIds ?? [] : [];
+    const syllabus = input.template === "course";
+    const selectedSessionIds = syllabus ? brief.syllabus?.sessionIds : brief.programSessionIds;
+    const sessionIds = input.template === workspace.kind && (syllabus || isAcademicTeachingProgram(input.template))
+      ? selectedSessionIds ?? [] : [];
+    const documentLabel = syllabus ? "syllabus" : "programa";
     const sessions = sessionIds.length ? await tx.altazorTeachingSession.findMany({
       where: { workspaceId: workspace.id, id: { in: sessionIds } },
       select: { title: true, startsAt: true, endsAt: true, contentJson: true },
       orderBy: [{ startsAt: "asc" }, { id: "asc" }],
     }) : [];
     if (sessions.length !== sessionIds.length) {
-      throw httpError("Alguna sesión elegida ya no está disponible. Revisa la selección de la Agenda antes de crear el syllabus.", 409);
+      throw httpError(`Alguna sesión elegida ya no está disponible. Revisa la selección de la Agenda antes de crear el ${documentLabel}.`, 409);
     }
     const body = academicManuscriptBody(input.template, workspace.title, brief, sessions.map(({ contentJson, ...session }) => ({
       ...session,
       content: readTeachingSessionContent(contentJson),
     })));
     if (body.length > ACADEMIC_MANUSCRIPT_MAX) {
-      throw httpError("Las sesiones elegidas exceden el tamaño del syllabus. Reduce la selección e inténtalo nuevamente.", 413);
+      throw httpError(`Las sesiones elegidas exceden el tamaño del ${documentLabel}. Reduce la selección e inténtalo nuevamente.`, 413);
     }
-    const mode = input.template === "course" ? "syllabus" : isAcademicTeachingKind(input.template) ? "teaching_material" : "academic_writing";
+    const mode = syllabus ? "syllabus" : isAcademicTeachingKind(input.template) ? "teaching_material" : "academic_writing";
     const artifact = await tx.altazorAcademicArtifact.create({
       data: {
         workspaceId: id, requestId: input.requestId, inputSha256, mode, title,

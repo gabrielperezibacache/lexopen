@@ -8,7 +8,7 @@ import { ACADEMIC_MANUSCRIPT_TEMPLATES, ACADEMIC_TEACHING_TEMPLATES } from "@/li
 import { formatCivilDate, SANTIAGO_TZ } from "@/lib/chile-time";
 import { isWorkCountry, workCountryOptions } from "@/lib/config/countries";
 import { AcademicCallSources } from "./AcademicCallSources";
-import { AcademicSyllabusSessions } from "./AcademicSyllabusSessions";
+import { AcademicAgendaSessionPicker } from "./AcademicAgendaSessionPicker";
 import { AltazorMark } from "./AltazorMark";
 import { useOptionalAltazorCompanion } from "./AltazorCompanionProvider";
 import type { AcademicProject } from "./academic-ui";
@@ -164,7 +164,7 @@ export function AcademicSyllabusForm({ workspaceId, sessionsVersion, title, brie
       <label data-wide=""><span>Bibliografía base</span><textarea rows={4} maxLength={5000} placeholder="Una referencia por párrafo."
         value={values.bibliography} onChange={event => onChange({ ...values, bibliography: event.target.value })} /></label>
     </fieldset>
-    <AcademicSyllabusSessions workspaceId={workspaceId} version={sessionsVersion} selection={values.sessionIds || []}
+    <AcademicAgendaSessionPicker documentKind="syllabus" workspaceId={workspaceId} version={sessionsVersion} selection={values.sessionIds || []}
       onChange={sessionIds => onChange({ ...values, sessionIds })} disabled={busy} />
     {sessionContentDirty && <p className={styles.meta} role="status">Guarda o descarta el contenido de la sesión antes de crear el syllabus.</p>}
     <div className={styles.actions}>
@@ -176,5 +176,35 @@ export function AcademicSyllabusForm({ workspaceId, sessionsVersion, title, brie
     </div>
     <p className={styles.meta}><CalendarDays size={16} aria-hidden="true" /> La ficha conserva el horario y la sala para el documento.</p>
     {notice && <p role="status" className={styles.meta}>{notice}</p>}
+  </section>;
+}
+
+const programTitles = { seminar: "Programa del seminario", congress: "Programa del congreso", workshop: "Programa del taller" } as const;
+
+export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, selection, title, busy, sessionContentDirty, onChange, onCreate }: {
+  kind: keyof typeof programTitles;
+  workspaceId: string;
+  sessionsVersion: number;
+  selection: string[];
+  title: string;
+  busy: boolean;
+  sessionContentDirty: boolean;
+  onChange: (sessionIds: string[]) => void;
+  onCreate: () => void;
+}) {
+  const Icon = icons[kind];
+  return <section className={styles.syllabus} aria-labelledby="teaching-program-title">
+    <header className={styles.heading}>
+      <Icon size={27} strokeWidth={1.4} aria-hidden="true" />
+      <div><h3 id="teaching-program-title">{programTitles[kind]}</h3>
+        <p>Crea un documento editable con la plantilla y las sesiones que elijas. Puedes <a className={styles.inlineLink} href="#agenda-docencia">añadir o editar sesiones en tu Agenda</a>.</p>
+      </div>
+    </header>
+    <AcademicAgendaSessionPicker documentKind="programa" workspaceId={workspaceId} version={sessionsVersion}
+      selection={selection} onChange={onChange} disabled={busy} />
+    {sessionContentDirty && <p className={styles.meta} role="status">Guarda o descarta el contenido de la sesión antes de crear el programa.</p>}
+    <div className={styles.actions}>
+      <button type="button" className="btn btn-primary" disabled={busy || sessionContentDirty || !title.trim()} onClick={onCreate}>Crear programa <ArrowRight size={16} aria-hidden="true" /></button>
+    </div>
   </section>;
 }

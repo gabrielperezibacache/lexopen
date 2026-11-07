@@ -39,3 +39,31 @@ test("course drafts preserve selected resource destinations and date changes at 
   assert.doesNotMatch(syllabus, /\*\*Materiales\*\*/);
   assert.doesNotMatch(academicManuscriptBody("article", "Curso", emptyAcademicBrief, [session]), /Taller/);
 });
+
+test("teaching programs place Agenda sessions under the existing program heading", () => {
+  const session = {
+    title: "Discusión inicial",
+    startsAt: new Date("2026-11-15T16:00:00Z"),
+    endsAt: null,
+    content: {
+      readings: [{ title: "Lectura base" }],
+      materials: [{ title: "Guía", href: "https://example.org/guia" }],
+      outcomes: ["Distinguir argumentos"],
+    },
+  };
+  for (const [template, section, next] of [
+    ["seminar", "Programa y ponentes", "Lecturas previas"],
+    ["congress", "Programa y mesas", "Convocatoria y evaluación"],
+    ["workshop", "Actividades y tiempos", "Materiales"],
+  ] as const) {
+    const program = academicManuscriptBody(template, "Encuentro", emptyAcademicBrief, [session]);
+    const schedule = program.split(`## ${section}\n\n`)[1]?.split(`\n\n## ${next}`)[0];
+    assert.ok(schedule);
+    assert.match(schedule, /^### Discusión inicial\n\n15-11-2026, 13:00 \(Santiago\)/);
+    assert.match(schedule, /\*\*Resultados de aprendizaje\*\*\n\n- Distinguir argumentos/);
+    assert.match(schedule, /\*\*Lecturas\*\*\n\n- Lectura base/);
+    assert.match(schedule, /\*\*Materiales\*\*\n\n- Guía — https:\/\/example.org\/guia/);
+    assert.ok(academicManuscriptBody(template, "Encuentro", emptyAcademicBrief).includes(`## ${section}\n\n## ${next}`));
+  }
+  assert.doesNotMatch(academicManuscriptBody("call", "Convocatoria", emptyAcademicBrief, [session]), /Discusión inicial/);
+});

@@ -13,6 +13,8 @@ const requestId = z.string().min(10).max(120).regex(/^[a-zA-Z0-9-]+$/);
 const revision = z.number().int().positive();
 export const academicProfileSchema = z.object({ name: z.string().trim().max(180), headline: z.string().trim().max(300).default(""), orcid: z.string().regex(/^(?:\d{4}-\d{4}-\d{4}-\d{3}[\dX])?$/).default(""), biography: z.string().max(12000).default(""), education: z.string().max(12000).default(""), experience: z.string().max(12000).default(""), publications: z.string().max(20000).default(""), languages: z.string().max(1000).default(""), interests: z.string().max(2000).default("") }).strict();
 export const academicProfileSaveSchema = z.object({ expectedRevision: z.number().int().nonnegative(), profile: academicProfileSchema }).strict();
+const agendaSessionIds = z.array(writingId).max(200)
+  .refine(ids => new Set(ids).size === ids.length, "Elige cada sesión una sola vez").optional();
 const syllabus = z.object({
   summary: z.string().max(4000),
   approach: z.string().max(3000),
@@ -20,8 +22,7 @@ const syllabus = z.object({
   room: z.string().max(600),
   requirements: z.string().max(3000),
   bibliography: z.string().max(5000),
-  sessionIds: z.array(writingId).max(200)
-    .refine(ids => new Set(ids).size === ids.length, "Elige cada sesión una sola vez").optional(),
+  sessionIds: agendaSessionIds,
 }).strict();
 export type AcademicSyllabus = z.infer<typeof syllabus>;
 export const emptyAcademicSyllabus: AcademicSyllabus = { summary: "", approach: "", schedule: "", room: "", requirements: "", bibliography: "" };
@@ -46,7 +47,7 @@ const academicCall = z.object({
 }).strict();
 export type AcademicCall = z.infer<typeof academicCall>;
 export const emptyAcademicCall: AcademicCall = { country: "", organization: "", url: "", deadline: "", status: "watching" };
-const brief = z.object({ objective: z.string().max(8000).default(""), audience: z.string().max(1000).default(""), language: z.string().max(80).default("Español"), duration: z.string().max(100).default(""), learningOutcomes: z.string().max(6000).default(""), evaluation: z.string().max(6000).default(""), task: academicModeSchema.default("literature_review"), syllabus: syllabus.optional(), call: academicCall.optional() }).strict();
+const brief = z.object({ objective: z.string().max(8000).default(""), audience: z.string().max(1000).default(""), language: z.string().max(80).default("Español"), duration: z.string().max(100).default(""), learningOutcomes: z.string().max(6000).default(""), evaluation: z.string().max(6000).default(""), task: academicModeSchema.default("literature_review"), syllabus: syllabus.optional(), programSessionIds: agendaSessionIds, call: academicCall.optional() }).strict();
 const dimension = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,40}$/), label: z.string().trim().min(1).max(100), type: z.enum(["text", "number", "date", "tag"]) }).strict();
 const cell = z.object({ value: z.string().max(5000), source: altazorSourceInputSchema.optional() }).strict();
 const matrix = z.object({ dimensions: z.array(dimension).max(12), rows: z.array(z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/), title: z.string().max(240), included: z.boolean(), cells: z.record(cell) }).strict()).max(100) }).strict().superRefine((value, ctx) => {
