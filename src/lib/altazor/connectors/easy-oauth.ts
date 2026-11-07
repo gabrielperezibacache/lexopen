@@ -11,6 +11,8 @@ import { assertComputerPolicy } from "../computer/privacy";
 import { normalizeAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { computerOperationHash } from "../computer/operation-hash";
 import { configureConnector, connectorInventory, testConnector } from "./service";
+import { oauthFailureReason, readOAuthTokenResponse } from "./oauth-token-response";
+import { checkGithubApplication } from "./github-application-check";
 
 import { EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth-providers";
 
@@ -86,13 +88,14 @@ function bindingOf(row: { ownerId: string; id: string; resultEnc: string | null 
 export async function easyOAuthSetupStatus(options: Options = {}, verifiedDisplayOrigin?: string) {
   return { providers: await Promise.all(EASY_OAUTH_PROVIDERS.map(async provider => { const config = await configFor(provider, options); return { provider, label: specifications[provider].label, configured: config.configured, source: config.source, callbackUri: config.redirectUri || (verifiedDisplayOrigin ? validOrigin(verifiedDisplayOrigin) + callbackPath : null), canEdit: config.source !== "environment", reason: config.reason, registrationUrl: specifications[provider].registrationUrl }; })) };
 }
-export async function saveEasyOAuthSetup(actor: ConnectorActor, input: { provider: EasyOAuthProvider; clientId: string; clientSecret: string; confirmed: true }, appOrigin: string) {
+export async function saveEasyOAuthSetup(actor: ConnectorActor, input: { provider: EasyOAuthProvider; clientId: string; clientSecret: string; confirmed: true }, appOrigin: string, options: Options = {}) {
   const user = await nativeOAuthActor(actor);
   if (!canSome(user, "host.admin")) throw new ConnectorError("forbidden", "Sólo el administrador puede preparar las conexiones del Host.", 403);
   const config = await configFor(input.provider);
   if (config.source === "environment") throw new ConnectorError("oauth_managed_environment", "Esta conexión ya está administrada por la configuración del Host.", 409);
   if (input.confirmed !== true || !input.clientId.trim() || !input.clientSecret.trim() || input.clientId.length > 1000 || input.clientSecret.length > 4000 || /[\r\n]/.test(input.clientId + input.clientSecret)) throw new ConnectorError("oauth_setup_invalid", "Complete los datos de la aplicación registrada.");
   const appUrl = validOrigin(appOrigin), credentialsEnc = seal({ clientId: input.clientId.trim(), clientSecret: input.clientSecret.trim(), appUrl }, setupContext(input.provider));
+  if (input.provider === "github") await checkGithubApplication(input.clientId.trim(), input.clientSecret.trim(), options.fetcher);
   await prisma.$transaction(async tx => {
     const current = await nativeOAuthActor(actor, tx); if (!canSome(current, "host.admin")) throw new ConnectorError("forbidden", "Sus permisos cambiaron.", 403);
     await tx.integrationConfig.upsert({ where: { provider: `altazor-oauth-${input.provider}` }, create: { provider: `altazor-oauth-${input.provider}`, enabled: true, configJson: JSON.stringify({ credentialsEnc }) }, update: { enabled: true, configJson: JSON.stringify({ credentialsEnc }) } });
@@ -168,12 +171,11 @@ export async function receiveEasyOAuth(actor: ConnectorActor, input: { state: st
     if (input.denied || !input.code || input.code.length > 8000) throw new ConnectorError("oauth_cancelled", "La conexión no fue autorizada.");
     const spec = specifications[provider], fetcher = options.fetcher || fetch;
     const tokens = await providerJson(spec.token, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: config.redirectUri, code: input.code, code_verifier: binding.verifier }) }, fetcher);
-    const scopes = typeof tokens.scope === "string" ? [...new Set(tokens.scope.split(/[\s,]+/).filter(Boolean))].sort() : [];
-    if (scopes.length !== spec.scopes.length || scopes.some((scope, index) => scope !== [...spec.scopes].sort()[index]) || typeof tokens.access_token !== "string" || !tokens.access_token || tokens.access_token.length > 16000 || /[\r\n]/.test(tokens.access_token) || String(tokens.token_type).toLowerCase() !== "bearer") throw new ConnectorError("oauth_scope_mismatch", "El servicio no confirmó exactamente los permisos de lectura solicitados.", 409);
+    const { accessToken, scopes } = readOAuthTokenResponse(tokens, spec.scopes);
     const ttl = tokens.expires_in;
     if ((provider !== "github" || ttl !== undefined) && (typeof ttl !== "number" || !Number.isFinite(ttl) || ttl < 60 || ttl > 366 * 86400)) throw new ConnectorError("oauth_expiry_invalid", "El servicio no confirmó una vigencia válida.", 409);
     const expiresAt = typeof ttl === "number" ? new Date(Date.now() + ttl * 1000) : null;
-    const headers = { Authorization: `Bearer ${tokens.access_token}`, Accept: "application/json" };
+    const headers = { Authorization: `Bearer ${accessToken}`, Accept: "application/json" };
     const subject = await verifyProviderAccount(provider, headers, fetcher);
     if ((typeof subject !== "string" && typeof subject !== "number") || !String(subject).trim() || String(subject).length > 200) throw new ConnectorError("oauth_identity_invalid", "No se pudo comprobar esta autorización de lectura.", 409);
     if (provider === "dropbox" && (typeof tokens.account_id !== "string" || !constantEqual(tokens.account_id, String(subject)))) throw new ConnectorError("oauth_identity_invalid", "Dropbox no confirmó la misma cuenta autorizada.", 409);
@@ -190,7 +192,7 @@ export async function receiveEasyOAuth(actor: ConnectorActor, input: { state: st
       if (!attemptLock.count) throw new ConnectorError("oauth_attempt_cancelled", "El intento cambió antes de guardar la conexión.", 409);
       const beforeSave = await access(actor, workspace.id, tx); await noActiveSession(beforeSave.workspace, tx);
       if (workspaceBinding(beforeSave.workspace) !== binding.workspaceBinding) throw new ConnectorError("oauth_binding_changed", "El espacio cambió durante la autorización.", 409);
-      const result = await configureConnector(beforeSave.user, workspace.id, `oauth:${attempt.id}`, binding.connectionName, { kind: spec.kind, settings: { token: tokens.access_token as string } }, workspace);
+      const result = await configureConnector(beforeSave.user, workspace.id, `oauth:${attempt.id}`, binding.connectionName, { kind: spec.kind, settings: { token: accessToken } }, workspace);
       if (result.operation.status !== "completed") throw new ConnectorError("oauth_save_unknown", "No se confirmó la conexión. Revise su estado antes de repetirla.", 409);
       const tested = await testConnector(beforeSave.user, workspace.id, binding.connectionName);
       if (!tested.ok || !tested.tested) throw new ConnectorError("oauth_test_failed", "La aplicación autorizó el acceso, pero ALTAZOR no pudo comprobar la conexión.", 409);
@@ -233,7 +235,7 @@ export async function easyOAuthStatus(actor: ConnectorActor, workspaceId: string
     const provider = attempt.provider.slice(prefix.length) as EasyOAuthProvider;
     if (attempt.resultEnc && bindingOf(attempt).workspaceId !== workspace.id || !attempt.resultEnc && !await prisma.altazorConnectorOperation.findFirst({ where: { ownerId: actor.id, workspaceId, requestId: `oauth:${attempt.id}` }, select: { id: true } })) throw new ConnectorError("oauth_attempt_unavailable", "El intento no pertenece a este espacio.", 404);
     const state = attempt.expiresAt.getTime() <= Date.now() && !["completed", "failed", "cancelled"].includes(attempt.phase) ? "expired" : attempt.phase;
-    attemptView = { id: attempt.id, provider, state: ["pending", "exchanging", "completed", "failed", "cancelled", "expired"].includes(state) ? state as EasyOAuthAttempt["state"] : "failed", reason: attempt.phase === "failed" ? "La conexión no se completó. Puede iniciar una conexión nueva." : state === "expired" ? "El intento venció. Inicie una conexión nueva." : null };
+    attemptView = { id: attempt.id, provider, state: ["pending", "exchanging", "completed", "failed", "cancelled", "expired"].includes(state) ? state as EasyOAuthAttempt["state"] : "failed", reason: attempt.phase === "failed" ? oauthFailureReason(attempt.errorCode) : state === "expired" ? "El intento venció. Inicie una conexión nueva." : null };
   }
   let inventory: Awaited<ReturnType<typeof connectorInventory>> | null = null;
   try { inventory = await connectorInventory(user, workspace.id); } catch { /* Failed inventory never becomes a stored/connected claim. */ }

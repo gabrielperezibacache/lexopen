@@ -17,9 +17,9 @@ const adminGuide = "https://github.com/gabrielperezibacache/lexopen/blob/main/do
 const providerLabels = { google: "Google", github: "GitHub", dropbox: "Dropbox" };
 const providerOrigins: Record<EasyConnectorProvider, string> = { google: "https://accounts.google.com", github: "https://github.com", dropbox: "https://www.dropbox.com" };
 const providerHelp: Record<EasyConnectorProvider, string> = {
-  google: "Consulte nombres y datos básicos de sus archivos de Drive. El permiso se limita a esos datos.",
-  github: "Consulte su perfil y sus repositorios públicos de GitHub. Esta conexión permite lectura.",
-  dropbox: "Busque, liste y lea archivos de Dropbox con su autorización. El acceso es temporal y se renueva desde aquí cuando vence.",
+  google: "Permite consultar nombres y datos básicos de tus archivos de Drive.",
+  github: "Permite consultar tu perfil y tus repositorios públicos de GitHub.",
+  dropbox: "Permite buscar y leer los archivos de Dropbox que autorices.",
 };
 const registrationSteps: Record<EasyConnectorProvider, { instruction: string; field: string; guide?: string }> = {
   google: { instruction: "En su proyecto de Google Cloud, habilite la API de Drive y configure la pantalla de consentimiento. En Clientes, cree un cliente de tipo Aplicación web.", field: "URI de redireccionamiento autorizados", guide: "https://developers.google.com/identity/protocols/oauth2/web-server?hl=es" },
@@ -33,7 +33,7 @@ function officialUrl(raw: string, provider: EasyConnectorProvider) {
   return url.href;
 }
 
-function AdminConnectorSetup({ provider, verifyPermission, busy, onBusyChange, onPrepared }: { provider: EasyConnectorProvider; verifyPermission: boolean; busy: boolean; onBusyChange: (busy: boolean) => void; onPrepared: () => Promise<void> }) {
+function AdminConnectorSetup({ provider, busy, onBusyChange }: { provider: EasyConnectorProvider; busy: boolean; onBusyChange: (busy: boolean) => void }) {
   const uid = useId(), formRef = useRef<HTMLFormElement>(null);
   const [setup, setSetup] = useState<ProviderSetup | null>(null), [loading, setLoading] = useState(true), [working, setWorking] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(false);
@@ -47,13 +47,13 @@ function AdminConnectorSetup({ provider, verifyPermission, busy, onBusyChange, o
     setSetup(item);
   }, [provider]);
   useEffect(() => {
-    if (!verifyPermission && !open) return;
+    if (!open) return;
     let active = true;
     queueMicrotask(() => {
       if (active) void refresh().catch(cause => { if (active) setError(cause.message); }).finally(() => { if (active) setLoading(false); });
     });
     return () => { active = false; };
-  }, [open, refresh, verifyPermission]);
+  }, [open, refresh]);
   async function copyCallback() {
     if (!setup?.callbackUri) return;
     try { await navigator.clipboard.writeText(setup.callbackUri); setCopied("Dirección de retorno copiada."); }
@@ -68,13 +68,12 @@ function AdminConnectorSetup({ provider, verifyPermission, busy, onBusyChange, o
       if (!result.ok) { setError(result.error); return; }
       setEditing(false);
       setNotice("Preparación guardada. Cada profesional autoriza su cuenta por separado.");
-      await refresh(); await onPrepared();
+      await refresh();
     } catch { setError("No se pudo confirmar la preparación. Vuelva a comprobar el estado antes de repetirla."); }
     finally { formRef.current?.reset(); setWorking(false); onBusyChange(false); }
   }
-  if (verifyPermission && !setup) return null;
   return <details className={styles.admin} onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary>Preparación inicial del administrador</summary>
+    <summary>Configurar {providerLabels[provider]}</summary>
     <div className={styles.setup}>
       {error && <p className={styles.error} role="alert">{error}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
       {loading ? <p role="status">Comprobando la preparación del servicio…</p> : setup && <>
@@ -98,6 +97,7 @@ function AdminConnectorSetup({ provider, verifyPermission, busy, onBusyChange, o
             <form ref={formRef} className={styles.setupForm} onSubmit={save} autoComplete="off">
               <label htmlFor={`${uid}-client`}>Identificador de cliente (Client ID)<input id={`${uid}-client`} name="clientId" required maxLength={1000} autoComplete="off" spellCheck={false} disabled={busy || working} /></label>
               <label htmlFor={`${uid}-secret`}>Secreto de cliente (Client secret)<input id={`${uid}-secret`} name="clientSecret" type="password" required maxLength={4000} autoComplete="new-password" disabled={busy || working} /></label>
+              {provider === "github" && <p>Usa el valor completo del Client secret de la OAuth App de GitHub. No uses el identificador del secreto, un token personal ni un código de inicio de sesión.</p>}
               <p>Estos datos pertenecen a la aplicación del estudio. Se guardan cifrados y sus valores quedan ocultos.</p>
               <button type="submit" disabled={busy || working}>Guardar preparación</button>
             </form>
@@ -111,6 +111,17 @@ function AdminConnectorSetup({ provider, verifyPermission, busy, onBusyChange, o
       {!loading && error && <button type="button" disabled={busy || working} onClick={() => { setError(""); void refresh().catch(cause => setError(cause.message)); }}>Volver a comprobar la preparación</button>}
     </div>
   </details>;
+}
+
+/** Administrative app registration belongs in Settings, outside account sign-in. */
+export function EasyConnectorAdministration() {
+  const [busy, setBusy] = useState(false);
+  return <section className={styles.root} aria-label="Preparación de aplicaciones del estudio" data-testid="easy-connector-administration">
+    <h4>Preparación del estudio</h4>
+    <p>Configura cada servicio una sola vez. Después, cada persona podrá conectar su cuenta desde Aplicaciones.</p>
+    {(Object.keys(providerLabels) as EasyConnectorProvider[]).map(provider => <AdminConnectorSetup key={provider}
+      provider={provider} busy={busy} onBusyChange={setBusy} />)}
+  </section>;
 }
 
 export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayReady, hasActiveSession, busy = false, onBusyChange, onDisconnect }: Props) {
@@ -165,27 +176,34 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
   const connected = Boolean(current?.connected && current.tested && current.state === "connected"), pending = attempt && ["pending", "exchanging"].includes(attempt.state);
   const attemptProblem = attempt && ["failed", "cancelled", "expired"].includes(attempt.state) ? attempt.reason || (attempt.state === "cancelled" ? "El ingreso se canceló. Puede volver a conectar cuando lo desee." : "No se confirmó el ingreso. Puede iniciar una conexión nueva.") : null;
   const computerHref = `/inicio?altazor=computer${causaId ? `&causaId=${encodeURIComponent(causaId)}` : ""}`;
+  const canConnect = Boolean(current?.available && gatewayReady && !requiresStop);
+  const configurationHref = "/configuracion#cuentas-conectadas";
   return <section className={styles.root} aria-labelledby={`${uid}-title`} data-testid="easy-connector-oauth">
-    <h4 id={`${uid}-title`}>Conecte su cuenta de {label}</h4>
+    <h4 id={`${uid}-title`} className={connected ? styles.connected : undefined}>{connected && <CheckCircle2 size={20} aria-hidden="true" />}{connected ? `${label} conectado` : `Tu cuenta de ${label}`}</h4>
     <p>{providerHelp[provider]}</p>
-    <p>Inicie sesión en la página oficial de {label}. Al terminar volverá a LexOpen.</p>
-    {provider === "google" && <p>Para sincronizar carpetas de Drive, abra <a href="/sincronizacion">Archivos conectados</a>.</p>}
+    {!connected && <p className={styles.hint}>Elige tu cuenta en {label} y vuelve a LexOpen.</p>}
     {error && <p role="alert" className={styles.error}>{error}</p>}{notice && <p role="status" className={styles.notice}>{notice}</p>}
-    {loading ? <p role="status">Comprobando su conexión…</p> : !workspaceId ? <p>Antes de conectar su cuenta, prepare la <a href={computerHref}>Computadora de ALTAZOR</a> de este espacio.</p> : <>
-      {connected && <p className={styles.connected} role="status"><CheckCircle2 size={19} aria-hidden="true" /><span>Conexión confirmada con {label}.{current?.lastVerifiedAt && <> Última comprobación: {new Date(current.lastVerifiedAt).toLocaleString("es-CL")}.</>}</span></p>}
-      {pending && <p role="status">Esperando que termine el ingreso en {label}. Si ya volvió de la página oficial, compruebe el estado.</p>}
+    {loading ? <p role="status">Comprobando conexión…</p> : !workspaceId ? <p>Abre tu <a href={computerHref}>escritorio de Altazor</a> para preparar este espacio y conectar tu cuenta.</p> : <>
+      {connected && <p role="status">Cuenta autorizada para este espacio.</p>}
+      {pending && <p role="status">Termina el ingreso en {label}. Si ya lo hiciste, pulsa Comprobar conexión.</p>}
       {attemptProblem && <p className={styles.error} role="alert">{attemptProblem}</p>}
-      {!connected && !attemptProblem && current && ["failed", "expired", "reconnect_required"].includes(current.state) && <p className={styles.error} role="alert">{current.reason || "La autorización necesita renovarse. Vuelva a conectar su cuenta."}</p>}
-      {!connected && attempt?.state === "completed" && <p role="status">Volvió de la página oficial, pero aún no se confirmó el acceso en este espacio. Vuelva a comprobar el estado.</p>}
-      {!connected && current && !current.available && <p>{current.reason || "El administrador debe habilitar esta conexión en LexOpen una sola vez."}</p>}
-      {!connected && current?.available && !gatewayReady && <p>El escritorio todavía no confirma esta aplicación. Revise su estado antes de conectar la cuenta.</p>}
-      {requiresStop && <p>El escritorio anterior aún no tiene un cierre confirmado. Revíselo y pulse Detener escritorio antes de conectar o desconectar una cuenta. Los cambios se aplican al próximo escritorio. <a href={computerHref}>Revisar mi escritorio</a></p>}
-      <div className={styles.actions}>
-        {current?.available && gatewayReady && !connected && <button type="button" className={styles.primary} disabled={busy || working || requiresStop} onClick={() => { if (needsNewAttempt) { requestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect(); }}>{working ? "Abriendo ingreso…" : needsNewAttempt ? `Iniciar otro ingreso en ${label}` : `Conectar ${label}`}<ArrowUpRight size={16} aria-hidden="true" /></button>}
-        <button type="button" disabled={busy || working} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden="true" />Volver a comprobar</button>
-      </div>
-      {current?.hasStoredConnection && <div className={styles.disconnect}><label className={styles.disconnectLabel}><input type="checkbox" checked={removeConfirmed} disabled={busy || working || requiresStop || !current.canDisconnect} onChange={event => setRemoveConfirmed(event.target.checked)} />Deseo desconectar {label} de este espacio.</label><button type="button" disabled={busy || working || requiresStop || !current.canDisconnect || !removeConfirmed} onClick={() => void disconnect()}>Desconectar {label}</button></div>}
+      {!connected && !attemptProblem && current && ["failed", "expired", "reconnect_required"].includes(current.state) && <p className={styles.error} role="alert">{current.reason || `Vuelve a conectar ${label} para renovar el acceso.`}</p>}
+      {!connected && attempt?.state === "completed" && <p role="status">El ingreso terminó. Comprueba la conexión para confirmar el acceso.</p>}
+      {!connected && current && !current.available && <p>Esta conexión necesita preparación del estudio. {data?.canAdmin ? <a href={configurationHref}>Preparar {label} en Configuración</a> : "Pide al administrador que la habilite."}</p>}
+      {!connected && current?.available && !gatewayReady && <p>No pudimos comprobar el acceso a esta aplicación. <a href={computerHref}>Revisa tu escritorio</a> y vuelve a comprobar la conexión.</p>}
+      {requiresStop && <p>Detén tu escritorio antes de cambiar las cuentas que usa. <a href={computerHref}>Revisar mi escritorio</a></p>}
+      {!connected && <div className={styles.actions}>
+        {pending || !current ? <button type="button" className={styles.primary} disabled={busy || working} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden="true" />Comprobar conexión</button>
+          : <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { requestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect(); }}>{working ? "Abriendo ingreso…" : `Conectar ${label}`}<ArrowUpRight size={16} aria-hidden="true" /></button>}
+      </div>}
+      <details className={styles.management}>
+        <summary>{connected ? "Gestionar conexión" : "Opciones de conexión"}</summary>
+        {current?.lastVerifiedAt && <p>Última comprobación: {new Date(current.lastVerifiedAt).toLocaleString("es-CL")}.</p>}
+        <button type="button" disabled={busy || working} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden="true" />Comprobar conexión</button>
+        {provider === "google" && <p>Para vincular carpetas de Drive a tus causas, abre <a href="/sincronizacion">Archivos conectados</a>.</p>}
+        {current?.hasStoredConnection && <div className={styles.disconnect}><label className={styles.disconnectLabel}><input type="checkbox" checked={removeConfirmed} disabled={busy || working || requiresStop || !current.canDisconnect} onChange={event => setRemoveConfirmed(event.target.checked)} />Quiero desconectar {label} de este espacio.</label><button type="button" disabled={busy || working || requiresStop || !current.canDisconnect || !removeConfirmed} onClick={() => void disconnect()}>Desconectar {label}</button></div>}
+        {data?.canAdmin && <p><a href={configurationHref}>Preparación del estudio en Configuración</a></p>}
+      </details>
     </>}
-    {(!workspaceId || data?.canAdmin) && <AdminConnectorSetup provider={provider} verifyPermission={!workspaceId} busy={busy || working} onBusyChange={onBusyChange} onPrepared={refresh} />}
   </section>;
 }

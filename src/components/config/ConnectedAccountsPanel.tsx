@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ArrowUpRight, Cloud, Files, GitFork } from "lucide-react";
+import { EasyConnectorAdministration } from "@/components/altazor/EasyConnectorOAuth";
 import styles from "./WorkspaceArea.module.css";
 
-export function ConnectedAccountsPanel({ locale }: { locale: "es" | "en" }) {
+export function ConnectedAccountsPanel({ locale, canManage = false }: { locale: "es" | "en"; canManage?: boolean }) {
   const tr = (es: string, en: string) => locale === "en" ? en : es;
   const accounts = [
     {
@@ -47,6 +48,7 @@ export function ConnectedAccountsPanel({ locale }: { locale: "es" | "en" }) {
       <Link className="btn btn-ghost mt-3" href="/inicio?altazor=connectors">
         {tr("Todas las conexiones y secretos", "All connections and secrets")}
       </Link>
+      {canManage && <EasyConnectorAdministration />}
     </section>
   );
 }

@@ -15,7 +15,7 @@ async function main() {
   process.env.ALTAZOR_COMPUTER_ENABLED = "1";
   const stamp = randomUUID(), userIds: string[] = [], caseIds: string[] = [], workspaceIds: string[] = [], oldFetch = globalThis.fetch;
   let puts = 0, providerExchanges = 0, wrongDestination = 0, revoked = false, broadScope = false, pauseExchange: (() => Promise<void>) | undefined;
-  let dropboxReadGate = true, dropboxIdentity = "dbid:fictitious-account", legacyDropboxStarts = 0;
+  let dropboxReadGate = true, dropboxIdentity = "dbid:fictitious-account", legacyDropboxStarts = 0, applicationAccepted = true;
   const dropboxScopes = "account_info.read files.content.read files.metadata.read";
   const gatewayTokens = new Map<string, { kind: string; token: string }>();
   const snapshot = () => ({ connector_catalog: CONNECTOR_CATALOG.map(kind => ({ name: kind.id, fields: kind.fieldNames.map(name => ({ name, label: name, secret: /token|secret/.test(name) })) })), connectors: [...gatewayTokens].map(([name, value]) => ({ name, kind: value.kind, settings: {}, secrets_set: ["token"], token_set: true, needs_sign_in: false, auth: "token" })) });
@@ -39,6 +39,11 @@ async function main() {
   const providerFetch = (async (raw, init) => {
     const url = new URL(String(raw));
     assert.equal(url.searchParams.has("access_token"), false); assert.equal(url.username, ""); assert.equal(init?.redirect, "error");
+    if (url.href === "https://api.github.com/applications/fictitious-github-client/token") {
+      assert.equal(init?.method, "POST");
+      assert.deepEqual(JSON.parse(String(init?.body)), { access_token: "0000000000000000000000000000000000000000" });
+      return Response.json({}, { status: applicationAccepted ? 404 : 401 });
+    }
     if (["https://oauth2.googleapis.com/token", "https://github.com/login/oauth/access_token", "https://api.dropboxapi.com/oauth2/token"].includes(url.href)) {
       providerExchanges++; assert.equal(init?.method, "POST");
       const body = new URLSearchParams(String(init?.body)); assert.equal(body.get("grant_type"), "authorization_code"); assert.ok(body.get("code_verifier")); assert.match(body.get("redirect_uri")!, /^http:\/\/127.0.0.1:3349\/api\/altazor\/connectors\/oauth\/callback$/);
@@ -75,7 +80,12 @@ async function main() {
     assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[0].state, "blocked");
     await assert.rejects(start("google", "blocked"), denied(503));
     await assert.rejects(saveEasyOAuthSetup(actor, { provider: "google", clientId: "fictitious-client", clientSecret: "fictitious-secret", confirmed: true }, origin), denied(403));
-    for (const provider of EASY_OAUTH_PROVIDERS) await saveEasyOAuthSetup(administrator, { provider, clientId: `fictitious-${provider}-client`, clientSecret: `fictitious-${provider}-operator-secret`, confirmed: true }, origin);
+    for (const provider of EASY_OAUTH_PROVIDERS) await saveEasyOAuthSetup(administrator, { provider, clientId: `fictitious-${provider}-client`, clientSecret: `fictitious-${provider}-operator-secret`, confirmed: true }, origin, { fetcher: providerFetch });
+    const beforeRejectedSetup = await prisma.integrationConfig.findUniqueOrThrow({ where: { provider: "altazor-oauth-github" } });
+    applicationAccepted = false;
+    await assert.rejects(saveEasyOAuthSetup(administrator, { provider: "github", clientId: "fictitious-github-client", clientSecret: "fictitious-wrong-secret", confirmed: true }, origin, { fetcher: providerFetch }), error => (error as { code?: string }).code === "oauth_client_credentials");
+    assert.equal((await prisma.integrationConfig.findUniqueOrThrow({ where: { provider: "altazor-oauth-github" } })).configJson, beforeRejectedSetup.configJson, "Rejected application credentials must never replace saved setup");
+    applicationAccepted = true;
     const persistedSetup = await prisma.integrationConfig.findMany({ where: { provider: { startsWith: "altazor-oauth-" } } });
     assert.equal(JSON.stringify(persistedSetup).includes("fictitious-google-operator-secret"), false);
     assert.equal(JSON.stringify(await easyOAuthSetupStatus()).includes("fictitious-google-client"), false);

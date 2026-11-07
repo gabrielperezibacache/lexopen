@@ -164,7 +164,7 @@ export default async function ConfiguracionPage() {
     </section>,
     "cuenta-personal": <PersonalSettingsIndex locale={locale} />,
     "preferencias-altazor": visibility.assistant ? <AltazorPreferencesPanel locale={locale} /> : undefined,
-    "cuentas-conectadas": visibility.assistant ? <ConnectedAccountsPanel locale={locale} /> : undefined,
+    "cuentas-conectadas": visibility.assistant ? <ConnectedAccountsPanel locale={locale} canManage={canManage} /> : undefined,
     comunicaciones: visibility.communications ? <section id="comunicaciones" className="panel space-y-3 p-5">
       <h3 className="text-lg font-semibold">{tr("Correo y mensajes", "Mail and messages")}</h3>
       <p className="max-w-prose text-sm text-[var(--ink-soft)]">{tr("Conecta tu buzón para revisar avisos judiciales y vincularlos a tus causas.", "Connect your mailbox to review court notices and link them to your matters.")}</p>

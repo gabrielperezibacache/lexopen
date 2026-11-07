@@ -256,6 +256,8 @@ jobs:
             --to-schema-datamodel prisma/schema.prisma \
             --exit-code
       - run: npm test
+      - name: Check connection setup and OAuth errors
+        run: node --import tsx --test src/lib/altazor/connectors/github-application-check.test.ts src/lib/altazor/connectors/oauth-token-response.test.ts
       - run: npm run test:integration
       - run: npm run lint
       - run: npm run build
