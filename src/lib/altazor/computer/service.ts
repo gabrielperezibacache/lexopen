@@ -461,10 +461,11 @@ export async function decideComputerApproval(user: CausaAccessUser, id: string, 
     const names = sessionConnectors(session);
     if (names[0] === "-") throw new ConnectorError("connector_selection", "Esta sesión no tiene aplicaciones autorizadas.", 409);
     if (approve && session.held && Date.now() - session.updatedAt.getTime() < 5 * 60_000) throw new ConnectorError("manual_control", "Devuelva el control al asistente antes de autorizar una operación.", 409);
-    const result = await client.decideApproval(approvalId, session.kittyId!, session.chatId!, names, approve);
+    const { resumeTask, ...result } = await client.decideApproval(approvalId, session.kittyId!, session.chatId!, names, approve);
     if (!result.canContinue) return result;
+    if (!resumeTask) return { ...result, continued: false, continuationPending: true };
     const unresolved = await tx.altazorComputerAction.count({ where: { sessionId: id, id: { not: actionId }, kind: { in: ["message", "connector_approval"] }, status: { in: ["sending", "unknown"] } } });
     if (unresolved) return { ...result, continued: false, continuationPending: true };
-    return { ...result, ...await continueApprovedRead(client, { chatId: session.chatId!, kittyId: session.kittyId!, actionId, expiresAt: session.expiresAt }, async () => { assertSessionLive(session); await workspaceFor(session.workspaceId, user, tx); await policyAllowsAction(tx); }) };
+    return { ...result, ...await continueApprovedRead(client, { chatId: session.chatId!, kittyId: session.kittyId!, actionId, expiresAt: session.expiresAt, task: resumeTask }, async () => { assertSessionLive(session); await workspaceFor(session.workspaceId, user, tx); await policyAllowsAction(tx); }) };
   });
 }

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { continueApprovedRead } from "./approval-continuation";
 import type { KittiesGateway } from "./gateway";
 
-const target = { chatId: "owned-chat", kittyId: "owned-kitty", actionId: "persisted-action", expiresAt: new Date(Date.now() + 60_000) };
+const target = { chatId: "owned-chat", kittyId: "owned-kitty", actionId: "persisted-action", expiresAt: new Date(Date.now() + 600_000), task: "Descarga desde GitHub el README.md de person/project y verifica su primera línea." };
 const authorized = async () => {};
 function fixture(states: boolean[], failSend = false, failRead = false) {
   const sent: unknown[][] = [], reads: string[][] = [];
@@ -16,7 +16,9 @@ function fixture(states: boolean[], failSend = false, failRead = false) {
 test("an approved read continues once on the same chat with a stable durable request id", async () => {
   const f = fixture([true, false]); let waits = 0;
   assert.deepEqual(await continueApprovedRead(f.client, target, authorized, async () => { waits++; }), { continued: true });
-  assert.deepEqual(f.sent, [["owned-chat", "continua", [], "approval_persisted-action"]]);
+  assert.equal(f.sent.length, 1);
+  assert.equal(f.sent[0][0], "owned-chat"); assert.deepEqual(f.sent[0][2], []); assert.equal(f.sent[0][3], "approval_persisted-action");
+  assert.ok(String(f.sent[0][1]).endsWith(target.task)); assert.match(String(f.sent[0][1]), /No repitas una operación ya completada/);
   assert.deepEqual(f.reads, [["owned-chat", "owned-kitty"], ["owned-chat", "owned-kitty"]]); assert.equal(waits, 1);
 });
 test("busy or unreadable work never creates a parallel continuation", async () => {
@@ -40,4 +42,7 @@ test("expiry and current authorization are checked before sending the continuati
   const revoked = fixture([false]);
   await assert.rejects(continueApprovedRead(revoked.client, target, async () => { throw Error("revoked"); }), /revoked/);
   assert.equal(revoked.sent.length, 0);
+  const oversized = fixture([false]);
+  await continueApprovedRead(oversized.client, { ...target, task: "x".repeat(15001) }, authorized);
+  assert.equal(oversized.sent.length, 0);
 });

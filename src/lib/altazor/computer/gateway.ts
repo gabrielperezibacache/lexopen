@@ -6,6 +6,7 @@ import { CONNECTOR_GATE, connectorKind } from "../connectors/catalog";
 import { assertGatewayOAuthAllowed, connectorConfigBody, connectorNameSchema, normalizeConnectorNames, projectConnectorSettings, validateConnectorConfiguration } from "../connectors/policy";
 import type { ConnectorApproval, ConnectorConfiguration } from "../connectors/types";
 import { assertEasyConnectorRead } from "../connectors/desktop-read-policy";
+import { originalTaskForApproval } from "./approval-task";
 
 type Fetcher = typeof fetch;
 export type KittyRecord = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
@@ -121,11 +122,16 @@ export class KittiesGateway {
     if (approve && selected.kind === "dropbox" && !(connectorKind("dropbox")?.actions as readonly string[]).includes(selected.action)) throw new ConnectorError("connector_action_unavailable", "Dropbox sólo permite listar, buscar y leer archivos.", 409);
     if (approve && !selected.reviewable) throw new ConnectorError("connector_approval_incomplete", "El detalle contiene datos ocultos o excede el límite de revisión. Rechácelo y revise la operación directamente en la aplicación.", 409);
     const easyRead = selected.kind === "github" && /^altazor-github-[a-f0-9]{16}$/.test(selected.connector) || selected.kind === "google-workspace" && /^altazor-google-[a-f0-9]{16}$/.test(selected.connector);
-    if (approve && easyRead) await this.requireAsyncMessages();
+    let resumeTask: string | null = null;
+    if (approve && easyRead) {
+      await this.requireAsyncMessages();
+      const current = await this.json(`/v1/chats/${safeId(chatId)}`);
+      resumeTask = originalTaskForApproval(this.validateChat(current.chat, kittyId, true, chatId).turns, id, kittyId);
+    }
     const result = await this.json(`/v1/approvals/${safeId(id)}/${approve ? "approve" : "reject"}`, "POST", approve ? { always: false } : { reason: "La persona rechazó esta operación en LexOpen.", always: false });
     const approval = result.approval as Record<string, unknown> | undefined;
     if (!approval || approval.id !== id || approval.kitty !== kittyId || approval.chat !== chatId || approval.status !== (approve ? "approved" : "rejected") || approval.always === true) throw new ConnectorError("connector_approval_unknown", "El gateway no confirmó la decisión. No se repetirá automáticamente.", 502);
-    return { id, status: String(approval.status), failed: Boolean(approval.error), canContinue: approve && easyRead && !approval.error };
+    return { id, status: String(approval.status), failed: Boolean(approval.error), canContinue: approve && easyRead && !approval.error, resumeTask };
   }
   async createChat(kitty: KittyRecord) {
     const result = await this.json("/v1/chats", "POST", { title: "ALTAZOR AI · espacio privado", members: [kitty.name] });
