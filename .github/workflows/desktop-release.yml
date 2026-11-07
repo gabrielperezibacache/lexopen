@@ -90,6 +90,24 @@ jobs:
         env:
           TARGET_PLATFORM: ${{ matrix.platform }}
           TARGET_ARCH: ${{ matrix.arch }}
+      - name: Prepare optional public account connection profile
+        shell: bash
+        env:
+          LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON: ${{ secrets.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs"), path = require("node:path");
+          const { parseDistributedOAuthProfile } = require("./desktop/oauth-clients.cjs");
+          const raw = process.env.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON;
+          if (!raw) process.exit(0);
+          const profile = parseDistributedOAuthProfile(raw);
+          if (!process.env.RUNNER_TEMP || !process.env.GITHUB_ENV) throw new Error("Missing release runner configuration");
+          const file = path.join(process.env.RUNNER_TEMP, "lexopen-oauth-clients.json");
+          if (/[\r\n]/.test(file)) throw new Error("Invalid release runner directory");
+          fs.writeFileSync(file, JSON.stringify(profile), { flag: "wx", mode: 0o600 });
+          fs.chmodSync(file, 0o600);
+          fs.appendFileSync(process.env.GITHUB_ENV, "LEXOPEN_DISTRIBUTED_OAUTH_PROFILE=" + file + "\n");
+          NODE
       - run: npm ci --prefix desktop
       - name: Diagnose native Windows PostgreSQL using owned fictitious clusters
         if: runner.os == 'Windows'

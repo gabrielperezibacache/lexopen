@@ -19,13 +19,15 @@ La revisión `1.1.0-preview.5` incorpora [Drive personal y sincronización de ca
 
 El gateway reforzado exige confirmación incluso para lecturas. El modelo no puede modificar esas reglas. Los permisos concedidos mediante OAuth pueden ser más amplios que una tarea; la revisión por operación limita el uso desde LexOpen, pero no reduce los permisos de la cuenta en el proveedor. Una respuesta incierta se conserva y no se reenvía automáticamente.
 
-El administrador prepara una vez la aplicación OAuth del servicio y el escritorio dedicado. Si falta esa preparación, el profesional ve un estado pendiente de activación; no debe crear claves para realizar su trabajo. Otros adaptadores pueden requerir configuración particular. Sus campos técnicos y la alternativa de tokens se encuentran en **Opciones avanzadas**.
+Google y GitHub muestran únicamente el ingreso a la cuenta y su estado. El profesional no necesita crear claves, registrar aplicaciones ni abrir consolas. La preparación técnica de una instalación propia corresponde al administrador, en **Configuración**; otros adaptadores pueden requerir datos particulares.
+
+Los instaladores admiten una identidad pública de LexOpen preparada por quien los distribuye. Google se abre en el navegador del usuario y LexOpen recoge el resultado en su ventana original. GitHub puede pedir un código breve en su página oficial. Después se comprueba y conserva la conexión. La [preparación del perfil de distribución](ALTAZOR-PERFIL-PUBLICO-DE-CONEXIONES.md) es una tarea única del publicador, con requisitos de los proveedores; este soporte no acredita que los instaladores publicados ya incluyan esa identidad.
 
 La conexión personal de Google de Altazor es distinta de **Google del estudio**: no reutiliza esa cuenta global ni sus autorizaciones de correo y calendario. El acceso básico consulta metadatos de Drive; trabajar con documentos requiere autorizar su contenido de lectura. GitHub permite consultar el perfil y repositorios públicos. Estas conexiones no habilitan repositorios privados, Gmail, Calendar ni escrituras.
 
 ### Inicio de sesión sencillo
 
-La preparación corresponde al administrador, una vez por instalación. En la ficha del servicio, abra la guía de preparación, copie la dirección de retorno y regístrela en la consola oficial. Guarde el identificador y secreto de la aplicación en los campos reservados. LexOpen cifra estos datos. Los profesionales pasan directamente al ingreso oficial una vez preparada la aplicación y habilitado el escritorio. También se admiten las siguientes variables del servidor, que tienen prioridad.
+Una instalación que utilice un registro propio conserva la preparación administrativa, una vez por Host. En Configuración, abra la guía de preparación del servicio, copie la dirección de retorno y regístrela en la consola oficial. Guarde el identificador y secreto de la aplicación en los campos reservados. LexOpen cifra estos datos. Cada profesional pasa directamente al ingreso oficial una vez preparada la aplicación y habilitado su escritorio. También se admiten las siguientes variables del servidor, que tienen prioridad.
 
 | Servicio | Configuración del servidor |
 | --- | --- |
@@ -47,9 +49,9 @@ Para habilitar **Dropbox**, prepare una aplicación en la consola oficial con pe
 
 Registrar una aplicación no conecta las cuentas del estudio ni de sus profesionales. Cada persona debe conceder su propia autorización. Si el Host no tiene la aplicación preparada, el botón informa del requisito administrativo; no simula un ingreso exitoso.
 
-### Opciones avanzadas: prueba con tokens
+### Pruebas técnicas anteriores con tokens
 
-La alternativa de tokens es opcional para operadores y pruebas técnicas. El recorrido habitual del profesional es **Conectar → ingreso oficial → volver a LexOpen**. Iniciar sesión en una pestaña por separado no configura automáticamente la conexión API.
+Las siguientes modalidades documentan pruebas técnicas anteriores. Los formularios de tokens de Google y GitHub se retiraron del catálogo habitual. El recorrido del profesional es **Conectar → ingreso oficial → volver a LexOpen**. Iniciar sesión en una pestaña por separado no configura automáticamente la conexión API.
 
 - **Google Workspace:** en [OAuth Playground de Google](https://developers.google.com/oauthplayground/), use acceso **Online** y el único alcance `https://www.googleapis.com/auth/drive.metadata.readonly`. Inicie sesión personalmente, intercambie el código y pegue sólo el access token en el campo reservado. Esta modalidad temporal bloquea escrituras y comprueba `Drive about` con `fields=user(permissionId)`; no comprueba Gmail ni acceso al contenido de documentos. Caduca según Google y no se renueva automáticamente. Requiere reconstruir el gateway con el refuerzo que añade el campo `token`.
 - **GitHub:** cree un [token fine-grained](https://github.com/settings/personal-access-tokens/new) de un día, con acceso sólo al repositorio elegido y `Contents: Read-only`; `Metadata` se incluye. La comprobación consulta `/user`. Leer un README requiere además el permiso de contenido del repositorio.

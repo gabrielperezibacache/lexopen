@@ -7,7 +7,7 @@ import { digest, seal, unseal } from "@/lib/personal-connectors/core";
 import { configureComputer } from "../computer/service";
 import { beginConnectorOAuth, configureConnector, removeConnector } from "./service";
 import { CONNECTOR_CATALOG } from "./catalog";
-import { easyConnectionName, easyOAuthReturnContext, failEasyOAuthReturn, easyOAuthSetupStatus, easyOAuthStatus, receiveEasyOAuth, saveEasyOAuthSetup, startEasyOAuth, EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth";
+import { easyConnectionName, easyOAuthReturnContext, failEasyOAuthReturn, easyOAuthSetupStatus, easyOAuthStatus, receiveEasyOAuth, captureInstalledOAuthReturn, continueEasyOAuth, pollEasyOAuthDevice, saveEasyOAuthSetup, startEasyOAuth, EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth";
 
 const denied = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
 async function main() {
@@ -19,6 +19,7 @@ async function main() {
   let pauseFirstCheck: (() => Promise<void>) | undefined;
   let puts = 0, providerExchanges = 0, wrongDestination = 0, revoked = false, broadScope = false, pauseExchange: (() => Promise<void>) | undefined;
   let dropboxReadGate = true, dropboxIdentity = "dbid:fictitious-account", legacyDropboxStarts = 0, applicationAccepted = true;
+  let devicePolls = 0, deviceResult = "authorization_pending";
   const dropboxScopes = "account_info.read files.content.read files.metadata.read";
   const gatewayTokens = new Map<string, { kind: string; token: string; persistent?: boolean }>();
   const snapshot = () => ({ connector_catalog: CONNECTOR_CATALOG.map(kind => ({ name: kind.id, fields: kind.fieldNames.map(name => ({ name, label: name, secret: /token|secret/.test(name) })) })), connectors: [...gatewayTokens].map(([name, value]) => ({ name, kind: value.kind, settings: {}, secrets_set: ["token"], token_set: true, needs_sign_in: false, auth: "token" })) });
@@ -54,6 +55,15 @@ async function main() {
   const providerFetch = (async (raw, init) => {
     const url = new URL(String(raw));
     assert.equal(url.searchParams.has("access_token"), false); assert.equal(url.username, ""); assert.equal(init?.redirect, "error");
+    if (url.href === "https://github.com/login/device/code") {
+      assert.deepEqual([...new URLSearchParams(String(init?.body))], [["client_id", "fictitious-public-github"], ["scope", "read:user"]]);
+      return Response.json({ device_code: "a".repeat(40), user_code: "ABCD-1234", verification_uri: "https://github.com/login/device", expires_in: 900, interval: 5 });
+    }
+    if (url.href === "https://github.com/login/oauth/access_token" && new URLSearchParams(String(init?.body)).get("grant_type") === "urn:ietf:params:oauth:grant-type:device_code") {
+      devicePolls++;
+      const body = new URLSearchParams(String(init?.body)); assert.equal(body.get("client_secret"), null); assert.equal(body.get("client_id"), "fictitious-public-github"); assert.equal(body.get("device_code"), "a".repeat(40));
+      return Response.json(deviceResult === "authorized" ? { access_token: "fictitious-github-consented-access", token_type: "bearer", scope: broadScope ? "repo" : "read:user" } : { error: deviceResult });
+    }
     if (url.href === "https://api.github.com/applications/fictitious-github-client/token") {
       assert.equal(init?.method, "POST");
       assert.deepEqual(JSON.parse(String(init?.body)), { access_token: "0000000000000000000000000000000000000000" });
@@ -95,7 +105,58 @@ async function main() {
     assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[0].state, "blocked");
     await assert.rejects(start("google", "blocked"), denied(503));
     await assert.rejects(saveEasyOAuthSetup(actor, { provider: "google", clientId: "fictitious-client", clientSecret: "fictitious-secret", confirmed: true }, origin), denied(403));
+    const publicOptions = { fetcher: providerFetch, env: { APP_URL: origin, LEXOPEN_DESKTOP: "1", ALTAZOR_DISTRIBUTED_OAUTH: JSON.stringify({ schemaVersion: 1, google: { type: "installed", client_id: "1234567890-fictitiouspublicdesktop.apps.googleusercontent.com", client_secret: "fictitious-public-desktop-parameter" }, github: { type: "device", client_id: "fictitious-public-github" } }) } };
+    const shipped = await easyOAuthSetupStatus(publicOptions);
+    assert.equal(shipped.providers[0].configured, true); assert.equal(shipped.providers[0].source, "distributed");
+    assert.equal(shipped.providers[1].configured, true); assert.equal(JSON.stringify(shipped).includes("fictitious-public-desktop-parameter"), false);
+    assert.equal((await easyOAuthSetupStatus({ ...publicOptions, env: { ...publicOptions.env, LEXOPEN_DESKTOP: "0" } })).providers[0].configured, false);
+    assert.equal((await easyOAuthSetupStatus({ ...publicOptions, env: { ...publicOptions.env, APP_URL: "https://elsewhere.invalid" } })).providers[0].configured, false);
+    await prisma.integrationConfig.create({ data: { provider: "altazor-oauth-google", enabled: true, configJson: "{\"credentialsEnc\":\"unreadable-fictitious-operator-registration\"}" } });
+    const brokenOperator = (await easyOAuthSetupStatus(publicOptions)).providers[0];
+    assert.equal(brokenOperator.source, "saved"); assert.equal(brokenOperator.configured, false, "an unreadable operator registration must never switch identities silently");
+    await prisma.integrationConfig.delete({ where: { provider: "altazor-oauth-google" } });
+    const native = await startEasyOAuth(actor, { provider: "google", workspaceId, requestId: `native-${stamp}`, confirmed: true }, origin, publicOptions);
+    assert.equal(native.flow, "external"); const nativeState = new URL(native.authUrl).searchParams.get("state")!; assert.ok(new URL(native.authUrl).searchParams.get("code_challenge"));
+    const beforeCapture = providerExchanges;
+    await assert.rejects(receiveEasyOAuth(actor, { state: nativeState, code: "fictitious-desktop-grant" }, origin, publicOptions), denied(409));
+    assert.equal((await continueEasyOAuth(actor, native.attemptId, origin, publicOptions)).state, "pending");
+    assert.equal(await captureInstalledOAuthReturn({ state: "x".repeat(43), code: "not-a-real-grant" }, origin, publicOptions), false);
+    assert.equal(await captureInstalledOAuthReturn({ state: nativeState, code: "fictitious-desktop-grant" }, origin, publicOptions), true);
+    assert.equal(providerExchanges, beforeCapture, "a browser without the application session may capture a code but never exchange it");
+    const captured = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: native.attemptId } });
+    assert.equal(captured.resultEnc!.includes("fictitious-desktop-grant"), false);
+    assert.equal(JSON.stringify(await easyOAuthStatus(actor, workspaceId, native.attemptId, publicOptions)).includes("fictitious-desktop-grant"), false);
+    await assert.rejects(continueEasyOAuth({ ...actor, sessionHash: digest("other-browser") }, native.attemptId, origin, publicOptions), denied(404));
+    assert.equal((await continueEasyOAuth(actor, native.attemptId, origin, publicOptions)).state, "completed");
+    assert.equal((await easyOAuthStatus(actor, workspaceId, native.attemptId, publicOptions)).providers[0].autoRefresh, true);
+    const device = await startEasyOAuth(actor, { provider: "github", workspaceId, requestId: `device-${stamp}`, confirmed: true }, origin, publicOptions);
+    assert.equal(device.flow, "device"); assert.equal(device.authUrl, "https://github.com/login/device");
+    const deviceRow = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: device.attemptId } });
+    assert.equal(deviceRow.resultEnc!.includes("a".repeat(40)), false);
+    const deviceContext = `altazor:desktop:oauth:${actor.id}:${device.attemptId}`;
+    const deviceBinding = unseal<{ state: string; device: { nextPollAt: number; interval: number } }>(deviceRow.resultEnc!, deviceContext);
+    await assert.rejects(receiveEasyOAuth(actor, { state: deviceBinding.state, code: "not-a-device-completion" }, origin, publicOptions), denied(409));
+    await assert.rejects(pollEasyOAuthDevice({ ...actor, id: other.id }, device.attemptId, origin, publicOptions), denied(404));
+    await assert.rejects(pollEasyOAuthDevice(actor, device.attemptId, "http://127.0.0.1:1", publicOptions), denied(409));
+    await pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions); assert.equal(devicePolls, 0);
+    async function makeDeviceDue() {
+      const row = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: device.attemptId } });
+      const binding = unseal<{ device: { nextPollAt: number } }>(row.resultEnc!, deviceContext); binding.device.nextPollAt = 0;
+      await prisma.personalOAuthAttempt.update({ where: { id: row.id }, data: { resultEnc: seal(binding, deviceContext) } });
+    }
+    await makeDeviceDue();
+    await Promise.all([pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions), pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions)]);
+    assert.equal(devicePolls, 1, "parallel polling may exchange only once");
+    deviceResult = "slow_down"; await makeDeviceDue(); await pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions);
+    const deviceView = await easyOAuthStatus(actor, workspaceId, device.attemptId, publicOptions);
+    assert.equal(deviceView.attempt?.device?.interval, 10); assert.equal(deviceView.attempt?.device?.userCode, "ABCD-1234"); assert.equal(JSON.stringify(deviceView).includes("a".repeat(40)), false);
+    deviceResult = "authorized"; await makeDeviceDue(); const beforeDevice = puts;
+    assert.equal((await pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions)).state, "completed");
+    const deviceSaved = await easyOAuthStatus(actor, workspaceId, device.attemptId, publicOptions);
+    assert.equal(deviceSaved.providers[1].connected, true); assert.equal(deviceSaved.attempt?.device, undefined); assert.equal(puts, beforeDevice + 1);
+    await assert.rejects(pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions), denied(409)); assert.equal(puts, beforeDevice + 1);
     for (const provider of EASY_OAUTH_PROVIDERS) await saveEasyOAuthSetup(administrator, { provider, clientId: `fictitious-${provider}-client`, clientSecret: `fictitious-${provider}-operator-secret`, confirmed: true }, origin, { fetcher: providerFetch });
+    assert.equal((await easyOAuthSetupStatus(publicOptions)).providers[0].source, "saved", "an existing operator identity wins over the installer profile");
     const beforeRejectedSetup = await prisma.integrationConfig.findUniqueOrThrow({ where: { provider: "altazor-oauth-github" } });
     applicationAccepted = false;
     await assert.rejects(saveEasyOAuthSetup(administrator, { provider: "github", clientId: "fictitious-github-client", clientSecret: "fictitious-wrong-secret", confirmed: true }, origin, { fetcher: providerFetch }), error => (error as { code?: string }).code === "oauth_client_credentials");

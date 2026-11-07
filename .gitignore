@@ -53,6 +53,7 @@ yarn-error.log*
 /desktop/node_modules
 /desktop/dist
 /desktop/.release/
+/desktop/resources/oauth-clients.json
 /desktop/data
 /playwright-report/
 /test-results/

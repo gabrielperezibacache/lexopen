@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "google": {
+    "type": "installed",
+    "client_id": "",
+    "client_secret": ""
+  },
+  "github": {
+    "type": "device",
+    "client_id": ""
+  }
+}

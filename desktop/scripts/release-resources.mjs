@@ -2,6 +2,32 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const { applyDistributedOAuthProfile } = require("../oauth-clients.cjs");
+
+const publicOAuthFile = "oauth-clients.json";
+
+/** Release input is explicit; never copy an operator's environment or account. */
+export function stageDistributedOAuthProfile(output, { env = process.env, defaultFile = new URL("../resources/oauth-clients.json", import.meta.url) } = {}) {
+  const specified = env.LEXOPEN_DISTRIBUTED_OAUTH_PROFILE;
+  const source = specified || defaultFile;
+  const temporaryEnv = {};
+  const profile = applyDistributedOAuthProfile(source, temporaryEnv);
+  if (!profile) {
+    if (specified) throw new Error("Falta el perfil público de conexiones indicado para la publicación.");
+    return null;
+  }
+  const destination = path.join(output, publicOAuthFile);
+  fs.writeFileSync(destination, JSON.stringify(profile) + "\n", { mode: 0o644, flag: "wx" });
+  fs.chmodSync(destination, 0o644);
+  return { sha256: sha256(destination), providers: ["google", "github"].filter(provider => profile[provider]) };
+}
+
+function verifyDistributedOAuthProfile(resources) {
+  const file = path.join(resources, publicOAuthFile), profile = applyDistributedOAuthProfile(file, {});
+  return profile ? { sha256: sha256(file), providers: ["google", "github"].filter(provider => profile[provider]) } : null;
+}
 
 export const RELEASE_TARGETS = ["darwin-x64", "darwin-arm64", "win32-x64", "linux-x64"];
 const forbiddenDirectories = new Set([".git", ".tmp", ".codex", ".agents", ".links", ".cache", "storage", "pgdata", "vault", "obsidian-vault", "backups", "private", "secrets", "test-results", "playwright-report"]);
@@ -167,9 +193,11 @@ export function verifyReleaseResources(resources, nodeModules, target) {
   if (!chromium.length) throw new Error("Missing bundled Chromium executable");
   for (const file of chromium) verifyBinary(file, target);
   const native = verifyNativeRuntime(resources, nodeModules, target);
+  const distributedOAuth = verifyDistributedOAuthProfile(resources);
+  if ((distributedOAuth?.sha256 || undefined) !== meta.distributedOAuthSha256) throw new Error("Public OAuth release profile differs from its build metadata");
   const desktopSource = path.join(resources, "altazor-desktop-source");
   const source = fs.existsSync(desktopSource) ? verifyDesktopSourceResource(desktopSource) : null;
-  return { version: meta.version, sourceDirty: meta.sourceDirty, files: files.length, buildId: meta.buildId, sourceRevision: meta.sourceRevision, native, browserExecutables: chromium.length, ...(source ? { altazorDesktopSourceSha256: source.sha256 } : {}) };
+  return { version: meta.version, sourceDirty: meta.sourceDirty, files: files.length, buildId: meta.buildId, sourceRevision: meta.sourceRevision, native, browserExecutables: chromium.length, ...(source ? { altazorDesktopSourceSha256: source.sha256 } : {}), ...(distributedOAuth ? { distributedOAuth } : {}) };
 }
 function regularDirectory(root, label) {
   const stat = fs.lstatSync(root);
@@ -208,8 +236,13 @@ export function copyStagedReleaseResources(stage, resources, sourceNodeModules, 
   const scopes = ["app-standalone", "prisma"];
   if (fs.existsSync(path.join(stage, "altazor-desktop-source"))) scopes.push("altazor-desktop-source");
   const expected = resourceFiles(stage).sort();
-  if (expected.some(file => !scopes.some(scope => file.startsWith(`${scope}/`)))) throw new Error("Unexpected staged resource scope");
+  if (expected.some(file => file !== publicOAuthFile && !scopes.some(scope => file.startsWith(`${scope}/`)))) throw new Error("Unexpected staged resource scope");
   verifyReleaseResources(stage, sourceNodeModules, target);
+  const hasOAuth = expected.includes(publicOAuthFile), destinationOAuth = path.join(resources, publicOAuthFile);
+  let oauthStat;
+  try { oauthStat = fs.lstatSync(destinationOAuth); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+  if (oauthStat && (oauthStat.isSymbolicLink() || !oauthStat.isFile())) throw new Error("Packaged public OAuth profile must be a regular file");
+  if (oauthStat && !hasOAuth) throw new Error("Unexpected packaged public OAuth profile absent from staging");
   for (const scope of scopes) {
     regularDirectory(path.join(stage, scope), "Staged runtime scope");
     const destination = path.join(resources, scope);
@@ -222,7 +255,8 @@ export function copyStagedReleaseResources(stage, resources, sourceNodeModules, 
     fs.rmSync(destination, { recursive: true, force: true });
     copyResourceTree(path.join(stage, scope), destination, { boundary: stage, relative: scope });
   }
-  const actual = scopes.flatMap(scope => resourceFiles(path.join(resources, scope), scope)).sort();
+  if (hasOAuth) copyResourceTree(path.join(stage, publicOAuthFile), destinationOAuth, { boundary: stage, relative: publicOAuthFile });
+  const actual = [...scopes.flatMap(scope => resourceFiles(path.join(resources, scope), scope)), ...(hasOAuth ? [publicOAuthFile] : [])].sort();
   if (actual.length !== expected.length || actual.some((file, i) => file !== expected[i])) throw new Error("Packaged runtime file inventory differs from staging");
   for (const file of expected) {
     const source = path.join(stage, file), destination = path.join(resources, file), sourceStat = fs.statSync(source), destinationStat = fs.statSync(destination);
