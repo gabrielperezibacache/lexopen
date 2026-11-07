@@ -62,7 +62,9 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
           if (controller.signal.aborted) return;
           setWorkspace(work); setSources(work.sources || []); setSourcesChanged(false); const kind = academicJourney(work.kind); setJourney(kind); setMode(work.brief.task);
           const artifact = initialArtifactId ? work.artifacts.find(item => item.id === initialArtifactId) : work.artifacts.find(item => item.available && ["proposed", "reviewed", "prepared"].includes(item.status || ""));
-          const teachingAnchor = isAcademicTeachingKind(work.kind) && ["#agenda-docencia", "#encargos-comite"].includes(window.location.hash);
+          const hash = window.location.hash;
+          const teachingAnchor = isAcademicTeachingKind(work.kind)
+            && (["#agenda-docencia", "#encargos-comite", "#reuniones-comite"].includes(hash) || hash.startsWith("#encargo-"));
           if (artifact?.available && !teachingAnchor) { setSelectedId(artifact.id); setStep(2); }
           else if (initialArtifactId && !artifact?.available) setError("Este resultado o sus fuentes ya no están disponibles. Puedes continuar con el resto del trabajo.");
         }
@@ -186,6 +188,26 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
     setNewTitle(""); setCreating(true); setPane("work"); setNotice(""); setError(""); replaceLink();
   }
   const draftRequest = useRef(createSubmissionKeys());
+  const agreementConversion = useRef(false);
+  async function convertAgreement(meetingId: string, agreementId: string) {
+    if (!workspace || busy || editorDirty || sessionContentDirty || agreementConversion.current) return;
+    agreementConversion.current = true;
+    try {
+      const revision = await saveWorkspace();
+      if (revision === null) return;
+      setBusy(true); setError(""); setNotice("");
+      const result = await api<{ actionId: string; revision: number; reused: boolean }>(`/api/altazor/academic/${workspace.id}/committee-agreements`, {
+        expectedRevision: revision, meetingId, agreementId,
+      });
+      await load(workspace.id);
+      if (!mounted.current || currentWorkspace.current !== workspace.id) return;
+      setNotice(result.reused ? "Este acuerdo ya tiene un encargo. Puedes continuar con su seguimiento." : "Encargo creado. Completa su responsable y su fecha cuando corresponda.");
+      window.history.replaceState(null, "", `${academicHref(workspace.id)}#encargo-${result.actionId}`);
+      window.dispatchEvent(new Event("hashchange"));
+    } catch (reason) {
+      setError(message(reason, "No se pudo crear el encargo del acuerdo. Vuelve a intentarlo."));
+    } finally { agreementConversion.current = false; setBusy(false); }
+  }
   async function createDraft(next: AcademicManuscriptTemplate) {
     if (!workspace || busy || editorDirty || sessionContentDirty || !workspace.title.trim()) return;
     const revision = await saveWorkspace();
@@ -364,6 +386,7 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
               {programKind && <AcademicTeachingProgram key={`program-${workspace.id}`} kind={programKind}
                 workspaceId={workspace.id} sessionsVersion={teachingSessionsVersion} selection={workspace.brief.programSessionIds ?? []}
                 congress={workspace.brief.congress} onCongressChange={congress => updateWorkspace({ brief: { ...workspace.brief, congress } })}
+                onConvertAgreement={convertAgreement}
                 title={workspace.title} busy={busy} sessionContentDirty={sessionContentDirty}
                 onChange={programSessionIds => updateWorkspace({ brief: { ...workspace.brief, programSessionIds } })}
                 onCreate={() => void createDraft(programKind)} onHandout={() => void createDraft("participant_handout")} />}

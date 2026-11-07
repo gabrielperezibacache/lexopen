@@ -7,7 +7,7 @@
 .count { margin-inline-start:auto; }
 .body { display:grid; gap:.8rem; min-width:0; padding-block:.5rem 1rem; }
 .helper { margin:0; max-width:65ch; }
-.action { min-width:0; border-block:1px solid var(--line); }
+.action { min-width:0; border-block:1px solid var(--line); scroll-margin-block-start:calc(var(--shell-header-offset, 4rem) + .75rem); }
 .actionHeading { display:grid; gap:.25rem; min-width:0; overflow-wrap:anywhere; }
 .actionHeading > strong { color:var(--ink); font-size:var(--text-sm); }
 .editor { display:grid; gap:.85rem; min-width:0; padding:.5rem .75rem 1rem; }
@@ -18,6 +18,10 @@
 .notes { min-width:0; border-block:1px solid var(--line); }
 .notes > summary { font-size:var(--text-sm); }
 .notes label { padding-block:.35rem 1rem; }
+.origin { display:grid; gap:.6rem; padding-block:.5rem 1rem; color:var(--ink-soft); font-size:var(--text-sm); overflow-wrap:anywhere; }
+.origin p { margin:0; }
+.origin a { color:var(--sea); text-decoration:underline; text-underline-offset:.18em; }
+.agreement { white-space:pre-wrap; }
 .body > button,.editor > button { justify-self:start; }
 @media (max-width:600px) {
   .fields { grid-template-columns:minmax(0,1fr); }

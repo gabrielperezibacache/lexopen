@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
+import type { z } from "zod";
 import { prisma } from "@/lib/db";
 import { actorFor } from "@/lib/books/access";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
@@ -12,7 +13,7 @@ import { writeAuditStrict } from "@/lib/audit";
 import { createCaseWritingFromSnapshots } from "@/lib/writings/service";
 import { captureWritingSource } from "@/lib/writings/sources";
 import { resolveAltazorSources, verifyAltazorSources, type AltazorSourceSnapshot } from "./resources";
-import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, academicDraftCreateSchema, ACADEMIC_LABELS, ACADEMIC_MANUSCRIPT_MAX, ACADEMIC_WORKSPACE_LIMIT, emptyAcademicBrief, emptyAcademicMatrix } from "./academic-schemas";
+import { academicProfileSaveSchema, academicWorkspaceCreateSchema, academicWorkspaceSaveSchema, academicPrepareSchema, academicArtifactSaveSchema, academicArtifactRestoreSchema, academicDraftCreateSchema, academicCongressSchema, committeeAgreementConversionSchema, ACADEMIC_CONGRESS_LIMITS, ACADEMIC_LABELS, ACADEMIC_MANUSCRIPT_MAX, ACADEMIC_WORKSPACE_LIMIT, emptyAcademicBrief, emptyAcademicCongress, emptyAcademicMatrix } from "./academic-schemas";
 import { parseAcademicOutput, academicReferenceAppendix, academicWritingBody } from "./academic-output";
 import { academicManuscriptBody, ACADEMIC_MANUSCRIPT_TEMPLATES, isAcademicTeachingKind, isAcademicTeachingProgram, isAcademicTeachingSessionKind, type AcademicManuscriptTemplate } from "./academic-templates";
 import type { AcademicCallOrigin } from "./academic-calls";
@@ -98,12 +99,19 @@ export async function saveAcademicWorkspace(id: string, raw: unknown, user: Caus
     const actor = await actorFor(user, tx), current = await tx.altazorAcademicWorkspace.findFirst({ where: { id, ownerId: actor.id, revision: input.expectedRevision, archivedAt: null } });
     if (!current) throw httpError("El trabajo cambió. Recargue antes de guardar", 409);
     const congress = input.brief.congress;
-    if (congress && (congress.axes.length || congress.tables.length || congress.actions?.length)) {
-      if (current.kind !== "congress") throw httpError("Los ejes, las mesas y los encargos se organizan dentro de un congreso.", 400);
+    if (congress && (congress.axes.length || congress.tables.length || congress.actions?.length || congress.meetings?.length)) {
+      if (current.kind !== "congress") throw httpError("Los ejes, las mesas, los encargos y las reuniones se organizan dentro de un congreso.", 400);
       for (const action of congress.actions ?? []) if (action.dueAtLocal) teachingTime(action.dueAtLocal);
       const sessionIds = congress.tables.flatMap(table => table.sessionIds);
       const available = sessionIds.length ? await tx.altazorTeachingSession.count({ where: { workspaceId: id, id: { in: sessionIds } } }) : 0;
       if (available !== sessionIds.length) throw httpError("Alguna sesión vinculada a las mesas ya no está disponible. Revisa Ejes y mesas y quita las sesiones retiradas antes de guardar.", 409);
+    }
+    const storedBrief = JSON.parse(current.briefJson) as typeof emptyAcademicBrief;
+    const storedOrigins = new Map((storedBrief.congress?.actions ?? []).map(action => [action.id, action.agreementOrigin]));
+    for (const action of congress?.actions ?? []) {
+      if (JSON.stringify(action.agreementOrigin) !== JSON.stringify(storedOrigins.get(action.id))) {
+        throw httpError("El origen de un encargo se conserva al crearlo desde un acuerdo. Recarga el trabajo antes de guardar.", 409);
+      }
     }
     type StoredRow = (typeof input.matrix.rows)[number] & { proofs: AltazorSourceSnapshot[] };
     const previous = JSON.parse(current.matrixJson) as { dimensions?: typeof input.matrix.dimensions; rows?: StoredRow[] };
@@ -135,6 +143,67 @@ export async function saveAcademicWorkspace(id: string, raw: unknown, user: Caus
     const changed = await tx.altazorAcademicWorkspace.updateMany({ where: { id, ownerId: actor.id, revision: input.expectedRevision, archivedAt: null }, data: { title: input.title, briefJson: JSON.stringify(input.brief), matrixJson: JSON.stringify({ dimensions: input.matrix.dimensions, rows }), ...(selection ? { sourcesJson: JSON.stringify(selection.refs) } : {}), revision: { increment: 1 } } });
     if (!changed.count) throw httpError("El trabajo cambió. Recargue antes de guardar", 409);
     return { revision: input.expectedRevision + 1 };
+  });
+}
+export async function createCommitteeActionFromAgreement(id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {
+  const input = committeeAgreementConversionSchema.parse(raw);
+  return bookTransaction(client, async tx => {
+    const { actor, workspace } = await workspaceFor(id, user, tx);
+    if (workspace.kind !== "congress") throw httpError("Los acuerdos del comité se gestionan dentro de un congreso.", 400);
+    const brief = JSON.parse(workspace.briefJson) as typeof emptyAcademicBrief;
+    const congress = academicCongressSchema.parse(brief.congress ?? emptyAcademicCongress);
+    const existing = congress.actions?.find(action => action.agreementOrigin?.meetingId === input.meetingId
+      && action.agreementOrigin.agreementId === input.agreementId);
+    if (existing) return { actionId: existing.id, revision: workspace.revision, reused: true };
+    if (workspace.revision !== input.expectedRevision) throw httpError("El trabajo cambió. Recárgalo antes de crear el encargo.", 409);
+    const meeting = congress.meetings?.find(item => item.id === input.meetingId);
+    const agreement = meeting?.agreements.find(item => item.id === input.agreementId);
+    if (!meeting || !agreement) throw httpError("La reunión o el acuerdo ya no están disponibles. Revisa las reuniones del comité.", 404);
+    const actions = congress.actions ?? [];
+    if (actions.length >= ACADEMIC_CONGRESS_LIMITS.actions) throw httpError("El congreso alcanzó cien encargos. Retira uno para crear otro desde el acuerdo.", 413);
+    const title = agreement.text.replace(/[\s\p{Cc}]+/gu, " ").trim().slice(0, ACADEMIC_CONGRESS_LIMITS.titleLength);
+    if (!title) throw httpError("Escribe el acuerdo con texto legible antes de crear el encargo.", 400);
+    const actionId = randomUUID();
+    const action = {
+      id: actionId,
+      title,
+      responsible: "",
+      status: "pending" as const,
+      notes: agreement.text,
+      agreementOrigin: {
+        meetingId: meeting.id,
+        agreementId: agreement.id,
+        meetingTitle: meeting.title,
+        meetingDate: meeting.date,
+        agreementText: agreement.text,
+      },
+    };
+    const nextCongress = academicCongressSchema.parse({ ...congress, actions: [...actions, action] });
+    const nextBrief = { ...brief, congress: nextCongress };
+    const storedMatrix = JSON.parse(workspace.matrixJson) as Partial<z.infer<typeof academicWorkspaceSaveSchema>["matrix"]>;
+    const futureSave = {
+      expectedRevision: input.expectedRevision + 1,
+      title: workspace.title,
+      brief: nextBrief,
+      matrix: {
+        dimensions: storedMatrix.dimensions ?? emptyAcademicMatrix.dimensions,
+        rows: (storedMatrix.rows ?? []).map(({ id, title, included, cells }) => ({ id, title, included, cells })),
+      },
+    };
+    // Keep room below the form's JSON limit for subsequent edits.
+    if (Buffer.byteLength(JSON.stringify(futureSave), "utf8") > 256 * 1024 - 2048) {
+      throw httpError("Reduce las notas o los acuerdos del trabajo antes de crear otro encargo.", 413);
+    }
+    const changed = await tx.altazorAcademicWorkspace.updateMany({
+      where: { id, ownerId: actor.id, revision: input.expectedRevision, archivedAt: null },
+      data: { briefJson: JSON.stringify(nextBrief), revision: { increment: 1 } },
+    });
+    if (!changed.count) throw httpError("El trabajo cambió. Recárgalo antes de crear el encargo.", 409);
+    await writeAuditStrict({
+      actorId: actor.id, action: "altazor.academic.agreement.action-create", entityType: "AltazorAcademicWorkspace", entityId: id,
+      after: { meetingId: meeting.id, agreementId: agreement.id, actionId },
+    }, tx);
+    return { actionId, revision: input.expectedRevision + 1, reused: false };
   });
 }
 export async function prepareAcademicArtifact(id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma) {

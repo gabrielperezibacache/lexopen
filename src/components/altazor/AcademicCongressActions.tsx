@@ -23,9 +23,16 @@ export function AcademicCongressActions({ value, disabled, onChange }: {
 
   useEffect(() => {
     function reveal() {
-      if (window.location.hash !== "#encargos-comite") return;
+      const hash = window.location.hash;
+      if (hash !== "#encargos-comite" && !hash.startsWith("#encargo-")) return;
       if (disclosure.current) disclosure.current.open = true;
-      requestAnimationFrame(() => section.current?.scrollIntoView({ block: "start" }));
+      requestAnimationFrame(() => {
+        const target = hash === "#encargos-comite" ? section.current : document.getElementById(hash.slice(1));
+        if (!target || !section.current?.contains(target)) return;
+        const editor = target.querySelector("details");
+        if (editor) editor.open = true;
+        target.scrollIntoView({ block: "start" });
+      });
     }
     reveal();
     window.addEventListener("hashchange", reveal);
@@ -71,7 +78,7 @@ export function AcademicCongressActions({ value, disabled, onChange }: {
         {actions.length === 0 && <p className={styles.helper}>Añade un encargo del congreso o vincúlalo a una de sus mesas.</p>}
         {actions.map((action, index) => {
           const number = index + 1;
-          return <section key={action.id} className={styles.action} role="group" aria-label={`Encargo ${number}`}>
+          return <section key={action.id} id={`encargo-${action.id}`} className={styles.action} role="group" aria-label={`Encargo ${number}`}>
             <details>
               <summary>
                 <span className={styles.actionHeading}>
@@ -114,10 +121,20 @@ export function AcademicCongressActions({ value, disabled, onChange }: {
                 <details className={styles.notes}>
                   <summary>Indicaciones</summary>
                   <label>Indicaciones del encargo {number}
-                    <textarea rows={4} value={action.notes} maxLength={ACADEMIC_CONGRESS_LIMITS.actionNotesLength} disabled={disabled}
+                    <textarea aria-label={`Indicaciones del encargo ${number}`} rows={4} value={action.notes} maxLength={ACADEMIC_CONGRESS_LIMITS.actionNotesLength} disabled={disabled}
                       placeholder="Qué hay que hacer y qué debe tenerse en consideración." onChange={event => update(action.id, { notes: event.target.value })} />
                   </label>
                 </details>
+                {action.agreementOrigin && <details className={styles.notes}>
+                  <summary>Origen del encargo</summary>
+                  <div className={styles.origin}>
+                    <p><strong>{action.agreementOrigin.meetingTitle}</strong></p>
+                    <time dateTime={action.agreementOrigin.meetingDate}>{formatCivilDate(action.agreementOrigin.meetingDate)}</time>
+                    <p className={styles.agreement}>{action.agreementOrigin.agreementText}</p>
+                    {congress.meetings?.some(meeting => meeting.id === action.agreementOrigin?.meetingId)
+                      && <a href="#reuniones-comite">Ver reunión</a>}
+                  </div>
+                </details>}
                 <button type="button" className="btn btn-ghost" disabled={disabled} aria-label={`Quitar encargo ${number}`}
                   onClick={() => setRemoval({ id: action.id, title: action.title.trim() || `Encargo ${number}` })}>
                   <Trash2 size={16} aria-hidden="true" /> Quitar encargo

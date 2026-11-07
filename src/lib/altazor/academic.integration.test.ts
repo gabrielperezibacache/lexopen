@@ -10,7 +10,7 @@ import { bookMetadataSchema } from "@/lib/books/ingest";
 import { importBook, readBook, createBookCollection, updateBookCollection } from "@/lib/books/service";
 import { workbenchDestination } from "@/lib/workbench/policy";
 import { emptyAcademicBrief, emptyAcademicMatrix, emptyAcademicSyllabus, type AcademicCongress } from "./academic-schemas";
-import { createAcademicWorkspace, saveAcademicWorkspace, readAcademicWorkspace, prepareAcademicArtifact, executeAcademicArtifact, readAcademicArtifact, saveAcademicArtifact, incorporateAcademicWriting, cancelAcademicArtifact, saveAcademicProfile, academicArtifactHistory, readAcademicArtifactVersion, readAcademicArtifactDownload, restoreAcademicArtifactVersion, createAcademicDraft } from "./academic";
+import { createAcademicWorkspace, saveAcademicWorkspace, readAcademicWorkspace, prepareAcademicArtifact, executeAcademicArtifact, readAcademicArtifact, saveAcademicArtifact, incorporateAcademicWriting, cancelAcademicArtifact, saveAcademicProfile, academicArtifactHistory, readAcademicArtifactVersion, readAcademicArtifactDownload, restoreAcademicArtifactVersion, createAcademicDraft, createCommitteeActionFromAgreement } from "./academic";
 import { exportCaseWriting } from "@/lib/writings/export";
 import { prepareAcademicLinkedInDraft, verifyAltazorShareOrigin } from "./share-origin";
 import { congressCalendarActions } from "./congress-actions";
@@ -428,6 +428,119 @@ async function main(){
     await saveOrganization({ ...committeeOrganization, actions: committeeActions.map(item => item.id === "action-confirm" ? { ...item, status: "done" as const } : item) });
     assert.deepEqual((await congressCalendarActions(owner, committeeRange, db)).map(item => item.title), ["Preparar sala del comité"]);
     assert.equal((await readAcademicArtifactVersion(organizedCongress.id, organizedProgram.id, 1, owner, db)).body, organizedBody);
+    const meeting = {
+      id: "meeting-preparation", title: "Reunión privada de preparación", date: "2030-05-06", attendees: "Asistente ficticia del comité",
+      notes: "Nota reservada sobre la preparación del encuentro.",
+      agreements: [
+        { id: "agreement-invitations", text: "Confirmar las invitaciones del encuentro.\nConservar constancia de las respuestas." },
+        { id: "agreement-materials", text: "Preparar las guías para participantes." },
+      ],
+    };
+    const meetingOrganization = { ...(await readAcademicWorkspace(organizedCongress.id, owner, db)).brief.congress!, meetings: [meeting] };
+    const meetingSaved = await saveOrganization(meetingOrganization);
+    const conversion = { expectedRevision: meetingSaved.revision, meetingId: meeting.id, agreementId: meeting.agreements[0].id };
+    await assert.rejects(createCommitteeActionFromAgreement(organizedCongress.id, conversion, other, db), status(404));
+    const courseForConversion = await readAcademicWorkspace(course.id, owner, db);
+    await assert.rejects(createCommitteeActionFromAgreement(course.id, { ...conversion, expectedRevision: courseForConversion.revision }, owner, db), status(400));
+    await assert.rejects(createCommitteeActionFromAgreement(organizedCongress.id, { ...conversion, expectedRevision: meetingSaved.revision - 1 }, owner, db), status(409));
+    await assert.rejects(createCommitteeActionFromAgreement(organizedCongress.id, { ...conversion, meetingId: "meeting-missing" }, owner, db), status(404));
+    await assert.rejects(createCommitteeActionFromAgreement(organizedCongress.id, { ...conversion, agreementId: "agreement-missing" }, owner, db), status(404));
+    const conversions = await Promise.all([
+      createCommitteeActionFromAgreement(organizedCongress.id, conversion, owner, db),
+      createCommitteeActionFromAgreement(organizedCongress.id, conversion, owner, db),
+    ]);
+    assert.equal(new Set(conversions.map(item => item.actionId)).size, 1);
+    assert.equal(conversions.filter(item => item.reused).length, 1);
+    const convertedId = conversions[0].actionId;
+    const afterConversion = await readAcademicWorkspace(organizedCongress.id, owner, db);
+    const liveMeetingOrganization: AcademicCongress = afterConversion.brief.congress!;
+    const convertedAction = liveMeetingOrganization.actions!.find(item => item.id === convertedId)!;
+    const originalAgreementOrigin = {
+      meetingId: meeting.id, agreementId: meeting.agreements[0].id, meetingTitle: meeting.title,
+      meetingDate: meeting.date, agreementText: meeting.agreements[0].text,
+    };
+    assert.equal(convertedAction.title, meeting.agreements[0].text.replace(/\s+/g, " "));
+    assert.equal(convertedAction.notes, meeting.agreements[0].text);
+    assert.equal(convertedAction.status, "pending");
+    assert.deepEqual(convertedAction.agreementOrigin, originalAgreementOrigin);
+    assert.deepEqual(await createCommitteeActionFromAgreement(organizedCongress.id, conversion, owner, db), {
+      actionId: convertedId, revision: afterConversion.revision, reused: true,
+    });
+    const changeConverted = (replacement: typeof convertedAction) => ({
+      ...liveMeetingOrganization, actions: liveMeetingOrganization.actions!.map(item => item.id === convertedId ? replacement : item),
+    });
+    await assert.rejects(saveOrganization(changeConverted({ ...convertedAction, agreementOrigin: { ...originalAgreementOrigin, agreementText: "Texto adulterado" } })), status(409));
+    const { agreementOrigin: omittedOrigin, ...withoutOrigin } = convertedAction;
+    assert.ok(omittedOrigin);
+    await assert.rejects(saveOrganization(changeConverted(withoutOrigin)), status(409));
+    await assert.rejects(saveOrganization({
+      ...liveMeetingOrganization, actions: [...liveMeetingOrganization.actions!, { ...convertedAction, id: "action-forged-origin", agreementOrigin: { ...originalAgreementOrigin, agreementId: meeting.agreements[1].id, agreementText: meeting.agreements[1].text } }],
+    }), status(409));
+    for (const invalidMeetings of [
+      [{ ...meeting, date: "2030-02-30" }],
+      [meeting, meeting],
+      [{ ...meeting, agreements: [meeting.agreements[0], meeting.agreements[0]] }],
+    ]) await assert.rejects(saveOrganization({ ...liveMeetingOrganization, meetings: invalidMeetings }), { name: "ZodError" });
+    const alteredMeeting = { ...meeting, title: "Título actualizado de la reunión", date: "2030-05-07", agreements: [{ ...meeting.agreements[0], text: "Acuerdo revisado después de crear el encargo." }, meeting.agreements[1]] };
+    await saveOrganization({ ...liveMeetingOrganization, meetings: [alteredMeeting] });
+    const afterMeetingEdit = await readAcademicWorkspace(organizedCongress.id, owner, db);
+    const editedMeetingOrganization: AcademicCongress = afterMeetingEdit.brief.congress!;
+    assert.deepEqual(editedMeetingOrganization.actions!.find(item => item.id === convertedId)!.agreementOrigin, originalAgreementOrigin);
+    assert.equal((await createCommitteeActionFromAgreement(organizedCongress.id, conversion, owner, db)).actionId, convertedId);
+    await saveOrganization({ ...afterMeetingEdit.brief.congress!, meetings: [] });
+    const afterMeetingRemoval = await readAcademicWorkspace(organizedCongress.id, owner, db);
+    const removedMeetingOrganization: AcademicCongress = afterMeetingRemoval.brief.congress!;
+    assert.deepEqual(removedMeetingOrganization.actions!.find(item => item.id === convertedId)!.agreementOrigin, originalAgreementOrigin);
+    assert.equal((await createCommitteeActionFromAgreement(organizedCongress.id, conversion, owner, db)).actionId, convertedId);
+    for (const template of ["congress", "participant_handout"] as const) {
+      const document = await createAcademicDraft(organizedCongress.id, { ...organizedInput, requestId: randomUUID(), expectedRevision: afterMeetingRemoval.revision, template }, owner, db);
+      assert.doesNotMatch((await readAcademicArtifact(organizedCongress.id, document.id, owner, db)).body, /Reunión privada|Nota reservada|Asistente ficticia|Confirmar las invitaciones|Conservar constancia|Título actualizado/);
+    }
+    assert.equal(await exportTeachingSessions(organizedCongress.id, owner, db), calendarBeforeActions);
+    const retainedMeetingActions = removedMeetingOrganization.actions!;
+    const atActionLimit = await saveOrganization({
+      ...afterMeetingRemoval.brief.congress!, meetings: [alteredMeeting],
+      actions: [...retainedMeetingActions, ...Array.from({ length: 100 - retainedMeetingActions.length }, (_, index) => ({
+        id: `action-limit-${index}`, title: "Encargo ficticio de capacidad", responsible: "", status: "pending" as const, notes: "",
+      }))],
+    });
+    await assert.rejects(createCommitteeActionFromAgreement(organizedCongress.id, {
+      expectedRevision: atActionLimit.revision, meetingId: meeting.id, agreementId: meeting.agreements[1].id,
+    }, owner, db), status(413));
+    assert.equal((await createCommitteeActionFromAgreement(organizedCongress.id, conversion, owner, db)).actionId, convertedId);
+    await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "assistant.use" } });
+    await assert.rejects(createCommitteeActionFromAgreement(organizedCongress.id, conversion, owner, db), status(403));
+    await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "" } });
+    await db.altazorAcademicWorkspace.update({ where: { id: organizedCongress.id }, data: { archivedAt: new Date() } });
+    await assert.rejects(createCommitteeActionFromAgreement(organizedCongress.id, conversion, owner, db), status(404));
+    await db.altazorAcademicWorkspace.update({ where: { id: organizedCongress.id }, data: { archivedAt: null } });
+    const sizeCongress = await createAcademicWorkspace({ requestId: randomUUID(), kind: "congress", title: "Congreso ficticio de capacidad" }, owner, db);
+    workspaces.push(sizeCongress.id);
+    const sizeWorkspace = await readAcademicWorkspace(sizeCongress.id, owner, db);
+    const sizeMeetings = Array.from({ length: 30 }, (_, index) => ({
+      id: `size-meeting-${index}`, title: "Reunión ficticia de capacidad", date: "2030-05-06", attendees: "", notes: "n".repeat(8000),
+      agreements: index ? [] : [{ id: "size-agreement", text: "x".repeat(2000) }],
+    }));
+    const sizeInput = {
+      expectedRevision: sizeWorkspace.revision, title: sizeWorkspace.title,
+      brief: { ...emptyAcademicBrief, congress: { axes: [], tables: [], meetings: sizeMeetings } }, matrix: emptyAcademicMatrix,
+    };
+    let paddingRemaining = 259000 - Buffer.byteLength(JSON.stringify(sizeInput), "utf8");
+    assert.ok(paddingRemaining > 0);
+    for (const item of sizeMeetings) {
+      const padding = Math.min(paddingRemaining, 2000);
+      item.attendees = "a".repeat(padding);
+      paddingRemaining -= padding;
+    }
+    assert.equal(paddingRemaining, 0);
+    assert.equal(Buffer.byteLength(JSON.stringify(sizeInput), "utf8"), 259000);
+    const sizeSaved = await saveAcademicWorkspace(sizeCongress.id, sizeInput, owner, db);
+    await assert.rejects(createCommitteeActionFromAgreement(sizeCongress.id, {
+      expectedRevision: sizeSaved.revision, meetingId: sizeMeetings[0].id, agreementId: "size-agreement",
+    }, owner, db), status(413));
+    const afterSizeRejection = await readAcademicWorkspace(sizeCongress.id, owner, db);
+    assert.equal(afterSizeRejection.revision, sizeSaved.revision);
+    assert.equal(afterSizeRejection.brief.congress.actions, undefined);
     assert.equal(network,0);
     console.log("ALTAZOR academic disposable integration passed: owner isolation, source-backed proposals, original/version history, CAS save races, idempotent save, recovery as unreviewed revision, tamper/source-revocation denial, native writing replay, LinkedIn origin/revision, legacy matrix, matrix-backed preparation and retention, profile CAS and cancellation, selected teaching sessions and retained snapshots; zero provider traffic.");
   }finally{

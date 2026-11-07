@@ -360,6 +360,61 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
           await expect(committeeTask.getByRole("textbox", { name: "Encargo 1", exact: true })).toHaveValue("Confirmar panelistas del congreso");
           await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
           await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
+          const meetings = academic.getByRole("region", { name: "Reuniones del comité", exact: true });
+          await meetings.getByText("Reuniones del comité", { exact: true }).click();
+          await meetings.getByRole("button", { name: "Añadir reunión", exact: true }).click();
+          const meeting = meetings.getByRole("group", { name: "Reunión 1", exact: true });
+          await meeting.getByLabel("Nombre de la reunión 1", { exact: true }).fill("Reunión ficticia de coordinación");
+          await meeting.getByLabel("Fecha de la reunión 1", { exact: true }).fill("2030-05-06");
+          await meeting.getByText("Notas y asistentes", { exact: true }).click();
+          await meeting.getByLabel("Asistentes de la reunión 1", { exact: true }).fill("Integrante ficticia del comité");
+          await meeting.getByLabel("Notas de la reunión 1", { exact: true }).fill("Nota privada sobre la distribución de invitaciones.");
+          await meeting.getByRole("button", { name: "Añadir acuerdo", exact: true }).click();
+          const agreement = meeting.getByRole("group", { name: "Acuerdo 1 de la reunión 1", exact: true });
+          const agreementText = "Enviar las invitaciones del encuentro.\nConservar una lista de respuestas.";
+          await agreement.getByLabel("Texto del acuerdo 1 de la reunión 1", { exact: true }).fill(agreementText);
+          if (process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
+            await meetings.screenshot({ path: info.outputPath("reuniones-comite-movil.png") });
+            await page.setViewportSize({ width: 1280, height: 880 });
+            await meetings.screenshot({ path: info.outputPath("reuniones-comite-escritorio.png") });
+            await page.setViewportSize({ width: 360, height: 800 });
+          }
+          let agreementConversions = 0;
+          page.on("request", request => {
+            if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/committee-agreements")) agreementConversions++;
+          });
+          const conversionResponse = page.waitForResponse(response => response.url().endsWith("/committee-agreements") && response.request().method() === "POST");
+          await agreement.getByRole("button", { name: "Crear encargo desde este acuerdo", exact: true }).click();
+          const conversion = await conversionResponse;
+          expect(conversion.ok()).toBeTruthy();
+          const { actionId } = await conversion.json() as { actionId: string };
+          await expect(page).toHaveURL(new RegExp(`#encargo-${actionId}$`));
+          const convertedTask = committee.getByRole("group", { name: "Encargo 2", exact: true });
+          await expect(convertedTask.getByRole("textbox", { name: "Encargo 2", exact: true })).toHaveValue(agreementText.replace(/\s+/g, " "));
+          await expect(convertedTask.getByLabel("Indicaciones del encargo 2", { exact: true })).toHaveValue(agreementText);
+          await convertedTask.getByText("Origen del encargo", { exact: true }).click();
+          await expect(convertedTask.getByText("Reunión ficticia de coordinación", { exact: true })).toBeVisible();
+          await expect(convertedTask.locator("time")).toHaveAttribute("datetime", "2030-05-06");
+          await expect(convertedTask.getByRole("paragraph").filter({ hasText: agreementText })).toBeVisible();
+          if (process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
+            await convertedTask.screenshot({ path: info.outputPath("origen-acuerdo-movil.png") });
+            await page.setViewportSize({ width: 1280, height: 880 });
+            await convertedTask.screenshot({ path: info.outputPath("origen-acuerdo-escritorio.png") });
+            await page.setViewportSize({ width: 360, height: 800 });
+          }
+          await page.goto(`/academico?trabajo=${projectId}#reuniones-comite`);
+          const meetingDisclosure = meeting.locator("details").first();
+          if (!await meetingDisclosure.evaluate(element => (element as HTMLDetailsElement).open)) {
+            await meetingDisclosure.locator("summary").first().click();
+          }
+          await expect(agreement.getByRole("button", { name: "Crear encargo desde este acuerdo", exact: true })).toHaveCount(0);
+          const existingAction = agreement.getByRole("link", { name: "Ver encargo", exact: true });
+          await expect(existingAction).toHaveAttribute("href", `#encargo-${actionId}`);
+          await existingAction.click();
+          await expect(convertedTask.getByRole("textbox", { name: "Encargo 2", exact: true })).toHaveValue(agreementText.replace(/\s+/g, " "));
+          expect(agreementConversions).toBe(1);
+          const storedCongress = JSON.parse((await db.altazorAcademicWorkspace.findUniqueOrThrow({ where: { id: projectId } })).briefJson).congress;
+          expect(storedCongress.actions.filter((item: { agreementOrigin?: { agreementText: string } }) => item.agreementOrigin?.agreementText === agreementText)).toHaveLength(1);
         }
         if (kind === "workshop") {
           const programId = new URL(page.url()).searchParams.get("resultado");

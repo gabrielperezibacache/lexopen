@@ -6,7 +6,7 @@ Abre **Académico → Docencia** y elige el tipo de trabajo. Cada trabajo conser
 | --- | --- | --- |
 | Cursos | Ficha de curso, bibliografía base y sugerencias por solicitud. Crea un syllabus editable con las sesiones que elijas de la Agenda. | Añadir unidades y evaluaciones reutilizables. |
 | Seminarios | Programa editable con las sesiones elegidas, sus ponentes, moderación, lecturas y lugar. | Vincular responsabilidades de organización y avisos del encuentro. |
-| Congresos | Organiza mesas por eje, vincula sus sesiones y prepara el programa. Lleva encargos privados del comité con responsable por nombre, estado y fechas en tu Agenda. | Añadir acuerdos de reunión y entregables vinculados al seguimiento. |
+| Congresos | Organiza mesas, programa y encargos privados con fechas en tu Agenda. Registra reuniones y convierte acuerdos en encargos que conservan su origen. | Vincular entregables a los encargos y revisar su avance. |
 | Talleres | Programa editable y hoja para participantes con las sesiones elegidas, sus consignas, lecturas y materiales. | Vincular rúbricas y recoger entregas de las actividades. |
 | Convocatorias | Ficha con país, organismo, bases, fecha límite y estado. Las fichas guardadas desde un aviso conservan su procedencia y la fecha de consulta. | Vincular responsables, anexos y un curso o proyecto de investigación. |
 | Búsqueda y fuentes por país | Catálogo oficial por país. Busca por tema entre los avisos que ya consultaste y filtra tu cartera por país. | Ampliar las fuentes y los filtros por área, elegibilidad y modalidad. |
@@ -46,6 +46,14 @@ La planificación conserva las mesas aunque algunas sesiones queden fuera de un 
 3. Pulsa **Guardar cambios**. Los encargos con fecha que estén pendientes o en curso aparecen en la Agenda personal. Desde allí puedes volver al seguimiento del congreso y actualizar su estado.
 
 Este seguimiento es privado del trabajo académico. Los responsables se indican por nombre. Si retiras una mesa o un eje, sus encargos pasan al seguimiento general del congreso.
+
+## Registrar reuniones y dar seguimiento a los acuerdos
+
+1. Dentro del congreso, abre **Reuniones del comité** y pulsa **Añadir reunión**. Indica el nombre, la fecha y los asistentes. Puedes conservar las notas de la reunión.
+2. Usa **Añadir acuerdo** para registrar cada decisión. Pulsa **Crear encargo desde este acuerdo** cuando quieras darle seguimiento. Esta acción guarda los cambios del trabajo y crea un encargo con el texto del acuerdo.
+3. Completa el responsable, la mesa y la fecha del encargo. En **Origen del encargo** puedes consultar la reunión, su fecha y el texto conservado al crearlo. **Ver encargo** permite volver a ese seguimiento desde el acuerdo.
+
+La conversión recupera el encargo existente si vuelves a solicitarla para el mismo acuerdo. El origen del encargo conserva su copia aunque después edites o retires la reunión. Las reuniones y los acuerdos forman parte del seguimiento privado del congreso.
 
 ## Preparar una hoja para participantes
 
