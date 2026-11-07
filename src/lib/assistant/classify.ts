@@ -10,6 +10,7 @@ import { askLlm as defaultAskLlm } from "@/lib/integrations/llm";
 import { ASSISTANT_TOOL_IDS, isAssistantToolId } from "./types";
 import type { AssistantIntent } from "./types";
 import { explicitDesktopListing, explicitWorkflowListing, ruleClassify } from "./classify-rules";
+import { connectorDesktopIntent } from "./connector-desktop-intent";
 import type { NormalizedAssistantInput } from "./normalize";
 import type { AssistantLlmMode } from "./firm-policy";
 
@@ -100,6 +101,8 @@ export async function classifyIntents(
   const prompt = classifyPrompt(input, opts?.attachments);
   const desktopRead = opts?.altazorContext ? explicitDesktopListing(input) : undefined;
   if (desktopRead) return { intents: [desktopRead], source: "rule", prompt };
+  const connectorTask = opts?.altazorContext ? connectorDesktopIntent(input.text) : undefined;
+  if (connectorTask) return { intents: [connectorTask], source: "rule", prompt };
   const workflowRead=opts?.altazorContext?explicitWorkflowListing(input):undefined;
   if(workflowRead) return {intents:[workflowRead],source:"rule",prompt};
   if (opts?.assistantLlmMode === "local_only" || opts?.forceLocal) {

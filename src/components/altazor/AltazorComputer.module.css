@@ -7,6 +7,13 @@
 .status > strong, .status > span { display: block; }
 .status > span { font-size: var(--text-sm); color: var(--muted); margin-top: .35rem; }
 .status p { margin: .75rem 0 0; }
+.applications { min-width: 0; padding: 0; margin: 1.25rem 0 0; border: 0; }
+.applications legend { font-size: var(--text-sm); font-weight: 600; }
+.applications > p { margin-top: .35rem; }
+.applications > a { display: inline-block; min-height: 44px; padding-block: .65rem; font-size: var(--text-sm); }
+.applicationChoices { display: flex; flex-wrap: wrap; gap: .25rem 1.5rem; margin-top: .5rem; }
+.applicationChoices label { min-height: 44px; cursor: pointer; }
+.applicationChoices small { display: block; color: var(--muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
 .preparationLink {
   color: var(--sea);
   text-decoration: underline;

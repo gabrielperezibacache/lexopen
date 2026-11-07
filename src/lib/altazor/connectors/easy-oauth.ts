@@ -13,6 +13,7 @@ import { computerOperationHash } from "../computer/operation-hash";
 import { configureConnector, connectorInventory, testConnector } from "./service";
 import { oauthFailureReason, readOAuthTokenResponse } from "./oauth-token-response";
 import { checkGithubApplication } from "./github-application-check";
+import { canReadConnectorFiles, easyOAuthScopes, validEasyOAuthScopes, type EasyOAuthAccess } from "./oauth-access";
 
 import { EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth-providers";
 
@@ -30,7 +31,7 @@ type Config = { provider: EasyOAuthProvider; clientId: string; clientSecret: str
 type Binding = { workspaceId: string; workspaceBinding: string; configurationBinding: string; connectionName: string; causaId: string | null; state: string; verifier: string; nonce: string };
 type ConnectionProof = { workspaceBinding: string; connectionName: string; expiresAt: string | null; scopes: string[] };
 export type EasyOAuthAttempt = { id: string; provider: EasyOAuthProvider; state: "pending" | "exchanging" | "completed" | "failed" | "cancelled" | "expired"; reason: string | null };
-export type EasyOAuthStatus = { workspaceId: string; causaId: string | null; canAdmin: boolean; requiresStop: boolean; providers: { provider: EasyOAuthProvider; label: string; available: boolean; reason: string | null; scopes: string[]; connectionName: string; state: "blocked" | "idle" | "pending" | "connected" | "failed" | "expired" | "reconnect_required"; connected: boolean; tested: boolean; hasStoredConnection: boolean; canDisconnect: boolean; expiresAt: string | null; lastVerifiedAt: string | null }[]; attempt?: EasyOAuthAttempt };
+export type EasyOAuthStatus = { workspaceId: string; causaId: string | null; canAdmin: boolean; requiresStop: boolean; providers: { provider: EasyOAuthProvider; label: string; available: boolean; reason: string | null; scopes: string[]; grantedScopes: string[]; canReadFiles: boolean; connectionName: string; state: "blocked" | "idle" | "pending" | "connected" | "failed" | "expired" | "reconnect_required"; connected: boolean; tested: boolean; hasStoredConnection: boolean; canDisconnect: boolean; expiresAt: string | null; lastVerifiedAt: string | null }[]; attempt?: EasyOAuthAttempt };
 const attemptContext = (ownerId: string, id: string) => `altazor:desktop:oauth:${ownerId}:${id}`;
 const proofContext = (ownerId: string, id: string) => `altazor:desktop:connection:${ownerId}:${id}`;
 const setupContext = (provider: EasyOAuthProvider) => `altazor:desktop:oauth:operator:${provider}`;
@@ -108,7 +109,9 @@ export async function saveEasyOAuthSetup(actor: ConnectorActor, input: { provide
   });
   return easyOAuthSetupStatus();
 }
-export async function startEasyOAuth(actor: ConnectorActor, input: { workspaceId: string; provider: EasyOAuthProvider; requestId: string; confirmed: true }, origin: string, options: Options = {}) {
+export async function startEasyOAuth(actor: ConnectorActor, input: { workspaceId: string; provider: EasyOAuthProvider; access?: EasyOAuthAccess; requestId: string; confirmed: true }, origin: string, options: Options = {}) {
+  let requestedScopes: string[];
+  try { requestedScopes = easyOAuthScopes(input.provider, input.access); } catch { throw new ConnectorError("oauth_access_invalid", "Esta aplicación no admite el permiso solicitado.", 400); }
   if (input.confirmed !== true) throw new ConnectorError("oauth_confirmation_required", "Confirme conectar esta aplicación a su espacio.");
   const { user, workspace } = await access(actor, input.workspaceId), config = requireConfig(await configFor(input.provider, options));
   if (origin !== config.origin) throw new ConnectorError("oauth_origin_mismatch", "Abra LexOpen en la dirección de retorno preparada por su administrador.", 409);
@@ -126,12 +129,12 @@ export async function startEasyOAuth(actor: ConnectorActor, input: { workspaceId
     if (previous) {
       if (previous.ownerId !== actor.id || previous.provider !== prefix + input.provider || previous.sessionHash !== actor.sessionHash || previous.sessionVersion !== actor.sessionVersion || previous.phase !== "pending" || previous.expiresAt.getTime() <= Date.now()) throw new ConnectorError("oauth_attempt_consumed", "Este intento ya cambió. Inicie una conexión nueva.", 409);
       const old = bindingOf(previous);
-      if (old.workspaceId !== workspace.id || old.workspaceBinding !== binding.workspaceBinding || old.configurationBinding !== binding.configurationBinding) throw new ConnectorError("request_conflict", "La solicitud corresponde a otra conexión.", 409);
+      if (old.workspaceId !== workspace.id || old.workspaceBinding !== binding.workspaceBinding || old.configurationBinding !== binding.configurationBinding || JSON.stringify(JSON.parse(previous.requestedScopesJson)) !== JSON.stringify(requestedScopes)) throw new ConnectorError("request_conflict", "La solicitud corresponde a otra conexión.", 409);
       binding = old; return previous;
     }
-    return tx.personalOAuthAttempt.create({ data: { id, ownerId: actor.id, provider: prefix + input.provider, stateHash: digest(binding.state), sessionHash: actor.sessionHash, sessionVersion: actor.sessionVersion, nonceHash: digest(binding.nonce), requestedScopesJson: JSON.stringify(spec.scopes), redirectUri: config.redirectUri, clientId: config.clientId, resultEnc: seal(binding, attemptContext(actor.id, id)), expiresAt } });
+    return tx.personalOAuthAttempt.create({ data: { id, ownerId: actor.id, provider: prefix + input.provider, stateHash: digest(binding.state), sessionHash: actor.sessionHash, sessionVersion: actor.sessionVersion, nonceHash: digest(binding.nonce), requestedScopesJson: JSON.stringify(requestedScopes), redirectUri: config.redirectUri, clientId: config.clientId, resultEnc: seal(binding, attemptContext(actor.id, id)), expiresAt } });
   });
-  const params = new URLSearchParams({ response_type: "code", client_id: config.clientId, redirect_uri: config.redirectUri, state: binding.state, scope: spec.scopes.join(" "), code_challenge: createHash("sha256").update(binding.verifier).digest("base64url"), code_challenge_method: "S256" });
+  const params = new URLSearchParams({ response_type: "code", client_id: config.clientId, redirect_uri: config.redirectUri, state: binding.state, scope: requestedScopes.join(" "), code_challenge: createHash("sha256").update(binding.verifier).digest("base64url"), code_challenge_method: "S256" });
   if (input.provider === "google") { params.set("access_type", "online"); params.set("include_granted_scopes", "false"); params.set("prompt", "consent"); }
   if (input.provider === "dropbox") params.set("token_access_type", "online");
   return { attemptId: attempt.id, provider: input.provider, authUrl: `${spec.authorize}?${params}`, expiresAt: attempt.expiresAt.toISOString() };
@@ -170,8 +173,10 @@ export async function receiveEasyOAuth(actor: ConnectorActor, input: { state: st
   try {
     if (input.denied || !input.code || input.code.length > 8000) throw new ConnectorError("oauth_cancelled", "La conexión no fue autorizada.");
     const spec = specifications[provider], fetcher = options.fetcher || fetch;
+    const requestedScopes: unknown = JSON.parse(attempt.requestedScopesJson);
+    if (!validEasyOAuthScopes(provider, requestedScopes)) throw new ConnectorError("oauth_scope_mismatch", "Los permisos de este intento no son válidos.", 409);
     const tokens = await providerJson(spec.token, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: config.redirectUri, code: input.code, code_verifier: binding.verifier }) }, fetcher);
-    const { accessToken, scopes } = readOAuthTokenResponse(tokens, spec.scopes);
+    const { accessToken, scopes } = readOAuthTokenResponse(tokens, requestedScopes);
     const ttl = tokens.expires_in;
     if ((provider !== "github" || ttl !== undefined) && (typeof ttl !== "number" || !Number.isFinite(ttl) || ttl < 60 || ttl > 366 * 86400)) throw new ConnectorError("oauth_expiry_invalid", "El servicio no confirmó una vigencia válida.", 409);
     const expiresAt = typeof ttl === "number" ? new Date(Date.now() + ttl * 1000) : null;
@@ -246,10 +251,12 @@ export async function easyOAuthStatus(actor: ConnectorActor, workspaceId: string
     const dropboxReady = provider !== "dropbox" || Boolean(inventory?.gateReady && inventory.catalog.find(entry => entry.id === "dropbox")?.available);
     const hasStoredConnection = Boolean(saved), canDisconnect = hasStoredConnection && Boolean(inventory?.gateReady) && !active;
     let state: EasyOAuthStatus["providers"][number]["state"] = config.configured ? "idle" : "blocked", tested = false, reason = config.reason;
+    let grantedScopes: string[] = [];
     if (config.configured && dropboxReady && account) {
       try {
         const proof = unseal<ConnectionProof>(account.credentialsEnc || "", proofContext(actor.id, account.id));
-        if (account.status !== "connected" || account.clientId !== config.clientId || proof.workspaceBinding !== workspaceBinding(workspace) || proof.connectionName !== name) throw new Error();
+        if (account.status !== "connected" || account.clientId !== config.clientId || proof.workspaceBinding !== workspaceBinding(workspace) || proof.connectionName !== name || !validEasyOAuthScopes(provider, proof.scopes) || JSON.stringify(proof.scopes) !== account.grantedScopesJson) throw new Error();
+        grantedScopes = proof.scopes;
         if (account.expiresAt && account.expiresAt.getTime() <= Date.now()) { state = "expired"; reason = "La autorización venció. Pulse Conectar para renovarla."; }
         else {
           if (!saved?.configured || saved.needsSignIn || !account.lastVerifiedAt) throw new Error();
@@ -259,13 +266,13 @@ export async function easyOAuthStatus(actor: ConnectorActor, workspaceId: string
           if (workspaceBinding(fresh.workspace) !== proof.workspaceBinding || !freshConfig.configured || freshConfig.clientId !== config.clientId) throw new Error();
           const checked = await prisma.personalConnectorAccount.updateMany({ where: { id: account.id, ownerId: actor.id, credentialsEnc: account.credentialsEnc, status: "connected" }, data: { lastVerifiedAt: new Date() } });
           if (!checked.count) throw new Error();
-          state = "connected"; tested = true; reason = null;
+          state = "connected"; tested = true; reason = null; grantedScopes = proof.scopes;
         }
-      } catch { state = "reconnect_required"; reason = "Compruebe el computador y vuelva a conectar esta aplicación."; }
+      } catch { grantedScopes = []; state = "reconnect_required"; reason = "Compruebe el computador y vuelva a conectar esta aplicación."; }
     }
     if (attemptView?.provider === provider && ["pending", "exchanging"].includes(attemptView.state) && state !== "connected") state = "pending";
     if (config.configured && !dropboxReady) { state = "blocked"; reason = "Actualice el escritorio de Altazor para conectar Dropbox con permisos de lectura."; }
-    providers.push({ provider, label: specifications[provider].label, available: config.configured && dropboxReady, reason, scopes: [...specifications[provider].scopes], connectionName: name, state, connected: state === "connected", tested: dropboxReady && tested, hasStoredConnection, canDisconnect, expiresAt: account?.expiresAt?.toISOString() || null, lastVerifiedAt: account?.lastVerifiedAt?.toISOString() || null });
+    providers.push({ provider, label: specifications[provider].label, available: config.configured && dropboxReady, reason, scopes: [...specifications[provider].scopes], grantedScopes, canReadFiles: tested && canReadConnectorFiles(provider, grantedScopes), connectionName: name, state, connected: state === "connected", tested: dropboxReady && tested, hasStoredConnection, canDisconnect, expiresAt: account?.expiresAt?.toISOString() || null, lastVerifiedAt: account?.lastVerifiedAt?.toISOString() || null });
   }
   return { workspaceId, causaId: workspace.causaId, canAdmin: canSome(user, "host.admin"), requiresStop: Boolean(active), providers, ...(attemptView ? { attempt: attemptView } : {}) };
 }

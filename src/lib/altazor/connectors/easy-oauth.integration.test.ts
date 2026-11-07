@@ -14,6 +14,7 @@ async function main() {
   assert.equal(assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL), new URL(process.env.DATABASE_URL!).toString());
   process.env.ALTAZOR_COMPUTER_ENABLED = "1";
   const stamp = randomUUID(), userIds: string[] = [], caseIds: string[] = [], workspaceIds: string[] = [], oldFetch = globalThis.fetch;
+  let googleFiles = false;
   let puts = 0, providerExchanges = 0, wrongDestination = 0, revoked = false, broadScope = false, pauseExchange: (() => Promise<void>) | undefined;
   let dropboxReadGate = true, dropboxIdentity = "dbid:fictitious-account", legacyDropboxStarts = 0, applicationAccepted = true;
   const dropboxScopes = "account_info.read files.content.read files.metadata.read";
@@ -50,7 +51,7 @@ async function main() {
       const pause = pauseExchange; pauseExchange = undefined; if (pause) await pause();
       if (url.hostname === "api.dropboxapi.com") return Response.json({ access_token: "fictitious-dropbox-consented-access", token_type: "bearer", account_id: "dbid:fictitious-account", scope: broadScope ? `${dropboxScopes} files.content.write` : dropboxScopes, expires_in: 14_400 });
       const google = url.hostname === "oauth2.googleapis.com";
-      return Response.json({ access_token: google ? "fictitious-google-consented-access" : "fictitious-github-consented-access", token_type: "Bearer", scope: broadScope ? "repo" : google ? "https://www.googleapis.com/auth/drive.metadata.readonly" : "read:user", ...(google ? { expires_in: 3600 } : {}) });
+      return Response.json({ access_token: google ? "fictitious-google-consented-access" : "fictitious-github-consented-access", token_type: "Bearer", scope: broadScope ? "repo" : google ? `https://www.googleapis.com/auth/drive.${googleFiles ? "readonly" : "metadata.readonly"}` : "read:user", ...(google ? { expires_in: 3600 } : {}) });
     }
     if (url.href === "https://api.dropboxapi.com/2/users/get_current_account") {
       assert.equal(init?.method, "POST"); assert.equal(init?.body, "null");
@@ -112,6 +113,18 @@ async function main() {
       const stored = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: begun.attemptId } });
       assert.equal(stored.resultEnc!.includes(payload.verifier), false);
     }
+    assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[0].canReadFiles, false);
+    const fileInput = { provider: "google" as const, workspaceId, requestId: `oauth-${stamp}-files`, access: "files" as const, confirmed: true as const };
+    const files = await startEasyOAuth(actor, fileInput, origin, options);
+    assert.equal(new URL(files.authUrl).searchParams.get("scope"), "https://www.googleapis.com/auth/drive.readonly");
+    assert.equal(new URL(files.authUrl).searchParams.get("include_granted_scopes"), "false");
+    await assert.rejects(startEasyOAuth(actor, { ...fileInput, access: "basic" }, origin, options), error => (error as { code?: string }).code === "request_conflict");
+    await assert.rejects(startEasyOAuth(actor, { ...fileInput, provider: "github", requestId: `oauth-${stamp}-github-files` }, origin, options), denied(400));
+    googleFiles = true;
+    await receiveEasyOAuth(actor, { state: new URL(files.authUrl).searchParams.get("state")!, code: "fictitious-files-consent" }, origin, options);
+    const fileStatus = (await easyOAuthStatus(actor, workspaceId, files.attemptId)).providers[0];
+    assert.equal(fileStatus.canReadFiles, true); assert.deepEqual(fileStatus.grantedScopes, ["https://www.googleapis.com/auth/drive.readonly"]);
+    googleFiles = false;
     revoked = true; const revokedStatus = (await easyOAuthStatus(actor, workspaceId)).providers[0]; assert.equal(revokedStatus.connected, false); assert.equal(revokedStatus.hasStoredConnection, true); assert.equal(revokedStatus.canDisconnect, true); revoked = false;
     const googleAccount = await prisma.personalConnectorAccount.findUniqueOrThrow({ where: { ownerId_provider: { ownerId: owner.id, provider: `altazor-desktop:${workspaceId}:google` } } });
     await prisma.personalConnectorAccount.update({ where: { id: googleAccount.id }, data: { expiresAt: new Date(0) } });

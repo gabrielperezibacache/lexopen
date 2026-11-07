@@ -125,7 +125,7 @@ export function EasyConnectorAdministration() {
 }
 
 export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayReady, hasActiveSession, busy = false, onBusyChange, onDisconnect }: Props) {
-  const uid = useId(), requestKey = useRef(operationKey()), disconnectKey = useRef(operationKey()), loadVersion = useRef(0), mounted = useRef(false);
+  const uid = useId(), requestKey = useRef(operationKey()), filesRequestKey = useRef(operationKey()), disconnectKey = useRef(operationKey()), loadVersion = useRef(0), mounted = useRef(false);
   const [data, setData] = useState<OAuthStatus | null>(null), [loading, setLoading] = useState(true), [working, setWorking] = useState(false), [error, setError] = useState("");
   const [removeConfirmed, setRemoveConfirmed] = useState(false), [notice, setNotice] = useState("");
   const [needsNewAttempt, setNeedsNewAttempt] = useState(false);
@@ -152,11 +152,11 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
     window.addEventListener("focus", returned); document.addEventListener("visibilitychange", returned);
     return () => { mounted.current = false; cancelReads(); window.removeEventListener("focus", returned); document.removeEventListener("visibilitychange", returned); };
   }, [refresh]);
-  async function connect() {
+  async function connect(access: "basic" | "files" = "basic") {
     if (!workspaceId || !current?.available || !gatewayReady || requiresStop || busy || working) return;
     setWorking(true); onBusyChange(true); setError(""); setNotice("");
     try {
-      const result = await apiMutation<{ attemptId: string; provider: EasyConnectorProvider; authUrl: string; expiresAt: string }>(`${api}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, provider, requestId: requestKey.current, confirmed: true }) });
+      const result = await apiMutation<{ attemptId: string; provider: EasyConnectorProvider; authUrl: string; expiresAt: string }>(`${api}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, provider, requestId: access === "files" ? filesRequestKey.current : requestKey.current, ...(access === "files" ? { access } : {}), confirmed: true }) });
       if (!result.ok) { setError(result.error); const code = (result.data as { code?: string } | undefined)?.code; if (["oauth_attempt_consumed", "request_conflict"].includes(code || "")) setNeedsNewAttempt(true); return; }
       if (result.data.provider !== provider || !result.data.attemptId) throw new Error("No se pudo confirmar el inicio de sesión. Vuelva a comprobar el estado.");
       const url = officialUrl(result.data.authUrl, provider);
@@ -180,11 +180,15 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
   const configurationHref = "/configuracion#cuentas-conectadas";
   return <section className={styles.root} aria-labelledby={`${uid}-title`} data-testid="easy-connector-oauth">
     <h4 id={`${uid}-title`} className={connected ? styles.connected : undefined}>{connected && <CheckCircle2 size={20} aria-hidden="true" />}{connected ? `${label} conectado` : `Tu cuenta de ${label}`}</h4>
-    <p>{providerHelp[provider]}</p>
+    <p>{provider === "google" && (current?.canReadFiles || !current?.connected) ? "Conecta Drive para que Altazor pueda buscar y leer tus archivos en los encargos que le pidas." : providerHelp[provider]}</p>
     {!connected && <p className={styles.hint}>Elige tu cuenta en {label} y vuelve a LexOpen.</p>}
     {error && <p role="alert" className={styles.error}>{error}</p>}{notice && <p role="status" className={styles.notice}>{notice}</p>}
     {loading ? <p role="status">Comprobando conexión…</p> : !workspaceId ? <p>Abre tu <a href={computerHref}>escritorio de Altazor</a> para preparar este espacio y conectar tu cuenta.</p> : <>
       {connected && <p role="status">Cuenta autorizada para este espacio.</p>}
+      {provider === "google" && connected && !current?.canReadFiles && <div className={styles.actions}>
+        <p>Para trabajar con el contenido de tus documentos, autoriza su lectura en Google.</p>
+        <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { filesRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect("files"); }}>Autorizar lectura de archivos<ArrowUpRight size={16} aria-hidden="true" /></button>
+      </div>}
       {pending && <p role="status">Termina el ingreso en {label}. Si ya lo hiciste, pulsa Comprobar conexión.</p>}
       {attemptProblem && <p className={styles.error} role="alert">{attemptProblem}</p>}
       {!connected && !attemptProblem && current && ["failed", "expired", "reconnect_required"].includes(current.state) && <p className={styles.error} role="alert">{current.reason || `Vuelve a conectar ${label} para renovar el acceso.`}</p>}
@@ -194,7 +198,7 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
       {requiresStop && <p>Detén tu escritorio antes de cambiar las cuentas que usa. <a href={computerHref}>Revisar mi escritorio</a></p>}
       {!connected && <div className={styles.actions}>
         {pending || !current ? <button type="button" className={styles.primary} disabled={busy || working} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden="true" />Comprobar conexión</button>
-          : <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { requestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect(); }}>{working ? "Abriendo ingreso…" : `Conectar ${label}`}<ArrowUpRight size={16} aria-hidden="true" /></button>}
+          : <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect(provider === "google" ? "files" : "basic"); }}>{working ? "Abriendo ingreso…" : `Conectar ${label}`}<ArrowUpRight size={16} aria-hidden="true" /></button>}
       </div>}
       <details className={styles.management}>
         <summary>{connected ? "Gestionar conexión" : "Opciones de conexión"}</summary>

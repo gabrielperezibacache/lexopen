@@ -14,6 +14,7 @@ import { prepareSecretUse, redeemSecretUse, revokeSecretUse } from "@/lib/altazo
 import type { PrepareSecretUseInput, SecretTarget } from "@/lib/altazor/secrets/policy";
 import { normalizeConnectorNames } from "@/lib/altazor/connectors/policy";
 import { connectorKind } from "@/lib/altazor/connectors/catalog";
+import { computerActivityDetail } from "./activity-detail";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 const credentialContext = (row: Pick<AltazorComputerWorkspace, "id" | "ownerId" | "scopeKey">) => `altazor:computer:${row.ownerId}:${row.id}:${row.scopeKey}`;
@@ -228,9 +229,11 @@ export async function readComputerActivity(user: CausaAccessUser, causaId?: stri
   if (!computerPolicyAllowed(await computerPolicy())) return reply("restricted");
   if (await passiveControlHeld(after.session)) return reply("paused", candidate.id, true);
   if (view.session.state !== "ready") return reply(view.session.state === "starting" ? "starting" : "unavailable", candidate.id, true);
-  if (view.approvals.length) return reply("approval", candidate.id, true);
-  if (computerTurnNeedsHelp(view.turns.at(-1))) return reply("help", candidate.id, true);
-  return reply(view.working ? "working" : "ready", candidate.id, true);
+  const detail = computerActivityDetail(view);
+  const activity = (state: ComputerActivityState) => ({ ...reply(state, candidate.id, true), ...(detail ? { detail } : {}) });
+  if (view.approvals.length) return activity("approval");
+  if (computerTurnNeedsHelp(view.turns.at(-1))) return activity("help");
+  return activity(view.working ? "working" : "ready");
 }
 function actionView(row: AltazorComputerAction) { return { id: row.id, status: row.status === "sending" && Date.now() - row.createdAt.getTime() > 60_000 ? "unknown" : row.status, result: row.status === "completed" && row.resultJson ? JSON.parse(row.resultJson) as Record<string, unknown> : null }; }
 function assertRenewable(session: AltazorComputerSession, now = Date.now()) {
@@ -370,6 +373,7 @@ export async function sendComputerMessage(user: CausaAccessUser, id: string, inp
     if (status.working) throw new ConnectorError("task_busy", "La tarea actual sigue en curso. Espere o solicite cancelarla.", 409);
     await policyAllowsAction();
     if (sessionConnectors(session)[0] !== "-") await client.requireConnectorGate();
+    if (sessionConnectors(session).some(name => /^altazor-(?:google|github)-[a-f0-9]{16}$/.test(name))) await client.requireFileReads();
     return client.send(session.chatId!, input.text, files, actionId);
   });
 }

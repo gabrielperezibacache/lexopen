@@ -12,6 +12,11 @@
 .heading h2 { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
 .heading p { margin: .16rem 0 0; font-size: .8125rem; line-height: 1.45; color: var(--ink-soft); }
 .header button { flex-shrink: 0; min-height: 44px; }
+.progress { padding: 0 .85rem .75rem; color: var(--ink-soft); font-size: var(--text-sm); line-height: 1.6; overflow-wrap: anywhere; }
+.progress p { margin: .2rem 0 0; }
+.progress strong { color: var(--ink); font-weight: 500; }
+.step { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .3rem 1rem; }
+.step time { color: var(--muted); font-variant-numeric: tabular-nums; }
 .screen { position: relative; background: var(--night, var(--surface)); border-top: 1px solid var(--line); }
 .live { position: absolute; inset-block-start: .55rem; inset-inline-start: .55rem; border-radius: var(--radius-sm); background: var(--surface-solid); color: var(--ink); font-size: var(--text-sm); padding: .2rem .5rem; }
 .screen img { display: block; width: 100%; height: auto; max-height: 32rem; object-fit: contain; }

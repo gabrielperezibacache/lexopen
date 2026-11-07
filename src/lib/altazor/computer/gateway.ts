@@ -5,6 +5,7 @@ import type { PersonInput } from "./policy";
 import { CONNECTOR_GATE, connectorKind } from "../connectors/catalog";
 import { assertGatewayOAuthAllowed, connectorConfigBody, connectorNameSchema, normalizeConnectorNames, projectConnectorSettings, validateConnectorConfiguration } from "../connectors/policy";
 import type { ConnectorApproval, ConnectorConfiguration } from "../connectors/types";
+import { assertEasyConnectorRead } from "../connectors/desktop-read-policy";
 
 type Fetcher = typeof fetch;
 export type KittyRecord = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
@@ -41,6 +42,7 @@ export class KittiesGateway {
   async createKitty(name: string, provider: string, connectors: readonly string[] = ["-"], start = true) {
     const selected = normalizeConnectorNames(connectors);
     if (selected[0] !== "-") await this.requireConnectorGate();
+    if (selected.some(name => /^altazor-(?:google|github)-[a-f0-9]{16}$/.test(name))) await this.requireFileReads();
     const result = await this.json("/v1/kitties", "POST", { name, provider, desktop: true, start, connectors: selected, approvals: "ask", backup: "", limits: { max_seconds: 600, max_rounds: 12, max_tokens: 60000, attended: true }, soul: { persona: "ALTAZOR AI", language: "es", instructions: "Trabaja sólo con la tarea y los archivos elegidos por la persona en este espacio. No recibes credenciales de LexOpen ni acceso a sus expedientes. Solicita intervención humana para accesos o decisiones que la requieran. No inventes resultados ni confirmaciones." } });
     return this.validateKitty(result.kitty, name, provider, selected);
   }
@@ -52,6 +54,7 @@ export class KittiesGateway {
   }
   async kitty(id: string, name: string, provider: string, connectors: readonly string[] = ["-"]) { const result = await this.json(`/v1/kitties/${safeId(id)}`); const kitty = this.validateKitty(result.kitty, name, provider, connectors); if (id !== name && kitty.id !== id) throw new ConnectorError("kitty_contract", "El gateway devolvió otro escritorio.", 502); return kitty; }
   async requireConnectorGate() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_connector_gate !== CONNECTOR_GATE) throw new ConnectorError("connector_gate_required", "El gateway necesita el refuerzo de permisos de LexOpen para usar conexiones.", 409); }
+  async requireFileReads() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_file_reads !== "v1") throw new ConnectorError("file_reads_required", "Actualice el escritorio de Altazor para trabajar con archivos completos de Google Drive y GitHub.", 409); }
   async connectorSettings() {
     const health = await this.json("/v1/health"), hardened = health.lexopen_connector_gate === CONNECTOR_GATE;
     return projectConnectorSettings(await this.json("/v1/settings"), hardened && ["darwin", "linux", "windows"].includes(String(health.lexopen_connector_platform)) ? String(health.lexopen_connector_platform) : "unknown", hardened && health.lexopen_dropbox_read_gate === true);
@@ -114,6 +117,7 @@ export class KittiesGateway {
     const pending = await this.pendingApprovals(kittyId, chatId, connectors);
     const selected = pending.find(row => row.id === id);
     if (!selected) throw new ConnectorError("connector_approval_missing", "La autorización ya cambió o no pertenece a esta sesión.", 409);
+    if (approve) assertEasyConnectorRead(selected);
     if (approve && selected.kind === "dropbox" && !(connectorKind("dropbox")?.actions as readonly string[]).includes(selected.action)) throw new ConnectorError("connector_action_unavailable", "Dropbox sólo permite listar, buscar y leer archivos.", 409);
     if (approve && !selected.reviewable) throw new ConnectorError("connector_approval_incomplete", "El detalle contiene datos ocultos o excede el límite de revisión. Rechácelo y revise la operación directamente en la aplicación.", 409);
     const result = await this.json(`/v1/approvals/${safeId(id)}/${approve ? "approve" : "reject"}`, "POST", approve ? { always: false } : { reason: "La persona rechazó esta operación en LexOpen.", always: false });

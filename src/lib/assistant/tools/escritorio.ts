@@ -6,6 +6,7 @@ import { canonicalJson } from "@/lib/command-execution";
 import { digest } from "@/lib/personal-connectors/core";
 import { sendComputerMessage } from "@/lib/altazor/computer/service";
 import { desktopScope, desktopSession, listDesktopSessions } from "./escritorio-access";
+import { desktopConnectorTask } from "./desktop-connector-task";
 import type { AssistantPlan, ToolContext } from "../types";
 import type { AssistantTool } from "./types";
 
@@ -24,7 +25,8 @@ export async function resolveDesktopTaskInput(input: Record<string, unknown>, ct
 }
 async function taskPreview(input: Task, ctx: ToolContext) {
   const access = await desktopSession(ctx, input.sessionId, true);
-  return `Enviar este encargo al escritorio existente ${access.session.id}.\nGateway local dedicado: espacio ${access.session.workspace.id}.\nProveedor de IA independiente del chat: ${access.session.workspace.providerName}. Puede ser remoto; esta confirmación autoriza enviar el texto a ese entorno.\nAplicaciones autorizadas en esa sesión: ${access.connectors.join(", ") || "ninguna"}.\nSe enviará únicamente el siguiente texto, completo; sin adjuntos y sin incorporar memoria ni secretos automáticamente:\n\n${input.texto}\n\nCada uso de una conexión pedirá una autorización aparte en el escritorio. El encargo continúa allí hasta completarse o detenerlo desde ese panel.`;
+  const apps = access.connectors.map(name => /^altazor-google-[a-f0-9]{16}$/.test(name) ? "Google Drive" : /^altazor-github-[a-f0-9]{16}$/.test(name) ? "GitHub (repositorios públicos)" : name);
+  return `Altazor realizará este encargo en su escritorio, con el modelo ${access.session.workspace.providerName}. Es un entorno de IA independiente del chat; puede usar un proveedor remoto.\nAplicaciones elegidas: ${apps.join(", ") || "ninguna"}.\n\n${input.texto}\n\nGoogle Drive y GitHub se usarán sólo para consultar o descargar los archivos solicitados. Cada acceso esperará su autorización. Podrá ver el avance y detener el trabajo desde la conversación. No se adjuntarán documentos ni se copiarán memoria o secretos automáticamente.`;
 }
 async function confirmedTask(input: Task, ctx: ToolContext) {
   if (!ctx.commandKey || !ctx.authorizeContext) throw httpError("Confirme el plan desde la conversación de ALTAZOR antes de enviar el encargo.", 409);
@@ -61,7 +63,8 @@ export const escritorioEncargarTool: AssistantTool<Task> = {
     const input = escritorioEncargarSchema.parse(raw), authorization = await confirmedTask(input, ctx);
     const access = await desktopSession(ctx, input.sessionId, true);
     await ctx.authorizeContext!(); ctx.signal?.throwIfAborted();
-    const result = await sendComputerMessage(authorization.actor, input.sessionId, { requestId: authorization.requestId, text: input.texto, files: [], confirmed: true });
+    const text = desktopConnectorTask(input.texto, authorization.actor.id, access.session.workspace.id, access.connectors);
+    const result = await sendComputerMessage(authorization.actor, input.sessionId, { requestId: authorization.requestId, text, files: [], confirmed: true });
     const ok = result.status === "completed";
     return { ok, message: ok ? `Encargo enviado al escritorio ${input.sessionId}, con el proveedor ${access.session.workspace.providerName}. Revise allí el avance y las autorizaciones de sus aplicaciones.` : "El escritorio no confirmó el encargo. Revise su estado; no se reenviará automáticamente.", entityId: input.sessionId, card: { type: "escritorio", id: input.sessionId, causaId: access.causaId, href: desktopHref(input.sessionId, access.causaId), provider: access.session.workspace.providerName, connectors: access.connectors, status: result.status } };
   },

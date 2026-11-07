@@ -91,6 +91,11 @@ async function main() {
     assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "help", sessionId: first.id, monitor: true });
     turn.steps?.push({ action: "helped" });
     assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "working", sessionId: first.id, monitor: true });
+    turn.steps?.push({ action: "run" });
+    const progress = await readComputerActivity(owner, cause.id);
+    assert.deepEqual(progress, { state: "working", sessionId: first.id, monitor: true, detail: { connections: [], step: { label: "Trabajando con archivos y herramientas", at: "" } } });
+    assert.equal(JSON.stringify(progress).includes(turn.text), false, "passive progress does not expose the task or document contents");
+    turn.steps?.pop();
     turn.working = false;
     turn.needs_help = true;
     assert.deepEqual(await readComputerActivity(owner, cause.id), { state: "help", sessionId: first.id, monitor: true });

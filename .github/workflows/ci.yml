@@ -257,7 +257,7 @@ jobs:
             --exit-code
       - run: npm test
       - name: Check connection setup and OAuth errors
-        run: node --import tsx --test src/lib/altazor/connectors/github-application-check.test.ts src/lib/altazor/connectors/oauth-token-response.test.ts
+        run: node --import tsx --test src/lib/altazor/connectors/github-application-check.test.ts src/lib/altazor/connectors/oauth-token-response.test.ts src/lib/altazor/connectors/oauth-access.test.ts src/lib/altazor/connectors/desktop-read-policy.test.ts src/lib/assistant/connector-desktop-intent.test.ts src/lib/altazor/computer/activity-detail.test.ts
       - run: npm run test:integration
       - run: npm run lint
       - run: npm run build
