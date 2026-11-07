@@ -96,6 +96,13 @@ export async function saveAcademicWorkspace(id: string, raw: unknown, user: Caus
   return bookTransaction(client, async tx => {
     const actor = await actorFor(user, tx), current = await tx.altazorAcademicWorkspace.findFirst({ where: { id, ownerId: actor.id, revision: input.expectedRevision, archivedAt: null } });
     if (!current) throw httpError("El trabajo cambió. Recargue antes de guardar", 409);
+    const congress = input.brief.congress;
+    if (congress && (congress.axes.length || congress.tables.length)) {
+      if (current.kind !== "congress") throw httpError("Los ejes y las mesas se organizan dentro de un congreso.", 400);
+      const sessionIds = congress.tables.flatMap(table => table.sessionIds);
+      const available = sessionIds.length ? await tx.altazorTeachingSession.count({ where: { workspaceId: id, id: { in: sessionIds } } }) : 0;
+      if (available !== sessionIds.length) throw httpError("Alguna sesión vinculada a las mesas ya no está disponible. Revisa Ejes y mesas y quita las sesiones retiradas antes de guardar.", 409);
+    }
     type StoredRow = (typeof input.matrix.rows)[number] & { proofs: AltazorSourceSnapshot[] };
     const previous = JSON.parse(current.matrixJson) as { dimensions?: typeof input.matrix.dimensions; rows?: StoredRow[] };
     const previousDimensions = previous.dimensions ?? emptyAcademicMatrix.dimensions;
@@ -155,6 +162,7 @@ export async function prepareAcademicArtifact(id: string, raw: unknown, user: Ca
   // Agenda selections belong to locally generated drafts.
   if (brief.syllabus) delete brief.syllabus.sessionIds;
   delete brief.programSessionIds;
+  delete brief.congress;
   const data = { destination, instruction: input.instruction, brief, matrix: { dimensions: matrix.dimensions || [], rows: (matrix.rows || []).filter((row: { included: boolean }) => row.included) }, profile: profile ? JSON.parse(profile.profileJson) : null };
   if (JSON.stringify(data).length > 60000) throw httpError("La matriz o el perfil excede el contexto de una consulta; reduzca la selección", 413);
   return bookTransaction(client, async tx => {
@@ -199,7 +207,7 @@ export async function createAcademicDraft(id: string, raw: unknown, user: CausaA
     const documentLabel = handout ? "material para participantes" : syllabus ? "syllabus" : "programa";
     const sessions = sessionIds.length ? await tx.altazorTeachingSession.findMany({
       where: { workspaceId: workspace.id, id: { in: sessionIds } },
-      select: { title: true, startsAt: true, endsAt: true, contentJson: true },
+      select: { id: true, title: true, startsAt: true, endsAt: true, contentJson: true },
       orderBy: [{ startsAt: "asc" }, { id: "asc" }],
     }) : [];
     if (sessions.length !== sessionIds.length) {

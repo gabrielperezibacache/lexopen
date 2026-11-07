@@ -1,5 +1,5 @@
 import { SANTIAGO_TZ, santiagoDateKey } from "@/lib/chile-time";
-import type { AcademicMode, emptyAcademicBrief } from "./academic-schemas";
+import type { AcademicCongress, AcademicMode, emptyAcademicBrief } from "./academic-schemas";
 import type { TeachingSessionContent } from "./teaching-session-content";
 
 export type AcademicJourney = "research" | "writing" | "course";
@@ -54,6 +54,7 @@ export function isAcademicTeachingKind(kind: string): kind is (typeof ACADEMIC_T
 }
 
 type ManuscriptSession = {
+  id?: string;
   title: string;
   startsAt: Date;
   endsAt: Date | null;
@@ -67,7 +68,7 @@ function markdownSessionText(value: string) {
   return value.replace(/[\s\p{Cc}]+/gu, " ").trim().replace(/[\\`*\[\]]/g, "\\$&");
 }
 
-function manuscriptSessionBody({ title, startsAt, endsAt, content }: ManuscriptSession) {
+function manuscriptSessionBody({ title, startsAt, endsAt, content }: ManuscriptSession, titleStyle: "heading" | "bold" = "heading") {
   const start = sessionDateTime.format(startsAt);
   const end = endsAt && (santiagoDateKey(startsAt) === santiagoDateKey(endsAt) ? sessionTime : sessionDateTime).format(endsAt);
   const resourceLabel = ({ title, href }: TeachingSessionContent["readings"][number]) =>
@@ -80,13 +81,36 @@ function manuscriptSessionBody({ title, startsAt, endsAt, content }: ManuscriptS
     { label: "Materiales", entries: content.materials.map(resourceLabel) },
   ];
   return [
-    `### ${markdownSessionText(title)}`,
+    titleStyle === "bold" ? `**${markdownSessionText(title)}**` : `### ${markdownSessionText(title)}`,
     `${end ? `${start} – ${end}` : start} (Santiago)`,
     ...(content.location ? [`**Sala o modalidad**`, markdownSessionText(content.location)] : []),
     ...sections.filter(({ entries }) => entries.length)
       .flatMap(({ label, entries }) => [`**${label}**`, entries.map(entry => `- ${entry}`).join("\n")]),
     ...(content.activity ? ["**Actividad**", content.activity.split(/\r\n?|\n/).map(markdownSessionText).join("\n")] : []),
   ].join("\n\n");
+}
+
+function congressProgramBody(congress: AcademicCongress, sessions: readonly ManuscriptSession[]) {
+  const sections: string[] = [];
+  const assigned = new Set<string>();
+  for (const axis of congress.axes) {
+    const tables: string[] = [];
+    for (const table of congress.tables.filter(item => item.axisId === axis.id)) {
+      const linkedIds = new Set(table.sessionIds);
+      const linked = sessions.filter(session => session.id && linkedIds.has(session.id));
+      if (!linked.length) continue;
+      for (const session of linked) assigned.add(session.id!);
+      tables.push([
+        `**Mesa · ${markdownSessionText(table.title)}**`,
+        ...(table.responsible ? ["**Responsable**", markdownSessionText(table.responsible)] : []),
+        ...linked.map(session => manuscriptSessionBody(session, "bold")),
+      ].join("\n\n"));
+    }
+    if (tables.length) sections.push(`### Eje · ${markdownSessionText(axis.title)}`, ...tables);
+  }
+  const unassigned = sessions.filter(session => !session.id || !assigned.has(session.id));
+  if (unassigned.length) sections.push("### Otras sesiones", ...unassigned.map(session => manuscriptSessionBody(session, "bold")));
+  return sections;
 }
 
 export function academicManuscriptBody(
@@ -111,8 +135,11 @@ export function academicManuscriptBody(
   }
   if (templateId !== "course") {
     const sessionSection = isAcademicTeachingProgram(templateId) ? teachingProgramSections[templateId] : undefined;
+    const sessionBodies = templateId === "congress" && brief.congress?.axes.length
+      ? congressProgramBody(brief.congress, sessions)
+      : sessions.map(session => manuscriptSessionBody(session));
     return [heading, ...ACADEMIC_MANUSCRIPT_TEMPLATES[templateId].headings.flatMap(label =>
-      label === sessionSection ? [`## ${label}`, ...sessions.map(manuscriptSessionBody)] : [`## ${label}`],
+      label === sessionSection ? [`## ${label}`, ...sessionBodies] : [`## ${label}`],
     )].join("\n\n");
   }
   const fields = brief.syllabus;
@@ -121,7 +148,7 @@ export function academicManuscriptBody(
     ["Destinatarios y requisitos", brief.audience, fields?.requirements],
     ["Horario y sala", fields?.schedule, fields?.room, brief.duration],
     ["Resultados de aprendizaje", brief.learningOutcomes],
-    ["Unidades y sesiones", ...sessions.map(manuscriptSessionBody)],
+    ["Unidades y sesiones", ...sessions.map(session => manuscriptSessionBody(session))],
     ["Evaluación", brief.evaluation],
     ["Bibliografía base", fields?.bibliography],
   ];

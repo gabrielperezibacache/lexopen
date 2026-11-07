@@ -203,7 +203,7 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
         await program.getByText("Material para participantes", { exact: true }).click();
         await expect(program.getByRole("button", { name: "Crear hoja para participantes", exact: true })).toBeDisabled();
         await academic.getByLabel("Tu objetivo o texto de trabajo", { exact: true }).fill("Nota privada del equipo organizador.");
-        const picker = program.getByText("Sesiones de la Agenda", { exact: true });
+        const picker = program.locator("#programa-agenda").getByText("Sesiones de la Agenda", { exact: true });
         const firstSession = program.getByRole("checkbox", { name: new RegExp(open) });
         const lastSession = program.getByRole("checkbox", { name: new RegExp(close) });
         const internalSession = program.getByRole("checkbox", { name: new RegExp(excluded) });
@@ -258,6 +258,65 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
         }
         await page.reload();
         await expect(text).toHaveValue(edited);
+        if (kind === "congress") {
+          const originalProgramId = new URL(page.url()).searchParams.get("resultado");
+          expect(originalProgramId).toBeTruthy();
+          await academic.getByRole("button", { name: "Objetivo", exact: true }).click();
+          const organization = academic.getByRole("region", { name: "Organización del congreso", exact: true });
+          await organization.getByText("Ejes y mesas", { exact: true }).click();
+          await organization.getByRole("button", { name: "Añadir eje", exact: true }).click();
+          await organization.getByLabel("Nombre del eje 1", { exact: true }).fill("Métodos de investigación");
+          await organization.getByRole("button", { name: "Añadir eje", exact: true }).click();
+          await organization.getByLabel("Nombre del eje 2", { exact: true }).fill("Fuentes y argumentación");
+          await organization.getByRole("group", { name: "Eje 1", exact: true }).getByRole("button", { name: "Añadir mesa", exact: true }).click();
+          await organization.getByLabel("Nombre de la mesa 1", { exact: true }).fill("Mesa de metodología");
+          await organization.getByLabel("Responsable de la mesa 1", { exact: true }).fill("Responsable ficticia de metodología");
+          const firstTable = organization.getByRole("group", { name: "Mesa 1", exact: true });
+          await firstTable.locator("summary").filter({ hasText: /^Sesiones de la mesa/ }).click();
+          const tableClose = firstTable.getByRole("checkbox", { name: new RegExp(close) });
+          await tableClose.evaluate(input => input.scrollIntoView({ block: "center", behavior: "instant" }));
+          await tableClose.check();
+          await organization.getByRole("group", { name: "Eje 2", exact: true }).getByRole("button", { name: "Añadir mesa", exact: true }).click();
+          await organization.getByLabel("Nombre de la mesa 2", { exact: true }).fill("Mesa de fuentes");
+          await organization.getByLabel("Responsable de la mesa 2", { exact: true }).fill("Responsable ficticio de fuentes");
+          const secondTable = organization.getByRole("group", { name: "Mesa 2", exact: true });
+          await secondTable.locator("summary").filter({ hasText: /^Sesiones de la mesa/ }).click();
+          await expect(secondTable.getByRole("checkbox", { name: new RegExp(close) })).toBeDisabled();
+          const tableOpen = secondTable.getByRole("checkbox", { name: new RegExp(open) });
+          await tableOpen.evaluate(input => input.scrollIntoView({ block: "center", behavior: "instant" }));
+          await tableOpen.check();
+          await organization.getByLabel("Eje de la mesa 1", { exact: true }).selectOption({ label: "Fuentes y argumentación" });
+          const movedTable = organization.getByRole("group", { name: "Eje 2", exact: true }).getByRole("group", { name: "Mesa 1", exact: true });
+          await expect(movedTable.getByLabel("Responsable de la mesa 1", { exact: true })).toHaveValue("Responsable ficticia de metodología");
+          await movedTable.locator("summary").filter({ hasText: /^Sesiones de la mesa/ }).click();
+          await expect(movedTable.getByRole("checkbox", { name: new RegExp(close) })).toBeChecked();
+          await organization.getByLabel("Eje de la mesa 1", { exact: true }).selectOption({ label: "Métodos de investigación" });
+          await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
+          await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
+          await page.reload();
+          await academic.getByRole("button", { name: "Objetivo", exact: true }).click();
+          await organization.getByText("Ejes y mesas", { exact: true }).click();
+          await expect(organization.getByLabel("Nombre del eje 1", { exact: true })).toHaveValue("Métodos de investigación");
+          await expect(organization.getByLabel("Responsable de la mesa 2", { exact: true })).toHaveValue("Responsable ficticio de fuentes");
+          if (process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
+            await organization.screenshot({ path: info.outputPath("congreso-mesas-movil.png") });
+            await page.setViewportSize({ width: 1280, height: 880 });
+            await organization.screenshot({ path: info.outputPath("congreso-mesas-escritorio.png") });
+            await page.setViewportSize({ width: 360, height: 800 });
+          }
+          await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+          await program.getByRole("button", { name: "Crear programa", exact: true }).click();
+          await expect(text).toHaveValue(/### Eje · Métodos de investigación/);
+          const grouped = await text.inputValue();
+          expect(grouped).toContain("**Mesa · Mesa de metodología**");
+          expect(grouped).toContain("Responsable ficticia de metodología");
+          expect(grouped).toContain("### Eje · Fuentes y argumentación");
+          expect(grouped).toContain("**Mesa · Mesa de fuentes**");
+          expect(grouped).toContain("Responsable ficticio de fuentes");
+          expect(grouped.indexOf(close)).toBeLessThan(grouped.indexOf(open));
+          expect(grouped).not.toContain(excluded);
+          expect((await db.altazorAcademicArtifact.findUniqueOrThrow({ where: { id: originalProgramId! } })).body).toBe(edited);
+        }
         if (kind === "workshop") {
           const programId = new URL(page.url()).searchParams.get("resultado");
           expect(programId).toBeTruthy();

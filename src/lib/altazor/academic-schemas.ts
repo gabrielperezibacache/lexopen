@@ -26,6 +26,30 @@ const syllabus = z.object({
 }).strict();
 export type AcademicSyllabus = z.infer<typeof syllabus>;
 export const emptyAcademicSyllabus: AcademicSyllabus = { summary: "", approach: "", schedule: "", room: "", requirements: "", bibliography: "" };
+export const ACADEMIC_CONGRESS_LIMITS = { axes: 12, tables: 48, titleLength: 200, responsibleLength: 200, sessionsPerTable: 200, sessions: 200 } as const;
+const congressTitle = z.string().trim().min(1).max(ACADEMIC_CONGRESS_LIMITS.titleLength)
+  .regex(/^[^\p{Cc}\p{Zl}\p{Zp}]+$/u, "Escribe el nombre en una sola línea.");
+export const academicCongressSchema = z.object({
+  axes: z.array(z.object({ id: writingId, title: congressTitle }).strict()).max(ACADEMIC_CONGRESS_LIMITS.axes),
+  tables: z.array(z.object({
+    id: writingId,
+    axisId: writingId,
+    title: congressTitle,
+    responsible: z.string().trim().max(ACADEMIC_CONGRESS_LIMITS.responsibleLength)
+      .regex(/^[^\p{Cc}\p{Zl}\p{Zp}]*$/u, "Escribe el nombre del responsable en una sola línea."),
+    sessionIds: z.array(writingId).max(ACADEMIC_CONGRESS_LIMITS.sessionsPerTable),
+  }).strict()).max(ACADEMIC_CONGRESS_LIMITS.tables),
+}).strict().superRefine((value, ctx) => {
+  const ids = [...value.axes, ...value.tables].map(item => item.id);
+  const axes = new Set(value.axes.map(axis => axis.id));
+  const sessionIds = value.tables.flatMap(table => table.sessionIds);
+  if (new Set(ids).size !== ids.length) ctx.addIssue({ code: "custom", message: "Cada eje y mesa debe tener un identificador propio." });
+  if (value.tables.some(table => !axes.has(table.axisId))) ctx.addIssue({ code: "custom", message: "Asigna cada mesa a un eje del congreso." });
+  if (new Set(sessionIds).size !== sessionIds.length) ctx.addIssue({ code: "custom", message: "Una sesión sólo puede pertenecer a una mesa." });
+  if (sessionIds.length > ACADEMIC_CONGRESS_LIMITS.sessions) ctx.addIssue({ code: "custom", message: "El congreso admite hasta 200 sesiones vinculadas a sus mesas." });
+});
+export type AcademicCongress = z.infer<typeof academicCongressSchema>;
+export const emptyAcademicCongress: AcademicCongress = { axes: [], tables: [] };
 export const ACADEMIC_CALL_STATUS = { watching: "En seguimiento", preparing: "Preparando postulación", submitted: "Presentada", closed: "Cerrada" } as const;
 const academicCall = z.object({
   country: z.string().refine(value => value === "" || isWorkCountry(value), "Selecciona un país válido"),
@@ -47,7 +71,7 @@ const academicCall = z.object({
 }).strict();
 export type AcademicCall = z.infer<typeof academicCall>;
 export const emptyAcademicCall: AcademicCall = { country: "", organization: "", url: "", deadline: "", status: "watching" };
-const brief = z.object({ objective: z.string().max(8000).default(""), audience: z.string().max(1000).default(""), language: z.string().max(80).default("Español"), duration: z.string().max(100).default(""), learningOutcomes: z.string().max(6000).default(""), evaluation: z.string().max(6000).default(""), task: academicModeSchema.default("literature_review"), syllabus: syllabus.optional(), programSessionIds: agendaSessionIds, call: academicCall.optional() }).strict();
+const brief = z.object({ objective: z.string().max(8000).default(""), audience: z.string().max(1000).default(""), language: z.string().max(80).default("Español"), duration: z.string().max(100).default(""), learningOutcomes: z.string().max(6000).default(""), evaluation: z.string().max(6000).default(""), task: academicModeSchema.default("literature_review"), syllabus: syllabus.optional(), programSessionIds: agendaSessionIds, congress: academicCongressSchema.optional(), call: academicCall.optional() }).strict();
 const dimension = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,40}$/), label: z.string().trim().min(1).max(100), type: z.enum(["text", "number", "date", "tag"]) }).strict();
 const cell = z.object({ value: z.string().max(5000), source: altazorSourceInputSchema.optional() }).strict();
 const matrix = z.object({ dimensions: z.array(dimension).max(12), rows: z.array(z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/), title: z.string().max(240), included: z.boolean(), cells: z.record(cell) }).strict()).max(100) }).strict().superRefine((value, ctx) => {

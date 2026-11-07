@@ -6,7 +6,7 @@ Abre **Académico → Docencia** y elige el tipo de trabajo. Cada trabajo conser
 | --- | --- | --- |
 | Cursos | Ficha de curso, bibliografía base y sugerencias por solicitud. Crea un syllabus editable con las sesiones que elijas de la Agenda. | Añadir unidades y evaluaciones reutilizables. |
 | Seminarios | Programa editable con las sesiones elegidas, sus ponentes, moderación, lecturas y lugar. | Vincular responsabilidades de organización y avisos del encuentro. |
-| Congresos | Programa editable con ejes, comité y mesas. Las sesiones elegidas aportan sus ponentes, moderación y lugar. | Organizar mesas por eje y distribuir tareas del comité. |
+| Congresos | Organiza mesas por eje, indica su responsable y vincula sus sesiones de la Agenda. El programa editable agrupa las sesiones elegidas por eje y mesa. | Distribuir tareas de organización y seguir los acuerdos del comité. |
 | Talleres | Programa editable y hoja para participantes con las sesiones elegidas, sus consignas, lecturas y materiales. | Vincular rúbricas y recoger entregas de las actividades. |
 | Convocatorias | Ficha con país, organismo, bases, fecha límite y estado. Las fichas guardadas desde un aviso conservan su procedencia y la fecha de consulta. | Vincular responsables, anexos y un curso o proyecto de investigación. |
 | Búsqueda y fuentes por país | Catálogo oficial por país. Busca por tema entre los avisos que ya consultaste y filtra tu cartera por país. | Ampliar las fuentes y los filtros por área, elegibilidad y modalidad. |
@@ -29,6 +29,15 @@ Las sesiones se registran en hora de Santiago de Chile, la zona que usa la Agend
 2. Para una lectura o material, puedes guardar sólo el título o añadir un enlace HTTPS, incluido un enlace a un libro o pasaje de tu Biblioteca de LexOpen. El enlace conserva los permisos de acceso de la Biblioteca.
 3. Abre **Sesiones de la Agenda** en la **Ficha para el syllabus** del curso o en el **Programa** del seminario, congreso o taller. Marca las sesiones de ese trabajo que quieras incorporar. **Guardar cambios** conserva la selección para retomarla después. Si retiras una sesión elegida de la Agenda, usa **Quitar sesiones retiradas** para actualizar la selección.
 4. Pulsa **Crear syllabus** o **Crear programa**. El borrador incorpora los horarios, ponentes, moderación, lugar y contenidos guardados en orden cronológico. Si dejas la selección vacía, puedes empezar desde la plantilla. Cada borrador conserva una copia editable. Los cambios posteriores de la Agenda se reflejan al crear otro borrador.
+
+## Organizar las mesas de un congreso
+
+1. Abre el trabajo del congreso y despliega **Ejes y mesas** dentro de **Programa del congreso**. Usa **Añadir eje** para registrar las líneas temáticas.
+2. En cada eje, pulsa **Añadir mesa**, escribe su nombre e indica el nombre de su responsable. Puedes cambiar la mesa de eje desde su selector.
+3. En **Sesiones de la mesa**, vincula las actividades de la Agenda que le correspondan. Cada sesión se vincula a una mesa. Los horarios, ponentes y materiales se editan desde **Actividades en mi Agenda**.
+4. Guarda los cambios. En **Sesiones de la Agenda**, elige qué actividades llevará el programa y pulsa **Crear programa**. Las sesiones elegidas se agrupan por eje y mesa, con sus responsables. Las elegidas que aún no tienen mesa aparecen en **Otras sesiones**.
+
+La planificación conserva las mesas aunque algunas sesiones queden fuera de un programa concreto. Cada borrador guarda su copia editable. Si retiras una actividad de la Agenda, revisa los avisos de las sesiones vinculadas y actualiza la planificación antes de guardarla.
 
 ## Preparar una hoja para participantes
 

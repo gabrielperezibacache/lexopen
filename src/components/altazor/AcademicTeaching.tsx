@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { ArrowDown, ArrowRight, BookOpen, CalendarDays, ExternalLink, GraduationCap, LibraryBig, Megaphone, PenTool, UsersRound } from "lucide-react";
 import type { AcademicCallOrigin } from "@/lib/altazor/academic-calls";
-import { ACADEMIC_CALL_STATUS, emptyAcademicCall, emptyAcademicSyllabus, type AcademicCall, type AcademicSyllabus, type emptyAcademicBrief } from "@/lib/altazor/academic-schemas";
+import { ACADEMIC_CALL_STATUS, academicCongressSchema, emptyAcademicCall, emptyAcademicSyllabus, type AcademicCall, type AcademicCongress, type AcademicSyllabus, type emptyAcademicBrief } from "@/lib/altazor/academic-schemas";
 import { ACADEMIC_MANUSCRIPT_TEMPLATES, ACADEMIC_TEACHING_TEMPLATES } from "@/lib/altazor/academic-templates";
 import { formatCivilDate, SANTIAGO_TZ } from "@/lib/chile-time";
 import { isWorkCountry, workCountryOptions } from "@/lib/config/countries";
 import { AcademicCallSources } from "./AcademicCallSources";
 import { AcademicAgendaSessionPicker } from "./AcademicAgendaSessionPicker";
+import { AcademicCongressOrganization } from "./AcademicCongressOrganization";
 import { AltazorMark } from "./AltazorMark";
 import { useOptionalAltazorCompanion } from "./AltazorCompanionProvider";
 import type { AcademicProject } from "./academic-ui";
@@ -183,19 +184,22 @@ export function AcademicSyllabusForm({ workspaceId, sessionsVersion, title, brie
 
 const programTitles = { seminar: "Programa del seminario", congress: "Programa del congreso", workshop: "Programa del taller" } as const;
 
-export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, selection, title, busy, sessionContentDirty, onChange, onCreate, onHandout }: {
+export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, selection, title, congress, busy, sessionContentDirty, onChange, onCongressChange, onCreate, onHandout }: {
   kind: keyof typeof programTitles;
   workspaceId: string;
   sessionsVersion: number;
   selection: string[];
   title: string;
+  congress?: AcademicCongress;
   busy: boolean;
   sessionContentDirty: boolean;
   onChange: (sessionIds: string[]) => void;
+  onCongressChange: (value: AcademicCongress) => void;
   onCreate: () => void;
   onHandout: () => void;
 }) {
   const Icon = icons[kind];
+  const incompleteOrganization = kind === "congress" && congress !== undefined && !academicCongressSchema.safeParse(congress).success;
   return <section className={styles.syllabus} aria-labelledby="teaching-program-title">
     <header className={styles.heading}>
       <Icon size={27} strokeWidth={1.4} aria-hidden="true" />
@@ -203,13 +207,16 @@ export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, se
         <p>Crea un documento editable con la plantilla y las sesiones que elijas. Puedes <a className={styles.inlineLink} href="#agenda-docencia">añadir o editar sesiones en tu Agenda</a>.</p>
       </div>
     </header>
+    {kind === "congress" && <AcademicCongressOrganization workspaceId={workspaceId} version={sessionsVersion}
+      value={congress} disabled={busy} onChange={onCongressChange} />}
     <AcademicAgendaSessionPicker documentKind="programa" workspaceId={workspaceId} version={sessionsVersion}
       selection={selection} onChange={onChange} disabled={busy} />
     {sessionContentDirty && <p className={styles.meta} role="status">Guarda o descarta el contenido de la sesión antes de crear el programa.</p>}
+    {incompleteOrganization && <p className={styles.meta} role="status">Completa los nombres de los ejes y las mesas antes de crear un documento.</p>}
     <div className={styles.actions}>
-      <button type="button" className="btn btn-primary" disabled={busy || sessionContentDirty || !title.trim()} onClick={onCreate}>Crear programa <ArrowRight size={16} aria-hidden="true" /></button>
+      <button type="button" className="btn btn-primary" disabled={busy || sessionContentDirty || incompleteOrganization || !title.trim()} onClick={onCreate}>Crear programa <ArrowRight size={16} aria-hidden="true" /></button>
     </div>
-    <ParticipantHandoutAction disabled={busy || sessionContentDirty || !title.trim()} hasSelection={selection.length > 0} onCreate={onHandout} />
+    <ParticipantHandoutAction disabled={busy || sessionContentDirty || incompleteOrganization || !title.trim()} hasSelection={selection.length > 0} onCreate={onHandout} />
   </section>;
 }
 

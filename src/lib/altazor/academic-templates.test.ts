@@ -82,3 +82,35 @@ test("teaching programs place Agenda sessions under the existing program heading
   assert.ok(handout.includes("**Tus notas**\n\n\n\n\n"));
   assert.doesNotMatch(handout, /Nota privada|Pauta de corrección/);
 });
+
+test("congress programs group chosen sessions by axis and table while keeping legacy and handout content", () => {
+  const sessions = ["primera", "segunda", "libre"].map((id, index) => ({
+    id,
+    title: `Sesión ${id}`,
+    startsAt: new Date(`2030-05-09T${String(16 + index).padStart(2, "0")}:00:00Z`),
+    endsAt: null,
+    content: { readings: [], materials: [], outcomes: [] },
+  }));
+  const congress = {
+    axes: [{ id: "derecho", title: "Derecho y tecnología" }, { id: "interno", title: "Eje interno" }],
+    tables: [
+      { id: "debate", axisId: "derecho", title: "Debate jurídico", responsible: "Coordinadora [invitada]", sessionIds: ["segunda", "primera"] },
+      { id: "otra", axisId: "interno", title: "Mesa excluida", responsible: "Responsable interno", sessionIds: ["no-elegida"] },
+    ],
+  };
+  const brief = { ...emptyAcademicBrief, congress };
+  const body = academicManuscriptBody("congress", "Congreso", brief, sessions);
+  assert.match(body, /## Programa y mesas\n\n### Eje · Derecho y tecnología\n\n\*\*Mesa · Debate jurídico\*\*/);
+  assert.ok(body.includes("**Responsable**\n\nCoordinadora \\[invitada\\]"));
+  assert.ok(body.includes("**Sesión primera**"));
+  assert.ok(body.indexOf("Sesión primera") < body.indexOf("Sesión segunda"));
+  assert.ok(body.includes("### Otras sesiones\n\n**Sesión libre**"));
+  assert.doesNotMatch(body, /Eje interno|Mesa excluida|Responsable interno/);
+  assert.doesNotMatch(body, /^#{4,}/m);
+  const legacy = academicManuscriptBody("congress", "Congreso", emptyAcademicBrief, sessions);
+  assert.equal(academicManuscriptBody("congress", "Congreso", { ...emptyAcademicBrief, congress: { axes: [], tables: [] } }, sessions), legacy);
+  assert.match(legacy, /## Programa y mesas\n\n### Sesión primera/);
+  for (const template of ["seminar", "participant_handout"] as const) {
+    assert.doesNotMatch(academicManuscriptBody(template, "Congreso", brief, sessions), /Derecho y tecnología|Coordinadora|Debate jurídico/);
+  }
+});

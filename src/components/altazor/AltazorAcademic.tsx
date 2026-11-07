@@ -362,6 +362,7 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
                 onSearch={() => { setDiscoveryQuery(workspace.title.trim()); setPane("discovery"); }} />}
               {programKind && <AcademicTeachingProgram key={`program-${workspace.id}`} kind={programKind}
                 workspaceId={workspace.id} sessionsVersion={teachingSessionsVersion} selection={workspace.brief.programSessionIds ?? []}
+                congress={workspace.brief.congress} onCongressChange={congress => updateWorkspace({ brief: { ...workspace.brief, congress } })}
                 title={workspace.title} busy={busy} sessionContentDirty={sessionContentDirty}
                 onChange={programSessionIds => updateWorkspace({ brief: { ...workspace.brief, programSessionIds } })}
                 onCreate={() => void createDraft(programKind)} onHandout={() => void createDraft("participant_handout")} />}
