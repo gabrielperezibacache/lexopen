@@ -17,3 +17,11 @@ El 7 de noviembre de 2026 se construyó una imagen local con el nuevo fondo sobr
 Pasaron las diez comprobaciones: Word, conversión con LibreOffice, PDF, OCR en español e inglés, Excel, EPUB, bibliografía, búsqueda local, audio y fondo de LexOpen. La prueba se ejecutó con el usuario del escritorio, sin red, sin montar carpetas del equipo y con el sistema de archivos raíz en modo de lectura. Los archivos del fondo, su configuración y la comprobación coinciden con los del repositorio.
 
 Esta evidencia corresponde a una imagen local. La activación en un escritorio y la publicación de instaladores se verifican por separado. Las tres pruebas offline de empaquetado también comprueban que el SVG conserva exactamente la firma original, ambas resoluciones y los avisos de licencia del contexto.
+
+## Apertura real
+
+La instalación privada se actualizó con la imagen local verificada. Se abrió un escritorio nuevo y se comprobó que PCManFM selecciona la gráfica de LexOpen sin intervención manual. La captura corresponde a esa sesión real a 1280 × 800; no es una maqueta.
+
+![Escritorio nuevo con el fondo aplicado](escritorio-fondo-lexopen-real.png)
+
+Este cambio local conserva las cuentas y el historial. No publica ni actualiza instaladores distribuidos anteriormente.
