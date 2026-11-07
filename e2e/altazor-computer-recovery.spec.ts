@@ -88,6 +88,50 @@ test("el escritorio renueva su imagen sin solapar capturas y se pausa al volver 
   } finally { if (retainedCapture) await retainedCapture.abort().catch(() => {}); }
 });
 
+test("una sesión pasa de iniciándose a disponible también en el selector y conserva sus controles actuales", async ({ page }) => {
+  const starting = { ...session("desktop-starting-fixture", "starting"), canRenew: false, requiresStop: true };
+  const ready = { ...starting, state: "ready", canRenew: true, held: true };
+  let created = false, closed = false, starts = 0;
+  let firstRead: Route | undefined;
+  await idleActivity(page);
+  await page.route(`**/api/altazor/connectors?workspaceId=${workspaceId}`, route => route.fulfill({ json: { connectors: emptyInventory } }));
+  await page.route("**/api/altazor/computer", route => route.fulfill({ json: {
+    computer: computer(created ? [{ ...starting, ...(closed ? { state: "closed", canRenew: false, requiresStop: false } : {}) }] : []),
+  } }));
+  await page.route("**/api/altazor/computer/sessions", route => {
+    starts++; created = true;
+    return route.fulfill({ json: { session: starting } });
+  });
+  await page.route(`**/api/altazor/computer/sessions/${starting.id}`, route => { firstRead = route; });
+  await page.route(`**/api/altazor/computer/sessions/${starting.id}/screenshot?*`, route => route.fulfill({ body: frame, contentType: "image/png" }));
+  await page.route(`**/api/altazor/computer/sessions/${starting.id}/actions`, route => {
+    expect(route.request().postDataJSON().action).toBe("close"); closed = true;
+    return route.fulfill({ json: { action: { id: "fixture-started-stop", status: "completed", result: { stopped: true } } } });
+  });
+  try {
+    await loginAs(page, "abogado@estudio.cl");
+    await page.goto("/inicio?altazor=computer");
+    const panel = page.getByRole("region", { name: "Escritorio de Altazor", exact: true });
+    const start = panel.getByRole("button", { name: "Iniciar escritorio privado", exact: true });
+    await expect(start).toBeEnabled();
+    await start.click();
+    const picker = panel.getByLabel("Sesión de este espacio", { exact: true });
+    await expect(picker).toHaveValue(starting.id);
+    await expect(picker.locator("option:checked")).toContainText("Escritorio iniciándose");
+    await expect.poll(() => Boolean(firstRead)).toBe(true);
+    await firstRead!.fulfill({ json: { session: ready, runtime: "container", kittyStatus: "running", working: false, approvals: [], turns: [] } });
+    firstRead = undefined;
+    await expect(picker.locator("option:checked")).toContainText("Escritorio disponible");
+    await expect(panel.getByRole("button", { name: "Mantener sesión 20 min", exact: true })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Devolver control", exact: true })).toBeEnabled();
+    await expect(start).toBeDisabled();
+    await panel.getByRole("button", { name: "Detener escritorio", exact: true }).click();
+    await expect(picker.locator(`option[value="${starting.id}"]`)).toContainText("Escritorio detenido");
+    await expect(start).toBeEnabled();
+    expect(starts).toBe(1);
+  } finally { if (firstRead) await firstRead.abort().catch(() => {}); }
+});
+
 test("una apertura sin confirmar recupera la sesión pendiente y permite detenerla sin repetir el inicio", async ({ page }) => {
   const uncertain = session("desktop-uncertain-fixture", "unknown");
   let created = false, closed = false, starts = 0, stops = 0, statusReads = 0;
@@ -116,6 +160,7 @@ test("una apertura sin confirmar recupera la sesión pendiente y permite detener
   const readsBeforeStart = statusReads;
   await start.click();
   await expect(panel.getByLabel("Sesión de este espacio", { exact: true })).toHaveValue(uncertain.id);
+  await expect(panel.getByLabel("Sesión de este espacio", { exact: true }).locator("option:checked")).toContainText("Creación sin confirmar");
   await expect(panel.getByRole("button", { name: "Detener escritorio", exact: true })).toBeEnabled();
   await expect(start).toBeDisabled();
   expect(statusReads).toBeGreaterThan(readsBeforeStart);

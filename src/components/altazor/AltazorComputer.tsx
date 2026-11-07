@@ -82,7 +82,13 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
       if (response.status === 410) { setView(null); setLinkFailure(true); }
       throw new Error(data.error || "No se pudo consultar la sesión.");
     }
-    setView(data);
+    const next = data as ComputerSessionView;
+    if (next.session.id !== id) throw new Error("No se pudo confirmar la sesión solicitada. Vuelve a comprobar el escritorio.");
+    setView(next);
+    setStatus(current => {
+      if (!current || signal?.aborted || selectedRef.current !== id || epoch !== selectionEpoch.current || version !== sessionVersion.current) return current;
+      return { ...current, sessions: current.sessions.map(session => session.id === id ? { ...session, ...next.session } : session) };
+    });
   }, [selectSession]);
   useEffect(() => { if (!active) return; let live = true; queueMicrotask(() => { if (live) void refresh().catch(cause => { if (live) setError(cause instanceof Error ? cause.message : "No se pudo consultar el computador."); }).finally(() => { if (live) setLoading(false); }); }); return () => { live = false; statusRequest.current?.abort(); }; }, [active, refresh]);
   useEffect(() => {
