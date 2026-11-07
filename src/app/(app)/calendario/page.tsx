@@ -19,6 +19,7 @@ import {
   weekQueryRange,
 } from "@/lib/calendario/week";
 import { teachingCalendarSessions } from "@/lib/altazor/teaching-sessions";
+import { congressCalendarActions } from "@/lib/altazor/congress-actions";
 import { civilDateKey, civilMonthQueryRange, civilSpanQueryRange, formatCivilDate, santiagoDateKey, SANTIAGO_TZ } from "@/lib/chile-time";
 import { prisma } from "@/lib/db";
 import { clasificarUrgencia, labelTipoComputo } from "@/lib/plazos";
@@ -118,7 +119,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
   const teachingRange = vista === "semana" ? civilSpanQueryRange(weekMonday, weekDays(weekMonday)[6]) : range;
 
   const showsEvents = filterTipo === "todos" || filterTipo === "evento";
-  const [plazos, tasks, causasTabla, movAudiencias, eventosRaw, causasOptions, teaching] =
+  const [plazos, tasks, causasTabla, movAudiencias, eventosRaw, causasOptions, teaching, committeeActions] =
     await Promise.all([
       prisma.plazo.findMany({
         where: { AND: [plazoAccessWhere(user), {
@@ -179,6 +180,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
         take: 100,
       }),
       showsEvents ? teachingCalendarSessions(user, teachingRange) : [],
+      showsEvents ? congressCalendarActions(user, teachingRange) : [],
     ]);
 
   const eventos: EventoListItem[] = eventosRaw.map((e) => ({
@@ -291,6 +293,10 @@ export default async function CalendarioPage({ searchParams }: Props) {
       ...teaching.map(item => ({
         id: item.id, titulo: item.title, tipo: "docencia", inicio: item.startsAt.toISOString(), causaId: null,
         teachingHref: `/academico?trabajo=${encodeURIComponent(item.workspaceId)}#agenda-docencia`,
+      })),
+      ...committeeActions.map(item => ({
+        id: item.id, titulo: `Encargo · ${item.title}`, tipo: "docencia", inicio: item.startsAt.toISOString(), causaId: null,
+        teachingHref: `/academico?trabajo=${encodeURIComponent(item.workspaceId)}#encargos-comite`,
       })),
     ];
     for (const event of activities.sort((a, b) => a.inicio.localeCompare(b.inicio))) {

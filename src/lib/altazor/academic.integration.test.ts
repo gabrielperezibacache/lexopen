@@ -13,6 +13,8 @@ import { emptyAcademicBrief, emptyAcademicMatrix, emptyAcademicSyllabus, type Ac
 import { createAcademicWorkspace, saveAcademicWorkspace, readAcademicWorkspace, prepareAcademicArtifact, executeAcademicArtifact, readAcademicArtifact, saveAcademicArtifact, incorporateAcademicWriting, cancelAcademicArtifact, saveAcademicProfile, academicArtifactHistory, readAcademicArtifactVersion, readAcademicArtifactDownload, restoreAcademicArtifactVersion, createAcademicDraft } from "./academic";
 import { exportCaseWriting } from "@/lib/writings/export";
 import { prepareAcademicLinkedInDraft, verifyAltazorShareOrigin } from "./share-origin";
+import { congressCalendarActions } from "./congress-actions";
+import { exportTeachingSessions } from "./teaching-sessions";
 const status=(expected:number)=>(error:unknown)=>(error as {status?:number}).status===expected;
 async function main(){
   const url=assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);assert.equal(url,new URL(process.env.DATABASE_URL!).toString());
@@ -377,9 +379,55 @@ async function main(){
     assert.ok(groupedHandoutBody.indexOf(unassignedSession.title) < groupedHandoutBody.indexOf(secondAxisSession.title));
     await db.altazorTeachingSession.delete({ where: { id: hiddenSession.id } });
     await assert.rejects(saveOrganization(changedOrganization), status(409));
-    const recoveredSelection = await saveOrganization({ ...changedOrganization, tables: changedOrganization.tables.filter(item => item.id !== "table-internal") });
+    const recoveredOrganization = { ...changedOrganization, tables: changedOrganization.tables.filter(item => item.id !== "table-internal") };
+    const recoveredSelection = await saveOrganization(recoveredOrganization);
     const recovered = await createAcademicDraft(organizedCongress.id, { ...organizedInput, requestId: randomUUID(), expectedRevision: recoveredSelection.revision }, owner, db);
     assert.ok((await readAcademicArtifact(organizedCongress.id, recovered.id, owner, db)).body.includes("Nueva coordinadora ficticia"));
+    const calendarBeforeActions = await exportTeachingSessions(organizedCongress.id, owner, db);
+    const committeeActions: NonNullable<AcademicCongress["actions"]> = [
+      { id: "action-confirm", title: "Confirmar asistencia del comité", responsible: "Responsable privada del comité", tableId: "table-research", dueAtLocal: "2030-05-08T10:00", status: "pending", notes: "Acuerdo reservado del comité." },
+      { id: "action-room", title: "Preparar sala del comité", responsible: "Responsable privada de sala", dueAtLocal: "2030-05-09T11:00", status: "in_progress", notes: "Revisar la disposición." },
+      { id: "action-done", title: "Encargo ya completado", responsible: "", dueAtLocal: "2030-05-10T11:00", status: "done", notes: "" },
+      { id: "action-undated", title: "Encargo sin fecha", responsible: "", status: "pending", notes: "" },
+      { id: "action-outside", title: "Encargo de otro mes", responsible: "", dueAtLocal: "2030-06-01T11:00", status: "pending", notes: "" },
+    ];
+    const committeeOrganization = { ...recoveredOrganization, actions: committeeActions };
+    const committeeSaved = await saveOrganization(committeeOrganization);
+    assert.deepEqual((await readAcademicWorkspace(organizedCongress.id, owner, db)).brief.congress?.actions, committeeActions);
+    const committeeRange = { start: new Date("2030-05-01T04:00:00Z"), end: new Date("2030-06-01T03:59:59Z") };
+    const agendaActions = await congressCalendarActions(owner, committeeRange, db);
+    assert.deepEqual(agendaActions.map(item => item.title), committeeActions.slice(0, 2).map(item => item.title));
+    assert.equal(agendaActions[0].startsAt.toISOString(), "2030-05-08T14:00:00.000Z");
+    assert.equal(agendaActions[0].workspaceId, organizedCongress.id);
+    assert.deepEqual((await congressCalendarActions(owner, committeeRange, db)).map(item => item.id), agendaActions.map(item => item.id));
+    assert.deepEqual(await congressCalendarActions(other, committeeRange, db), []);
+    await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "assistant.use" } });
+    assert.deepEqual(await congressCalendarActions(owner, committeeRange, db), []);
+    await db.user.update({ where: { id: owner.id }, data: { capabilityRevokes: "" } });
+    await db.altazorAcademicWorkspace.update({ where: { id: organizedCongress.id }, data: { archivedAt: new Date() } });
+    assert.deepEqual(await congressCalendarActions(owner, committeeRange, db), []);
+    await db.altazorAcademicWorkspace.update({ where: { id: organizedCongress.id }, data: { archivedAt: null } });
+    for (const invalidActions of [
+      [committeeActions[0], committeeActions[0]],
+      [{ ...committeeActions[0], tableId: "table-missing" }],
+      [{ ...committeeActions[0], id: "axis-research" }],
+      [{ ...committeeActions[0], status: "unknown" }],
+      [{ ...committeeActions[0], notes: "x".repeat(2001) }],
+    ]) await assert.rejects(saveOrganization({ ...recoveredOrganization, actions: invalidActions } as AcademicCongress), { name: "ZodError" });
+    await assert.rejects(saveOrganization({ ...recoveredOrganization, actions: [{ ...committeeActions[0], dueAtLocal: "2026-09-06T00:30" }] }), status(400));
+    const afterRejectedActions = await readAcademicWorkspace(organizedCongress.id, owner, db);
+    assert.equal(afterRejectedActions.revision, committeeSaved.revision);
+    assert.deepEqual(afterRejectedActions.brief.congress?.actions, committeeActions);
+    const committeeProgram = await createAcademicDraft(organizedCongress.id, { ...organizedInput, requestId: randomUUID(), expectedRevision: committeeSaved.revision }, owner, db);
+    const committeeHandout = await createAcademicDraft(organizedCongress.id, { ...organizedInput, requestId: randomUUID(), expectedRevision: committeeSaved.revision, template: "participant_handout" }, owner, db);
+    for (const artifact of [committeeProgram, committeeHandout]) {
+      const body = (await readAcademicArtifact(organizedCongress.id, artifact.id, owner, db)).body;
+      assert.doesNotMatch(body, /Confirmar asistencia del comité|Responsable privada del comité|Acuerdo reservado del comité|Preparar sala del comité/);
+    }
+    assert.equal(await exportTeachingSessions(organizedCongress.id, owner, db), calendarBeforeActions);
+    await saveOrganization({ ...committeeOrganization, actions: committeeActions.map(item => item.id === "action-confirm" ? { ...item, status: "done" as const } : item) });
+    assert.deepEqual((await congressCalendarActions(owner, committeeRange, db)).map(item => item.title), ["Preparar sala del comité"]);
+    assert.equal((await readAcademicArtifactVersion(organizedCongress.id, organizedProgram.id, 1, owner, db)).body, organizedBody);
     assert.equal(network,0);
     console.log("ALTAZOR academic disposable integration passed: owner isolation, source-backed proposals, original/version history, CAS save races, idempotent save, recovery as unreviewed revision, tamper/source-revocation denial, native writing replay, LinkedIn origin/revision, legacy matrix, matrix-backed preparation and retention, profile CAS and cancellation, selected teaching sessions and retained snapshots; zero provider traffic.");
   }finally{

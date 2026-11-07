@@ -291,6 +291,16 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
           await movedTable.locator("summary").filter({ hasText: /^Sesiones de la mesa/ }).click();
           await expect(movedTable.getByRole("checkbox", { name: new RegExp(close) })).toBeChecked();
           await organization.getByLabel("Eje de la mesa 1", { exact: true }).selectOption({ label: "Métodos de investigación" });
+          const committee = academic.getByRole("region", { name: "Encargos del comité", exact: true });
+          await committee.getByText("Encargos del comité", { exact: true }).click();
+          await committee.getByRole("button", { name: "Añadir encargo", exact: true }).click();
+          const committeeTask = committee.getByRole("group", { name: "Encargo 1", exact: true });
+          await committeeTask.getByRole("textbox", { name: "Encargo 1", exact: true }).fill("Confirmar panelistas del congreso");
+          await committeeTask.getByLabel("Mesa del encargo 1", { exact: true }).selectOption({ label: "Mesa de metodología" });
+          await expect(committeeTask.getByLabel("Responsable del encargo 1", { exact: true })).toHaveValue("Responsable ficticia de metodología");
+          await committeeTask.getByLabel("Fecha del encargo 1", { exact: true }).fill("2030-05-08T10:00");
+          await committeeTask.getByText("Indicaciones", { exact: true }).click();
+          await committeeTask.getByLabel("Indicaciones del encargo 1", { exact: true }).fill("Acuerdo privado sobre las invitaciones del comité.");
           await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
           await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
           await page.reload();
@@ -315,7 +325,41 @@ test("Docencia crea programas editables con las sesiones elegidas para cada encu
           expect(grouped).toContain("Responsable ficticio de fuentes");
           expect(grouped.indexOf(close)).toBeLessThan(grouped.indexOf(open));
           expect(grouped).not.toContain(excluded);
+          expect(grouped).not.toContain("Confirmar panelistas del congreso");
+          expect(grouped).not.toContain("Acuerdo privado sobre las invitaciones del comité.");
           expect((await db.altazorAcademicArtifact.findUniqueOrThrow({ where: { id: originalProgramId! } })).body).toBe(edited);
+          const committeeAgenda = "/calendario?vista=agenda&ym=2030-05&tipo=evento";
+          const taskHref = `/academico?trabajo=${projectId}#encargos-comite`;
+          await page.goto(committeeAgenda);
+          const agendaTask = page.getByRole("link", { name: "10:00 · Docencia · Encargo · Confirmar panelistas del congreso", exact: true });
+          await expect(agendaTask).toHaveAttribute("href", taskHref);
+          await agendaTask.click();
+          await expect(page).toHaveURL(new RegExp(`trabajo=${projectId}#encargos-comite$`));
+          await expect(committee).toBeVisible();
+          await committeeTask.locator("details").first().locator("summary").first().click();
+          await expect(committeeTask.getByRole("textbox", { name: "Encargo 1", exact: true })).toHaveValue("Confirmar panelistas del congreso");
+          await expect(committeeTask.getByLabel("Fecha del encargo 1", { exact: true })).toHaveValue("2030-05-08T10:00");
+          if (process.env.LEXOPEN_DOCENCIA_CONTENT_SCREENSHOT === "1") {
+            await committee.screenshot({ path: info.outputPath("encargos-comite-movil.png") });
+            await page.setViewportSize({ width: 1280, height: 880 });
+            await committee.screenshot({ path: info.outputPath("encargos-comite-escritorio.png") });
+            await page.setViewportSize({ width: 360, height: 800 });
+          }
+          await committeeTask.getByLabel("Estado del encargo 1", { exact: true }).selectOption("done");
+          await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
+          await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
+          await page.goto(committeeAgenda);
+          await expect(agendaTask).toHaveCount(0);
+          await page.goto(taskHref);
+          await committeeTask.locator("details").first().locator("summary").first().click();
+          await expect(committeeTask.getByLabel("Estado del encargo 1", { exact: true })).toHaveValue("done");
+          await organization.getByText("Ejes y mesas", { exact: true }).click();
+          await organization.getByRole("button", { name: "Quitar mesa 1", exact: true }).click();
+          await page.getByRole("dialog").getByRole("button", { name: "Quitar mesa", exact: true }).click();
+          await expect(committeeTask.getByLabel("Mesa del encargo 1", { exact: true })).toHaveValue("");
+          await expect(committeeTask.getByRole("textbox", { name: "Encargo 1", exact: true })).toHaveValue("Confirmar panelistas del congreso");
+          await academic.getByRole("button", { name: "Guardar cambios", exact: true }).click();
+          await expect(academic.getByText("Objetivo y cambios guardados.", { exact: true })).toBeVisible();
         }
         if (kind === "workshop") {
           const programId = new URL(page.url()).searchParams.get("resultado");

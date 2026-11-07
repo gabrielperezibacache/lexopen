@@ -97,6 +97,7 @@ test("congress programs group chosen sessions by axis and table while keeping le
       { id: "debate", axisId: "derecho", title: "Debate jurídico", responsible: "Coordinadora [invitada]", sessionIds: ["segunda", "primera"] },
       { id: "otra", axisId: "interno", title: "Mesa excluida", responsible: "Responsable interno", sessionIds: ["no-elegida"] },
     ],
+    actions: [{ id: "encargo", title: "Encargo privado del comité", responsible: "Responsable privada", status: "pending" as const, notes: "Notas internas del encargo", dueAtLocal: "2030-05-09T09:00", tableId: "debate" }],
   };
   const brief = { ...emptyAcademicBrief, congress };
   const body = academicManuscriptBody("congress", "Congreso", brief, sessions);
@@ -105,12 +106,12 @@ test("congress programs group chosen sessions by axis and table while keeping le
   assert.ok(body.includes("**Sesión primera**"));
   assert.ok(body.indexOf("Sesión primera") < body.indexOf("Sesión segunda"));
   assert.ok(body.includes("### Otras sesiones\n\n**Sesión libre**"));
-  assert.doesNotMatch(body, /Eje interno|Mesa excluida|Responsable interno/);
+  assert.doesNotMatch(body, /Eje interno|Mesa excluida|Responsable interno|Encargo privado|Responsable privada|Notas internas/);
   assert.doesNotMatch(body, /^#{4,}/m);
   const legacy = academicManuscriptBody("congress", "Congreso", emptyAcademicBrief, sessions);
   assert.equal(academicManuscriptBody("congress", "Congreso", { ...emptyAcademicBrief, congress: { axes: [], tables: [] } }, sessions), legacy);
   assert.match(legacy, /## Programa y mesas\n\n### Sesión primera/);
   for (const template of ["seminar", "participant_handout"] as const) {
-    assert.doesNotMatch(academicManuscriptBody(template, "Congreso", brief, sessions), /Derecho y tecnología|Coordinadora|Debate jurídico/);
+    assert.doesNotMatch(academicManuscriptBody(template, "Congreso", brief, sessions), /Derecho y tecnología|Coordinadora|Debate jurídico|Encargo privado|Responsable privada|Notas internas/);
   }
 });

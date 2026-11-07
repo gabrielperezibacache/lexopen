@@ -10,6 +10,7 @@ import { isWorkCountry, workCountryOptions } from "@/lib/config/countries";
 import { AcademicCallSources } from "./AcademicCallSources";
 import { AcademicAgendaSessionPicker } from "./AcademicAgendaSessionPicker";
 import { AcademicCongressOrganization } from "./AcademicCongressOrganization";
+import { AcademicCongressActions } from "./AcademicCongressActions";
 import { AltazorMark } from "./AltazorMark";
 import { useOptionalAltazorCompanion } from "./AltazorCompanionProvider";
 import type { AcademicProject } from "./academic-ui";
@@ -209,10 +210,11 @@ export function AcademicTeachingProgram({ kind, workspaceId, sessionsVersion, se
     </header>
     {kind === "congress" && <AcademicCongressOrganization workspaceId={workspaceId} version={sessionsVersion}
       value={congress} disabled={busy} onChange={onCongressChange} />}
+    {kind === "congress" && <AcademicCongressActions value={congress} disabled={busy} onChange={onCongressChange} />}
     <AcademicAgendaSessionPicker documentKind="programa" workspaceId={workspaceId} version={sessionsVersion}
       selection={selection} onChange={onChange} disabled={busy} />
     {sessionContentDirty && <p className={styles.meta} role="status">Guarda o descarta el contenido de la sesión antes de crear el programa.</p>}
-    {incompleteOrganization && <p className={styles.meta} role="status">Completa los nombres de los ejes y las mesas antes de crear un documento.</p>}
+    {incompleteOrganization && <p className={styles.meta} role="status">Revisa los datos de los ejes, las mesas y los encargos antes de crear un documento.</p>}
     <div className={styles.actions}>
       <button type="button" className="btn btn-primary" disabled={busy || sessionContentDirty || incompleteOrganization || !title.trim()} onClick={onCreate}>Crear programa <ArrowRight size={16} aria-hidden="true" /></button>
     </div>

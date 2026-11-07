@@ -77,7 +77,7 @@ const missing = () => httpError("La actividad o el trabajo docente no están dis
 const requestConflict = () => httpError("Este intento ya corresponde a otra actividad. Revisa los datos y vuelve a intentarlo.", 409);
 const editConflict = () => httpError("La actividad cambió. Vuelve a cargarla antes de guardar.", 409);
 
-function teachingTime(value: string, offsetDays = 0) {
+export function teachingTime(value: string, offsetDays = 0) {
   const [day, time] = value.split("T");
   if (!isValidYmd(day) || !isValidHhmm(time)) throw httpError("Elige una fecha y una hora válidas.", 400);
   const actualDay = offsetDays ? addCivilDays(day, offsetDays) : day;

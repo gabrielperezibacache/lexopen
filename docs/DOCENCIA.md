@@ -6,7 +6,7 @@ Abre **Académico → Docencia** y elige el tipo de trabajo. Cada trabajo conser
 | --- | --- | --- |
 | Cursos | Ficha de curso, bibliografía base y sugerencias por solicitud. Crea un syllabus editable con las sesiones que elijas de la Agenda. | Añadir unidades y evaluaciones reutilizables. |
 | Seminarios | Programa editable con las sesiones elegidas, sus ponentes, moderación, lecturas y lugar. | Vincular responsabilidades de organización y avisos del encuentro. |
-| Congresos | Organiza mesas por eje, indica su responsable y vincula sus sesiones de la Agenda. El programa editable agrupa las sesiones elegidas por eje y mesa. | Distribuir tareas de organización y seguir los acuerdos del comité. |
+| Congresos | Organiza mesas por eje, vincula sus sesiones y prepara el programa. Lleva encargos privados del comité con responsable por nombre, estado y fechas en tu Agenda. | Añadir acuerdos de reunión y entregables vinculados al seguimiento. |
 | Talleres | Programa editable y hoja para participantes con las sesiones elegidas, sus consignas, lecturas y materiales. | Vincular rúbricas y recoger entregas de las actividades. |
 | Convocatorias | Ficha con país, organismo, bases, fecha límite y estado. Las fichas guardadas desde un aviso conservan su procedencia y la fecha de consulta. | Vincular responsables, anexos y un curso o proyecto de investigación. |
 | Búsqueda y fuentes por país | Catálogo oficial por país. Busca por tema entre los avisos que ya consultaste y filtra tu cartera por país. | Ampliar las fuentes y los filtros por área, elegibilidad y modalidad. |
@@ -38,6 +38,14 @@ Las sesiones se registran en hora de Santiago de Chile, la zona que usa la Agend
 4. Guarda los cambios. En **Sesiones de la Agenda**, elige qué actividades llevará el programa y pulsa **Crear programa**. Las sesiones elegidas se agrupan por eje y mesa, con sus responsables. Las elegidas que aún no tienen mesa aparecen en **Otras sesiones**.
 
 La planificación conserva las mesas aunque algunas sesiones queden fuera de un programa concreto. Cada borrador guarda su copia editable. Si retiras una actividad de la Agenda, revisa los avisos de las sesiones vinculadas y actualiza la planificación antes de guardarla.
+
+## Seguir los encargos del comité
+
+1. Dentro de **Programa del congreso**, abre **Encargos del comité** y pulsa **Añadir encargo**. Escribe qué hay que hacer, quién se encarga y, si corresponde, la mesa relacionada.
+2. Añade una fecha y hora en Santiago para verla en tu Agenda. Puedes completar las indicaciones y cambiar el estado entre **Pendiente**, **En curso** y **Completado**.
+3. Pulsa **Guardar cambios**. Los encargos con fecha que estén pendientes o en curso aparecen en la Agenda personal. Desde allí puedes volver al seguimiento del congreso y actualizar su estado.
+
+Este seguimiento es privado del trabajo académico. Los responsables se indican por nombre. Si retiras una mesa o un eje, sus encargos pasan al seguimiento general del congreso.
 
 ## Preparar una hoja para participantes
 

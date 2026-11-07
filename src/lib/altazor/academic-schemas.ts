@@ -3,6 +3,7 @@ import { altazorSourceInputSchema } from "./resource-input";
 import { ACADEMIC_MANUSCRIPT_TEMPLATE_IDS, ACADEMIC_TEACHING_TEMPLATES } from "./academic-templates";
 import { isWorkCountry } from "@/lib/config/countries";
 import { writingId } from "@/lib/writings/schemas";
+import { isValidYmd } from "@/lib/chile-time";
 export const ACADEMIC_WORKSPACE_LIMIT = 100;
 export const ACADEMIC_MANUSCRIPT_MAX = 100000;
 export const ACADEMIC_MODES = ["synthesis", "literature_review", "comparison", "claim_audit", "bibliography_audit", "academic_writing", "translation", "abstract", "peer_review", "syllabus", "rubric", "teaching_material", "cv"] as const;
@@ -26,9 +27,22 @@ const syllabus = z.object({
 }).strict();
 export type AcademicSyllabus = z.infer<typeof syllabus>;
 export const emptyAcademicSyllabus: AcademicSyllabus = { summary: "", approach: "", schedule: "", room: "", requirements: "", bibliography: "" };
-export const ACADEMIC_CONGRESS_LIMITS = { axes: 12, tables: 48, titleLength: 200, responsibleLength: 200, sessionsPerTable: 200, sessions: 200 } as const;
+export const ACADEMIC_CONGRESS_LIMITS = { axes: 12, tables: 48, actions: 100, titleLength: 200, responsibleLength: 200, actionNotesLength: 2000, sessionsPerTable: 200, sessions: 200 } as const;
 const congressTitle = z.string().trim().min(1).max(ACADEMIC_CONGRESS_LIMITS.titleLength)
   .regex(/^[^\p{Cc}\p{Zl}\p{Zp}]+$/u, "Escribe el nombre en una sola línea.");
+export const ACADEMIC_CONGRESS_ACTION_STATUS = { pending: "Pendiente", in_progress: "En curso", done: "Completado" } as const;
+const congressAction = z.object({
+  id: writingId,
+  title: congressTitle,
+  responsible: z.string().trim().max(ACADEMIC_CONGRESS_LIMITS.responsibleLength)
+    .regex(/^[^\p{Cc}\p{Zl}\p{Zp}]*$/u, "Escribe el nombre del responsable en una sola línea."),
+  tableId: writingId.optional(),
+  dueAtLocal: z.string().regex(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/, "Elige una fecha y una hora válidas.")
+    .refine(value => isValidYmd(value.slice(0, 10)), "Elige una fecha válida.").optional(),
+  status: z.enum(["pending", "in_progress", "done"]),
+  notes: z.string().max(ACADEMIC_CONGRESS_LIMITS.actionNotesLength),
+}).strict();
+export type AcademicCongressAction = z.infer<typeof congressAction>;
 export const academicCongressSchema = z.object({
   axes: z.array(z.object({ id: writingId, title: congressTitle }).strict()).max(ACADEMIC_CONGRESS_LIMITS.axes),
   tables: z.array(z.object({
@@ -39,12 +53,15 @@ export const academicCongressSchema = z.object({
       .regex(/^[^\p{Cc}\p{Zl}\p{Zp}]*$/u, "Escribe el nombre del responsable en una sola línea."),
     sessionIds: z.array(writingId).max(ACADEMIC_CONGRESS_LIMITS.sessionsPerTable),
   }).strict()).max(ACADEMIC_CONGRESS_LIMITS.tables),
+  actions: z.array(congressAction).max(ACADEMIC_CONGRESS_LIMITS.actions).optional(),
 }).strict().superRefine((value, ctx) => {
-  const ids = [...value.axes, ...value.tables].map(item => item.id);
+  const ids = [...value.axes, ...value.tables, ...(value.actions ?? [])].map(item => item.id);
   const axes = new Set(value.axes.map(axis => axis.id));
+  const tables = new Set(value.tables.map(table => table.id));
   const sessionIds = value.tables.flatMap(table => table.sessionIds);
-  if (new Set(ids).size !== ids.length) ctx.addIssue({ code: "custom", message: "Cada eje y mesa debe tener un identificador propio." });
+  if (new Set(ids).size !== ids.length) ctx.addIssue({ code: "custom", message: "Cada eje, mesa y encargo debe tener un identificador propio." });
   if (value.tables.some(table => !axes.has(table.axisId))) ctx.addIssue({ code: "custom", message: "Asigna cada mesa a un eje del congreso." });
+  if (value.actions?.some(action => action.tableId && !tables.has(action.tableId))) ctx.addIssue({ code: "custom", message: "Asigna cada encargo a una mesa disponible o al seguimiento general." });
   if (new Set(sessionIds).size !== sessionIds.length) ctx.addIssue({ code: "custom", message: "Una sesión sólo puede pertenecer a una mesa." });
   if (sessionIds.length > ACADEMIC_CONGRESS_LIMITS.sessions) ctx.addIssue({ code: "custom", message: "El congreso admite hasta 200 sesiones vinculadas a sus mesas." });
 });

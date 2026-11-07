@@ -62,8 +62,9 @@ export function AltazorAcademic({ initialWorkspaceId = "", initialArtifactId = "
           if (controller.signal.aborted) return;
           setWorkspace(work); setSources(work.sources || []); setSourcesChanged(false); const kind = academicJourney(work.kind); setJourney(kind); setMode(work.brief.task);
           const artifact = initialArtifactId ? work.artifacts.find(item => item.id === initialArtifactId) : work.artifacts.find(item => item.available && ["proposed", "reviewed", "prepared"].includes(item.status || ""));
-          if (artifact?.available && !(isAcademicTeachingKind(work.kind) && window.location.hash === "#agenda-docencia")) { setSelectedId(artifact.id); setStep(2); }
-          else if (initialArtifactId) setError("Este resultado o sus fuentes ya no están disponibles. Puedes continuar con el resto del trabajo.");
+          const teachingAnchor = isAcademicTeachingKind(work.kind) && ["#agenda-docencia", "#encargos-comite"].includes(window.location.hash);
+          if (artifact?.available && !teachingAnchor) { setSelectedId(artifact.id); setStep(2); }
+          else if (initialArtifactId && !artifact?.available) setError("Este resultado o sus fuentes ya no están disponibles. Puedes continuar con el resto del trabajo.");
         }
       }).catch(reason => { if (!controller.signal.aborted) setError(message(reason, "No se pudieron abrir tus trabajos. Inténtalo nuevamente.")); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });

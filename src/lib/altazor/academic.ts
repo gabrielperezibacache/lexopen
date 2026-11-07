@@ -17,6 +17,7 @@ import { parseAcademicOutput, academicReferenceAppendix, academicWritingBody } f
 import { academicManuscriptBody, ACADEMIC_MANUSCRIPT_TEMPLATES, isAcademicTeachingKind, isAcademicTeachingProgram, isAcademicTeachingSessionKind, type AcademicManuscriptTemplate } from "./academic-templates";
 import type { AcademicCallOrigin } from "./academic-calls";
 import { readTeachingSessionContent } from "./teaching-session-content";
+import { teachingTime } from "./teaching-sessions";
 const missing = () => httpError("El trabajo académico no está disponible", 404);
 const unavailableRowTitle = "Fila cuyo respaldo ya no está disponible";
 const unavailableSource = (error: unknown) => [403,404,409,410,413,422].includes(Number((error as { status?: number }).status));
@@ -97,8 +98,9 @@ export async function saveAcademicWorkspace(id: string, raw: unknown, user: Caus
     const actor = await actorFor(user, tx), current = await tx.altazorAcademicWorkspace.findFirst({ where: { id, ownerId: actor.id, revision: input.expectedRevision, archivedAt: null } });
     if (!current) throw httpError("El trabajo cambió. Recargue antes de guardar", 409);
     const congress = input.brief.congress;
-    if (congress && (congress.axes.length || congress.tables.length)) {
-      if (current.kind !== "congress") throw httpError("Los ejes y las mesas se organizan dentro de un congreso.", 400);
+    if (congress && (congress.axes.length || congress.tables.length || congress.actions?.length)) {
+      if (current.kind !== "congress") throw httpError("Los ejes, las mesas y los encargos se organizan dentro de un congreso.", 400);
+      for (const action of congress.actions ?? []) if (action.dueAtLocal) teachingTime(action.dueAtLocal);
       const sessionIds = congress.tables.flatMap(table => table.sessionIds);
       const available = sessionIds.length ? await tx.altazorTeachingSession.count({ where: { workspaceId: id, id: { in: sessionIds } } }) : 0;
       if (available !== sessionIds.length) throw httpError("Alguna sesión vinculada a las mesas ya no está disponible. Revisa Ejes y mesas y quita las sesiones retiradas antes de guardar.", 409);

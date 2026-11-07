@@ -72,10 +72,16 @@ export function AcademicCongressOrganization({ workspaceId, version, value, disa
 
   function remove() {
     if (!removal) return;
-    onChange(removal.kind === "axis" ? {
-      axes: congress.axes.filter(axis => axis.id !== removal.id),
-      tables: congress.tables.filter(table => table.axisId !== removal.id),
-    } : { ...congress, tables: congress.tables.filter(table => table.id !== removal.id) });
+    const removedTableIds = new Set(removal.kind === "axis"
+      ? congress.tables.filter(table => table.axisId === removal.id).map(table => table.id)
+      : [removal.id]);
+    const actions = congress.actions?.map(action => removedTableIds.has(action.tableId ?? "") ? { ...action, tableId: undefined } : action);
+    onChange({
+      ...congress,
+      axes: removal.kind === "axis" ? congress.axes.filter(axis => axis.id !== removal.id) : congress.axes,
+      tables: congress.tables.filter(table => !removedTableIds.has(table.id)),
+      ...(actions ? { actions } : {}),
+    });
     setRemoval(null);
     focusControl("add-axis");
   }
@@ -168,8 +174,8 @@ export function AcademicCongressOrganization({ workspaceId, version, value, disa
     <ConfirmDialog open={Boolean(removal)} onClose={() => setRemoval(null)} onConfirm={remove} busy={disabled}
       title={removal?.kind === "axis" ? "Quitar eje del congreso" : "Quitar mesa del congreso"}
       description={removal?.kind === "axis"
-        ? `Se quitarán «${removal.title}», sus mesas y sus vínculos con las sesiones. Las actividades seguirán disponibles en la Agenda.`
-        : `Se quitarán «${removal?.title ?? ""}», su responsable y sus vínculos con las sesiones. Las actividades seguirán disponibles en la Agenda.`}
+        ? `Se quitarán «${removal.title}», sus mesas y sus vínculos con las sesiones. Los encargos asociados pasarán al seguimiento general del congreso.`
+        : `Se quitarán «${removal?.title ?? ""}», su responsable y sus vínculos con las sesiones. Los encargos asociados pasarán al seguimiento general del congreso.`}
       confirmLabel={removal?.kind === "axis" ? "Quitar eje" : "Quitar mesa"} />
   </section>;
 }
