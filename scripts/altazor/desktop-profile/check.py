@@ -1,6 +1,7 @@
 #!/usr/bin/python3 -I
 """Exercise the installed tools offline with synthetic files as the desktop user."""
 import json
+import configparser
 import os
 import pathlib
 import shutil
@@ -23,6 +24,13 @@ def run(*args, env=None):
 def verify():
     assert os.geteuid() != 0, "The check must run as the desktop user"
     assert not pathlib.Path("/etc/sudoers.d/kitty").exists()
+    wallpaper = pathlib.Path("/usr/share/backgrounds/lexopen/midnight.png")
+    data = wallpaper.read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) > 24, "Missing LexOpen wallpaper"
+    assert (int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")) == (2560, 1600)
+    desktop = configparser.ConfigParser(interpolation=None)
+    desktop.read(pathlib.Path.home() / ".config/pcmanfm/default/desktop-items-0.conf", encoding="utf-8")
+    assert desktop.get("*", "wallpaper") == str(wallpaper), "The desktop does not select the LexOpen wallpaper"
     for command in ("chromium", "soffice", "localc", "loimpress", "lodraw", "ffprobe"):
         assert shutil.which(command), f"Executable missing: {command}"
 
@@ -81,7 +89,7 @@ def verify():
             assert recording.getframerate() == 16_000 and recording.getnchannels() == 1
 
     print(json.dumps({"ok": True, "checks": ["docx", "libreoffice-pdf", "pdf-pages", "ocr-spa-eng",
-                                             "xlsx", "epub", "bibliography", "local-search", "audio-16khz"]}))
+                                             "xlsx", "epub", "bibliography", "local-search", "audio-16khz", "lexopen-wallpaper"]}))
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ import { maximumArchiveBytes, toolpackName, toolpackReceiptName } from "../../de
 const execute = promisify(execFile);
 const profile = JSON.parse(await readFile(new URL("../../desktop/altazor-desktop-profile.json", import.meta.url), "utf8"));
 const { version } = JSON.parse(await readFile(new URL("../../desktop/package.json", import.meta.url), "utf8"));
-const toolChecks = ["docx", "libreoffice-pdf", "pdf-pages", "ocr-spa-eng", "xlsx", "epub", "bibliography", "local-search", "audio-16khz"];
+const toolChecks = ["docx", "libreoffice-pdf", "pdf-pages", "ocr-spa-eng", "xlsx", "epub", "bibliography", "local-search", "audio-16khz", "lexopen-wallpaper"];
 
 async function main() {
   if (process.argv.length !== 4) throw new Error("Uso: pack-desktop-image.mjs informe-del-escritorio.json carpeta-nueva");

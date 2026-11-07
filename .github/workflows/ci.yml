@@ -94,6 +94,8 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      - name: Check desktop source packaging offline
+        run: python3 scripts/altazor/prepare-desktop-source.test.py
       - name: Archive public source, build gateway and verify dedicated UID access
         shell: bash
         run: |

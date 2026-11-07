@@ -152,8 +152,8 @@ async function main() {
     check(inspected.Config.Labels?.["org.lexopen.altazor.desktop-profile"] === desktopProfile.id &&
       inspected.Config.Labels?.["org.lexopen.altazor.desktop-source"] === KITTIES_SOURCE_COMMIT, "Expected the pinned LexOpen desktop tool profile");
     const toolchain = JSON.parse(await run("docker", ["exec", containerId, "lexopen-desktop-check"], 150_000));
-    check(toolchain.ok === true && Array.isArray(toolchain.checks) && toolchain.checks.length === 9,
-      "Document, OCR, bibliography, search and audio tests must run inside the actual desktop");
+    check(toolchain.ok === true && Array.isArray(toolchain.checks) && toolchain.checks.length === 10 && toolchain.checks.includes("lexopen-wallpaper"),
+      "Document, OCR, bibliography, search, audio and LexOpen wallpaper tests must run inside the actual desktop");
     stage = "screenshot-and-manual-control";
     const png = await until(async () => { try { return await computerScreenshot(owner, session.id); } catch { return null; } }, bytes => Boolean(bytes && bytes.length > 1024));
     check(png && png.subarray(0, 8).toString("hex") === "89504e470d0a1a0a" && png.readUInt32BE(16) >= 640 && png.readUInt32BE(20) >= 480, "Actual screenshot must have PNG bytes and desktop dimensions");
