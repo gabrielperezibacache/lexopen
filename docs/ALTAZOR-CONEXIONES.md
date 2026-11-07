@@ -21,7 +21,7 @@ El gateway reforzado exige confirmación incluso para lecturas. El modelo no pue
 
 El administrador prepara una vez la aplicación OAuth del servicio y el escritorio dedicado. Si falta esa preparación, el profesional ve un estado pendiente de activación; no debe crear claves para realizar su trabajo. Otros adaptadores pueden requerir configuración particular. Sus campos técnicos y la alternativa de tokens se encuentran en **Opciones avanzadas**.
 
-La conexión personal de Google de ALTAZOR es distinta de **Google del estudio**: no reutiliza esa cuenta global ni sus autorizaciones de correo y calendario. El ingreso sencillo solicita sólo lectura de metadatos de Drive; GitHub solicita lectura de perfil y consulta de repositorios públicos. No acredita acceso a repositorios privados, Gmail, Calendar ni contenido de documentos.
+La conexión personal de Google de Altazor es distinta de **Google del estudio**: no reutiliza esa cuenta global ni sus autorizaciones de correo y calendario. El acceso básico consulta metadatos de Drive; trabajar con documentos requiere autorizar su contenido de lectura. GitHub permite consultar el perfil y repositorios públicos. Estas conexiones no habilitan repositorios privados, Gmail, Calendar ni escrituras.
 
 ### Inicio de sesión sencillo
 
@@ -35,7 +35,13 @@ La preparación corresponde al administrador, una vez por instalación. En la fi
 
 El retorno autorizado es el origen configurado de LexOpen seguido de `/api/altazor/connectors/oauth/callback`. Registre ese retorno exactamente en el proveedor. No añada contraseñas ni tokens a la URL. En un Host local, utilice su dirección loopback; una instalación publicada debe tener su propio registro y configuración autorizados por el proveedor.
 
-Cada inicio vincula la autorización al profesional, a su sesión de LexOpen y al espacio elegido, con un plazo y uso único. El proveedor entrega la autorización al servidor, que la comprueba y la guarda expresamente en el gateway dedicado. El retorno al navegador contiene únicamente el identificador del intento. Google y Dropbox conceden autorizaciones temporales. Al caducar, la persona puede volver a conectar desde el mismo apartado.
+Cada inicio vincula la autorización al profesional, a su sesión de LexOpen y al espacio elegido, con un plazo y uso único. El proveedor entrega la autorización al servidor, que la comprueba y la guarda expresamente en el gateway dedicado. El retorno al navegador contiene únicamente el identificador del intento.
+
+**Conexiones guardadas:** Google y Dropbox se autorizan con renovación automática. El gateway conserva la credencial de renovación fuera del chat y de los archivos del escritorio y obtiene un acceso nuevo cuando es necesario, también después de reiniciarse. No hay que iniciar sesión de nuevo al abrir LexOpen ni cada vez que vence un acceso temporal. GitHub conserva su autorización ya guardada; esta actualización no obliga a reemplazar una conexión válida. Las conexiones temporales anteriores de Google o Dropbox necesitan una sola autorización adicional desde **Mantener conexión** o **Conectar**. Desconectar o revocar el permiso en el proveedor pone fin al acceso.
+
+Un fallo de red conserva la conexión y ofrece **Comprobar conexión**. La autorización interactiva sólo vuelve a solicitarse cuando hace falta: por ejemplo, revocación, cambio de cuenta o de permisos, o una exigencia del proveedor. No se oculta ni se evita su verificación.
+
+**Preparación de Google para uso continuo:** el proyecto debe salir del modo Prueba. Google limita a siete días las credenciales de renovación para Drive de aplicaciones externas en Prueba. La consola exige completar la página pública de la aplicación y su política de privacidad antes de habilitar Producción. El registro puede requerir además verificación de Google según sus permisos y público. [Documentación oficial sobre duración y revocación](https://developers.google.com/identity/protocols/oauth2#expiration). La renovación automática evita ingresos repetidos por la caducidad del acceso; no promete una autorización irrevocable.
 
 Para habilitar **Dropbox**, prepare una aplicación en la consola oficial con permisos `account_info.read`, `files.metadata.read` y `files.content.read`. Puede limitar el acceso de la aplicación a su propia carpeta de Dropbox. Actualice el escritorio de Altazor para disponer de las operaciones de listado, búsqueda y lectura de archivos de hasta 4 MiB. Cada consulta requiere confirmación. Los usuarios inician sesión desde **Conectar Dropbox**. [Guía oficial de autorización de Dropbox](https://docs.dropboxapi.com/dropbox-api/docs/get-started/authorization).
 

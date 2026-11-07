@@ -78,6 +78,7 @@ function AdminConnectorSetup({ provider, busy, onBusyChange }: { provider: EasyC
       {error && <p className={styles.error} role="alert">{error}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
       {loading ? <p role="status">Comprobando la preparación del servicio…</p> : setup && <>
         <p>{setup.configured ? setup.source === "environment" ? "Este servicio está preparado en la configuración del equipo." : "La preparación del estudio está guardada en LexOpen." : "Prepare la aplicación del estudio una sola vez. Después, cada profesional podrá iniciar sesión con su propia cuenta."}</p>
+        {provider === "google" && <p>Para uso continuo, la aplicación de Google debe estar en Producción. En modo Prueba, Google limita la autorización renovable de Drive a siete días. <a href="https://developers.google.com/identity/protocols/oauth2#expiration" target="_blank" rel="noopener noreferrer">Ver condiciones de Google</a>.</p>}
         {setup.canEdit && setup.configured && !editing && <button type="button" disabled={busy || working} onClick={() => setEditing(true)}>Actualizar preparación</button>}
         {setup.canEdit && setup.callbackUri && (!setup.configured || editing) ? <ol className={styles.setupSteps}>
           <li>
@@ -181,29 +182,35 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
   return <section className={styles.root} aria-labelledby={`${uid}-title`} data-testid="easy-connector-oauth">
     <h4 id={`${uid}-title`} className={connected ? styles.connected : undefined}>{connected && <CheckCircle2 size={20} aria-hidden="true" />}{connected ? `${label} conectado` : `Tu cuenta de ${label}`}</h4>
     <p>{provider === "google" && (current?.canReadFiles || !current?.connected) ? "Conecta Drive para que Altazor pueda buscar y leer tus archivos en los encargos que le pidas." : providerHelp[provider]}</p>
-    {!connected && <p className={styles.hint}>Elige tu cuenta en {label} y vuelve a LexOpen.</p>}
+    {!connected && current?.state !== "unavailable" && <p className={styles.hint}>Inicia sesión una vez. LexOpen conservará la conexión.</p>}
     {error && <p role="alert" className={styles.error}>{error}</p>}{notice && <p role="status" className={styles.notice}>{notice}</p>}
     {loading ? <p role="status">Comprobando conexión…</p> : !workspaceId ? <p>Abre tu <a href={computerHref}>escritorio de Altazor</a> para preparar este espacio y conectar tu cuenta.</p> : <>
-      {connected && <p role="status">Cuenta autorizada para este espacio.</p>}
+      {connected && <p role="status">{current?.autoRefresh ? "Conexión guardada. El acceso se renueva automáticamente." : "Conexión guardada para este espacio."}</p>}
+      {provider !== "github" && connected && !current?.autoRefresh && (provider !== "google" || current?.canReadFiles) && <div className={styles.actions}>
+        <p>Autoriza una vez la renovación automática para mantener tu cuenta conectada.</p>
+        <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); void connect(provider === "google" ? "files" : "basic"); }}>Mantener conexión<ArrowUpRight size={16} aria-hidden="true" /></button>
+      </div>}
       {provider === "google" && connected && !current?.canReadFiles && <div className={styles.actions}>
         <p>Para trabajar con el contenido de tus documentos, autoriza su lectura en Google.</p>
         <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { filesRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect("files"); }}>Autorizar lectura de archivos<ArrowUpRight size={16} aria-hidden="true" /></button>
       </div>}
       {pending && <p role="status">Termina el ingreso en {label}. Si ya lo hiciste, pulsa Comprobar conexión.</p>}
-      {attemptProblem && <p className={styles.error} role="alert">{attemptProblem}</p>}
+      {!connected && attemptProblem && <p className={styles.error} role="alert">{attemptProblem}</p>}
       {!connected && !attemptProblem && current && ["failed", "expired", "reconnect_required"].includes(current.state) && <p className={styles.error} role="alert">{current.reason || `Vuelve a conectar ${label} para renovar el acceso.`}</p>}
+      {!connected && current?.state === "unavailable" && <p role="status">La conexión sigue guardada. No pudimos comprobar el acceso en este momento; vuelve a comprobarlo sin iniciar sesión otra vez.</p>}
       {!connected && attempt?.state === "completed" && <p role="status">El ingreso terminó. Comprueba la conexión para confirmar el acceso.</p>}
       {!connected && current && !current.available && <p>Esta conexión necesita preparación del estudio. {data?.canAdmin ? <a href={configurationHref}>Preparar {label} en Configuración</a> : "Pide al administrador que la habilite."}</p>}
       {!connected && current?.available && !gatewayReady && <p>No pudimos comprobar el acceso a esta aplicación. <a href={computerHref}>Revisa tu escritorio</a> y vuelve a comprobar la conexión.</p>}
       {requiresStop && <p>Detén tu escritorio antes de cambiar las cuentas que usa. <a href={computerHref}>Revisar mi escritorio</a></p>}
       {!connected && <div className={styles.actions}>
-        {pending || !current ? <button type="button" className={styles.primary} disabled={busy || working} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden="true" />Comprobar conexión</button>
+        {pending || !current || current.state === "unavailable" ? <button type="button" className={styles.primary} disabled={busy || working} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden="true" />Comprobar conexión</button>
           : <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect(provider === "google" ? "files" : "basic"); }}>{working ? "Abriendo ingreso…" : `Conectar ${label}`}<ArrowUpRight size={16} aria-hidden="true" /></button>}
       </div>}
       <details className={styles.management}>
         <summary>{connected ? "Gestionar conexión" : "Opciones de conexión"}</summary>
         {current?.lastVerifiedAt && <p>Última comprobación: {new Date(current.lastVerifiedAt).toLocaleString("es-CL")}.</p>}
         <button type="button" disabled={busy || working} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden="true" />Comprobar conexión</button>
+        {current?.state === "unavailable" && <button type="button" disabled={busy || working || !canConnect} onClick={() => { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); void connect(provider === "google" ? "files" : "basic"); }}>Volver a autorizar mi cuenta</button>}
         {provider === "google" && <p>Para vincular carpetas de Drive a tus causas, abre <a href="/sincronizacion">Archivos conectados</a>.</p>}
         {current?.hasStoredConnection && <div className={styles.disconnect}><label className={styles.disconnectLabel}><input type="checkbox" checked={removeConfirmed} disabled={busy || working || requiresStop || !current.canDisconnect} onChange={event => setRemoveConfirmed(event.target.checked)} />Quiero desconectar {label} de este espacio.</label><button type="button" disabled={busy || working || requiresStop || !current.canDisconnect || !removeConfirmed} onClick={() => void disconnect()}>Desconectar {label}</button></div>}
         {data?.canAdmin && <p><a href={configurationHref}>Preparación del estudio en Configuración</a></p>}

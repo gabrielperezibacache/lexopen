@@ -11,6 +11,7 @@ import { KittiesGateway } from "../computer/gateway";
 import { assertGatewayOAuthAllowed, connectorNameSchema, validateConnectorConfiguration } from "./policy";
 import { EASY_OAUTH_PROVIDERS } from "./easy-oauth-providers";
 import type { ConnectorConfiguration, ConnectorInventory } from "./types";
+import { validatePersistentEasyOAuth, type PersistentEasyOAuthConfiguration } from "./persistent-oauth";
 
 type Client = typeof prisma | Prisma.TransactionClient;
 type Actor = CausaAccessUser;
@@ -37,8 +38,8 @@ async function ready(workspace: AltazorComputerWorkspace) {
   const health = await client.readiness(workspace.providerName, sessions.map(row => row.kittyName));
   return { client, health };
 }
-async function inventory(client: KittiesGateway, health: { version: string; connectorGate: boolean }): Promise<ConnectorInventory> {
-  return { ...await client.connectorSettings(), gateReady: health.connectorGate, version: health.version };
+async function inventory(client: KittiesGateway, health: { version: string; connectorGate: boolean; persistentOAuth?: boolean }): Promise<ConnectorInventory> {
+  return { ...await client.connectorSettings(), gateReady: health.connectorGate, version: health.version, persistentOAuthReady: health.persistentOAuth === true };
 }
 export async function connectorInventory(user: Actor, workspaceId: string) {
   const { workspace } = await access(user, workspaceId), { client, health } = await ready(workspace);
@@ -69,7 +70,7 @@ async function mutation(user: Actor, workspaceId: string, requestId: string, kin
     // Changing a native connection in advanced settings invalidates its old OAuth
     // proof before the external write, including when its outcome is uncertain.
     const name = input && typeof input === "object" && "name" in input ? String(input.name) : "";
-    if (["configure", "remove"].includes(kind)) for (const provider of EASY_OAUTH_PROVIDERS) {
+    if (["configure", "configure_persistent", "remove"].includes(kind)) for (const provider of EASY_OAUTH_PROVIDERS) {
       if (name === `altazor-${provider}-${digest(`${actor.id}:${workspaceId}`).slice(0, 16)}`) await tx.personalConnectorAccount.updateMany({ where: { ownerId: actor.id, provider: `altazor-desktop:${workspaceId}:${provider}` }, data: { status: "reconnect_required", lastVerifiedAt: null, credentialsEnc: null } });
     }
     return tx.altazorConnectorOperation.create({ data: { ownerId: actor.id, workspaceId, requestId, kind, inputHash } });
@@ -96,6 +97,17 @@ export async function configureConnector(user: Actor, workspaceId: string, reque
     if (Object.keys(config.settings).some(name => !available.fields.some(field => field.name === name))) throw new ConnectorError("connector_fields_unavailable", "El gateway no ofrece todos los campos de esta configuración.", 409);
     const old = before.connections.find(row => row.name === name);
     if (old && old.kind !== config.kind) throw new ConnectorError("connector_kind_changed", "Quite la conexión existente antes de cambiar su servicio.", 409);
+  }, expectedWorkspace);
+}
+/** Internal OAuth callback only; app and refresh credentials never enter a browser form or the model. */
+export async function configurePersistentEasyOAuth(user: Actor, workspaceId: string, requestId: string, name: string, value: PersistentEasyOAuthConfiguration, expectedWorkspace: AltazorComputerWorkspace) {
+  connectorNameSchema.parse(name); validatePersistentEasyOAuth(value);
+  const provider = value.kind === "google-workspace" ? "google" : "dropbox";
+  if (name !== `altazor-${provider}-${digest(`${user.id}:${workspaceId}`).slice(0, 16)}`) throw new ConnectorError("oauth_binding_changed", "La conexión no corresponde a este profesional y espacio.", 409);
+  return mutation(user, workspaceId, requestId, "configure_persistent", { name, value }, async client => ({ ...await client.setPersistentEasyOAuth(name, value) }), false, async client => {
+    await client.requirePersistentOAuth();
+    const before = await client.connectorSettings(), available = before.catalog.find(kind => kind.id === value.kind), old = before.connections.find(row => row.name === name);
+    if (!available?.available || available.blockedReason || old && old.kind !== value.kind) throw new ConnectorError("connector_unavailable", "No se pudo confirmar el servicio de esta conexión.", 409);
   }, expectedWorkspace);
 }
 export async function removeConnector(user: Actor, workspaceId: string, requestId: string, name: string) {

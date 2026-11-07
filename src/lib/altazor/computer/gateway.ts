@@ -6,6 +6,7 @@ import { CONNECTOR_GATE, connectorKind } from "../connectors/catalog";
 import { assertGatewayOAuthAllowed, connectorConfigBody, connectorNameSchema, normalizeConnectorNames, projectConnectorSettings, validateConnectorConfiguration } from "../connectors/policy";
 import type { ConnectorApproval, ConnectorConfiguration } from "../connectors/types";
 import { assertEasyConnectorRead } from "../connectors/desktop-read-policy";
+import { validatePersistentEasyOAuth, type PersistentEasyOAuthConfiguration } from "../connectors/persistent-oauth";
 import { originalTaskForApproval } from "./approval-task";
 
 type Fetcher = typeof fetch;
@@ -38,7 +39,7 @@ export class KittiesGateway {
     if (!selected || /demo|scripted/i.test(JSON.stringify(selected))) throw new ConnectorError("provider_not_ready", "Configure un proveedor real de IA en el gateway del escritorio. ALTAZOR no transferirá sus credenciales.", 409);
     const fleet = await this.json("/v1/kitties");
     if (!Array.isArray(fleet.kitties) || fleet.kitties.some(item => !item || typeof item !== "object" || !knownKittyNames.includes(item.name) || String(item.container || "").startsWith("demo-"))) throw new ConnectorError("gateway_not_dedicated", "Este gateway contiene escritorios ajenos a este espacio. Use una instancia independiente y dedicada.", 409);
-    return { version: health.version.slice(0, 120), connectorGate: health.lexopen_connector_gate === CONNECTOR_GATE };
+    return { version: health.version.slice(0, 120), connectorGate: health.lexopen_connector_gate === CONNECTOR_GATE, persistentOAuth: health.lexopen_persistent_oauth === "v1" };
   }
   async createKitty(name: string, provider: string, connectors: readonly string[] = ["-"], start = true) {
     const selected = normalizeConnectorNames(connectors);
@@ -56,6 +57,13 @@ export class KittiesGateway {
   async kitty(id: string, name: string, provider: string, connectors: readonly string[] = ["-"]) { const result = await this.json(`/v1/kitties/${safeId(id)}`); const kitty = this.validateKitty(result.kitty, name, provider, connectors); if (id !== name && kitty.id !== id) throw new ConnectorError("kitty_contract", "El gateway devolvió otro escritorio.", 502); return kitty; }
   async requireConnectorGate() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_connector_gate !== CONNECTOR_GATE) throw new ConnectorError("connector_gate_required", "El gateway necesita el refuerzo de permisos de LexOpen para usar conexiones.", 409); }
   async requireFileReads() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_file_reads !== "v1") throw new ConnectorError("file_reads_required", "Actualice el escritorio de Altazor para trabajar con archivos completos de Google Drive y GitHub.", 409); }
+  async requirePersistentOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_persistent_oauth !== "v1") throw new ConnectorError("oauth_persistence_required", "Actualice el escritorio de Altazor para mantener sus conexiones sin iniciar sesión repetidamente.", 409); }
+  async setPersistentEasyOAuth(name: string, input: PersistentEasyOAuthConfiguration) {
+    connectorNameSchema.parse(name); validatePersistentEasyOAuth(input); await this.requirePersistentOAuth();
+    const result = await this.json(`/v1/lexopen/easy-oauth/${safeId(name)}`, "POST", { kind: input.kind, client_id: input.clientId, client_secret: input.clientSecret, access_token: input.accessToken, refresh_token: input.refreshToken, expires_at: input.expiresAt, scopes: input.scopes, ...(input.account ? { account: input.account } : {}) });
+    if (result.name !== name || result.kind !== input.kind || result.persistent !== true || result.auto_refresh !== true) throw new ConnectorError("oauth_save_unknown", "No se confirmó el guardado persistente de la conexión. Compruebe su estado antes de repetir el ingreso.", 502);
+    return { persistent: true, autoRefresh: true };
+  }
   async connectorSettings() {
     const health = await this.json("/v1/health"), hardened = health.lexopen_connector_gate === CONNECTOR_GATE;
     return projectConnectorSettings(await this.json("/v1/settings"), hardened && ["darwin", "linux", "windows"].includes(String(health.lexopen_connector_platform)) ? String(health.lexopen_connector_platform) : "unknown", hardened && health.lexopen_dropbox_read_gate === true);
@@ -68,7 +76,8 @@ export class KittiesGateway {
   async testConnector(name: string) {
     connectorNameSchema.parse(name); const result = await this.json(`/v1/settings/connectors/${safeId(name)}/test`, "POST", {});
     if (typeof result.ok !== "boolean" || typeof result.tested !== "boolean") throw new ConnectorError("connector_test_contract", "No se pudo verificar la conexión.", 502);
-    return { ok: result.ok, tested: result.tested };
+    const code = ["oauth_reconnect_required", "oauth_unavailable"].includes(String(result.code)) ? String(result.code) as "oauth_reconnect_required" | "oauth_unavailable" : undefined;
+    return { ok: result.ok, tested: result.tested, ...(code ? { code } : {}) };
   }
   async connectorOAuth(name: string) {
     connectorNameSchema.parse(name);

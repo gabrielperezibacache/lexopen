@@ -11,6 +11,8 @@ export function oauthFailureReason(code: string | null) {
     case "oauth_cancelled": return "No se autorizó la conexión. Puede iniciarla de nuevo cuando quiera.";
     case "oauth_test_failed": return "El acceso fue autorizado, pero no pudo comprobarse. Compruebe la conexión antes de volver a intentarlo.";
     case "oauth_save_unknown": return "No pudo confirmarse el guardado de la conexión. Compruebe su estado antes de iniciar otro ingreso.";
+    case "oauth_refresh_missing": return "El servicio no autorizó mantener la conexión guardada. Vuelva a conectar su cuenta y complete el consentimiento una sola vez.";
+    case "oauth_attempt_outdated": return "Este ingreso corresponde a una conexión temporal anterior. Inicie uno nuevo para mantener su cuenta conectada.";
     case "oauth_token_invalid":
     case "oauth_token_type":
     case "oauth_provider_rejected": return "El servicio no confirmó el acceso. Pulse Conectar para iniciar un ingreso nuevo.";

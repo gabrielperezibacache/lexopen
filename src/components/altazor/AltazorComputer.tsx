@@ -10,7 +10,7 @@ import { useComputerScreen } from "./useComputerScreen";
 import type { ConnectorInventory } from "@/lib/altazor/connectors/types";
 import { desktopPoint } from "@/lib/altazor/computer/coordinates";
 import { computerConnectionLabel } from "@/lib/altazor/computer/activity-detail";
-import { computerUserMessagePresentation } from "@/lib/altazor/computer/presentation";
+import { computerFileReadPresentation, computerUserMessagePresentation } from "@/lib/altazor/computer/presentation";
 import { ConnectorOperationPreview } from "./ConnectorOperationPreview";
 import { COMPUTER_ATTACHMENT_FORMATS, computerTurnNeedsHelp, type ComputerFile, type ComputerReview, type ComputerSessionView, type ComputerStatus } from "@/lib/altazor/computer/types";
 import styles from "./AltazorComputer.module.css";
@@ -244,9 +244,10 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
       <div className={styles.chat} aria-live="polite">{view?.turns.length ? view.turns.map(turn => {
         const help = turn === lastTurn && computerTurnNeedsHelp(turn);
         const message = turn.from === "user" ? computerUserMessagePresentation(turn.text) : { text: turn.text, environment: null };
+        const fileRead = computerFileReadPresentation(turn);
         return <article key={turn.index} {...(help ? { ref: helpMessage, tabIndex: -1, "aria-label": "Solicitud de ayuda de Altazor" } : {})}>
           <strong>{turn.from === "user" ? "Usted" : turn.from === "assistant" ? "Altazor AI" : "Sistema"}{help ? " · necesita tu ayuda" : turn.working ? " · trabajando" : ""}</strong>
-          {message.text && <p>{message.text}</p>}
+          {fileRead ? <><p><strong>{fileRead.title}</strong></p><p>{fileRead.summary}</p><details><summary>Detalles de la consulta</summary><p>{fileRead.receipt}</p></details></> : message.text && <p>{message.text}</p>}
           {message.environment && <details><summary>Información del entorno</summary><p>{message.environment}</p></details>}
           {help && turn.working && <p>Toma el control del escritorio y devuélveselo a Altazor cuando termines.</p>}
           {turn.steps.length > 0 && <small>{turn.steps.map(step => step.action).join(" · ")}</small>}

@@ -10,10 +10,11 @@ import { assertComputerEnabled } from "../computer/policy";
 import { assertComputerPolicy } from "../computer/privacy";
 import { normalizeAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { computerOperationHash } from "../computer/operation-hash";
-import { configureConnector, connectorInventory, testConnector } from "./service";
+import { configureConnector, configurePersistentEasyOAuth, connectorInventory, testConnector } from "./service";
 import { oauthFailureReason, readOAuthTokenResponse } from "./oauth-token-response";
 import { checkGithubApplication } from "./github-application-check";
 import { canReadConnectorFiles, easyOAuthScopes, validEasyOAuthScopes, type EasyOAuthAccess } from "./oauth-access";
+import { validatePersistentEasyOAuth } from "./persistent-oauth";
 
 import { EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth-providers";
 
@@ -28,10 +29,10 @@ const specifications = {
   dropbox: { label: "Dropbox", kind: "dropbox", scopes: ["account_info.read", "files.content.read", "files.metadata.read"], authorize: "https://www.dropbox.com/oauth2/authorize", token: "https://api.dropboxapi.com/oauth2/token", registrationUrl: "https://www.dropbox.com/developers/apps" },
 } as const;
 type Config = { provider: EasyOAuthProvider; clientId: string; clientSecret: string; origin: string; redirectUri: string; configured: boolean; source: "environment" | "saved" | "none"; reason: string | null };
-type Binding = { workspaceId: string; workspaceBinding: string; configurationBinding: string; connectionName: string; causaId: string | null; state: string; verifier: string; nonce: string };
-type ConnectionProof = { workspaceBinding: string; connectionName: string; expiresAt: string | null; scopes: string[] };
+type Binding = { workspaceId: string; workspaceBinding: string; configurationBinding: string; connectionName: string; causaId: string | null; state: string; verifier: string; nonce: string; persistence?: "offline-v1" };
+type ConnectionProof = { workspaceBinding: string; connectionName: string; expiresAt: string | null; scopes: string[]; autoRefresh?: boolean };
 export type EasyOAuthAttempt = { id: string; provider: EasyOAuthProvider; state: "pending" | "exchanging" | "completed" | "failed" | "cancelled" | "expired"; reason: string | null };
-export type EasyOAuthStatus = { workspaceId: string; causaId: string | null; canAdmin: boolean; requiresStop: boolean; providers: { provider: EasyOAuthProvider; label: string; available: boolean; reason: string | null; scopes: string[]; grantedScopes: string[]; canReadFiles: boolean; connectionName: string; state: "blocked" | "idle" | "pending" | "connected" | "failed" | "expired" | "reconnect_required"; connected: boolean; tested: boolean; hasStoredConnection: boolean; canDisconnect: boolean; expiresAt: string | null; lastVerifiedAt: string | null }[]; attempt?: EasyOAuthAttempt };
+export type EasyOAuthStatus = { workspaceId: string; causaId: string | null; canAdmin: boolean; requiresStop: boolean; providers: { provider: EasyOAuthProvider; label: string; available: boolean; reason: string | null; scopes: string[]; grantedScopes: string[]; canReadFiles: boolean; autoRefresh: boolean; persistent: boolean; connectionName: string; state: "blocked" | "idle" | "pending" | "connected" | "failed" | "expired" | "reconnect_required" | "unavailable"; connected: boolean; tested: boolean; hasStoredConnection: boolean; canDisconnect: boolean; expiresAt: string | null; lastVerifiedAt: string | null }[]; attempt?: EasyOAuthAttempt };
 const attemptContext = (ownerId: string, id: string) => `altazor:desktop:oauth:${ownerId}:${id}`;
 const proofContext = (ownerId: string, id: string) => `altazor:desktop:connection:${ownerId}:${id}`;
 const setupContext = (provider: EasyOAuthProvider) => `altazor:desktop:oauth:operator:${provider}`;
@@ -118,8 +119,10 @@ export async function startEasyOAuth(actor: ConnectorActor, input: { workspaceId
   await noActiveSession(workspace);
   const inventory = await connectorInventory(user, workspace.id), name = easyConnectionName(actor.id, workspace.id, input.provider), spec = specifications[input.provider];
   if (!inventory.gateReady || !inventory.catalog.some(kind => kind.id === spec.kind && kind.available && kind.fields.some(field => field.name === "token" && field.secret))) throw new ConnectorError("oauth_gateway_upgrade", "Actualice el computador de ALTAZOR para habilitar esta conexión.", 409);
+  const persistence = input.provider === "github" ? undefined : "offline-v1";
+  if (persistence && !inventory.persistentOAuthReady) throw new ConnectorError("oauth_persistence_required", "Actualice el escritorio de Altazor para mantener sus conexiones sin iniciar sesión repetidamente.", 409);
   const id = computerOperationHash(actor.id, "oauth-start", "request", { requestId: input.requestId });
-  let binding: Binding = { workspaceId: workspace.id, workspaceBinding: workspaceBinding(workspace), configurationBinding: appBinding(actor, workspace.id, config), connectionName: name, causaId: workspace.causaId, state: randomToken(), verifier: randomToken(), nonce: randomToken() };
+  let binding: Binding = { workspaceId: workspace.id, workspaceBinding: workspaceBinding(workspace), configurationBinding: appBinding(actor, workspace.id, config), connectionName: name, causaId: workspace.causaId, state: randomToken(), verifier: randomToken(), nonce: randomToken(), ...(persistence ? { persistence } : {}) };
   const expiresAt = new Date(Date.now() + 10 * 60_000);
   const attempt = await prisma.$transaction(async tx => {
     const current = await access(actor, workspace.id, tx); await noActiveSession(current.workspace, tx);
@@ -129,14 +132,14 @@ export async function startEasyOAuth(actor: ConnectorActor, input: { workspaceId
     if (previous) {
       if (previous.ownerId !== actor.id || previous.provider !== prefix + input.provider || previous.sessionHash !== actor.sessionHash || previous.sessionVersion !== actor.sessionVersion || previous.phase !== "pending" || previous.expiresAt.getTime() <= Date.now()) throw new ConnectorError("oauth_attempt_consumed", "Este intento ya cambió. Inicie una conexión nueva.", 409);
       const old = bindingOf(previous);
-      if (old.workspaceId !== workspace.id || old.workspaceBinding !== binding.workspaceBinding || old.configurationBinding !== binding.configurationBinding || JSON.stringify(JSON.parse(previous.requestedScopesJson)) !== JSON.stringify(requestedScopes)) throw new ConnectorError("request_conflict", "La solicitud corresponde a otra conexión.", 409);
+      if (old.workspaceId !== workspace.id || old.workspaceBinding !== binding.workspaceBinding || old.configurationBinding !== binding.configurationBinding || old.persistence !== persistence || JSON.stringify(JSON.parse(previous.requestedScopesJson)) !== JSON.stringify(requestedScopes)) throw new ConnectorError("request_conflict", "La solicitud corresponde a otra conexión.", 409);
       binding = old; return previous;
     }
     return tx.personalOAuthAttempt.create({ data: { id, ownerId: actor.id, provider: prefix + input.provider, stateHash: digest(binding.state), sessionHash: actor.sessionHash, sessionVersion: actor.sessionVersion, nonceHash: digest(binding.nonce), requestedScopesJson: JSON.stringify(requestedScopes), redirectUri: config.redirectUri, clientId: config.clientId, resultEnc: seal(binding, attemptContext(actor.id, id)), expiresAt } });
   });
   const params = new URLSearchParams({ response_type: "code", client_id: config.clientId, redirect_uri: config.redirectUri, state: binding.state, scope: requestedScopes.join(" "), code_challenge: createHash("sha256").update(binding.verifier).digest("base64url"), code_challenge_method: "S256" });
-  if (input.provider === "google") { params.set("access_type", "online"); params.set("include_granted_scopes", "false"); params.set("prompt", "consent"); }
-  if (input.provider === "dropbox") params.set("token_access_type", "online");
+  if (input.provider === "google") { params.set("access_type", "offline"); params.set("include_granted_scopes", "false"); params.set("prompt", "consent"); }
+  if (input.provider === "dropbox") params.set("token_access_type", "offline");
   return { attemptId: attempt.id, provider: input.provider, authUrl: `${spec.authorize}?${params}`, expiresAt: attempt.expiresAt.toISOString() };
 }
 async function providerJson(url: string, init: RequestInit, fetcher: typeof fetch) {
@@ -172,6 +175,7 @@ export async function receiveEasyOAuth(actor: ConnectorActor, input: { state: st
   if (!claimed.count) throw new ConnectorError("oauth_attempt_consumed", "Este retorno ya se utilizó. Compruebe el estado en LexOpen.", 409);
   try {
     if (input.denied || !input.code || input.code.length > 8000) throw new ConnectorError("oauth_cancelled", "La conexión no fue autorizada.");
+    if (provider !== "github" && binding.persistence !== "offline-v1") throw new ConnectorError("oauth_attempt_outdated", "Este ingreso pertenece a una conexión temporal anterior. Inicie una conexión nueva para mantenerla guardada.", 409);
     const spec = specifications[provider], fetcher = options.fetcher || fetch;
     const requestedScopes: unknown = JSON.parse(attempt.requestedScopesJson);
     if (!validEasyOAuthScopes(provider, requestedScopes)) throw new ConnectorError("oauth_scope_mismatch", "Los permisos de este intento no son válidos.", 409);
@@ -180,6 +184,8 @@ export async function receiveEasyOAuth(actor: ConnectorActor, input: { state: st
     const ttl = tokens.expires_in;
     if ((provider !== "github" || ttl !== undefined) && (typeof ttl !== "number" || !Number.isFinite(ttl) || ttl < 60 || ttl > 366 * 86400)) throw new ConnectorError("oauth_expiry_invalid", "El servicio no confirmó una vigencia válida.", 409);
     const expiresAt = typeof ttl === "number" ? new Date(Date.now() + ttl * 1000) : null;
+    if (provider !== "github" && (typeof tokens.refresh_token !== "string" || !tokens.refresh_token.trim())) throw new ConnectorError("oauth_refresh_missing", "El servicio no autorizó mantener la conexión. Vuelva a conectar su cuenta y complete el consentimiento.", 409);
+    const persistentInput = provider !== "github" ? validatePersistentEasyOAuth({ kind: specifications[provider].kind, clientId: config.clientId, clientSecret: config.clientSecret, accessToken, refreshToken: tokens.refresh_token as string, expiresAt: expiresAt!.toISOString(), scopes }) : null;
     const headers = { Authorization: `Bearer ${accessToken}`, Accept: "application/json" };
     const subject = await verifyProviderAccount(provider, headers, fetcher);
     if ((typeof subject !== "string" && typeof subject !== "number") || !String(subject).trim() || String(subject).length > 200) throw new ConnectorError("oauth_identity_invalid", "No se pudo comprobar esta autorización de lectura.", 409);
@@ -188,7 +194,7 @@ export async function receiveEasyOAuth(actor: ConnectorActor, input: { state: st
     if (appBinding(actor, workspace.id, currentConfig) !== binding.configurationBinding || workspaceBinding(current.workspace) !== binding.workspaceBinding) throw new ConnectorError("oauth_binding_changed", "La configuración cambió durante la autorización.", 409);
     // Lock the operator configuration and attempt through the one outbound save. A
     // setup rotation waits here; no transaction containing an RPC is ever retried.
-    await prisma.$transaction(async tx => {
+    const savedAccount = await prisma.$transaction(async tx => {
       const operator = await tx.integrationConfig.findUnique({ where: { provider: `altazor-oauth-${provider}` } });
       if (operator) await tx.integrationConfig.updateMany({ where: { id: operator.id, configJson: operator.configJson }, data: { updatedAt: operator.updatedAt } });
       const lockedConfig = requireConfig(await configFor(provider, options, tx));
@@ -197,19 +203,32 @@ export async function receiveEasyOAuth(actor: ConnectorActor, input: { state: st
       if (!attemptLock.count) throw new ConnectorError("oauth_attempt_cancelled", "El intento cambió antes de guardar la conexión.", 409);
       const beforeSave = await access(actor, workspace.id, tx); await noActiveSession(beforeSave.workspace, tx);
       if (workspaceBinding(beforeSave.workspace) !== binding.workspaceBinding) throw new ConnectorError("oauth_binding_changed", "El espacio cambió durante la autorización.", 409);
-      const result = await configureConnector(beforeSave.user, workspace.id, `oauth:${attempt.id}`, binding.connectionName, { kind: spec.kind, settings: { token: accessToken } }, workspace);
+      const result = persistentInput
+        ? await configurePersistentEasyOAuth(beforeSave.user, workspace.id, `oauth:${attempt.id}`, binding.connectionName, { ...persistentInput, account: String(subject) }, workspace)
+        : await configureConnector(beforeSave.user, workspace.id, `oauth:${attempt.id}`, binding.connectionName, { kind: spec.kind, settings: { token: accessToken } }, workspace);
       if (result.operation.status !== "completed") throw new ConnectorError("oauth_save_unknown", "No se confirmó la conexión. Revise su estado antes de repetirla.", 409);
-      const tested = await testConnector(beforeSave.user, workspace.id, binding.connectionName);
-      if (!tested.ok || !tested.tested) throw new ConnectorError("oauth_test_failed", "La aplicación autorizó el acceso, pero ALTAZOR no pudo comprobar la conexión.", 409);
       const live = await access(actor, workspace.id, tx); await noActiveSession(live.workspace, tx);
       if (workspaceBinding(live.workspace) !== binding.workspaceBinding || appBinding(actor, workspace.id, requireConfig(await configFor(provider, options, tx))) !== binding.configurationBinding) throw new ConnectorError("oauth_binding_changed", "La configuración cambió.", 409);
       const completed = await tx.personalOAuthAttempt.updateMany({ where: { id: attempt.id, phase: "exchanging", expiresAt: { gt: new Date() } }, data: { phase: "completed", completedAt: new Date(), resultEnc: seal({ workspaceId: workspace.id, causaId: workspace.causaId }, attemptContext(actor.id, attempt.id)), errorCode: null } });
       if (!completed.count) throw new ConnectorError("oauth_attempt_cancelled", "El intento cambió antes de completarse.", 409);
       const where = { ownerId_provider: { ownerId: actor.id, provider: accountProvider(workspace.id, provider) } }, previous = await tx.personalConnectorAccount.findUnique({ where }), id = previous?.id || randomUUID();
-      const proof: ConnectionProof = { workspaceBinding: binding.workspaceBinding, connectionName: binding.connectionName, expiresAt: expiresAt?.toISOString() || null, scopes };
-      const data = { clientId: config.clientId, externalSubject: digest(String(subject)), name: spec.label, status: "connected", grantedScopesJson: JSON.stringify(scopes), credentialsEnc: seal(proof, proofContext(actor.id, id)), expiresAt, lastVerifiedAt: new Date(), lastErrorCode: null };
-      await tx.personalConnectorAccount.upsert({ where, create: { id, ownerId: actor.id, provider: accountProvider(workspace.id, provider), ...data }, update: data });
+      const connectionExpiresAt = persistentInput ? null : expiresAt;
+      const proof: ConnectionProof = { workspaceBinding: binding.workspaceBinding, connectionName: binding.connectionName, expiresAt: connectionExpiresAt?.toISOString() || null, scopes, autoRefresh: Boolean(persistentInput) };
+      const data = { clientId: config.clientId, externalSubject: digest(String(subject)), name: spec.label, status: "connected", grantedScopesJson: JSON.stringify(scopes), credentialsEnc: seal(proof, proofContext(actor.id, id)), expiresAt: connectionExpiresAt, lastVerifiedAt: null, lastErrorCode: "oauth_unavailable" };
+      return tx.personalConnectorAccount.upsert({ where, create: { id, ownerId: actor.id, provider: accountProvider(workspace.id, provider), ...data }, update: data });
     }, { isolationLevel: "ReadCommitted", timeout: 60_000 });
+    // The imported grant and consumed attempt have committed before any remote
+    // first check. A slow/offline provider cannot roll them back. Updates are
+    // guarded by the exact saved proof so a concurrent reconfiguration wins.
+    try {
+      const beforeCheck = await access(actor, workspace.id), beforeConfig = requireConfig(await configFor(provider, options));
+      if (workspaceBinding(beforeCheck.workspace) !== binding.workspaceBinding || appBinding(actor, workspace.id, beforeConfig) !== binding.configurationBinding) throw new Error();
+      const tested = await testConnector(beforeCheck.user, workspace.id, binding.connectionName);
+      const afterCheck = await access(actor, workspace.id), afterConfig = requireConfig(await configFor(provider, options));
+      if (workspaceBinding(afterCheck.workspace) !== binding.workspaceBinding || appBinding(actor, workspace.id, afterConfig) !== binding.configurationBinding) throw new Error();
+      const verified = tested.ok && tested.tested;
+      await prisma.personalConnectorAccount.updateMany({ where: { id: savedAccount.id, ownerId: actor.id, clientId: savedAccount.clientId, credentialsEnc: savedAccount.credentialsEnc, status: "connected" }, data: { lastVerifiedAt: verified ? new Date() : null, lastErrorCode: verified ? null : tested.code || "oauth_unavailable" } });
+    } catch { /* A later read-only status check can verify the same saved grant. */ }
     return { attemptId: attempt.id, provider, causaId: workspace.causaId };
   } catch (error) {
     await prisma.personalOAuthAttempt.updateMany({ where: { id: attempt.id, phase: "exchanging" }, data: { phase: "failed", resultEnc: seal({ workspaceId: workspace.id, causaId: workspace.causaId }, attemptContext(actor.id, attempt.id)), errorCode: error instanceof ConnectorError ? error.code : "oauth_failed" } });
@@ -251,28 +270,36 @@ export async function easyOAuthStatus(actor: ConnectorActor, workspaceId: string
     const dropboxReady = provider !== "dropbox" || Boolean(inventory?.gateReady && inventory.catalog.find(entry => entry.id === "dropbox")?.available);
     const hasStoredConnection = Boolean(saved), canDisconnect = hasStoredConnection && Boolean(inventory?.gateReady) && !active;
     let state: EasyOAuthStatus["providers"][number]["state"] = config.configured ? "idle" : "blocked", tested = false, reason = config.reason;
-    let grantedScopes: string[] = [];
+    let grantedScopes: string[] = [], autoRefresh = false, persistent = false, proofValid = false;
     if (config.configured && dropboxReady && account) {
       try {
         const proof = unseal<ConnectionProof>(account.credentialsEnc || "", proofContext(actor.id, account.id));
         if (account.status !== "connected" || account.clientId !== config.clientId || proof.workspaceBinding !== workspaceBinding(workspace) || proof.connectionName !== name || !validEasyOAuthScopes(provider, proof.scopes) || JSON.stringify(proof.scopes) !== account.grantedScopesJson) throw new Error();
+        proofValid = true; autoRefresh = proof.autoRefresh === true && provider !== "github";
+        persistent = autoRefresh || provider === "github" && account.expiresAt === null;
         grantedScopes = proof.scopes;
-        if (account.expiresAt && account.expiresAt.getTime() <= Date.now()) { state = "expired"; reason = "La autorización venció. Pulse Conectar para renovarla."; }
+        if (!autoRefresh && account.expiresAt && account.expiresAt.getTime() <= Date.now()) { state = "expired"; reason = "La autorización temporal venció. Conecte su cuenta una vez más para mantenerla guardada."; }
         else {
-          if (!saved?.configured || saved.needsSignIn || !account.lastVerifiedAt) throw new Error();
+          if (!inventory || autoRefresh && !inventory.persistentOAuthReady) throw new ConnectorError("oauth_unavailable", "No pudimos comprobar el escritorio que guarda esta conexión.", 503);
+          if (!saved?.configured || saved.needsSignIn) throw new ConnectorError("oauth_reconnect_required", "La conexión guardada necesita autorización de su cuenta.", 409);
           const liveCheck = await testConnector(user, workspace.id, name);
-          if (!liveCheck.ok || !liveCheck.tested) throw new Error();
+          if (!liveCheck.ok || !liveCheck.tested) throw new ConnectorError(liveCheck.code === "oauth_reconnect_required" ? "oauth_reconnect_required" : "oauth_unavailable", "No se pudo comprobar el acceso a esta aplicación.", 409);
           const fresh = await access(actor, workspace.id), freshConfig = await configFor(provider, options);
           if (workspaceBinding(fresh.workspace) !== proof.workspaceBinding || !freshConfig.configured || freshConfig.clientId !== config.clientId) throw new Error();
           const checked = await prisma.personalConnectorAccount.updateMany({ where: { id: account.id, ownerId: actor.id, credentialsEnc: account.credentialsEnc, status: "connected" }, data: { lastVerifiedAt: new Date() } });
           if (!checked.count) throw new Error();
           state = "connected"; tested = true; reason = null; grantedScopes = proof.scopes;
         }
-      } catch { grantedScopes = []; state = "reconnect_required"; reason = "Compruebe el computador y vuelva a conectar esta aplicación."; }
+      } catch (error) {
+        grantedScopes = [];
+        const revoked = error instanceof ConnectorError && error.code === "oauth_reconnect_required";
+        state = proofValid && !revoked ? "unavailable" : "reconnect_required";
+        reason = state === "unavailable" ? "La conexión sigue guardada. No pudimos comprobar el acceso en este momento; vuelva a comprobarlo sin iniciar sesión de nuevo." : "El servicio necesita que vuelva a autorizar esta conexión. Sus archivos y conversaciones se conservan.";
+      }
     }
     if (attemptView?.provider === provider && ["pending", "exchanging"].includes(attemptView.state) && state !== "connected") state = "pending";
     if (config.configured && !dropboxReady) { state = "blocked"; reason = "Actualice el escritorio de Altazor para conectar Dropbox con permisos de lectura."; }
-    providers.push({ provider, label: specifications[provider].label, available: config.configured && dropboxReady, reason, scopes: [...specifications[provider].scopes], grantedScopes, canReadFiles: tested && canReadConnectorFiles(provider, grantedScopes), connectionName: name, state, connected: state === "connected", tested: dropboxReady && tested, hasStoredConnection, canDisconnect, expiresAt: account?.expiresAt?.toISOString() || null, lastVerifiedAt: account?.lastVerifiedAt?.toISOString() || null });
+    providers.push({ provider, label: specifications[provider].label, available: config.configured && dropboxReady, reason, scopes: [...specifications[provider].scopes], grantedScopes, canReadFiles: tested && canReadConnectorFiles(provider, grantedScopes), autoRefresh, persistent, connectionName: name, state, connected: state === "connected", tested: dropboxReady && tested, hasStoredConnection, canDisconnect, expiresAt: autoRefresh ? null : account?.expiresAt?.toISOString() || null, lastVerifiedAt: account?.lastVerifiedAt?.toISOString() || null });
   }
   return { workspaceId, causaId: workspace.causaId, canAdmin: canSome(user, "host.admin"), requiresStop: Boolean(active), providers, ...(attemptView ? { attempt: attemptView } : {}) };
 }
