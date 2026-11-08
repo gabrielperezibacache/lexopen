@@ -58,6 +58,17 @@ function parseDistributedOAuthProfile(raw) {
   } catch { throw invalid(); }
 }
 
+/** Public installers share one publisher identity; Microsoft remains optional. */
+function requirePublishableOAuthProviders(providers) {
+  const supported = ["google", "github", "dropbox", "microsoft"];
+  if (!Array.isArray(providers) || providers.length > supported.length ||
+      providers.some(provider => !supported.includes(provider)) || new Set(providers).size !== providers.length ||
+      !supported.slice(0, 3).every(provider => providers.includes(provider))) {
+    throw new Error("La publicación requiere las conexiones públicas de Google, GitHub y Dropbox.");
+  }
+  return Object.freeze(supported.filter(provider => providers.includes(provider)));
+}
+
 /** No file is read, nor any environment value replaced, when one is configured. */
 function applyDistributedOAuthProfile(file, targetEnv = process.env) {
   const current = targetEnv[DISTRIBUTED_OAUTH_ENV];
@@ -84,4 +95,4 @@ function applyDistributedOAuthProfile(file, targetEnv = process.env) {
   } finally { if (descriptor !== undefined) fs.closeSync(descriptor); }
 }
 
-module.exports = { DISTRIBUTED_OAUTH_ENV, MAX_DISTRIBUTED_OAUTH_BYTES, parseDistributedOAuthProfile, applyDistributedOAuthProfile };
+module.exports = { DISTRIBUTED_OAUTH_ENV, MAX_DISTRIBUTED_OAUTH_BYTES, parseDistributedOAuthProfile, requirePublishableOAuthProviders, applyDistributedOAuthProfile };

@@ -90,17 +90,22 @@ jobs:
         env:
           TARGET_PLATFORM: ${{ matrix.platform }}
           TARGET_ARCH: ${{ matrix.arch }}
-      - name: Prepare optional public account connection profile
+      - name: Prepare public account connection profile
         shell: bash
         env:
           LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON: ${{ secrets.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON }}
+          LEXOPEN_PUBLIC_OAUTH_REQUIRED: ${{ startsWith(github.ref, 'refs/tags/') }}
         run: |
           node <<'NODE'
           const fs = require("node:fs"), path = require("node:path");
-          const { parseDistributedOAuthProfile } = require("./desktop/oauth-clients.cjs");
+          const { parseDistributedOAuthProfile, requirePublishableOAuthProviders } = require("./desktop/oauth-clients.cjs");
           const raw = process.env.LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON;
-          if (!raw) process.exit(0);
+          if (!raw) {
+            if (process.env.LEXOPEN_PUBLIC_OAUTH_REQUIRED === "true") throw new Error("Falta el perfil público de conexiones requerido para publicar.");
+            process.exit(0);
+          }
           const profile = parseDistributedOAuthProfile(raw);
+          requirePublishableOAuthProviders(Object.keys(profile).filter(provider => provider !== "schemaVersion"));
           if (!process.env.RUNNER_TEMP || !process.env.GITHUB_ENV) throw new Error("Missing release runner configuration");
           const file = path.join(process.env.RUNNER_TEMP, "lexopen-oauth-clients.json");
           if (/[\r\n]/.test(file)) throw new Error("Invalid release runner directory");
@@ -165,12 +170,12 @@ jobs:
         with:
           pattern: desktop-*
           path: native-artifacts
-      - name: Assemble verified feeds, manifest and checksums
+      - name: Assemble verification artifacts only (not publishable)
         shell: bash
-        run: node desktop/scripts/assemble-release.mjs --input native-artifacts --output release --version "$(node -p 'require("./package.json").version')" --revision "$GITHUB_SHA"
+        run: node desktop/scripts/assemble-release.mjs --input native-artifacts --output release --version "$(node -p 'require("./package.json").version')" --revision "$GITHUB_SHA" --verification-only
       - uses: actions/upload-artifact@v4
         with:
-          name: verified-release
+          name: verification-only-installers
           path: release/*
           if-no-files-found: error
           retention-days: 14
@@ -201,7 +206,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$(node -p 'require("./package.json").version')"
-          node -e 'const fs=require("fs"),p=require("./package.json"),m=require("./release/release-manifest.json");if(m.version!==p.version||m.sourceRevision!==process.env.GITHUB_SHA)process.exit(1);fs.writeFileSync("/tmp/lexopen-release-notes.md",`LexOpen ${m.version}\n\nNueva identidad índigo y plata, conversación de Altazor con vista del escritorio, Mis Causas con carpetas y opciones de IA local. El instalador prepara las herramientas del escritorio con un motor compatible en ejecución. La conexión del servicio y los modelos conservan su configuración propia.\n\nInstaladores nativos con comprobación de inicio, creación del primer administrador y persistencia tras reiniciar.\n\n${m.prerelease?"Versión preliminar: consulte release-manifest.json para el estado de firma. Los paquetes sin firma pueden mostrar avisos del sistema y no garantizan actualización automática en macOS.":"Versión estable con validación de firma del editor."}\n\nSHA256SUMS permite comprobar integridad; no sustituye la firma del editor. No incluye datos de expedientes.\n\nGuía: https://github.com/gabrielperezibacache/lexopen/blob/${process.env.GITHUB_REF_NAME}/docs/INSTALADORES.md\n`);'
+          node -e 'const fs=require("fs"),p=require("./package.json"),m=require("./release/release-manifest.json");if(m.publishable!==true||m.version!==p.version||m.sourceRevision!==process.env.GITHUB_SHA)process.exit(1);fs.writeFileSync("/tmp/lexopen-release-notes.md",`LexOpen ${m.version}\n\nNueva identidad índigo y plata, conversación de Altazor con vista del escritorio, Mis Causas con carpetas y opciones de IA local. El instalador prepara las herramientas del escritorio con un motor compatible en ejecución. La conexión del servicio y los modelos conservan su configuración propia.\n\nInstaladores nativos con comprobación de inicio, creación del primer administrador y persistencia tras reiniciar.\n\n${m.prerelease?"Versión preliminar: consulte release-manifest.json para el estado de firma. Los paquetes sin firma pueden mostrar avisos del sistema y no garantizan actualización automática en macOS.":"Versión estable con validación de firma del editor."}\n\nSHA256SUMS permite comprobar integridad; no sustituye la firma del editor. No incluye datos de expedientes.\n\nGuía: https://github.com/gabrielperezibacache/lexopen/blob/${process.env.GITHUB_REF_NAME}/docs/INSTALADORES.md\n`);'
           FLAGS=()
           if [[ "$VERSION" == *-* ]]; then FLAGS+=(--prerelease); fi
           gh release create "$GITHUB_REF_NAME" release/* --verify-tag --title "LexOpen $VERSION" --notes-file /tmp/lexopen-release-notes.md "${FLAGS[@]}"

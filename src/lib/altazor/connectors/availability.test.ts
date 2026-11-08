@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CONNECTOR_CATALOG } from "./catalog";
-import { connectorAvailability, connectorConnectionAvailability } from "./availability";
+import { connectorAccountAvailability, connectorAvailability, connectorConnectionAvailability, connectorOAuthSnapshot } from "./availability";
+import { connectorAccountPresentation } from "./presentation";
 import type { ConnectorCatalogEntry, ConnectorConnection } from "./types";
 
 const entry: ConnectorCatalogEntry = { ...CONNECTOR_CATALOG.find(item => item.id === "dropbox")!, available: true, oauthReady: false, fields: [] };
@@ -30,4 +31,48 @@ test("a successful account cannot make all accounts look verified", () => {
   assert.equal(connectorAvailability(entry, [saved, other], true, { files: { tested: true, ok: true } }).label, "1 de 2 accesos comprobados");
   assert.equal(connectorAvailability(entry, [saved, { ...other, kind: "rss" }], true).label, "Guardada · sin comprobar");
   assert.equal(connectorAvailability(entry, [saved, other], true).state, "saved");
+});
+
+const oauth = { workspaceId: "personal-files", causaId: null, providers: [{ provider: "dropbox", available: true, state: "connected", connected: true, tested: true, hasStoredConnection: true }] };
+test("guided accounts require checked OAuth evidence for this exact workspace", () => {
+  const snapshot = connectorOAuthSnapshot(oauth, "personal-files", null);
+  assert.ok(snapshot);
+  assert.equal(connectorAccountAvailability(entry, true, snapshot).state, "verified");
+  assert.equal(connectorAccountAvailability(entry, false, snapshot).state, "unknown");
+  assert.equal(connectorAccountAvailability(entry, true, null).state, "unknown");
+  assert.equal(connectorAccountAvailability({ ...entry, available: false }, true, snapshot).state, "unavailable");
+  assert.equal(connectorOAuthSnapshot(oauth, "other-workspace", null), null);
+  assert.equal(connectorOAuthSnapshot(oauth, "personal-files", "another-case"), null);
+  for (const malformed of [
+    { ...oauth, providers: [oauth.providers[0], oauth.providers[0]] },
+    { ...oauth, providers: [{ ...oauth.providers[0], tested: "true" }] },
+    { ...oauth, providers: [{ ...oauth.providers[0], provider: "other" }] },
+    { ...oauth, providers: [{ ...oauth.providers[0], state: "made-up" }] },
+  ]) assert.equal(connectorOAuthSnapshot(malformed, "personal-files", null), null);
+});
+test("guided account readiness and uncertainty are separate from stored credentials", () => {
+  const status = (overrides: Record<string, unknown>) => connectorAccountAvailability(entry, true,
+    connectorOAuthSnapshot({ ...oauth, providers: [{ ...oauth.providers[0], ...overrides }] }, "personal-files", null));
+  assert.equal(status({ tested: false }).state, "saved");
+  assert.equal(status({ connected: false }).state, "saved");
+  assert.equal(status({ state: "idle", connected: false, tested: false, hasStoredConnection: false }).label, "Iniciar sesión");
+  assert.equal(status({ state: "blocked", available: false }).label, "Servicio en preparación");
+  assert.equal(status({ state: "pending" }).label, "Ingreso pendiente");
+  assert.equal(status({ state: "unavailable" }).label, "Conexión sin comprobar");
+  assert.equal(status({ state: "expired" }).label, "Vuelve a conectar");
+  assert.equal(status({ state: "reconnect_required" }).label, "Vuelve a conectar");
+  assert.equal(status({ state: "failed" }).state, "failed");
+});
+test("guided account copy describes read-only access without changing adapter capabilities", () => {
+  const google = CONNECTOR_CATALOG.find(item => item.id === "google-workspace")!;
+  const github = CONNECTOR_CATALOG.find(item => item.id === "github")!;
+  const slack = CONNECTOR_CATALOG.find(item => item.id === "slack")!;
+  assert.equal(connectorAccountPresentation(google).label, "Google Drive");
+  assert.match(connectorAccountPresentation(google).description, /sin modificarlos/);
+  assert.doesNotMatch(connectorAccountPresentation(google).description, /correo|calendario/i);
+  assert.match(connectorAccountPresentation(github).description, /repositorios públicos/);
+  assert.doesNotMatch(connectorAccountPresentation(github).description, /privados|publicar|crear/i);
+  assert.deepEqual(connectorAccountPresentation(slack), { label: slack.label, description: slack.description });
+  assert.equal(google.label, "Google Workspace");
+  assert.match(google.description, /Correo/);
 });

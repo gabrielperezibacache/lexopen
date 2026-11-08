@@ -8,4 +8,5 @@ export type DistributedOAuthProfile = Readonly<{
 export const DISTRIBUTED_OAUTH_ENV: "ALTAZOR_DISTRIBUTED_OAUTH";
 export const MAX_DISTRIBUTED_OAUTH_BYTES: 16384;
 export function parseDistributedOAuthProfile(raw: unknown): DistributedOAuthProfile;
+export function requirePublishableOAuthProviders(providers: unknown): readonly ("google" | "github" | "dropbox" | "microsoft")[];
 export function applyDistributedOAuthProfile(file: string | null | undefined, targetEnv?: Record<string, string | undefined>): DistributedOAuthProfile | null;
