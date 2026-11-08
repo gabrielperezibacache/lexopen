@@ -70,11 +70,65 @@ test("selection is bound to the same owner and workspace; another alias cannot b
   assert.equal(prepare(`Descarga ${ordinary} usando altazor-google-0123456789abcdef`), null);
 });
 test("output names must be simple, bounded and explicitly supplied", () => {
-  assert.equal(prepare(`Descarga ${ordinary} con nombre "Mi resolución.pdf"`)?.args.name, "Mi resolución.pdf");
-  assert.equal(prepare(`Descarga ${ordinary} como Sentencia.pdf`)?.args.name, "Sentencia.pdf");
-  assert.equal(prepare(`Download ${ordinary} as Judgment.pdf`)?.args.name, "Judgment.pdf");
-  assert.equal(prepare(`Descarga ${ordinary}`)?.args.name, undefined);
+  const outputName = (text: string) => {
+    const task = prepare(text);
+    assert.ok(task?.kind === "google-workspace");
+    return task.args.name;
+  };
+  assert.equal(outputName(`Descarga ${ordinary} con nombre "Mi resolución.pdf"`), "Mi resolución.pdf");
+  assert.equal(outputName(`Descarga ${ordinary} como Sentencia.pdf`), "Sentencia.pdf");
+  assert.equal(outputName(`Download ${ordinary} as Judgment.pdf`), "Judgment.pdf");
+  assert.equal(outputName(`Descarga ${ordinary}`), undefined);
   for (const name of ["../x.pdf", "/tmp/x.pdf", "dir/x.pdf", "dir\\x.pdf", ".bashrc", "x\u0001.pdf", "x\u007f.pdf", "x".repeat(161)]) assert.equal(prepare(`Descarga ${ordinary} con nombre "${name}"`), null);
   assert.equal(prepare("Descarga " + "x".repeat(15_001)), null);
   assert.equal(prepareExplicitFileTask(`Descarga ${ordinary}`, "", workspace, selected), null);
+});
+
+test("Dropbox stages only an exact literal account path in the selected account", () => {
+  const dropbox = `altazor-dropbox-${suffix}`, connectors = [...selected, dropbox];
+  for (const text of ['Descarga el archivo "/Docencia/Curso.pdf" de Dropbox', 'Por favor, descarga desde Dropbox el archivo /Docencia/Curso.pdf', 'Download the file `/Docencia/Curso.pdf` from Dropbox']) assert.deepEqual(prepare(text, connectors), { kind: "dropbox", connector: dropbox, action: "download_file", args: { path: "/Docencia/Curso.pdf" } });
+  const exact = "/Docencia/Programa de teoría jurídica.pdf";
+  const quoted = prepare(`Descarga el archivo "${exact}" de Dropbox y verifica cuántas páginas tiene.`, connectors); assert.equal(quoted?.kind, "dropbox"); assert.equal(quoted?.kind === "dropbox" ? quoted.args.path : null, exact);
+  for (const scopes of [[], ["-"], selected, ["altazor-dropbox-0123456789abcdef"]]) assert.equal(prepare('Descarga el archivo "/Docencia/Curso.pdf" de Dropbox', scopes), null);
+  assert.equal(prepareExplicitFileTask('Descarga el archivo "/Docencia/Curso.pdf" de Dropbox', "other-owner", workspace, connectors), null);
+  assert.equal(prepareExplicitFileTask('Descarga el archivo "/Docencia/Curso.pdf" de Dropbox', owner, "other-workspace", connectors), null);
+});
+test("Dropbox never resolves shared links, searches titles or changes an ambiguous path", () => {
+  const connectors = [...selected, `altazor-dropbox-${suffix}`];
+  for (const text of [
+    'Descarga el archivo "Curso.pdf" de Dropbox', 'Busca y descarga el archivo "/Docencia/Curso.pdf" de Dropbox',
+    'No descargues el archivo "/Docencia/Curso.pdf" de Dropbox', 'Descarga el archivo "/Docencia/Curso.pdf" de Dropbox si te confirmo',
+    'Descarga el archivo /Docencia/Curso.pdf. de Dropbox', 'Descarga el archivo "/Docencia/../Curso.pdf" de Dropbox',
+    "Descarga el archivo /Docencia/O'Brien.pdf de Dropbox", 'Descarga el archivo /Docencia/Curso.pdf<extra de Dropbox',
+    'Descarga el archivo /Docencia/Programa de teoría.pdf de Dropbox',
+    'Descarga desde Dropbox el archivo /Docencia/Programa de teoría.pdf',
+    'Descarga el archivo /Docencia/Programa de teoría.pdf de Dropbox y verifica sus páginas',
+    'Descarga el archivo /Docencia/Programa de Dropbox teoría.pdf',
+    'Descarga desde Dropbox el archivo /Docencia/Programa verifica teoría.pdf',
+    'Descarga desde Dropbox el archivo /Docencia/Programa y verifica teoría.pdf',
+    'Descarga el archivo /Docencia/Programa.pdf de Dropbox y verifica sus páginas',
+    'Descarga el archivo "/Docencia/Programa.pdf" texto adicional de Dropbox',
+    'Descarga el archivo "/Docencia/Programa.pdf" de Dropbox texto adicional',
+    'Descarga el archivo "/Docencia//Curso.pdf" de Dropbox', 'Descarga el archivo "/Docencia/%2e%2e/Curso.pdf" de Dropbox',
+    'Descarga el archivo "/Docencia/Curso.pdf?dl=1" de Dropbox', 'Descarga el archivo "/Docencia/Curso.pdf#x" de Dropbox',
+    'Descarga el archivo "/Docencia/Curso.pdf" de Dropbox y el archivo "/Docencia/Otro.pdf"',
+    'Descarga el archivo "/Docencia/Curso.pdf" de Dropbox o /Docencia/Otro.pdf',
+    'Descarga el archivo "/Docencia/Curso.pdf" de Dropbox con nombre Otro.pdf',
+    'Descarga el archivo "/Docencia/Curso.pdf" de Dropbox como Otro.pdf',
+    'Descarga el archivo "/Docencia/Curso.pdf" de Dropbox y envía el resultado por correo',
+    'Descarga el archivo "/Docencia/Curso.pdf" de Dropbox usando altazor-dropbox-0123456789abcdef',
+    'Descarga https://www.dropbox.com/scl/fi/example/Curso.pdf?dl=1',
+    'Descarga el archivo "/Docencia/Curso.pdf" de Dropbox desde https://www.dropbox.com/scl/fi/example/Curso.pdf',
+  ]) assert.equal(prepare(text, connectors), null, text);
+  // A word in an existing Drive output filename must not steal its provider.
+  assert.equal(prepare(`Descarga ${ordinary} con nombre "Notas de Dropbox.pdf"`, connectors)?.kind, "google-workspace");
+});
+test("Dropbox preserves quoted spaces and JSON-special Unicode paths without repairing malformed Unicode", () => {
+  const dropbox = `altazor-dropbox-${suffix}`, connectors = [dropbox];
+  for (const path of ["/Docencia/Programa de teoría.pdf", '/Docencia/Teoría & <prueba> "citada".pdf']) {
+    const task = prepare('Descarga el archivo `' + path + '` de Dropbox y verifica cuántas páginas tiene.', connectors);
+    assert.deepEqual(task, { kind: "dropbox", connector: dropbox, action: "download_file", args: { path } });
+    assert.equal(JSON.parse(JSON.stringify(task)).args.path, path);
+  }
+  assert.equal(prepare('Descarga el archivo `/Docencia/Programa\ud800.pdf` de Dropbox', connectors), null);
 });

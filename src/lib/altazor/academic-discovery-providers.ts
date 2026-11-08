@@ -1,14 +1,19 @@
+import { normalizeIsbn } from "./bibliography-identity";
 /** Public metadata only. No supplied URL, credential, document or redirect is followed. */
 import { z } from "zod";
 import { httpError } from "@/lib/auth/access";
 import { bibliographyMetadataSchema, doiHref, normalizeDoi, normalizeOrcid, openalexId, type AcademicPaper, type BibliographyMetadata, type DiscoveryProvider } from "./bibliography-types";
 
+function recordIsbn(value: unknown) {
+  for (const entry of Array.isArray(value) ? value : []) { if (typeof entry === "string") { try { return normalizeIsbn(entry); } catch { /* Ignore malformed provider identifiers. */ } } }
+  return undefined;
+}
 const HOSTS = new Set(["api.crossref.org", "api.openalex.org", "pub.orcid.org"]), MAX_BYTES = 2 * 1024 * 1024;
 const active = new Map<string, number>();
 export type AcademicTransport = typeof fetch;
 type FetchOptions = { fetch?: AcademicTransport; signal?: AbortSignal };
 function clean(value: unknown, max = 1000): string { return typeof value === "string" ? value.replace(/<[^>]*>/g, " ").replace(/[\x00-\x1f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : ""; }
-const object = z.record(z.unknown());
+const object = z.record(z.string(), z.unknown());
 function row(value: unknown) { return object.parse(value); }
 function first(value: unknown) { return Array.isArray(value) ? clean(value[0]) : clean(value); }
 function doi(value: unknown) { try { return normalizeDoi(clean(value, 300)); } catch { return ""; } }
@@ -40,7 +45,7 @@ function crossrefPaper(value: unknown): AcademicPaper | null {
   const input = row(value), identifier = doi(input.DOI), title = first(input.title); if (!identifier || !title) return null;
   const published = input.published || input["published-print"] || input["published-online"] || input.issued, dates = published && typeof published === "object" ? (published as Record<string, unknown>)["date-parts"] : undefined;
   const authors = Array.isArray(input.author) ? input.author.slice(0, 50).map(value => { const item = row(value); return { family: clean(item.family, 200), given: clean(item.given, 200), name: clean(item.name, 300) }; }).filter(author => author.family || author.name) : [];
-  const metadata = bibliographyMetadataSchema.parse({ title, authors, year: year(Array.isArray(dates) && Array.isArray(dates[0]) ? dates[0][0] : null), containerTitle: first(input["container-title"]).slice(0, 500), volume: clean(input.volume, 100), issue: clean(input.issue, 100), pages: clean(input.page, 100), publisher: clean(input.publisher, 300), doi: identifier, type: input.type === "book" || input.type === "monograph" ? "book" : input.type === "book-chapter" ? "chapter" : "article", warnings: Array.isArray(input.author) && input.author.length > 50 ? ["La fuente enumera más de cincuenta autores; revise el registro completo."] : [] });
+  const metadata = bibliographyMetadataSchema.parse({ title, authors, year: year(Array.isArray(dates) && Array.isArray(dates[0]) ? dates[0][0] : null), containerTitle: first(input["container-title"]).slice(0, 500), volume: clean(input.volume, 100), issue: clean(input.issue, 100), pages: clean(input.page, 100), publisher: clean(input.publisher, 300), ...(recordIsbn(input.ISBN) ? { isbn: recordIsbn(input.ISBN) } : {}), doi: identifier, type: input.type === "book" || input.type === "monograph" ? "book" : input.type === "book-chapter" ? "chapter" : "article", warnings: Array.isArray(input.author) && input.author.length > 50 ? ["La fuente enumera más de cincuenta autores; revise el registro completo."] : [] });
   return { key: `doi:${identifier}`, metadata, provider: "crossref", sourceUrl: `https://api.crossref.org/works/${encodeURIComponent(identifier)}`, landingUrl: doiHref(identifier), checkedAt: new Date().toISOString(), openAccess: null, citedByCount: counter(input["is-referenced-by-count"]) };
 }
 export function openalexPaper(value: unknown): AcademicPaper | null {

@@ -10,7 +10,7 @@ import { assertComputerEnabled } from "../computer/policy";
 import { assertComputerPolicy } from "../computer/privacy";
 import { normalizeAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { computerOperationHash } from "../computer/operation-hash";
-import { configureConnector, configurePersistentEasyOAuth, connectorInventory, testConnector } from "./service";
+import { configureConnector, configurePersistentEasyOAuth, connectorInventory, testConnector, assertPersistentOAuthImportReady } from "./service";
 import { oauthFailureReason, readOAuthTokenResponse } from "./oauth-token-response";
 import { checkGithubApplication } from "./github-application-check";
 import { canReadConnectorFiles, easyOAuthScopes, validEasyOAuthScopes, type EasyOAuthAccess } from "./oauth-access";
@@ -149,6 +149,7 @@ export async function startEasyOAuth(actor: ConnectorActor, input: { workspaceId
   const persistence = input.provider === "github" ? undefined : "offline-v1";
   if (persistence && !inventory.persistentOAuthReady) throw new ConnectorError("oauth_persistence_required", "Actualice el escritorio de Altazor para mantener sus conexiones sin iniciar sesión repetidamente.", 409);
   if (config.flow === "public_client" && !inventory.cloudFileOAuthReady) throw new ConnectorError("oauth_cloud_files_required", "Actualice el escritorio de Altazor para conectar esta cuenta pública con lectura y renovación seguras.", 409);
+  if (input.provider !== "github") await assertPersistentOAuthImportReady(user, workspace.id, name, input.provider === "google" ? "google-workspace" : input.provider === "microsoft" ? "microsoft-365" : "dropbox");
   const id = computerOperationHash(actor.id, "oauth-start", "request", { requestId: input.requestId });
   let binding: Binding = { workspaceId: workspace.id, workspaceBinding: workspaceBinding(workspace), configurationBinding: appBinding(actor, workspace.id, config), connectionName: name, causaId: workspace.causaId, state: randomToken(), verifier: randomToken(), nonce: randomToken(), ...(persistence ? { persistence } : {}), ...(config.flow === "installed" ? { installed: true as const } : {}), ...(config.flow !== "device" && (input.external || config.flow === "installed" || config.flow === "public_client") ? { external: true as const } : {}) };
   let expiresAt = new Date(Date.now() + 10 * 60_000);

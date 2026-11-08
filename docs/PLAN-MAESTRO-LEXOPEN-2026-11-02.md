@@ -1,5 +1,7 @@
 # LexOpen · plan maestro de desarrollo e integración
 
+Estado posterior: consulte las [correcciones de auditoría del 7 de noviembre](CORRECCIONES-AUDITORIA-2026-11-07.md). Este plan conserva la planificación de su fecha; Novedades y los recorridos académicos ya están implementados.
+
 Fecha de revisión: **2 de noviembre de 2026**. Punto de partida: `main@8cb233ffccac2dca86db4b4333b228188c06d15b`, después del PR 215. Este documento continúa el [plan de capacidades jurídicas propias](PLAN-DESARROLLO-LEXOPEN.md) y la [revisión visual anterior](UI-REVIEW-2026-11-01.md). La prioridad elegida por el usuario es **preparar causas, audiencias y escritos con fuentes**.
 
 El objetivo de la siguiente etapa es recorrer un asunto completo dentro de LexOpen: incorporar sus documentos, entender hechos y controversias, investigar el derecho, preparar una audiencia, recuperar sus notas y producir un escrito cuyas referencias puedan abrirse y corroborarse. La operación del estudio acompaña ese recorrido: cliente, equipo, calendario, tareas, comunicaciones y honorarios. LexOpen mantiene sus datos, búsqueda, modelos configurables e integraciones propias.

@@ -1,7 +1,7 @@
 "use client";
 import { parseMinutaTemplate } from "@/lib/minutas/template";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ETAPAS } from "@/lib/chile";
 import {
@@ -68,6 +68,8 @@ export function MinutaWizard({
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const submission = useRef<{ key: string; body: string } | null>(null);
+  const [retryingSave, setRetryingSave] = useState(false);
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const [tipo, setTipo] = useState(
@@ -171,13 +173,9 @@ export function MinutaWizard({
       return;
     }
 
-    startTransition(async () => {
-      const result = await apiMutation<{
-        minuta?: { id: string };
-        warnings?: string[];
-      }>("/api/minutas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+    if (!retryingSave || !submission.current) {
+      submission.current = {
+        key: submission.current?.key || crypto.randomUUID(),
         body: JSON.stringify({
           causaId,
           tipo,
@@ -210,14 +208,30 @@ export function MinutaWizard({
             .map((a) => `- ${a.descripcion}`)
             .join("\n"),
         }),
+      };
+    }
+    const attempt = submission.current;
+    startTransition(async () => {
+      const result = await apiMutation<{
+        minuta?: { id: string };
+        warnings?: string[];
+      }>("/api/minutas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": attempt.key },
+        body: attempt.body,
       });
       if (!result.ok) {
-        setError(result.error || "No se pudo guardar la minuta");
+        const uncertain = retryingSave || result.status === 0 || result.status === 408 || result.status >= 500;
+        setRetryingSave(uncertain);
+        setError(uncertain
+          ? "No se pudo confirmar si la minuta quedó guardada. Reintente el guardado para comprobarlo sin crear otra minuta."
+          : result.error || "No se pudo guardar la minuta");
         return;
       }
       const data = result.data;
       if (!data.minuta?.id) {
-        setError("No se pudo guardar la minuta");
+        setRetryingSave(true);
+        setError("El servidor no confirmó la minuta. Reintente el guardado para comprobar el resultado.");
         return;
       }
       const driveWarn =
@@ -278,7 +292,7 @@ export function MinutaWizard({
             <li key={label}>
               <button
                 type="button"
-                disabled={i > step}
+                disabled={i > step || pending || retryingSave}
                 onClick={() => i <= step && setStep(i)}
                 className={`inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-sm)] px-3 py-2 text-sm font-medium transition-colors ${
                   i === step
@@ -682,6 +696,7 @@ export function MinutaWizard({
               <select
                 className="input"
                 value={etapaSugerida}
+                disabled={pending || retryingSave}
                 onChange={(e) => setEtapaSugerida(e.target.value)}
               >
                 <option value="">Sin cambio</option>
@@ -698,7 +713,7 @@ export function MinutaWizard({
                   type="checkbox"
                   checked={actualizarEtapa}
                   onChange={(e) => setActualizarEtapa(e.target.checked)}
-                  disabled={!etapaSugerida}
+                  disabled={!etapaSugerida || pending || retryingSave}
                 />
                 Actualizar etapa de la causa
               </label>
@@ -706,7 +721,7 @@ export function MinutaWizard({
                 <input
                   type="checkbox"
                   checked={subirADrive && hasRealDriveFolder}
-                  disabled={!hasRealDriveFolder}
+                  disabled={!hasRealDriveFolder || pending || retryingSave}
                   onChange={(e) => setSubirADrive(e.target.checked)}
                 />
                 Subir a carpeta Google Drive
@@ -720,6 +735,7 @@ export function MinutaWizard({
                 <input
                   type="checkbox"
                   checked={confidencial}
+                  disabled={pending || retryingSave}
                   onChange={(e) => setConfidencial(e.target.checked)}
                 />
                 Marcar confidencial
@@ -765,7 +781,7 @@ export function MinutaWizard({
         <button
           type="button"
           className="btn btn-ghost"
-          disabled={step === 0 || pending}
+          disabled={step === 0 || pending || retryingSave}
           onClick={() => setStep((s) => Math.max(0, s - 1))}
         >
           Atrás
@@ -786,7 +802,7 @@ export function MinutaWizard({
             disabled={!canNext() || pending}
             onClick={submit}
           >
-            {pending ? "Guardando…" : "Guardar minuta"}
+            {pending ? "Guardando…" : retryingSave ? "Reintentar guardado" : "Guardar minuta"}
           </button>
         )}
       </div>

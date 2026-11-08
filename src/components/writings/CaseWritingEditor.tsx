@@ -31,6 +31,11 @@ async function postJson<T>(url: string, body: unknown) {
   try { return await apiMutation<T>(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: control.signal }); }
   finally { clearTimeout(timeout); }
 }
+function openOfflineWorkspace(causaId: string, draftId: string) {
+  // Static public HTML has no RSC route; use a full document navigation.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  location.assign(`/offline.html?case=${encodeURIComponent(causaId)}&draft=${encodeURIComponent(draftId)}`);
+}
 function fileDownload(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob), link = document.createElement("a");
   link.href = url; link.download = name; link.click();
@@ -237,11 +242,11 @@ function WritingSession({ causaId, initial, initialSources, initialBookId, onSav
     publish(result.data.draft); fieldsRef.current = { title: result.data.draft.title, body: result.data.draft.body }; setFields(fieldsRef.current);
     setSaveState("saved"); setNotice(action.success); setPanelOpen(false);
   }
-  async function download(format: "markdown" | "text" | "docx") {
+  async function download(format: "markdown" | "text" | "docx", purpose: "draft" | "approved" = "draft") {
     if (!await flush()) return;
     setActionBusy(true); setError("");
     try {
-      const response = await fetch(url + "/export?format=" + format, { cache: "no-store" });
+      const response = await fetch(url + "/export?" + new URLSearchParams({ format, purpose, revision: String(draftRef.current.revision) }), { cache: "no-store" });
       if (!response.ok) { const value = await response.json(); throw Object.assign(new Error(value.error || "No se pudo exportar."), { status: response.status, code: value.code }); }
       fileDownload(await response.blob(), "lexopen-escrito." + (format === "markdown" ? "md" : format === "docx" ? "docx" : "txt"));
       setNotice("Archivo descargado con los respaldos que se acaban de comprobar.");
@@ -270,7 +275,7 @@ function WritingSession({ causaId, initial, initialSources, initialBookId, onSav
     <div className="context-workspace writing-layout">
       <div className="writing-paper">
         <div className="writing-paper-meta"><span><FileText size={18} aria-hidden="true" />Escrito privado · versión {draft.revision}</span><span className="writing-status" data-state={state} role="status" aria-live="polite">{state === "saved" && <Check size={16} aria-hidden="true" />}{labels[state]}</span></div>
-        {draft.canWrite && <div className="writing-actions writing-actions-top"><button type="button" className="btn btn-primary" disabled={locked || state === "conflict" || state === "saved"} onClick={() => void flush()}><Save size={16} aria-hidden="true" />Guardar ahora</button></div>}
+        {draft.canWrite && <div className="writing-actions writing-actions-top"><button type="button" className="btn btn-primary" disabled={locked || state === "conflict" || state === "saved"} onClick={() => void flush()}><Save size={16} aria-hidden="true" />Guardar ahora</button><button type="button" className="btn btn-secondary" disabled={locked || state === "conflict"} onClick={() => void flush().then(saved => { if (saved) openOfflineWorkspace(causaId, draft.id); })}>Trabajar sin conexión</button></div>}
         <label className="writing-title-label" htmlFor="writing-title">Título del escrito</label><input id="writing-title" className="writing-title" value={fields.title} onChange={event => edit({ title: event.target.value })} maxLength={200} disabled={locked} />
         <label className="writing-body-label" htmlFor="writing-body">Texto del escrito</label><textarea id="writing-body" className="writing-body" value={fields.body} onChange={event => edit({ body: event.target.value })} maxLength={100_000} rows={20} disabled={locked} placeholder="Empiece a redactar. Puede incorporar un hecho, una nota o un pasaje desde el cuaderno de fuentes…" spellCheck />
         <p className="writing-help">El texto se guarda automáticamente al dejar de escribir. Los marcadores [^R1] enlazan los respaldos incorporados; consérvelos junto a la afirmación correspondiente. Las conclusiones requieren revisión profesional.</p><p className="writing-help">{fields.body.length.toLocaleString("es-CL")} de 100.000 caracteres · último guardado: {dateLabel(draft.updatedAt)}</p>
@@ -281,7 +286,7 @@ function WritingSession({ causaId, initial, initialSources, initialBookId, onSav
         <div hidden={panel !== "sources"}><SourcePicker causaId={causaId} draftId={draft.id} active={panelOpen && panel === "sources"} visit={sourceVisit} initialKind={initialSources} initialBookId={initialBookId} disabled={locked || state === "conflict"} add={async source => { await commit("/sources", { source }, "Fuente incorporada al final del escrito. Sus citas quedan vinculadas a esta versión."); }} onCatalogError={catalogFailure} /></div>
         <div hidden={panel !== "references"} className="writing-companion-panel"><p>Los pasajes vinculados a esta versión vuelven a comprobarse al abrir o exportar el escrito.</p><References causaId={causaId} draftId={draft.id} references={draft.references} /><Warnings warnings={draft.warnings} /></div>
         <div hidden={panel !== "history"}><HistoryPanel url={url} visit={historyVisit} active={panelOpen && panel === "history"} current={draft.revision} canWrite={draft.canWrite} disabled={operating || state === "conflict"} restore={revision => commit("/restore", { targetRevision: revision }, "Versión recuperada como un nuevo guardado. El historial anterior se conserva.")} onPrivateError={privateFailure} /></div>
-        <section hidden={panel !== "export"}><p>Se comprueban los respaldos y el acceso antes de preparar la descarga. Los cambios pendientes se guardan primero.</p><div className="writing-actions"><button type="button" className="btn btn-primary" disabled={operating || state === "conflict"} onClick={() => void download("docx")}><Download size={16} aria-hidden="true" />Descargar Word</button></div><details><summary>Otros formatos</summary><div className="writing-actions"><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("markdown")}>Descargar Markdown</button><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("text")}>Descargar TXT</button></div></details></section>
+        <section hidden={panel !== "export"}><WritingReview key={draft.revision} draft={draft} disabled={locked || state !== "saved"} review={(decision, citationsChecked, note) => commit("/review", { decision, citationsChecked, note }, "Revisión registrada para esta versión.")} /><p>Se comprueban los respaldos y el acceso antes de preparar la descarga. Los cambios pendientes se guardan primero.</p><div className="writing-actions"><button type="button" className="btn btn-primary" disabled={operating || state === "conflict"} onClick={() => void download("docx")}><Download size={16} aria-hidden="true" />Descargar Word</button><button type="button" className="btn btn-secondary" disabled={operating || state !== "saved" || !draft.canReview || !draft.review?.current || draft.review.decision !== "approved"} onClick={() => void download("docx", "approved")}>Descargar versión aprobada</button></div><details><summary>Otros formatos</summary><div className="writing-actions"><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("markdown")}>Descargar Markdown</button><button type="button" className="btn btn-secondary" disabled={operating || state === "conflict"} onClick={() => void download("text")}>Descargar TXT</button></div></details></section>
       </ContextPanel>
     </div>
   </div>;
@@ -422,4 +427,19 @@ function HistoryPanel({ url, active = true, visit = 0, current, canWrite, disabl
     {ready && history?.nextBefore && <button type="button" className="writing-text-link" disabled={loading} onClick={() => { chosenRevision.current = undefined; setBefore(history.nextBefore!); setPreview(undefined); }}>Ver versiones anteriores</button>}
     {before && <button type="button" className="writing-text-link" onClick={() => { chosenRevision.current = undefined; setBefore(undefined); setPreview(undefined); }}>Volver a las recientes</button>}
   </div>;
+}
+
+function WritingReview({ draft, disabled, review }: { draft: WritingDraftView; disabled: boolean; review: (decision: "approved" | "changes_requested", citationsChecked: boolean, note: string) => Promise<void> }) {
+  const [checked, setChecked] = useState(false), [note, setNote] = useState("");
+  const current = draft.review?.current;
+  return <section aria-label="Revisión profesional del escrito" className="writing-review-panel">
+    <h3>Revisión de la versión {draft.revision}</h3>
+    <p>La decisión registra al profesional y los respaldos comprobados de esta versión. Al modificar el escrito debe revisarlo de nuevo.</p>
+    {draft.review && <p role="status">{current ? draft.review.decision === "approved" ? "Versión aprobada" : "Requiere cambios" : "Revisión anterior sin vigencia para este texto"} · {draft.review.reviewerName} · versión {draft.review.revision} · {dateLabel(draft.review.createdAt)}{draft.review.note && <> · {draft.review.note}</>}</p>}
+    {draft.canReview && !current && <div className="space-y-3">
+      <label className="writing-review-check"><input type="checkbox" checked={checked} disabled={disabled} onChange={event => setChecked(event.target.checked)} /><span>He revisado el texto y cotejado sus citas con los respaldos incorporados</span></label>
+      <label className="block">Observaciones de revisión<textarea className="textarea" maxLength={4000} value={note} disabled={disabled} onChange={event => setNote(event.target.value)} /></label>
+      <div className="writing-actions"><button className="btn btn-secondary" type="button" disabled={disabled || !checked} onClick={() => void review("approved", checked, note)}>Aprobar esta versión</button><button className="btn btn-ghost" type="button" disabled={disabled || !note.trim()} onClick={() => void review("changes_requested", checked, note)}>Registrar cambios necesarios</button></div>
+    </div>}
+  </section>;
 }

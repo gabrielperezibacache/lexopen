@@ -181,6 +181,7 @@ export default async function ConfiguracionPage() {
   return (
     <div className={`${styles.area} space-y-6`} data-settings-workspace>
       <ModuleHeader
+        artwork="settings"
         eyebrow={h.eyebrow}
         title={canManage ? h.title : dict.nav.settings}
         subtitle={canManage ? h.subtitle : tr("Ajusta tu cuenta, tus avisos y las herramientas que usas.", "Adjust your account, notifications and tools.")}

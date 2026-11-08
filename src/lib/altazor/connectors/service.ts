@@ -47,6 +47,21 @@ export async function connectorInventory(user: Actor, workspaceId: string) {
   const operations = await prisma.altazorConnectorOperation.findMany({ where: { workspaceId, ownerId: workspace.ownerId, status: { in: ["sending", "unknown"] } }, select: { id: true, kind: true, status: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 20 });
   return { ...result, operations: operations.map(row => ({ ...row, createdAt: row.createdAt.toISOString() })) };
 }
+/** Check a first account before asking its provider for consent. An older
+ * persistent runtime may still renew an alias it already stores. No write. */
+export async function assertPersistentOAuthImportReady(user: Actor, workspaceId: string, name: string, kind: PersistentEasyOAuthConfiguration["kind"]) {
+  connectorNameSchema.parse(name);
+  const { actor, workspace } = await access(user, workspaceId);
+  const provider = kind === "google-workspace" ? "google" : kind === "microsoft-365" ? "microsoft" : "dropbox";
+  if (name !== `altazor-${provider}-${digest(`${actor.id}:${workspaceId}`).slice(0, 16)}`) throw new ConnectorError("oauth_binding_changed", "La conexión no corresponde a este profesional y espacio.", 409);
+  await policy();
+  const { client } = await ready(workspace);
+  await client.requirePersistentOAuth();
+  const settings = await client.connectorSettings(), existing = settings.connections.find(connection => connection.name === name);
+  if (existing && existing.kind !== kind) throw new ConnectorError("connector_unavailable", "No se pudo confirmar el servicio de esta conexión.", 409);
+  if (!existing) await client.requireOAuthAliasCreation();
+  await current(actor, workspace);
+}
 function receipt(row: { id: string; status: string; createdAt: Date }) { return { id: row.id, status: row.status === "sending" && Date.now() - row.createdAt.getTime() > 60_000 ? "unknown" : row.status }; }
 
 async function mutation(user: Actor, workspaceId: string, requestId: string, kind: string, input: unknown, run: (client: KittiesGateway) => Promise<Record<string, unknown>>, cleanup = false, preflight?: (client: KittiesGateway) => Promise<void>, expectedWorkspace?: AltazorComputerWorkspace) {

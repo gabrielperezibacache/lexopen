@@ -135,7 +135,7 @@ export async function PUT(req: NextRequest) {
         if (!isModo(p.modo)) continue;
         if (p.tipo !== "*" && !isTipo(p.tipo)) continue;
         const def = p.tipo === "*" ? null : CATALOGO[p.tipo as keyof typeof CATALOGO];
-        if (def && !def.apagable && p.modo === "off") {
+        if (def && !def.apagable && p.modo === "off" && p.canal !== "whatsapp") {
           // Críticos: no se apagan; se ignora off.
           continue;
         }

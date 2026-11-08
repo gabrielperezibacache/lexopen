@@ -11,6 +11,7 @@ import { getCurrentUser, requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import type { Prisma } from "@prisma/client";
 
 export { isClientAllowedPagePath, isClientAllowedPath } from "@/lib/auth/client-paths";
 
@@ -23,16 +24,17 @@ export function httpError(message: string, status: number) {
 /** Cliente: debe ser miembro Y el site visible. Staff: libre. */
 export async function requireSiteAccess(
   siteId: string,
-  user: PermissionSubject & { id: string }
+  user: PermissionSubject & { id: string },
+  client: Pick<Prisma.TransactionClient, "site"> = prisma
 ) {
   if (isStaff(user.role)) {
     const { siteAccessWhere } = await import("@/lib/auth/causa-access");
-    const site = await prisma.site.findFirst({ where: { id: siteId, ...siteAccessWhere(user) }, select: { id: true } });
+    const site = await client.site.findFirst({ where: { id: siteId, ...siteAccessWhere(user) }, select: { id: true } });
     if (!site) throw httpError("Site no encontrado", 404);
     return;
   }
 
-  const site = await prisma.site.findUnique({
+  const site = await client.site.findUnique({
     where: { id: siteId },
     select: {
       id: true,
@@ -107,13 +109,17 @@ export async function requireStaffPage() {
 }
 
 /** Portal actions retain their explicit handler policy; staff mutations inherit matter permissions. */
-export async function requireSiteMutationAccess(siteId: string, user: PermissionSubject & { id: string }) {
-  await requireSiteAccess(siteId, user);
+export async function requireSiteMutationAccess(
+  siteId: string,
+  user: PermissionSubject & { id: string },
+  client: Pick<Prisma.TransactionClient, "site" | "causa" | "auditEvent"> = prisma
+) {
+  await requireSiteAccess(siteId, user, client);
   if (isStaff(user.role)) {
-    const site = await prisma.site.findUniqueOrThrow({ where: { id: siteId }, select: { causaId: true } });
+    const site = await client.site.findUniqueOrThrow({ where: { id: siteId }, select: { causaId: true } });
     if (site.causaId) {
       const { assertCausaCapability } = await import("@/lib/auth/causa-access");
-      await assertCausaCapability(site.causaId, user, "causa.write");
+      await assertCausaCapability(site.causaId, user, "causa.write", client);
     }
   }
 }

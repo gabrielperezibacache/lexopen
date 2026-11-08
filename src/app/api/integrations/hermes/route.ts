@@ -1,3 +1,4 @@
+import { requireDeadlineComputation } from "@/lib/plazos-policy";
 import { assertChatSourcesAccess, canReadChatSources } from "@/lib/ai/chat-access";
 import { createHash } from "node:crypto";
 import { causaAccessWhere, relatedCausaWhere, assertCausaAccess, assertCausaCapability } from "@/lib/auth/causa-access";
@@ -129,6 +130,7 @@ export async function POST(req: Request) {
     }
 
     if (body.action === "estimate-plazo") {
+      await requireDeadlineComputation();
       const estimate = formatPlazoEstimate({
         desde: String(body.desde || ""),
         dias: Number(body.dias || 0),

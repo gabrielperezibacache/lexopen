@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { normalizarRut, validarRut } from "@/lib/chile";
 import { causaAccessWhere, type CausaAccessUser } from "@/lib/auth/causa-access";
@@ -95,14 +96,16 @@ const RECENT_CLOSED_MS = 3 * 365.25 * 24 * 60 * 60 * 1000;
 
 /** Busca conflictos por nombre o identificación en causas activas y cerradas recientes. */
 export async function checkConflicts(opts: {
+  client?: Prisma.TransactionClient;
   partes: Array<{ nombre: string; rut?: string | null }>;
   excludeCausaId?: string;
   user?: CausaAccessUser;
 }): Promise<ConflictCheckResult> {
+  const db = opts.client || prisma;
   const hits: ConflictHit[] = [];
   const closedAfter = new Date(Date.now() - RECENT_CLOSED_MS);
 
-  const causas = await prisma.causa.findMany({
+  const causas = await db.causa.findMany({
     where: {
       OR: [
         { estado: { in: ["activa", "suspensa"] } },
@@ -186,7 +189,7 @@ export async function checkConflicts(opts: {
     seen.add(k);
     return true;
   });
-  const allowed = opts.user && unique.length ? await prisma.causa.findMany({
+  const allowed = opts.user && unique.length ? await db.causa.findMany({
     where: { AND: [causaAccessWhere(opts.user), { id: { in: [...new Set(unique.map((hit) => hit.causaId))] } }] },
     select: { id: true },
   }) : [];

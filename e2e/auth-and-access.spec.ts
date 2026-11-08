@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { CSRF_COOKIE, CSRF_HEADER } from "../src/lib/auth/csrf-constants";
-import { loginAs } from "./helpers";
+import { authenticateApiRequests, loginAs } from "./helpers";
 
 test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
   page,
 }) => {
   test.setTimeout(90_000);
   await loginAs(page, "socio@estudio.cl");
+  await authenticateApiRequests(page);
 
   await expect(page).toHaveURL(/\/(inicio|dashboard)$/);
   await expect(page.getByTestId("inicio-composer")).toBeVisible();
@@ -36,22 +37,22 @@ test("un usuario del estudio puede iniciar sesión y abrir causas", async ({
 
   await page.goto("/personas");
   await expect(page.getByRole("heading", { name: "Personas" })).toBeVisible();
-  await expect(page.getByTestId("people-manager")).toBeVisible();
+  await expect(page.getByRole("main").getByTestId("people-manager")).toBeVisible();
 
   await page.goto("/causas");
   await expect(page).toHaveURL(/\/causas$/);
   await expect(
     page.getByRole("heading", { name: "Causas", exact: true })
   ).toBeVisible();
-  await expect(page.getByText("C-4521-2025")).toBeVisible();
-  const causeRow = page.locator("tr").filter({ hasText: "C-4521-2025" }).first();
+  const causeRow = page.getByRole("main").locator("tr").filter({ hasText: "C-4521-2025" }).first();
+  await expect(causeRow).toBeVisible();
   const causeHref = await causeRow
     .locator('a[href^="/causas/"]:not([href*="/editar"])')
     .first()
     .getAttribute("href");
   expect(causeHref).toBeTruthy();
   await page.goto(causeHref!);
-  await page.getByText("Registrar movimientos manualmente", { exact: true }).click();
+  await page.locator("#main-content").getByText("Registrar movimientos manualmente", { exact: true }).click();
   const exportHref = await page
     .getByRole("link", { name: "Exportar movimientos" })
     .getAttribute("href");
@@ -114,6 +115,7 @@ test("un profesional abre sus ajustes sin acceso a la administración", async ({
 test("un cliente queda limitado al portal y a sus espacios", async ({ page }) => {
   test.setTimeout(90_000);
   await loginAs(page, "cliente@andes.cl");
+  await authenticateApiRequests(page);
 
   await expect(page).toHaveURL(/\/portal$/);
   await expect(

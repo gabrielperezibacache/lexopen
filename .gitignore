@@ -62,3 +62,9 @@ yarn-error.log*
 /.jules/
 /.Jules/
 .lexopen-e2e-pg/
+
+# Independent Android project and local visual QA captures
+/relevo-android/
+/docs/estetica-editorial-2026-11-07/**/*.png
+/docs/estetica-editorial-2026-11-07/**/*.jpg
+/docs/estetica-editorial-2026-11-07/**/*.mp4

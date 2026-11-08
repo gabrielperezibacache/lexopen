@@ -1,0 +1,29 @@
+{
+  "results": [
+    {
+      "theme": "light",
+      "file": "buscar-light-webkit-video.png",
+      "box": {
+        "x": 736.6875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "muted": true,
+      "overflow": false
+    },
+    {
+      "theme": "dark",
+      "file": "buscar-dark-webkit-video.png",
+      "box": {
+        "x": 736.6875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "muted": true,
+      "overflow": false
+    }
+  ],
+  "errors": []
+}

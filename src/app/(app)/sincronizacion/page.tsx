@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { PersonalDriveConnection } from "@/components/altazor/PersonalDriveConnection";
 import { can, canSome } from "@/lib/auth/permissions";
 import styles from "./sync.module.css";
+import { EditorialHeading } from "@/components/ui/EditorialHeading";
 
 export default async function SyncPage() {
   const user = await requireStaff();
@@ -22,7 +23,7 @@ export default async function SyncPage() {
     }, orderBy: { updatedAt: "desc" }, take: 100,
   });
   return <div className={styles.workspace}>
-    <header className={styles.heading}><h1>Archivos conectados</h1><Link className="btn btn-secondary" href="/causas">Ver causas <ArrowUpRight size={16} aria-hidden="true" /></Link></header>
+    <header className={styles.heading}><EditorialHeading artwork="connections"><h1>Archivos conectados</h1></EditorialHeading><Link className="btn btn-secondary" href="/causas">Ver causas <ArrowUpRight size={16} aria-hidden="true" /></Link></header>
     {canSome(user,"assistant.use") && <div id="sync-google"><PersonalDriveConnection /></div>}
     <section className={styles.files} id="sync-files" aria-labelledby="sync-files-title">
       <div className={styles.sectionHeading}><FolderSync size={23} aria-hidden="true" /><h2 id="sync-files-title">Carpetas de mis causas</h2></div>

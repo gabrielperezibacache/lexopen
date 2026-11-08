@@ -6,7 +6,7 @@ import { httpError } from "@/lib/auth/access";
 import { writeAuditStrict } from "@/lib/audit";
 import { sha256 } from "@/lib/evidence/fragments";
 import { captureWritingSource, verifyWritingSource } from "./sources";
-import { writingAddSourceSchema, writingCreateSchema, writingRestoreSchema, writingSaveSchema, writingSourceInputSchema } from "./schemas";
+import { writingAddSourceSchema, writingCreateSchema, writingRestoreSchema, writingSaveSchema, writingSourceInputSchema, writingReviewSchema } from "./schemas";
 import { writingActor, writingChanged, writingMissing, writingTransaction, writingUnavailable, type WritingClient } from "./access";
 import type { WritingChange, WritingDraftList, WritingDraftView, WritingHistory, WritingMutationResult, WritingReference, WritingReferenceView, WritingRevisionView } from "./types";
 import type { StoredWritingSource } from "./source-types";
@@ -57,7 +57,12 @@ async function rowFor(causaId: string, id: string, user: CausaAccessUser, client
 }
 async function view(row: DraftRow, user: CausaAccessUser, client: WritingClient, canWrite: boolean, cache?: Map<string, unknown>): Promise<WritingDraftView> {
   const refs = await verifiedReferences(row.causaId, row.referencesJson, user, client, cache);
-  return { id: row.id, causaId: row.causaId, title: row.title, body: row.body, revision: row.revision, references: refs, canWrite, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), warnings: warnings(row.body, refs) };
+  const { canReview } = await writingActor(row.causaId, user, client);
+  const review = await client.caseWritingReview.findFirst({ where: { draftId: row.id }, orderBy: { revision: "desc" } });
+  return { id: row.id, causaId: row.causaId, title: row.title, body: row.body, revision: row.revision, references: refs, canWrite, canReview, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), warnings: warnings(row.body, refs), review: review ? {
+    id: review.id, revision: review.revision, current: review.revision === row.revision && review.contentSha256 === sha256(JSON.stringify([row.title, row.body])) && review.referencesSha256 === sha256(row.referencesJson),
+    reviewerId: review.reviewerId, reviewerName: review.reviewerName, decision: review.decision as "approved" | "changes_requested", note: review.note, createdAt: review.createdAt.toISOString(),
+  } : null };
 }
 async function revisionView(causaId: string, row: RevisionRow, actor: CausaAccessUser, client: WritingClient, canWrite: boolean): Promise<WritingRevisionView> {
   const refs = await verifiedReferences(causaId, row.referencesJson, actor, client);
@@ -159,7 +164,7 @@ export async function listCaseWritings(causaId: string, user: CausaAccessUser, a
 export async function readCaseWriting(causaId: string, id: string, user: CausaAccessUser, client: WritingClient = prisma): Promise<WritingDraftView> {
   return writingTransaction(client, async tx => { const { actor, row, canWrite } = await rowFor(causaId, id, user, tx); return view(row, actor, tx, canWrite); });
 }
-export async function readCaseWritingForExport(causaId: string, id: string, user: CausaAccessUser, client: PrismaClient = prisma) {
+export async function readCaseWritingForExport(causaId: string, id: string, user: CausaAccessUser, client: WritingClient = prisma) {
   return writingTransaction(client, async tx => {
     const { actor, row, canWrite } = await rowFor(causaId, id, user, tx);
     const caseIdentity = await tx.causa.findUniqueOrThrow({ where: { id: causaId }, select: { id: true, titulo: true, rit: true } });
@@ -231,5 +236,31 @@ export async function restoreCaseWriting(causaId: string, id: string, raw: z.inp
     const next = await updateRow(tx, row, { title: target.title, body: target.body, referencesJson: target.referencesJson });
     await snapshot(tx, next, "restored", target.revision); await recordRequest(tx, next, input.requestId, hash); await audit(tx, actor, next, "restored", target.revision);
     return { draft: await view(next, actor, tx, canWrite), reused: false };
+  });
+}
+
+/** A professional's explicit decision applies to one immutable content version. */
+export async function reviewCaseWriting(causaId: string, id: string, raw: unknown, user: CausaAccessUser, client: PrismaClient = prisma): Promise<WritingMutationResult> {
+  const input = writingReviewSchema.parse(raw), hash = inputHash("review", input);
+  return writingTransaction(client, async tx => {
+    const { actor, row, canWrite } = await rowFor(causaId, id, user, tx, true);
+    await assertCausaCapability(causaId, actor, "escrito.approve", tx);
+    const checked = await view(row, actor, tx, canWrite);
+    const previous = await tx.caseWritingReview.findUnique({ where: { draftId_requestId: { draftId: id, requestId: input.requestId } } });
+    if (previous) {
+      if (previous.inputSha256 !== hash) throw writingChanged();
+      return { draft: checked, reused: true };
+    }
+    expected(row, input.expectedRevision);
+    if (await tx.caseWritingReview.count({ where: { draftId: id, revision: row.revision } })) throw httpError("Esta versión ya tiene una decisión. Edite el escrito para preparar una nueva revisión", 409);
+    const registered = new Set(checked.references.map(ref => ref.id));
+    if (input.decision === "approved" && [...row.body.matchAll(/\[\^(R[1-9][0-9]*)\]/g)].some(match => !registered.has(match[1]))) throw httpError("Corrija los marcadores de cita sin respaldo antes de aprobar", 409);
+    const reviewer = await tx.user.findUniqueOrThrow({ where: { id: actor.id }, select: { name: true } });
+    const review = await tx.caseWritingReview.create({ data: {
+      draftId: id, revision: row.revision, requestId: input.requestId, inputSha256: hash, reviewerId: actor.id, reviewerName: reviewer.name,
+      decision: input.decision, note: input.note, contentSha256: sha256(JSON.stringify([row.title, row.body])), referencesSha256: sha256(row.referencesJson),
+    } });
+    await writeAuditStrict({ actorId: actor.id, action: "case.writing.review", entityType: "CaseWritingDraft", entityId: id, after: { causaId, revision: row.revision, reviewId: review.id, decision: review.decision } }, tx);
+    return { draft: await view(row, actor, tx, canWrite), reused: false };
   });
 }

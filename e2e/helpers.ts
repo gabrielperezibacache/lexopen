@@ -1,4 +1,14 @@
 import type { Page, Response } from "@playwright/test";
+import { CSRF_COOKIE, CSRF_HEADER } from "../src/lib/auth/csrf-constants";
+
+/** Explicit opt-in for HTTP fixtures that exercise the compiled production server. */
+export async function authenticateApiRequests(page: Page) {
+  await page.waitForLoadState("networkidle");
+  const origin = new URL(page.url()).origin;
+  const token = (await page.context().cookies(origin)).find(cookie => cookie.name === CSRF_COOKIE)?.value;
+  if (!token) throw Error("The authenticated browser must have a CSRF cookie");
+  await page.context().setExtraHTTPHeaders({ Origin: origin, [CSRF_HEADER]: token, "Accept-Language": "es-CL,es;q=0.9" });
+}
 
 async function waitLoginResponse(page: Page, timeout = 15_000): Promise<Response> {
   return page.waitForResponse(

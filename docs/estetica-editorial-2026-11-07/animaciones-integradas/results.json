@@ -1,0 +1,469 @@
+{
+  "results": [
+    {
+      "route": "mis-causas",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 860.796875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "buttonBox": {
+        "x": 860.796875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "mis-causas-light-desktop-static.png",
+      "videoFile": "mis-causas-light-desktop-video.png"
+    },
+    {
+      "route": "mis-causas",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "buttonBox": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "mis-causas-light-mobile-static.png",
+      "videoFile": "mis-causas-light-mobile-video.png"
+    },
+    {
+      "route": "mis-causas",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 860.796875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "buttonBox": {
+        "x": 860.796875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "mis-causas-dark-desktop-static.png",
+      "videoFile": "mis-causas-dark-desktop-video.png"
+    },
+    {
+      "route": "mis-causas",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "buttonBox": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "mis-causas-dark-mobile-static.png",
+      "videoFile": "mis-causas-dark-mobile-video.png"
+    },
+    {
+      "route": "facturacion",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 490.109375,
+        "y": 142,
+        "width": 144,
+        "height": 81
+      },
+      "buttonBox": {
+        "x": 490.109375,
+        "y": 142,
+        "width": 144,
+        "height": 81
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "facturacion-light-desktop-static.png",
+      "videoFile": "facturacion-light-desktop-video.png"
+    },
+    {
+      "route": "facturacion",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 151.6875,
+        "y": 126,
+        "width": 80,
+        "height": 45
+      },
+      "buttonBox": {
+        "x": 151.6875,
+        "y": 126,
+        "width": 80,
+        "height": 45
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "facturacion-light-mobile-static.png",
+      "videoFile": "facturacion-light-mobile-video.png"
+    },
+    {
+      "route": "facturacion",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 490.109375,
+        "y": 142,
+        "width": 144,
+        "height": 81
+      },
+      "buttonBox": {
+        "x": 490.109375,
+        "y": 142,
+        "width": 144,
+        "height": 81
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "facturacion-dark-desktop-static.png",
+      "videoFile": "facturacion-dark-desktop-video.png"
+    },
+    {
+      "route": "facturacion",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 151.6875,
+        "y": 126,
+        "width": 80,
+        "height": 45
+      },
+      "buttonBox": {
+        "x": 151.6875,
+        "y": 126,
+        "width": 80,
+        "height": 45
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "facturacion-dark-mobile-static.png",
+      "videoFile": "facturacion-dark-mobile-video.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 959.25,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "buttonBox": {
+        "x": 959.25,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "plazos-light-desktop-static.png",
+      "videoFile": "plazos-light-desktop-video.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "buttonBox": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "plazos-light-mobile-static.png",
+      "videoFile": "plazos-light-mobile-video.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 959.25,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "buttonBox": {
+        "x": 959.25,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "plazos-dark-desktop-static.png",
+      "videoFile": "plazos-dark-desktop-video.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "buttonBox": {
+        "x": 264,
+        "y": 162.46875,
+        "width": 80,
+        "height": 45
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "plazos-dark-mobile-static.png",
+      "videoFile": "plazos-dark-mobile-video.png"
+    },
+    {
+      "route": "buscar",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 736.671875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "buttonBox": {
+        "x": 736.671875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "buscar-light-desktop-static.png",
+      "videoFile": "buscar-light-desktop-video.png"
+    },
+    {
+      "route": "buscar",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 264,
+        "y": 150.5625,
+        "width": 80,
+        "height": 45
+      },
+      "buttonBox": {
+        "x": 264,
+        "y": 150.5625,
+        "width": 80,
+        "height": 45
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "buscar-light-mobile-static.png",
+      "videoFile": "buscar-light-mobile-video.png"
+    },
+    {
+      "route": "buscar",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 736.671875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "buttonBox": {
+        "x": 736.671875,
+        "y": 145.96875,
+        "width": 144,
+        "height": 81
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "buscar-dark-desktop-static.png",
+      "videoFile": "buscar-dark-desktop-video.png"
+    },
+    {
+      "route": "buscar",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "prematureVideoRequests": 0,
+      "overflow": false,
+      "box": {
+        "x": 264,
+        "y": 150.5625,
+        "width": 80,
+        "height": 45
+      },
+      "buttonBox": {
+        "x": 264,
+        "y": 150.5625,
+        "width": 80,
+        "height": 45
+      },
+      "imageLoaded": true,
+      "time": 2,
+      "paused": true,
+      "muted": true,
+      "blend": "normal",
+      "filter": "url(\"#lexopen-editorial-cutout\")",
+      "background": "rgba(0, 0, 0, 0)",
+      "staticFile": "buscar-dark-mobile-static.png",
+      "videoFile": "buscar-dark-mobile-video.png"
+    }
+  ],
+  "errors": []
+}

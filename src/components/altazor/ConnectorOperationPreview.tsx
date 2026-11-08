@@ -1,9 +1,9 @@
-import type { ConnectorApproval } from "@/lib/altazor/connectors/types";
+import type { ComputerApproval } from "@/lib/altazor/computer/types";
 import { computerOperationPresentation } from "@/lib/altazor/computer/presentation";
 import styles from "./ConnectorOperationPreview.module.css";
 
-export function ConnectorOperationPreview({ approval }: { approval: ConnectorApproval }) {
-  const presentation = computerOperationPresentation(approval);
+export function ConnectorOperationPreview({ approval }: { approval: ComputerApproval }) {
+  const presentation = approval.kind === "computer-use" ? null : computerOperationPresentation(approval);
   if (!presentation) return <><h4>{approval.connector} · {approval.action}</h4><p>{approval.summary}</p><pre>{JSON.stringify(approval.args, null, 2)}</pre></>;
   return <>
     <h4>{presentation.title}</h4>

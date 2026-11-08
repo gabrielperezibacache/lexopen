@@ -15,6 +15,7 @@ export default async function CorreoPage({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-6">
       <PageHeader
+        artwork="correspondence"
         eyebrow={t("mailbox.eyebrow")}
         title={t("mailbox.title")}
         subtitle={t("mailbox.subtitle")}

@@ -47,6 +47,7 @@ export default async function CuentaCorrientePage({
   return (
     <div className="space-y-6">
       <ModuleHeader
+        artwork="billing"
         eyebrow="Provisión de fondos"
         title="Cuenta corriente"
         subtitle="Provisiones, cargos y pagos por cliente. El saldo positivo es plata a favor del cliente; el negativo, un adeudo al estudio. Los documentos se exportan a un facturador externo desde Facturas (CSV/XML, no DTE SII)."

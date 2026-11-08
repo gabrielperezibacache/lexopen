@@ -7,10 +7,8 @@ import { createGmailProvider } from "./gmail";
 import { createSmtpProvider } from "./smtp";
 import { createTelegramProvider } from "./telegram";
 import { createWebPushProvider } from "./webpush";
-import {
-  createWhatsAppMetaStub,
-  createWhatsAppTwilioStub,
-} from "./whatsapp";
+import { createWhatsAppProvider } from "./whatsapp";
+import { getWhatsAppConfig } from "../whatsapp-config";
 import type { ChannelProvider, ProviderId } from "./types";
 
 export async function resolveEmailProvider(): Promise<ChannelProvider | null> {
@@ -28,7 +26,7 @@ export async function resolveEmailProvider(): Promise<ChannelProvider | null> {
 }
 
 export async function getProvider(
-  id: ProviderId | "email"
+  id: ProviderId | "email" | "whatsapp"
 ): Promise<ChannelProvider | null> {
   if (id === "email" || id === "smtp" || id === "gmail") {
     return resolveEmailProvider();
@@ -41,8 +39,11 @@ export async function getProvider(
     const wp = await getWebPushConfig();
     return wp.enabled && wp.config ? createWebPushProvider(wp.config) : null;
   }
-  if (id === "whatsapp_meta") return createWhatsAppMetaStub();
-  if (id === "whatsapp_twilio") return createWhatsAppTwilioStub();
+  if (id === "whatsapp" || id === "whatsapp_meta" || id === "whatsapp_twilio") {
+    const config = await getWhatsAppConfig();
+    if (!config || (id !== "whatsapp" && id !== `whatsapp_${config.vendor}`)) return null;
+    return createWhatsAppProvider(config);
+  }
   return null;
 }
 
@@ -57,14 +58,8 @@ export async function providersHealth() {
     getProvider("webpush").then(async (p) =>
       p ? { id: p.id, ...(await p.health()) } : { id: "webpush", ok: false, detail: "no configurado" }
     ),
-    Promise.resolve(createWhatsAppMetaStub()).then(async (p) => ({
-      id: p.id,
-      ...(await p.health()),
-    })),
-    Promise.resolve(createWhatsAppTwilioStub()).then(async (p) => ({
-      id: p.id,
-      ...(await p.health()),
-    })),
+    getProvider("whatsapp_meta").then(async p => p ? { id: p.id, ...await p.health() } : { id: "whatsapp_meta", ok: false, detail: "no configurado" }),
+    getProvider("whatsapp_twilio").then(async p => p ? { id: p.id, ...await p.health() } : { id: "whatsapp_twilio", ok: false, detail: "no configurado" }),
   ]);
   return { email, telegram, webpush, whatsapp_meta: waMeta, whatsapp_twilio: waTwilio };
 }

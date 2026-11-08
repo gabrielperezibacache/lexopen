@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
-import { LOCAL_MODELS, LOCAL_CONTEXT_TOKENS, type LocalModelId } from "@/lib/integrations/local-model-profiles";
+import { LOCAL_MODELS, LOCAL_MODELS_BY_MEMORY, LOCAL_MEMORY_CAPACITIES, LOCAL_CONTEXT_TOKENS, localModelsForMemory, localModelSource, type LocalModelId, type LocalMemoryKind } from "@/lib/integrations/local-model-profiles";
 import type { publicLlmConfig } from "@/lib/integrations/llm";
 import type { LocalModelHardware, LocalModelRecommendation } from "@/lib/integrations/local-model-hardware";
 import styles from "./LocalModelsPanel.module.css";
@@ -12,7 +12,7 @@ type Status = {
   message: string;
   models: { id: LocalModelId; state: "ready" | "missing" | "different" | null }[];
   hardware: LocalModelHardware;
-  recommendations: LocalModelRecommendation[];
+  recommendation: LocalModelRecommendation;
   installed: { name: string; size: number; catalogId?: LocalModelId; state: "verified" | "unmanaged" }[];
   installedLimited: boolean;
   installedCount: number;
@@ -22,8 +22,8 @@ type ConnectionView = ReturnType<typeof publicLlmConfig>;
 type Action = "download" | "test" | "activate" | "restore";
 
 const endpoint = "/api/integrations/llm/local";
-const purposes = { documents: "Revisar documentos", writing: "Redactar y ordenar notas", browser: "Apoyar el uso del navegador y conectores" } as const;
-const memoryLabel = (bytes: number) => `${(bytes / 1024 ** 3).toLocaleString("es-CL", { maximumFractionDigits: 1 })} GB`;
+const memoryKinds = { ram: "RAM · sin GPU dedicada", vram: "VRAM · GPU dedicada", unified: "Memoria unificada" } as const;
+const memoryLabel = (bytes: number) => `${(bytes / 1024 ** 3).toLocaleString("es-CL", { maximumFractionDigits: 1 })} GiB`;
 
 async function checkLocalModels(signal: AbortSignal): Promise<Status> {
   const response = await fetch(endpoint, { signal, cache: "no-store" });
@@ -40,7 +40,8 @@ export function LocalModelsPanel({
   disabled: boolean;
 }) {
   const [selection, setSelection] = useState<LocalModelId | undefined>();
-  const [purpose, setPurpose] = useState<keyof typeof purposes>("documents");
+  const [memoryKind, setMemoryKind] = useState<LocalMemoryKind | "auto">("auto");
+  const [capacity, setCapacity] = useState("auto");
   const [status, setStatus] = useState<Status | null>(null);
   const [checking, setChecking] = useState(true);
   const [checkingError, setCheckingError] = useState("");
@@ -48,8 +49,17 @@ export function LocalModelsPanel({
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; error: boolean } | null>(null);
   const operation = useRef<AbortController | null>(null);
-  const recommendation = status?.recommendations?.find(item => item.purpose === purpose);
-  const profile = LOCAL_MODELS.find((model) => model.id === (selection ?? activeModel ?? recommendation?.candidateId)) ?? LOCAL_MODELS[0];
+  const recommendation = status?.recommendation;
+  const recommendedId = recommendation?.candidateId ?? recommendation?.capacityCandidateId;
+  const detectedKind = recommendation?.basis ?? (status?.hardware?.memoryKind === "unified" ? "unified" : "ram");
+  const effectiveKind = memoryKind === "auto" ? detectedKind : memoryKind;
+  const detectedCapacity = memoryKind === "auto" && recommendation?.memoryCapacityBytes ? recommendation.memoryCapacityBytes
+    : effectiveKind === "unified" ? status?.hardware?.unifiedMemoryBytes
+    : effectiveKind === "vram" ? Math.max(0, ...(status?.hardware?.gpus ?? []).filter(gpu => gpu.memoryKind === "dedicated").map(gpu => gpu.totalMemoryBytes ?? 0))
+    : status?.hardware?.totalMemoryBytes;
+  const capacityGiB = capacity === "auto" ? detectedCapacity ? detectedCapacity / 1024 ** 3 : null : capacity ? Number(capacity) : null;
+  const catalog = capacityGiB === null ? LOCAL_MODELS_BY_MEMORY : localModelsForMemory(effectiveKind, capacityGiB);
+  const profile = LOCAL_MODELS.find((model) => model.id === (selection ?? activeModel ?? recommendedId)) ?? LOCAL_MODELS[0];
   const state = status?.models.find((model) => model.id === profile.id)?.state;
   const active = activeModel === profile.id;
 
@@ -138,42 +148,83 @@ export function LocalModelsPanel({
   return (
     <section className="panel space-y-4 rounded-3xl p-5 md:p-6" aria-labelledby="local-ai-title" aria-busy={checking || Boolean(action)}>
       <div>
-        <h2 id="local-ai-title" className="text-lg font-semibold">Modelos de IA local</h2>
+        <h2 id="local-ai-title" className="text-lg font-semibold">Modelos de IA locales</h2>
         <p className="mt-1 max-w-prose text-sm text-[var(--ink-soft)]">
-          Elige un modelo para trabajar con textos en el equipo que aloja LexOpen. Puedes detectar lo que ya está instalado, descargar un modelo y probarlo antes de usarlo.
+          Compara modelos en una sola lista, según la memoria de tu equipo. Prioriza aprovechar el hardware que ya tienes: puedes explorar y elegir sin descargar ni cambiar la conexión activa.
         </p>
       </div>
 
       {(checking || status?.message || checkingError) && (
-        <p role="status" className="text-sm text-[var(--ink-soft)]">{checking ? "Comprobando Ollama…" : checkingError || status?.message}</p>
+        <p role="status" className="text-sm text-[var(--ink-soft)]">{checking ? "Detectando memoria, GPU y modelos…" : checkingError || status?.message}</p>
       )}
 
       {status?.hardware && <div className={styles.hardware} aria-label="Equipo detectado">
-        <h3>Tu equipo</h3>
+        <h3>Equipo detectado automáticamente</h3>
         <p>{status.hardware.cpuName} · {status.hardware.cpuCores} núcleos</p>
         <dl>
-          <div><dt>Memoria total</dt><dd>{memoryLabel(status.hardware.totalMemoryBytes)}</dd></div>
-          <div><dt>Memoria disponible ahora</dt><dd>{memoryLabel(status.hardware.availableMemoryBytes)}</dd></div>
+          <div><dt>{status.hardware.memoryKind === "unified" ? "Memoria unificada total" : "RAM total"}</dt><dd>{memoryLabel(status.hardware.totalMemoryBytes)}</dd></div>
+          <div><dt>Memoria disponible estimada</dt><dd>{memoryLabel(status.hardware.availableMemoryBytes)}</dd></div>
           <div><dt>Espacio de disco de referencia</dt><dd>{status.hardware.diskFreeBytes === null ? "Sin comprobar" : memoryLabel(status.hardware.diskFreeBytes)}</dd></div>
         </dl>
-        <details><summary>Acerca de esta detección</summary><p>Corresponde al equipo que aloja LexOpen, aunque te conectes desde otro dispositivo. La memoria disponible cambia con las aplicaciones abiertas. El disco medido puede ser distinto del utilizado por Ollama. La aceleración gráfica no está comprobada.</p></details>
+        {status.hardware.gpus?.length ? <ul className={styles.devices}>{status.hardware.gpus.map((gpu, index) => <li key={`${index}-${gpu.name}`}>
+          <strong>{gpu.name}</strong>
+          {gpu.memoryKind === "unified" ? <p>CPU y GPU utilizan la misma memoria unificada indicada arriba.</p>
+            : gpu.memoryKind === "shared" ? <p>Memoria gráfica compartida; se conserva la referencia de RAM sin sumarla como VRAM.</p>
+            : <p>VRAM total: {gpu.totalMemoryBytes === null ? "Sin comprobar" : memoryLabel(gpu.totalMemoryBytes)} · VRAM libre: {gpu.availableMemoryBytes === null ? "Sin comprobar" : memoryLabel(gpu.availableMemoryBytes)}</p>}
+        </li>)}</ul> : <p>GPU sin comprobar. Se utiliza la memoria del sistema como referencia.</p>}
+        <details><summary>Acerca de esta detección</summary><p>Corresponde al equipo que aloja LexOpen y ejecuta los modelos, aunque te conectes desde otro dispositivo. Las consultas del sistema son de solo lectura: no descargan, instalan ni activan modelos. La memoria disponible incluye una estimación del sistema y cambia con las aplicaciones abiertas. Identificar una GPU no comprueba que el motor pueda utilizarla. El disco medido puede ser distinto del utilizado por Ollama.</p></details>
       </div>}
 
       <div className={styles.recommendation}>
-        <label className="block max-w-md text-sm font-medium">Uso principal
-          <select className="select w-full" aria-label="Uso principal de la IA local" value={purpose} disabled={Boolean(action) || disabled}
-            onChange={event => { setPurpose(event.target.value as keyof typeof purposes); setSelection(undefined); setAcceptedTerms(false); setFeedback(null); }}>
-            {Object.entries(purposes).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-          </select>
-        </label>
         {recommendation && <div role="status">
-          <p><strong>{recommendation.candidateId ? `Recomendación: ${LOCAL_MODELS.find(item => item.id === recommendation.candidateId)?.name}` : "Sin recomendación para el estado actual del equipo"}</strong></p>
+          <p><strong>{recommendedId ? `Recomendación para documentos: ${LOCAL_MODELS.find(item => item.id === recommendedId)?.name}` : "Sin recomendación para el estado actual del equipo"}</strong></p>
           <p>{recommendation.reason}</p>
-          {recommendation.candidateId && profile.id !== recommendation.candidateId && <button className="btn btn-secondary" type="button" disabled={Boolean(action) || disabled} onClick={() => {
-            setSelection(recommendation.candidateId ?? undefined); setAcceptedTerms(false); setFeedback(null);
+          {recommendation.candidateId && recommendation.capacityCandidateId && recommendation.capacityCandidateId !== recommendation.candidateId && <p>Con más memoria libre, la capacidad total permite comparar {LOCAL_MODELS.find(item => item.id === recommendation.capacityCandidateId)?.name}. La recomendación actual contempla las aplicaciones abiertas.</p>}
+          {recommendedId && profile.id !== recommendedId && <button className="btn btn-secondary" type="button" disabled={Boolean(action) || disabled} onClick={() => {
+            setSelection(recommendedId); setAcceptedTerms(false); setFeedback(null);
           }}>Seleccionar recomendado</button>}
         </div>}
         <p className="text-sm text-[var(--ink-soft)]">La recomendación es una estimación de recursos. Elegir un modelo no lo descarga ni cambia la conexión activa.</p>
+      </div>
+
+      <div className={styles.catalog}>
+        <h3>Opciones según tu memoria</h3>
+        <p>Estimaciones para una solicitud de texto con {LOCAL_CONTEXT_TOKENS.toLocaleString("es-CL")} tokens de contexto. RAM y memoria unificada incluyen margen para el sistema. La VRAM es la capacidad de una GPU compatible; requiere también RAM del sistema.</p>
+        <div className={styles.filters}>
+          <label>Tipo de memoria
+            <select className="select w-full" value={memoryKind} disabled={Boolean(action) || disabled} onChange={event => setMemoryKind(event.target.value as LocalMemoryKind | "auto")}>
+              <option value="auto">Detección automática</option>
+              {Object.entries(memoryKinds).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+            </select>
+          </label>
+          <label>Capacidad del equipo
+            <select className="select w-full" value={capacity} disabled={Boolean(action) || disabled} onChange={event => setCapacity(event.target.value)}>
+              <option value="auto">{detectedCapacity ? `Detectada: ${memoryLabel(detectedCapacity)}` : "Capacidad sin comprobar"}</option>
+              <option value="">Ver todas las capacidades</option>
+              {LOCAL_MEMORY_CAPACITIES.map(value => <option key={value} value={value}>{value} GB</option>)}
+            </select>
+          </label>
+        </div>
+        <p>{memoryKind === "auto" ? `Referencia automática: ${memoryKinds[effectiveKind]}.` : "Estás comparando una referencia manual."} Puedes cambiar los filtros sin alterar la recomendación ni la conexión activa. RAM, VRAM y memoria unificada no se suman; cada GPU se evalúa por separado.</p>
+        <div className={styles.tableScroll} role="region" aria-label="Comparación de modelos por memoria" tabIndex={0}>
+          <table>
+            <caption>{catalog.length} de {LOCAL_MODELS.length} modelos · memoria orientativa en GB · descarga en GB decimales</caption>
+            <thead><tr><th scope="col">Modelo y edición</th><th scope="col">Descarga</th><th scope="col">RAM</th><th scope="col">VRAM</th><th scope="col">Unificada</th><th scope="col"><span className="sr-only">Seleccionar modelo</span></th></tr></thead>
+            <tbody>{catalog.map(model => <tr key={model.id} aria-selected={profile.id === model.id}>
+              <th scope="row"><a href={localModelSource(model)} target="_blank" rel="noreferrer">{model.name}</a><span>{model.tag.split(":")[1]}</span>{model.id === recommendedId && <span>Recomendado para documentos</span>}</th>
+              <td><span className={styles.mobileLabel} aria-hidden="true">Descarga</span>{model.download}</td><td><span className={styles.mobileLabel} aria-hidden="true">RAM</span>{model.memory.ram} GB</td><td><span className={styles.mobileLabel} aria-hidden="true">VRAM</span>{model.memory.vram} GB</td><td><span className={styles.mobileLabel} aria-hidden="true">Unificada</span>{model.memory.unified} GB</td>
+              <td><button type="button" className="btn btn-secondary" aria-label={`Elegir ${model.name}`} aria-pressed={profile.id === model.id} disabled={Boolean(action) || disabled} onClick={() => { setSelection(model.id); setAcceptedTerms(false); setFeedback(null); }}>{profile.id === model.id ? "Elegido" : "Elegir"}</button></td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {!catalog.length && <p role="status">No hay modelos con ese margen orientativo. Prueba con otra capacidad.</p>}
+        <details><summary>Cómo elegir con menos gasto</summary>
+          <p>Para documentos, empieza comparando Qwen3.5 2B en equipos de 8 GB, Qwen3.5 4B en 12–16 GB, Qwen3.5 9B en 16–24 GB y Gemma 4 12B desde 24 GB. Con 32 GB o más puedes comparar Gemma 4 26B A4B o Qwen3.8 27B, dejando más margen si necesitas contexto largo. Son orientaciones de memoria, sin una evaluación comparativa en español jurídico.</p>
+          <p>Los modelos mayores son alternativas para hardware disponible; más tamaño no garantiza una respuesta mejor. LexOpen trabaja actualmente con pasajes acotados: el contexto máximo anunciado por un modelo no es la longitud que utiliza esta integración.</p>
+          <p>Estos modelos se ejecutan sin tarifa por token del proveedor; siguen existiendo consumo eléctrico, almacenamiento y condiciones de licencia. CPU permite evitar la compra de GPU, con respuestas más lentas. La velocidad debe medirse en el equipo real.</p>
+          <p>La cuantización reduce el tamaño de los pesos. Los modelos de expertos también cargan los pesos completos. Más contexto, varias solicitudes o imágenes aumentan la memoria necesaria.</p>
+          <p><a href="https://docs.ollama.com/context-length" target="_blank" rel="noreferrer">Contexto y memoria en Ollama</a> · <a href="https://docs.ollama.com/gpu" target="_blank" rel="noreferrer">Compatibilidad de GPU</a> · <a href="https://ai.google.dev/gemma/docs/core" target="_blank" rel="noreferrer">Memoria de Gemma</a></p>
+        </details>
       </div>
       {status && status.runtime !== "ready" && (
         <div className="flex flex-wrap gap-2">
@@ -195,12 +246,16 @@ export function LocalModelsPanel({
             setFeedback(null);
           }}
         >
-          {LOCAL_MODELS.map((model) => (
+          {LOCAL_MODELS_BY_MEMORY.map((model) => (
             <option key={model.id} value={model.id}>{model.name} · {model.download}{model.id === recommendation?.candidateId ? " · Recomendado" : ""}{status?.models.find(item => item.id === model.id)?.state === "ready" ? " · Instalado" : ""}</option>
           ))}
         </select>
       </label>
-      <p className="max-w-prose text-sm text-[var(--ink-soft)]">{profile.task}</p>
+      <div className={styles.selectedModel}>
+        <p>{profile.summary}</p>
+        <p>Referencia: {profile.memory.ram} GB de RAM · {profile.memory.vram} GB de VRAM · {profile.memory.unified} GB de memoria unificada.</p>
+        <p><a href={localModelSource(profile)} target="_blank" rel="noreferrer">Ficha oficial, edición y licencia de {profile.name}</a></p>
+      </div>
       {state === "different" && <p role="status" className="text-sm text-[var(--ink-soft)]">La edición instalada es distinta de la verificada. Elige otro modelo del catálogo.</p>}
       {state === "ready" && <p className="text-sm text-[var(--ink-soft)]">{active ? "Modelo activo para el estudio." : "Modelo instalado y verificado."}</p>}
       {state === "missing" && profile.licenseUrl && (

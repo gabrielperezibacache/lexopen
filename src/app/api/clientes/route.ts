@@ -7,13 +7,14 @@ import {
   requireStaff,
 } from "@/lib/api";
 import { clienteCreateSchema } from "@/lib/schemas";
-import { writeAuditStrict } from "@/lib/audit";
-import { TRAMITES_ABIERTOS } from "@/lib/tramites";
 import { parseListLimit } from "@/lib/api/list-limit";
+import { clienteListInclude } from "@/lib/clientes/list";
+import { createClienteCommand } from "@/lib/clientes/commands";
+import { requestCommandKey } from "@/lib/command-execution";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireStaff();
+    const user = await requireStaff();
     const sp = new URL(req.url).searchParams;
     const q = sp.get("q")?.trim();
     const estado = sp.get("estado")?.trim();
@@ -34,27 +35,7 @@ export async function GET(req: NextRequest) {
             : {},
         ],
       },
-      include: {
-        abogado: { select: { id: true, name: true } },
-        _count: {
-          select: {
-            causas: true,
-            documentos: true,
-          },
-        },
-        causas: {
-          select: {
-            id: true,
-            _count: {
-              select: {
-                tramites: {
-                  where: { estado: { in: [...TRAMITES_ABIERTOS] } },
-                },
-              },
-            },
-          },
-        },
-      },
+      include: clienteListInclude(user),
       orderBy: { updatedAt: "desc" },
       take: limit,
     });
@@ -89,30 +70,7 @@ export async function POST(req: NextRequest) {
     assertCsrf(req);
     const user = await requireStaff();
     const body = await parseBody(req, clienteCreateSchema);
-    const email =
-      body.email === "" || body.email == null ? null : body.email;
-
-    const cliente = await prisma.cliente.create({
-      data: {
-        razonSocial: body.razonSocial.trim(),
-        rut: body.rut || null,
-        email,
-        telefono: body.telefono || null,
-        tipo: body.tipo || "persona",
-        estado: body.estado || "activo",
-        notas: body.notas || null,
-        abogadoId: body.abogadoId || null,
-      },
-    });
-
-    await writeAuditStrict({
-      actorId: user.id,
-      action: "cliente.create",
-      entityType: "Cliente",
-      entityId: cliente.id,
-      after: cliente,
-    });
-
+    const cliente = await createClienteCommand(user, body, requestCommandKey(req, "cliente.create"));
     return NextResponse.json(cliente, { status: 201 });
   } catch (e) {
     return handleRouteError(e);

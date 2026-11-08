@@ -69,6 +69,7 @@ export class KittiesGateway {
     assertEasyConnectorRead({ ...task, args: { action: task.action, ...task.args } });
     if (!text.trim() || Buffer.byteLength(text, "utf8") > 16000) throw new ConnectorError("file_task_length", "El encargo de descarga supera el tamaño admitido. Acorte el mensaje y vuelva a revisarlo.", 400);
     await this.requireStagedFileActions();
+    if (task.kind === "dropbox") await this.requireCloudFileOAuth();
     const response = await this.response(`/v1/lexopen/chats/${safeId(chatId)}/file-actions`, "POST", { request_id: requestId, kitty: kittyId, connector: task.connector, action: task.action, args: task.args, text });
     let result: Record<string, unknown>;
     try { result = JSON.parse(response.bytes.toString("utf8")); } catch { throw new ConnectorError("file_stage_unknown", "No se confirmó la preparación de la descarga. Revise sus autorizaciones; no se repetirá automáticamente.", 502); }
@@ -78,6 +79,7 @@ export class KittiesGateway {
     return { accepted: true, staged: true, state: "pending", requestId, approvalId: result.approval_id, fileTask: task };
   }
   async requirePersistentOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_persistent_oauth !== "v1") throw new ConnectorError("oauth_persistence_required", "Actualice el escritorio de Altazor para mantener sus conexiones sin iniciar sesión repetidamente.", 409); }
+  async requireOAuthAliasCreation() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_oauth_alias_create !== "v1") throw new ConnectorError("oauth_alias_create_required", "Actualiza el escritorio de Altazor antes de conectar una cuenta nueva. El ingreso todavía no se ha iniciado.", 409); }
   async requireCloudFileOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_cloud_file_oauth !== "v1") throw new ConnectorError("cloud_file_oauth_required", "Actualice el escritorio de Altazor para conectar esta cuenta desde la aplicación instalada.", 409); }
   async requireComputerUsePolicy() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_computer_use_policy !== "v1") throw new ConnectorError("computer_policy_unsupported", "Actualice el escritorio de Altazor para aplicar autorizaciones de uso del computador.", 409); }
   async computerAuthorization(chatId: string, kittyId: string, binding: string) {

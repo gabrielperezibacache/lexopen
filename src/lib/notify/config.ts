@@ -1,3 +1,4 @@
+import { whatsappSnapshot } from "./whatsapp-config";
 /**
  * Configuración de proveedores de notificación en IntegrationConfig
  * (provider=smtp|telegram|webpush). Secretos cifrados con lib/notify/secrets.
@@ -230,9 +231,6 @@ export async function notifyProvidersSnapshot() {
       subject: wpRaw.subject || null,
       hasPrivateKey: Boolean(wpRaw.privateKey),
     },
-    whatsapp: {
-      enabled: false,
-      note: "WhatsApp Cloud API / Twilio en LexOpen 1.2 (solo interfaz en 1.1).",
-    },
+    whatsapp: await whatsappSnapshot(),
   };
 }

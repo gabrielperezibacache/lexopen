@@ -27,6 +27,7 @@ export default async function CorreoSettingsPage({ searchParams }: { searchParam
   return (
     <div className="space-y-6">
       <ModuleHeader
+        artwork="correspondence"
         title={t("mailbox.settingsTitle")}
         actions={<Link className="btn btn-secondary" href="/correo"><Inbox size={16} aria-hidden="true" /> {t("mailbox.openInbox")}</Link>}
       />

@@ -24,7 +24,7 @@ async function main() {
     assert.equal(target.hostname, "127.0.0.1"); assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-connector-gateway-token");
     let result: unknown;
     const body = init?.body ? JSON.parse(String(init.body)) : {};
-    if (path === "/v1/health") result = { ok: true, containers: true, version: "connector-fixture", ...(gateReady ? { lexopen_connector_gate: "v1" } : {}), lexopen_connector_platform: "linux" };
+    if (path === "/v1/health") result = { ok: true, containers: true, version: "connector-fixture", lexopen_async_messages: "v1", ...(gateReady ? { lexopen_connector_gate: "v1" } : {}), lexopen_connector_platform: "linux" };
     else if (path === "/v1/providers") result = { providers: [{ name: "connector-model", kind: "openai" }] };
     else if (path === "/v1/kitties" && method === "GET") result = { kitties: fleet };
     else if (path === "/v1/kitties" && method === "POST") {
@@ -59,7 +59,11 @@ async function main() {
     else if (/^\/v1\/kitties\/[^/]+$/.test(path)) result = { kitty: fleet.find(row => row.id === path.split("/")[3] || row.name === path.split("/")[3]) };
     else if (/^\/v1\/kitties\/[^/]+\/start$/.test(path)) { lifecycle.push("start"); const kitty = fleet.find(row => row.id === path.split("/")[3]); assert.ok(kitty); kitty.status = "running"; result = { kitty }; }
     else if (/^\/v1\/chats\/[^/]+$/.test(path)) result = { chat: chats.get(path.split("/")[3]) };
-    else if (path.endsWith("/messages")) { messages++; const chat = chats.get(path.split("/")[3]); assert.ok(chat); chat.turns.push({ from: "user", text: body.text }, { from: "kitty-fixture", text: "Acciones ficticias preparadas; falta autorización." }); result = { turns: chat.turns }; }
+    else if (path.endsWith("/messages/async")) {
+      messages++; const chat = chats.get(path.split("/")[3]); assert.ok(chat); assert.ok(body.request_id);
+      chat.turns.push({ from: "user", text: body.text }, { from: "kitty-fixture", text: "Acciones ficticias preparadas; falta autorización." });
+      return Response.json({ request_id: body.request_id, chat_id: chat.id, status: "accepted" }, { status: 202 });
+    }
     else if (path.endsWith("/control")) result = { held: body.hold === true };
     else if (path.endsWith("/cancel")) result = { cancelled: false };
     else if (path.endsWith("/stop")) { const kitty = fleet.find(row => row.id === path.split("/")[3]); assert.ok(kitty); kitty.status = "stopped"; result = { kitty }; }

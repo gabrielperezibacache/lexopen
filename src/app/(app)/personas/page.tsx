@@ -25,7 +25,7 @@ export default async function PeoplePage() {
 
   return (
     <div>
-      <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
+      <ModuleHeader artwork="people" eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
       <PeopleManager
         canManage={isAdmin(me.role)}
         currentUserId={me.id}

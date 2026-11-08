@@ -14,6 +14,7 @@ export default async function EditarCausaPage({ params }: Params) {
       where: { AND: [scopedcausaAccessWhere(user), { id }] },
       select: {
         id: true,
+        updatedAt: true,
         titulo: true,
         rit: true,
         ruc: true,
@@ -46,6 +47,7 @@ export default async function EditarCausaPage({ params }: Params) {
 
   return (
     <CausaEditForm
+      expectedUpdatedAt={causa.updatedAt.toISOString()}
       causa={causa}
       clientes={clientes.map((c) => ({ id: c.id, label: c.razonSocial }))}
       abogados={abogados.map((a) => ({ id: a.id, label: a.name }))}

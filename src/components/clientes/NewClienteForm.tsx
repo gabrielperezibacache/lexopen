@@ -1,54 +1,64 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
 import { Dialog } from "@/components/ui/Dialog";
 import { Plus } from "lucide-react";
+import { createSubmissionKeys, operationKey } from "@/lib/client-submission-key";
 
 export function NewClienteForm({
   abogados,
+  userId,
 }: {
   abogados: Array<{ id: string; name: string }>;
+  userId: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
+  const submission = useRef(createSubmissionKeys(operationKey, `lexopen:cliente-create:${userId}`));
+  const completed = useRef(false);
+  const trigger = useRef<HTMLButtonElement>(null);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy || completed.current) return;
     setBusy(true);
     setError("");
     const fd = new FormData(e.currentTarget);
+    const payload = {
+      razonSocial: fd.get("razonSocial"),
+      rut: fd.get("rut") || null,
+      email: fd.get("email") || null,
+      telefono: fd.get("telefono") || null,
+      tipo: fd.get("tipo") || "persona",
+      estado: "activo",
+      notas: fd.get("notas") || null,
+      abogadoId: fd.get("abogadoId") || null,
+    };
     const result = await apiMutation<{ id: string }>("/api/clientes", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        razonSocial: fd.get("razonSocial"),
-        rut: fd.get("rut") || null,
-        email: fd.get("email") || null,
-        telefono: fd.get("telefono") || null,
-        tipo: fd.get("tipo") || "persona",
-        estado: "activo",
-        notas: fd.get("notas") || null,
-        abogadoId: fd.get("abogadoId") || null,
-      }),
+      headers: { "Content-Type": "application/json", "Idempotency-Key": submission.current.forPayload(payload) },
+      body: JSON.stringify(payload),
     });
     setBusy(false);
     if (!result.ok) {
       setError(result.error || "No se pudo crear");
       return;
     }
+    completed.current = true;
+    submission.current.complete(payload);
     router.push(`/clientes/${result.data.id}`);
   }
 
   return (
     <>
-      <button className="btn btn-primary" type="button" onClick={() => setOpen(true)}>
+      <button ref={trigger} className="btn btn-primary" type="button" onClick={() => { completed.current = false; setOpen(true); }}>
         <Plus size={16} aria-hidden="true" /> Nuevo cliente
       </button>
-      <Dialog open={open} onClose={() => setOpen(false)} title="Nuevo cliente" className="!w-[min(40rem,calc(100vw-1.5rem))]">
+      <Dialog open={open} onClose={() => setOpen(false)} title="Nuevo cliente" returnFocusRef={trigger} className="!w-[min(40rem,calc(100vw-1.5rem))]">
       {open && <form onSubmit={onSubmit} className="space-y-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="block space-y-2 text-sm font-medium sm:col-span-2">

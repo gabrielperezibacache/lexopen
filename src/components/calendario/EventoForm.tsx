@@ -1,7 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useId, useRef, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
+import { operationKey } from "@/lib/client-submission-key";
+import { eventFormDates } from "@/lib/calendario/form-dates";
 
 type Option = { id: string; label: string };
 
@@ -24,6 +26,7 @@ const MODALIDADES = [
 
 export type EventoFormDefaults = {
   id?: string;
+  expectedUpdatedAt?: string;
   titulo?: string;
   tipo?: string;
   inicio?: string; // datetime-local value, e.g. 2026-10-05T10:00
@@ -45,10 +48,15 @@ export function EventoForm({
 }: {
   causas: Option[];
   defaults?: EventoFormDefaults;
-  onSaved?: () => void;
+  onSaved?: (warning?: string | null) => void;
   onCancel?: () => void;
 }) {
   const isEdit = Boolean(defaults?.id);
+  const fieldId = useId();
+  const submission = useRef<{ key: string; payload: Record<string, unknown> } | null>(null);
+  const [retryingSave, setRetryingSave] = useState(false);
+  const [inicio, setInicio] = useState(defaults?.inicio || "");
+  const [fin, setFin] = useState(defaults?.fin || "");
   const [tipo, setTipo] = useState(defaults?.tipo || "reunion");
   const [todoElDia, setTodoElDia] = useState(Boolean(defaults?.todoElDia));
   const [error, setError] = useState("");
@@ -59,40 +67,51 @@ export function EventoForm({
     e.preventDefault();
     setError("");
     setWarning("");
+    if (busy) return;
+    if (!retryingSave || !submission.current) {
+      const fd = new FormData(e.currentTarget);
+      let dates;
+      try { dates = eventFormDates(inicio, fin, todoElDia); }
+      catch (error) { setError((error as Error).message); return; }
+      const payload = {
+        titulo: String(fd.get("titulo") || ""),
+        tipo,
+        ...dates,
+        ...(isEdit && defaults?.expectedUpdatedAt ? { expectedUpdatedAt: defaults.expectedUpdatedAt } : {}),
+        todoElDia,
+        lugar: String(fd.get("lugar") || "") || null,
+        modalidad: String(fd.get("modalidad") || "") || null,
+        notas: String(fd.get("notas") || "") || null,
+        causaId: String(fd.get("causaId") || "") || null,
+        ...(tipo === "audiencia"
+          ? {
+              tipoAudiencia: String(fd.get("tipoAudiencia") || "") || null,
+              tribunal: String(fd.get("tribunal") || "") || null,
+            }
+          : {}),
+      };
+      submission.current = { key: submission.current?.key || operationKey(), payload };
+    }
+    const attempt = submission.current;
     setBusy(true);
-    const fd = new FormData(e.currentTarget);
-    const payload = {
-      titulo: String(fd.get("titulo") || ""),
-      tipo,
-      inicio: String(fd.get("inicio") || ""),
-      fin: String(fd.get("fin") || "") || null,
-      todoElDia,
-      lugar: String(fd.get("lugar") || "") || null,
-      modalidad: String(fd.get("modalidad") || "") || null,
-      notas: String(fd.get("notas") || "") || null,
-      causaId: String(fd.get("causaId") || "") || null,
-      ...(tipo === "audiencia"
-        ? {
-            tipoAudiencia: String(fd.get("tipoAudiencia") || "") || null,
-            tribunal: String(fd.get("tribunal") || "") || null,
-          }
-        : {}),
-    };
-    const result = await apiMutation<{ conflictWarning?: string | null; error?: string }>(
+    const result = await apiMutation<{ id?: string; conflictWarning?: string | null; error?: string }>(
       isEdit ? `/api/eventos/${defaults!.id}` : "/api/eventos",
       {
         method: isEdit ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json", "Idempotency-Key": attempt.key },
+        body: JSON.stringify(attempt.payload),
       }
     );
     setBusy(false);
     if (!result.ok) {
-      setError(result.error || "No se pudo guardar el evento");
+      const uncertain = retryingSave || result.status === 0 || result.status === 408 || result.status >= 500;
+      setRetryingSave(uncertain);
+      setError(uncertain ? "No se pudo confirmar el evento. Reintente el guardado para comprobarlo sin duplicarlo." : result.error || "No se pudo guardar el evento");
       return;
     }
+    if (!result.data.id) { setRetryingSave(true); setError("El servidor no confirmó el evento. Reintente el guardado."); return; }
     if (result.data.conflictWarning) setWarning(result.data.conflictWarning);
-    onSaved?.();
+    onSaved?.(result.data.conflictWarning);
   }
 
   return (
@@ -100,19 +119,21 @@ export function EventoForm({
       onSubmit={onSubmit}
       className="panel grid grid-cols-1 gap-4 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4"
     >
+      <fieldset disabled={busy || retryingSave} className="contents">
+      <legend className="sr-only">Datos del evento</legend>
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-sm font-medium">Título</label>
+        <label htmlFor={`${fieldId}-titulo`} className="mb-1 block text-sm font-medium">Título</label>
         <input
           className="input"
-          name="titulo"
+          id={`${fieldId}-titulo`} name="titulo"
           required
           defaultValue={defaults?.titulo || ""}
           placeholder="Ej. Audiencia de juicio"
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Tipo</label>
-        <select
+        <label htmlFor={`${fieldId}-tipo`} className="mb-1 block text-sm font-medium">Tipo</label>
+        <select id={`${fieldId}-tipo`}
           className="select"
           value={tipo}
           onChange={(e) => setTipo(e.target.value)}
@@ -125,8 +146,8 @@ export function EventoForm({
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Causa</label>
-        <select className="select" name="causaId" defaultValue={defaults?.causaId || ""}>
+        <label htmlFor={`${fieldId}-causaId`} className="mb-1 block text-sm font-medium">Causa</label>
+        <select className="select" id={`${fieldId}-causaId`} name="causaId" defaultValue={defaults?.causaId || ""}>
           <option value="">Sin causa</option>
           {causas.map((c) => (
             <option key={c.id} value={c.id}>
@@ -136,34 +157,40 @@ export function EventoForm({
         </select>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Inicio</label>
+        <label htmlFor={`${fieldId}-inicio`} className="mb-1 block text-sm font-medium">Inicio</label>
         <input
           className="input"
-          type="datetime-local"
-          name="inicio"
+          type={todoElDia ? "date" : "datetime-local"}
+          id={`${fieldId}-inicio`} name="inicio"
           required
-          defaultValue={defaults?.inicio || ""}
+          value={inicio}
+          onChange={event => setInicio(event.target.value)}
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Fin (opcional)</label>
-        <input className="input" type="datetime-local" name="fin" defaultValue={defaults?.fin || ""} />
+        <label htmlFor={`${fieldId}-fin`} className="mb-1 block text-sm font-medium">{todoElDia ? "Último día (opcional)" : "Fin (opcional)"}</label>
+        <input className="input" type={todoElDia ? "date" : "datetime-local"} id={`${fieldId}-fin`} name="fin" value={fin} onChange={event => setFin(event.target.value)} />
       </div>
       <label className="flex items-end gap-2 pb-3 text-sm">
         <input
           type="checkbox"
           checked={todoElDia}
-          onChange={(e) => setTodoElDia(e.target.checked)}
+          onChange={(e) => {
+            const allDay = e.target.checked;
+            setTodoElDia(allDay);
+            setInicio(value => allDay ? value.slice(0, 10) : value && value.length === 10 ? `${value}T09:00` : value);
+            setFin(value => allDay ? value.slice(0, 10) : value && value.length === 10 ? `${value}T10:00` : value);
+          }}
         />{" "}
         Todo el día
       </label>
       <div>
-        <label className="mb-1 block text-sm font-medium">Lugar</label>
-        <input className="input" name="lugar" defaultValue={defaults?.lugar || ""} />
+        <label htmlFor={`${fieldId}-lugar`} className="mb-1 block text-sm font-medium">Lugar</label>
+        <input className="input" id={`${fieldId}-lugar`} name="lugar" defaultValue={defaults?.lugar || ""} />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Modalidad</label>
-        <select className="select" name="modalidad" defaultValue={defaults?.modalidad || ""}>
+        <label htmlFor={`${fieldId}-modalidad`} className="mb-1 block text-sm font-medium">Modalidad</label>
+        <select className="select" id={`${fieldId}-modalidad`} name="modalidad" defaultValue={defaults?.modalidad || ""}>
           {MODALIDADES.map((m) => (
             <option key={m.value} value={m.value}>
               {m.label}
@@ -174,36 +201,37 @@ export function EventoForm({
       {tipo === "audiencia" && (
         <>
           <div>
-            <label className="mb-1 block text-sm font-medium">Tipo de audiencia</label>
+            <label htmlFor={`${fieldId}-tipoAudiencia`} className="mb-1 block text-sm font-medium">Tipo de audiencia</label>
             <input
               className="input"
-              name="tipoAudiencia"
+              id={`${fieldId}-tipoAudiencia`} name="tipoAudiencia"
               placeholder="Ej. Preparatoria"
               defaultValue={defaults?.tipoAudiencia || ""}
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Tribunal</label>
-            <input className="input" name="tribunal" defaultValue={defaults?.tribunal || ""} />
+            <label htmlFor={`${fieldId}-tribunal`} className="mb-1 block text-sm font-medium">Tribunal</label>
+            <input className="input" id={`${fieldId}-tribunal`} name="tribunal" defaultValue={defaults?.tribunal || ""} />
           </div>
         </>
       )}
       <div className="sm:col-span-2 lg:col-span-4">
-        <label className="mb-1 block text-sm font-medium">Notas</label>
-        <input className="input" name="notas" defaultValue={defaults?.notas || ""} />
+        <label htmlFor={`${fieldId}-notas`} className="mb-1 block text-sm font-medium">Notas</label>
+        <input className="input" id={`${fieldId}-notas`} name="notas" defaultValue={defaults?.notas || ""} />
       </div>
+      </fieldset>
       {warning && (
         <p className="text-sm text-[var(--warn)] sm:col-span-2 lg:col-span-4">{warning}</p>
       )}
       {error && (
-        <p className="text-sm text-[var(--danger)] sm:col-span-2 lg:col-span-4">{error}</p>
+        <p role="alert" className="text-sm text-[var(--danger)] sm:col-span-2 lg:col-span-4">{error}</p>
       )}
       <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
         <button className="btn btn-primary" disabled={busy} type="submit">
-          {busy ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear evento"}
+          {busy ? "Guardando…" : retryingSave ? "Reintentar guardado" : isEdit ? "Guardar cambios" : "Crear evento"}
         </button>
         {onCancel && (
-          <button className="btn btn-ghost" type="button" onClick={onCancel}>
+          <button className="btn btn-ghost" type="button" disabled={busy || retryingSave} onClick={onCancel}>
             Cancelar
           </button>
         )}

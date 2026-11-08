@@ -1,3 +1,7 @@
+import { offlineVersion } from "@/lib/offline/schemas";
+import { updateClienteRecord } from "@/lib/clientes/mutations";
+import { serializable } from "@/lib/command-execution";
+import { currentStaffActor } from "@/lib/auth/staff-actor";
 import {
   assertCsrf,
   confidentialWhere,
@@ -88,48 +92,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const body = await parseBody(req, clienteUpdateSchema);
-    const existing = await prisma.cliente.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    }
-
-    const email =
-      body.email === undefined
-        ? undefined
-        : body.email === "" || body.email == null
-          ? null
-          : body.email;
-
-    const cliente = await prisma.cliente.update({
-      where: { id },
-      data: {
-        ...(body.razonSocial !== undefined
-          ? { razonSocial: body.razonSocial.trim() }
-          : {}),
-        ...(body.rut !== undefined ? { rut: body.rut || null } : {}),
-        ...(email !== undefined ? { email } : {}),
-        ...(body.telefono !== undefined
-          ? { telefono: body.telefono || null }
-          : {}),
-        ...(body.tipo !== undefined ? { tipo: body.tipo } : {}),
-        ...(body.estado !== undefined ? { estado: body.estado } : {}),
-        ...(body.notas !== undefined ? { notas: body.notas || null } : {}),
-        ...(body.abogadoId !== undefined
-          ? { abogadoId: body.abogadoId || null }
-          : {}),
-      },
-    });
-
-    await writeAuditStrict({
-      actorId: user.id,
-      action: "cliente.update",
-      entityType: "Cliente",
-      entityId: id,
-      before: existing,
-      after: cliente,
-    });
-
+    const body = await parseBody(req, clienteUpdateSchema.extend({ expectedVersion: offlineVersion.optional() }));
+    const cliente = await serializable(tx => updateClienteRecord(user, id, body, tx, body.expectedVersion));
     return NextResponse.json(cliente);
   } catch (e) {
     return handleRouteError(e);
@@ -141,7 +105,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     assertCsrf(req);
     const user = await requireStaff();
     const { id } = await params;
-    const existing = await prisma.cliente.findUnique({
+    return await serializable(async tx => {
+    await currentStaffActor(user, tx);
+    const existing = await tx.cliente.findUnique({
       where: { id },
       include: { _count: { select: { causas: true, invoices: true } } },
     });
@@ -157,15 +123,16 @@ export async function DELETE(req: NextRequest, { params }: Params) {
         { status: 409 }
       );
     }
-    await prisma.cliente.delete({ where: { id } });
+    await tx.cliente.delete({ where: { id } });
     await writeAuditStrict({
       actorId: user.id,
       action: "cliente.delete",
       entityType: "Cliente",
       entityId: id,
       before: existing,
-    });
+    }, tx);
     return NextResponse.json({ ok: true });
+    });
   } catch (e) {
     return handleRouteError(e);
   }

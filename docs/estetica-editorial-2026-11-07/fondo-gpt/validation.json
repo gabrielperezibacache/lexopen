@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-07",
+  "generator": "OpenAI GPT image generation / built-in image_gen",
+  "image": "public/editorial/generated/filosofo-gpt-v1.webp",
+  "alpha": true,
+  "dimensions": [
+    960,
+    1280
+  ],
+  "bytes": 345242,
+  "presentation": "Static background, soft-light blending into indigo, grayscale and fading mask; no pointer events; hidden for collapsed sidebar, print and forced colors.",
+  "initialViews": 35,
+  "finalBlendViews": 11,
+  "imageFailures": [],
+  "horizontalOverflow": false,
+  "javascriptErrors": [],
+  "assetStatus": 200,
+  "typescript": "Global tsc --noEmit --incremental false passed",
+  "eslint": "AppShell, AppSidebar and editorial components passed",
+  "playbackTests": {
+    "passed": 5,
+    "project": "chromium",
+    "durationSeconds": 28.5
+  },
+  "scope": "Local disposable data and isolated dev server; no deployment. Eight new editorial motifs and four available videos remain integrated; seven Flow videos were not generated."
+}

@@ -43,6 +43,7 @@ export default async function GastosPage({
   return (
     <div className="space-y-6">
       <ModuleHeader
+        artwork="billing"
         eyebrow="Desembolsos"
         title="Gastos"
         subtitle="Notaría, receptor, peritos, costas y otros desembolsos por cuenta del cliente."

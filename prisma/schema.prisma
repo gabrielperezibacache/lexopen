@@ -570,6 +570,10 @@ model MinutaAccion {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  tipoComputo String?
+  esFatal Boolean?
+  orden Int?
+
   minutaId String
   minuta   Minuta @relation(fields: [minutaId], references: [id], onDelete: Cascade)
   plazoId  String?
@@ -647,6 +651,10 @@ model FileVersion {
   note      String?
   createdAt DateTime @default(now())
   authorId  String?
+  storageKey String?
+  mimeType String?
+  sizeBytes Int?
+  snapshotJson String?
   file      SiteFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
   author    User?    @relation(fields: [authorId], references: [id])
 }
@@ -689,11 +697,31 @@ model Documento {
   caseAudioSource CaseAudio? @relation("CaseAudioSourceDocument")
   caseAudioPublications CaseAudio[] @relation("CaseAudioTranscriptDocument")
   audioPublication CaseAudioPublication?
+  offlineRevisions OfflineDocumentRevision[]
 
   @@index([causaId])
   @@index([clienteId])
   @@index([updatedAt])
   @@index([extractionStatus, extractionNextAttemptAt])
+}
+
+/// Retained revisions of a document, including the original bytes before replacement.
+model OfflineDocumentRevision {
+  id String @id @default(cuid())
+  documentoId String
+  version Int
+  contenido String?
+  storageKey String?
+  mimeType String?
+  nombre String
+  confidencial Boolean
+  privilegio Boolean
+  causaId String?
+  snapshotJson String
+  createdAt DateTime @default(now())
+  documento Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  @@unique([documentoId, version])
 }
 
 /// Virtual folders are scoped to a case. Filing does not revise the original.
@@ -753,6 +781,8 @@ model Plazo {
   fechaLimite   DateTime
   fechaNotificacion DateTime?
   diasPlazo     Int?
+  calculationCountry String?
+  calculationRegime String?
   tipoComputo   String   @default("habiles") // habiles | corridos
   esFatal       Boolean  @default(false)
   tipo          String   @default("procesal")
@@ -2047,6 +2077,8 @@ model CaseWritingDraft {
   owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict)
   revisions CaseWritingRevision[]
   requests CaseWritingRequest[]
+  reviews CaseWritingReview[]
+  exports CaseWritingExport[]
   @@unique([ownerId,causaId,requestId])
   @@index([ownerId,causaId,updatedAt])
 }
@@ -2072,6 +2104,41 @@ model CaseWritingRequest {
   createdAt DateTime @default(now())
   draft CaseWritingDraft @relation(fields:[draftId],references:[id],onDelete:Cascade)
   @@unique([draftId,requestId])
+}
+
+model CaseWritingReview {
+  id String @id @default(cuid())
+  draftId String
+  revision Int
+  requestId String
+  inputSha256 String
+  reviewerId String
+  reviewerName String
+  decision String
+  note String @db.Text
+  contentSha256 String
+  referencesSha256 String
+  createdAt DateTime @default(now())
+  draft CaseWritingDraft @relation(fields:[draftId],references:[id],onDelete:Cascade)
+  exports CaseWritingExport[]
+  @@unique([draftId,revision])
+  @@unique([draftId,requestId])
+}
+
+model CaseWritingExport {
+  id String @id @default(cuid())
+  draftId String
+  revision Int
+  actorId String
+  reviewId String?
+  format String
+  purpose String
+  contentSha256 String
+  bytes Int
+  createdAt DateTime @default(now())
+  draft CaseWritingDraft @relation(fields:[draftId],references:[id],onDelete:Cascade)
+  review CaseWritingReview? @relation(fields:[reviewId],references:[id],onDelete:SetNull)
+  @@index([draftId,createdAt])
 }
 
 model HearingWorkspace {

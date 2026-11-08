@@ -12,7 +12,7 @@ import { prisma } from "@/lib/db";
 import { processOutboxBatch } from "@/lib/notify/worker";
 
 const schema = z.object({
-  canal: z.enum(["email", "telegram", "push"]),
+  canal: z.enum(["email", "telegram", "push", "whatsapp"]),
 });
 
 export async function POST(req: NextRequest) {

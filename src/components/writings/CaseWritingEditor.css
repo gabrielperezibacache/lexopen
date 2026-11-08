@@ -82,3 +82,8 @@
 @media (max-width: 1120px) { .writing-body { min-height: 28rem; } }
 @media (max-width: 700px) { .writing-page-heading { display: block; } .writing-overview { grid-template-columns: minmax(0, 1fr); gap: 1rem; } .writing-create { display: grid; grid-template-columns: minmax(0, 1fr); } .writing-create button { justify-self: start; } .writing-overview-note { margin: 0; } .writing-paper { padding: 1.25rem; } .writing-body { min-height: 24rem; } .writing-actions { align-items: stretch; } .writing-actions .btn { flex: 1 1 auto; } .writing-mobile-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { .writing-companion-panel { animation: none; } }
+
+.writing-review-panel { display: grid; gap: .75rem; padding-bottom: 1.25rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
+.writing-companion .writing-review-check { display: flex; align-items: flex-start; gap: .75rem; min-height: 44px; }
+.writing-review-check input[type="checkbox"] { width: 1.125rem; min-width: 1.125rem; height: 1.125rem; min-height: 1.125rem; margin-top: .25rem; accent-color: var(--sea); flex-shrink: 0; }
+.writing-review-panel .writing-actions { margin-top: .75rem; }

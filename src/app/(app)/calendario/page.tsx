@@ -188,6 +188,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
     titulo: e.titulo,
     tipo: e.tipo,
     inicio: e.inicio.toISOString(),
+    updatedAt: e.updatedAt.toISOString(),
     fin: e.fin ? e.fin.toISOString() : null,
     todoElDia: e.todoElDia,
     lugar: e.lugar,
@@ -338,7 +339,7 @@ export default async function CalendarioPage({ searchParams }: Props) {
         titulo: x.titulo,
         causaId: x.causaId,
       })),
-      ev: ev.map(({ id, titulo, tipo, inicio, causaId, teachingHref }) => ({ id, titulo, tipo, inicio, causaId, teachingHref })),
+      ev: ev.map(({ id, titulo, tipo, inicio, causaId, teachingHref, todoElDia, updatedAt }) => ({ id, titulo, tipo, inicio, causaId, teachingHref, todoElDia, updatedAt })),
     };
   });
 

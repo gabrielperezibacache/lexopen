@@ -1,0 +1,249 @@
+{
+  "date": "2026-11-07",
+  "provider": "Google Flow",
+  "project": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79",
+  "settings": {
+    "model": "Veo 3.1 - Fast",
+    "aspectRatio": "16:9",
+    "durationSeconds": 8,
+    "outputs": 1,
+    "resolution": "720p",
+    "sameStartAndEndFrame": true
+  },
+  "latestObservedAt": "2026-11-07T22:12:35Z",
+  "attempts": [
+    {
+      "artwork": "writing",
+      "action": "submit",
+      "result": "unusual_activity"
+    },
+    {
+      "artwork": "writing",
+      "action": "normal_UI_retry",
+      "result": "unusual_activity"
+    }
+  ],
+  "exactServiceMessage": "Hemos detectado actividad inusual. Ten en cuenta que las extensiones del navegador que modifican la página pueden causar problemas.",
+  "evidence": "flow-reintento-bloqueado.jpg",
+  "newVideosGenerated": [],
+  "applicationFilesChanged": false,
+  "existingMotionArtworks": [
+    "casefiles",
+    "billing",
+    "deadlines",
+    "research"
+  ],
+  "pending": [
+    {
+      "artwork": "writing",
+      "label": "Escritura y minutas",
+      "sourceStill": "public/editorial/generated/escritura-flow-v1.webp",
+      "startFrameAssetId": "54a08c6d-28f9-435a-80fb-f0a615af2328",
+      "endFrameAssetId": "54a08c6d-28f9-435a-80fb-f0a615af2328",
+      "prompt": "Only the free upper-right corner of the TOP LOOSE MANUSCRIPT FOLIO lifts gently by a few millimeters and settles. The sheet stays flat everywhere else; no sheet flips. Inkwell, cap, fountain pen, lower papers and bookmark remain absolutely fixed. The paper is not a cover and cannot peel or transform. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "blocked_after_retry",
+      "targetVideo": "public/editorial/generated/escritura-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/escritura-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/app/(app)/minutas/page.tsx",
+        "src/app/(app)/causas/[id]/minutas/[minutaId]/page.tsx",
+        "src/app/(app)/causas/[id]/minuta/nueva/page.tsx"
+      ],
+      "sourceSha256": "966ad57614fe0341f05752d6be195c4e08e492d59389201cf6f21f10e7c7190a"
+    },
+    {
+      "artwork": "hearings",
+      "label": "Audiencias",
+      "sourceStill": "public/editorial/generated/audiencias-flow-v1.webp",
+      "startFrameAssetId": "57c1ffae-a119-4900-8a8b-eb3a598682c6",
+      "endFrameAssetId": "57c1ffae-a119-4900-8a8b-eb3a598682c6",
+      "prompt": "Only the small microphone head makes one very slight, mechanically plausible two-degree nod at the top of its flexible gooseneck, then returns. The base, notepad and lower neck remain fixed. No stretching, breathing, speech, indicator light or sound waves. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/audiencias-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/audiencias-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/components/hearings/AudienceHub.tsx"
+      ],
+      "sourceSha256": "531044feb09f206466e0f8cae8addafb27e495ee5d650159d979b369853aa0c4"
+    },
+    {
+      "artwork": "people",
+      "label": "Personas y portal",
+      "sourceStill": "public/editorial/generated/personas-flow-v1.webp",
+      "startFrameAssetId": "64d4a108-9332-455f-bdca-8d48f7cab3d1",
+      "endFrameAssetId": "64d4a108-9332-455f-bdca-8d48f7cab3d1",
+      "prompt": "Only the loose blank contact card leaning against the front makes a subtle three-degree tilt and returns to rest. The solid card-index box, open lid and all divider cards remain absolutely fixed. No card is removed and no labels or portraits appear. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/personas-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/personas-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/app/(app)/portal/page.tsx",
+        "src/app/(app)/personas/page.tsx"
+      ],
+      "sourceSha256": "060e2ffd95a52da399a60d4909cb3ea01840f50f29ef8133dbc800de00f7776b"
+    },
+    {
+      "artwork": "workflows",
+      "label": "Flujos y sitios",
+      "sourceStill": "public/editorial/generated/flujos-flow-v1.webp",
+      "startFrameAssetId": "1823b8c4-ef4a-401e-8db8-0f7c946c6c0e",
+      "endFrameAssetId": "1823b8c4-ef4a-401e-8db8-0f7c946c6c0e",
+      "prompt": "Only the slender silk thread makes one gentle small traveling tension-and-release movement between the three eyelets, then rests exactly as it began. All three paper cards and eyelets remain completely fixed, rigid and flat. The thread remains one continuous strand, no tangling, detaching or extra strands. No light trail or arrows. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/flujos-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/flujos-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/app/(app)/flujos/page.tsx",
+        "src/app/(app)/dashboard/page.tsx",
+        "src/app/(app)/sites/page.tsx",
+        "src/components/sites/SiteNav.tsx"
+      ],
+      "sourceSha256": "740f10879fb912ff1afd9f295c3464c47bdae2f8f70b31ec84bdad2778cdf1f4"
+    },
+    {
+      "artwork": "connections",
+      "label": "Conexiones e integraciones",
+      "sourceStill": "public/editorial/generated/conexiones-flow-v1.webp",
+      "startFrameAssetId": "a068c416-a723-437f-ace5-86b7aacfc7d1",
+      "endFrameAssetId": "a068c416-a723-437f-ace5-86b7aacfc7d1",
+      "prompt": "Only the two rigid metal chain links make a very small natural rocking motion of a few degrees around their shared contact point, then settle into the original arrangement. The closed document wallet stays perfectly fixed. Links stay solid, distinct and genuinely interlocked throughout; no opening, fusing, bending or pulling apart. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/conexiones-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/conexiones-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/app/(app)/integraciones/page.tsx",
+        "src/app/(app)/sincronizacion/page.tsx",
+        "src/components/pjud/PjudAccountWorkspace.tsx",
+        "src/components/pjud/PjudPortfolioWorkspace.tsx"
+      ],
+      "sourceSha256": "69e190d82cc86d8b63997e0b8bb6f53e1d1d515b1fd00a482f6575fa7f1c6675"
+    },
+    {
+      "artwork": "notifications",
+      "label": "Avisos y notificaciones",
+      "sourceStill": "public/editorial/generated/avisos-flow-v1.webp",
+      "startFrameAssetId": "f694acfe-ce02-41aa-8abc-bcbe6fbc10e1",
+      "endFrameAssetId": "f694acfe-ce02-41aa-8abc-bcbe6fbc10e1",
+      "prompt": "Only the whole solid handbell makes one extremely small natural two-degree rock about the bottom rim and settles back in the original upright position. Keep the handle and bell body rigid as one coherent object. The two paper reminder slips stay absolutely fixed. No floating, no added clapper or sound waves. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/avisos-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/avisos-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/app/(app)/notificaciones/page.tsx",
+        "src/app/(app)/cuenta/notificaciones/page.tsx"
+      ],
+      "sourceSha256": "ab221dab66e69e3d7925811d377d8328479ac85d3173949f7c3b46cbc3fe9528"
+    },
+    {
+      "artwork": "settings",
+      "label": "Configuración y cuenta",
+      "sourceStill": "public/editorial/generated/configuracion-flow-v1.webp",
+      "startFrameAssetId": "6e35d124-1ef7-4fc5-97e0-8319574e8871",
+      "endFrameAssetId": "6e35d124-1ef7-4fc5-97e0-8319574e8871",
+      "prompt": "Only the two existing rigid compass legs open three degrees at their ONE original left pivot and close back exactly to their initial position. The wheel and drafting slip underneath stay fixed. Keep EXACTLY two legs and one hinge for the entire shot. No extra points, hands, legs, new metal, stretching or changing the compass design. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/configuracion-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/configuracion-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/app/(app)/configuracion/page.tsx",
+        "src/app/(app)/cuenta/page.tsx"
+      ],
+      "sourceSha256": "b699d1173f5b7367c3e0b7f5f9ea65cfa89659c73cbb16435ef09311213a33b9"
+    },
+    {
+      "artwork": "tasks",
+      "label": "Tareas",
+      "sourceStill": "public/editorial/generated/tareas-flow-v1.webp",
+      "startFrameAssetId": "7ec342f7-c31d-4e8c-8f8d-b008fd2e3133",
+      "endFrameAssetId": "7ec342f7-c31d-4e8c-8f8d-b008fd2e3133",
+      "requiresUpload": false,
+      "prompt": "Only the free upper outer corner of the RIGHT PAPER PAGE of the open task notebook lifts a few millimeters and settles once. The rest of that sheet, the binding, left checklist page, mechanical pencil and iris tab remain absolutely fixed. This is a thin paper corner, never the rigid cover; no page turn, no pencil movement and no marks appearing. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/tareas-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/tareas-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/app/(app)/tareas/page.tsx"
+      ],
+      "sourceSha256": "a2a1fb46321b131f64e5c389f7e33eb1e9b6917739296c3af0570bd2bf1c74af"
+    },
+    {
+      "artwork": "correspondence",
+      "label": "Correo y correspondencia",
+      "sourceStill": "public/editorial/generated/correspondencia-flow-v1.webp",
+      "startFrameAssetId": "2a39c267-5251-4b1d-86b8-541819b8c461",
+      "endFrameAssetId": "2a39c267-5251-4b1d-86b8-541819b8c461",
+      "requiresUpload": false,
+      "prompt": "Only the existing blank letter slides upward by a few millimeters out of its open envelope, then returns exactly to its original depth. The letter remains one rigid flat paper sheet with unchanged faint engraved rules. The open envelope, its triangular flap and the smaller closed envelope remain completely fixed. No unfolding, addresses, stamps or extra sheets. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/correspondencia-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/correspondencia-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/app/(app)/correo/page.tsx",
+        "src/app/(app)/configuracion/correo/page.tsx",
+        "src/app/(app)/cuenta/feedback/page.tsx",
+        "src/components/MessagesClient.tsx"
+      ],
+      "sourceSha256": "b50a30ea76ac198368ff2b5659a0ff5eca2e65eeb8c4b61e45fda880a9f3ffc2"
+    },
+    {
+      "artwork": "academic",
+      "label": "Académico",
+      "sourceStill": "public/editorial/academico.webp",
+      "startFrameAssetId": null,
+      "endFrameAssetId": null,
+      "requiresUpload": true,
+      "prompt": "Only the loose feather tip of the EXISTING quill makes one barely perceptible natural flex and returns to rest. The rigid quill shaft stays in place. Both books, their covers, pages and existing engraved page texture remain absolutely fixed. No writing motion, no ink marks, no new letters and no page turns. Preserve the existing illustration and exact object arrangement. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/academico-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/academico-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/components/altazor/AltazorAcademic.tsx"
+      ],
+      "sourceSha256": "b8eede15df2b999ef5d25b74a6bbd96a60ab1f31eab06ff8affbc9c166781d03"
+    },
+    {
+      "artwork": "calendar",
+      "label": "Agenda",
+      "sourceStill": "public/editorial/agenda.webp",
+      "startFrameAssetId": null,
+      "endFrameAssetId": null,
+      "requiresUpload": true,
+      "prompt": "Only a few tiny silver engraved grains descend through the EXISTING central neck of the hourglass. Keep the visible sand levels effectively unchanged over this short shot so the supplied start and end frames match. The glass, all posts, hourglass frame, closed planner, strap and ribbon stay perfectly rigid and fixed. No hourglass rotation or planner opening, no extra grains outside the glass. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/agenda-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/agenda-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/app/(app)/calendario/page.tsx"
+      ],
+      "sourceSha256": "9910f1bed961d8a34f0604962dcc5055922432ef0c59e8988622dec6040f27ad"
+    },
+    {
+      "artwork": "clients",
+      "label": "Clientes",
+      "sourceStill": "public/editorial/generated/consulta-v1.webp",
+      "startFrameAssetId": null,
+      "endFrameAssetId": null,
+      "requiresUpload": true,
+      "prompt": "Only the upper cover of the small closed notebook ON THE ROUND TABLE opens by two degrees at its existing spine hinge, then closes exactly to its initial position. Treat this cover as one rigid flat board, never as a peeling sheet. The notebook base, both armchairs and the whole table remain absolutely fixed. No people appear and no chair or table movement, writing, deformation or new props. Eight-second restrained editorial animation of this EXACT supplied silver steel engraving. Use the supplied first AND last frames as the visual anchors. Camera completely locked: no zoom, pan, orbit, reframing, shake or cuts. Preserve every object, all fine engraved crosshatching, the original cool silver/indigo/iris palette and the completely uniform deep indigo backdrop. No changes to the composition, perspective, texture style or object scale. Keep every edge visible inside the original generous margins throughout. Hold the first second still, perform ONE quiet precise movement in the middle and hold the last second still, returning to the supplied original arrangement. No new objects, people, hands, writing, letters, numbers, logos, extra props, halos, smoke, sparks, dramatic light sweeps, gradients or photorealism. Silent video, no voices, music or sound effects. Suitable for a sober professional legal application, understated motion rather than spectacle.",
+      "status": "not_attempted_in_this_continuation",
+      "targetVideo": "public/editorial/generated/clientes-motion-flow-v1.mp4",
+      "targetPoster": "public/editorial/generated/clientes-motion-flow-v1-poster.webp",
+      "integrated": false,
+      "consumers": [
+        "src/app/(app)/clientes/page.tsx"
+      ],
+      "sourceSha256": "50149445c0bdfbab96b1515c04bd8f1a324953c476b49c443303dabb6c8beee5"
+    }
+  ]
+}

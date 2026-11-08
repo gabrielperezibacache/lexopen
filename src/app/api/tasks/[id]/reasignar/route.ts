@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertCsrf, handleRouteError, parseBody, requireStaff } from "@/lib/api";
-import { updateTasks } from "@/lib/tasks/service";
+import { updateTasksCommand } from "@/lib/tasks/service";
+import { requestCommandKey } from "@/lib/command-execution";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -11,6 +12,6 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest, { params }: Params) {
-  try { assertCsrf(req); const user = await requireStaff(); const { id } = await params; const body = await parseBody(req, schema); const tasks = await updateTasks(user, [id], body); return NextResponse.json(tasks[0]); }
+  try { assertCsrf(req); const user = await requireStaff(); const { id } = await params; const body = await parseBody(req, schema); const tasks = await updateTasksCommand(user, [id], body, requestCommandKey(req, "task.update")); return NextResponse.json(tasks[0]); }
   catch (error) { return handleRouteError(error); }
 }

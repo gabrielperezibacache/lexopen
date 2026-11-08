@@ -20,7 +20,7 @@ const llmIntentSchema = z.object({
       z.object({
         toolId: z.string(),
         confidence: z.number().min(0).max(1).default(0.5),
-        slots: z.record(z.unknown()).default({}),
+        slots: z.record(z.string(), z.unknown()).default({}),
       })
     )
     .default([]),

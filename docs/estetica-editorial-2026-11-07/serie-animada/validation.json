@@ -1,0 +1,15 @@
+{
+  "routes": 3,
+  "views": 12,
+  "noVideoBeforeInteraction": true,
+  "allResponsesOk": true,
+  "horizontalOverflow": false,
+  "allMuted": true,
+  "javascriptErrors": [],
+  "editorialMotionTests": {
+    "passed": 5,
+    "project": "chromium",
+    "durationSeconds": 24.8
+  },
+  "scope": "Local disposable fixtures; only the research video is generated and integrated. Seven videos and the Greek philosopher image remain pending because Google Flow rejects generation."
+}

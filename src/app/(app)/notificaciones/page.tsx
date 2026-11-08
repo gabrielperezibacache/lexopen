@@ -12,7 +12,7 @@ export default async function NotificacionesPage() {
   const inbox = await prisma.$transaction(tx => notificationInbox(user.id, tx, 100), { isolationLevel: "RepeatableRead" });
   return (
     <div className="space-y-6">
-      <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
+      <ModuleHeader artwork="notifications" eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
       <NotificationsPanel initial={inbox} />
     </div>
   );

@@ -1,10 +1,10 @@
 import os from "node:os";
 import { statfs } from "node:fs/promises";
 import { LOCAL_MODELS, type LocalModelId, type LocalModelProfile } from "./local-model-profiles";
+import { collectLocalDevices, type LocalGpu } from "./local-model-device-probe";
 
 const GIB = 1024 ** 3;
 const MAX_INSTALLED_BYTES = 1024 ** 4;
-const RESERVED_MEMORY_BYTES = Math.ceil(1.5 * GIB);
 
 export type LocalModelHardware = {
   platform: string;
@@ -15,7 +15,11 @@ export type LocalModelHardware = {
   availableMemoryBytes: number;
   diskFreeBytes: number | null;
   scope: "host";
-  gpu: "unknown";
+  gpu: "unknown" | "detected";
+  gpus: LocalGpu[];
+  memoryKind: "ram" | "unified";
+  unifiedMemoryBytes: number | null;
+  availableMemorySource: "os" | "meminfo" | "memory-pressure";
 };
 
 /** An observation boundary for deterministic recommendations, not a hardware benchmark. */
@@ -29,13 +33,21 @@ export type LocalModelHardwareProbe = {
   availableMemoryBytes?: unknown;
   constrainedMemoryBytes?: unknown;
   diskFreeBytes?: unknown;
+  gpus?: unknown;
+  systemAvailableMemoryBytes?: unknown;
+  availableMemorySource?: unknown;
 };
 
 export type LocalModelRecommendation = {
-  purpose: "documents" | "writing" | "browser";
   candidateId: LocalModelId | null;
+  capacityCandidateId: LocalModelId | null;
+  basis: "ram" | "vram" | "unified";
+  gpuName: string | null;
+  availableMemoryKnown: boolean;
+  downloadFits: boolean | null;
   reason: string;
   memoryBudgetBytes: number;
+  memoryCapacityBytes: number;
   estimate: true;
 };
 
@@ -53,6 +65,30 @@ function identifier(value: unknown) {
   return typeof value === "string" && /^[a-zA-Z0-9_-]{1,32}$/.test(value) ? value : "unknown";
 }
 
+function deviceName(value: unknown, fallback: string) {
+  return typeof value === "string" ? value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, " ").trim().slice(0, 160) || fallback : fallback;
+}
+
+function normalizeGpus(value: unknown): LocalGpu[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 16).flatMap((item: unknown): LocalGpu[] => {
+    if (!item || typeof item !== "object") return [];
+    const gpu = item as LocalGpu;
+    if (!["system-profiler", "nvidia-smi", "linux-sysfs", "dxgi", "windows-cim"].includes(gpu.source)) return [];
+    const total = bytes(gpu.totalMemoryBytes);
+    const available = bytes(gpu.availableMemoryBytes);
+    const totalMemoryBytes = total && total <= MAX_INSTALLED_BYTES ? total : null;
+    return [{
+      name: deviceName(gpu.name, "GPU sin identificar"),
+      vendor: ["apple", "nvidia", "amd", "intel"].includes(gpu.vendor) ? gpu.vendor : "unknown",
+      memoryKind: ["dedicated", "shared", "unified"].includes(gpu.memoryKind) ? gpu.memoryKind : "unknown",
+      totalMemoryBytes,
+      availableMemoryBytes: totalMemoryBytes && available !== undefined && available <= totalMemoryBytes ? available : null,
+      source: gpu.source,
+    }];
+  });
+}
+
 export function normalizeLocalModelHardware(probe: LocalModelHardwareProbe): LocalModelHardware {
   const total = bytes(probe.totalMemoryBytes) ?? 0;
   const constraint = bytes(probe.constrainedMemoryBytes) ?? 0;
@@ -60,19 +96,36 @@ export function normalizeLocalModelHardware(probe: LocalModelHardwareProbe): Loc
   const free = bytes(probe.freeMemoryBytes);
   const available = bytes(probe.availableMemoryBytes);
   const observations = [free, available].filter((value): value is number => value !== undefined);
-  const availableMemoryBytes = Math.min(totalMemoryBytes, ...(observations.length ? observations : [0]));
-  const cpuName = typeof probe.cpuName === "string"
-    ? probe.cpuName.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, " ").trim().slice(0, 160) : "";
+  const nativeAvailable = bytes(probe.systemAvailableMemoryBytes);
+  const nativeSource = probe.availableMemorySource === "meminfo" || probe.availableMemorySource === "memory-pressure" ? probe.availableMemorySource : null;
+  // Native availability includes reclaimable pages. A process/container limit still takes precedence.
+  const availableMemoryBytes = nativeSource && nativeAvailable !== undefined
+    ? Math.min(totalMemoryBytes, nativeAvailable, ...(constraint > 0 && available !== undefined ? [available] : []))
+    : Math.min(totalMemoryBytes, ...(observations.length ? observations : [0]));
+  const cpuName = deviceName(probe.cpuName, "No identificado");
+  const gpus = normalizeGpus(probe.gpus);
+  const unified = probe.platform === "darwin" && (/^Apple\s+[MA]\d/i.test(cpuName) || gpus.some(gpu => gpu.vendor === "apple" && gpu.memoryKind === "unified"));
+  for (const gpu of gpus) {
+    if (gpu.memoryKind !== "unified") continue;
+    if (unified && gpu.vendor === "apple") {
+      gpu.totalMemoryBytes = totalMemoryBytes || null;
+      gpu.availableMemoryBytes = totalMemoryBytes ? availableMemoryBytes : null;
+    } else { gpu.memoryKind = "shared"; gpu.totalMemoryBytes = null; gpu.availableMemoryBytes = null; }
+  }
   return {
     platform: identifier(probe.platform),
     arch: identifier(probe.arch),
-    cpuName: cpuName || "No identificado",
+    cpuName,
     cpuCores: typeof probe.cpuCores === "number" && Number.isInteger(probe.cpuCores) && probe.cpuCores > 0 ? Math.min(probe.cpuCores, 4096) : 1,
     totalMemoryBytes,
     availableMemoryBytes,
     diskFreeBytes: bytes(probe.diskFreeBytes) ?? null,
     scope: "host",
-    gpu: "unknown",
+    gpu: gpus.length ? "detected" : "unknown",
+    gpus,
+    memoryKind: unified ? "unified" : "ram",
+    unifiedMemoryBytes: unified && totalMemoryBytes ? totalMemoryBytes : null,
+    availableMemorySource: nativeSource && nativeAvailable !== undefined ? nativeSource : "os",
   };
 }
 
@@ -81,15 +134,20 @@ function observe<T>(read: () => T): T | undefined {
 }
 
 /** No path is accepted from the browser; the free-disk reading is only a reference. */
-export async function collectLocalModelHardware(): Promise<LocalModelHardware> {
+export async function collectLocalModelHardware(signal?: AbortSignal): Promise<LocalModelHardware> {
+  signal?.throwIfAborted();
   const cpus = observe(() => os.cpus());
   const processMemory = process as typeof process & { availableMemory?: () => number; constrainedMemory?: () => number };
-  let diskFreeBytes: number | null = null;
-  try {
-    const disk = await statfs(os.homedir(), { bigint: true });
-    const free = disk.bavail * disk.bsize;
-    if (free >= BigInt(0)) diskFreeBytes = Number(free > BigInt(Number.MAX_SAFE_INTEGER) ? BigInt(Number.MAX_SAFE_INTEGER) : free);
-  } catch { /* The model runtime may use another volume; do not invent a capacity. */ }
+  const [devices, diskFreeBytes] = await Promise.all([
+    collectLocalDevices(process.platform, observe(() => os.totalmem()) ?? 0, signal),
+    (async (): Promise<number | null> => {
+      try {
+        const disk = await statfs(os.homedir(), { bigint: true });
+        const free = disk.bavail * disk.bsize;
+        return free >= BigInt(0) ? Number(free > BigInt(Number.MAX_SAFE_INTEGER) ? BigInt(Number.MAX_SAFE_INTEGER) : free) : null;
+      } catch { return null; /* The runtime may use another volume; do not invent a capacity. */ }
+    })(),
+  ]);
   return normalizeLocalModelHardware({
     platform: process.platform,
     arch: process.arch,
@@ -100,6 +158,7 @@ export async function collectLocalModelHardware(): Promise<LocalModelHardware> {
     availableMemoryBytes: observe(() => processMemory.availableMemory?.()),
     constrainedMemoryBytes: observe(() => processMemory.constrainedMemory?.()),
     diskFreeBytes,
+    ...devices,
   });
 }
 
@@ -136,25 +195,50 @@ export function localModelInventory(models: readonly InstalledLocalModel[]) {
   return { installed: entries, installedCount: models.length, installedLimited: models.length > entries.length };
 }
 
-// Planning estimates for the bounded text/context profile, not guaranteed runtime consumption.
-const MEMORY_ESTIMATES: Record<LocalModelId, number> = { "qwen-mini": Math.ceil(1.75 * GIB), "gemma-small": Math.ceil(2.5 * GIB), "qwen-small": Math.ceil(3.5 * GIB) };
-const purposes = ["documents", "writing", "browser"] as const;
+// Editorial ordering for document review, not a measured Spanish legal benchmark.
+const DOCUMENT_RANK: Record<LocalModelId, number> = {
+  "qwen-mini": 10, "gemma-small": 12, "qwen-small": 20, "qwen35-2b": 30,
+  "phi4-mini": 40, "qwen35-4b": 50, "gemma4-e2b": 50, "qwen35-9b": 65,
+  "gemma4-e4b": 64, "gemma4-12b": 75, "gpt-oss-20b": 70, "gemma4-26b": 85,
+  "qwen38-27b": 90, "gemma4-31b": 88, "qwen36-35b": 86, "gpt-oss-120b": 92,
+};
 
-export function localModelRecommendations(hardware: LocalModelHardware, installedCatalogIds: readonly LocalModelId[] = []): LocalModelRecommendation[] {
+/** One physical pool per route: never add RAM to VRAM or combine multiple GPUs. */
+export function localModelRecommendation(hardware: LocalModelHardware, installedCatalogIds: readonly LocalModelId[] = []): LocalModelRecommendation {
   const installed = new Set(installedCatalogIds);
-  return purposes.map(purpose => {
-    const extra = purpose === "browser" ? 1.5 * GIB : purpose === "writing" ? .5 * GIB : .25 * GIB;
-    const memoryBudgetBytes = Math.max(0, hardware.availableMemoryBytes - RESERVED_MEMORY_BYTES - extra);
-    const order: LocalModelId[] = purpose === "writing" ? ["qwen-small", "gemma-small", "qwen-mini"] : ["qwen-small", "qwen-mini", "gemma-small"];
-    const candidates = order.map(id => LOCAL_MODELS.find(profile => profile.id === id)!);
-    const candidate = candidates.find(profile => MEMORY_ESTIMATES[profile.id] <= memoryBudgetBytes
-      && (installed.has(profile.id) || hardware.diskFreeBytes !== null && hardware.diskFreeBytes >= Math.ceil(profile.bytes * 2) + .5 * GIB));
-    let reason: string;
-    if (!hardware.totalMemoryBytes) reason = "No se pudo comprobar la memoria del equipo principal. Vuelve a comprobar antes de elegir un perfil.";
-    else if (!candidates.some(profile => MEMORY_ESTIMATES[profile.id] <= memoryBudgetBytes)) reason = "El margen de memoria disponible es reducido. Cierra otras aplicaciones y vuelve a comprobar.";
-    else if (!candidate) reason = hardware.diskFreeBytes === null ? "No se pudo comprobar el espacio de referencia para una descarga. Puedes usar un perfil verificado ya instalado." : "El espacio de referencia es reducido para una descarga con margen. Revisa el almacenamiento del equipo principal.";
-    else reason = candidate.id === "qwen-mini" ? "Perfil ligero para etiquetas, datos explícitos y notas breves; revisa siempre el resultado." : purpose === "writing" ? "Perfil de texto para revisar y reorganizar pasajes breves; la redacción extensa necesita revisión por partes." : "Perfil de texto para resumir y extraer datos de pasajes breves con revisión.";
-    if (purpose === "browser") reason += " Apoyo de lectura; las acciones del navegador y los conectores dependen del escritorio y sus permisos.";
-    return { purpose, candidateId: hardware.totalMemoryBytes ? candidate?.id ?? null : null, reason, memoryBudgetBytes, estimate: true };
-  });
+  const unified = hardware.memoryKind === "unified";
+  const reserve = unified ? Math.max(3 * GIB, Math.min(8 * GIB, hardware.totalMemoryBytes * .15)) : Math.min(3 * GIB, hardware.totalMemoryBytes * .25);
+  const hostBudget = Math.max(0, hardware.availableMemoryBytes - reserve);
+  type Route = { basis: LocalModelRecommendation["basis"]; total: number; budget: number; capacityBudget: number; gpu: LocalGpu | null; known: boolean };
+  const routes: Route[] = [{ basis: unified ? "unified" : "ram", total: hardware.totalMemoryBytes, budget: unified ? Math.min(hostBudget, hardware.totalMemoryBytes * .75) : hostBudget, capacityBudget: unified ? Math.min(hardware.totalMemoryBytes - reserve, hardware.totalMemoryBytes * .75) : Math.max(0, hardware.totalMemoryBytes - reserve), gpu: null, known: true }];
+  if (!unified) for (const gpu of hardware.gpus ?? []) {
+    if (gpu.memoryKind !== "dedicated" || !gpu.totalMemoryBytes) continue;
+    const gpuReserve = Math.max(.5 * GIB, gpu.totalMemoryBytes * .05);
+    routes.push({ basis: "vram", total: gpu.totalMemoryBytes, budget: gpu.availableMemoryBytes === null ? gpu.totalMemoryBytes * .8 : Math.max(0, gpu.availableMemoryBytes - gpuReserve), capacityBudget: Math.max(0, gpu.totalMemoryBytes - gpuReserve), gpu, known: gpu.availableMemoryBytes !== null });
+  }
+  function choose(capacityOnly: boolean) {
+    return routes.flatMap(route => LOCAL_MODELS.flatMap(profile => {
+      const required = route.basis === "vram" ? profile.memory.vram * GIB * .85 : profile.workingMemoryGiB * GIB;
+      const hostFits = route.basis !== "vram" || hardware.totalMemoryBytes >= Math.min(profile.memory.ram, 8) * GIB && (capacityOnly ? hardware.totalMemoryBytes - reserve : hostBudget) >= Math.min(2, profile.workingMemoryGiB) * GIB;
+      if (!hostFits || profile.memory[route.basis] * GIB > route.total || required > (capacityOnly ? route.capacityBudget : route.budget)) return [];
+      const score = DOCUMENT_RANK[profile.id] + (route.basis !== "ram" ? 12 : 0)
+        - (route.basis === "ram" && profile.workingMemoryGiB > 12 ? 60 : 0)
+        - (profile.workingMemoryGiB > 32 ? 12 : 0);
+      return [{ profile, route, score }];
+    })).sort((a, b) => b.score - a.score || Number(installed.has(b.profile.id)) - Number(installed.has(a.profile.id)) || a.profile.bytes - b.profile.bytes)[0];
+  }
+  const current = choose(false), capacity = choose(true);
+  const selected = current ?? capacity;
+  const candidate = current?.profile;
+  const route = selected?.route ?? routes[0];
+  let reason: string;
+  if (!hardware.totalMemoryBytes) reason = "No se pudo comprobar la memoria del equipo que aloja LexOpen. Vuelve a detectar el equipo.";
+  else if (!candidate) reason = capacity ? "La capacidad total permite este modelo, pero falta memoria libre ahora. Cierra otras aplicaciones y vuelve a detectar antes de usarlo." : "El margen de memoria es demasiado reducido para recomendar un modelo del catálogo. Puedes seguir comparando las opciones.";
+  else reason = `Orientación para revisar documentos según ${route.basis === "unified" ? "la memoria unificada" : route.basis === "vram" ? `la VRAM de ${route.gpu?.name}` : "la RAM"} y el margen disponible. Se reserva memoria para el sistema y el contexto.`;
+  if (route.basis === "vram") reason += route.known ? " La ejecución acelerada depende de la compatibilidad del motor con esta GPU." : " No se pudo medir la VRAM libre; se aplica un margen del 20 % y la recomendación queda condicionada a la memoria y compatibilidad del motor.";
+  if (route.basis === "ram" && hardware.gpu === "unknown") reason += " GPU sin comprobar; se utiliza una estimación en CPU.";
+  if (candidate && installed.has(candidate.id)) reason += " Esta edición ya está instalada y verificada.";
+  const downloadFits = candidate && hardware.diskFreeBytes !== null ? hardware.diskFreeBytes >= Math.ceil(candidate.bytes * 2) + .5 * GIB : null;
+  if (downloadFits === false && candidate && !installed.has(candidate.id)) reason += " El disco de referencia tiene poco margen para prepararlo más adelante.";
+  return { candidateId: hardware.totalMemoryBytes ? candidate?.id ?? null : null, capacityCandidateId: hardware.totalMemoryBytes ? capacity?.profile.id ?? null : null, basis: route.basis, gpuName: route.gpu?.name ?? null, availableMemoryKnown: route.known, downloadFits, reason, memoryBudgetBytes: Math.floor(route.budget), memoryCapacityBytes: route.total, estimate: true };
 }

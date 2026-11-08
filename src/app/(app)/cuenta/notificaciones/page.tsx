@@ -12,6 +12,7 @@ export default async function CuentaNotificacionesPage() {
   return (
     <div className={`${styles.area} space-y-6`}>
       <ModuleHeader
+        artwork="notifications"
         eyebrow="Cuenta"
         title="Notificaciones"
         subtitle="Canales, preferencias y horas de silencio. Los plazos fatales no se apagan."

@@ -1,0 +1,181 @@
+{
+  "gptImagesGenerated": 12,
+  "gptImagesIntegrated": 12,
+  "gptImagesUploadedToFlow": 12,
+  "newFlowVideosGenerated": 0,
+  "newFlowVideosIntegrated": 0,
+  "uiViews": 48,
+  "uiSourceMatches": true,
+  "imagesLoaded": true,
+  "allRouteResponses200": true,
+  "overflow": [],
+  "javascriptErrors": [],
+  "imageChecks": [
+    {
+      "artwork": "writing",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "hearings",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "people",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "workflows",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "connections",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "notifications",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "settings",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "tasks",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "correspondence",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "academic",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "calendar",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "clients",
+      "size": [
+        720,
+        405
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "transparentCorners": true,
+      "hashMatches": true
+    }
+  ],
+  "affectedTypeScript": "passed (EditorialHeading dependency graph)",
+  "eslint": "passed (EditorialHeading)",
+  "globalTypeScript": "blocked by unrelated easy-oauth.ts missing modules and easy-oauth.integration.test.ts string/undefined errors",
+  "globalTypeScriptFiles": [
+    "src/lib/altazor/connectors/easy-oauth.ts",
+    "src/lib/altazor/connectors/easy-oauth.integration.test.ts"
+  ],
+  "scope": "Local isolated database with dummy data; browser checks use emulated desktop and mobile. No deployment.",
+  "existingAutoplayCasesPassed": 4,
+  "existingAutoplayVerification": "Three cases passed in the initial selected run; billing passed in a targeted rerun after a local navigation abort before media interaction."
+}

@@ -24,6 +24,9 @@ const CSRF_COOKIE = "lexopen_csrf";
 const PUBLIC_PATHS = [
   "/",
   "/login",
+  "/offline.html",
+  "/api/notify/whatsapp/webhook/meta",
+  "/api/notify/whatsapp/webhook/twilio",
   "/setup",
   "/recovery",
   "/api/auth/login",
@@ -177,7 +180,9 @@ function withSecurityHeaders(
     nonce,
     isDev: process.env.NODE_ENV === "development",
   });
-  res.headers.set("Content-Security-Policy", csp);
+  // The public offline document contains only external, same-origin modules.
+  // Its cached HTML cannot carry a per-request nonce.
+  res.headers.set("Content-Security-Policy", req.nextUrl.pathname === "/offline.html" ? csp.replace(/script-src [^;]+/, "script-src 'self'") : csp);
   res.headers.set("x-request-id", requestId);
   if (!req.cookies.get(CSRF_COOKIE)?.value) {
     res.cookies.set(CSRF_COOKIE, newEdgeCsrfToken(), {

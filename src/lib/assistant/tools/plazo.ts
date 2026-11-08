@@ -1,3 +1,4 @@
+import { requireDeadlineComputation, deadlineCalculation } from "@/lib/plazos-policy";
 import { secureTool } from "@/lib/assistant/secure-tool";
 import { z } from "zod";
 import { assistantDb as prisma } from "@/lib/assistant/transaction-context";
@@ -48,19 +49,17 @@ export const plazoCrearTool: AssistantTool<PlazoCrearInput> = secureTool({
   roles: [...STAFF_ROLES],
   inputSchema: plazoCrearSchema,
   preview(input) {
-    const fecha = resolveFechaLimite(input);
-    if (!fecha) return `Crear plazo "${input.titulo}" — indique fechaLimite o diasPlazo.`;
-    return `Crear plazo "${input.titulo}"${
-      input.esFatal ? " (FATAL)" : ""
-    } con vencimiento ${civilDateKey(fecha)}. Estimación interna LexOpen, no es cómputo oficial del tribunal.`;
+    return `Crear plazo "${input.titulo}". ${input.fechaLimite ? `Fecha indicada: ${input.fechaLimite}.` : "Se comprobará el país antes de estimar su fecha; revise el régimen del procedimiento."}`;
   },
   async execute(input, ctx) {
+    if (!input.fechaLimite || input.diasPlazo) await requireDeadlineComputation(prisma);
     const fechaLimite = resolveFechaLimite(input);
     if (!fechaLimite) {
       return { ok: false, message: "Indique fechaLimite o diasPlazo para calcular el vencimiento." };
     }
     const plazo = await prisma.plazo.create({
       data: {
+        ...(!input.fechaLimite ? deadlineCalculation : {}),
         titulo: input.titulo,
         descripcion: input.descripcion || null,
         fechaLimite,
@@ -146,20 +145,10 @@ export const plazoEstimarTool: AssistantTool<PlazoEstimarInput> = secureTool({
   roles: [...STAFF_ROLES],
   inputSchema: plazoEstimarSchema,
   preview(input) {
-    const estimate = formatPlazoEstimate({
-      desde: input.desde,
-      dias: input.dias,
-      tipoComputo: input.tipoComputo,
-    });
-    if ("error" in estimate) return `Estimar plazo: ${estimate.error}.`;
-    const tipo = input.tipoComputo || "habiles";
-    const pasos =
-      tipo === "habiles"
-        ? `Desde ${input.desde}, se cuentan ${input.dias} día(s) hábil(es) (lun–vie, sin feriados nacionales) sin contar el día de inicio.`
-        : `Desde ${input.desde}, se cuentan ${input.dias} día(s) corrido(s); si el vencimiento cae en fin de semana o feriado, se corre al día hábil siguiente.`;
-    return `${pasos} Resultado: vence el ${estimate.vencimiento} (${estimate.urgenciaLabel}). ⚠ Estimación interna LexOpen: no reemplaza el cómputo oficial del tribunal ni el criterio del abogado.`;
+    return `Estimar ${input.dias} día(s) desde ${input.desde}. El cálculo requiere Chile y revisión del régimen aplicable.`;
   },
   async execute(input) {
+    await requireDeadlineComputation(prisma);
     const estimate = formatPlazoEstimate({
       desde: input.desde,
       dias: input.dias,

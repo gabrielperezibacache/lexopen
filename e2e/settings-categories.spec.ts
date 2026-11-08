@@ -146,6 +146,8 @@ test("ajustes: cambiar de categoría y usar atrás/adelante conserva campos y me
   await page.locator("#estudio").getByRole("button", { name: "Guardar configuración", exact: true }).click();
   await expect(page.locator("#estudio").getByRole("status")).toContainText("No se pudo guardar");
   await nav.getByRole("link", { name: "Conexiones e IA", exact: true }).click();
+  await expect(page).toHaveURL(/#cuentas-conectadas$/);
+  await nav.getByRole("link", { name: "IA", exact: true }).click();
   await expect(page).toHaveURL(/#llm-settings$/);
   const key = page.getByTestId("llm-settings-form").locator('input[type="password"]').first();
   await key.fill("clave-ficticia-no-enviada");

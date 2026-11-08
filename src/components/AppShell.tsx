@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Menu, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { OfflineStatus } from "@/components/OfflineStatus";
 import { AppSidebar } from "@/components/AppSidebar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { StudioCredit } from "@/components/StudioCredit";
@@ -11,6 +12,7 @@ import { UpdateAvailableBanner } from "@/components/UpdateAvailableBanner";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { Breadcrumbs } from "@/components/shell/Breadcrumbs";
 import { CommandPalette, type CommandItem } from "@/components/ui/CommandPalette";
+import { EditorialInkFilter } from "@/components/ui/EditorialInkFilter";
 import type { SessionUserSummary } from "@/components/auth/UserSwitcher";
 import { activeNavigationArea, activeNavigationEntry, navigationEntries, type NavigationModel } from "@/lib/navigation/catalog";
 import "@/components/shell/shell.css";
@@ -52,6 +54,7 @@ export function AppShell({
   const pathname = usePathname();
   const shellRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+  const mobileTrigger = useRef<HTMLButtonElement>(null);
   const [menuPath, setMenuPath] = useState<string | null>(null);
   const mobileOpen = menuPath === pathname;
   const { t } = useI18n();
@@ -120,6 +123,7 @@ export function AppShell({
 
   return (
     <div ref={shellRef} className="app-shell flex min-h-screen w-full">
+      <EditorialInkFilter />
       <a href="#main-content" className="skip-link" inert={mobileOpen}>
         {t("common.skipToContent")}
       </a>
@@ -130,15 +134,17 @@ export function AppShell({
         onMobileOpenChange={setMobileOpen}
         collapsed={collapsed}
         onCollapsedChange={onCollapsedChange}
+        returnFocusRef={mobileTrigger}
       />
 
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col" inert={mobileOpen}>
+      <div className="shell-workspace flex min-h-screen min-w-0 flex-1 flex-col" inert={mobileOpen}>
         <header
           ref={headerRef}
           className="shell-header sticky top-0 z-20 flex items-center gap-2 px-3 py-2.5 md:gap-3 md:px-5"
           style={{ paddingTop: "max(0.625rem, env(safe-area-inset-top))" }}
         >
           <button
+            ref={mobileTrigger}
             type="button"
             className="grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] text-[var(--ink)] md:hidden"
             onClick={() => setMobileOpen(true)}
@@ -162,6 +168,7 @@ export function AppShell({
             <NotificationBell key={user?.id} />
           </div>
         </header>
+        {navigation.mode !== "portal" && <OfflineStatus />}
 
         <UpdateAvailableBanner
           enabled={showUpdateBanner}

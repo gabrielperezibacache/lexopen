@@ -11,6 +11,11 @@ export type ExplicitFileTask = {
   connector: string;
   action: "download_file";
   args: { repo: string; path: string; ref?: string; name?: string };
+} | {
+  kind: "dropbox";
+  connector: string;
+  action: "download_file";
+  args: { path: string; name?: string };
 };
 
 type Argument = { value: string; start: number; end: number };
@@ -63,11 +68,43 @@ function targetFiles(text: string) {
   return [...new Set(paths)];
 }
 
+/** Dropbox paths are literal account paths, not share URLs or inferred names.
+ * Quoted paths may contain spaces; an unquoted trailing punctuation mark is
+ * ambiguous and is never silently removed from the requested filename. */
+function explicitDropboxFile(text: string, ownerId: string, workspaceId: string, selected: readonly string[]): ExplicitFileTask | null {
+  if (/https?:\/\//i.test(text)) return null;
+  const matches = [...text.matchAll(/\b(?:archivo|file)\s+(?:(?:llamado|named)\s+)?(?:`([^`\r\n]+)`|"([^"\r\n]+)"|'([^'\r\n]+)'|(\/[^\s`"'<>]+))/gi)];
+  if (matches.length !== 1) return null;
+  const match = matches[0], path = match[1] ?? match[2] ?? match[3] ?? match[4];
+  const nextCharacter = text[match.index! + match[0].length];
+  if (match[4] && nextCharacter && !/\s/.test(nextCharacter)) return null;
+  if (!path.startsWith("/") || Buffer.byteLength(path, "utf8") > 1500 || Buffer.from(path, "utf8").toString("utf8") !== path || path !== path.trim() || /[\\%?#\u0000-\u001f\u007f]/.test(path) || path.slice(1).split("/").some(part => !part || part === "." || part === "..") || match[4] && /[.,;!]$/.test(path)) return null;
+  // Account for the complete syntax around the path. Otherwise an unquoted
+  // '/Docencia/Programa de teoría.pdf' could silently become '/Docencia/Programa'.
+  const before = text.slice(0, match.index).trim().replace(intent, "").trim();
+  const after = text.slice(match.index! + match[0].length).trim();
+  const service = /^(?:desde|de|del|en|from)\s+Dropbox\b/i;
+  let suffix: string;
+  if (/^(?:el|the)?$/i.test(before) && service.test(after)) suffix = after.replace(service, "").trim();
+  else if (service.test(before) && /^(?:el|the)?$/i.test(before.replace(service, "").trim())) suffix = after;
+  else return null;
+  if (match[4] && !/^[.,;!?]*$/.test(suffix)) return null;
+  if (!/^[.,;!?]*\s*(?:(?:y\s+|and\s+)?(?:verifica|comprueba|confirma|dime|indica|muestra|revisa|check|verify|show|tell)\b[^\r\n]*)?$/i.test(suffix)) return null;
+  const remainder = text.slice(0, match.index) + " ".repeat(match[0].length) + text.slice(match.index! + match[0].length);
+  if (!intent.test(remainder.trim()) || ambiguous.test(remainder) || !/\b(?:desde|de|del|en|from)\s+Dropbox\b/i.test(remainder) || [...remainder.matchAll(/\bdropbox\b/gi)].length !== 1 || /[\/\\]|\b(?:archivo|file|documento|document|github|google|onedrive|microsoft|repositorio|repository|rama|branch|ref|commit|nombre|named|guardar|save|como|as|formato|format|convierte|convert|borra|elimina|env[ií]a|comparte|delete|send|share)\b/i.test(remainder)) return null;
+  const connector = `altazor-dropbox-${digest(`${ownerId}:${workspaceId}`).slice(0, 16)}`;
+  if (!selected.includes(connector) || [...remainder.matchAll(/\baltazor-(?:google|github|dropbox|microsoft)-[a-f0-9]{16}\b/g)].some(alias => alias[0] !== connector)) return null;
+  const task: ExplicitFileTask = { kind: "dropbox", connector, action: "download_file", args: { path } };
+  try { assertEasyConnectorRead({ ...task, args: { action: task.action, ...task.args } }); } catch { return null; }
+  return task;
+}
+
 /** Prepare one exact, explicitly requested file download. This performs no I/O,
  * account lookup, approval or download; the caller must retain those controls.
  * The gateway's complete-file action retains its 4 MiB download limit. */
 export function prepareExplicitFileTask(text: string, ownerId: string, workspaceId: string, selected: readonly string[]): ExplicitFileTask | null {
   if (typeof text !== "string" || !text.trim() || text.length > 15_000 || /\u0000/.test(text) || !ownerId || !workspaceId || !Array.isArray(selected)) return null;
+  if (/\bdropbox\b/i.test(text) && /\b(?:archivo|file)\s+(?:(?:llamado|named)\s+)?(?:[`"']\/|\/)/i.test(text)) return explicitDropboxFile(text, ownerId, workspaceId, selected);
   const urls = [...text.matchAll(/https?:\/\/[^\s<>`"']+/gi)];
   if (urls.length > 1) return null;
   let semantic = text;

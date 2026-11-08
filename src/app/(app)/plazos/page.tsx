@@ -85,6 +85,7 @@ export default async function PlazosPage({ searchParams }: Props) {
   return (
     <div className="space-y-6">
       <PageHeader
+        artwork="deadlines"
         eyebrow={h.eyebrow}
         title={h.title}
         subtitle={h.subtitle}
@@ -172,7 +173,7 @@ export default async function PlazosPage({ searchParams }: Props) {
                 <p className="mt-2 text-sm text-[var(--muted)]">{p.descripcion}</p>
               )}
             </div>
-            <PlazoGoogleButton plazoId={p.id} />
+            <div className="flex flex-wrap items-center gap-2"><Link href={`/offline.html?kind=plazo&record=${p.id}`} className="btn btn-secondary">Sin conexión</Link><PlazoGoogleButton plazoId={p.id} /></div>
           </div>
         ))}
       </div>

@@ -1,0 +1,225 @@
+{
+  "results": [
+    {
+      "route": "tareas",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "tasks",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "tareas-light-desktop.png"
+    },
+    {
+      "route": "tareas",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "tasks",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "tareas-light-mobile.png"
+    },
+    {
+      "route": "tareas",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "tasks",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "tareas-dark-desktop.png"
+    },
+    {
+      "route": "tareas",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "tasks",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "tareas-dark-mobile.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "deadlines",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "plazos-light-desktop.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "deadlines",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "plazos-light-mobile.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "deadlines",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "plazos-dark-desktop.png"
+    },
+    {
+      "route": "plazos",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "deadlines",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "plazos-dark-mobile.png"
+    },
+    {
+      "route": "mensajes",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "mensajes-light-desktop.png"
+    },
+    {
+      "route": "mensajes",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "mensajes-light-mobile.png"
+    },
+    {
+      "route": "mensajes",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "mensajes-dark-desktop.png"
+    },
+    {
+      "route": "mensajes",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "mensajes-dark-mobile.png"
+    },
+    {
+      "route": "correo",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "correo-light-desktop.png"
+    },
+    {
+      "route": "correo",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "correo-light-mobile.png"
+    },
+    {
+      "route": "correo",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "correo-dark-desktop.png"
+    },
+    {
+      "route": "correo",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "correo-dark-mobile.png"
+    },
+    {
+      "route": "configuracion/correo",
+      "theme": "light",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "configuracion-correo-light-desktop.png"
+    },
+    {
+      "route": "configuracion/correo",
+      "theme": "light",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "configuracion-correo-light-mobile.png"
+    },
+    {
+      "route": "configuracion/correo",
+      "theme": "dark",
+      "device": "desktop",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "configuracion-correo-dark-desktop.png"
+    },
+    {
+      "route": "configuracion/correo",
+      "theme": "dark",
+      "device": "mobile",
+      "status": 200,
+      "artwork": "correspondence",
+      "imageLoaded": true,
+      "videoBeforeInteraction": 0,
+      "overflow": false,
+      "file": "configuracion-correo-dark-mobile.png"
+    }
+  ],
+  "errors": []
+}

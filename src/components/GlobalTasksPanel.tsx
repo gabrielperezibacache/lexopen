@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Plus } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { Dialog } from "@/components/ui/Dialog";
 import { apiMutation } from "@/lib/api-mutation";
+import { createSubmissionKeys } from "@/lib/client-submission-key";
 import { civilDateKey, formatCivilDate } from "@/lib/chile-time";
 import type { TaskWorkspaceFilters } from "@/lib/tasks/workspace";
 
@@ -71,6 +72,9 @@ function TaskEditor({ task, cases, sites, initialCaseId, currentUserId, onClose,
   const [eligibility, setEligibility] = useState<{ url: string; users: UserOption[]; assignOthers: boolean; error: string } | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [retryingSave, setRetryingSave] = useState(false);
+  const submission = useRef(createSubmissionKeys(undefined, `task-editor:${currentUserId}:${task?.id || "new"}`));
+  const pending = useRef<{ key: string; payload: Record<string, unknown> } | null>(null);
   const search = task ? new URLSearchParams({ taskId: task.id }) : new URLSearchParams({ causaId, siteId });
   const optionsUrl = `/api/tasks/assignees?${search}`;
   const result = eligibility?.url === optionsUrl ? eligibility : null;
@@ -98,30 +102,38 @@ function TaskEditor({ task, cases, sites, initialCaseId, currentUserId, onClose,
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
-    const fields = new FormData(event.currentTarget);
-    const text = (field: string) => String(fields.get(field) || "").trim();
-    const dueDate = text("dueDate");
-    const chosenAssignee = fields.get("assigneeId");
-    const data = {
-      title: text("title"), description: text("description") || null,
-      instructions: text("instructions") || null, considerations: text("considerations") || null,
-      priority: text("priority"), status: text("status"),
-      ...(!task || dueDate !== oldDate ? { dueDate: dueDate || null } : {}),
-      ...(chosenAssignee !== null ? { assigneeId: chosenAssignee || null } : {}),
-      ...(task ? { id: task.id, expectedUpdatedAt: task.updatedAt } : { causaId: causaId || null, siteId: siteId || null }),
-    };
+    if (!retryingSave || !pending.current) {
+      const fields = new FormData(event.currentTarget);
+      const text = (field: string) => String(fields.get(field) || "").trim();
+      const dueDate = text("dueDate");
+      const chosenAssignee = fields.get("assigneeId");
+      const data = {
+        title: text("title"), description: text("description") || null,
+        instructions: text("instructions") || null, considerations: text("considerations") || null,
+        priority: text("priority"), status: text("status"),
+        ...(!task || dueDate !== oldDate ? { dueDate: dueDate || null } : {}),
+        ...(chosenAssignee !== null ? { assigneeId: chosenAssignee || null } : {}),
+        ...(task ? { id: task.id, expectedUpdatedAt: task.updatedAt } : { causaId: causaId || null, siteId: siteId || null }),
+      };
+      pending.current = { key: submission.current.forPayload(data), payload: data };
+    }
+    const attempt = pending.current;
     setSaving(true);
     setError("");
-    const response = await apiMutation("/api/tasks", {
+    const response = await apiMutation<{ id?: string }>("/api/tasks", {
       method: task ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      headers: { "Content-Type": "application/json", "Idempotency-Key": attempt.key },
+      body: JSON.stringify(attempt.payload),
     });
     setSaving(false);
     if (!response.ok) {
-      setError(response.error);
+      const uncertain = retryingSave || response.status === 0 || response.status === 408 || response.status >= 500;
+      setRetryingSave(uncertain);
+      setError(uncertain ? "No se pudo confirmar la tarea. Reintente el guardado para comprobarlo sin duplicarla." : response.error);
       return;
     }
+    if (!response.data?.id) { setRetryingSave(true); setError("El servidor no confirmó la tarea. Reintente el guardado."); return; }
+    submission.current.complete(attempt.payload);
     onSaved(task ? "Tarea actualizada." : "Tarea creada.");
     router.refresh();
   }
@@ -131,75 +143,78 @@ function TaskEditor({ task, cases, sites, initialCaseId, currentUserId, onClose,
   return (
     <form onSubmit={save} className="space-y-5">
       {error && <p role="alert" className="text-sm text-[var(--danger)]">{error}</p>}
-      <label className="block space-y-2 text-sm font-medium">
-        <span>Título</span>
-        <input className="input" name="title" required maxLength={300} defaultValue={task?.title} />
-      </label>
-      <label className="block space-y-2 text-sm font-medium">
-        <span>Descripción</span>
-        <textarea className="textarea" name="description" rows={3} maxLength={20000} defaultValue={task?.description ?? ""} />
-      </label>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <fieldset disabled={saving || retryingSave} className="space-y-5">
+        <legend className="sr-only">Datos de la tarea</legend>
         <label className="block space-y-2 text-sm font-medium">
-          <span>Cómo hacerlo</span>
-          <textarea className="textarea" name="instructions" rows={3} maxLength={20000} defaultValue={task?.instructions ?? ""} />
+          <span>Título</span>
+          <input className="input" name="title" required maxLength={300} defaultValue={task?.title} />
         </label>
         <label className="block space-y-2 text-sm font-medium">
-          <span>Consideraciones</span>
-          <textarea className="textarea" name="considerations" rows={3} maxLength={20000} defaultValue={task?.considerations ?? ""} />
+          <span>Descripción</span>
+          <textarea className="textarea" name="description" rows={3} maxLength={20000} defaultValue={task?.description ?? ""} />
         </label>
-      </div>
-      {!task && (
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block space-y-2 text-sm font-medium">
-            <span>Causa</span>
-            <select className="select" value={causaId} onChange={event => { setCausaId(event.target.value); setSiteId(""); setAssignee(""); }}>
-              <option value="">Sin causa</option>
-              {cases.map(item => <option key={item.id} value={item.id}>{caseLabel(item)}</option>)}
+            <span>Cómo hacerlo</span>
+            <textarea className="textarea" name="instructions" rows={3} maxLength={20000} defaultValue={task?.instructions ?? ""} />
+          </label>
+          <label className="block space-y-2 text-sm font-medium">
+            <span>Consideraciones</span>
+            <textarea className="textarea" name="considerations" rows={3} maxLength={20000} defaultValue={task?.considerations ?? ""} />
+          </label>
+        </div>
+        {!task && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Causa</span>
+              <select className="select" value={causaId} onChange={event => { setCausaId(event.target.value); setSiteId(""); setAssignee(""); }}>
+                <option value="">Sin causa</option>
+                {cases.map(item => <option key={item.id} value={item.id}>{caseLabel(item)}</option>)}
+              </select>
+            </label>
+            <label className="block space-y-2 text-sm font-medium">
+              <span>Espacio</span>
+              <select className="select" value={siteId} onChange={event => { setSiteId(event.target.value); setAssignee(""); }}>
+                <option value="">Sin espacio</option>
+                {sites.filter(site => !causaId || !site.causaId || site.causaId === causaId).map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block space-y-2 text-sm font-medium">
+            <span>Responsable</span>
+            <select className="select" name="assigneeId" value={selected} disabled={!result || Boolean(result.error)} onChange={event => setAssignee(event.target.value)}>
+              <option value="" disabled={Boolean(task?.assignee && !result?.assignOthers)}>Sin asignar</option>
+              {task?.assignee && !allowed.some(person => person.id === task.assignee?.id) && (
+                <option value={task.assignee.id} disabled>{task.assignee.name} · actual</option>
+              )}
+              {allowed.map(person => <option key={person.id} value={person.id}>{person.id === currentUserId ? `${person.name} (yo)` : person.name}</option>)}
+            </select>
+            {!result && <span className="block text-xs text-[var(--muted)]" role="status">Consultando responsables…</span>}
+            {result?.error && <span className="block text-xs text-[var(--danger)]" role="alert">{result.error}</span>}
+          </label>
+          <label className="block space-y-2 text-sm font-medium">
+            <span>Fecha límite</span>
+            <input className="input" type="date" name="dueDate" defaultValue={oldDate} />
+          </label>
+          <label className="block space-y-2 text-sm font-medium">
+            <span>Prioridad</span>
+            <select className="select" name="priority" defaultValue={task?.priority || "medium"}>
+              {Object.entries(priorities).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
           <label className="block space-y-2 text-sm font-medium">
-            <span>Espacio</span>
-            <select className="select" value={siteId} onChange={event => { setSiteId(event.target.value); setAssignee(""); }}>
-              <option value="">Sin espacio</option>
-              {sites.filter(site => !causaId || !site.causaId || site.causaId === causaId).map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+            <span>Estado</span>
+            <select className="select" name="status" defaultValue={task?.status || "todo"}>
+              {Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
         </div>
-      )}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block space-y-2 text-sm font-medium">
-          <span>Responsable</span>
-          <select className="select" name="assigneeId" value={selected} disabled={!result || Boolean(result.error)} onChange={event => setAssignee(event.target.value)}>
-            <option value="" disabled={Boolean(task?.assignee && !result?.assignOthers)}>Sin asignar</option>
-            {task?.assignee && !allowed.some(person => person.id === task.assignee?.id) && (
-              <option value={task.assignee.id} disabled>{task.assignee.name} · actual</option>
-            )}
-            {allowed.map(person => <option key={person.id} value={person.id}>{person.id === currentUserId ? `${person.name} (yo)` : person.name}</option>)}
-          </select>
-          {!result && <span className="block text-xs text-[var(--muted)]" role="status">Consultando responsables…</span>}
-          {result?.error && <span className="block text-xs text-[var(--danger)]" role="alert">{result.error}</span>}
-        </label>
-        <label className="block space-y-2 text-sm font-medium">
-          <span>Fecha límite</span>
-          <input className="input" type="date" name="dueDate" defaultValue={oldDate} />
-        </label>
-        <label className="block space-y-2 text-sm font-medium">
-          <span>Prioridad</span>
-          <select className="select" name="priority" defaultValue={task?.priority || "medium"}>
-            {Object.entries(priorities).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </label>
-        <label className="block space-y-2 text-sm font-medium">
-          <span>Estado</span>
-          <select className="select" name="status" defaultValue={task?.status || "todo"}>
-            {Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </label>
-      </div>
+      </fieldset>
       <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--line)] pt-4">
         <button className="btn btn-ghost" type="button" onClick={onClose}>Cancelar</button>
-        <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? "Guardando…" : task ? "Guardar cambios" : "Crear tarea"}</button>
+        <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? "Guardando…" : retryingSave ? "Reintentar guardado" : task ? "Guardar cambios" : "Crear tarea"}</button>
       </div>
     </form>
   );
@@ -219,6 +234,7 @@ export function GlobalTasksPanel({ tasks, filters, causes, sites, users, current
   const [editor, setEditor] = useState<TaskWorkItem | "new" | null>(null);
   const [busyTask, setBusyTask] = useState<string | null>(null);
   const [feedback, setFeedback] = useState({ error: "", notice: "" });
+  const statusKeys = useRef(new Map<string, ReturnType<typeof createSubmissionKeys>>());
   const currentCase = causes.find(cause => cause.id === filters.prioritizedCausaId);
   const exportParams = taskParams({ ...filters, status: "pending" });
 
@@ -231,16 +247,20 @@ export function GlobalTasksPanel({ tasks, filters, causes, sites, users, current
     if (busyTask) return;
     setFeedback({ error: "", notice: "" });
     setBusyTask(task.id);
+    const payload = { id: task.id, status, expectedUpdatedAt: task.updatedAt };
+    if (!statusKeys.current.has(task.id)) statusKeys.current.set(task.id, createSubmissionKeys());
+    const submission = statusKeys.current.get(task.id)!;
     const response = await apiMutation("/api/tasks", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: task.id, status, expectedUpdatedAt: task.updatedAt }),
+      headers: { "Content-Type": "application/json", "Idempotency-Key": submission.forPayload(payload) },
+      body: JSON.stringify(payload),
     });
     setBusyTask(null);
     if (!response.ok) {
       setFeedback({ error: response.error, notice: "" });
       return;
     }
+    submission.complete(payload);
     setFeedback({ error: "", notice: status === "done" ? "Tarea marcada como hecha." : "Tarea reabierta." });
     router.refresh();
   }
@@ -360,6 +380,7 @@ export function GlobalTasksPanel({ tasks, filters, causes, sites, users, current
               {task.canEdit && (
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <button className="btn btn-ghost" type="button" onClick={() => setEditor(task)}>Editar</button>
+                  <a className="btn btn-ghost" href={`/offline.html?kind=task&record=${encodeURIComponent(task.id)}`} aria-label={`Trabajar sin conexión: ${task.title}`}>Sin conexión</a>
                   <button className="btn btn-ghost" type="button" disabled={busyTask !== null} onClick={() => void setStatus(task, task.status === "done" || task.status === "cancelled" ? "todo" : "done")}>
                     {busyTask === task.id ? "Guardando…" : task.status === "done" || task.status === "cancelled" ? "Reabrir" : "Marcar hecha"}
                   </button>

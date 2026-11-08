@@ -1,5 +1,7 @@
 # Desarrollo de LexOpen: trabajo conectado y MIDNIGHT editorial
 
+Estado posterior: consulte las [correcciones de auditoría del 7 de noviembre](CORRECCIONES-AUDITORIA-2026-11-07.md). Este plan conserva la planificación de su fecha; Novedades y los recorridos académicos ya están implementados.
+
 Fecha: 5 de noviembre de 2026. Este plan continúa la aplicación existente y prioriza preparar causas, audiencias y escritos con fuentes. La revisión de rutas está en [la auditoría de interfaz](AUDITORIA-INTERFAZ-2026-11-05.md); la dirección visual, en [las referencias y decisiones gráficas](REFERENCIAS-GRAFICAS-2026-11-05.md).
 
 ## Orden de implementación

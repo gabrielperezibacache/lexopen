@@ -30,6 +30,7 @@ export default async function NuevaMinutaPage({ params, searchParams }: Params) 
         {sp.desde === "minutas" ? "Volver a elegir causa" : "Volver a la causa"}
       </Link>
       <PageHeader
+        artwork="writing"
         title="Nueva minuta"
         subtitle="Completa el contexto y el resumen. Si quedaron compromisos, añádelos antes de guardar."
       />

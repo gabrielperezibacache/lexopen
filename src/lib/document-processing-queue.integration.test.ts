@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { PrismaClient } from "@prisma/client";
 import { createDocumentProcessor } from "./document-processing-queue";
 import { assertDisposableDatabaseUrl } from "./testing/disposable-db";
@@ -38,6 +39,19 @@ async function main() {
   let first=true; const broken=db.$extends({query:{documento:{async findFirst({args,query}){if(first){first=false;throw new Error('transient-database');}return query(args);}}}});
   const retryRecovery=createDocumentProcessor({client:broken as unknown as PrismaClient,documentIds:[],process:processText}); processors.push(retryRecovery);
   await assert.rejects(retryRecovery.recover(),/transient-database/); await retryRecovery.recover();
-  console.log('document-processing-queue.integration OK: 201, concurrent claim, stale lease, retry, CAS, recover after failure');
+  // Use the production processor on a real mixed PDF and persist per-page results.
+  const pdf=await doc({nombre:`${prefix}.pdf`,storageKey:'fictitious/mixed.pdf'});
+  const bytes=await readFile(new URL('./evidence/pdf-fixtures/mixed-three-pages.pdf',import.meta.url));
+  const pdfWorker=createDocumentProcessor({client:db,documentIds:[pdf.id],read:async()=>bytes}); processors.push(pdfWorker);
+  await pdfWorker.recover();
+  const prepared=await db.documento.findUniqueOrThrow({where:{id:pdf.id}});
+  assert.equal(prepared.extractionStatus,'completed');
+  assert.equal(prepared.extractionLockToken,null);
+  assert.deepEqual(prepared.extractedMarkdown?.match(/^## Página \d+$/gm),['## Página 1','## Página 2']);
+  const metadata=JSON.parse(prepared.extractionJson!);
+  assert.equal(metadata.partial,false);
+  assert.deepEqual(metadata.ocrPagesProcessed,[1]);
+  assert.deepEqual(metadata.pages.map((page:{pageNumber:number;status:string})=>[page.pageNumber,page.status]),[[1,'completed'],[2,'completed'],[3,'empty']]);
+  console.log('document-processing-queue.integration OK: 201, concurrent claim, stale lease, retry, CAS, recovery and real mixed PDF persistence');
 }
 main().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{processors.forEach(p=>p.stop());await db.documento.deleteMany({where:{id:{in:ids}}});await db.$disconnect();});

@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { writeAuditStrict } from "@/lib/audit";
+import { writingTransaction } from "./access";
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
@@ -25,7 +28,7 @@ function markdownProse(body: string, registered: Set<string>) {
 export function renderCaseWriting(draft: WritingDraftView, cause: { id: string; titulo: string; rit: string | null }, format: "markdown" | "text", generatedAt = new Date().toISOString()) {
   const registered = new Set(draft.references.map(ref => ref.id));
   if ([...draft.body.matchAll(/\[\^(R[1-9][0-9]*)\]/g)].some(match => !registered.has(match[1]))) throw Object.assign(httpError("Hay marcadores de cita sin una fuente incorporada; corríjalos antes de exportar", 409), { code: "writing_invalid_references" });
-  const scope = ["Borrador de trabajo para revisión profesional.", "El texto de autor y las notas personales no se certifican mediante el cotejo de sus referencias.", "Los enlaces relativos se abren dentro de LexOpen y requieren acceso actual.", ...draft.warnings];
+  const scope = [draft.review?.current && draft.review.decision === "approved" ? `Versión aprobada por ${draft.review.reviewerName} el ${draft.review.createdAt}.` : "Borrador de trabajo para revisión profesional.", "El texto de autor y las notas personales no se certifican mediante el cotejo de sus referencias.", "Los enlaces relativos se abren dentro de LexOpen y requieren acceso actual.", ...draft.warnings];
   const identity = `${cause.titulo}${cause.rit ? ` · RIT ${cause.rit}` : ""} · Causa ${cause.id}`;
   if (format === "text") {
     return `${draft.title}\n${identity}\nVersión ${draft.revision} · Generado ${generatedAt}\n\n${draft.body}\n\nREFERENCIAS INCORPORADAS\n\n${draft.references.length ? draft.references.map(ref => {
@@ -50,11 +53,27 @@ export function renderCaseWriting(draft: WritingDraftView, cause: { id: string; 
   }).join("\n\n");
   return `# ${md(draft.title)}\n\n${md(identity)}\n\nVersión ${draft.revision} · Generado ${generatedAt}\n\n${markdownProse(draft.body, registered)}\n\n## Referencias incorporadas\n\n${footnotes || "Este escrito no incorpora referencias corroboradas."}\n\n## Alcance\n\n${[...new Set(scope)].map(md).join("\n\n")}\n`;
 }
-export async function exportCaseWriting(causaId: string, id: string, format: "markdown" | "text", user: CausaAccessUser, client: PrismaClient = prisma) {
-  const { draft, caseIdentity } = await readCaseWritingForExport(causaId, id, user, client);
-  return { content: renderCaseWriting(draft, caseIdentity, format), filename: `escrito-${draft.id}-v${draft.revision}.${format === "markdown" ? "md" : "txt"}`, contentType: format === "markdown" ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8" };
+export type WritingExportOptions = { purpose?: "draft" | "approved"; expectedRevision?: number };
+async function generateExport(causaId: string, id: string, format: "markdown" | "text" | "docx", user: CausaAccessUser, client: PrismaClient, options: WritingExportOptions) {
+  return writingTransaction(client, async tx => {
+    const { draft, caseIdentity } = await readCaseWritingForExport(causaId, id, user, tx);
+    if (options.expectedRevision !== undefined && options.expectedRevision !== draft.revision) throw httpError("El escrito cambió. Revise la versión actual antes de exportar", 409);
+    const purpose = options.purpose || "draft";
+    if (purpose === "approved" && !draft.canReview) throw httpError("No tiene permiso para aprobar o liberar escritos", 403);
+    if (purpose === "approved" && (!draft.review?.current || draft.review.decision !== "approved")) throw httpError("Esta versión no tiene una aprobación vigente", 409);
+    const rendered = { ...draft, review: purpose === "approved" ? draft.review : null };
+    const content = format === "docx" ? renderCaseWritingDocx(rendered, caseIdentity) : renderCaseWriting(rendered, caseIdentity, format);
+    const bytes = typeof content === "string" ? Buffer.from(content) : content;
+    const receipt = await tx.caseWritingExport.create({ data: { draftId: id, revision: draft.revision, actorId: user.id, reviewId: purpose === "approved" ? draft.review!.id : null, format, purpose, contentSha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.length } });
+    await writeAuditStrict({ actorId: user.id, action: "case.writing.export", entityType: "CaseWritingDraft", entityId: id, after: { causaId, revision: draft.revision, receiptId: receipt.id, reviewId: receipt.reviewId, format, purpose, contentSha256: receipt.contentSha256, bytes: receipt.bytes } }, tx);
+    return { content, receiptId: receipt.id, filename: `escrito-${draft.id}-v${draft.revision}.${format === "markdown" ? "md" : format === "docx" ? "docx" : "txt"}`, contentType: format === "docx" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : format === "markdown" ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8" };
+  });
 }
-export async function exportCaseWritingDocx(causaId: string, id: string, user: CausaAccessUser, client: PrismaClient = prisma) {
-  const { draft, caseIdentity } = await readCaseWritingForExport(causaId, id, user, client);
-  return { content: renderCaseWritingDocx(draft, caseIdentity), filename: `escrito-${draft.id}-v${draft.revision}.docx`, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+export async function exportCaseWriting(causaId: string, id: string, format: "markdown" | "text", user: CausaAccessUser, client: PrismaClient = prisma, options: WritingExportOptions = {}) {
+  const output = await generateExport(causaId, id, format, user, client, options);
+  return { ...output, content: output.content as string };
+}
+export async function exportCaseWritingDocx(causaId: string, id: string, user: CausaAccessUser, client: PrismaClient = prisma, options: WritingExportOptions = {}) {
+  const output = await generateExport(causaId, id, "docx", user, client, options);
+  return { ...output, content: output.content as Buffer };
 }

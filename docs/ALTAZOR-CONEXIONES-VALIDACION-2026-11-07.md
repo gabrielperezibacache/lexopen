@@ -44,11 +44,21 @@ El código admite clientes públicos con PKCE y permisos delimitados de lectura,
 
 Se validaron el ingreso, el retorno al navegador original, el guardado y la renovación mediante cuentas ficticias. El motor de escritorio también comprobó los límites de descarga, las redirecciones y las huellas de archivos de prueba.
 
-**Falta preparar sus identidades públicas y validar las cuentas reales.** La cuenta de Dropbox pudo entrar a su consola, pero el registro de la aplicación quedó sin crear porque no se completó la aceptación de sus condiciones. Microsoft no tiene todavía un registro preparado. Por eso se muestra «Servicio en preparación» en lugar de pedir al profesional datos técnicos o afirmar que ya está conectado.
+El titular creó el registro de Dropbox y confirmó su consentimiento de lectura. Se guardaron el identificador público, PKCE sin secreto y el retorno local, con únicamente `account_info.read`, `files.metadata.read` y `files.content.read`. La aplicación de Dropbox permanece en Desarrollo; todavía no está habilitada para una distribución pública general.
+
+La primera autorización real detectó un defecto: el motor rechazaba importar una cuenta cuyo alias aún no existía. El motor `.12` crea el alias y sus credenciales en una sola escritura; renovar una cuenta retirada sigue sin recrearla. La corrección se instaló localmente tras sus pruebas. El intento fallido quedó revisado sin reenviarlo, y Drive y GitHub conservaron su configuración. **Falta repetir el ingreso de Dropbox con la corrección para confirmar el guardado real de la cuenta.** Microsoft aún no tiene una identidad de aplicación registrada ni una conexión real comprobada.
+
+La descarga determinista de Dropbox admite una ruta explícita, por ejemplo `Descarga el archivo "/Docencia/Curso.pdf" de Dropbox`. Conserva el origen y contrasta bytes, huella y páginas dentro del escritorio. Sus pruebas usan un PDF ficticio de tres páginas; todavía no acreditan una descarga con la cuenta real de Dropbox. Las rutas ambiguas no se recortan para elegir silenciosamente otro archivo.
+
+## Autorizaciones del computador
+
+Configuración reúne **Supervisar cada acción**, **Consultas inteligentes** y **Trabajo autónomo**, con categorías separadas para entrada, navegación y aplicaciones. Cambiar de modo no activa categorías. Los permisos se vinculan al usuario, espacio y sesión; el escritorio confirma la revisión aplicada antes de trabajar. El [alcance de cada modo](ALTAZOR-AUTORIZACIONES-ESCRITORIO.md) detalla los límites del control gráfico y los resultados inciertos.
+
+Se probó una sesión real sin cuentas conectadas: el modelo local solicitó mover el puntero a una coordenada concreta, la interfaz presentó la acción y el motor confirmó una única ejecución tras aprobarla. La política aplicada fue supervisada, sin categorías autónomas. La sesión terminó sin consultas pendientes y se cerró expresamente. Esto comprueba el circuito de autorización; no acredita que el modelo consiga cualquier objetivo ni que comprenda el efecto de cada clic.
 
 ## Alcance de las comprobaciones
 
-El motor de escritorio superó 98 pruebas con detección de concurrencia, sin omisiones. La aplicación superó TypeScript, ESLint, las pruebas de recibos y políticas, las integraciones con PostgreSQL desechable y los recorridos de navegador de conexiones, recuperación y vistas móviles. Las pruebas automáticas usan proveedores y cuentas ficticios; las dos descargas de la tabla sí se realizaron con los conectores reales.
+La primera ronda del motor superó 98 pruebas con detección de concurrencia; la ronda `.12` superó 134, sin fallos ni omisiones. Son rondas sucesivas, no cantidades acumulables. La aplicación superó TypeScript, ESLint, las pruebas de recibos y políticas, las integraciones con PostgreSQL desechable y los recorridos de navegador de conexiones, recuperación y vistas móviles. Las pruebas automáticas usan proveedores y cuentas ficticios; las dos descargas de la tabla y la autorización del movimiento sí se comprobaron en el entorno real.
 
 El paquete autónomo conserva las dependencias anidadas de Next y materializa únicamente los enlaces a sus siete paquetes públicos registrados, excluyendo archivos de entorno. La actualización local comprueba el manifiesto, conserva cuenta y configuración y prepara la restauración de la versión anterior.
 

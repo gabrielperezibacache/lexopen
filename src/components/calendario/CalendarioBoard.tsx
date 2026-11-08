@@ -1,9 +1,11 @@
 "use client";
 
-import { DragEvent, useState } from "react";
+import { DragEvent, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiMutation } from "@/lib/api-mutation";
+import { createSubmissionKeys } from "@/lib/client-submission-key";
+import { moveEventToDay } from "@/lib/calendario/form-dates";
 import { clasificarUrgencia } from "@/lib/plazos";
 
 export type BoardEvento = {
@@ -13,6 +15,8 @@ export type BoardEvento = {
   inicio: string;
   causaId: string | null;
   teachingHref?: string;
+  todoElDia?: boolean;
+  updatedAt?: string;
 };
 
 export type BoardPlazo = {
@@ -43,14 +47,6 @@ export type BoardDay = {
   ev: BoardEvento[];
 };
 
-function moveInicioToYmd(isoInicio: string, ymd: string): string {
-  const original = new Date(isoInicio);
-  const [y, m, d] = ymd.split("-").map(Number);
-  const moved = new Date(original);
-  moved.setFullYear(y, m - 1, d);
-  return moved.toISOString();
-}
-
 /** Rejilla mes/semana con drag-and-drop de eventos a otro día. */
 export function CalendarioBoard({
   mode,
@@ -65,6 +61,7 @@ export function CalendarioBoard({
   weekLabels: string[];
 }) {
   const router = useRouter();
+  const submission = useRef(createSubmissionKeys());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [dragOverYmd, setDragOverYmd] = useState<string | null>(null);
@@ -72,7 +69,7 @@ export function CalendarioBoard({
   function onDragStart(e: DragEvent, evento: BoardEvento) {
     e.dataTransfer.setData(
       "application/x-lexopen-evento",
-      JSON.stringify({ id: evento.id, inicio: evento.inicio })
+      JSON.stringify({ id: evento.id, inicio: evento.inicio, todoElDia: evento.todoElDia, updatedAt: evento.updatedAt })
     );
     e.dataTransfer.effectAllowed = "move";
   }
@@ -94,24 +91,29 @@ export function CalendarioBoard({
     if (!ymd) return;
     const raw = e.dataTransfer.getData("application/x-lexopen-evento");
     if (!raw) return;
-    let payload: { id: string; inicio: string };
+    let payload: { id: string; inicio: string; todoElDia?: boolean; updatedAt?: string };
     try {
       payload = JSON.parse(raw);
     } catch {
       return;
     }
+    if (!payload || typeof payload.id !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(payload.id) || typeof payload.inicio !== "string") return;
+    const inicio = moveEventToDay(payload.inicio, ymd, payload.todoElDia === true);
+    if (!inicio) { setError("Revise el día y la hora del evento"); return; }
+    const body = { inicio, expectedUpdatedAt: payload.updatedAt };
     setBusyId(payload.id);
     setError("");
     const result = await apiMutation(`/api/eventos/${payload.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inicio: moveInicioToYmd(payload.inicio, ymd) }),
+      headers: { "Content-Type": "application/json", "Idempotency-Key": submission.current.forPayload({ id: payload.id, ...body }) },
+      body: JSON.stringify(body),
     });
     setBusyId(null);
     if (!result.ok) {
       setError(result.error || "No se pudo mover el evento");
       return;
     }
+    submission.current.complete({ id: payload.id, ...body });
     router.refresh();
   }
 

@@ -1,0 +1,38 @@
+[
+  {
+    "file": "public/editorial/generated/expedientes-flow-v2-poster.webp",
+    "source": "public/editorial/generated/expedientes-flow-v2.mp4",
+    "processing": "First-frame extraction only; no generative changes. Theme compositing is CSS.",
+    "width": 640,
+    "height": 360,
+    "bytes": 27528,
+    "sha256": "7b6e0b69d7d3b4064fdef1845c73bf21c1c9a66315d17f642bd0481b50f3a5b8"
+  },
+  {
+    "file": "public/editorial/generated/libro-contable-flow-v1-poster.webp",
+    "source": "public/editorial/generated/libro-contable-flow-v1.mp4",
+    "processing": "First-frame extraction only; no generative changes. Theme compositing is CSS.",
+    "width": 640,
+    "height": 360,
+    "bytes": 75936,
+    "sha256": "83fe68359ad001fb0016e5c3062187611972912cbcae28424d30045288b66f03"
+  },
+  {
+    "file": "public/editorial/generated/plazos-flow-v1-poster.webp",
+    "source": "public/editorial/generated/plazos-flow-v1.mp4",
+    "processing": "First-frame extraction only; no generative changes. Theme compositing is CSS.",
+    "width": 640,
+    "height": 360,
+    "bytes": 23894,
+    "sha256": "64be31dad56e174980e3f05bc3162d1ebea975063fc8fc3d305d61099d7207ac"
+  },
+  {
+    "file": "public/editorial/generated/investigacion-motion-flow-v1-poster.webp",
+    "source": "public/editorial/generated/investigacion-motion-flow-v1.mp4",
+    "processing": "First-frame extraction only; no generative changes. Theme compositing is CSS.",
+    "width": 640,
+    "height": 360,
+    "bytes": 29788,
+    "sha256": "515b6fdab0e4a08e7fe1a1a5fa74101128e3f4edcf0e4dae0ca71038d629b918"
+  }
+]

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { loginAs } from "./helpers";
+import { CONNECTOR_CATALOG } from "../src/lib/altazor/connectors/catalog";
 
 // UI navigation and a proposed plan only. All assistant/workspace responses are
 // synthetic; no real model, account, desktop or approved operation is used.
@@ -59,4 +60,60 @@ test("volver de Aplicaciones y del escritorio conserva el contexto y deja visibl
   expect(prepares).toHaveLength(1); expect(prepares[0]).toMatchObject({ causaId: causeId, documentoId: documentId });
   expect(sends).toHaveLength(1); expect(sends[0]).toMatchObject({ text: message, documentoId: documentId });
   expect(desktopWrites).toEqual([]);
+});
+
+test("Aplicaciones explícitas conserva Dropbox y el retorno OAuth al restaurar una conversación guardada", async ({ page }) => {
+  test.setTimeout(45_000);
+  const conversationId = "pane-saved-active-fixture", workspaceId = "pane-saved-workspace";
+  const conversation = { id: conversationId, title: "Conversación personal guardada", causaId: null, scopeKey: "personal", revision: 3, status: "active" };
+  const destination = { provider: "synthetic", model: "fixture", endpoint: "http://127.0.0.1:18999", endpointHash: "fixture", remote: false, permitted: true, key: "pane-fixture-destination" };
+  const saved = { activeConversationId: conversationId, selectionUnavailable: false, memoryEnabled: true, backgroundEnabled: true, revision: 4 };
+  const data = { conversation, turns: [], attachments: [], destination, hasMore: false, beforeOrdinal: null };
+  let armed = false, resources = 0, details = 0, accountReads = 0;
+  let releaseBootstrap!: () => void, releaseResources!: () => void, releaseDetails!: () => void;
+  const bootstrap = new Promise<void>(resolve => { releaseBootstrap = resolve; });
+  const synchronization = new Promise<void>(resolve => { releaseResources = resolve; });
+  const savedDetails = new Promise<void>(resolve => { releaseDetails = resolve; });
+  const writes: string[] = [];
+  await page.context().route("**/*", route => { const url = new URL(route.request().url()); return ["http:", "https:"].includes(url.protocol) && !["localhost", "127.0.0.1"].includes(url.hostname) ? route.abort() : route.continue(); });
+  await page.route(/\/api\/altazor\/resources(?:\?.*)?$/, async route => {
+    if (armed) { resources++; await (resources === 1 ? bootstrap : synchronization); }
+    await route.fulfill({ json: { causas: [] } });
+  });
+  await page.route("**/api/altazor/companion", async route => { if (armed) await bootstrap; await route.fulfill({ json: saved }); });
+  await page.route(/\/api\/altazor\/conversations(?:\?.*)?$/, async route => { if (armed) await bootstrap; await route.fulfill({ json: { conversations: [conversation], destination } }); });
+  await page.route(`**/api/altazor/conversations/${conversationId}`, async route => { details++; if (armed) await savedDetails; await route.fulfill({ json: data }); });
+  await page.route("**/api/altazor/timeline*", route => route.fulfill({ json: { turns: [], before: null } }));
+  await page.route("**/api/altazor/updates*", route => route.fulfill({ json: { updates: [] } }));
+  await page.route("**/api/altazor/computer/activity*", route => route.fulfill({ json: { state: "idle", sessionId: null, monitor: false } }));
+  await page.route(/\/api\/altazor\/computer(?:\?.*)?$/, route => route.fulfill({ json: { computer: { enabled: true, configured: true, policyAllowed: true, canConfigure: false, state: "configured", workspaceId, provider: "synthetic", version: "synthetic", runtime: "container", lastVerifiedAt: null, reason: null, sessions: [] } } }));
+  const dropbox = { ...CONNECTOR_CATALOG.find(entry => entry.id === "dropbox")!, available: true, oauthReady: true };
+  await page.route("**/api/altazor/connectors?*", route => route.fulfill({ json: { connectors: { catalog: [dropbox], connections: [], gateReady: true, persistentOAuthReady: true, cloudFileOAuthReady: true, version: "synthetic" } } }));
+  await page.route("**/api/altazor/connectors/oauth?*", route => { accountReads++; return route.fulfill({ json: { workspaceId, causaId: null, canAdmin: false, requiresStop: false, providers: [{ provider: "dropbox", label: "Dropbox", available: true, reason: null, scopes: ["account_info.read", "files.metadata.read", "files.content.read"], grantedScopes: ["account_info.read", "files.metadata.read", "files.content.read"], canReadFiles: true, autoRefresh: true, persistent: true, connectionName: "altazor-dropbox-0123456789abcdef", state: "connected", connected: true, tested: true, hasStoredConnection: true, canDisconnect: true, expiresAt: null, lastVerifiedAt: "2030-05-06T17:00:00Z" }], attempt: { id: "pane-saved-oauth-attempt", provider: "dropbox", state: "completed", reason: null } } }); });
+  page.on("request", request => { if (request.url().includes("/api/altazor/") && request.method() !== "GET") writes.push(request.url()); });
+  try {
+    await loginAs(page, "abogado@estudio.cl");
+    await expect.poll(() => details).toBeGreaterThan(0);
+    await page.clock.install(); armed = true;
+    const explicit = "/inicio?altazor=connectors&connector=dropbox&oauthAttempt=pane-saved-oauth-attempt&oauthProvider=dropbox&oauth=connected&keep=pane-saved-fixture";
+    await page.goto(explicit); await expect.poll(() => resources).toBeGreaterThan(0);
+    releaseBootstrap();
+    const applications = page.getByRole("heading", { name: "Aplicaciones", exact: true });
+    await expect(applications).toBeVisible();
+    releaseDetails(); releaseResources();
+    const account = page.getByTestId("easy-connector-oauth"); await expect(account.getByRole("heading", { name: "Dropbox conectado", exact: true })).toBeVisible();
+    const assertExplicit = async () => {
+      await expect(applications).toBeVisible();
+      const url = new URL(page.url());
+      for (const [key, value] of new URLSearchParams(explicit.split("?")[1])) expect(url.searchParams.get(key)).toBe(value);
+      expect(url.searchParams.has("conversacion")).toBe(false);
+    };
+    await assertExplicit();
+    const beforePoll = details; await page.clock.fastForward(16_000); await expect.poll(() => details).toBeGreaterThan(beforePoll);
+    const beforeFocus = accountReads;
+    await page.evaluate(() => { window.dispatchEvent(new Event("focus")); document.dispatchEvent(new Event("visibilitychange")); });
+    await expect.poll(() => accountReads).toBeGreaterThan(beforeFocus); await assertExplicit();
+    await page.reload(); await expect(account.getByRole("heading", { name: "Dropbox conectado", exact: true })).toBeVisible(); await assertExplicit();
+    expect(writes).toEqual([]);
+  } finally { releaseBootstrap(); releaseResources(); releaseDetails(); }
 });

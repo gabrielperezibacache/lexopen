@@ -1,0 +1,7 @@
+{
+  "viewport": 820,
+  "before": 867,
+  "after": 820,
+  "fix": "position: relative on the existing table scroller",
+  "passed": true
+}

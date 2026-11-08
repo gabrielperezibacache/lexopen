@@ -1,3 +1,4 @@
+import { getWorkCountry } from "@/lib/config/work-country";
 /**
  * Orquestación del turno del asistente: normalize → classify → resolve
  * entidades → plan ordenado → (confirmación humana en escrituras) → execute.
@@ -254,7 +255,7 @@ export async function runAssistantTurn(
   const streamEvents: AssistantStreamEvent[] = [];
   streamEvents.push({ type: "status", message: "Analizando su solicitud…" });
 
-  const normalized = normalizeAssistantInput(input.text, input.now);
+  const normalized = normalizeAssistantInput(input.text, input.now, await getWorkCountry());
   const policy = await getAssistantFirmPolicy();
   const classification = await classifyIntents(normalized, {
     userId: input.user.id,
@@ -322,7 +323,7 @@ export async function runAssistantTurn(
     if (!parsed.success) {
       streamEvents.push({
         type: "status",
-        message: `No se pudo preparar "${intent.toolId}": ${parsed.error.errors
+        message: `No se pudo preparar "${intent.toolId}": ${parsed.error.issues
           .map((e) => e.message)
           .join("; ")}`,
       });

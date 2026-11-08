@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "date": "2026-11-07",
+  "provider": "Google Flow",
+  "project": "https://flow.google.com/project/b25bcbf2-49db-4eff-90e4-98740b2e7e79",
+  "image": {
+    "model": "Nano Banana 2.1",
+    "assetId": "9647711b-0d6c-43fe-b1f5-b587afc5d475",
+    "original": "docs/estetica-editorial-2026-11-07/media-sources/flow-expedientes-base-v2.jpg",
+    "file": "public/editorial/generated/expedientes-v2.webp",
+    "dimensions": [
+      720,
+      402
+    ],
+    "transparent": false,
+    "prompt": "Create a refined editorial spot illustration for LexOpen, a legal work application. A real documentary case folder lying OPEN on a flat surface, viewed from a fixed three-quarter angle, with a small orderly stack of three loose paper folios inside and a simple restrained metal paper fastener on the LEFT spine. Thin rigid archival grey-blue cardboard cover, straight clean structural edges, papers clearly separate from the cover. No book binding, no decorative ribbon, no bow, no gift packaging. Fine nineteenth-century silver steel engraving and precise crosshatching, cool silver white #f4f3f7, indigo ink #313958, one restrained iris #aab5ff tab. Entire folder and every paper edge fully visible, compact horizontal silhouette occupying only the middle 65 percent of a 16:9 image. At least 15 percent empty safe margin on all sides, nothing cropped. Perfectly plain uniform deep indigo #0d1022 background, no horizon, no scene, no smoke, no surrounding glow, no dramatic shadows. Paper contains only subtle non-readable engraved ruling: absolutely no letters, numbers, writing, labels, text or logos. Elegant, restrained, professional legal publisher engraving, clean and readable at small size."
+  },
+  "video": {
+    "model": "Veo 3.1 - Fast",
+    "assetId": "e8846c67-37fd-4228-9105-c6176dc1a933",
+    "original": "docs/estetica-editorial-2026-11-07/media-sources/flow-expedientes-v2-original.mp4",
+    "file": "public/editorial/generated/expedientes-flow-v2.mp4",
+    "startFrameAssetId": "9647711b-0d6c-43fe-b1f5-b587afc5d475",
+    "endFrameAssetId": "9647711b-0d6c-43fe-b1f5-b587afc5d475",
+    "prompt": "A restrained eight-second editorial animation of this exact OPEN archival case folder. Use the supplied first and last images exactly. The rigid grey-blue cardboard cover, metal fastener, binding, perspective, object position, silhouette and background stay absolutely FIXED for every frame. The folder is NOT a book and its cover must NEVER bend, peel, open further or turn into paper. Only the free OUTER RIGHT CORNER of the TOP PAPER FOLIO makes one small believable lift of a few millimeters, then gently settles flat on the stack. The paper remains attached at the left fastener. No sheet turns over, no full page flip, no curling the entire paper, no floating loose sheets. Hold the first two seconds still, one very small paper-corner movement in the middle, then hold the final two seconds completely still. Locked-off camera: no zoom, pan, orbit or reframing. Keep the WHOLE folder and every edge inside the frame with the generous existing margins throughout. Preserve the original silver steel-engraving crosshatching and straight ruled lines. Uniform unchanged indigo backdrop, no new objects, hands, text, numbers, logos, sparkles, light sweeps, smoke or glow. Silent, no music or sound effects. Understated and precise, suitable for a professional legal application."
+  },
+  "review": {
+    "sampledFrames": 16,
+    "contactSheet": "docs/estetica-editorial-2026-11-07/media-sources/flow-expedientes-v2-contact.png",
+    "observed": "Open folder remains rigid and entirely visible; one folio lifts and settles. The generated lift is broader than the millimeter motion requested in the prompt. The old cover-peeling effect and bow are absent."
+  }
+}

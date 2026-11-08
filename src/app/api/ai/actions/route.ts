@@ -28,7 +28,7 @@ const postSchema = z.object({
   clienteId: z.string().optional().nullable(),
   documentoId: z.string().optional().nullable(),
   siteId: z.string().optional().nullable(),
-  extra: z.record(z.unknown()).optional(),
+  extra: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function GET() {

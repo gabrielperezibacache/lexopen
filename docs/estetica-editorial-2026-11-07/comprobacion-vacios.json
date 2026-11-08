@@ -1,0 +1,26 @@
+[
+  {
+    "theme": "light",
+    "device": "desktop",
+    "visible": true,
+    "overflow": false
+  },
+  {
+    "theme": "light",
+    "device": "mobile",
+    "visible": true,
+    "overflow": false
+  },
+  {
+    "theme": "dark",
+    "device": "desktop",
+    "visible": true,
+    "overflow": false
+  },
+  {
+    "theme": "dark",
+    "device": "mobile",
+    "visible": true,
+    "overflow": false
+  }
+]

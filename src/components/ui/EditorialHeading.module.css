@@ -1,33 +1,51 @@
 .heading {
-  display: flex;
+  --editorial-media-width: clamp(8.5rem, 13vw, 10.5rem);
+  --editorial-media-height: calc(var(--editorial-media-width) * .5625);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--editorial-media-width);
   align-items: center;
   gap: clamp(.75rem, 2.25vw, 1.75rem);
+  flex: 1 1 22rem;
+  inline-size: 100%;
   min-inline-size: 0;
 }
 
 .copy { min-inline-size: 0; }
 
-.engraving,
-.folio {
-  flex: none;
-  inline-size: clamp(4rem, 11vw, 9rem);
-  block-size: auto;
+.artwork {
+  position: relative;
+  inline-size: var(--editorial-media-width);
+  aspect-ratio: 16 / 9;
+  justify-self: end;
+}
+.artwork[data-editorial-static] { overflow: clip; }
+:global(html.dark) .artwork { opacity: .9; }
+
+.engraving {
+  position: absolute;
+  inset: 0;
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+  transform: scale(var(--engraving-scale, 1)) translate(var(--engraving-x, 0%), var(--engraving-y, 0%));
 }
 
-@media (min-width: 701px) {
-  .heading { flex: 1 1 22rem; }
-}
-
-.folio {
-  inline-size: clamp(2.5rem, 7vw, 4.5rem);
-  color: var(--sea);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .engraving { animation: settle-engraving 380ms cubic-bezier(.2, .72, .25, 1) both; }
-}
-
-@keyframes settle-engraving {
-  from { opacity: .7; transform: translateY(.25rem); }
-  to { opacity: 1; transform: translateY(0); }
+@media (max-width: 767px) {
+  .heading {
+    --editorial-media-width: clamp(5.25rem, 24vw, 6.25rem);
+    display: block;
+    flex-basis: 100%;
+  }
+  .artwork {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+  }
+  .copy :where(h1) {
+    min-block-size: var(--editorial-media-height);
+    padding-inline-end: calc(var(--editorial-media-width) + var(--space-4));
+  }
+  .heading[data-editorial-context="site"] .artwork { inset-block-start: 3.25rem; }
 }

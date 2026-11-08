@@ -3,8 +3,21 @@ import { httpError } from "@/lib/auth/access";
 import { BOOK_COLORS, BOOK_STYLES } from "./types";
 import { BOOK_MAX_BYTES } from "./formats";
 import { bookSourceTypeSchema, judicialMetadataSchema, judicialMetadataPatchSchema, JUDICIAL_JSON_MAX_BYTES, normalizeJudicialMetadata } from "./judicial";
-export const bookMetadataSchema = z.object({ title: z.string().trim().min(1).max(240), author: z.string().trim().max(180).default(""), year: z.string().trim().max(40).default(""), edition: z.string().trim().max(100).default(""), publisher: z.string().trim().max(160).default(""), identifier: z.string().trim().max(100).default(""), coverColor: z.enum(BOOK_COLORS).default("oxblood"), coverStyle: z.enum(BOOK_STYLES).default("leather"), spineLabel: z.string().trim().max(100).default(""), shelf: z.string().trim().min(1).max(100).default("General"), favorite: z.boolean().default(false) });
-export const bookPatchSchema = bookMetadataSchema.partial().extend({ sourceType: bookSourceTypeSchema.optional(), judicial: judicialMetadataPatchSchema.nullable().optional(), revision: z.number().int().positive() }).strict();
+const bookMetadataFields = {
+  title: z.string().trim().min(1).max(240), author: z.string().trim().max(180), year: z.string().trim().max(40),
+  edition: z.string().trim().max(100), publisher: z.string().trim().max(160), identifier: z.string().trim().max(100),
+  coverColor: z.enum(BOOK_COLORS), coverStyle: z.enum(BOOK_STYLES), spineLabel: z.string().trim().max(100),
+  shelf: z.string().trim().min(1).max(100), favorite: z.boolean(),
+};
+export const bookMetadataSchema = z.object({
+  ...bookMetadataFields,
+  author: bookMetadataFields.author.default(""), year: bookMetadataFields.year.default(""), edition: bookMetadataFields.edition.default(""),
+  publisher: bookMetadataFields.publisher.default(""), identifier: bookMetadataFields.identifier.default(""),
+  coverColor: bookMetadataFields.coverColor.default("oxblood"), coverStyle: bookMetadataFields.coverStyle.default("leather"),
+  spineLabel: bookMetadataFields.spineLabel.default(""), shelf: bookMetadataFields.shelf.default("General"), favorite: bookMetadataFields.favorite.default(false),
+});
+// Zod 4 applies defaults inside optional fields. PATCH must leave omitted values untouched.
+export const bookPatchSchema = z.object(bookMetadataFields).partial().extend({ sourceType: bookSourceTypeSchema.optional(), judicial: judicialMetadataPatchSchema.nullable().optional(), revision: z.number().int().positive() }).strict();
 export const bookRevisionSchema = z.object({ revision: z.number().int().positive() }).strict();
 export type BookUpload = z.infer<typeof bookMetadataSchema> & { requestId: string; name: string; bytes: Buffer; convertToText?: boolean; preserveOriginal?: boolean; sourceType?: z.infer<typeof bookSourceTypeSchema>; judicial?: z.infer<typeof judicialMetadataSchema> | null };
 /** Bounds streamed multipart bytes before the platform multipart decoder allocates fields. */

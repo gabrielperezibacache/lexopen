@@ -64,6 +64,7 @@ export default async function DocumentosPage() {
       <PageHeader
         eyebrow={h.eyebrow}
         title={h.title}
+        artwork="casefiles"
         actions={
           <Link className="btn btn-secondary" href="/agente?utility=doc_qa">
             Consultar con ALTAZOR
@@ -123,6 +124,7 @@ export default async function DocumentosPage() {
                           Consultar con ALTAZOR
                         </Link>
                       )}
+                      <Link href={`/offline.html?kind=documento&record=${d.id}`} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)]">Sin conexión</Link>
                       <DocumentDriveAction
                         documentId={d.id}
                         googleDriveId={d.googleDriveId}

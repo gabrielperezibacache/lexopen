@@ -4,7 +4,8 @@ import { assertCsrf, handleRouteError, requireStaff } from "@/lib/api";
 import { publicUserSelect } from "@/lib/auth/public-user";
 import { causaAccessWhere } from "@/lib/auth/causa-access";
 import { activeDelegadorIds } from "@/lib/auth/delegacion";
-import { createTask, updateTasks } from "@/lib/tasks/service";
+import { createTaskCommand, updateTasksCommand } from "@/lib/tasks/service";
+import { requestCommandKey } from "@/lib/command-execution";
 import { taskWorkspaceAccessWhere } from "@/lib/tasks/workspace";
 import type { Prisma } from "@prisma/client";
 
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  try { assertCsrf(req); const user = await requireStaff(); return NextResponse.json(await createTask(user, await req.json()), { status: 201 }); }
+  try { assertCsrf(req); const user = await requireStaff(); return NextResponse.json(await createTaskCommand(user, await req.json(), requestCommandKey(req, "task.create")), { status: 201 }); }
   catch (error) { return handleRouteError(error); }
 }
 
@@ -84,7 +85,7 @@ export async function PATCH(req: NextRequest) {
   try {
     assertCsrf(req); const user = await requireStaff(); const body = await req.json();
     const ids = Array.isArray(body.ids) ? body.ids : [body.id];
-    const tasks = await updateTasks(user, ids, body);
+    const tasks = await updateTasksCommand(user, ids, body, requestCommandKey(req, "task.update"));
     return NextResponse.json(Array.isArray(body.ids) ? { updated: tasks.length } : tasks[0]);
   } catch (error) { return handleRouteError(error); }
 }

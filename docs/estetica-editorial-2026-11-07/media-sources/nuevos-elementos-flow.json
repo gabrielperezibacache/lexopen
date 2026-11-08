@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-07",
+  "provider": "Google Flow",
+  "model": "Nano Banana 2.1",
+  "assets": [
+    {
+      "name": "tareas",
+      "flowAssetId": "7ec342f7-c31d-4e8c-8f8d-b008fd2e3133",
+      "prompt": "Create one exquisite editorial spot illustration for LexOpen, a refined legal work application. Subject: a small practical desk notebook lying OPEN in three-quarter view, its left page carrying just five delicate blank horizontal rules and a narrow empty square at the start of each rule, a slender silver mechanical pencil placed diagonally across the lower right page, and one small iris cloth page tab. No readable writing, no symbols inside the squares. A working notebook, NOT an accounting book, no columns. Fine nineteenth-century silver steel engraving, dense precise crosshatching, tactile layered paper edges, elegant professional legal publisher frontispiece. Palette only cool silver white #f4f3f7, slate indigo #313958, deep ink #0d1022, a tiny restrained iris #aab5ff detail. Compact coherent object occupying about 78 percent of a horizontal 16:9 canvas; every edge fully visible with clear safe margins. Perfectly flat uniform deep indigo #0d1022 background, no room or floor, no horizon or haze, no cast shadow or glow around the silhouette. Clean strong silhouette readable at 144px wide. Absolutely no letters, numbers, labels, title, logos, scales, gavels, people, hands, decorative borders, gradients, smoke, photorealism or UI."
+    },
+    {
+      "name": "plazos",
+      "flowAssetId": "1115c93e-3c60-41c6-a761-31a6e8ba35a1",
+      "prompt": "Create one exquisite editorial spot illustration for LexOpen, a refined legal work application. One classic open-face pocket watch standing at a three-quarter angle, with a short gently curved segment of its fine chain resting beside the base. A real mechanically coherent circular watch case, a small winding crown at twelve oclock. Elegant clean silver dial carrying ONLY twelve simple thin hour tick marks and two distinct dark indigo hands, no second hand, NO numerals, no letters, no brand, no words. Two hands clearly separated at about 10:10. Fine nineteenth-century silver steel engraving and precise dense crosshatching on the outer case, tactile engraved metal. Cool silver white #f4f3f7, slate indigo #313958, deep ink #0d1022; a very small iris #aab5ff reflected detail along the lower case rim. Object and entire short chain fully visible with ample safe margin, subject occupying 72 percent of horizontal 16:9 canvas. Perfectly flat uniform deep indigo #0d1022 background, no floor or horizon, no smoky vignette, no halo, no cast shadow. Strong composed silhouette readable at 144px wide, sober scholarly publisher style. No other props, no hands or people, no readable text, numerals, logos, gavels, scales, sparkles, gradients, borders, photorealism or UI."
+    },
+    {
+      "name": "correspondencia",
+      "flowAssetId": "2a39c267-5251-4b1d-86b8-541819b8c461",
+      "prompt": "Create one exquisite editorial spot illustration for LexOpen, a refined legal work application. A compact still life of correspondence: one large elegant OPEN paper envelope in three-quarter view with its triangular flap standing cleanly behind, one blank folded letter emerging just halfway, and a second smaller closed envelope lying flat beside it. Perfectly coherent paper folds, crisp fine edges, no wax seal and no ribbons. The letter has three extremely faint short rules without any characters. Fine nineteenth-century silver steel engraving, delicate dense crosshatching, tactile cotton paper grain, considered antique scholarly publisher composition. Palette ONLY cool silver white #f4f3f7, slate indigo #313958, deep ink #0d1022, a restrained tiny iris #aab5ff accent along the smaller envelope edge. Entire objects and all paper corners fully visible, one compact horizontal silhouette occupying 78 percent of a 16:9 canvas with generous clear safe margins. Perfectly flat uniform deep indigo #0d1022 background, no floor or room, no horizon, no haze or halo, no cast shadow, no vignette. Readable and elegant at 144px wide. Absolutely no stamps, lettering, addresses, numbers, symbols, logos, people, hands, birds, gavels, scales, sparkles, gradients, ornamental frame, photorealism or UI."
+    }
+  ],
+  "videos": [
+    {
+      "name": "plazos",
+      "provider": "Google Flow",
+      "model": "Veo 3.1 - Fast",
+      "flowAssetId": "125322c3-dfd8-43c6-9053-f82822653b96",
+      "startFrameAssetId": "1115c93e-3c60-41c6-a761-31a6e8ba35a1",
+      "prompt": "Animate this exact engraved pocket watch as a restrained eight-second editorial still life. LOCKED camera. Preserve the exact original shape, perspective, silver steel-engraved crosshatching, dial, twelve hour marks, winding crown, chain and uniform deep indigo background throughout. The watch case and entire chain remain absolutely stationary. ONLY the existing LONG minute hand advances smoothly CLOCKWISE by a small restrained angle, about twelve degrees over the whole eight seconds. Its pivot remains fixed at the center. The short hour hand remains still. Do not add a second hand. No spinning or full revolutions, no wobbling, no stretching, no melting metal, no deformation of the dial or rim. Preserve all original safe margins, keep the whole watch and chain inside frame. No zoom, orbit, pan, camera shake, new props, letters, numerals, logos, characters, light flares, smoke or sparkles. Elegant subtly accelerated passage of time, professional scholarly engraving, not a realistic photograph. Silent video, no music, voices or sound effects.",
+      "review": "The complete source was inspected in a 16-frame contact sheet. Flow adds a thin second hand during the opening seconds. The UI uses only the stable segment from 3 seconds onward, with its matching first-frame poster. Watch case, chain and framing stay stable; the hands advance visibly. No locally generated motion.",
+      "processing": "Trim first 3 seconds; resize to 640x360; H.264 CRF25; audio removed. Poster extracted from the same Flow frame at 3 seconds."
+    }
+  ]
+}

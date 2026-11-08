@@ -1,0 +1,122 @@
+{
+  "checkedAt": "2026-11-07T22:46:47.510775+00:00",
+  "integratedImages": [
+    {
+      "artwork": "writing",
+      "file": "public/editorial/generated/escritura-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "hearings",
+      "file": "public/editorial/generated/audiencias-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "people",
+      "file": "public/editorial/generated/personas-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "workflows",
+      "file": "public/editorial/generated/flujos-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "connections",
+      "file": "public/editorial/generated/conexiones-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "notifications",
+      "file": "public/editorial/generated/avisos-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "settings",
+      "file": "public/editorial/generated/configuracion-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "tasks",
+      "file": "public/editorial/generated/tareas-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "correspondence",
+      "file": "public/editorial/generated/correspondencia-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "academic",
+      "file": "public/editorial/generated/academico-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "calendar",
+      "file": "public/editorial/generated/agenda-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    },
+    {
+      "artwork": "clients",
+      "file": "public/editorial/generated/clientes-gpt-v1.webp",
+      "exists": true,
+      "wired": true,
+      "hashMatches": true
+    }
+  ],
+  "integratedVideos": [
+    {
+      "file": "public/editorial/generated/expedientes-flow-v2.mp4",
+      "exists": true
+    },
+    {
+      "file": "public/editorial/generated/libro-contable-flow-v1.mp4",
+      "exists": true
+    },
+    {
+      "file": "public/editorial/generated/plazos-flow-v1.mp4",
+      "exists": true
+    },
+    {
+      "file": "public/editorial/generated/investigacion-motion-flow-v1.mp4",
+      "exists": true
+    }
+  ],
+  "integratedBackgrounds": [
+    {
+      "file": "public/editorial/generated/filosofo-gpt-v1.webp",
+      "exists": true,
+      "wired": true
+    },
+    {
+      "file": "public/editorial/generated/atenea-gpt-v1.webp",
+      "exists": true,
+      "wired": true
+    }
+  ],
+  "newAnimations": "deferred_by_user_to_another_session",
+  "newAnimationProvider": "Google Flow only",
+  "deploymentPerformed": false
+}

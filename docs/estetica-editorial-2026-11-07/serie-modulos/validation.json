@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-07",
+  "provider": "Google Flow / Nano Banana 2.1",
+  "newIllustrations": 8,
+  "publicBytes": 171216,
+  "runtime": "Isolated local Next.js dev, NODE_ENV=development, disposable fixture database",
+  "routes": 26,
+  "views": 104,
+  "allImagesLoaded": true,
+  "allResponsesOk": true,
+  "overlap": false,
+  "horizontalOverflow": false,
+  "javascriptErrors": [],
+  "typescript": "tsc --noEmit --incremental false: passed",
+  "eslint": "All 30 affected TS/TSX source files: passed",
+  "editorialMotionTests": {
+    "project": "chromium",
+    "passed": 4,
+    "durationSeconds": 23.9
+  },
+  "scope": "Local fixtures; no deployment. PJUD conditional headers checked by type/lint; feature remains disabled in the fixture."
+}

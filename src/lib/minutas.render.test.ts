@@ -23,6 +23,8 @@ assert(local!.getMonth() === 7, "month august=7");
 assert(local!.getDate() === 1, "day 1");
 assert(formatLocalDate(local) === "2026-08-01", "format local date");
 
+assert(renderMinutaMarkdown({ tipo: "reunion", titulo: "Fecha civil", fecha: "2026-11-08T15:00:00Z", resumenEjecutivo: "Prueba", causa: { titulo: "Ficticia" }, acciones: [{ descripcion: "Vencimiento", fechaLimite: new Date("2026-11-20T00:00:00.000Z") }] }).includes("2026-11-20"), "UTC midnight deadline keeps its civil day");
+
 const md = renderMinutaMarkdown({
   tipo: "reunion",
   titulo: "Reunión estrategia",
@@ -54,5 +56,9 @@ assert(md.includes("C-4521-2025"), "rit");
 assert(md.includes("Encargar perito"), "accion");
 assert(md.includes("2026-07-28"), "local due date in md");
 assert(md.includes("handoff"), "handoff footer");
+for (const [estado, label] of [["pendiente", "Pendiente"], ["en_curso", "En curso"], ["hecha", "Hecha"], ["cancelada", "Cancelada"]]) {
+  const text = renderMinutaMarkdown({ tipo: "reunion", titulo: "Estado de seguimiento", fecha: "2026-11-08", resumenEjecutivo: "Prueba", causa: { titulo: "Ficticia" }, acciones: [{ descripcion: "Revisar antecedentes", estado }] });
+  assert(text.includes(`estado ${label}`), `exports action state ${estado}`);
+}
 
 console.log("minutas.render.test.ts OK");

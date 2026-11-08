@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { loginAs } from "./helpers";
+import { authenticateApiRequests, loginAs } from "./helpers";
 
 test("espacios: hub, creación vinculada y enlace desde causa", async ({ page }) => {
   await loginAs(page, "socio@estudio.cl");
+  await authenticateApiRequests(page);
   await page.goto("/sites");
 
   await expect(page.getByRole("heading", { name: "Espacios" })).toBeVisible();
@@ -21,7 +22,7 @@ test("espacios: hub, creación vinculada y enlace desde causa", async ({ page })
       clienteId: clientes[0]!.id,
     },
   });
-  expect(causaRes.ok()).toBeTruthy();
+  expect(causaRes.ok(), await causaRes.text()).toBeTruthy();
   const causa = (await causaRes.json()) as { id: string; titulo: string };
 
   const siteName = `E2E Espacio ${Date.now()}`;

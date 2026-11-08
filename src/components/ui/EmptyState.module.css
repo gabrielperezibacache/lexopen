@@ -1,0 +1,35 @@
+.state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.folio {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  flex: 0 0 6rem;
+  padding-inline-end: var(--space-8);
+  border-inline-end: 1px solid var(--line-strong);
+}
+
+.symbol { inline-size: 3.5rem; block-size: auto; color: var(--sea); }
+.copy { min-inline-size: 0; max-inline-size: 48ch; }
+.title {
+  color: var(--ink);
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: var(--text-xl);
+  font-weight: 500;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+.description { margin-block-start: var(--space-2); color: var(--muted); font-size: var(--text-sm); }
+.action { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-block-start: var(--space-5); }
+
+@media (max-width: 639px) {
+  .state { flex-direction: column; gap: var(--space-5); text-align: center; }
+  .folio { align-self: center; flex-basis: auto; padding: 0; border: 0; }
+  .action { justify-content: center; }
+}

@@ -24,7 +24,23 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: "hearing-live-transcription.spec.ts",
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "chromium-audio",
+      testMatch: "hearing-live-transcription.spec.ts",
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "firefox",
+      testMatch: ["browser-smoke.spec.ts", "writing-review.spec.ts", "offline-workspace.spec.ts", "offline-records.spec.ts", "offline-links.spec.ts", "offline-legal.spec.ts", "offline-memos.spec.ts", "offline-files.spec.ts", "offline-operations.spec.ts", "whatsapp-link.spec.ts"],
+      use: { ...devices["Desktop Firefox"], launchOptions: { timeout: 30_000 } },
+    },
+    {
+      name: "webkit",
+      testMatch: ["browser-smoke.spec.ts", "writing-review.spec.ts", "offline-workspace.spec.ts", "offline-records.spec.ts", "offline-links.spec.ts", "offline-legal.spec.ts", "offline-memos.spec.ts", "offline-files.spec.ts", "offline-operations.spec.ts", "whatsapp-link.spec.ts"],
+      use: { ...devices["Desktop Safari"] },
     },
   ],
   webServer: {

@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-07",
+  "provider": "OpenAI GPT image generation",
+  "tool": "built-in image_gen",
+  "mode": "generate",
+  "transparent_background": true,
+  "prompt": "Use case: illustration-story. Asset type: a NEW genuine transparent-background editorial engraving for the LEFT NAVIGATION SIDEBAR of LexOpen. This must be distinctly different from the application's central seated male philosopher with his chin on his hand; DO NOT draw a seated man or a thinker pose. Create one exquisite classical BUST OF ATHENA: a dignified adult woman in an ancient Greek peplos, head and shoulders in a calm three-quarter profile facing RIGHT toward the application's central workspace. Recognizable refined Corinthian helmet pushed back above her brow so her serene face and thoughtful eyes are fully visible, with a restrained narrow crest. Graceful engraved waves of hair under the helmet; draped cloth over the shoulders, a simple small plinth beneath the bust. No arms or hands, no weapons, no shield, no Medusa face, no aggressive expression. Fine nineteenth-century silver STEEL ENGRAVING like an antique scholarly frontispiece, incredibly precise crosshatching, carved curls, delicate metal hatching on the helmet, tactile cloth folds. Match a classical Greek silver engraved reader and scholar family: elegant, realistic drawn proportions, dense fine cut lines, strong negative spaces; no cartoon, vector icon, photography or glossy 3D render. Palette only cool silver white #f4f3f7, slate indigo #313958, deep ink #0d1022, one extremely tiny restrained iris #aab5ff detail on the helmet rim. Portrait 3:4 composition; the entire bust, helmet crest and plinth fully inside the canvas with twelve percent clear margin all around, nothing cropped. Strong coherent silhouette readable as a subtle background at 250px wide. Genuine clean alpha transparency around the whole object and in all gaps. NO background, rectangular plate, floor, horizon, architecture, columns, scenery, surrounding shadows, smoke, haze, halo, rays, aura, glow, ornamental frame, writing, numbers, letters, captions, inscriptions, logos, signature or watermark. Quiet, learned, editorial and beautifully hand-engraved.",
+  "source": "docs/estetica-editorial-2026-11-07/media-sources/atenea-gpt-v1-original.png",
+  "file": "public/editorial/generated/atenea-gpt-v1.webp",
+  "dimensions": [
+    720,
+    960
+  ],
+  "use": "Distinct engraved Athena bust for the blue navigation sidebar; central philosopher preserved.",
+  "processing": "Resize and WebP encoding only; generated alpha preserved."
+}

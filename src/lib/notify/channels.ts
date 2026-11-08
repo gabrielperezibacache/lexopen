@@ -61,7 +61,7 @@ export async function loadDestinos(userId: string, client: Prisma.TransactionCli
     });
   }
   for (const c of canales) {
-    if (c.canal !== "telegram" && c.canal !== "push") continue;
+    if (c.canal !== "telegram" && c.canal !== "push" && c.canal !== "whatsapp") continue;
     destinos.push({
       canal: c.canal as ExternalChannel,
       canalUsuarioId: c.id,
@@ -72,6 +72,7 @@ export async function loadDestinos(userId: string, client: Prisma.TransactionCli
 }
 
 export async function decryptCanalDestino(canalUsuarioId: string, client: Prisma.TransactionClient = prisma): Promise<
+  | { canal: "whatsapp"; e164: string }
   | { canal: "telegram"; chatId: string }
   | { canal: "push"; subscription: PushSubscriptionJSON }
   | null
@@ -80,6 +81,7 @@ export async function decryptCanalDestino(canalUsuarioId: string, client: Prisma
   if (!row || row.estado !== "activo" || !row.destinoEnc) return null;
   const plain = decryptSecret(row.destinoEnc);
   if (!plain) return null;
+  if (row.canal === "whatsapp" && row.verificadoAt) return { canal: "whatsapp", e164: plain };
   if (row.canal === "telegram") return { canal: "telegram", chatId: plain };
   if (row.canal === "push") {
     try {
@@ -181,7 +183,7 @@ export async function upsertPushSubscription(opts: {
 
 export async function revokeCanal(opts: {
   userId: string;
-  canal: "telegram" | "push";
+  canal: "telegram" | "push" | "whatsapp";
   id?: string;
 }) {
   return prisma.canalUsuario.updateMany({

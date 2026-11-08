@@ -1,5 +1,8 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { civilDateKey } from "@/lib/chile-time";
+import { canReceiveNotification } from "@/lib/notify/access";
+import { isStaff } from "@/lib/auth/rbac";
+import { STAFF_ROLES } from "@/lib/auth/roles";
 
 export function escapeAlertHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({
@@ -20,13 +23,13 @@ export async function createPlazoAlerts(
             estado: "pendiente",
             alertaEnviada: false,
             fechaLimite: { gte: opts.from, lte: opts.until },
-            OR: [{ responsableId: { not: null } }, { causa: { abogadoId: { not: null } } }],
+            OR: [{ responsable: { role: { in: [...STAFF_ROLES] } } }, { causa: { abogado: { role: { in: [...STAFF_ROLES] } } } }],
           },
           include: {
-            responsable: { select: { id: true, email: true, name: true } },
+            responsable: { select: { id: true, email: true, name: true, role: true } },
             causa: { select: {
               id: true, titulo: true, rit: true,
-              abogado: { select: { id: true, email: true, name: true } },
+              abogado: { select: { id: true, email: true, name: true, role: true } },
             } },
           },
           orderBy: [{ fechaLimite: "asc" }, { id: "asc" }],
@@ -42,16 +45,19 @@ export async function createPlazoAlerts(
           const dueKey = civilDateKey(plazo.fechaLimite);
           if (dueKey < fromKey || dueKey > untilKey) continue;
           considered += 1;
-          const recipients = new Map<string, { id: string; email: string | null; name: string | null }>();
+          const recipients = new Map<string, { id: string; email: string | null; name: string | null; role: string }>();
           for (const user of [plazo.responsable, plazo.causa?.abogado]) {
-            if (user) recipients.set(user.id, user);
+            if (user && isStaff(user.role)) recipients.set(user.id, user);
           }
           if (!recipients.size) continue;
           const title = `Plazo próximo · ${plazo.causa?.rit || plazo.causa?.titulo || "sin causa"}`;
           const body = `${plazo.titulo} vence el ${civilDateKey(plazo.fechaLimite)}.`;
           const href = plazo.causaId ? `/causas/${plazo.causaId}` : "/plazos";
+          let notified = false;
           for (const user of recipients.values()) {
-            data.push({ userId: user.id, title, body, href });
+            if (!await canReceiveNotification(user.id, { entityType: "plazo", entityId: plazo.id }, tx)) continue;
+            data.push({ userId: user.id, title, body, href, entityType: "plazo", entityId: plazo.id });
+            notified = true;
             if (opts.emailEnabled && user.email) {
               const bucket = emailBuckets.get(user.email) || {
                 email: user.email, name: user.name || user.email, lines: [],
@@ -60,7 +66,7 @@ export async function createPlazoAlerts(
               emailBuckets.set(user.email, bucket);
             }
           }
-          ids.push(plazo.id);
+          if (notified) ids.push(plazo.id);
         }
         if (data.length) {
           await tx.notification.createMany({ data });
