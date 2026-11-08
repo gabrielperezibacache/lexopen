@@ -12,6 +12,7 @@ import { assertGatewayOAuthAllowed, connectorNameSchema, validateConnectorConfig
 import { EASY_OAUTH_PROVIDERS } from "./easy-oauth-providers";
 import type { ConnectorConfiguration, ConnectorInventory } from "./types";
 import { validatePersistentEasyOAuth, type PersistentEasyOAuthConfiguration } from "./persistent-oauth";
+import { canManageConnectorFiles } from "./oauth-access";
 
 type Client = typeof prisma | Prisma.TransactionClient;
 type Actor = CausaAccessUser;
@@ -38,8 +39,8 @@ async function ready(workspace: AltazorComputerWorkspace) {
   const health = await client.readiness(workspace.providerName, sessions.map(row => row.kittyName));
   return { client, health };
 }
-async function inventory(client: KittiesGateway, health: { version: string; connectorGate: boolean; persistentOAuth?: boolean; cloudFileOAuth?: boolean; githubPersistentOAuth?: boolean }): Promise<ConnectorInventory> {
-  return { ...await client.connectorSettings(), gateReady: health.connectorGate, version: health.version, persistentOAuthReady: health.persistentOAuth === true, cloudFileOAuthReady: health.cloudFileOAuth === true, githubPersistentOAuthReady: health.githubPersistentOAuth === true };
+async function inventory(client: KittiesGateway, health: { version: string; connectorGate: boolean; persistentOAuth?: boolean; cloudFileOAuth?: boolean; githubPersistentOAuth?: boolean; driveManagement?: boolean }): Promise<ConnectorInventory> {
+  return { ...await client.connectorSettings(), gateReady: health.connectorGate, version: health.version, persistentOAuthReady: health.persistentOAuth === true, cloudFileOAuthReady: health.cloudFileOAuth === true, githubPersistentOAuthReady: health.githubPersistentOAuth === true, driveManagementReady: health.driveManagement === true };
 }
 export async function connectorInventory(user: Actor, workspaceId: string) {
   const { workspace } = await access(user, workspaceId), { client, health } = await ready(workspace);
@@ -122,6 +123,7 @@ export async function configurePersistentEasyOAuth(user: Actor, workspaceId: str
   if (name !== `altazor-${provider}-${digest(`${user.id}:${workspaceId}`).slice(0, 16)}`) throw new ConnectorError("oauth_binding_changed", "La conexión no corresponde a este profesional y espacio.", 409);
   return mutation(user, workspaceId, requestId, "configure_persistent", { name, value }, async client => ({ ...await client.setPersistentEasyOAuth(name, value) }), false, async client => {
     await client.requirePersistentOAuth();
+    if (value.kind === "google-workspace" && canManageConnectorFiles("google", value.scopes)) await client.requireDriveManagement();
     if (value.kind === "github") await client.requireGithubPersistentOAuth();
     else if (value.publicClient) await client.requireCloudFileOAuth();
     const before = await client.connectorSettings(), available = before.catalog.find(kind => kind.id === value.kind), old = before.connections.find(row => row.name === name);

@@ -10,7 +10,7 @@ export function ConnectedAccountsPanel({ locale, canManage = false }: { locale: 
       name: "Google Drive",
       href: "/inicio?altazor=connectors&connector=google",
       icon: Files,
-      description: tr("Busca y lee tus archivos autorizados de Drive, sin modificarlos.", "Find and read your authorized Drive files without changing them."),
+      description: tr("Conecta tus archivos y carpetas de Drive para trabajar con Altazor.", "Connect your Drive files and folders to work with Altazor."),
     },
     {
       name: "GitHub",

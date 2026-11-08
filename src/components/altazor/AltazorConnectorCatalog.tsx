@@ -111,7 +111,7 @@ export function AltazorConnectorCatalog({ causaId }: { causaId?: string | null }
   }, [workspaceId, causaId]);
   const gatewayReady = Boolean(verified && !checking && computer?.policyAllowed && inventory?.gateReady && entry?.available && entry.fields.some(field => field.name === "token" && field.secret));
   const activeSession = Boolean(computer?.sessions.some(session => session.requiresStop || ["creating", "starting", "ready", "unknown"].includes(session.state)));
-  const filtered = catalog.filter(item => { const copy = connectorAccountPresentation(item); return (category === "all" || item.category === category) && `${copy.label} ${copy.description}`.toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es").trim()); });
+  const filtered = catalog.filter(item => { const copy = connectorAccountPresentation(item, scopedOAuthStatus?.providers.find(account => EASY_OAUTH_CONNECTOR[account.provider] === item.id)); return (category === "all" || item.category === category) && `${copy.label} ${copy.description}`.toLocaleLowerCase("es").includes(query.toLocaleLowerCase("es").trim()); });
   const canConfigure = Boolean(verified && !checking && computer?.configured && inventory?.gateReady && computer.policyAllowed && !activeSession);
   function select(item: ConnectorCatalogEntry, existing: ConnectorConnection | null = null) {
     setSelected(item.id); setConnection(existing); setName(existing?.name || item.id); setAuthUrl(""); setNotice(""); setError(""); setRemoveConfirmed(false); requestKey.current = operationKey(); formRef.current?.reset();

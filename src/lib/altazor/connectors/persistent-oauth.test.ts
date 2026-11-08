@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { KittiesGateway } from "../computer/gateway";
-import { GOOGLE_FILES_SCOPE } from "./oauth-access";
+import { GOOGLE_FILES_SCOPE, GOOGLE_MANAGE_SCOPE } from "./oauth-access";
 import { validatePersistentEasyOAuth, type PersistentEasyOAuthConfiguration } from "./persistent-oauth";
 
 const configuration = (): PersistentEasyOAuthConfiguration => ({ kind: "google-workspace", clientId: "fictitious-client", clientSecret: "fictitious-app-secret", accessToken: "fictitious-access-token", refreshToken: "fictitious-refresh-token", scopes: [GOOGLE_FILES_SCOPE], expiresAt: new Date(Date.now() + 3600_000).toISOString() });
@@ -88,5 +88,25 @@ test("GitHub refresh capability is required before sending either web or device 
       else await assert.rejects(client.setPersistentEasyOAuth(githubName, input), error => (error as { code?: string }).code === "github_oauth_persistence_required");
       assert.equal(posts, supported ? 1 : 0);
     }
+  }
+});
+
+test("Drive management needs its own runtime capability before transferring any credentials", async () => {
+  const input = { ...configuration(), scopes: [GOOGLE_MANAGE_SCOPE] };
+  assert.equal(validatePersistentEasyOAuth(input).scopes[0], GOOGLE_MANAGE_SCOPE);
+  for (const supported of [false, true]) {
+    let posts = 0;
+    const client = new KittiesGateway("http://127.0.0.1:7494", "fictitious-gateway-token", async (url, init) => {
+      if (new URL(String(url)).pathname === "/v1/health") {
+        assert.equal(init?.body, undefined);
+        return Response.json({ ok: true, lexopen_persistent_oauth: "v1", ...(supported ? { lexopen_drive_management: "v1" } : {}) });
+      }
+      posts++; assert.equal(init?.method, "POST");
+      assert.deepEqual(JSON.parse(String(init?.body)).scopes, [GOOGLE_MANAGE_SCOPE]);
+      return Response.json({ name, kind: input.kind, persistent: true, auto_refresh: true });
+    });
+    if (supported) assert.deepEqual(await client.setPersistentEasyOAuth(name, input), { persistent: true, autoRefresh: true });
+    else await assert.rejects(client.setPersistentEasyOAuth(name, input), error => (error as { code?: string }).code === "drive_management_required");
+    assert.equal(posts, supported ? 1 : 0);
   }
 });

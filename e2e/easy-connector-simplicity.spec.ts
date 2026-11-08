@@ -39,6 +39,7 @@ test("Google y GitHub ofrecen una acción principal y mantienen la desconexión 
     providers: providers.map(provider => ({
       provider, label: labels[provider], available: true, reason: null, scopes: provider === "github" ? ["read:user"] : ["https://www.googleapis.com/auth/drive.metadata.readonly"],
       connectionName: `${provider}-fixture`, state: connected ? "connected" : "idle", connected, tested: connected,
+      canReadFiles: connected, canManageFiles: false, manageAvailable: provider === "google", autoRefresh: connected, persistent: connected,
       hasStoredConnection: connected, canDisconnect: connected, expiresAt: null, lastVerifiedAt: connected ? "2030-05-06T12:00:00Z" : null,
     })),
   } }));
@@ -64,12 +65,21 @@ test("Google y GitHub ofrecen una acción principal y mantienen la desconexión 
     await panel.getByRole("button", { name: `Conectar ${label}`, exact: true }).click();
     await expect(panel.getByRole("alert")).toContainText("Abre Configuración para corregirlo");
     expect(starts.at(-1)).toMatchObject({ workspaceId, provider, confirmed: true });
+    if (provider === "google") expect(starts.at(-1)?.access).toBe("manage"); else expect(starts.at(-1)).not.toHaveProperty("access");
 
     connected = true;
     await page.reload();
     await expect(panel.getByRole("heading", { name: `${label} conectado`, exact: true })).toBeVisible();
     await expect(panel.getByRole("button", { name: `Conectar ${label}`, exact: true })).toHaveCount(0);
     await expect(panel.getByRole("button", { name: `Desconectar ${label}`, exact: true })).toHaveCount(0);
+    if (provider === "google") {
+      await expect(panel.getByText("Tu cuenta conserva acceso de sólo lectura a los documentos de Drive.", { exact: true })).toBeVisible();
+      expect(starts.filter(body => body.provider === "google")).toHaveLength(1);
+      await panel.getByRole("button", { name: "Permitir crear y editar", exact: true }).click();
+      await expect(panel.getByRole("alert")).toContainText("Abre Configuración para corregirlo");
+      expect(starts.at(-1)).toMatchObject({ provider: "google", access: "manage", confirmed: true });
+      await expect(panel.getByRole("heading", { name: "Google conectado", exact: true })).toBeVisible();
+    }
     for (const [size, viewport] of [["desktop", { width: 1280, height: 900 }], ["mobile", { width: 360, height: 800 }]] as const) {
       await page.setViewportSize(viewport);
       await panel.scrollIntoViewIfNeeded();
@@ -84,7 +94,7 @@ test("Google y GitHub ofrecen una acción principal y mantienen la desconexión 
     await expect(panel.getByRole("button", { name: `Conectar ${label}`, exact: true })).toBeVisible();
   }
   expect(setupReads).toBe(0);
-  expect(starts).toHaveLength(2);
+  expect(starts).toHaveLength(3);
   expect(removals).toHaveLength(2);
   expect(removals.every(body => body.workspaceId === workspaceId && body.confirmed === true)).toBe(true);
 });
@@ -110,7 +120,7 @@ test("la preparación administrativa se realiza en Configuración y no inicia se
   await expect(panel).not.toHaveAttribute("open", "");
   await expect(panel.getByText("Configurar GitHub", { exact: true })).toBeHidden();
   expect(setupReads).toBe(0);
-  await expect(page.getByRole("link", { name: /Google Drive.*sin modificarlos/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Google Drive.*archivos y carpetas/ })).toBeVisible();
   await panel.getByText("Administración avanzada de conexiones", { exact: true }).click();
   expect(setupReads).toBe(0);
   await panel.getByText("Configurar GitHub", { exact: true }).click();
@@ -142,7 +152,7 @@ test("las tarjetas muestran sólo el alcance y el acceso comprobados de cada cue
     return route.fulfill({ json: { workspaceId, causaId: null, canAdmin: false, requiresStop: false, providers: accountProviders.map(provider => ({
       provider, available: provider !== "microsoft", state: provider === "microsoft" ? "blocked" : provider === "github" || provider === "google" && checked ? "connected" : "unavailable",
       connected: provider === "github" || provider === "google", tested: provider === "google" && checked, hasStoredConnection: true, canDisconnect: true,
-      connectionName: `${provider}-fixture`, autoRefresh: true, persistent: true, canReadFiles: true,
+      connectionName: `${provider}-fixture`, autoRefresh: true, persistent: true, canReadFiles: true, canManageFiles: false, manageAvailable: provider === "google",
     })) } });
   });
   await page.route(`**${oauthApi}/setup`, route => { setupReads++; return route.abort(); });

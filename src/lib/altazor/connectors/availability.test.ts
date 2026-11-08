@@ -68,11 +68,21 @@ test("guided account copy describes read-only access without changing adapter ca
   const github = CONNECTOR_CATALOG.find(item => item.id === "github")!;
   const slack = CONNECTOR_CATALOG.find(item => item.id === "slack")!;
   assert.equal(connectorAccountPresentation(google).label, "Google Drive");
-  assert.match(connectorAccountPresentation(google).description, /sin modificarlos/);
+  assert.doesNotMatch(connectorAccountPresentation(google).description, /sin modificarlos/);
   assert.doesNotMatch(connectorAccountPresentation(google).description, /correo|calendario/i);
   assert.match(connectorAccountPresentation(github).description, /repositorios públicos/);
   assert.doesNotMatch(connectorAccountPresentation(github).description, /privados|publicar|crear/i);
   assert.deepEqual(connectorAccountPresentation(slack), { label: slack.label, description: slack.description });
   assert.equal(google.label, "Google Workspace");
   assert.match(google.description, /Correo/);
+});
+test("Drive management copy follows checked account permissions rather than adapter features", () => {
+  const google = CONNECTOR_CATALOG.find(item => item.id === "google-workspace")!;
+  const account = { connected: true, tested: true, canReadFiles: true, canManageFiles: true };
+  assert.match(connectorAccountPresentation(google, account).description, /encargos que autorices/);
+  assert.match(connectorAccountPresentation(google, { ...account, canManageFiles: false }).description, /sin modificarlos/);
+  assert.match(connectorAccountPresentation(google, { ...account, canReadFiles: false, canManageFiles: false }).description, /datos básicos/);
+  for (const unverified of [{ ...account, tested: false }, { ...account, connected: false }]) assert.doesNotMatch(connectorAccountPresentation(google, unverified).description, /crea|edita/);
+  const snapshot = connectorOAuthSnapshot({ ...oauth, providers: [{ ...oauth.providers[0], provider: "google", canManageFiles: true }] }, "personal-files", null);
+  assert.equal(snapshot?.providers[0].canManageFiles, false, "legacy or incomplete status cannot claim management");
 });
