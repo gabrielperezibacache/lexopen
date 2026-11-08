@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,readFile,writeFile,lstat,rm} from 'node:fs/promises';
+import {join} from 'node:path';import {tmpdir} from 'node:os';
+import {hardenGitHubPersistent,rewriteGitHubPersistent} from './harden-github-persistent-oauth.mjs';import {PINNED_COMMIT} from './harden-connectors.mjs';
+assert.match(rewriteGitHubPersistent('internal/gateway/gateway.go','out["lexopen_cloud_metadata"] = "v1"'),/lexopen_github_persistent_oauth/);assert.throws(()=>rewriteGitHubPersistent('unknown','x'),/Not a pinned/);assert.throws(()=>rewriteGitHubPersistent('internal/gateway/gateway.go','wrong'),/no longer matches/);
+const root=await mkdtemp(join(tmpdir(),'lexopen-github-persistent-test-'));try{await writeFile(join(root,'.lexopen-source-commit'),PINNED_COMMIT);await writeFile(join(root,'.lexopen-cloud-metadata'),'v1');await mkdir(join(root,'internal/gateway'),{recursive:true});const path=join(root,'internal/gateway/lexopen_persistent_oauth.go');await writeFile(path,'drift');await assert.rejects(()=>hardenGitHubPersistent(root),/source differs/);assert.equal(await readFile(path,'utf8'),'drift');await assert.rejects(()=>lstat(join(root,'.lexopen-github-persistent-oauth')),{code:'ENOENT'});await writeFile(join(root,'.lexopen-source-commit'),'wrong');await assert.rejects(()=>hardenGitHubPersistent(root),/exact Go14/)}finally{await rm(root,{recursive:true,force:true})}
+console.log('GitHub persistent hardener PASS: exact Go14, all-file drift preflight, narrow import/rotation/capability.');

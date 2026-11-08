@@ -150,7 +150,7 @@ export async function startEasyOAuth(actor: ConnectorActor, input: { workspaceId
   const persistence = input.provider === "github" ? undefined : "offline-v1";
   if (persistence && !inventory.persistentOAuthReady) throw new ConnectorError("oauth_persistence_required", "Actualice el escritorio de Altazor para mantener sus conexiones sin iniciar sesión repetidamente.", 409);
   if (config.flow === "public_client" && !inventory.cloudFileOAuthReady) throw new ConnectorError("oauth_cloud_files_required", "Actualice el escritorio de Altazor para conectar esta cuenta pública con lectura y renovación seguras.", 409);
-  if (input.provider !== "github") await assertPersistentOAuthImportReady(user, workspace.id, name, input.provider === "google" ? "google-workspace" : input.provider === "microsoft" ? "microsoft-365" : "dropbox");
+  await assertPersistentOAuthImportReady(user, workspace.id, name, spec.kind);
   const id = computerOperationHash(actor.id, "oauth-start", "request", { requestId: input.requestId });
   let binding: Binding = { workspaceId: workspace.id, workspaceBinding: workspaceBinding(workspace), configurationBinding: appBinding(actor, workspace.id, config), connectionName: name, causaId: workspace.causaId, state: randomToken(), verifier: randomToken(), nonce: randomToken(), ...(persistence ? { persistence } : {}), ...(config.flow === "installed" ? { installed: true as const } : {}), ...(config.flow !== "device" && (input.external || config.flow === "installed" || config.flow === "public_client") ? { external: true as const } : {}) };
   let expiresAt = new Date(Date.now() + 10 * 60_000);
@@ -231,15 +231,16 @@ async function receiveAuthorizedEasyOAuth(actor: ConnectorActor, input: { state:
     if (!validEasyOAuthScopes(provider, requestedScopes)) throw new ConnectorError("oauth_scope_mismatch", "Los permisos de este intento no son válidos.", 409);
     const body = provider === "microsoft" ? microsoftPublicCodeBody({ clientId: config.clientId, redirectUri: config.redirectUri, code: input.code!, verifier: binding.verifier }) : new URLSearchParams({ grant_type: "authorization_code", client_id: config.clientId, ...(config.flow !== "public_client" ? { client_secret: config.clientSecret } : {}), redirect_uri: config.redirectUri, code: input.code!, code_verifier: binding.verifier });
     const tokens = deviceTokens || await requestOAuthProviderJson("token", spec.token, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body }, fetcher);
-    if (deviceTokens && (tokens.expires_in !== undefined || tokens.refresh_token !== undefined)) throw new ConnectorError("github_device_expiring_unsupported", "La identidad de GitHub del instalador usa una modalidad de renovación todavía no compatible. El administrador debe revisar la preparación; su cuenta no se guardó como permanente.", 409);
     let tokenResponse = tokens;
     if (provider === "microsoft" && tokens.error === undefined) { try { tokenResponse = { ...tokens, scope: normalizeMicrosoftFileScopes(tokens.scope).join(" ") }; } catch { throw new ConnectorError("oauth_scope_mismatch", oauthFailureReason("oauth_scope_mismatch"), 409); } }
     const { accessToken, scopes } = readOAuthTokenResponse(tokenResponse, requestedScopes);
     const ttl = tokens.expires_in;
-    if ((provider !== "github" || ttl !== undefined) && (typeof ttl !== "number" || !Number.isFinite(ttl) || ttl < 60 || ttl > 366 * 86400)) throw new ConnectorError("oauth_expiry_invalid", "El servicio no confirmó una vigencia válida.", 409);
+    const githubExpiring = provider === "github" && (ttl !== undefined || tokens.refresh_token !== undefined || tokens.refresh_token_expires_in !== undefined);
+    if ((provider !== "github" || githubExpiring) && (typeof ttl !== "number" || !Number.isInteger(ttl) || ttl < 60 || ttl > 366 * 86400)) throw new ConnectorError("oauth_expiry_invalid", "El servicio no confirmó una vigencia válida.", 409);
+    if (provider === "github" && tokens.refresh_token_expires_in !== undefined && (typeof tokens.refresh_token_expires_in !== "number" || !Number.isInteger(tokens.refresh_token_expires_in) || tokens.refresh_token_expires_in <= 0 || tokens.refresh_token_expires_in > 366 * 86400)) throw new ConnectorError("oauth_expiry_invalid", "El servicio no confirmó una vigencia válida.", 409);
     const expiresAt = typeof ttl === "number" ? new Date(Date.now() + ttl * 1000) : null;
-    if (provider !== "github" && (typeof tokens.refresh_token !== "string" || !tokens.refresh_token.trim())) throw new ConnectorError("oauth_refresh_missing", "El servicio no autorizó mantener la conexión. Vuelva a conectar su cuenta y complete el consentimiento.", 409);
-    const persistentInput = provider !== "github" ? validatePersistentEasyOAuth({ kind: specifications[provider].kind, clientId: config.clientId, clientSecret: config.clientSecret, ...(config.flow === "public_client" ? { publicClient: true } : {}), accessToken, refreshToken: tokens.refresh_token as string, expiresAt: expiresAt!.toISOString(), scopes }) : null;
+    if ((provider !== "github" || githubExpiring) && (typeof tokens.refresh_token !== "string" || !tokens.refresh_token.trim())) throw new ConnectorError("oauth_refresh_missing", "El servicio no autorizó mantener la conexión. Vuelva a conectar su cuenta y complete el consentimiento.", 409);
+    const persistentInput = provider !== "github" || githubExpiring ? validatePersistentEasyOAuth({ kind: specifications[provider].kind, clientId: config.clientId, clientSecret: config.clientSecret, ...(config.flow === "public_client" || provider === "github" && config.flow === "device" ? { publicClient: true } : {}), accessToken, refreshToken: tokens.refresh_token as string, expiresAt: expiresAt!.toISOString(), scopes }) : null;
     const headers = { Authorization: `Bearer ${accessToken}`, Accept: "application/json" };
     const subject = await verifyProviderAccount(provider, headers, fetcher);
     if ((typeof subject !== "string" && typeof subject !== "number") || !String(subject).trim() || String(subject).length > 200) throw new ConnectorError("oauth_identity_invalid", "No se pudo comprobar esta autorización de lectura.", 409);
@@ -259,7 +260,7 @@ async function receiveAuthorizedEasyOAuth(actor: ConnectorActor, input: { state:
       if (workspaceBinding(beforeSave.workspace) !== binding.workspaceBinding) throw new ConnectorError("oauth_binding_changed", "El espacio cambió durante la autorización.", 409);
       const result = persistentInput
         ? await configurePersistentEasyOAuth(beforeSave.user, workspace.id, `oauth:${attempt.id}`, binding.connectionName, { ...persistentInput, account: String(subject) }, workspace)
-        : await configureConnector(beforeSave.user, workspace.id, `oauth:${attempt.id}`, binding.connectionName, { kind: spec.kind, settings: { token: accessToken } }, workspace);
+        : await configureConnector(beforeSave.user, workspace.id, `oauth:${attempt.id}`, binding.connectionName, { kind: spec.kind, settings: { token: accessToken }, ...(provider === "github" ? { clear: ["sign_in"] } : {}) }, workspace);
       if (result.operation.status !== "completed") throw new ConnectorError("oauth_save_unknown", "No se confirmó la conexión. Revise su estado antes de repetirla.", 409);
       const live = await access(actor, workspace.id, tx); await noActiveSession(live.workspace, tx);
       if (workspaceBinding(live.workspace) !== binding.workspaceBinding || appBinding(actor, workspace.id, requireConfig(await configFor(provider, options, tx))) !== binding.configurationBinding) throw new ConnectorError("oauth_binding_changed", "La configuración cambió.", 409);
@@ -383,12 +384,12 @@ export async function easyOAuthStatus(actor: ConnectorActor, workspaceId: string
       try {
         const proof = unseal<ConnectionProof>(account.credentialsEnc || "", proofContext(actor.id, account.id));
         if (account.status !== "connected" || account.clientId !== config.clientId || proof.workspaceBinding !== workspaceBinding(workspace) || proof.connectionName !== name || !validEasyOAuthScopes(provider, proof.scopes) || JSON.stringify(proof.scopes) !== account.grantedScopesJson) throw new Error();
-        proofValid = true; autoRefresh = proof.autoRefresh === true && provider !== "github";
+        proofValid = true; autoRefresh = proof.autoRefresh === true;
         persistent = autoRefresh || provider === "github" && account.expiresAt === null;
         grantedScopes = proof.scopes;
         if (!autoRefresh && account.expiresAt && account.expiresAt.getTime() <= Date.now()) { state = "expired"; reason = "La autorización temporal venció. Conecte su cuenta una vez más para mantenerla guardada."; }
         else {
-          if (!inventory || autoRefresh && !inventory.persistentOAuthReady) throw new ConnectorError("oauth_unavailable", "No pudimos comprobar el escritorio que guarda esta conexión.", 503);
+          if (!inventory || autoRefresh && (!inventory.persistentOAuthReady || provider === "github" && !inventory.githubPersistentOAuthReady)) throw new ConnectorError("oauth_unavailable", "No pudimos comprobar el escritorio que guarda esta conexión.", 503);
           if (!saved?.configured || saved.needsSignIn) throw new ConnectorError("oauth_reconnect_required", "La conexión guardada necesita autorización de su cuenta.", 409);
           const liveCheck = await testConnector(user, workspace.id, name);
           if (!liveCheck.ok || !liveCheck.tested) throw new ConnectorError(liveCheck.code === "oauth_reconnect_required" ? "oauth_reconnect_required" : "oauth_unavailable", "No se pudo comprobar el acceso a esta aplicación.", 409);

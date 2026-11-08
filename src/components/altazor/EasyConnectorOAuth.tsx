@@ -215,7 +215,7 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
     {error && <p role="alert" className={styles.error}>{error}</p>}{notice && <p role="status" className={styles.notice}>{notice}</p>}
     {loading ? <p role="status">Comprobando conexión…</p> : !workspaceId ? <p>Abre tu <a href={computerHref}>escritorio de Altazor</a> para preparar este espacio y conectar tu cuenta.</p> : <>
       {connected && <p role="status">{current?.autoRefresh ? "Conexión guardada. El acceso se renueva automáticamente." : "Conexión guardada para este espacio."}</p>}
-      {provider !== "github" && connected && !current?.autoRefresh && (provider !== "google" || current?.canReadFiles) && <div className={styles.actions}>
+      {(provider !== "github" || !current?.persistent) && connected && !current?.autoRefresh && (provider !== "google" || current?.canReadFiles) && <div className={styles.actions}>
         <p>Autoriza una vez la renovación automática para mantener tu cuenta conectada.</p>
         <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); void connect(provider === "google" ? "files" : "basic"); }}>Mantener conexión<ArrowUpRight size={16} aria-hidden="true" /></button>
       </div>}

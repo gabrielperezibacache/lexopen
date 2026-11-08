@@ -191,6 +191,6 @@ test("readiness contract works against a synthetic loopback HTTP server", async 
   try {
     const address = server.address(); assert.ok(address && typeof address !== "string");
     const client = new KittiesGateway(`http://127.0.0.1:${address.port}`, token);
-    assert.deepEqual(await client.readiness("model-fixture", []), { version: "synthetic-contract-fixture", connectorGate: false, persistentOAuth: false, cloudFileOAuth: false });
+    assert.deepEqual(await client.readiness("model-fixture", []), { version: "synthetic-contract-fixture", connectorGate: false, persistentOAuth: false, cloudFileOAuth: false, githubPersistentOAuth: false });
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });

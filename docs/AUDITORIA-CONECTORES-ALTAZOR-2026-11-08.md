@@ -99,6 +99,12 @@ Las autorizaciones y las respuestas técnicas de Dropbox y OneDrive se presentan
 
 La revisión independiente detectó que un modelo podía copiar el formato textual de una consulta y obtener su presentación visual de resultado. Ahora sólo un turno de aprobación generado por el gateway recibe la marca de procedencia del conector; el modelo no puede declararla mediante su texto ni mediante un campo de origen. Además se comprueba que el servicio y la acción sean compatibles. Los recibos tipados de archivos siguen verificándose por separado.
 
+Una prueba real con el modelo local mostró otro error: trató una carpeta como PDF y convirtió una página de resultados en una afirmación sobre toda la cuenta. Los servicios ahora entregan metadatos con tipos explícitos y límites. Para los encargos inequívocos de mostrar sólo nombres, LexOpen filtra y cuenta los resultados mediante código, después de comprobar el origen y la autorización; no vuelve a consultar al modelo. Una carpeta llamada `.pdf` sigue siendo carpeta y un tipo incierto nunca se presenta como PDF. Los resultados siempre se refieren a la consulta recibida, con aviso de recorte cuando corresponde.
+
+La revalidación de GitHub también reveló que una autorización temporal había vencido. Su modalidad actual permite accesos de ocho horas con un permiso de renovación; el flujo anterior descartaba ese permiso. Se añadió su almacenamiento y rotación segura para web y dispositivo, manteniendo únicamente `read:user`, y una opción para convertir la conexión temporal sin desconectarla. Las autorizaciones clásicas sin vencimiento conservan su funcionamiento. No se desactiva la caducidad del proveedor. [Protocolo oficial de GitHub](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps).
+
+Las pruebas automáticas comprueban renovación, rotación, concurrencia, reinicio, permisos y rechazo de respuestas inválidas. La validación con cuentas reales distingue guardar el par renovable, reiniciar y consultar del hecho de observar una rotación al vencer: esta última sólo se acredita cuando se alcanza su ventana natural, sin manipular fechas ni credenciales para simularla.
+
 ## Orden de continuidad
 
 1. Completar la identidad de Microsoft y comprobar su cuenta y un archivo seleccionado.
