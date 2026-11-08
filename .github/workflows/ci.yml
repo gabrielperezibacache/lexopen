@@ -220,7 +220,7 @@ jobs:
           pdftotext "$RUNNER_TEMP"/workbench-output/*.pdf "$RUNNER_TEMP/workbench-output/opened.txt"
           test -s "$RUNNER_TEMP/workbench-output/opened.txt"
           node -e 'if(!require("fs").readFileSync(process.argv[1],"utf8").includes("análisis"))process.exit(1)' "$RUNNER_TEMP/workbench-output/opened.txt"
-  build:
+  application:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     services:
@@ -278,23 +278,69 @@ jobs:
       - run: npm run test:integration
       - run: npm run lint
       - run: npm run build
-      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:pjud:browser
-      - name: General browser regression
-        run: npm run e2e
+      - name: Retain the exact compiled application for browser jobs
+        uses: actions/upload-artifact@v7
+        with:
+          name: application-build-${{ github.run_id }}
+          path: |
+            .next
+            !.next/cache/**
+            !.next/dev/**
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+  browser-general:
+    name: General browser ${{ matrix.shard }}/4
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    uses: ./.github/workflows/browser-check.yml
+    with:
+      project: chromium
+      shard-index: ${{ matrix.shard }}
+      shard-total: 4
+  browser-cross:
+    name: Compiled ${{ matrix.browser }}
+    needs: application
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    uses: ./.github/workflows/browser-check.yml
+    with:
+      project: ${{ matrix.browser }}
+      compiled: true
+  browser-audio:
+    name: Compiled native audio
+    needs: application
+    uses: ./.github/workflows/browser-check.yml
+    with:
+      project: chromium-audio
+      compiled: true
+  build:
+    name: build
+    if: ${{ always() }}
+    needs: [application, browser-general, browser-cross, browser-audio, altazor-computer-runtime, workbench-runtime]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Require every application, browser and runtime check
         env:
-          CODEX_BIN: ${{ github.workspace }}/e2e/fixtures/codex-app-server.mjs
-          CODEX_DATA_DIR: /tmp/lexopen-codex-e2e
-      # Real network cuts must use the compiled server: the fault injector does
-      # not proxy the development server's HMR WebSocket.
-      - name: Compiled cross-browser offline regression
-        run: npm run e2e:cross
-        env:
-          CODEX_BIN: ${{ github.workspace }}/e2e/fixtures/codex-app-server.mjs
-          CODEX_DATA_DIR: /tmp/lexopen-codex-e2e
-      - name: Native audio against the compiled server
-        run: npm run e2e:audio
-        env:
-          E2E_SERVER_MODE: production
-          CODEX_BIN: ${{ github.workspace }}/e2e/fixtures/codex-app-server.mjs
-          CODEX_DATA_DIR: /tmp/lexopen-codex-e2e
+          CHECK_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node - <<'JS'
+          const checks = JSON.parse(process.env.CHECK_RESULTS);
+          const required = ['application', 'browser-general', 'browser-cross', 'browser-audio', 'altazor-computer-runtime', 'workbench-runtime'];
+          const failed = required.filter(name => checks[name]?.result !== 'success');
+          if (failed.length) {
+            console.error('Required checks did not pass:', failed.join(', '));
+            process.exit(1);
+          }
+          console.log('Every required application, browser and runtime check passed.');
+          JS
