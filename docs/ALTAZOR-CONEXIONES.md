@@ -111,9 +111,19 @@ Proteja directorios y respaldos del gateway con una cuenta de sistema dedicada y
 
 ### Construir el gateway reforzado
 
-La construcción del servicio usa una revisión fija, identificada en el [flujo de comprobación del escritorio](../.github/workflows/ci.yml). Ese flujo prepara una copia limpia, verifica la revisión, aplica primero `harden-connectors.mjs` y después `harden-async-messages.mjs`, y ejecuta sus pruebas antes de compilar. Si ya hay un paquete publicado para tu versión y arquitectura, sigue la [preparación del escritorio](ESCRITORIO-ALTAZOR.md).
+La construcción del servicio usa una revisión fija, identificada en el [flujo de comprobación del escritorio](../.github/workflows/ci.yml). La [receta única del gateway](../scripts/altazor/prepare-gateway-source.mjs) aplica los catorce refuerzos ordenados hasta `gateway.12`, con sus pruebas de scripts y los pasos de formato necesarios entre etapas. Incluye las conexiones persistentes, las descargas verificadas, las autorizaciones del computador y la creación inicial de cuentas autorizadas. CI y la compilación manual deben usar esa misma receta.
 
 Para compilar manualmente, reproduce esos pasos en directorios nuevos, sin archivos ni credenciales del usuario. El refuerzo valida las huellas de la revisión, desactiva los cambios de permisos solicitados por el modelo y exige confirmación por operación. No lo apliques sobre los datos de una instalación existente.
+
+Después de archivar la revisión pública y crear su marcador `.lexopen-source-commit` como indica CI, ejecuta:
+
+```sh
+node scripts/altazor/prepare-gateway-source.mjs /ruta/al/codigo-publico-archivado
+```
+
+Necesita Node.js y `gofmt` de la versión de Go fijada en CI. `LEXOPEN_GOFMT` permite indicar la ruta de ese ejecutable. La receta prepara sólo el código: no compila ni instala un servicio, no crea credenciales ni cambia una instancia existente. Ante un error se detiene sin reintentar; conserva la copia para el diagnóstico y utiliza otra copia limpia al corregirlo. Las pruebas Go y la compilación se ejecutan después, como en CI.
+
+El instalador actual prepara automáticamente **la imagen de herramientas** (ofimática, OCR, PDF y audio). El gateway dedicado y su configuración por profesional se instalan por separado. Descargar esa imagen o completar esta receta no acredita que el servicio esté instalado ni conectado. Comprueba su respuesta de salud y la conexión desde LexOpen.
 
 La respuesta de salud de la compilación reforzada debe incluir `lexopen_connector_gate: "v1"` y `lexopen_connector_platform` con su sistema real. LexOpen exige esa capacidad antes de habilitar conexiones; un gateway sin el refuerzo puede seguir ofreciendo el escritorio sin conectores. El indicador es una capacidad del ejecutable administrado localmente, no una certificación externa.
 

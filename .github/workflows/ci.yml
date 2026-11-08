@@ -116,59 +116,8 @@ jobs:
           git -C "$upstream" archive HEAD | tar -xf - -C "$source_dir"
           test ! -e "$source_dir/.git"
           printf '%s\n' 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3 > "$source_dir/.lexopen-source-commit"
-          node scripts/altazor/harden-connectors.test.mjs
-          node scripts/altazor/harden-connectors.mjs "$source_dir"
-          node scripts/altazor/harden-async-messages.test.mjs
-          node scripts/altazor/harden-async-messages.mjs "$source_dir"
-          node scripts/altazor/harden-read-files.test.mjs
-          node scripts/altazor/harden-read-files.mjs "$source_dir"
-          node scripts/altazor/harden-vision-context.test.mjs
-          node scripts/altazor/harden-vision-context.mjs "$source_dir"
-          node scripts/altazor/harden-native-connector-schema.test.mjs
-          node scripts/altazor/harden-native-connector-schema.mjs "$source_dir"
-          node scripts/altazor/harden-connector-file-focus.test.mjs
-          node scripts/altazor/harden-connector-file-focus.mjs "$source_dir"
-          node scripts/altazor/harden-native-file-actions.test.mjs
-          node scripts/altazor/harden-native-file-actions.mjs "$source_dir"
-          node scripts/altazor/harden-readable-file-results.test.mjs
-          node scripts/altazor/harden-readable-file-results.mjs "$source_dir"
-          node scripts/altazor/harden-compact-file-results.test.mjs
-          node scripts/altazor/harden-compact-file-results.mjs "$source_dir"
-          node scripts/altazor/harden-persistent-oauth.test.mjs
-          node scripts/altazor/harden-persistent-oauth.mjs "$source_dir"
-          gofmt -w "$source_dir/internal/chat/approve.go" "$source_dir/internal/chat/chat.go" "$source_dir/internal/approvals/approvals.go" "$source_dir/internal/gateway/gateway.go" "$source_dir/internal/connector/connector.go"
-          node scripts/altazor/harden-staged-file-actions.test.mjs
-          node scripts/altazor/harden-staged-file-actions.mjs "$source_dir"
-          gofmt -w "$source_dir/internal/chat/approve.go" "$source_dir/internal/chat/chat.go" "$source_dir/internal/approvals/approvals.go" "$source_dir/internal/gateway/gateway.go" "$source_dir/internal/connector/connector.go" "$source_dir/internal/oauth/oauth.go" \
-            "$source_dir/internal/connector/lexopen_staged_file_receipt.go" \
-            "$source_dir/internal/approvals/lexopen_staged_file_store.go" "$source_dir/internal/approvals/lexopen_staged_file_store_test.go" \
-            "$source_dir/internal/chat/lexopen_staged_file_actions.go" "$source_dir/internal/chat/lexopen_staged_file_inspect.go" "$source_dir/internal/chat/lexopen_staged_file_actions_test.go" \
-            "$source_dir/internal/gateway/lexopen_staged_file_actions.go" "$source_dir/internal/gateway/lexopen_staged_file_actions_test.go"
-          node scripts/altazor/harden-cloud-file-connectors.test.mjs
-          node scripts/altazor/harden-cloud-file-connectors.mjs "$source_dir"
-          gofmt -w "$source_dir/internal/oauth/lexopen_cloud_file.go" \
-            "$source_dir/internal/oauth/lexopen_cloud_file_test.go" \
-            "$source_dir/internal/chat/lexopen_cloud_file.go" \
-            "$source_dir/internal/chat/lexopen_cloud_file_test.go" \
-            "$source_dir/internal/connector/lexopen_cloud_file.go" \
-            "$source_dir/internal/connector/lexopen_cloud_file_test.go" \
-            "$source_dir/internal/gateway/lexopen_cloud_file_test.go"
-          node scripts/altazor/harden-computer-use-policy.test.mjs
-          node scripts/altazor/harden-computer-use-policy.mjs "$source_dir"
-          gofmt -w "$source_dir/internal/chat/chat.go" \
-            "$source_dir/internal/chat/actions.go" \
-            "$source_dir/internal/chat/approve.go" \
-            "$source_dir/internal/approvals/approvals.go" \
-            "$source_dir/internal/gateway/gateway.go" \
-            "$source_dir/internal/gateway/approvals.go" \
-            "$source_dir/internal/chat/lexopen_computer_use_test.go" \
-            "$source_dir/internal/chat/lexopen_computer_use.go" \
-            "$source_dir/internal/desktop/lexopen_computer_use_test.go" \
-            "$source_dir/internal/desktop/lexopen_computer_use.go" \
-            "$source_dir/internal/approvals/lexopen_computer_use_test.go" \
-            "$source_dir/internal/approvals/lexopen_computer_use.go" \
-            "$source_dir/internal/gateway/lexopen_computer_use_test.go" \
-            "$source_dir/internal/gateway/lexopen_computer_use.go"
+          node scripts/altazor/prepare-gateway-source.test.mjs
+          node scripts/altazor/prepare-gateway-source.mjs "$source_dir"
           (cd "$source_dir" && go test ./internal/chat ./internal/connector ./internal/gateway ./internal/oauth ./internal/orchestrator ./internal/approvals ./internal/desktop -run '^TestLexOpen' -count=1)
           make -C "$source_dir" WEB=0 VERSION=lexopen-ci build
           node scripts/altazor/prepare-computer-ci.test.mjs
