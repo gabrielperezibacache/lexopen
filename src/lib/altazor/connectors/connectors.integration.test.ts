@@ -24,7 +24,13 @@ async function main() {
     assert.equal(target.hostname, "127.0.0.1"); assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-connector-gateway-token");
     let result: unknown;
     const body = init?.body ? JSON.parse(String(init.body)) : {};
-    if (path === "/v1/health") result = { ok: true, containers: true, version: "connector-fixture", lexopen_async_messages: "v1", ...(gateReady ? { lexopen_connector_gate: "v1" } : {}), lexopen_connector_platform: "linux" };
+    if (/^\/v1\/lexopen\/chats\/[A-Za-z0-9_-]{1,100}\/computer-policy$/.test(target.pathname)) {
+      assert.equal(init?.method || "GET", "GET", "Legacy fixtures never grant computer-use permissions");
+      const binding = target.searchParams.get("binding"), kittyId = target.searchParams.get("kitty");
+      assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
+      return Response.json({ applied: false, chat_id: target.pathname.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
+    }
+    if (path === "/v1/health") result = { ok: true, containers: true, lexopen_computer_use_policy: "v1", version: "connector-fixture", lexopen_async_messages: "v1", ...(gateReady ? { lexopen_connector_gate: "v1" } : {}), lexopen_connector_platform: "linux" };
     else if (path === "/v1/providers") result = { providers: [{ name: "connector-model", kind: "openai" }] };
     else if (path === "/v1/kitties" && method === "GET") result = { kitties: fleet };
     else if (path === "/v1/kitties" && method === "POST") {

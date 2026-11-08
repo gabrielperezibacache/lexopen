@@ -1,6 +1,6 @@
 {
   "name": "lexopen-desktop",
-  "version": "1.1.0-preview.7",
+  "version": "1.1.0-preview.8",
   "private": true,
   "author": "LexOpen contributors",
   "description": "LexOpen Desktop — host local del estudio + cliente remoto (Tailscale)",
@@ -21,26 +21,26 @@
     "@prisma/fetch-engine": "^5.22.0",
     "@prisma/get-platform": "^5.22.0",
     "electron-store": "^8.2.0",
-    "electron-updater": "^6.8.9",
+    "electron-updater": "^6.8.11",
     "embedded-postgres": "^17.5.0-beta.15",
     "prisma": "^5.22.0",
-    "tsx": "^4.19.4"
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
-    "electron": "^43.3.0",
-    "electron-builder": "26.15.3",
+    "electron": "^43.8.7",
+    "electron-builder": "26.18.0",
     "@electron/asar": "3.4.1",
-    "js-yaml": "4.3.1"
+    "js-yaml": "4.3.2"
   },
   "optionalDependencies": {
     "@embedded-postgres/darwin-arm64": "17.5.0-beta.15",
     "@embedded-postgres/darwin-x64": "17.5.0-beta.15",
     "@embedded-postgres/linux-x64": "17.5.0-beta.15",
     "@embedded-postgres/windows-x64": "17.5.0-beta.15",
-    "@esbuild/darwin-arm64": "0.25.12",
-    "@esbuild/darwin-x64": "0.25.12",
-    "@esbuild/linux-x64": "0.25.12",
-    "@esbuild/win32-x64": "0.25.12"
+    "@esbuild/darwin-arm64": "0.28.2",
+    "@esbuild/darwin-x64": "0.28.2",
+    "@esbuild/linux-x64": "0.28.2",
+    "@esbuild/win32-x64": "0.28.2"
   },
   "homepage": "https://github.com/gabrielperezibacache/lexopen",
   "repository": {

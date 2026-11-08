@@ -125,27 +125,29 @@ export function TaskStatusButton({
   updatedAt: string;
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const busy = loadingAction !== null;
   const [error, setError] = useState("");
   const submission = useRef(createSubmissionKeys());
 
   async function setStatus(next: string) {
     if (busy) return;
-    setBusy(true);
+    setLoadingAction(next);
     setError("");
     const payload = { id: taskId, status: next, expectedUpdatedAt: updatedAt };
+    try {
     const result = await apiMutation(`/api/sites/${siteId}/tasks`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "Idempotency-Key": submission.current.forPayload(payload) },
       body: JSON.stringify(payload),
     });
-    setBusy(false);
     if (!result.ok) {
       setError(result.error || "No se pudo actualizar la tarea");
       return;
     }
     submission.current.complete(payload);
     router.refresh();
+    } finally { setLoadingAction(null); }
   }
   if (status === "done") {
     return <span className="text-sm text-[var(--ok)]">{STATUS_LABEL.done}</span>;
@@ -158,18 +160,20 @@ export function TaskStatusButton({
             className="btn btn-ghost"
             type="button"
             disabled={busy}
+            aria-busy={loadingAction === "in_progress"}
             onClick={() => setStatus("in_progress")}
           >
-            En curso
+            {loadingAction === "in_progress" ? "Actualizando…" : "En curso"}
           </button>
         )}
         <button
           className="btn btn-ghost"
           type="button"
           disabled={busy}
+          aria-busy={loadingAction === "done"}
           onClick={() => setStatus("done")}
         >
-          Marcar hecha
+          {loadingAction === "done" ? "Marcando…" : "Marcar hecha"}
         </button>
       </div>
       {error && <p role="alert" className="mt-1 text-sm text-[var(--danger)]">{error}</p>}

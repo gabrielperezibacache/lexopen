@@ -54,17 +54,17 @@ jobs:
       ALTAZOR_COMPUTER_ENABLED: "1"
       LEXOPEN_ALTAZOR_TEST_DOCKER: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Read pinned desktop gateway source without persisted credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: madkoding/kitties
           ref: 6aee950bdf971ff41f3867763a0ec9f5ef8ef8e3
           path: .tmp/kitties-upstream
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -125,7 +125,7 @@ jobs:
           printf 'KITTIES_CI_SOURCE=%s\n' "$source_dir" >> "$GITHUB_ENV"
       - name: Retrieve the same desktop source archive bundled by native installers
         if: ${{ inputs.package_altazor && startsWith(github.ref, 'refs/tags/v') }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: altazor-desktop-source-context
           path: ${{ runner.temp }}/altazor-desktop-source
@@ -154,7 +154,7 @@ jobs:
         env:
           ALTAZOR_TOOLPACK_ARCH: ${{ matrix.architecture }}
       - name: Retain safe fictitious runtime evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.evidence }}
           path: ${{ env.KITTIES_CI_OUTPUT }}/
@@ -181,7 +181,7 @@ jobs:
           test "$(docker image inspect --format '{{.Id}}' "$profile_tag")" = "$KITTIES_CI_IMAGE_ID"
       - name: Retain the desktop verification receipt
         if: ${{ inputs.package_altazor && startsWith(github.ref, 'refs/tags/v') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: altazor-toolpack-receipt-${{ matrix.architecture }}
           path: ${{ runner.temp }}/altazor-toolpack/*.json
@@ -193,8 +193,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -246,8 +246,8 @@ jobs:
       LEXOPEN_RELAX_CSRF: "1"
       LEXOPEN_PDF_REQUIRE_TOOLS: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm

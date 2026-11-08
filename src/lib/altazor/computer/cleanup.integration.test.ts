@@ -25,7 +25,13 @@ async function main() {
     assert.equal(/artifacts|\/exec|settings|vault|local-token|control|input|messages/.test(path), false);
     if (method !== "GET") posts.push(path);
     const fleet = fleets.get(url.origin) || []; fleets.set(url.origin, fleet);
-    if (path === "/v1/health") { const pause = pauseHealth; pauseHealth = undefined; if (pause) await pause(); return Response.json({ ok: true, containers: true, version: "fictitious-cleanup", lexopen_async_messages: "v1" }); }
+    if (/^\/v1\/lexopen\/chats\/[A-Za-z0-9_-]{1,100}\/computer-policy$/.test(url.pathname)) {
+      assert.equal(init?.method || "GET", "GET", "Legacy fixtures never grant computer-use permissions");
+      const binding = url.searchParams.get("binding"), kittyId = url.searchParams.get("kitty");
+      assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
+      return Response.json({ applied: false, chat_id: url.pathname.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
+    }
+    if (path === "/v1/health") { const pause = pauseHealth; pauseHealth = undefined; if (pause) await pause(); return Response.json({ ok: true, containers: true, lexopen_computer_use_policy: "v1", version: "fictitious-cleanup", lexopen_async_messages: "v1" }); }
     if (path === "/v1/providers") return Response.json({ providers: [{ name: "cleanup-model", kind: "openai" }] });
     if (path === "/v1/kitties" && method === "GET") return Response.json({ kitties: fleet });
     if (/^\/v1\/kitties\/[\w-]+$/.test(path) && method === "GET") return Response.json({ kitty: fleet.find(kitty => kitty.id === path.split("/").pop() || kitty.name === path.split("/").pop()) });

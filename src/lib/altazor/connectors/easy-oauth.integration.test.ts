@@ -32,7 +32,13 @@ async function main() {
     const url = new URL(String(raw)), method = init?.method || "GET";
     if (url.origin !== "http://127.0.0.1:18999") { wrongDestination++; throw new Error("Unexpected fictitious gateway destination"); }
     assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-easy-oauth-gateway");
-    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate, ...(persistentGate ? { lexopen_persistent_oauth: "v1" } : {}), ...(cloudGate ? { lexopen_cloud_file_oauth: "v1" } : {}), ...(aliasCreateGate ? { lexopen_oauth_alias_create: "v1" } : {}) });
+    if (/^\/v1\/lexopen\/chats\/[A-Za-z0-9_-]{1,100}\/computer-policy$/.test(url.pathname)) {
+      assert.equal(init?.method || "GET", "GET", "Legacy fixtures never grant computer-use permissions");
+      const binding = url.searchParams.get("binding"), kittyId = url.searchParams.get("kitty");
+      assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
+      return Response.json({ applied: false, chat_id: url.pathname.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
+    }
+    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, lexopen_computer_use_policy: "v1", version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate, ...(persistentGate ? { lexopen_persistent_oauth: "v1" } : {}), ...(cloudGate ? { lexopen_cloud_file_oauth: "v1" } : {}), ...(aliasCreateGate ? { lexopen_oauth_alias_create: "v1" } : {}) });
     if (url.pathname === "/v1/providers") return Response.json({ providers: [{ name: "fixture-model", kind: "openai" }] });
     if (url.pathname === "/v1/kitties") return Response.json({ kitties: [] });
     if (url.pathname === "/v1/settings") return Response.json(snapshot());
