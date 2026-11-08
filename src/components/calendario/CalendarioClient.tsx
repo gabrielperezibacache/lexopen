@@ -11,6 +11,8 @@ import { ConfirmDialog, formatDateTime } from "@/components/ui";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { EventoForm, type EventoFormDefaults } from "@/components/calendario/EventoForm";
 
+import { useHydrated } from "./useHydrated";
+
 type Option = { id: string; label: string };
 
 export type EventoListItem = {
@@ -62,6 +64,7 @@ export function CalendarioClient({
   autoOpenNuevo: boolean;
   currentYm: string;
 }) {
+  const hydrated = useHydrated();
   const router = useRouter();
   const { dict, t } = useI18n();
   const [formOpen, setFormOpen] = useState(autoOpenNuevo);
@@ -184,7 +187,7 @@ export function CalendarioClient({
                 {e.tipo === "audiencia" ? "Audiencia · " : ""}{e.titulo}
               </button>
               <div className="text-xs text-[var(--ink-soft)]/65">
-                {e.todoElDia ? `${formatCivilDate(e.inicio)} · Todo el día` : formatDateTime(e.inicio)}
+                {e.todoElDia ? `${formatCivilDate(e.inicio)} · Todo el día` : hydrated ? formatDateTime(e.inicio) : <time dateTime={e.inicio}>…</time>}
                 {e.causaLabel ? (
                   <>
                     {" · "}

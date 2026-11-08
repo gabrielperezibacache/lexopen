@@ -4,6 +4,7 @@ import { FormEvent, useId, useRef, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
 import { operationKey } from "@/lib/client-submission-key";
 import { eventFormDates } from "@/lib/calendario/form-dates";
+import { useHydrated } from "./useHydrated";
 
 type Option = { id: string; label: string };
 
@@ -51,6 +52,7 @@ export function EventoForm({
   onSaved?: (warning?: string | null) => void;
   onCancel?: () => void;
 }) {
+  const hydrated = useHydrated();
   const isEdit = Boolean(defaults?.id);
   const fieldId = useId();
   const submission = useRef<{ key: string; payload: Record<string, unknown> } | null>(null);
@@ -67,7 +69,7 @@ export function EventoForm({
     e.preventDefault();
     setError("");
     setWarning("");
-    if (busy) return;
+    if (!hydrated || busy) return;
     if (!retryingSave || !submission.current) {
       const fd = new FormData(e.currentTarget);
       let dates;
@@ -117,9 +119,10 @@ export function EventoForm({
   return (
     <form
       onSubmit={onSubmit}
+      aria-busy={!hydrated || busy}
       className="panel grid grid-cols-1 gap-4 rounded-3xl p-5 sm:grid-cols-2 lg:grid-cols-4"
     >
-      <fieldset disabled={busy || retryingSave} className="contents">
+      <fieldset disabled={!hydrated || busy || retryingSave} className="contents">
       <legend className="sr-only">Datos del evento</legend>
       <div className="sm:col-span-2">
         <label htmlFor={`${fieldId}-titulo`} className="mb-1 block text-sm font-medium">Título</label>
@@ -227,8 +230,8 @@ export function EventoForm({
         <p role="alert" className="text-sm text-[var(--danger)] sm:col-span-2 lg:col-span-4">{error}</p>
       )}
       <div className="flex gap-2 sm:col-span-2 lg:col-span-4">
-        <button className="btn btn-primary" disabled={busy} type="submit">
-          {busy ? "Guardando…" : retryingSave ? "Reintentar guardado" : isEdit ? "Guardar cambios" : "Crear evento"}
+        <button className="btn btn-primary" disabled={!hydrated || busy} type="submit">
+          {!hydrated ? "Preparando formulario…" : busy ? "Guardando…" : retryingSave ? "Reintentar guardado" : isEdit ? "Guardar cambios" : "Crear evento"}
         </button>
         {onCancel && (
           <button className="btn btn-ghost" type="button" disabled={busy || retryingSave} onClick={onCancel}>

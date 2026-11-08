@@ -101,6 +101,8 @@ test("agenda: día completo conserva sus días al editar, mover y exportar", asy
 });
 
 test("agenda: el aviso de solapamiento permanece después de guardar", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
   const f = await fixture(page);
   try {
     const response = await page.request.post("/api/eventos", { data: { titulo: "Otro evento", causaId: f.cause.id, inicio: "2026-11-24T01:30:00Z", fin: "2026-11-24T03:30:00Z" } });
@@ -110,6 +112,7 @@ test("agenda: el aviso de solapamiento permanece después de guardar", async ({ 
     await page.getByLabel("Fin (opcional)", { exact: true }).fill("2026-11-24T12:00");
     await page.getByRole("button", { name: "Crear evento", exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "Conflicto de agenda" })).toBeVisible();
+    expect(errors).toEqual([]);
     await expect(page.getByRole("button", { name: `Editar ${f.title}`, exact: true })).toBeVisible();
     expect((await page.request.get("/api/eventos?desde=2026-02-31&hasta=2026-12-01")).status()).toBe(400);
     expect((await page.request.get("/api/calendario/ics?desde=2026-12-01&hasta=2026-11-01")).status()).toBe(400);
@@ -138,4 +141,24 @@ test("plazos: validación de fechas, creación manual idempotente y permisos de 
     expect((await page.request.patch("/api/plazos", { data: { id: deadline.id, estado: "cumplido" } })).status()).toBe(403);
     expect((await db.plazo.findUniqueOrThrow({ where: { id: deadline.id } })).estado).toBe("pendiente");
   } finally { await f.cleanup(); }
+});
+
+
+test("agenda espera a sus controles antes de aceptar datos y enviar", async ({ page }) => {
+  const f = await fixture(page);
+  let release!: () => void;
+  const ready = new Promise<void>(resolve => { release = resolve; });
+  await page.route(/\/_next\/.*\.js(?:\?.*)?$/, async route => { await ready; await route.continue(); });
+  try {
+    await page.goto("/calendario?ym=2026-11&tipo=evento&nuevo=1", { waitUntil: "commit" });
+    const title = page.getByLabel("Título", { exact: true });
+    await expect(title).toBeVisible();
+    await expect(title).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Preparando formulario…", exact: true })).toBeDisabled();
+    release();
+    await expect(page.getByRole("button", { name: "Crear evento", exact: true })).toBeEnabled();
+    await title.fill(f.title);
+    await expect(title).toHaveValue(f.title);
+    expect(await db.evento.count({ where: { causaId: f.cause.id } })).toBe(0);
+  } finally { release(); await page.unrouteAll({ behavior: "ignoreErrors" }); await f.cleanup(); }
 });

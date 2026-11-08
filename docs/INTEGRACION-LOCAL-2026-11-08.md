@@ -28,6 +28,8 @@ Relevo Android conserva su Git independiente y se excluye de LexOpen por decisi�
 - Reintentos acotados con espera para transacciones serializables de Altazor; regresión con doce preparaciones simultáneas que convergen en una conversación.
 - Limpieza de fixtures después de finalizar todas las operaciones concurrentes, conservando el error original.
 - Pruebas de navegación adaptadas a la restauración del panel de memoria y al rechazo de orígenes externos.
+- Fechas de Agenda en la zona del navegador después de la hidratación, sin diferencias entre el HTML inicial del servidor y el cliente.
+- Formulario de Agenda bloqueado hasta que sus controles están preparados, para conservar las entradas durante la carga inicial.
 - Simulaciones de fallos de red aisladas del service worker; las pruebas sin conexión continúan usándolo.
 - Actualización de dependencias transitivas vulnerables de escritorio y de minimatch en los dos consumidores afectados, manteniendo electron-builder actual.
 - Separación de la regresión general y de las pruebas sin conexión: estas últimas usan el servidor compilado y CSRF activo en Chromium, Firefox y WebKit.
