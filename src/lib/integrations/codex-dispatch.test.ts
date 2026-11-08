@@ -44,8 +44,9 @@ async function main() {
     const routePreference = await personalCodexPreference("professional_a");
     const routeApproval = { provider: "codex", model: routeModel, ...await codexDestinationFor("professional_a", { ...routePreference, model: routeModel }) };
     codexModel = routeModel;
+    const callsBeforeRoute = codexCalls;
     const routed = await askLlm({ ...input, route: { provider: "codex", model: routeModel }, expectedDestination: routeApproval });
-    assert.equal(routed.source, "llm"); assert.equal(routed.model, routeModel); assert.equal(codexCalls, 2);
+    assert.equal(routed.source, "llm"); assert.equal(routed.model, routeModel); assert.equal(codexCalls, callsBeforeRoute + 1);
     codexModel = "fixture-model";
     const beforeSwitch = codexCalls;
     source = "host"; shared = true;
