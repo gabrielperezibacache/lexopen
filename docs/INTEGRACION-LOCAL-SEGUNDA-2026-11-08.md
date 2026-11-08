@@ -26,4 +26,6 @@ Las pruebas completas de integración, las nuevas integraciones de causas y herr
 
 El primer empaquetado remoto de macOS ARM agotó el heap predeterminado de V8 (2 GiB) durante TypeScript, después de compilar el código. El paso de construcción nativa dispone ahora de 4 GiB de heap; conserva la comprobación completa de tipos y no altera la memoria del Host instalado. La validación remota se repite sobre este ajuste.
 
+La prueba de creación simultánea de plazos asumía que el primer elemento del arreglo ganaba la escritura y devolvía un objeto Date. Un replay válido procede del recibo JSON y devuelve ISO. Ahora comprueba las dos respuestas concurrentes y un replay forzado con fechas normalizadas y una única fila persistida; los recordatorios reciben la fecha Date explícita. No modifica el contrato JSON ni los permisos de los comandos.
+
 Relevo Android y las capturas locales permanecen separados de la publicación. No se ejecutan migraciones sobre bases de usuarios ni se publica una versión.
