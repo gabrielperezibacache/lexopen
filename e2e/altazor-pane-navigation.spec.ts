@@ -69,7 +69,7 @@ test("Aplicaciones explícitas conserva Dropbox y el retorno OAuth al restaurar 
   const destination = { provider: "synthetic", model: "fixture", endpoint: "http://127.0.0.1:18999", endpointHash: "fixture", remote: false, permitted: true, key: "pane-fixture-destination" };
   const saved = { activeConversationId: conversationId, selectionUnavailable: false, memoryEnabled: true, backgroundEnabled: true, revision: 4 };
   const data = { conversation, turns: [], attachments: [], destination, hasMore: false, beforeOrdinal: null };
-  let armed = false, resources = 0, details = 0, accountReads = 0;
+  let armed = false, holdingScopeRefresh = false, resources = 0, details = 0, accountReads = 0;
   let releaseBootstrap!: () => void, releaseResources!: () => void, releaseDetails!: () => void;
   const bootstrap = new Promise<void>(resolve => { releaseBootstrap = resolve; });
   const synchronization = new Promise<void>(resolve => { releaseResources = resolve; });
@@ -77,7 +77,8 @@ test("Aplicaciones explícitas conserva Dropbox y el retorno OAuth al restaurar 
   const writes: string[] = [];
   await page.context().route("**/*", route => { const url = new URL(route.request().url()); return ["http:", "https:"].includes(url.protocol) && !["localhost", "127.0.0.1"].includes(url.hostname) ? route.abort() : route.continue(); });
   await page.route(/\/api\/altazor\/resources(?:\?.*)?$/, async route => {
-    if (armed) { resources++; await (resources === 1 ? bootstrap : synchronization); }
+    // Strict Mode can start more than one bootstrap request in development.
+    if (armed) { resources++; await (holdingScopeRefresh ? synchronization : bootstrap); }
     await route.fulfill({ json: { causas: [] } });
   });
   await page.route("**/api/altazor/companion", async route => { if (armed) await bootstrap; await route.fulfill({ json: saved }); });
@@ -100,6 +101,7 @@ test("Aplicaciones explícitas conserva Dropbox y el retorno OAuth al restaurar 
     releaseBootstrap();
     const applications = page.getByRole("heading", { name: "Aplicaciones", exact: true });
     await expect(applications).toBeVisible();
+    holdingScopeRefresh = true;
     releaseDetails(); releaseResources();
     const account = page.getByTestId("easy-connector-oauth"); await expect(account.getByRole("heading", { name: "Dropbox conectado", exact: true })).toBeVisible();
     const assertExplicit = async () => {
