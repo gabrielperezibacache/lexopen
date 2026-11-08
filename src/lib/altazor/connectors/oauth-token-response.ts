@@ -4,6 +4,19 @@ import { ConnectorError } from "@/lib/personal-connectors/core";
 // fixed, locally authored messages may leave the server.
 export function oauthFailureReason(code: string | null) {
   switch (code) {
+    case "oauth_token_network":
+    case "oauth_token_timeout": return "No se pudo completar el intercambio del ingreso con el servicio. Compruebe la conexión antes de iniciar otro ingreso.";
+    case "oauth_account_network":
+    case "oauth_account_timeout": return "El ingreso respondió, pero no se pudo comprobar la cuenta. Compruebe la conexión antes de iniciar otro ingreso.";
+    case "oauth_token_rate_limited":
+    case "oauth_account_rate_limited": return "El servicio limitó temporalmente las solicitudes. Espere antes de iniciar otro ingreso.";
+    case "oauth_token_unavailable":
+    case "oauth_account_unavailable": return "El servicio de la cuenta no está disponible temporalmente. Espere antes de iniciar otro ingreso.";
+    case "oauth_account_http_rejected": return "El servicio no permitió comprobar la cuenta autorizada. La conexión no se guardó.";
+    case "oauth_token_http_rejected":
+    case "oauth_token_rejected": return "El servicio rechazó el intercambio del ingreso. No se guardó la conexión.";
+    case "oauth_token_response_invalid": return "La respuesta al intercambio del ingreso no pudo verificarse. No se guardó la conexión.";
+    case "oauth_account_response_invalid": return "La respuesta de comprobación de la cuenta no pudo verificarse. No se guardó la conexión.";
     case "oauth_client_credentials": return "La preparación de esta aplicación necesita revisarse en Configuración. Después podrá iniciar sesión de nuevo.";
     case "oauth_code_rejected": return "El ingreso venció o ya fue utilizado. Pulse Conectar para iniciar uno nuevo.";
     case "oauth_callback_mismatch": return "La dirección de retorno no coincide con la aplicación registrada. Revísela en Configuración.";

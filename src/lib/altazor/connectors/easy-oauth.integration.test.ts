@@ -22,7 +22,7 @@ async function main() {
   let puts = 0, providerExchanges = 0, wrongDestination = 0, revoked = false, broadScope = false, pauseExchange: (() => Promise<void>) | undefined;
   let dropboxReadGate = true, dropboxIdentity = "dbid:fictitious-account", legacyDropboxStarts = 0, applicationAccepted = true;
   let devicePolls = 0, deviceResult = "authorization_pending";
-  let cloudGate = true;
+  let cloudGate = true, aliasCreateGate = true, providerRequests = 0;
   const legacyProviders = EASY_OAUTH_PROVIDERS.filter(provider => provider !== "microsoft");
   const microsoftClientId = "12345678-abcd-1234-abcd-123456789abc";
   const dropboxScopes = "account_info.read files.content.read files.metadata.read";
@@ -32,7 +32,7 @@ async function main() {
     const url = new URL(String(raw)), method = init?.method || "GET";
     if (url.origin !== "http://127.0.0.1:18999") { wrongDestination++; throw new Error("Unexpected fictitious gateway destination"); }
     assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-easy-oauth-gateway");
-    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate, ...(persistentGate ? { lexopen_persistent_oauth: "v1" } : {}), ...(cloudGate ? { lexopen_cloud_file_oauth: "v1" } : {}) });
+    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate, ...(persistentGate ? { lexopen_persistent_oauth: "v1" } : {}), ...(cloudGate ? { lexopen_cloud_file_oauth: "v1" } : {}), ...(aliasCreateGate ? { lexopen_oauth_alias_create: "v1" } : {}) });
     if (url.pathname === "/v1/providers") return Response.json({ providers: [{ name: "fixture-model", kind: "openai" }] });
     if (url.pathname === "/v1/kitties") return Response.json({ kitties: [] });
     if (url.pathname === "/v1/settings") return Response.json(snapshot());
@@ -60,6 +60,7 @@ async function main() {
     throw new Error("Unexpected fictitious gateway endpoint");
   }) as typeof fetch;
   const providerFetch = (async (raw, init) => {
+    providerRequests++;
     const url = new URL(String(raw));
     assert.equal(url.searchParams.has("access_token"), false); assert.equal(url.username, ""); assert.equal(init?.redirect, "error");
     if (url.href === "https://github.com/login/device/code") {
@@ -120,6 +121,18 @@ async function main() {
     await assert.rejects(start("google", "blocked"), denied(503));
     await assert.rejects(saveEasyOAuthSetup(actor, { provider: "google", clientId: "fictitious-client", clientSecret: "fictitious-secret", confirmed: true }, origin), denied(403));
     const publicOptions = { fetcher: providerFetch, env: { APP_URL: origin, LEXOPEN_DESKTOP: "1", ALTAZOR_DISTRIBUTED_OAUTH: JSON.stringify({ schemaVersion: 1, google: { type: "installed", client_id: "1234567890-fictitiouspublicdesktop.apps.googleusercontent.com", client_secret: "fictitious-public-desktop-parameter" }, github: { type: "device", client_id: "fictitious-public-github" }, dropbox: { type: "public_client", client_id: "fictitiousDropboxPublic" }, microsoft: { type: "public_client", client_id: microsoftClientId } }) } };
+    aliasCreateGate = false;
+    const attemptsBeforeAliasCheck = await prisma.personalOAuthAttempt.count({ where: { ownerId: actor.id } }), requestsBeforeAliasCheck = providerRequests, putsBeforeAliasCheck = puts;
+    for (const provider of ["google", "dropbox", "microsoft"] as const) await assert.rejects(startEasyOAuth(actor, { provider, workspaceId, requestId: `missing-alias-${provider}-${stamp}`, confirmed: true }, origin, publicOptions), error => (error as { code?: string }).code === "oauth_alias_create_required");
+    assert.equal(await prisma.personalOAuthAttempt.count({ where: { ownerId: actor.id } }), attemptsBeforeAliasCheck, "a missing native capability must not create an OAuth attempt");
+    assert.equal(providerRequests, requestsBeforeAliasCheck, "a missing native capability must not contact a provider");
+    assert.equal(puts, putsBeforeAliasCheck, "preflight must not create a placeholder connection");
+    const existingGoogleAlias = easyConnectionName(actor.id, workspaceId, "google");
+    gatewayTokens.set(existingGoogleAlias, { kind: "google-workspace", token: "fictitious-existing-read-access", persistent: true });
+    const existingGoogleStart = await startEasyOAuth(actor, { provider: "google", workspaceId, requestId: `existing-alias-${stamp}`, confirmed: true }, origin, publicOptions);
+    assert.ok(existingGoogleStart.authUrl, "an existing alias remains usable on an older persistent runtime");
+    assert.equal(providerRequests, requestsBeforeAliasCheck); assert.equal(puts, putsBeforeAliasCheck);
+    gatewayTokens.delete(existingGoogleAlias); aliasCreateGate = true;
     const shipped = await easyOAuthSetupStatus(publicOptions);
     assert.equal(shipped.providers[0].configured, true); assert.equal(shipped.providers[0].source, "distributed");
     assert.equal(shipped.providers[1].configured, true); assert.equal(JSON.stringify(shipped).includes("fictitious-public-desktop-parameter"), false);

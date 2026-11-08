@@ -4,7 +4,7 @@ import { assertEasyConnectorRead } from "../connectors/desktop-read-policy";
 
 export type FileReceiptBinding = {
   requestId: string; approvalId: string; chatId: string; kittyId: string;
-  connector: string; kind: "google-workspace" | "github"; action: "download_file";
+  connector: string; kind: "google-workspace" | "github" | "dropbox"; action: "download_file";
   args: Record<string, unknown>;
 };
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -27,8 +27,8 @@ export function normalizeVerifiedFileReceipt(value: unknown, expected: FileRecei
   if (!record(value)) throw invalid();
   const fields = new Set(["state", "request_id", "approval_id", "chat_id", "kitty", "connector", "kind", "action", "target", "local_path", "name", "bytes", "sha256", "pages", "first_line"]);
   if (Object.keys(value).some(key => !fields.has(key)) || ![expected.requestId, expected.approvalId, expected.chatId, expected.kittyId].every(id => identifier.test(id))) throw invalid();
-  const pattern = expected.kind === "google-workspace" ? /^altazor-google-[a-f0-9]{16}$/ : expected.kind === "github" ? /^altazor-github-[a-f0-9]{16}$/ : null;
-  const allowed = expected.kind === "google-workspace" ? ["id", "name", "format"] : ["repo", "path", "ref", "name"];
+  const pattern = expected.kind === "google-workspace" ? /^altazor-google-[a-f0-9]{16}$/ : expected.kind === "github" ? /^altazor-github-[a-f0-9]{16}$/ : expected.kind === "dropbox" ? /^altazor-dropbox-[a-f0-9]{16}$/ : null;
+  const allowed = expected.kind === "google-workspace" ? ["id", "name", "format"] : expected.kind === "dropbox" ? ["path", "name"] : ["repo", "path", "ref", "name"];
   const target = fileReceiptTarget(expected.args);
   try { assertEasyConnectorRead({ kind: expected.kind, connector: expected.connector, action: expected.action, args: { action: expected.action, ...target } }); } catch { throw invalid(); }
   if (!pattern?.test(expected.connector) || Object.keys(target).some(key => !allowed.includes(key)) || !record(value.target) || !sameTarget(value.target, target)) throw invalid();

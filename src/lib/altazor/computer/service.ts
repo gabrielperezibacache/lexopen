@@ -204,8 +204,8 @@ function stagedAction(row: Pick<AltazorComputerAction, "id" | "kind" | "status" 
     const value: unknown = JSON.parse(row.resultJson);
     if (!object(value) || value.staged !== true || value.accepted !== true || value.state !== "pending" || value.requestId !== row.id || typeof value.approvalId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(value.approvalId) || !object(value.fileTask)) return null;
     const task = value.fileTask;
-    if (!["google-workspace", "github"].includes(String(task.kind)) || typeof task.connector !== "string" || !names.includes(task.connector) || task.action !== "download_file" || !object(task.args)) return null;
-    assertEasyConnectorRead({ kind: task.kind as "github" | "google-workspace", connector: task.connector, action: task.action, args: { action: task.action, ...task.args } });
+    if (!["google-workspace", "github", "dropbox"].includes(String(task.kind)) || typeof task.connector !== "string" || !names.includes(task.connector) || task.action !== "download_file" || !object(task.args)) return null;
+    assertEasyConnectorRead({ kind: task.kind as "github" | "google-workspace" | "dropbox", connector: task.connector, action: task.action, args: { action: task.action, ...task.args } });
     return { approvalId: value.approvalId, requestId: row.id, task: task as ExplicitFileTask };
   } catch { return null; }
 }

@@ -140,7 +140,7 @@ export function VerifiedComputerFiles({ files }: { files: readonly VerifiedCompu
       {file.firstLine !== undefined && <p className={styles.firstLine}><span>Primera línea del archivo</span><q>{file.firstLine}</q></p>}
       <details><summary>Origen y verificación</summary><dl>
         <dt>Archivo en el escritorio</dt><dd>{file.localPath}</dd>
-        <dt>Origen</dt><dd>{file.kind === "google-workspace" ? `Google Drive · ${file.target.id}` : `${file.target.repo} · ${file.target.path}${file.target.ref ? ` · ${file.target.ref}` : ""}`}</dd>
+        <dt>Origen</dt><dd>{file.kind === "google-workspace" ? `Google Drive · ${file.target.id}` : file.kind === "dropbox" ? `Dropbox · ${file.target.path}` : `${file.target.repo} · ${file.target.path}${file.target.ref ? ` · ${file.target.ref}` : ""}`}</dd>
         <dt>SHA-256</dt><dd>{file.sha256}</dd>
       </dl></details>
     </li>)}</ul>

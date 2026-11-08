@@ -1,6 +1,7 @@
 /** Disposable PostgreSQL and a completely synthetic native gateway. */
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { prisma } from "@/lib/db";
 import { digest, seal } from "@/lib/personal-connectors/core";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
@@ -13,6 +14,8 @@ async function main() {
   const stamp = randomUUID(), users: string[] = [], workspaces: string[] = [], fixtures: Fixture[] = [];
   const endpoint = "http://127.0.0.1:18889", oldFetch = globalThis.fetch;
   const posts: { path: string; body: Record<string, unknown> }[] = [];
+  const dropboxPdf = await readFile(new URL("../../evidence/pdf-fixtures/mixed-three-pages.pdf", import.meta.url));
+  const dropboxSha = createHash("sha256").update(dropboxPdf).digest("hex");
   let names: string[] = [], requests = 0;
   globalThis.fetch = (async (raw, init) => {
     requests++; const url = new URL(String(raw)), path = url.pathname;
@@ -27,21 +30,21 @@ async function main() {
     if (init?.method === "POST") posts.push({ path, body });
     const kitty = (f: Fixture) => ({ id: f.kittyId, name: f.name, provider: "synthetic-staged-model", desktop: true, container: `kitty-${f.name}`, status: "running", connectors: names, approvals: "ask", backup: "" });
     const approval = (f: Fixture) => ({ id: f.approvalId, kitty: f.kittyId, chat: f.chatId, connector: f.task!.connector, kind: f.task!.kind, action: "download_file", args: { action: "download_file", ...(f.task!.args as object) }, request_id: f.requestId, file_stage_ready: true, status: "pending", at: new Date().toISOString() });
-    if (path === "/v1/health") return Response.json({ ok: true, containers: true, version: "synthetic-files.9", lexopen_connector_gate: "v1", lexopen_file_reads: "v1", lexopen_async_messages: "v1", lexopen_computer_use_policy: "v1", lexopen_staged_file_actions: "v1" });
+    if (path === "/v1/health") return Response.json({ ok: true, containers: true, version: "synthetic-files.11", lexopen_connector_gate: "v1", lexopen_file_reads: "v1", lexopen_async_messages: "v1", lexopen_computer_use_policy: "v1", lexopen_staged_file_actions: "v1", lexopen_cloud_file_oauth: "v1" });
     if (path === "/v1/providers") return Response.json({ providers: [{ name: "synthetic-staged-model", kind: "ollama" }] });
     if (path === "/v1/kitties") return Response.json({ kitties: fixtures.map(kitty) });
     if (path.startsWith("/v1/kitties/")) { const f = fixtures.find(item => item.kittyId === path.split("/").pop()); assert.ok(f); return Response.json({ kitty: kitty(f) }); }
     if (path.endsWith("/file-actions")) {
       const f = fixtures.find(item => item.chatId === path.split("/")[4]); assert.ok(f); assert.equal(f.requestId, null, "staging must not be replayed");
-      f.requestId = String(body.request_id); f.text = String(body.text); f.task = { kind: String(body.connector).includes("-google-") ? "google-workspace" : "github", connector: body.connector, action: body.action, args: body.args };
+      f.requestId = String(body.request_id); f.text = String(body.text); f.task = { kind: String(body.connector).includes("-google-") ? "google-workspace" : String(body.connector).includes("-dropbox-") ? "dropbox" : "github", connector: body.connector, action: body.action, args: body.args };
       if (f.mode === "lost") throw new Error("Synthetic stage acknowledgement lost");
       return Response.json({ state: "pending", approval_id: f.approvalId, request_id: f.requestId });
     }
     if (path === "/v1/approvals") return Response.json({ approvals: fixtures.filter(f => f.requestId && !f.approved).map(approval) });
     if (path.endsWith("/approve")) {
       const f = fixtures.find(item => item.approvalId === path.split("/")[3]); assert.ok(f?.task); assert.equal(f.approved, false, "approval must not be replayed"); f.approved = true;
-      const target = f.task.args as Record<string, unknown>, google = f.task.kind === "google-workspace", name = google ? "drive-document.pdf" : "README.md", sha = google ? "a".repeat(64) : "b".repeat(64);
-      const receipt = { state: "desktop_verified", request_id: f.requestId, approval_id: f.approvalId, chat_id: f.chatId, kitty: f.kittyId, connector: f.task.connector, kind: f.task.kind, action: "download_file", target, local_path: `/home/kitty/work/imports/${sha}/${name}`, name, bytes: google ? 4200 : 8696, sha256: sha, ...(google ? { pages: 3 } : { first_line: "# Synthetic LexOpen README" }) };
+      const target = f.task.args as Record<string, unknown>, google = f.task.kind === "google-workspace", dropbox = f.task.kind === "dropbox", name = google ? "drive-document.pdf" : dropbox ? "Programa de teoría.pdf" : "README.md", sha = google ? "a".repeat(64) : dropbox ? dropboxSha : "b".repeat(64);
+      const receipt = { state: "desktop_verified", request_id: f.requestId, approval_id: f.approvalId, chat_id: f.chatId, kitty: f.kittyId, connector: f.task.connector, kind: f.task.kind, action: "download_file", target, local_path: `/home/kitty/work/imports/${sha}/${name}`, name, bytes: google ? 4200 : dropbox ? dropboxPdf.length : 8696, sha256: sha, ...(google || dropbox ? { pages: 3 } : { first_line: "# Synthetic LexOpen README" }) };
       return Response.json({ approval: { ...approval(f), status: "approved", always: false, ...(f.mode === "missing" ? {} : { structured_receipt: receipt }) } });
     }
     if (path.endsWith("/messages/async")) return Response.json({ request_id: body.request_id, chat_id: path.split("/")[3], status: "accepted", state: "accepted" }, { status: 202 });
@@ -53,7 +56,7 @@ async function main() {
     const outsider = await prisma.user.create({ data: { email: `${stamp}-other@staged-file.invalid`, name: "Synthetic outsider", role: "abogado", password: "not-a-login" } }); users.push(outsider.id);
     const id = randomUUID(), scope = "personal";
     await prisma.altazorComputerWorkspace.create({ data: { id, ownerId: owner.id, scopeKey: scope, endpoint, providerName: "synthetic-staged-model", enabled: true, dedicatedDeclaredAt: new Date(), credentialEnc: seal({ token: "synthetic-staged-token" }, `altazor:computer:${owner.id}:${id}:${scope}`) } }); workspaces.push(id);
-    const suffix = digest(`${owner.id}:${id}`).slice(0, 16); names = [`altazor-google-${suffix}`, `altazor-github-${suffix}`];
+    const suffix = digest(`${owner.id}:${id}`).slice(0, 16); names = [`altazor-google-${suffix}`, `altazor-github-${suffix}`, `altazor-dropbox-${suffix}`];
     async function fixture(label: string, mode: Fixture["mode"] = "success") {
       const row = await prisma.altazorComputerSession.create({ data: { ownerId: owner.id, workspaceId: id, requestId: `${stamp}-${label}`, kittyId: `kitty-${label}`, kittyName: `altazor-${label}-${stamp}`, chatId: `chat-${label}`, state: "ready", connectorNamesJson: JSON.stringify(names), expiresAt: new Date(Date.now() + 300_000) } });
       const f: Fixture = { id: row.id, kittyId: row.kittyId!, name: row.kittyName, chatId: row.chatId!, approvalId: `approval-${label}`, requestId: null, task: null, text: "", approved: false, mode }; fixtures.push(f); return f;
@@ -82,6 +85,17 @@ async function main() {
     await decideComputerApproval(owner, github.id, `github-approve-${stamp}`, github.approvalId, true);
     assert.equal((await readComputerSession(owner, github.id)).verifiedFiles?.[0].firstLine, "# Synthetic LexOpen README");
 
+    const dropbox = await fixture("dropbox"), dropboxText = 'Descarga el archivo "/Docencia/Programa de teoría.pdf" desde Dropbox y verifica cuántas páginas tiene.';
+    const beforeDropbox = posts.length;
+    await sendComputerMessage(owner, dropbox.id, { requestId: `dropbox-${stamp}`, text: dropboxText, files: [], confirmed: true });
+    assert.equal(dropbox.text, dropboxText); assert.deepEqual(dropbox.task?.args, { path: "/Docencia/Programa de teoría.pdf" });
+    const dropboxApproval = await decideComputerApproval(owner, dropbox.id, `dropbox-approve-${stamp}`, dropbox.approvalId, true);
+    assert.equal(dropboxApproval.result?.canContinue, false);
+    const dropboxFile = (await readComputerSession(owner, dropbox.id)).verifiedFiles?.[0];
+    assert.ok(dropboxFile); assert.equal(dropboxFile.kind, "dropbox"); assert.equal(dropboxFile.target.path, "/Docencia/Programa de teoría.pdf"); assert.equal(dropboxFile.bytes, dropboxPdf.length); assert.equal(dropboxFile.sha256, dropboxSha); assert.equal(dropboxFile.pages, 3);
+    assert.deepEqual((await readComputerActivity(owner, null, dropbox.id)).verifiedFiles?.[0], dropboxFile);
+    assert.equal(posts.slice(beforeDropbox).some(post => post.path.includes("/messages")), false, "Dropbox download/receipt must never rely on a model or continuation");
+
     const missing = await fixture("missing", "missing"); await sendComputerMessage(owner, missing.id, { requestId: `missing-${stamp}`, text, files: [], confirmed: true });
     const missingId = `missing-approve-${stamp}`; await assert.rejects(decideComputerApproval(owner, missing.id, missingId, missing.approvalId, true), error => (error as { code?: string }).code === "file_receipt_unknown");
     assert.equal((await prisma.altazorComputerAction.findUniqueOrThrow({ where: { ownerId_requestId: { ownerId: owner.id, requestId: missingId } } })).status, "unknown");
@@ -95,7 +109,7 @@ async function main() {
 
     await sendComputerMessage(owner, github.id, { requestId: `fallback-${stamp}`, text: "Organiza un esquema de investigación", files: [], confirmed: true });
     const fallback = posts.at(-1)!; assert.ok(fallback.path.endsWith("/messages/async")); assert.ok(String(fallback.body.text).startsWith("INSTRUCCIONES DEL ENTORNO")); assert.ok(String(fallback.body.text).endsWith("Organiza un esquema de investigación"));
-    console.log("Staged files PG PASS: raw original task, exact Google PDF/GitHub targets, zero model calls for downloads, one durable approval, verified files on reload/activity, metadata isolation, missing receipt and lost-response fail closed without replay. Synthetic gateway only.");
+    console.log("Staged files PG PASS: raw original task, exact Google/GitHub/Dropbox targets, known PDF byte count/SHA-256/3 pages, zero model calls for downloads, one durable approval, verified files on reload/activity, metadata isolation, missing receipt and lost-response fail closed without replay. Synthetic gateway only.");
   } finally {
     globalThis.fetch = oldFetch;
     await prisma.altazorComputerAction.deleteMany({ where: { ownerId: { in: users } } }); await prisma.altazorComputerSession.deleteMany({ where: { ownerId: { in: users } } }); await prisma.altazorComputerWorkspace.deleteMany({ where: { id: { in: workspaces } } }); await prisma.auditEvent.deleteMany({ where: { actorId: { in: users } } }); await prisma.user.deleteMany({ where: { id: { in: users } } }); await prisma.$disconnect();

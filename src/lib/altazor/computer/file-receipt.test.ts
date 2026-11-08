@@ -89,3 +89,29 @@ test("a failed native download exposes no receipt or provider detail and does no
   assert.equal(result.failed, true); assert.equal(result.canContinue, false); assert.equal(result.verifiedFile, undefined);
   assert.equal(JSON.stringify(result).includes("private provider detail"), false);
 });
+
+test("Dropbox receipts preserve the exact account path and reject substitutions or unverified summaries", () => {
+  const dropbox: FileReceiptBinding = { ...binding, kind: "dropbox", connector: "altazor-dropbox-0123456789abcdef", args: { path: "/Docencia/Programa de teoría.pdf" } };
+  const receipt = { ...wire(), connector: dropbox.connector, kind: dropbox.kind, target: { ...dropbox.args } };
+  const verified = normalizeVerifiedFileReceipt(receipt, dropbox);
+  assert.equal(verified.target.path, dropbox.args.path); assert.equal(verified.pages, 3); assert.equal(verified.sha256, receipt.sha256); assert.equal(verified.bytes, receipt.bytes);
+  assert.deepEqual(normalizeStoredFileReceipt(verified, dropbox), verified);
+  for (const forged of [{ ...receipt, target: { path: "/Docencia/Other.pdf" } }, { ...receipt, target: { ...dropbox.args, id: "invented" } }, { ...receipt, connector: "altazor-dropbox-fedcba9876543210" }, { ...receipt, local_path: "/tmp/claimed.pdf" }, { output: "PDF downloaded, five pages" }]) assert.throws(() => normalizeVerifiedFileReceipt(forged, dropbox), denied);
+  const special = { ...dropbox, args: { path: '/Docencia/Teoría & <prueba> "citada".pdf' } };
+  const nativeJson = JSON.stringify({ ...receipt, target: special.args }).replaceAll("&", "\\u0026").replaceAll("<", "\\u003c").replaceAll(">", "\\u003e");
+  assert.equal(normalizeVerifiedFileReceipt(JSON.parse(nativeJson), special).target.path, special.args.path, "Go JSON escaping must not change the original literal target");
+});
+test("Dropbox staging requires both the staged-transfer and cloud-file capability before any POST", async () => {
+  const dropbox: ExplicitFileTask = { kind: "dropbox", connector: "altazor-dropbox-0123456789abcdef", action: "download_file", args: { path: "/Docencia/Curso.pdf" } };
+  for (const cloud of [false, true]) {
+    let posts = 0;
+    const client: KittiesGateway = new KittiesGateway("http://127.0.0.1:7494", "synthetic-token", async (url, init): Promise<Response> => {
+      if (new URL(String(url)).pathname === "/v1/health") return Response.json({ ok: true, lexopen_staged_file_actions: "v1", ...(cloud ? { lexopen_cloud_file_oauth: "v1" } : {}) });
+      posts++; assert.equal(init?.method, "POST"); assert.deepEqual(JSON.parse(String(init?.body)).args, dropbox.args);
+      return Response.json({ state: "pending", request_id: binding.requestId, approval_id: binding.approvalId });
+    });
+    const operation = client.stageFileAction(binding.chatId, binding.kittyId, binding.requestId, dropbox, 'Descarga el archivo "/Docencia/Curso.pdf" de Dropbox');
+    if (cloud) { assert.equal((await operation).staged, true); assert.equal(posts, 1); }
+    else { await assert.rejects(operation, error => (error as { code?: string }).code === "cloud_file_oauth_required"); assert.equal(posts, 0); }
+  }
+});
