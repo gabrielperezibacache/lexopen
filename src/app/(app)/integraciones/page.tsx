@@ -137,7 +137,7 @@ function IntegracionesInner() {
 
   return (
     <div className={`${styles.area} space-y-6`}>
-      <PageHeader
+      <PageHeader artwork="connections"
         eyebrow={h.eyebrow}
         title={h.title}
         subtitle={h.subtitle}

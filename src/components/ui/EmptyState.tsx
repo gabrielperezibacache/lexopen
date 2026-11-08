@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { FolioSymbol } from "./FolioSymbol";
+import styles from "./EmptyState.module.css";
 
 export function EmptyState({
   title,
@@ -18,19 +19,21 @@ export function EmptyState({
   symbol?: "mark" | "collection" | "evidence";
 }) {
   return (
-    <div className="panel empty-state px-6 py-10 text-center" role="status">
-      <FolioSymbol variant={symbol} className="mx-auto mb-4 h-12 w-12 text-[var(--sea)]" />
-      <h3 className="text-lg font-semibold text-[var(--ink)]">{title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">{description}</p>
-      {(action || (actionLabel && actionHref)) && (
-        <div className="mt-5 flex justify-center">
-          {action || (
-            <Link href={actionHref!} className="btn btn-primary">
-              {actionLabel}
-            </Link>
-          )}
-        </div>
-      )}
+    <div className={`panel empty-state ${styles.state}`} role="status">
+      <div className={styles.folio}><FolioSymbol variant={symbol} className={styles.symbol} /></div>
+      <div className={styles.copy}>
+        <h3 className={styles.title}>{title}</h3>
+        <p className={styles.description}>{description}</p>
+        {(action || (actionLabel && actionHref)) && (
+          <div className={styles.action}>
+            {action || (
+              <Link href={actionHref!} className="btn btn-primary">
+                {actionLabel}
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

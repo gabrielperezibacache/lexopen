@@ -14,7 +14,7 @@
 .root summary { cursor:pointer; padding-block:.8rem; font-size:var(--text-sm); }
 .root :global(.altazor-check) { display:flex; align-items:flex-start; gap:.65rem; line-height:1.6; }
 .root :global(.altazor-check) input { width:18px; height:18px; margin-top:.2rem; flex-shrink:0; accent-color:var(--sea); }
-.header { display:flex; justify-content:space-between; align-items:center; gap:1.5rem; padding-block:.5rem 1.75rem; }
+.header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:1.5rem; padding-block:.5rem 1.75rem; }
 .header p { color:var(--ink-soft); margin-top:.75rem; }
 .navigation { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem 1.5rem; border-bottom:1px solid var(--line); margin-bottom:2rem; }
 .navigation > button { min-height:44px; padding:.6rem 0; border-bottom:2px solid transparent; font-size:var(--text-sm); }

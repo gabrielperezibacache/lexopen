@@ -14,7 +14,7 @@ export default async function FeedbackRoute() {
   const [{ locale }, initial] = await Promise.all([getI18n(), readFeedback(user)]);
   return (
     <div className="min-w-0">
-      <PageHeader title="Feedback"
+      <PageHeader artwork="correspondence" title="Feedback"
         subtitle={locale === "en" ? "Suggest an improvement or report a problem in LexOpen." : "Propón una mejora o avisa si algo falla en LexOpen."}
         actions={<Link className="btn btn-ghost" href="/cuenta"><ArrowLeft size={16} aria-hidden="true" />{locale === "en" ? "My account" : "Mi cuenta"}</Link>}
       />

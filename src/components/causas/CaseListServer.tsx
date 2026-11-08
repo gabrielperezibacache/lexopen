@@ -54,7 +54,7 @@ export async function CaseListServer({ mode, searchParams, organizer = false }: 
   const hasFilters = Boolean(q || materia || origen || monitoreo || rawEstado && rawEstado !== "activa");
   const situation = tr("Situación", "Status"), update = connected ? tr("Seguimiento", "Tracking") : tr("Actualización", "Updated"), options = tr("Opciones", "Options");
   return <div className="space-y-6" data-testid={organizer ? "case-organizer" : connected ? "pjud-workspace" : "manual-cases-workspace"}>
-    <PageHeader title={organizer ? t("nav.myMatters") : connected ? "PJUD · Chile" : tr("Causas", "Matters")}
+    <PageHeader artwork="casefiles" title={organizer ? t("nav.myMatters") : connected ? "PJUD · Chile" : tr("Causas", "Matters")}
       subtitle={organizer ? tr("Organiza los expedientes y consulta sus documentos con Altazor AI.", "Organize your case files and consult their documents with Altazor AI.") : undefined}
       actions={connected ? <>
         <Link className="btn btn-secondary" href="/causas/monitoreo#alta-rol">{tr("Consultar por RIT/ROL", "Search by RIT/ROL")}</Link>

@@ -84,7 +84,7 @@ export default async function PlazosPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader artwork="deadlines"
         eyebrow={h.eyebrow}
         title={h.title}
         subtitle={h.subtitle}

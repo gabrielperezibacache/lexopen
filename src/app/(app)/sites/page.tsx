@@ -76,7 +76,7 @@ export default async function SitesPage({
 
   return (
     <div className={`${styles.area} space-y-6`}>
-      <ModuleHeader
+      <ModuleHeader artwork="workflows"
         eyebrow={t("sites.eyebrow")}
         title={t("sites.title")}
         subtitle={t("sites.subtitle")}

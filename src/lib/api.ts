@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ZodError, type ZodSchema } from "zod";
+import { ZodError, type ZodType } from "zod";
 import {
   getCurrentUser,
   requireCapability,
@@ -47,7 +47,7 @@ export function handleRouteError(e: unknown) {
     return jsonError(message, status);
   }
   if (e instanceof ZodError) {
-    return jsonError(e.errors.map((x) => x.message).join("; "), 400);
+    return jsonError(e.issues.map((x) => x.message).join("; "), 400);
   }
   if (isPrismaSchemaMismatch(e)) {
     log.error("prisma_schema_mismatch", {
@@ -73,7 +73,7 @@ export function handleRouteError(e: unknown) {
   );
 }
 
-export async function parseBody<T>(req: Request, schema: ZodSchema<T>) {
+export async function parseBody<T>(req: Request, schema: ZodType<T>) {
   const body = await req.json().catch(() => ({}));
   return schema.parse(body);
 }

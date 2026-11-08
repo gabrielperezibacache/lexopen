@@ -64,7 +64,7 @@ export default async function ClientesPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader artwork="clients"
         eyebrow={t("crm.eyebrow")}
         title={t("crm.title")}
         subtitle={t("crm.subtitle")}

@@ -41,6 +41,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .categoryLinks,
@@ -71,14 +72,19 @@
 }
 
 .categoryLink[data-active="true"] {
-  color: var(--sea);
-  background: var(--sea-soft);
+  color: var(--action-ink);
+  background: var(--action-bg);
 }
 
 .categoryLink:hover,
 .sectionLink:hover {
   background: var(--mist);
   color: var(--ink);
+}
+
+.categoryLink[data-active="true"]:hover {
+  color: var(--action-ink);
+  background: var(--action-hover);
 }
 
 .categoryLink:focus-visible,
@@ -128,6 +134,11 @@
   font-family: var(--font-fraunces), Georgia, serif;
   font-size: var(--text-xl);
   line-height: var(--leading-tight);
+}
+
+.groupHeader {
+  padding-block-start: var(--space-5);
+  border-block-start: 3px double var(--line-strong);
 }
 
 .groupHeader p {
@@ -186,6 +197,15 @@
 }
 .personalLink:hover strong { text-decoration: underline; text-underline-offset: var(--space-1); }
 .personalLink:focus-visible { outline: 2px solid var(--sea); outline-offset: 2px; }
+
+@media (min-width: 1280px) {
+  .group {
+    grid-template-columns: minmax(11rem, .75fr) minmax(0, 3fr);
+    gap: var(--space-8);
+    align-items: start;
+  }
+  .groupHeader p { line-height: 1.75; }
+}
 
 @media (max-width: 700px) {
   .categoryLinks {

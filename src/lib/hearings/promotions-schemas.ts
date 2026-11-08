@@ -11,5 +11,5 @@ export const hearingPromotionSchema = z.object({
   reviewed: z.literal(true),
 }).strict().superRefine((input, context) => {
   const maximum = input.target === "fact" ? 3000 : input.target === "note" ? 20_000 : 100_000;
-  if (input.body.length > maximum) context.addIssue({ code: z.ZodIssueCode.too_big, maximum, inclusive: true, type: "string", message: `El texto admite hasta ${maximum} caracteres para este destino`, path: ["body"] });
+  if (input.body.length > maximum) context.addIssue({ code: "too_big", maximum, inclusive: true, origin: "string", message: `El texto admite hasta ${maximum} caracteres para este destino`, path: ["body"] });
 });

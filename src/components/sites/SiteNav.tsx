@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/chile";
 import { useI18n } from "@/components/i18n/I18nProvider";
+import { EditorialHeading } from "@/components/ui/EditorialHeading";
 import { pageTitleClass } from "@/components/ui";
 import { FileStack, BookOpen, Newspaper, Table2, ListTodo, MessagesSquare, Users, GitBranch, LayoutDashboard } from "lucide-react";
 
@@ -74,7 +75,7 @@ export function SiteNav({
   return (
     <div className="mb-6 min-w-0 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
+        <EditorialHeading artwork="workflows" context="site">
           <Link href={clientView ? "/portal" : "/sites"} className="inline-flex min-h-11 items-center text-sm text-[var(--sea)] hover:underline">
             {clientView ? t("siteTabs.backToPortal") : t("siteTabs.backToSites")}
           </Link>
@@ -99,7 +100,7 @@ export function SiteNav({
           {breadcrumb && !clientView && (
             <p className="mt-2 break-words text-sm text-[var(--ink-soft)]">{breadcrumb}</p>
           )}
-        </div>
+        </EditorialHeading>
       </div>
       <nav ref={navRef} aria-label={siteName} className="max-w-full overflow-x-auto overscroll-x-contain border-b border-[var(--line)] pb-2 [scrollbar-width:thin]">
         <div className="flex min-w-max items-center gap-1">

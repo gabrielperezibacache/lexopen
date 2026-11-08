@@ -69,7 +69,7 @@ export default async function MinutasPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-8">
-      <PageHeader
+      <PageHeader artwork="writing"
         title={dict.hubs.minutas.title}
         subtitle={tr(
           "Registra lo que ocurrió en una audiencia, reunión o llamada y deja los próximos pasos en el expediente.",

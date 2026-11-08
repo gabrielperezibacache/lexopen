@@ -1,5 +1,52 @@
 .app-shell { --shell-header-offset: 6rem; }
-.shell-sidebar { transition: width var(--motion-base) ease-out; }
+.shell-sidebar { position: relative; transition: width var(--motion-base) ease-out; }
+.shell-workspace { position: relative; isolation: isolate; background: var(--paper); }
+.shell-workspace::before,
+.sidebar-surface::before {
+  content: "";
+  pointer-events: none;
+  z-index: -1;
+  background-position: right bottom;
+  background-size: contain;
+  background-repeat: no-repeat;
+  mix-blend-mode: soft-light;
+  filter: grayscale(1);
+  mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 62%, transparent);
+}
+.shell-workspace::before {
+  background-image: url("/editorial/generated/filosofo-gpt-v1.webp");
+  display: none;
+  position: fixed;
+  inset-inline-end: clamp(1rem, 3vw, 4rem);
+  inset-block-end: 1rem;
+  inline-size: clamp(18rem, 31vw, 34rem);
+  block-size: min(64dvh, 42rem);
+  opacity: .48;
+}
+html.dark .shell-workspace::before { display: block; }
+.sidebar-surface { isolation: isolate; }
+.sidebar-surface::before {
+  background-image: url("/editorial/generated/atenea-gpt-v1.webp");
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-end: 6rem;
+  inline-size: 100%;
+  block-size: min(58dvh, 28rem);
+  opacity: .35;
+}
+.sidebar-surface[data-sidebar-collapsed]::before { display: none; }
+@media (max-width: 767px) {
+  .shell-workspace::before {
+    inset-inline-end: -2rem;
+    inline-size: 68vw;
+    block-size: 64dvh;
+    opacity: .38;
+  }
+}
+@media print, (forced-colors: active) {
+  .shell-workspace::before,
+  .sidebar-surface::before { display: none; }
+}
 .shell-sidebar-brand { display: flex; align-items: center; gap: .5rem; min-height: 5rem; padding: 1rem; }
 .shell-sidebar-brand-compact { flex-direction: column; padding: .75rem .5rem; gap: .5rem; }
 .shell-sidebar-toggle { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; color: white; background: rgb(255 255 255 / .08); }

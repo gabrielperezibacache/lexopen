@@ -1,0 +1,148 @@
+{
+  "version": "1.1.0-preview.8",
+  "base": "617a705556b2b2c1d8995ae16c8a8054a8aab1da",
+  "production_build": "passed",
+  "lint": "passed",
+  "unit_suite": "passed",
+  "integration_suite": "passed",
+  "production_audit_vulnerabilities": 0,
+  "production_browser_tests": {
+    "passed": 6,
+    "seconds": 10.4,
+    "serviceWorkers": "block"
+  },
+  "media": [
+    {
+      "file": "public/editorial/generated/academico-gpt-v1.webp",
+      "bytes": 93098,
+      "sha256": "7ec13ce1802efc8715f820cae6401280276c0cfbd700c27b228cd29b3a10fa19"
+    },
+    {
+      "file": "public/editorial/generated/agenda-gpt-v1.webp",
+      "bytes": 48918,
+      "sha256": "e344ea9e06b3792f558110aa9e698f382b5ae7647803a4b0316df6a67fa2f1fe"
+    },
+    {
+      "file": "public/editorial/generated/atenea-gpt-v1.webp",
+      "bytes": 182562,
+      "sha256": "76e255f4a29618328b9df821e5a6beed2557ded68dfc931369a3856e4f81418f"
+    },
+    {
+      "file": "public/editorial/generated/audiencias-gpt-v1.webp",
+      "bytes": 36102,
+      "sha256": "bc80903fa4ef3ed8090e9572c17ad3a0bc044218e638ce8da9eb0a18d89c879a"
+    },
+    {
+      "file": "public/editorial/generated/avisos-gpt-v1.webp",
+      "bytes": 39296,
+      "sha256": "c6356447f5c87b228f4b61dd111e34dff0bc6b1bbc5b596fdb4330a8ca171812"
+    },
+    {
+      "file": "public/editorial/generated/clientes-gpt-v1.webp",
+      "bytes": 74404,
+      "sha256": "dc03575ea5e1ed8cefcbe167c4653d61667c068fc715fdb3f09ee4ab4e04d7b5"
+    },
+    {
+      "file": "public/editorial/generated/conexiones-gpt-v1.webp",
+      "bytes": 76174,
+      "sha256": "0ca45de721357404b732d7d066d0f4b9f5214afb9b5ef4ee3ac101da622dc0e3"
+    },
+    {
+      "file": "public/editorial/generated/configuracion-gpt-v1.webp",
+      "bytes": 58026,
+      "sha256": "9fca0c8dd1ebef0cf52f616f05d51957fcfbc542cb7a2ecc6738e62870348eb5"
+    },
+    {
+      "file": "public/editorial/generated/correspondencia-gpt-v1.webp",
+      "bytes": 51688,
+      "sha256": "c009bc65c41f41491b6e26d43eb122b99861c4017cc53b2d088e35c556749084"
+    },
+    {
+      "file": "public/editorial/generated/escritura-gpt-v1.webp",
+      "bytes": 57832,
+      "sha256": "2d04b6c02d1e288d52aca5d9b7a8c84fc300a7ff1bfeb0a5ee931f801abe1963"
+    },
+    {
+      "file": "public/editorial/generated/expedientes-flow-v2-poster.webp",
+      "bytes": 27528,
+      "sha256": "7b6e0b69d7d3b4064fdef1845c73bf21c1c9a66315d17f642bd0481b50f3a5b8"
+    },
+    {
+      "file": "public/editorial/generated/expedientes-flow-v2.mp4",
+      "bytes": 150883,
+      "sha256": "4770b98765555e1be84a26e1d8d6c977c68cc442e60755da045797f1fedc4646"
+    },
+    {
+      "file": "public/editorial/generated/expedientes-v2.webp",
+      "bytes": 23422,
+      "sha256": "194b9e6a12e37b7d76a786f95270272e2879dff0764db5f8e9669fdcbb51bd3a"
+    },
+    {
+      "file": "public/editorial/generated/filosofo-gpt-v1.webp",
+      "bytes": 345242,
+      "sha256": "acbf04e7d722a7d861f00271405f0fbdacaefb69c6e24eb6ca9b9a069a8cfc29"
+    },
+    {
+      "file": "public/editorial/generated/flujos-gpt-v1.webp",
+      "bytes": 63812,
+      "sha256": "eae4987d8c27c46c2859373174d93af171cdf7cf4ccdca7ec03bb6bd6f188917"
+    },
+    {
+      "file": "public/editorial/generated/investigacion-flow-v1.webp",
+      "bytes": 25040,
+      "sha256": "da2ba1d829f97f795fa2df4c2aac3f016290f2a5f64df399149847f0185e97e3"
+    },
+    {
+      "file": "public/editorial/generated/investigacion-motion-flow-v1-poster.webp",
+      "bytes": 29788,
+      "sha256": "515b6fdab0e4a08e7fe1a1a5fa74101128e3f4edcf0e4dae0ca71038d629b918"
+    },
+    {
+      "file": "public/editorial/generated/investigacion-motion-flow-v1.mp4",
+      "bytes": 277756,
+      "sha256": "e43cbe99a53a4539394e7845c2b2aed16b324d6cf94378164d94cf204c847f52"
+    },
+    {
+      "file": "public/editorial/generated/libro-contable-flow-v1-poster.webp",
+      "bytes": 75936,
+      "sha256": "83fe68359ad001fb0016e5c3062187611972912cbcae28424d30045288b66f03"
+    },
+    {
+      "file": "public/editorial/generated/libro-contable-flow-v1.mp4",
+      "bytes": 438285,
+      "sha256": "85abff31b4ada2b1fd5a90151914c3d8164ca12e5dfcbeb1ffbe54e5bccc2222"
+    },
+    {
+      "file": "public/editorial/generated/libro-contable-v1.webp",
+      "bytes": 94424,
+      "sha256": "19958f30799e9a472ce9c3dd6a97b6f27c5c301962df3897f7b9f6d2c4727cfd"
+    },
+    {
+      "file": "public/editorial/generated/personas-gpt-v1.webp",
+      "bytes": 66594,
+      "sha256": "c137213bf5c25a6eaa04625a82be59c9d40411e11217c5bfbb2c8b1250cf256e"
+    },
+    {
+      "file": "public/editorial/generated/plazos-flow-v1-poster.webp",
+      "bytes": 23894,
+      "sha256": "64be31dad56e174980e3f05bc3162d1ebea975063fc8fc3d305d61099d7207ac"
+    },
+    {
+      "file": "public/editorial/generated/plazos-flow-v1.mp4",
+      "bytes": 135786,
+      "sha256": "c19b2214ac81bb400941da30c6ec2661dd77becb4808c18d49d577028cc5ec4e"
+    },
+    {
+      "file": "public/editorial/generated/plazos-flow-v1.webp",
+      "bytes": 25194,
+      "sha256": "32d2eeaaebd49047a468f947efaab59e2d25667b7d678ef4a6ecef65184539ff"
+    },
+    {
+      "file": "public/editorial/generated/tareas-gpt-v1.webp",
+      "bytes": 61410,
+      "sha256": "6b9883f4855225cbb0f6be10d0554da2da12e57a2e2742c302760ac68e267abf"
+    }
+  ],
+  "runtimeData": "Two new disposable local databases; no real installation data used.",
+  "installers": "Awaiting GitHub Actions native builds and publication."
+}

@@ -1,0 +1,4 @@
+/* The shell's shared filter turns only the dark matte transparent in either theme. */
+.ink {
+  filter: url("#lexopen-editorial-cutout");
+}

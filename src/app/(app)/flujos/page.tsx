@@ -29,7 +29,7 @@ export default async function WorkflowsGlobalPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleHeader eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
+      <ModuleHeader artwork="workflows" eyebrow={h.eyebrow} title={h.title} subtitle={h.subtitle} />
       {workflows.length === 0 ? (
         <EmptyState
           title={h.emptyTitle}

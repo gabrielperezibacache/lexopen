@@ -2,6 +2,7 @@
  * Contratos ligeros de schemas/helpers de trámites y documentos (sin HTTP).
  */
 import assert from "node:assert/strict";
+import { ZodError } from "zod";
 import {
   documentoUpdateSchema,
   tramiteCreateSchema,
@@ -23,7 +24,9 @@ const created = tramiteCreateSchema.parse({
 assert.equal(created.titulo, "Presentar demanda");
 assert.equal(created.responsableId, "user-1");
 
-assert.throws(() => tramiteCreateSchema.parse({ titulo: "x" }), /String/);
+assert.throws(() => tramiteCreateSchema.parse({ titulo: "x" }), error =>
+  error instanceof ZodError && error.issues.some(issue => issue.code === "too_small" && issue.path[0] === "titulo")
+);
 
 const updated = tramiteUpdateSchema.parse({
   estado: "cancelado",

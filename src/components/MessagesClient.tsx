@@ -75,7 +75,7 @@ export function MessagesClient({
 
   return (
     <div className="space-y-6">
-      <ModuleHeader
+      <ModuleHeader artwork="correspondence"
         title="Mensajes"
         actions={
           <button type="button" className="btn btn-primary" disabled={busy || directory.length === 0} onClick={() => setComposeOpen(value => !value)} aria-expanded={composeOpen} aria-controls="message-composer">
