@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 
 test.use({ timezoneId: "Asia/Tokyo" });
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
@@ -105,7 +105,7 @@ test("agenda: el aviso de solapamiento permanece después de guardar", async ({ 
   page.on("pageerror", error => errors.push(error.message));
   const f = await fixture(page);
   try {
-    const response = await page.request.post("/api/eventos", { data: { titulo: "Otro evento", causaId: f.cause.id, inicio: "2026-11-24T01:30:00Z", fin: "2026-11-24T03:30:00Z" } });
+    const response = await apiRequest(page).post("/api/eventos", { data: { titulo: "Otro evento", causaId: f.cause.id, inicio: "2026-11-24T01:30:00Z", fin: "2026-11-24T03:30:00Z" } });
     expect(response.status()).toBe(201);
     await openEvent(page, f);
     await page.locator("form").getByLabel("Inicio", { exact: true }).fill("2026-11-24T10:00");
@@ -126,19 +126,19 @@ test("plazos: validación de fechas, creación manual idempotente y permisos de 
   const f = await fixture(page);
   try {
     for (const bad of [{ fechaLimite: "2026-02-31", diasPlazo: 5 }, { diasPlazo: 1e12 }]) {
-      const response = await page.request.post("/api/plazos", { data: { titulo: "No crear", causaId: f.cause.id, ...bad } });
+      const response = await apiRequest(page).post("/api/plazos", { data: { titulo: "No crear", causaId: f.cause.id, ...bad } });
       expect(response.status()).toBe(400);
     }
     const body = { titulo: "Plazo manual", causaId: f.cause.id, fechaLimite: "2026-11-24" }, key = randomUUID();
-    const first = await page.request.post("/api/plazos", { headers: { "Idempotency-Key": key }, data: body });
+    const first = await apiRequest(page).post("/api/plazos", { headers: { "Idempotency-Key": key }, data: body });
     expect(first.status()).toBe(201);
     const deadline = await first.json();
-    expect((await (await page.request.post("/api/plazos", { headers: { "Idempotency-Key": key }, data: body })).json()).id).toBe(deadline.id);
+    expect((await (await apiRequest(page).post("/api/plazos", { headers: { "Idempotency-Key": key }, data: body })).json()).id).toBe(deadline.id);
     expect(deadline.fechaLimite).toBe("2026-11-24T00:00:00.000Z");
     await page.goto("/plazos?mes=2026-11");
     await expect(page.getByRole("heading", { name: "Plazo manual", exact: true })).toBeVisible();
     await db.user.update({ where: { id: f.owner.id }, data: { capabilityRevokes: "plazo.edit" } });
-    expect((await page.request.patch("/api/plazos", { data: { id: deadline.id, estado: "cumplido" } })).status()).toBe(403);
+    expect((await apiRequest(page).patch("/api/plazos", { data: { id: deadline.id, estado: "cumplido" } })).status()).toBe(403);
     expect((await db.plazo.findUniqueOrThrow({ where: { id: deadline.id } })).estado).toBe("pendiente");
   } finally { await f.cleanup(); }
 });

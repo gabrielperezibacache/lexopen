@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
-import { authenticateApiRequests, loginAs } from "./helpers";
+import { authenticateApiRequests, loginAs, apiRequest } from "./helpers";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 
 const db=new PrismaClient({datasources:{db:{url:assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL)}}});
@@ -26,7 +26,7 @@ test('fuentes propias: preparar, citar, paginar y conservar versión; portal sin
  await expect(page.getByRole('heading',{name:'Fragmento 1',exact:true})).toBeVisible();
  const response=await page.request.get(`/api/documentos/${documentId}/evidence`);expect(response.ok()).toBeTruthy();const evidence=await response.json();
  expect(evidence.fragments).toHaveLength(50);expect(evidence.nextAfter).not.toBeNull();
- const verify=await page.request.post(`/api/evidence/fragments/${evidence.fragments[0].id}/verify`,{data:{quote:'Cita inexistente inventada'}});expect(verify.status(),await verify.text()).toBe(200);expect((await verify.json()).verified).toBe(false);
+ const verify=await apiRequest(page).post(`/api/evidence/fragments/${evidence.fragments[0].id}/verify`,{data:{quote:'Cita inexistente inventada'}});expect(verify.status(),await verify.text()).toBe(200);expect((await verify.json()).verified).toBe(false);
  const original=await page.request.get(`/api/evidence/versions/${evidence.selectedVersionId}/original`);expect(original.ok()).toBeTruthy();
  await page.setViewportSize({width:1366,height:900});await page.screenshot({path:testInfo.outputPath('evidence-desktop.png'),fullPage:false});
  await page.setViewportSize({width:360,height:800});await page.screenshot({path:testInfo.outputPath('evidence-mobile.png'),fullPage:false});

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { prisma } from "../src/lib/db";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { authenticateApiRequests, loginAs } from "./helpers";
+import { authenticateApiRequests, loginAs, apiRequest } from "./helpers";
 import { networkGateway } from "./fixtures/network-gateway";
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL) throw Error("Disposable database required");
@@ -23,7 +23,7 @@ async function fixture(page: Page) {
   await prisma.causaMiembro.createMany({ data: [cause, next].map(c => ({ causaId: c.id, userId: b.id, rol: "colaborador" })) });
   const hidden = await prisma.causa.create({ data: { titulo: `Reservada ${tag}`, tribunal: "Ficticio", materia: "civil", abogadoId: b.id, acceso: "equipo", clienteId: client.id } });
   await loginAs(page, a.email); await authenticateApiRequests(page);
-  const response = await page.request.post("/api/tasks", { data: { title: `Tarea ${tag}`, causaId: cause.id, assigneeId: a.id, clienteId: client.id, dueDate: "2026-11-12T13:40:10.000Z" } });
+  const response = await apiRequest(page).post("/api/tasks", { data: { title: `Tarea ${tag}`, causaId: cause.id, assigneeId: a.id, clienteId: client.id, dueDate: "2026-11-12T13:40:10.000Z" } });
   expect(response.status()).toBe(201); const task = await response.json();
   return { a, b, client, cause, next, hidden, task, tag,
     url: (kind: Kind) => `/offline.html?kind=${kind}&record=${kind === "cliente" ? client.id : task.id}`,

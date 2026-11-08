@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { authenticateApiRequests, loginAs } from "./helpers";
+import { authenticateApiRequests, loginAs, apiRequest } from "./helpers";
 
 test("espacios: hub, creación vinculada y enlace desde causa", async ({ page }) => {
   await loginAs(page, "socio@estudio.cl");
@@ -14,7 +14,7 @@ test("espacios: hub, creación vinculada y enlace desde causa", async ({ page })
   const clientes = (await clientesRes.json()) as Array<{ id: string }>;
   expect(clientes.length).toBeGreaterThan(0);
 
-  const causaRes = await page.request.post("/api/causas", {
+  const causaRes = await apiRequest(page).post("/api/causas", {
     data: {
       titulo: `E2E Causa Espacios ${Date.now()}`,
       tribunal: "1° Juzgado Civil de Santiago",
@@ -26,7 +26,7 @@ test("espacios: hub, creación vinculada y enlace desde causa", async ({ page })
   const causa = (await causaRes.json()) as { id: string; titulo: string };
 
   const siteName = `E2E Espacio ${Date.now()}`;
-  const createRes = await page.request.post("/api/sites", {
+  const createRes = await apiRequest(page).post("/api/sites", {
     data: {
       name: siteName,
       description: "Prueba e2e espacios",
@@ -47,7 +47,7 @@ test("espacios: hub, creación vinculada y enlace desde causa", async ({ page })
   await expect(page.getByRole("heading", { name: siteName })).toBeVisible();
   await expect(page.getByText("Cliente y causa vinculados")).toBeVisible();
 
-  const patchRes = await page.request.patch(`/api/sites/${created.id}`, {
+  const patchRes = await apiRequest(page).patch(`/api/sites/${created.id}`, {
     data: { description: "Actualizado por PATCH e2e" },
   });
   expect(patchRes.ok()).toBeTruthy();

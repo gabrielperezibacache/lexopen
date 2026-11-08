@@ -3,7 +3,7 @@ import { hash } from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../src/lib/db";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL) throw Error("Disposable browser database required");
 import { networkGateway } from "./fixtures/network-gateway";
@@ -18,7 +18,7 @@ async function fixture(page: Page) {
   const other = await prisma.user.create({ data: { name: "Otra cuenta ficticia", email: `${tag}-other@offline.invalid`, role: "abogado", password: await hash("lexopen", 10) } });
   const cause = await prisma.causa.create({ data: { titulo: tag, tribunal: "Ficticio", materia: "civil", acceso: "equipo", abogadoId: user.id } });
   await loginAs(page, user.email); await authenticateApiRequests(page);
-  const response = await page.request.post(`/api/causas/${cause.id}/writings`, { data: { requestId: randomUUID(), title: "Escrito sin conexión ficticio", body: "Texto inicial confidencial ficticio" } }); expect(response.status()).toBe(201);
+  const response = await apiRequest(page).post(`/api/causas/${cause.id}/writings`, { data: { requestId: randomUUID(), title: "Escrito sin conexión ficticio", body: "Texto inicial confidencial ficticio" } }); expect(response.status()).toBe(201);
   const { draft } = await response.json(), url = `/offline.html?case=${cause.id}&draft=${draft.id}`, api = `/api/causas/${cause.id}/writings/${draft.id}`;
   return { user, other, cause, draft, url, api, cleanup: async () => {
     await prisma.caseWritingDraft.deleteMany({ where: { causaId: cause.id } }); await prisma.causa.delete({ where: { id: cause.id } });
@@ -81,7 +81,7 @@ test("un conflicto conserva el texto local y no sobrescribe la versión del serv
   test.setTimeout(120000); const f = await fixture(page);
   try {
     await prepare(page, f.url); await edit(page, "Mi texto local en conflicto");
-    expect((await page.request.patch(f.api, { data: { requestId: randomUUID(), expectedRevision: 1, title: f.draft.title, body: "Edición independiente del servidor" } })).status()).toBe(200);
+    expect((await apiRequest(page).patch(f.api, { data: { requestId: randomUUID(), expectedRevision: 1, title: f.draft.title, body: "Edición independiente del servidor" } })).status()).toBe(200);
     await page.getByRole("button", { name: "Sincronizar escrito", exact: true }).click(); await expect(page.locator("#message")).toContainText("Hay cambios en otra sesión");
     await page.reload(); await unlock(page); await expect(page.getByLabel("Texto del escrito", { exact: true })).toHaveValue("Mi texto local en conflicto");
     await page.getByRole("button", { name: "Sincronizar escrito", exact: true }).click(); await expect(page.locator("#message")).toContainText("Hay cambios en otra sesión");
@@ -93,10 +93,10 @@ test("reautenticación con la misma cuenta, aislamiento entre cuentas y revocaci
   test.setTimeout(120000); const f = await fixture(page);
   try {
     await prepare(page, f.url); await edit(page, "Texto local protegido por permisos actuales");
-    await page.request.post("/api/auth/logout"); await page.getByRole("button", { name: "Sincronizar escrito", exact: true }).click(); await expect(page.locator("#message")).toHaveAttribute("data-error", "true");
+    await apiRequest(page).post("/api/auth/logout"); await page.getByRole("button", { name: "Sincronizar escrito", exact: true }).click(); await expect(page.locator("#message")).toHaveAttribute("data-error", "true");
     await loginAs(page, f.other.email); await authenticateApiRequests(page); await page.goto(f.url); await unlock(page);
     await page.getByRole("button", { name: "Sincronizar escrito", exact: true }).click(); await expect(page.locator("#message")).toContainText("otra cuenta"); expect((await prisma.caseWritingDraft.findUniqueOrThrow({ where: { id: f.draft.id } })).revision).toBe(1);
-    await page.request.post("/api/auth/logout"); await loginAs(page, f.user.email); await authenticateApiRequests(page); await page.goto(f.url); await unlock(page);
+    await apiRequest(page).post("/api/auth/logout"); await loginAs(page, f.user.email); await authenticateApiRequests(page); await page.goto(f.url); await unlock(page);
     await prisma.user.update({ where: { id: f.user.id }, data: { capabilityRevokes: "causa.write" } });
     await page.getByRole("button", { name: "Sincronizar escrito", exact: true }).click(); await expect(page.locator("#message")).toHaveAttribute("data-error", "true"); expect((await prisma.caseWritingDraft.findUniqueOrThrow({ where: { id: f.draft.id } })).revision).toBe(1);
     await prisma.user.update({ where: { id: f.user.id }, data: { capabilityRevokes: "" } });

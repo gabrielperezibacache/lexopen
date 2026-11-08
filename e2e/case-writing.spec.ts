@@ -6,7 +6,7 @@ import path from "node:path";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { putObject } from "../src/lib/storage";
 import type { WritingDraftView, WritingHistory, WritingMutationResult } from "../src/lib/writings/types";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 if ([process.env.S3_BUCKET, process.env.S3_ACCESS_KEY_ID, process.env.S3_SECRET_ACCESS_KEY].some(Boolean)) throw new Error("Writing fixtures require local storage");
@@ -37,21 +37,21 @@ async function openWritingTool(editor: Locator, tool: "sources" | "references" |
   await expect(panel).toBeVisible();
 }
 async function createDraft(page: Page, title: string, body = "") {
-  return (await json<WritingMutationResult>(await page.request.post(base(), { data: { requestId: randomUUID(), title, body } }), 201)).draft;
+  return (await json<WritingMutationResult>(await apiRequest(page).post(base(), { data: { requestId: randomUUID(), title, body } }), 201)).draft;
 }
 async function current(page: Page, id: string) { return json<WritingDraftView>(await page.request.get(`${base()}/${id}`)); }
 async function prepare(page: Page) {
   if (prepared) return;
-  await json(await page.request.post(`/api/documentos/${documentId}/evidence`), 201);
-  await json(await page.request.post(`/api/causas/${causaId}/knowledge/analyze`, { data: {} }));
+  await json(await apiRequest(page).post(`/api/documentos/${documentId}/evidence`), 201);
+  await json(await apiRequest(page).post(`/api/causas/${causaId}/knowledge/analyze`, { data: {} }));
   factId = (await db.caseFact.findFirstOrThrow({ where: { causaId }, select: { id: true } })).id;
-  const imported = await json<{ book: { id: string } }>(await page.request.post("/api/books", { multipart: { requestId: randomUUID(), title: "Tratado ficticio de contratos", author: "Autora ficticia", preserveOriginal: "true", convertToText: "false", file: { name: "contratos-ficticios.txt", mimeType: "text/plain", buffer: Buffer.from(bookText) } } }), 201);
+  const imported = await json<{ book: { id: string } }>(await apiRequest(page).post("/api/books", { multipart: { requestId: randomUUID(), title: "Tratado ficticio de contratos", author: "Autora ficticia", preserveOriginal: "true", convertToText: "false", file: { name: "contratos-ficticios.txt", mimeType: "text/plain", buffer: Buffer.from(bookText) } } }), 201);
   bookId = imported.book.id;
   bookStorageKey = (await db.libraryBook.findUniqueOrThrow({ where: { id: bookId }, select: { storageKey: true } })).storageKey;
-  const hearing = await json<{ id: string }>(await page.request.post(`/api/causas/${causaId}/hearings`, { data: { title: "Audiencia preparatoria ficticia" } }), 201);
+  const hearing = await json<{ id: string }>(await apiRequest(page).post(`/api/causas/${causaId}/hearings`, { data: { title: "Audiencia preparatoria ficticia" } }), 201);
   workspaceId = hearing.id;
-  await json(await page.request.post(`/api/causas/${causaId}/hearings/${workspaceId}/notes`, { data: { title: "Pedir exhibición del comprobante", body: noteText, citation: null } }));
-  await json(await page.request.post(`/api/causas/${causaId}/hearings`, { data: { title: "Otra mesa ficticia más reciente" } }), 201);
+  await json(await apiRequest(page).post(`/api/causas/${causaId}/hearings/${workspaceId}/notes`, { data: { title: "Pedir exhibición del comprobante", body: noteText, citation: null } }));
+  await json(await apiRequest(page).post(`/api/causas/${causaId}/hearings`, { data: { title: "Otra mesa ficticia más reciente" } }), 201);
   prepared = true;
 }
 
@@ -359,13 +359,13 @@ test("conflicto de pestañas y revocación: no sobrescribe ni exporta derivados 
   await page.goto(`/causas/${causaId}/escritos?draft=${draft.id}`);
   const editor = page.getByTestId("writing-editor"), body = editor.getByLabel("Texto del escrito", { exact: true });
   await expect(body).toHaveValue(draft.body);
-  const external = await json<WritingMutationResult>(await page.request.patch(`${base()}/${draft.id}`, { data: { requestId: randomUUID(), expectedRevision: draft.revision, title: draft.title, body: "Cambio confirmado desde la otra sesión." } }));
+  const external = await json<WritingMutationResult>(await apiRequest(page).patch(`${base()}/${draft.id}`, { data: { requestId: randomUUID(), expectedRevision: draft.revision, title: draft.title, body: "Cambio confirmado desde la otra sesión." } }));
   await body.fill("Texto local que debe poder recuperarse y no sobrescribir al otro.");
   await expect(editor.getByRole("alert")).toContainText(/otra sesión|conflicto/i);
   await expect(body).toHaveValue("Texto local que debe poder recuperarse y no sobrescribir al otro.");
   expect((await current(page, draft.id)).body).toBe(external.draft.body);
   const fact = await db.caseFact.findUniqueOrThrow({ where: { id: factId }, select: { revision: true } });
-  const attached = await json<WritingMutationResult>(await page.request.post(`${base()}/${draft.id}/sources`, { data: { requestId: randomUUID(), expectedRevision: external.draft.revision, source: { kind: "fact", factId, revision: fact.revision } } }));
+  const attached = await json<WritingMutationResult>(await apiRequest(page).post(`${base()}/${draft.id}/sources`, { data: { requestId: randomUUID(), expectedRevision: external.draft.revision, source: { kind: "fact", factId, revision: fact.revision } } }));
   await db.documento.update({ where: { id: documentId }, data: { confidencial: true } });
   await db.user.update({ where: { id: ownerId }, data: { capabilityRevokes: "doc.confidential.read" } });
   try {
@@ -373,7 +373,7 @@ test("conflicto de pestañas y revocación: no sobrescribe ni exporta derivados 
       const response = await page.request.get(`${base()}/${draft.id}${suffix}`);
       expect([404, 409]).toContain(response.status()); expect(await response.text()).not.toContain(publicText);
     }
-    const restored = await page.request.post(`${base()}/${draft.id}/restore`, { data: { requestId: randomUUID(), expectedRevision: attached.draft.revision, targetRevision: attached.draft.revision } });
+    const restored = await apiRequest(page).post(`${base()}/${draft.id}/restore`, { data: { requestId: randomUUID(), expectedRevision: attached.draft.revision, targetRevision: attached.draft.revision } });
     expect([404, 409]).toContain(restored.status());
     await page.reload(); await expect(page.getByLabel("Texto del escrito", { exact: true })).toHaveCount(0);
     await expect(page.getByText(publicText, { exact: true })).toHaveCount(0);

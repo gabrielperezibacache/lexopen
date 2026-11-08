@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { hash } from "bcryptjs";
 import { prisma } from "../src/lib/db";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL) throw Error("Disposable browser database required");
 test("revisión por versión, Word aprobado con recibo y edición que invalida la aprobación", async ({ page }, info) => {
@@ -15,7 +15,7 @@ test("revisión por versión, Word aprobado con recibo y edición que invalida l
     const cause = await prisma.causa.create({ data: { titulo: tag, tribunal: "Ficticio", materia: "civil", acceso: "equipo", abogadoId: userId } }); causeId = cause.id;
     await loginAs(page, user.email); await authenticateApiRequests(page);
     const base = `/api/causas/${causeId}/writings`;
-    const created = await page.request.post(base, { data: { requestId: randomUUID(), title: "Escrito ficticio para revisar", body: "Texto de autor ficticio para cotejo." } }); expect(created.status()).toBe(201);
+    const created = await apiRequest(page).post(base, { data: { requestId: randomUUID(), title: "Escrito ficticio para revisar", body: "Texto de autor ficticio para cotejo." } }); expect(created.status()).toBe(201);
     const { draft } = await created.json();
     await page.goto(`/causas/${causeId}/escritos?draft=${draft.id}`);
     const openExport = async () => {

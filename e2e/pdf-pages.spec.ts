@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { randomUUID, createHash } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
-import { authenticateApiRequests, loginAs } from "./helpers";
+import { authenticateApiRequests, loginAs, apiRequest } from "./helpers";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { putObject } from "../src/lib/storage";
 
@@ -37,7 +37,7 @@ test("carga de PDF mixto: prepara el texto en orden y conserva el original",asyn
   await authenticateApiRequests(page);
   let uploadedId="",uploadedKey="";
   try {
-    const response=await page.request.post("/api/documentos",{multipart:{nombre:`Carga OCR ${prefix}.pdf`,causaId:causeId,file:{name:`Carga OCR ${prefix}.pdf`,mimeType:"application/pdf",buffer:bytes}}});
+    const response=await apiRequest(page).post("/api/documentos",{multipart:{nombre:`Carga OCR ${prefix}.pdf`,causaId:causeId,file:{name:`Carga OCR ${prefix}.pdf`,mimeType:"application/pdf",buffer:bytes}}});
     expect(response.status(),await response.text()).toBe(201);
     const uploaded=await response.json();uploadedId=uploaded.id;uploadedKey=uploaded.storageKey;
     await expect.poll(async()=> (await db.documento.findUniqueOrThrow({where:{id:uploadedId}})).extractionStatus,{timeout:20_000}).toBe("completed");
@@ -89,7 +89,7 @@ test("PDF físico: página, OCR, original y cita conservan su versión y permiso
   await expect(reference).toBeVisible();expect(await reference.inputValue()).toContain("Página 2");expect(await reference.inputValue()).toContain("page=2");
   await page.getByRole("button",{name:"Cerrar referencia",exact:true}).click();
   const pdfPage2=await page.request.get(`/api/documentos/${documentId}/evidence?version=${version}&page=2`);const fragments=await pdfPage2.json();
-  const verification=await page.request.post(`/api/evidence/fragments/${fragments.fragments[0].id}/verify`,{data:{quote:fragments.fragments[0].text}});
+  const verification=await apiRequest(page).post(`/api/evidence/fragments/${fragments.fragments[0].id}/verify`,{data:{quote:fragments.fragments[0].text}});
   expect(verification.status(),await verification.text()).toBe(200);
   const verified=await verification.json();expect(verified.verified).toBe(true);expect(verified.pageNumber).toBe(2);expect(verified.href).toContain("page=2");
   await page.setViewportSize({width:1366,height:900});await selector.scrollIntoViewIfNeeded();await page.screenshot({path:testInfo.outputPath("pdf-pages-desktop.png")});

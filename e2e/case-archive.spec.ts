@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 
 test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
@@ -123,7 +123,7 @@ test("Mis Causas organiza manual, OJV y Drive en un expediente autorizado", asyn
 
     await loginAs(page, "abogado@estudio.cl");
     await authenticateApiRequests(page);
-    const denied = await page.request.post(`/api/causas/${causaId}/expediente`, { data: { action: "create-folder", name: "Ajena", parentId: null } });
+    const denied = await apiRequest(page).post(`/api/causas/${causaId}/expediente`, { data: { action: "create-folder", name: "Ajena", parentId: null } });
     expect(denied.status()).toBe(404);
   } finally {
     if (causaId) {

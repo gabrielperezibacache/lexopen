@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { prisma } from "../src/lib/db";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 import { networkGateway } from "./fixtures/network-gateway";
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL)
@@ -24,7 +24,7 @@ async function fixture(page: Page) {
     await prisma.evento.create({ data: { titulo: `Coincidencia privada ${tag}`, inicio: event.inicio, fin: event.fin, causaId: cause.id, responsableId: a.id } });
     await loginAs(page, a.email);
     await authenticateApiRequests(page);
-    const res = await page.request.post(`/api/causas/${cause.id}/tramites`, { data: { titulo: `Trámite ${tag}`, detalle: "Detalle original", fechaLimite: "2092-11-25" } });
+    const res = await apiRequest(page).post(`/api/causas/${cause.id}/tramites`, { data: { titulo: `Trámite ${tag}`, detalle: "Detalle original", fechaLimite: "2092-11-25" } });
     expect(res.status()).toBe(201);
     const tramite = await res.json();
     return { a, cause, event, tramite, tag, id: (k: Kind) => k === "evento" ? event.id : tramite.id, url: (k: Kind) => `/offline.html?kind=${k}&record=${k === "evento" ? event.id : tramite.id}`, cleanup: async () => { await prisma.mensajeSaliente.deleteMany({ where: { userId: a.id } }); await prisma.notification.deleteMany({ where: { userId: a.id } }); await prisma.task.deleteMany({ where: { creatorId: a.id } }); await prisma.evento.deleteMany({ where: { responsableId: a.id } }); await prisma.causa.deleteMany({ where: { abogadoId: a.id } }); await prisma.commandExecution.deleteMany({ where: { ownerId: a.id } }); await prisma.auditEvent.deleteMany({ where: { actorId: a.id } }); await prisma.user.delete({ where: { id: a.id } }); } };

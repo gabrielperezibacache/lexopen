@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "../src/lib/db";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import { withRejectedAudit } from "../src/lib/testing/audit-failure";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL) throw Error("Use the explicit disposable browser database");
@@ -62,7 +62,7 @@ test("Flujos rechaza sólo lectura y desactivados, conserva un único inicio y p
   const workflow = await prisma.workflow.create({ data: { name, siteId: site.id, active: false, stepsJson: JSON.stringify([{ name: "Revisión", role: "abogado" }, { name: "Entrega", role: "abogado" }]) } });
   await loginAs(page, reader.email); await authenticateApiRequests(page);
   const data = { action: "start", workflowId: workflow.id };
-  expect((await page.request.post("/api/workflows", { data })).status()).toBe(403);
+  expect((await apiRequest(page).post("/api/workflows", { data })).status()).toBe(403);
   const ownerContext = await browser.newContext({ baseURL: info.project.use.baseURL, locale: "es-CL" }); contexts.push(ownerContext);
   const ownerPage = await ownerContext.newPage(); await loginAs(ownerPage, owner.email); await authenticateApiRequests(ownerPage);
   expect((await ownerContext.request.post("/api/workflows", { data })).status()).toBe(409);
@@ -76,7 +76,7 @@ test("Flujos rechaza sólo lectura y desactivados, conserva un único inicio y p
   expect(first.id).toBe(second.id);
   expect(await prisma.workflowInstance.count({ where: { workflowId: workflow.id } })).toBe(1);
   const advance = { action: "advance", instanceId: first.id, decision: "approve", expectedStep: 0 };
-  expect((await page.request.post("/api/workflows", { data: advance })).status()).toBe(403);
+  expect((await apiRequest(page).post("/api/workflows", { data: advance })).status()).toBe(403);
   expect((await ownerContext.request.post("/api/workflows", { data: advance, headers: { "Idempotency-Key": randomUUID() } })).status()).toBe(200);
   expect((await ownerContext.request.post("/api/workflows", { data: advance, headers: { "Idempotency-Key": randomUUID() } })).status()).toBe(409);
   expect((await prisma.workflowInstance.findUniqueOrThrow({ where: { id: first.id } })).currentStep).toBe(1);
@@ -88,25 +88,25 @@ test("CRM revierte un fallo de auditoría y reutiliza el envío del formulario t
   const rollbackName = `Rollback CRM ${randomUUID()}`; clientNames.push(rollbackName);
   const data = { razonSocial: rollbackName }, headers = { "Idempotency-Key": randomUUID() };
   await withRejectedAudit(owner.id, "cliente.create", async () => {
-    const response = await page.request.post("/api/clientes", { data, headers });
+    const response = await apiRequest(page).post("/api/clientes", { data, headers });
     expect(response.status()).toBe(500);
     expect(await prisma.cliente.count({ where: { razonSocial: rollbackName } })).toBe(0);
   });
-  const restored = await page.request.post("/api/clientes", { data, headers }); expect(restored.status()).toBe(201);
-  const repeated = await page.request.post("/api/clientes", { data, headers }); expect(repeated.status()).toBe(201);
+  const restored = await apiRequest(page).post("/api/clientes", { data, headers }); expect(restored.status()).toBe(201);
+  const repeated = await apiRequest(page).post("/api/clientes", { data, headers }); expect(repeated.status()).toBe(201);
   expect((await restored.json()).id).toBe((await repeated.json()).id);
   expect(await prisma.cliente.count({ where: { razonSocial: rollbackName } })).toBe(1);
   const rollbackClient = await prisma.cliente.findFirstOrThrow({ where: { razonSocial: rollbackName } });
   await withRejectedAudit(owner.id, "cliente.update", async () => {
-    expect((await page.request.patch(`/api/clientes/${rollbackClient.id}`, { data: { telefono: "123456789" } })).status()).toBe(500);
+    expect((await apiRequest(page).patch(`/api/clientes/${rollbackClient.id}`, { data: { telefono: "123456789" } })).status()).toBe(500);
     expect((await prisma.cliente.findUniqueOrThrow({ where: { id: rollbackClient.id } })).telefono).toBeNull();
   });
   await withRejectedAudit(owner.id, "cliente.delete", async () => {
-    expect((await page.request.delete(`/api/clientes/${rollbackClient.id}`)).status()).toBe(500);
+    expect((await apiRequest(page).delete(`/api/clientes/${rollbackClient.id}`)).status()).toBe(500);
     expect(await prisma.cliente.count({ where: { id: rollbackClient.id } })).toBe(1);
   });
-  expect((await page.request.patch(`/api/clientes/${rollbackClient.id}`, { data: { telefono: "123456789" } })).status()).toBe(200);
-  expect((await page.request.delete(`/api/clientes/${rollbackClient.id}`)).status()).toBe(200);
+  expect((await apiRequest(page).patch(`/api/clientes/${rollbackClient.id}`, { data: { telefono: "123456789" } })).status()).toBe(200);
+  expect((await apiRequest(page).delete(`/api/clientes/${rollbackClient.id}`)).status()).toBe(200);
 
   const formName = `Respuesta perdida CRM ${randomUUID()}`; clientNames.push(formName);
   const requestKeys: Array<string | undefined> = [];

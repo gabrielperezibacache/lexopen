@@ -5,7 +5,7 @@ import { hash } from "bcryptjs";
 import { prisma } from "../src/lib/db";
 import { putObject, getObject } from "../src/lib/storage";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 import { networkGateway } from "./fixtures/network-gateway";
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL); if(process.env.DATABASE_URL!==process.env.E2E_DATABASE_URL)throw Error("Disposable database required");
 const test=baseTest.extend<{network:Awaited<ReturnType<typeof networkGateway>>}>({network:async({},provide,info)=>{const n=await networkGateway(String(info.project.use.baseURL));try{await provide(n);}finally{await n.close();}},baseURL:async({network},provide)=>provide(network.origin)});
@@ -53,7 +53,7 @@ for(const kind of ["documento","adjunto"] as const){
   test(`${kind}: edición normal posterior provoca conflicto y conserva el archivo local`,async({page})=>{
     test.setTimeout(120000);const f=await fixture(page);try{
       await prepare(page,f.url(kind),kind);await upload(page,Buffer.from("Cambios locales que no se pierden"));
-      const r=kind==="documento"?await page.request.patch(`/api/documentos/${f.doc.id}`,{data:{nombre:"Nombre desde otra sesión.pdf",expectedVersion:1}}):await page.request.post(`/api/sites/${f.site.id}/files`,{headers:{"Idempotency-Key":randomUUID()},data:{action:"new-version",fileId:f.file.id,expectedVersion:1,contenidoBase64:Buffer.from("Otra sesión").toString("base64"),mimeType:"application/pdf"}});expect(r.status()).toBe(200);
+      const r=kind==="documento"?await apiRequest(page).patch(`/api/documentos/${f.doc.id}`,{data:{nombre:"Nombre desde otra sesión.pdf",expectedVersion:1}}):await apiRequest(page).post(`/api/sites/${f.site.id}/files`,{headers:{"Idempotency-Key":randomUUID()},data:{action:"new-version",fileId:f.file.id,expectedVersion:1,contenidoBase64:Buffer.from("Otra sesión").toString("base64"),mimeType:"application/pdf"}});expect(r.status()).toBe(200);
       await sync(page);await expect(page.locator("#message")).toHaveAttribute("data-error","true");await expect(page.locator("#message")).toContainText("cambió");const d=page.waitForEvent("download");await page.getByRole("button",{name:"Descargar archivo local",exact:true}).click();expect((await readFile((await(await d).path())!)).toString()).toBe("Cambios locales que no se pierden");
     }finally{await f.cleanup();}
   });

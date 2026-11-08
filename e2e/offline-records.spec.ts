@@ -4,7 +4,7 @@ import { hash } from "bcryptjs";
 import { readFile } from "node:fs/promises";
 import { prisma } from "../src/lib/db";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 import { networkGateway } from "./fixtures/network-gateway";
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL) throw Error("Disposable database required");
@@ -22,9 +22,9 @@ async function fixture(page: Page) {
   const b = await prisma.user.create({ data: { name: "Otra cuenta ficticia", email: `${tag}-b@records.invalid`, password: await hash("lexopen", 10), role: "abogado" } });
   const cause = await prisma.causa.create({ data: { titulo: tag, materia: "civil", tribunal: "Ficticio", acceso: "equipo", abogadoId: a.id } });
   await loginAs(page, a.email); await authenticateApiRequests(page);
-  const clientResponse = await page.request.post("/api/clientes", { data: { razonSocial: `Cliente ${tag}`, telefono: "+15555550100", notas: "Nota original", abogadoId: a.id } }); expect(clientResponse.status()).toBe(201);
+  const clientResponse = await apiRequest(page).post("/api/clientes", { data: { razonSocial: `Cliente ${tag}`, telefono: "+15555550100", notas: "Nota original", abogadoId: a.id } }); expect(clientResponse.status()).toBe(201);
   const client = await clientResponse.json();
-  const taskResponse = await page.request.post("/api/tasks", { data: { title: `Tarea ${tag}`, assigneeId: a.id, causaId: cause.id, instructions: "Instrucciones originales", dueDate: "2026-11-12T13:40:10.000Z" } }); expect(taskResponse.status()).toBe(201);
+  const taskResponse = await apiRequest(page).post("/api/tasks", { data: { title: `Tarea ${tag}`, assigneeId: a.id, causaId: cause.id, instructions: "Instrucciones originales", dueDate: "2026-11-12T13:40:10.000Z" } }); expect(taskResponse.status()).toBe(201);
   const task = await taskResponse.json();
   return { a, b, cause, client, task, tag, id: (kind: Kind) => kind === "cliente" ? client.id : task.id,
     url: (kind: Kind) => `/offline.html?kind=${kind}&record=${kind === "cliente" ? client.id : task.id}`,
@@ -93,7 +93,7 @@ for (const kind of ["cliente", "task"] as const) {
     test.setTimeout(120000); const f = await fixture(page);
     try {
       await prepare(page, f.url(kind), kind); await edit(page, kind, `Copia local ${f.tag}`);
-      const response = kind === "cliente" ? await page.request.patch(`/api/clientes/${f.client.id}`, { data: { razonSocial: `Otra sesión ${f.tag}` } }) : await page.request.patch("/api/tasks", { data: { id: f.task.id, title: `Otra sesión ${f.tag}` } }); expect(response.status()).toBe(200);
+      const response = kind === "cliente" ? await apiRequest(page).patch(`/api/clientes/${f.client.id}`, { data: { razonSocial: `Otra sesión ${f.tag}` } }) : await apiRequest(page).patch("/api/tasks", { data: { id: f.task.id, title: `Otra sesión ${f.tag}` } }); expect(response.status()).toBe(200);
       await sync(page); await expect(page.locator("#message")).toContainText("Hay cambios en otra sesión"); await page.reload(); await unlock(page); await expect(page.getByLabel(names[kind], { exact: true })).toHaveValue(`Copia local ${f.tag}`);
       let dismissed = false; page.once("dialog", async dialog => { await dialog.dismiss(); dismissed = true; }); await page.getByRole("button", { name: "Descargar versión del servidor", exact: true }).click(); await expect.poll(() => dismissed).toBe(true); await expect(page.getByRole("button", { name: "Descargar versión del servidor", exact: true })).toBeEnabled(); await expect(page.getByLabel(names[kind], { exact: true })).toHaveValue(`Copia local ${f.tag}`);
       page.once("dialog", dialog => dialog.accept()); await page.getByRole("button", { name: "Descargar versión del servidor", exact: true }).click(); await expect(page.getByLabel(names[kind], { exact: true })).toHaveValue(`Otra sesión ${f.tag}`);
@@ -105,9 +105,9 @@ test("otra cuenta no puede sincronizar y retirar permisos conserva la copia pend
   test.setTimeout(120000); const f = await fixture(page);
   try {
     await prepare(page, f.url("cliente"), "cliente"); await edit(page, "cliente", `Cambio protegido ${f.tag}`);
-    await page.request.post("/api/auth/logout"); await loginAs(page, f.b.email); await authenticateApiRequests(page); await page.goto(f.url("cliente")); await unlock(page);
+    await apiRequest(page).post("/api/auth/logout"); await loginAs(page, f.b.email); await authenticateApiRequests(page); await page.goto(f.url("cliente")); await unlock(page);
     await sync(page); await expect(page.locator("#message")).toContainText("otra cuenta"); expect((await prisma.cliente.findUniqueOrThrow({ where: { id: f.client.id } })).razonSocial).toBe(f.client.razonSocial);
-    await page.request.post("/api/auth/logout"); await loginAs(page, f.a.email); await authenticateApiRequests(page); await page.goto(f.url("cliente")); await unlock(page);
+    await apiRequest(page).post("/api/auth/logout"); await loginAs(page, f.a.email); await authenticateApiRequests(page); await page.goto(f.url("cliente")); await unlock(page);
     await prisma.user.update({ where: { id: f.a.id }, data: { role: "cliente" } }); await sync(page); await expect(page.locator("#message")).toHaveAttribute("data-error", "true");
     await expect(page.getByLabel(names.cliente, { exact: true })).toHaveValue(`Cambio protegido ${f.tag}`);
     await prisma.user.update({ where: { id: f.a.id }, data: { role: "abogado" } }); await sync(page); await expect(page.locator("#message")).toContainText("Registro sincronizado");
@@ -138,7 +138,7 @@ test("el formulario de Clientes conserva sus datos ante una sincronización post
   try {
     await page.goto(`/clientes/${f.client.id}`); await page.getByRole("textbox", { name: "Notas", exact: true }).fill("Edición del formulario abierta antes del cambio");
     const snapshot = await (await page.request.get(`/api/offline/entities?kind=cliente&id=${f.client.id}`)).json();
-    expect((await page.request.post("/api/offline/sync", { data: { kind: "cliente", action: "update", requestId: randomUUID(), entityId: f.client.id, expectedVersion: snapshot.version, fields: { razonSocial: f.client.razonSocial, notas: "Cambio sincronizado desde otra sesión" } } })).status()).toBe(200);
+    expect((await apiRequest(page).post("/api/offline/sync", { data: { kind: "cliente", action: "update", requestId: randomUUID(), entityId: f.client.id, expectedVersion: snapshot.version, fields: { razonSocial: f.client.razonSocial, notas: "Cambio sincronizado desde otra sesión" } } })).status()).toBe(200);
     await page.getByRole("button", { name: "Guardar datos", exact: true }).click(); await expect(page.getByText(/El cliente cambió en otra sesión/)).toBeVisible(); await expect(page.getByRole("textbox", { name: "Notas", exact: true })).toHaveValue("Edición del formulario abierta antes del cambio");
     expect((await prisma.cliente.findUniqueOrThrow({ where: { id: f.client.id } })).notas).toBe("Cambio sincronizado desde otra sesión");
   } finally { await f.cleanup(); }
@@ -169,7 +169,7 @@ test("una validación rechazada permite corregir el contacto y sincronizar sin d
 test("un espacio anterior conserva los escritos y sus peticiones al añadir Clientes", async ({ page }) => {
   test.setTimeout(120000); const f = await fixture(page);
   try {
-    const response = await page.request.post(`/api/causas/${f.cause.id}/writings`, { data: { requestId: randomUUID(), title: "Escrito anterior", body: "Texto original" } }); expect(response.status()).toBe(201);
+    const response = await apiRequest(page).post(`/api/causas/${f.cause.id}/writings`, { data: { requestId: randomUUID(), title: "Escrito anterior", body: "Texto original" } }); expect(response.status()).toBe(201);
     const { draft } = await response.json(), pending = { requestId: randomUUID(), expectedRevision: 1, title: draft.title, body: "Edición heredada aún pendiente" };
     const url = `/offline.html?case=${f.cause.id}&draft=${draft.id}`; await page.goto(url);
     await page.evaluate(async payload => {

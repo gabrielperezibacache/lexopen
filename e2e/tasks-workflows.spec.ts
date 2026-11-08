@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { authenticateApiRequests, loginAs } from "./helpers";
+import { authenticateApiRequests, loginAs, apiRequest } from "./helpers";
 
 test.use({ timezoneId: "Asia/Tokyo" });
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
@@ -109,7 +109,7 @@ test("tareas del espacio: acuse incompleto, reintento único y protección de ca
     await page.getByRole("button", { name: "Marcar hecha", exact: true }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Esta tarea cambió" })).toBeVisible();
     expect((await db.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("todo");
-    expect((await page.request.post("/api/tasks", { data: { title: "Fecha imposible", dueDate: "2030-02-31" } })).status()).toBe(400);
+    expect((await apiRequest(page).post("/api/tasks", { data: { title: "Fecha imposible", dueDate: "2030-02-31" } })).status()).toBe(400);
   } finally { await f.cleanup(); }
 });
 
@@ -134,7 +134,7 @@ test("flujos: reintentar inicio y aprobación sin saltar pasos ni cambiar de dec
     expect(keys.start).toHaveLength(2); expect(keys.start[1]).toBe(keys.start[0]);
     expect(await db.workflowInstance.count({ where: { workflowId: workflow.id } })).toBe(1);
     const instance = await db.workflowInstance.findFirstOrThrow({ where: { workflowId: workflow.id } });
-    expect((await page.request.post("/api/workflows", { data: { action: "advance", instanceId: instance.id, decision: "approve" } })).status()).toBe(400);
+    expect((await apiRequest(page).post("/api/workflows", { data: { action: "advance", instanceId: instance.id, decision: "approve" } })).status()).toBe(400);
     await section.getByRole("button", { name: "Aprobar", exact: true }).click();
     await expect(section.getByRole("button", { name: "Reintentar aprobación" })).toBeVisible();
     await expect(section.getByRole("button", { name: "Rechazar", exact: true })).toBeDisabled();

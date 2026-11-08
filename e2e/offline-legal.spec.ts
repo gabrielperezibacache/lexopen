@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { prisma } from "../src/lib/db";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 import { networkGateway } from "./fixtures/network-gateway";
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL) throw Error("Disposable database required");
@@ -81,7 +81,7 @@ test("la ficha en línea no sobrescribe un cambio sincronizado después de abrir
   test.setTimeout(120000); const f = await fixture(page);
   try {
     const snapshot = await (await page.request.get(`/api/offline/entities?kind=causa&id=${f.cause.id}`)).json(); await page.goto(`/causas/${f.cause.id}/editar`); await page.getByLabel("Resumen", { exact: true }).fill("Edición abierta anteriormente");
-    const response = await page.request.post("/api/offline/sync", { data: { kind: "causa", action: "update", requestId: randomUUID(), entityId: f.cause.id, expectedVersion: snapshot.version, fields: { ...snapshot.fields, resumen: "Cambio sincronizado" } } }); expect(response.status()).toBe(200);
+    const response = await apiRequest(page).post("/api/offline/sync", { data: { kind: "causa", action: "update", requestId: randomUUID(), entityId: f.cause.id, expectedVersion: snapshot.version, fields: { ...snapshot.fields, resumen: "Cambio sincronizado" } } }); expect(response.status()).toBe(200);
     await page.getByRole("button", { name: "Guardar cambios", exact: true }).click(); await expect(page.getByText(/La causa cambió en otra sesión/)).toBeVisible(); await expect(page.getByLabel("Resumen", { exact: true })).toHaveValue("Edición abierta anteriormente"); expect((await prisma.causa.findUniqueOrThrow({ where: { id: f.cause.id } })).resumen).toBe("Cambio sincronizado");
   } finally { await f.cleanup(); }
 });

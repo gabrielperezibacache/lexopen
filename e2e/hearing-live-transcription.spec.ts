@@ -5,7 +5,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
 import type { HearingLiveAudioView } from "../src/lib/audio/live-types";
 import type { HearingLiveMutation } from "../src/lib/hearings/live-types";
@@ -25,7 +25,7 @@ async function json<T>(response: Pick<APIResponse, "status" | "text" | "json">, 
   expect(response.status(), (await response.text()).slice(0, 1000)).toBe(status); return response.json();
 }
 async function createDesk(page: Page, title: string) {
-  return json<{ id: string }>(await page.request.post(`/api/causas/${causaId}/hearings`, { data: { title } }), 201);
+  return json<{ id: string }>(await apiRequest(page).post(`/api/causas/${causaId}/hearings`, { data: { title } }), 201);
 }
 async function openLive(page: Page, workspaceId: string) {
   await page.goto(`/causas/${causaId}/audiencias?mesa=${workspaceId}`);
@@ -118,7 +118,7 @@ test("captura nativa por tramos: transcripción, pasaje, hecho propuesto, nota y
   try {
     await loginAs(page, email); await authenticateApiRequests(page);
     const desk = await createDesk(page, "Transcripción y revisión ficticias");
-    const reference = await json<{ book: { id: string } }>(await page.request.post("/api/books", { multipart: {
+    const reference = await json<{ book: { id: string } }>(await apiRequest(page).post("/api/books", { multipart: {
       requestId: randomUUID(), title: "Fuente ficticia para continuidad de captura", author: "Material de prueba", preserveOriginal: "true",
       file: { name: "continuidad-ficticia.txt", mimeType: "text/plain", buffer: Buffer.from("El comprobante ficticio es un antecedente que debe contrastarse con la declaración. Este texto no es una obra jurídica publicada.") },
     } }), 201);
@@ -221,7 +221,7 @@ test("captura nativa por tramos: transcripción, pasaje, hecho propuesto, nota y
       const converting = page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname === `${live(desk.id)}/promotions`);
       await promotion.getByRole("button", { name: "Confirmar conversión", exact: true }).click();
       const response = await converting, result = await json<HearingPromotionResult>(response, 201); results.push(result);
-      const replay = await json<HearingPromotionResult>(await page.request.post(`${live(desk.id)}/promotions`, { data: response.request().postDataJSON() }), 201);
+      const replay = await json<HearingPromotionResult>(await apiRequest(page).post(`${live(desk.id)}/promotions`, { data: response.request().postDataJSON() }), 201);
       expect(replay.id).toBe(result.id); expect(replay.reused).toBeTruthy();
       if (target !== "writing") await promotion.getByRole("button", { name: "Volver al registro", exact: true }).click();
     }
@@ -357,7 +357,7 @@ test("sesión cerrada oculta el tramo y permite recuperarlo al autenticarse de n
     const audio = page.getByTestId("hearing-live-audio");
     await startCapture(audio, "Tramo ficticio previo al cierre de sesión");
     await page.waitForTimeout(1200);
-    expect((await page.request.post("/api/auth/logout")).ok()).toBe(true);
+    expect((await apiRequest(page).post("/api/auth/logout")).ok()).toBe(true);
     const deniedUpload = page.waitForResponse(response => response.url().endsWith("/clips") && response.request().method() === "POST" && response.status() === 401);
     await audio.getByRole("button", { name: "Detener captura", exact: true }).click();
     await deniedUpload;

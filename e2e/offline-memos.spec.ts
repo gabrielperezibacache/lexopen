@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { prisma } from "../src/lib/db";
 import { assertDisposableDatabaseUrl } from "../src/lib/testing/disposable-db";
-import { loginAs, authenticateApiRequests } from "./helpers";
+import { loginAs, authenticateApiRequests, apiRequest } from "./helpers";
 import { networkGateway } from "./fixtures/network-gateway";
 assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL) throw Error("Disposable database required");
@@ -23,7 +23,7 @@ async function fixture(page: Page) {
   await prisma.causaMiembro.create({ data: { causaId: cause.id, userId: b.id, rol: "colaborador" } });
   const note = await prisma.nota.create({ data: { titulo: `Nota ${tag}`, contenido: "Contenido original", causaId: cause.id } });
   await loginAs(page, a.email); await authenticateApiRequests(page);
-  const response = await page.request.post("/api/minutas", { data: { causaId: cause.id, titulo: `Minuta ${tag}`, resumenEjecutivo: "Resumen original", acciones: [{ descripcion: "Seguimiento original", responsable: a.name, fechaLimite: "2026-11-20", crearTask: true, crearPlazo: true, tipoComputo: "corridos", esFatal: true }] } }); expect(response.status()).toBe(201);
+  const response = await apiRequest(page).post("/api/minutas", { data: { causaId: cause.id, titulo: `Minuta ${tag}`, resumenEjecutivo: "Resumen original", acciones: [{ descripcion: "Seguimiento original", responsable: a.name, fechaLimite: "2026-11-20", crearTask: true, crearPlazo: true, tipoComputo: "corridos", esFatal: true }] } }); expect(response.status()).toBe(201);
   const minute = (await response.json()).minuta;
   return { a, b, cause, note, minute, tag, id: (kind: Kind) => kind === "nota" ? note.id : minute.id, url: (kind: Kind) => `/offline.html?kind=${kind}&record=${kind === "nota" ? note.id : minute.id}`,
     cleanup: async () => {
@@ -111,7 +111,7 @@ test("minutas: otra sesión cambia el documento y el conflicto conserva el texto
   test.setTimeout(120000); const f = await fixture(page);
   try {
     await prepare(page, f.url("minuta"), "minuta"); await page.getByLabel("Resumen ejecutivo", { exact: true }).fill("Texto local pendiente");
-    expect((await page.request.patch(`/api/minutas/${f.minute.id}`, { data: { titulo: "Edición desde otra sesión" } })).status()).toBe(200); await sync(page); await expect(page.locator("#message")).toContainText("Hay cambios");
+    expect((await apiRequest(page).patch(`/api/minutas/${f.minute.id}`, { data: { titulo: "Edición desde otra sesión" } })).status()).toBe(200); await sync(page); await expect(page.locator("#message")).toContainText("Hay cambios");
     await page.reload(); await unlock(page); await expect(page.getByLabel("Resumen ejecutivo", { exact: true })).toHaveValue("Texto local pendiente");
     const m = await prisma.minuta.findUniqueOrThrow({ where: { id: f.minute.id }, include: { documento: true } }); expect(m.titulo).toBe("Edición desde otra sesión"); expect(m.documento!.contenido).toContain("Edición desde otra sesión"); expect(m.documento!.contenido).not.toContain("Texto local pendiente");
   } finally { await f.cleanup(); }
@@ -130,7 +130,7 @@ test("minutas: el documento confidencial y el acceso sin permiso quedan protegid
   try {
     await prepare(page, f.url("minuta"), "minuta"); await page.getByLabel("Confidencialidad de la minuta", { exact: true }).selectOption("true"); await sync(page); await expect(page.locator("#message")).toContainText("Registro sincronizado");
     const m = await prisma.minuta.findUniqueOrThrow({ where: { id: f.minute.id }, include: { documento: true } }); expect(m.documento!.confidencial).toBe(true);
-    await page.request.post("/api/auth/logout"); await loginAs(page, f.b.email); await authenticateApiRequests(page);
+    await apiRequest(page).post("/api/auth/logout"); await loginAs(page, f.b.email); await authenticateApiRequests(page);
     expect((await page.request.get(`/api/offline/entities?kind=minuta&id=${f.minute.id}`)).status()).toBe(403); expect((await page.request.get(`/api/minutas/${f.minute.id}`)).status()).toBe(403);
     const docs = await (await page.request.get(`/api/documentos?causaId=${f.cause.id}`)).json(); expect(JSON.stringify(docs)).not.toContain(m.documentoId);
   } finally { await f.cleanup(); }
