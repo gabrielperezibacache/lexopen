@@ -76,35 +76,35 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1095.0",
-    "@firecrawl/anydoc": "^0.1.8",
-    "@firecrawl/pdf-inspector": "^1.14.1",
+    "@aws-sdk/client-s3": "^3.1162.0",
+    "@firecrawl/anydoc": "^0.2.4",
+    "@firecrawl/pdf-inspector": "^1.25.2",
     "@prisma/client": "5.22.0",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "htmlparser2": "^10.1.0",
-    "imapflow": "^1.7.1",
-    "lucide-react": "^0.511.0",
+    "imapflow": "^1.7.8",
+    "lucide-react": "^0.577.0",
     "mailparser": "^3.9.15",
     "next": "^16.4.5",
     "nodemailer": "^10.4.0",
-    "playwright": "^1.62.1",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "playwright": "^1.64.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "web-push": "^3.6.7",
     "zod": "^4.6.7"
   },
   "optionalDependencies": {
-    "@d0paminedriven/pdfdown-ocr": "^0.9.9"
+    "@d0paminedriven/pdfdown-ocr": "^0.10.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
-    "@types/mailparser": "^3.4.6",
+    "@types/mailparser": "^3.9.0",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
@@ -115,7 +115,7 @@
     "eslint-config-next": "^16.3.0",
     "prisma": "5.22.0",
     "tailwindcss": "^4",
-    "tsx": "^4.19.4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
