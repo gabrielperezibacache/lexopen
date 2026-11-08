@@ -29,6 +29,8 @@ Relevo Android conserva su Git independiente y se excluye de LexOpen por decisi�
 - Limpieza de fixtures después de finalizar todas las operaciones concurrentes, conservando el error original.
 - Pruebas de navegación adaptadas a la restauración del panel de memoria y al rechazo de orígenes externos.
 - Simulaciones de fallos de red aisladas del service worker; las pruebas sin conexión continúan usándolo.
+- Actualización de dependencias transitivas vulnerables de escritorio y de minimatch en los dos consumidores afectados, manteniendo electron-builder actual.
+- Separación de la regresión general y de las pruebas sin conexión: estas últimas usan el servidor compilado y CSRF activo en Chromium, Firefox y WebKit.
 - Corrección del texto largo del selector de transcripción en WebKit a 360 px, sin ocultar el desbordamiento de la página.
 
 ## Validación

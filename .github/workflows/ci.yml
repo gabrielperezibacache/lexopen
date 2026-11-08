@@ -254,7 +254,9 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix desktop
       - name: Check production dependency advisories
-        run: npm audit --omit=dev --audit-level=moderate
+        run: |
+          npm audit --omit=dev --audit-level=moderate
+          npm audit --prefix desktop --audit-level=moderate
       - run: npx prisma generate
       - name: Local PDF rendering and OCR
         run: sudo apt-get update && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa
@@ -278,7 +280,15 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run test:pjud:browser
-      - run: npm run e2e:cross
+      - name: General browser regression
+        run: npm run e2e
+        env:
+          CODEX_BIN: ${{ github.workspace }}/e2e/fixtures/codex-app-server.mjs
+          CODEX_DATA_DIR: /tmp/lexopen-codex-e2e
+      # Real network cuts must use the compiled server: the fault injector does
+      # not proxy the development server's HMR WebSocket.
+      - name: Compiled cross-browser offline regression
+        run: npm run e2e:cross
         env:
           CODEX_BIN: ${{ github.workspace }}/e2e/fixtures/codex-app-server.mjs
           CODEX_DATA_DIR: /tmp/lexopen-codex-e2e

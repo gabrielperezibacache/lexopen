@@ -77,7 +77,7 @@
     "test:tasks:integration": "node --import tsx src/lib/tasks/commands.integration.test.ts && node --import tsx src/lib/tasks/workspace.integration.test.ts && node --import tsx src/lib/tasks/export.integration.test.ts",
     "test:workflows:integration": "node --import tsx src/lib/workflows/commands.integration.test.ts",
     "e2e:audio": "cross-env E2E_SERVER_MODE=production playwright test --project chromium-audio",
-    "e2e:cross": "playwright test --project chromium --project firefox --project webkit",
+    "e2e:cross": "cross-env E2E_SERVER_MODE=production playwright test --project chromium --project firefox --project webkit",
     "test:offline:integration": "node --import tsx src/lib/offline/service.integration.test.ts && node --import tsx src/lib/offline/relations.integration.test.ts && node --import tsx src/lib/offline/legal.integration.test.ts && node --import tsx src/lib/offline/memo.integration.test.ts && node --import tsx src/lib/offline/files.integration.test.ts && node --import tsx src/lib/offline/operations.integration.test.ts && node --import tsx src/lib/minutas/mutations.integration.test.ts",
     "test:minutas:integration": "node --import tsx src/lib/minutas/mutations.integration.test.ts && node --import tsx src/lib/offline/memo.integration.test.ts",
     "test:plazos-agenda:integration": "node --import tsx src/lib/plazo-commands.integration.test.ts && node --import tsx src/lib/plazo-alerts.integration.test.ts && node --import tsx src/lib/calendario/commands.integration.test.ts"

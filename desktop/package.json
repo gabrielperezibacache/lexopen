@@ -46,5 +46,13 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/gabrielperezibacache/lexopen.git"
+  },
+  "overrides": {
+    "app-builder-lib": {
+      "minimatch": "^11.0.5"
+    },
+    "@electron/universal": {
+      "minimatch": "^11.0.5"
+    }
   }
 }

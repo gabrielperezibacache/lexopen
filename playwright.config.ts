@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.E2E_BASE_URL || "http://127.0.0.1:3100";
 
+const compiledBrowserSpecs = ["browser-smoke.spec.ts", "writing-review.spec.ts", "offline-*.spec.ts", "whatsapp-link.spec.ts"];
+const compiled = process.env.E2E_SERVER_MODE === "production";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
@@ -24,7 +27,8 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: "hearing-live-transcription.spec.ts",
+      testMatch: compiled ? compiledBrowserSpecs : undefined,
+      testIgnore: compiled ? "hearing-live-transcription.spec.ts" : ["hearing-live-transcription.spec.ts", "offline-*.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
     {
