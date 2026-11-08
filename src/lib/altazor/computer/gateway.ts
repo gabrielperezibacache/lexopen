@@ -1,13 +1,17 @@
 import { ConnectorError } from "@/lib/personal-connectors/core";
 import { endpointFor } from "./policy";
-import type { ComputerFile, ComputerTurn } from "./types";
+import type { ComputerApproval, ComputerFile, ComputerTurn, VerifiedComputerFile } from "./types";
 import type { PersonInput } from "./policy";
 import { CONNECTOR_GATE, connectorKind } from "../connectors/catalog";
 import { assertGatewayOAuthAllowed, connectorConfigBody, connectorNameSchema, normalizeConnectorNames, projectConnectorSettings, validateConnectorConfiguration } from "../connectors/policy";
-import type { ConnectorApproval, ConnectorConfiguration } from "../connectors/types";
+import type { ConnectorConfiguration } from "../connectors/types";
 import { assertEasyConnectorRead } from "../connectors/desktop-read-policy";
 import { validatePersistentEasyOAuth, type PersistentEasyOAuthConfiguration } from "../connectors/persistent-oauth";
 import { originalTaskForApproval } from "./approval-task";
+import { fileReceiptTarget, normalizeVerifiedFileReceipt } from "./file-receipt";
+import type { ExplicitFileTask } from "./file-task";
+
+export type StagedFileApproval = { requestId: string; task: ExplicitFileTask };
 
 type Fetcher = typeof fetch;
 export type KittyRecord = { id: string; name: string; provider: string; desktop: boolean; container: string; status: string; connectors: string[]; approvals: string; backup: string };
@@ -39,7 +43,7 @@ export class KittiesGateway {
     if (!selected || /demo|scripted/i.test(JSON.stringify(selected))) throw new ConnectorError("provider_not_ready", "Configure un proveedor real de IA en el gateway del escritorio. ALTAZOR no transferirá sus credenciales.", 409);
     const fleet = await this.json("/v1/kitties");
     if (!Array.isArray(fleet.kitties) || fleet.kitties.some(item => !item || typeof item !== "object" || !knownKittyNames.includes(item.name) || String(item.container || "").startsWith("demo-"))) throw new ConnectorError("gateway_not_dedicated", "Este gateway contiene escritorios ajenos a este espacio. Use una instancia independiente y dedicada.", 409);
-    return { version: health.version.slice(0, 120), connectorGate: health.lexopen_connector_gate === CONNECTOR_GATE, persistentOAuth: health.lexopen_persistent_oauth === "v1" };
+    return { version: health.version.slice(0, 120), connectorGate: health.lexopen_connector_gate === CONNECTOR_GATE, persistentOAuth: health.lexopen_persistent_oauth === "v1", cloudFileOAuth: health.lexopen_cloud_file_oauth === "v1" };
   }
   async createKitty(name: string, provider: string, connectors: readonly string[] = ["-"], start = true) {
     const selected = normalizeConnectorNames(connectors);
@@ -57,10 +61,26 @@ export class KittiesGateway {
   async kitty(id: string, name: string, provider: string, connectors: readonly string[] = ["-"]) { const result = await this.json(`/v1/kitties/${safeId(id)}`); const kitty = this.validateKitty(result.kitty, name, provider, connectors); if (id !== name && kitty.id !== id) throw new ConnectorError("kitty_contract", "El gateway devolvió otro escritorio.", 502); return kitty; }
   async requireConnectorGate() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_connector_gate !== CONNECTOR_GATE) throw new ConnectorError("connector_gate_required", "El gateway necesita el refuerzo de permisos de LexOpen para usar conexiones.", 409); }
   async requireFileReads() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_file_reads !== "v1") throw new ConnectorError("file_reads_required", "Actualice el escritorio de Altazor para trabajar con archivos completos de Google Drive y GitHub.", 409); }
+  async requireStagedFileActions() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_staged_file_actions !== "v1") throw new ConnectorError("staged_file_actions_required", "Actualice el escritorio de Altazor para descargar archivos con comprobación real de sus resultados.", 409); }
+  async stageFileAction(chatId: string, kittyId: string, requestId: string, task: ExplicitFileTask, text: string) {
+    safeId(chatId); safeId(kittyId); safeId(requestId); connectorNameSchema.parse(task.connector);
+    assertEasyConnectorRead({ ...task, args: { action: task.action, ...task.args } });
+    if (!text.trim() || Buffer.byteLength(text, "utf8") > 16000) throw new ConnectorError("file_task_length", "El encargo de descarga supera el tamaño admitido. Acorte el mensaje y vuelva a revisarlo.", 400);
+    await this.requireStagedFileActions();
+    const response = await this.response(`/v1/lexopen/chats/${safeId(chatId)}/file-actions`, "POST", { request_id: requestId, kitty: kittyId, connector: task.connector, action: task.action, args: task.args, text });
+    let result: Record<string, unknown>;
+    try { result = JSON.parse(response.bytes.toString("utf8")); } catch { throw new ConnectorError("file_stage_unknown", "No se confirmó la preparación de la descarga. Revise sus autorizaciones; no se repetirá automáticamente.", 502); }
+    if (!result || typeof result !== "object" || Array.isArray(result) || !response.contentType.startsWith("application/json") || result.request_id !== requestId || typeof result.approval_id !== "string" || !["pending", "desktop_verified", "failed", "rejected", "unknown"].includes(String(result.state))) throw new ConnectorError("file_stage_unknown", "No se confirmó la preparación de la descarga. Revise sus autorizaciones; no se repetirá automáticamente.", 502);
+    safeId(result.approval_id);
+    if (result.state !== "pending") throw new ConnectorError("file_stage_unknown", "Esta petición ya tiene un resultado o necesita comprobación. No se repetirá automáticamente.", 409);
+    return { accepted: true, staged: true, state: "pending", requestId, approvalId: result.approval_id, fileTask: task };
+  }
   async requirePersistentOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_persistent_oauth !== "v1") throw new ConnectorError("oauth_persistence_required", "Actualice el escritorio de Altazor para mantener sus conexiones sin iniciar sesión repetidamente.", 409); }
+  async requireCloudFileOAuth() { const health = await this.json("/v1/health"); if (health.ok !== true || health.lexopen_cloud_file_oauth !== "v1") throw new ConnectorError("cloud_file_oauth_required", "Actualice el escritorio de Altazor para conectar esta cuenta desde la aplicación instalada.", 409); }
   async setPersistentEasyOAuth(name: string, input: PersistentEasyOAuthConfiguration) {
     connectorNameSchema.parse(name); validatePersistentEasyOAuth(input); await this.requirePersistentOAuth();
-    const result = await this.json(`/v1/lexopen/easy-oauth/${safeId(name)}`, "POST", { kind: input.kind, client_id: input.clientId, client_secret: input.clientSecret, access_token: input.accessToken, refresh_token: input.refreshToken, expires_at: input.expiresAt, scopes: input.scopes, ...(input.account ? { account: input.account } : {}) });
+    if (input.publicClient) await this.requireCloudFileOAuth();
+    const result = await this.json(`/v1/lexopen/easy-oauth/${safeId(name)}`, "POST", { kind: input.kind, client_id: input.clientId, ...(input.publicClient ? { public_client: true } : { client_secret: input.clientSecret }), access_token: input.accessToken, refresh_token: input.refreshToken, expires_at: input.expiresAt, scopes: input.scopes, ...(input.account ? { account: input.account } : {}) });
     if (result.name !== name || result.kind !== input.kind || result.persistent !== true || result.auto_refresh !== true) throw new ConnectorError("oauth_save_unknown", "No se confirmó el guardado persistente de la conexión. Compruebe su estado antes de repetir el ingreso.", 502);
     return { persistent: true, autoRefresh: true };
   }
@@ -113,26 +133,34 @@ export class KittiesGateway {
     const result = await this.json(`/v1/kitties/${safeId(id)}`, "PATCH", { connectors: selected, approvals: "ask" });
     return this.validateKitty(result.kitty, name, provider, selected);
   }
-  async pendingApprovals(kittyId: string, chatId: string, connectors: readonly string[]): Promise<ConnectorApproval[]> {
+  async pendingApprovals(kittyId: string, chatId: string, connectors: readonly string[]): Promise<ComputerApproval[]> {
     await this.requireConnectorGate(); const result = await this.json("/v1/approvals?status=pending");
     if (!Array.isArray(result.approvals) || result.approvals.length > 200) throw new ConnectorError("connector_approvals_contract", "No se pudo leer las autorizaciones pendientes.", 502);
     return result.approvals.filter(row => row && row.kitty === kittyId && row.chat === chatId && row.status === "pending" && connectors.includes(row.connector)).map(row => {
       const kind = connectorKind(String(row.kind));
       if (!kind || typeof row.id !== "string" || typeof row.action !== "string" || !row.args || typeof row.args !== "object" || Array.isArray(row.args)) throw new ConnectorError("connector_approvals_contract", "La autorización no corresponde a una conexión verificada.", 502);
       safeId(row.id);
-      return { id: row.id, kittyId, chatId, connector: String(row.connector), kind: kind.id, action: row.action.slice(0, 100), summary: typeof row.summary === "string" ? row.summary.slice(0, 1000) : "", ...safeApprovalArgs(row.args), at: typeof row.at === "string" ? row.at.slice(0, 80) : "", status: "pending" as const };
+      if (row.request_id !== undefined && (typeof row.request_id !== "string" || !row.request_id || row.file_stage_ready !== true)) throw new ConnectorError("connector_approvals_contract", "La petición de descarga todavía no está confirmada para su revisión.", 502);
+      if (typeof row.request_id === "string") safeId(row.request_id);
+      return { id: row.id, kittyId, chatId, connector: String(row.connector), kind: kind.id, action: row.action.slice(0, 100), summary: typeof row.summary === "string" ? row.summary.slice(0, 1000) : "", ...safeApprovalArgs(row.args), at: typeof row.at === "string" ? row.at.slice(0, 80) : "", status: "pending" as const, ...(typeof row.request_id === "string" ? { requestId: row.request_id } : {}) };
     });
   }
-  async decideApproval(id: string, kittyId: string, chatId: string, connectors: readonly string[], approve: boolean) {
+  async decideApproval(id: string, kittyId: string, chatId: string, connectors: readonly string[], approve: boolean, staged?: StagedFileApproval): Promise<{ id: string; status: string; failed: boolean; canContinue: boolean; resumeTask: string | null; verifiedFile?: VerifiedComputerFile }> {
     const pending = await this.pendingApprovals(kittyId, chatId, connectors);
     const selected = pending.find(row => row.id === id);
     if (!selected) throw new ConnectorError("connector_approval_missing", "La autorización ya cambió o no pertenece a esta sesión.", 409);
+    if (selected.requestId || staged) {
+      await this.requireStagedFileActions();
+      const exact = (value: Record<string, unknown>) => JSON.stringify(Object.entries(fileReceiptTarget(value)).sort(([a], [b]) => a.localeCompare(b)));
+      if (!staged || selected.requestId !== staged.requestId || selected.kind !== staged.task.kind || selected.connector !== staged.task.connector || selected.action !== staged.task.action || exact(selected.args) !== exact(staged.task.args)) throw new ConnectorError("file_stage_binding", "La autorización no coincide con el archivo del encargo original. No se ejecutará.", 409);
+    }
     if (approve) assertEasyConnectorRead(selected);
-    if (approve && selected.kind === "dropbox" && !(connectorKind("dropbox")?.actions as readonly string[]).includes(selected.action)) throw new ConnectorError("connector_action_unavailable", "Dropbox sólo permite listar, buscar y leer archivos.", 409);
+    if (approve && selected.kind === "dropbox" && selected.action === "download_file") await this.requireCloudFileOAuth();
+    else if (approve && selected.kind === "dropbox" && !(connectorKind("dropbox")?.actions as readonly string[]).includes(selected.action)) throw new ConnectorError("connector_action_unavailable", "Dropbox sólo permite listar, buscar y leer archivos.", 409);
     if (approve && !selected.reviewable) throw new ConnectorError("connector_approval_incomplete", "El detalle contiene datos ocultos o excede el límite de revisión. Rechácelo y revise la operación directamente en la aplicación.", 409);
     const easyRead = selected.kind === "github" && /^altazor-github-[a-f0-9]{16}$/.test(selected.connector) || selected.kind === "google-workspace" && /^altazor-google-[a-f0-9]{16}$/.test(selected.connector);
     let resumeTask: string | null = null;
-    if (approve && easyRead) {
+    if (approve && easyRead && !staged) {
       await this.requireAsyncMessages();
       const current = await this.json(`/v1/chats/${safeId(chatId)}`);
       resumeTask = originalTaskForApproval(this.validateChat(current.chat, kittyId, true, chatId).turns, id, kittyId);
@@ -140,6 +168,11 @@ export class KittiesGateway {
     const result = await this.json(`/v1/approvals/${safeId(id)}/${approve ? "approve" : "reject"}`, "POST", approve ? { always: false } : { reason: "La persona rechazó esta operación en LexOpen.", always: false });
     const approval = result.approval as Record<string, unknown> | undefined;
     if (!approval || approval.id !== id || approval.kitty !== kittyId || approval.chat !== chatId || approval.status !== (approve ? "approved" : "rejected") || approval.always === true) throw new ConnectorError("connector_approval_unknown", "El gateway no confirmó la decisión. No se repetirá automáticamente.", 502);
+    if (staged) {
+      if (approval.request_id !== staged.requestId || approval.connector !== selected.connector || approval.kind !== selected.kind || approval.action !== "download_file") throw new ConnectorError("file_receipt_unknown", "El resultado no coincide con esta descarga. No se repetirá automáticamente.", 502);
+      const verifiedFile = approve && !approval.error ? normalizeVerifiedFileReceipt(approval.structured_receipt, { requestId: staged.requestId, approvalId: id, chatId, kittyId, connector: staged.task.connector, kind: staged.task.kind, action: staged.task.action, args: staged.task.args }) : undefined;
+      return { id, status: String(approval.status), failed: Boolean(approval.error), canContinue: false, resumeTask: null, ...(verifiedFile ? { verifiedFile } : {}) };
+    }
     return { id, status: String(approval.status), failed: Boolean(approval.error), canContinue: approve && easyRead && !approval.error, resumeTask };
   }
   async createChat(kitty: KittyRecord) {

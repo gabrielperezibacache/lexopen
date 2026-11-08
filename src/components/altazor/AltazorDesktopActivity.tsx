@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowUpRight, Monitor } from "lucide-react";
+import { ArrowUpRight, FileCheck2, Monitor } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import type { ComputerActivity, ComputerActivityState, ComputerReview } from "@/lib/altazor/computer/types";
+import type { ComputerActivity, ComputerActivityState, ComputerReview, VerifiedComputerFile } from "@/lib/altazor/computer/types";
 import { computerConnectionLabel } from "@/lib/altazor/computer/activity-detail";
 import styles from "./AltazorDesktopActivity.module.css";
 
@@ -119,9 +119,28 @@ export function AltazorDesktopActivity({ causaId, refreshKey, onOpen }: { causaI
       {activity.detail.connections.length > 0 && <p>Aplicaciones de este escritorio: <strong>{activity.detail.connections.map(computerConnectionLabel).join(" · ")}</strong></p>}
       {activity.detail.step && <p className={styles.step}>{activity.detail.step.label}{Number.isFinite(Date.parse(activity.detail.step.at)) && <time dateTime={activity.detail.step.at}>{new Date(activity.detail.step.at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}</time>}</p>}
     </div>}
+    {activity?.verifiedFiles?.length ? <VerifiedComputerFiles files={activity.verifiedFiles} /> : null}
     {visibleFrame && <div className={styles.screen}>
       <span className={styles.live}>Vista en directo</span>
       <Image src={visibleFrame.url} unoptimized width={1280} height={800} alt="Vista actual del escritorio privado de Altazor" />
     </div>}
+  </section>;
+}
+
+/** Render only server-verified receipts. File text stays literal source data. */
+export function VerifiedComputerFiles({ files }: { files: readonly VerifiedComputerFile[] }) {
+  if (!files.length) return null;
+  return <section className={styles.files} aria-label="Archivos descargados y verificados">
+    <h3><FileCheck2 size={18} aria-hidden="true" />Descargas verificadas</h3>
+    <ul>{files.map(file => <li key={`${file.requestId}:${file.sha256}`}>
+      <p className={styles.fileName}>{file.name}</p>
+      <p>{computerConnectionLabel(file.connector)} · {file.bytes.toLocaleString("es-CL")} bytes{file.pages !== undefined ? ` · ${file.pages} ${file.pages === 1 ? "página" : "páginas"}` : ""}</p>
+      {file.firstLine !== undefined && <p className={styles.firstLine}><span>Primera línea del archivo</span><q>{file.firstLine}</q></p>}
+      <details><summary>Origen y verificación</summary><dl>
+        <dt>Archivo en el escritorio</dt><dd>{file.localPath}</dd>
+        <dt>Origen</dt><dd>{file.kind === "google-workspace" ? `Google Drive · ${file.target.id}` : `${file.target.repo} · ${file.target.path}${file.target.ref ? ` · ${file.target.ref}` : ""}`}</dd>
+        <dt>SHA-256</dt><dd>{file.sha256}</dd>
+      </dl></details>
+    </li>)}</ul>
   </section>;
 }

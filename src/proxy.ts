@@ -272,7 +272,7 @@ export async function proxy(req: NextRequest) {
 
   // OAuth callbacks validate one-use state. Account activation remains session-bound.
   if (pathname === "/api/integrations/google/callback" ||
-      req.method === "GET" && ["/api/personal-connectors/linkedin/oauth/callback", "/api/personal-connectors/google-drive/oauth/callback"].includes(pathname)) {
+      req.method === "GET" && ["/api/personal-connectors/linkedin/oauth/callback", "/api/personal-connectors/google-drive/oauth/callback", "/api/altazor/connectors/oauth/callback"].includes(pathname)) {
     return pass();
   }
 

@@ -104,7 +104,7 @@ try {
   write(path.join(app, "playwright-browsers/chromium-fixture/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"), macho);
   assert.equal(verifyReleaseResources(resources, modules, native).browserExecutables, 1);
   // Only an explicitly supplied installed/device identity may enter the release.
-  const publicOAuth = { schemaVersion: 1, google: { type: "installed", client_id: "123456789-fixture.apps.googleusercontent.com", client_secret: "fixture-installed-public-parameter" }, github: { type: "device", client_id: "fixturePublicClient123" } };
+  const publicOAuth = { schemaVersion: 1, google: { type: "installed", client_id: "123456789-fixture.apps.googleusercontent.com", client_secret: "fixture-installed-public-parameter" }, github: { type: "device", client_id: "fixturePublicClient123" }, dropbox: { type: "public_client", client_id: "fixtureDropboxPublic123" }, microsoft: { type: "public_client", client_id: "12345678-abcd-1234-abcd-123456789abc" } };
   const publisherProfile = path.join(root, "publisher-oauth.json"), stagedProfile = path.join(resources, "oauth-clients.json"), releaseMetadata = path.join(app, "lexopen-release.json");
   write(publisherProfile, JSON.stringify(publicOAuth));
   assert.equal(stageDistributedOAuthProfile(resources, { env: { ALTAZOR_GOOGLE_CLIENT_SECRET: "PRIVATE_OPERATOR_CANARY" }, defaultFile: path.join(root, "missing-public-profile.json") }), null);
@@ -115,7 +115,7 @@ try {
   try { stagedOAuth = stageDistributedOAuthProfile(resources, { env: { LEXOPEN_DISTRIBUTED_OAUTH_PROFILE: publisherProfile } }); }
   finally { if (previousUmask !== null) process.umask(previousUmask); }
   if (process.platform !== "win32") assert.equal(fs.statSync(stagedProfile).mode & 0o777, 0o644);
-  assert.deepEqual(stagedOAuth.providers, ["google", "github"]);
+  assert.deepEqual(stagedOAuth.providers, ["google", "github", "dropbox", "microsoft"]);
   assert.equal(fs.readFileSync(stagedProfile, "utf8"), JSON.stringify(publicOAuth) + "\n");
   assert.throws(() => verifyReleaseResources(resources, modules, native), /profile differs/);
   const publicMeta = JSON.parse(fs.readFileSync(releaseMetadata, "utf8")); publicMeta.distributedOAuthSha256 = stagedOAuth.sha256;

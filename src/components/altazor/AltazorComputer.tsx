@@ -12,12 +12,13 @@ import { desktopPoint } from "@/lib/altazor/computer/coordinates";
 import { computerConnectionLabel } from "@/lib/altazor/computer/activity-detail";
 import { computerFileReadPresentation, computerUserMessagePresentation } from "@/lib/altazor/computer/presentation";
 import { ConnectorOperationPreview } from "./ConnectorOperationPreview";
+import { VerifiedComputerFiles } from "./AltazorDesktopActivity";
 import { COMPUTER_ATTACHMENT_FORMATS, computerTurnNeedsHelp, type ComputerFile, type ComputerReview, type ComputerSessionView, type ComputerStatus } from "@/lib/altazor/computer/types";
 import styles from "./AltazorComputer.module.css";
 
 const api = "/api/altazor/computer";
 const stateLabel: Record<string, string> = { disabled: "Desactivado", unconfigured: "Por preparar", configured: "Escritorio preparado", error: "Requiere comprobación", creating: "Creación pendiente", starting: "Escritorio iniciándose", ready: "Escritorio disponible", unknown: "Creación sin confirmar", closed: "Escritorio detenido", expired: "Acceso vencido", stopped: "Escritorio detenido" };
-type ActionReply = { action: { id: string; status: string; result: { held?: boolean; cancelled?: boolean; stopped?: boolean; continued?: boolean; continuationPending?: boolean; continuationUnknown?: boolean } | null } };
+type ActionReply = { action: { id: string; status: string; result: { held?: boolean; cancelled?: boolean; stopped?: boolean; continued?: boolean; continuationPending?: boolean; continuationUnknown?: boolean; failed?: boolean; verifiedFile?: { state: "desktop_verified"; name: string } } | null } };
 type PanelProps = { causaId?: string | null; active?: boolean; preferredSessionId?: string | null; review?: ComputerReview };
 export function AltazorComputer(props: PanelProps) {
   return <ComputerPanel key={`${props.causaId || "personal"}:${props.preferredSessionId || "default"}`} {...props} />;
@@ -169,7 +170,7 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
     if (result.action.status !== "completed") { setNotice("El gateway no confirmó la acción. Compruebe el escritorio antes de repetirla."); return; }
     if (body.action === "close" && result.action.result?.stopped) { selectSession(""); await refresh().catch(() => {}); setNotice("El gateway confirmó que detuvo este escritorio. Sus archivos pueden permanecer en el gateway."); return; }
     if (body.action === "cancel") setNotice(result.action.result?.cancelled ? "El gateway confirmó la cancelación de la tarea." : "El gateway no encontró una tarea cancelable en ese momento. Compruebe el chat.");
-    if (body.action === "connector_approval") setNotice(body.approve === false ? "Consulta rechazada." : result.action.result?.continued ? "Lectura autorizada. Altazor continúa trabajando con el archivo en este escritorio." : result.action.result?.continuationUnknown ? "Lectura autorizada. No se confirmó si Altazor pudo continuar; comprueba el avance antes de repetir el encargo. No se reenviará automáticamente." : result.action.result?.continuationPending ? "Lectura autorizada. El escritorio sigue trabajando; comprueba su avance. Cuando termine, puedes pedirle que continúe." : "Operación autorizada. Revisa el avance en el escritorio.");
+    if (body.action === "connector_approval") setNotice(body.approve === false ? "Consulta rechazada." : result.action.result?.failed ? "No se confirmó la descarga del archivo. Revisa el resultado antes de preparar otro encargo." : result.action.result?.verifiedFile?.state === "desktop_verified" ? `Archivo descargado y verificado: ${result.action.result.verifiedFile.name}.` : result.action.result?.continued ? "Lectura autorizada. Altazor continúa trabajando con el archivo en este escritorio." : result.action.result?.continuationUnknown ? "Lectura autorizada. No se confirmó si Altazor pudo continuar; comprueba el avance antes de repetir el encargo. No se reenviará automáticamente." : result.action.result?.continuationPending ? "Lectura autorizada. El escritorio sigue trabajando; comprueba su avance. Cuando termine, puedes pedirle que continúe." : "Operación autorizada. Revisa el avance en el escritorio.");
     await loadSession(selected).catch(() => {}); setFrame(Date.now());
   }
   async function send() {
@@ -241,6 +242,7 @@ function ComputerPanel({ causaId, active = true, preferredSessionId, review }: P
       {held && canWork && <AltazorSecretUse key={selected} sessionId={selected} onBusyChange={setBusy} />}
       {view?.session.connectors?.length ? <p className={styles.expiry}>Aplicaciones autorizadas para esta sesión: {view.session.connectors.map(computerConnectionLabel).join(" · ")}.</p> : null}
       {view?.approvals?.length ? <section className={styles.approvals} aria-label="Autorizaciones de aplicaciones"><h3 ref={approvalHeading} tabIndex={-1}>Altazor espera tu decisión</h3><p>Revise el destino y el contenido. Autorizar ejecuta esta operación una sola vez.</p>{view.approvals.map(approval => <article key={approval.id}><ConnectorOperationPreview approval={approval} />{!approval.reviewable && <p>El detalle contiene datos ocultos o supera el límite de revisión. Puede rechazarlo y realizar la operación directamente en la aplicación.</p>}<div className={styles.actions}><button type="button" disabled={busy || !canWork || held || !approval.reviewable} onClick={() => action({ action: "connector_approval", approvalId: approval.id, approve: true })}>Autorizar esta operación</button><button type="button" disabled={busy || !canAct} onClick={() => action({ action: "connector_approval", approvalId: approval.id, approve: false })}>Rechazar</button></div>{held && <p>Devuelva el control para ejecutar una operación autorizada.</p>}</article>)}</section> : null}
+      {view?.verifiedFiles?.length ? <VerifiedComputerFiles files={view.verifiedFiles} /> : null}
       <div className={styles.chat} aria-live="polite">{view?.turns.length ? view.turns.map(turn => {
         const help = turn === lastTurn && computerTurnNeedsHelp(turn);
         const message = turn.from === "user" ? computerUserMessagePresentation(turn.text) : { text: turn.text, environment: null };

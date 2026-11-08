@@ -17,8 +17,39 @@ function stringsOnly(args: Record<string, unknown>, keys: readonly string[]) {
 function queryAllowed(query: URLSearchParams, names: readonly string[]) {
   return [...query].every(([key, value]) => names.includes(key) && value.length <= 1500) && [...query.keys()].length <= 12;
 }
+function cloudReadAllowed(approval: Pick<ConnectorApproval, "kind" | "connector" | "action" | "args">) {
+  const { args, action, kind } = approval;
+  if (args.action !== action) return false;
+  const limit = args.limit === undefined || typeof args.limit === "string" && /^(?:[1-9]|[1-4][0-9]|50)$/.test(args.limit);
+  const name = args.name === undefined || typeof args.name === "string" && args.name.length > 0 && args.name.length <= 180 && !args.name.startsWith(".") && !/[\\/\u0000-\u001f\u007f]/.test(args.name);
+  if (kind === "dropbox") {
+    const path = args.path;
+    const root = path === undefined || path === "" || path === "/";
+    const exact = typeof path === "string" && path.startsWith("/") && !/[\\%?#\u0000-\u001f\u007f]/.test(path) && safeSegments(path.slice(1));
+    if (["download_file", "read"].includes(action)) return stringsOnly(args, ["action", "path", "name"]) && !root && exact && name;
+    if (action === "list") return stringsOnly(args, ["action", "path", "limit"]) && (root || exact) && limit;
+    return action === "search" && stringsOnly(args, ["action", "query", "limit"]) && typeof args.query === "string" && Boolean(args.query.trim()) && args.query.length <= 500 && !/[\u0000-\u001f\u007f]/.test(args.query) && limit;
+  }
+  const item = (value: unknown) => typeof value === "string" && /^[A-Za-z0-9!_-]{1,200}$/.test(value);
+  if (action === "download_file") return stringsOnly(args, ["action", "id", "name"]) && item(args.id) && name;
+  if (action === "list") return stringsOnly(args, ["action", "id", "limit"]) && (args.id === undefined || item(args.id)) && limit;
+  if (action === "search") return stringsOnly(args, ["action", "query", "limit"]) && typeof args.query === "string" && Boolean(args.query.trim()) && args.query.length <= 500 && !/[\u0000-\u001f\u007f]/.test(args.query) && limit;
+  if (action !== "request" || Object.keys(args).some(key => !["action", "path", "method", "query"].includes(key)) || ![undefined, "GET"].includes(args.method as undefined | string) || typeof args.path !== "string" || !/^\/v1\.0\/me\/drive\/(?:root(?:\/children)?|items\/[A-Za-z0-9!_-]{1,200}(?:\/children)?)$/.test(args.path)) return false;
+  if (args.query === undefined) return true;
+  if (!args.query || typeof args.query !== "object" || Array.isArray(args.query) || Object.keys(args.query).length > 3) return false;
+  return Object.entries(args.query).every(([key, value]) => {
+    if (typeof value !== "string" || !value.trim() || value.length > 500 || /[\u0000-\u001f\u007f]/.test(value)) return false;
+    if (key === "$top") return /^(?:[1-9]|[1-4][0-9]|50)$/.test(value);
+    if (key === "$select") return value.split(",").every(field => ["id", "name", "size", "file", "folder", "lastModifiedDateTime", "parentReference"].includes(field));
+    return key === "$orderby" && ["name", "lastModifiedDateTime desc"].includes(value);
+  });
+}
 /** These easy sign-ins offer file reads. A broader native API must not turn them into writes. */
 export function easyConnectorReadAllowed(approval: Pick<ConnectorApproval, "kind" | "connector" | "action" | "args">) {
+  const generated = /^altazor-(google|github|dropbox|microsoft)-[a-f0-9]{16}$/.exec(approval.connector);
+  const expectedKind: Record<string, string> = { google: "google-workspace", github: "github", dropbox: "dropbox", microsoft: "microsoft-365" };
+  if (generated && expectedKind[generated[1]] !== approval.kind) return false;
+  if (approval.kind === "microsoft-365" && /^altazor-microsoft-[a-f0-9]{16}$/.test(approval.connector) || approval.kind === "dropbox" && /^altazor-dropbox-[a-f0-9]{16}$/.test(approval.connector)) return cloudReadAllowed(approval);
   const isGoogle = approval.kind === "google-workspace" && /^altazor-google-[a-f0-9]{16}$/.test(approval.connector);
   const isGithub = approval.kind === "github" && /^altazor-github-[a-f0-9]{16}$/.test(approval.connector);
   if (!isGoogle && !isGithub) return true;
@@ -69,5 +100,5 @@ export function easyConnectorReadAllowed(approval: Pick<ConnectorApproval, "kind
 }
 
 export function assertEasyConnectorRead(approval: Pick<ConnectorApproval, "kind" | "connector" | "action" | "args">) {
-  if (!easyConnectorReadAllowed(approval)) throw new ConnectorError("connector_read_only", "Esta conexión permite consultar archivos de Drive o repositorios públicos de GitHub. Pida una lectura concreta; no se autorizó la operación propuesta.", 409);
+  if (!easyConnectorReadAllowed(approval)) throw new ConnectorError("connector_read_only", "Esta conexión permite consultar los archivos autorizados. Pida una lectura concreta; no se autorizó la operación propuesta.", 409);
 }

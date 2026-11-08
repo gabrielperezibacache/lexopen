@@ -1,13 +1,15 @@
 /** Owned disposable PostgreSQL plus fake official HTTP endpoints; no real accounts. */
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import { digest, seal, unseal } from "@/lib/personal-connectors/core";
 import { configureComputer } from "../computer/service";
 import { beginConnectorOAuth, configureConnector, removeConnector } from "./service";
 import { CONNECTOR_CATALOG } from "./catalog";
-import { easyConnectionName, easyOAuthReturnContext, failEasyOAuthReturn, easyOAuthSetupStatus, easyOAuthStatus, receiveEasyOAuth, captureInstalledOAuthReturn, continueEasyOAuth, pollEasyOAuthDevice, saveEasyOAuthSetup, startEasyOAuth, EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth";
+import { easyConnectionName, easyOAuthReturnContext, failEasyOAuthReturn, easyOAuthSetupStatus, easyOAuthStatus, receiveEasyOAuth, captureInstalledOAuthReturn, captureExternalOAuthReturn, continueEasyOAuth, pollEasyOAuthDevice, saveEasyOAuthSetup, startEasyOAuth, EASY_OAUTH_PROVIDERS, type EasyOAuthProvider } from "./easy-oauth";
+import { GET as externalOAuthCallback } from "@/app/api/altazor/connectors/oauth/callback/route";
 
 const denied = (status: number) => (error: unknown) => (error as { status?: number }).status === status;
 async function main() {
@@ -20,6 +22,9 @@ async function main() {
   let puts = 0, providerExchanges = 0, wrongDestination = 0, revoked = false, broadScope = false, pauseExchange: (() => Promise<void>) | undefined;
   let dropboxReadGate = true, dropboxIdentity = "dbid:fictitious-account", legacyDropboxStarts = 0, applicationAccepted = true;
   let devicePolls = 0, deviceResult = "authorization_pending";
+  let cloudGate = true;
+  const legacyProviders = EASY_OAUTH_PROVIDERS.filter(provider => provider !== "microsoft");
+  const microsoftClientId = "12345678-abcd-1234-abcd-123456789abc";
   const dropboxScopes = "account_info.read files.content.read files.metadata.read";
   const gatewayTokens = new Map<string, { kind: string; token: string; persistent?: boolean }>();
   const snapshot = () => ({ connector_catalog: CONNECTOR_CATALOG.map(kind => ({ name: kind.id, fields: kind.fieldNames.map(name => ({ name, label: name, secret: /token|secret/.test(name) })) })), connectors: [...gatewayTokens].map(([name, value]) => ({ name, kind: value.kind, settings: {}, secrets_set: ["token"], token_set: true, needs_sign_in: false, auth: "token" })) });
@@ -27,7 +32,7 @@ async function main() {
     const url = new URL(String(raw)), method = init?.method || "GET";
     if (url.origin !== "http://127.0.0.1:18999") { wrongDestination++; throw new Error("Unexpected fictitious gateway destination"); }
     assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-easy-oauth-gateway");
-    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate, ...(persistentGate ? { lexopen_persistent_oauth: "v1" } : {}) });
+    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate, ...(persistentGate ? { lexopen_persistent_oauth: "v1" } : {}), ...(cloudGate ? { lexopen_cloud_file_oauth: "v1" } : {}) });
     if (url.pathname === "/v1/providers") return Response.json({ providers: [{ name: "fixture-model", kind: "openai" }] });
     if (url.pathname === "/v1/kitties") return Response.json({ kitties: [] });
     if (url.pathname === "/v1/settings") return Response.json(snapshot());
@@ -39,8 +44,10 @@ async function main() {
     }
     if (url.pathname.startsWith("/v1/lexopen/easy-oauth/")) {
       assert.equal(method, "POST"); const name = decodeURIComponent(url.pathname.split("/").pop()!), body = JSON.parse(String(init?.body));
-      assert.ok(body.refresh_token.startsWith("fictitious-")); assert.ok(body.client_secret.includes("fictitious")); assert.ok(Date.parse(body.expires_at) > Date.now());
-      assert.deepEqual(Object.keys(body).sort(), ["access_token", "account", "client_id", "client_secret", "expires_at", "kind", "refresh_token", "scopes"].sort());
+      assert.ok(body.refresh_token.startsWith("fictitious-")); assert.ok(Date.parse(body.expires_at) > Date.now());
+      if (body.public_client) { assert.equal(body.public_client, true); assert.equal(body.client_secret, undefined); assert.ok(["dropbox", "microsoft-365"].includes(body.kind)); }
+      else assert.ok(body.client_secret.includes("fictitious"));
+      assert.deepEqual(Object.keys(body).sort(), ["access_token", "account", "client_id", body.public_client ? "public_client" : "client_secret", "expires_at", "kind", "refresh_token", "scopes"].sort());
       puts++; gatewayTokens.set(name, { kind: body.kind, token: body.access_token, persistent: true });
       if (loseNextImport) { loseNextImport = false; throw new Error("Fictitious import acknowledgement lost after acceptance"); }
       return Response.json({ name, kind: body.kind, persistent: true, auto_refresh: true });
@@ -69,11 +76,17 @@ async function main() {
       assert.deepEqual(JSON.parse(String(init?.body)), { access_token: "0000000000000000000000000000000000000000" });
       return Response.json({}, { status: applicationAccepted ? 404 : 401 });
     }
+    if (url.href === "https://login.microsoftonline.com/common/oauth2/v2.0/token") {
+      providerExchanges++; const body = new URLSearchParams(String(init?.body));
+      assert.equal(body.get("client_id"), microsoftClientId); assert.equal(body.has("client_secret"), false); assert.equal(body.get("grant_type"), "authorization_code"); assert.ok(body.get("code_verifier"));
+      assert.equal(body.get("redirect_uri"), "http://localhost:3349/api/altazor/connectors/oauth/callback");
+      return Response.json({ access_token: "fictitious-microsoft-consented-access", token_type: "Bearer", scope: broadScope ? "User.Read Files.ReadWrite" : "https://graph.microsoft.com/User.Read https://graph.microsoft.com/Files.Read", expires_in: 3600, ...(!missingRefresh ? { refresh_token: "fictitious-microsoft-refresh-token" } : {}) });
+    }
     if (["https://oauth2.googleapis.com/token", "https://github.com/login/oauth/access_token", "https://api.dropboxapi.com/oauth2/token"].includes(url.href)) {
       providerExchanges++; assert.equal(init?.method, "POST");
       const body = new URLSearchParams(String(init?.body)); assert.equal(body.get("grant_type"), "authorization_code"); assert.ok(body.get("code_verifier")); assert.match(body.get("redirect_uri")!, /^http:\/\/127.0.0.1:3349\/api\/altazor\/connectors\/oauth\/callback$/);
       const pause = pauseExchange; pauseExchange = undefined; if (pause) await pause();
-      if (url.hostname === "api.dropboxapi.com") return Response.json({ access_token: "fictitious-dropbox-consented-access", token_type: "bearer", ...(!missingRefresh ? { refresh_token: "fictitious-dropbox-refresh-token" } : {}), account_id: "dbid:fictitious-account", scope: broadScope ? `${dropboxScopes} files.content.write` : dropboxScopes, expires_in: 14_400 });
+      if (url.hostname === "api.dropboxapi.com") { if (body.get("client_id") === "fictitiousDropboxPublic") assert.equal(body.has("client_secret"), false); return Response.json({ access_token: "fictitious-dropbox-consented-access", token_type: "bearer", ...(!missingRefresh ? { refresh_token: "fictitious-dropbox-refresh-token" } : {}), account_id: "dbid:fictitious-account", scope: broadScope ? `${dropboxScopes} files.content.write` : dropboxScopes, expires_in: 14_400 }); }
       const google = url.hostname === "oauth2.googleapis.com";
       return Response.json({ access_token: google ? "fictitious-google-consented-access" : "fictitious-github-consented-access", token_type: "Bearer", scope: broadScope ? "repo" : google ? `https://www.googleapis.com/auth/drive.${googleFiles ? "readonly" : "metadata.readonly"}` : "read:user", ...(google ? { expires_in: 3600, ...(!missingRefresh ? { refresh_token: "fictitious-google-refresh-token" } : {}) } : {}) });
     }
@@ -83,6 +96,7 @@ async function main() {
       return Response.json({ account_id: dropboxIdentity, email: "private@example.invalid" });
     }
     assert.equal(init?.method || "GET", "GET");
+    if (url.href === "https://graph.microsoft.com/v1.0/me?$select=id") { assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-microsoft-consented-access"); return Response.json({ id: "fictitious-microsoft-subject", mail: "must-not-leave-private-profile" }); }
     if (url.hostname === "www.googleapis.com") { assert.equal(url.pathname, "/drive/v3/about"); assert.equal(url.searchParams.get("fields"), "user(permissionId)"); assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-google-consented-access"); return Response.json({ user: { permissionId: "fictitious-google-subject" } }); }
     if (url.href === "https://api.github.com/user") { assert.equal(new Headers(init?.headers).get("authorization"), "Bearer fictitious-github-consented-access"); return Response.json({ id: 777, login: "private-profile-not-returned", email: "private@example.invalid" }); }
     throw new Error("Unexpected fake official endpoint");
@@ -105,7 +119,7 @@ async function main() {
     assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[0].state, "blocked");
     await assert.rejects(start("google", "blocked"), denied(503));
     await assert.rejects(saveEasyOAuthSetup(actor, { provider: "google", clientId: "fictitious-client", clientSecret: "fictitious-secret", confirmed: true }, origin), denied(403));
-    const publicOptions = { fetcher: providerFetch, env: { APP_URL: origin, LEXOPEN_DESKTOP: "1", ALTAZOR_DISTRIBUTED_OAUTH: JSON.stringify({ schemaVersion: 1, google: { type: "installed", client_id: "1234567890-fictitiouspublicdesktop.apps.googleusercontent.com", client_secret: "fictitious-public-desktop-parameter" }, github: { type: "device", client_id: "fictitious-public-github" } }) } };
+    const publicOptions = { fetcher: providerFetch, env: { APP_URL: origin, LEXOPEN_DESKTOP: "1", ALTAZOR_DISTRIBUTED_OAUTH: JSON.stringify({ schemaVersion: 1, google: { type: "installed", client_id: "1234567890-fictitiouspublicdesktop.apps.googleusercontent.com", client_secret: "fictitious-public-desktop-parameter" }, github: { type: "device", client_id: "fictitious-public-github" }, dropbox: { type: "public_client", client_id: "fictitiousDropboxPublic" }, microsoft: { type: "public_client", client_id: microsoftClientId } }) } };
     const shipped = await easyOAuthSetupStatus(publicOptions);
     assert.equal(shipped.providers[0].configured, true); assert.equal(shipped.providers[0].source, "distributed");
     assert.equal(shipped.providers[1].configured, true); assert.equal(JSON.stringify(shipped).includes("fictitious-public-desktop-parameter"), false);
@@ -155,8 +169,75 @@ async function main() {
     const deviceSaved = await easyOAuthStatus(actor, workspaceId, device.attemptId, publicOptions);
     assert.equal(deviceSaved.providers[1].connected, true); assert.equal(deviceSaved.attempt?.device, undefined); assert.equal(puts, beforeDevice + 1);
     await assert.rejects(pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions), denied(409)); assert.equal(puts, beforeDevice + 1);
-    for (const provider of EASY_OAUTH_PROVIDERS) await saveEasyOAuthSetup(administrator, { provider, clientId: `fictitious-${provider}-client`, clientSecret: `fictitious-${provider}-operator-secret`, confirmed: true }, origin, { fetcher: providerFetch });
+    for (const provider of ["dropbox", "microsoft"] as const) {
+      const providerSetup = (await easyOAuthSetupStatus(publicOptions)).providers.find(row => row.provider === provider)!;
+      assert.equal(providerSetup.source, "distributed"); assert.equal(providerSetup.publicClient, true);
+      const input = { provider, workspaceId, requestId: `cloud-${provider}-${stamp}`, confirmed: true as const };
+      cloudGate = false;
+      await assert.rejects(startEasyOAuth(actor, input, origin, publicOptions), error => (error as { code?: string }).code === "oauth_cloud_files_required");
+      assert.equal((await easyOAuthStatus(actor, workspaceId, null, publicOptions)).providers.find(row => row.provider === provider)?.available, false);
+      cloudGate = true;
+      const begun = await startEasyOAuth(actor, input, origin, publicOptions), auth = new URL(begun.authUrl), state = auth.searchParams.get("state")!;
+      assert.equal(begun.flow, "external"); assert.equal(auth.searchParams.get("code_challenge_method"), "S256"); assert.equal(auth.searchParams.has("client_secret"), false);
+      if (provider === "microsoft") { assert.equal(auth.hostname, "login.microsoftonline.com"); assert.equal(auth.searchParams.get("redirect_uri"), "http://localhost:3349/api/altazor/connectors/oauth/callback"); assert.deepEqual(auth.searchParams.get("scope")!.split(" ").sort(), ["Files.Read", "User.Read", "offline_access"]); }
+      const before = providerExchanges, saved = puts, code = `fictitious-cloud-${provider}-code`, callbackOrigin = new URL(auth.searchParams.get("redirect_uri")!).origin;
+      await assert.rejects(receiveEasyOAuth(actor, { state, code }, origin, publicOptions), denied(409));
+      await assert.rejects(captureExternalOAuthReturn({ state, code }, "http://localhost:9999", publicOptions), denied(409));
+      assert.equal(await captureExternalOAuthReturn({ state, code }, callbackOrigin, publicOptions), true);
+      assert.equal(providerExchanges, before); assert.equal(puts, saved);
+      await assert.rejects(continueEasyOAuth({ ...actor, sessionHash: digest("cloud-other-session") }, begun.attemptId, origin, publicOptions), denied(404));
+      if (provider === "microsoft") await assert.rejects(continueEasyOAuth(actor, begun.attemptId, callbackOrigin, publicOptions), denied(409));
+      assert.equal((await continueEasyOAuth(actor, begun.attemptId, origin, publicOptions)).state, "completed"); assert.equal(providerExchanges, before + 1); assert.equal(puts, saved + 1);
+      const view = await easyOAuthStatus(actor, workspaceId, begun.attemptId, publicOptions), connected = view.providers.find(row => row.provider === provider)!;
+      assert.equal(connected.connected, true); assert.equal(connected.autoRefresh, true); assert.equal(connected.canReadFiles, true);
+      if (provider === "microsoft") assert.deepEqual(connected.grantedScopes, ["Files.Read", "User.Read"]);
+      for (const secret of [code, "fictitious-microsoft-consented-access", "fictitious-microsoft-refresh-token", "must-not-leave-private-profile"]) assert.equal(JSON.stringify(view).includes(secret), false);
+      const broader = await startEasyOAuth(actor, { ...input, requestId: `cloud-broad-${provider}-${stamp}` }, origin, publicOptions), broadState = new URL(broader.authUrl).searchParams.get("state")!;
+      broadScope = true;
+      await captureExternalOAuthReturn({ state: broadState, code: "fictitious-broad-scope" }, callbackOrigin, publicOptions);
+      assert.equal((await continueEasyOAuth(actor, broader.attemptId, origin, publicOptions)).state, "failed"); assert.equal(puts, saved + 1, "a broader grant never reaches the gateway");
+      broadScope = false;
+    }
+    for (const provider of legacyProviders) await saveEasyOAuthSetup(administrator, { provider, clientId: `fictitious-${provider}-client`, clientSecret: `fictitious-${provider}-operator-secret`, confirmed: true }, origin, { fetcher: providerFetch });
     assert.equal((await easyOAuthSetupStatus(publicOptions)).providers[0].source, "saved", "an existing operator identity wins over the installer profile");
+    for (const provider of legacyProviders) {
+      const input = { provider, workspaceId, requestId: `external-${provider}-${stamp}`, external: true, confirmed: true as const };
+      const external = await startEasyOAuth(actor, input, origin, options), auth = new URL(external.authUrl), state = auth.searchParams.get("state")!;
+      assert.equal(external.flow, "external"); assert.equal(auth.searchParams.get("code_challenge_method"), "S256");
+      assert.equal((await easyOAuthStatus(actor, workspaceId, external.attemptId)).attempt?.external, true);
+      await assert.rejects(startEasyOAuth(actor, { ...input, external: false }, origin, options), error => (error as { code?: string }).code === "request_conflict");
+      const code = `fictitious-external-${provider}-grant`, beforeExchanges = providerExchanges, beforePuts = puts;
+      await assert.rejects(receiveEasyOAuth(actor, { state, code }, origin, options), denied(409));
+      assert.equal((await continueEasyOAuth(actor, external.attemptId, origin, options)).state, "pending");
+      await assert.rejects(continueEasyOAuth({ ...actor, id: other.id }, external.attemptId, origin, options), denied(404));
+      await assert.rejects(continueEasyOAuth({ ...actor, sessionHash: digest("fictitious-other-session") }, external.attemptId, origin, options), denied(404));
+      await assert.rejects(continueEasyOAuth({ ...actor, sessionVersion: actor.sessionVersion + 1 }, external.attemptId, origin, options), denied(404));
+      await assert.rejects(captureExternalOAuthReturn({ state, code }, "http://127.0.0.1:1", options), denied(409));
+      const returned = await externalOAuthCallback(new NextRequest(`${origin}/api/altazor/connectors/oauth/callback?${new URLSearchParams({ state, code })}`, { headers: { host: new URL(origin).host } }));
+      assert.equal(returned.status, 200, "a system browser callback does not require the application cookie");
+      assert.match(returned.headers.get("cache-control") || "", /no-store/);
+      const html = await returned.text(); assert.equal(html.includes(code), false); assert.equal(html.includes(state), false);
+      assert.equal(providerExchanges, beforeExchanges, "the real GET callback captures but never exchanges a code"); assert.equal(puts, beforePuts);
+      assert.equal(await captureExternalOAuthReturn({ state, code: "fictitious-later-code-must-not-replace" }, origin, options), true);
+      const captured = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: external.attemptId } });
+      assert.equal(captured.resultEnc!.includes(code), false);
+      assert.equal(unseal<{ authorization: { code: string } }>(captured.resultEnc!, `altazor:desktop:oauth:${actor.id}:${captured.id}`).authorization.code, code);
+      const publicStatus = JSON.stringify(await easyOAuthStatus(actor, workspaceId, external.attemptId));
+      for (const secret of [code, state, "fictitious-later-code-must-not-replace", `fictitious-${provider}-operator-secret`]) assert.equal(publicStatus.includes(secret), false);
+      const claims = await Promise.allSettled([continueEasyOAuth(actor, external.attemptId, origin, options), continueEasyOAuth(actor, external.attemptId, origin, options)]);
+      assert.ok(claims.some(result => result.status === "fulfilled" && result.value.state === "completed"));
+      assert.equal(providerExchanges, beforeExchanges + 1, "only the initiating session can exchange, once"); assert.equal(puts, beforePuts + 1);
+      assert.equal((await easyOAuthStatus(actor, workspaceId, external.attemptId)).attempt?.state, "completed");
+      assert.equal(await captureExternalOAuthReturn({ state, code }, origin, options), false);
+      await assert.rejects(receiveEasyOAuth(actor, { state, code }, origin, options), denied(409));
+      assert.equal(providerExchanges, beforeExchanges + 1); assert.equal(puts, beforePuts + 1);
+      const deniedExternal = await startEasyOAuth(actor, { ...input, requestId: `external-denied-${provider}-${stamp}` }, origin, options), deniedState = new URL(deniedExternal.authUrl).searchParams.get("state")!;
+      const deniedResponse = await externalOAuthCallback(new NextRequest(`${origin}/api/altazor/connectors/oauth/callback?${new URLSearchParams({ state: deniedState, error: "access_denied", error_description: "DO_NOT_REFLECT_PROVIDER_DETAIL" })}`, { headers: { host: new URL(origin).host } }));
+      assert.equal(deniedResponse.status, 200); assert.equal((await deniedResponse.text()).includes("DO_NOT_REFLECT_PROVIDER_DETAIL"), false);
+      assert.equal((await continueEasyOAuth(actor, deniedExternal.attemptId, origin, options)).state, "failed");
+      assert.equal((await easyOAuthStatus(actor, workspaceId, deniedExternal.attemptId)).attempt?.reason, "No se autorizó la conexión. Puede iniciarla de nuevo cuando quiera.");
+      assert.equal(providerExchanges, beforeExchanges + 1, "denial is never exchanged or imported"); assert.equal(puts, beforePuts + 1);
+    }
     const beforeRejectedSetup = await prisma.integrationConfig.findUniqueOrThrow({ where: { provider: "altazor-oauth-github" } });
     applicationAccepted = false;
     await assert.rejects(saveEasyOAuthSetup(administrator, { provider: "github", clientId: "fictitious-github-client", clientSecret: "fictitious-wrong-secret", confirmed: true }, origin, { fetcher: providerFetch }), error => (error as { code?: string }).code === "oauth_client_credentials");
@@ -172,12 +253,13 @@ async function main() {
     persistentGate = false;
     await assert.rejects(start("google", "no-persistent-gate"), error => (error as { code?: string }).code === "oauth_persistence_required");
     persistentGate = true;
-    for (const provider of EASY_OAUTH_PROVIDERS) {
+    for (const provider of legacyProviders) {
       const begun = await start(provider, provider), auth = new URL(begun.authUrl), state = auth.searchParams.get("state")!;
       assert.equal(auth.hostname, { google: "accounts.google.com", github: "github.com", dropbox: "www.dropbox.com" }[provider]); assert.equal(auth.searchParams.get("code_challenge_method"), "S256"); assert.equal(auth.searchParams.has("client_secret"), false);
       if (provider === "dropbox") { assert.equal(auth.searchParams.get("scope"), dropboxScopes); assert.equal(auth.searchParams.get("token_access_type"), "offline"); assert.equal(auth.searchParams.has("include_granted_scopes"), false); }
       if (provider === "google") assert.equal(auth.searchParams.get("access_type"), "offline");
       const pending = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: begun.attemptId } });
+      assert.equal(await captureExternalOAuthReturn({ state, code: "legacy-callback-is-not-an-external-return" }, origin, options), false);
       const payload = unseal<{ verifier: string }>(pending.resultEnc!, `altazor:desktop:oauth:${owner.id}:${pending.id}`);
       assert.equal(auth.searchParams.get("code_challenge"), createHash("sha256").update(payload.verifier).digest("base64url")); assert.equal(pending.resultEnc!.includes(payload.verifier), false);
       assert.equal((await start(provider, provider)).authUrl, begun.authUrl);

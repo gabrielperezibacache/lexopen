@@ -29,8 +29,8 @@ function parseDistributedOAuthProfile(raw) {
       if (Buffer.byteLength(raw, "utf8") > MAX_DISTRIBUTED_OAUTH_BYTES) throw invalid();
       input = JSON.parse(raw);
     }
-    record(input, ["schemaVersion", "google", "github"], ["schemaVersion"]);
-    if (input.schemaVersion !== 1 || (!Object.hasOwn(input, "google") && !Object.hasOwn(input, "github"))) throw invalid();
+    record(input, ["schemaVersion", "google", "github", "dropbox", "microsoft"], ["schemaVersion"]);
+    if (input.schemaVersion !== 1 || !["google", "github", "dropbox", "microsoft"].some(provider => Object.hasOwn(input, provider))) throw invalid();
     const result = { schemaVersion: 1 };
     if (Object.hasOwn(input, "google")) {
       const google = record(input.google, ["type", "client_id", "client_secret"]);
@@ -46,6 +46,12 @@ function parseDistributedOAuthProfile(raw) {
       const github = record(input.github, ["type", "client_id"]);
       if (github.type !== "device") throw invalid();
       result.github = Object.freeze({ type: "device", client_id: value(github.client_id, 200, /^[A-Za-z0-9_.-]{8,200}$/) });
+    }
+    for (const provider of ["dropbox", "microsoft"]) if (Object.hasOwn(input, provider)) {
+      const entry = record(input[provider], ["type", "client_id"]);
+      if (entry.type !== "public_client") throw invalid();
+      const pattern = provider === "microsoft" ? /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i : /^[A-Za-z0-9_-]{8,200}$/;
+      result[provider] = Object.freeze({ type: "public_client", client_id: value(entry.client_id, 200, pattern) });
     }
     if (Buffer.byteLength(JSON.stringify(result), "utf8") > MAX_DISTRIBUTED_OAUTH_BYTES) throw invalid();
     return Object.freeze(result);

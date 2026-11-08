@@ -7,6 +7,8 @@ const { parseDistributedOAuthProfile: parse, applyDistributedOAuthProfile: apply
 const fixture = { schemaVersion: 1, google: { type: "installed", client_id: "123456789-fixture.apps.googleusercontent.com", client_secret: "fixture-installed-public-parameter" }, github: { type: "device", client_id: "fixturePublicClient123" } };
 assert.deepEqual(parse(JSON.stringify(fixture)), fixture);
 assert.equal(Object.isFrozen(parse(fixture).google), true);
+const publicCloud = { schemaVersion: 1, dropbox: { type: "public_client", client_id: "fixtureDropboxApp123" }, microsoft: { type: "public_client", client_id: "12345678-abcd-1234-abcd-123456789abc" } };
+assert.deepEqual(parse(JSON.stringify(publicCloud)), publicCloud);
 for (const bad of [
   {}, { schemaVersion: 1 }, { ...fixture, schemaVersion: 2 }, { ...fixture, endpoint: "https://fixture.invalid" },
   { schemaVersion: 1, google: { ...fixture.google, type: "web" } },
@@ -16,6 +18,11 @@ for (const bad of [
   { schemaVersion: 1, github: { type: "device", client_id: "github_pat_never-show-private-value" } },
   { schemaVersion: 1, github: { ...fixture.github, client_secret: "never-show-private-value" } },
   { schemaVersion: 1, github: { ...fixture.github, client_id: "https://fixture.invalid" } },
+  { ...publicCloud, microsoft: { ...publicCloud.microsoft, client_secret: "never-show-private-value" } },
+  { ...publicCloud, microsoft: { ...publicCloud.microsoft, client_id: "not-a-client-guid" } },
+  { ...publicCloud, dropbox: { ...publicCloud.dropbox, type: "web" } },
+  { ...publicCloud, dropbox: { ...publicCloud.dropbox, access_token: "never-show-private-value" } },
+  { ...publicCloud, dropbox: { ...publicCloud.dropbox, client_secret: "" } },
   Object.assign(Object.create({ inherited: true }), fixture),
   JSON.parse('{"schemaVersion":1,"__proto__":{},"github":{"type":"device","client_id":"fixture-public"}}'),
   " ".repeat(16385), "not-json",

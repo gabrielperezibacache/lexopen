@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { microsoftNativeCallback, microsoftPublicAuthorization, microsoftPublicCodeBody, microsoftPublicRefreshBody, normalizeMicrosoftFileScopes } from "./microsoft-oauth";
+
+const clientId = "11111111-2222-3333-4444-555555555555", verifier = "v".repeat(43), state = "s".repeat(43);
+const redirectUri = microsoftNativeCallback("http://127.0.0.1:3366");
+assert.equal(redirectUri, "http://localhost:3366/api/altazor/connectors/oauth/callback");
+const auth = new URL(microsoftPublicAuthorization({ clientId, verifier, state, redirectUri }));
+assert.equal(auth.origin, "https://login.microsoftonline.com");
+assert.equal(auth.pathname, "/common/oauth2/v2.0/authorize");
+assert.equal(auth.searchParams.get("scope"), "offline_access User.Read Files.Read");
+assert.equal(auth.searchParams.get("code_challenge"), createHash("sha256").update(verifier).digest("base64url"));
+assert.equal(auth.searchParams.get("response_mode"), "query");
+for (const scopes of ["Files.Read User.Read", "offline_access User.Read Files.Read", ["https://graph.microsoft.com/Files.Read", "https://graph.microsoft.com/User.Read"], "files.read user.read"]) assert.deepEqual(normalizeMicrosoftFileScopes(scopes), ["Files.Read", "User.Read"]);
+for (const scopes of ["Files.ReadWrite User.Read", "Files.Read.All User.Read", "Files.Read User.Read Mail.Read", "Files.Read", "User.Read Files.Read Files.Read", "https://evil.test/Files.Read User.Read", null, ["Files.Read", {}], "User.Read Files.Read openid"]) assert.throws(() => normalizeMicrosoftFileScopes(scopes));
+for (const app of ["http://192.168.1.2:3000", "https://localhost:3000", "http://[::1]:3000", "http://user@localhost:3000", "http://localhost:3000/other", "http://localhost:3000?next=evil"]) assert.throws(() => microsoftNativeCallback(app));
+for (const redirect of [redirectUri + "?next=evil", redirectUri + "#token=fixture", redirectUri.replace("localhost", "evil.test"), redirectUri.replace("http:", "https:"), redirectUri.replace("localhost", "127.0.0.1")]) assert.throws(() => microsoftPublicAuthorization({ clientId, verifier, state, redirectUri: redirect }));
+assert.throws(() => microsoftPublicAuthorization({ clientId, verifier: "short", state, redirectUri }));
+const code = microsoftPublicCodeBody({ clientId, redirectUri, code: "fixture-code", verifier });
+const refresh = microsoftPublicRefreshBody({ clientId, refreshToken: "fixture-refresh" });
+assert.equal(code.get("code_verifier"), verifier); assert.equal(refresh.get("scope"), "User.Read Files.Read");
+for (const body of [auth.searchParams, code, refresh]) assert.equal(body.has("client_secret"), false);
+assert.throws(() => microsoftPublicRefreshBody({ clientId, refreshToken: "fixture\nreflected" }));
+console.log("Microsoft public OAuth helper PASS: native callback, PKCE, exact read scopes, code/refresh without secret; no account or network used.");

@@ -7,6 +7,7 @@ const basicScopes = {
   google: [GOOGLE_METADATA_SCOPE],
   github: ["read:user"],
   dropbox: ["account_info.read", "files.content.read", "files.metadata.read"],
+  microsoft: ["Files.Read", "User.Read"],
 } as const;
 
 /** Each permission upgrade is explicit and bound to its own OAuth attempt. */
@@ -28,5 +29,5 @@ export function validEasyOAuthScopes(provider: EasyOAuthProvider, value: unknown
 }
 
 export function canReadConnectorFiles(provider: EasyOAuthProvider, scopes: readonly string[]) {
-  return provider === "google" ? scopes.includes(GOOGLE_FILES_SCOPE) : provider === "github" ? scopes.includes("read:user") : scopes.includes("files.content.read");
+  return provider === "google" ? scopes.includes(GOOGLE_FILES_SCOPE) : provider === "github" ? scopes.includes("read:user") : provider === "microsoft" ? scopes.includes("Files.Read") : scopes.includes("files.content.read");
 }

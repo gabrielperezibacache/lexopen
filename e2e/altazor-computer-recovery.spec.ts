@@ -198,7 +198,7 @@ test("una comprobación fallida de conectores invalida el estado anterior hasta 
   const probe = catalog.getByRole("button", { name: "Probar acceso", exact: true });
   await expect(save).toBeEnabled();
   await expect(probe).toBeEnabled();
-  await expect(catalog.getByRole("button", { name: "ntfy-fixture · Sesión autorizada", exact: true })).toBeVisible();
+  await expect(catalog.getByRole("button", { name: "ntfy-fixture · Guardada · sin comprobar", exact: true })).toBeVisible();
   fail = true;
   await catalog.getByRole("button", { name: "Comprobar estado", exact: true }).click();
   await expect.poll(() => Boolean(pendingCheck)).toBe(true);
@@ -212,12 +212,49 @@ test("una comprobación fallida de conectores invalida el estado anterior hasta 
   await expect(probe).toBeDisabled();
   await expect(catalog.getByText("Permisos por uso activos", { exact: true })).toHaveCount(0);
   await expect(catalog.getByRole("button", { name: /ntfy-fixture.*Sesión autorizada/ })).toHaveCount(0);
-  await expect(catalog.getByRole("button", { name: /ntfy-fixture.*Sin comprobar/ })).toBeVisible();
+  await expect(catalog.getByRole("button", { name: "ntfy-fixture · Estado sin comprobar", exact: true })).toBeVisible();
   fail = false;
   await catalog.getByRole("button", { name: "Comprobar estado", exact: true }).click();
   await expect(save).toBeEnabled();
   await expect(probe).toBeEnabled();
-  await expect(catalog.getByRole("button", { name: "ntfy-fixture · Sesión autorizada", exact: true })).toBeVisible();
+  await expect(catalog.getByRole("button", { name: "ntfy-fixture · Guardada · sin comprobar", exact: true })).toBeVisible();
   expect(connectorReads).toBeGreaterThanOrEqual(3);
   expect(mutations).toEqual([]);
+});
+
+test("una prueba de acceso confirma sólo esa cuenta y se invalida al actualizar o recargar", async ({ page }) => {
+  const kind = CONNECTOR_CATALOG.find(item => item.id === "ntfy")!;
+  const inventory: ConnectorInventory = {
+    ...emptyInventory,
+    catalog: [{ ...kind, fields: [{ name: "topic", label: "Tema", secret: false, required: true }], available: true, oauthReady: false }],
+    connections: ["ntfy-primary", "ntfy-secondary"].map(name => ({ name, kind: "ntfy", signedIn: true, needsSignIn: false, configured: true, ownAppConfigured: false, secretFields: [], auth: null, usedBy: [] })),
+  };
+  const mutations: string[] = [];
+  await idleActivity(page);
+  await page.route("**/api/altazor/computer", route => route.fulfill({ json: { computer: computer([]) } }));
+  await page.route(`**/api/altazor/connectors?workspaceId=${workspaceId}`, route => route.fulfill({ json: { connectors: inventory } }));
+  await page.route("**/api/altazor/connectors/ntfy-primary/test", route => {
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().postDataJSON()).toMatchObject({ workspaceId, confirmed: true });
+    return route.fulfill({ json: { test: { ok: true, tested: true } } });
+  });
+  page.on("request", request => { if (request.url().includes("/api/altazor/connectors") && request.method() !== "GET") mutations.push(`${request.method()} ${new URL(request.url()).pathname}`); });
+  await loginAs(page, "abogado@estudio.cl");
+  await page.goto("/inicio?altazor=connectors");
+  const catalog = page.getByTestId("altazor-connector-catalog");
+  await catalog.getByRole("button", { name: /^ntfy \(push\)/ }).click();
+  const saved = (name: string) => catalog.getByRole("button", { name: `${name} · Guardada · sin comprobar`, exact: true });
+  const verified = catalog.getByRole("button", { name: "ntfy-primary · Acceso comprobado", exact: true });
+  await expect(saved("ntfy-primary")).toBeVisible(); await expect(saved("ntfy-secondary")).toBeVisible();
+  await catalog.getByRole("button", { name: "Probar acceso", exact: true }).click();
+  await expect(verified).toBeVisible();
+  await expect(saved("ntfy-secondary")).toBeVisible();
+  await expect(catalog.getByRole("status").filter({ hasText: "El servicio confirmó el acceso." })).toBeVisible();
+  await catalog.getByRole("button", { name: "Comprobar estado", exact: true }).click();
+  await expect(saved("ntfy-primary")).toBeVisible(); await expect(verified).toHaveCount(0);
+  await page.reload();
+  await catalog.getByRole("button", { name: /^ntfy \(push\)/ }).click();
+  await expect(saved("ntfy-primary")).toBeVisible(); await expect(saved("ntfy-secondary")).toBeVisible();
+  await expect(verified).toHaveCount(0);
+  expect(mutations).toEqual(["POST /api/altazor/connectors/ntfy-primary/test"]);
 });

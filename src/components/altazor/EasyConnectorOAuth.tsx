@@ -10,21 +10,23 @@ import styles from "./EasyConnectorOAuth.module.css";
 export type EasyConnectorProvider = EasyOAuthProvider;
 type OAuthStatus = EasyOAuthStatus;
 type ProviderStatus = OAuthStatus["providers"][number];
-type ProviderSetup = { provider: EasyConnectorProvider; label: string; configured: boolean; source: "environment" | "saved" | "distributed" | "none"; callbackUri: string | null; canEdit: boolean; reason: string | null; registrationUrl: string };
+type ProviderSetup = { provider: EasyConnectorProvider; label: string; configured: boolean; source: "environment" | "saved" | "distributed" | "none"; publicClient?: boolean; callbackUri: string | null; canEdit: boolean; reason: string | null; registrationUrl: string };
 type Props = { provider: EasyConnectorProvider; workspaceId: string | null; causaId?: string | null; gatewayReady: boolean; hasActiveSession: boolean; busy?: boolean; onBusyChange: (busy: boolean) => void; onDisconnect: (name: string, requestId: string) => Promise<boolean> };
 const api = "/api/altazor/connectors/oauth";
 const adminGuide = "https://github.com/gabrielperezibacache/lexopen/blob/main/docs/ALTAZOR-CONEXIONES.md#inicio-de-sesión-sencillo";
-const providerLabels = { google: "Google", github: "GitHub", dropbox: "Dropbox" };
-const providerOrigins: Record<EasyConnectorProvider, string> = { google: "https://accounts.google.com", github: "https://github.com", dropbox: "https://www.dropbox.com" };
+const providerLabels = { google: "Google", github: "GitHub", dropbox: "Dropbox", microsoft: "Microsoft 365" };
+const providerOrigins: Record<EasyConnectorProvider, string> = { google: "https://accounts.google.com", github: "https://github.com", dropbox: "https://www.dropbox.com", microsoft: "https://login.microsoftonline.com" };
 const providerHelp: Record<EasyConnectorProvider, string> = {
   google: "Permite consultar nombres y datos básicos de tus archivos de Drive.",
   github: "Permite consultar tu perfil y tus repositorios públicos de GitHub.",
   dropbox: "Permite buscar y leer los archivos de Dropbox que autorices.",
+  microsoft: "Permite buscar y leer tus archivos de OneDrive. No autoriza enviar correos ni modificar archivos.",
 };
 const registrationSteps: Record<EasyConnectorProvider, { instruction: string; field: string; guide?: string }> = {
   google: { instruction: "En su proyecto de Google Cloud, habilite la API de Drive y configure la pantalla de consentimiento. En Clientes, cree un cliente de tipo Aplicación web.", field: "URI de redireccionamiento autorizados", guide: "https://developers.google.com/identity/protocols/oauth2/web-server?hl=es" },
   github: { instruction: "En los ajustes de desarrollador de GitHub, abra OAuth Apps y elija New OAuth App. Use la dirección de LexOpen como Homepage URL.", field: "Authorization callback URL", guide: "https://docs.github.com/es/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app" },
   dropbox: { instruction: "En la consola de Dropbox, cree una aplicación y habilite los permisos de lectura indicados en la guía del administrador.", field: "Redirect URIs" },
+  microsoft: { instruction: "En Microsoft Entra, registre una aplicación para cuentas personales y profesionales. Añada una plataforma de aplicaciones móviles y de escritorio con esta dirección localhost. Configure sólo User.Read y Files.Read; el acceso renovable se solicita al iniciar sesión. No cree un secreto de cliente.", field: "URI de redirección de aplicaciones móviles y de escritorio", guide: "https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow" },
 };
 
 function officialUrl(raw: string, provider: EasyConnectorProvider) {
@@ -38,6 +40,7 @@ function AdminConnectorSetup({ provider, busy, onBusyChange }: { provider: EasyC
   const [setup, setSetup] = useState<ProviderSetup | null>(null), [loading, setLoading] = useState(true), [working, setWorking] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState("");
+  const [publicClient, setPublicClient] = useState(provider === "microsoft");
   const steps = registrationSteps[provider];
   const refresh = useCallback(async () => {
     const response = await fetch(`${api}/setup`, { cache: "no-store" }), data = await response.json();
@@ -45,6 +48,7 @@ function AdminConnectorSetup({ provider, busy, onBusyChange }: { provider: EasyC
     const item = Array.isArray(data.providers) ? data.providers.find((item: ProviderSetup) => item.provider === provider) : null;
     if (!item || typeof item.canEdit !== "boolean") throw new Error("No se pudo confirmar la preparación del servicio.");
     setSetup(item);
+    setPublicClient(provider === "microsoft" || item.publicClient === true);
   }, [provider]);
   useEffect(() => {
     if (!open) return;
@@ -64,7 +68,7 @@ function AdminConnectorSetup({ provider, busy, onBusyChange }: { provider: EasyC
     const form = new FormData(event.currentTarget);
     setWorking(true); onBusyChange(true); setError(""); setNotice("");
     try {
-      const result = await apiMutation(`${api}/setup`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, clientId: form.get("clientId"), clientSecret: form.get("clientSecret"), confirmed: true }) });
+      const result = await apiMutation(`${api}/setup`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, clientId: form.get("clientId"), clientSecret: publicClient ? "" : form.get("clientSecret"), ...(publicClient ? { publicClient: true } : {}), confirmed: true }) });
       if (!result.ok) { setError(result.error); return; }
       setEditing(false);
       setNotice("Preparación guardada. Cada profesional autoriza su cuenta por separado.");
@@ -97,7 +101,9 @@ function AdminConnectorSetup({ provider, busy, onBusyChange }: { provider: EasyC
             <strong>Guarde los datos de la aplicación en LexOpen</strong>
             <form ref={formRef} className={styles.setupForm} onSubmit={save} autoComplete="off">
               <label htmlFor={`${uid}-client`}>Identificador de cliente (Client ID)<input id={`${uid}-client`} name="clientId" required maxLength={1000} autoComplete="off" spellCheck={false} disabled={busy || working} /></label>
-              <label htmlFor={`${uid}-secret`}>Secreto de cliente (Client secret)<input id={`${uid}-secret`} name="clientSecret" type="password" required maxLength={4000} autoComplete="new-password" disabled={busy || working} /></label>
+              {provider === "dropbox" && <label><input type="checkbox" checked={publicClient} onChange={event => setPublicClient(event.target.checked)} disabled={busy || working} />Aplicación pública de escritorio con PKCE, sin secreto de cliente.</label>}
+              {!publicClient && <label htmlFor={`${uid}-secret`}>Secreto de cliente (Client secret)<input id={`${uid}-secret`} name="clientSecret" type="password" required maxLength={4000} autoComplete="new-password" disabled={busy || working} /></label>}
+              {publicClient && <p>Esta modalidad utiliza el identificador público y PKCE. No introduzcas un secreto de cliente.</p>}
               {provider === "github" && <p>Usa el valor completo del Client secret de la OAuth App de GitHub. No uses el identificador del secreto, un token personal ni un código de inicio de sesión.</p>}
               <p>Estos datos pertenecen a la aplicación del estudio. Se guardan cifrados y sus valores quedan ocultos.</p>
               <button type="submit" disabled={busy || working}>Guardar preparación</button>
@@ -172,12 +178,12 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
     if (!workspaceId || !current?.available || !gatewayReady || requiresStop || busy || working) return;
     setWorking(true); onBusyChange(true); setError(""); setNotice("");
     try {
-      const result = await apiMutation<{ attemptId: string; provider: EasyConnectorProvider; authUrl: string; flow?: "redirect" | "external" | "device"; expiresAt: string }>(`${api}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, provider, requestId: access === "files" ? filesRequestKey.current : requestKey.current, ...(access === "files" ? { access } : {}), confirmed: true }) });
+      const result = await apiMutation<{ attemptId: string; provider: EasyConnectorProvider; authUrl: string; flow?: "redirect" | "external" | "device"; expiresAt: string }>(`${api}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, provider, external: true, requestId: access === "files" ? filesRequestKey.current : requestKey.current, ...(access === "files" ? { access } : {}), confirmed: true }) });
       if (!result.ok) { setError(result.error); const code = (result.data as { code?: string } | undefined)?.code; if (["oauth_attempt_consumed", "request_conflict"].includes(code || "")) setNeedsNewAttempt(true); return; }
       if (result.data.provider !== provider || !result.data.attemptId) throw new Error("No se pudo confirmar el inicio de sesión. Vuelva a comprobar el estado.");
       const url = officialUrl(result.data.authUrl, provider);
       if (result.data.flow === "device" || result.data.flow === "external") {
-        if (result.data.flow === "device" && (provider !== "github" || url !== "https://github.com/login/device") || result.data.flow === "external" && provider !== "google") throw new Error("No se pudo confirmar la página oficial de ingreso.");
+        if (result.data.flow === "device" && (provider !== "github" || url !== "https://github.com/login/device")) throw new Error("No se pudo confirmar la página oficial de ingreso.");
         const currentUrl = new URL(location.href); currentUrl.searchParams.set("oauthAttempt", result.data.attemptId); currentUrl.searchParams.set("oauthProvider", provider);
         window.history.replaceState(null, "", currentUrl.pathname + currentUrl.search);
         if (result.data.flow === "external") { setExternalUrl(url); window.open(url, "_blank", "noopener,noreferrer"); }
@@ -205,7 +211,7 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
   return <section className={styles.root} aria-labelledby={`${uid}-title`} data-testid="easy-connector-oauth">
     <h4 id={`${uid}-title`} className={connected ? styles.connected : undefined}>{connected && <CheckCircle2 size={20} aria-hidden="true" />}{connected ? `${label} conectado` : `Tu cuenta de ${label}`}</h4>
     <p>{provider === "google" && (current?.canReadFiles || !current?.connected) ? "Conecta Drive para que Altazor pueda buscar y leer tus archivos en los encargos que le pidas." : providerHelp[provider]}</p>
-    {!connected && current?.state !== "unavailable" && <p className={styles.hint}>Inicia sesión una vez. LexOpen conservará la conexión.</p>}
+    {!connected && current?.available && current.state !== "unavailable" && <p className={styles.hint}>Inicia sesión una vez. LexOpen conservará la conexión.</p>}
     {error && <p role="alert" className={styles.error}>{error}</p>}{notice && <p role="status" className={styles.notice}>{notice}</p>}
     {loading ? <p role="status">Comprobando conexión…</p> : !workspaceId ? <p>Abre tu <a href={computerHref}>escritorio de Altazor</a> para preparar este espacio y conectar tu cuenta.</p> : <>
       {connected && <p role="status">{current?.autoRefresh ? "Conexión guardada. El acceso se renueva automáticamente." : "Conexión guardada para este espacio."}</p>}
@@ -218,7 +224,8 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
         <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { filesRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect("files"); }}>Autorizar lectura de archivos<ArrowUpRight size={16} aria-hidden="true" /></button>
       </div>}
       {pending && <p role="status">Termina el ingreso en {label}. Si ya lo hiciste, pulsa Comprobar conexión.</p>}
-      {deviceAttempt?.external && externalUrl && <p><a href={externalUrl} target="_blank" rel="noopener noreferrer">Continuar en Google<ArrowUpRight size={16} aria-hidden="true" /></a></p>}
+      {deviceAttempt?.external && externalUrl && <p><a href={externalUrl} target="_blank" rel="noopener noreferrer">Continuar en {label}<ArrowUpRight size={16} aria-hidden="true" /></a></p>}
+      {deviceAttempt?.external && deviceAttempt.state === "pending" && !externalUrl && <div className={styles.actions}><p>Si se cerró la página de ingreso, puedes abrir un intento nuevo. El anterior no se reenviará.</p><button type="button" disabled={busy || working || !canConnect} onClick={() => { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); void connect(provider === "google" ? "files" : "basic"); }}>Reiniciar ingreso en {label}<ArrowUpRight size={16} aria-hidden="true" /></button></div>}
       {deviceAttempt?.device && <div className={styles.device} aria-label="Iniciar sesión en GitHub">
         <p>Abre GitHub e introduce este código para conectar tu cuenta.</p>
         <code>{deviceAttempt.device.userCode}</code>
@@ -230,12 +237,12 @@ export function EasyConnectorOAuth({ provider, workspaceId, causaId, gatewayRead
       {!connected && !attemptProblem && current && ["failed", "expired", "reconnect_required"].includes(current.state) && <p className={styles.error} role="alert">{current.reason || `Vuelve a conectar ${label} para renovar el acceso.`}</p>}
       {!connected && current?.state === "unavailable" && <p role="status">La conexión sigue guardada. No pudimos comprobar el acceso en este momento; vuelve a comprobarlo sin iniciar sesión otra vez.</p>}
       {!connected && attempt?.state === "completed" && <p role="status">El ingreso terminó. Comprueba la conexión para confirmar el acceso.</p>}
-      {!connected && current && !current.available && <p>Esta conexión necesita preparación del estudio. {data?.canAdmin ? <a href={configurationHref}>Preparar {label} en Configuración</a> : "Pide al administrador que la habilite."}</p>}
+      {!connected && current && !current.available && <p>Servicio en preparación. {data?.canAdmin ? <a href={configurationHref}>Preparación del estudio en Configuración</a> : "Podrás conectar tu cuenta cuando el servicio esté habilitado."}</p>}
       {!connected && current?.available && !gatewayReady && <p>No pudimos comprobar el acceso a esta aplicación. <a href={computerHref}>Revisa tu escritorio</a> y vuelve a comprobar la conexión.</p>}
       {requiresStop && <p>Detén tu escritorio antes de cambiar las cuentas que usa. <a href={computerHref}>Revisar mi escritorio</a></p>}
       {!connected && <div className={styles.actions}>
         {pending || !current || current.state === "unavailable" ? <button type="button" className={styles.primary} disabled={busy || working} onClick={() => void refresh()}><RefreshCw size={16} aria-hidden="true" />Comprobar conexión</button>
-          : <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect(provider === "google" ? "files" : "basic"); }}>{working ? "Abriendo ingreso…" : `Conectar ${label}`}<ArrowUpRight size={16} aria-hidden="true" /></button>}
+          : <button type="button" className={styles.primary} disabled={busy || working || !canConnect} onClick={() => { if (needsNewAttempt) { requestKey.current = operationKey(); filesRequestKey.current = operationKey(); setNeedsNewAttempt(false); } void connect(provider === "google" ? "files" : "basic"); }}>{working ? "Abriendo ingreso…" : current.available ? `Conectar ${label}` : "Servicio en preparación"}<ArrowUpRight size={16} aria-hidden="true" /></button>}
       </div>}
       <details className={styles.management}>
         <summary>{connected ? "Gestionar conexión" : "Opciones de conexión"}</summary>

@@ -11,10 +11,12 @@ export function computerTurnNeedsHelp(turn?: ComputerTurn) {
   // separately when a turn finishes without being able to continue.
   return turn?.from === "assistant" && (turn.needsHelp || (turn.working && turn.steps.at(-1)?.action === "ask_help"));
 }
-export type ComputerSessionView = { session: ComputerSessionSummary; runtime: "container"; kittyStatus: string; working: boolean; turns: ComputerTurn[]; approvals: import("../connectors/types").ConnectorApproval[] };
+export type ComputerApproval = import("../connectors/types").ConnectorApproval & { requestId?: string };
+export type VerifiedComputerFile = { state: "desktop_verified"; requestId: string; approvalId: string; chatId: string; kittyId: string; connector: string; kind: "google-workspace" | "github"; action: "download_file"; target: Record<string, string>; localPath: string; name: string; bytes: number; sha256: string; pages?: number; firstLine?: string };
+export type ComputerSessionView = { session: ComputerSessionSummary; runtime: "container"; kittyStatus: string; working: boolean; turns: ComputerTurn[]; approvals: ComputerApproval[]; verifiedFiles?: VerifiedComputerFile[] };
 export type ComputerActivityState = "disabled" | "unconfigured" | "restricted" | "idle" | "starting" | "ready" | "working" | "approval" | "help" | "paused" | "expired" | "unavailable";
 export type ComputerReview = "approval" | "help";
-export type ComputerActivity = { state: ComputerActivityState; sessionId: string | null; monitor: boolean; causaId?: string | null; detail?: { connections: string[]; step: { label: string; at: string } | null } };
+export type ComputerActivity = { state: ComputerActivityState; sessionId: string | null; monitor: boolean; causaId?: string | null; detail?: { connections: string[]; step: { label: string; at: string } | null }; verifiedFiles?: VerifiedComputerFile[] };
 export type ComputerFile = { name: string; mime: string; data: string };
 export const COMPUTER_ATTACHMENT_FORMATS = ".pdf,.docx,.xlsx,.pptx,.odt,.epub,.txt,.md,.csv,.png,.jpg,.jpeg,.gif,.webp,.mp3,.wav,.m4a,.ogg,.webm,.flac";
 export type ComputerMessage = { requestId: string; text: string; files: ComputerFile[]; confirmed: true };

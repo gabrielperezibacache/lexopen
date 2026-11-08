@@ -6,7 +6,6 @@ import { canonicalJson } from "@/lib/command-execution";
 import { digest } from "@/lib/personal-connectors/core";
 import { sendComputerMessage } from "@/lib/altazor/computer/service";
 import { desktopScope, desktopSession, listDesktopSessions } from "./escritorio-access";
-import { desktopConnectorTask } from "./desktop-connector-task";
 import type { AssistantPlan, ToolContext } from "../types";
 import type { AssistantTool } from "./types";
 
@@ -63,8 +62,7 @@ export const escritorioEncargarTool: AssistantTool<Task> = {
     const input = escritorioEncargarSchema.parse(raw), authorization = await confirmedTask(input, ctx);
     const access = await desktopSession(ctx, input.sessionId, true);
     await ctx.authorizeContext!(); ctx.signal?.throwIfAborted();
-    const text = desktopConnectorTask(input.texto, authorization.actor.id, access.session.workspace.id, access.connectors);
-    const result = await sendComputerMessage(authorization.actor, input.sessionId, { requestId: authorization.requestId, text, files: [], confirmed: true });
+    const result = await sendComputerMessage(authorization.actor, input.sessionId, { requestId: authorization.requestId, text: input.texto, files: [], confirmed: true });
     const ok = result.status === "completed";
     return { ok, message: ok ? `Encargo enviado al escritorio ${input.sessionId}, con el proveedor ${access.session.workspace.providerName}. Revise allí el avance y las autorizaciones de sus aplicaciones.` : "El escritorio no confirmó el encargo. Revise su estado; no se reenviará automáticamente.", entityId: input.sessionId, card: { type: "escritorio", id: input.sessionId, causaId: access.causaId, href: desktopHref(input.sessionId, access.causaId), provider: access.session.workspace.providerName, connectors: access.connectors, status: result.status } };
   },

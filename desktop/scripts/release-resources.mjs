@@ -21,12 +21,12 @@ export function stageDistributedOAuthProfile(output, { env = process.env, defaul
   const destination = path.join(output, publicOAuthFile);
   fs.writeFileSync(destination, JSON.stringify(profile) + "\n", { mode: 0o644, flag: "wx" });
   fs.chmodSync(destination, 0o644);
-  return { sha256: sha256(destination), providers: ["google", "github"].filter(provider => profile[provider]) };
+  return { sha256: sha256(destination), providers: ["google", "github", "dropbox", "microsoft"].filter(provider => profile[provider]) };
 }
 
 function verifyDistributedOAuthProfile(resources) {
   const file = path.join(resources, publicOAuthFile), profile = applyDistributedOAuthProfile(file, {});
-  return profile ? { sha256: sha256(file), providers: ["google", "github"].filter(provider => profile[provider]) } : null;
+  return profile ? { sha256: sha256(file), providers: ["google", "github", "dropbox", "microsoft"].filter(provider => profile[provider]) } : null;
 }
 
 export const RELEASE_TARGETS = ["darwin-x64", "darwin-arm64", "win32-x64", "linux-x64"];

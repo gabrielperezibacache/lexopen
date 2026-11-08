@@ -6,8 +6,8 @@ import { altazorActor, altazorScopeKey } from "@/lib/altazor/access";
 import { normalizeAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { ConnectorError, digest, encryptionKey, seal, unseal } from "@/lib/personal-connectors/core";
 import { assertComputerEnabled, assertSessionLive, COMPUTER_LIMITS, computerEnabled, endpointFor, inputSchema, inspectSelectedFiles, type PersonInput } from "./policy";
-import { KittiesGateway } from "./gateway";
-import { computerTurnNeedsHelp, type ComputerActivity, type ComputerActivityState, type ComputerMessage, type ComputerSessionSummary, type ComputerSessionView, type ComputerStatus } from "./types";
+import { KittiesGateway, type StagedFileApproval } from "./gateway";
+import { computerTurnNeedsHelp, type ComputerActivity, type ComputerActivityState, type ComputerMessage, type ComputerSessionSummary, type ComputerSessionView, type ComputerStatus, type VerifiedComputerFile } from "./types";
 import { assertComputerPolicy, computerPolicyAllowed, COMPUTER_LOCAL_ONLY_REASON } from "./privacy";
 import { computerOperationHash } from "./operation-hash";
 import { prepareSecretUse, redeemSecretUse, revokeSecretUse } from "@/lib/altazor/secrets/service";
@@ -16,6 +16,10 @@ import { normalizeConnectorNames } from "@/lib/altazor/connectors/policy";
 import { connectorKind } from "@/lib/altazor/connectors/catalog";
 import { computerActivityDetail } from "./activity-detail";
 import { continueApprovedRead } from "./approval-continuation";
+import { prepareExplicitFileTask, type ExplicitFileTask } from "./file-task";
+import { normalizeStoredFileReceipt } from "./file-receipt";
+import { assertEasyConnectorRead } from "../connectors/desktop-read-policy";
+import { desktopConnectorTask } from "@/lib/assistant/tools/desktop-connector-task";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 const credentialContext = (row: Pick<AltazorComputerWorkspace, "id" | "ownerId" | "scopeKey">) => `altazor:computer:${row.ownerId}:${row.id}:${row.scopeKey}`;
@@ -176,11 +180,48 @@ export async function readComputerSession(user: CausaAccessUser, id: string, pas
   if (hasConnections) await client.requireConnectorGate();
   const kitty = await client.kitty(session.kittyId, session.kittyName, workspace.providerName, names), chat = await client.chat(session.chatId, session.kittyId);
   const approvals = hasConnections ? await client.pendingApprovals(session.kittyId, session.chatId, names) : [];
+  const verifiedFiles = await verifiedSessionFiles(session, names);
   // Containers may finish starting after create returns. Persist this transition so
   // manual controls and one-use Secretos grants see the same state as the interface.
   if (!passive && session.state === "starting" && kitty.status === "running") await prisma.altazorComputerSession.updateMany({ where: { id, ownerId: session.ownerId, state: "starting", updatedAt: session.updatedAt }, data: { state: "ready" } });
   const current = await sessionFor(id, user);
-  return { session: { ...summary(current.session), state: kitty.status === "running" ? "ready" : ["created", "starting"].includes(kitty.status) ? "starting" : kitty.status }, runtime: "container", kittyStatus: kitty.status, ...chat, approvals };
+  return { session: { ...summary(current.session), state: kitty.status === "running" ? "ready" : ["created", "starting"].includes(kitty.status) ? "starting" : kitty.status }, runtime: "container", kittyStatus: kitty.status, ...chat, approvals, verifiedFiles };
+}
+
+const object = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
+function stagedAction(row: Pick<AltazorComputerAction, "id" | "kind" | "status" | "resultJson">, names: readonly string[]) {
+  if (row.kind !== "message" || row.status !== "completed" || !row.resultJson) return null;
+  try {
+    const value: unknown = JSON.parse(row.resultJson);
+    if (!object(value) || value.staged !== true || value.accepted !== true || value.state !== "pending" || value.requestId !== row.id || typeof value.approvalId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(value.approvalId) || !object(value.fileTask)) return null;
+    const task = value.fileTask;
+    if (!["google-workspace", "github"].includes(String(task.kind)) || typeof task.connector !== "string" || !names.includes(task.connector) || task.action !== "download_file" || !object(task.args)) return null;
+    assertEasyConnectorRead({ kind: task.kind as "github" | "google-workspace", connector: task.connector, action: task.action, args: { action: task.action, ...task.args } });
+    return { approvalId: value.approvalId, requestId: row.id, task: task as ExplicitFileTask };
+  } catch { return null; }
+}
+async function stagedApproval(session: AltazorComputerSession, approvalId: string, names: readonly string[], tx: Client): Promise<StagedFileApproval | undefined> {
+  const rows = await tx.altazorComputerAction.findMany({ where: { sessionId: session.id, ownerId: session.ownerId, kind: "message", status: "completed" }, orderBy: { createdAt: "desc" }, take: 200 });
+  return rows.map(row => stagedAction(row, names)).find(value => value?.approvalId === approvalId) ?? undefined;
+}
+async function verifiedSessionFiles(session: AltazorComputerSession, names: readonly string[]): Promise<VerifiedComputerFile[]> {
+  if (!session.chatId || !session.kittyId) return [];
+  const rows = await prisma.altazorComputerAction.findMany({ where: { sessionId: session.id, ownerId: session.ownerId, kind: { in: ["message", "connector_approval"] }, status: "completed" }, orderBy: { createdAt: "desc" }, take: 200 });
+  const staged = new Map(rows.map(row => stagedAction(row, names)).filter(value => value !== null).map(value => [value.requestId, value]));
+  const files: VerifiedComputerFile[] = [], seen = new Set<string>();
+  for (const row of rows) {
+    if (row.kind !== "connector_approval" || !row.resultJson) continue;
+    try {
+      const value: unknown = JSON.parse(row.resultJson);
+      if (!object(value) || value.status !== "approved" || value.failed !== false || value.canContinue !== false || !object(value.verifiedFile) || typeof value.verifiedFile.requestId !== "string") continue;
+      const original = staged.get(value.verifiedFile.requestId);
+      if (!original || value.id !== original.approvalId || seen.has(original.requestId)) continue;
+      const file = normalizeStoredFileReceipt(value.verifiedFile, { requestId: original.requestId, approvalId: original.approvalId, chatId: session.chatId, kittyId: session.kittyId, ...original.task });
+      files.push(file); seen.add(original.requestId);
+      if (files.length >= 12) break;
+    } catch { /* An incomplete or mismatched record never becomes success evidence. */ }
+  }
+  return files;
 }
 
 async function passiveControlHeld(session: AltazorComputerSession) {
@@ -231,7 +272,7 @@ export async function readComputerActivity(user: CausaAccessUser, causaId?: stri
   if (await passiveControlHeld(after.session)) return reply("paused", candidate.id, true);
   if (view.session.state !== "ready") return reply(view.session.state === "starting" ? "starting" : "unavailable", candidate.id, true);
   const detail = computerActivityDetail(view);
-  const activity = (state: ComputerActivityState) => ({ ...reply(state, candidate.id, true), ...(detail ? { detail } : {}) });
+  const activity = (state: ComputerActivityState) => ({ ...reply(state, candidate.id, true), ...(detail ? { detail } : {}), ...(view.verifiedFiles?.length ? { verifiedFiles: view.verifiedFiles.slice(0, 3) } : {}) });
   if (view.approvals.length) return activity("approval");
   if (computerTurnNeedsHelp(view.turns.at(-1))) return activity("help");
   return activity(view.working ? "working" : "ready");
@@ -375,7 +416,10 @@ export async function sendComputerMessage(user: CausaAccessUser, id: string, inp
     await policyAllowsAction();
     if (sessionConnectors(session)[0] !== "-") await client.requireConnectorGate();
     if (sessionConnectors(session).some(name => /^altazor-(?:google|github)-[a-f0-9]{16}$/.test(name))) await client.requireFileReads();
-    return client.send(session.chatId!, input.text, files, actionId);
+    const names = sessionConnectors(session);
+    const task = files.length ? null : prepareExplicitFileTask(input.text, session.ownerId, session.workspaceId, names);
+    if (task) return client.stageFileAction(session.chatId!, session.kittyId!, actionId, task, input.text);
+    return client.send(session.chatId!, desktopConnectorTask(input.text, session.ownerId, session.workspaceId, names), files, actionId);
   });
 }
 export async function controlComputer(user: CausaAccessUser, id: string, requestId: string, hold: boolean) {
@@ -461,7 +505,8 @@ export async function decideComputerApproval(user: CausaAccessUser, id: string, 
     const names = sessionConnectors(session);
     if (names[0] === "-") throw new ConnectorError("connector_selection", "Esta sesión no tiene aplicaciones autorizadas.", 409);
     if (approve && session.held && Date.now() - session.updatedAt.getTime() < 5 * 60_000) throw new ConnectorError("manual_control", "Devuelva el control al asistente antes de autorizar una operación.", 409);
-    const { resumeTask, ...result } = await client.decideApproval(approvalId, session.kittyId!, session.chatId!, names, approve);
+    const staged = await stagedApproval(session, approvalId, names, tx);
+    const { resumeTask, ...result } = await client.decideApproval(approvalId, session.kittyId!, session.chatId!, names, approve, staged);
     if (!result.canContinue) return result;
     if (!resumeTask) return { ...result, continued: false, continuationPending: true };
     const unresolved = await tx.altazorComputerAction.count({ where: { sessionId: id, id: { not: actionId }, kind: { in: ["message", "connector_approval"] }, status: { in: ["sending", "unknown"] } } });
