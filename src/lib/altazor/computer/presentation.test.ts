@@ -107,6 +107,62 @@ test("Dropbox and OneDrive receipts fold without asserting an unverified downloa
   }
 });
 
+function metadataReceipt(service: "dropbox" | "microsoft-365", items: unknown[], extra: Record<string, unknown> = {}, truncated = false) {
+  return fileReceipt(service, JSON.stringify({ schema: "lexopen-cloud-metadata.v1", service, action: "list", items, page_only: true, exhaustive: false, items_truncated: false, ...extra }), truncated, "list");
+}
+
+test("cloud metadata names folders and unknown items without guessing from a PDF suffix", () => {
+  for (const service of ["dropbox", "microsoft-365"] as const) {
+    const source = metadataReceipt(service, [
+      { kind: "folder", name: "Carpeta.pdf" },
+      { kind: "file", name: "Lectura.pdf", ...(service === "dropbox" ? { path: "/Curso/Lectura.pdf" } : { id: "EXACT!123", mimeType: "application/pdf" }) },
+      { kind: "unknown", name: "Sin tipo.pdf" },
+      { kind: "file", name: "Resumen.docx" },
+    ]);
+    const shown = computerFileReadPresentation({ from: "assistant", origin: "connector-result", text: source });
+    assert.deepEqual(shown?.entries?.map(item => [item.name, item.kind, item.label]), [["Carpeta.pdf", "folder", "Carpeta"], ["Lectura.pdf", "file", "PDF"], ["Sin tipo.pdf", "unknown", "Tipo sin confirmar"], ["Resumen.docx", "file", "Archivo"]]);
+    assert.equal(shown?.source, service === "dropbox" ? "Dropbox" : "OneDrive");
+    assert.equal(shown?.summary, "4 elementos recibidos en esta página. No representa toda tu cuenta.");
+    assert.equal(shown?.receipt, source);
+  }
+});
+
+test("only an unambiguous metadata task filters PDF names and preserves page limits", () => {
+  const source = metadataReceipt("dropbox", [
+    { kind: "folder", name: "No es un archivo.pdf" }, { kind: "unknown", name: "Tipo ausente.pdf" },
+    { kind: "file", name: "Lectura.pdf", path: "/Curso/Lectura.pdf" }, { kind: "file", name: "Resumen.docx" },
+  ]);
+  const turn = { from: "assistant" as const, origin: "connector-result" as const, text: source };
+  const request = "Comprueba mi conexión de Dropbox y muestra sólo los nombres de hasta cinco archivos PDF disponibles, sin abrir ni modificar su contenido. Usa la cuenta de Dropbox ya conectada.";
+  const filtered = computerFileReadPresentation(turn, request);
+  assert.deepEqual(filtered?.entries?.map(item => item.name), ["Lectura.pdf"]);
+  assert.equal(filtered?.entries?.[0].path, "/Curso/Lectura.pdf");
+  assert.match(filtered?.summary || "", /1 elemento recibido en esta página\. No representa toda tu cuenta\./);
+  for (const task of ["¿Cómo puedo mostrar nombres de PDF en Dropbox?", "No muestres los PDF de Dropbox", "Analiza y compara los documentos de Dropbox", "Muestra nombres de Dropbox y envía un correo"]) {
+    assert.equal(computerFileReadPresentation(turn, task)?.entries?.length, 4, "ambiguous, explanatory or compound tasks do not silently filter the native result");
+  }
+});
+
+test("partial, invalid and copied metadata never acquire a complete typed source list", () => {
+  const items = [{ kind: "file", name: "Lectura.pdf" }];
+  const partialPage = computerFileReadPresentation({ from: "assistant", origin: "connector-result", text: metadataReceipt("dropbox", items, { items_truncated: true }) });
+  assert.equal(partialPage?.entries?.length, 1);
+  assert.match(partialPage?.summary || "", /La página se recortó/);
+  const emptyPage = computerFileReadPresentation({ from: "assistant", origin: "connector-result", text: metadataReceipt("dropbox", []) });
+  assert.match(emptyPage?.summary || "", /No permite concluir que la cuenta esté vacía/);
+  const truncated = computerFileReadPresentation({ from: "assistant", origin: "connector-result", text: metadataReceipt("dropbox", items, {}, true) });
+  assert.equal(truncated?.entries, undefined);
+  assert.match(truncated?.summary || "", /Vista parcial/);
+  for (const extra of [{ schema: "invented" }, { service: "microsoft-365" }, { action: "download_file" }, { page_only: false }, { exhaustive: true }, { items_truncated: "false" }]) {
+    const result = computerFileReadPresentation({ from: "assistant", origin: "connector-result", text: metadataReceipt("dropbox", items, extra) });
+    assert.equal(result?.entries, undefined);
+    assert.equal(result?.summary, "Respuesta de la consulta disponible para revisión.");
+  }
+  const source = metadataReceipt("dropbox", [{ kind: "unknown", name: "Dudoso.pdf", folder: false }]);
+  assert.equal(computerFileReadPresentation({ from: "assistant", text: source }), null, "a model cannot manufacture source provenance by copying the metadata wrapper");
+  assert.notEqual(computerFileReadPresentation({ from: "assistant", origin: "connector-result", text: source })?.entries?.[0]?.label, "PDF", "a false folder boolean is not file evidence");
+});
+
 test("partial, malformed and user-authored data never become full or trusted results", () => {
   const partial = fileReceipt("google-drive", '{"files":[', true);
   assert.equal(computerFileReadPresentation({ from: "assistant", origin: "connector-result", text: partial })?.summary, "Vista parcial de la respuesta: se alcanzó el límite de lectura.");

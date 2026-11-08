@@ -61,3 +61,32 @@ test("unconfirmed persistence never becomes a durable connection claim or a hidd
   await assert.rejects(client.setPersistentEasyOAuth(name, configuration()), error => (error as { code?: string }).code === "oauth_save_unknown");
   assert.equal(posts, 1);
 });
+
+test("expiring GitHub grants accept only exact read:user and distinguish web credentials from a public device client", () => {
+  const web = { ...configuration(), kind: "github" as const, clientId: "Ov23.fictitious-client", scopes: ["read:user"], expiresAt: new Date(Date.now() + 28800_000).toISOString() };
+  assert.equal(validatePersistentEasyOAuth(web).kind, "github");
+  assert.equal(validatePersistentEasyOAuth({ ...web, publicClient: true, clientSecret: "" }).publicClient, true);
+  for (const change of [{ scopes: ["repo"] }, { scopes: ["read:user", "repo"] }, { scopes: ["read:user", "read:user"] }, { scopes: ["read:user", "offline_access"] }, { clientSecret: "" }, { publicClient: true, clientSecret: "unexpected-device-secret" }, { refreshToken: "" }, { clientId: "https://wrong.invalid" }, { expiresAt: new Date(0).toISOString() }]) assert.throws(() => validatePersistentEasyOAuth({ ...web, ...change }), error => (error as { code?: string }).code === "oauth_persistence_invalid");
+});
+
+test("GitHub refresh capability is required before sending either web or device credentials", async () => {
+  for (const publicClient of [false, true]) {
+    const input: PersistentEasyOAuthConfiguration = { ...configuration(), kind: "github", scopes: ["read:user"], ...(publicClient ? { publicClient: true, clientSecret: "" } : {}) };
+    for (const supported of [false, true]) {
+      let posts = 0;
+      const githubName = "altazor-github-0123456789abcdef";
+      const client = new KittiesGateway("http://127.0.0.1:7494", "fictitious-gateway-token", async (url, init) => {
+        if (new URL(String(url)).pathname === "/v1/health") return Response.json({ ok: true, lexopen_persistent_oauth: "v1", ...(supported ? { lexopen_github_persistent_oauth: "v1" } : {}) });
+        posts++; const body = JSON.parse(String(init?.body));
+        assert.equal(body.kind, "github"); assert.deepEqual(body.scopes, ["read:user"]);
+        assert.equal(body.refresh_token, input.refreshToken);
+        assert.equal(body.public_client, publicClient ? true : undefined);
+        assert.equal(body.client_secret, publicClient ? undefined : input.clientSecret);
+        return Response.json({ name: githubName, kind: "github", persistent: true, auto_refresh: true });
+      });
+      if (supported) assert.deepEqual(await client.setPersistentEasyOAuth(githubName, input), { persistent: true, autoRefresh: true });
+      else await assert.rejects(client.setPersistentEasyOAuth(githubName, input), error => (error as { code?: string }).code === "github_oauth_persistence_required");
+      assert.equal(posts, supported ? 1 : 0);
+    }
+  }
+});

@@ -22,7 +22,10 @@ async function main() {
   let puts = 0, providerExchanges = 0, wrongDestination = 0, revoked = false, broadScope = false, pauseExchange: (() => Promise<void>) | undefined;
   let dropboxReadGate = true, dropboxIdentity = "dbid:fictitious-account", legacyDropboxStarts = 0, applicationAccepted = true;
   let devicePolls = 0, deviceResult = "authorization_pending";
-  let cloudGate = true, aliasCreateGate = true, providerRequests = 0;
+  let cloudGate = true, aliasCreateGate = true, githubPersistentGate = true, githubExpiring = false, providerRequests = 0;
+  let githubExpiry: unknown = 28800;
+  const importedGrants: Record<string, unknown>[] = [];
+  const githubRotation = () => githubExpiring ? { expires_in: githubExpiry, refresh_token_expires_in: 15897600, ...(!missingRefresh ? { refresh_token: "fictitious-github-refresh-token" } : {}) } : {};
   const legacyProviders = EASY_OAUTH_PROVIDERS.filter(provider => provider !== "microsoft");
   const microsoftClientId = "12345678-abcd-1234-abcd-123456789abc";
   const dropboxScopes = "account_info.read files.content.read files.metadata.read";
@@ -38,7 +41,7 @@ async function main() {
       assert.match(binding || "", /^[a-f0-9]{64}$/); assert.match(kittyId || "", /^[A-Za-z0-9_-]{1,100}$/);
       return Response.json({ applied: false, chat_id: url.pathname.split("/")[4], kitty: kittyId, binding, mode: "supervised", revision: 0, allow_input: false, allow_browser: false, allow_apps: false, max_actions: 100, max_consultations: 20, actions_used: 0, consultations_used: 0, outcome_unknown: false });
     }
-    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, lexopen_computer_use_policy: "v1", version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate, ...(persistentGate ? { lexopen_persistent_oauth: "v1" } : {}), ...(cloudGate ? { lexopen_cloud_file_oauth: "v1" } : {}), ...(aliasCreateGate ? { lexopen_oauth_alias_create: "v1" } : {}) });
+    if (url.pathname === "/v1/health") return Response.json({ ok: true, containers: true, lexopen_computer_use_policy: "v1", version: "fictitious-oauth-gateway", lexopen_connector_gate: "v1", lexopen_connector_platform: "linux", lexopen_dropbox_read_gate: dropboxReadGate, ...(persistentGate ? { lexopen_persistent_oauth: "v1" } : {}), ...(cloudGate ? { lexopen_cloud_file_oauth: "v1" } : {}), ...(aliasCreateGate ? { lexopen_oauth_alias_create: "v1" } : {}), ...(githubPersistentGate ? { lexopen_github_persistent_oauth: "v1" } : {}) });
     if (url.pathname === "/v1/providers") return Response.json({ providers: [{ name: "fixture-model", kind: "openai" }] });
     if (url.pathname === "/v1/kitties") return Response.json({ kitties: [] });
     if (url.pathname === "/v1/settings") return Response.json(snapshot());
@@ -51,16 +54,16 @@ async function main() {
     if (url.pathname.startsWith("/v1/lexopen/easy-oauth/")) {
       assert.equal(method, "POST"); const name = decodeURIComponent(url.pathname.split("/").pop()!), body = JSON.parse(String(init?.body));
       assert.ok(body.refresh_token.startsWith("fictitious-")); assert.ok(Date.parse(body.expires_at) > Date.now());
-      if (body.public_client) { assert.equal(body.public_client, true); assert.equal(body.client_secret, undefined); assert.ok(["dropbox", "microsoft-365"].includes(body.kind)); }
+      if (body.public_client) { assert.equal(body.public_client, true); assert.equal(body.client_secret, undefined); assert.ok(["dropbox", "microsoft-365", "github"].includes(body.kind)); }
       else assert.ok(body.client_secret.includes("fictitious"));
       assert.deepEqual(Object.keys(body).sort(), ["access_token", "account", "client_id", body.public_client ? "public_client" : "client_secret", "expires_at", "kind", "refresh_token", "scopes"].sort());
-      puts++; gatewayTokens.set(name, { kind: body.kind, token: body.access_token, persistent: true });
+      importedGrants.push(body); puts++; gatewayTokens.set(name, { kind: body.kind, token: body.access_token, persistent: true });
       if (loseNextImport) { loseNextImport = false; throw new Error("Fictitious import acknowledgement lost after acceptance"); }
       return Response.json({ name, kind: body.kind, persistent: true, auto_refresh: true });
     }
     if (url.pathname.startsWith("/v1/settings/connectors/")) {
       const name = decodeURIComponent(url.pathname.split("/").pop()!);
-      if (method === "PUT") { puts++; const body = JSON.parse(String(init?.body)); gatewayTokens.set(name, { kind: body.kind, token: body.settings.token }); return Response.json(snapshot()); }
+      if (method === "PUT") { puts++; const body = JSON.parse(String(init?.body)); if (body.kind === "github") { assert.deepEqual(body.clear, ["sign_in"], "a new non-expiring grant must atomically remove any old refresh identity"); assert.deepEqual(Object.keys(body.settings), ["token"], "a legacy grant transfers no client or refresh credential"); } gatewayTokens.set(name, { kind: body.kind, token: body.settings.token }); return Response.json(snapshot()); }
       if (method === "DELETE") { gatewayTokens.delete(name); return Response.json(snapshot()); }
     }
     throw new Error("Unexpected fictitious gateway endpoint");
@@ -76,7 +79,7 @@ async function main() {
     if (url.href === "https://github.com/login/oauth/access_token" && new URLSearchParams(String(init?.body)).get("grant_type") === "urn:ietf:params:oauth:grant-type:device_code") {
       devicePolls++;
       const body = new URLSearchParams(String(init?.body)); assert.equal(body.get("client_secret"), null); assert.equal(body.get("client_id"), "fictitious-public-github"); assert.equal(body.get("device_code"), "a".repeat(40));
-      return Response.json(deviceResult === "authorized" ? { access_token: "fictitious-github-consented-access", token_type: "bearer", scope: broadScope ? "repo" : "read:user" } : { error: deviceResult });
+      return Response.json(deviceResult === "authorized" ? { access_token: "fictitious-github-consented-access", token_type: "bearer", scope: broadScope ? "repo" : "read:user", ...githubRotation() } : { error: deviceResult });
     }
     if (url.href === "https://api.github.com/applications/fictitious-github-client/token") {
       assert.equal(init?.method, "POST");
@@ -95,7 +98,7 @@ async function main() {
       const pause = pauseExchange; pauseExchange = undefined; if (pause) await pause();
       if (url.hostname === "api.dropboxapi.com") { if (body.get("client_id") === "fictitiousDropboxPublic") assert.equal(body.has("client_secret"), false); return Response.json({ access_token: "fictitious-dropbox-consented-access", token_type: "bearer", ...(!missingRefresh ? { refresh_token: "fictitious-dropbox-refresh-token" } : {}), account_id: "dbid:fictitious-account", scope: broadScope ? `${dropboxScopes} files.content.write` : dropboxScopes, expires_in: 14_400 }); }
       const google = url.hostname === "oauth2.googleapis.com";
-      return Response.json({ access_token: google ? "fictitious-google-consented-access" : "fictitious-github-consented-access", token_type: "Bearer", scope: broadScope ? "repo" : google ? `https://www.googleapis.com/auth/drive.${googleFiles ? "readonly" : "metadata.readonly"}` : "read:user", ...(google ? { expires_in: 3600, ...(!missingRefresh ? { refresh_token: "fictitious-google-refresh-token" } : {}) } : {}) });
+      return Response.json({ access_token: google ? "fictitious-google-consented-access" : "fictitious-github-consented-access", token_type: "Bearer", scope: broadScope ? "repo" : google ? `https://www.googleapis.com/auth/drive.${googleFiles ? "readonly" : "metadata.readonly"}` : "read:user", ...(google ? { expires_in: 3600, ...(!missingRefresh ? { refresh_token: "fictitious-google-refresh-token" } : {}) } : githubRotation()) });
     }
     if (url.href === "https://api.dropboxapi.com/2/users/get_current_account") {
       assert.equal(init?.method, "POST"); assert.equal(init?.body, "null");
@@ -129,7 +132,7 @@ async function main() {
     const publicOptions = { fetcher: providerFetch, env: { APP_URL: origin, LEXOPEN_DESKTOP: "1", ALTAZOR_DISTRIBUTED_OAUTH: JSON.stringify({ schemaVersion: 1, google: { type: "installed", client_id: "1234567890-fictitiouspublicdesktop.apps.googleusercontent.com", client_secret: "fictitious-public-desktop-parameter" }, github: { type: "device", client_id: "fictitious-public-github" }, dropbox: { type: "public_client", client_id: "fictitiousDropboxPublic" }, microsoft: { type: "public_client", client_id: microsoftClientId } }) } };
     aliasCreateGate = false;
     const attemptsBeforeAliasCheck = await prisma.personalOAuthAttempt.count({ where: { ownerId: actor.id } }), requestsBeforeAliasCheck = providerRequests, putsBeforeAliasCheck = puts;
-    for (const provider of ["google", "dropbox", "microsoft"] as const) await assert.rejects(startEasyOAuth(actor, { provider, workspaceId, requestId: `missing-alias-${provider}-${stamp}`, confirmed: true }, origin, publicOptions), error => (error as { code?: string }).code === "oauth_alias_create_required");
+    for (const provider of ["google", "dropbox", "microsoft", "github"] as const) await assert.rejects(startEasyOAuth(actor, { provider, workspaceId, requestId: `missing-alias-${provider}-${stamp}`, confirmed: true }, origin, publicOptions), error => (error as { code?: string }).code === "oauth_alias_create_required");
     assert.equal(await prisma.personalOAuthAttempt.count({ where: { ownerId: actor.id } }), attemptsBeforeAliasCheck, "a missing native capability must not create an OAuth attempt");
     assert.equal(providerRequests, requestsBeforeAliasCheck, "a missing native capability must not contact a provider");
     assert.equal(puts, putsBeforeAliasCheck, "preflight must not create a placeholder connection");
@@ -172,10 +175,10 @@ async function main() {
     await assert.rejects(pollEasyOAuthDevice({ ...actor, id: other.id }, device.attemptId, origin, publicOptions), denied(404));
     await assert.rejects(pollEasyOAuthDevice(actor, device.attemptId, "http://127.0.0.1:1", publicOptions), denied(409));
     await pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions); assert.equal(devicePolls, 0);
-    async function makeDeviceDue() {
-      const row = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: device.attemptId } });
-      const binding = unseal<{ device: { nextPollAt: number } }>(row.resultEnc!, deviceContext); binding.device.nextPollAt = 0;
-      await prisma.personalOAuthAttempt.update({ where: { id: row.id }, data: { resultEnc: seal(binding, deviceContext) } });
+    async function makeDeviceDue(id = device.attemptId) {
+      const row = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id } }), context = `altazor:desktop:oauth:${actor.id}:${id}`;
+      const binding = unseal<{ device: { nextPollAt: number } }>(row.resultEnc!, context); binding.device.nextPollAt = 0;
+      await prisma.personalOAuthAttempt.update({ where: { id: row.id }, data: { resultEnc: seal(binding, context) } });
     }
     await makeDeviceDue();
     await Promise.all([pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions), pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions)]);
@@ -188,6 +191,21 @@ async function main() {
     const deviceSaved = await easyOAuthStatus(actor, workspaceId, device.attemptId, publicOptions);
     assert.equal(deviceSaved.providers[1].connected, true); assert.equal(deviceSaved.attempt?.device, undefined); assert.equal(puts, beforeDevice + 1);
     await assert.rejects(pollEasyOAuthDevice(actor, device.attemptId, origin, publicOptions), denied(409)); assert.equal(puts, beforeDevice + 1);
+    githubPersistentGate = false;
+    const oldGithubAttempts = await prisma.personalOAuthAttempt.count({ where: { ownerId: actor.id } }), oldGithubRequests = providerRequests;
+    await assert.rejects(startEasyOAuth(actor, { provider: "github", workspaceId, requestId: `device-old-runtime-${stamp}`, confirmed: true }, origin, publicOptions), error => (error as { code?: string }).code === "github_oauth_persistence_required");
+    assert.equal(providerRequests, oldGithubRequests); assert.equal(await prisma.personalOAuthAttempt.count({ where: { ownerId: actor.id } }), oldGithubAttempts);
+    assert.equal((await easyOAuthStatus(actor, workspaceId, undefined, publicOptions)).providers[1].connected, true, "a saved non-expiring GitHub token remains usable on a legacy runtime");
+    githubPersistentGate = true; githubExpiring = true;
+    const expiringDevice = await startEasyOAuth(actor, { provider: "github", workspaceId, requestId: `device-expiring-${stamp}`, confirmed: true }, origin, publicOptions);
+    await makeDeviceDue(expiringDevice.attemptId); const beforeExpiringDevice = puts;
+    assert.equal((await pollEasyOAuthDevice(actor, expiringDevice.attemptId, origin, publicOptions)).state, "completed");
+    assert.equal(puts, beforeExpiringDevice + 1);
+    const deviceGrant = importedGrants.at(-1)!; assert.equal(deviceGrant.kind, "github"); assert.equal(deviceGrant.public_client, true); assert.equal(deviceGrant.client_secret, undefined); assert.deepEqual(deviceGrant.scopes, ["read:user"]); assert.equal(deviceGrant.refresh_token, "fictitious-github-refresh-token");
+    const expiringDeviceStatus = (await easyOAuthStatus(actor, workspaceId, expiringDevice.attemptId, publicOptions)).providers[1];
+    assert.equal(expiringDeviceStatus.autoRefresh, true); assert.equal(expiringDeviceStatus.persistent, true); assert.equal(expiringDeviceStatus.expiresAt, null);
+    await assert.rejects(pollEasyOAuthDevice(actor, expiringDevice.attemptId, origin, publicOptions), denied(409)); assert.equal(puts, beforeExpiringDevice + 1);
+    githubExpiring = false;
     for (const provider of ["dropbox", "microsoft"] as const) {
       const providerSetup = (await easyOAuthSetupStatus(publicOptions)).providers.find(row => row.provider === provider)!;
       assert.equal(providerSetup.source, "distributed"); assert.equal(providerSetup.publicClient, true);
@@ -295,6 +313,29 @@ async function main() {
       const stored = await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: begun.attemptId } });
       assert.equal(stored.resultEnc!.includes(payload.verifier), false);
     }
+    githubPersistentGate = false;
+    const oldWebRequests = providerRequests, oldWebAttempts = await prisma.personalOAuthAttempt.count({ where: { ownerId: actor.id } });
+    await assert.rejects(start("github", "web-old-runtime"), error => (error as { code?: string }).code === "github_oauth_persistence_required");
+    assert.equal(providerRequests, oldWebRequests); assert.equal(await prisma.personalOAuthAttempt.count({ where: { ownerId: actor.id } }), oldWebAttempts);
+    assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[1].connected, true);
+    githubPersistentGate = true; githubExpiring = true;
+    const expiringWeb = await start("github", "expiring-web"), beforeExpiringWeb = puts;
+    await receiveEasyOAuth(actor, { state: new URL(expiringWeb.authUrl).searchParams.get("state")!, code: "fictitious-expiring-web-code" }, origin, options);
+    assert.equal(puts, beforeExpiringWeb + 1);
+    const webGrant = importedGrants.at(-1)!; assert.equal(webGrant.kind, "github"); assert.equal(webGrant.public_client, undefined); assert.equal(webGrant.client_secret, "fictitious-github-operator-secret"); assert.deepEqual(webGrant.scopes, ["read:user"]);
+    const expiringWebStatus = (await easyOAuthStatus(actor, workspaceId, expiringWeb.attemptId)).providers[1];
+    assert.equal(expiringWebStatus.connected, true); assert.equal(expiringWebStatus.autoRefresh, true); assert.equal(expiringWebStatus.persistent, true); assert.equal(expiringWebStatus.expiresAt, null);
+    assert.equal(JSON.stringify(expiringWebStatus).includes("fictitious-github-refresh-token"), false);
+    githubPersistentGate = false;
+    const downgraded = (await easyOAuthStatus(actor, workspaceId)).providers[1]; assert.equal(downgraded.state, "unavailable"); assert.equal(downgraded.hasStoredConnection, true);
+    githubPersistentGate = true;
+    for (const failure of ["missing-refresh", "invalid-expiry"] as const) {
+      missingRefresh = failure === "missing-refresh"; githubExpiry = failure === "invalid-expiry" ? undefined : 28800;
+      const bad = await start("github", failure), beforeBad = puts;
+      await receiveEasyOAuth(actor, { state: new URL(bad.authUrl).searchParams.get("state")!, code: "fictitious-invalid-rotation" }, origin, options);
+      assert.equal(puts, beforeBad); assert.equal((await prisma.personalOAuthAttempt.findUniqueOrThrow({ where: { id: bad.attemptId } })).errorCode, failure === "missing-refresh" ? "oauth_refresh_missing" : "oauth_expiry_invalid");
+    }
+    missingRefresh = false; githubExpiry = 28800; githubExpiring = false;
     assert.equal((await easyOAuthStatus(actor, workspaceId)).providers[0].canReadFiles, false);
     const fileInput = { provider: "google" as const, workspaceId, requestId: `oauth-${stamp}-files`, access: "files" as const, confirmed: true as const };
     const files = await startEasyOAuth(actor, fileInput, origin, options);

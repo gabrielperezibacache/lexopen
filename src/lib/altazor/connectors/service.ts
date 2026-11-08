@@ -38,8 +38,8 @@ async function ready(workspace: AltazorComputerWorkspace) {
   const health = await client.readiness(workspace.providerName, sessions.map(row => row.kittyName));
   return { client, health };
 }
-async function inventory(client: KittiesGateway, health: { version: string; connectorGate: boolean; persistentOAuth?: boolean; cloudFileOAuth?: boolean }): Promise<ConnectorInventory> {
-  return { ...await client.connectorSettings(), gateReady: health.connectorGate, version: health.version, persistentOAuthReady: health.persistentOAuth === true, cloudFileOAuthReady: health.cloudFileOAuth === true };
+async function inventory(client: KittiesGateway, health: { version: string; connectorGate: boolean; persistentOAuth?: boolean; cloudFileOAuth?: boolean; githubPersistentOAuth?: boolean }): Promise<ConnectorInventory> {
+  return { ...await client.connectorSettings(), gateReady: health.connectorGate, version: health.version, persistentOAuthReady: health.persistentOAuth === true, cloudFileOAuthReady: health.cloudFileOAuth === true, githubPersistentOAuthReady: health.githubPersistentOAuth === true };
 }
 export async function connectorInventory(user: Actor, workspaceId: string) {
   const { workspace } = await access(user, workspaceId), { client, health } = await ready(workspace);
@@ -52,11 +52,12 @@ export async function connectorInventory(user: Actor, workspaceId: string) {
 export async function assertPersistentOAuthImportReady(user: Actor, workspaceId: string, name: string, kind: PersistentEasyOAuthConfiguration["kind"]) {
   connectorNameSchema.parse(name);
   const { actor, workspace } = await access(user, workspaceId);
-  const provider = kind === "google-workspace" ? "google" : kind === "microsoft-365" ? "microsoft" : "dropbox";
+  const provider = kind === "google-workspace" ? "google" : kind === "microsoft-365" ? "microsoft" : kind === "github" ? "github" : "dropbox";
   if (name !== `altazor-${provider}-${digest(`${actor.id}:${workspaceId}`).slice(0, 16)}`) throw new ConnectorError("oauth_binding_changed", "La conexión no corresponde a este profesional y espacio.", 409);
   await policy();
   const { client } = await ready(workspace);
   await client.requirePersistentOAuth();
+  if (kind === "github") await client.requireGithubPersistentOAuth();
   const settings = await client.connectorSettings(), existing = settings.connections.find(connection => connection.name === name);
   if (existing && existing.kind !== kind) throw new ConnectorError("connector_unavailable", "No se pudo confirmar el servicio de esta conexión.", 409);
   if (!existing) await client.requireOAuthAliasCreation();
@@ -117,11 +118,12 @@ export async function configureConnector(user: Actor, workspaceId: string, reque
 /** Internal OAuth callback only; app and refresh credentials never enter a browser form or the model. */
 export async function configurePersistentEasyOAuth(user: Actor, workspaceId: string, requestId: string, name: string, value: PersistentEasyOAuthConfiguration, expectedWorkspace: AltazorComputerWorkspace) {
   connectorNameSchema.parse(name); validatePersistentEasyOAuth(value);
-  const provider = value.kind === "google-workspace" ? "google" : value.kind === "microsoft-365" ? "microsoft" : "dropbox";
+  const provider = value.kind === "google-workspace" ? "google" : value.kind === "microsoft-365" ? "microsoft" : value.kind === "github" ? "github" : "dropbox";
   if (name !== `altazor-${provider}-${digest(`${user.id}:${workspaceId}`).slice(0, 16)}`) throw new ConnectorError("oauth_binding_changed", "La conexión no corresponde a este profesional y espacio.", 409);
   return mutation(user, workspaceId, requestId, "configure_persistent", { name, value }, async client => ({ ...await client.setPersistentEasyOAuth(name, value) }), false, async client => {
     await client.requirePersistentOAuth();
-    if (value.publicClient) await client.requireCloudFileOAuth();
+    if (value.kind === "github") await client.requireGithubPersistentOAuth();
+    else if (value.publicClient) await client.requireCloudFileOAuth();
     const before = await client.connectorSettings(), available = before.catalog.find(kind => kind.id === value.kind), old = before.connections.find(row => row.name === name);
     if (!available?.available || available.blockedReason || old && old.kind !== value.kind) throw new ConnectorError("connector_unavailable", "No se pudo confirmar el servicio de esta conexión.", 409);
   }, expectedWorkspace);

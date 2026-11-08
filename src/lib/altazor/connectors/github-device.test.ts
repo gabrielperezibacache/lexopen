@@ -65,6 +65,15 @@ test("authorized tokens remain server-side and granted-scope validation stays wi
   await assert.rejects(pollGithubDevice(clientId, deviceCode, fake({ error: "authorization_pending", ...tokens })), isSafe("github_device_response"));
 });
 
+test("expiring device tokens preserve the rotation pair without inventing additional scopes", async () => {
+  const tokens = { access_token: "fictitious-private-access", refresh_token: "fictitious-private-refresh", expires_in: 28800, refresh_token_expires_in: 15897600, token_type: "bearer", scope: "read:user" };
+  const result = await pollGithubDevice(clientId, deviceCode, fake({ ...tokens, ignored_private_field: "never-project" }));
+  assert.equal(result.state, "authorized");
+  if (result.state !== "authorized") return;
+  assert.deepEqual(result.tokenResponse, tokens);
+  assert.deepEqual(readOAuthTokenResponse(result.tokenResponse, ["read:user"]), { accessToken: tokens.access_token, scopes: ["read:user"] });
+});
+
 test("invalid clients, disabled device flow and other errors have fixed safe messages", async () => {
   for (const [error, code] of [["incorrect_client_credentials", "oauth_client_credentials"], ["invalid_client", "oauth_client_credentials"], ["device_flow_disabled", "github_device_unavailable"], ["device_flow_not_enabled", "github_device_unavailable"], ["incorrect_device_code", "oauth_code_rejected"], ["unexpected_provider_error", "github_device_unavailable"]]) {
     const fetcher = fake({ error, error_description: "fictitious-private-token reflected-secret", error_uri: "https://private.invalid" }, 400);
