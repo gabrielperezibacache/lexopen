@@ -2,8 +2,9 @@
  * LexOpen Desktop — Electron shell.
  * mode=host → Postgres embebido + Next; mode=client → BrowserWindow a URL Tailscale.
  */
-const { app, BrowserWindow, ipcMain, shell, dialog, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, dialog, Menu, autoUpdater: nativeAutoUpdater } = require("electron");
 const { autoUpdater } = require("electron-updater");
+const { officialReleaseProvider } = require("./release-provider.cjs");
 const fs = require("fs");
 const path = require("path");
 const {
@@ -29,7 +30,7 @@ const { isAllowedAppUrl, isAllowedExternalUrl } = require("./external-url.cjs");
 const { pathToFileURL } = require("node:url");
 const { prepareDesktopToolpack } = require("./altazor-toolpack.cjs");
 const { attachMicrophoneGuards } = require("./media-permissions.cjs");
-const { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, assertUpdateVersion, friendlyUpdateError, withNetworkRetry, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools } = require("./update-policy.cjs");
+const { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, assertUpdateVersion, friendlyUpdateError, withNetworkRetry, quitAndInstallUpdate, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools } = require("./update-policy.cjs");
 
 let mainWindow = null;
 let currentDesktopAppUrl = "";
@@ -105,6 +106,7 @@ function configureAutoUpdater() {
   applyUpdaterPolicy(autoUpdater, readConfig());
   if (updaterConfigured) return;
   updaterConfigured = true;
+  autoUpdater.setFeedURL(officialReleaseProvider);
 
   autoUpdater.on("checking-for-update", () => {
     sendStatus({ phase: "checking-update", message: "Buscando actualizaciones…" });
@@ -219,6 +221,7 @@ async function promptInstallUpdate(info) {
   if (updatePromptActive) return;
   updatePromptActive = true;
   let ownsMaintenance = false;
+  let pausedClientUrl = null;
   try {
     const result = await dialog.showMessageBox({
       type: "info",
@@ -237,7 +240,9 @@ async function promptInstallUpdate(info) {
       assertUpdateVersion(bundledVersion(), info.version, updatePreferences(readConfig()).channel);
       const cfg = readConfig();
       await installPreparedUpdate({
-        mode: cfg.mode,
+        // Opening the setup assistant clears cfg.mode before the running Host
+        // stops. The active runtime still requires a consistent backup.
+        mode: hostHandle ? "host" : cfg.mode,
         stopHost: async () => { if (!hostHandle) throw new Error("Inicie el Host antes de preparar el respaldo de actualización."); await stopHostForMaintenance(); },
         backupHost: async () => {
           const dataDir = hostDataDirectory();
@@ -250,11 +255,15 @@ async function promptInstallUpdate(info) {
           return checked.manifest;
         },
         install: async () => {
-          if (clientWatchTimer) clearInterval(clientWatchTimer);
+          if (clientWatchTimer) {
+            clearInterval(clientWatchTimer);
+            clientWatchTimer = null;
+            if (cfg.mode === "client") pausedClientUrl = cfg.remoteUrl;
+          }
           desktopPreparationAbort?.abort();
           await desktopPreparationTask;
           quitting = true;
-          try { autoUpdater.quitAndInstall(false, true); }
+          try { await quitAndInstallUpdate(autoUpdater, app, { nativeUpdater: process.platform === "darwin" ? nativeAutoUpdater : null }); }
           catch (error) { quitting = false; throw error; }
         },
         restartHost: () => restartHostAfterMaintenance(cfg),
@@ -262,7 +271,9 @@ async function promptInstallUpdate(info) {
       });
     }
   } catch (error) {
+    if (pausedClientUrl && !quitting) startClientVersionWatch(pausedClientUrl);
     const message = error instanceof Error ? error.message : String(error);
+    sendStatus({ phase: "update-error", message });
     dialog.showErrorBox("Actualizaciones", message);
   } finally {
     updatePromptActive = false;
@@ -656,6 +667,7 @@ function buildMenu() {
           {
             label: "Cambiar modo (asistente)",
             click: () => {
+              if (maintenanceActive || quitting) return;
               writeConfig({ mode: null });
               showSetup();
               sendStatus({
@@ -934,6 +946,7 @@ ipcMain.handle("desktop:open-external", async (_e, url) => {
 });
 
 ipcMain.handle("desktop:retry", async () => {
+  if (maintenanceActive || quitting || booting) return lastStatus;
   await stopHostIfRunning();
   await boot();
   return lastStatus;

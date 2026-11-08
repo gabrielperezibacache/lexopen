@@ -269,6 +269,7 @@ jobs:
             --to-schema-datamodel prisma/schema.prisma \
             --exit-code
       - run: npm test
+      - run: npm run test:updates:host
       - name: Check connection setup and OAuth errors
         run: node --import tsx --test src/lib/altazor/connectors/github-application-check.test.ts src/lib/altazor/connectors/oauth-token-response.test.ts src/lib/altazor/connectors/oauth-provider-response.test.ts src/lib/altazor/connectors/oauth-access.test.ts src/lib/altazor/connectors/persistent-oauth.test.ts src/lib/altazor/connectors/github-device.test.ts src/lib/altazor/connectors/desktop-read-policy.test.ts src/lib/assistant/connector-desktop-intent.test.ts src/lib/altazor/computer/activity-detail.test.ts src/lib/altazor/computer/file-read-capability.test.ts src/lib/altazor/computer/approval-continuation.test.ts src/lib/altazor/computer/approval-task.test.ts src/lib/altazor/computer/presentation.test.ts src/lib/altazor/computer/file-metadata-task.test.ts
       - name: Check verified downloads and connection availability
@@ -280,6 +281,7 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:pjud:browser
+      - run: npm run test:updates:browser
       - name: Retain the exact compiled application for browser jobs
         uses: actions/upload-artifact@v7
         with:

@@ -4,14 +4,14 @@ En Windows, el Host inicia y detiene PostgreSQL mediante `pg_ctl`, con espera de
 
 La aplicación de escritorio empaquetada y el Host ejecutado desde un clon tienen actualizadores distintos. Ambos conservan la carpeta de datos. Descargar código o un instalador no acredita que el Host haya reiniciado con la versión nueva.
 
-Esta entrega incorpora comprobaciones, preparación y recibos. Las pruebas descritas al final usan datos ficticios y un actualizador simulado; no acreditan una actualización firmada real en todos los sistemas.
+Esta entrega incorpora comprobaciones, preparación y recibos. Las pruebas descritas al final usan datos ficticios, componentes reales del actualizador y sustitutos de servicios nativos; no acreditan una actualización firmada real en todos los sistemas.
 
 ## Escritorio empaquetado
 
 En el menú **LexOpen → Actualizaciones** puede elegir:
 
 - Comprobar automáticamente al abrir y cada seis horas, o desactivar esas comprobaciones. **Buscar actualizaciones** sigue disponible manualmente.
-- **Estable**, que consulta el canal `latest`, o **Vista previa**, que consulta `preview`. Una versión de prueba no se ofrece como estable.
+- **Estable**, que consulta el canal `latest`, o **Vista previa**, que compara `preview` y `latest` y ofrece la versión posterior. Así, una preliminar puede actualizarse a su versión estable sin cambiar de preferencia. Una versión de prueba no se ofrece como estable.
 - **Descargar instalador oficial**, para revisar los paquetes disponibles si el actualizador no está disponible.
 
 La comprobación y la descarga reintentan hasta tres llamadas cuando falla la red, con esperas acotadas. Una firma o huella inválida no se trata como un fallo transitorio. La descarga muestra progreso en el estado y, cuando el sistema lo admite, en el icono de la aplicación. **Versión y estado** permite consultar el último mensaje.
@@ -113,12 +113,22 @@ Pruebas reproducibles de esta implementación:
 ```bash
 node desktop/update-policy.test.cjs
 node desktop/main-updater.test.cjs
+node desktop/release-provider.test.cjs
+node desktop/appimage-updater.test.cjs
+node desktop/mac-updater.test.cjs
 node desktop/config.test.cjs
 node desktop/renderer.test.cjs
 node scripts/web-self-update.test.mjs
+node scripts/web-host.integration.test.mjs
 node --import tsx src/lib/self-update.test.ts
 ```
 
 El test de main ejecuta el entrypoint real dentro de un proceso Electron simulado: comprueba preferencias, intervalo, progreso y orden de mantenimiento, copiando y verificando datos ficticios. El test del clon crea repositorios Git temporales locales; no descarga actualizaciones reales ni ejecuta npm/migraciones sobre la instalación del estudio. Se comprueban también el fallo de build, identidad antigua rechazada, cambios locales preservados y bloqueo de otro propietario.
+
+La prueba del proveedor usa GitHubProvider real con respuestas HTTP simuladas. La de AppImage verifica descarga, SHA-512, sustitución y relanzamiento de ejecutables ficticios en Linux. La de MacUpdater sustituye el servicio nativo de Electron; no instala una aplicación de macOS. La integración del Host ejecuta el coordinador, Git, npm, procesos y HTTP locales, con un Host y migraciones ficticios.
+
+En el ensayo del DEB publicado, el Host no superó la comprobación de salud en Linux con OpenSSL 3 porque faltaba su motor Prisma. Tras añadir ese motor a una extracción temporal, pasó la prueba de arranque y persistencia. El empaquetado debe incluir y comprobar motores para OpenSSL 1.1 y 3; falta construir, probar y publicar un nuevo paquete con esa corrección. El parche temporal no modifica la descarga publicada ni acredita una actualización completa entre versiones.
+
+Windows y macOS siguen pendientes de una instalación y actualización firmadas en sus sistemas nativos; los paquetes preliminares publicados carecen de firma de editor y notarización. Las pruebas con sustitutos no resuelven ese requisito.
 
 Estos resultados no sustituyen un ensayo de actualización firmada, permisos del sistema operativo, pérdida de energía, volumen real ni actualización mayor de PostgreSQL. La entrega de distribución debe registrar por separado los paquetes construidos e instalados, sus huellas, plataformas y limitaciones.

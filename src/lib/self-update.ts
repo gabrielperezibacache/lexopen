@@ -127,11 +127,19 @@ function readJsonFile<T>(file: string): T | null {
   }
 }
 
-function writeJsonFile(file: string, value: unknown) {
+function writeFileAtomic(file: string, contents: string) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
-  fs.renameSync(tmp, file);
+  try {
+    fs.writeFileSync(tmp, contents);
+    fs.renameSync(tmp, file);
+  } finally {
+    fs.rmSync(tmp, { force: true });
+  }
+}
+
+function writeJsonFile(file: string, value: unknown) {
+  writeFileAtomic(file, JSON.stringify(value, null, 2));
 }
 
 export function readSelfUpdateStatus(): SelfUpdateStatus {
@@ -153,8 +161,11 @@ export function readSelfUpdateStatus(): SelfUpdateStatus {
     expectedBuildId?: string;
   }>(selfUpdateStatusPath());
   const request = readJsonFile<{ requestedAt?: string }>(selfUpdateRequestPath());
+  // Publishing a request is the commit point. An abandoned queued receipt alone
+  // must not prevent another attempt after a failed publication/rollback.
+  const orphanedQueue = stored?.phase === "queued" && !request && !fs.existsSync(selfUpdateLockPath());
   const phase: SelfUpdatePhase =
-    stored?.phase || (request ? "queued" : "idle");
+    orphanedQueue ? "failed" : stored?.phase || (request ? "queued" : "idle");
 
   return {
     phase,
@@ -166,8 +177,8 @@ export function readSelfUpdateStatus(): SelfUpdateStatus {
     toVersion: stored?.toVersion ?? null,
     startedAt: stored?.startedAt ?? request?.requestedAt ?? null,
     updatedAt: stored?.updatedAt ?? null,
-    message: stored?.message ?? null,
-    error: stored?.error ?? null,
+    message: orphanedQueue ? "No se publicó la solicitud de actualización. Puede volver a intentarlo." : stored?.message ?? null,
+    error: orphanedQueue ? "La solicitud de actualización no llegó al coordinador." : stored?.error ?? null,
     webHostManaged: capability.webHostManaged,
     requestId: stored?.requestId || null,
     recoveryRequired: Boolean(stored?.recoveryRequired),
@@ -181,17 +192,30 @@ export function readSelfUpdateStatus(): SelfUpdateStatus {
 let ownedRequestId: string | undefined;
 function acquireLock(requestId: string): boolean {
   const lock = selfUpdateLockPath();
+  let descriptor: number | undefined;
+  let created: fs.Stats | undefined;
   try {
     fs.mkdirSync(path.dirname(lock), { recursive: true });
-    const fd = fs.openSync(lock, "wx");
-    fs.writeFileSync(
-      fd,
-      JSON.stringify({ pid: process.pid, requestId, at: new Date().toISOString() })
-    );
-    fs.closeSync(fd);
+    descriptor = fs.openSync(lock, "wx", 0o600);
+    created = fs.fstatSync(descriptor);
+    fs.writeFileSync(descriptor, JSON.stringify({ pid: process.pid, requestId, at: new Date().toISOString() }));
+    fs.closeSync(descriptor);
+    descriptor = undefined;
     ownedRequestId = requestId;
     return true;
-  } catch {
+  } catch (error) {
+    if (descriptor !== undefined) {
+      try { fs.closeSync(descriptor); } catch { /* Preserve the original storage error. */ }
+    }
+    // A failed write after exclusive creation must not leave an ownerless lock.
+    // Only remove the exact inode opened by this attempt, never a replacement.
+    if (created) {
+      try {
+        const current = fs.lstatSync(lock);
+        if (current.dev === created.dev && current.ino === created.ino) fs.unlinkSync(lock);
+      } catch { /* Storage recovery may be required before another attempt. */ }
+    }
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     // Age alone never authorizes deleting a live owner's lock or pending job.
     try {
       const owner = readJsonFile<{ pid?: number; requestId?: string }>(lock);
@@ -262,8 +286,11 @@ export function requestSelfUpdate(opts: {
     pid: process.pid,
   };
 
+  const statusFile = selfUpdateStatusPath();
+  let previousStatus: string | null = null;
+  let queuedWritten = false;
   try {
-    writeJsonFile(selfUpdateRequestPath(), payload);
+    previousStatus = fs.existsSync(statusFile) ? fs.readFileSync(statusFile, "utf8") : null;
     writeJsonFile(selfUpdateStatusPath(), {
       requestId,
       phase: "queued",
@@ -278,7 +305,29 @@ export function requestSelfUpdate(opts: {
           : "Actualización en cola. LexOpen aplicará los cambios y reiniciará el proceso.",
       error: null,
     });
+    queuedWritten = true;
+    // The coordinator only consumes requests. Validate/persist its status first
+    // so a failed API call cannot leave an executable request behind.
+    writeJsonFile(selfUpdateRequestPath(), payload);
   } catch (error) {
+    const pending = readJsonFile<{ requestId?: string }>(selfUpdateRequestPath());
+    if (pending?.requestId === requestId) return readSelfUpdateStatus();
+    if (queuedWritten && readJsonFile<{ requestId?: string }>(statusFile)?.requestId === requestId) {
+      try {
+        if (previousStatus === null) fs.unlinkSync(statusFile);
+        else writeFileAtomic(statusFile, previousStatus);
+      } catch {
+        try {
+          writeJsonFile(statusFile, {
+            requestId, phase: "failed", ok: false, recoveryRequired: false,
+            startedAt: requestedAt, updatedAt: new Date().toISOString(),
+            error: "No se pudo publicar la solicitud de actualización. Puede volver a intentarlo.",
+          });
+        } catch {
+          // readSelfUpdateStatus also recognizes an orphaned queued receipt.
+        }
+      }
+    }
     releaseSelfUpdateLock(requestId);
     throw error;
   }

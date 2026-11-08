@@ -1,27 +1,30 @@
 import { readFileSync } from "fs";
 import path from "path";
 
-export type Semver = { major: number; minor: number; patch: number };
+export type Semver = { major: number; minor: number; patch: number; prerelease: string[] };
 
-/** Strip leading `v` and optional pre-release/build metadata for comparison. */
+/** Strip the tag prefix and build metadata, preserving release precedence. */
 export function normalizeVersionTag(input: string | null | undefined): string | null {
-  if (!input?.trim()) return null;
+  if (!input || !parseSemver(input)) return null;
   let v = input.trim();
   if (v.toLowerCase().startsWith("v")) v = v.slice(1);
-  // Drop pre-release / build for ordering (0.1.5-beta < 0.1.5 treated as equal base).
-  v = v.split("-")[0]!.split("+")[0]!.trim();
+  v = v.split("+")[0]!.trim();
   return v || null;
 }
 
 export function parseSemver(input: string | null | undefined): Semver | null {
-  const normalized = normalizeVersionTag(input);
-  if (!normalized) return null;
-  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(normalized);
+  const version = input?.trim().replace(/^v/i, "");
+  if (!version) return null;
+  const m = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(version);
   if (!m) return null;
+  const core = m.slice(1, 4).map(Number);
+  const prerelease = m[4]?.split(".") || [];
+  if (core.some(value => !Number.isSafeInteger(value)) || prerelease.some(value => /^0\d+$/.test(value))) return null;
   return {
-    major: Number(m[1]),
-    minor: Number(m[2]),
-    patch: Number(m[3]),
+    major: core[0],
+    minor: core[1],
+    patch: core[2],
+    prerelease,
   };
 }
 
@@ -32,7 +35,20 @@ export function compareSemver(a: string | null | undefined, b: string | null | u
   if (!left || !right) return 0;
   if (left.major !== right.major) return left.major - right.major;
   if (left.minor !== right.minor) return left.minor - right.minor;
-  return left.patch - right.patch;
+  if (left.patch !== right.patch) return left.patch - right.patch;
+  if (!left.prerelease.length || !right.prerelease.length) {
+    return left.prerelease.length === right.prerelease.length ? 0 : left.prerelease.length ? -1 : 1;
+  }
+  for (let i = 0; i < Math.max(left.prerelease.length, right.prerelease.length); i++) {
+    const a = left.prerelease[i], b = right.prerelease[i];
+    if (a === b) continue;
+    if (a === undefined || b === undefined) return a === undefined ? -1 : 1;
+    const aNumeric = /^\d+$/.test(a), bNumeric = /^\d+$/.test(b);
+    if (aNumeric && bNumeric && a.length !== b.length) return a.length < b.length ? -1 : 1;
+    if (aNumeric !== bNumeric) return aNumeric ? -1 : 1;
+    return a < b ? -1 : 1;
+  }
+  return 0;
 }
 
 export function isNewerVersion(

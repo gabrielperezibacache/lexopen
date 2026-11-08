@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { Button } from "@/components/ui";
 
 type Status = {
   phase: string;
@@ -31,16 +33,27 @@ const ACTIVE = new Set([
 ]);
 
 export function SelfUpdatePanel() {
+  const { t } = useI18n();
+  const readingStatus = useRef(false);
+  const [loadError, setLoadError] = useState("");
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
   const load = useCallback(async () => {
+    if (readingStatus.current) return;
+    readingStatus.current = true;
     try {
-      const res = await fetch("/api/admin/self-update", { cache: "no-store" });
-      if (res.ok) setStatus(await res.json());
-    } catch { /* The coordinator may be restarting the local HTTP process. */ }
-  }, []);
+      const res = await fetch("/api/admin/self-update", { cache: "no-store", signal: AbortSignal.timeout(12_000) });
+      if (!res.ok) throw new Error("status unavailable");
+      setStatus(await res.json());
+      setLoadError("");
+    } catch {
+      setLoadError(t("updates.statusUnavailable"));
+    } finally {
+      readingStatus.current = false;
+    }
+  }, [t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +67,7 @@ export function SelfUpdatePanel() {
   }, [load]);
 
   useEffect(() => {
-    if (!status || !ACTIVE.has(status.phase)) return;
+    if (status && !ACTIVE.has(status.phase)) return;
     const id = setInterval(() => void load(), 3000);
     return () => clearInterval(id);
   }, [status, load]);
@@ -69,20 +82,23 @@ export function SelfUpdatePanel() {
     });
     setBusy(false);
     if (!result.ok) {
-      setMsg(result.error || "No se pudo iniciar la actualización.");
+      setMsg(result.error || t("updates.startFailed"));
       return;
     }
     setStatus(result.data.status || null);
     setMsg(
       result.data.status?.message ||
-        "Actualización iniciada. Espere a que el Host vuelva y recargue."
+        t("updates.startedHint")
     );
   }
 
   if (!status) {
     return (
       <div className="rounded-2xl border border-[var(--line)] bg-white/60 p-4 text-sm text-[var(--ink-soft)]/70">
-        Cargando opciones de actualización…
+        {loadError ? <>
+          <p role="alert">{loadError}</p>
+          <Button variant="secondary" className="mt-3" onClick={() => void load()}>{t("common.retry")}</Button>
+        </> : t("updates.loading")}
       </div>
     );
   }
@@ -100,13 +116,14 @@ export function SelfUpdatePanel() {
           <p className="mt-1 text-sm text-[var(--ink-soft)]/75">
             Actualice LexOpen desde esta pantalla cuando el Host lo permita (git +
             web-host). Versión actual: v{status.currentVersion}
-            {status.latestVersion
+            {status.updateAvailable && status.latestVersion
               ? ` · disponible v${status.latestVersion}`
               : ""}
           </p>
           {!status.available && status.reason && (
             <p className="mt-2 text-xs text-[var(--ink-soft)]/70">{status.reason}</p>
           )}
+          {loadError && <p className="mt-2 text-xs text-[var(--ink-soft)]/70" role="status">{loadError}</p>}
           {status.message && (
             <p className="mt-2 text-xs text-[var(--ink)]">{status.message}</p>
           )}
@@ -118,29 +135,25 @@ export function SelfUpdatePanel() {
         </div>
         <div className="flex flex-wrap gap-2">
           {status.available && (
-            <button
-              type="button"
-              className="btn btn-primary"
+            <Button
               disabled={busy || updating || status.recoveryRequired}
               onClick={start}
             >
               {updating
-                ? "Actualizando…"
+                ? t("updates.updatingTitle")
                 : busy
-                  ? "Iniciando…"
+                  ? t("updates.starting")
                   : status.updateAvailable
-                    ? "Actualizar ahora"
-                    : "Buscar y actualizar"}
-            </button>
+                    ? t("updates.start")
+                    : t("updates.searchAndUpdate")}
+            </Button>
           )}
           {status.phase === "done" && (
-            <button
-              type="button"
-              className="btn btn-secondary"
+            <Button variant="secondary"
               onClick={() => window.location.reload()}
             >
-              Recargar
-            </button>
+              {t("updates.reload")}
+            </Button>
           )}
         </div>
       </div>

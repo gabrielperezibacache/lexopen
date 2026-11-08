@@ -13,7 +13,7 @@
     "dist:mac": "electron-builder --mac --publish never",
     "dist:win": "electron-builder --win --publish never",
     "dist:linux": "electron-builder --linux --publish never",
-    "test": "node config.test.cjs && node oauth-clients.test.cjs && node external-url.test.cjs && node backup.test.cjs && node host-runtime.test.mjs && node renderer.test.cjs && node media-permissions.test.cjs && node update-policy.test.cjs && node main-updater.test.cjs && node scripts/release-resources.test.mjs && node scripts/assemble-release.test.mjs && node scripts/native-pg-probe.test.mjs"
+    "test": "node config.test.cjs && node oauth-clients.test.cjs && node external-url.test.cjs && node backup.test.cjs && node host-runtime.test.mjs && node renderer.test.cjs && node media-permissions.test.cjs && node update-policy.test.cjs && node main-updater.test.cjs && node appimage-updater.test.cjs && node mac-updater.test.cjs && node release-provider.test.cjs && node scripts/release-resources.test.mjs && node scripts/assemble-release.test.mjs && node scripts/native-pg-probe.test.mjs"
   },
   "dependencies": {
     "@prisma/debug": "^5.22.0",

@@ -55,7 +55,8 @@ function applyUpdaterPolicy(updater, config) {
   updater.allowDowngrade = false;
   updater.autoDownload = false;
   updater.autoInstallOnAppQuit = false;
-  if ("verifyUpdateCodeSignature" in updater) updater.verifyUpdateCodeSignature = true;
+  // NsisUpdater exposes verifyUpdateCodeSignature as a verifier function, not
+  // the boolean electron-builder option. Keep its built-in verifier intact.
 }
 
 function versionParts(raw) {
@@ -113,6 +114,39 @@ async function withNetworkRetry(run, { attempts = 3, sleep = ms => new Promise(r
   }
 }
 
+function quitAndInstallUpdate(updater, app, { nativeUpdater, timeoutMs = 10 * 60 * 1000 } = {}) {
+  // electron-updater reports installer failures through "error", including
+  // synchronous failures that quitAndInstall catches internally. Wait until
+  // Electron actually starts quitting so the caller can resume a stopped Host.
+  return new Promise((resolve, reject) => {
+    let timer;
+    // electron-updater 6.8.x MacUpdater adds its install callback synchronously
+    // in quitAndInstall(). Snapshot that call only; retain permanent native
+    // listeners, including MacUpdater's downloaded-state listener.
+    const priorNativeListeners = new Set(nativeUpdater?.rawListeners("update-downloaded") || []);
+    const addedNativeListeners = () => nativeUpdater?.rawListeners("update-downloaded").filter(listener => !priorNativeListeners.has(listener)) || [];
+    let installListeners;
+    const cleanup = () => {
+      clearTimeout(timer);
+      updater.removeListener("error", failed);
+      app.removeListener("before-quit", quitting);
+      // MacUpdater uses on(), so a native error otherwise leaves an install
+      // callback armed. A later download must not install after Host recovery.
+      for (const listener of installListeners || addedNativeListeners()) nativeUpdater.removeListener("update-downloaded", listener);
+    };
+    const failed = error => { cleanup(); reject(error); };
+    const quitting = () => { cleanup(); resolve(); };
+    updater.once("error", failed);
+    app.once("before-quit", quitting);
+    timer = setTimeout(() => failed(Object.assign(new Error("La instalación no confirmó el reinicio dentro del tiempo previsto. Se canceló el intento; puede volver a intentarlo."), { code: "ERR_UPDATER_INSTALL_TIMEOUT" })), timeoutMs);
+    try {
+      updater.quitAndInstall(false, true);
+      installListeners = addedNativeListeners();
+    }
+    catch (error) { failed(error); }
+  });
+}
+
 async function installPreparedUpdate({ mode, stopHost, backupHost, install, restartHost, status = () => {} }) {
   let stopped = false;
   try {
@@ -129,9 +163,14 @@ async function installPreparedUpdate({ mode, stopHost, backupHost, install, rest
     status("installing-update");
     await install();
   } catch (error) {
-    if (stopped) await restartHost().catch(() => {});
+    if (stopped) {
+      try { await restartHost(); }
+      catch (restartError) {
+        throw Object.assign(new AggregateError([error, restartError], "La actualización falló y no se pudo reanudar el Host. Conserve el respaldo y vuelva a iniciar el Host antes de intentar otra actualización.", { cause: error }), { code: "ERR_UPDATER_HOST_RECOVERY_FAILED" });
+      }
+    }
     throw error;
   }
 }
 
-module.exports = { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, compareVersions, assertUpdateVersion, friendlyUpdateError, isTransientUpdateError, withNetworkRetry, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools };
+module.exports = { CHECK_INTERVAL_MS, RELEASES_URL, updatePreferences, applyUpdaterPolicy, compareVersions, assertUpdateVersion, friendlyUpdateError, isTransientUpdateError, withNetworkRetry, quitAndInstallUpdate, installPreparedUpdate, verifyBackupContents, diagnoseOptionalTools };
