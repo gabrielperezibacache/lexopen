@@ -238,7 +238,9 @@ export class KittiesGateway {
   }
   async chat(id: string, kittyId: string): Promise<{ working: boolean; turns: ComputerTurn[] }> {
     const result = await this.json(`/v1/chats/${safeId(id)}`), chat = this.validateChat(result.chat, kittyId, true, id);
-    return { working: chat.turns.some(turn => turn.working === true), turns: chat.turns.slice(-80).map((turn, index) => ({ index: Math.max(0, chat.turns.length - 80) + index, from: turn.from === "user" ? "user" : turn.from === "system" ? "system" : "assistant", text: typeof turn.text === "string" ? turn.text.slice(0, 24000) : "", working: turn.working === true, needsHelp: turn.needs_help === true, steps: Array.isArray(turn.steps) ? turn.steps.slice(-60).map(step => ({ action: typeof step.action === "string" ? step.action.slice(0, 80) : "acción", at: typeof step.at === "string" ? step.at.slice(0, 60) : "" })) : [] })) };
+    // Native approval turns are appended by the gateway; model text and any
+    // incoming origin property cannot assert connector-result provenance.
+    return { working: chat.turns.some(turn => turn.working === true), turns: chat.turns.slice(-80).map((turn, index) => ({ index: Math.max(0, chat.turns.length - 80) + index, from: turn.from === "user" ? "user" : turn.from === "system" ? "system" : "assistant", ...(turn.from === "approval" ? { origin: "connector-result" as const } : {}), text: typeof turn.text === "string" ? turn.text.slice(0, 24000) : "", working: turn.working === true, needsHelp: turn.needs_help === true, steps: Array.isArray(turn.steps) ? turn.steps.slice(-60).map(step => ({ action: typeof step.action === "string" ? step.action.slice(0, 80) : "acción", at: typeof step.at === "string" ? step.at.slice(0, 60) : "" })) : [] })) };
   }
   async requireAsyncMessages() {
     const health = await this.json("/v1/health");
