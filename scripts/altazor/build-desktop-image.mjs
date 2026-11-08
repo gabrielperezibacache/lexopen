@@ -29,8 +29,10 @@ async function main() {
     }
     const toolFiles = join(context, ".lexopen-desktop-profile");
     mkdirSync(toolFiles);
-    for (const file of ["check.py", "managed-install.sh", "desktop-items-0.conf"]) cpSync(join(recipe, file), join(toolFiles, file));
+    for (const file of ["check.py", "managed-install.sh", "reading.py", "browser-read.js", "desktop-items-0.conf"]) cpSync(join(recipe, file), join(toolFiles, file));
     cpSync(fileURLToPath(new URL("../../public/branding/lexopen-desktop-midnight-2560.png", import.meta.url)), join(toolFiles, "wallpaper.png"));
+    const adapted = spawnSync("python3", [join(recipe, "adapt_desktop.py"), context], { encoding: "utf8", windowsHide: true });
+    if (adapted.status !== 0) throw new Error("No se pudo preparar el lector semántico del escritorio fijado.");
     const dockerfile = join(context, "Dockerfile");
     const combined = readFileSync(dockerfile, "utf8") + "\n" + readFileSync(join(recipe, "Dockerfile.suffix"), "utf8");
     writeFileSync(dockerfile, combined);

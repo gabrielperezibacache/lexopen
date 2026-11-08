@@ -2,7 +2,8 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { requireStaff } from "@/lib/auth/session";
-import { can, canSome } from "@/lib/auth/permissions";
+import { canSome } from "@/lib/auth/permissions";
+import { isAdmin } from "@/lib/auth/rbac";
 import { ModuleHeader } from "@/components/ui/PageHeader";
 import { getI18n } from "@/lib/i18n/server";
 import { TranscriptionSettings } from "@/components/audio/TranscriptionSettings";
@@ -44,24 +45,26 @@ async function adminSections(userId: string, mode: CaseManagementMode, country: 
     prisma.organization.findFirst({ select: firmFormSelect }),
     getHostStatus(),
     prisma.user.findMany({
-      include: {
-        siteMemberships: { include: { site: true } },
-        groupMembers: { include: { group: true } },
+      select: {
+        id: true, name: true, email: true, role: true, title: true, avatarColor: true,
+        capabilityGrants: true, capabilityRevokes: true,
+        siteMemberships: { select: { site: { select: { id: true, name: true } } } },
+        groupMembers: { select: { group: { select: { id: true, name: true } } } },
       },
       orderBy: { name: "asc" },
     }),
     prisma.group.findMany({
-      include: { members: { include: { user: true } } },
+      select: { id: true, name: true, description: true, members: { select: { user: { select: { id: true, name: true } } } } },
       orderBy: { name: "asc" },
     }),
     canSetCountry ? getHostNavigationSections() : null,
   ]);
-  const settingsOrganization =
-    organization ||
-    (await prisma.organization.create({ data: {}, select: firmFormSelect }));
+  const settingsOrganization = organization ?? {
+    name: "Estudio LexOpen", rut: null, email: null, telefono: null, direccion: null, settings: null,
+  };
 
-  const settings = await prisma.firmSettings.findUnique({
-    where: { organizationId: settingsOrganization.id },
+  const settings = organization ? await prisma.firmSettings.findUnique({
+    where: { organizationId: organization.id },
     select: {
       claveUnicaLastSyncAt: true,
       claveUnicaLastSyncStatus: true,
@@ -70,7 +73,7 @@ async function adminSections(userId: string, mode: CaseManagementMode, country: 
       pjudDigestLastStatus: true,
       pjudDigestLastNote: true,
     },
-  });
+  }) : null;
   const pjudOpsLog = buildPjudOpsLog({
     generatedAt: hostStatus.generatedAt,
     honesty: hostStatus.pjud.honesty,
@@ -111,6 +114,8 @@ async function adminSections(userId: string, mode: CaseManagementMode, country: 
           role: u.role,
           title: u.title,
           avatarColor: u.avatarColor,
+          capabilityGrants: u.capabilityGrants,
+          capabilityRevokes: u.capabilityRevokes,
           siteMemberships: u.siteMemberships.map((m) => ({
             site: { id: m.site.id, name: m.site.name },
           })),
@@ -148,8 +153,8 @@ export default async function ConfiguracionPage() {
   const user = await requireStaff();
   const [{ dict, locale, t }, mode, country] = await Promise.all([getI18n(), getCaseManagementMode(), getWorkCountry()]);
   const h = dict.hubs.configuracion;
-  const canManage = can(user, "host.admin");
-  const canSetCountry = canManage && user.role === "admin";
+  const canManage = isAdmin(user);
+  const canSetCountry = canManage;
   const visibility = { canManage, canSetCountry, assistant: canSome(user, "assistant.use"), communications: showCommunications(country, mode) };
   const categories = configCategoriesForMode(mode, visibility);
   const tr = (es: string, en: string) => locale === "en" ? en : es;
@@ -186,6 +191,14 @@ export default async function ConfiguracionPage() {
         title={canManage ? h.title : dict.nav.settings}
         subtitle={canManage ? h.subtitle : tr("Ajusta tu cuenta, tus avisos y las herramientas que usas.", "Adjust your account, notifications and tools.")}
       />
+      <section className="panel space-y-3 p-5" aria-labelledby="settings-scope-title">
+        <h2 id="settings-scope-title" className="text-lg font-semibold">{tr("A quién afectan los ajustes", "Who these settings affect")}</h2>
+        <dl className="grid gap-4 text-sm md:grid-cols-3">
+          <div><dt className="font-semibold">{tr("Tu usuario", "Your account")}</dt><dd className="mt-1 text-[var(--ink-soft)]">{tr("Tu cuenta, notificaciones, recuerdos y conexiones personales de Altazor y Codex. Cada persona administra los suyos.", "Your account, notifications, memories and personal Altazor and Codex connections. Each person manages their own.")}</dd></div>
+          <div><dt className="font-semibold">{tr("Todo el estudio", "The whole firm")}</dt><dd className="mt-1 text-[var(--ink-soft)]">{canManage ? tr("Puedes administrar los datos, usuarios, integraciones y políticas compartidas del Host. Los cambios se aplican a todo el equipo.", "You can administer the Host's shared details, users, integrations and policies. Changes apply to the whole team.") : tr("La administración del Host gestiona los datos, usuarios, integraciones y políticas compartidas. Tus preferencias personales respetan esas políticas.", "Host administrators manage shared details, users, integrations and policies. Your personal preferences follow those policies.")}</dd></div>
+          <div><dt className="font-semibold">{tr("Este navegador", "This browser")}</dt><dd className="mt-1 text-[var(--ink-soft)]">{tr("El idioma y la apariencia se conservan en este navegador y pueden mantenerse al cambiar de usuario.", "Language and appearance are saved in this browser and may remain when switching accounts.")}</dd></div>
+        </dl>
+      </section>
       <ConfigSectionNav categories={categories} />
       <div className={styles.groups}>
         {categories.map(category => (

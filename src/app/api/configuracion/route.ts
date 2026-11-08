@@ -1,77 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { assertCsrf, handleRouteError, parseBody, requireRole } from "@/lib/api";
-import { firmFormSelect } from "@/lib/config/firm-form-fields";
+import { firmSettingsPatchSchema, updateFirmSettings } from "@/lib/config/firm-settings";
 
-const schema = z.object({
-  name: z.string().min(1),
-  rut: z.string().optional().nullable(),
-  email: z.string().optional().nullable(),
-  telefono: z.string().optional().nullable(),
-  direccion: z.string().optional().nullable(),
-  emisorRazonSocial: z.string().optional().nullable(),
-  emisorRut: z.string().optional().nullable(),
-  emisorGiro: z.string().optional().nullable(),
-  emisorDireccion: z.string().optional().nullable(),
-  defaultRetencionPct: z.coerce.number().min(0).max(1),
-  ivaPct: z.coerce.number().min(0).max(1),
-  hermesAllowDemo: z.boolean().optional(),
-  assistantLlmMode: z.enum(["local_only", "remote_allowed"]).optional(),
-  auditLlmPrompts: z.boolean().optional(),
-});
+const headers = { "Cache-Control": "private, no-store", Vary: "Cookie" };
 
 export async function PATCH(req: NextRequest) {
   try {
     assertCsrf(req);
-    await requireRole("admin");
-    const body = await parseBody(req, schema);
-    const current =
-      (await prisma.organization.findFirst({ select: { id: true } })) ||
-      (await prisma.organization.create({ data: {}, select: { id: true } }));
-    const org = await prisma.organization.update({
-      where: { id: current.id },
-      data: {
-        name: body.name,
-        rut: body.rut || null,
-        email: body.email || null,
-        telefono: body.telefono || null,
-        direccion: body.direccion || null,
-        settings: {
-          upsert: {
-            create: {
-              emisorRazonSocial: body.emisorRazonSocial || null,
-              emisorRut: body.emisorRut || null,
-              emisorGiro: body.emisorGiro || null,
-              emisorDireccion: body.emisorDireccion || null,
-              defaultRetencionPct: body.defaultRetencionPct,
-              ivaPct: body.ivaPct,
-              hermesAllowDemo: Boolean(body.hermesAllowDemo),
-              assistantLlmMode: body.assistantLlmMode ?? "remote_allowed",
-              auditLlmPrompts: Boolean(body.auditLlmPrompts),
-            },
-            update: {
-              emisorRazonSocial: body.emisorRazonSocial || null,
-              emisorRut: body.emisorRut || null,
-              emisorGiro: body.emisorGiro || null,
-              emisorDireccion: body.emisorDireccion || null,
-              defaultRetencionPct: body.defaultRetencionPct,
-              ivaPct: body.ivaPct,
-              hermesAllowDemo: Boolean(body.hermesAllowDemo),
-              ...(body.assistantLlmMode !== undefined
-                ? { assistantLlmMode: body.assistantLlmMode }
-                : {}),
-              ...(body.auditLlmPrompts !== undefined
-                ? { auditLlmPrompts: body.auditLlmPrompts }
-                : {}),
-            },
-          },
-        },
-      },
-      select: firmFormSelect,
-    });
-    return NextResponse.json(org);
+    const user = await requireRole("admin");
+    const body = await parseBody(req, firmSettingsPatchSchema);
+    return NextResponse.json(await updateFirmSettings(body, user), { headers });
   } catch (e) {
-    return handleRouteError(e);
+    const response = handleRouteError(e);
+    for (const [name, value] of Object.entries(headers)) response.headers.set(name, value);
+    return response;
   }
 }

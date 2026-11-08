@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { httpError } from "@/lib/auth/access";
-import { canSome } from "@/lib/auth/permissions";
+import { isAdmin } from "@/lib/auth/rbac";
 import type { CausaAccessUser } from "@/lib/auth/causa-access";
 import { writeAuditStrict } from "@/lib/audit";
 
@@ -25,7 +25,7 @@ export async function updateCaseManagementMode(mode: CaseManagementMode, user: C
   if (mode !== "manual" && mode !== "pjud_cl") throw httpError("Elige una modalidad válida.", 400);
   await client.$transaction(async tx => {
     const actor = await tx.user.findUnique({ where: { id: user.id }, select: { id: true, role: true, capabilityGrants: true, capabilityRevokes: true } });
-    if (!actor || actor.role !== "admin" || !canSome(actor, "host.admin")) throw httpError("Sólo la administración puede cambiar la modalidad de causas.", 403);
+    if (!actor || !isAdmin(actor)) throw httpError("Sólo la administración puede cambiar la modalidad de causas.", 403);
     const before = await getCaseManagementMode(tx), organization = await tx.organization.findFirst({ select: { id: true } }) || await tx.organization.create({ data: {}, select: { id: true } });
     await tx.firmSettings.upsert({ where: { organizationId: organization.id }, create: { organizationId: organization.id, caseManagementMode: mode }, update: { caseManagementMode: mode } });
     if (mode === "manual") await pausePjudManagementJobs(tx);

@@ -84,8 +84,7 @@ export async function GET(req: NextRequest) {
           role: true,
           title: true,
           avatarColor: true,
-          capabilityGrants: true,
-          capabilityRevokes: true,
+          ...(isAdmin(user) ? { capabilityGrants: true, capabilityRevokes: true } : {}),
           createdAt: true,
           siteMemberships: {
             where: { site: siteAccessWhere(user) },
@@ -106,7 +105,7 @@ export async function GET(req: NextRequest) {
         take: limit,
       }),
     ]);
-    return NextResponse.json({ users, groups });
+    return NextResponse.json({ users, groups }, { headers: { "Cache-Control": "private, no-store", Vary: "Cookie" } });
   } catch (e) {
     return handleRouteError(e);
   }

@@ -4,11 +4,13 @@ import { operationKey, createSubmissionKeys } from "@/lib/client-submission-key"
 import { withCsrfHeaders } from "@/lib/client-csrf";
 import type { AltazorDestination } from "@/lib/altazor/types";
 import { prepareAssistantSubmission } from "@/lib/altazor/client-send-policy";
+import type { ExecutionProgress } from "./AltazorExecutionSummary";
+import type { IcaroJobView } from "@/lib/altazor/icaros/types";
 import { locationForAltazorPane, type Pane } from "./pane-location";
 export type { Pane } from "./pane-location";
 export type Conversation = { id: string; title: string; causaId: string | null; scopeKey: string; revision: number; status: string };
 type Attachment = { id: string; sourceName: string; byteSize: number; status: string };
-export type Turn = { id: string; ordinal: number; status: string; userText: string; assistantText: string; available?: boolean; attachmentIds: string[]; sourceRefs: { title: string; href: string }[]; results: { toolId: string; result: { ok: boolean; message: string; card?: Record<string, unknown> | null; undoToken?: string | null } }[]; plan: { id: string; steps: { toolId: string; preview: string }[] } | null; errorCode: string | null; createdAt: string };
+export type Turn = { id: string; ordinal: number; status: string; userText: string; assistantText: string; progress?: ExecutionProgress | null; delegations?: IcaroJobView[]; available?: boolean; attachmentIds: string[]; sourceRefs: { title: string; href: string }[]; results: { toolId: string; result: { ok: boolean; message: string; card?: Record<string, unknown> | null; undoToken?: string | null } }[]; plan: { id: string; steps: { toolId: string; preview: string }[] } | null; errorCode: string | null; createdAt: string };
 export type ConversationData = { conversation: Conversation; turns: Turn[]; attachments: Attachment[]; destination: AltazorDestination; hasMore: boolean; beforeOrdinal: number | null };
 type CompanionPreference = { activeConversationId: string | null; selectionUnavailable: boolean; memoryEnabled: boolean; backgroundEnabled: boolean; revision: number };
 async function request<T>(url: string, body?: unknown, method = "POST"): Promise<T> {
@@ -61,7 +63,7 @@ export function useAltazorCompanionState() {
       if (controller.signal.aborted) return; setLinkedDocumentId(params.get("documentoId") || ""); setConversations(result.conversations); setDestination(result.destination); setCausas(resources.causas || []); setPreference(saved);
       if (saved.selectionUnavailable) setError("El contexto anterior ya no está disponible. Puedes seguir escribiendo aquí.");
       const selectedPane = params.get("altazor");
-      if (["chat", "memory", "connectors", "computer"].includes(selectedPane || "")) { setPane(selectedPane as Pane); setVisited(["chat", selectedPane as Pane]); }
+      if (["chat", "memory", "connectors", "computer", "icaros", "help"].includes(selectedPane || "")) { setPane(selectedPane as Pane); setVisited(["chat", selectedPane as Pane]); }
       if (requestedCase && (resources.causas || []).some((causa: {id:string}) => causa.id === requestedCase)) setScope(requestedCase);
       const id = params.get("conversacion") || (!requestedCase ? saved.activeConversationId : null);
       if (id) { liveId.current = id; setActiveId(id); }
@@ -85,11 +87,12 @@ export function useAltazorCompanionState() {
     return () => { active = false; };
   }, [activeId]);
   const running = data?.turns.find(turn => ["queued", "running"].includes(turn.status));
+  const hasDelegations = Boolean(data?.turns.some(turn => turn.status === "delegating" || turn.delegations?.some(job => ["queued", "running"].includes(job.status))));
   useEffect(() => {
     if (!activeId) return;
-    const timer = window.setInterval(() => { void reload(activeId).catch(() => {}); }, running ? 1800 : 15000);
+    const timer = window.setInterval(() => { void reload(activeId).catch(() => {}); }, running || hasDelegations ? 1800 : 15000);
     return () => window.clearInterval(timer);
-  }, [activeId, running, reload]);
+  }, [activeId, running, hasDelegations, reload]);
   useEffect(() => {
     if (!text.trim()) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
@@ -205,9 +208,9 @@ export function useAltazorCompanionState() {
         setLinkedDocumentId(params.get("documentoId") || ""); setText(intent.slice(0,8000)); choosePane("chat", false);
         const url = new URL(location.href); url.searchParams.delete("intencion"); url.searchParams.delete("run"); history.replaceState(null, "", url.pathname + url.search);
       }
-      if (selectedPane && ["chat", "memory", "connectors", "computer"].includes(selectedPane)) choosePane(selectedPane as Pane, false);
+      if (selectedPane && ["chat", "memory", "connectors", "computer", "icaros", "help"].includes(selectedPane)) choosePane(selectedPane as Pane, false);
     }).catch(reason=>{if(!controller.signal.aborted && version === locationVersion.current)setError(reason.message);});
     return()=>controller.abort();
   }
-  return { linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, preference, preferenceSaving, preferenceError, savePreference,synchronizeLocation };
+  return { linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, hasDelegations, preference, preferenceSaving, preferenceError, savePreference,synchronizeLocation };
 }

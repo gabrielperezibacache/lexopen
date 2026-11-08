@@ -17,6 +17,22 @@ export const ROLES = [
 
 export type Role = (typeof ROLES)[number];
 
+/** Roles de una membresía de causa; no sustituyen el rol general del usuario. */
+export const CAUSA_MIEMBRO_ROLES = [
+  "responsable",
+  "colaborador",
+  "procurador",
+  "supervisor",
+  "externo",
+  "lectura",
+] as const;
+
+export type CausaMiembroRol = (typeof CAUSA_MIEMBRO_ROLES)[number];
+
+export function isCausaMiembroRol(value: string): value is CausaMiembroRol {
+  return (CAUSA_MIEMBRO_ROLES as readonly string[]).includes(value);
+}
+
 export const STAFF_ROLES: readonly Role[] = [
   "admin",
   "socio",

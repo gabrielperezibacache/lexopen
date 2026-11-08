@@ -1,5 +1,6 @@
 /**
- * Política «2FA obligatorio para roles financieros/aprobadores» (D9).
+ * Política «2FA obligatorio para roles financieros/aprobadores» (D9),
+ * incluida la administración del Host delegada a otro rol interno.
  * Edge-safe: sin Prisma. El proxy carga el flag `FirmSettings.require2faPrivileged`
  * y el estado `User.totpEnabled`, y usa estas funciones para decidir.
  *
@@ -9,6 +10,8 @@
  */
 
 import { TWO_FACTOR_ROLES } from "./roles";
+import { isAdmin } from "./rbac";
+import type { PermissionSubject } from "./permissions";
 
 export const TWO_FACTOR_REQUIRED_CODE = "2fa_required";
 export const TWO_FACTOR_SETUP_PATH = "/cuenta?requiere2fa=1";
@@ -18,14 +21,13 @@ export function isTwoFactorEnrollmentRelaxed() {
   return process.env.NODE_ENV !== "production" && process.env.LEXOPEN_E2E === "1";
 }
 
-export function mustEnrollTwoFactor(opts: {
-  role: string;
+export function mustEnrollTwoFactor(opts: PermissionSubject & {
   totpEnabled: boolean;
   policyEnabled: boolean;
 }) {
   if (isTwoFactorEnrollmentRelaxed()) return false;
   if (!opts.policyEnabled || opts.totpEnabled) return false;
-  return (TWO_FACTOR_ROLES as readonly string[]).includes(opts.role);
+  return (TWO_FACTOR_ROLES as readonly string[]).includes(opts.role) || isAdmin(opts);
 }
 
 /** Rutas que siguen abiertas mientras el usuario no enrola 2FA. */

@@ -15,7 +15,7 @@ for (const role of ROLES) {
     for (const area of model.areas) assert.ok(entries.some(entry => entry.href === area.href), `${role}: reachable area ${area.id}`);
     for (const href of ["/clientes", "/configuracion", "/facturacion", "/audiencias", "/biblioteca"]) assert.ok(entries.some(entry => entry.href === href), `${role}: read gate is staff ${href}`);
     assert.ok(entries.every(entry => !["/correo", "/mensajes", "/configuracion#comunicaciones"].includes(entry.href)), `${role}: communications absent from unconfigured discovery`);
-    assert.equal(entries.some(entry => entry.href === "/auditoria"), role === "admin");
+    assert.equal(entries.some(entry => entry.href === "/auditoria"), canSome({ role }, "audit.read"));
   } else {
     assert.equal(model.mode, "portal");
     assert.equal(model.areas.length, 0);
@@ -32,7 +32,10 @@ for (const role of ROLES) {
 for (const subject of [null, undefined, { role: "" }, { role: "unknown" }]) assert.equal(navigationEntries(buildNavigation(subject)).length, 0);
 const delegated = navigationEntries(buildNavigation({ role: "socio", capabilityGrants: "host.admin,audit.read" }));
 assert.ok(delegated.some(entry => entry.id === "configuracion"), "delegated Host administrators can find firm settings");
-assert.equal(delegated.some(entry => entry.id === "auditoria"), false, "audit remains role-gated in navigation");
+assert.equal(delegated.some(entry => entry.id === "auditoria"), true, "audit is discoverable with its effective capability");
+assert.equal(navigationEntries(buildNavigation({ role: "admin", capabilityRevokes: "audit.read" })).some(entry => entry.id === "auditoria"), false, "Host administration does not override audit revocation");
+assert.equal(navigationEntries(buildNavigation({ role: "abogado", capabilityGrants: "audit.read" })).some(entry => entry.id === "auditoria"), true, "audit can be delegated independently of Host administration");
+assert.equal(navigationEntries(buildNavigation({ role: "cliente", capabilityGrants: "audit.read,host.admin" })).some(entry => entry.id === "auditoria"), false, "portal access still excludes firm audit");
 assert.equal(navigationEntries(buildNavigation({ role: "admin", capabilityRevokes: "host.admin" })).some(entry => entry.id === "configuracion"), true, "personal settings remain accessible when Host administration is revoked");
 assert.equal(navigationEntries(buildNavigation({ role: "cliente", capabilityGrants: "host.admin" })).some(entry => entry.id === "configuracion"), false, "portal access never exposes firm settings");
 assert.equal(navigationEntries(buildNavigation({ role: "abogado", capabilityRevokes: "assistant.use" })).some(entry => entry.id === "agente"), false);

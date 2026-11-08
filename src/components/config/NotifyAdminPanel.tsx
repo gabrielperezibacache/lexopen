@@ -5,6 +5,7 @@ import { apiMutation } from "@/lib/api-mutation";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { WhatsAppSettings, type WhatsAppSnapshot } from "./WhatsAppSettings";
+import Link from "next/link";
 import { tipoDef } from "@/lib/notify/catalog";
 
 type Snapshot = {
@@ -455,6 +456,16 @@ export function NotifyAdminPanel() {
       </Dialog>
 
       {snapshot && <WhatsAppSettings key={JSON.stringify(snapshot.whatsapp)} snapshot={snapshot.whatsapp} onSaved={load} />}
+
+      <section className="panel space-y-2 rounded-3xl p-5">
+        <h3 className="font-medium">Ayuda de Altazor · avisos al teléfono</h3>
+        <p className="text-sm text-[var(--ink-soft)]/70">
+          Las solicitudes de ayuda usan su propia configuración de ntfy o Meta y una plantilla de respuesta con código de uso único.
+          Los avisos generales de WhatsApp de arriba usan otra plantilla, sin variables.
+          Cada persona elige su canal y vincula su teléfono desde Altazor.
+        </p>
+        <Link className="btn btn-ghost" href="/inicio?altazor=help">Configurar avisos de ayuda</Link>
+      </section>
 
       {message && <p role="status" className="text-sm text-[var(--ink-soft)]">{message}</p>}
     </div>

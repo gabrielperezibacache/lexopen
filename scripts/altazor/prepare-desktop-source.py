@@ -7,6 +7,7 @@ import io
 import json
 import subprocess
 import tarfile
+import sys
 from pathlib import Path, PurePosixPath
 
 
@@ -47,6 +48,9 @@ def source_files(checkout, revision):
 
 def prepare_desktop_source(checkout, output, profile=PROFILE):
     files = source_files(checkout, profile["sourceCommit"])
+    sys.path.insert(0, str(RECIPE))
+    from adapt_desktop import adapt_page
+    files['kitty-page.py'] = (adapt_page(files['kitty-page.py'][0].decode('utf-8')).encode(), 0o755)
     original, _ = files["Dockerfile"]
     if not files["licenses/desktop-original.txt"][0]:
         raise ValueError("Missing original desktop source license")
@@ -64,7 +68,7 @@ def prepare_desktop_source(checkout, output, profile=PROFILE):
         recipe = recipe.replace(step, "", 1)
     recipe = "# Desktop recipe modified by LexOpen on 2026-11-05. See licenses/changes.txt.\n" + recipe
     files["Dockerfile"] = (recipe.encode() + b"\n" + (RECIPE / "Dockerfile.suffix").read_bytes(), 0o644)
-    for name in ("check.py", "managed-install.sh", "desktop-items-0.conf"):
+    for name in ("check.py", "managed-install.sh", "reading.py", "browser-read.js", "desktop-items-0.conf"):
         files[f".lexopen-desktop-profile/{name}"] = ((RECIPE / name).read_bytes(), 0o644)
     files[".lexopen-desktop-profile/wallpaper.png"] = ((REPO / "public/branding/lexopen-desktop-midnight-2560.png").read_bytes(), 0o644)
     files["licenses/original.Dockerfile"] = (original, 0o644)

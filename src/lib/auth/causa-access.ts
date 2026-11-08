@@ -8,19 +8,10 @@ import { writeAuditStrict } from "@/lib/audit";
 import { httpError } from "@/lib/auth/access";
 import { can, canSome, type Capability, type PermissionSubject } from "@/lib/auth/permissions";
 import { isStaff } from "@/lib/auth/rbac";
+import { CAUSA_MIEMBRO_ROLES, isCausaMiembroRol } from "@/lib/auth/roles";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
-
-export const CAUSA_MIEMBRO_ROLES = [
-  "responsable",
-  "colaborador",
-  "procurador",
-  "supervisor",
-  "externo",
-  "lectura",
-] as const;
-
-export type CausaMiembroRol = (typeof CAUSA_MIEMBRO_ROLES)[number];
+export { CAUSA_MIEMBRO_ROLES, type CausaMiembroRol } from "./roles";
 
 export type CausaAccessUser = PermissionSubject & { id: string };
 
@@ -28,6 +19,7 @@ function activeMembershipFilter(userId: string): Prisma.CausaMiembroWhereInput {
   const now = new Date();
   return {
     userId,
+    rol: { in: [...CAUSA_MIEMBRO_ROLES] },
     desde: { lte: now },
     OR: [{ hasta: null }, { hasta: { gt: now } }],
   };
@@ -64,14 +56,8 @@ export function causaAccessWhere(user: CausaAccessUser): Prisma.CausaWhereInput 
 }
 
 export async function getCausaMembership(causaId: string, userId: string) {
-  const now = new Date();
   return prisma.causaMiembro.findFirst({
-    where: {
-      causaId,
-      userId,
-      desde: { lte: now },
-      OR: [{ hasta: null }, { hasta: { gt: now } }],
-    },
+    where: { causaId, ...activeMembershipFilter(userId) },
   });
 }
 
@@ -85,6 +71,9 @@ export async function assertCausaAccess(
   opts?: { auditOverride?: boolean },
   client: Pick<Prisma.TransactionClient, "causa" | "auditEvent"> = prisma
 ) {
+  // La lectura puntual respeta el mismo límite de roles que los listados.
+  // Los clientes acceden por su portal, nunca por el permiso de staff.
+  if (!isStaff(user.role) && user.role !== "externo") throw httpError("No encontrada", 404);
   const causa = await client.causa.findUnique({
     where: { id: causaId },
     select: {
@@ -102,13 +91,13 @@ export async function assertCausaAccess(
 
   if (!canSome(user, "causa.read")) throw httpError("No encontrada", 404);
 
-  const member = causa.miembros[0] ?? null;
+  const member = causa.miembros.find(item => isCausaMiembroRol(item.rol)) ?? null;
   const isAbogado = causa.abogadoId === user.id;
   const override = can(user, "causa.override_walls");
   const levelAll = can(user, "causa.read");
 
   if (causa.acceso === "equipo") {
-    if (member || isAbogado || override) {
+    if (member || isAbogado || levelAll && override) {
       // Solo auditar cuando el llamador lo pide (p. ej. export / override explícito).
       if (override && !member && !isAbogado && opts?.auditOverride !== false) {
         await writeAuditStrict({
@@ -121,7 +110,7 @@ export async function assertCausaAccess(
       }
       return {
         causa,
-        causaRol: member?.rol ?? (isAbogado ? "responsable" : null),
+        causaRol: isAbogado ? "responsable" : member?.rol ?? null,
         viaOverride: Boolean(override && !member && !isAbogado),
       };
     }
@@ -129,10 +118,10 @@ export async function assertCausaAccess(
   }
 
   // acceso = estudio (default)
-  if (causa.acceso === "estudio" && (levelAll || member || isAbogado || override)) {
+  if (causa.acceso === "estudio" && (levelAll || member || isAbogado)) {
     return {
       causa,
-      causaRol: member?.rol ?? (isAbogado ? "responsable" : null),
+      causaRol: isAbogado ? "responsable" : member?.rol ?? null,
       viaOverride: false,
     };
   }
@@ -158,7 +147,8 @@ export async function ensureResponsableMiembro(
   agregadoPorId?: string | null,
   client: Prisma.TransactionClient = prisma
 ) {
-  await client.causaMiembro.upsert({
+  const now = new Date();
+  const member = await client.causaMiembro.upsert({
     where: { causaId_userId: { causaId, userId } },
     create: {
       causaId,
@@ -168,6 +158,11 @@ export async function ensureResponsableMiembro(
     },
     update: { rol: "responsable", hasta: null },
   });
+  // Reactivar una membresía futura no debe dejar al responsable sin permisos.
+  // Una membresía ya vigente conserva su fecha original de incorporación.
+  if (member.desde > now) {
+    await client.causaMiembro.updateMany({ where: { id: member.id, desde: { gt: now } }, data: { desde: now } });
+  }
 }
 
 /** Related records with no matter remain usable; linked records inherit its wall. */

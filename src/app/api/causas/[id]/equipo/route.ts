@@ -33,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const user = await requireStaff();
     const { id } = await params;
-    await assertCausaAccess(id, user);
+    const access = await assertCausaAccess(id, user);
 
     const [causa, miembros] = await Promise.all([
       prisma.causa.findFirst({
@@ -54,9 +54,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       causa,
       miembros,
       canManage: can(user, "causa.team.manage", {
-        causaRol:
-          miembros.find((m) => m.userId === user.id)?.rol ??
-          (causa?.abogadoId === user.id ? "responsable" : null),
+        causaRol: access.causaRol,
       }),
     });
   } catch (e) {

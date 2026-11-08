@@ -3,9 +3,10 @@
 import { useEffect, useState, type RefObject } from "react";
 
 /** A visible desktop owns one abortable screenshot request at a time. */
-export function useComputerScreen(enabled: boolean, sessionId: string, refresh: number, element: RefObject<HTMLElement | null>) {
+export function useComputerScreen(enabled: boolean, sessionId: string, refresh: number, element: RefObject<HTMLElement | null>, { polling = true, passive = false }: { polling?: boolean; passive?: boolean } = {}) {
   const [frame, setFrame] = useState<{ sessionId: string; url: string } | null>(null);
   const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(false);
   useEffect(() => {
     if (!enabled || !sessionId || !element.current) return;
     let disposed = false, inView = typeof IntersectionObserver === "undefined";
@@ -20,10 +21,11 @@ export function useComputerScreen(enabled: boolean, sessionId: string, refresh: 
       if (!visible() || request) return;
       const controller = new AbortController();
       request = controller;
+      setLoading(true);
       const timeout = window.setTimeout(() => controller.abort(), 15_000);
       let delay = 2_000;
       try {
-        const response = await fetch(`/api/altazor/computer/sessions/${encodeURIComponent(sessionId)}/screenshot?frame=${refresh}`, { cache: "no-store", signal: controller.signal });
+        const response = await fetch(`/api/altazor/computer/sessions/${encodeURIComponent(sessionId)}/screenshot?frame=${refresh}${passive ? "&passive=1" : ""}`, { cache: "no-store", signal: controller.signal });
         if (!response.ok || !response.headers.get("content-type")?.startsWith("image/png")) throw new Error("screenshot_unavailable");
         const blob = await response.blob();
         if (!visible() || controller.signal.aborted) return;
@@ -37,7 +39,8 @@ export function useComputerScreen(enabled: boolean, sessionId: string, refresh: 
       } finally {
         window.clearTimeout(timeout);
         if (request === controller) request = null;
-        if (visible()) timer = window.setTimeout(() => void poll(), controller.signal.aborted ? 2_000 : delay);
+        if (!disposed) setLoading(false);
+        if (polling && visible()) timer = window.setTimeout(() => void poll(), controller.signal.aborted ? 2_000 : delay);
       }
     }
     const synchronize = () => {
@@ -53,6 +56,6 @@ export function useComputerScreen(enabled: boolean, sessionId: string, refresh: 
       clearFrame(); disposed = true; window.clearTimeout(timer); request?.abort();
       observer?.disconnect(); document.removeEventListener("visibilitychange", synchronize);
     };
-  }, [enabled, sessionId, refresh, element]);
-  return { frame: enabled && frame?.sessionId === sessionId ? frame : null, failed };
+  }, [enabled, sessionId, refresh, element, polling, passive]);
+  return { frame: enabled && frame?.sessionId === sessionId ? frame : null, failed, loading };
 }

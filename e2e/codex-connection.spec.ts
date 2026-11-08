@@ -9,10 +9,10 @@ import { loginAs } from "./helpers";
 const db = new PrismaClient({ datasources: { db: { url: assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL) } } });
 const base = path.resolve(process.env.CODEX_DATA_DIR || ""), executable = path.resolve("e2e/fixtures/codex-app-server.mjs");
 if (path.resolve(process.env.CODEX_BIN || "") !== executable || !/^lexopen-codex-e2e(?:[-_][a-zA-Z0-9_-]+)?$/.test(path.basename(base))) throw new Error("Codex browser tests require CODEX_BIN=e2e/fixtures/codex-app-server.mjs and a dedicated CODEX_DATA_DIR named lexopen-codex-e2e.");
-const tag = randomUUID(), ownerEmail = `codex-owner-${tag}@example.test`, peerEmail = `codex-peer-${tag}@example.test`;
+const tag = randomUUID(), ownerEmail = `codex-owner-${tag}@example.test`, peerEmail = `codex-peer-${tag}@example.test`, revokedEmail = `codex-revoked-${tag}@example.test`;
 const api = "/api/integrations/codex", actorIds: string[] = [];
 let firm: { id: string; assistantLlmMode: string };
-type State = { connection: { available: boolean; connected: boolean; account?: { email: string }; pendingLogin?: { verificationUrl: string; userCode: string } }; preference: { enabled: boolean; model: string }; remoteAllowed: boolean };
+type State = { connection: { available: boolean; connected: boolean; account?: { email: string }; pendingLogin?: { verificationUrl: string; userCode: string } }; preference: { enabled: boolean; model: string }; canUse: boolean; remoteAllowed: boolean };
 const homeFor = (actorId: string) => path.join(base, createHash("sha256").update(actorId).digest("hex"));
 function safe(value: unknown) {
   const serialized = JSON.stringify(value);
@@ -31,9 +31,42 @@ async function methods(actorId: string) {
 }
 test.beforeAll(async () => {
   const seed = await db.user.findUniqueOrThrow({ where: { email: "abogado@estudio.cl" }, select: { password: true } });
-  for (const [email, name] of [[ownerEmail, "Profesional ficticio con Codex"], [peerEmail, "Otra profesional ficticia"]]) actorIds.push((await db.user.create({ data: { email, name, role: "abogado", password: seed.password } })).id);
+  for (const [email, name] of [[ownerEmail, "Profesional ficticio con Codex"], [peerEmail, "Otra profesional ficticia"], [revokedEmail, "Profesional ficticio con permiso revocado"]]) actorIds.push((await db.user.create({ data: { email, name, role: "abogado", password: seed.password } })).id);
   firm = await db.firmSettings.findFirstOrThrow({ select: { id: true, assistantLlmMode: true } });
   await db.firmSettings.update({ where: { id: firm.id }, data: { assistantLlmMode: "remote_allowed" } });
+});
+
+test("Codex personal: revocar IA impide uso y conserva la desconexión de la cuenta propia", async ({ page }) => {
+  await loginAs(page, revokedEmail);
+  await page.goto("/cuenta#codex");
+  const connection = page.locator("#codex");
+  await connection.getByRole("button", { name: "Conectar cuenta de ChatGPT/Codex", exact: true }).click();
+  await expect(connection.getByLabel("Código de autorización", { exact: true })).toHaveText("DEMO-1234");
+  await writeFile(path.join(homeFor(actorIds[2]), "approval.json"), JSON.stringify({ approved: true }), { mode: 0o600 });
+  await expect(connection.getByText("Cuenta conectada", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(connection.getByRole("combobox")).toHaveValue("codex-e2e");
+  await expect(connection).toContainText("La autorización de la cuenta no comprueba el acceso al modelo ni la cuota disponible.");
+  await connection.getByRole("checkbox", { name: "Usar mi Codex en las próximas solicitudes de IA", exact: true }).check();
+  await connection.getByRole("button", { name: "Guardar preferencia", exact: true }).click();
+  await expect(connection).toContainText("Preferencia guardada.");
+  await db.user.update({ where: { id: actorIds[2] }, data: { capabilityGrants: "assistant.use", capabilityRevokes: "assistant.use" } });
+  expect((await state(page)).canUse).toBe(false);
+  await page.reload();
+  await expect(connection).toContainText("Tu usuario no tiene permiso para usar IA.");
+  await expect(connection.getByRole("button", { name: "Probar conexión", exact: true })).toBeDisabled();
+  await expect(connection.getByRole("button", { name: "Actualizar modelos", exact: true })).toBeDisabled();
+  const before = await methods(actorIds[2]);
+  for (const data of [{ action: "connect" }, { action: "models" }, { action: "test", model: "codex-e2e" }, { action: "save", enabled: true, model: "codex-e2e" }]) {
+    expect((await page.request.post(api, { data })).status()).toBe(403);
+  }
+  expect(await methods(actorIds[2])).toEqual(before);
+  await connection.getByRole("button", { name: "Desactivar mi Codex personal", exact: true }).click();
+  await expect(connection).toContainText("Preferencia guardada.");
+  expect((await state(page)).preference.enabled).toBe(false);
+  await expect(connection.getByRole("button", { name: "Desconectar cuenta", exact: true })).toBeEnabled();
+  await connection.getByRole("button", { name: "Desconectar cuenta", exact: true }).click();
+  await expect(connection.getByText("Cuenta sin conectar", { exact: true })).toBeVisible();
+  expect((await state(page)).connection.connected).toBe(false);
 });
 test.afterAll(async () => {
   try {

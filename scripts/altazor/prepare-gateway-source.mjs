@@ -23,6 +23,8 @@ export const GATEWAY_HARDENING_STAGES = Object.freeze([
   stage("github-persistent-oauth", ["internal/gateway/lexopen_persistent_oauth.go", "internal/gateway/gateway.go", "internal/oauth/oauth.go", "internal/oauth/lexopen_persistent.go", "internal/orchestrator/lexopen_persistent_oauth.go", "internal/oauth/lexopen_github_persistent.go", "internal/oauth/lexopen_github_persistent_test.go", "internal/gateway/lexopen_github_persistent_test.go", "internal/orchestrator/lexopen_github_persistent_test.go"]),
   stage("staged-metadata-actions", ["internal/gateway/gateway.go", "internal/chat/approve.go", "internal/chat/lexopen_staged_file_actions.go", "internal/approvals/approvals.go", "internal/chat/chat.go", "internal/connector/catalog.go", "internal/chat/lexopen_staged_metadata.go", "internal/chat/lexopen_staged_metadata_approve.go", "internal/approvals/lexopen_staged_metadata.go", "internal/gateway/lexopen_staged_metadata.go", "internal/connector/lexopen_staged_metadata.go", "internal/chat/lexopen_staged_metadata_test.go", "internal/connector/lexopen_staged_metadata_test.go", "internal/gateway/lexopen_staged_metadata_test.go", "internal/approvals/lexopen_staged_metadata_test.go"]),
   stage("drive-management", ["internal/gateway/gateway.go", "internal/gateway/lexopen_persistent_oauth.go", "internal/orchestrator/lexopen_persistent_oauth.go", "internal/orchestrator/orchestrator.go", "internal/oauth/oauth.go", "internal/connector/catalog.go", "internal/gateway/lexopen_persistent_oauth_test.go", "internal/orchestrator/settings.go", "internal/orchestrator/lexopen_drive_management.go", "internal/orchestrator/lexopen_drive_management_commands.go", "internal/gateway/lexopen_drive_management.go", "internal/oauth/lexopen_drive_management.go", "internal/orchestrator/lexopen_drive_management_test.go", "internal/gateway/lexopen_drive_management_test.go", "internal/oauth/lexopen_drive_management_test.go"]),
+  // Final stage consumes the exact gateway.17 hashes; earlier hardeners stay unchanged.
+  stage("reading", ["internal/gateway/gateway.go", "internal/desktop/desktop.go", "internal/chat/actions.go", "internal/chat/chat.go", "internal/desktop/lexopen_computer_use.go", "internal/desktop/lexopen_reading.go", "internal/desktop/lexopen_reading_test.go", "internal/gateway/lexopen_reading.go", "internal/gateway/lexopen_reading_test.go", "internal/chat/lexopen_reading.go", "internal/chat/lexopen_reading_test.go", "internal/desktop/desktop_test.go"]),
 ]);
 
 async function regular(file) {
@@ -46,7 +48,7 @@ export async function prepareGatewaySource(directory, { execute = executeFile, e
     await run(process.execPath, [join(scripts, item.script), root], `el refuerzo ${item.name}`);
     if (item.formatAfter.length) await run(gofmt, ["-w", ...item.formatAfter], `el formato posterior a ${item.name}`, root);
   }
-  return { source: PINNED_COMMIT, recipe: "gateway.17", hardeners: GATEWAY_HARDENING_STAGES.length, scriptTests: GATEWAY_HARDENING_STAGES.length, formattingPasses: GATEWAY_HARDENING_STAGES.filter(item => item.formatAfter.length).length, compiled: false, installed: false };
+  return { source: PINNED_COMMIT, recipe: "gateway.18", hardeners: GATEWAY_HARDENING_STAGES.length, scriptTests: GATEWAY_HARDENING_STAGES.length, formattingPasses: GATEWAY_HARDENING_STAGES.filter(item => item.formatAfter.length).length, compiled: false, installed: false };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

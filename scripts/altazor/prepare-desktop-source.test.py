@@ -1,5 +1,6 @@
 """Offline checks of the source bundle; this does not build a container image."""
 import hashlib
+import ast
 import base64
 import importlib.util
 import io
@@ -23,6 +24,7 @@ class DesktopSourceTests(unittest.TestCase):
                            b'RUN for f in /tmp/fonts/*.woff2; do woff2_decompress "$f"; done && mv /tmp/fonts/*.ttf /out/fonts/\n'
                            b"COPY --from=extras /out/fonts/ /usr/share/fonts/truetype/kitties/\n", 0o644),
             "licenses/desktop-original.txt": (b"Synthetic source license fixture\n", 0o644),
+            "kitty-page.py": (b'READ_JS = r"""(() => ({text: "old fixture"}))()"""\n\n# Finds the element to act on:\nclass Page:\n    def __init__(self):\n        self.id = 0\n\n    def call(self, method, **params):\n        return {}\n', 0o755),
         }
         original_recipe = fixture["Dockerfile"][0]
         with tempfile.TemporaryDirectory(prefix="lexopen-wallpaper-test-") as temporary, patch.object(source, "source_files", return_value=fixture):
@@ -42,6 +44,15 @@ class DesktopSourceTests(unittest.TestCase):
                 recipe = bundle.extractfile("Dockerfile").read().decode()
                 self.assertIn("/home/kitty/.config/pcmanfm/default/desktop-items-0.conf", recipe)
                 self.assertIn("/usr/share/backgrounds/lexopen/midnight.png", recipe)
+                self.assertIn("/usr/local/lib/lexopen-reading/reading.py", recipe)
+                self.assertIn("/usr/local/bin/lexopen-read", recipe)
+                self.assertEqual(bundle.extractfile(".lexopen-desktop-profile/reading.py").read(), (source.RECIPE / "reading.py").read_bytes())
+                self.assertEqual(bundle.extractfile(".lexopen-desktop-profile/browser-read.js").read(), (source.RECIPE / "browser-read.js").read_bytes())
+                adapted = bundle.extractfile("kitty-page.py").read().decode()
+                ast.parse(adapted)
+                self.assertIn("reader.active_page()", adapted)
+                self.assertIn("[redacted]", adapted)
+                self.assertNotIn("old fixture", adapted)
                 self.assertNotIn("COPY fonts/", recipe)
                 self.assertEqual(bundle.extractfile("licenses/desktop-original.txt").read(), fixture["licenses/desktop-original.txt"][0])
                 self.assertEqual(bundle.extractfile("licenses/original.Dockerfile").read(), original_recipe)

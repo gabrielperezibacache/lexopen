@@ -45,6 +45,8 @@ export const ASSISTANT_TOOL_IDS = [
   "escrito.guardar",
   "biblioteca.listar",
   "sincronizacion.estado",
+  "icaro.listar",
+  "icaro.delegar",
   "drive.estado",
   "drive.crearCarpeta",
   "drive.guardarDocumento",

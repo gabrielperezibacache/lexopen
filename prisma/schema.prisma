@@ -55,6 +55,10 @@ model FirmSettings {
 }
 
 model User {
+  altazorIcaros AltazorIcaro[]
+  altazorIcaroJobs AltazorIcaroJob[]
+  altazorIcaroMemories AltazorIcaroMemory[]
+  altazorHelpRequests AltazorHelpRequest[]
   altazorCompanion AltazorCompanion?
   driveSyncSubscriptions DriveSyncSubscription[]
   pjudDocumentJobs PjudDocumentJob[]
@@ -308,6 +312,7 @@ model Cliente {
 }
 
 model Causa {
+  altazorIcaros AltazorIcaro[]
   pjudDocumentDownloadsEnabled Boolean @default(false)
   pjudDocumentDownloadOwnerId String?
   pjudDocumentDownloadOwner User? @relation("PjudDownloadAuthorization", fields: [pjudDocumentDownloadOwnerId], references: [id], onDelete: Restrict)
@@ -417,6 +422,114 @@ model Causa {
   audioRecordings CaseAudio[]
   writingDrafts CaseWritingDraft[]
 
+}
+
+/// Private specialist profiles. A profile never grants access beyond its owner and scope.
+model AltazorIcaro {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  causaId String?
+  causa Causa? @relation(fields:[causaId],references:[id],onDelete:Cascade)
+  scopeKey String
+  requestId String
+  inputSha256 String
+  name String
+  instructions String @db.Text
+  provider String @default("inherit")
+  model String @default("")
+  memoryEnabled Boolean @default(false)
+  enabled Boolean @default(true)
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  jobs AltazorIcaroJob[]
+  memories AltazorIcaroMemory[]
+  @@unique([ownerId,requestId])
+  @@index([ownerId,scopeKey,enabled])
+}
+
+/// Durable delegation with immutable input/destination snapshots and bounded execution leases.
+model AltazorIcaroJob {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  icaroId String
+  icaro AltazorIcaro @relation(fields:[icaroId],references:[id],onDelete:Cascade)
+  requestId String
+  inputSha256 String
+  actorSessionVersion Int
+  profileRevision Int
+  instruction String @db.Text
+  explicitText String @default("") @db.Text
+  contextJson String @default("{}") @db.Text
+  destinationJson String @db.Text
+  parentJobId String?
+  depth Int @default(0)
+  status String @default("queued")
+  result String @default("") @db.Text
+  errorCode String?
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  cancelRequestedAt DateTime?
+  startedAt DateTime?
+  finishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([ownerId,requestId])
+  @@index([ownerId,status,leaseExpiresAt])
+  @@index([icaroId,createdAt])
+}
+
+/// Explicitly retained memories, isolated per specialist and revalidated against their sources.
+model AltazorIcaroMemory {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  icaroId String
+  icaro AltazorIcaro @relation(fields:[icaroId],references:[id],onDelete:Cascade)
+  requestId String
+  inputSha256 String
+  label String
+  body String @db.Text
+  sourcesJson String @default("[]") @db.Text
+  sourceJobId String?
+  status String @default("confirmed")
+  revision Int @default(1)
+  forgottenAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([icaroId,requestId])
+  @@index([ownerId,icaroId,status])
+}
+
+/// Human assistance stays bound to its owner and originating work; delivery does not authorize execution.
+model AltazorHelpRequest {
+  id String @id @default(cuid())
+  ownerId String
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Cascade)
+  conversationId String?
+  computerSessionId String?
+  computerTurnId String?
+  scopeKind String?
+  scopeId String?
+  status String @default("pending")
+  question String @db.Text
+  correlationHash String @unique
+  requestKey String @unique
+  response String? @db.Text
+  responseSource String?
+  responseMessageId String? @unique
+  respondedAt DateTime?
+  expiresAt DateTime
+  notificationStatus String @default("pending")
+  notificationAttemptedAt DateTime?
+  notifiedAt DateTime?
+  deliveryJson String @default("{}") @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([ownerId,status,createdAt])
+  @@index([status,expiresAt])
 }
 
 model Tramite {

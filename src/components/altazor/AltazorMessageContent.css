@@ -1,0 +1,14 @@
+.altazor-message-content { min-width:0; max-width:76ch; font-size:1rem; line-height:1.8; color:var(--ink); overflow-wrap:anywhere; }
+.altazor-message-content > :first-child { margin-top:0; }.altazor-message-content > :last-child { margin-bottom:0; }
+.altazor-message-content p { margin:.65rem 0; white-space:pre-wrap; }
+.altazor-message-content strong { font-weight:650; }.altazor-message-content em { font-style:italic; }
+.altazor-message-content ul,.altazor-message-content ol { margin:.75rem 0; padding-inline-start:1.5rem; }
+.altazor-message-content ul { list-style:disc; }.altazor-message-content ol { list-style:decimal; }.altazor-message-content li { padding-inline-start:.15rem; margin:.3rem 0; }
+.altazor-message-content a { color:var(--sea); text-decoration:underline; text-underline-offset:3px; }.altazor-message-content a:focus-visible { outline:2px solid var(--sea); outline-offset:3px; }
+.altazor-message-content .altazor-message-heading { margin-top:1.1rem; font-size:1.08em; }
+.altazor-message-content code { font-family:var(--font-mono),ui-monospace,monospace; font-size:.88em; padding:.12em .3em; background:var(--mist); border-radius:4px; }
+.altazor-message-content pre { max-width:100%; overflow:auto; padding:1rem; border:1px solid var(--line); border-radius:10px; background:var(--mist); white-space:pre; line-height:1.65; margin:1rem 0; overscroll-behavior:contain; }
+.altazor-message-content pre code { padding:0; background:none; }.altazor-message-content pre:focus-visible,.altazor-message-table:focus-visible { outline:2px solid var(--sea); outline-offset:3px; }
+.altazor-message-content blockquote { border-inline-start:3px solid var(--line-strong); padding:.2rem 1rem; margin:1rem 0; white-space:pre-wrap; color:var(--ink-soft); }
+.altazor-message-table { max-width:100%; overflow:auto; margin:1rem 0; border:1px solid var(--line); border-radius:8px; }.altazor-message-table table { width:100%; border-collapse:collapse; font-size:.92em; }.altazor-message-table th,.altazor-message-table td { padding:.65rem .8rem; text-align:start; border-bottom:1px solid var(--line); vertical-align:top; min-width:110px; }.altazor-message-table th { background:var(--mist); }.altazor-message-table tr:last-child td { border-bottom:0; }
+.altazor-message-plain { white-space:pre-wrap; }

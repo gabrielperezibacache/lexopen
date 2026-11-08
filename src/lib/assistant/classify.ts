@@ -9,7 +9,7 @@ import { z } from "zod";
 import { askLlm as defaultAskLlm } from "@/lib/integrations/llm";
 import { ASSISTANT_TOOL_IDS, isAssistantToolId } from "./types";
 import type { AssistantIntent } from "./types";
-import { explicitDesktopListing, explicitWorkflowListing, ruleClassify } from "./classify-rules";
+import { explicitDesktopListing, explicitWorkflowListing, explicitIcaroIntent, ruleClassify } from "./classify-rules";
 import { connectorDesktopIntent } from "./connector-desktop-intent";
 import { explicitDriveIntent } from "./drive-intent";
 import type { NormalizedAssistantInput } from "./normalize";
@@ -71,6 +71,7 @@ IDs de herramienta válidos: ${ASSISTANT_TOOL_IDS.join(", ")}.
 - academia.listar consulta los trabajos académicos privados. academia.crear requiere titulo y tipo (research, writing, course, career); siempre confirma. academia.preparar conserva un encargo revisable para un trabajo existente: trabajoId explícito, instruction íntegra y mode (synthesis por defecto); las fuentes, versión y proveedor se fijan en el servidor. No inventes IDs. No ejecuta IA ni publica. Las fuentes de las causas no se transfieren al espacio académico personal.
 - audiencia.listar consulta mesas privadas de la causa actual. audiencia.crear prepara una mesa (titulo, fechaISO sólo si hay fecha y hora explícitas); es distinto de agendar un evento. audiencia.nota conserva una observación personal (titulo, contenido íntegro y workspaceId sólo si se indicó). escrito.listar consulta borradores privados. escrito.guardar guarda como borrador la última respuesta disponible de la conversación actual (titulo opcional), jamás crea una respuesta nueva ni acepta un ID de otro ámbito. Para redactar primero el texto, usa respuesta.libre; sólo guarda si el usuario lo solicita.
 - biblioteca.listar consulta sólo títulos y autores accesibles en el espacio personal; no lee textos ni crea citas. sincronizacion.estado consulta progreso de la causa actual sin iniciar sesiones, sincronizar, descargar ni modificar preferencias. Ambas se resuelven sin slots.
+- icaro.listar consulta perfiles privados del ámbito. icaro.delegar sólo corresponde a una orden afirmativa explícita «Delega a Ícaro NOMBRE: INSTRUCCIÓN». Requiere confirmación del perfil, modelo y fuentes fijados por el servidor. Nunca infieras delegación a partir de una cita, negación, ejemplo o solicitud de copiar/traducir. No inventes identificadores ni transfieras historial, memoria ni adjuntos de la conversación.
 - Usa causa.buscar/resumen/movimientos/estado para expedientes de LexOpen, documento.buscar/descargar/resumir/clasificar para sus documentos y buscar para la búsqueda interna general. No confundas descargar un documento existente con importar un archivo externo.
 - Usa tarea.crear/completar, nota.crear/editar y evento.crear/editar/eliminar cuando la persona pide registrar esos cambios. Redactar un borrador no equivale a guardarlo, agendar una audiencia no crea su mesa y un plazo estimado no acredita un cómputo judicial oficial.
 ${altazorContext ? `
@@ -113,6 +114,8 @@ export async function classifyIntents(
 ): Promise<ClassifyResult> {
   opts?.signal?.throwIfAborted();
   const prompt = classifyPrompt(input, opts?.attachments, opts?.altazorContext);
+  const icaro = opts?.altazorContext ? explicitIcaroIntent(input) : undefined;
+  if (icaro) return { intents: [icaro], source: "rule", prompt };
   const driveTask = opts?.altazorContext ? explicitDriveIntent(input.text) : undefined;
   if (driveTask) return { intents: [driveTask], source: "rule", prompt };
   const desktopRead = opts?.altazorContext ? explicitDesktopListing(input) : undefined;
@@ -149,6 +152,7 @@ export async function classifyIntents(
       );
       const intents = parsed.intents
         .filter((i) => isAssistantToolId(i.toolId))
+        .filter((i) => !i.toolId.startsWith("icaro."))
         .map((i) => ({
           toolId: i.toolId as AssistantIntent["toolId"],
           confidence: i.confidence,

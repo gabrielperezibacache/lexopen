@@ -19,6 +19,9 @@ RUN install -d -m0755 /usr/share/backgrounds/lexopen \
 
 COPY --chmod=0555 .lexopen-desktop-profile/check.py /usr/local/bin/lexopen-desktop-check
 COPY --chmod=0555 .lexopen-desktop-profile/managed-install.sh /usr/local/bin/kitty-install
+COPY --chmod=0555 .lexopen-desktop-profile/reading.py /usr/local/lib/lexopen-reading/reading.py
+COPY --chmod=0444 .lexopen-desktop-profile/browser-read.js /usr/local/lib/lexopen-reading/browser-read.js
+RUN ln -s /usr/local/lib/lexopen-reading/reading.py /usr/local/bin/lexopen-read
 COPY --chmod=0644 .lexopen-desktop-profile/wallpaper.png /usr/share/backgrounds/lexopen/midnight.png
 COPY --chown=kitty:kitty --chmod=0644 .lexopen-desktop-profile/desktop-items-0.conf /home/kitty/.config/pcmanfm/default/desktop-items-0.conf
 USER kitty

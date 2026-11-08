@@ -7,7 +7,7 @@ import { assertDisposableDatabaseUrl } from "@/lib/testing/disposable-db";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { resolveAprobacion } from "./aprobacion";
-import { assertCausaAccess, assertCausaCapability, documentReadWhere, relatedCausaWhere, taskAccessWhere } from "./causa-access";
+import { assertCausaAccess, assertCausaCapability, causaAccessWhere, documentReadWhere, ensureResponsableMiembro, relatedCausaWhere, taskAccessWhere } from "./causa-access";
 import { generateTotpCode, generateTotpSecret, sealTotpSecret } from "./totp";
 import { confirmTotpEnrollment, prepareTotpEnrollment } from "./totp-enrollment";
 
@@ -21,7 +21,7 @@ async function user(role: string) {
 }
 async function main() {
 try {
- const owner = await user("abogado"), excluded = await user("abogado"), accountant = await user("contabilidad"), socio = await user("socio");
+ const owner = await user("abogado"), excluded = await user("abogado"), accountant = await user("contabilidad"), socio = await user("socio"), assistant = await user("asistente");
  const party = `ReservedFixture${key.replaceAll("-", "")}`;
  const cause = await prisma.causa.create({ data: { titulo: `Private ${key}`, tribunal: "Fixture", materia: "civil", acceso: "equipo", abogadoId: owner.id, partes: { create: { nombre: party, rut: "99999999-9", rol: "demandante" } }, miembros: { create: [{ userId: owner.id, rol: "responsable" }, { userId: accountant.id, rol: "lectura" }] } } }); causeIds.push(cause.id);
  await assertCausaAccess(cause.id, owner);
@@ -29,6 +29,25 @@ try {
  await assertCausaAccess(cause.id, accountant);
  await assert.rejects(assertCausaCapability(cause.id, accountant, "causa.write"), /Prohibido/);
  await assert.rejects(assertCausaCapability(cause.id, { ...owner, capabilityRevokes: "causa.write" }, "causa.write"), /Prohibido/);
+ const assistantMember = await prisma.causaMiembro.create({ data: { causaId: cause.id, userId: assistant.id, rol: "lectura" } });
+ await assertCausaAccess(cause.id, assistant);
+ await assert.rejects(assertCausaCapability(cause.id, assistant, "escrito.draft"), /Prohibido/);
+ await assert.rejects(assertCausaCapability(cause.id, assistant, "plazo.edit"), /Prohibido/);
+ await prisma.causaMiembro.update({ where: { id: assistantMember.id }, data: { rol: "colaborador" } });
+ await assertCausaCapability(cause.id, assistant, "escrito.draft");
+ await assertCausaCapability(cause.id, assistant, "plazo.edit");
+ await prisma.causaMiembro.update({ where: { id: assistantMember.id }, data: { rol: "desconocido" } });
+ await assert.rejects(assertCausaAccess(cause.id, assistant), /No encontrada/);
+ assert.equal(await prisma.causa.count({ where: { id: cause.id, ...causaAccessWhere(assistant) } }), 0);
+ await prisma.causaMiembro.update({ where: { id: assistantMember.id }, data: { rol: "supervisor", hasta: new Date(0) } });
+ await assert.rejects(assertCausaAccess(cause.id, assistant), /No encontrada/);
+ await prisma.causaMiembro.update({ where: { causaId_userId: { causaId: cause.id, userId: owner.id } }, data: { desde: new Date(Date.now() + 86_400_000), hasta: new Date(Date.now() + 172_800_000) } });
+ await ensureResponsableMiembro(cause.id, owner.id, owner.id);
+ const activeResponsible = await prisma.causaMiembro.findUniqueOrThrow({ where: { causaId_userId: { causaId: cause.id, userId: owner.id } } });
+ assert.ok(activeResponsible.desde.getTime() <= Date.now()); assert.equal(activeResponsible.hasta, null);
+ await ensureResponsableMiembro(cause.id, owner.id, owner.id);
+ assert.equal((await prisma.causaMiembro.findUniqueOrThrow({ where: { id: activeResponsible.id } })).desde.getTime(), activeResponsible.desde.getTime(), "la fecha vigente se conserva al asegurar de nuevo al responsable");
+ assert.equal((await assertCausaAccess(cause.id, owner)).causaRol, "responsable");
  const restrictedConflict = await checkConflicts({ user: excluded, partes: [{ nombre: party, rut: "99999999-9" }] });
  assert.equal(restrictedConflict.status, "blocked"); assert.equal(restrictedConflict.hasRestrictedMatch, true);
  assert.deepEqual(restrictedConflict.conflicts, []);
@@ -42,6 +61,9 @@ try {
  assert.equal(await prisma.documento.count({ where: { id: doc.id, ...relatedCausaWhere(excluded) } }), 0);
  assert.equal(await prisma.documento.count({ where: { id: doc.id, ...relatedCausaWhere(socio) } }), 1);
  const study = await prisma.causa.create({ data: { titulo: key, tribunal: "Fixture", materia: "civil", acceso: "estudio", abogadoId: owner.id } }); causeIds.push(study.id);
+ const scopedOverride = { ...accountant, capabilityGrants: "causa.override_walls" };
+ await assert.rejects(assertCausaAccess(study.id, scopedOverride), /No encontrada/);
+ assert.equal(await prisma.causa.count({ where: { id: study.id, ...causaAccessWhere(scopedOverride) } }), 0);
  const privileged = await prisma.documento.create({ data: { nombre: key, causaId: study.id, privilegio: true, autorId: owner.id } });
  assert.equal(await prisma.documento.count({ where: { id: privileged.id, ...documentReadWhere(excluded) } }), 0);
  assert.equal(await prisma.documento.count({ where: { id: privileged.id, ...documentReadWhere(owner) } }), 1);

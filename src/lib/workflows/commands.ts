@@ -14,7 +14,7 @@ const advanceSchema = z.object({ action: z.literal("advance"), instanceId: id, d
 const createSchema = z.object({
   action: z.literal("create"), name: z.string().trim().min(1).max(240), description: z.string().max(10000).optional().nullable(), siteId: id,
   triggerType: z.enum(["manual", "file_upload", "task_done", "isheet_row"]).default("manual"),
-  steps: stepsSchema.default([{ name: "Revisión abogado", role: "abogado" }, { name: "Aprobación administrador", role: "admin" }]),
+  steps: stepsSchema.default([{ name: "Revisión abogado", role: "abogado" }, { name: "Aprobación socio", role: "socio" }]),
 }).strict();
 export const workflowCommandSchema = z.discriminatedUnion("action", [startSchema, advanceSchema, createSchema]);
 
@@ -65,7 +65,8 @@ export async function advanceWorkflowCommand(user: StaffActor, raw: unknown, key
       if (input.expectedStep !== instance.currentStep) throw httpError("El workflow cambió. Recárguelo antes de continuar", 409);
       const current = readSteps(workflow.stepsJson)[instance.currentStep];
       if (!current) throw httpError("Paso de workflow inválido", 409);
-      if (current.role && current.role !== actor.role && actor.role !== "admin") throw httpError("Este paso requiere otro rol", 403);
+      // Host administration does not substitute the professional role of a step.
+      if (current.role && current.role !== actor.role) throw httpError("Este paso requiere otro rol", 403);
     },
     run: async tx => {
       const before = await tx.workflowInstance.findUniqueOrThrow({ where: { id: input.instanceId }, include: { workflow: true } });

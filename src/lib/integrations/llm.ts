@@ -14,6 +14,8 @@ import { sha256 } from "@/lib/evidence/fragments";
 import { configuredLocalModel, localModelProfile, OLLAMA_LOCAL_API, type LocalModelId } from "./local-model-profiles";
 import { completeLocalModel } from "./local-models";
 import { writeAuditStrict } from "@/lib/audit";
+import { isStaff } from "@/lib/auth/rbac";
+import { isLlmRoute, studyLlmConfigForModel, type LlmRoute } from "./llm-route";
 
 export type LlmPreset =
   | "openai"
@@ -533,16 +535,22 @@ export async function askLlm(params: {
   timeoutMs?: number;
   signal?: AbortSignal;
   expectedDestination?: { provider: string; model: string; endpointHash: string };
+  route?: LlmRoute;
 }) {
   params.signal?.throwIfAborted();
-  const config = await getLlmConfig();
+  let config = await getLlmConfig();
+  if (params.route) {
+    if (!params.userId || !isLlmRoute(params.route)) return { source: "error" as const, content: "", requireApproval: true, provider: config.preset, model: config.model, note: "No se pudo validar el modelo delegado.", error: "llm_route_invalid", code: "llm_route_invalid" as const };
+    try { if (params.route.provider === "study") config = studyLlmConfigForModel(config, params.route.model); }
+    catch { return { source: "error" as const, content: "", requireApproval: true, provider: config.preset, model: config.model, note: "Seleccione un modelo del proveedor o del catálogo local verificado.", error: "llm_route_invalid", code: "llm_route_invalid" as const }; }
+  }
   // This is the single egress boundary for Inicio, Agente, document/cliente
   // actions and connection tests. A classifier-only gate is insufficient.
   const policy = await getAssistantFirmPolicy();
   const localOnly = policy.assistantLlmMode === "local_only";
   if (params.userId) {
     const user = await prisma.user.findUnique({ where: { id: params.userId }, select: { role: true, capabilityGrants: true, capabilityRevokes: true } });
-    if (!user || !canSome(user, "assistant.use")) {
+    if (!user || !isStaff(user.role) || !canSome(user, "assistant.use")) {
       return { source: "error" as const, content: "", requireApproval: true, provider: config.preset, model: config.model,
         note: "No tiene permiso para usar la IA del estudio.", error: "llm_forbidden", code: "llm_forbidden" as const };
     }
@@ -559,8 +567,9 @@ export async function askLlm(params: {
     };
   }
 
-  const personal = await askPersonalCodex({ ...params, messages }, localOnly);
+  const personal = params.route?.provider === "study" ? null : await askPersonalCodex({ ...params, messages, ...(params.route?.provider === "codex" ? { modelOverride: params.route.model } : {}) }, localOnly);
   if (personal) return personal;
+  if (params.route?.provider === "codex") return { source: "error" as const, content: "", requireApproval: true, provider: "codex", model: params.route.model, note: "Active su conexión personal de Codex antes de usarla con un Ícaro.", error: "codex_disabled", code: "codex_disabled" as const };
   if (params.expectedDestination && (params.expectedDestination.provider !== config.preset || params.expectedDestination.model !== config.model || params.expectedDestination.endpointHash !== llmEndpointHash(config))) {
     return { source: "error" as const, content: "", requireApproval: true, provider: config.preset, model: config.model, note: "El destino de IA cambió; revise el proveedor antes de volver a enviar.", error: "llm_destination_changed", code: "llm_destination_changed" as const };
   }

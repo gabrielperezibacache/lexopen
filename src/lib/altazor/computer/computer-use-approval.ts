@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto";
 import { ConnectorError } from "@/lib/personal-connectors/core";
 import type { ComputerUseApproval } from "./types";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 const record = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === "object" && !Array.isArray(v));
 const id = /^[A-Za-z0-9_-]{1,100}$/;
 const hash = /^[a-f0-9]{64}$/;
-const actions = new Set(["click", "double_click", "move", "type", "key", "scroll", "drag", "page_click", "page_type", "open", "launch", "run", "install", "machine"]);
+const actions = new Set(["click", "double_click", "move", "type", "key", "scroll", "drag", "page_click", "page_type", "open", "launch", "run", "install", "machine", "document_read"]);
 const actionLabels: Record<string, string> = { click: "Hacer clic", double_click: "Hacer doble clic", move: "Mover el puntero", type: "Escribir en la aplicación", key: "Pulsar una tecla", scroll: "Desplazar la vista", drag: "Arrastrar un elemento", page_click: "Pulsar un elemento de la página", page_type: "Escribir en la página", open: "Abrir una dirección web", launch: "Abrir una aplicación", run: "Ejecutar un comando", install: "Instalar un programa", machine: "Cambiar el estado del computador" };
-const categories = new Set(["input", "browser", "apps", "command", "install", "secret", "machine"]);
+actionLabels.document_read = es.computerReading.documentRead;
+const categories = new Set(["input", "browser", "apps", "command", "install", "secret", "machine", "local_read"]);
 const invalid = () => new ConnectorError("computer_approval_contract", "La consulta no acredita la acción exacta de este escritorio. No se ejecutará.", 502);
 function canonical(value: unknown, depth = 0): string {
   if (depth > 12) throw invalid();
@@ -34,5 +36,6 @@ export function normalizeComputerUseApproval(value: unknown, expected: { chatId:
   };
   const args = sanitize(value.args) as Record<string, unknown>;
   const reasons: Record<string, string> = { input: "Confirma esta acción de ratón o teclado; puede producir cambios en la aplicación abierta.", browser: "Confirma la apertura de esta dirección web.", apps: "Confirma la apertura de esta aplicación local.", command: "La ejecución de este comando necesita tu confirmación.", install: "La instalación de programas necesita tu confirmación.", secret: "Este acceso requiere el flujo de Secretos o tu control manual.", machine: "Confirma este cambio en el estado del computador." };
+  reasons.local_read = es.computerReading.confirmation;
   return { id: value.id, kittyId: expected.kittyId, chatId: expected.chatId, connector: "lexopen-computer-use", kind: "computer-use", action: value.action, args, summary: actionLabels[value.action], reviewable, at: typeof value.at === "string" ? value.at.slice(0, 80) : "", status: "pending", computerAction: { version: "v1", binding: expected.binding, policyRevision: expected.revision, category: metadata.category as ComputerUseApproval["computerAction"]["category"], reason: reasons[metadata.category], effectUnknown: metadata.effect_unknown, actionHash: metadata.action_hash } };
 }

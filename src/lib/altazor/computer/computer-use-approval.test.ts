@@ -30,6 +30,21 @@ test("secret fields and raw proof are never projected as a reviewable action", (
   assert.equal(visible.reviewable, false); assert.equal(JSON.stringify(visible).includes("synthetic-must-not-escape"), false);
   assert.equal(JSON.stringify(visible).includes("action_json"), false);
 });
+test("supervised semantic document consultations remain bound to their exact local target", () => {
+  const selected = approval({ path: "uploads/selected.pdf", offset: 6000, limit: 1000, query: "hechos" });
+  selected.action = "document_read";
+  selected.computer_action.category = "local_read";
+  selected.computer_action.effect_unknown = false;
+  const target = JSON.parse(selected.computer_action.action_json); target.action = "document_read";
+  selected.computer_action.action_json = JSON.stringify(target);
+  selected.computer_action.action_hash = createHash("sha256").update(selected.computer_action.action_json).digest("hex");
+  const visible = normalizeComputerUseApproval(selected, scope);
+  assert.equal(visible.action, "document_read"); assert.equal(visible.computerAction.category, "local_read");
+  assert.equal(visible.reviewable, true); assert.deepEqual(visible.args, selected.args);
+  assert.match(visible.summary, /documento/); assert.equal(visible.computerAction.actionHash, selected.computer_action.action_hash);
+  assert.throws(() => normalizeComputerUseApproval({ ...selected, args: { ...selected.args, path: "uploads/substituted.pdf" } }, scope), code("computer_approval_contract"));
+  assert.throws(() => normalizeComputerUseApproval(selected, { ...scope, revision: scope.revision + 1 }), code("computer_approval_contract"));
+});
 test("policy capability is mandatory and a GET does not grant or persist anything", async () => {
   const methods: string[] = [];
   const client = new KittiesGateway("http://127.0.0.1:18890", "fixture-token", async (raw, init) => {

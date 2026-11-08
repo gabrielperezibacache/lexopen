@@ -14,6 +14,8 @@ import { prepareSecretUse, redeemSecretUse, revokeSecretUse } from "@/lib/altazo
 import type { PrepareSecretUseInput, SecretTarget } from "@/lib/altazor/secrets/policy";
 import { normalizeConnectorNames } from "@/lib/altazor/connectors/policy";
 import { connectorKind } from "@/lib/altazor/connectors/catalog";
+import { computerReadSchema, type ComputerReading } from "./reading";
+import { computerHelpIdentity } from "./help-identity";
 import { computerActivityDetail } from "./activity-detail";
 import { continueApprovedRead } from "./approval-continuation";
 import { prepareExplicitFileTask, type ExplicitFileTask } from "./file-task";
@@ -492,6 +494,22 @@ export async function sendComputerMessage(user: CausaAccessUser, id: string, inp
     return client.send(session.chatId!, desktopConnectorTask(input.text, session.ownerId, session.workspaceId, names), files, actionId);
   });
 }
+
+/** Resume only an authenticated human answer to the exact live ask_help turn. */
+export async function resumeComputerHelp(user: CausaAccessUser, id: string, input: { requestId: string; turnIndex: number; response: string }) {
+  if (!Number.isSafeInteger(input.turnIndex) || input.turnIndex < 0 || !input.response.trim() || Buffer.byteLength(input.response, "utf8") > 2000) throw new ConnectorError("help_response_invalid", "La respuesta de ayuda está vacía o supera el límite admitido.", 400);
+  const request = await prisma.altazorHelpRequest.findFirst({ where: { id: input.requestId, ownerId: user.id, computerSessionId: id, computerTurnId: String(input.turnIndex), status: { in: ["resuming", "resumed"] }, expiresAt: { gt: new Date() } } });
+  if (!request || request.response !== input.response) throw new ConnectorError("help_response_unbound", "La respuesta no corresponde a una ayuda autenticada y vigente de este escritorio.", 409);
+  return executeAction(user, id, "help", `help:${request.id}`, { requestId: request.id, turnIndex: input.turnIndex, responseHash: digest(input.response) }, async (client, session) => {
+    if (await passiveControlHeld(session)) throw new ConnectorError("manual_control", "Devuelve el control al asistente antes de reanudar la ayuda.", 409);
+    const current = await prisma.altazorHelpRequest.findFirst({ where: { id: request.id, ownerId: user.id, computerSessionId: id, computerTurnId: String(input.turnIndex), status: "resuming", response: input.response, expiresAt: { gt: new Date() } }, select: { id: true } });
+    if (!current) throw new ConnectorError("help_response_changed", "La ayuda cambió antes de reanudarse.", 409);
+    const view = await client.chat(session.chatId!, session.kittyId!), last = view.turns.findLast(turn => turn.from === "assistant");
+    const identity = computerHelpIdentity(user.id, id, last);
+    if (!last || last.index !== input.turnIndex || !identity || view.turns.some(turn => turn.from === "user" && turn.index > last.index) || identity.requestKey !== request.requestKey) throw new ConnectorError("help_question_changed", "La pregunta del escritorio cambió. Revisa la ayuda vigente antes de responder.", 409);
+    return client.replyHelp(session.chatId!, session.kittyId!, input.turnIndex, input.response);
+  });
+}
 export async function controlComputer(user: CausaAccessUser, id: string, requestId: string, hold: boolean) {
   return executeAction(user, id, "control", requestId, { hold }, async (client, session, tx) => {
     const result = await client.control(session.kittyId!, hold);
@@ -533,6 +551,24 @@ export async function computerScreenshot(user: CausaAccessUser, id: string, pass
   await assertPassive(afterFrame);
   if (passive && beforeFrame.updatedAt.getTime() !== afterFrame.updatedAt.getTime()) throw new ConnectorError("preview_changed", "El escritorio cambió durante la captura.", 409);
   return png;
+}
+
+/** Bounded text-only observation. It never injects scripts, retains text or takes manual control. */
+export async function readComputerContent(user: CausaAccessUser, id: string, raw: unknown): Promise<ComputerReading> {
+  const input = computerReadSchema.parse(raw);
+  const before = await sessionFor(id, user);
+  await policyAllowsAction();
+  if (await passiveControlHeld(before.session)) throw new ConnectorError("reading_paused", "Devuelve el control al asistente antes de leer el texto del escritorio.", 409);
+  if (!before.session.kittyId) throw new ConnectorError("desktop_starting", "El escritorio todavía no está disponible.", 409);
+  const client = await readyGateway(before.workspace, false);
+  const kitty = await client.kitty(before.session.kittyId, before.session.kittyName, before.workspace.providerName, sessionConnectors(before.session));
+  if (kitty.status !== "running") throw new ConnectorError("desktop_starting", "Espera a que el escritorio esté disponible para leer su texto.", 409);
+  await unchangedWorkspace(before.workspace, user);
+  const reading = await client.read(before.session.kittyId, input);
+  const after = await sessionFor(id, user);
+  await unchangedWorkspace(before.workspace, user); await policyAllowsAction();
+  if (await passiveControlHeld(after.session) || after.session.updatedAt.getTime() !== before.session.updatedAt.getTime()) throw new ConnectorError("reading_changed", "El escritorio cambió durante la lectura. Vuelve a consultar el texto.", 409);
+  return reading;
 }
 
 // Origin and field are deliberately declarations by the person. This bridge verifies

@@ -5,13 +5,13 @@ export type ComputerStatus = {
   runtime: "container"; sessions: ComputerSessionSummary[];
 };
 export type ComputerSessionSummary = { id: string; state: string; expiresAt: string; renewableUntil: string; canRenew: boolean; requiresStop?: boolean; held: boolean; createdAt: string; connectors: string[] };
-export type ComputerTurn = { index: number; from: "user" | "assistant" | "system"; origin?: "connector-result"; text: string; working: boolean; needsHelp: boolean; steps: { action: string; at: string }[] };
+export type ComputerTurn = { index: number; from: "user" | "assistant" | "system"; origin?: "connector-result"; text: string; working: boolean; needsHelp: boolean; actionCount?: number; help?: { stepIndex: number; question: string }; steps: { action: string; at: string }[] };
 export function computerTurnNeedsHelp(turn?: ComputerTurn) {
   // A live request pauses inside a working turn. The terminal help flag is set
   // separately when a turn finishes without being able to continue.
   return turn?.from === "assistant" && (turn.needsHelp || (turn.working && turn.steps.at(-1)?.action === "ask_help"));
 }
-export type ComputerUseApproval = { id: string; kittyId: string; chatId: string; connector: "lexopen-computer-use"; kind: "computer-use"; action: string; args: Record<string, unknown>; summary: string; reviewable: boolean; at: string; status: "pending"; computerAction: { version: "v1"; binding: string; policyRevision: number; category: "input" | "browser" | "apps" | "command" | "install" | "secret" | "machine"; reason: string; effectUnknown: boolean; actionHash: string } };
+export type ComputerUseApproval = { id: string; kittyId: string; chatId: string; connector: "lexopen-computer-use"; kind: "computer-use"; action: string; args: Record<string, unknown>; summary: string; reviewable: boolean; at: string; status: "pending"; computerAction: { version: "v1"; binding: string; policyRevision: number; category: "input" | "browser" | "apps" | "command" | "install" | "secret" | "machine" | "local_read"; reason: string; effectUnknown: boolean; actionHash: string } };
 export type ComputerApproval = (import("../connectors/types").ConnectorApproval & { requestId?: string }) | ComputerUseApproval;
 export type ComputerAuthorizationSettings = { mode: import("./authorization-policy").ComputerAuthorizationMode; allowInput: boolean; allowBrowser: boolean; allowApps: boolean; maxActions: number; maxConsultations: number };
 export type ComputerAuthorizationView = { workspaceId: string; revision: number; desired: ComputerAuthorizationSettings; applied: import("./authorization-policy").ComputerAuthorizationSnapshot | null; sessionId: string | null; state: "default" | "saved" | "applied" | "unknown" | "unsupported" | "mismatch"; canConfigure: boolean; reason?: string };

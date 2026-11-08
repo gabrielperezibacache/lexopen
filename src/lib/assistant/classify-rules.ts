@@ -164,6 +164,18 @@ const RULES: Rule[] = [
 
 const COMPOUND_HINT = /\by\b|;|\n/;
 
+/** Only direct affirmative commands delegate; quotes, negations and copy requests do not. */
+export function explicitIcaroIntent(normalized: NormalizedAssistantInput): AssistantIntent | undefined {
+  const text = normalized.text.trim();
+  const flat = normalizeSearch(text).replace(/^[¿¡\s]+|[?!.\s]+$/g, "");
+  if (/^(?:(?:por favor[,\s]+|puedes\s+|podrias\s+))*(?:lista|listar|muestra|muestrame|ver|consulta|consultar)\s+(?:(?:mis|los)\s+)?icaros(?:\s+(?:disponibles|de esta causa|de este espacio))?$/.test(flat)) return { toolId: "icaro.listar", confidence: 1, slots: {} };
+  const match = /^(?:(?:por favor[,\s]+|puedes\s+|podr[ií]as\s+))*(?:delega|delegar|encarga|encargar)\s+(?:a|al)\s+[ií]caro\s+([^:\n]{1,200}):\s*([\s\S]+)$/iu.exec(text);
+  if (!match) return undefined;
+  const name = match[1].trim().replace(/^["«“]|["»”]$/g, ""), instruction = match[2].trim();
+  if (!name || !instruction || instruction.length > 6000) return undefined;
+  return { toolId: "icaro.delegar", confidence: 1, slots: { icaroName: name, instruction } };
+}
+
 /** A complete, affirmative read command; never infer a write or an extra action. */
 export function explicitDesktopListing(normalized: NormalizedAssistantInput): AssistantIntent | undefined {
   const text = normalizeSearch(normalized.text).replace(/^[¿¡\s]+|[?!\.\s]+$/g, "");
@@ -210,6 +222,8 @@ export function ruleClassify(
   normalized: NormalizedAssistantInput
 ): RuleClassifyResult {
   const flat = normalizeSearch(normalized.text);
+  const icaro = explicitIcaroIntent(normalized);
+  if (icaro) return { intents: [icaro] };
   const connectorTask = connectorDesktopIntent(normalized.text);
   if (connectorTask) return { intents: [connectorTask] };
   const desktopRead = explicitDesktopListing(normalized);

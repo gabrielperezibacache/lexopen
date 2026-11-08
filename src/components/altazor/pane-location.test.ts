@@ -9,8 +9,8 @@ test("returning to the conversation clears only the abandoned application naviga
   for (const [key, value] of [["conversacion", "fixture-conversation"], ["causaId", "fixture-cause"], ["documentoId", "fixture-document"], ["keep", "fixture"]]) assert.equal(result.searchParams.get(key), value);
   assert.equal(result.hash, "#position");
 });
-test("opening the desktop or memory replaces the pane without restoring an old application", () => {
-  for (const pane of ["computer", "memory"] as const) {
+test("opening another assistant tool replaces the pane without restoring an old application", () => {
+  for (const pane of ["computer", "memory", "icaros", "help"] as const) {
     const result = new URL(locationForAltazorPane(href, pane)!, "http://127.0.0.1:3485");
     assert.equal(result.searchParams.get("altazor"), pane); assert.equal(result.searchParams.has("oauthAttempt"), false);
     assert.equal(result.searchParams.get("conversacion"), "fixture-conversation");

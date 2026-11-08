@@ -7,11 +7,13 @@ import { AltazorMark } from "./AltazorMark";
 import { AltazorHome } from "./AltazorHome";
 import { useAltazorUpdates } from "./AltazorUpdates";
 import { useAltazorCompanionState } from "./useAltazorCompanionState";
+import { useAltazorHelpReconciliation } from "./useAltazorHelpReconciliation";
 import "./AltazorCompanion.css";
 
 type CompanionState = ReturnType<typeof useAltazorCompanionState> & {
   updates: ReturnType<typeof useAltazorUpdates>;
   preparePersonalMessage: (message: string) => boolean;
+  reconcileHelp: () => Promise<unknown>;
 };
 const Context = createContext<CompanionState | null>(null);
 export function useOptionalAltazorCompanion() {
@@ -29,6 +31,7 @@ export function AltazorCompanionProvider({ userId, children }: { userId: string;
 }
 function UserCompanion({ children }: { children: ReactNode }) {
   const state = useAltazorCompanionState(), updates = useAltazorUpdates(), pathname = usePathname();
+  const reconcile = useAltazorHelpReconciliation();
   const [openAt, setOpenAt] = useState<string | null>(null);
   const [previousPath, setPreviousPath] = useState(pathname);
   if (previousPath !== pathname) {
@@ -47,7 +50,7 @@ function UserCompanion({ children }: { children: ReactNode }) {
     setOpenAt(pathname);
     return canPrepare;
   }
-  return <Context.Provider value={{ ...state, updates, preparePersonalMessage }}>
+  return <Context.Provider value={{ ...state, updates, preparePersonalMessage, reconcileHelp: () => reconcile(true) }}>
     <Suspense fallback={null}><CompanionLocationObserver /></Suspense>
     {children}
     {!atHome && <CompanionPanel key={pathname} open={openAt === pathname} onOpenChange={open => setOpenAt(open ? pathname : null)} />}
@@ -62,7 +65,7 @@ function CompanionLocationObserver(){
 }
 function CompanionPanel({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const state = useAltazorCompanion();
-  const running = state.data?.turns.some(turn => ["queued", "running"].includes(turn.status));
+  const running = state.data?.turns.some(turn => ["queued", "running", "delegating"].includes(turn.status));
   const params=new URLSearchParams();if(state.activeId)params.set("conversacion",state.activeId);else if(state.scope)params.set("causaId",state.scope);
   const homeHref=`/inicio${params.size?`?${params}`:""}`;
   return <>

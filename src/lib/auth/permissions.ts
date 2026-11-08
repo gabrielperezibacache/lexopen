@@ -5,10 +5,10 @@
  * Niveles: `all` (✔), `scoped` (◐ — solo causas donde es miembro / recursos
  * propios; el llamador debe aportar `scope`), `none` (✖).
  * `User.capabilityGrants` eleva a `all`; `capabilityRevokes` baja a `none`
- * (los revokes ganan).
+ * (los revokes ganan). `host.admin` solo es efectivo para roles internos.
  */
 
-import { ROLES, type Role } from "./roles";
+import { isCausaMiembroRol, ROLES, STAFF_ROLES, type Role } from "./roles";
 
 export const CAPABILITIES = [
   "causa.read",
@@ -154,23 +154,33 @@ export function capabilityLevel(
 ): CapabilityLevel {
   const s = subjectOf(subject);
   if (parseCapabilityCsv(s.capabilityRevokes).includes(cap)) return "none";
+  // La administración interna nunca se delega a cuentas del portal.
+  if (cap === "host.admin" && !(STAFF_ROLES as readonly string[]).includes(s.role)) return "none";
   if (parseCapabilityCsv(s.capabilityGrants).includes(cap)) return "all";
   return presetLevel(s.role, cap);
 }
 
 /** Roles con los que un `scoped` se satisface por membresía de causa. */
 const CAUSA_TEAM_MANAGER_ROLES = new Set(["responsable", "supervisor"]);
+const CAUSA_READ_CAPABILITIES = new Set<Capability>([
+  "causa.read",
+  "doc.confidential.read",
+  "doc.privileged.read",
+  "reports.firm",
+  "audit.read",
+]);
 
 function scopeSatisfied(cap: Capability, scope: PermissionScope | undefined) {
   if (!scope) return false;
-  if (scope.own) return true;
   const rol = scope.causaRol;
-  if (!rol) return false;
+  // Una membresía de solo lectura no autoriza mutaciones aunque el recurso
+  // sea propio; tampoco se aceptan valores de rol desconocidos como permisos.
+  if (rol && (!isCausaMiembroRol(rol) || rol === "lectura" && !CAUSA_READ_CAPABILITIES.has(cap))) return false;
   if (cap === "causa.team.manage" || cap === "escrito.approve" || cap === "time.approve") {
-    return CAUSA_TEAM_MANAGER_ROLES.has(rol);
+    return Boolean(rol && CAUSA_TEAM_MANAGER_ROLES.has(rol));
   }
-  if (cap === "causa.write" || cap === "plazo.close") return rol !== "lectura";
-  return true;
+  if (scope.own) return true;
+  return Boolean(rol);
 }
 
 /**

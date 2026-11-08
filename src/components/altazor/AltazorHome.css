@@ -35,13 +35,13 @@
 .altazor-prompts { display:flex; flex-wrap:wrap; gap:.65rem; }
 .altazor-prompts button { padding:.65rem .95rem; min-height:44px; border:1px solid var(--line); border-radius:999px; font-size:1rem; text-align:left; }
 .altazor-prompts button:hover { border-color:var(--sea); color:var(--sea); }
-.altazor-history { max-height:clamp(150px,calc(100svh - 530px),480px); overflow:auto; overscroll-behavior:contain; min-width:0; scrollbar-width:thin; }
+.altazor-history { max-height:clamp(132px,calc(100dvh - 570px),560px); overflow:auto; overscroll-behavior:contain; min-width:0; scrollbar-width:thin; overflow-anchor:auto; scrollbar-gutter:stable; }
 .altazor-history:focus-visible { outline:2px solid var(--sea); outline-offset:3px; }
 .altazor-turns { list-style:none; display:grid; gap:2rem; padding:1rem 0 1.75rem; }
-.altazor-user-message { margin-left:clamp(0px,4vw,40px); padding:1rem 1.2rem; background:var(--mist); border-radius:.85rem; }
+.altazor-user-message { width:fit-content; max-width:92%; margin-inline-start:auto; padding:1rem 1.2rem; background:var(--sea-soft); border:1px solid var(--line); border-radius:1rem 1rem .3rem 1rem; }
 .altazor-user-message>span { display:block; font-weight:600; margin-bottom:.45rem; }
 .altazor-user-message p,.altazor-prose { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.8; max-width:75ch; }
-.altazor-answer { padding-top:1.1rem; min-width:0; }
+.altazor-answer { padding:1rem 1.1rem; margin-top:.85rem; min-width:0; background:var(--surface-solid); border:1px solid var(--line); border-radius:.3rem 1rem 1rem 1rem; }
 .altazor-answer-author { display:flex; align-items:center; gap:.55rem; color:var(--sea); margin-bottom:.5rem; }
 .altazor-inline-sources { display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1rem; }
 .altazor-home a { overflow-wrap:anywhere; }
@@ -52,6 +52,12 @@
 .altazor-plan li { white-space:pre-wrap; overflow-wrap:anywhere; }
 .altazor-plan .btn { margin:.3rem .5rem .3rem 0; }
 .altazor-running { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; padding:1rem 0; }
+.altazor-execution-summary { padding:1rem; border:1px solid var(--line); border-inline-start:3px solid var(--sea); border-radius:10px; background:var(--mist); margin-block:.75rem 1rem; }
+.altazor-execution-heading { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.4rem 1rem; font-size:.9rem; }.altazor-execution-heading>span { color:var(--ink-soft); }.altazor-execution-summary p { margin:.65rem 0 0; font-size:1rem; line-height:1.75; overflow-wrap:anywhere; }.altazor-execution-summary progress { display:block; width:100%; height:.4rem; margin-top:.9rem; accent-color:var(--sea); }
+.altazor-result-details { border-top:1px solid var(--line); margin-top:1rem; }.altazor-result-details>summary { font-size:.9rem; }.altazor-result-details[open]>summary { margin-bottom:.75rem; }
+.altazor-delegation-list { display:grid; gap:1rem; padding:0; list-style:none; }.altazor-delegation-list>li { border-bottom:1px solid var(--line); padding-bottom:1rem; }.altazor-delegation-list>li>span { display:block; color:var(--muted); font-size:.85rem; margin-block:.3rem .75rem; }
+.altazor-latest { display:flex; gap:.5rem; align-items:center; margin:.35rem auto; font-size:.85rem; }.altazor-latest-arrow { transform:rotate(180deg); }
+.altazor-keyboard-help { font-size:.78rem; line-height:1.5; color:var(--muted); padding:.45rem .6rem 0; margin:0; }
 .altazor-composer { margin-top:.5rem; min-width:0; border:1px solid var(--line-strong); border-radius:.85rem; background:var(--surface-solid); padding:.7rem; }
 .altazor-composer:focus-within { border-color:var(--sea); }
 .altazor-composer textarea { border:none; padding:.5rem .6rem; min-height:110px; box-shadow:none; outline-offset:2px; }

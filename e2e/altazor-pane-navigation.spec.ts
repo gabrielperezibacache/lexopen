@@ -50,7 +50,9 @@ test("volver de Aplicaciones y del escritorio conserva el contexto y deja visibl
   await page.getByRole("button", { name: "Volver a la conversación", exact: true }).click();
   await expect(composer).toHaveValue(message);
   await page.getByTestId("inicio-send").click();
-  await expect(page.getByRole("heading", { name: "Revisa los cambios propuestos", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Revisa el encargo completo", exact: true })).toBeVisible();
+  await expect(page.getByText(preview, { exact: true })).toBeHidden();
+  await page.getByText("Ver la acción propuesta", { exact: true }).click();
   await expect(page.getByText(preview, { exact: true })).toBeVisible();
   await expect(page.getByTestId("plan-confirm")).toBeEnabled();
   await expect(page.getByRole("heading", { name: "Aplicaciones", exact: true })).toBeHidden();
@@ -91,7 +93,9 @@ test("Aplicaciones explícitas conserva Dropbox y el retorno OAuth al restaurar 
   const dropbox = { ...CONNECTOR_CATALOG.find(entry => entry.id === "dropbox")!, fields: [{ name: "token", label: "Autorización reservada", secret: true, required: false }], available: true, oauthReady: true };
   await page.route("**/api/altazor/connectors?*", route => route.fulfill({ json: { connectors: { catalog: [dropbox], connections: [], gateReady: true, persistentOAuthReady: true, cloudFileOAuthReady: true, version: "synthetic" } } }));
   await page.route("**/api/altazor/connectors/oauth?*", route => { accountReads++; return route.fulfill({ json: { workspaceId, causaId: null, canAdmin: false, requiresStop: false, providers: [{ provider: "dropbox", label: "Dropbox", available: true, reason: null, scopes: ["account_info.read", "files.metadata.read", "files.content.read"], grantedScopes: ["account_info.read", "files.metadata.read", "files.content.read"], canReadFiles: true, autoRefresh: true, persistent: true, connectionName: "altazor-dropbox-0123456789abcdef", state: "connected", connected: true, tested: true, hasStoredConnection: true, canDisconnect: true, expiresAt: null, lastVerifiedAt: "2030-05-06T17:00:00Z" }], attempt: { id: "pane-saved-oauth-attempt", provider: "dropbox", state: "completed", reason: null } } }); });
-  page.on("request", request => { if (request.url().includes("/api/altazor/") && request.method() !== "GET") writes.push(request.url()); });
+  // Help reconciliation belongs to the shared companion, independently of pane
+  // navigation. Every conversation, desktop and connector mutation stays forbidden.
+  page.on("request", request => { if (request.url().includes("/api/altazor/") && new URL(request.url()).pathname !== "/api/altazor/help/reconcile" && request.method() !== "GET") writes.push(request.url()); });
   try {
     await loginAs(page, "abogado@estudio.cl");
     await expect.poll(() => details).toBeGreaterThan(0);

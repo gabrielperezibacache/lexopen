@@ -17,8 +17,11 @@ async function main() {
       userIds.push(row.id); return row;
     }
     const owner = await user(), reader = await user(), outsider = await user();
+    const technical = await prisma.user.create({ data: { name: "Technical admin fixture", email: `${randomUUID()}@workflow-fixture.invalid`, role: "admin", password: "no-login", capabilityGrants: "" } }); userIds.push(technical.id);
+    const partner = await prisma.user.create({ data: { name: "Partner fixture", email: `${randomUUID()}@workflow-fixture.invalid`, role: "socio", password: "no-login" } }); userIds.push(partner.id);
     const cause = await prisma.causa.create({ data: { titulo: tag, tribunal: "Fixture", materia: "civil", acceso: "equipo", abogadoId: owner.id, miembros: { create: { userId: reader.id, rol: "lectura" } } } }); caseId = cause.id;
     const site = await prisma.site.create({ data: { name: tag, slug: tag, causaId: caseId } }); siteId = site.id;
+    await prisma.causaMiembro.createMany({ data: [technical, partner].map(actor => ({ causaId: caseId, userId: actor.id, rol: "colaborador" })) });
     const create = { action: "create", name: tag, siteId, steps: [{ name: "First", role: "abogado" }, { name: "Second", role: "abogado" }] };
     await assert.rejects(createWorkflowCommand(reader, create, randomUUID()), status(403));
     await assert.rejects(createWorkflowCommand(outsider, create, randomUUID()), status(404));
@@ -82,6 +85,15 @@ async function main() {
     const roleWorkflow = await createWorkflowCommand(owner, { ...create, steps: [{ name: "Admin only", role: "admin" }] }, randomUUID());
     const roleInstance = await startWorkflowCommand(owner, { ...input, workflowId: roleWorkflow.id }, randomUUID());
     await assert.rejects(advanceWorkflowCommand(owner, { ...advance, instanceId: roleInstance.id }, randomUUID()), status(403));
+    assert.equal((await advanceWorkflowCommand(technical, { ...advance, instanceId: roleInstance.id }, randomUUID())).status, "approved", "un paso admin explícito conserva su rol");
+    const professional = await createWorkflowCommand(owner, { action: "create", name: "Professional defaults", siteId }, randomUUID());
+    assert.deepEqual(JSON.parse(professional.stepsJson), [{ name: "Revisión abogado", role: "abogado" }, { name: "Aprobación socio", role: "socio" }]);
+    const professionalInstance = await startWorkflowCommand(owner, { action: "start", workflowId: professional.id }, randomUUID());
+    const professionalReview = { action: "advance", instanceId: professionalInstance.id, expectedStep: 0, decision: "approve" };
+    await assert.rejects(advanceWorkflowCommand(technical, professionalReview, randomUUID()), status(403));
+    await advanceWorkflowCommand(owner, professionalReview, randomUUID());
+    await assert.rejects(advanceWorkflowCommand(technical, { ...professionalReview, expectedStep: 1 }, randomUUID()), status(403));
+    assert.equal((await advanceWorkflowCommand(partner, { ...professionalReview, expectedStep: 1 }, randomUUID())).status, "approved");
     await prisma.workflow.update({ where: { id: roleWorkflow.id }, data: { stepsJson: "[]" } });
     await assert.rejects(startWorkflowCommand(owner, { ...input, workflowId: roleWorkflow.id }, randomUUID()), status(400));
     const createRollbackKey = randomUUID();

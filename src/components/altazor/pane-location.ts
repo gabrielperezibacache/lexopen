@@ -1,4 +1,4 @@
-export type Pane = "chat" | "memory" | "connectors" | "computer";
+export type Pane = "chat" | "memory" | "connectors" | "computer" | "icaros" | "help";
 
 /** A deliberate tool change updates only its navigation state. Account return
  * parameters remain available while Applications is open, until the user leaves. */
