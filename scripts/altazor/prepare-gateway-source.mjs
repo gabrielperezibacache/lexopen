@@ -18,6 +18,7 @@ export const GATEWAY_HARDENING_STAGES = Object.freeze([
   stage("cloud-file-connectors", ["internal/oauth/lexopen_cloud_file.go", "internal/oauth/lexopen_cloud_file_test.go", "internal/chat/lexopen_cloud_file.go", "internal/chat/lexopen_cloud_file_test.go", "internal/connector/lexopen_cloud_file.go", "internal/connector/lexopen_cloud_file_test.go", "internal/gateway/lexopen_cloud_file_test.go"]),
   stage("computer-use-policy", ["internal/chat/chat.go", "internal/chat/actions.go", "internal/chat/approve.go", "internal/approvals/approvals.go", "internal/gateway/gateway.go", "internal/gateway/approvals.go", "internal/chat/lexopen_computer_use_test.go", "internal/chat/lexopen_computer_use.go", "internal/desktop/lexopen_computer_use_test.go", "internal/desktop/lexopen_computer_use.go", "internal/approvals/lexopen_computer_use_test.go", "internal/approvals/lexopen_computer_use.go", "internal/gateway/lexopen_computer_use_test.go", "internal/gateway/lexopen_computer_use.go"]),
   stage("oauth-alias-create", ["internal/orchestrator/lexopen_persistent_oauth.go", "internal/gateway/gateway.go", "internal/orchestrator/lexopen_oauth_alias_create_test.go", "internal/gateway/lexopen_oauth_alias_create_test.go"]),
+  stage("connected-file-focus", ["internal/chat/lexopen_connector_file_focus.go", "internal/chat/lexopen_cloud_file.go", "internal/chat/lexopen_native_file_actions.go", "internal/chat/chat.go", "internal/gateway/gateway.go", "internal/chat/lexopen_connected_file_focus.go", "internal/chat/lexopen_connected_file_focus_test.go", "internal/gateway/lexopen_connected_file_focus_test.go"]),
 ]);
 
 async function regular(file) {
@@ -41,7 +42,7 @@ export async function prepareGatewaySource(directory, { execute = executeFile, e
     await run(process.execPath, [join(scripts, item.script), root], `el refuerzo ${item.name}`);
     if (item.formatAfter.length) await run(gofmt, ["-w", ...item.formatAfter], `el formato posterior a ${item.name}`, root);
   }
-  return { source: PINNED_COMMIT, recipe: "gateway.12", hardeners: GATEWAY_HARDENING_STAGES.length, scriptTests: GATEWAY_HARDENING_STAGES.length, formattingPasses: GATEWAY_HARDENING_STAGES.filter(item => item.formatAfter.length).length, compiled: false, installed: false };
+  return { source: PINNED_COMMIT, recipe: "gateway.13", hardeners: GATEWAY_HARDENING_STAGES.length, scriptTests: GATEWAY_HARDENING_STAGES.length, formattingPasses: GATEWAY_HARDENING_STAGES.filter(item => item.formatAfter.length).length, compiled: false, installed: false };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
