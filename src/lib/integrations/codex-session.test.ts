@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, stat, symlink } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { CodexSessionManager, codexChildEnvironment } from "./codex-session";
+import { pathToFileURL } from "node:url";
+import { CodexSessionManager, beginCodexLogin, beginHostCodexLogin, cancelHostCodexLogin, closeHostCodexSessions, codexChildEnvironment, codexStatus, completeWithCodex, completeWithHostCodex, disconnectCodex, disconnectHostCodex, hostCodexModels, hostCodexStatus } from "./codex-session";
 
 const fixture = path.resolve("src/lib/integrations/fixtures/codex-app-server.mjs");
 const hash = (id: string) => createHash("sha256").update(id).digest("hex");
@@ -38,6 +39,14 @@ test("Codex duplicate login attempts don't create two active device codes", asyn
   const results = await Promise.allSettled([manager.beginLogin("actor_a"), manager.beginLogin("actor_a")]);
   assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
   assert.equal(results.filter(result => result.status === "rejected").length, 1);
+}));
+test("Codex account replacement remains unavailable until device login completes", async () => run("connected", async manager => {
+  assert.equal((await manager.status("actor_a")).connected, true);
+  const pending = await manager.beginLogin("actor_a");
+  assert.equal(pending.connected, false); assert.equal(pending.status, "connecting"); assert.ok(pending.pendingLogin);
+  await assert.rejects(manager.models("actor_a"), /Conecte su cuenta/);
+  await new Promise(resolve => setTimeout(resolve, 130));
+  assert.equal((await manager.status("actor_a")).connected, true);
 }));
 test("Codex immediate login failure doesn't leave a stale pending code", async () => run("login-failed", async manager => {
   const status = await manager.beginLogin("actor_a"); assert.equal(status.connected, false); assert.equal(status.status, "error"); assert.equal(status.pendingLogin, undefined); assert.equal(JSON.stringify(status).includes("SECRET_FROM_PROVIDER"), false);
@@ -85,4 +94,150 @@ test("Codex refuses a symlink in a professional's private directory", async () =
   const manager = new CodexSessionManager({ baseDir: base });
   try { await symlink(other, path.join(base, hash("actor_a")), "dir"); const result = await manager.status("actor_a"); assert.equal(result.connected, false); assert.equal(result.status, "error"); assert.match(result.note || "", /carpeta privada/); }
   finally { await manager.closeAll(); await rm(base, { recursive: true, force: true }); await rm(other, { recursive: true, force: true }); }
+});
+test("Host Codex has its own private account, independent lifecycle and fresh context for every user", async () => {
+  const base = await mkdtemp(path.join(tmpdir(), "lexopen-codex-host-test-"));
+  const ambient = await mkdtemp(path.join(tmpdir(), "lexopen-codex-ambient-test-"));
+  const executable = path.join(base, "fake-codex.mjs");
+  await writeFile(executable, `#!${process.execPath}\nimport ${JSON.stringify(pathToFileURL(fixture).href)};\n`, { mode: 0o700 });
+  await writeFile(path.join(ambient, "fake-auth.json"), JSON.stringify({ accessToken: "AMBIENT_CREDENTIAL_MUST_NOT_BE_USED" }));
+  const previousEnv = { CODEX_DATA_DIR: process.env.CODEX_DATA_DIR, CODEX_BIN: process.env.CODEX_BIN, CODEX_HOME: process.env.CODEX_HOME };
+  const globals = globalThis as typeof globalThis & { lexopenCodexSessions?: CodexSessionManager; lexopenHostCodexSessions?: CodexSessionManager };
+  const previousHostManager = globals.lexopenHostCodexSessions;
+  globals.lexopenHostCodexSessions = undefined;
+  process.env.CODEX_DATA_DIR = base; process.env.CODEX_BIN = executable; process.env.CODEX_HOME = ambient;
+  const actorId = "lexopen_host", hostHome = path.join(base, "host", hash(actorId)), personalHome = path.join(base, hash(actorId));
+  try {
+    assert.equal((await hostCodexStatus()).connected, false);
+    assert.equal((await codexStatus(actorId)).connected, false);
+    const pending = await beginHostCodexLogin(); assert.equal(pending.status, "connecting");
+    assert.equal((await cancelHostCodexLogin()).pendingLogin, undefined);
+    await beginHostCodexLogin(); await new Promise(resolve => setTimeout(resolve, 130));
+    assert.equal((await hostCodexStatus()).connected, true);
+    assert.equal((await codexStatus(actorId)).connected, false);
+    const hostEnv = JSON.parse(await readFile(path.join(hostHome, "fake-environment.json"), "utf8"));
+    assert.equal(hostEnv.CODEX_HOME, hostHome); assert.equal(hostEnv.HOME, hostHome);
+    assert.equal((await stat(hostHome)).mode & 0o777, 0o700);
+    assert.notEqual(hostHome, personalHome); assert.notEqual(hostEnv.CODEX_HOME, ambient);
+
+    await beginCodexLogin(actorId); await new Promise(resolve => setTimeout(resolve, 130));
+    await disconnectCodex(actorId);
+    assert.equal((await hostCodexStatus()).connected, true);
+    await beginCodexLogin(actorId); await new Promise(resolve => setTimeout(resolve, 130));
+    await completeWithHostCodex([{ role: "user", content: "PRIVATE_USER_A" }], { model: "codex-test" });
+    await completeWithHostCodex([{ role: "user", content: "PRIVATE_USER_B" }], { model: "codex-test" });
+    const trace = (await readFile(path.join(hostHome, "trace.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
+    const threads = trace.filter(row => row.method === "thread/start").map(row => row.params);
+    const turns = trace.filter(row => row.method === "turn/start").map(row => row.params);
+    assert.equal(threads.length, 2); assert.equal(threads.every(thread => thread.ephemeral === true), true);
+    assert.notEqual(threads[0].cwd, threads[1].cwd);
+    assert.equal(turns[0].input[0].text.includes("PRIVATE_USER_A"), true); assert.equal(turns[0].input[0].text.includes("PRIVATE_USER_B"), false);
+    assert.equal(turns[1].input[0].text.includes("PRIVATE_USER_B"), true); assert.equal(turns[1].input[0].text.includes("PRIVATE_USER_A"), false);
+    assert.deepEqual((await hostCodexModels()).map(model => model.id), ["codex-test"]);
+    await closeHostCodexSessions();
+    assert.equal((await hostCodexStatus()).connected, true);
+    assert.equal((await codexStatus(actorId)).connected, true);
+    await disconnectHostCodex();
+    assert.equal((await hostCodexStatus()).connected, false);
+    assert.equal((await codexStatus(actorId)).connected, true);
+    await assert.rejects(completeWithHostCodex([{ role: "user", content: "No fallback" }], { model: "codex-test" }), /Conecte su cuenta/);
+  } finally {
+    await closeHostCodexSessions(); await globals.lexopenCodexSessions?.closeAll();
+    globals.lexopenHostCodexSessions = previousHostManager;
+    for (const [key, value] of Object.entries(previousEnv)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    await new Promise(resolve => setTimeout(resolve, 40));
+    await rm(base, { recursive: true, force: true }); await rm(ambient, { recursive: true, force: true });
+  }
+});
+test("Revoking Host Codex interrupts its active request", async () => run("hang", async manager => {
+  const globals = globalThis as typeof globalThis & { lexopenHostCodexSessions?: CodexSessionManager };
+  const previous = globals.lexopenHostCodexSessions;
+  globals.lexopenHostCodexSessions = manager;
+  try {
+    const pending = completeWithHostCodex([{ role: "user", content: "Private pending work" }], { model: "codex-test" });
+    const rejected = assert.rejects(pending, /cerró/);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await closeHostCodexSessions();
+    await rejected;
+  } finally { globals.lexopenHostCodexSessions = previous; }
+}));
+test("Host Codex binds every text send to the authorized sharing revision", async () => run("connected", async (manager, base) => {
+  let enabled = false, revision = "host-1", reads = 0, revokeOn = 0;
+  const globals = globalThis as typeof globalThis & {
+    prisma?: unknown; lexopenHostCodexSessions?: CodexSessionManager;
+  };
+  const previousPrisma = globals.prisma, previousHost = globals.lexopenHostCodexSessions;
+  globals.prisma = { integrationConfig: { findUnique: async ({ where }: { where: { provider: string } }) => {
+    assert.equal(where.provider, "codex-host"); reads++;
+    return { provider: "codex-host", enabled: enabled && reads !== revokeOn, configJson: JSON.stringify({ revision }) };
+  } } };
+  globals.lexopenHostCodexSessions = manager;
+  const complete = () => completeWithHostCodex([{ role: "system", content: "Authorized system text" }, { role: "user", content: "MUST_NEVER_SEND_WITH_REVOKED_POLICY" }], { model: "codex-test", hostRevision: "host-1" });
+  const trace = async () => (await readFile(path.join(base, hash("lexopen_host"), "trace.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
+  try {
+    await assert.rejects(complete(), /cambió o dejó/);
+    enabled = true; revision = "host-2";
+    await assert.rejects(complete(), /cambió o dejó/);
+    revision = "host-1"; reads = 0; revokeOn = 2;
+    await assert.rejects(complete(), /cambió o dejó/);
+    assert.equal((await trace()).some(row => row.method === "thread/start"), false, "revocation before thread creation also protects system messages");
+    reads = 0; revokeOn = 3;
+    await assert.rejects(complete(), /cambió o dejó/);
+    const revokedTrace = await trace();
+    assert.equal(revokedTrace.filter(row => row.method === "thread/start").length, 1);
+    assert.equal(revokedTrace.some(row => row.method === "turn/start"), false);
+    assert.equal(JSON.stringify(revokedTrace).includes("MUST_NEVER_SEND_WITH_REVOKED_POLICY"), false);
+    reads = 0; revokeOn = 0;
+    assert.equal((await complete()).content, "Respuesta de prueba.");
+    assert.equal(reads, 3, "check before opening, before system text and before user text");
+  } finally { globals.prisma = previousPrisma; globals.lexopenHostCodexSessions = previousHost; }
+}));
+test("Host revocation also rejects a request that has not opened its session yet", async () => run("connected", async manager => {
+  const globals = globalThis as typeof globalThis & { lexopenHostCodexSessions?: CodexSessionManager };
+  const previous = globals.lexopenHostCodexSessions;
+  globals.lexopenHostCodexSessions = manager;
+  try {
+    const rejected = assert.rejects(completeWithHostCodex([{ role: "user", content: "Do not send" }], { model: "codex-test" }), /cambió o dejó|cerró/);
+    await closeHostCodexSessions();
+    await rejected;
+  } finally { globals.lexopenHostCodexSessions = previous; }
+}));
+test("Personal Codex rejects stale approvals before either text send", async () => {
+  const base = await mkdtemp(path.join(tmpdir(), "lexopen-codex-personal-lease-test-"));
+  const executable = path.join(base, "fake-codex.mjs"), actorId = "lease_actor";
+  await writeFile(executable, `#!${process.execPath}\nprocess.argv.push("--scenario=connected");\nawait import(${JSON.stringify(pathToFileURL(fixture).href)});\n`, { mode: 0o700 });
+  const previousEnv = { CODEX_DATA_DIR: process.env.CODEX_DATA_DIR, CODEX_BIN: process.env.CODEX_BIN };
+  process.env.CODEX_DATA_DIR = base; process.env.CODEX_BIN = executable;
+  const database = (await import("../db")).prisma as unknown as { integrationConfig: { findUnique: (query: { where: { provider: string } }) => Promise<{ provider: string; enabled: boolean; configJson: string }> } };
+  const previousFind = database.integrationConfig.findUnique;
+  let enabled = false, source = "personal", revision = "personal-1", reads = 0, revokeOn = 0;
+  database.integrationConfig.findUnique = async ({ where }) => {
+    assert.equal(where.provider, `codex:${actorId}`); reads++;
+    return { provider: where.provider, enabled: enabled && reads !== revokeOn, configJson: JSON.stringify({ source, revision, model: "codex-test" }) };
+  };
+  const complete = () => completeWithCodex(actorId, [{ role: "system", content: "Approved system text" }, { role: "user", content: "PRIVATE_PERSONAL_TEXT" }], { model: "codex-test", personalRevision: "personal-1" });
+  const trace = async () => (await readFile(path.join(base, hash(actorId), "trace.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
+  try {
+    await assert.rejects(complete(), /conexión personal de Codex cambió/);
+    enabled = true; source = "host";
+    await assert.rejects(complete(), /conexión personal de Codex cambió/);
+    source = "personal"; revision = "personal-2";
+    await assert.rejects(complete(), /conexión personal de Codex cambió/);
+    revision = "personal-1"; reads = 0; revokeOn = 2;
+    await assert.rejects(complete(), /conexión personal de Codex cambió/);
+    assert.equal((await trace()).some(row => row.method === "thread/start"), false);
+    reads = 0; revokeOn = 3;
+    await assert.rejects(complete(), /conexión personal de Codex cambió/);
+    const revokedTrace = await trace();
+    assert.equal(revokedTrace.filter(row => row.method === "thread/start").length, 1);
+    assert.equal(revokedTrace.some(row => row.method === "turn/start"), false);
+    assert.equal(JSON.stringify(revokedTrace).includes("PRIVATE_PERSONAL_TEXT"), false);
+    reads = 0; revokeOn = 0;
+    assert.equal((await complete()).content, "Respuesta de prueba."); assert.equal(reads, 3);
+  } finally {
+    database.integrationConfig.findUnique = previousFind;
+    await (globalThis as typeof globalThis & { lexopenCodexSessions?: CodexSessionManager }).lexopenCodexSessions?.closeAll();
+    for (const [key, value] of Object.entries(previousEnv)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    await new Promise(resolve => setTimeout(resolve, 40)); await rm(base, { recursive: true, force: true });
+  }
 });

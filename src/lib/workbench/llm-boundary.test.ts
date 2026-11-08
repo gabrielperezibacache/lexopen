@@ -41,10 +41,13 @@ async function main() {
     personal = true;
     await askLlm({ ...input, expectedDestination: { provider: config.preset, model: config.model, endpointHash: sha256(config.apiUrl) } }); assert.equal(calls, 0, "enabling personal Codex after approval cannot silently reroute a study request");
     const personalControl = new AbortController();
-    await askLlm({ ...input, signal: personalControl.signal, expectedDestination: { provider: "codex", model: "fixture-model", endpointHash: sha256("codex") } });
+    const { personalCodexPreference } = await import("@/lib/integrations/codex-preference");
+    const { codexDestinationFor } = await import("@/lib/integrations/codex-destination");
+    const personalDestination = { provider: "codex", model: "fixture-model", ...await codexDestinationFor("fixture", await personalCodexPreference("fixture")) };
+    await askLlm({ ...input, signal: personalControl.signal, expectedDestination: personalDestination });
     assert.equal(calls, 1); assert.equal(receivedSignal, personalControl.signal, "personal Codex receives the same cancellation signal");
     personal = false;
-    await askLlm({ ...input, expectedDestination: { provider: "codex", model: "fixture-model", endpointHash: sha256("codex") } }); assert.equal(remoteCalls, 1, "disconnecting Codex cannot fall back to a different unapproved provider");
+    await askLlm({ ...input, expectedDestination: personalDestination }); assert.equal(remoteCalls, 1, "disconnecting Codex cannot fall back to a different unapproved provider");
     const aborted = new AbortController(); aborted.abort(); await assert.rejects(askLlm({ ...input, signal: aborted.signal })); assert.equal(remoteCalls, 1);
     const profile = LOCAL_MODELS[1];
     await assert.rejects(selectLocalLlmProfile(profile.id, "fixture"), /permiso/);

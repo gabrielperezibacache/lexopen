@@ -10,6 +10,9 @@ const eslintConfig = [
       ".next/**",
       "out/**",
       "build/**",
+      ".tmp/**",
+      "test-results/**",
+      "playwright-report/**",
       "next-env.d.ts",
       "desktop/**",
       // Espejo estático del sitio del estudio (bundle generado, no código LexOpen)

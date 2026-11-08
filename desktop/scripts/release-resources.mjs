@@ -30,6 +30,8 @@ function verifyDistributedOAuthProfile(resources) {
 }
 
 export const RELEASE_TARGETS = ["darwin-x64", "darwin-arm64", "win32-x64", "linux-x64"];
+// Linux installers must run on both Ubuntu 22.04 and current Debian/Ubuntu.
+export const LINUX_PRISMA_BINARY_TARGETS = Object.freeze(["debian-openssl-1.1.x", "debian-openssl-3.0.x"]);
 const forbiddenDirectories = new Set([".git", ".tmp", ".codex", ".agents", ".links", ".cache", "storage", "pgdata", "vault", "obsidian-vault", "backups", "private", "secrets", "test-results", "playwright-report"]);
 const forbiddenFiles = new Set(["credentials.json", "tokens.json", "auth.json", "desktop-config.json", "app-state.json", "rate-limit.json", "session-state.json"]);
 export function privateResourcePath(relative) {
@@ -162,6 +164,15 @@ export function verifyNativeRuntime(resources, nodeModules, target) {
   const schemas = fs.readdirSync(engines).filter(name => /^(?:schema|migration)-engine-/.test(name) && !/\.(?:js|md|json|sha256)$/.test(name));
   if (!schemas.length) throw new Error("Missing native Prisma schema engine");
   for (const name of schemas) verifyBinary(path.join(engines, name), target);
+  const cliQueries = fs.readdirSync(engines).filter(name => /^(?:libquery_engine|query_engine|query-engine)/.test(name) && !/\.(?:js|ts|json|wasm|map|md|prisma|sha256)$/.test(name));
+  for (const name of cliQueries) verifyBinary(path.join(engines, name), target);
+  if (target.platform === "linux") {
+    for (const binaryTarget of LINUX_PRISMA_BINARY_TARGETS) {
+      required(path.join(client, `libquery_engine-${binaryTarget}.so.node`));
+      required(path.join(engines, `libquery_engine-${binaryTarget}.so.node`));
+      required(path.join(engines, `schema-engine-${binaryTarget}`));
+    }
+  }
   const packageName = `${target.platform === "win32" ? "windows" : target.platform}-${target.arch}`;
   const pgRoot = path.join(nodeModules, "@embedded-postgres", packageName);
   if (!fs.existsSync(pgRoot)) throw new Error(`Missing native embedded PostgreSQL package: ${packageName}`);

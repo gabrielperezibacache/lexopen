@@ -3,6 +3,7 @@ import { getAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { getLlmConfig, llmEndpointHash } from "@/lib/integrations/llm";
 import { studyLlmConfigForModel } from "@/lib/integrations/llm-route";
 import { personalCodexPreference } from "@/lib/integrations/codex-preference";
+import { codexDestinationFor } from "@/lib/integrations/codex-destination";
 import { sha256 } from "@/lib/evidence/fragments";
 import type { IcaroDestination, IcaroProvider } from "./types";
 
@@ -13,7 +14,8 @@ export async function icaroDestination(userId: string, profile: { provider: stri
   let model = profile.model || (routeProvider === "codex" ? preference.model : initial.model);
   let endpoint = "Proveedor sin configurar", endpointHash = "", remote = true, permitted = true;
   if (routeProvider === "codex") {
-    endpoint = "OpenAI · Codex personal"; endpointHash = sha256("codex"); permitted = preference.enabled;
+    const codex = await codexDestinationFor(userId, { ...preference, model });
+    endpoint = codex.endpoint; endpointHash = codex.endpointHash; permitted = codex.permitted;
   } else {
     try {
       const config = studyLlmConfigForModel(initial, model);

@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiMutation } from "@/lib/api-mutation";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { Button } from "@/components/ui";
 
 type UpdatePayload = {
   updateAvailable: boolean;
@@ -14,6 +16,8 @@ type UpdatePayload = {
 
 type SelfUpdateStatus = {
   phase: string;
+  currentVersion: string;
+  requestId?: string | null;
   ok: boolean;
   available: boolean;
   reason?: string;
@@ -21,37 +25,49 @@ type SelfUpdateStatus = {
   error?: string | null;
   toVersion?: string | null;
   webHostManaged?: boolean;
+  recoveryRequired?: boolean;
 };
 
 const DISMISS_PREFIX = "lexopen:dismiss-update:";
 
 const ACTIVE_PHASES = new Set([
   "queued",
+  "preflight",
+  "backing_up",
+  "applying",
   "pulling",
   "installing",
   "migrating",
   "building",
   "restarting",
+  "awaiting_restart",
 ]);
 
-function phaseLabel(phase: string) {
+function phaseLabel(phase: string, t: (key: string) => string) {
   switch (phase) {
     case "queued":
-      return "En cola…";
+      return t("updates.phases.queued");
+    case "preflight":
+      return t("updates.phases.preflight");
+    case "backing_up":
+      return t("updates.phases.backingUp");
+    case "applying":
+      return t("updates.phases.applying");
     case "pulling":
-      return "Descargando código…";
+      return t("updates.phases.pulling");
     case "installing":
-      return "Instalando dependencias…";
+      return t("updates.phases.installing");
     case "migrating":
-      return "Aplicando base de datos…";
+      return t("updates.phases.migrating");
     case "building":
-      return "Compilando…";
+      return t("updates.phases.building");
     case "restarting":
-      return "Reiniciando Host…";
+    case "awaiting_restart":
+      return t("updates.phases.restarting");
     case "done":
-      return "Listo";
+      return t("updates.phases.done");
     case "failed":
-      return "Falló";
+      return t("updates.phases.failed");
     default:
       return phase;
   }
@@ -64,6 +80,13 @@ export function UpdateAvailableBanner({
   enabled: boolean;
   canSelfUpdate?: boolean;
 }) {
+  const { t } = useI18n();
+  const readingStatus = useRef(false);
+  const refreshPending = useRef(false);
+  const currentReceipt = useRef<string | null>(null);
+  const previousReceipt = useRef<string | null | undefined>(undefined);
+  const [tracking, setTracking] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [data, setData] = useState<UpdatePayload | null>(null);
   const [openSteps, setOpenSteps] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -71,26 +94,62 @@ export function UpdateAvailableBanner({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const refreshSelfUpdate = useCallback(async () => {
+  const refreshSelfUpdate = useCallback(async function readStatus(): Promise<SelfUpdateStatus | null> {
+    if (readingStatus.current) { refreshPending.current = true; return null; }
+    readingStatus.current = true;
     try {
-      const res = await fetch("/api/admin/self-update");
+      const res = await fetch("/api/admin/self-update", { cache: "no-store", signal: AbortSignal.timeout(12_000) });
       if (!res.ok) return null;
       const payload = (await res.json()) as SelfUpdateStatus;
+      // A request begun before the local mutation finished may still describe
+      // the old idle state. The coalesced refresh below obtains a fresh receipt.
+      if (refreshPending.current) return null;
+      currentReceipt.current = payload.requestId || null;
       setSelfUpdate(payload);
+      setRecovering(false);
+      if (ACTIVE_PHASES.has(payload.phase)) { setTracking(true); setMsg(""); }
+      else if (payload.phase === "done" && payload.requestId && payload.requestId === previousReceipt.current) setTracking(false);
+      if (payload.phase === "done" && payload.ok && payload.requestId !== previousReceipt.current) setMsg("");
       return payload;
     } catch {
       return null;
+    } finally {
+      readingStatus.current = false;
+      if (refreshPending.current) {
+        refreshPending.current = false;
+        queueMicrotask(() => void readStatus());
+      }
     }
   }, []);
 
   useEffect(() => {
+    if (!enabled || !canSelfUpdate) return;
+    const starting = () => {
+      previousReceipt.current = currentReceipt.current;
+      setBusy(true);
+      setTracking(true);
+    };
+    const refresh = () => {
+      setBusy(false);
+      setRecovering(true);
+      void refreshSelfUpdate();
+    };
+    window.addEventListener("lexopen:self-update:starting", starting);
+    window.addEventListener("lexopen:self-update", refresh);
+    return () => {
+      window.removeEventListener("lexopen:self-update:starting", starting);
+      window.removeEventListener("lexopen:self-update", refresh);
+    };
+  }, [enabled, canSelfUpdate, refreshSelfUpdate]);
+
+  useEffect(() => {
     if (!enabled) return;
     let active = true;
-    fetch("/api/admin/update-check")
+    if (canSelfUpdate) queueMicrotask(() => { if (active) void refreshSelfUpdate(); });
+    fetch("/api/admin/update-check", { signal: AbortSignal.timeout(12_000) })
       .then((res) => (res.ok ? res.json() : null))
-      .then(async (payload: UpdatePayload | null) => {
+      .then((payload: UpdatePayload | null) => {
         if (!active) return;
-        if (canSelfUpdate) await refreshSelfUpdate();
         if (!payload?.updateAvailable || !payload.latestVersion) return;
         try {
           if (
@@ -113,27 +172,33 @@ export function UpdateAvailableBanner({
 
   useEffect(() => {
     if (!enabled || !canSelfUpdate) return;
-    if (!selfUpdate || !ACTIVE_PHASES.has(selfUpdate.phase)) return;
+    if (!recovering && selfUpdate && !ACTIVE_PHASES.has(selfUpdate.phase)) return;
     const id = setInterval(() => {
       void refreshSelfUpdate().then((st) => {
         if (st?.phase === "done") {
           setMsg(
             st.message ||
-              "Actualización aplicada. Recargue la página para ver la versión nueva."
+              t("updates.completedHint")
           );
         }
         if (st?.phase === "failed") {
-          setMsg(st.error || st.message || "La actualización falló.");
+          setMsg(st.error || st.message || t("updates.failedTitle"));
         }
       });
     }, 3000);
     return () => clearInterval(id);
-  }, [enabled, canSelfUpdate, selfUpdate, refreshSelfUpdate]);
+  }, [enabled, canSelfUpdate, selfUpdate, recovering, refreshSelfUpdate, t]);
 
-  const updating = Boolean(selfUpdate && ACTIVE_PHASES.has(selfUpdate.phase));
+  const updating = recovering || Boolean(selfUpdate && ACTIVE_PHASES.has(selfUpdate.phase));
+  // A completed receipt belongs to an earlier operation. A fresh release check
+  // for the currently running version must still offer the next update.
+  const newUpdateAfterReceipt = selfUpdate?.phase === "done" && Boolean(
+    data?.updateAvailable && data.currentVersion === selfUpdate.currentVersion
+  );
+  const finished = selfUpdate?.phase === "failed" || (selfUpdate?.phase === "done" && tracking && !newUpdateAfterReceipt);
   const showBanner =
     enabled &&
-    ((data?.updateAvailable && data.latestVersion && !dismissed) || updating);
+    ((data?.updateAvailable && data.latestVersion && !dismissed) || updating || (finished && !dismissed));
 
   if (!showBanner) {
     return null;
@@ -153,27 +218,32 @@ export function UpdateAvailableBanner({
   async function startUpdate() {
     setBusy(true);
     setMsg("");
+    window.dispatchEvent(new Event("lexopen:self-update:starting"));
     const result = await apiMutation<{ status?: SelfUpdateStatus }>(
       "/api/admin/self-update",
       {
         method: "POST",
+        signal: AbortSignal.timeout(20_000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "start" }),
       }
     );
-    setBusy(false);
+    // Even an error/aborted response may have queued the update already. Read
+    // its receipt and keep retrying while the Host returns; never repeat POST.
+    window.dispatchEvent(new Event("lexopen:self-update"));
     if (!result.ok) {
-      setMsg(result.error || "No se pudo iniciar la actualización.");
+      setMsg(result.error || t("updates.startFailed"));
       return;
     }
     setSelfUpdate(result.data.status || null);
+    setTracking(Boolean(result.data.status && ACTIVE_PHASES.has(result.data.status.phase)));
     setMsg(
       result.data.status?.message ||
-        "Actualización iniciada. La app estará unos minutos fuera de línea."
+        t("updates.startedHint")
     );
   }
 
-  const canAutoUpdate = canSelfUpdate && selfUpdate?.available !== false;
+  const canAutoUpdate = canSelfUpdate && selfUpdate?.available === true && !selfUpdate.recoveryRequired && (selfUpdate.phase !== "done" || newUpdateAfterReceipt);
   const latest = data?.latestVersion || selfUpdate?.toVersion;
 
   return (
@@ -185,7 +255,9 @@ export function UpdateAvailableBanner({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-[var(--ink)]">
             {updating
-              ? `Actualizando LexOpen… ${phaseLabel(selfUpdate!.phase)}`
+              ? recovering ? t("updates.phases.preflight") : `${t("updates.updatingTitle")} ${phaseLabel(selfUpdate?.phase || "preflight", t)}`
+              : finished
+                ? selfUpdate?.phase === "done" ? t("updates.completedTitle") : t("updates.failedTitle")
               : (
                   <>
                     Hay una versión nueva de LexOpen:{" "}
@@ -201,9 +273,11 @@ export function UpdateAvailableBanner({
           </p>
           <p className="mt-1 text-xs text-[var(--ink-soft)]/80">
             {updating
-              ? selfUpdate?.message ||
-                "No cierre el navegador. Cuando termine, recargue la página."
-              : "Puede actualizar desde aquí sin salir de LexOpen. Los datos del estudio se conservan."}
+              ? !recovering && selfUpdate?.message ||
+                t("updates.updatingHint")
+              : finished
+                ? selfUpdate?.message || (selfUpdate?.phase === "done" ? t("updates.completedHint") : t("updates.failedHint"))
+                : canAutoUpdate ? t("updates.availableHint") : t("updates.manualHint")}
           </p>
           {msg && (
             <p className="mt-2 text-xs text-[var(--ink)]" role="status">
@@ -213,36 +287,34 @@ export function UpdateAvailableBanner({
           {selfUpdate?.phase === "failed" && selfUpdate.error && (
             <p className="mt-2 text-xs text-rose-800">{selfUpdate.error}</p>
           )}
+          {selfUpdate?.recoveryRequired && (
+            <p className="mt-2 text-xs text-rose-800" role="alert">{t("updates.recoveryHint")}</p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {canAutoUpdate && !updating && (
-            <button
-              type="button"
-              className="btn btn-primary"
+            <Button
               disabled={busy}
               onClick={startUpdate}
             >
-              {busy ? "Iniciando…" : "Actualizar ahora"}
-            </button>
+              {busy ? t("updates.starting") : t("updates.start")}
+            </Button>
           )}
-          {selfUpdate?.phase === "done" && (
-            <button
-              type="button"
-              className="btn btn-primary"
+          {finished && selfUpdate?.phase === "done" && (
+            <Button
               onClick={() => window.location.reload()}
             >
-              Recargar aplicación
-            </button>
+              {t("updates.reload")}
+            </Button>
           )}
-          <button
-            type="button"
-            className="btn btn-secondary"
+          <Button
+            variant="secondary"
             onClick={() => setOpenSteps((v) => !v)}
             aria-expanded={openSteps}
             aria-controls="manual-update-steps"
           >
-            {openSteps ? "Ocultar pasos" : "Pasos manuales"}
-          </button>
+            {openSteps ? t("updates.hideManual") : t("updates.showManual")}
+          </Button>
           {data?.releaseUrl && (
             <a
               href={data.releaseUrl}
@@ -254,9 +326,9 @@ export function UpdateAvailableBanner({
             </a>
           )}
           {!updating && (
-            <button type="button" className="btn btn-ghost" onClick={dismiss}>
-              Descartar
-            </button>
+            <Button variant="ghost" onClick={dismiss}>
+              {t("updates.dismiss")}
+            </Button>
           )}
         </div>
       </div>
@@ -267,32 +339,9 @@ export function UpdateAvailableBanner({
 
       {openSteps && (
         <div id="manual-update-steps" className="mt-3 rounded-2xl border border-[var(--line)] bg-white/80 p-4 text-sm text-[var(--ink-soft)]/90">
-          <p className="font-medium text-[var(--ink)]">
-            Actualización manual (si el botón no está disponible)
-          </p>
-          <ol className="mt-2 list-decimal space-y-1 pl-5">
-            <li>
-              Respalde con el Host detenido:{" "}
-              <code className="text-xs">
-                npm run web:backup -- --output /ruta/backup
-              </code>
-              {data?.desktop ? " (o menú LexOpen → Crear respaldo…)" : ""}
-            </li>
-            <li>
-              En el clon del Host:{" "}
-              <code className="text-xs">git pull origin main && npm ci</code>
-            </li>
-            <li>
-              Arranque de nuevo:{" "}
-              <code className="text-xs">
-                {data?.desktop
-                  ? "npm run desktop:dev"
-                  : "LEXOPEN_DATA_DIR=… npm run web:host"}
-              </code>
-              .
-            </li>
-            <li>Recargue el navegador (F5).</li>
-          </ol>
+          <p className="font-medium text-[var(--ink)]">{t("updates.manualTitle")}</p>
+          <p className="mt-2">{t("updates.manualGuideHint")}</p>
+          <a className="btn btn-secondary mt-3" href="https://github.com/gabrielperezibacache/lexopen/blob/main/docs/ACTUALIZACIONES.md" target="_blank" rel="noreferrer">{t("updates.manualGuide")}</a>
         </div>
       )}
     </div>
