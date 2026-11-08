@@ -8,7 +8,7 @@ assertDisposableDatabaseUrl(process.env.E2E_DATABASE_URL);
 if (process.env.DATABASE_URL !== process.env.E2E_DATABASE_URL) throw Error("Use the explicit disposable database");
 async function fixture(page: Page, readOnly = false) {
   const tag = randomUUID(), ids: string[] = [], password = await hash("lexopen", 10);
-  const person = async (name: string) => { const u = await prisma.user.create({ data: { name, email: `${tag}-${name}@pr-review.invalid`, role: "abogado", password } }); ids.push(u.id); return u; };
+  const person = async (name: string) => { const u = await prisma.user.create({ data: { name, email: `${tag}-${name.toLowerCase().replaceAll(" ", "-")}@pr-review.invalid`, role: "abogado", password } }); ids.push(u.id); return u; };
   const owner = await person("Responsable"), member = await person("Integrante"), candidate = await person("Nueva persona");
   const cause = await prisma.causa.create({ data: { titulo: `Causa ${tag}`, tribunal: "Ficticio", materia: "civil", abogadoId: owner.id, acceso: "equipo" } });
   await prisma.causaMiembro.createMany({ data: [{ causaId: cause.id, userId: owner.id, rol: "responsable" }, { causaId: cause.id, userId: member.id, rol: readOnly ? "lectura" : "colaborador" }] });
@@ -24,6 +24,7 @@ test("Equipo distingue cambio de acceso, retirada y alta, y recupera el fallo si
   const f = await fixture(page), access = gate(), removal = gate(), addition = gate();
   try {
     await page.goto(`/causas/${f.cause.id}`);
+    await page.locator("#main-content").getByText("Equipo y gestión de la causa", { exact: true }).click();
     const team = page.locator("section").filter({ has: page.getByRole("heading", { name: "Equipo de la causa", exact: true }) });
     await page.route(`**/api/causas/${f.cause.id}/equipo*`, async route => {
       const method = route.request().method();
@@ -53,7 +54,7 @@ test("Equipo distingue cambio de acceso, retirada y alta, y recupera el fallo si
     await expect(team.getByRole("button", { name: "Estudio", exact: true })).toBeEnabled();
     await expect(team.getByRole("button", { name: "Estudio", exact: true })).toHaveAttribute("aria-pressed", "true");
     expect(await prisma.causaMiembro.count({ where: { causaId: f.cause.id, userId: f.candidate.id } })).toBe(1);
-  } finally { access.release(); removal.release(); addition.release(); await page.unrouteAll({ behavior: "ignoreErrors" }); await f.cleanup(); }
+  } finally { access.release(); removal.release(); addition.release(); await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => {}); await f.cleanup(); }
 });
 test("Tareas identifica la acción pendiente, recupera errores y completa una vez", async ({ page }) => {
   const f = await fixture(page), progress = gate(), completion = gate(); let writes = 0;
@@ -73,10 +74,10 @@ test("Tareas identifica la acción pendiente, recupera errores y completa una ve
     await expect(row.getByRole("button", { name: "Marcando…", exact: true })).toBeDisabled();
     completion.release(); await expect(row.getByRole("button", { name: "Marcando…", exact: true })).toHaveCount(0);
     expect((await prisma.task.findUniqueOrThrow({ where: { id: f.task.id } })).status).toBe("done"); expect(writes).toBe(2);
-  } finally { progress.release(); completion.release(); await page.unrouteAll({ behavior: "ignoreErrors" }); await f.cleanup(); }
+  } finally { progress.release(); completion.release(); await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => {}); await f.cleanup(); }
 });
 test("Equipo conserva los controles de lectura sin ofrecer escritura", async ({ page }) => {
   const f = await fixture(page, true);
-  try { await page.goto(`/causas/${f.cause.id}`); const group = page.getByRole("group", { name: "Nivel de acceso" }); await expect(group.getByRole("button", { name: "Estudio", exact: true })).toBeDisabled(); await expect(group.getByRole("button", { name: "Solo equipo (muro ético)", exact: true })).toBeDisabled(); const team = page.locator("section").filter({ has: page.getByRole("heading", { name: "Equipo de la causa", exact: true }) }); await expect(team.getByRole("button", { name: "Agregar", exact: true })).toHaveCount(0); }
+  try { await page.goto(`/causas/${f.cause.id}`); await page.locator("#main-content").getByText("Equipo y gestión de la causa", { exact: true }).click(); const group = page.getByRole("group", { name: "Nivel de acceso" }); await expect(group.getByRole("button", { name: "Estudio", exact: true })).toBeDisabled(); await expect(group.getByRole("button", { name: "Solo equipo (muro ético)", exact: true })).toBeDisabled(); const team = page.locator("section").filter({ has: page.getByRole("heading", { name: "Equipo de la causa", exact: true }) }); await expect(team.getByRole("button", { name: "Agregar", exact: true })).toHaveCount(0); }
   finally { await f.cleanup(); }
 });
