@@ -6,7 +6,7 @@ import { altazorActor, altazorScopeKey } from "@/lib/altazor/access";
 import { normalizeAssistantFirmPolicy } from "@/lib/assistant/firm-policy";
 import { ConnectorError, digest, encryptionKey, seal, unseal } from "@/lib/personal-connectors/core";
 import { assertComputerEnabled, assertSessionLive, COMPUTER_LIMITS, computerEnabled, endpointFor, inputSchema, inspectSelectedFiles, type PersonInput } from "./policy";
-import { KittiesGateway, type StagedFileApproval } from "./gateway";
+import { KittiesGateway, type StagedFileApproval, type StagedMetadataApproval } from "./gateway";
 import { computerTurnNeedsHelp, type ComputerActivity, type ComputerActivityState, type ComputerMessage, type ComputerSessionSummary, type ComputerSessionView, type ComputerStatus, type VerifiedComputerFile } from "./types";
 import { assertComputerPolicy, computerPolicyAllowed, COMPUTER_LOCAL_ONLY_REASON } from "./privacy";
 import { computerOperationHash } from "./operation-hash";
@@ -20,6 +20,8 @@ import { prepareExplicitFileTask, type ExplicitFileTask } from "./file-task";
 import { normalizeStoredFileReceipt } from "./file-receipt";
 import { assertEasyConnectorRead } from "../connectors/desktop-read-policy";
 import { desktopConnectorTask } from "@/lib/assistant/tools/desktop-connector-task";
+import { prepareExplicitMetadataTask, validateExplicitMetadataTask } from "./metadata-task";
+import { metadataRequest } from "./file-metadata-task";
 
 type Client = PrismaClient | Prisma.TransactionClient;
 const credentialContext = (row: Pick<AltazorComputerWorkspace, "id" | "ownerId" | "scopeKey">) => `altazor:computer:${row.ownerId}:${row.id}:${row.scopeKey}`;
@@ -209,9 +211,19 @@ function stagedAction(row: Pick<AltazorComputerAction, "id" | "kind" | "status" 
     return { approvalId: value.approvalId, requestId: row.id, task: task as ExplicitFileTask };
   } catch { return null; }
 }
-async function stagedApproval(session: AltazorComputerSession, approvalId: string, names: readonly string[], tx: Client): Promise<StagedFileApproval | undefined> {
+async function stagedApproval(session: AltazorComputerSession, approvalId: string, names: readonly string[], tx: Client): Promise<StagedFileApproval | StagedMetadataApproval | undefined> {
   const rows = await tx.altazorComputerAction.findMany({ where: { sessionId: session.id, ownerId: session.ownerId, kind: "message", status: "completed" }, orderBy: { createdAt: "desc" }, take: 200 });
-  return rows.map(row => stagedAction(row, names)).find(value => value?.approvalId === approvalId) ?? undefined;
+  for (const row of rows) {
+    const file = stagedAction(row, names);
+    if (file?.approvalId === approvalId) return file;
+    try {
+      const value: unknown = JSON.parse(row.resultJson || "null");
+      if (!object(value) || value.accepted !== true || value.staged !== true || value.metadataStaged !== true || value.state !== "pending" || value.requestId !== row.id || value.approvalId !== approvalId) continue;
+      const metadataTask = validateExplicitMetadataTask(value.metadataTask, session.ownerId, session.workspaceId, names);
+      if (metadataTask) return { requestId: row.id, metadataTask };
+    } catch { /* An unconfirmed or modified stage cannot authorize a query. */ }
+  }
+  return undefined;
 }
 async function verifiedSessionFiles(session: AltazorComputerSession, names: readonly string[]): Promise<VerifiedComputerFile[]> {
   if (!session.chatId || !session.kittyId) return [];
@@ -441,6 +453,23 @@ export async function decideComputerUseApproval(user: CausaAccessUser, id: strin
 export async function sendComputerMessage(user: CausaAccessUser, id: string, input: ComputerMessage) {
   if (input.confirmed !== true || !input.text.trim() || input.text.length > 16000) throw new ConnectorError("task_approval_required", "Revise y autorice una tarea de hasta 16000 caracteres antes de enviarla.", 400);
   const files = inspectSelectedFiles(input.files), safeHashInput = { text: input.text, files: files.map(file => ({ name: file.name, mime: file.mime, hash: digest(file.data) })) };
+  const metadataIntent = metadataRequest(input.text);
+  const { session: beforeSession, workspace: beforeWorkspace } = await sessionFor(id, user);
+  await policyAllowsAction();
+  const previous = await prisma.altazorComputerAction.findUnique({ where: { ownerId_requestId: { ownerId: beforeSession.ownerId, requestId: input.requestId } } });
+  if (previous) return actionView(matchingAction(previous, id, "message", computerOperationHash(beforeSession.ownerId, id, "message", safeHashInput)));
+  if (await prisma.altazorComputerAction.findFirst({ where: { sessionId: id, ownerId: beforeSession.ownerId, kind: { in: ["message", "connector_approval", "computer_use_approval"] }, status: { in: ["sending", "unknown"] } }, select: { id: true } })) throw new ConnectorError("task_unconfirmed", "Existe una tarea sin confirmación. Compruebe el chat o cierre la sesión; no se reenviará automáticamente.", 409);
+  const beforeNames = sessionConnectors(beforeSession);
+  const pendingError = () => new ConnectorError("connector_approval_pending", "Resuelve la consulta pendiente antes de enviar otro encargo al escritorio.", 409);
+  if (beforeNames[0] !== "-" || metadataIntent) {
+    const client = await readyGateway(beforeWorkspace);
+    if (beforeNames[0] !== "-" && (await client.pendingApprovals(beforeSession.kittyId!, beforeSession.chatId!, beforeNames)).length) throw pendingError();
+    if (metadataIntent) {
+      if (files.length) throw new ConnectorError("metadata_attachments", "Esta consulta sólo pide nombres de archivos. Retira los adjuntos antes de continuar.", 409);
+      if (!prepareExplicitMetadataTask(input.text, beforeSession.ownerId, beforeSession.workspaceId, beforeNames)) throw new ConnectorError("connector_selection", "Selecciona la cuenta solicitada al abrir este escritorio antes de consultar sus archivos.", 409);
+      await client.requireStagedMetadataActions();
+    }
+  }
   return executeAction(user, id, "message", input.requestId, safeHashInput, async (client, session, _tx, actionId) => {
     if (session.held && Date.now() - session.updatedAt.getTime() < 5 * 60_000) throw new ConnectorError("manual_control", "Devuelva el control al asistente antes de enviar otra tarea.", 409);
     const status = await client.chat(session.chatId!, session.kittyId!);
@@ -449,8 +478,14 @@ export async function sendComputerMessage(user: CausaAccessUser, id: string, inp
     if (sessionConnectors(session)[0] !== "-") await client.requireConnectorGate();
     if (sessionConnectors(session).some(name => /^altazor-(?:google|github)-[a-f0-9]{16}$/.test(name))) await client.requireFileReads();
     const names = sessionConnectors(session);
+    if (names[0] !== "-" && (await client.pendingApprovals(session.kittyId!, session.chatId!, names)).length) throw pendingError();
     const task = files.length ? null : prepareExplicitFileTask(input.text, session.ownerId, session.workspaceId, names);
     if (task) return client.stageFileAction(session.chatId!, session.kittyId!, actionId, task, input.text);
+    if (metadataIntent) {
+      const metadata = prepareExplicitMetadataTask(input.text, session.ownerId, session.workspaceId, names);
+      if (!metadata) throw new ConnectorError("connector_selection", "Selecciona la cuenta solicitada al abrir este escritorio antes de consultar sus archivos.", 409);
+      return client.stageMetadataAction(session.chatId!, session.kittyId!, actionId, metadata, input.text);
+    }
     const { assertComputerAuthorizationCurrent } = await import("./authorization-service");
     const { workspace } = await workspaceFor(session.workspaceId, user, _tx);
     await assertComputerAuthorizationCurrent(user, workspace, session, client, _tx);
