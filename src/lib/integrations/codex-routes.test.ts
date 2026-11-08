@@ -55,7 +55,7 @@ async function harness(admin = false) {
     "next/server": { NextResponse: Response },
     "@/lib/api": {
       assertCsrf: () => { calls.push("csrf"); if (!fixture.csrf) throw error("CSRF", 403); },
-      requireStaff: async () => { calls.push("staff"); if (!fixture.staff) throw error("Prohibido", 403); return { id: fixture.actorId }; },
+      requireStaff: async () => { calls.push("staff"); if (!fixture.staff) throw error("Prohibido", 403); return { id: fixture.actorId, role: "abogado" }; },
       requireRole: async (role: string) => { assert.equal(role, "admin"); calls.push("admin"); if (!fixture.admin) throw error("Prohibido", 403); return { id: fixture.actorId }; },
       handleRouteError: (reason: unknown) => Response.json({ error: reason instanceof Error ? reason.message : "Error" }, { status: (reason as { status?: number }).status ?? (reason instanceof ZodError ? 400 : 500) }),
     },
@@ -66,6 +66,12 @@ async function harness(admin = false) {
     "@/lib/db": { prisma: { auditEvent, $transaction: async (operation: (client: typeof tx) => Promise<void>) => { calls.push("transaction.begin"); await operation(tx); calls.push("transaction.commit"); } } },
     "@/lib/integrations/codex-session": sessions,
     "@/lib/integrations/codex-preference": {
+      canUsePersonalCodex: () => fixture.capability,
+      assertPersonalCodexAction: (_actor: unknown, action: string, localOnly: boolean, enabled = false) => {
+        const usesCodex = action === "connect" || action === "models" || action === "test" || action === "save" && enabled;
+        if (usesCodex && !fixture.capability) throw error("Permiso revocado", 403);
+        if (usesCodex && localOnly) throw error("El estudio permite sólo IA local.", 403);
+      },
       hostCodexPolicy: async () => fixture.sharing,
       personalCodexPreference: async (actorId: string) => { assert.equal(actorId, fixture.actorId); return fixture.preference; },
       savePersonalCodexPreference: async (actorId: string, value: Omit<Preference, "revision">) => { assert.equal(actorId, fixture.actorId); calls.push("personal.save"); fixture.preference = { ...value, revision: `personal-${++revision}` }; await fixture.beforePersonalSave?.(); },
@@ -97,6 +103,7 @@ async function main() {
   const state = await stateResponse.json();
   assert.deepEqual(state.host, { enabled: false, available: false, connected: false });
   assert.equal(state.host.account, undefined); assert.equal(state.host.pendingLogin, undefined);
+  assert.equal(state.canUse, true);
   assert.ok(!user.calls.includes("host.status"), "disabled sharing never starts or inspects the Host session");
   assert.match(stateResponse.headers.get("cache-control")!, /no-store/);
   assert.equal(stateResponse.headers.get("vary"), "Cookie");
@@ -105,7 +112,9 @@ async function main() {
   user.fixture.sharing.enabled = false;
 
   user.fixture.capability = false; user.calls.length = 0;
-  assert.equal((await user.get()).status, 403); assert.ok(!user.calls.includes("host.status"));
+  const restrictedState = await user.get();
+  assert.equal(restrictedState.status, 200); assert.equal((await restrictedState.json()).canUse, false);
+  assert.ok(!user.calls.includes("host.status"));
   user.fixture.capability = true; user.fixture.csrf = false; user.calls.length = 0;
   assert.equal((await user.post({ action: "disconnect" })).status, 403); assert.deepEqual(user.calls, ["csrf"]);
   user.fixture.csrf = true; user.fixture.limited = true;
