@@ -10,11 +10,11 @@ import { promisify } from "node:util";
 import { createGzip } from "node:zlib";
 import { desktopCliEnvironment, localDesktopEngine } from "../../desktop/altazor-desktop-profile.cjs";
 import { maximumArchiveBytes, toolpackName, toolpackReceiptName } from "../../desktop/altazor-toolpack.cjs";
+import { desktopToolchainVerified } from "./desktop-toolchain.mjs";
 
 const execute = promisify(execFile);
 const profile = JSON.parse(await readFile(new URL("../../desktop/altazor-desktop-profile.json", import.meta.url), "utf8"));
 const { version } = JSON.parse(await readFile(new URL("../../desktop/package.json", import.meta.url), "utf8"));
-const toolChecks = ["docx", "libreoffice-pdf", "pdf-pages", "ocr-spa-eng", "xlsx", "epub", "bibliography", "local-search", "audio-16khz", "lexopen-wallpaper"];
 
 async function main() {
   if (process.argv.length !== 4) throw new Error("Uso: pack-desktop-image.mjs informe-del-escritorio.json carpeta-nueva");
@@ -23,8 +23,7 @@ async function main() {
     typeof evidence.sourceRevision !== "string" || !/^[a-f0-9]{40}$/.test(evidence.sourceRevision) ||
     process.env.GITHUB_SHA && evidence.sourceRevision !== process.env.GITHUB_SHA ||
     process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME !== `v${version}` ||
-    typeof evidence.imageId !== "string" || !/^sha256:[a-f0-9]{64}$/.test(evidence.imageId) || evidence.toolchain?.ok !== true ||
-    !Array.isArray(evidence.toolchain.checks) || !toolChecks.every(check => evidence.toolchain.checks.includes(check))) {
+    typeof evidence.imageId !== "string" || !/^sha256:[a-f0-9]{64}$/.test(evidence.imageId) || !desktopToolchainVerified(evidence.toolchain)) {
     throw new Error("Se requiere evidencia satisfactoria del escritorio real con el perfil de herramientas.");
   }
   const engine = await localDesktopEngine();

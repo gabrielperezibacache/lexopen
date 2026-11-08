@@ -34,9 +34,14 @@ test("un abogado agenda una audiencia desde Inicio y aparece en el calendario", 
   await expect(confirmButton).toBeVisible({ timeout: 20_000 });
   await confirmButton.click();
 
-  await expect(page.getByTestId("assistant-result-card").first()).toBeVisible({
-    timeout: 15_000,
-  });
+  const summary = page.getByTestId("altazor-execution-summary");
+  await expect(summary).toBeVisible();
+  await expect(summary).toContainText("Finalizado", { timeout: 15_000 });
+  const resultCard = page.getByTestId("assistant-result-card").first();
+  await expect(resultCard).toHaveCount(1);
+  await expect(resultCard).toBeHidden();
+  await page.getByText(/^Ver resultados y detalles ·/).click();
+  await expect(resultCard).toBeVisible();
   await expect(page.getByText(/agendad/i).first()).toBeVisible();
 
   await page.goto("/calendario?tipo=evento");
