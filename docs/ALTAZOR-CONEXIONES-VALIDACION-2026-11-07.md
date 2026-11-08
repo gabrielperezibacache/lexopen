@@ -1,27 +1,55 @@
 # Conexiones de Altazor: validación del 7 de noviembre de 2026
 
-La instalación privada conservó Google y GitHub después de actualizar el Host y reiniciar el servicio dedicado de Altazor, sin escritorios activos. Google se publicó en modo Producción, el usuario completó personalmente el consentimiento y LexOpen confirmó «Conexión guardada. El acceso se renueva automáticamente». La comprobación real consultó la identidad de Drive con los permisos de lectura ya autorizados. No se midió todavía una renovación real tras vencer el access token; el almacenamiento y la renovación se verificaron también mediante pruebas simuladas.
+Google Drive y GitHub se comprobaron con las cuentas ya conectadas de la instalación privada. Después de actualizar LexOpen y reiniciar su servicio de escritorio, ambas conservaron el acceso. Las dos descargas siguientes se solicitaron desde la conversación, se revisaron antes de ejecutarlas y se comprobaron dentro del computador de Altazor. No fue necesario iniciar sesión otra vez.
 
-La presentación y privacidad están [publicadas y verificadas](perezibacache-site/LEXOPEN-PUBLICACION-2026-11-07.md). El modo Producción no equivale a la verificación pública de Google: todavía apareció su aviso de aplicación sin verificar, que el usuario revisó y continuó personalmente.
+## Archivos comprobados en el escritorio real
 
-## Archivos en el escritorio real
+| Origen | Archivo | Resultado calculado del archivo |
+| --- | --- | --- |
+| Documento público de ejemplo de Google | `ejemplo-publico-google.pdf` | 53.269 bytes; PDF legible de **1 página** |
+| Repositorio público `gabrielperezibacache/lexopen` | `README.md` | 8.696 bytes; primera línea literal: `<div align="center">` |
 
-Desde la conversación se encargó descargar `README.md` de `gabrielperezibacache/lexopen`. La solicitud visible indicó ese repositorio y archivo exactos; se autorizó únicamente esa lectura. El conector descargó el archivo completo y entregó una ruta local verificada. Una lectura independiente dentro del contenedor confirmó 8.696 bytes y SHA-256 `57a734f306608547fce2d7646b8e48f553a3c526314e542c6a0179495f0f9115`, coincidentes con el recibo.
+Huellas SHA-256 de las copias comprobadas:
 
-El modelo local dio una primera línea incorrecta, aunque la copia era íntegra. En otro encargo con el archivo público de ejemplo de Google afirmó haber descargado un PDF de cinco páginas, pero no generó una solicitud de autorización ni un recibo de descarga. La comprobación independiente encontró cero copias con el nombre solicitado. **La descarga de ese PDF no queda validada.** La disponibilidad de una cuenta y el texto del modelo no acreditan una tarea realizada.
+- PDF: `26d3ce26ff264b4cd14f10c7922b5c5cc7d91205232fc2beb017b33af11dd707`.
+- README: `e9d352466ec0a7d815038040db5db01c1f839bb902274cbfc35c37b01c6dfabf`.
 
-El escritorio de prueba se detuvo al terminar. Se conserva como pendiente mejorar la ejecución efectiva de herramientas y contrastar las afirmaciones del modelo con sus resultados; no se accedió a otros archivos privados para estas pruebas.
+El origen de Google fue el documento público `1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms`. No se utilizaron expedientes ni archivos personales para estas pruebas.
 
-## Conexión sencilla para nuevas instalaciones
+Una lectura independiente dentro del contenedor volvió a comprobar los bytes, huellas, páginas y primera línea. Los resultados coinciden con los recibos de LexOpen y permanecieron visibles al recargar la conversación durante la sesión. El escritorio temporal se detuvo al terminar; las conexiones y los recibos guardados se conservaron.
 
-Se incorporó un perfil público opcional de distribución: cliente instalado de Google con PKCE y autorización por dispositivo de GitHub. No se distribuyen el secreto web del estudio, tokens de cuenta ni credenciales personales. Las preparaciones que ya existían tienen prioridad.
+Se corrigió el fallo por el que el modelo podía anunciar una descarga o inventar sus páginas sin haber creado el archivo. Una petición explícita con destino inequívoco se prepara ahora como una operación concreta, con autorización de un solo uso. Sólo el archivo real, contrastado dentro del escritorio, produce una descarga verificada. Una respuesta ambigua o un recibo ausente no se confirman ni se repiten automáticamente.
 
-El retorno de Google desde el navegador del sistema sólo guarda una respuesta cifrada. La sesión original y autenticada de LexOpen debe reclamarla para intercambiarla y guardar la conexión. GitHub conserva su código de dispositivo cifrado, limita el sondeo y aplica la misma validación de identidad, permisos de lectura y guardado único. El catálogo habitual de Google y GitHub ya no contiene formularios de tokens o registro.
+La preparación automática y la presentación de estos recibos se validaron para Google Drive y GitHub. El límite actual de estas descargas completas es 4 MiB; no se entrega un fragmento como si fuera el archivo íntegro. La consulta de resultados históricos después de cerrar o vencer una sesión sigue siendo una mejora pendiente de la interfaz, independiente de la conservación de los recibos.
 
-Las pruebas de integración con PostgreSQL y proveedores simulados verificaron la separación de sesiones, el retorno sin cookie, el cifrado, el sondeo concurrente, la espera solicitada por GitHub y el guardado único. Pasaron 17 pruebas unitarias, TypeScript, ESLint, la compilación de producción y 10 recorridos de Chromium, incluidos cuatro nuevos de conexiones distribuidas. Las pruebas del parser, arranque y recursos de los instaladores también pasaron con perfiles ficticios.
+## Conectar una cuenta
 
-El usuario creó el cliente de escritorio de Google, dedicado al agente de IA, y autorizó preparar el perfil. GitHub confirmó el ingreso por dispositivo y su sitio público después de guardar y recargar la configuración. El perfil real se validó con el parser compartido, quedó fuera de Git y se guardó en el ajuste protegido `LEXOPEN_PUBLIC_OAUTH_PROFILE_JSON` del repositorio. El empaquetador lo incorporó con los permisos esperados. Un canje ficticio de Google fue rechazado como `invalid_grant`, sin `invalid_client`; GitHub entregó una solicitud de dispositivo válida, que no se autorizó con ninguna cuenta ni generó un token de usuario. Estas comprobaciones acreditan la preparación del proveedor, no un ingreso completo en una instalación nueva.
+El recorrido habitual es **Conectar → iniciar sesión en el servicio oficial → autorizar → volver a LexOpen**. El panel funcional no solicita tokens personales, identificadores ni secretos de aplicaciones. Esos preparativos pertenecen exclusivamente a quien publica o administra la instalación.
 
-La build standalone final `wrfnZEg0ZZnP0w5vSqiyT`, correspondiente al código `c60693a`, está instalada en el Host privado. Durante la copia operativa se omitió por error una carpeta interna `next/dist/trace`; se reparó conservando las dependencias anidadas y se confirmó la salud del Host, la cuenta con 2FA y ambas conexiones. La versión anterior sigue respaldada. Este problema pertenecía al script temporal de copia, no al filtro de recursos de los instaladores.
+El retorno desde el navegador del sistema funciona aunque ese navegador no tenga la sesión de LexOpen. La respuesta se guarda cifrada y sólo puede completarla la sesión autenticada que inició el ingreso. Se corrigió también el bloqueo del proxy que antes impedía llegar a ese retorno sin cookie.
 
-La publicación de un instalador nuevo, la validación del nuevo ingreso en una instalación limpia y la verificación pública de Google siguen pendientes. El soporte de distribución no elimina los requisitos de Google ni prepara por sí solo un escritorio dedicado para cada nuevo miembro de un Host compartido.
+El perfil público opcional permite distribuir el cliente instalado de Google y la autorización por dispositivo de GitHub. El usuario creó sus identidades y autorizó preparar ese perfil. Sus valores están fuera de Git y en la configuración protegida de compilación. No se distribuyen el secreto web del estudio, tokens de cuenta ni credenciales personales. Una preparación guardada previamente conserva su prioridad.
+
+La conservación de las cuentas se comprobó en la instalación real. Los escenarios de vencimiento, rotación, denegación, concurrencia y guardado único se comprobaron además con proveedores ficticios.
+
+## Estado de Google
+
+La [presentación y privacidad](perezibacache-site/LEXOPEN-PUBLICACION-2026-11-07.md) siguen publicadas. Google confirmó la propiedad HTTPS del dominio mediante Search Console, tras la confirmación personal de su titular. Se actualizó el nombre y logotipo de LexOpen y se guardaron los dos permisos de consulta de Drive con su justificación.
+
+La aplicación está en Producción, pero **la revisión pública OAuth aún no está aprobada**. Google indicó esperar 24 horas después de acreditar el dominio antes de repetir la comprobación de marca. También exige un video de demostración que incluya todos los clientes OAuth del proyecto. El enlace de ese video todavía está pendiente. El expediente y los próximos pasos están en [Verificación de Google](GOOGLE-VERIFICACION-2026-11-07.md).
+
+## Dropbox y Microsoft 365
+
+El código admite clientes públicos con PKCE y permisos delimitados de lectura, sin exigir un secreto de cliente al usuario. Dropbox contempla cuenta, metadatos y contenido; Microsoft contempla el perfil y los archivos propios de OneDrive, sin permisos de correo, calendario, escritura ni acceso general a archivos del estudio.
+
+Se validaron el ingreso, el retorno al navegador original, el guardado y la renovación mediante cuentas ficticias. El motor de escritorio también comprobó los límites de descarga, las redirecciones y las huellas de archivos de prueba.
+
+**Falta preparar sus identidades públicas y validar las cuentas reales.** La cuenta de Dropbox pudo entrar a su consola, pero el registro de la aplicación quedó sin crear porque no se completó la aceptación de sus condiciones. Microsoft no tiene todavía un registro preparado. Por eso se muestra «Servicio en preparación» en lugar de pedir al profesional datos técnicos o afirmar que ya está conectado.
+
+## Alcance de las comprobaciones
+
+El motor de escritorio superó 98 pruebas con detección de concurrencia, sin omisiones. La aplicación superó TypeScript, ESLint, las pruebas de recibos y políticas, las integraciones con PostgreSQL desechable y los recorridos de navegador de conexiones, recuperación y vistas móviles. Las pruebas automáticas usan proveedores y cuentas ficticios; las dos descargas de la tabla sí se realizaron con los conectores reales.
+
+El paquete autónomo conserva las dependencias anidadas de Next y materializa únicamente los enlaces a sus siete paquetes públicos registrados, excluyendo archivos de entorno. La actualización local comprueba el manifiesto, conserva cuenta y configuración y prepara la restauración de la versión anterior.
+
+Siguen pendientes la revisión pública de Google, las cuentas reales de Dropbox/Microsoft y publicar y validar nuevos instaladores. No se ha presentado esta actualización local como una publicación ni como una integración en `main`.

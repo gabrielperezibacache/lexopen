@@ -4,11 +4,12 @@ import { operationKey, createSubmissionKeys } from "@/lib/client-submission-key"
 import { withCsrfHeaders } from "@/lib/client-csrf";
 import type { AltazorDestination } from "@/lib/altazor/types";
 import { prepareAssistantSubmission } from "@/lib/altazor/client-send-policy";
+import { locationForAltazorPane, type Pane } from "./pane-location";
+export type { Pane } from "./pane-location";
 export type Conversation = { id: string; title: string; causaId: string | null; scopeKey: string; revision: number; status: string };
 type Attachment = { id: string; sourceName: string; byteSize: number; status: string };
 export type Turn = { id: string; ordinal: number; status: string; userText: string; assistantText: string; available?: boolean; attachmentIds: string[]; sourceRefs: { title: string; href: string }[]; results: { toolId: string; result: { ok: boolean; message: string; card?: Record<string, unknown> | null; undoToken?: string | null } }[]; plan: { id: string; steps: { toolId: string; preview: string }[] } | null; errorCode: string | null; createdAt: string };
 export type ConversationData = { conversation: Conversation; turns: Turn[]; attachments: Attachment[]; destination: AltazorDestination; hasMore: boolean; beforeOrdinal: number | null };
-export type Pane = "chat" | "memory" | "connectors" | "computer";
 type CompanionPreference = { activeConversationId: string | null; selectionUnavailable: boolean; memoryEnabled: boolean; backgroundEnabled: boolean; revision: number };
 async function request<T>(url: string, body?: unknown, method = "POST"): Promise<T> {
   const response = await fetch(url, { method: body === undefined ? "GET" : method, headers: body === undefined ? undefined : withCsrfHeaders({ "Content-Type": "application/json" }), body: body === undefined ? undefined : JSON.stringify(body), cache: "no-store" });
@@ -23,6 +24,7 @@ export function useAltazorCompanionState() {
   const [linkedDocumentId, setLinkedDocumentId] = useState("");
   const [clarification, setClarification] = useState("");
   const routeCausaId = useRef("");
+  const locationVersion = useRef(0);
   const [libraryNotice,setLibraryNotice]=useState<{id:string;title:string}|null>(null);
   const [initialFailed, setInitialFailed] = useState(false);
   const [pane, setPane] = useState<Pane>("chat"), [visited, setVisited] = useState<Pane[]>(["chat"]), [conversations, setConversations] = useState<Conversation[]>([]), [activeId, setActiveId] = useState(""), [data, setData] = useState<ConversationData | null>(null), [destination, setDestination] = useState<AltazorDestination | null>(null), [causas, setCausas] = useState<{ id: string; titulo: string; rit: string | null }[]>([]), [scope, setScope] = useState(""), [text, setText] = useState(""), [attachmentIds, setAttachmentIds] = useState<string[]>([]), [busy, setBusy] = useState(false), [uploading, setUploading] = useState(false), [error, setError] = useState(""), [loading, setLoading] = useState(true);
@@ -93,11 +95,19 @@ export function useAltazorCompanionState() {
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
     window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn);
   }, [text]);
-  function choosePane(next: Pane) { setPane(next); setVisited(previous => previous.includes(next) ? previous : [...previous, next]); }
+  function choosePane(next: Pane, synchronize = true) {
+    if (synchronize) {
+      // A response from an older URL must not undo the user's deliberate close.
+      locationVersion.current++;
+      const href = locationForAltazorPane(location.href, next);
+      if (href && href !== location.pathname + location.search + location.hash) history.replaceState(null, "", href);
+    }
+    setPane(next); setVisited(previous => previous.includes(next) ? previous : [...previous, next]);
+  }
   function chooseConversation(id: string, remember = true) {
     if (remember) void savePreference({ activeConversationId: id || null });
     setLinkedDocumentId(""); setClarification(""); setScope(""); drafts.current.set(activeId || "new", text); liveId.current = id; setActiveId(id); setData(null); setText(drafts.current.get(id || "new") || ""); setAttachmentIds([]); setError(""); turnRequest.current = createSubmissionKeys();
-    if(!id)conversationRequest.current=createSubmissionKeys();reflectConversationLocation(id);choosePane("chat");
+    if(!id)conversationRequest.current=createSubmissionKeys();reflectConversationLocation(id);choosePane("chat", false);
   }
   function leaveCaseContext() {
     if (busy || uploading || attachmentIds.length) return;
@@ -179,22 +189,24 @@ export function useAltazorCompanionState() {
     const match = pathname.match(/^\/(?:causas|pjud)\/([^/]+)(?:\/|$)/);
     routeCausaId.current = match && !["nueva", "monitoreo", "mis-causas"].includes(match[1]) ? match[1] : "";
     if (loading||pathname!=="/inicio") return;
+    const version = ++locationVersion.current;
     const params = new URLSearchParams(search), intent = params.get("intencion"), requestedCase = params.get("causaId"), requestedConversation = params.get("conversacion"), selectedPane = params.get("altazor");
     if (!intent && !requestedConversation && !selectedPane&&!requestedCase) { if(liveId.current)reflectConversationLocation(liveId.current);return; }
     const controller=new AbortController();
     const read=async<T,>(url:string):Promise<T>=>{const response=await fetch(url,{signal:controller.signal,cache:"no-store"}),value=await response.json();if(!response.ok)throw Error(value.error||"La selección no está disponible");return value;};
     // Both the linked cause and any explicit conversation are checked before replacing a draft.
     void Promise.all([read<{causas:{id:string;titulo:string;rit:string|null}[]}>(`/api/altazor/resources${requestedCase?`?causaId=${encodeURIComponent(requestedCase)}`:""}`),requestedConversation?read<ConversationData>(`/api/altazor/conversations/${encodeURIComponent(requestedConversation)}`):Promise.resolve(null)]).then(([resources,selected])=>{
+      if(controller.signal.aborted || version !== locationVersion.current)return;
       if(selected&&requestedCase&&selected.conversation.causaId!==requestedCase)throw Error("La conversación no pertenece a la causa solicitada. Tu borrador se conserva.");
       if(controller.signal.aborted)return;setCausas(resources.causas || []);
       if(selected&&requestedConversation!==liveId.current)chooseConversation(selected.conversation.id, selected.conversation.status === "active");
       if(!selected&&(intent||requestedCase&&(liveId.current||scope!==requestedCase))){chooseConversation("");setScope(requestedCase||"");setText("");}
       if (intent) {
-        setLinkedDocumentId(params.get("documentoId") || ""); setText(intent.slice(0,8000)); choosePane("chat");
+        setLinkedDocumentId(params.get("documentoId") || ""); setText(intent.slice(0,8000)); choosePane("chat", false);
         const url = new URL(location.href); url.searchParams.delete("intencion"); url.searchParams.delete("run"); history.replaceState(null, "", url.pathname + url.search);
       }
-      if (selectedPane && ["chat", "memory", "connectors", "computer"].includes(selectedPane)) choosePane(selectedPane as Pane);
-    }).catch(reason=>{if(!controller.signal.aborted)setError(reason.message);});
+      if (selectedPane && ["chat", "memory", "connectors", "computer"].includes(selectedPane)) choosePane(selectedPane as Pane, false);
+    }).catch(reason=>{if(!controller.signal.aborted && version === locationVersion.current)setError(reason.message);});
     return()=>controller.abort();
   }
   return { linkedDocumentId, libraryNotice, setLibraryNotice, initialFailed, pane, visited, conversations, activeId, data, setData, destination, causas, scope, text, setText, attachmentIds, setAttachmentIds, clarification, busy, setBusy, uploading, error, setError, loading, input, textarea, liveId, reload, choosePane, leaveCaseContext, send, upload, turnAction, running, preference, preferenceSaving, preferenceError, savePreference,synchronizeLocation };
