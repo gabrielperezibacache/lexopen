@@ -140,6 +140,13 @@ export function computerFileReadPresentation(turn: Pick<ComputerTurn, "from" | "
   const header = fileReadHeader.exec(turn.text);
   if (!header) return null;
   const [, service, action] = header;
+  const allowedActions: Record<string, readonly string[]> = {
+    github: ["request", "download_file", "get_file", "list_issues", "get_issue"],
+    "google-drive": ["request", "download_file"],
+    dropbox: ["list", "search", "read", "download_file"],
+    "microsoft-365": ["list", "search", "request", "download_file"],
+  };
+  if (!allowedActions[service]?.includes(action)) return null;
   const opening = new RegExp(`^<lexopen_file_read service="${service}" action="${action}" truncated="(true|false)"><!\\[CDATA\\[\\n`);
   const rest = turn.text.slice(header[0].length), block = opening.exec(rest);
   if (!block) return null;

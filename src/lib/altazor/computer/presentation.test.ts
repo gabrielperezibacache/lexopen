@@ -75,6 +75,9 @@ test("Dropbox and OneDrive receipts fold without asserting an unverified downloa
     assert.equal(computerFileReadPresentation({ from: "assistant", text: download })?.summary, "Respuesta de la consulta disponible para revisión.");
     assert.equal(computerFileReadPresentation({ from: "assistant", text: source.replace(`service="${service}"`, 'service="github"') }), null);
   }
+  for (const [service, action] of [["dropbox", "get_issue"], ["dropbox", "request"], ["microsoft-365", "get_file"], ["google-drive", "list_issues"]] as const) {
+    assert.equal(computerFileReadPresentation({ from: "assistant", text: fileReceipt(service, "Source data", false, action) }), null, "an impossible service/action pair keeps the original visible text");
+  }
 });
 
 test("partial, malformed and user-authored data never become full or trusted results", () => {
